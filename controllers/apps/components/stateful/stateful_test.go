@@ -74,9 +74,9 @@ var _ = Describe("Stateful Component", func() {
 	Context("Stateful Component test", func() {
 		It("Stateful Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			clusterDef, _, cluster := testapps.InitConsensusMysql(testCtx, clusterDefName,
+			clusterDef, _, cluster := testapps.InitConsensusMysql(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, statefulCompDefRef, statefulCompName)
-			_ = testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, statefulCompName)
+			_ = testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, statefulCompName)
 			stsList := &appsv1.StatefulSetList{}
 			Eventually(func() bool {
 				_ = k8sClient.List(ctx, stsList, client.InNamespace(testCtx.DefaultNamespace), client.MatchingLabels{
@@ -108,7 +108,7 @@ var _ = Describe("Stateful Component", func() {
 			Expect(podsReady == false).Should(BeTrue())
 
 			By("create pods of sts")
-			podList := testapps.MockConsensusComponentPods(testCtx, sts, clusterName, statefulCompName)
+			podList := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, statefulCompName)
 
 			By("test stateful component is abnormal")
 			// mock pod is not ready

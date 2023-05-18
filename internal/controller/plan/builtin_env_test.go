@@ -197,6 +197,7 @@ bootstrap:
 		cluster = &appsv1alpha1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "my",
+				UID:  "b006a20c-fb03-441c-bffa-2605cad7e297",
 			},
 		}
 		component = &ctrlcomp.SynthesizedComponent{

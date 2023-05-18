@@ -44,12 +44,16 @@ var _ = Describe("Cluster", func() {
 		testComponentWithInvalidResourcePath = "../../testing/testdata/component_with_invalid_resource.yaml"
 	)
 
+	const (
+		clusterName = "test"
+		namespace   = "default"
+	)
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
-		tf = cmdtesting.NewTestFactory().WithNamespace("default")
+		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		cd := testing.FakeClusterDef()
 		fakeDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName, testing.IsDefautl)
 		tf.FakeDynamicClient = testing.FakeDynamicClient(cd, fakeDefaultStorageClass, testing.FakeClusterVersion())
@@ -69,27 +73,17 @@ var _ = Describe("Cluster", func() {
 				UpdatableFlags: UpdatableFlags{
 					TerminationPolicy: "Delete",
 				},
-				BaseOptions: create.BaseOptions{
-					Dynamic: tf.FakeDynamicClient,
+				CreateOptions: create.CreateOptions{
+					Factory:   tf,
+					Dynamic:   tf.FakeDynamicClient,
+					IOStreams: streams,
 				},
 			}
-			o.IOStreams = streams
-			Expect(o.Validate()).To(Succeed())
+			o.Options = o
+			Expect(o.Complete()).To(Succeed())
 			Expect(o.Name).ShouldNot(BeEmpty())
+			Expect(o.Run()).Should(HaveOccurred())
 		})
-
-		It("new command", func() {
-			cmd := NewCreateCmd(tf, streams)
-			Expect(cmd).ShouldNot(BeNil())
-			Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
-			Expect(cmd.Flags().Set("cluster-version", testing.ClusterVersionName)).Should(Succeed())
-			Expect(cmd.Flags().Set("set-file", testComponentPath)).Should(Succeed())
-			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
-
-			// must succeed otherwise exit 1 and make test fails
-			cmd.Run(nil, []string{"test1"})
-		})
-
 	})
 
 	Context("run", func() {
@@ -100,14 +94,22 @@ var _ = Describe("Cluster", func() {
 			tf.FakeDynamicClient = testing.FakeDynamicClient(
 				clusterDef,
 				testing.FakeStorageClass(testing.StorageClassName, testing.IsDefautl),
+				testing.FakeClusterVersion(),
 				testing.FakeComponentClassDef(fmt.Sprintf("custom-%s", testing.ComponentDefName), clusterDef.Name, testing.ComponentDefName),
 				testing.FakeComponentClassDef("custom-mysql", clusterDef.Name, "mysql"),
 			)
 			o = &CreateOptions{
-				BaseOptions:       create.BaseOptions{IOStreams: streams, Name: "test", Dynamic: tf.FakeDynamicClient},
+				CreateOptions: create.CreateOptions{
+					IOStreams:       streams,
+					Name:            clusterName,
+					Dynamic:         tf.FakeDynamicClient,
+					CueTemplateName: CueTemplateName,
+					Factory:         tf,
+					GVR:             types.ClusterGVR(),
+				},
 				SetFile:           "",
 				ClusterDefRef:     testing.ClusterDefName,
-				ClusterVersionRef: "cluster-version",
+				ClusterVersionRef: testing.ClusterVersionName,
 				UpdatableFlags: UpdatableFlags{
 					PodAntiAffinity: "Preferred",
 					TopologyKeys:    []string{"kubernetes.io/hostname"},
@@ -120,18 +122,12 @@ var _ = Describe("Cluster", func() {
 		})
 
 		Run := func() {
-			inputs := create.Inputs{
-				ResourceName:    types.ResourceClusters,
-				CueTemplateName: CueTemplateName,
-				Options:         o,
-				Factory:         tf,
-			}
-
-			Expect(o.BaseOptions.Complete(inputs, []string{"test"})).Should(Succeed())
-			Expect(o.Namespace).To(Equal("default"))
-			Expect(o.Name).To(Equal("test"))
-
-			Expect(o.Run(inputs)).Should(Succeed())
+			o.CreateOptions.Options = o
+			o.Args = []string{clusterName}
+			Expect(o.CreateOptions.Complete()).Should(Succeed())
+			Expect(o.Namespace).To(Equal(namespace))
+			Expect(o.Name).To(Equal(clusterName))
+			Expect(o.Run()).Should(Succeed())
 		}
 
 		It("validate tolerations", func() {
@@ -261,7 +257,8 @@ var _ = Describe("Cluster", func() {
 				UpdatableFlags: UpdatableFlags{
 					TerminationPolicy: "Delete",
 				},
-				BaseOptions: create.BaseOptions{
+				CreateOptions: create.CreateOptions{
+					Factory:   tf,
 					Namespace: "default",
 					Name:      "mycluster",
 					Dynamic:   tf.FakeDynamicClient,

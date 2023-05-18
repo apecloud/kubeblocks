@@ -21,6 +21,7 @@ package apps
 
 import (
 	"context"
+	"strconv"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
@@ -91,9 +92,13 @@ func (r *componentWorkloadReconciler[T, PT, S, PS]) Reconcile(ctx context.Contex
 
 	handler := func(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec,
 		compDef *appsv1alpha1.ClusterComponentDefinition) (ctrl.Result, error) {
+		// update component info to pods' annotations
+		if err := updateComponentInfoToPods(reqCtx.Ctx, r.Client, cluster, compSpec); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
 		// patch the current componentSpec workload's custom labels
 		if err := patchWorkloadCustomLabel(reqCtx.Ctx, r.Client, cluster, compSpec); err != nil {
-			reqCtx.Recorder.Event(cluster, corev1.EventTypeWarning, "Component Workload Controller PatchWorkloadCustomLabelFailed", err.Error())
+			reqCtx.Event(cluster, corev1.EventTypeWarning, "Component Workload Controller PatchWorkloadCustomLabelFailed", err.Error())
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
 
@@ -145,6 +150,40 @@ func workloadCompClusterReconcile(reqCtx intctrlutil.RequestCtx,
 	componentDef := clusterDef.GetComponentDefByName(componentSpec.ComponentDefRef)
 
 	return processor(cluster, componentSpec, componentDef)
+}
+
+func updateComponentInfoToPods(
+	ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	componentSpec *appsv1alpha1.ClusterComponentSpec) error {
+	if cluster == nil || componentSpec == nil {
+		return nil
+	}
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey:    cluster.GetName(),
+		constant.KBAppComponentLabelKey: componentSpec.Name,
+	}
+	podList := corev1.PodList{}
+	if err := cli.List(ctx, &podList, ml); err != nil {
+		return err
+	}
+	replicasStr := strconv.Itoa(int(componentSpec.Replicas))
+	for _, pod := range podList.Items {
+		if pod.Annotations != nil &&
+			pod.Annotations[constant.ComponentReplicasAnnotationKey] == replicasStr {
+			continue
+		}
+		patch := client.MergeFrom(pod.DeepCopy())
+		if pod.Annotations == nil {
+			pod.Annotations = make(map[string]string)
+		}
+		pod.Annotations[constant.ComponentReplicasAnnotationKey] = replicasStr
+		if err := cli.Patch(ctx, &pod, patch); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // patchWorkloadCustomLabel patches workload custom labels.

@@ -20,9 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package replication
 
 import (
-	"fmt"
-
-	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
@@ -37,23 +34,7 @@ type replicationComponentWorkloadBuilder struct {
 var _ internal.ComponentWorkloadBuilder = &replicationComponentWorkloadBuilder{}
 
 func (b *replicationComponentWorkloadBuilder) BuildWorkload() internal.ComponentWorkloadBuilder {
-	buildfn := func() ([]client.Object, error) {
-		if b.EnvConfig == nil {
-			return nil, fmt.Errorf("build replication workload but env config is nil, cluster: %s, component: %s",
-				b.Comp.GetClusterName(), b.Comp.GetName())
-		}
-
-		sts, err := builder.BuildStsLow(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), b.EnvConfig.Name)
-		if err != nil {
-			return nil, err
-		}
-		sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
-
-		b.Workload = sts
-
-		return nil, nil // don't return sts here
-	}
-	return b.BuildWrapper(buildfn)
+	return b.BuildWorkload4StatefulSet("replication")
 }
 
 func (b *replicationComponentWorkloadBuilder) BuildService() internal.ComponentWorkloadBuilder {

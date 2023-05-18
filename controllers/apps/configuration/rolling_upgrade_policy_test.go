@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/golang/mock/gomock"
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	metautil "k8s.io/apimachinery/pkg/util/intstr"
@@ -175,7 +175,13 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			var pods []corev1.Pod
 			{
 				mockParam.Component.WorkloadType = appsv1alpha1.Stateful
-				mockParam.Component.MaxUnavailable = func() *metautil.IntOrString { v := metautil.FromString("100%"); return &v }()
+				mockParam.Component.StatefulSpec = &appsv1alpha1.StatefulSetSpec{
+					LLUpdateStrategy: &apps.StatefulSetUpdateStrategy{
+						RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
+							MaxUnavailable: func() *metautil.IntOrString { v := metautil.FromString("100%"); return &v }(),
+						},
+					},
+				}
 				pods = newMockPodsWithStatefulSet(&mockParam.ComponentUnits[0], defaultReplica)
 			}
 

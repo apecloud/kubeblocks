@@ -110,7 +110,9 @@ func (o *UninstallOptions) PreCheck() error {
 	// check if there is any resource should be removed first, if so, return error
 	// and ask user to remove them manually
 	if err := checkResources(o.Dynamic); err != nil {
-		return err
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
 	}
 
 	// verify where kubeblocks is installed
@@ -121,15 +123,15 @@ func (o *UninstallOptions) PreCheck() error {
 			fmt.Fprintf(o.Out, "to find out the namespace where KubeBlocks is installed, please use:\n\t'kbcli kubeblocks status'\n")
 			fmt.Fprintf(o.Out, "to uninstall KubeBlocks completely, please use:\n\t`kbcli kubeblocks uninstall -n <namespace>`\n")
 		}
-	} else if o.Namespace != kbNamespace {
-		o.Namespace = kbNamespace
-		fmt.Fprintf(o.Out, "Uninstall KubeBlocks in namespace \"%s\"\n", kbNamespace)
 	}
+	o.Namespace = kbNamespace
+	fmt.Fprintf(o.Out, "Uninstall KubeBlocks in namespace \"%s\"\n", kbNamespace)
+
 	return nil
 }
 
 func (o *UninstallOptions) Uninstall() error {
-	printSpinner := func(s *spinner.Spinner, err error) {
+	printSpinner := func(s spinner.Interface, err error) {
 		if err == nil || apierrors.IsNotFound(err) ||
 			strings.Contains(err.Error(), "release: not found") {
 			s.Success()
@@ -138,7 +140,7 @@ func (o *UninstallOptions) Uninstall() error {
 		s.Fail()
 		fmt.Fprintf(o.Out, "  %s\n", err.Error())
 	}
-	newSpinner := func(msg string) *spinner.Spinner {
+	newSpinner := func(msg string) spinner.Interface {
 		return spinner.New(o.Out, spinner.WithMessage(fmt.Sprintf("%-50s", msg)))
 	}
 
@@ -206,7 +208,7 @@ func (o *UninstallOptions) Uninstall() error {
 	if o.Wait {
 		fmt.Fprintln(o.Out, "Uninstall KubeBlocks done.")
 	} else {
-		fmt.Fprintf(o.Out, "KubeBlocks is uninstalling, run \"kbcli kubeblocks status\" to check status.\n")
+		fmt.Fprintf(o.Out, "KubeBlocks is uninstalling, run \"kbcli kubeblocks status -A\" to check kubeblocks resources.\n")
 	}
 	return nil
 }
@@ -280,7 +282,7 @@ func (o *UninstallOptions) uninstallAddons() error {
 		}
 	)
 
-	var s *spinner.Spinner
+	var s spinner.Interface
 	if !o.Wait {
 		s = spinner.New(o.Out, spinner.WithMessage(fmt.Sprintf("%-50s", "Uninstall KubeBlocks addons")))
 	} else {
@@ -298,7 +300,7 @@ func (o *UninstallOptions) uninstallAddons() error {
 		return nil
 	}
 
-	spinnerDone := func(s *spinner.Spinner, msg string) {
+	spinnerDone := func(s spinner.Interface, msg string) {
 		s.SetFinalMsg(msg)
 		s.Done("")
 		fmt.Fprintln(o.Out)

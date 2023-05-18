@@ -42,6 +42,7 @@ type ComponentWorkloadBuilder interface {
 	BuildEnv() ComponentWorkloadBuilder
 	BuildConfig() ComponentWorkloadBuilder
 	BuildWorkload() ComponentWorkloadBuilder
+	BuildPDB() ComponentWorkloadBuilder
 	BuildVolumeMount() ComponentWorkloadBuilder
 	BuildService() ComponentWorkloadBuilder
 	BuildHeadlessService() ComponentWorkloadBuilder
@@ -80,7 +81,7 @@ func (b *ComponentWorkloadBuilderBase) BuildConfig() ComponentWorkloadBuilder {
 				b.Comp.GetClusterName(), b.Comp.GetName())
 		}
 
-		objs, err := plan.BuildCfgLow(b.Comp.GetClusterVersion(), b.Comp.GetCluster(),
+		objs, err := plan.RenderConfigNScriptFiles(b.Comp.GetClusterVersion(), b.Comp.GetCluster(),
 			b.Comp.GetSynthesizedComponent(), b.Workload, b.getRuntime(), b.LocalObjs, b.ReqCtx.Ctx, b.Client)
 		if err != nil {
 			return nil, err
@@ -91,6 +92,44 @@ func (b *ComponentWorkloadBuilderBase) BuildConfig() ComponentWorkloadBuilder {
 			}
 		}
 		return objs, nil
+	}
+	return b.BuildWrapper(buildfn)
+}
+
+func (b *ComponentWorkloadBuilderBase) BuildWorkload4StatefulSet(workloadType string) ComponentWorkloadBuilder {
+	buildfn := func() ([]client.Object, error) {
+		if b.EnvConfig == nil {
+			return nil, fmt.Errorf("build %s workload but env config is nil, cluster: %s, component: %s",
+				workloadType, b.Comp.GetClusterName(), b.Comp.GetName())
+		}
+
+		component := b.Comp.GetSynthesizedComponent()
+		sts, err := builder.BuildStsLow(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		b.Workload = sts
+
+		return nil, nil // don't return sts here
+	}
+	return b.BuildWrapper(buildfn)
+}
+
+func (b *ComponentWorkloadBuilderBase) BuildPDB() ComponentWorkloadBuilder {
+	buildfn := func() ([]client.Object, error) {
+		// if no these handle, the cluster controller will occur an error during reconciling.
+		// conditional build PodDisruptionBudget
+		synthesizedComponent := b.Comp.GetSynthesizedComponent()
+		if synthesizedComponent.MinAvailable != nil {
+			pdb, err := builder.BuildPDBLow(b.Comp.GetCluster(), synthesizedComponent)
+			if err != nil {
+				return nil, err
+			}
+			return []client.Object{pdb}, nil
+		} else {
+			panic("this shouldn't happen")
+		}
 	}
 	return b.BuildWrapper(buildfn)
 }

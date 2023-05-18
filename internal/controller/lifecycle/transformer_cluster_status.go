@@ -298,7 +298,7 @@ func getClusterAvailabilityEffect(componentDef *appsv1alpha1.ClusterComponentDef
 	case appsv1alpha1.Consensus, appsv1alpha1.Replication:
 		return true
 	default:
-		return componentDef.MaxUnavailable != nil
+		return componentDef.GetMaxUnavailable() != nil
 	}
 }
 

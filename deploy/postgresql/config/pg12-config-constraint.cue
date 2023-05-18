@@ -580,7 +580,7 @@
 	max_wal_senders: int & >=5 & <=8388607 | *20
 
 	// (MB) Sets the WAL size that triggers a checkpoint.
-	max_wal_size: int & >=128 & <=201326592 | *2048 @storeResource(1MB)
+	max_wal_size: int & >=2 & <=2147483647 | *2048 @storeResource(1MB)
 
 	// Sets the maximum number of concurrent worker processes.
 	max_worker_processes?: int & >=0 & <=262143
@@ -598,7 +598,7 @@
 	min_parallel_table_scan_size?: int & >=0 & <=715827882 @storeResource(8KB)
 
 	// (MB) Sets the minimum size to shrink the WAL to.
-	min_wal_size: int & >=128 & <=201326592 | *192 @storeResource(1MB)
+	min_wal_size: int & >=2 & <=2147483647 | *192 @storeResource(1MB)
 
 	// (min) Time before a snapshot is too old to read pages changed after the snapshot was taken.
 	old_snapshot_threshold?: int & >=-1 & <=86400 @timeDurationResource(1min)
@@ -910,7 +910,7 @@
 	shared_buffers?: int & >=16 & <=1073741823 @storeResource(8KB)
 
 	// Lists shared libraries to preload into server.
-	// TODO support enum list, e.g. shared_preload_libraries = 'pg_stat_statements, auto_explain'
+	// TODO: support enum list, e.g. shared_preload_libraries = 'pg_stat_statements, auto_explain'
 	// shared_preload_libraries?: string & "auto_explain" | "orafce" | "pgaudit" | "pglogical" | "pg_bigm" | "pg_cron" | "pg_hint_plan" | "pg_prewarm" | "pg_similarity" | "pg_stat_statements" | "pg_tle" | "pg_transport" | "plprofiler"
 
 	// Enables SSL connections.

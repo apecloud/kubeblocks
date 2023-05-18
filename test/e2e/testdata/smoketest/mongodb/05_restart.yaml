@@ -7,4 +7,4 @@ spec:
   ttlSecondsAfterSucceed: 27017
   type: Restart
   restart:
-    - componentName: replicaset
+    - componentName: mongodb

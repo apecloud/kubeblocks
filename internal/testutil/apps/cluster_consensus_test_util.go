@@ -42,7 +42,7 @@ const (
 
 // InitConsensusMysql initializes a cluster environment which only contains a component of ConsensusSet type for testing,
 // includes ClusterDefinition/ClusterVersion/Cluster resources.
-func InitConsensusMysql(testCtx testutil.TestContext,
+func InitConsensusMysql(testCtx *testutil.TestContext,
 	clusterDefName,
 	clusterVersionName,
 	clusterName,
@@ -56,7 +56,7 @@ func InitConsensusMysql(testCtx testutil.TestContext,
 
 // CreateConsensusMysqlCluster creates a mysql cluster with a component of ConsensusSet type.
 func CreateConsensusMysqlCluster(
-	testCtx testutil.TestContext,
+	testCtx *testutil.TestContext,
 	clusterDefName,
 	clusterVersionName,
 	clusterName,
@@ -65,35 +65,35 @@ func CreateConsensusMysqlCluster(
 	pvcSpec := NewPVCSpec("2Gi")
 	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 		AddComponent(consensusCompName, workloadType).SetReplicas(3).SetEnabledLogs(errorLogName).
-		AddVolumeClaimTemplate("data", pvcSpec).Create(&testCtx).GetObject()
+		AddVolumeClaimTemplate("data", pvcSpec).Create(testCtx).GetObject()
 }
 
 // CreateConsensusMysqlClusterDef creates a mysql clusterDefinition with a component of ConsensusSet type.
-func CreateConsensusMysqlClusterDef(testCtx testutil.TestContext, clusterDefName, componentDefName string) *appsv1alpha1.ClusterDefinition {
+func CreateConsensusMysqlClusterDef(testCtx *testutil.TestContext, clusterDefName, componentDefName string) *appsv1alpha1.ClusterDefinition {
 	filePathPattern := "/data/mysql/log/mysqld.err"
 	return NewClusterDefFactory(clusterDefName).AddComponentDef(ConsensusMySQLComponent, componentDefName).
-		AddLogConfig(errorLogName, filePathPattern).Create(&testCtx).GetObject()
+		AddLogConfig(errorLogName, filePathPattern).Create(testCtx).GetObject()
 }
 
 // CreateConsensusMysqlClusterVersion creates a mysql clusterVersion with a component of ConsensusSet type.
-func CreateConsensusMysqlClusterVersion(testCtx testutil.TestContext, clusterDefName, clusterVersionName, workloadType string) *appsv1alpha1.ClusterVersion {
+func CreateConsensusMysqlClusterVersion(testCtx *testutil.TestContext, clusterDefName, clusterVersionName, workloadType string) *appsv1alpha1.ClusterVersion {
 	return NewClusterVersionFactory(clusterVersionName, clusterDefName).AddComponentVersion(workloadType).AddContainerShort("mysql", ApeCloudMySQLImage).
-		Create(&testCtx).GetObject()
+		Create(testCtx).GetObject()
 }
 
 // MockConsensusComponentStatefulSet mocks the component statefulSet, just using in envTest
 func MockConsensusComponentStatefulSet(
-	testCtx testutil.TestContext,
+	testCtx *testutil.TestContext,
 	clusterName,
 	consensusCompName string) *appsv1.StatefulSet {
 	stsName := clusterName + "-" + consensusCompName
 	return NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, consensusCompName).SetReplicas(int32(3)).
-		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(&testCtx).GetObject()
+		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(testCtx).GetObject()
 }
 
 // MockConsensusComponentStsPod mocks to create the pod of the consensus StatefulSet, just using in envTest
 func MockConsensusComponentStsPod(
-	testCtx testutil.TestContext,
+	testCtx *testutil.TestContext,
 	sts *appsv1.StatefulSet,
 	clusterName,
 	consensusCompName,
@@ -112,7 +112,7 @@ func MockConsensusComponentStsPod(
 		AddConsensusSetAccessModeLabel(accessMode).
 		AddControllerRevisionHashLabel(stsUpdateRevision).
 		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).
-		CheckedCreate(&testCtx).GetObject()
+		CheckedCreate(testCtx).GetObject()
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Status.Conditions = []corev1.PodCondition{
 		{
@@ -126,7 +126,7 @@ func MockConsensusComponentStsPod(
 
 // MockConsensusComponentPods mocks the component pods, just using in envTest
 func MockConsensusComponentPods(
-	testCtx testutil.TestContext,
+	testCtx *testutil.TestContext,
 	sts *appsv1.StatefulSet,
 	clusterName,
 	consensusCompName string) []*corev1.Pod {

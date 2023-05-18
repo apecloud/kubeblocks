@@ -198,6 +198,7 @@ var _ = Describe("Deployment Controller", func() {
 
 			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 				AddComponent(statelessCompName, statelessCompType).SetReplicas(2).Create(&testCtx).GetObject()
+			clusterKey := client.ObjectKeyFromObject(cluster)
 
 			By("patch cluster to Running")
 			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
@@ -205,18 +206,18 @@ var _ = Describe("Deployment Controller", func() {
 			}))
 
 			By("create the deployment of the stateless component")
-			deploy := testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
+			deploy := testapps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessCompName)
 			newDeploymentKey := client.ObjectKey{Name: deploy.Name, Namespace: namespace}
 			Eventually(testapps.CheckObj(&testCtx, newDeploymentKey, func(g Gomega, deploy *appsv1.Deployment) {
 				g.Expect(deploy.Generation == 1).Should(BeTrue())
 			})).Should(Succeed())
 
 			By("check stateless component phase is Creating")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, statelessCompName)).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
 
 			By("mock error message and PodCondition about some pod's failure")
 			podName := fmt.Sprintf("%s-%s-%s", clusterName, statelessCompName, testCtx.GetRandomStr())
-			pod := testapps.MockStatelessPod(testCtx, deploy, clusterName, statelessCompName, podName)
+			pod := testapps.MockStatelessPod(&testCtx, deploy, clusterName, statelessCompName, podName)
 			// mock pod container is failed
 			errMessage := "Back-off pulling image nginx:latest"
 			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
@@ -249,7 +250,7 @@ var _ = Describe("Deployment Controller", func() {
 			})).Should(Succeed())
 
 			By("check stateless component phase is Failed")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, statelessCompName)).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 
 			By("check component.Status.Message contains pod error message")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
@@ -263,7 +264,7 @@ var _ = Describe("Deployment Controller", func() {
 			})).Should(Succeed())
 
 			By("waiting for the component to be running")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, statelessCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		})
 	})
 })
@@ -331,7 +332,7 @@ var _ = Describe("StatefulSet Controller", func() {
 		})).Should(Succeed())
 
 		By("create pods of statefulset")
-		pods := testapps.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
+		pods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
 
 		By("Mock a pod without role label and it will wait for HandleProbeTimeoutWhenPodsReady")
 		leaderPod := pods[0]
@@ -374,7 +375,7 @@ var _ = Describe("StatefulSet Controller", func() {
 		})).Should(Succeed())
 
 		By("check the component phase becomes Running")
-		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, consensusCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
 		return pods
 	}
@@ -382,8 +383,9 @@ var _ = Describe("StatefulSet Controller", func() {
 	Context("test controller", func() {
 		It("test statefulSet controller", func() {
 			By("mock cluster object")
-			_, _, cluster := testapps.InitConsensusMysql(testCtx, clusterDefName,
+			_, _, cluster := testapps.InitConsensusMysql(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, consensusCompType, consensusCompName)
+			clusterKey := client.ObjectKeyFromObject(cluster)
 
 			// REVIEW/TODO: "Rebooting" got refactored
 			By("mock cluster phase is 'Rebooting' and restart operation is running on cluster")
@@ -396,7 +398,7 @@ var _ = Describe("StatefulSet Controller", func() {
 					},
 				}
 			})).Should(Succeed())
-			_ = testapps.CreateRestartOpsRequest(testCtx, clusterName, opsRequestName, []string{consensusCompName})
+			_ = testapps.CreateRestartOpsRequest(&testCtx, clusterName, opsRequestName, []string{consensusCompName})
 			Expect(testapps.ChangeObj(&testCtx, cluster, func(lcluster *appsv1alpha1.Cluster) {
 				lcluster.Annotations = map[string]string{
 					constant.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"}]`, opsRequestName),
@@ -404,7 +406,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			})).Should(Succeed())
 
 			// trigger statefulset controller Reconcile
-			sts := testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusCompName)
+			sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
 
 			By("mock the StatefulSet and pods are ready")
 			// mock statefulSet available and consensusSet component is running
@@ -435,7 +437,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			}
 
 			By("check the component phase becomes Stopped")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, consensusCompName)).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
 
 			By("test updateStrategy with Serial")
 			testUpdateStrategy(appsv1alpha1.SerialStrategy, consensusCompName, 1)

@@ -274,10 +274,10 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 	Context("Test VolumeExpansion", func() {
 		It("VolumeExpansion should work", func() {
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
-			_, _, clusterObject := testapps.InitConsensusMysql(testCtx, clusterDefinitionName,
+			_, _, clusterObject := testapps.InitConsensusMysql(&testCtx, clusterDefinitionName,
 				clusterVersionName, clusterName, "consensus", consensusCompName)
 			// init storageClass
-			sc := testapps.CreateStorageClass(testCtx, storageClassName, true)
+			sc := testapps.CreateStorageClass(&testCtx, storageClassName, true)
 			Expect(testapps.ChangeObj(&testCtx, sc, func(lsc *storagev1.StorageClass) {
 				lsc.Annotations = map[string]string{storage.IsDefaultStorageClassAnnotation: "true"}
 			})).ShouldNot(HaveOccurred())

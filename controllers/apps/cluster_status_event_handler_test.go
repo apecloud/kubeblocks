@@ -76,19 +76,19 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 	AfterEach(cleanEnv)
 
 	const statefulMySQLCompType = "stateful"
-	const statefulMySQLCompName = "mysql1"
+	const statefulMySQLCompName = "stateful"
 
 	const consensusMySQLCompType = "consensus"
-	const consensusMySQLCompName = "mysql2"
+	const consensusMySQLCompName = "consensus"
 
-	const nginxCompType = "stateless"
-	const nginxCompName = "nginx"
+	const statelessCompType = "stateless"
+	const statelessCompName = "nginx"
 
 	createClusterDef := func() {
 		_ = testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatefulMySQLComponent, statefulMySQLCompType).
 			AddComponentDef(testapps.ConsensusMySQLComponent, consensusMySQLCompType).
-			AddComponentDef(testapps.StatelessNginxComponent, nginxCompType).
+			AddComponentDef(testapps.StatelessNginxComponent, statelessCompType).
 			Create(&testCtx)
 	}
 
@@ -96,7 +96,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		_ = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 			AddComponentVersion(statefulMySQLCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
 			AddComponentVersion(consensusMySQLCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
-			AddComponentVersion(nginxCompType).AddContainerShort(testapps.DefaultNginxContainerName, testapps.NginxImage).
+			AddComponentVersion(statelessCompType).AddContainerShort(testapps.DefaultNginxContainerName, testapps.NginxImage).
 			Create(&testCtx)
 	}
 
@@ -104,7 +104,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 		return testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 			AddComponent(statefulMySQLCompName, statefulMySQLCompType).SetReplicas(3).
 			AddComponent(consensusMySQLCompName, consensusMySQLCompType).SetReplicas(3).
-			AddComponent(nginxCompName, nginxCompType).SetReplicas(3).
+			AddComponent(statelessCompName, statelessCompType).SetReplicas(3).
 			Create(&testCtx).GetObject()
 	}
 
@@ -270,9 +270,9 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			//	false)
 
 			// By("watch warning event from Deployment and component workload type is Stateless")
-			// deploy := getDeployment(nginxCompName)
+			// deploy := getDeployment(statelessCompName)
 			// setInvolvedObject(event, constant.DeploymentKind, deploy.Name)
-			// handleAndCheckComponentStatus(nginxCompName, event,
+			// handleAndCheckComponentStatus(statelessCompName, event,
 			//	appsv1alpha1.FailedClusterPhase,
 			//	appsv1alpha1.FailedClusterCompPhase,
 			//	false)
@@ -288,9 +288,9 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			// By("test the cluster phase when stateless component is Failed and other components are Running")
 			//// set nginx component phase to Failed
 			// Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
-			//	compStatus := tmpCluster.Status.Components[nginxCompName]
+			//	compStatus := tmpCluster.Status.Components[statelessCompName]
 			//	compStatus.Phase = appsv1alpha1.FailedClusterCompPhase
-			//	tmpCluster.Status.SetComponentStatus(nginxCompName, compStatus)
+			//	tmpCluster.Status.SetComponentStatus(statelessCompName, compStatus)
 			// })()).ShouldNot(HaveOccurred())
 
 			// expect cluster phase is Abnormal by cluster controller.

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package plan
 
 // import (
+//	"fmt"
 //	"reflect"
 //
 //	. "github.com/onsi/ginkgo/v2"
@@ -104,22 +105,29 @@ package plan
 //				Ctx: ctx,
 //				Log: logger,
 //			}
-//			component := component.BuildComponent(
+//			component, err := component.BuildComponent(
 //				reqCtx,
 //				*cluster,
 //				*clusterDef,
 //				clusterDef.Spec.ComponentDefs[0],
 //				cluster.Spec.ComponentSpecs[0],
 //				&clusterVersion.Spec.ComponentVersions[0])
+//			Expect(err).Should(Succeed())
 //			task := types.InitReconcileTask(clusterDef, clusterVersion, cluster, component)
 //			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 //
 //			resources := *task.Resources
-//			Expect(len(resources)).Should(Equal(4))
-//			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
-//			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
-//			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("Deployment"))
-//			Expect(reflect.TypeOf(resources[3]).String()).Should(ContainSubstring("Service"))
+//			expects := []string{
+//				"PodDisruptionBudget",
+//				"Service",
+//				"ConfigMap",
+//				"Service",
+//				"Deployment",
+//			}
+//			Expect(resources).Should(HaveLen(len(expects)))
+//			for i, v := range expects {
+//				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
+//			}
 //		})
 //	})
 //
@@ -145,7 +153,7 @@ package plan
 //				Ctx: ctx,
 //				Log: logger,
 //			}
-//			component := component.BuildComponent(
+//			component, err := component.BuildComponent(
 //				reqCtx,
 //				*cluster,
 //				*clusterDef,
@@ -153,18 +161,27 @@ package plan
 //				cluster.Spec.ComponentSpecs[0],
 //				&clusterVersion.Spec.ComponentVersions[0],
 //			)
+//			Expect(err).Should(Succeed())
 //			task := types.InitReconcileTask(clusterDef, clusterVersion, cluster, component)
 //			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 //
 //			resources := *task.Resources
-//			Expect(len(resources)).Should(Equal(4))
-//			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
-//			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
-//			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("StatefulSet"))
-//
-//			container := clusterDef.Spec.ComponentDefs[0].PodSpec.Containers[0]
-//			sts := resources[2].(*appsv1.StatefulSet)
-//			Expect(len(sts.Spec.Template.Spec.Volumes)).Should(Equal(len(container.VolumeMounts)))
+//			expects := []string{
+//				"PodDisruptionBudget",
+//				"Service",
+//				"ConfigMap",
+//				"Service",
+//				"StatefulSet",
+//			}
+//			Expect(resources).Should(HaveLen(len(expects)))
+//			for i, v := range expects {
+//				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
+//				if v == "StatefulSet" {
+//					container := clusterDef.Spec.ComponentDefs[0].PodSpec.Containers[0]
+//					sts := resources[i].(*appsv1.StatefulSet)
+//					Expect(len(sts.Spec.Template.Spec.Volumes)).Should(Equal(len(container.VolumeMounts)))
+//				}
+//			}
 //		})
 //	})
 //
@@ -197,22 +214,30 @@ package plan
 //				Ctx: ctx,
 //				Log: logger,
 //			}
-//			component := component.BuildComponent(
+//			component, err := component.BuildComponent(
 //				reqCtx,
 //				*cluster,
 //				*clusterDef,
 //				clusterDef.Spec.ComponentDefs[0],
 //				cluster.Spec.ComponentSpecs[0],
 //				&clusterVersion.Spec.ComponentVersions[0])
+//			Expect(err).Should(Succeed())
 //			task := types.InitReconcileTask(clusterDef, clusterVersion, cluster, component)
 //			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 //
 //			resources := *task.Resources
-//			Expect(len(resources)).Should(Equal(5))
-//			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
-//			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
-//			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("ConfigMap"))
-//			Expect(reflect.TypeOf(resources[3]).String()).Should(ContainSubstring("StatefulSet"))
+//			expects := []string{
+//				"PodDisruptionBudget",
+//				"Service",
+//				"ConfigMap",
+//				"Service",
+//				"ConfigMap",
+//				"StatefulSet",
+//			}
+//			Expect(resources).Should(HaveLen(len(expects)))
+//			for i, v := range expects {
+//				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
+//			}
 //		})
 //	})
 //
@@ -246,29 +271,37 @@ package plan
 //				Ctx: ctx,
 //				Log: logger,
 //			}
-//			component := component.BuildComponent(
+//			component, err := component.BuildComponent(
 //				reqCtx,
 //				*cluster,
 //				*clusterDef,
 //				clusterDef.Spec.ComponentDefs[0],
 //				cluster.Spec.ComponentSpecs[0],
 //				&clusterVersion.Spec.ComponentVersions[0])
+//			Expect(err).Should(Succeed())
 //			task := types.InitReconcileTask(clusterDef, clusterVersion, cluster, component)
 //			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 //
 //			resources := *task.Resources
-//			Expect(len(resources)).Should(Equal(5))
-//			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
-//			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
-//			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("ConfigMap"))
-//			Expect(reflect.TypeOf(resources[3]).String()).Should(ContainSubstring("StatefulSet"))
-//
+//			expects := []string{
+//				"PodDisruptionBudget",
+//				"Service",
+//				"ConfigMap",
+//				"Service",
+//				"ConfigMap",
+//				"StatefulSet",
+//			}
+//			Expect(resources).Should(HaveLen(len(expects)))
+//			for i, v := range expects {
+//				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
+//				if v == "StatefulSet" {
+//					sts := resources[i].(*appsv1.StatefulSet)
+//					podSpec := sts.Spec.Template.Spec
+//					Expect(len(podSpec.Containers)).Should(Equal(2))
+//				}
+//			}
 //			originPodSpec := clusterDef.Spec.ComponentDefs[0].PodSpec
 //			Expect(len(originPodSpec.Containers)).Should(Equal(1))
-//
-//			sts := resources[3].(*appsv1.StatefulSet)
-//			podSpec := sts.Spec.Template.Spec
-//			Expect(len(podSpec.Containers)).Should(Equal(2))
 //		})
 //	})
 //
@@ -304,22 +337,28 @@ package plan
 //				Ctx: ctx,
 //				Log: logger,
 //			}
-//			component := component.BuildComponent(
+//			component, err := component.BuildComponent(
 //				reqCtx,
 //				*cluster,
 //				*clusterDef,
 //				clusterDef.Spec.ComponentDefs[0],
 //				cluster.Spec.ComponentSpecs[0],
 //				&clusterVersion.Spec.ComponentVersions[0])
+//			Expect(err).Should(Succeed())
 //			task := types.InitReconcileTask(clusterDef, clusterVersion, cluster, component)
 //			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
-//
 //			resources := *task.Resources
-//			Expect(len(resources)).Should(Equal(4))
-//			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
-//			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
-//			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("StatefulSet"))
-//			Expect(reflect.TypeOf(resources[3]).String()).Should(ContainSubstring("Service"))
+//			expects := []string{
+//				"PodDisruptionBudget",
+//				"Service",
+//				"ConfigMap",
+//				"Service",
+//				"StatefulSet",
+//			}
+//			Expect(resources).Should(HaveLen(len(expects)))
+//			for i, v := range expects {
+//				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
+//			}
 //		})
 //	})
 //
@@ -355,24 +394,26 @@ package plan
 //				Ctx: ctx,
 //				Log: logger,
 //			}
-//			component := component.BuildComponent(
+//			component, err := component.BuildComponent(
 //				reqCtx,
 //				*cluster,
 //				*clusterDef,
 //				clusterDef.Spec.ComponentDefs[0],
 //				cluster.Spec.ComponentSpecs[0],
 //				&clusterVersion.Spec.ComponentVersions[0])
+//			Expect(err).Should(Succeed())
 //			task := types.InitReconcileTask(clusterDef, clusterVersion, cluster, component)
 //			Expect(PrepareComponentResources(reqCtx, testCtx.Cli, task)).Should(Succeed())
 //
 //			resources := *task.Resources
 //			// REVIEW: (free6om)
 //			//  missing connection credential, TLS secret objs check?
-//			Expect(resources).Should(HaveLen(4))
-//			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("ConfigMap"))
+//			Expect(resources).Should(HaveLen(5))
+//			Expect(reflect.TypeOf(resources[0]).String()).Should(ContainSubstring("PodDisruptionBudget"))
 //			Expect(reflect.TypeOf(resources[1]).String()).Should(ContainSubstring("Service"))
-//			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("StatefulSet"))
+//			Expect(reflect.TypeOf(resources[2]).String()).Should(ContainSubstring("ConfigMap"))
 //			Expect(reflect.TypeOf(resources[3]).String()).Should(ContainSubstring("Service"))
+//			Expect(reflect.TypeOf(resources[4]).String()).Should(ContainSubstring("StatefulSet"))
 //		})
 //	})
 //

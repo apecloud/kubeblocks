@@ -21,10 +21,10 @@ package consensus
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"strings"
 
-	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -64,54 +64,6 @@ const (
 	// unknownPriority           = 0
 )
 
-// SortPods sorts pods by their role priority
-func SortPods(pods []corev1.Pod, rolePriorityMap map[string]int) {
-	// make a Serial pod list,
-	// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
-	sort.SliceStable(pods, func(i, j int) bool {
-		roleI := pods[i].Labels[constant.RoleLabelKey]
-		roleJ := pods[j].Labels[constant.RoleLabelKey]
-
-		if rolePriorityMap[roleI] == rolePriorityMap[roleJ] {
-			_, ordinal1 := intctrlutil.GetParentNameAndOrdinal(&pods[i])
-			_, ordinal2 := intctrlutil.GetParentNameAndOrdinal(&pods[j])
-			return ordinal1 < ordinal2
-		}
-
-		return rolePriorityMap[roleI] < rolePriorityMap[roleJ]
-	})
-}
-
-//// generateConsensusUpdatePlan generates Update plan based on UpdateStrategy
-// func generateConsensusUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
-//	consensusSpec *appsv1alpha1.ConsensusSetSpec) *util.Plan {
-//	restartPod := func(obj interface{}) (bool, error) {
-//		pod, ok := obj.(corev1.Pod)
-//		if !ok {
-//			return false, errors.New("wrong type: obj not Pod")
-//		}
-//
-//		// if DeletionTimestamp is not nil, it is terminating.
-//		if pod.DeletionTimestamp != nil {
-//			return true, nil
-//		}
-//
-//		// if pod is the latest version, we do nothing
-//		if intctrlutil.GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
-//			// wait until ready
-//			return !intctrlutil.PodIsReadyWithLabel(pod), nil
-//		}
-//
-//		// delete the pod to trigger associate StatefulSet to re-create it
-//		if err := cli.Delete(ctx, &pod); err != nil && !apierrors.IsNotFound(err) {
-//			return false, err
-//		}
-//
-//		return true, nil
-//	}
-//	return generateConsensusUpdatePlanLow(ctx, cli, stsObj, pods, consensusSpec, restartPod)
-// }
-
 // generateRestartPodPlan generates update plan to restart pods based on UpdateStrategy
 func generateRestartPodPlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
 	consensusSpec *appsv1alpha1.ConsensusSetSpec, podsToDelete []*corev1.Pod) *util.Plan {
@@ -120,12 +72,10 @@ func generateRestartPodPlan(ctx context.Context, cli client.Client, stsObj *apps
 		if !ok {
 			return false, errors.New("wrong type: obj not Pod")
 		}
-
 		// if DeletionTimestamp is not nil, it is terminating.
 		if pod.DeletionTimestamp != nil {
 			return true, nil
 		}
-
 		// if pod is the latest version, we do nothing
 		if intctrlutil.GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
 			// wait until ready
@@ -148,18 +98,17 @@ func generateConsensusUpdatePlanLow(ctx context.Context, cli client.Client, stsO
 	plan.WalkFunc = restartPod
 
 	rolePriorityMap := ComposeRolePriorityMap(consensusSpec)
-	SortPods(pods, rolePriorityMap)
+	util.SortPods(pods, rolePriorityMap, constant.RoleLabelKey)
 
 	// generate plan by UpdateStrategy
 	switch consensusSpec.UpdateStrategy {
 	case appsv1alpha1.SerialStrategy:
-		generateConsensusSerialPlan(plan, pods)
+		generateConsensusSerialPlan(plan, pods, rolePriorityMap)
 	case appsv1alpha1.ParallelStrategy:
-		generateConsensusParallelPlan(plan, pods)
+		generateConsensusParallelPlan(plan, pods, rolePriorityMap)
 	case appsv1alpha1.BestEffortParallelStrategy:
 		generateConsensusBestEffortParallelPlan(plan, pods, rolePriorityMap)
 	}
-
 	return plan
 }
 
@@ -220,7 +169,7 @@ func generateConsensusBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod,
 }
 
 // unknown & empty & leader & followers & learner
-func generateConsensusParallelPlan(plan *util.Plan, pods []corev1.Pod) {
+func generateConsensusParallelPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
 	start := plan.Start
 	for _, pod := range pods {
 		nextStep := &util.Step{}
@@ -230,7 +179,7 @@ func generateConsensusParallelPlan(plan *util.Plan, pods []corev1.Pod) {
 }
 
 // unknown -> empty -> learner -> followers(none->readonly->readwrite) -> leader
-func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod) {
+func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
 	start := plan.Start
 	for _, pod := range pods {
 		nextStep := &util.Step{}
@@ -243,9 +192,8 @@ func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod) {
 // ComposeRolePriorityMap generates a priority map based on roles.
 func ComposeRolePriorityMap(consensusSpec *appsv1alpha1.ConsensusSetSpec) map[string]int {
 	if consensusSpec == nil {
-		consensusSpec = &appsv1alpha1.ConsensusSetSpec{Leader: appsv1alpha1.DefaultLeader}
+		consensusSpec = appsv1alpha1.NewConsensusSetSpec()
 	}
-
 	rolePriorityMap := make(map[string]int, 0)
 	rolePriorityMap[""] = emptyPriority
 	rolePriorityMap[consensusSpec.Leader.Name] = leaderPriority
@@ -262,7 +210,6 @@ func ComposeRolePriorityMap(consensusSpec *appsv1alpha1.ConsensusSetSpec) map[st
 			rolePriorityMap[follower.Name] = followerReadWritePriority
 		}
 	}
-
 	return rolePriorityMap
 }
 

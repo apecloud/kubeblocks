@@ -29,10 +29,7 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -56,6 +53,7 @@ var _ = Describe("operations", func() {
 		clusterWithOneComp.Spec.ComponentSpecs = []appsv1alpha1.ClusterComponentSpec{
 			clusterWithOneComp.Spec.ComponentSpecs[0],
 		}
+		clusterWithOneComp.Spec.ComponentSpecs[0].ClassDefRef = &appsv1alpha1.ClassDefRef{Class: testapps.Class1c1gName}
 		classDef := testapps.NewComponentClassDefinitionFactory("custom", clusterWithOneComp.Spec.ClusterDefRef, testing.ComponentDefName).
 			AddClasses(testapps.DefaultResourceConstraintName, []string{testapps.Class1c1gName}).
 			GetObject()
@@ -69,7 +67,7 @@ var _ = Describe("operations", func() {
 	})
 
 	initCommonOperationOps := func(opsType appsv1alpha1.OpsType, clusterName string, hasComponentNamesFlag bool) *OperationsOptions {
-		o := newBaseOperationsOptions(streams, opsType, hasComponentNamesFlag)
+		o := newBaseOperationsOptions(tf, streams, opsType, hasComponentNamesFlag)
 		o.Dynamic = tf.FakeDynamicClient
 		o.Name = clusterName
 		o.Namespace = testing.Namespace
@@ -77,7 +75,7 @@ var _ = Describe("operations", func() {
 	}
 
 	It("Upgrade Ops", func() {
-		o := newBaseOperationsOptions(streams, appsv1alpha1.UpgradeType, false)
+		o := newBaseOperationsOptions(tf, streams, appsv1alpha1.UpgradeType, false)
 		o.Dynamic = tf.FakeDynamicClient
 
 		By("validate o.name is null")
@@ -168,8 +166,8 @@ var _ = Describe("operations", func() {
 	It("Restart ops", func() {
 		o := initCommonOperationOps(appsv1alpha1.RestartType, clusterName, true)
 		By("expect for not found error")
-		inputs := buildOperationsInputs(tf, o)
-		Expect(o.Complete(inputs, []string{clusterName + "2"}))
+		o.Args = []string{clusterName + "2"}
+		Expect(o.Complete())
 		Expect(o.CompleteRestartOps().Error()).Should(ContainSubstring("not found"))
 
 		By("expect for complete success")
@@ -184,27 +182,4 @@ var _ = Describe("operations", func() {
 		capturedOutput, _ := done()
 		Expect(testing.ContainExpectStrings(capturedOutput, "kbcli cluster describe-ops")).Should(BeTrue())
 	})
-
-	It("list and delete operations", func() {
-		clusterName := "wesql"
-		args := []string{clusterName}
-		clusterLabel := util.BuildLabelSelectorByNames("", args)
-		testLabel := "kubeblocks.io/test=test"
-
-		By("test delete OpsRequest with cluster")
-		o := delete.NewDeleteOptions(tf, streams, types.OpsGVR())
-		Expect(completeForDeleteOps(o, args)).Should(Succeed())
-		Expect(o.LabelSelector == clusterLabel).Should(BeTrue())
-
-		By("test delete OpsRequest with cluster and custom label")
-		o.LabelSelector = testLabel
-		Expect(completeForDeleteOps(o, args)).Should(Succeed())
-		Expect(o.LabelSelector == testLabel+","+clusterLabel).Should(BeTrue())
-
-		By("test delete OpsRequest with name")
-		o.Names = []string{"test1"}
-		Expect(completeForDeleteOps(o, nil)).Should(Succeed())
-		Expect(len(o.ConfirmedNames)).Should(Equal(1))
-	})
-
 })

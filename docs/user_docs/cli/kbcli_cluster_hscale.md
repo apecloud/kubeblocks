@@ -5,20 +5,20 @@ title: kbcli cluster hscale
 Horizontally scale the specified components in the cluster.
 
 ```
-kbcli cluster hscale [flags]
+kbcli cluster hscale NAME [flags]
 ```
 
 ### Examples
 
 ```
-  # expand storage resources of specified components, separate with commas when <component-name> more than one
-  kbcli cluster hscale <my-cluster> --components=<component-name> --replicas=3
+  # expand storage resources of specified components, separate with commas when component name more than one
+  kbcli cluster hscale mycluster --components=mysql --replicas=3
 ```
 
 ### Options
 
 ```
-      --components strings              Component names to this operations
+      --components strings             Component names to this operations
       --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
   -h, --help                           help for hscale
       --name string                    OpsRequest name. if not specified, it will be randomly generated 

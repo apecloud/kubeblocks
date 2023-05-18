@@ -20,12 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package stateful
 
 import (
-	"fmt"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
 type statefulComponentWorkloadBuilder struct {
@@ -35,20 +30,5 @@ type statefulComponentWorkloadBuilder struct {
 var _ internal.ComponentWorkloadBuilder = &statefulComponentWorkloadBuilder{}
 
 func (b *statefulComponentWorkloadBuilder) BuildWorkload() internal.ComponentWorkloadBuilder {
-	buildfn := func() ([]client.Object, error) {
-		if b.EnvConfig == nil {
-			return nil, fmt.Errorf("build consensus workload but env config is nil, cluster: %s, component: %s",
-				b.Comp.GetClusterName(), b.Comp.GetName())
-		}
-
-		sts, err := builder.BuildStsLow(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent(), b.EnvConfig.Name)
-		if err != nil {
-			return nil, err
-		}
-
-		b.Workload = sts
-
-		return nil, nil // don't return deploy here
-	}
-	return b.BuildWrapper(buildfn)
+	return b.BuildWorkload4StatefulSet("stateful")
 }

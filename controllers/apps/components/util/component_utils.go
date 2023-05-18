@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -473,8 +474,8 @@ func PatchGVRCustomLabels(ctx context.Context, cli client.Client, cluster *appsv
 	if err := GetObjectListByCustomLabels(ctx, cli, *cluster, objectList, client.MatchingLabels(matchLabels)); err != nil {
 		return err
 	}
-	labelKey = replaceKBEnvPlaceholderTokens(cluster.Name, componentName, labelKey)
-	labelValue = replaceKBEnvPlaceholderTokens(cluster.Name, componentName, labelValue)
+	labelKey = replaceKBEnvPlaceholderTokens(cluster, componentName, labelKey)
+	labelValue = replaceKBEnvPlaceholderTokens(cluster, componentName, labelValue)
 	switch gvk.Kind {
 	case constant.StatefulSetKind:
 		stsList := objectList.(*appsv1.StatefulSetList)
@@ -566,6 +567,22 @@ func GetCustomLabelWorkloadKind() []string {
 	}
 }
 
+// SortPods sorts pods by their role priority
+func SortPods(pods []corev1.Pod, priorityMap map[string]int, idLabelKey string) {
+	// make a Serial pod list,
+	// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
+	sort.SliceStable(pods, func(i, j int) bool {
+		roleI := pods[i].Labels[idLabelKey]
+		roleJ := pods[j].Labels[idLabelKey]
+		if priorityMap[roleI] == priorityMap[roleJ] {
+			_, ordinal1 := intctrlutil.GetParentNameAndOrdinal(&pods[i])
+			_, ordinal2 := intctrlutil.GetParentNameAndOrdinal(&pods[j])
+			return ordinal1 < ordinal2
+		}
+		return priorityMap[roleI] < priorityMap[roleJ]
+	})
+}
+
 // getObjectListMapOfResourceKind returns the mapping of resource kind and its object list.
 func getObjectListMapOfResourceKind() map[string]client.ObjectList {
 	return map[string]client.ObjectList{
@@ -580,7 +597,7 @@ func getObjectListMapOfResourceKind() map[string]client.ObjectList {
 }
 
 // replaceKBEnvPlaceholderTokens replaces the placeholder tokens in the string strToReplace with builtInEnvMap and return new string.
-func replaceKBEnvPlaceholderTokens(clusterName, componentName, strToReplace string) string {
-	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(clusterName, componentName)
+func replaceKBEnvPlaceholderTokens(cluster *appsv1alpha1.Cluster, componentName, strToReplace string) string {
+	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(cluster.Name, string(cluster.UID), componentName)
 	return componentutil.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
 }

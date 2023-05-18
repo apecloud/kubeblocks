@@ -27,6 +27,7 @@ const (
 	ControllerPaused     = "controller.kubeblocks.io/controller-paused"
 	SkipInstallableCheck = "extensions.kubeblocks.io/skip-installable-check"
 	NoDeleteJobs         = "extensions.kubeblocks.io/no-delete-jobs"
+	AddonDefaultIsEmpty  = "addons.extensions.kubeblocks.io/default-is-empty"
 
 	// condition reasons
 	AddonDisabled = "AddonDisabled"

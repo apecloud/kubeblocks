@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	probeutil "github.com/apecloud/kubeblocks/cmd/probe/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -51,7 +52,7 @@ func init() {
 
 // Handle is the event handler for the cluster status event.
 func (r *ClusterStatusEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != constant.ProbeCheckRolePath {
+	if event.Reason != string(probeutil.CheckRoleOperation) {
 		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
 
@@ -63,7 +64,7 @@ func (r *ClusterStatusEventHandler) Handle(cli client.Client, reqCtx intctrlutil
 	}
 
 	// if probe message event is checkRoleFailed, it means the cluster is abnormal, need to handle the cluster status
-	if message.Event == k8score.ProbeEventCheckRoleFailed {
+	if message.Event == probeutil.OperationFailed {
 		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
 	}
 	return nil

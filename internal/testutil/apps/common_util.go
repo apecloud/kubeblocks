@@ -152,14 +152,13 @@ func CheckObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil
 
 // Helper functions to check fields of resource lists when writing unit tests.
 
-func GetListLen[T intctrlutil.Object, PT intctrlutil.PObject[T],
+func List[T intctrlutil.Object, PT intctrlutil.PObject[T],
 	L intctrlutil.ObjList[T], PL intctrlutil.PObjList[T, L]](
-	testCtx *testutil.TestContext, _ func(T, L), opt ...client.ListOption) func(gomega.Gomega) int {
-	return func(g gomega.Gomega) int {
+	testCtx *testutil.TestContext, _ func(T, L), opt ...client.ListOption) func(gomega.Gomega) []T {
+	return func(g gomega.Gomega) []T {
 		var objList L
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, PL(&objList), opt...)).To(gomega.Succeed())
-		items := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
-		return len(items)
+		return reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
 	}
 }
 
@@ -265,13 +264,13 @@ func NewCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](
 func CreateCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
 	filePath string, pobj PT, actions ...any) PT {
 	pobj = NewCustomizedObj(filePath, pobj, actions...)
-	return CreateK8sResource(*testCtx, pobj).(PT)
+	return CreateK8sResource(testCtx, pobj).(PT)
 }
 
 func CheckedCreateCustomizedObj[T intctrlutil.Object, PT intctrlutil.PObject[T]](testCtx *testutil.TestContext,
 	filePath string, pobj PT, actions ...any) PT {
 	pobj = NewCustomizedObj(filePath, pobj, actions...)
-	return CheckedCreateK8sResource(*testCtx, pobj).(PT)
+	return CheckedCreateK8sResource(testCtx, pobj).(PT)
 }
 
 // Helper functions to delete object.

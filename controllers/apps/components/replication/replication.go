@@ -208,7 +208,7 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 			pod.GetLabels()[constant.RoleLabelKey] = role
 			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
 				Obj:    pod,
-				Action: ictrltypes.ActionUpdatePtr(),
+				Action: ictrltypes.ActionUpdatePtr(), // update or patch?
 			})
 		}
 		// else {
@@ -216,6 +216,11 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 		// }
 		podsToSyncStatus = append(podsToSyncStatus, pod)
 	}
+	// // REVIEW/TODO: (Y-Rookie)
+	// //  1. should employ rolling deletion as default strategy instead of delete them all.
+	// if err := util.DeleteStsPods(ctx, r.Cli, sts); err != nil {
+	// 	return err
+	// }
 	// sync cluster.spec.componentSpecs.[x].primaryIndex when failover occurs and switchPolicy is Noop.
 	// TODO(refactor): syncPrimaryIndex will update cluster spec, resolve it.
 	if err := syncPrimaryIndex(ctx, r.Cli, r.Cluster, r.getName()); err != nil {

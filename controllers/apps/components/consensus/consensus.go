@@ -275,6 +275,48 @@ func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) 
 	return vertexes, nil
 }
 
+// func (r *ConsensusSet) HandleUpdate(ctx context.Context, obj client.Object) error {
+//	if r == nil {
+//		return nil
+//	}
+//	return r.Stateful.HandleUpdateWithProcessors(ctx, obj,
+//		func(componentDef *appsv1alpha1.ClusterComponentDefinition, pods []corev1.Pod, componentName string) error {
+//			// first, get the old status
+//			var oldConsensusSetStatus *appsv1alpha1.ConsensusSetStatus
+//			if v, ok := r.Cluster.Status.Components[componentName]; ok {
+//				oldConsensusSetStatus = v.ConsensusSetStatus
+//			}
+//			// create the initial status
+//			newConsensusSetStatus := &appsv1alpha1.ConsensusSetStatus{
+//				Leader: appsv1alpha1.ConsensusMemberStatus{
+//					Name:       "",
+//					Pod:        constant.ComponentStatusDefaultPodName,
+//					AccessMode: appsv1alpha1.None,
+//				},
+//			}
+//			// then, calculate the new status
+//			setConsensusSetStatusRoles(newConsensusSetStatus, r.getConsensusSpec(), pods)
+//			// if status changed, do update
+//			if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
+//				patch := client.MergeFrom((*r.Cluster).DeepCopy())
+//				if err := util.InitClusterComponentStatusIfNeed(r.Cluster, componentName, r.getWorkloadType()); err != nil {
+//					return err
+//				}
+//				componentStatus := r.Cluster.Status.Components[componentName]
+//				componentStatus.ConsensusSetStatus = newConsensusSetStatus
+//				r.Cluster.Status.SetComponentStatus(componentName, componentStatus)
+//				if err := r.Cli.Status().Patch(ctx, r.Cluster, patch); err != nil {
+//					return err
+//				}
+//				// add consensus role info to pod env
+//				if err := updateConsensusRoleInfo(ctx, r.Cli, r.Cluster, r.getConsensusSpec(), r.getDefName(), componentName, pods, nil); err != nil {
+//					return err
+//				}
+//			}
+//			return nil
+//		}, ComposeRolePriorityMap, generateConsensusSerialPlan, generateConsensusBestEffortParallelPlan, generateConsensusParallelPlan)
+// }
+
 func newConsensusSet(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	spec *appsv1alpha1.ClusterComponentSpec,

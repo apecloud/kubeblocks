@@ -213,14 +213,13 @@ func handleStatelessProgress(reqCtx intctrlutil.RequestCtx,
 	for _, v := range podList.Items {
 		objectKey := getProgressObjectKey(v.Kind, v.Name)
 		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
-		if podIsPendingDuringOperation(opsStartTime, &v, compStatus.Phase) {
-			handlePendingProgressDetail(opsRes, compStatus, progressDetail)
-			continue
-		}
-
 		if podProcessedSuccessful(workloadType, opsStartTime, &v, minReadySeconds, compStatus.Phase, pgRes.opsIsCompleted) {
 			completedCount += 1
 			handleSucceedProgressDetail(opsRes, pgRes, compStatus, progressDetail)
+			continue
+		}
+		if podIsPendingDuringOperation(opsStartTime, &v) {
+			handlePendingProgressDetail(opsRes, compStatus, progressDetail)
 			continue
 		}
 		completedCount += handleFailedOrProcessingProgressDetail(opsRes, pgRes, compStatus, progressDetail, &v)
@@ -249,13 +248,13 @@ func handleStatefulSetProgress(reqCtx intctrlutil.RequestCtx,
 	for _, v := range podList.Items {
 		objectKey := getProgressObjectKey(v.Kind, v.Name)
 		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
-		if podIsPendingDuringOperation(opsStartTime, &v, compStatus.Phase) {
-			handlePendingProgressDetail(opsRes, compStatus, progressDetail)
-			continue
-		}
 		if podProcessedSuccessful(workloadType, opsStartTime, &v, minReadySeconds, compStatus.Phase, pgRes.opsIsCompleted) {
 			completedCount += 1
 			handleSucceedProgressDetail(opsRes, pgRes, compStatus, progressDetail)
+			continue
+		}
+		if podIsPendingDuringOperation(opsStartTime, &v) {
+			handlePendingProgressDetail(opsRes, compStatus, progressDetail)
 			continue
 		}
 		completedCount += handleFailedOrProcessingProgressDetail(opsRes, pgRes, compStatus, progressDetail, &v)
@@ -312,9 +311,8 @@ func handleFailedOrProcessingProgressDetail(opsRes *OpsResource,
 }
 
 // podIsPendingDuringOperation checks if pod is pending during the component is doing operation.
-func podIsPendingDuringOperation(opsStartTime metav1.Time, pod *corev1.Pod, componentPhase appsv1alpha1.ClusterComponentPhase) bool {
-	return pod.CreationTimestamp.Before(&opsStartTime) && pod.DeletionTimestamp.IsZero() &&
-		!slices.Contains(appsv1alpha1.GetComponentTerminalPhases(), componentPhase)
+func podIsPendingDuringOperation(opsStartTime metav1.Time, pod *corev1.Pod) bool {
+	return pod.CreationTimestamp.Before(&opsStartTime) && pod.DeletionTimestamp.IsZero()
 }
 
 // podIsFailedDuringOperation checks if pod is failed during operation.

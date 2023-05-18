@@ -139,6 +139,7 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 		fieldPath string
 	}{
 		{name: "KB_POD_NAME", fieldPath: "metadata.name"},
+		{name: "KB_POD_UID", fieldPath: "metadata.uid"},
 		{name: "KB_NAMESPACE", fieldPath: "metadata.namespace"},
 		{name: "KB_SA_NAME", fieldPath: "spec.serviceAccountName"},
 		{name: "KB_NODENAME", fieldPath: "spec.nodeName"},
@@ -163,10 +164,17 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 		})
 	}
 
+	var kbClusterPostfix8 string
+	if len(cluster.UID) > 8 {
+		kbClusterPostfix8 = string(cluster.UID)[len(cluster.UID)-8:]
+	} else {
+		kbClusterPostfix8 = string(cluster.UID)
+	}
 	toInjectEnvs = append(toInjectEnvs, []corev1.EnvVar{
 		{Name: "KB_CLUSTER_NAME", Value: cluster.Name},
 		{Name: "KB_COMP_NAME", Value: component.Name},
 		{Name: "KB_CLUSTER_COMP_NAME", Value: cluster.Name + "-" + component.Name},
+		{Name: "KB_CLUSTER_UID_POSTFIX_8", Value: kbClusterPostfix8},
 		{Name: "KB_POD_FQDN", Value: fmt.Sprintf("%s.%s-headless.%s.svc", "$(KB_POD_NAME)",
 			"$(KB_CLUSTER_COMP_NAME)", "$(KB_NAMESPACE)")},
 	}...)
@@ -225,14 +233,22 @@ func BuildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.Persi
 	}
 }
 
-func BuildSvcList(params BuilderParams) ([]*corev1.Service, error) {
-	return BuildSvcListLow(params.Cluster, params.Component)
+func BuildSvcListWithCustomAttributes(params BuilderParams, customAttributeSetter func(*corev1.Service)) ([]*corev1.Service, error) {
+	services, err := BuildSvcListLow(params.Cluster, params.Component)
+	if err != nil {
+		return nil, err
+	}
+	if customAttributeSetter != nil {
+		for _, svc := range services {
+			customAttributeSetter(svc)
+		}
+	}
+	return services, nil
 }
 
 func BuildSvcListLow(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) ([]*corev1.Service, error) {
 	const tplFile = "service_template.cue"
-
-	var result []*corev1.Service
+	var result = make([]*corev1.Service, 0)
 	for _, item := range component.Services {
 		if len(item.Spec.Ports) == 0 {
 			continue
@@ -247,7 +263,6 @@ func BuildSvcListLow(cluster *appsv1alpha1.Cluster, component *component.Synthes
 		}
 		result = append(result, &svc)
 	}
-
 	return result, nil
 }
 
@@ -257,7 +272,6 @@ func BuildHeadlessSvc(params BuilderParams) (*corev1.Service, error) {
 
 func BuildHeadlessSvcLow(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*corev1.Service, error) {
 	const tplFile = "headless_service_template.cue"
-
 	service := corev1.Service{}
 	if err := buildFromCUE(tplFile, map[string]any{
 		"cluster":   cluster,
@@ -282,6 +296,10 @@ func BuildStsLow(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, c
 		"component": component,
 	}, "statefulset", &sts); err != nil {
 		return nil, err
+	}
+
+	if component.StatefulSetWorkload != nil {
+		sts.Spec.PodManagementPolicy, sts.Spec.UpdateStrategy = component.StatefulSetWorkload.FinalStsUpdateStrategy()
 	}
 
 	// update sts.spec.volumeClaimTemplates[].metadata.labels
@@ -381,11 +399,9 @@ func BuildConnCredentialLow(clusterDefiniiton *appsv1alpha1.ClusterDefinition, c
 
 	// 2nd pass replace $(CONN_CREDENTIAL) variables
 	m = map[string]string{}
-
 	for k, v := range connCredential.StringData {
 		m[fmt.Sprintf("$(CONN_CREDENTIAL).%s", k)] = v
 	}
-
 	replaceData(m)
 	return &connCredential, nil
 }
@@ -403,7 +419,6 @@ func BuildPDBLow(cluster *appsv1alpha1.Cluster, component *component.Synthesized
 	}, "pdb", &pdb); err != nil {
 		return nil, err
 	}
-
 	return &pdb, nil
 }
 
@@ -414,7 +429,6 @@ func BuildDeploy(reqCtx intctrlutil.RequestCtx, params BuilderParams) (*appsv1.D
 func BuildDeployLow(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent) (*appsv1.Deployment, error) {
 	const tplFile = "deployment_template.cue"
-
 	deploy := appsv1.Deployment{}
 	if err := buildFromCUE(tplFile, map[string]any{
 		"cluster":   cluster,
@@ -423,6 +437,9 @@ func BuildDeployLow(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster
 		return nil, err
 	}
 
+	if component.StatelessSpec != nil {
+		deploy.Spec.Strategy = component.StatelessSpec.UpdateStrategy
+	}
 	if err := processContainersInjection(reqCtx, cluster, component, "", &deploy.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
@@ -434,7 +451,6 @@ func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
 	pvcKey types.NamespacedName,
 	snapshotName string,
 	component *component.SynthesizedComponent) (*corev1.PersistentVolumeClaim, error) {
-
 	pvc := corev1.PersistentVolumeClaim{}
 	if err := buildFromCUE("pvc_template.cue", map[string]any{
 		"sts":                 sts,
@@ -511,7 +527,6 @@ func BuildEnvConfigLow(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster
 	}, "config", &config); err != nil {
 		return nil, err
 	}
-
 	return &config, nil
 }
 
@@ -526,7 +541,6 @@ func BuildBackup(sts *appsv1.StatefulSet,
 	}, "backup_job", &backup); err != nil {
 		return nil, err
 	}
-
 	return &backup, nil
 }
 
@@ -541,16 +555,13 @@ func BuildVolumeSnapshot(snapshotKey types.NamespacedName,
 	}, "snapshot", &snapshot); err != nil {
 		return nil, err
 	}
-
 	return &snapshot, nil
 }
 
 func BuildCronJob(pvcKey types.NamespacedName,
 	schedule string,
 	sts *appsv1.StatefulSet) (*batchv1.CronJob, error) {
-
 	serviceAccount := viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
-
 	cronJob := batchv1.CronJob{}
 	if err := buildFromCUE("delete_pvc_cron_job_template.cue", map[string]any{
 		"pvc":                   pvcKey,
@@ -560,7 +571,6 @@ func BuildCronJob(pvcKey types.NamespacedName,
 	}, "cronjob", &cronJob); err != nil {
 		return nil, err
 	}
-
 	return &cronJob, nil
 }
 
@@ -665,7 +675,6 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams)
 
 func BuildTLSSecret(namespace, clusterName, componentName string) (*corev1.Secret, error) {
 	const tplFile = "tls_certs_secret_template.cue"
-
 	secret := &corev1.Secret{}
 	pathedName := componentPathedName{
 		Namespace:   namespace,
@@ -680,7 +689,6 @@ func BuildTLSSecret(namespace, clusterName, componentName string) (*corev1.Secre
 
 func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1alpha1.Backup, podSpec *corev1.PodSpec) (*batchv1.Job, error) {
 	const tplFile = "backup_manifests_template.cue"
-
 	job := &batchv1.Job{}
 	if err := buildFromCUE(tplFile,
 		map[string]any{
@@ -711,6 +719,5 @@ func BuildPITRJob(name string, cluster *appsv1alpha1.Cluster, image string, comm
 	}, "job", job); err != nil {
 		return nil, err
 	}
-
 	return job, nil
 }

@@ -20,9 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package consensus
 
 import (
-	"fmt"
-
-	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
@@ -37,32 +34,7 @@ type consensusComponentWorkloadBuilder struct {
 var _ internal.ComponentWorkloadBuilder = &consensusComponentWorkloadBuilder{}
 
 func (b *consensusComponentWorkloadBuilder) BuildWorkload() internal.ComponentWorkloadBuilder {
-	buildfn := func() ([]client.Object, error) {
-		if b.EnvConfig == nil {
-			return nil, fmt.Errorf("build consensus workload but env config is nil, cluster: %s, component: %s",
-				b.Comp.GetClusterName(), b.Comp.GetName())
-		}
-
-		component := b.Comp.GetSynthesizedComponent()
-		sts, err := builder.BuildStsLow(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
-		if err != nil {
-			return nil, err
-		}
-		sts.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
-
-		b.Workload = sts
-
-		// build PDB object
-		if component.MaxUnavailable != nil {
-			pdb, err := builder.BuildPDBLow(b.Comp.GetCluster(), component)
-			if err != nil {
-				return nil, err
-			}
-			return []client.Object{pdb}, err // don't return sts here
-		}
-		return nil, nil
-	}
-	return b.BuildWrapper(buildfn)
+	return b.BuildWorkload4StatefulSet("consensus")
 }
 
 func (b *consensusComponentWorkloadBuilder) BuildService() internal.ComponentWorkloadBuilder {

@@ -186,7 +186,7 @@ func (r *AddonReconciler) cleanupJobPods(reqCtx intctrlutil.RequestCtx) error {
 }
 
 func (r *AddonReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, addon *extensionsv1alpha1.Addon) (*ctrl.Result, error) {
-	if addon.Annotations != nil && addon.Annotations[NoDeleteJobs] == "true" {
+	if addon.Annotations != nil && addon.Annotations[NoDeleteJobs] == trueVal {
 		return nil, nil
 	}
 	deleteJobIfExist := func(jobName string) error {

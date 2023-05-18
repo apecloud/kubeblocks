@@ -110,7 +110,7 @@ func (o *destroyOptions) destroy() error {
 
 // destroyLocal destroy local k3d cluster that will destroy all resources
 func (o *destroyOptions) destroyLocal() error {
-	provider := cp.NewLocalCloudProvider(o.Out, o.ErrOut)
+	provider, _ := cp.New(cp.Local, "", o.Out, o.ErrOut)
 	s := spinner.New(o.Out, spinnerMsg("Delete playground k3d cluster "+o.prevCluster.ClusterName))
 	defer s.Fail()
 	if err := provider.DeleteK8sCluster(o.prevCluster); err != nil {
@@ -134,7 +134,7 @@ func (o *destroyOptions) destroyLocal() error {
 func (o *destroyOptions) destroyCloud() error {
 	var err error
 
-	printer.Warning(o.Out, `This action will destroy the kubernetes cluster, there may be residual resources, 
+	printer.Warning(o.Out, `This action will destroy the kubernetes cluster, there may be residual resources,
   please confirm and manually clean up related resources after this action.
 
 `)

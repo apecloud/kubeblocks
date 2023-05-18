@@ -24,6 +24,14 @@ import (
 	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 )
 
+const (
+	MissingOutcomeMessage = "there is a missing outcome message"
+	IncorrectOutcomeType  = "there is an incorrect outcome type"
+	PassType              = "Pass"
+	WarnType              = "Warn"
+	FailType              = "Fail"
+)
+
 func newAnalyzeResult(title string, resultType string, outcomes []*troubleshoot.Outcome) *analyze.AnalyzeResult {
 	for _, outcome := range outcomes {
 		if outcome == nil {

@@ -296,7 +296,9 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 		// render a job object
 		job := renderJob(engine, compKey, stmts, ep)
 		// before create job, we adjust job's attributes, such as labels, tolerations w.r.t cluster info.
-		calibrateJobMetaAndSpec(job, cluster, compKey, account.Name)
+		if err := calibrateJobMetaAndSpec(job, cluster, compKey, account.Name); err != nil {
+			return err
+		}
 		// update owner reference
 		if err := controllerutil.SetControllerReference(cluster, job, scheme); err != nil {
 			return err

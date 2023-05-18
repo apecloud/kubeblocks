@@ -289,7 +289,7 @@ release_next_available_tag() {
 
 usage_message() {
     curl -H "Content-Type: application/json" -X POST $BOT_WEBHOOK \
-        -d '{"msg_type":"post","content":{"post":{"zh_cn":{"title":"Usage:","content":[[{"tag":"text","text":"sorry master, please enter the correct format\n"},{"tag":"text","text":"1. do <alpha|beta|rc|stable> release\n"},{"tag":"text","text":"2. {\"ref\":\"<ref_branch>\",\"inputs\":{\"release_version\":\"<release_version>\"}}"}]]}}}}'
+        -d '{"msg_type":"post","content":{"post":{"zh_cn":{"title":"Usage:","content":[[{"tag":"text","text":"please enter the correct format\n"},{"tag":"text","text":"1. do <alpha|beta|rc|stable> release\n"},{"tag":"text","text":"2. {\"ref\":\"<ref_branch>\",\"inputs\":{\"release_version\":\"<release_version>\"}}"}]]}}}}'
 }
 
 trigger_release() {
@@ -314,7 +314,7 @@ send_message() {
             -d '{"msg_type":"post","content":{"post":{"zh_cn":{"title":"Success:","content":[[{"tag":"text","text":"'$CONTENT'"}]]}}}}'
     else
         curl -H "Content-Type: application/json" -X POST $BOT_WEBHOOK \
-            -d '{"msg_type":"post","content":{"post":{"zh_cn":{"title":"Error:","content":[[{"tag":"text","text":"sorry master, "},{"tag":"a","text":"['$CONTENT']","href":"'$RUN_URL'"}]]}}}}'
+            -d '{"msg_type":"post","content":{"post":{"zh_cn":{"title":"Error:","content":[[{"tag":"a","text":"['$CONTENT']","href":"'$RUN_URL'"}]]}}}}'
     fi
 }
 

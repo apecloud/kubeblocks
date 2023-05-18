@@ -298,31 +298,25 @@ func doSnapshot(cli types2.ReadonlyClient,
 	componentDef,
 	backupPolicyTemplateName string) ([]client.Object, error) {
 	backupPolicyTemplate := &appsv1alpha1.BackupPolicyTemplate{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: backupPolicyTemplateName}, backupPolicyTemplate); err != nil && !apierrors.IsNotFound(err) {
+	err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: backupPolicyTemplateName}, backupPolicyTemplate)
+	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 
-	objs := make([]client.Object, 0)
-	if len(backupPolicyTemplate.Name) > 0 {
-		// if there is backuppolicytemplate created by provider
-		// create backupjob CR, will ignore error if already exists
-		backups, err := createBackup(reqCtx, cli, stsObj, componentDef, backupPolicyTemplateName, snapshotKey, cluster)
-		if err != nil {
-			return nil, err
-		}
-		objs = append(objs, backups...)
-	} else {
+	if err != nil {
 		// no backuppolicytemplate, then try native volumesnapshot
 		pvcName := strings.Join([]string{vcts[0].Name, stsObj.Name, "0"}, "-")
 		snapshot, err := builder.BuildVolumeSnapshot(snapshotKey, pvcName, stsObj)
 		if err != nil {
 			return nil, err
 		}
-		objs = append(objs, snapshot)
-
-		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create volumesnapshot/%s", snapshotKey.Name)
+		reqCtx.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create volumesnapshot/%s", snapshotKey.Name)
+		return []client.Object{snapshot}, nil
 	}
-	return objs, nil
+
+	// if there is backuppolicytemplate created by provider
+	// create backupjob CR, will ignore error if already exists
+	return createBackup(reqCtx, cli, stsObj, componentDef, backupPolicyTemplateName, snapshotKey, cluster)
 }
 
 // check snapshot ready to use

@@ -95,6 +95,7 @@ func (c *statelessComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if builder != nil {
 		if err = builder.BuildEnv().
 			BuildWorkload().
+			BuildPDB().
 			BuildHeadlessService().
 			BuildConfig().
 			BuildTLSVolume().

@@ -46,6 +46,7 @@ type envWrapper struct {
 	// configmap or secret not yet submitted.
 	localObjects  []coreclient.Object
 	clusterName   string
+	clusterUID    string
 	componentName string
 	// cache remoted configmap and secret.
 	cache map[schema.GroupVersionKind]map[coreclient.ObjectKey]coreclient.Object
@@ -62,6 +63,7 @@ func wrapGetEnvByName(templateBuilder *configTemplateBuilder, component *compone
 	// hack for test cases of cli update cmd...
 	if component != nil {
 		wrapper.clusterName = component.ClusterName
+		wrapper.clusterUID = component.ClusterUID
 		wrapper.componentName = component.Name
 	}
 	return func(args interface{}, envName string) (string, error) {
@@ -231,8 +233,9 @@ func (w *envWrapper) checkAndReplaceEnv(value string, container *corev1.Containe
 func (w *envWrapper) doEnvReplace(replacedVars *set.LinkedHashSetString, oldValue string, container *corev1.Container) (string, error) {
 	var (
 		clusterName   = w.clusterName
+		clusterUID    = w.clusterUID
 		componentName = w.componentName
-		builtInEnvMap = component.GetReplacementMapForBuiltInEnv(clusterName, componentName)
+		builtInEnvMap = component.GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName)
 	)
 
 	builtInEnvMap[constant.ConnCredentialPlaceHolder] = component.GenerateConnCredential(clusterName)

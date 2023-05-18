@@ -23,6 +23,8 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: postgresql-12.14.0
+  annotations:
+    kubeblocks.io/is-default-cluster-version: "true"
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:

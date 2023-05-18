@@ -255,7 +255,7 @@ CLI_LD_FLAGS ="-s -w \
 	-X github.com/apecloud/kubeblocks/version.K3dVersion=$(K3D_VERSION) \
 	-X github.com/apecloud/kubeblocks/version.DefaultKubeBlocksVersion=$(VERSION)"
 
-bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH).
+bin/kbcli.%: test-go-generate ## Cross build bin/kbcli.$(OS).$(ARCH).
 	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) CGO_ENABLED=0 $(GO) build -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
 
 .PHONY: kbcli-fast

@@ -21,6 +21,7 @@ package consensusset
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"sort"
 	"strconv"
@@ -42,13 +43,6 @@ import (
 // HorizontalScalingTransformer Pod level horizontal scaling handling
 type HorizontalScalingTransformer struct{}
 
-type podAction struct {
-	podName       string
-	hasPreAction  bool
-	hasPostAction bool
-	actionList    []*batchv1.Job
-}
-
 type conditionChecker = func() bool
 
 var actionNameRegex = regexp.MustCompile(`(.*)-([0-9]+)-([0-9]+)-([a-zA-Z\-]+)$`)
@@ -64,11 +58,8 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 	if err != nil {
 		return err
 	}
-	// handle Update only, i.e. consensus cluster exists
-	if stsVertex.Action == nil || *stsVertex.Action != model.UPDATE {
-		return nil
-	}
 
+	// barrier 1: the underlying sts is ready
 	// handle membership in consensus_set level and pod lifecycle in stateful_set
 	// pre-conditions validation: make sure sts level is ok
 	sts, _ := stsVertex.OriObj.(*apps.StatefulSet)
@@ -84,69 +75,20 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		return nil
 	}
 
-	// handle membership
 	stsVertex.Immutable = true
 	updateStsHandler := func() {
 		stsVertex.Immutable = false
 	}
-	leaderPodName := getLeaderPodName(transCtx.CSSet.Status.MembersStatus)
 
-	// TODO(free6om): separate consensus cluster Creation from Update
-	//if len(leaderPodName) == 0 {
-	//	return nil
-	//}
-
+	// barrier 2: latest action list in the api-server
 	if model.IsObjectUpdating(transCtx.OrigCSSet) {
-		// members with ordinal less than 'spec.replicas' should in the consensus cluster
-		// member join
-		// create actions
-		memberJoining := make([]string, 0)
-		actionTypeList := []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
-		for i := 0; i < int(transCtx.CSSet.Spec.Replicas); i++ {
-			podName := getPodName(transCtx.CSSet.Name, i)
-			if isMemberReady(podName, transCtx.CSSet.Status.MembersStatus) {
-				continue
-			}
-			actionCreated, err := doActions(transCtx.CSSet, dag, leaderPodName, i, actionTypeList)
-			if err != nil {
-				return err
-			}
-			if actionCreated {
-				memberJoining = append(memberJoining, podName)
-			}
+		if transCtx.CSSet.Status.Replicas == transCtx.CSSet.Spec.Replicas {
+			return nil
 		}
-		// member leave
-		// members with ordinal greater than 'spec.replicas - 1' should not in the consensus cluster
-		memberLeaving := make([]string, 0)
-		actionTypeList = []string{jobTypeSwitchover, jobTypeMemberLeaveNotifying}
-		for i := transCtx.CSSet.Spec.Replicas; i < transCtx.CSSet.Status.Replicas; i++ {
-			actionCreated, err := doActions(transCtx.CSSet, dag, leaderPodName, int(i), actionTypeList)
-			if err != nil {
-				return err
-			}
-			if actionCreated {
-				memberLeaving = append(memberLeaving, getPodName(transCtx.CSSet.Name, int(i)))
-			}
-		}
-		return nil
+		return generateActionLog(transCtx, dag)
 	}
 
-	// handle actions
-	// barrier: make sure all actions are in cache:
-	// 1. all joining members with a final join action
-	// 2. all leaving members with a final leave action
-	podActionMap, orphanActionList, err := getPodActionMap(transCtx)
-	if err != nil {
-		return err
-	}
-
-	// clean up orphan actions
-	// if pod not exist, delete all related suspend actions
-	for _, action := range orphanActionList {
-		doActionCleanup(dag, action)
-	}
-
-	// handle actions in serial order to minimum disrupt on current cluster
+	// compose action list
 	// sort pods in order:
 	// 1. action generation in ascend
 	// 2. leaving with ordinal descend
@@ -168,23 +110,32 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 	// if current action and action at the stack top are a leave-join pair, pop
 	// else push
 	// pop the stack into a list and reverse it
-	allActionList := buildAllActionList(podActionMap)
-	if len(allActionList) == 0 {
-		// no actions come yet, but should, wait
-		return nil
+	allActionList, err := buildAllActionList(transCtx)
+	if err != nil {
+		return err
 	}
 	printActionList(transCtx.Logger, allActionList)
 	finalActionList := buildFinalActionList(allActionList)
 	printActionList(transCtx.Logger, finalActionList)
+
+	// barrier 3: make sure latest action list is in cache
+	// why should have the latest action list?
+	// one case:
+	// replicas: 5->3, local action list: member-5-leave
+	// if action(member-5-leave) is finished,
+	// the list is all handled and sts should be updated, which will kill (member)pod-4 without do action(member-4-leave)
+	if !isLatestActionList(finalActionList, transCtx.CSSet) {
+		return nil
+	}
+
+	// finally, have the latest action list, handle it
+	// handle actions in serial order to minimum disrupt on current cluster
 	// find first unfinished action
 	index := findFirstUnfinishedAction(finalActionList)
 	switch {
 	case index > 0:
 		// last finished action
-		action := finalActionList[index-1]
-		if action.Status.Failed > 0 {
-			emitActionFailedEvent(transCtx, action.Labels[jobTypeLabel], action.Name)
-		}
+		emitEvent(transCtx, finalActionList[index-1])
 		fallthrough
 	case index == 0:
 		// start action if suspend
@@ -198,6 +149,8 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 			startAction(dag, action)
 		}
 	case index < 0:
+		// last finished action
+		emitEvent(transCtx, finalActionList[len(finalActionList)-1])
 		// all action finished, do clean up
 		for _, ac := range allActionList {
 			doActionCleanup(dag, ac)
@@ -206,84 +159,6 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 	}
 
 	return nil
-}
-
-func buildFinalActionList(allActionList []*batchv1.Job) []*batchv1.Job {
-	var finalActionList []*batchv1.Job
-	for _, action := range allActionList {
-		if len(finalActionList) == 0 {
-			finalActionList = append(finalActionList, action)
-			continue
-		}
-		lastIndex := len(finalActionList) - 1
-		lastAction := finalActionList[lastIndex]
-		if isSuspendPair(lastAction, action) {
-			finalActionList = finalActionList[:lastIndex]
-		} else {
-			finalActionList = append(finalActionList, action)
-		}
-	}
-	return finalActionList
-}
-
-func printActionList(logger logr.Logger, actionList []*batchv1.Job) {
-	var actionNameList []string
-	for _, action := range actionList {
-		actionNameList = append(actionNameList, fmt.Sprintf("%s-%v", action.Name, *action.Spec.Suspend))
-	}
-	logger.Info(fmt.Sprintf("action list: %v\n", actionNameList))
-}
-
-func isSuspendPair(lastAction, currentAction *batchv1.Job) bool {
-	if lastAction.Spec.Suspend != nil && !*lastAction.Spec.Suspend {
-		return false
-	}
-	lastOrdinal, _ := getActionOrdinal(lastAction.Name)
-	currentOrdinal, _ := getActionOrdinal(currentAction.Name)
-	return lastOrdinal == currentOrdinal
-}
-
-func findFirstUnfinishedAction(allActionList []*batchv1.Job) int {
-	index := -1
-	for i := range allActionList {
-		if allActionList[i].Status.Failed > 0 || allActionList[i].Status.Succeeded > 0 {
-			continue
-		}
-		index = i
-		break
-	}
-	return index
-}
-
-func buildAllActionList(podActionMap map[string]*podAction) []*batchv1.Job {
-	allActionList := make([]*batchv1.Job, 0, len(podActionMap))
-	for _, pAction := range podActionMap {
-		allActionList = append(allActionList, pAction.actionList...)
-	}
-	actionTypePriorityMap := map[string]int{
-		jobTypeSwitchover:           1,
-		jobTypeMemberLeaveNotifying: 2,
-		jobTypeMemberJoinNotifying:  3,
-		jobTypeLogSync:              4,
-		jobTypePromote:              5,
-	}
-	sort.Slice(allActionList, func(i, j int) bool {
-		nameI, nameJ := allActionList[i].Name, allActionList[j].Name
-		// name should be legal, no error should be returned
-		generationI, ordinalI, actionTypeI, _ := getActionGenerationOrdinalAndType(nameI)
-		generationJ, ordinalJ, actionTypeJ, _ := getActionGenerationOrdinalAndType(nameJ)
-		switch {
-		case generationI == generationJ && ordinalI == ordinalJ:
-			return actionTypePriorityMap[actionTypeI] < actionTypePriorityMap[actionTypeJ]
-		case generationI == generationJ && (actionTypeI == jobTypeSwitchover || actionTypeI == jobTypeMemberLeaveNotifying):
-			return ordinalJ < ordinalI
-		case generationI == generationJ:
-			return ordinalI < ordinalJ
-		default:
-			return generationI < generationJ
-		}
-	})
-	return allActionList
 }
 
 func isStatefulSetReady(sts *apps.StatefulSet) bool {
@@ -334,6 +209,178 @@ func isMemberReady(podName string, membersStatus []workloads.ConsensusMemberStat
 	return false
 }
 
+func generateActionLog(transCtx *CSSetTransformContext, dag *graph.DAG) error {
+	leaderPodName := getLeaderPodName(transCtx.CSSet.Status.MembersStatus)
+	// member join
+	// members with ordinal less than 'spec.replicas' should in the consensus cluster
+	actionTypeList := []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
+	for i := 0; i < int(transCtx.CSSet.Spec.Replicas); i++ {
+		podName := getPodName(transCtx.CSSet.Name, i)
+		if isMemberReady(podName, transCtx.CSSet.Status.MembersStatus) {
+			continue
+		}
+		if err := doActions(transCtx.CSSet, dag, leaderPodName, i, actionTypeList); err != nil {
+			return err
+		}
+	}
+	// member leave
+	// members with ordinal greater than 'spec.replicas - 1' should not in the consensus cluster
+	actionTypeList = []string{jobTypeSwitchover, jobTypeMemberLeaveNotifying}
+	for i := transCtx.CSSet.Spec.Replicas; i < transCtx.CSSet.Status.Replicas; i++ {
+		if err := doActions(transCtx.CSSet, dag, leaderPodName, int(i), actionTypeList); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// sorted by generation and action priority
+func buildAllActionList(transCtx *CSSetTransformContext) ([]*batchv1.Job, error) {
+	// get all actions in cache
+	actionLists, err := getAllActionList(transCtx)
+	if err != nil {
+		return nil, err
+	}
+
+	// put all actions into a list
+	var allActionList []*batchv1.Job
+	for _, list := range actionLists {
+		for i := range list.Items {
+			allActionList = append(allActionList, &list.Items[i])
+		}
+	}
+
+	// sort the action list
+	actionTypePriorityMap := map[string]int{
+		jobTypeSwitchover:           1,
+		jobTypeMemberLeaveNotifying: 2,
+		jobTypeMemberJoinNotifying:  3,
+		jobTypeLogSync:              4,
+		jobTypePromote:              5,
+	}
+	sort.Slice(allActionList, func(i, j int) bool {
+		nameI, nameJ := allActionList[i].Name, allActionList[j].Name
+		// name should be legal, no error should be returned
+		generationI, ordinalI, actionTypeI, _ := getActionGenerationOrdinalAndType(nameI)
+		generationJ, ordinalJ, actionTypeJ, _ := getActionGenerationOrdinalAndType(nameJ)
+		switch {
+		case generationI == generationJ && ordinalI == ordinalJ:
+			return actionTypePriorityMap[actionTypeI] < actionTypePriorityMap[actionTypeJ]
+		case generationI == generationJ && isPreAction(actionTypeI):
+			return ordinalJ < ordinalI
+		case generationI == generationJ:
+			return ordinalI < ordinalJ
+		default:
+			return generationI < generationJ
+		}
+	})
+	return allActionList, nil
+}
+
+func buildFinalActionList(allActionList []*batchv1.Job) []*batchv1.Job {
+	var finalActionList []*batchv1.Job
+	for _, action := range allActionList {
+		if len(finalActionList) == 0 {
+			finalActionList = append(finalActionList, action)
+			continue
+		}
+		lastIndex := len(finalActionList) - 1
+		lastAction := finalActionList[lastIndex]
+		switch {
+		case isSuspendPair(lastAction, action):
+			finalActionList = finalActionList[:lastIndex]
+		case isAdjacentPair(lastAction, action):
+			finalActionList = append(finalActionList, action)
+		}
+	}
+	return finalActionList
+}
+
+func printActionList(logger logr.Logger, actionList []*batchv1.Job) {
+	var actionNameList []string
+	for _, action := range actionList {
+		actionNameList = append(actionNameList, fmt.Sprintf("%s-%v", action.Name, *action.Spec.Suspend))
+	}
+	logger.Info(fmt.Sprintf("action list: %v\n", actionNameList))
+}
+
+func isSuspendPair(lastAction, currentAction *batchv1.Job) bool {
+	if lastAction.Spec.Suspend != nil && !*lastAction.Spec.Suspend {
+		return false
+	}
+	lastOrdinal, _ := getActionOrdinal(lastAction.Name)
+	currentOrdinal, _ := getActionOrdinal(currentAction.Name)
+	return lastOrdinal == currentOrdinal
+}
+
+func isAdjacentPair(lastAction, currentAction *batchv1.Job) bool {
+	if lastAction.Spec.Suspend != nil && !*lastAction.Spec.Suspend {
+		return false
+	}
+	lastOrdinal, _ := getActionOrdinal(lastAction.Name)
+	currentOrdinal, _ := getActionOrdinal(currentAction.Name)
+	lastPre := isPreAction(lastAction.Labels[jobTypeLabel])
+	currentPre := isPreAction(currentAction.Labels[jobTypeLabel])
+	// scale out: member-3-post-join adjacent with member-4-post-join
+	// scale in:  member-4-pre-leave adjacent with member-3-pre-leave
+	return (math.Abs(float64(lastOrdinal-currentOrdinal)) == 1) && (lastPre==currentPre)
+}
+
+func isPreAction(actionType string) bool {
+	return actionType == jobTypeSwitchover || actionType == jobTypeMemberLeaveNotifying
+}
+
+func isLatestActionList(actionList []*batchv1.Job, csSet *workloads.ConsensusSet) bool {
+	// no actions as membershipReconfiguration not configured
+	// bad case: membership configuration is updated during action list generation.
+	// this should be rare, ignore it currently.
+	// for the users: don't do `spec.membershipReconfiguration` update during horizontal scaling.
+	if !shouldHaveActions(csSet) {
+		return true
+	}
+
+	// no actions come yet, but should
+	if len(actionList) == 0 {
+		return false
+	}
+
+	// get the last action, its target should be the last member which has ordinal equals to `spec.replicas - 1`
+	action := actionList[len(actionList)-1]
+	ordinal, _ := getActionOrdinal(action.Name)
+	return ordinal == int(csSet.Spec.Replicas-1)
+}
+
+func shouldHaveActions(csSet *workloads.ConsensusSet) bool {
+	currentReplicas := len(csSet.Status.MembersStatus)
+	expectedReplicas := int(csSet.Spec.Replicas)
+
+	var actionTypeList []string
+	switch {
+	case currentReplicas > expectedReplicas:
+		actionTypeList = []string{jobTypeSwitchover, jobTypeMemberLeaveNotifying}
+	case currentReplicas < expectedReplicas:
+		actionTypeList = []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
+	}
+	for _, actionType := range actionTypeList {
+		if shouldCreateAction(csSet, actionType, nil) {
+			return true
+		}
+	}
+	return false
+}
+
+func findFirstUnfinishedAction(allActionList []*batchv1.Job) int {
+	index := -1
+	for i := range allActionList {
+		if allActionList[i].Status.Failed > 0 || allActionList[i].Status.Succeeded > 0 {
+			continue
+		}
+		index = i
+		break
+	}
+	return index
+}
+
 func shouldCreateAction(csSet *workloads.ConsensusSet, actionType string, checker conditionChecker) bool {
 	if checker != nil && !checker() {
 		return false
@@ -378,50 +425,6 @@ func getAllActionList(transCtx *CSSetTransformContext) ([]*batchv1.JobList, erro
 
 func getPodName(parent string, ordinal int) string {
 	return fmt.Sprintf("%s-%d", parent, ordinal)
-}
-
-// with actionList sorted by generation and action priority
-func getPodActionMap(transCtx *CSSetTransformContext) (map[string]*podAction, []*batchv1.Job, error) {
-	// sort actions by generation and actionType
-	actionLists, err := getAllActionList(transCtx)
-	if err != nil {
-		return nil, nil, err
-	}
-	podActionMap := make(map[string]*podAction, len(actionLists))
-	var orphanActionList []*batchv1.Job
-	for _, list := range actionLists {
-		for i, action := range list.Items {
-			ordinal, err := getActionOrdinal(action.Name)
-			if err != nil {
-				return nil, nil, err
-			}
-			if ordinal >= int(transCtx.CSSet.Status.Replicas) && ordinal >= int(transCtx.CSSet.Spec.Replicas) {
-				orphanActionList = append(orphanActionList, &list.Items[i])
-				continue
-			}
-			podName := getPodName(transCtx.CSSet.Name, ordinal)
-			pAction, ok := podActionMap[podName]
-			if !ok {
-				pAction = &podAction{}
-			}
-			pAction.podName = podName
-			switch action.Labels[jobTypeLabel] {
-			case jobTypeSwitchover, jobTypeMemberLeaveNotifying:
-				pAction.hasPreAction = true
-			case jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote:
-				pAction.hasPostAction = true
-			}
-			actionList := pAction.actionList
-			if actionList == nil {
-				actionList = make([]*batchv1.Job, 0)
-			}
-			actionList = append(actionList, &list.Items[i])
-			pAction.actionList = actionList
-			podActionMap[podName] = pAction
-		}
-	}
-
-	return podActionMap, orphanActionList, nil
 }
 
 func getActionOrdinal(actionName string) (int, error) {
@@ -498,8 +501,7 @@ func abnormalAnalysis(csSet *workloads.ConsensusSet, action *batchv1.Job) error 
 	return nil
 }
 
-func doActions(csSet *workloads.ConsensusSet, dag *graph.DAG, leaderPodName string, ordinal int, actionTypeList []string) (bool, error) {
-	actionCreated := false
+func doActions(csSet *workloads.ConsensusSet, dag *graph.DAG, leaderPodName string, ordinal int, actionTypeList []string) error {
 	podName := getPodName(csSet.Name, ordinal)
 	for _, actionType := range actionTypeList {
 		checker := func() bool {
@@ -513,11 +515,10 @@ func doActions(csSet *workloads.ConsensusSet, dag *graph.DAG, leaderPodName stri
 		}
 		env := buildActionEnv(csSet, leaderPodName, podName)
 		if err := createAction(csSet, dag, env, actionType, ordinal, true); err != nil {
-			return false, err
+			return err
 		}
-		actionCreated = true
 	}
-	return actionCreated, nil
+	return nil
 }
 
 // ordinal is the ordinal of pod which this action apply to
@@ -678,8 +679,22 @@ func doActionCleanup(dag *graph.DAG, action *batchv1.Job) {
 	model.PrepareUpdate(dag, actionOld, actionNew)
 }
 
+func emitEvent(transCtx *CSSetTransformContext, action *batchv1.Job) {
+	switch {
+	case action.Status.Succeeded > 0:
+		emitActionSucceedEvent(transCtx, action.Labels[jobTypeLabel], action.Name)
+	case action.Status.Failed > 0:
+		emitActionFailedEvent(transCtx, action.Labels[jobTypeLabel], action.Name)
+	}
+}
+
+func emitActionSucceedEvent(transCtx *CSSetTransformContext, actionType, actionName string) {
+	message := fmt.Sprintf("%s succeed, job name: %s", actionType, actionName)
+	emitActionEvent(transCtx, corev1.EventTypeNormal, actionType, message)
+}
+
 func emitActionFailedEvent(transCtx *CSSetTransformContext, actionType, actionName string) {
-	message := fmt.Sprintf("%s action failed, job name: %s", actionType, actionName)
+	message := fmt.Sprintf("%s failed, job name: %s", actionType, actionName)
 	emitActionEvent(transCtx, corev1.EventTypeWarning, actionType, message)
 }
 

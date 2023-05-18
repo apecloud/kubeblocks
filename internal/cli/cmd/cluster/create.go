@@ -317,9 +317,10 @@ func (o *CreateOptions) Validate() error {
 
 func (o *CreateOptions) Complete() error {
 	var (
-		compByte     []byte
-		clusterComps *appsv1alpha1.Cluster
-		err          error
+		compByte         []byte
+		cls              *appsv1alpha1.Cluster
+		clusterCompSpecs []appsv1alpha1.ClusterComponentSpec
+		err              error
 	)
 	if len(o.SetFile) > 0 {
 		if compByte, err = MultipleSourceComponents(o.SetFile, o.IOStreams.In); err != nil {
@@ -328,24 +329,30 @@ func (o *CreateOptions) Complete() error {
 		if compByte, err = yaml.YAMLToJSON(compByte); err != nil {
 			return err
 		}
-		if err = json.Unmarshal(compByte, &clusterComps); err != nil {
-			return err
+
+		// compatible with old file format that only specify the components
+		if err = json.Unmarshal(compByte, &cls); err != nil {
+			if clusterCompSpecs, err = parseClusterComponentSpec(compByte); err != nil {
+				return err
+			}
+		} else {
+			clusterCompSpecs = cls.Spec.ComponentSpecs
 		}
 	}
 
 	// build annotation
-	o.buildAnnotation(clusterComps)
+	o.buildAnnotation(cls)
 
 	// build cluster definition
-	if err := o.buildClusterDef(clusterComps); err != nil {
+	if err := o.buildClusterDef(cls); err != nil {
 		return err
 	}
 
 	// build cluster version
-	o.buildClusterVersion(clusterComps)
+	o.buildClusterVersion(cls)
 
 	// build components
-	components, err := o.buildComponents(clusterComps)
+	components, err := o.buildComponents(clusterCompSpecs)
 	if err != nil {
 		return err
 	}
@@ -375,7 +382,7 @@ func (o *CreateOptions) CleanUp() error {
 }
 
 // buildComponents build components from file or set values
-func (o *CreateOptions) buildComponents(clusterComps *appsv1alpha1.Cluster) ([]map[string]interface{}, error) {
+func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterComponentSpec) ([]map[string]interface{}, error) {
 	var (
 		err       error
 		cd        *appsv1alpha1.ClusterDefinition
@@ -392,8 +399,8 @@ func (o *CreateOptions) buildComponents(clusterComps *appsv1alpha1.Cluster) ([]m
 		return nil, err
 	}
 
-	if clusterComps != nil {
-		for _, comp := range clusterComps.Spec.ComponentSpecs {
+	if clusterCompSpecs != nil {
+		for _, comp := range clusterCompSpecs {
 			compSpecs = append(compSpecs, &comp)
 		}
 	} else {
@@ -1099,4 +1106,23 @@ func (o *CreateOptions) buildAnnotation(comp *appsv1alpha1.Cluster) {
 	if o.Annotations == nil {
 		o.Annotations = comp.Annotations
 	}
+}
+
+// parse the cluster component spec
+// compatible with old file format that only specify the components
+func parseClusterComponentSpec(compByte []byte) ([]appsv1alpha1.ClusterComponentSpec, error) {
+	var compSpecs []appsv1alpha1.ClusterComponentSpec
+	var comps []map[string]interface{}
+	if err := json.Unmarshal(compByte, &comps); err != nil {
+		return nil, err
+	}
+	for _, comp := range comps {
+		var compSpec appsv1alpha1.ClusterComponentSpec
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(comp, &compSpec); err != nil {
+			return nil, err
+		}
+		compSpecs = append(compSpecs, compSpec)
+	}
+
+	return compSpecs, nil
 }

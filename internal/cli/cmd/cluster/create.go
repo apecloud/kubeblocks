@@ -955,7 +955,7 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 // validateClusterVersion check whether the cluster version we need is exist in K8S or
 // the default cluster version is exist
 func (o *CreateOptions) validateClusterVersion() error {
-	existedClusterVersions, defaultVersion, existedDefault, err := getClusterVersions(o.Dynamic, o.ClusterDefRef)
+	existedClusterVersions, defaultVersion, existedDefault, err := GetClusterVersions(o.Dynamic, o.ClusterDefRef)
 	if err != nil {
 		return err
 	}
@@ -983,8 +983,8 @@ func (o *CreateOptions) validateClusterVersion() error {
 	return nil
 }
 
-// getClusterVersions return all cluster versions in K8S and return true if the cluster have a default cluster version
-func getClusterVersions(dynamic dynamic.Interface, clusterDef string) (map[string]struct{}, string, bool, error) {
+// GetClusterVersions return all cluster versions in K8S and return true if the cluster have a default cluster version
+func GetClusterVersions(dynamic dynamic.Interface, clusterDef string) (map[string]struct{}, string, bool, error) {
 	allClusterVersions := make(map[string]struct{})
 	existedDefault := false
 	defaultVersion := ""
@@ -997,7 +997,7 @@ func getClusterVersions(dynamic dynamic.Interface, clusterDef string) (map[strin
 	for _, item := range list.Items {
 		allClusterVersions[item.GetName()] = struct{}{}
 		annotations := item.GetAnnotations()
-		if annotations != nil && annotations[constant.DefaultClusterVersionAnnotationKey] == annotationTrueValue {
+		if annotations != nil && annotations[constant.IsDefaultClusterVersionAnnotationKey] == annotationTrueValue {
 			if existedDefault {
 				return nil, defaultVersion, existedDefault, fmt.Errorf("clusterDef %s has more than one default cluster version", clusterDef)
 			}

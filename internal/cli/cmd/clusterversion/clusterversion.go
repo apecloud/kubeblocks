@@ -21,14 +21,19 @@ package clusterversion
 
 import (
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var listExample = templates.Examples(`
@@ -48,6 +53,8 @@ func NewClusterVersionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 	}
 
 	cmd.AddCommand(NewListCmd(f, streams))
+	cmd.AddCommand(NewSetDefaultCMD(f, streams))
+	cmd.AddCommand(NewUnSetDefaultCMD(f, streams))
 	return cmd
 }
 
@@ -66,11 +73,49 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 				o.LabelSelector = util.BuildClusterDefinitionRefLable(o.LabelSelector, []string{o.clusterDefinitionRef})
 			}
 			o.Names = args
-			_, err := o.Run()
-			util.CheckErr(err)
+			util.CheckErr(run(o))
 		},
 	}
 	o.AddFlags(cmd, true)
 	flags.AddClusterDefinitionFlag(f, cmd, &o.clusterDefinitionRef)
 	return cmd
+}
+
+func run(o *ListClusterVersionOptions) error {
+	o.Print = false
+	r, err := o.Run()
+	if err != nil {
+		return err
+	}
+	if !o.Format.IsHumanReadable() {
+		return o.PrintGeneric(r)
+	}
+
+	infos, err := r.Infos()
+	if err != nil {
+		return err
+	}
+	p := printer.NewTablePrinter(o.Out)
+	p.SetHeader("NAME", "CLUSTER-DEFINITION", "STATUS", "CREATED-TIME", "IS-DEFAULT")
+	p.SortBy(o.GetSortByForCustomTable(1))
+	for _, info := range infos {
+		var cv v1alpha1.ClusterVersion
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cv); err != nil {
+			return err
+		}
+		isDefaultValue := getIsDefault(&cv)
+		p.AddRow(cv.Name, cv.Labels[constant.ClusterDefLabelKey], cv.Status.Phase, util.TimeFormat(&cv.CreationTimestamp), isDefaultValue)
+	}
+	p.Print()
+	return nil
+}
+
+func getIsDefault(cv *v1alpha1.ClusterVersion) string {
+	if cv.Annotations == nil {
+		return "false"
+	}
+	if _, ok := cv.Annotations[constant.IsDefaultClusterVersionAnnotationKey]; !ok {
+		return "false"
+	}
+	return cv.Annotations[constant.IsDefaultClusterVersionAnnotationKey]
 }

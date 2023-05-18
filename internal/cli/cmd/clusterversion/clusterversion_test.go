@@ -21,6 +21,7 @@ package clusterversion
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -38,50 +39,14 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var _ = Describe("clusterversion", func() {
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
 	out := new(bytes.Buffer)
-
-	mockRestTable := func() *metav1.Table {
-		var Type = "string"
-		table := &metav1.Table{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "Table",
-				APIVersion: "meta.k8s.io/v1",
-			},
-			ColumnDefinitions: []metav1.TableColumnDefinition{
-				{
-					Name: "NAME",
-					Type: Type,
-				}, {
-					Name: "CLUSTER-DEFINITION",
-					Type: Type,
-				}, {
-					Name: "STATUS",
-					Type: Type,
-				},
-				{
-					Name: "AGE",
-					Type: Type,
-				},
-			},
-			Rows: []metav1.TableRow{
-				{
-					Cells: []interface{}{
-						testing.ClusterVersionName,
-						testing.ClusterDefName,
-						"Available",
-						"0s",
-					},
-				},
-			},
-		}
-		return table
-	}
-
+	var CreateTime string
 	mockClient := func(data runtime.Object) *cmdtesting.TestFactory {
 		tf := testing.NewTestFactory(testing.Namespace)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -99,8 +64,9 @@ var _ = Describe("clusterversion", func() {
 		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
 		_ = metav1.AddMetaToScheme(scheme.Scheme)
 		streams, _, out, _ = genericclioptions.NewTestIOStreams()
-		table := mockRestTable()
-		tf = mockClient(table)
+		fakeCV := testing.FakeClusterVersion()
+		CreateTime = util.TimeFormat(&fakeCV.CreationTimestamp)
+		tf = mockClient(fakeCV)
 	})
 
 	AfterEach(func() {
@@ -121,9 +87,7 @@ var _ = Describe("clusterversion", func() {
 	It("list --cluster-definition", func() {
 		cmd := NewListCmd(tf, streams)
 		cmd.Run(cmd, []string{"--cluster-definition=" + testing.ClusterDefName})
-		expected := `NAME                   CLUSTER-DEFINITION        STATUS      AGE
-fake-cluster-version   fake-cluster-definition   Available   0s
-`
+		expected := fmt.Sprintf("NAME                   CLUSTER-DEFINITION        STATUS   CREATED-TIME                 IS-DEFAULT   \nfake-cluster-version   fake-cluster-definition            %s   false        \n", CreateTime)
 		Expect(expected).Should(Equal(out.String()))
 	})
 })

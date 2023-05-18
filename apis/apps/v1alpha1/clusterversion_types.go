@@ -120,7 +120,6 @@ type VersionsContext struct {
 // +kubebuilder:printcolumn:name="CLUSTER-DEFINITION",type="string",JSONPath=".spec.clusterDefinitionRef",description="ClusterDefinition referenced by cluster."
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
-// +kubebuilder:printcolumn:name="IS-DEFAULT",type="date",JSONPath=".metadata.creationTimestamp"
 
 // ClusterVersion is the Schema for the ClusterVersions API
 type ClusterVersion struct {

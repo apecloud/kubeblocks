@@ -1,13 +1,24 @@
 ---
-title: kbcli clusterversion
+title: kbcli clusterversion set-default
 ---
 
-ClusterVersion command.
+Set the clusterversion to the default cluster clusterversion for its clusterDef.
+
+```
+kbcli clusterversion set-default NAME [flags]
+```
+
+### Examples
+
+```
+  # set the clusterversion to be the default
+  kbcli clusterversion set-default ac-mysql-8.0.30
+```
 
 ### Options
 
 ```
-  -h, --help   help for clusterversion
+  -h, --help   help for set-default
 ```
 
 ### Options inherited from parent commands
@@ -36,10 +47,7 @@ ClusterVersion command.
 
 ### SEE ALSO
 
-
-* [kbcli clusterversion list](kbcli_clusterversion_list.md)	 - List ClusterVersions.
-* [kbcli clusterversion set-default](kbcli_clusterversion_set-default.md)	 - Set the clusterversion to the default cluster clusterversion for its clusterDef.
-* [kbcli clusterversion unset-default](kbcli_clusterversion_unset-default.md)	 - Unset the clusterversion if it's default.
+* [kbcli clusterversion](kbcli_clusterversion.md)	 - ClusterVersion command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

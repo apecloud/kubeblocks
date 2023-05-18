@@ -114,6 +114,10 @@ func (t *TablePrinter) Print() {
 	t.Tbl.Render()
 }
 
+func (t *TablePrinter) SortBy(sortBy []table.SortBy) {
+	t.Tbl.SortBy(sortBy)
+}
+
 // PrintPairStringToLine print pair string for a line , the format is as follows "<space>*<key>:\t<value>".
 // spaceCount is the space character count which is placed in the offset of field string.
 // the default values of tabCount is 2.

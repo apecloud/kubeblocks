@@ -454,6 +454,22 @@ var _ = Describe("builder", func() {
 
 		It("builds config manager sidecar container correctly", func() {
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
+				ManagerName:   "cfgmgr",
+				CharacterType: "mysql",
+				SecreteName:   "test-secret",
+				Image:         constant.KBToolsImage,
+				Args:          []string{},
+				Envs:          []corev1.EnvVar{},
+				Volumes:       []corev1.VolumeMount{},
+			}
+			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
+			Expect(err).Should(BeNil())
+			Expect(configmap).ShouldNot(BeNil())
+			Expect(configmap.SecurityContext).Should(BeNil())
+		})
+
+		It("builds config manager sidecar container correctly", func() {
+			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:           "cfgmgr",
 				CharacterType:         "mysql",
 				SecreteName:           "test-secret",
@@ -466,6 +482,9 @@ var _ = Describe("builder", func() {
 			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
+			Expect(configmap.SecurityContext).ShouldNot(BeNil())
+			Expect(configmap.SecurityContext.RunAsUser).ShouldNot(BeNil())
+			Expect(*configmap.SecurityContext.RunAsUser).Should(BeEquivalentTo(int64(0)))
 		})
 	})
 

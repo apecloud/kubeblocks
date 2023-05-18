@@ -21,7 +21,6 @@ package consensusset
 
 import (
 	"fmt"
-	"math"
 	"regexp"
 	"sort"
 	"strconv"
@@ -159,7 +158,9 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		}
 	case index < 0:
 		// last finished action
-		emitEvent(transCtx, finalActionList[len(finalActionList)-1])
+		if len(finalActionList) > 0 {
+			emitEvent(transCtx, finalActionList[len(finalActionList)-1])
+		}
 		// all action finished, do clean up
 		for _, ac := range allActionList {
 			doActionCleanup(dag, ac)
@@ -359,7 +360,15 @@ func isAdjacentPair(lastAction, currentAction *batchv1.Job) bool {
 	currentPre := isPreAction(currentAction.Labels[jobTypeLabel])
 	// scale out: member-3-post-join adjacent with member-4-post-join
 	// scale in:  member-4-pre-leave adjacent with member-3-pre-leave
-	return (math.Abs(float64(lastOrdinal-currentOrdinal)) == 1) && (lastPre == currentPre)
+	if lastPre != currentPre {
+		return false
+	}
+	switch lastPre {
+	case true:
+		return lastOrdinal - currentOrdinal == 1
+	default:
+		return currentOrdinal - lastOrdinal == 1
+	}
 }
 
 func printActionList(logger logr.Logger, actionList []*batchv1.Job) {

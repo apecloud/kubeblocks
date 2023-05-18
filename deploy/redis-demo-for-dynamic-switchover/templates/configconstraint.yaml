@@ -2,7 +2,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ConfigConstraint
 metadata:
-  name: redis7-config-constraints-new
+  name: redis7-demo-config-constraints
   labels:
     {{- include "redis.labels" . | nindent 4 }}
 spec:
@@ -48,7 +48,7 @@ spec:
       - "redis-update.sh"
 
   scriptConfigs:
-    - scriptConfigMapRef: redis-reload-script-new
+    - scriptConfigMapRef: redis-demo-reload-script
       namespace: {{ .Release.Namespace }}
 
   toolImageSpec:

@@ -1,11 +1,11 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
-  name: redis-new-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  name: redis-demo-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   labels:
     {{- include "redis.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: redis-new
+  clusterDefinitionRef: redis-demo
   componentVersions:
   - componentDefRef: redis
     versionsContext:

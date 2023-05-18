@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: redis-new
+  name: redis-demo
   labels:
     {{- include "redis.labels" . | nindent 4 }}
 spec:
@@ -67,17 +67,17 @@ spec:
             targetPort: redis
       configSpecs:
         - name: redis-replication-config
-          templateRef: redis7-config-template-new
-          constraintRef: redis7-config-constraints-new
+          templateRef: redis7-demo-config-template
+          constraintRef: redis7-demo-config-constraints
           namespace: {{ .Release.Namespace }}
           volumeName: redis-config
           secondaryRenderedConfigSpec:
-            templateRef: redis7-config-template-second
+            templateRef: redis7-demo-config-template-second
             namespace: {{ .Release.Namespace }}
             policy: none
       scriptSpecs:
         - name: redis-scripts
-          templateRef: redis-scripts-new
+          templateRef: redis-demo-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 493
@@ -194,18 +194,18 @@ spec:
             port: 26379
       configSpecs:
         - name: redis-replication-config
-          templateRef: redis7-config-template-new
-          constraintRef: redis7-config-constraints-new
+          templateRef: redis7-demo-config-template
+          constraintRef: redis7-demo-config-constraints
           namespace: {{ .Release.Namespace }}
           volumeName: redis-config
         - name: redis-replicas-config
-          templateRef: redis7-sentinel-config-template-new
-          constraintRef: redis7-sentinel-config-constraints-new
+          templateRef: redis7-demo-sentinel-config-template
+          constraintRef: redis7-demo-sentinel-config-constraints
           namespace: {{ .Release.Namespace }}
           volumeName: redis-sentinel-config
       scriptSpecs:
         - name: redis-scripts
-          templateRef: redis-scripts-new
+          templateRef: redis-demo-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 493

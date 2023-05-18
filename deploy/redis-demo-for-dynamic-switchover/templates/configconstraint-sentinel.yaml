@@ -2,7 +2,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ConfigConstraint
 metadata:
-  name: redis7-sentinel-config-constraints-new
+  name: redis7-demo-sentinel-config-constraints
   labels:
     {{- include "redis.labels" . | nindent 4 }}
 spec:
@@ -23,7 +23,7 @@ spec:
         - "redis-replicas-update.sh"
 
   scriptConfigs:
-    - scriptConfigMapRef: redis-reload-script-new
+    - scriptConfigMapRef: redis-demo-reload-script
       namespace: {{ .Release.Namespace }}
 
   staticParameters:

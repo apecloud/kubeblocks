@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: redis7-config-template-new
+  name: redis7-demo-config-template
   labels:
     {{- include "redis.labels" . | nindent 4 }}
 data:
@@ -11,7 +11,7 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: redis-reload-script-new
+  name: redis-demo-reload-script
   labels:
     {{- include "redis.labels" . | nindent 4 }}
 data:
@@ -27,7 +27,7 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: redis7-config-template-second
+  name: redis7-demo-config-template-second
   labels:
     {{- include "redis.labels" . | nindent 4 }}
 data:
@@ -37,7 +37,7 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: redis7-sentinel-config-template-new
+  name: redis7-demo-sentinel-config-template
   labels:
     {{- include "redis.labels" . | nindent 4 }}
 data:

@@ -79,17 +79,18 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 	updateStsHandler := func() {
 		stsVertex.Immutable = false
 	}
+	memberReadyReplicas := int32(len(transCtx.CSSet.Status.MembersStatus))
 
 	// barrier 2: latest action list in the api-server
 	if model.IsObjectUpdating(transCtx.OrigCSSet) {
-		if transCtx.CSSet.Status.Replicas == transCtx.CSSet.Spec.Replicas {
+		if memberReadyReplicas == transCtx.CSSet.Spec.Replicas {
 			return nil
 		}
-		return generateActions(transCtx, dag)
+		return generateActions(transCtx, dag, memberReadyReplicas)
 	}
 
 	// barrier 3: if scale out, make sure new pods are ready
-	if len(transCtx.CSSet.Status.MembersStatus) < int(transCtx.CSSet.Spec.Replicas) &&
+	if memberReadyReplicas < transCtx.CSSet.Spec.Replicas &&
 		sts.Status.ReadyReplicas != transCtx.CSSet.Spec.Replicas {
 		updateStsHandler()
 		return nil
@@ -166,10 +167,6 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		updateStsHandler()
 	}
 
-	if len(transCtx.CSSet.Status.MembersStatus) < int(transCtx.CSSet.Spec.Replicas) {
-		updateStsHandler()
-	}
-
 	return nil
 }
 
@@ -224,24 +221,28 @@ func isMemberReady(podName string, membersStatus []workloads.ConsensusMemberStat
 	return false
 }
 
-func generateActions(transCtx *CSSetTransformContext, dag *graph.DAG) error {
-	leaderPodName := getLeaderPodName(transCtx.CSSet.Status.MembersStatus)
-	// member join
-	// members with ordinal less than 'spec.replicas' should in the consensus cluster
-	actionTypeList := []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
-	for i := 0; i < int(transCtx.CSSet.Spec.Replicas); i++ {
-		podName := getPodName(transCtx.CSSet.Name, i)
-		if isMemberReady(podName, transCtx.CSSet.Status.MembersStatus) {
-			continue
-		}
-		if err := doActions(transCtx.CSSet, dag, leaderPodName, i, actionTypeList); err != nil {
-			return err
-		}
+func generateActions(transCtx *CSSetTransformContext, dag *graph.DAG, memberReadyReplicas int32) error {
+	var (
+		start, end     int32
+		actionTypeList []string
+	)
+	switch {
+	case memberReadyReplicas < transCtx.CSSet.Spec.Replicas:
+		// member join
+		// members with ordinal less than 'spec.replicas' should in the consensus cluster
+		actionTypeList = []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
+		start = memberReadyReplicas
+		end = transCtx.CSSet.Spec.Replicas
+	case memberReadyReplicas > transCtx.CSSet.Spec.Replicas:
+		// member leave
+		// members with ordinal greater than 'spec.replicas - 1' should not in the consensus cluster
+		actionTypeList = []string{jobTypeSwitchover, jobTypeMemberLeaveNotifying}
+		start = transCtx.CSSet.Spec.Replicas
+		end = memberReadyReplicas
 	}
-	// member leave
-	// members with ordinal greater than 'spec.replicas - 1' should not in the consensus cluster
-	actionTypeList = []string{jobTypeSwitchover, jobTypeMemberLeaveNotifying}
-	for i := transCtx.CSSet.Spec.Replicas; i < transCtx.CSSet.Status.Replicas; i++ {
+
+	leaderPodName := getLeaderPodName(transCtx.CSSet.Status.MembersStatus)
+	for i := start; i < end; i++ {
 		if err := doActions(transCtx.CSSet, dag, leaderPodName, int(i), actionTypeList); err != nil {
 			return err
 		}

@@ -88,6 +88,13 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		return generateActionLog(transCtx, dag)
 	}
 
+	// barrier 3: if scale out, make sure new pods are ready
+	if len(transCtx.CSSet.Status.MembersStatus) < int(transCtx.CSSet.Spec.Replicas) &&
+		sts.Status.ReadyReplicas != transCtx.CSSet.Spec.Replicas {
+		updateStsHandler()
+		return nil
+	}
+
 	// compose action list
 	// sort pods in order:
 	// 1. action generation in ascend
@@ -118,7 +125,7 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 	finalActionList := buildFinalActionList(allActionList)
 	printActionList(transCtx.Logger, finalActionList)
 
-	// barrier 3: make sure latest action list is in cache
+	// barrier 4: make sure latest action list is in cache
 	// why should have the latest action list?
 	// one case:
 	// replicas: 5->3, local action list: member-5-leave
@@ -155,6 +162,10 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		for _, ac := range allActionList {
 			doActionCleanup(dag, ac)
 		}
+		updateStsHandler()
+	}
+
+	if len(transCtx.CSSet.Status.MembersStatus) < int(transCtx.CSSet.Spec.Replicas) {
 		updateStsHandler()
 	}
 
@@ -350,7 +361,12 @@ func isLatestActionList(actionList []*batchv1.Job, csSet *workloads.ConsensusSet
 	// get the last action, its target should be the last member which has ordinal equals to `spec.replicas - 1`
 	action := actionList[len(actionList)-1]
 	ordinal, _ := getActionOrdinal(action.Name)
-	return ordinal == int(csSet.Spec.Replicas-1)
+	switch {
+	case len(csSet.Status.MembersStatus) < int(csSet.Spec.Replicas):
+		return ordinal == int(csSet.Spec.Replicas-1)
+	default:
+		return ordinal == int(csSet.Spec.Replicas)
+	}
 }
 
 func shouldHaveActions(csSet *workloads.ConsensusSet) bool {

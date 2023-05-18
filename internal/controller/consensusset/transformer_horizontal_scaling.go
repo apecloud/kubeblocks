@@ -123,7 +123,7 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		return err
 	}
 	printActionList(transCtx.Logger, allActionList)
-	finalActionList := buildFinalActionList(allActionList)
+	finalActionList := buildFinalActionList(allActionList, int(memberReadyReplicas), int(transCtx.CSSet.Spec.Replicas))
 	printActionList(transCtx.Logger, finalActionList)
 
 	// barrier 4: make sure latest action list is in cache
@@ -293,9 +293,28 @@ func buildAllActionList(transCtx *CSSetTransformContext) ([]*batchv1.Job, error)
 	return allActionList, nil
 }
 
-func buildFinalActionList(allActionList []*batchv1.Job) []*batchv1.Job {
+func buildFinalActionList(allActionList []*batchv1.Job, readyMembers, expectedMembers int) []*batchv1.Job {
+	currentMembers := readyMembers
+	index := findFirstUnfinishedAction(allActionList)
+	if index > 0 {
+		lastAction := allActionList[index-1]
+		ordinal, _ := getActionOrdinal(lastAction.Name)
+		if isPreAction(lastAction.Labels[jobTypeLabel]) {
+			currentMembers = ordinal
+		} else {
+			currentMembers = ordinal + 1
+		}
+	}
+
 	var finalActionList []*batchv1.Job
 	for _, action := range allActionList {
+		if action.Spec.Suspend != nil && !*action.Spec.Suspend {
+			finalActionList = append(finalActionList, action)
+			continue
+		}
+		if isOutOfScope(action, currentMembers, expectedMembers) {
+			continue
+		}
 		if len(finalActionList) == 0 {
 			finalActionList = append(finalActionList, action)
 			continue
@@ -312,12 +331,13 @@ func buildFinalActionList(allActionList []*batchv1.Job) []*batchv1.Job {
 	return finalActionList
 }
 
-func printActionList(logger logr.Logger, actionList []*batchv1.Job) {
-	var actionNameList []string
-	for _, action := range actionList {
-		actionNameList = append(actionNameList, fmt.Sprintf("%s-%v", action.Name, *action.Spec.Suspend))
+func isOutOfScope(action *batchv1.Job, currentMembers, expectedMembers int) bool {
+	bottom, top := currentMembers, expectedMembers
+	if bottom > top {
+		bottom, top = top, bottom
 	}
-	logger.Info(fmt.Sprintf("action list: %v\n", actionNameList))
+	ordinal, _ := getActionOrdinal(action.Name)
+	return ordinal >= top || ordinal < bottom
 }
 
 func isSuspendPair(lastAction, currentAction *batchv1.Job) bool {
@@ -339,7 +359,15 @@ func isAdjacentPair(lastAction, currentAction *batchv1.Job) bool {
 	currentPre := isPreAction(currentAction.Labels[jobTypeLabel])
 	// scale out: member-3-post-join adjacent with member-4-post-join
 	// scale in:  member-4-pre-leave adjacent with member-3-pre-leave
-	return (math.Abs(float64(lastOrdinal-currentOrdinal)) == 1) && (lastPre==currentPre)
+	return (math.Abs(float64(lastOrdinal-currentOrdinal)) == 1) && (lastPre == currentPre)
+}
+
+func printActionList(logger logr.Logger, actionList []*batchv1.Job) {
+	var actionNameList []string
+	for _, action := range actionList {
+		actionNameList = append(actionNameList, fmt.Sprintf("%s-%v", action.Name, *action.Spec.Suspend))
+	}
+	logger.Info(fmt.Sprintf("action list: %v\n", actionNameList))
 }
 
 func isPreAction(actionType string) bool {

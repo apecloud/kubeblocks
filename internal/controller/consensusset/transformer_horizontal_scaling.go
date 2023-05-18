@@ -85,7 +85,7 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		if transCtx.CSSet.Status.Replicas == transCtx.CSSet.Spec.Replicas {
 			return nil
 		}
-		return generateActionLog(transCtx, dag)
+		return generateActions(transCtx, dag)
 	}
 
 	// barrier 3: if scale out, make sure new pods are ready
@@ -96,7 +96,7 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 	}
 
 	// compose action list
-	// sort pods in order:
+	// sort actions in order:
 	// 1. action generation in ascend
 	// 2. leaving with ordinal descend
 	// 3. joining with ordinal ascend
@@ -223,7 +223,7 @@ func isMemberReady(podName string, membersStatus []workloads.ConsensusMemberStat
 	return false
 }
 
-func generateActionLog(transCtx *CSSetTransformContext, dag *graph.DAG) error {
+func generateActions(transCtx *CSSetTransformContext, dag *graph.DAG) error {
 	leaderPodName := getLeaderPodName(transCtx.CSSet.Status.MembersStatus)
 	// member join
 	// members with ordinal less than 'spec.replicas' should in the consensus cluster

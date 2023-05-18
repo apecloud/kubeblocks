@@ -162,6 +162,9 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 }
 
 func isStatefulSetReady(sts *apps.StatefulSet) bool {
+	if sts == nil {
+		return false
+	}
 	if sts.Status.ObservedGeneration == sts.Generation &&
 		sts.Status.Replicas == *sts.Spec.Replicas &&
 		sts.Status.ReadyReplicas == sts.Status.Replicas {
@@ -315,7 +318,7 @@ func isSuspendPair(lastAction, currentAction *batchv1.Job) bool {
 
 func isAdjacentPair(lastAction, currentAction *batchv1.Job) bool {
 	if lastAction.Spec.Suspend != nil && !*lastAction.Spec.Suspend {
-		return false
+		return true
 	}
 	lastOrdinal, _ := getActionOrdinal(lastAction.Name)
 	currentOrdinal, _ := getActionOrdinal(currentAction.Name)

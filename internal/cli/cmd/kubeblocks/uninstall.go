@@ -147,6 +147,7 @@ func (o *UninstallOptions) Uninstall() error {
 
 	// uninstall all KubeBlocks addons
 	if err := o.uninstallAddons(); err != nil {
+		fmt.Fprintf(o.Out, "Failed to uninstall addons, run \"kbcli kubeblocks uninstall\" to retry.\n")
 		return err
 	}
 
@@ -216,79 +217,67 @@ func (o *UninstallOptions) Uninstall() error {
 
 // uninstallAddons uninstall all KubeBlocks addons
 func (o *UninstallOptions) uninstallAddons() error {
-	addons := make(map[string]*extensionsv1alpha1.Addon)
-
 	var (
 		allErrs []error
 		err     error
-		msg     = "Wait for addons to be disabled"
-
-		processAddons = func(uninstall bool) error {
-			objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
-				LabelSelector: buildKubeBlocksSelectorLabels(),
-			})
-			if err != nil && !apierrors.IsNotFound(err) {
-				klog.V(1).Infof("Failed to get KubeBlocks addons %s", err.Error())
-				allErrs = append(allErrs, err)
-				return utilerrors.NewAggregate(allErrs)
-			}
-			if objects == nil {
-				return nil
-			}
-
-			for _, obj := range objects.Items {
-				addon := &extensionsv1alpha1.Addon{}
-				if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, addon); err != nil {
-					klog.V(1).Infof("Failed to convert KubeBlocks addon %s", err.Error())
-					allErrs = append(allErrs, err)
-					continue
-				}
-
-				if uninstall {
-					// we only need to uninstall addons that are not disabled
-					if addon.Status.Phase == extensionsv1alpha1.AddonDisabled {
-						continue
-					}
-					addons[addon.Name] = addon
-					o.addons = append(o.addons, addon)
-
-					// uninstall addons
-					if err = disableAddon(o.Dynamic, addon); err != nil {
-						klog.V(1).Infof("Failed to uninstall KubeBlocks addon %s %s", addon.Name, err.Error())
-						allErrs = append(allErrs, err)
-					}
-				} else {
-					// update cached addon if exists
-					if _, ok := addons[addon.Name]; ok {
-						addons[addon.Name] = addon
-					}
-				}
-			}
-			return utilerrors.NewAggregate(allErrs)
-		}
-
-		buildMsg = func() (string, bool) {
-			var addonMsg []string
-			allDisabled := true
-			for k, v := range addons {
-				status := string(v.Status.Phase)
-				if v.Status.Phase == extensionsv1alpha1.AddonDisabled {
-					status = printer.BoldGreen("OK")
-				} else {
-					allDisabled = false
-				}
-				addonMsg = append(addonMsg, fmt.Sprintf("%-48s %s", "Addon "+k, status))
-			}
-			sort.Strings(addonMsg)
-			return fmt.Sprintf("%-50s\n  %s", msg, strings.Join(addonMsg, "\n  ")), allDisabled
-		}
+		header  = "Wait for addons to be disabled"
+		s       spinner.Interface
+		msg     string
 	)
 
-	var s spinner.Interface
+	addons := make(map[string]*extensionsv1alpha1.Addon)
+	processAddons := func(uninstall bool) error {
+		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: buildKubeBlocksSelectorLabels(),
+		})
+		if err != nil && !apierrors.IsNotFound(err) {
+			klog.V(1).Infof("Failed to get KubeBlocks addons %s", err.Error())
+			allErrs = append(allErrs, err)
+			return utilerrors.NewAggregate(allErrs)
+		}
+		if objects == nil {
+			return nil
+		}
+
+		for _, obj := range objects.Items {
+			addon := &extensionsv1alpha1.Addon{}
+			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, addon); err != nil {
+				klog.V(1).Infof("Failed to convert KubeBlocks addon %s", err.Error())
+				allErrs = append(allErrs, err)
+				continue
+			}
+
+			if uninstall {
+				// we only need to uninstall addons that are not disabled
+				if addon.Status.Phase == extensionsv1alpha1.AddonDisabled {
+					continue
+				}
+				addons[addon.Name] = addon
+				o.addons = append(o.addons, addon)
+
+				// uninstall addons
+				if err = disableAddon(o.Dynamic, addon); err != nil {
+					klog.V(1).Infof("Failed to uninstall KubeBlocks addon %s %s", addon.Name, err.Error())
+					allErrs = append(allErrs, err)
+				}
+			} else {
+				// update cached addon if exists
+				if _, ok := addons[addon.Name]; ok {
+					addons[addon.Name] = addon
+				}
+			}
+		}
+		return utilerrors.NewAggregate(allErrs)
+	}
+
+	suffixMsg := func(msg string) string {
+		return fmt.Sprintf("%-50s", msg)
+	}
+
 	if !o.Wait {
 		s = spinner.New(o.Out, spinner.WithMessage(fmt.Sprintf("%-50s", "Uninstall KubeBlocks addons")))
 	} else {
-		s = spinner.New(o.Out, spinner.WithMessage(fmt.Sprintf("%-50s", msg)))
+		s = spinner.New(o.Out, spinner.WithMessage(fmt.Sprintf("%-50s", header)))
 	}
 
 	// get all addons and uninstall them
@@ -302,7 +291,7 @@ func (o *UninstallOptions) uninstallAddons() error {
 		return nil
 	}
 
-	spinnerDone := func(s spinner.Interface, msg string) {
+	spinnerDone := func() {
 		s.SetFinalMsg(msg)
 		s.Done("")
 		fmt.Fprintln(o.Out)
@@ -315,22 +304,20 @@ func (o *UninstallOptions) uninstallAddons() error {
 		if err = processAddons(false); err != nil {
 			return false, err
 		}
-		m, allDisabled := buildMsg()
-		s.SetMessage(m)
-		if allDisabled {
-			spinnerDone(s, m)
+		status := checkAddons(maps.Values(addons), false)
+		msg = suffixMsg(fmt.Sprintf("%s\n  %s", header, status.outputMsg))
+		s.SetMessage(msg)
+		if status.allDisabled {
+			spinnerDone()
 			return true, nil
+		} else if status.hasFailed {
+			return false, errors.New("there are some addons failed to disabled")
 		}
 		return false, nil
 	}); err != nil {
-		m, _ := buildMsg()
-		spinnerDone(s, m)
-		if err == wait.ErrWaitTimeout {
-			printAddonTimeoutMsg(o.Out, maps.Values(addons), false)
-			allErrs = append(allErrs, errors.New("timeout waiting for addons to be disabled"))
-		} else {
-			allErrs = append(allErrs, err)
-		}
+		spinnerDone()
+		printAddonMsg(o.Out, maps.Values(addons), false)
+		allErrs = append(allErrs, err)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

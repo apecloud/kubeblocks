@@ -431,7 +431,7 @@ func addonDescribeHandler(o *addonCmdOpts, cmd *cobra.Command, args []string) er
 				continue
 			}
 			if printHeader {
-				printer.PrintTitle("Failed Message")
+				fmt.Fprintln(o.Out, "Failed Message")
 				tbl = printer.NewTablePrinter(o.Out)
 				tbl.Tbl.SetColumnConfigs([]table.ColumnConfig{
 					{Number: 3, WidthMax: 120},

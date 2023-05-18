@@ -120,7 +120,7 @@ var _ = Describe("kubeblocks install", func() {
 		Expect(o.checkVersion(v)).Should(Succeed())
 	})
 
-	It("printAddonTimeoutMsg", func() {
+	It("printAddonMsg", func() {
 		const (
 			reason = "test-failed-reason"
 		)
@@ -177,7 +177,7 @@ var _ = Describe("kubeblocks install", func() {
 		for _, c := range testCases {
 			By(c.desc)
 			out := &bytes.Buffer{}
-			printAddonTimeoutMsg(out, c.addons)
+			printAddonMsg(out, c.addons, true)
 			Expect(out.String()).To(ContainSubstring(c.expected))
 		}
 	})

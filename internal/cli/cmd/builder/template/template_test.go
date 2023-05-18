@@ -26,13 +26,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"helm.sh/helm/v3/pkg/cli/values"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/apecloud/kubeblocks/test/testdata"
-	"github.com/apecloud/kubeblocks/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
@@ -87,27 +84,13 @@ var _ = Describe("template", func() {
 			_, err := os.ReadDir(componentPath)
 			Expect(err).Should(Succeed())
 			helmOutput := filepath.Join(helmOutputRoot, component)
-			testComponentTemplate(componentPath, helmTemplate(componentPath, helmOutput))
+			Expect(helmTemplate(componentPath, helmOutput)).Should(Succeed())
+			testComponentTemplate(componentPath, helmOutput)
 		}
 	})
 
-	// It("test config template render without depend on helm", func() {
-	//	testComponentTemplate("", testdata.SubTestDataPath("helm_template_output"))
-	// })
+	It("test config template render without depend on helm", func() {
+		testComponentTemplate(testdata.SubTestDataPath("../../deploy/apecloud-mysql"), "")
+		testComponentTemplate(testdata.SubTestDataPath("../../deploy/postgresql"), "")
+	})
 })
-
-func helmTemplate(helmPath string, helmOutput string) string {
-	o := helm.InstallOpts{
-		Name:      testing.KubeBlocksChartName,
-		Chart:     helmPath,
-		Namespace: "default",
-		Version:   version.DefaultKubeBlocksVersion,
-
-		DryRun:    func() *bool { r := true; return &r }(),
-		OutputDir: helmOutput,
-		ValueOpts: &values.Options{Values: []string{}},
-	}
-	_, err := o.Install(helm.NewFakeConfig("default"))
-	Expect(err).Should(Succeed())
-	return helmOutput
-}

@@ -20,9 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package template
 
 import (
-	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -32,7 +30,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	cfgcontainer "github.com/apecloud/kubeblocks/internal/configuration/container"
 )
 
 type renderTPLCmdOpts struct {
@@ -114,13 +111,8 @@ func (o *renderTPLCmdOpts) checkAndHelmTemplate() error {
 	if o.helmTemplateDir != "" && o.helmOutputDir == "" {
 		o.helmOutputDir = filepath.Join("./helm-output", RandomString(6))
 	}
-	cmd := exec.Command("helm", "template", o.helmTemplateDir, "--output-dir", o.helmOutputDir)
-	stdout, err := cfgcontainer.ExecShellCommand(cmd)
-	if err != nil {
-		return err
-	}
-	fmt.Println(stdout)
-	return nil
+
+	return helmTemplate(o.helmTemplateDir, o.helmOutputDir)
 }
 
 func NewComponentTemplateRenderCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {

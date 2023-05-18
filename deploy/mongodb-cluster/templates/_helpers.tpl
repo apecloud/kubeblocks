@@ -50,9 +50,13 @@ app.kubernetes.io/name: {{ include "mongodb-cluster.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{- define "clustername" -}}
+{{ include "mongodb-cluster.fullname" .}}
+{{- end}}
+
 {{/*
 Create the name of the service account to use
 */}}
 {{- define "mongodb-cluster.serviceAccountName" -}}
-{{- default ((printf "kb-sa-%s" .Release.Name) | trunc 63 | trimSuffix "-") .Values.serviceAccount.name }}
+{{- default (printf "kb-%s" (include "clustername" .)) .Values.serviceAccount.name }}
 {{- end }}

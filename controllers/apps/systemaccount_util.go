@@ -390,11 +390,18 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 
 // completeExecConfig override the image of execConfig if version is not nil.
 func completeExecConfig(execConfig *appsv1alpha1.CmdExecutorConfig, version *appsv1alpha1.ClusterComponentVersion) {
-	if version == nil {
+	if version == nil || version.SystemAccountSpec == nil || version.SystemAccountSpec.CmdExecutorConfig == nil {
 		return
 	}
-	if len(version.ClientImage) == 0 {
-		return
+	sysAccountSpec := version.SystemAccountSpec
+	if len(sysAccountSpec.CmdExecutorConfig.Image) > 0 {
+		execConfig.Image = sysAccountSpec.CmdExecutorConfig.Image
 	}
-	execConfig.Image = version.ClientImage
+
+	if len(sysAccountSpec.CmdExecutorConfig.Env) > 0 {
+		if len(execConfig.Env) == 0 {
+			execConfig.Env = make([]corev1.EnvVar, 0)
+		}
+		execConfig.Env = append(execConfig.Env, sysAccountSpec.CmdExecutorConfig.Env...)
+	}
 }

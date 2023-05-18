@@ -17,59 +17,59 @@
 
 // required, command line input options for parameters and flags
 options: {
-	namespace:        string
-	selector:					{}
-	mode:							string
-	value:						string
-	duration: 				string
+	namespace: string
+	selector: {}
+	mode:     string
+	value:    string
+	duration: string
 
-	target:					string
-	port:						int32
-	path:						string
-	method:					string
-	code?:						int32
+	target: string
+	port:   int32
+	path:   string
+	method: string
+	code?:  int32
 
-	abort?:						bool
-	delay?:						string
+	abort?: bool
+	delay?: string
 
-	repalceBody?: 		bytes
-	replacePath?:			string
-	replaceMethod?:		string
+	repalceBody?:   bytes
+	replacePath?:   string
+	replaceMethod?: string
 
-	patchBodyValue?:	string
-	patchBodyType?:		string
+	patchBodyValue?: string
+	patchBodyType?:  string
 }
 
 // required, k8s api resource content
 content: {
-  kind: "HTTPChaos"
-  apiVersion: "chaos-mesh.org/v1alpha1"
-  metadata:{
-  	generateName: "http-chaos-"
-    namespace: options.namespace
-  }
-  spec:{
-    selector: options.selector
-    mode: options.mode
-    value: options.value
-    duration: options.duration
+	kind:       "HTTPChaos"
+	apiVersion: "chaos-mesh.org/v1alpha1"
+	metadata: {
+		generateName: "http-chaos-"
+		namespace:    options.namespace
+	}
+	spec: {
+		selector: options.selector
+		mode:     options.mode
+		value:    options.value
+		duration: options.duration
 
 		target: options.target
-    port: options.port
-    path: options.path
-    method: options.method
-    if options.code != _|_ {
-    	code: options.code
-    }
+		port:   options.port
+		path:   options.path
+		method: options.method
+		if options.code != _|_ {
+			code: options.code
+		}
 
-    if options.abort != _|_ {
-    	abort: options.abort
-    }
-    if options.delay != _|_ {
+		if options.abort != _|_ {
+			abort: options.abort
+		}
+		if options.delay != _|_ {
 			delay: options.delay
 		}
-		if options.replaceBody != _|_ || options.replacePath != _|_ || options.replaceMethod != _|_{
-			replace:{
+		if options.replaceBody != _|_ || options.replacePath != _|_ || options.replaceMethod != _|_ {
+			replace: {
 				if options.replaceBody != _|_ {
 					body: options.replaceBody
 				}
@@ -82,14 +82,14 @@ content: {
 			}
 		}
 		if options.patchBodyValue != _|_ && options.patchBodyType != _|_ {
-			patch:{
+			patch: {
 				if options.patchBodyValue != _|_ && options.patchBodyType != _|_ {
 					body: {
 						value: options.patchBodyValue
-						type: options.patchBodyType
+						type:  options.patchBodyType
 					}
 				}
 			}
 		}
-  }
+	}
 }

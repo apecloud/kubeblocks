@@ -353,17 +353,17 @@ var _ = Describe("Backup Policy Controller", func() {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
 				})).Should(Succeed())
 				By("enable schedule for reconfigure")
-				Expect(testapps.GetAndChangeObj(&testCtx, backupPolicyKey, func(fetched *dpv1alpha1.BackupPolicy) {
+				Eventually(testapps.GetAndChangeObj(&testCtx, backupPolicyKey, func(fetched *dpv1alpha1.BackupPolicy) {
 					fetched.Spec.Schedule.Logfile = &dpv1alpha1.SchedulePolicy{Enable: true, CronExpression: "* * * * *"}
-				})()).Should(Succeed())
+				})).Should(Succeed())
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
 					g.Expect(fetched.Annotations[constant.LastAppliedConfigAnnotation]).To(Equal(`[{"key":"archive_command","value":"''"}]`))
 				})).Should(Succeed())
 
 				By("disable schedule for reconfigure")
-				Expect(testapps.GetAndChangeObj(&testCtx, backupPolicyKey, func(fetched *dpv1alpha1.BackupPolicy) {
+				Eventually(testapps.GetAndChangeObj(&testCtx, backupPolicyKey, func(fetched *dpv1alpha1.BackupPolicy) {
 					fetched.Spec.Schedule.Logfile.Enable = false
-				})()).Should(Succeed())
+				})).Should(Succeed())
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
 					g.Expect(fetched.Annotations[constant.LastAppliedConfigAnnotation]).To(Equal(`[{"key":"archive_command","value":"'/bin/true'"}]`))
 				})).Should(Succeed())

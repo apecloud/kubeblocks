@@ -98,7 +98,7 @@ def main(argv: list[str]) -> None:
         if len(title) > 1:
             prefix = title[0].strip().lower()
             if prefix in ("feat", "feature"):
-                change_type = "New Features"
+                change_type = "Improvements"
             elif prefix in ("fix", "bug"):
                 change_type = "Bug Fixes"
             note = title[1].strip()

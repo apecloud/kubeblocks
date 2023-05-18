@@ -100,6 +100,14 @@ if [[ "broker" = "$KAFKA_CFG_PROCESS_ROLES" ]]; then
     {{- end }}
     export KAFKA_CFG_CONTROLLER_QUORUM_VOTERS={{ $voters }}
     echo "export KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=$KAFKA_CFG_CONTROLLER_QUORUM_VOTERS,for kafka-broker."
+
+    # deleting this information can reacquire the controller members when the broker restarts,
+    # and avoid the mismatch between the controller in the quorum-state and the actual controller in the case of a controller scale,
+    # which will cause the broker to fail to start
+    if [ -f "$KAFKA_CFG_METADATA_LOG_DIR/__cluster_metadata-0/quorum-state" ]; then
+      echo "Removing quorum-state file when restart."
+      rm -f "$KAFKA_CFG_METADATA_LOG_DIR/__cluster_metadata-0/quorum-state"
+    fi
 else
     # generate node.id
     ID="${KB_POD_NAME#${KB_CLUSTER_COMP_NAME}-}"

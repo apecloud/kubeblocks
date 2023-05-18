@@ -57,9 +57,9 @@ content: {
 			zone: options.region
 			instance: options.instance
 			if options.deviceName != _|_ {
-				deviceNames: [options.deviceName]
+				deviceNames:[options.deviceName]
 			}
-		}
 
+		}
 	}
 }

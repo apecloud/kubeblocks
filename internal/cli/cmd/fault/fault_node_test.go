@@ -48,58 +48,53 @@ var _ = Describe("Fault Node", func() {
 	Context("test fault node", func() {
 		It("fault node stop", func() {
 			inputs := [][]string{
-				{"-c=aws", "--secret-name=cloud-key-secret", "--region=cn-northwest-1", "--instance=i-0a4986881adf30039", "--duration=3m", "--dry-run=client"},
-				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--instance=gke-hyqtest-default-pool-2fe51a08-45rl", "--secret-name=cloud-key-secret", "--dry-run=client"},
+				{"-c=aws", "--secret-name=cloud-key-secret", "--region=cn-northwest-1", "--duration=3m", "--dry-run=client"},
+				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--secret-name=cloud-key-secret", "--dry-run=client"},
 			}
 			o := NewNodeOptions(tf, streams)
-			cmd := o.NewCobraCommand(Kill, KillShort)
-			o.AddCommonFlag(cmd, tf)
+			cmd := o.NewCobraCommand(Stop, StopShort)
+			o.AddCommonFlag(cmd)
 
+			o.Args = []string{"node1", "node2"}
 			for _, input := range inputs {
 				Expect(cmd.Flags().Parse(input)).Should(Succeed())
-				Expect(o.CreateOptions.Complete())
-				Expect(o.Complete(Stop)).Should(Succeed())
-				Expect(o.Validate()).Should(Succeed())
-				Expect(o.Run()).Should(Succeed())
+				Expect(o.Execute(Stop, o.Args)).Should(Succeed())
 			}
 		})
 
 		It("fault node restart", func() {
 			inputs := [][]string{
-				{"-c=aws", "--secret-name=cloud-key-secret", "--region=cn-northwest-1", "--instance=i-0a4986881adf30039", "--duration=3m", "--dry-run=client"},
-				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--instance=gke-hyqtest-default-pool-2fe51a08-45rl", "--secret-name=cloud-key-secret", "--dry-run=client"},
+				{"-c=aws", "--secret-name=cloud-key-secret", "--region=cn-northwest-1", "--duration=3m", "--dry-run=client"},
+				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--secret-name=cloud-key-secret", "--dry-run=client"},
 			}
 			o := NewNodeOptions(tf, streams)
 			cmd := o.NewCobraCommand(Restart, RestartShort)
-			o.AddCommonFlag(cmd, tf)
+			o.AddCommonFlag(cmd)
 
+			o.Args = []string{"node1", "node2"}
 			for _, input := range inputs {
 				Expect(cmd.Flags().Parse(input)).Should(Succeed())
-				Expect(o.CreateOptions.Complete())
-				Expect(o.Complete(Restart)).Should(Succeed())
-				Expect(o.Validate()).Should(Succeed())
-				Expect(o.Run()).Should(Succeed())
+				Expect(o.Execute(Restart, o.Args)).Should(Succeed())
 			}
 		})
 
 		It("fault node detach-volume", func() {
 			inputs := [][]string{
-				{"-c=aws", "--secret-name=cloud-key-secret", "--region=cn-northwest-1", "--instance=i-0df0732607d54dd8e", "--duration=1m", "--volume-id=vol-072f0940c28664f74", "--device-name=/dev/xvdab", "--dry-run=client"},
-				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--instance=gke-hyqtest-default-pool-2fe51a08-d9nd", "--secret-name=cloud-key-secret", "--device-name=/dev/sdb", "--dry-run=client"},
+				{"-c=aws", "--secret-name=cloud-key-secret", "--region=cn-northwest-1", "--duration=1m", "--volume-id=vol-072f0940c28664f74, v2", "--device-name=/dev/sdb,/d2", "--dry-run=client"},
+				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--secret-name=cloud-key-secret", "--device-name=/dev/sdb,/d2", "--dry-run=client"},
 			}
 			o := NewNodeOptions(tf, streams)
 			cmd := o.NewCobraCommand(DetachVolume, DetachVolumeShort)
-			o.AddCommonFlag(cmd, tf)
-			cmd.Flags().StringVar(&o.VolumeID, "volume-id", "", "The volume id of the ec2.")
-			cmd.Flags().StringVar(&o.DeviceName, "device-name", "", "The device name of the volume.")
+			o.AddCommonFlag(cmd)
+			cmd.Flags().StringSliceVar(&o.VolumeIDs, "volume-id", nil, "The volume id of the ec2.")
+			cmd.Flags().StringSliceVar(&o.DeviceNames, "device-name", nil, "The device name of the volume.")
 
+			o.Args = []string{"node1", "node2"}
 			for _, input := range inputs {
 				Expect(cmd.Flags().Parse(input)).Should(Succeed())
-				Expect(o.CreateOptions.Complete())
-				Expect(o.Complete(DetachVolume)).Should(Succeed())
-				Expect(o.Validate()).Should(Succeed())
-				Expect(o.Run()).Should(Succeed())
-				o.VolumeID = ""
+				Expect(o.Execute(DetachVolume, o.Args)).Should(Succeed())
+				o.VolumeIDs = nil
+				o.DeviceNames = nil
 			}
 		})
 	})

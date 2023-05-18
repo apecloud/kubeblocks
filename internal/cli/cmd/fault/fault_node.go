@@ -38,28 +38,25 @@ import (
 
 var faultNodeExample = templates.Examples(`
 	# Stop a specified EC2 instance.
-	kbcli fault node stop aws --secret-name=cloud-key-secret --region=cn-northwest-1 --instance=i-0a4986881adf30039 --duration=3m
-	
-	# Stop a specified EC2 instance.
-	kbcli fault node stop -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --instance=i-0a4986881adf30039 --duration=3m
+	kbcli fault node stop node1 -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --duration=3m
 
-	# Restart a specified EC2 instance.
-	kbcli fault node restart aws --secret-name=cloud-key-secret --region=cn-northwest-1 --instance=i-0ff10a1487cf6bbac --duration=1m
+	# Stop two specified EC2 instance.
+	kbcli fault node stop node1 node2 -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --duration=3m
 
-	# Detach a specified volume from a specified EC2 instance.
-	kbcli fault node detach-volume aws --secret-name=cloud-key-secret --region=cn-northwest-1 --instance=i-0df0732607d54dd8e --duration=1m --volume-id=vol-072f0940c28664f74 --device-name=/dev/xvdab
-	
-	# Stop a specified GCK instance.
-	kbcli fault node stop gcp --region=us-central1-c --project=apecloud-platform-engineering --instance=gke-hyqtest-default-pool-2fe51a08-45rl --secret-name=cloud-key-secret
-		
-	# Stop a specified GCK instance.
-	kbcli fault node stop -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --instance=gke-hyqtest-default-pool-2fe51a08-45rl --secret-name=cloud-key-secret
+	# Restart two specified EC2 instance.
+	kbcli fault node restart node1 node2 -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --duration=3m
 
-	# Restart a specified GCK instance.
-	kbcli fault node restart gcp --region=us-central1-c --project=apecloud-platform-engineering --instance=gke-hyqtest-default-pool-2fe51a08-d9 --secret-name=cloud-key-secret
+	# Detach two specified volume from two specified EC2 instance.
+	kbcli fault node detach-volume node1 node2 -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --duration=1m --volume-id=v1,v2 --device-name=/d1,/d2
 
-	# Detach a specified volume from a specified GCK instance.
-	kbcli fault node detach-volume gcp --region=us-central1-c --project=apecloud-platform-engineering --instance=gke-hyqtest-default-pool-2fe51a08-d9 --secret-name=cloud-key-secret --device-name=/dev/sdb
+	# Stop two specified GCK instance.
+	kbcli fault node stop node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --secret-name=cloud-key-secret	
+
+	# Restart two specified GCK instance.
+	kbcli fault node restart node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --secret-name=cloud-key-secret
+
+	# Detach two specified volume from two specified GCK instance.
+	kbcli fault node detach-volume node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --secret-name=cloud-key-secret --device-name=/dev/sdb,/dsafs -device-name=/ddsfa
 `)
 
 type NodeChaoOptions struct {
@@ -75,9 +72,11 @@ type NodeChaoOptions struct {
 
 	Instance string `json:"instance"`
 
-	VolumeID string `json:"volumeID"`
+	VolumeID  string   `json:"volumeID"`
+	VolumeIDs []string `json:"-"`
 
-	DeviceName string `json:"deviceName,omitempty"`
+	DeviceName  string   `json:"deviceName,omitempty"`
+	DeviceNames []string `json:"-"`
 
 	Project string `json:"project"`
 
@@ -117,7 +116,7 @@ func NewStopCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	o := NewNodeOptions(f, streams)
 	cmd := o.NewCobraCommand(Stop, StopShort)
 
-	o.AddCommonFlag(cmd, f)
+	o.AddCommonFlag(cmd)
 	return cmd
 }
 
@@ -125,7 +124,7 @@ func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	o := NewNodeOptions(f, streams)
 	cmd := o.NewCobraCommand(Restart, RestartShort)
 
-	o.AddCommonFlag(cmd, f)
+	o.AddCommonFlag(cmd)
 	return cmd
 }
 
@@ -133,9 +132,10 @@ func NewDetachVolumeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	o := NewNodeOptions(f, streams)
 	cmd := o.NewCobraCommand(DetachVolume, DetachVolumeShort)
 
-	o.AddCommonFlag(cmd, f)
-	cmd.Flags().StringVar(&o.VolumeID, "volume-id", "", "The volume id of the ec2.Only available when cloud-provider=aws.")
-	cmd.Flags().StringVar(&o.DeviceName, "device-name", "", "The device name of the volume.")
+	o.AddCommonFlag(cmd)
+
+	cmd.Flags().StringSliceVar(&o.VolumeIDs, "volume-id", nil, "The volume ids of the ec2.Only available when cloud-provider=aws.")
+	cmd.Flags().StringSliceVar(&o.DeviceNames, "device-name", nil, "The device name of the volume.")
 
 	util.CheckErr(cmd.MarkFlagRequired("device-name"))
 	return cmd
@@ -147,33 +147,53 @@ func (o *NodeChaoOptions) NewCobraCommand(use, short string) *cobra.Command {
 		Short:   short,
 		Example: faultNodeExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			o.Args = args
-			cmdutil.CheckErr(o.CreateOptions.Complete())
-			cmdutil.CheckErr(o.Complete(use))
-			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.Run())
+			cmdutil.CheckErr(o.Execute(use, args))
 		},
 	}
 }
 
-func (o *NodeChaoOptions) AddCommonFlag(cmd *cobra.Command, f cmdutil.Factory) {
+func (o *NodeChaoOptions) Execute(action string, args []string) error {
+	o.Args = args
+	if err := o.CreateOptions.Complete(); err != nil {
+		return err
+	}
+	if err := o.Complete(action); err != nil {
+		return err
+	}
+	if err := o.Validate(); err != nil {
+		return err
+	}
+
+	for idx, arg := range o.Args {
+		o.Instance = arg
+		if o.DeviceNames != nil {
+			o.DeviceName = o.DeviceNames[idx]
+		}
+		if o.VolumeIDs != nil {
+			o.VolumeID = o.VolumeIDs[idx]
+		}
+		if err := o.Run(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (o *NodeChaoOptions) AddCommonFlag(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&o.CloudProvider, "cloud-provider", "c", "", fmt.Sprintf("Cloud provider type, one of %v", supportedCloudProviders))
 	cmd.Flags().StringVar(&o.SecretName, "secret-name", "", "The name of the Kubernetes Secret that stores the AWS authentication information.")
 	cmd.Flags().StringVar(&o.Region, "region", "", "The region of the aws.")
-	cmd.Flags().StringVar(&o.Instance, "instance", "", "The instance id of the ec2.")
 	cmd.Flags().StringVar(&o.Duration, "duration", "30s", "Supported formats of the duration are: ms / s / m / h.")
 	cmd.Flags().StringVar(&o.Project, "project", "", "The ID of the GCP project.Only available when cloud-provider=gcp.")
-
 	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = Unchanged
 	printer.AddOutputFlagForCreate(cmd, &o.Format)
 
 	util.CheckErr(cmd.MarkFlagRequired("secret-name"))
 	util.CheckErr(cmd.MarkFlagRequired("region"))
-	util.CheckErr(cmd.MarkFlagRequired("instance"))
 
 	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
+	registerFlagCompletionFunc(cmd, o.Factory)
 }
 
 func (o *NodeChaoOptions) Validate() error {
@@ -181,32 +201,43 @@ func (o *NodeChaoOptions) Validate() error {
 		return err
 	}
 
+	if len(o.Args) == 0 {
+		return fmt.Errorf("node instance is required")
+	}
+
 	if o.CloudProvider == "" {
 		return fmt.Errorf("cloud provider is required" + fmt.Sprintf("Cloud provider type, one of %v", supportedCloudProviders))
 	}
 
-	if o.CloudProvider == cp.AWS && o.Project != "" {
-		return fmt.Errorf("you must not use --project to specify the projectID when cloud provider is aws")
+	switch o.CloudProvider {
+	case cp.AWS:
+		if o.Project != "" {
+			return fmt.Errorf("you must not use --project to specify the projectID when cloud provider is aws")
+		}
+		if o.Action == DetachVolume && o.VolumeIDs == nil {
+			return fmt.Errorf("you must use --volume-id to specify the volumeID when cloud provider is aws")
+		}
+		if o.Action == DetachVolume && len(o.DeviceNames) != len(o.VolumeIDs) {
+			return fmt.Errorf("the number of volume-id must be equal to the number of device-name")
+		}
+	case cp.GCP:
+		if o.Project == "" {
+			return fmt.Errorf("you must use --project to specify the projectID when cloud provider is gcp")
+		}
+		if o.VolumeIDs != nil {
+			return fmt.Errorf("you must not use --volume-id to specify the volumeID when cloud provider is gcp")
+		}
+	default:
+		return fmt.Errorf("cloud provider type, one of %v", supportedCloudProviders)
 	}
 
-	if o.CloudProvider == cp.GCP && o.Project == "" {
-		return fmt.Errorf("you must use --project to specify the projectID when cloud provider is gcp")
-	}
-
-	if o.CloudProvider == cp.AWS && o.Action == DetachVolume && o.VolumeID == "" {
-		return fmt.Errorf("you must use --volume-id to specify the volumeID when cloud provider is aws")
-	}
-
-	if o.CloudProvider == cp.GCP && o.VolumeID != "" {
-		return fmt.Errorf("you must not use --volume-id to specify the volumeID when cloud provider is gcp")
+	if o.DeviceNames != nil && len(o.Args) != len(o.DeviceNames) {
+		return fmt.Errorf("the number of device-name must be equal to the number of node")
 	}
 	return nil
 }
 
 func (o *NodeChaoOptions) Complete(action string) error {
-	if len(o.Args) > 0 {
-		o.CloudProvider = o.Args[0]
-	}
 	if o.CloudProvider == cp.AWS {
 		o.GVR = GetGVR(Group, Version, ResourceAWSChaos)
 		o.Kind = KindAWSChaos

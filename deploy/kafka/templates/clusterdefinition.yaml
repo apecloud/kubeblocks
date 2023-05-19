@@ -176,6 +176,9 @@ spec:
               - name: kafka-config
                 mountPath: /scripts/server.properties
                 subPath: server.properties
+              - name: kafka-config
+                mountPath: /scripts/client-ssl.properties
+                subPath: client-ssl.properties
 
           - name: jmx-exporter
             image: docker.io/bitnami/jmx-exporter:0.18.0-debian-11-r20
@@ -262,10 +265,10 @@ spec:
                 value: "controller"
               - name: KAFKA_CFG_CONTROLLER_LISTENER_NAMES # required for KRaft
                 value: "CONTROLLER"
-              # - name: KAFKA_CFG_INTER_BROKER_LISTENER_NAME
-              #   value: "INTERNAL"
               - name: KAFKA_CFG_LISTENERS # required for KRaft
                 value: "CONTROLLER://:9093"
+              - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
+                value: "CONTROLLER:PLAINTEXT"
               - name: ALLOW_PLAINTEXT_LISTENER
                 value: "yes"
               - name: JMX_PORT
@@ -491,6 +494,9 @@ spec:
               - name: kafka-config
                 mountPath: /scripts/server.properties
                 subPath: server.properties
+              - name: kafka-config
+                mountPath: /scripts/client-ssl.properties
+                subPath: client-ssl.properties
           - name: jmx-exporter
             image: docker.io/bitnami/jmx-exporter:0.18.0-debian-11-r20
             imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}

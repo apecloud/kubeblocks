@@ -7,6 +7,8 @@ terminationPolicy: Halt
 ##
 mode: combined
 
+tls: false
+
 ## Enable persistence using Persistent Volume Claims
 ## ref: https://kubernetes.io/docs/user-guide/persistent-volumes/
 ##

@@ -184,6 +184,9 @@ func (r *BackupPolicyReconciler) patchStatusFailed(reqCtx intctrlutil.RequestCtx
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
 	reason string,
 	err error) (ctrl.Result, error) {
+	if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue) {
+		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+	}
 	backupPolicyDeepCopy := backupPolicy.DeepCopy()
 	backupPolicy.Status.Phase = dataprotectionv1alpha1.PolicyFailed
 	backupPolicy.Status.FailureReason = err.Error()
@@ -508,14 +511,17 @@ func (r *BackupPolicyReconciler) reconfigure(reqCtx intctrlutil.RequestCtx,
 	updateParameterPairsBytes, _ := json.Marshal(parameters)
 	updateParameterPairs := string(updateParameterPairsBytes)
 	if updateParameterPairs == backupPolicy.Annotations[constant.LastAppliedConfigAnnotation] {
-		// skip reconfig if last config is the same
-		return nil
+		// reconcile the config job if finished
+		return r.reconcileReconfigure(reqCtx, backupPolicy)
 	}
 
 	ops := appsv1alpha1.OpsRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: backupPolicy.Name + "-",
 			Namespace:    backupPolicy.Namespace,
+			Labels: map[string]string{
+				dataProtectionLabelBackupPolicyKey: backupPolicy.Name,
+			},
 		},
 		Spec: appsv1alpha1.OpsRequestSpec{
 			Type:       appsv1alpha1.ReconfiguringType,
@@ -541,12 +547,35 @@ func (r *BackupPolicyReconciler) reconfigure(reqCtx intctrlutil.RequestCtx,
 	if err := r.Client.Create(reqCtx.Ctx, &ops); err != nil {
 		return err
 	}
+
 	r.Recorder.Eventf(backupPolicy, corev1.EventTypeNormal, "Reconfiguring", "update config %s", updateParameterPairs)
-	// sync the cronjob with the current backup policy configuration.
 	patch := client.MergeFrom(backupPolicy.DeepCopy())
 	if backupPolicy.Annotations == nil {
 		backupPolicy.Annotations = map[string]string{}
 	}
 	backupPolicy.Annotations[constant.LastAppliedConfigAnnotation] = updateParameterPairs
 	return r.Client.Patch(reqCtx.Ctx, backupPolicy, patch)
+}
+
+func (r *BackupPolicyReconciler) reconcileReconfigure(reqCtx intctrlutil.RequestCtx,
+	backupPolicy *dataprotectionv1alpha1.BackupPolicy) error {
+
+	opsList := appsv1alpha1.OpsRequestList{}
+	if err := r.Client.List(reqCtx.Ctx, &opsList,
+		client.InNamespace(backupPolicy.Namespace),
+		client.MatchingLabels{dataProtectionLabelBackupPolicyKey: backupPolicy.Name}); err != nil {
+		return err
+	}
+	if len(opsList.Items) > 0 {
+		sort.Slice(opsList.Items, func(i, j int) bool {
+			return opsList.Items[j].CreationTimestamp.Before(&opsList.Items[i].CreationTimestamp)
+		})
+		latestOps := opsList.Items[0]
+		if latestOps.Status.Phase == appsv1alpha1.OpsFailedPhase {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeReconfigureFailed, "ops failed %s", latestOps.Name)
+		} else if latestOps.Status.Phase != appsv1alpha1.OpsSucceedPhase {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting ops %s finished.", latestOps.Name)
+		}
+	}
+	return nil
 }

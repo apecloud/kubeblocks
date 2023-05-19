@@ -85,10 +85,12 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
+	// skip if same cluster UID
 	if lc.UID == cluster.UID {
 		return nil
 	}
 
+	// check clusterDefRef equality
 	if cluster.Spec.ClusterDefRef != lc.Spec.ClusterDefRef {
 		return emitError(metav1.Condition{
 			Type:    appsv1alpha1.ConditionTypeHaltRecovery,
@@ -97,6 +99,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 		})
 	}
 
+	// check clusterVersionRef equality but allow clusters.apps.kubeblocks.io/allow-inconsistent-cv=true annotation override
 	if cluster.Spec.ClusterVersionRef != lc.Spec.ClusterVersionRef &&
 		cluster.Annotations[constant.AllowInconsistentCVAnnotationKey] != "true" {
 		return emitError(metav1.Condition{
@@ -107,6 +110,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 		})
 	}
 
+	// check component len equality
 	if l := len(lc.Spec.ComponentSpecs); l != len(cluster.Spec.ComponentSpecs) {
 		return emitError(metav1.Condition{
 			Type:    appsv1alpha1.ConditionTypeHaltRecovery,
@@ -115,6 +119,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 		})
 	}
 
+	// check every components' equality
 	for _, comp := range cluster.Spec.ComponentSpecs {
 		found := false
 		h := hash.Object(comp)

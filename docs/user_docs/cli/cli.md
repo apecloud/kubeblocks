@@ -98,7 +98,7 @@ ClusterDefinition command.
 ClusterVersion command.
 
 * [kbcli clusterversion list](kbcli_clusterversion_list.md)	 - List ClusterVersions.
-* [kbcli clusterversion set-default](kbcli_clusterversion_set-default.md)	 - Set the clusterversion to the default cluster clusterversion for its clusterDef.
+* [kbcli clusterversion set-default](kbcli_clusterversion_set-default.md)	 - Set the clusterversion to the default cluster clusterversion for its clusterdefinition.
 * [kbcli clusterversion unset-default](kbcli_clusterversion_unset-default.md)	 - Unset the clusterversion if it's default.
 
 

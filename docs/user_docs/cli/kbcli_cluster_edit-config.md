@@ -23,6 +23,7 @@ kbcli cluster edit-config NAME [--component=component-name] [--config-spec=confi
       --config-spec string             Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). For available templates and configs, refer to: 'kbcli cluster describe-config'.
       --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
   -h, --help                           help for edit-config
+      --local-file string              Specify the local configuration file to be updated.
       --name string                    OpsRequest name. if not specified, it will be randomly generated 
   -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --replace                        Boolean flag to enable replacing config file. Default with false.

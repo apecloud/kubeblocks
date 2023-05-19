@@ -152,6 +152,20 @@ func (r *OpsRequest) getCluster(ctx context.Context, k8sClient client.Client) (*
 	return cluster, nil
 }
 
+func (r *OpsRequest) getConfigMap(cmName string) (*corev1.ConfigMap, error) {
+	cmObj := &corev1.ConfigMap{}
+	cmKey := client.ObjectKey{
+		Namespace: r.Namespace,
+		Name:      cmName,
+	}
+
+	ctx := context.Background()
+	if err := webhookMgr.client.Get(ctx, cmKey, cmObj); err != nil {
+		return nil, err
+	}
+	return cmObj, nil
+}
+
 // Validate validates OpsRequest
 func (r *OpsRequest) Validate(ctx context.Context,
 	k8sClient client.Client,
@@ -261,8 +275,28 @@ func (r *OpsRequest) validateReconfigure(cluster *Cluster) error {
 	if reconfigure == nil {
 		return notEmptyError("spec.reconfigure")
 	}
+	if len(reconfigure.Configurations) == 0 {
+		return notEmptyError("spec.reconfigure.configurations[*]")
+	}
+	if cluster.Spec.GetComponentByName(reconfigure.ComponentName) == nil {
+		return fmt.Errorf("component %s not found", reconfigure.ComponentName)
+	}
+	for _, configuration := range reconfigure.Configurations {
+		cmObj, err := r.getConfigMap(configuration.Name)
+		if err != nil {
+			return err
+		}
+		for _, key := range configuration.Keys {
+			// check add file
+			if _, ok := cmObj.Data[key.Key]; !ok && key.FileContent == "" {
+				return errors.Errorf("key %s not found in configmap %s", key.Key, configuration.Name)
+			}
+			if key.FileContent == "" && len(key.Parameters) == 0 {
+				return errors.New("key.fileContent and key.parameters cannot be empty at the same time")
+			}
+		}
+	}
 	return nil
-	// TODO validate updated params
 }
 
 // compareRequestsAndLimits compares the resource requests and limits

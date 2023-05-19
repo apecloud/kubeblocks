@@ -34,10 +34,11 @@ import (
 )
 
 type reconfiguringResult struct {
-	failed             bool
-	configPatch        *cfgcore.ConfigPatchInfo
-	lastAppliedConfigs map[string]string
-	err                error
+	failed               bool
+	noFormatFilesUpdated bool
+	configPatch          *cfgcore.ConfigPatchInfo
+	lastAppliedConfigs   map[string]string
+	err                  error
 }
 
 // updateCfgParams merges parameters of the config into the configmap, and verifies final configuration file.
@@ -48,8 +49,8 @@ func updateCfgParams(config appsv1alpha1.Configuration,
 	cli client.Client,
 	opsCrName string) reconfiguringResult {
 	var (
-		cm     = &corev1.ConfigMap{}
-		cfgTpl = &appsv1alpha1.ConfigConstraint{}
+		cm = &corev1.ConfigMap{}
+		cc = &appsv1alpha1.ConfigConstraint{}
 
 		err    error
 		newCfg map[string]string
@@ -61,32 +62,55 @@ func updateCfgParams(config appsv1alpha1.Configuration,
 	if err := cli.Get(ctx, client.ObjectKey{
 		Namespace: tpl.Namespace,
 		Name:      tpl.ConfigConstraintRef,
-	}, cfgTpl); err != nil {
+	}, cc); err != nil {
 		return makeReconfiguringResult(err)
 	}
 
-	params := make([]cfgcore.ParamPairs, len(config.Keys))
-	for i, key := range config.Keys {
-		params[i] = cfgcore.ParamPairs{
-			Key:           key.Key,
-			UpdatedParams: fromKeyValuePair(key.Parameters),
+	updatedFiles := make(map[string]string, len(config.Keys))
+	updatedParams := make([]cfgcore.ParamPairs, 0, len(config.Keys))
+	for _, key := range config.Keys {
+		if key.FileContent != "" {
+			updatedFiles[key.Key] = key.FileContent
+			continue
+		}
+		if len(key.Parameters) > 0 {
+			updatedParams = append(updatedParams, cfgcore.ParamPairs{
+				Key:           key.Key,
+				UpdatedParams: fromKeyValuePair(key.Parameters)})
 		}
 	}
 
-	fc := cfgTpl.Spec.FormatterConfig
-	newCfg, err = cfgcore.MergeAndValidateConfigs(cfgTpl.Spec, cm.Data, tpl.Keys, params)
-	if err != nil {
+	if newCfg, err = mergeUpdatedParams(cm.Data, updatedFiles, updatedParams, cc.Spec, tpl); err != nil {
 		return makeReconfiguringResult(err, withFailed(true))
 	}
-
-	configPatch, _, err := cfgcore.CreateConfigPatch(cm.Data, newCfg, fc.Format, tpl.Keys, false)
+	configPatch, restart, err := cfgcore.CreateConfigPatch(cm.Data, newCfg, cc.Spec.FormatterConfig.Format, tpl.Keys, len(updatedFiles) != 0)
 	if err != nil {
 		return makeReconfiguringResult(err)
 	}
-	if !configPatch.IsModify {
+	if !restart && !configPatch.IsModify {
 		return makeReconfiguringResult(nil, withReturned(newCfg, configPatch))
 	}
-	return makeReconfiguringResult(persistCfgCM(cm, newCfg, cli, ctx, opsCrName), withReturned(newCfg, configPatch))
+	return makeReconfiguringResult(
+		persistCfgCM(cm, newCfg, cli, ctx, opsCrName),
+		withReturned(newCfg, configPatch),
+		withNoFormatFilesUpdated(restart))
+}
+
+func mergeUpdatedParams(base map[string]string,
+	updatedFiles map[string]string,
+	updatedParams []cfgcore.ParamPairs,
+	cc appsv1alpha1.ConfigConstraintSpec,
+	tpl appsv1alpha1.ComponentConfigSpec) (map[string]string, error) {
+	updatedConfig := base
+
+	// merge updated files into configmap
+	if len(updatedFiles) != 0 {
+		updatedConfig = cfgcore.MergeUpdatedConfig(base, updatedFiles)
+	}
+	if len(updatedParams) == 0 {
+		return updatedConfig, nil
+	}
+	return cfgcore.MergeAndValidateConfigs(cc, updatedConfig, tpl.Keys, updatedParams)
 }
 
 func persistCfgCM(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.Client, ctx context.Context, opsCrName string) error {
@@ -125,6 +149,12 @@ func withReturned(configs map[string]string, patch *cfgcore.ConfigPatchInfo) fun
 	}
 }
 
+func withNoFormatFilesUpdated(changed bool) func(result *reconfiguringResult) {
+	return func(result *reconfiguringResult) {
+		result.noFormatFilesUpdated = changed
+	}
+}
+
 func makeReconfiguringResult(err error, ops ...func(*reconfiguringResult)) reconfiguringResult {
 	result := reconfiguringResult{
 		failed: false,
@@ -145,7 +175,7 @@ func getConfigSpecName(configSpec []appsv1alpha1.ComponentConfigSpec) []string {
 }
 
 func constructReconfiguringConditions(result reconfiguringResult, resource *OpsResource, configSpec *appsv1alpha1.ComponentConfigSpec) *metav1.Condition {
-	if result.configPatch.IsModify {
+	if result.configPatch.IsModify || result.noFormatFilesUpdated {
 		return appsv1alpha1.NewReconfigureRunningCondition(
 			resource.OpsRequest,
 			appsv1alpha1.ReasonReconfigureMerged,

@@ -235,9 +235,14 @@ type ParameterConfig struct {
 	Key string `json:"key"`
 
 	// Setting the list of parameters for a single configuration file.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
+	// update specified the parameters.
+	// +optional
 	Parameters []ParameterPair `json:"parameters"`
+
+	// fileContent indicates the configuration file content.
+	// update whole file.
+	// +optional
+	FileContent string `json:"fileContent,omitempty"`
 }
 
 type Expose struct {

@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -46,7 +47,7 @@ type configOpsOptions struct {
 
 	// Reconfiguring options
 	ComponentName string
-	URLPath       string   `json:"urlPath"`
+	LocalFilePath string   `json:"localFilePath"`
 	Parameters    []string `json:"parameters"`
 }
 
@@ -67,11 +68,9 @@ func (o *configOpsOptions) Complete() error {
 	}
 
 	if !o.editMode {
-		kvs, err := o.parseUpdatedParams()
-		if err != nil {
+		if err := o.validateReconfigureOptions(); err != nil {
 			return err
 		}
-		o.KeyValues = kvs
 	}
 
 	wrapper, err := newConfigWrapper(o.CreateOptions, o.Name, o.ComponentName, o.CfgTemplateName, o.CfgFile, o.KeyValues)
@@ -81,6 +80,26 @@ func (o *configOpsOptions) Complete() error {
 
 	o.wrapper = wrapper
 	return wrapper.AutoFillRequiredParam()
+}
+
+func (o *configOpsOptions) validateReconfigureOptions() error {
+	if o.LocalFilePath != "" && o.CfgFile == "" {
+		return cfgcore.MakeError("config file is required when using --local-file")
+	}
+	if o.LocalFilePath != "" {
+		b, err := os.ReadFile(o.LocalFilePath)
+		if err != nil {
+			return err
+		}
+		o.FileContent = string(b)
+	} else {
+		kvs, err := o.parseUpdatedParams()
+		if err != nil {
+			return err
+		}
+		o.KeyValues = kvs
+	}
+	return nil
 }
 
 // Validate command flags or args is legal
@@ -113,10 +132,16 @@ func (o *configOpsOptions) validateConfigParams(tpl *appsv1alpha1.ComponentConfi
 		return err
 	}
 
-	newConfigData, err := cfgcore.MergeAndValidateConfigs(configConstraint.Spec, map[string]string{o.CfgFile: ""}, tpl.Keys, []cfgcore.ParamPairs{{
-		Key:           o.CfgFile,
-		UpdatedParams: cfgcore.FromStringMap(o.KeyValues),
-	}})
+	var err error
+	var newConfigData map[string]string
+	if o.FileContent != "" {
+		newConfigData = map[string]string{o.CfgFile: o.FileContent}
+	} else {
+		newConfigData, err = cfgcore.MergeAndValidateConfigs(configConstraint.Spec, map[string]string{o.CfgFile: ""}, tpl.Keys, []cfgcore.ParamPairs{{
+			Key:           o.CfgFile,
+			UpdatedParams: cfgcore.FromStringMap(o.KeyValues),
+		}})
+	}
 	if err != nil {
 		return err
 	}
@@ -136,9 +161,12 @@ func (o *configOpsOptions) checkChangedParamsAndDoubleConfirm(cc *appsv1alpha1.C
 		return o.confirmReconfigureWithRestart()
 	}
 
-	configPatch, _, err := cfgcore.CreateConfigPatch(mockEmptyData(data), data, cc.FormatterConfig.Format, tpl.Keys, false)
+	configPatch, restart, err := cfgcore.CreateConfigPatch(mockEmptyData(data), data, cc.FormatterConfig.Format, tpl.Keys, o.FileContent != "")
 	if err != nil {
 		return err
+	}
+	if restart {
+		return o.confirmReconfigureWithRestart()
 	}
 
 	dynamicUpdated, err := cfgcore.IsUpdateDynamicParameters(cc, configPatch)
@@ -168,7 +196,7 @@ func (o *configOpsOptions) confirmReconfigureWithRestart() error {
 }
 
 func (o *configOpsOptions) parseUpdatedParams() (map[string]string, error) {
-	if len(o.Parameters) == 0 && len(o.URLPath) == 0 {
+	if len(o.Parameters) == 0 && len(o.LocalFilePath) == 0 {
 		return nil, cfgcore.MakeError(missingUpdatedParametersErrMessage)
 	}
 
@@ -204,6 +232,7 @@ func (o *configOpsOptions) buildReconfigureCommonFlags(cmd *cobra.Command) {
 		"For available templates and configs, refer to: 'kbcli cluster describe-config'.")
 	cmd.Flags().StringVar(&o.CfgFile, "config-file", "", "Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). "+
 		"For available templates and configs, refer to: 'kbcli cluster describe-config'.")
+	cmd.Flags().StringVar(&o.LocalFilePath, "local-file", "", "Specify the local configuration file to be updated.")
 }
 
 // NewReconfigureCmd creates a Reconfiguring command

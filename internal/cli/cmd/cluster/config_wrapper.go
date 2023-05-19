@@ -100,9 +100,9 @@ func (w *configWrapper) ValidateRequiredParam() error {
 	}
 
 	// TODO support all config file update.
-	if !cfgcore.IsSupportConfigFileReconfigure(w.configTemplateSpec, w.configFileKey) {
-		return makeNotSupportConfigFileUpdateErr(w.configFileKey, w.configTemplateSpec)
-	}
+	// if !cfgcore.IsSupportConfigFileReconfigure(w.configTemplateSpec, w.configFileKey) {
+	//	return makeNotSupportConfigFileUpdateErr(w.configFileKey, w.configTemplateSpec)
+	// }
 	return nil
 }
 

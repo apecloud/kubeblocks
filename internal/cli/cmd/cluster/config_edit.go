@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -56,7 +57,7 @@ var (
 	`)
 )
 
-func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) error) error {
+func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec, edited string) error) error {
 	wrapper := o.wrapper
 	cfgEditContext := newConfigContext(o.CreateOptions, o.Name, wrapper.ComponentName(), wrapper.ConfigSpecName(), wrapper.ConfigFile())
 	if err := cfgEditContext.prepare(); err != nil {
@@ -102,25 +103,18 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 	if formatterConfig == nil {
 		return cfgcore.MakeError("config spec[%s] not support reconfigure!", wrapper.ConfigSpecName())
 	}
-	configPatch, _, err := cfgcore.CreateConfigPatch(oldVersion, newVersion, formatterConfig.Format, configSpec.Keys, false)
+	configPatch, fileUpdated, err := cfgcore.CreateConfigPatch(oldVersion, newVersion, formatterConfig.Format, configSpec.Keys, true)
 	if err != nil {
 		return err
 	}
-	if !configPatch.IsModify {
+	if !fileUpdated && !configPatch.IsModify {
 		fmt.Println("No parameters changes made.")
 		return nil
 	}
 
-	fmt.Fprintf(o.Out, "Config patch(updated parameters): \n%s\n\n", string(configPatch.UpdateConfig[o.CfgFile]))
-
-	dynamicUpdated, err := cfgcore.IsUpdateDynamicParameters(&configConstraint.Spec, configPatch)
+	confirmPrompt, err := generateReconfiguringPrompt(o.Out, fileUpdated, configPatch, &configConstraint.Spec, o.CfgFile)
 	if err != nil {
-		return nil
-	}
-
-	confirmPrompt := confirmApplyReconfigurePrompt
-	if !dynamicUpdated || !cfgcm.IsSupportReload(configConstraint.Spec.ReloadOptions) {
-		confirmPrompt = restartConfirmPrompt
+		return err
 	}
 	yes, err := o.confirmReconfigure(confirmPrompt)
 	if err != nil {
@@ -137,7 +131,25 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 	if err = cfgcore.NewConfigValidator(&configConstraint.Spec, options).Validate(validatedData); err != nil {
 		return cfgcore.WrapError(err, "failed to validate edited config")
 	}
-	return fn(configPatch, &configConstraint.Spec)
+	return fn(configPatch, &configConstraint.Spec, cfgEditContext.getEdited())
+}
+
+func generateReconfiguringPrompt(out io.Writer, fileUpdated bool, configPatch *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec, fileName string) (string, error) {
+	if fileUpdated {
+		return restartConfirmPrompt, nil
+	}
+
+	fmt.Fprintf(out, "Config patch(updated parameters): \n%s\n\n", string(configPatch.UpdateConfig[fileName]))
+	dynamicUpdated, err := cfgcore.IsUpdateDynamicParameters(cc, configPatch)
+	if err != nil {
+		return "", nil
+	}
+
+	confirmPrompt := confirmApplyReconfigurePrompt
+	if !dynamicUpdated || !cfgcm.IsSupportReload(cc.ReloadOptions) {
+		confirmPrompt = restartConfirmPrompt
+	}
+	return confirmPrompt, nil
 }
 
 func (o *editConfigOptions) confirmReconfigure(promptStr string) (bool, error) {
@@ -177,11 +189,15 @@ func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 			cmdutil.CheckErr(o.CreateOptions.Complete())
 			util.CheckErr(o.Complete())
 			util.CheckErr(o.Validate())
-			util.CheckErr(o.Run(func(info *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) error {
+			util.CheckErr(o.Run(func(info *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec, edited string) error {
 				// generate patch for config
-				formatterConfig := cc.FormatterConfig
-				params := cfgcore.GenerateVisualizedParamsList(info, formatterConfig, nil)
-				o.KeyValues = fromKeyValuesToMap(params, o.CfgFile)
+				if !o.replaceFile {
+					formatterConfig := cc.FormatterConfig
+					params := cfgcore.GenerateVisualizedParamsList(info, formatterConfig, nil)
+					o.KeyValues = fromKeyValuesToMap(params, o.CfgFile)
+				} else {
+					o.FileContent = edited
+				}
 				return o.CreateOptions.Run()
 			}))
 		},

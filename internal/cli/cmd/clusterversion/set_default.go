@@ -49,7 +49,6 @@ var (
 	kbcli clusterversion unset-default ac-mysql-8.0.30`)
 
 	clusterVersionGVR = types.ClusterVersionGVR()
-	// clusterDefinitionGVR = types.ClusterDefGVR()
 )
 
 const (
@@ -122,6 +121,7 @@ func (o *SetOrUnsetDefaultOption) run(args []string) error {
 	if err != nil {
 		return err
 	}
+	// alreadySet is to marks if two input args have the same clusterdefintion
 	alreadySet := make(map[string]string)
 	for _, cv := range args {
 		if len(cv2Cd[cv]) == 0 {
@@ -174,14 +174,12 @@ func getAllClusterVersionAndDefault(client dynamic.Interface) (map[string]string
 	if err != nil {
 		return nil, nil, err
 	}
-	// args 2 clusterdefinition
 	cvToCd := make(map[string]string)
 	cdToDefaultCv := make(map[string]string)
 	for _, item := range lists.Items {
 		name := item.GetName()
 		annotations := item.GetAnnotations()
 		labels := item.GetLabels()
-
 		if labels == nil {
 			// allErrs = append(allErrs, fmt.Errorf("cluterversion \"%s\" lacks of \"labels\" field"))
 			continue

@@ -25,6 +25,7 @@ kbcli cluster edit-config NAME [--component=component-name] [--config-spec=confi
       --enable-delete                  Boolean flag to enable delete configuration. Default with false.
       --force-restart                  Boolean flag to restart component. Default with false.
   -h, --help                           help for edit-config
+      --local-file string              Specify the local configuration file to be updated.
       --name string                    OpsRequest name. if not specified, it will be randomly generated 
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --replace                        Boolean flag to enable replacing config file. Default with false.

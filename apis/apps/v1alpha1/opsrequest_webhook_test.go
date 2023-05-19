@@ -524,6 +524,43 @@ var _ = Describe("OpsRequest webhook", func() {
 		return opsRequest
 	}
 
+	testReconfiguring := func(cluster *Cluster, clusterDef *ClusterDefinition) {
+		opsRequest := createTestOpsRequest(clusterName, opsRequestName+"-reconfiguring", ReconfiguringType)
+
+		createReconfigureObj := func(compName string) *Reconfigure {
+			return &Reconfigure{
+				ComponentOps: ComponentOps{ComponentName: compName},
+				Configurations: []Configuration{{Name: "for-test",
+					Keys: []ParameterConfig{{
+						Key: "test",
+						Parameters: []ParameterPair{{
+							Key:   "test",
+							Value: func(t string) *string { return &t }("test")}},
+					}},
+				}}}
+		}
+
+		By("By testing when spec.reconfiguring is null")
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("spec.reconfigure"))
+
+		By("By testing when target cluster definition not exist")
+		opsRequest.Spec.Reconfigure = createReconfigureObj(componentName + "-not-exist")
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found"))
+		opsRequest.Spec.Reconfigure = createReconfigureObj(componentName)
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found"))
+
+		By("By creating a configmap")
+		Expect(testCtx.CheckedCreateObj(ctx, createTestConfigmap(fmt.Sprintf("%s-%s-%s", opsRequest.Spec.ClusterRef, componentName, "for-test")))).Should(Succeed())
+		opsRequest.Spec.Reconfigure = createReconfigureObj(componentName)
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found in configmap"))
+
+		By("By test reconfiguring for file content")
+		r := createReconfigureObj(componentName)
+		r.Configurations[0].Keys[0].FileContent = "new context"
+		opsRequest.Spec.Reconfigure = r
+		Expect(testCtx.CreateObj(ctx, opsRequest)).To(Succeed())
+	}
+
 	Context("When clusterVersion create and update", func() {
 		It("Should webhook validate passed", func() {
 			By("By create a clusterDefinition")
@@ -553,6 +590,8 @@ var _ = Describe("OpsRequest webhook", func() {
 			testHorizontalScaling(clusterDef, cluster)
 
 			testSwitchover(clusterDef, cluster)
+
+			testReconfiguring(cluster, clusterDef)
 
 			opsRequest = testRestart(cluster)
 
@@ -642,6 +681,19 @@ func createTestOpsRequest(clusterName, opsRequestName string, opsType OpsType) *
 		Spec: OpsRequestSpec{
 			ClusterRef: clusterName,
 			Type:       opsType,
+		},
+	}
+}
+
+func createTestConfigmap(cmName string) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cmName,
+			Namespace: "default",
+		},
+		Data: map[string]string{
+			"key1": "value1",
+			"key2": "value2",
 		},
 	}
 }

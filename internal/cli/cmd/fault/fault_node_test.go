@@ -48,7 +48,7 @@ var _ = Describe("Fault Node", func() {
 	Context("test fault node", func() {
 		It("fault node stop", func() {
 			inputs := [][]string{
-				{"-c=aws", "--secret-name=cloud-key-secret", "--region=cn-northwest-1", "--duration=3m", "--dry-run=client"},
+				{"-c=aws", "--region=cn-northwest-1", "--secret-name=cloud-key-secret", "--dry-run=client"},
 				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--secret-name=cloud-key-secret", "--dry-run=client"},
 			}
 			o := NewNodeOptions(tf, streams)
@@ -64,7 +64,7 @@ var _ = Describe("Fault Node", func() {
 
 		It("fault node restart", func() {
 			inputs := [][]string{
-				{"-c=aws", "--secret-name=cloud-key-secret", "--region=cn-northwest-1", "--duration=3m", "--dry-run=client"},
+				{"-c=aws", "--region=cn-northwest-1", "--secret-name=cloud-key-secret", "--dry-run=client"},
 				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--secret-name=cloud-key-secret", "--dry-run=client"},
 			}
 			o := NewNodeOptions(tf, streams)
@@ -80,8 +80,8 @@ var _ = Describe("Fault Node", func() {
 
 		It("fault node detach-volume", func() {
 			inputs := [][]string{
-				{"-c=aws", "--secret-name=cloud-key-secret", "--region=cn-northwest-1", "--duration=1m", "--volume-id=vol-072f0940c28664f74, v2", "--device-name=/dev/sdb,/d2", "--dry-run=client"},
-				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--secret-name=cloud-key-secret", "--device-name=/dev/sdb,/d2", "--dry-run=client"},
+				{"-c=aws", "--region=cn-northwest-1", "--secret-name=cloud-key-secret", "--volume-id=v1,v2", "--device-name=/d1,/d2", "--dry-run=client"},
+				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--secret-name=cloud-key-secret", "--device-name=/d1,/d2", "--dry-run=client"},
 			}
 			o := NewNodeOptions(tf, streams)
 			cmd := o.NewCobraCommand(DetachVolume, DetachVolumeShort)

@@ -40,23 +40,23 @@ var faultNodeExample = templates.Examples(`
 	# Stop a specified EC2 instance.
 	kbcli fault node stop node1 -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --duration=3m
 
-	# Stop two specified EC2 instance.
+	# Stop two specified EC2 instances.
 	kbcli fault node stop node1 node2 -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --duration=3m
 
-	# Restart two specified EC2 instance.
+	# Restart two specified EC2 instances.
 	kbcli fault node restart node1 node2 -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --duration=3m
 
-	# Detach two specified volume from two specified EC2 instance.
+	# Detach two specified volume from two specified EC2 instances.
 	kbcli fault node detach-volume node1 node2 -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --duration=1m --volume-id=v1,v2 --device-name=/d1,/d2
 
-	# Stop two specified GCK instance.
+	# Stop two specified GCK instances.
 	kbcli fault node stop node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --secret-name=cloud-key-secret	
 
-	# Restart two specified GCK instance.
+	# Restart two specified GCK instances.
 	kbcli fault node restart node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --secret-name=cloud-key-secret
 
-	# Detach two specified volume from two specified GCK instance.
-	kbcli fault node detach-volume node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --secret-name=cloud-key-secret --device-name=/dev/sdb,/dsafs -device-name=/ddsfa
+	# Detach two specified volume from two specified GCK instances.
+	kbcli fault node detach-volume node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --secret-name=cloud-key-secret --device-name=/d1,/d2
 `)
 
 type NodeChaoOptions struct {
@@ -133,8 +133,7 @@ func NewDetachVolumeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	cmd := o.NewCobraCommand(DetachVolume, DetachVolumeShort)
 
 	o.AddCommonFlag(cmd)
-
-	cmd.Flags().StringSliceVar(&o.VolumeIDs, "volume-id", nil, "The volume ids of the ec2.Only available when cloud-provider=aws.")
+	cmd.Flags().StringSliceVar(&o.VolumeIDs, "volume-id", nil, "The volume ids of the ec2. Only available when cloud-provider=aws.")
 	cmd.Flags().StringSliceVar(&o.DeviceNames, "device-name", nil, "The device name of the volume.")
 
 	util.CheckErr(cmd.MarkFlagRequired("device-name"))
@@ -181,14 +180,16 @@ func (o *NodeChaoOptions) Execute(action string, args []string) error {
 
 func (o *NodeChaoOptions) AddCommonFlag(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&o.CloudProvider, "cloud-provider", "c", "", fmt.Sprintf("Cloud provider type, one of %v", supportedCloudProviders))
-	cmd.Flags().StringVar(&o.SecretName, "secret-name", "", "The name of the Kubernetes Secret that stores the AWS authentication information.")
-	cmd.Flags().StringVar(&o.Region, "region", "", "The region of the aws.")
+	cmd.Flags().StringVar(&o.SecretName, "secret-name", "", "The name of the Kubernetes Secret that stores the kubernetes cluster authentication information.")
+	cmd.Flags().StringVar(&o.Region, "region", "", "The region of the node.")
+	cmd.Flags().StringVar(&o.Project, "project", "", "The name of the GCP project. Only available when cloud-provider=gcp.")
 	cmd.Flags().StringVar(&o.Duration, "duration", "30s", "Supported formats of the duration are: ms / s / m / h.")
-	cmd.Flags().StringVar(&o.Project, "project", "", "The ID of the GCP project.Only available when cloud-provider=gcp.")
+
 	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = Unchanged
 	printer.AddOutputFlagForCreate(cmd, &o.Format)
 
+	util.CheckErr(cmd.MarkFlagRequired("cloud-provider"))
 	util.CheckErr(cmd.MarkFlagRequired("secret-name"))
 	util.CheckErr(cmd.MarkFlagRequired("region"))
 
@@ -205,27 +206,23 @@ func (o *NodeChaoOptions) Validate() error {
 		return fmt.Errorf("node instance is required")
 	}
 
-	if o.CloudProvider == "" {
-		return fmt.Errorf("cloud provider is required" + fmt.Sprintf("Cloud provider type, one of %v", supportedCloudProviders))
-	}
-
 	switch o.CloudProvider {
 	case cp.AWS:
 		if o.Project != "" {
-			return fmt.Errorf("you must not use --project to specify the projectID when cloud provider is aws")
+			return fmt.Errorf("--project is not supported when cloud provider is aws")
 		}
 		if o.Action == DetachVolume && o.VolumeIDs == nil {
-			return fmt.Errorf("you must use --volume-id to specify the volumeID when cloud provider is aws")
+			return fmt.Errorf("--volume-id is required when cloud provider is aws")
 		}
 		if o.Action == DetachVolume && len(o.DeviceNames) != len(o.VolumeIDs) {
 			return fmt.Errorf("the number of volume-id must be equal to the number of device-name")
 		}
 	case cp.GCP:
 		if o.Project == "" {
-			return fmt.Errorf("you must use --project to specify the projectID when cloud provider is gcp")
+			return fmt.Errorf("--project is required when cloud provider is gcp")
 		}
 		if o.VolumeIDs != nil {
-			return fmt.Errorf("you must not use --volume-id to specify the volumeID when cloud provider is gcp")
+			return fmt.Errorf(" --volume-id is not supported when cloud provider is gcp")
 		}
 	default:
 		return fmt.Errorf("cloud provider type, one of %v", supportedCloudProviders)

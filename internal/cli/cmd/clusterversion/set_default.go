@@ -124,10 +124,6 @@ func (o *SetOrUnsetDefaultOption) run(args []string) error {
 	// alreadySet is to marks if two input args have the same clusterdefintion
 	alreadySet := make(map[string]string)
 	for _, cv := range args {
-		if len(cv2Cd[cv]) == 0 {
-			allErrs = append(allErrs, fmt.Errorf("clusterversion \"%s\" is not existed", cv))
-			continue
-		}
 		if len(cd2DefaultCv[cv2Cd[cv]]) != 0 {
 			allErrs = append(allErrs, fmt.Errorf("clusterdefinition \"%s\" already has a default cluster version \"%s\"", cv2Cd[cv], cd2DefaultCv[cv2Cd[cv]]))
 			continue
@@ -138,6 +134,7 @@ func (o *SetOrUnsetDefaultOption) run(args []string) error {
 		}
 		if err := patchDefaultClusterVersionAnnotations(client, cv, annotationTrueValue); err != nil {
 			allErrs = append(allErrs, err)
+			continue
 		}
 		alreadySet[cv2Cd[cv]] = cv
 	}

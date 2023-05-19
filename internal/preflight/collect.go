@@ -98,7 +98,7 @@ func CollectHostData(ctx context.Context, hostPreflight *preflightv1beta2.HostPr
 	return &collectResults, nil
 }
 
-// CollectHost collects host data against by HostCollector，and returns the collected data which is encapsulated in CollectResult struct
+// CollectHost collects host data against by HostCollector, and returns the collected data which is encapsulated in CollectResult struct
 func CollectHost(ctx context.Context, opts preflight.CollectOpts, collectors []pkgcollector.HostCollector, hostPreflight *preflightv1beta2.HostPreflight) (preflight.CollectResult, error) {
 	allCollectedData := make(map[string][]byte)
 	collectResult := KBHostCollectResult{
@@ -187,7 +187,7 @@ func CollectClusterData(ctx context.Context, kbPreflight *preflightv1beta2.Prefl
 	return &collectResults, err
 }
 
-// CollectCluster collects cluster data against by Collector，and returns the collected data which is encapsulated in CollectResult struct
+// CollectCluster collects cluster data against by Collector, and returns the collected data which is encapsulated in CollectResult struct
 func CollectCluster(ctx context.Context,
 	opts preflight.CollectOpts,
 	allCollectors []pkgcollector.Collector,

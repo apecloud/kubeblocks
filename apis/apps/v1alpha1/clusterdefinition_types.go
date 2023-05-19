@@ -836,7 +836,7 @@ type SwitchPolicy struct {
 	// Promote: candidate primary after elected, which to be promoted
 	// Demote: primary before switch, which to be demoted
 	// Follow: the other secondaries that are not selected as the primary, which to follow the new primary
-	// if switchStatements is not set，we will try to use the built-in switchStatements for the database engine with built-in support.
+	// if switchStatements is not set, we will try to use the built-in switchStatements for the database engine with built-in support.
 	// +optional
 	SwitchStatements *SwitchStatements `json:"switchStatements,omitempty"`
 }

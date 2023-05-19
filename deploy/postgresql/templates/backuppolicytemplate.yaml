@@ -5,6 +5,18 @@ metadata:
   labels:
     clusterdefinition.kubeblocks.io/name: postgresql
     {{- include "postgresql.labels" . | nindent 4 }}
+  annotations:
+    dataprotection.kubeblocks.io/reconfigure-ref: |
+      {
+        "name": "postgresql-configuration",
+        "key": "postgresql.conf",
+        "enable": {
+          "logfile": [{"key": "archive_command","value": "''"}]
+        },
+        "disable": {
+          "logfile": [{ "key": "archive_command","value": "'/bin/true'"}]
+        }
+      }
 spec:
   clusterDefinitionRef: postgresql
   backupPolicies:

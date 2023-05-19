@@ -17,102 +17,102 @@
 
 // required, command line input options for parameters and flags
 options: {
-	namespace:        string
-	action:						string
-	selector:					{}
-	mode:							string
-	value:						string
-	duration: 				string
+	namespace: string
+	action:    string
+	selector: {}
+	mode:     string
+	value:    string
+	duration: string
 
-	direction: 				string
-	externalTargets?:  [...]
+	direction: string
+	externalTargets?: [...]
 
-	targetMode?:				string
-	targetValue:				string
+	targetMode?: string
+	targetValue: string
 	targetNamespaceSelectors: [...string]
-	targetLabelSelectors:			{}
+	targetLabelSelectors: {}
 
-	loss?:						string
-	corrupt?:					string
-	duplicate?:				string
+	loss?:      string
+	corrupt?:   string
+	duplicate?: string
 
-	latency?: 				string
-	jitter: 					string
+	latency?: string
+	jitter:   string
 
-	correlation:			string
+	correlation: string
 
-	rate?:						string
-	limit:						uint32
-	buffer:						uint32
-	peakrate:					uint32
-	minburst:					uint32
+	rate?:    string
+	limit:    uint32
+	buffer:   uint32
+	peakrate: uint32
+	minburst: uint32
 }
 
 // required, k8s api resource content
 content: {
-  kind: "NetworkChaos"
-  apiVersion: "chaos-mesh.org/v1alpha1"
-  metadata:{
-  	generateName: "network-chaos-"
-    namespace: options.namespace
-  }
-  spec:{
-    selector: options.selector
-    mode: options.mode
-    value: options.value
-    action: options.action
-    duration: options.duration
+	kind:       "NetworkChaos"
+	apiVersion: "chaos-mesh.org/v1alpha1"
+	metadata: {
+		generateName: "network-chaos-"
+		namespace:    options.namespace
+	}
+	spec: {
+		selector: options.selector
+		mode:     options.mode
+		value:    options.value
+		action:   options.action
+		duration: options.duration
 
-    direction: options.direction
-    if options.externalTargets != _|_ {
-  		externalTargets: options.externalTargets
-    }
-  	if options.targetMode != _|_ {
-				target:{
-					mode: options.targetMode
-					value: options.targetValue
-					selector:{
-						namespaces: options.targetNamespaceSelectors
-						labelSelectors:{
-								options.targetLabelSelectors
-						}
+		direction: options.direction
+		if options.externalTargets != _|_ {
+			externalTargets: options.externalTargets
+		}
+		if options.targetMode != _|_ {
+			target: {
+				mode:  options.targetMode
+				value: options.targetValue
+				selector: {
+					namespaces: options.targetNamespaceSelectors
+					labelSelectors: {
+						options.targetLabelSelectors
 					}
 				}
-  	}
-  	if options.loss != _|_ {
-  		loss:{
-  			loss: options.loss
+			}
+		}
+		if options.loss != _|_ {
+			loss: {
+				loss:        options.loss
 				correlation: options.correlation
 			}
-  	}
+		}
 		if options.corrupt != _|_ {
-				corrupt:{
-					corrupt: options.corrupt
-					correlation: options.correlation
-				}
+			corrupt: {
+				corrupt:     options.corrupt
+				correlation: options.correlation
+			}
 		}
 		if options.duplicate != _|_ {
-				duplicate:{
-					duplicate: options.duplicate
-					correlation: options.correlation
-				}
+			duplicate: {
+				duplicate:   options.duplicate
+				correlation: options.correlation
+			}
 		}
-  	if options.latency != _|_{
-				delay:{
-					latency: options.latency
-					jitter: options.jitter
-					correlation: options.correlation
-				}
-  	}
-  	if options.rate != _|_{
-				bandwidth:{
-					rate: options.rate
-					limit: options.limit
-					buffer: options.buffer
-					peakrate: options.peakrate
-					minburst: options.minburst
-					correlation: options.correlation
-				}
+		if options.latency != _|_ {
+			delay: {
+				latency:     options.latency
+				jitter:      options.jitter
+				correlation: options.correlation
+			}
 		}
-  }
+		if options.rate != _|_ {
+			bandwidth: {
+				rate:        options.rate
+				limit:       options.limit
+				buffer:      options.buffer
+				peakrate:    options.peakrate
+				minburst:    options.minburst
+				correlation: options.correlation
+			}
+		}
+	}
 }

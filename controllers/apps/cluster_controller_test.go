@@ -1594,7 +1594,7 @@ var _ = Describe("Cluster Controller", func() {
 				})
 			})
 
-			It("should be able to recover if volume expansion fails", func() {
+			It(fmt.Sprintf("[comp: %s] should be able to recover if volume expansion fails", compName), func() {
 				testVolumeExpansionFailedAndRecover(compName, compDefName)
 			})
 

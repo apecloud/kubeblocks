@@ -118,6 +118,7 @@ func NewDeleteAccountCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		},
 	}
 	o.AddFlags(cmd)
+	cmd.Flags().BoolVar(&o.AutoApprove, "auto-approve", false, "Skip interactive approval before deleting account")
 	return cmd
 }
 

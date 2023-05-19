@@ -30,7 +30,8 @@ import (
 
 type DeleteUserOptions struct {
 	*AccountBaseOptions
-	info sqlchannel.UserInfo
+	info        sqlchannel.UserInfo
+	AutoApprove bool
 }
 
 func NewDeleteUserOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *DeleteUserOptions {
@@ -50,6 +51,9 @@ func (o *DeleteUserOptions) Validate(args []string) error {
 	}
 	if len(o.info.UserName) == 0 {
 		return errMissingUserName
+	}
+	if o.AutoApprove {
+		return nil
 	}
 	if err := delete.Confirm([]string{o.info.UserName}, o.In); err != nil {
 		return err

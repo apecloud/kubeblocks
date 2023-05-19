@@ -62,8 +62,9 @@ type destroyOptions struct {
 
 	// purge resources, before destroy kubernetes cluster we should delete cluster and
 	// uninstall KubeBlocks
-	purge   bool
-	timeout time.Duration
+	autoApprove bool
+	purge       bool
+	timeout     time.Duration
 }
 
 func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
@@ -82,7 +83,7 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 
 	cmd.Flags().BoolVar(&o.purge, "purge", true, "Purge all resources before destroy kubernetes cluster, delete all clusters created by KubeBlocks and uninstall KubeBlocks.")
 	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for installing KubeBlocks, such as --timeout=10m")
-
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before destroying the playground")
 	return cmd
 }
 
@@ -143,10 +144,12 @@ func (o *destroyOptions) destroyCloud() error {
 		o.prevCluster.ClusterName, o.prevCluster.String())
 
 	// confirm to destroy
-	entered, _ := prompt.NewPrompt("Enter a value:", nil, o.In).Run()
-	if entered != yesStr {
-		fmt.Fprintf(o.Out, "\nPlayground destroy cancelled.\n")
-		return cmdutil.ErrExit
+	if !o.autoApprove {
+		entered, _ := prompt.NewPrompt("Enter a value:", nil, o.In).Run()
+		if entered != yesStr {
+			fmt.Fprintf(o.Out, "\nPlayground destroy cancelled.\n")
+			return cmdutil.ErrExit
+		}
 	}
 
 	o.startTime = time.Now()

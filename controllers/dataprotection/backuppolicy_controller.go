@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -183,6 +184,9 @@ func (r *BackupPolicyReconciler) patchStatusFailed(reqCtx intctrlutil.RequestCtx
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
 	reason string,
 	err error) (ctrl.Result, error) {
+	if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeRequeue) {
+		return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+	}
 	backupPolicyDeepCopy := backupPolicy.DeepCopy()
 	backupPolicy.Status.Phase = dataprotectionv1alpha1.PolicyFailed
 	backupPolicy.Status.FailureReason = err.Error()
@@ -382,6 +386,10 @@ func (r *BackupPolicyReconciler) handlePolicy(reqCtx intctrlutil.RequestCtx,
 	basePolicy dataprotectionv1alpha1.BasePolicy,
 	cronExpression string,
 	backType dataprotectionv1alpha1.BackupType) error {
+
+	if err := r.reconfigure(reqCtx, backupPolicy, basePolicy, backType); err != nil {
+		return err
+	}
 	// create/delete/patch cronjob workload
 	if err := r.reconcileCronJob(reqCtx, backupPolicy, basePolicy,
 		cronExpression, backType); err != nil {
@@ -454,4 +462,120 @@ func (r *BackupPolicyReconciler) setGlobalPersistentVolumeClaim(backupPolicy *da
 	if pvcCfg.InitCapacity.IsZero() && globalInitCapacity != "" {
 		backupPolicy.PersistentVolumeClaim.InitCapacity = resource.MustParse(globalInitCapacity)
 	}
+}
+
+type backupReconfigureRef struct {
+	Name    string         `json:"name"`
+	Key     string         `json:"key"`
+	Enable  parameterPairs `json:"enable,omitempty"`
+	Disable parameterPairs `json:"disable,omitempty"`
+}
+
+type parameterPairs map[string][]appsv1alpha1.ParameterPair
+
+func (r *BackupPolicyReconciler) reconfigure(reqCtx intctrlutil.RequestCtx,
+	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
+	basePolicy dataprotectionv1alpha1.BasePolicy,
+	backType dataprotectionv1alpha1.BackupType) error {
+
+	reconfigRef := backupPolicy.Annotations[constant.ReconfigureRefAnnotationKey]
+	if reconfigRef == "" {
+		return nil
+	}
+	configRef := backupReconfigureRef{}
+	if err := json.Unmarshal([]byte(reconfigRef), &configRef); err != nil {
+		return err
+	}
+
+	enable := false
+	commonSchedule := backupPolicy.Spec.GetCommonSchedulePolicy(backType)
+	if commonSchedule != nil {
+		enable = commonSchedule.Enable
+	}
+	if backupPolicy.Annotations[constant.LastAppliedConfigAnnotation] == "" && !enable {
+		// disable in the first policy created, no need reconfigure because default configs had been set.
+		return nil
+	}
+	configParameters := configRef.Disable
+	if enable {
+		configParameters = configRef.Enable
+	}
+	if configParameters == nil {
+		return nil
+	}
+	parameters := configParameters[string(backType)]
+	if len(parameters) == 0 {
+		// skip reconfigure if not found parameters.
+		return nil
+	}
+	updateParameterPairsBytes, _ := json.Marshal(parameters)
+	updateParameterPairs := string(updateParameterPairsBytes)
+	if updateParameterPairs == backupPolicy.Annotations[constant.LastAppliedConfigAnnotation] {
+		// reconcile the config job if finished
+		return r.reconcileReconfigure(reqCtx, backupPolicy)
+	}
+
+	ops := appsv1alpha1.OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: backupPolicy.Name + "-",
+			Namespace:    backupPolicy.Namespace,
+			Labels: map[string]string{
+				dataProtectionLabelBackupPolicyKey: backupPolicy.Name,
+			},
+		},
+		Spec: appsv1alpha1.OpsRequestSpec{
+			Type:       appsv1alpha1.ReconfiguringType,
+			ClusterRef: basePolicy.Target.LabelsSelector.MatchLabels[constant.AppInstanceLabelKey],
+			Reconfigure: &appsv1alpha1.Reconfigure{
+				ComponentOps: appsv1alpha1.ComponentOps{
+					ComponentName: basePolicy.Target.LabelsSelector.MatchLabels[constant.KBAppComponentLabelKey],
+				},
+				Configurations: []appsv1alpha1.Configuration{
+					{
+						Name: configRef.Name,
+						Keys: []appsv1alpha1.ParameterConfig{
+							{
+								Key:        configRef.Key,
+								Parameters: parameters,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	if err := r.Client.Create(reqCtx.Ctx, &ops); err != nil {
+		return err
+	}
+
+	r.Recorder.Eventf(backupPolicy, corev1.EventTypeNormal, "Reconfiguring", "update config %s", updateParameterPairs)
+	patch := client.MergeFrom(backupPolicy.DeepCopy())
+	if backupPolicy.Annotations == nil {
+		backupPolicy.Annotations = map[string]string{}
+	}
+	backupPolicy.Annotations[constant.LastAppliedConfigAnnotation] = updateParameterPairs
+	return r.Client.Patch(reqCtx.Ctx, backupPolicy, patch)
+}
+
+func (r *BackupPolicyReconciler) reconcileReconfigure(reqCtx intctrlutil.RequestCtx,
+	backupPolicy *dataprotectionv1alpha1.BackupPolicy) error {
+
+	opsList := appsv1alpha1.OpsRequestList{}
+	if err := r.Client.List(reqCtx.Ctx, &opsList,
+		client.InNamespace(backupPolicy.Namespace),
+		client.MatchingLabels{dataProtectionLabelBackupPolicyKey: backupPolicy.Name}); err != nil {
+		return err
+	}
+	if len(opsList.Items) > 0 {
+		sort.Slice(opsList.Items, func(i, j int) bool {
+			return opsList.Items[j].CreationTimestamp.Before(&opsList.Items[i].CreationTimestamp)
+		})
+		latestOps := opsList.Items[0]
+		if latestOps.Status.Phase == appsv1alpha1.OpsFailedPhase {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeReconfigureFailed, "ops failed %s", latestOps.Name)
+		} else if latestOps.Status.Phase != appsv1alpha1.OpsSucceedPhase {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting ops %s finished.", latestOps.Name)
+		}
+	}
+	return nil
 }

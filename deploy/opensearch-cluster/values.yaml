@@ -62,3 +62,6 @@ persistence:
 dashboard:
   resources: {}
   replicaCount: 1
+
+serviceAccount:
+  name:

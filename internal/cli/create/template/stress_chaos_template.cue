@@ -17,30 +17,30 @@
 
 // required, command line input options for parameters and flags
 options: {
-	namespace:        string
-	selector:					{}
-	mode:							string
-	value:						string
-	duration: 				string
+	namespace: string
+	selector: {}
+	mode:     string
+	value:    string
+	duration: string
 
-	stressors: 				{}
-	containerNames: 	[...]
+	stressors: {}
+	containerNames: [...]
 }
 
 // required, k8s api resource content
 content: {
-  kind: "StressChaos"
-  apiVersion: "chaos-mesh.org/v1alpha1"
-  metadata:{
-  	generateName: "stress-chaos-"
-    namespace: options.namespace
-  }
-  spec:{
-    selector: options.selector
-    mode: options.mode
-    value: options.value
-    duration: options.duration
-    stressors: options.stressors
-    containerNames: options.containerNames
-  }
+	kind:       "StressChaos"
+	apiVersion: "chaos-mesh.org/v1alpha1"
+	metadata: {
+		generateName: "stress-chaos-"
+		namespace:    options.namespace
+	}
+	spec: {
+		selector:       options.selector
+		mode:           options.mode
+		value:          options.value
+		duration:       options.duration
+		stressors:      options.stressors
+		containerNames: options.containerNames
+	}
 }

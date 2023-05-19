@@ -1,0 +1,14 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: postgresql-14.7.0
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: postgresql-old
+  componentVersions:
+  - componentDefRef: pg-replication
+    versionsContext:
+      containers:
+      - name: postgresql
+        image: registry.cn-hangzhou.aliyuncs.com/apecloud/postgresql:14.7.0

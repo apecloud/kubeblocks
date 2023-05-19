@@ -21,7 +21,6 @@ package kubeblocks
 
 import (
 	"bytes"
-	"os"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -138,9 +137,9 @@ var _ = Describe("kubeblocks", func() {
 
 		for _, c := range testCases {
 			By(c.desc)
-			//out := &bytes.Buffer{}
-			printAddonMsg(os.Stdout, c.addons, true)
-			//Expect(out.String()).To(ContainSubstring(c.expected))
+			out := &bytes.Buffer{}
+			printAddonMsg(out, c.addons, true)
+			Expect(out.String()).To(ContainSubstring(c.expected))
 		}
 	})
 })

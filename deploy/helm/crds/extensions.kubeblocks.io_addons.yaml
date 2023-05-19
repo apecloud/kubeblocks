@@ -49,6 +49,24 @@ spec:
           spec:
             description: AddonSpec defines the desired state of Addon
             properties:
+              cliPlugins:
+                description: Plugin installation spec.
+                items:
+                  properties:
+                    description:
+                      description: The description of the plugin.
+                      type: string
+                    indexRepository:
+                      description: The index repository of the plugin.
+                      type: string
+                    name:
+                      description: Name of the plugin.
+                      type: string
+                  required:
+                  - indexRepository
+                  - name
+                  type: object
+                type: array
               defaultInstallValues:
                 description: Default installation parameters.
                 items:

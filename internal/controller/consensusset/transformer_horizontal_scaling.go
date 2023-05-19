@@ -259,7 +259,7 @@ func createNextAction(transCtx *CSSetTransformContext, dag *graph.DAG, csSet *wo
 		ordinal = 0
 	}
 	target := getPodName(csSet.Name, ordinal)
-	actionName := buildActionName(csSet.Name, int(csSet.Generation), ordinal, nextActionInfo.actionType)
+	actionName := buildActionName(csSet.Name, int(csSet.Generation), nextActionInfo.ordinal, nextActionInfo.actionType)
 	nextAction := buildAction(csSet, actionName, nextActionInfo.actionType, leader, target, false)
 
 	if err := abnormalAnalysis(csSet, nextAction); err != nil {

@@ -89,14 +89,30 @@ $kubeblocks_contributors
 $kubeblocks_changes
 
 ### Easy of Use
-* ClusterDefinition API `spec.connectionCredential` add following built-in variables:
-    * Headless service FQDN `$(HEADLESS_SVC_FQDN)` placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc, where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute
+- `kbcli playground` supports one-command launching on running environments of Alibaba Cloud, Tencent Cloud, and GCP to experience complete KubeBlocks functionality
+- kbcli supports creating clusters by entering CPU, memory, or class type
+- kbcli supports tagging related resources of cluster
+- kbcli is compatible with macOS package manager `brew`
+- kbcli supports `preflight` command to check whether the environment meets the requirements for installing KubeBlocks
+- kbcli adds object storage addon for storing full file backups, logs, and other data
+- `kbcli install` runs preflight to check whether the environment meets the requirements, including node taints, storage class, and other check rules
+- kbcli addon adds timeout parameter, printing exception information when enable fails
+- Addon inherits the affinity and tolerations configuration of KubeBlocks
+- `kbcli uninstall` prompts information to delete backup files, printing log information if the deletion fails
+- ClusterDefinition API `spec.connectionCredential` add following built-in variables:
+    - Headless service FQDN `$(HEADLESS_SVC_FQDN)` placeholder, value pattern - `$(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc`, where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute
 
 #### Compatibility
 - Compatible with AWS EKS v1.22/v1.23/v1.24/v1.25
 - Compatible with Alibaba Cloud ACK v1.22/v1.24
 - Compatible with Tencent Cloud TKE standard cluster v1.22/v1.24
 - Compatible with GCP GKE standard cluster v1.24/v1.25
+
+#### Stability
+- KubeBlocks limits the combination of CPU and memory to avoid unreasonable configurations that reduce resource utilization or system stability
+
+#### Performance
+- High-availability MySQL 8.0 with 4C 8GB 500GB, throughput and RT differences of various products on AWS, including ApeCloud MySQL Raft group, AWS RDS operator, Operator for Percona Server for MySQL, Oracle MySQL Operator for Kubernetes
 
 ### API changes
 - New APIs:

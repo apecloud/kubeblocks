@@ -113,9 +113,8 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 			pvRestorePolicyStep
 		)
 
-		addStepVertex := func(fromVertex *lifecycleVertex, step pvcRecreateStep) *lifecycleVertex {
-			switch step {
-			case pvPolicyRetainStep:
+		addStepMap := map[pvcRecreateStep]func(fromVertex *lifecycleVertex, step pvcRecreateStep) *lifecycleVertex{
+			pvPolicyRetainStep: func(fromVertex *lifecycleVertex, step pvcRecreateStep) *lifecycleVertex {
 				// step 1: update pv to retain
 				retainPV := pv.DeepCopy()
 				if retainPV.Labels == nil {
@@ -136,7 +135,8 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 				dag.AddVertex(retainPVVertex)
 				dag.Connect(fromVertex, retainPVVertex)
 				return retainPVVertex
-			case deletePVCStep:
+			},
+			deletePVCStep: func(fromVertex *lifecycleVertex, step pvcRecreateStep) *lifecycleVertex {
 				// step 2: delete pvc, this will not delete pv because policy is 'retain'
 				deletePVCVertex := &lifecycleVertex{obj: pvc, action: actionPtr(DELETE)}
 				removeFinalizerPVC := pvc.DeepCopy()
@@ -151,7 +151,8 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 				dag.Connect(removeFinalizerPVCVertex, deletePVCVertex)
 				dag.Connect(fromVertex, removeFinalizerPVCVertex)
 				return deletePVCVertex
-			case removePVClaimRefStep:
+			},
+			removePVClaimRefStep: func(fromVertex *lifecycleVertex, step pvcRecreateStep) *lifecycleVertex {
 				// step 3: remove claimRef in pv
 				removeClaimRefPV := pv.DeepCopy()
 				if removeClaimRefPV.Spec.ClaimRef != nil {
@@ -166,7 +167,8 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 				dag.AddVertex(removeClaimRefVertex)
 				dag.Connect(fromVertex, removeClaimRefVertex)
 				return removeClaimRefVertex
-			case createPVCStep:
+			},
+			createPVCStep: func(fromVertex *lifecycleVertex, step pvcRecreateStep) *lifecycleVertex {
 				// step 4: create new pvc
 				newPVC.SetResourceVersion("")
 				createNewPVCVertex := &lifecycleVertex{
@@ -176,7 +178,8 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 				dag.AddVertex(createNewPVCVertex)
 				dag.Connect(fromVertex, createNewPVCVertex)
 				return createNewPVCVertex
-			case pvRestorePolicyStep:
+			},
+			pvRestorePolicyStep: func(fromVertex *lifecycleVertex, step pvcRecreateStep) *lifecycleVertex {
 				// step 5: restore to previous pv policy
 				restorePV := pv.DeepCopy()
 				policy := corev1.PersistentVolumeReclaimPolicy(restorePV.Annotations[constant.PVLastClaimPolicyAnnotationKey])
@@ -192,14 +195,13 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 				dag.AddVertex(restorePVVertex)
 				dag.Connect(fromVertex, restorePVVertex)
 				return restorePVVertex
-			}
-			return nil
+			},
 		}
 
 		updatePVCByRecreateFromStep := func(fromStep pvcRecreateStep) {
 			lastVertex := vertex
-			for i := pvRestorePolicyStep; i >= fromStep && i >= pvPolicyRetainStep; i-- {
-				lastVertex = addStepVertex(lastVertex, i)
+			for step := pvRestorePolicyStep; step >= fromStep && step >= pvPolicyRetainStep; step-- {
+				lastVertex = addStepMap[step](lastVertex, step)
 			}
 		}
 

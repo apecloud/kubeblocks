@@ -454,9 +454,9 @@ func (r *OpsRequest) getSCNameByPvc(ctx context.Context,
 	vctName string) *string {
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err := cli.List(ctx, pvcList, client.InNamespace(r.Namespace), client.MatchingLabels{
-		"app.kubernetes.io/instance":        r.Spec.ClusterRef,
-		"apps.kubeblocks.io/component-name": compName,
-		"apps.kubeblocks.io/pvc-name":       vctName,
+		constant.AppInstanceLabelKey:    r.Spec.ClusterRef,
+		constant.KBAppComponentLabelKey: compName,
+		constant.PVCNameLabelKey:        vctName,
 	}, client.Limit(1)); err != nil {
 		return nil
 	}

@@ -21,6 +21,7 @@ package consensusset
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -52,9 +53,6 @@ type probeMessage struct {
 const (
 	// roleChangedAnnotKey is used to mark the role change event has been handled.
 	roleChangedAnnotKey = "role.kubeblocks.io/event-handled"
-
-	// trueStr values
-	trueStr = "true"
 )
 
 const (
@@ -72,7 +70,8 @@ func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Reque
 		annotations = event.GetAnnotations()
 	)
 	// filter role changed event that has been handled
-	if annotations != nil && annotations[roleChangedAnnotKey] == trueStr {
+	count := fmt.Sprintf("count-%d", event.Count)
+	if annotations != nil && annotations[roleChangedAnnotKey] == count {
 		return nil
 	}
 
@@ -85,7 +84,7 @@ func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Reque
 	if event.Annotations == nil {
 		event.Annotations = make(map[string]string, 0)
 	}
-	event.Annotations[roleChangedAnnotKey] = trueStr
+	event.Annotations[roleChangedAnnotKey] = count
 	return cli.Patch(reqCtx.Ctx, event, patch)
 }
 

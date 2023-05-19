@@ -720,7 +720,7 @@ func findActionImage(reconfiguration *workloads.MembershipReconfiguration, actio
 		}
 		fallthrough
 	case jobTypeSwitchover:
-		if image := getImage(reconfiguration.PromoteAction); len(image) > 0 {
+		if image := getImage(reconfiguration.SwitchoverAction); len(image) > 0 {
 			return image
 		}
 		return defaultActionImage

@@ -53,7 +53,7 @@ func (t *CSSetDeletionTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
-	return graph.ErrFastReturn
+	return graph.ErrNoops
 }
 
 var _ graph.Transformer = &CSSetDeletionTransformer{}

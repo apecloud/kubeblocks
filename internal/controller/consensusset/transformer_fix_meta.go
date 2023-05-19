@@ -44,7 +44,7 @@ func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	controllerutil.AddFinalizer(csSet, csSetFinalizerName)
 	model.PrepareRootUpdate(dag)
 
-	return graph.ErrFastReturn
+	return graph.ErrNoops
 }
 
 var _ graph.Transformer = &FixMetaTransformer{}

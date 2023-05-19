@@ -22,7 +22,7 @@ data:
       exit 0
     else
       primary_fqdn="$primary.$KB_CLUSTER_NAME-$KB_COMP_NAME-headless.$KB_NAMESPACE.svc"
-      echo "primary_fqdn=$primary_fqdn" >> /data/redis/.kb_set_up.log
+      echo "primary_fqdn=$primary_fqdn" >> /etc/redis/.kb_set_up.log
       until redis-cli -h $primary_fqdn -p 6379 ping; do sleep 1; done
       redis-cli -h 127.0.0.1 -p 6379 replicaof $primary_fqdn 6379 || exit 1
     fi

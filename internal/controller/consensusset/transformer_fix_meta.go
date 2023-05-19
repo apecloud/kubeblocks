@@ -41,11 +41,10 @@ func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	if controllerutil.ContainsFinalizer(csSet, csSetFinalizerName) {
 		return nil
 	}
-	csSetCopy := csSet.DeepCopy()
-	controllerutil.AddFinalizer(csSetCopy, csSetFinalizerName)
-	model.PrepareUpdate(dag, transCtx.OrigCSSet, csSetCopy)
+	controllerutil.AddFinalizer(csSet, csSetFinalizerName)
+	model.PrepareRootUpdate(dag)
 
-	return nil
+	return graph.ErrFastReturn
 }
 
 var _ graph.Transformer = &FixMetaTransformer{}

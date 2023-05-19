@@ -224,6 +224,15 @@ func PrepareStatus(dag *graph.DAG, objectOld, objectNew client.Object) {
 	dag.AddVertex(vertex)
 }
 
+func PrepareRootUpdate(dag *graph.DAG) error {
+	root, err := FindRootVertex(dag)
+	if err != nil {
+		return err
+	}
+	root.Action = ActionPtr(UPDATE)
+	return nil
+}
+
 func PrepareRootDelete(dag *graph.DAG) error {
 	root, err := FindRootVertex(dag)
 	if err != nil {

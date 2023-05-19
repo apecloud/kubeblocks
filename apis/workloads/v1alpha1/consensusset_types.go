@@ -86,6 +86,15 @@ type ConsensusSetSpec struct {
 type ConsensusSetStatus struct {
 	appsv1.StatefulSetStatus `json:",inline"`
 
+	// InitReplicas is the number of pods(members) when cluster first initialized
+	// it's set to Replicas when at object creation time and never changes
+	InitReplicas int32 `json:"initReplicas"`
+
+	// ReadyInitReplicas is the number of pods(members) already in MembersStatus in the cluster initialization stage
+	// will never change once equals to InitReplicas
+	// +optional
+	ReadyInitReplicas int32 `json:"readyInitReplicas,omitempty"`
+
 	// members' status.
 	// +optional
 	MembersStatus []ConsensusMemberStatus `json:"membersStatus,omitempty"`

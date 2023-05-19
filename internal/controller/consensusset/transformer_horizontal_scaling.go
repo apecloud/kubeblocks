@@ -52,20 +52,33 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		return nil
 	}
 
+	// TODO(free6om): remove all printLog when all testes pass
+	printLog := func(message string) {
+		transCtx.Logger.Info(message)
+	}
+
 	// get the underlying sts
 	stsVertex, err := getUnderlyingStsVertex(dag)
 	if err != nil {
 		return err
 	}
-	// don't handle creation
-	if stsVertex.Action == nil || *stsVertex.Action != model.UPDATE {
+
+	// handle cluster initialization
+	// set initReplicas at creation
+	if transCtx.CSSet.Status.InitReplicas == 0 {
+		transCtx.CSSet.Status.InitReplicas = transCtx.CSSet.Spec.Replicas
+		return nil
+	}
+	// update readyInitReplicas
+	if transCtx.CSSet.Status.ReadyInitReplicas < transCtx.CSSet.Status.InitReplicas {
+		transCtx.CSSet.Status.ReadyInitReplicas = int32(len(transCtx.CSSet.Status.MembersStatus))
+	}
+	// return if cluster initialization not done
+	if transCtx.CSSet.Status.ReadyInitReplicas != transCtx.CSSet.Status.InitReplicas {
 		return nil
 	}
 
-	// TODO(free6om): remove all printLog when all testes pass
-	printLog := func(message string) {
-		transCtx.Logger.Info(message)
-	}
+	// cluster initialization done, handle dynamic membership reconfiguration
 
 	printLog(fmt.Sprintf("step 1: loop begins, gen: %d, observed: %d", transCtx.CSSet.Generation, transCtx.OrigCSSet.Status.ObservedGeneration))
 	allActionList, err := buildAllActionList(transCtx)
@@ -94,7 +107,6 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		stsVertex.Immutable = false
 	}
 
-	// TODO(free6om): bug: separate consensus cluster creation from scaling 0-N
 	// generate new (action) log based on snapshot + active transaction(action)
 	// in progress action should be in cache as has been started in last loop
 	memberReadyReplicas := getCurrentMembers(allActionList, int32(len(transCtx.CSSet.Status.MembersStatus)))

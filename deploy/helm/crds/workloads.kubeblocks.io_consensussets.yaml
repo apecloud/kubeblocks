@@ -8582,6 +8582,12 @@ spec:
                 description: currentRevision, if not empty, indicates the version
                   of the StatefulSet used to generate Pods in the sequence [0,currentReplicas).
                 type: string
+              initReplicas:
+                description: InitReplicas is the number of pods(members) when cluster
+                  first initialized it's set to Replicas when at object creation time
+                  and never changes
+                format: int32
+                type: integer
               membersStatus:
                 description: members' status.
                 items:
@@ -8627,6 +8633,12 @@ spec:
                   which is updated on mutation by the API Server.
                 format: int64
                 type: integer
+              readyInitReplicas:
+                description: ReadyInitReplicas is the number of pods(members) already
+                  in MembersStatus in the cluster initialization stage will never
+                  change once equals to InitReplicas
+                format: int32
+                type: integer
               readyReplicas:
                 description: readyReplicas is the number of pods created for this
                   StatefulSet with a Ready Condition.
@@ -8648,6 +8660,7 @@ spec:
                 format: int32
                 type: integer
             required:
+            - initReplicas
             - replicas
             type: object
         type: object

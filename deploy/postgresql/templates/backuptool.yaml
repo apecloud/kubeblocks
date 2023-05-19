@@ -47,4 +47,6 @@ spec:
       set -e;
       mkdir -p ${BACKUP_DIR};
       echo ${DB_PASSWORD} | pg_basebackup -Ft -Pv -Xs -z -D ${BACKUP_DIR} -Z5 -h ${DB_HOST} -U standby -W;
+      cat $(ls -t ${DATA_DIR}/pg_wal/*.backup|head -n 1) > ${DATA_DIR}/basebackup.info
+      echo "TOTAL SIZE: $(du -sh ${BACKUP_DIR}|awk '{print $1}')" >> ${DATA_DIR}/basebackup.info
   incrementalBackupCommands: []

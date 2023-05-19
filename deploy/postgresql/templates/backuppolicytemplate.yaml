@@ -49,6 +49,11 @@ spec:
           updateStage: post
     datafile:
       backupToolName: postgres-basebackup
+      backupStatusUpdates:
+        - path: ""
+          containerName: postgresql
+          script: /kb-scripts/basebackup-collector.sh
+          updateStage: post
     logfile:
       backupToolName: postgres-pitr
       target:

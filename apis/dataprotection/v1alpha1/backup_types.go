@@ -149,7 +149,7 @@ type BackupToolManifestsStatus struct {
 
 	// backup check point, for incremental backup.
 	// +optional
-	CheckPoint string `json:"CheckPoint,omitempty"`
+	CheckPoint string `json:"checkPoint,omitempty"`
 }
 
 // +genclient

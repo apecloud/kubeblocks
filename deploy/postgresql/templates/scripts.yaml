@@ -129,3 +129,22 @@ data:
       LOG_STOP_TIME=$(date -d "$LOG_STOP_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')
       printf "{\"startTime\": \"$LOG_START_TIME\" ,\"stopTime\": \"$LOG_STOP_TIME\"}"
     fi
+  basebackup-collector.sh: |
+    #!/bin/bash
+    set -e;
+    function getProperty() {
+       file=$1; key=$2;
+       echo $(grep "${key}: " ${file} | awk -F ': ' '{print $2}')
+    }
+    basebackup_info=${PGDATA}/basebackup.info
+    if [ -e ${basebackup_info} ]; then
+      TOTAL_SIZE=$(getProperty ${basebackup_info} "TOTAL SIZE")
+      START_TIME=$(getProperty ${basebackup_info} "START TIME")
+      STOP_TIME=$(getProperty ${basebackup_info} "STOP TIME")
+      if [ "${START_TIME}" != "" ]; then START_TIME=$(date -d "$START_TIME" -u '+%Y-%m-%dT%H:%M:%SZ'); fi
+      if [ "${STOP_TIME}" != "" ]; then STOP_TIME=$(date -d "$STOP_TIME" -u '+%Y-%m-%dT%H:%M:%SZ'); fi
+      rm -f ${basebackup_info}
+      printf "{\"totalSize\":\"${TOTAL_SIZE}\",\"manifests\":{\"backupLog\":{\"startTime\":\"$START_TIME\",\"stopTime\":\"$STOP_TIME\"},\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}"
+    else
+      printf "{}"
+    fi

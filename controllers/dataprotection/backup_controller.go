@@ -710,11 +710,15 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 	basePolicy *dataprotectionv1alpha1.BasePolicy,
 	updateInfo dataprotectionv1alpha1.BackupStatusUpdate) error {
 	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	updatePath := updateInfo.Path
+	if updateInfo.Path == "" {
+		updatePath = "status"
+	}
 	jobName := backup.Name
 	if len(backup.Name) > 30 {
-		jobName = backup.Name[:30]
+		jobName = backup.Name[:30] + "-" + strings.ToLower(updatePath)
 	}
-	key := types.NamespacedName{Namespace: mgrNS, Name: jobName + "-" + strings.ToLower(updateInfo.Path)}
+	key := types.NamespacedName{Namespace: mgrNS, Name: jobName}
 	job := &batchv1.Job{}
 	// check if job is created
 	if exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, job); err != nil {
@@ -1376,7 +1380,11 @@ func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 	args := "set -o errexit; set -o nounset;" +
 		"OUTPUT=$(kubectl -n %s exec -it pod/%s -c %s -- %s);" +
 		"kubectl -n %s patch backup %s --subresource=status --type=merge --patch \"%s\";"
-	patchJSON := generateJSON("status."+updateInfo.Path, "$OUTPUT")
+	statusPath := "status." + updateInfo.Path
+	if updateInfo.Path == "" {
+		statusPath = "status"
+	}
+	patchJSON := generateJSON(statusPath, "$OUTPUT")
 	args = fmt.Sprintf(args, targetPod.Namespace, targetPod.Name, updateInfo.ContainerName,
 		updateInfo.Script, backup.Namespace, backup.Name, patchJSON)
 	container.Args = []string{args}

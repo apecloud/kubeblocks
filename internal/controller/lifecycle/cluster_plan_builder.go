@@ -257,6 +257,12 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 			c.transCtx.Logger.Error(err, fmt.Sprintf("update %T error: %s", o, node.oriObj.GetName()))
 			return err
 		}
+	case PATCH:
+		patch := client.MergeFrom(node.oriObj)
+		if err := c.cli.Patch(c.transCtx.Context, node.obj, patch); !apierrors.IsNotFound(err) {
+			c.transCtx.Logger.Error(err, fmt.Sprintf("patch %T error", node.oriObj))
+			return err
+		}
 	case DELETE:
 		if controllerutil.RemoveFinalizer(node.obj, dbClusterFinalizerName) {
 			err := c.cli.Update(c.transCtx.Context, node.obj)
@@ -332,7 +338,11 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 
 	handlePVC := func(origObj, pvcProto *corev1.PersistentVolumeClaim) (client.Object, error) {
 		pvcObj := origObj.DeepCopy()
-		pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] = pvcProto.Spec.Resources.Requests[corev1.ResourceStorage]
+		if pvcObj.Spec.Resources.Requests == nil {
+			pvcObj.Spec.Resources.Requests = pvcProto.Spec.Resources.Requests
+		} else {
+			pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] = pvcProto.Spec.Resources.Requests[corev1.ResourceStorage]
+		}
 		return pvcObj, nil
 	}
 

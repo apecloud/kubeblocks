@@ -43,7 +43,7 @@ var (
 	`)
 )
 
-type upgradeOptions struct {
+type UpgradeOptions struct {
 	//	common user flags
 	all bool
 
@@ -52,7 +52,7 @@ type upgradeOptions struct {
 }
 
 func NewPluginUpgradeCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &upgradeOptions{
+	o := &UpgradeOptions{
 		IOStreams: streams,
 	}
 
@@ -61,8 +61,8 @@ func NewPluginUpgradeCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Short:   "Upgrade kbcli or kubectl plugins",
 		Example: pluginUpgradeExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.complete(args))
-			cmdutil.CheckErr(o.run())
+			cmdutil.CheckErr(o.Complete(args))
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
@@ -71,7 +71,7 @@ func NewPluginUpgradeCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
-func (o *upgradeOptions) complete(args []string) error {
+func (o *UpgradeOptions) Complete(args []string) error {
 	if o.all {
 		installed, err := GetInstalledPluginReceipts(paths.InstallReceiptsPath())
 		if err != nil {
@@ -96,7 +96,7 @@ func (o *upgradeOptions) complete(args []string) error {
 	return nil
 }
 
-func (o *upgradeOptions) run() error {
+func (o *UpgradeOptions) Run() error {
 	for _, name := range o.pluginNames {
 		indexName, pluginName := CanonicalPluginName(name)
 

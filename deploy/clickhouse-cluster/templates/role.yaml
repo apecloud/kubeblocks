@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: kb-role-{{ .Release.Name }}
+  name: kb-{{ include "clustername" . }}
   namespace: {{ .Release.Namespace }}
   labels:
     {{ include "clickhouse-cluster.labels" . | nindent 4 }}

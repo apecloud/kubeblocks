@@ -186,7 +186,9 @@ func renderJob(engine *customizedEngine, key componentUniqueKey, statement []str
 	// place statements and endpoints before user defined envs.
 	envs := make([]corev1.EnvVar, 0, 2+len(engine.getEnvs()))
 	envs = append(envs, statementEnv, endpointEnv)
-	envs = append(envs, engine.getEnvs()...)
+	if len(engine.getEnvs()) > 0 {
+		envs = append(envs, engine.getEnvs()...)
+	}
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -390,11 +392,22 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 
 // completeExecConfig override the image of execConfig if version is not nil.
 func completeExecConfig(execConfig *appsv1alpha1.CmdExecutorConfig, version *appsv1alpha1.ClusterComponentVersion) {
-	if version == nil {
+	if version == nil || version.SystemAccountSpec == nil || version.SystemAccountSpec.CmdExecutorConfig == nil {
 		return
 	}
-	if len(version.ClientImage) == 0 {
+	sysAccountSpec := version.SystemAccountSpec
+	if len(sysAccountSpec.CmdExecutorConfig.Image) > 0 {
+		execConfig.Image = sysAccountSpec.CmdExecutorConfig.Image
+	}
+
+	// envs from sysAccountSpec will override the envs from execConfig
+	if sysAccountSpec.CmdExecutorConfig.Env == nil {
 		return
 	}
-	execConfig.Image = version.ClientImage
+	if len(sysAccountSpec.CmdExecutorConfig.Env) == 0 {
+		// clean up envs
+		execConfig.Env = nil
+	} else {
+		execConfig.Env = sysAccountSpec.CmdExecutorConfig.Env
+	}
 }

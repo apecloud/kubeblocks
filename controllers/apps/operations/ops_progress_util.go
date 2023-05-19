@@ -417,7 +417,7 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 		expectProgressCount = dValue * -1
 	}
 	if !isScaleOut {
-		completedCount, err = handleScaleDownProgress(opsRes, pgRes, podList, compStatus)
+		completedCount, err = handleScaleDownProgress(reqCtx, cli, opsRes, pgRes, podList, compStatus)
 		expectProgressCount = getFinalExpectCount(compStatus, expectProgressCount)
 		return expectProgressCount, completedCount, err
 	}
@@ -438,7 +438,7 @@ func handleScaleOutProgress(reqCtx intctrlutil.RequestCtx,
 	podList *corev1.PodList,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
 	var componentName = pgRes.clusterComponent.Name
-	workloadType := pgRes.clusterComponentDef.WorkloadType
+	var workloadType = pgRes.clusterComponentDef.WorkloadType
 	minReadySeconds, err := util.GetComponentWorkloadMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, workloadType, componentName)
 	if err != nil {
 		return 0, err
@@ -453,30 +453,19 @@ func handleScaleOutProgress(reqCtx intctrlutil.RequestCtx,
 		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
 		if components.PodIsAvailable(workloadType, &v, minReadySeconds) {
 			completedCount += 1
-			message := fmt.Sprintf("Successfully created pod: %s in Component: %s", objectKey, componentName)
-			progressDetail.SetStatusAndMessage(appsv1alpha1.SucceedProgressStatus, message)
-			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
-				&compStatus.ProgressDetails, progressDetail)
+			pgRes.opsMessageKey = "created"
+			handleSucceedProgressDetail(opsRes, pgRes, compStatus, progressDetail)
 			continue
 		}
-
-		if util.IsFailedOrAbnormal(compStatus.Phase) {
-			// means the pod is failed.
-			podMessage := getFailedPodMessage(opsRes.Cluster, componentName, &v)
-			message := fmt.Sprintf("Failed to create pod: %s in Component: %s, message: %s", objectKey, componentName, podMessage)
-			progressDetail.SetStatusAndMessage(appsv1alpha1.FailedProgressStatus, message)
-			completedCount += 1
-		} else {
-			progressDetail.SetStatusAndMessage(appsv1alpha1.ProcessingProgressStatus, "Start to create pod: "+objectKey)
-		}
-		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
-			&compStatus.ProgressDetails, progressDetail)
+		completedCount += handleFailedOrProcessingProgressDetail(opsRes, pgRes, compStatus, progressDetail, &v)
 	}
 	return completedCount, nil
 }
 
 // handleScaleDownProgress handles the progressDetails of scaled down replicas.
 func handleScaleDownProgress(
+	reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
 	opsRes *OpsResource,
 	pgRes progressResource,
 	podList *corev1.PodList,
@@ -513,6 +502,31 @@ func handleScaleDownProgress(
 		completedCount += 1
 		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest,
 			&compStatus.ProgressDetails, progressDetail)
+	}
+	// handle the re-created pods if these pods are failed before doing horizontal scaling.
+	var componentName = pgRes.clusterComponent.Name
+	var workloadType = pgRes.clusterComponentDef.WorkloadType
+	minReadySeconds, err := util.GetComponentWorkloadMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, workloadType, componentName)
+	if err != nil {
+		return 0, err
+	}
+	for _, v := range podList.Items {
+		objectKey := getProgressObjectKey(constant.PodKind, v.Name)
+		progressDetail := findStatusProgressDetail(compStatus.ProgressDetails, objectKey)
+		if progressDetail == nil {
+			continue
+		}
+		if isCompletedProgressStatus(progressDetail.Status) {
+			completedCount += 1
+			continue
+		}
+		pgRes.opsMessageKey = "re-create"
+		if components.PodIsAvailable(workloadType, &v, minReadySeconds) {
+			completedCount += 1
+			handleSucceedProgressDetail(opsRes, pgRes, compStatus, *progressDetail)
+			continue
+		}
+		completedCount += handleFailedOrProcessingProgressDetail(opsRes, pgRes, compStatus, *progressDetail, &v)
 	}
 	return completedCount, nil
 }

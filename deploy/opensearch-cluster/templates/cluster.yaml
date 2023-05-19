@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ include "opensearch-cluster.fullname" . }}
+  name: {{ include "clustername" . }}
   labels: {{ include "opensearch-cluster.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: opensearch  # ref clusterdefinition.name

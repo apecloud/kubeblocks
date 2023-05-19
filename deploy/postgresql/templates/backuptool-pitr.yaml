@@ -23,8 +23,6 @@ spec:
       value: $KB_RECOVERY_TIME
     - name: TIME_FORMAT
       value: 2006-01-02 15:04:05 MST
-    - name: ARCHIVE_LOG_DIR
-      value: $(VOLUME_DATA_DIR)/pgroot/arcwal
     - name: LOG_DIR
       value: $(VOLUME_DATA_DIR)/pgroot/data/pg_wal
   image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
@@ -37,6 +35,7 @@ spec:
     restoreCommands:
       - |
         set -e;
+        if [ -d ${DATA_DIR}.old ]; then echo "${DATA_DIR}.old directory already exists, skip restore."; exit 0; fi
         mkdir -p ${PITR_DIR};
         cd ${PITR_DIR}
         for i in $(find ${BACKUP_DIR} -name "*.gz"); do
@@ -64,9 +63,13 @@ spec:
       if [ -d ${EXPIRED_INCR_LOG} ]; then rm -rf ${EXPIRED_INCR_LOG}; fi
       TODAY_INCR_LOG=${BACKUP_DIR}/$(date +%Y%m%d);
       mkdir -p ${TODAY_INCR_LOG};
-      for i in $(find ${ARCHIVE_LOG_DIR} -name "*.gz"); do
-        echo "uploading ${i}";
-        mv -f ${i} ${TODAY_INCR_LOG}/;
+      cd ${LOG_DIR}
+      for i in $(find ./archive_status/ -name "*.ready"); do
+        wal_ready_name="${i##*/}"
+        wal_name=${wal_ready_name%.*}
+        echo "uploading ${wal_name}";
+        gzip -kqc ${wal_name} > ${TODAY_INCR_LOG}/${wal_name}.gz;
+        mv -f ${i} ./archive_status/${wal_name}.done;
       done
       echo "done."
       sync;

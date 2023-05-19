@@ -53,11 +53,11 @@ type configOpsOptions struct {
 var (
 	createReconfigureExample = templates.Examples(`
 		# update component params 
-		kbcli cluster configure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=1000,general_log=OFF
+		kbcli cluster reconfigure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=1000,general_log=OFF
 
 		# if only one component, and one config spec, and one config file, simplify the use of configure. e.g:
 		# update mysql max_connections, cluster name is mycluster
-		kbcli cluster configure mycluster --set max_connections=2000
+		kbcli cluster reconfigure mycluster --set max_connections=2000
 	`)
 )
 
@@ -152,6 +152,9 @@ func (o *configOpsOptions) checkChangedParamsAndDoubleConfirm(cc *appsv1alpha1.C
 }
 
 func (o *configOpsOptions) confirmReconfigureWithRestart() error {
+	if o.autoApprove {
+		return nil
+	}
 	const confirmStr = "yes"
 	printer.Warning(o.Out, restartConfirmPrompt)
 	_, err := prompt.NewPrompt(fmt.Sprintf("Please type \"%s\" to confirm:", confirmStr),
@@ -221,5 +224,6 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		},
 	}
 	o.buildReconfigureCommonFlags(cmd)
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before reconfigure the cluster")
 	return cmd
 }

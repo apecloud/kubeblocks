@@ -72,7 +72,7 @@ func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *
 				return intctrlutil.NewNotFound("componentDef %s not found in ClusterDefinition: %s ", v.ComponentDefRef, clusterDefName)
 			}
 			// build the backup policy from the template.
-			backupPolicy, action := r.transformBackupPolicy(transCtx, v, origCluster, compDef.WorkloadType, tpl.Name)
+			backupPolicy, action := r.transformBackupPolicy(transCtx, v, origCluster, compDef.WorkloadType, &tpl)
 			if backupPolicy == nil {
 				continue
 			}
@@ -95,7 +95,7 @@ func (r *BackupPolicyTPLTransformer) transformBackupPolicy(transCtx *ClusterTran
 	policyTPL appsv1alpha1.BackupPolicy,
 	cluster *appsv1alpha1.Cluster,
 	workloadType appsv1alpha1.WorkloadType,
-	tplName string) (*dataprotectionv1alpha1.BackupPolicy, *ictrltypes.LifecycleAction) {
+	tpl *appsv1alpha1.BackupPolicyTemplate) (*dataprotectionv1alpha1.BackupPolicy, *ictrltypes.LifecycleAction) {
 	backupPolicyName := DeriveBackupPolicyName(cluster.Name, policyTPL.ComponentDefRef, r.tplIdentifier)
 	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
 	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKey{Namespace: cluster.Namespace, Name: backupPolicyName}, backupPolicy); err != nil && !apierrors.IsNotFound(err) {
@@ -103,10 +103,10 @@ func (r *BackupPolicyTPLTransformer) transformBackupPolicy(transCtx *ClusterTran
 	}
 	if len(backupPolicy.Name) == 0 {
 		// build a new backup policy from the backup policy template.
-		return r.buildBackupPolicy(policyTPL, cluster, workloadType, tplName, backupPolicyName), ictrltypes.ActionCreatePtr()
+		return r.buildBackupPolicy(policyTPL, cluster, workloadType, tpl, backupPolicyName), ictrltypes.ActionCreatePtr()
 	}
 	// sync the existing backup policy with the cluster changes
-	r.syncBackupPolicy(backupPolicy, cluster, policyTPL, workloadType, tplName)
+	r.syncBackupPolicy(backupPolicy, cluster, policyTPL, workloadType, tpl)
 	return backupPolicy, ictrltypes.ActionUpdatePtr()
 }
 
@@ -115,13 +115,16 @@ func (r *BackupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotecti
 	cluster *appsv1alpha1.Cluster,
 	policyTPL appsv1alpha1.BackupPolicy,
 	workloadType appsv1alpha1.WorkloadType,
-	tplName string) {
+	tpl *appsv1alpha1.BackupPolicyTemplate) {
 	// update labels and annotations of the backup policy.
 	if backupPolicy.Annotations == nil {
 		backupPolicy.Annotations = map[string]string{}
 	}
 	backupPolicy.Annotations[constant.DefaultBackupPolicyAnnotationKey] = r.defaultPolicyAnnotationValue()
-	backupPolicy.Annotations[constant.BackupPolicyTemplateAnnotationKey] = tplName
+	backupPolicy.Annotations[constant.BackupPolicyTemplateAnnotationKey] = tpl.Name
+	if tpl.Annotations[constant.ReconfigureRefAnnotationKey] != "" {
+		backupPolicy.Annotations[constant.ReconfigureRefAnnotationKey] = tpl.Annotations[constant.ReconfigureRefAnnotationKey]
+	}
 	if backupPolicy.Labels == nil {
 		backupPolicy.Labels = map[string]string{}
 	}
@@ -175,7 +178,8 @@ func (r *BackupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotecti
 func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.BackupPolicy,
 	cluster *appsv1alpha1.Cluster,
 	workloadType appsv1alpha1.WorkloadType,
-	tplName, backupPolicyName string) *dataprotectionv1alpha1.BackupPolicy {
+	tpl *appsv1alpha1.BackupPolicyTemplate,
+	backupPolicyName string) *dataprotectionv1alpha1.BackupPolicy {
 	component := r.getFirstComponent(cluster, policyTPL.ComponentDefRef)
 	if component == nil {
 		return nil
@@ -192,10 +196,13 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 			},
 			Annotations: map[string]string{
 				constant.DefaultBackupPolicyAnnotationKey:  r.defaultPolicyAnnotationValue(),
-				constant.BackupPolicyTemplateAnnotationKey: tplName,
+				constant.BackupPolicyTemplateAnnotationKey: tpl.Name,
 				constant.BackupDataPathPrefixAnnotationKey: fmt.Sprintf("/%s-%s/%s", cluster.Name, cluster.UID, component.Name),
 			},
 		},
+	}
+	if tpl.Annotations[constant.ReconfigureRefAnnotationKey] != "" {
+		backupPolicy.Annotations[constant.ReconfigureRefAnnotationKey] = tpl.Annotations[constant.ReconfigureRefAnnotationKey]
 	}
 	bpSpec := backupPolicy.Spec
 	if policyTPL.Retention != nil {

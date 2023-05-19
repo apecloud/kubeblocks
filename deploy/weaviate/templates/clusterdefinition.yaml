@@ -44,18 +44,11 @@ spec:
           - name: weaviate
             imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
             command:
-              - /bin/weaviate
-            args:
-              - --host
-              - 0.0.0.0
-              - --port
-              - "8080"
-              - --scheme
-              - http
-              - --config-file
-              - /weaviate-config/conf.yaml
-              - --read-timeout=60s
-              - --write-timeout=60s
+            - /bin/sh
+            - -c
+            - |
+              export $(cat /weaviate-config/envs | xargs)
+              /bin/weaviate --host 0.0.0.0 --port "8080" --scheme http --config-file /weaviate-config/conf.yaml --read-timeout=60s --write-timeout=60s
             securityContext:
               runAsUser: 0
             livenessProbe:
@@ -128,3 +121,4 @@ spec:
                 value: "7000"
               - name: CLUSTER_DATA_BIND_PORT
                 value: "7001"
+

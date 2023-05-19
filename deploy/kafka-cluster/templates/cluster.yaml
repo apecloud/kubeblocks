@@ -18,6 +18,11 @@ spec:
     {{- if eq "combined" $.Values.mode }}
     - name: server
       componentDefRef: kafka-server
+      tls: {{ $.Values.tls }}
+      {{- if $.Values.tls }}
+      issuer:
+        name: KubeBlocks
+      {{- end }}
       replicas: {{ $.Values.kafkaServer.replicaCount }}
       monitor: {{ $.Values.monitor.enabled }}
       {{- with $.Values.tolerations }}

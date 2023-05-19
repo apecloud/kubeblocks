@@ -13,6 +13,8 @@ metadata:
 data:
   server.properties: |-
     {{- .Files.Get "configs/kafka-server.prop.tpl" | nindent 4 }}
+  client-ssl.properties: |-
+    {{- .Files.Get "configs/kafka-ssl.prop.tpl" | nindent 4 }}
 
 ---
 apiVersion: v1

@@ -4,19 +4,23 @@
 # override TLS and auth settings
 export KAFKA_TLS_TYPE="PEM"
 echo "KAFKA_TLS_TYPE=$KAFKA_TLS_TYPE"
-export KAFKA_CFG_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM="https"
+export KAFKA_CFG_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=""
 echo "KAFKA_CFG_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=$KAFKA_CFG_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM"
 export KAFKA_CERTIFICATE_PASSWORD=""
 echo "KAFKA_CERTIFICATE_PASSWORD=$KAFKA_CERTIFICATE_PASSWORD"
-export KAFKA_TLS_CLIENT_AUTH=required
+export KAFKA_TLS_CLIENT_AUTH=none
 echo "KAFKA_TLS_CLIENT_AUTH=$KAFKA_TLS_CLIENT_AUTH"
-export KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:SSL,INTERNAL:PLAINTEXT,CLIENT:SSL
+
+# override TLS protocol
+export KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:SSL,INTERNAL:SSL,CLIENT:SSL
 echo "KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=$KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP"
+export KAFKA_CFG_SECURITY_INTER_BROKER_PROTOCOL=SSL
+echo "KAFKA_CFG_SECURITY_INTER_BROKER_PROTOCOL=SSL"
 
 mkdir -p /opt/bitnami/kafka/config/certs
-PEM_CA="/certs-${ID}/ca.crt"
-PEM_CERT="/certs-${ID}/tls.crt"
-PEM_KEY="/certs-${ID}/tls.key"
+PEM_CA="$KB_TLS_CERT_PATH/ca.crt"
+PEM_CERT="$KB_TLS_CERT_PATH/tls.crt"
+PEM_KEY="$KB_TLS_CERT_PATH/tls.key"
 if [[ -f "$PEM_CERT" ]] && [[ -f "$PEM_KEY" ]]; then
     CERT_DIR="/opt/bitnami/kafka/config/certs"
     PEM_CA_LOCATION="${CERT_DIR}/kafka.truststore.pem"
@@ -30,13 +34,17 @@ if [[ -f "$PEM_CERT" ]] && [[ -f "$PEM_KEY" ]]; then
         fi
 
     # Ensure the key used PEM format with PKCS#8
-    openssl pkcs8 -topk8 -nocrypt -in "$PEM_KEY" > "/opt/bitnami/kafka/config/certs/kafka.keystore.key"
+    openssl pkcs8 -topk8 -nocrypt -in "$PEM_KEY" > "${CERT_DIR}/kafka.keystore.key"
+    # combined the certificate and private-key for client use
+    cat ${CERT_DIR}/kafka.keystore.key ${PEM_CERT_LOCATION} > ${CERT_DIR}/client.combined.key
 else
     echo "Couldn't find the expected PEM files! They are mandatory when encryption via TLS is enabled."
     exit 1
 fi
 export KAFKA_TLS_TRUSTSTORE_FILE="/opt/bitnami/kafka/config/certs/kafka.truststore.pem"
 echo "KAFKA_TLS_TRUSTSTORE_FILE=$KAFKA_TLS_TRUSTSTORE_FILE"
+echo "ssl.endpoint.identification.algorithm=" >> /opt/bitnami/kafka/config/kraft/server.properties
+echo "ssl.endpoint.identification.algorithm=" >> /opt/bitnami/kafka/config/server.properties
 {{- end }}
 
 # convert server.properties to 'export KAFKA_CFG_{prop}' env variables

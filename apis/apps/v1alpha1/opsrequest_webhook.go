@@ -456,7 +456,7 @@ func (r *OpsRequest) getSCNameByPvc(ctx context.Context,
 	if err := cli.List(ctx, pvcList, client.InNamespace(r.Namespace), client.MatchingLabels{
 		"app.kubernetes.io/instance":        r.Spec.ClusterRef,
 		"apps.kubeblocks.io/component-name": compName,
-		"vct.kubeblocks.io/name":            vctName,
+		"apps.kubeblocks.io/pvc-name":       vctName,
 	}, client.Limit(1)); err != nil {
 		return nil
 	}

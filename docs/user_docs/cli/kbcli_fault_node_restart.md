@@ -12,28 +12,25 @@ kbcli fault node restart [flags]
 
 ```
   # Stop a specified EC2 instance.
-  kbcli fault node stop aws --secret-name=cloud-key-secret --region=cn-northwest-1 --instance=i-0a4986881adf30039 --duration=3m
+  kbcli fault node stop node1 -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --duration=3m
   
-  # Stop a specified EC2 instance.
-  kbcli fault node stop -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --instance=i-0a4986881adf30039 --duration=3m
+  # Stop two specified EC2 instances.
+  kbcli fault node stop node1 node2 -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --duration=3m
   
-  # Restart a specified EC2 instance.
-  kbcli fault node restart aws --secret-name=cloud-key-secret --region=cn-northwest-1 --instance=i-0ff10a1487cf6bbac --duration=1m
+  # Restart two specified EC2 instances.
+  kbcli fault node restart node1 node2 -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --duration=3m
   
-  # Detach a specified volume from a specified EC2 instance.
-  kbcli fault node detach-volume aws --secret-name=cloud-key-secret --region=cn-northwest-1 --instance=i-0df0732607d54dd8e --duration=1m --volume-id=vol-072f0940c28664f74 --device-name=/dev/xvdab
+  # Detach two specified volume from two specified EC2 instances.
+  kbcli fault node detach-volume node1 node2 -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --duration=1m --volume-id=v1,v2 --device-name=/d1,/d2
   
-  # Stop a specified GCK instance.
-  kbcli fault node stop gcp --region=us-central1-c --project=apecloud-platform-engineering --instance=gke-hyqtest-default-pool-2fe51a08-45rl --secret-name=cloud-key-secret
+  # Stop two specified GCK instances.
+  kbcli fault node stop node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --secret-name=cloud-key-secret
   
-  # Stop a specified GCK instance.
-  kbcli fault node stop -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --instance=gke-hyqtest-default-pool-2fe51a08-45rl --secret-name=cloud-key-secret
+  # Restart two specified GCK instances.
+  kbcli fault node restart node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --secret-name=cloud-key-secret
   
-  # Restart a specified GCK instance.
-  kbcli fault node restart gcp --region=us-central1-c --project=apecloud-platform-engineering --instance=gke-hyqtest-default-pool-2fe51a08-d9 --secret-name=cloud-key-secret
-  
-  # Detach a specified volume from a specified GCK instance.
-  kbcli fault node detach-volume gcp --region=us-central1-c --project=apecloud-platform-engineering --instance=gke-hyqtest-default-pool-2fe51a08-d9 --secret-name=cloud-key-secret --device-name=/dev/sdb
+  # Detach two specified volume from two specified GCK instances.
+  kbcli fault node detach-volume node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --secret-name=cloud-key-secret --device-name=/d1,/d2
 ```
 
 ### Options
@@ -43,11 +40,10 @@ kbcli fault node restart [flags]
       --dry-run string[="unchanged"]   Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
       --duration string                Supported formats of the duration are: ms / s / m / h. (default "30s")
   -h, --help                           help for restart
-      --instance string                The instance id of the ec2.
   -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
-      --project string                 The ID of the GCP project.Only available when cloud-provider=gcp.
-      --region string                  The region of the aws.
-      --secret-name string             The name of the Kubernetes Secret that stores the AWS authentication information.
+      --project string                 The name of the GCP project. Only available when cloud-provider=gcp.
+      --region string                  The region of the node.
+      --secret-name string             The name of the Kubernetes Secret that stores the kubernetes cluster authentication information.
 ```
 
 ### Options inherited from parent commands

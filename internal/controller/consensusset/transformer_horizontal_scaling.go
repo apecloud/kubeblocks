@@ -391,7 +391,15 @@ func getCurrentMembers(allActionList []*batchv1.Job, readyMembers int32) int32 {
 	currentMembers := readyMembers
 	index := findFirstUnfinishedAction(allActionList)
 	if index > 0 {
+		// TODO(free6om): handling active transaction(action) state: in progress, failed, succeed
+		// 1. assume in-progress will be success,
+		// 2. assume failed has no impact on membership,
+		//    that is no member leaves in a failed pre-action or no member joins in a failed post-action,
+		//    which some times is not true.
 		lastAction := allActionList[index-1]
+		if lastAction.Status.Failed > 0 {
+			return currentMembers
+		}
 		ordinal, _ := getActionOrdinal(lastAction.Name)
 		if isPreAction(lastAction.Labels[jobTypeLabel]) {
 			currentMembers = int32(ordinal)

@@ -87,7 +87,7 @@ var _ = Describe("clusterversion", func() {
 	It("list --cluster-definition", func() {
 		cmd := NewListCmd(tf, streams)
 		cmd.Run(cmd, []string{"--cluster-definition=" + testing.ClusterDefName})
-		expected := fmt.Sprintf("NAME                   CLUSTER-DEFINITION        STATUS   CREATED-TIME                 IS-DEFAULT   \nfake-cluster-version   fake-cluster-definition            %s   false        \n", CreateTime)
+		expected := fmt.Sprintf("NAME                   CLUSTER-DEFINITION        STATUS   IS-DEFAULT   CREATED-TIME                 \nfake-cluster-version   fake-cluster-definition            false        %s   \n", CreateTime)
 		Expect(expected).Should(Equal(out.String()))
 	})
 })

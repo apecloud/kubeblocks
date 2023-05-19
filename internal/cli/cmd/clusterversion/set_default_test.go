@@ -74,28 +74,28 @@ var _ = Describe("set-default", func() {
 	})
 
 	It("set-default cmd", func() {
-		cmd := NewSetDefaultCMD(tf, streams)
+		cmd := newSetDefaultCMD(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})
 
 	It("unset-default cmd", func() {
-		cmd := NewUnSetDefaultCMD(tf, streams)
+		cmd := newUnSetDefaultCMD(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 	})
 
 	It("set-default empty args", func() {
-		o := NewSetOrUnsetDefaultOptions(tf, streams, true)
+		o := newSetOrUnsetDefaultOptions(tf, streams, true)
 		Expect(o.validate([]string{})).Should(HaveOccurred())
 	})
 
 	It("unset-default empty args", func() {
-		o := NewSetOrUnsetDefaultOptions(tf, streams, false)
+		o := newSetOrUnsetDefaultOptions(tf, streams, false)
 		Expect(o.validate([]string{})).Should(HaveOccurred())
 	})
 
 	It("set-default and unset-default", func() {
 		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterVersion())
-		cmd := NewSetDefaultCMD(tf, streams)
+		cmd := newSetDefaultCMD(tf, streams)
 		// before set-default
 		cv, err := getFakeClusterVersion(tf.FakeDynamicClient, testing.ClusterVersionName)
 		Expect(err).ShouldNot(HaveOccurred())
@@ -107,7 +107,7 @@ var _ = Describe("set-default", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(getIsDefault(cv)).Should(Equal(annotationTrueValue))
 		// unset-default
-		cmd = NewUnSetDefaultCMD(tf, streams)
+		cmd = newUnSetDefaultCMD(tf, streams)
 		cmd.Run(cmd, []string{testing.ClusterVersionName})
 		cv, err = getFakeClusterVersion(tf.FakeDynamicClient, testing.ClusterVersionName)
 		Expect(err).ShouldNot(HaveOccurred())
@@ -116,7 +116,7 @@ var _ = Describe("set-default", func() {
 
 	It("the clusterDef already have a default cv when set-default", func() {
 		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterVersion())
-		o := NewSetOrUnsetDefaultOptions(tf, streams, true)
+		o := newSetOrUnsetDefaultOptions(tf, streams, true)
 		err := o.run([]string{testing.ClusterVersionName})
 		Expect(err).ShouldNot(HaveOccurred())
 		cv, err := getFakeClusterVersion(tf.FakeDynamicClient, testing.ClusterVersionName)
@@ -131,7 +131,7 @@ var _ = Describe("set-default", func() {
 		cv2 := testing.FakeClusterVersion()
 		cv2.Name += "-other"
 		tf.FakeDynamicClient = testing.FakeDynamicClient(cv1, cv2)
-		o := NewSetOrUnsetDefaultOptions(tf, streams, true)
+		o := newSetOrUnsetDefaultOptions(tf, streams, true)
 		err := o.run([]string{cv1.Name, cv2.Name})
 		Expect(err).Should(HaveOccurred())
 	})
@@ -145,7 +145,7 @@ var _ = Describe("set-default", func() {
 			constant.AppManagedByLabelKey: constant.AppName,
 		})
 		tf.FakeDynamicClient = testing.FakeDynamicClient(cv1, cv2)
-		cmd := NewSetDefaultCMD(tf, streams)
+		cmd := newSetDefaultCMD(tf, streams)
 		cv1Res, err := getFakeClusterVersion(tf.FakeDynamicClient, cv1.Name)
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(getIsDefault(cv1Res)).Should(Equal(annotationFalseValue))
@@ -161,7 +161,7 @@ var _ = Describe("set-default", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		Expect(getIsDefault(cv2Res)).Should(Equal(annotationTrueValue))
 		// unset-defautl
-		cmd = NewUnSetDefaultCMD(tf, streams)
+		cmd = newUnSetDefaultCMD(tf, streams)
 		cmd.Run(cmd, []string{cv1.Name, cv2.Name})
 		cv1Res, err = getFakeClusterVersion(tf.FakeDynamicClient, cv1.Name)
 		Expect(err).ShouldNot(HaveOccurred())

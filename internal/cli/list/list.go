@@ -25,7 +25,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -385,21 +384,4 @@ func (o *ListOptions) PrintNotFoundResources() {
 	} else {
 		fmt.Fprintf(o.ErrOut, "No %s found\n", o.GVR.Resource)
 	}
-}
-
-// GetSortByForCustomTable will sort the output when you use the custom table in internal/cli/printer
-// it's sorted by the first column in default.The columnNumber index start with 1
-func (o *ListOptions) GetSortByForCustomTable(columnNumber ...int) []table.SortBy {
-	if len(columnNumber) == 0 {
-		return []table.SortBy{
-			{
-				Number: 1,
-			},
-		}
-	}
-	res := make([]table.SortBy, len(columnNumber))
-	for i := range columnNumber {
-		res[i].Number = columnNumber[i]
-	}
-	return res
 }

@@ -80,7 +80,7 @@ func run(o *list.ListOptions) error {
 	}
 	p := printer.NewTablePrinter(o.Out)
 	p.SetHeader("NAME", "WORKLOAD-TYPE", "CHARACTER-TYPE", "CLUSTER-DEFINITION")
-	p.SortBy(o.GetSortByForCustomTable(1))
+	p.SortBy(1)
 	for _, info := range infos {
 		var cd v1alpha1.ClusterDefinition
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cd); err != nil {

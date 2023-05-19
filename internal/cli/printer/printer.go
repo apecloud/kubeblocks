@@ -114,8 +114,22 @@ func (t *TablePrinter) Print() {
 	t.Tbl.Render()
 }
 
-func (t *TablePrinter) SortBy(sortBy []table.SortBy) {
-	t.Tbl.SortBy(sortBy)
+// SortBy will sort the table alphabetically by the column you specify, it's sorted by the first table column in default.
+// The columnNumber index start form 1
+func (t *TablePrinter) SortBy(columnNumber ...int) {
+	if len(columnNumber) == 0 {
+		t.Tbl.SortBy([]table.SortBy{
+			{
+				Number: 1,
+			},
+		})
+		return
+	}
+	res := make([]table.SortBy, len(columnNumber))
+	for i := range columnNumber {
+		res[i].Number = columnNumber[i]
+	}
+	t.Tbl.SortBy(res)
 }
 
 // PrintPairStringToLine print pair string for a line , the format is as follows "<space>*<key>:\t<value>".

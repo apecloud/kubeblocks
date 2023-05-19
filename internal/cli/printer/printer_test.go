@@ -112,3 +112,25 @@ func checkOutPut(t *testing.T, captureFunc func() (string, error), expect string
 	}
 	assert.Equal(t, expect, capturedOutput)
 }
+
+func TestSort(t *testing.T) {
+	printer := NewTablePrinter(os.Stdout)
+	headerRow := make([]interface{}, len(header))
+	for i, h := range header {
+		headerRow[i] = h
+	}
+	printer.SetHeader(headerRow...)
+	printer.SortBy(1)
+	for _, r := range [][]string{
+		{"cedar51", "default", "apecloud-mysql", "ac-mysql-8.0.30", "Delete", "Feb 20,2023 16:39 UTC+0800"},
+		{"brier63", "default", "apecloud-mysql", "ac-mysql-8.0.30", "Delete", "Feb 20,2023 16:39 UTC+0800"},
+		{"alpha19", "default", "apecloud-mysql", "ac-mysql-8.0.30", "Delete", "Feb 20,2023 16:39 UTC+0800"},
+	} {
+		row := make([]interface{}, len(r))
+		for i, rr := range r {
+			row[i] = rr
+		}
+		printer.AddRow(row...)
+	}
+	printer.Print()
+}

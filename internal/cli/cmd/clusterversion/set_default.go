@@ -65,7 +65,7 @@ type SetOrUnsetDefaultOption struct {
 	toSetDefault bool
 }
 
-func NewSetOrUnsetDefaultOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, toSet bool) *SetOrUnsetDefaultOption {
+func newSetOrUnsetDefaultOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, toSet bool) *SetOrUnsetDefaultOption {
 	return &SetOrUnsetDefaultOption{
 		Factory:      f,
 		IOStreams:    streams,
@@ -73,8 +73,8 @@ func NewSetOrUnsetDefaultOptions(f cmdutil.Factory, streams genericclioptions.IO
 	}
 }
 
-func NewSetDefaultCMD(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := NewSetOrUnsetDefaultOptions(f, streams, true)
+func newSetDefaultCMD(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := newSetOrUnsetDefaultOptions(f, streams, true)
 	cmd := &cobra.Command{
 		Use:               "set-default NAME",
 		Short:             "Set the clusterversion to the default cluster clusterversion for its clusterDef.",
@@ -88,8 +88,8 @@ func NewSetDefaultCMD(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	return cmd
 }
 
-func NewUnSetDefaultCMD(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := NewSetOrUnsetDefaultOptions(f, streams, false)
+func newUnSetDefaultCMD(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := newSetOrUnsetDefaultOptions(f, streams, false)
 	cmd := &cobra.Command{
 		Use:               "unset-default NAME",
 		Short:             "Unset the clusterversion if it's default.",

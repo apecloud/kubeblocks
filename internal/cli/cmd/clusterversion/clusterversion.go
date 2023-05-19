@@ -53,8 +53,8 @@ func NewClusterVersionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 	}
 
 	cmd.AddCommand(NewListCmd(f, streams))
-	cmd.AddCommand(NewSetDefaultCMD(f, streams))
-	cmd.AddCommand(NewUnSetDefaultCMD(f, streams))
+	cmd.AddCommand(newSetDefaultCMD(f, streams))
+	cmd.AddCommand(newUnSetDefaultCMD(f, streams))
 	return cmd
 }
 
@@ -96,15 +96,15 @@ func run(o *ListClusterVersionOptions) error {
 		return err
 	}
 	p := printer.NewTablePrinter(o.Out)
-	p.SetHeader("NAME", "CLUSTER-DEFINITION", "STATUS", "CREATED-TIME", "IS-DEFAULT")
-	p.SortBy(o.GetSortByForCustomTable(1))
+	p.SetHeader("NAME", "CLUSTER-DEFINITION", "STATUS", "IS-DEFAULT", "CREATED-TIME")
+	p.SortBy(1)
 	for _, info := range infos {
 		var cv v1alpha1.ClusterVersion
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cv); err != nil {
 			return err
 		}
 		isDefaultValue := getIsDefault(&cv)
-		p.AddRow(cv.Name, cv.Labels[constant.ClusterDefLabelKey], cv.Status.Phase, util.TimeFormat(&cv.CreationTimestamp), isDefaultValue)
+		p.AddRow(cv.Name, cv.Labels[constant.ClusterDefLabelKey], cv.Status.Phase, isDefaultValue, util.TimeFormat(&cv.CreationTimestamp))
 	}
 	p.Print()
 	return nil

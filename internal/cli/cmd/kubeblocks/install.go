@@ -56,7 +56,10 @@ import (
 )
 
 const (
-	kMonitorParam = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t"
+	kMonitorParam    = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t"
+	kNodeAffinity    = "affinity.nodeAffinity=%s"
+	kPodAntiAffinity = "affinity.podAntiAffinity=%s"
+	kTolerations     = "tolerations=%s"
 )
 
 type Options struct {
@@ -236,26 +239,21 @@ func (o *InstallOptions) Install() error {
 	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 
 	// add pod anti-affinity
-	if o.PodAntiAffinity != "" {
-		o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf("podAntiAffinity=%s", o.PodAntiAffinity))
-	}
-
-	// add topology keys
-	if len(o.TopologyKeys) > 0 {
-		topologyJSON, err := json.Marshal(o.TopologyKeys)
+	if o.PodAntiAffinity != "" || len(o.TopologyKeys) > 0 {
+		podAntiAffinityJSON, err := json.Marshal(util.BuildPodAntiAffinity(o.PodAntiAffinity, o.TopologyKeys))
 		if err != nil {
 			return err
 		}
-		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf("topologyKeys=%s", topologyJSON))
+		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kPodAntiAffinity, podAntiAffinityJSON))
 	}
 
-	// add node labels
+	// add node affinity
 	if len(o.NodeLabels) > 0 {
-		nodeLabelsJSON, err := json.Marshal(o.NodeLabels)
+		nodeLabelsJSON, err := json.Marshal(util.BuildNodeAffinity(o.NodeLabels))
 		if err != nil {
 			return err
 		}
-		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf("nodeLabels=%s", string(nodeLabelsJSON)))
+		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kNodeAffinity, string(nodeLabelsJSON)))
 	}
 
 	// parse tolerations and add to values
@@ -268,7 +266,7 @@ func (o *InstallOptions) Install() error {
 		if err != nil {
 			return err
 		}
-		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf("tolerations=%s", string(tolerationsJSON)))
+		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kTolerations, string(tolerationsJSON)))
 	}
 
 	// add helm repo

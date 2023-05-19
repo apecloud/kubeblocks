@@ -1794,4 +1794,6 @@ aws-load-balancer-controller:
             - "true"
 
 recover-volume-expansion-failure:
+  ## @param recover-volume-expansion-failure.enabled -- Specifies whether feature gates RecoverVolumeExpansionFailure is enabled in k8s cluster. For more information, refer to https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/
+  ##
   enabled: false

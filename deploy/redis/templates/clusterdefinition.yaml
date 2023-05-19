@@ -105,6 +105,8 @@ spec:
                 mountPath: /scripts
               - name: redis-conf
                 mountPath: /etc/redis
+              - name: pod-info
+                mountPath: /kb-podinfo
             command: ["/scripts/redis-start.sh"]
             lifecycle:
               postStart:
@@ -128,6 +130,19 @@ spec:
               httpGet:
                 path: /
                 port: metrics
+        volumes:
+          - name: pod-info
+            downwardAPI:
+              items:
+                - path: "pod-role"
+                  fieldRef:
+                    fieldPath: metadata.labels['kubeblocks.io/role']
+                - path: "primary-pod"
+                  fieldRef:
+                    fieldPath: metadata.annotations['rs.apps.kubeblocks.io/primary']
+                - path: "component-replicas"
+                  fieldRef:
+                    fieldPath: metadata.annotations['apps.kubeblocks.io/component-replicas']
       systemAccounts:
 # Seems redis-cli has its own mechanism to parse input tokens and there is no elegent way
 # to pass $(KB_ACCOUNT_STATEMENT) to redis-cli without causing parsing error.

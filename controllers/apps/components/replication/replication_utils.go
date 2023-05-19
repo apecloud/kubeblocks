@@ -22,12 +22,9 @@ package replication
 import (
 	"context"
 	"fmt"
-	"reflect"
-
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -108,28 +105,6 @@ func syncReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStat
 	return nil
 }
 
-// RemoveReplicationSetClusterStatus removes replicationSet pod status from cluster.status.component[componentName].ReplicationStatus.
-func RemoveReplicationSetClusterStatus(cli client.Client,
-	ctx context.Context,
-	cluster *appsv1alpha1.Cluster,
-	stsList []*appsv1.StatefulSet,
-	componentReplicas int32) error {
-	if len(stsList) == 0 {
-		return nil
-	}
-	var allPodList []corev1.Pod
-	for _, stsObj := range stsList {
-		podList, err := util.GetPodListByStatefulSet(ctx, cli, stsObj)
-		if err != nil {
-			return err
-		}
-		allPodList = append(allPodList, podList...)
-	}
-	componentName := stsList[0].Labels[constant.KBAppComponentLabelKey]
-	replicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
-	return removeTargetPodsInfoInStatus(replicationSetStatus, allPodList, componentReplicas)
-}
-
 // removeTargetPodsInfoInStatus remove the target pod info from cluster.status.components.
 func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus,
 	targetPodList []corev1.Pod,
@@ -176,26 +151,31 @@ func checkObjRoleLabelIsPrimary[T generics.Object, PT generics.PObject[T]](obj P
 	return obj.GetLabels()[constant.RoleLabelKey] == constant.Primary, nil
 }
 
-// getReplicationSetPrimaryObj gets the primary obj(statefulSet or pod) of the replication workload.
-func getReplicationSetPrimaryObj[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
-	ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, _ func(T, L), compSpecName string) (PT, error) {
-	var (
-		objList L
-	)
+// GetReplicationSetPrimaryPod gets the primary Pod of the replication workload.
+func GetReplicationSetPrimaryPod(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, compSpecName string) ([]corev1.Pod, error) {
 	matchLabels := client.MatchingLabels{
 		constant.AppInstanceLabelKey:    cluster.Name,
 		constant.KBAppComponentLabelKey: compSpecName,
 		constant.AppManagedByLabelKey:   constant.AppName,
 		constant.RoleLabelKey:           constant.Primary,
 	}
-	if err := cli.List(ctx, PL(&objList), client.InNamespace(cluster.Namespace), matchLabels); err != nil {
+	podList := &corev1.PodList{}
+	if err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace), matchLabels); err != nil {
 		return nil, err
 	}
-	objListItems := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
-	if len(objListItems) != 1 {
+	return podList.Items, nil
+}
+
+// GetAndCheckReplicationSetPrimaryPod gets and checks the primary Pod of the replication workload.
+func GetAndCheckReplicationSetPrimaryPod(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, compSpecName string) (*corev1.Pod, error) {
+	podList, err := GetReplicationSetPrimaryPod(ctx, cli, cluster, compSpecName)
+	if err != nil {
+		return nil, err
+	}
+	if len(podList) != 1 {
 		return nil, fmt.Errorf("the number of current replicationSet primary obj is not 1, pls check")
 	}
-	return &objListItems[0], nil
+	return &podList[0], nil
 }
 
 // updateObjRoleLabel updates the value of the role label of the object.
@@ -210,29 +190,17 @@ func updateObjRoleLabel[T generics.Object, PT generics.PObject[T]](
 	return nil
 }
 
-// GeneratePVCFromVolumeClaimTemplates generates the required pvc object according to the name of statefulSet and volumeClaimTemplates.
-func GeneratePVCFromVolumeClaimTemplates(sts *appsv1.StatefulSet, vctList []corev1.PersistentVolumeClaimTemplate) map[string]*corev1.PersistentVolumeClaim {
-	claims := make(map[string]*corev1.PersistentVolumeClaim, len(vctList))
-	for index := range vctList {
-		claim := &corev1.PersistentVolumeClaim{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "PersistentVolumeClaim",
-				APIVersion: "v1",
-			},
-			Spec: vctList[index].Spec,
-		}
-		// The replica of replicationSet statefulSet defaults to 1, so the ordinal here is 0
-		claim.Name = GetPersistentVolumeClaimName(sts, &vctList[index], 0)
-		claim.Namespace = sts.Namespace
-		claims[vctList[index].Name] = claim
+// patchPodPrimaryAnnotation patches the primary annotation of the pod.
+func patchPodPrimaryAnnotation(ctx context.Context, cli client.Client, pod *corev1.Pod, primary string) error {
+	if pod.Annotations == nil {
+		pod.Annotations = map[string]string{}
 	}
-	return claims
-}
-
-// GetPersistentVolumeClaimName gets the name of PersistentVolumeClaim for a replicationSet pod with an ordinal.
-// claimTpl must be a PersistentVolumeClaimTemplate from the VolumeClaimsTemplate in the Cluster API.
-func GetPersistentVolumeClaimName(sts *appsv1.StatefulSet, claimTpl *corev1.PersistentVolumeClaimTemplate, ordinal int) string {
-	return fmt.Sprintf("%s-%s-%d", claimTpl.Name, sts.Name, ordinal)
+	if v, ok := pod.Annotations[constant.PrimaryAnnotationKey]; !ok || v != primary {
+		patch := client.MergeFrom(pod.DeepCopy())
+		pod.Annotations[constant.PrimaryAnnotationKey] = primary
+		return cli.Patch(ctx, pod, patch)
+	}
+	return nil
 }
 
 // filterReplicationWorkload filters workload which workloadType is not Replication.
@@ -278,7 +246,7 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 		return nil
 	}
 
-	oldPrimaryPod, err := getReplicationSetPrimaryObj(reqCtx.Ctx, cli, cluster, generics.PodSignature, compName)
+	oldPrimaryPod, err := GetAndCheckReplicationSetPrimaryPod(reqCtx.Ctx, cli, cluster, compName)
 	if err != nil {
 		reqCtx.Log.Info("handleReplicationSetRoleChangeEvent get old primary pod failed", "error", err)
 		return err

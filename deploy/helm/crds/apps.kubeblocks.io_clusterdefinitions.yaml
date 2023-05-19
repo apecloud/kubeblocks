@@ -8657,17 +8657,6 @@ spec:
                         defined in switchoverSpec will only be executed under the
                         condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
                       properties:
-                        args:
-                          description: args is used to perform statements.
-                          items:
-                            type: string
-                          type: array
-                        command:
-                          description: command to perform statements.
-                          items:
-                            type: string
-                          minItems: 1
-                          type: array
                         env:
                           description: envs is a list of environment variables.
                           items:
@@ -8787,8 +8776,43 @@ spec:
                         image:
                           description: image for Connector when executing the command.
                           type: string
+                        withCandidateInstance:
+                          description: withCandidateInstance corresponds to the switchover
+                            of the specified candidate primary/leader instance.
+                          properties:
+                            args:
+                              description: args is used to perform statements.
+                              items:
+                                type: string
+                              type: array
+                            command:
+                              description: command to perform statements.
+                              items:
+                                type: string
+                              minItems: 1
+                              type: array
+                          required:
+                          - command
+                          type: object
+                        withoutCandidateInstance:
+                          description: withoutCandidateInstance corresponds to a switchover
+                            that does not specify a candidate primary/leader instance.
+                          properties:
+                            args:
+                              description: args is used to perform statements.
+                              items:
+                                type: string
+                              type: array
+                            command:
+                              description: command to perform statements.
+                              items:
+                                type: string
+                              minItems: 1
+                              type: array
+                          required:
+                          - command
+                          type: object
                       required:
-                      - command
                       - image
                       type: object
                     systemAccounts:

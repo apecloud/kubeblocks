@@ -101,6 +101,7 @@ const (
 	RestoreFromBackUpAnnotationKey           = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
 	ClusterSnapshotAnnotationKey             = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 	LeaderAnnotationKey                      = "cs.apps.kubeblocks.io/leader"
+	PrimaryAnnotationKey                     = "rs.apps.kubeblocks.io/primary"
 	ComponentReplicasAnnotationKey           = "apps.kubeblocks.io/component-replicas"                   // ComponentReplicasAnnotationKey specifies the number of pods in replicas
 	DefaultBackupPolicyAnnotationKey         = "dataprotection.kubeblocks.io/is-default-policy"          // DefaultBackupPolicyAnnotationKey specifies the default backup policy.
 	DefaultBackupPolicyTemplateAnnotationKey = "dataprotection.kubeblocks.io/is-default-policy-template" // DefaultBackupPolicyTemplateAnnotationKey specifies the default backup policy template.
@@ -224,6 +225,7 @@ const (
 
 const (
 	KBReplicationSetPrimaryPodName = "KB_PRIMARY_POD_NAME"
+	KBReplicationSetPrimaryPodFQDN = "KB_PRIMARY_POD_FQDN"
 )
 
 const (

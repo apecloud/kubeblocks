@@ -42,6 +42,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -442,16 +443,12 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 		hostNameTplKey := prefix + strconv.Itoa(j) + "_HOSTNAME"
 		hostNameTplValue := params.Cluster.Name + "-" + params.Component.Name + "-" + strconv.Itoa(j)
 		envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
+	}
 
-		// build env for replication workload
-		// TODO: (xingran) remove KBReplicationSetPrimaryPodName ENV or dynamic generate primary instance
-		if params.Component.WorkloadType == appsv1alpha1.Replication {
-			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d.%s",
-				params.Cluster.Name,
-				params.Component.Name,
-				0,
-				svcName)
-		}
+	// build env for replication workload
+	replicationEnv := buildReplicationSetEnv(params, reqCtx, cli)
+	for k, v := range replicationEnv {
+		envData[k] = v
 	}
 
 	// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
@@ -490,6 +487,27 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 		return nil, err
 	}
 	return &config, nil
+}
+
+// buildReplicationSetEnv build env for replication workload.
+func buildReplicationSetEnv(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli client.Client) map[string]string {
+	if params.Component.WorkloadType != appsv1alpha1.Replication {
+		return nil
+	}
+	env := map[string]string{}
+	svcName := strings.Join([]string{params.Cluster.Name, params.Component.Name, "headless"}, "-")
+	podList, _ := replication.GetReplicationSetPrimaryPod(reqCtx.Ctx, cli, params.Cluster, params.Component.Name)
+	if podList != nil && len(podList) > 0 {
+		env[constant.KBReplicationSetPrimaryPodName] = podList[0].Name
+		env[constant.KBReplicationSetPrimaryPodFQDN] = fmt.Sprintf("%s.%s.%s.svc", podList[0].Name, svcName, params.Cluster.Namespace)
+	} else {
+		// If there is no primaryPod in the cluster, it means that the cluster is new created for the first time,
+		// and index=0 is used as the primary pod by default.
+		primaryPodName := fmt.Sprintf("%s-%s-%d", params.Cluster.Name, params.Component.Name, 0)
+		env[constant.KBReplicationSetPrimaryPodName] = primaryPodName
+		env[constant.KBReplicationSetPrimaryPodFQDN] = fmt.Sprintf("%s.%s.%s.svc", primaryPodName, svcName, params.Cluster.Namespace)
+	}
+	return env
 }
 
 func BuildBackup(sts *appsv1.StatefulSet,

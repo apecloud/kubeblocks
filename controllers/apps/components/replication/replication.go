@@ -145,8 +145,8 @@ func (r *ReplicationComponent) HandleUpdate(ctx context.Context, obj client.Obje
 		return nil
 	}
 
-	// sync pod role label
-	if err := syncReplicationPodRoleLabel(ctx, r.Cli, sts); err != nil {
+	// sync pod role label and annotations
+	if err := syncReplicationPodRoleLabelAndAnnotations(ctx, r.Cli, sts); err != nil {
 		return err
 	}
 
@@ -161,7 +161,7 @@ func (r *ReplicationComponent) HandleUpdate(ctx context.Context, obj client.Obje
 	return r.Cli.Status().Patch(ctx, r.Cluster, client.MergeFrom(clusterDeepCopy))
 }
 
-func syncReplicationPodRoleLabel(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
+func syncReplicationPodRoleLabelAndAnnotations(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
 	podList, err := util.GetPodListByStatefulSet(ctx, cli, sts)
 	if err != nil {
 		return err
@@ -169,20 +169,21 @@ func syncReplicationPodRoleLabel(ctx context.Context, cli client.Client, sts *ap
 	if len(podList) == 0 {
 		return nil
 	}
-	existPrimary := false
+	primary := ""
 	var updateRolePodList []corev1.Pod
 	for _, pod := range podList {
 		// if there is no role label on the Pod, it needs to be patch role label.
 		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
 			updateRolePodList = append(updateRolePodList, pod)
 		} else if v == constant.Primary {
-			existPrimary = true
+			primary = pod.Name
 		}
 	}
+	// sync pod role label
 	if len(updateRolePodList) > 0 {
 		for _, pod := range updateRolePodList {
 			// if exists primary Pod, it means that the Pod without a role label is a new secondary Pod created by h-scale.
-			if existPrimary {
+			if primary != "" {
 				if err := updateObjRoleLabel(ctx, cli, pod, constant.Secondary); err != nil {
 					return err
 				}
@@ -196,6 +197,16 @@ func syncReplicationPodRoleLabel(ctx context.Context, cli client.Client, sts *ap
 			}
 		}
 	}
+
+	// sync pods primary annotations
+	if primary != "" {
+		for _, pod := range podList {
+			if err := patchPodPrimaryAnnotation(ctx, cli, &pod, primary); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 

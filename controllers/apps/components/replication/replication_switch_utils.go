@@ -34,7 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	componetutil "github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
 // ProbeDetectManager implements the SwitchDetectManager interface with KubeBlocks Probe.
@@ -487,7 +486,7 @@ func CheckCandidateInstanceChanged(ctx context.Context,
 		return false, "", nil
 	}
 	// get the Pod object whose current role label is primary
-	pod, err := getReplicationSetPrimaryObj(ctx, cli, cluster, generics.PodSignature, clusterCompSpec.Name)
+	pod, err := GetAndCheckReplicationSetPrimaryPod(ctx, cli, cluster, clusterCompSpec.Name)
 	if err != nil {
 		return false, "", err
 	}

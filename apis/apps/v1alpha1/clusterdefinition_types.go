@@ -879,6 +879,22 @@ type SwitchStep struct {
 	Role SwitchStepRole `json:"role"`
 }
 
+type SwitchoverSpec struct {
+	CommandExecutorEnvItem `json:",inline"`
+
+	// withCandidateInstance corresponds to the switchover of the specified candidate primary/leader instance.
+	// +optional
+	WithCandidateInstance *SwitchoverAction `json:"withCandidateInstance,omitempty"`
+
+	// withoutCandidateInstance corresponds to a switchover that does not specify a candidate primary/leader instance.
+	// +optional
+	WithoutCandidateInstance *SwitchoverAction `json:"withoutCandidateInstance,omitempty"`
+}
+
+type SwitchoverAction struct {
+	CommandExecutorItem `json:",inline"`
+}
+
 type CommandExecutorEnvItem struct {
 	// image for Connector when executing the command.
 	// +kubebuilder:validation:Required
@@ -899,12 +915,6 @@ type CommandExecutorItem struct {
 	// args is used to perform statements.
 	// +optional
 	Args []string `json:"args,omitempty"`
-}
-
-type SwitchoverSpec struct {
-	CommandExecutorEnvItem `json:",inline"`
-
-	CommandExecutorItem `json:",inline"`
 }
 
 type CustomLabelSpec struct {

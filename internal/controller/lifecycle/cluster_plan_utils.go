@@ -29,6 +29,9 @@ func mergeAnnotations(originalAnnotations map[string]string, targetAnnotations *
 	if targetAnnotations == nil {
 		return
 	}
+	if len(originalAnnotations) == 0 {
+		return
+	}
 	if *targetAnnotations == nil {
 		*targetAnnotations = map[string]string{}
 	}

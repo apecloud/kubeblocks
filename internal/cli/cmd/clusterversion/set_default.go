@@ -59,15 +59,15 @@ const (
 type SetOrUnsetDefaultOption struct {
 	Factory   cmdutil.Factory
 	IOStreams genericclioptions.IOStreams
-	// `set-default` cmd will set the toSetDefault to be true, while `unset-default` cmd set it false
-	toSetDefault bool
+	// `set-default` cmd will set the setDefault to be true, while `unset-default` cmd set it false
+	setDefault bool
 }
 
 func newSetOrUnsetDefaultOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, toSet bool) *SetOrUnsetDefaultOption {
 	return &SetOrUnsetDefaultOption{
-		Factory:      f,
-		IOStreams:    streams,
-		toSetDefault: toSet,
+		Factory:    f,
+		IOStreams:  streams,
+		setDefault: toSet,
 	}
 }
 
@@ -108,7 +108,7 @@ func (o *SetOrUnsetDefaultOption) run(args []string) error {
 	}
 	var allErrs []error
 	// unset-default logic
-	if !o.toSetDefault {
+	if !o.setDefault {
 		for _, cv := range args {
 			if err := patchDefaultClusterVersionAnnotations(client, cv, annotationFalseValue); err != nil {
 				allErrs = append(allErrs, err)
@@ -134,6 +134,7 @@ func (o *SetOrUnsetDefaultOption) run(args []string) error {
 		}
 		if err := patchDefaultClusterVersionAnnotations(client, cv, annotationTrueValue); err != nil {
 			allErrs = append(allErrs, err)
+			continue
 		}
 		alreadySet[cv2Cd[cv]] = cv
 	}
@@ -142,7 +143,7 @@ func (o *SetOrUnsetDefaultOption) run(args []string) error {
 
 func (o *SetOrUnsetDefaultOption) validate(args []string) error {
 	if len(args) == 0 {
-		if o.toSetDefault {
+		if o.setDefault {
 			return fmt.Errorf("set-default shuold specify the clusterversions. use \"kbcli clusterversion list\" to list the clusterversions")
 		} else {
 			return fmt.Errorf("unset-default shuold specify the clusterversions. use \"kbcli clusterversion list\" to list the clusterversions")

@@ -82,15 +82,15 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 }
 
 func run(o *ListClusterVersionOptions) error {
+	if !o.Format.IsHumanReadable() {
+		_, err := o.Run()
+		return err
+	}
 	o.Print = false
 	r, err := o.Run()
 	if err != nil {
 		return err
 	}
-	if !o.Format.IsHumanReadable() {
-		return o.PrintGeneric(r)
-	}
-
 	infos, err := r.Infos()
 	if err != nil {
 		return err
@@ -103,14 +103,14 @@ func run(o *ListClusterVersionOptions) error {
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cv); err != nil {
 			return err
 		}
-		isDefaultValue := getIsDefault(&cv)
+		isDefaultValue := isDefault(&cv)
 		p.AddRow(cv.Name, cv.Labels[constant.ClusterDefLabelKey], cv.Status.Phase, isDefaultValue, util.TimeFormat(&cv.CreationTimestamp))
 	}
 	p.Print()
 	return nil
 }
 
-func getIsDefault(cv *v1alpha1.ClusterVersion) string {
+func isDefault(cv *v1alpha1.ClusterVersion) string {
 	if cv.Annotations == nil {
 		return "false"
 	}

@@ -33,7 +33,6 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -41,16 +40,16 @@ import (
 
 var (
 	setDefaultExample = templates.Examples(`
-	# set the clusterversion to be the default
+	# set ac-mysql-8.0.30 as the default clusterversion
 	kbcli clusterversion set-default ac-mysql-8.0.30`,
 	)
 
 	unsetDefaultExample = templates.Examples(`
-	# set the clusterversion not to be the default if it's default
+	# unset ac-mysql-8.0.30 from default clusterversion if it's default
 	kbcli clusterversion unset-default ac-mysql-8.0.30`)
 
-	ClusterVersionGVR    = types.ClusterVersionGVR()
-	ClusterDefinitionGVR = types.ClusterDefGVR()
+	clusterVersionGVR = types.ClusterVersionGVR()
+	// clusterDefinitionGVR = types.ClusterDefGVR()
 )
 
 const (
@@ -77,9 +76,9 @@ func newSetDefaultCMD(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	o := newSetOrUnsetDefaultOptions(f, streams, true)
 	cmd := &cobra.Command{
 		Use:               "set-default NAME",
-		Short:             "Set the clusterversion to the default cluster clusterversion for its clusterDef.",
+		Short:             "Set the clusterversion to the default cluster clusterversion for its clusterdefinition.",
 		Example:           setDefaultExample,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, ClusterVersionGVR),
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, clusterVersionGVR),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.validate(args))
 			util.CheckErr(o.run(args))
@@ -94,7 +93,7 @@ func newUnSetDefaultCMD(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Use:               "unset-default NAME",
 		Short:             "Unset the clusterversion if it's default.",
 		Example:           unsetDefaultExample,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, ClusterVersionGVR),
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, clusterVersionGVR),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.validate(args))
 			util.CheckErr(o.run(args))
@@ -109,7 +108,7 @@ func (o *SetOrUnsetDefaultOption) run(args []string) error {
 		return err
 	}
 	var allErrs []error
-	// unset-default logic:
+	// unset-default logic
 	if !o.toSetDefault {
 		for _, cv := range args {
 			if err := patchDefaultClusterVersionAnnotations(client, cv, annotationFalseValue); err != nil {
@@ -119,52 +118,29 @@ func (o *SetOrUnsetDefaultOption) run(args []string) error {
 		return utilerrors.NewAggregate(allErrs)
 	}
 	// set-default logic
-	allClusterDefinition := make(map[string]string)
-	// find all clusterDefinitionRef of the input cv
-	for _, cv := range args {
-		item, err := client.Resource(ClusterVersionGVR).Get(context.Background(), cv, metav1.GetOptions{})
-		if err != nil {
-			allErrs = append(allErrs, err)
-			continue
-		}
-		labels := item.GetLabels()
-		if labels == nil {
-			// Absolutely not expected to happen， if return this error, the clusterversion has a wrong structure that without labels
-			allErrs = append(allErrs, fmt.Errorf("the \"%s\" lacks of labels", cv))
-			continue
-		}
-		// if labels don't have the KEY, the error will throw late, so we don't throw here
-		cd := labels[constant.ClusterDefLabelKey]
-		if _, ok := allClusterDefinition[cd]; ok {
-			// the args belong the same clusterDefinitionRef
-			allErrs = append(allErrs, fmt.Errorf("\"%s\" has the same clusterDef with \"%s\"", cv, allClusterDefinition[cd]))
-			continue
-		}
-		allClusterDefinition[cd] = cv
+	cv2Cd, cd2DefaultCv, err := getAllClusterVersionAndDefault(client)
+	if err != nil {
+		return err
 	}
-
-	for cd := range allClusterDefinition {
-		versions, defaultcv, existedDefault, err := cluster.GetClusterVersions(client, cd)
-		cv := allClusterDefinition[cd]
-		if err != nil {
-			allErrs = append(allErrs, err)
+	alreadySet := make(map[string]string)
+	for _, cv := range args {
+		if len(cv2Cd[cv]) == 0 {
+			allErrs = append(allErrs, fmt.Errorf("clusterversion \"%s\" is not existed", cv))
 			continue
 		}
-		if _, ok := versions[cv]; !ok {
-			// Absolutely not expected to happen， if return this error we must check the clusterdefinition we have created
-			allErrs = append(allErrs, fmt.Errorf("clusterDefinition \"%s\" don't have a clusterversion \"%s\"", cd, cv))
+		if len(cd2DefaultCv[cv2Cd[cv]]) != 0 {
+			allErrs = append(allErrs, fmt.Errorf("clusterdefinition \"%s\" already has a default cluster version \"%s\"", cv2Cd[cv], cd2DefaultCv[cv2Cd[cv]]))
 			continue
 		}
-		if existedDefault {
-			// The clusterDef already has a default cluster version
-			allErrs = append(allErrs, fmt.Errorf("clusterDefinition %s already has a default cluster version \"%s\"", cd, defaultcv))
+		if len(alreadySet[cv2Cd[cv]]) != 0 {
+			allErrs = append(allErrs, fmt.Errorf("\"%s\" has the same clusterdefinition with \"%s\"", cv, alreadySet[cv2Cd[cv]]))
 			continue
 		}
 		if err := patchDefaultClusterVersionAnnotations(client, cv, annotationTrueValue); err != nil {
 			allErrs = append(allErrs, err)
 		}
+		alreadySet[cv2Cd[cv]] = cv
 	}
-
 	return utilerrors.NewAggregate(allErrs)
 }
 
@@ -189,9 +165,35 @@ func patchDefaultClusterVersionAnnotations(client dynamic.Interface, cvName stri
 		},
 	}
 	patchBytes, _ := json.Marshal(patchData)
-	_, err := client.Resource(ClusterVersionGVR).Patch(context.Background(), cvName, apitypes.MergePatchType, patchBytes, metav1.PatchOptions{})
+	_, err := client.Resource(clusterVersionGVR).Patch(context.Background(), cvName, apitypes.MergePatchType, patchBytes, metav1.PatchOptions{})
+	return err
+}
+
+func getAllClusterVersionAndDefault(client dynamic.Interface) (map[string]string, map[string]string, error) {
+	lists, err := client.Resource(clusterVersionGVR).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
-	return nil
+	// args 2 clusterdefinition
+	cvToCd := make(map[string]string)
+	cdToDefaultCv := make(map[string]string)
+	for _, item := range lists.Items {
+		name := item.GetName()
+		annotations := item.GetAnnotations()
+		labels := item.GetLabels()
+
+		if labels == nil {
+			// allErrs = append(allErrs, fmt.Errorf("cluterversion \"%s\" lacks of \"labels\" field"))
+			continue
+		}
+		cvToCd[name] = labels[constant.ClusterDefLabelKey]
+		if annotations == nil {
+			// allErrs = append(allErrs, fmt.Errorf("cluterversion \"%s\" lacks of \"annotations\" field"))
+			continue
+		}
+		if annotations[constant.DefaultClusterVersionAnnotationKey] == annotationTrueValue {
+			cdToDefaultCv[labels[constant.ClusterDefLabelKey]] = name
+		}
+	}
+	return cvToCd, cdToDefaultCv, nil
 }

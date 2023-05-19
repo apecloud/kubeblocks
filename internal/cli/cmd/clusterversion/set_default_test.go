@@ -51,7 +51,7 @@ var _ = Describe("set-default", func() {
 
 	getFakeClusterVersion := func(dynamic dynamic.Interface, clusterVersionName string) (*appsv1alpha1.ClusterVersion, error) {
 		var cv appsv1alpha1.ClusterVersion
-		u, err := dynamic.Resource(ClusterVersionGVR).Get(context.Background(), clusterVersionName, metav1.GetOptions{})
+		u, err := dynamic.Resource(clusterVersionGVR).Get(context.Background(), clusterVersionName, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -62,15 +62,15 @@ var _ = Describe("set-default", func() {
 		return &cv, nil
 	}
 
-	It("test getIsDefault", func() {
+	It("test isDefault", func() {
 		cv := &appsv1alpha1.ClusterVersion{}
-		Expect(getIsDefault(cv)).Should(Equal(annotationFalseValue))
+		Expect(isDefault(cv)).Should(Equal(annotationFalseValue))
 		cv.SetAnnotations(map[string]string{
 			constant.DefaultClusterVersionAnnotationKey: annotationFalseValue,
 		})
-		Expect(getIsDefault(cv)).Should(Equal(annotationFalseValue))
+		Expect(isDefault(cv)).Should(Equal(annotationFalseValue))
 		cv.Annotations[constant.DefaultClusterVersionAnnotationKey] = annotationTrueValue
-		Expect(getIsDefault(cv)).Should(Equal(annotationTrueValue))
+		Expect(isDefault(cv)).Should(Equal(annotationTrueValue))
 	})
 
 	It("set-default cmd", func() {
@@ -99,19 +99,19 @@ var _ = Describe("set-default", func() {
 		// before set-default
 		cv, err := getFakeClusterVersion(tf.FakeDynamicClient, testing.ClusterVersionName)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(getIsDefault(cv)).Should(Equal(annotationFalseValue))
+		Expect(isDefault(cv)).Should(Equal(annotationFalseValue))
 
 		// set-default
 		cmd.Run(cmd, []string{testing.ClusterVersionName})
 		cv, err = getFakeClusterVersion(tf.FakeDynamicClient, testing.ClusterVersionName)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(getIsDefault(cv)).Should(Equal(annotationTrueValue))
+		Expect(isDefault(cv)).Should(Equal(annotationTrueValue))
 		// unset-default
 		cmd = newUnSetDefaultCMD(tf, streams)
 		cmd.Run(cmd, []string{testing.ClusterVersionName})
 		cv, err = getFakeClusterVersion(tf.FakeDynamicClient, testing.ClusterVersionName)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(getIsDefault(cv)).Should(Equal(annotationFalseValue))
+		Expect(isDefault(cv)).Should(Equal(annotationFalseValue))
 	})
 
 	It("the clusterDef already have a default cv when set-default", func() {
@@ -121,7 +121,7 @@ var _ = Describe("set-default", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		cv, err := getFakeClusterVersion(tf.FakeDynamicClient, testing.ClusterVersionName)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(getIsDefault(cv)).Should(Equal(annotationTrueValue))
+		Expect(isDefault(cv)).Should(Equal(annotationTrueValue))
 		err = o.run([]string{testing.ClusterVersionName})
 		Expect(err).Should(HaveOccurred())
 	})
@@ -148,26 +148,26 @@ var _ = Describe("set-default", func() {
 		cmd := newSetDefaultCMD(tf, streams)
 		cv1Res, err := getFakeClusterVersion(tf.FakeDynamicClient, cv1.Name)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(getIsDefault(cv1Res)).Should(Equal(annotationFalseValue))
+		Expect(isDefault(cv1Res)).Should(Equal(annotationFalseValue))
 		cv2Res, err := getFakeClusterVersion(tf.FakeDynamicClient, cv2.Name)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(getIsDefault(cv2Res)).Should(Equal(annotationFalseValue))
+		Expect(isDefault(cv2Res)).Should(Equal(annotationFalseValue))
 		// set-default
 		cmd.Run(cmd, []string{cv1.Name, cv2.Name})
 		cv1Res, err = getFakeClusterVersion(tf.FakeDynamicClient, cv1.Name)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(getIsDefault(cv1Res)).Should(Equal(annotationTrueValue))
+		Expect(isDefault(cv1Res)).Should(Equal(annotationTrueValue))
 		cv2Res, err = getFakeClusterVersion(tf.FakeDynamicClient, cv2.Name)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(getIsDefault(cv2Res)).Should(Equal(annotationTrueValue))
+		Expect(isDefault(cv2Res)).Should(Equal(annotationTrueValue))
 		// unset-defautl
 		cmd = newUnSetDefaultCMD(tf, streams)
 		cmd.Run(cmd, []string{cv1.Name, cv2.Name})
 		cv1Res, err = getFakeClusterVersion(tf.FakeDynamicClient, cv1.Name)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(getIsDefault(cv1Res)).Should(Equal(annotationFalseValue))
+		Expect(isDefault(cv1Res)).Should(Equal(annotationFalseValue))
 		cv2Res, err = getFakeClusterVersion(tf.FakeDynamicClient, cv2.Name)
 		Expect(err).ShouldNot(HaveOccurred())
-		Expect(getIsDefault(cv2Res)).Should(Equal(annotationFalseValue))
+		Expect(isDefault(cv2Res)).Should(Equal(annotationFalseValue))
 	})
 })

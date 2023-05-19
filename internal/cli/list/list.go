@@ -188,7 +188,7 @@ func (o *ListOptions) transformRequests(req *rest.Request) {
 
 func (o *ListOptions) printResult(r *resource.Result) error {
 	if !o.Format.IsHumanReadable() {
-		return o.PrintGeneric(r)
+		return o.printGeneric(r)
 	}
 
 	var allErrs []error
@@ -291,8 +291,8 @@ func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping
 	return printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource
 }
 
-// PrintGeneric copied from kubectl get.go
-func (o *ListOptions) PrintGeneric(r *resource.Result) error {
+// printGeneric copied from kubectl get.go
+func (o *ListOptions) printGeneric(r *resource.Result) error {
 	var errs []error
 
 	singleItemImplied := false

@@ -106,11 +106,11 @@ func (t *StsPVCTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG
 
 		type pvcRecreateStep int
 		const (
-			pvPolicyRetainStep   pvcRecreateStep = 0
-			deletePVCStep        pvcRecreateStep = 1
-			removePVClaimRefStep pvcRecreateStep = 2
-			createPVCStep        pvcRecreateStep = 3
-			pvRestorePolicyStep  pvcRecreateStep = 4
+			pvPolicyRetainStep pvcRecreateStep = iota
+			deletePVCStep
+			removePVClaimRefStep
+			createPVCStep
+			pvRestorePolicyStep
 		)
 
 		addStepVertex := func(fromVertex *lifecycleVertex, step pvcRecreateStep) *lifecycleVertex {

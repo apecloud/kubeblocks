@@ -22,7 +22,7 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: 9187
+          scrapePort: 2112
       logConfigs:
       configSpecs:
         - name: weaviate-config-template
@@ -100,7 +100,7 @@ spec:
               - name: tcp-weaviate
                 containerPort: 8080
               - name: tcp-metrics
-                containerPort: 9091
+                containerPort: 2112
             env:
               - name: CLUSTER_DATA_BIND_PORT
                 value: "7001"
@@ -109,7 +109,9 @@ spec:
               - name: GOGC
                 value: "100"
               - name: PROMETHEUS_MONITORING_ENABLED
-                value: "false"
+                value: "true"
+              - name: PROMETHEUS_MONITORING_PORT
+                value: "2112"
               - name: QUERY_MAXIMUM_RESULTS
                 value: "100000"
               - name: REINDEX_VECTOR_DIMENSIONS_AT_STARTUP

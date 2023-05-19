@@ -248,11 +248,12 @@ func (c *statelessComponent) updateUnderlyingResources(reqCtx intctrlutil.Reques
 	} else {
 		c.updateWorkload(deployObj)
 	}
-
+	if err := c.UpdatePDB(reqCtx, cli); err != nil {
+		return err
+	}
 	if err := c.UpdateService(reqCtx, cli); err != nil {
 		return err
 	}
-
 	return nil
 }
 

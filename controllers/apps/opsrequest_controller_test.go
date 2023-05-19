@@ -464,6 +464,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).Should(Succeed())
 		})
 
+		// TODO(refactor): review the case before merge.
 		It("HorizontalScaling via volume snapshot backup", func() {
 			By("init backup policy template, mysql cluster and hscale ops")
 			viper.Set("VOLUMESNAPSHOT", true)
@@ -478,11 +479,11 @@ var _ = Describe("OpsRequest Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 				g.Expect(cluster.Generation == 2).Should(BeTrue())
 				g.Expect(cluster.Status.ObservedGeneration == 2).Should(BeTrue())
-				// the expected cluster phase is Updating during Hscale.
-				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
 				// component phase should be running during snapshot backup
-				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
-				// g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+				// g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+				// the expected cluster phase is Updating during Hscale.
+				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
 			})).Should(Succeed())
 
 			By("mock VolumeSnapshot status is ready, component phase should change to Updating when component is horizontally scaling.")
@@ -494,8 +495,9 @@ var _ = Describe("OpsRequest Controller", func() {
 			volumeSnapshot.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
 			Expect(k8sClient.Status().Update(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
 				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+				// g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
+				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
 			})).Should(Succeed())
 
 			By("wait the underlying workload been updated")

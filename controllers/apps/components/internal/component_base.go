@@ -29,6 +29,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -208,6 +209,31 @@ func (c *ComponentBase) ResolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli 
 		}
 	}
 	return c.ValidateObjectsAction()
+}
+
+func (c *ComponentBase) UpdatePDB(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	pdbObjList, err := util.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PodDisruptionBudgetSignature, c.GetNamespace(), c.GetMatchingLabels())
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	for _, v := range ictrltypes.FindAll[*policyv1.PodDisruptionBudget](c.Dag) {
+		node := v.(*ictrltypes.LifecycleVertex)
+		pdbProto := node.Obj.(*policyv1.PodDisruptionBudget)
+
+		if pos := slices.IndexFunc(pdbObjList, func(pdbObj *policyv1.PodDisruptionBudget) bool {
+			return pdbObj.GetName() == pdbProto.GetName()
+		}); pos < 0 {
+			node.Action = ictrltypes.ActionCreatePtr() // TODO: Create or Noop?
+		} else {
+			pdbObj := pdbObjList[pos]
+			if !reflect.DeepEqual(pdbObj.Spec, pdbProto.Spec) {
+				pdbObj.Spec = pdbProto.Spec
+				node.Obj = pdbObj
+				node.Action = ictrltypes.ActionUpdatePtr()
+			}
+		}
+	}
+	return nil
 }
 
 func (c *ComponentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -679,9 +705,8 @@ func resolveObjectAction(snapshot clusterSnapshot, vertex *ictrltypes.LifecycleV
 	if err != nil {
 		return nil, err
 	}
-	if obj, ok := snapshot[*gvk]; ok {
-		vertex.ObjCopy = obj
-		return ictrltypes.ActionUpdatePtr(), nil
+	if _, ok := snapshot[*gvk]; ok {
+		return ictrltypes.ActionNoopPtr(), nil
 	} else {
 		return ictrltypes.ActionCreatePtr(), nil
 	}

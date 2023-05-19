@@ -535,6 +535,9 @@ func (c *StatefulComponentBase) updateUnderlyingResources(reqCtx intctrlutil.Req
 			return err
 		}
 	}
+	if err := c.UpdatePDB(reqCtx, cli); err != nil {
+		return err
+	}
 	if err := c.UpdateService(reqCtx, cli); err != nil {
 		return err
 	}

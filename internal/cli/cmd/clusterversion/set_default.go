@@ -45,7 +45,7 @@ var (
 	)
 
 	unsetDefaultExample = templates.Examples(`
-	# unset ac-mysql-8.0.30 from default clusterversion if it's default
+	# unset ac-mysql-8.0.30 to default clusterversion if it's default
 	kbcli clusterversion unset-default ac-mysql-8.0.30`)
 
 	clusterVersionGVR = types.ClusterVersionGVR()
@@ -75,7 +75,7 @@ func newSetDefaultCMD(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	o := newSetOrUnsetDefaultOptions(f, streams, true)
 	cmd := &cobra.Command{
 		Use:               "set-default NAME",
-		Short:             "Set the clusterversion to the default cluster clusterversion for its clusterdefinition.",
+		Short:             "Set the clusterversion to the default clusterversion for its clusterdefinition.",
 		Example:           setDefaultExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, clusterVersionGVR),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -90,7 +90,7 @@ func newUnSetDefaultCMD(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	o := newSetOrUnsetDefaultOptions(f, streams, false)
 	cmd := &cobra.Command{
 		Use:               "unset-default NAME",
-		Short:             "Unset the clusterversion if it's default.",
+		Short:             "Unset the clusterversion to the default clusterversion if it's default.",
 		Example:           unsetDefaultExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, clusterVersionGVR),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -117,7 +117,7 @@ func (o *SetOrUnsetDefaultOption) run(args []string) error {
 		return utilerrors.NewAggregate(allErrs)
 	}
 	// set-default logic
-	cv2Cd, cd2DefaultCv, err := getAllClusterVersionAndDefault(client)
+	cv2Cd, cd2DefaultCv, err := getMapsBetweenCvAndCd(client)
 	if err != nil {
 		return err
 	}
@@ -166,7 +166,7 @@ func patchDefaultClusterVersionAnnotations(client dynamic.Interface, cvName stri
 	return err
 }
 
-func getAllClusterVersionAndDefault(client dynamic.Interface) (map[string]string, map[string]string, error) {
+func getMapsBetweenCvAndCd(client dynamic.Interface) (map[string]string, map[string]string, error) {
 	lists, err := client.Resource(clusterVersionGVR).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return nil, nil, err

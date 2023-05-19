@@ -2,7 +2,7 @@
 title: kbcli clusterversion unset-default
 ---
 
-Unset the clusterversion if it's default.
+Unset the clusterversion to the default clusterversion if it's default.
 
 ```
 kbcli clusterversion unset-default NAME [flags]
@@ -11,7 +11,7 @@ kbcli clusterversion unset-default NAME [flags]
 ### Examples
 
 ```
-  # unset ac-mysql-8.0.30 from default clusterversion if it's default
+  # unset ac-mysql-8.0.30 to default clusterversion if it's default
   kbcli clusterversion unset-default ac-mysql-8.0.30
 ```
 

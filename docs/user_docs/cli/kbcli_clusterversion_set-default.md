@@ -2,7 +2,7 @@
 title: kbcli clusterversion set-default
 ---
 
-Set the clusterversion to the default cluster clusterversion for its clusterdefinition.
+Set the clusterversion to the default clusterversion for its clusterdefinition.
 
 ```
 kbcli clusterversion set-default NAME [flags]

@@ -56,14 +56,24 @@ var _ = Describe("set-default", func() {
 	})
 
 	beginWithTwoClusterversion := func() {
-		cv1 := testing.FakeClusterVersion()
-		cv2 := testing.FakeClusterVersion()
-		cv2.Name = otherClusterversionName
-		cv2.SetLabels(map[string]string{
-			constant.ClusterDefLabelKey:   testing.ClusterDefName + "-other",
-			constant.AppManagedByLabelKey: constant.AppName,
-		})
-		tf.FakeDynamicClient = testing.FakeDynamicClient(cv1, cv2)
+		tf.FakeDynamicClient = testing.FakeDynamicClient([]runtime.Object{
+			&appsv1alpha1.ClusterVersion{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: cluterversionName,
+					Labels: map[string]string{
+						constant.ClusterDefLabelKey: testing.ClusterDefName,
+					},
+				},
+			},
+			&appsv1alpha1.ClusterVersion{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: otherClusterversionName,
+					Labels: map[string]string{
+						constant.ClusterDefLabelKey: testing.ClusterDefName + "-other",
+					},
+				},
+			},
+		}...)
 	}
 
 	getFakeClusterVersion := func(dynamic dynamic.Interface, clusterVersionName string) (*appsv1alpha1.ClusterVersion, error) {

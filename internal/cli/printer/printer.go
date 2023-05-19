@@ -114,7 +114,7 @@ func (t *TablePrinter) Print() {
 	t.Tbl.Render()
 }
 
-// SortBy will sort the table alphabetically by the column you specify, it's sorted by the first table column in default.
+// SortBy will sort the table alphabetically by the column you specify, it will be sorted by the first table column in default.
 // The columnNumber index start form 1
 func (t *TablePrinter) SortBy(columnNumber ...int) {
 	if len(columnNumber) == 0 {

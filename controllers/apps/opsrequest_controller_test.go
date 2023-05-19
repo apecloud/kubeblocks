@@ -50,7 +50,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
-	const mysqlCompDefName = "consensus"
+	const mysqlCompDefName = "mysql"
 	const mysqlCompName = "mysql"
 	const defaultMinReadySeconds = 10
 
@@ -63,7 +63,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.OpsRequestSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.VolumeSnapshotSignature, inNS)
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
@@ -78,7 +78,6 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	BeforeEach(func() {
 		cleanEnv()
-
 	})
 
 	AfterEach(func() {
@@ -169,14 +168,16 @@ var _ = Describe("OpsRequest Controller", func() {
 		clusterObj = clusterFactory.Create(&testCtx).GetObject()
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
-		By("Waiting for the cluster enter running phase")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		By("Waiting for the cluster enters creating phase")
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
 
 		By("mock pod/sts are available and wait for cluster enter running phase")
 		podName := fmt.Sprintf("%s-%s-0", clusterObj.Name, mysqlCompName)
-		pod := testapps.MockConsensusComponentStsPod(testCtx, nil, clusterObj.Name, mysqlCompName,
+		pod := testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterObj.Name, mysqlCompName,
 			podName, "leader", "ReadWrite")
+		// the opsRequest will use startTime to check some condition.
+		// if there is no sleep for 1 second, unstable error may occur.
+		time.Sleep(time.Second)
 		if workloadType == testapps.StatefulMySQLComponent {
 			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
 			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
@@ -211,27 +212,27 @@ var _ = Describe("OpsRequest Controller", func() {
 		}
 		Expect(testCtx.CreateObj(testCtx.Ctx, verticalScalingOpsRequest)).Should(Succeed())
 
-		By("check VerticalScalingOpsRequest running")
+		By("wait for VerticalScalingOpsRequest is running")
 		Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
-		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, mysqlCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
 		checkLatestOpsIsProcessing(clusterKey, verticalScalingOpsRequest.Spec.Type)
 
-		By("check Cluster and changed component phase is VerticalScaling")
+		By("cluster and component phase are Updating")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterPhase))                               // VerticalScalingPhase
-			g.Expect(cluster.Status.Components[mysqlCompName].Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // VerticalScalingPhase
+			g.Expect(cluster.Status.Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
+			g.Expect(cluster.Status.Components[mysqlCompName].Phase).To(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
 		})).Should(Succeed())
 
 		By("mock bring Cluster and changed component back to running status")
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(&mysqlSts), func(tmpSts *appsv1.StatefulSet) {
 			testk8s.MockStatefulSetReady(tmpSts)
 		})()).ShouldNot(HaveOccurred())
-		Eventually(testapps.GetClusterComponentPhase(testCtx, clusterObj.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 		checkLatestOpsHasProcessed(clusterKey)
 
-		By("patch opsrequest controller to run")
+		By("notice opsrequest controller to run")
 		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func(lopsReq *appsv1alpha1.OpsRequest) {
 			if lopsReq.Annotations == nil {
 				lopsReq.Annotations = map[string]string{}
@@ -329,14 +330,6 @@ var _ = Describe("OpsRequest Controller", func() {
 				Create(&testCtx).GetObject()
 		})
 
-		It("issue an VerticalScalingOpsRequest should change Cluster's resource requirements successfully", func() {
-			ctx := verticalScalingContext{
-				source: resourceContext{class: &testapps.Class1c1g},
-				target: resourceContext{resource: testapps.Class2c4g.ToResourceRequirements()},
-			}
-			testVerticalScaleCPUAndMemory(testapps.ConsensusMySQLComponent, ctx)
-		})
-
 		mockCompRunning := func(replicas int32) {
 			stsList := testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, mysqlCompName)
 			sts := &stsList.Items[0]
@@ -352,14 +345,13 @@ var _ = Describe("OpsRequest Controller", func() {
 					podRole = "leader"
 					accessMode = "ReadWrite"
 				}
-				testapps.MockConsensusComponentStsPod(testCtx, sts, clusterObj.Name, mysqlCompName, podName, podRole, accessMode)
+				testapps.MockConsensusComponentStsPod(&testCtx, sts, clusterObj.Name, mysqlCompName, podName, podRole, accessMode)
 			}
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 		}
 
-		mockMysqlCluster := func() {
+		createMysqlCluster := func(replicas int32) {
 			createBackupPolicyTpl(clusterDefObj)
-			replicas := int32(3)
 
 			By("set component to horizontal with snapshot policy and create a cluster")
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
@@ -392,9 +384,12 @@ var _ = Describe("OpsRequest Controller", func() {
 			// wait for cluster observed generation
 			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 			mockSetClusterStatusPhaseToRunning(clusterKey)
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
 		}
 
-		mockHscaleOps := func(replicas int32) *appsv1alpha1.OpsRequest {
+		createClusterHscaleOps := func(replicas int32) *appsv1alpha1.OpsRequest {
 			By("create a opsRequest to horizontal scale")
 			opsName := "hscale-ops-" + testCtx.GetRandomStr()
 			ops := testapps.NewOpsRequestObj(opsName, testCtx.DefaultNamespace,
@@ -409,48 +404,63 @@ var _ = Describe("OpsRequest Controller", func() {
 			return ops
 		}
 
+		It("issue an VerticalScalingOpsRequest should change Cluster's resource requirements successfully", func() {
+			ctx := verticalScalingContext{
+				source: resourceContext{class: &testapps.Class1c1g},
+				target: resourceContext{resource: testapps.Class2c4g.ToResourceRequirements()},
+			}
+			testVerticalScaleCPUAndMemory(testapps.ConsensusMySQLComponent, ctx)
+		})
+
 		It("HorizontalScaling when not support snapshot", func() {
 			By("init backup policy template, mysql cluster and hscale ops")
 			viper.Set("VOLUMESNAPSHOT", false)
-			mockMysqlCluster()
-			ops := mockHscaleOps(int32(5))
+			createMysqlCluster(3)
+			ops := createClusterHscaleOps(5)
 			opsKey := client.ObjectKeyFromObject(ops)
 
 			By("expect component is Running if don't support volume snapshot during doing h-scale ops")
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
-			// cluster phase changes to HorizontalScalingPhase first. then, it will be ConditionsError because it does not support snapshot backup after a period of time.
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase)) // HorizontalScalingPhase
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			Eventually(testapps.GetClusterGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
+				// expect cluster phase is Updating during Hscale.
+				g.Expect(fetched.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
+				// when snapshot is not supported, the expected component phase is running.
+				g.Expect(fetched.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+				// expect preCheckFailed condition to occur.
+				condition := meta.FindStatusCondition(fetched.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
+				g.Expect(condition).ShouldNot(BeNil())
+				g.Expect(condition.Status).Should(BeFalse())
+				g.Expect(condition.Reason).Should(Equal(lifecycle.ReasonPreCheckFailed))
+				g.Expect(condition.Message).Should(Equal("HorizontalScaleFailed: volume snapshot not support"))
+			}))
 
-			By("delete h-scale ops")
-			testapps.DeleteObject(&testCtx, opsKey, ops)
-			Expect(testapps.ChangeObj(&testCtx, ops, func(lopsReq *appsv1alpha1.OpsRequest) {
-				lopsReq.SetFinalizers([]string{})
-			})).ShouldNot(HaveOccurred())
-
-			By("reset replicas to 1 and cluster should reconcile to Running")
+			By("reset replicas to 3 and cluster phase should be reconciled to Running")
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 				cluster.Spec.ComponentSpecs[0].Replicas = int32(3)
 			})()).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 		})
 
-		It("HorizontalScaling when support snapshot", func() {
+		It("HorizontalScaling via volume snapshot backup", func() {
 			By("init backup policy template, mysql cluster and hscale ops")
 			viper.Set("VOLUMESNAPSHOT", true)
-			mockMysqlCluster()
+			createMysqlCluster(3)
+
 			replicas := int32(5)
-			ops := mockHscaleOps(replicas)
+			ops := createClusterHscaleOps(replicas)
 			opsKey := client.ObjectKeyFromObject(ops)
 
 			By("expect component is Running")
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
-			// cluster phase changes to HorizontalScalingPhase first. then, it will be ConditionsError because it does not support snapshot backup after a period of time.
+			Eventually(testapps.GetClusterGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
+			// the expected cluster phase is Updating during Hscale.
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 			// component phase should be running during snapshot backup
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
-			By("mock snapshot created and ready to use, component phase should change to Updating to do horizontalScaling")
+			By("mock VolumeSnapshot status is ready, component phase should change to Updating when component is horizontally scaling.")
 			snapshotKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
 				clusterKey.Name, mysqlCompName), Namespace: testCtx.DefaultNamespace}
 			volumeSnapshot := &snapshotv1.VolumeSnapshot{}
@@ -459,7 +469,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			volumeSnapshot.Status = &snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
 			Expect(k8sClient.Status().Update(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterKey.Name, mysqlCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
 
 			By("mock component is Running and expect cluster is Running")
 			mockCompRunning(replicas)
@@ -473,10 +483,10 @@ var _ = Describe("OpsRequest Controller", func() {
 		var stsList = &appsv1.StatefulSetList{}
 
 		createStsPodAndMockStsReady := func() {
-			Eventually(testapps.GetListLen(&testCtx, intctrlutil.StatefulSetSignature,
+			Eventually(testapps.List(&testCtx, intctrlutil.StatefulSetSignature,
 				client.MatchingLabels{
 					constant.AppInstanceLabelKey: clusterObj.Name,
-				}, client.InNamespace(clusterObj.Namespace))).Should(BeEquivalentTo(1))
+				}, client.InNamespace(clusterObj.Namespace))).Should(HaveLen(1))
 			stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj),
 				testapps.DefaultRedisCompName)
 			Expect(stsList.Items).Should(HaveLen(1))
@@ -495,7 +505,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("init replication cluster")
 			// init storageClass
 			storageClassName := "standard"
-			testapps.CreateStorageClass(testCtx, storageClassName, true)
+			testapps.CreateStorageClass(&testCtx, storageClassName, true)
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompDefName).
 				Create(&testCtx).GetObject()

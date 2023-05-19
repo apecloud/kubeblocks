@@ -50,9 +50,9 @@ jobs:
       - uses: actions/checkout@v3
       - name: send message
         run: |
-          CONTENT="release\u00a0chart\u00a0error"
+          CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0chart\u00a0error"
           if [[ "${{ needs.release-chart.result }}" == "success" ]]; then
-              CONTENT="release\u00a0chart\u00a0success"
+              CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0chart\u00a0success"
           fi
           
           bash .github/utils/utils.sh --type 12 \

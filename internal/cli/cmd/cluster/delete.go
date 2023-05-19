@@ -115,11 +115,11 @@ func clusterPostDeleteHook(o *delete.DeleteOptions, object runtime.Object) error
 
 func deleteCompDependencies(client kubernetes.Interface, ns string, name string, cd *appsv1alpha1.ClusterDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec) error {
-	if d, err := shouldCreateDependencies(cd, compSpec); err != nil {
-		return err
-	} else if !d {
-		return nil
-	}
+	// if d, err := shouldCreateDependencies(cd, compSpec); err != nil {
+	// 	return err
+	// } else if !d {
+	// 	return nil
+	// }
 	return deleteDependencies(client, ns, name)
 }
 

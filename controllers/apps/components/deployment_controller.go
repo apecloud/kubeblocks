@@ -59,9 +59,10 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	)
 
 	reqCtx := intctrlutil.RequestCtx{
-		Ctx: ctx,
-		Req: req,
-		Log: log.FromContext(ctx).WithValues("deployment", req.NamespacedName),
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("deployment", req.NamespacedName),
+		Recorder: r.Recorder,
 	}
 
 	if err = r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, deploy); err != nil {
@@ -78,12 +79,11 @@ func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, deploy, componentSpec)
 			// update component info to pods' annotations
 			if err := updateComponentInfoToPods(reqCtx.Ctx, r.Client, cluster, componentSpec); err != nil {
-				reqCtx.Recorder.Event(cluster, corev1.EventTypeWarning, "StatefulSet Deploy updateComponentInfoToPods Failed", err.Error())
 				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			}
 			// patch the current componentSpec workload's custom labels
 			if err := patchWorkloadCustomLabel(reqCtx.Ctx, r.Client, cluster, componentSpec); err != nil {
-				reqCtx.Recorder.Event(cluster, corev1.EventTypeWarning, "Deployment Controller PatchWorkloadCustomLabelFailed", err.Error())
+				reqCtx.Event(cluster, corev1.EventTypeWarning, "Deployment Controller PatchWorkloadCustomLabelFailed", err.Error())
 				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			}
 			if requeueAfter, err := updateComponentStatusInClusterStatus(compCtx, cluster); err != nil {

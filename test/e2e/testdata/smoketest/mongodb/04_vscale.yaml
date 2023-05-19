@@ -6,7 +6,7 @@ spec:
   clusterRef: mycluster
   type: VerticalScaling
   verticalScaling:
-    - componentName: replicaset
+    - componentName: mongodb
       requests:
         cpu: "500m"
         memory: 500Mi

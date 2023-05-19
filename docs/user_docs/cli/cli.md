@@ -90,6 +90,7 @@ Cluster command.
 ClusterDefinition command.
 
 * [kbcli clusterdefinition list](kbcli_clusterdefinition_list.md)	 - List ClusterDefinitions.
+* [kbcli clusterdefinition list-components](kbcli_clusterdefinition_list-components.md)	 - List cluster definition components.
 
 
 ## [clusterversion](kbcli_clusterversion.md)
@@ -105,6 +106,17 @@ List and open the KubeBlocks dashboards.
 
 * [kbcli dashboard list](kbcli_dashboard_list.md)	 - List all dashboards.
 * [kbcli dashboard open](kbcli_dashboard_open.md)	 - Open one dashboard.
+
+
+## [fault](kbcli_fault.md)
+
+Inject faults to pod.
+
+* [kbcli fault io](kbcli_fault_io.md)	 - IO chaos.
+* [kbcli fault network](kbcli_fault_network.md)	 - Network chaos.
+* [kbcli fault pod](kbcli_fault_pod.md)	 - Pod chaos.
+* [kbcli fault stress](kbcli_fault_stress.md)	 - Add memory pressure or CPU load to the system.
+* [kbcli fault time](kbcli_fault_time.md)	 - Clock skew failure.
 
 
 ## [kubeblocks](kbcli_kubeblocks.md)
@@ -154,7 +166,13 @@ Provides utilities for interacting with plugins.
 
  Plugins provide extended functionality that is not part of the major command-line distribution.
 
+* [kbcli plugin describe](kbcli_plugin_describe.md)	 - Describe a plugin
+* [kbcli plugin index](kbcli_plugin_index.md)	 - Manage custom plugin indexes
+* [kbcli plugin install](kbcli_plugin_install.md)	 - Install kbcli or kubectl plugins
 * [kbcli plugin list](kbcli_plugin_list.md)	 - List all visible plugin executables on a user's PATH
+* [kbcli plugin search](kbcli_plugin_search.md)	 - Search kbcli or kubectl plugins
+* [kbcli plugin uninstall](kbcli_plugin_uninstall.md)	 - Uninstall kbcli or kubectl plugins
+* [kbcli plugin upgrade](kbcli_plugin_upgrade.md)	 - Upgrade kbcli or kubectl plugins
 
 
 ## [version](kbcli_version.md)

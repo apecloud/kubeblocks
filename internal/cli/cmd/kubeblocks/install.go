@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"helm.sh/helm/v3/pkg/cli/values"
@@ -105,6 +106,12 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 
+	p := &PreflightOptions{
+		PreflightFlags: preflight.NewPreflightFlags(),
+		IOStreams:      streams,
+	}
+	*p.Interactive = false
+
 	cmd := &cobra.Command{
 		Use:     "install",
 		Short:   "Install KubeBlocks.",
@@ -112,6 +119,8 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f, cmd))
+			util.CheckErr(o.PreCheck())
+			util.CheckErr(p.Preflight(f, args, o.ValueOpts))
 			util.CheckErr(o.Install())
 		},
 	}
@@ -122,6 +131,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before install")
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for installing KubeBlocks, such as --timeout=10m")
 	cmd.Flags().BoolVar(&o.Wait, "wait", true, "Wait for KubeBlocks to be ready, including all the auto installed add-ons. It will wait for as long as --timeout")
+	cmd.Flags().BoolVar(&p.force, flagForce, p.force, "If present, just print fail item and continue with the following steps")
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
@@ -167,13 +177,16 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	return err
 }
 
-func (o *InstallOptions) Install() error {
+func (o *InstallOptions) PreCheck() error {
 	// check if KubeBlocks has been installed
 	v, err := util.GetVersionInfo(o.Client)
 	if err != nil {
 		return err
 	}
 
+	// Todo: KubeBlocks maybe already install but it's status could be Failed.
+	// For example: 'kbcli playground init' in windows will fail and try 'kbcli playground init' again immediately,
+	// kbcli will output SUCCESSFULLY, however the addon csi is failed and KubeBlocks do not install SUCCESSFULLY
 	if v.KubeBlocks != "" {
 		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", v.KubeBlocks)
 		fmt.Fprintln(o.Out, "If you want to upgrade it, please use \"kbcli kubeblocks upgrade\".")
@@ -191,10 +204,14 @@ func (o *InstallOptions) Install() error {
 		return err
 	}
 
-	if err = o.preCheck(v); err != nil {
+	if err = o.checkVersion(v); err != nil {
 		return err
 	}
+	return nil
+}
 
+func (o *InstallOptions) Install() error {
+	var err error
 	// add monitor parameters
 	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 
@@ -313,13 +330,12 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	var (
 		allEnabled  bool
 		err         error
-		spinnerDone = func(s *spinner.Spinner) {
+		spinnerDone = func(s spinner.Interface) {
 			s.SetFinalMsg(allMsg)
 			s.Done("")
 			fmt.Fprintln(o.Out)
 		}
 	)
-
 	// wait all addons to be enabled, or timeout
 	if err = wait.PollImmediate(5*time.Second, o.Timeout, func() (bool, error) {
 		allEnabled, err = checkAddons()
@@ -343,7 +359,7 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 	return nil
 }
 
-func (o *InstallOptions) preCheck(v util.Version) error {
+func (o *InstallOptions) checkVersion(v util.Version) error {
 	if !o.Check {
 		return nil
 	}

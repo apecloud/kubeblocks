@@ -50,13 +50,13 @@ app.kubernetes.io/name: {{ include "clickhouse-cluster.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{- define "clustername" -}}
+{{ include "clickhouse-cluster.fullname" .}}
+{{- end}}
+
 {{/*
 Create the name of the service account to use
 */}}
 {{- define "clickhouse-cluster.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "clickhouse-cluster.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
+{{- default (printf "kb-%s" (include "clustername" .)) .Values.serviceAccount.name }}
 {{- end }}

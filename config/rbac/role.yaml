@@ -413,6 +413,12 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - pods/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
   - pods/log
   verbs:
   - get

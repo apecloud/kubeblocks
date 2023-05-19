@@ -61,3 +61,7 @@ topologyKeys:
 ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
 ##
 tolerations: [ ]
+
+# The RABC permission used by cluster component pod, now include event.create
+serviceAccount:
+  name: ""

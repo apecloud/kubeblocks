@@ -100,7 +100,7 @@ var _ = Describe("StatefulSet Controller", func() {
 		})).Should(Succeed())
 
 		By("create pods of statefulset")
-		pods := testapps.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
+		pods := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
 
 		By("Mock a pod without role label and it will wait for HandleProbeTimeoutWhenPodsReady")
 		leaderPod := pods[0]
@@ -143,9 +143,10 @@ var _ = Describe("StatefulSet Controller", func() {
 	Context("test controller", func() {
 		It("test statefulSet controller", func() {
 			By("mock cluster object")
-			_, _, cluster := testapps.InitConsensusMysql(testCtx, clusterDefName,
+			_, _, cluster := testapps.InitConsensusMysql(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, consensusCompType, consensusCompName)
 
+			clusterKey := client.ObjectKeyFromObject(cluster)
 			// REVIEW/TODO: "Rebooting" got refactored
 			By("mock cluster phase is 'Rebooting' and restart operation is running on cluster")
 			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
@@ -157,7 +158,7 @@ var _ = Describe("StatefulSet Controller", func() {
 					},
 				}
 			})).Should(Succeed())
-			_ = testapps.CreateRestartOpsRequest(testCtx, clusterName, opsRequestName, []string{consensusCompName})
+			_ = testapps.CreateRestartOpsRequest(&testCtx, clusterName, opsRequestName, []string{consensusCompName})
 			Expect(testapps.ChangeObj(&testCtx, cluster, func(lcluster *appsv1alpha1.Cluster) {
 				lcluster.Annotations = map[string]string{
 					constant.OpsRequestAnnotationKey: fmt.Sprintf(`[{"name":"%s","clusterPhase":"Updating"}]`, opsRequestName),
@@ -165,14 +166,14 @@ var _ = Describe("StatefulSet Controller", func() {
 			})).Should(Succeed())
 
 			// trigger statefulset controller Reconcile
-			sts := testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusCompName)
+			sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
 
 			By("mock the StatefulSet and pods are ready")
 			// mock statefulSet available and consensusSet component is running
 			pods := testUsingEnvTest(sts)
 
 			By("check the component phase becomes Running")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, consensusCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 
 			By("mock component of cluster is stopping")
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
@@ -199,7 +200,7 @@ var _ = Describe("StatefulSet Controller", func() {
 			}
 
 			By("check the component phase becomes Stopped")
-			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, consensusCompName)).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, consensusCompName)).Should(Equal(appsv1alpha1.StoppedClusterCompPhase))
 
 			By("test updateStrategy with Serial")
 			testUpdateStrategy(appsv1alpha1.SerialStrategy, consensusCompName, 1)

@@ -192,6 +192,9 @@ func updateComponentInfoToPods(
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	componentSpec *appsv1alpha1.ClusterComponentSpec) error {
+	if cluster == nil || componentSpec == nil {
+		return nil
+	}
 	ml := client.MatchingLabels{
 		constant.AppInstanceLabelKey:    cluster.GetName(),
 		constant.KBAppComponentLabelKey: componentSpec.Name,

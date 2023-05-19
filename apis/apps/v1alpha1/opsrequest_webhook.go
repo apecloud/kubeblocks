@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -38,6 +39,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // log is for logging in this package.
@@ -335,6 +338,7 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 		existInSpec      bool
 		storageClassName *string
 		allowExpansion   bool
+		requestStorage   resource.Quantity
 	}
 
 	// component name -> vct name -> entity
@@ -344,20 +348,32 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 			if _, ok := vols[comp.ComponentName]; !ok {
 				vols[comp.ComponentName] = make(map[string]Entity)
 			}
-			vols[comp.ComponentName][vct.Name] = Entity{false, nil, false}
+			vols[comp.ComponentName][vct.Name] = Entity{false, nil, false, vct.Storage}
 		}
 	}
-
+	// TODO: remove it after supporting to recover volume expansion when it fails.
+	recoverVolumeExpansionFailure := viper.GetBool(constant.CfgRecoverVolumeExpansionFailure)
 	// traverse the spec to update volumes
 	for _, comp := range cluster.Spec.ComponentSpecs {
 		if _, ok := vols[comp.Name]; !ok {
 			continue // ignore not-exist component
 		}
 		for _, vct := range comp.VolumeClaimTemplates {
-			if _, ok := vols[comp.Name][vct.Name]; !ok {
+			e, ok := vols[comp.Name][vct.Name]
+			if !ok {
 				continue
 			}
-			vols[comp.Name][vct.Name] = Entity{true, vct.Spec.StorageClassName, false}
+			// TODO:
+			// compare the requested storage size with the pvc.status.capacity when KubeBlocks supports to manage the pvc by self
+			// and supports to recover volume expansion when it is fails.
+			previousValue := *vct.Spec.Resources.Requests.Storage()
+			if e.requestStorage.Cmp(previousValue) < 0 && !recoverVolumeExpansionFailure {
+				return fmt.Errorf(`requested storage size of volumeClaimTemplate "%s" can not less than previous values "%s" unless both Kubernetes and KubeBlocks support RECOVER_VOLUME_EXPANSION_FAILURE`,
+					vct.Name, previousValue.String())
+			}
+			e.existInSpec = true
+			e.storageClassName = vct.Spec.StorageClassName
+			vols[comp.Name][vct.Name] = e
 		}
 	}
 
@@ -375,7 +391,8 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 			if err != nil {
 				continue // ignore the error and take it as not-supported
 			}
-			vols[cname][vname] = Entity{e.existInSpec, e.storageClassName, allowExpansion}
+			e.allowExpansion = allowExpansion
+			vols[cname][vname] = e
 		}
 	}
 

@@ -5,7 +5,7 @@ description: ApeCloud MySQL-Scale is ApeCloud MySQL proxy. ApeCloud MySQL-Scale 
 
 type: application
 
-version: 0.5.0-beta.9
+version: 0.5.0-beta.24
 
 # This is the version number of the ApeCloud MySQL being deployed,
 # rather than the version number of ApeCloud MySQL-Scale itself.

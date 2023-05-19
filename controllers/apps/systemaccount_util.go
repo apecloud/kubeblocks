@@ -186,7 +186,9 @@ func renderJob(engine *customizedEngine, key componentUniqueKey, statement []str
 	// place statements and endpoints before user defined envs.
 	envs := make([]corev1.EnvVar, 0, 2+len(engine.getEnvs()))
 	envs = append(envs, statementEnv, endpointEnv)
-	envs = append(envs, engine.getEnvs()...)
+	if len(engine.getEnvs()) > 0 {
+		envs = append(envs, engine.getEnvs()...)
+	}
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -363,7 +365,7 @@ func getDebugMode(annotatedDebug string) bool {
 	return viper.GetBool(systemAccountsDebugMode) || debugOn
 }
 
-func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, compKey componentUniqueKey, account appsv1alpha1.AccountName) {
+func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, compKey componentUniqueKey, account appsv1alpha1.AccountName) error {
 	debugModeOn := getDebugMode(cluster.Annotations[debugClusterAnnotationKey])
 	// add label
 	ml := getLabelsForSecretsAndJobs(compKey)
@@ -379,25 +381,33 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 	}
 
 	// add toleration
-	tolerations := cluster.Spec.Tolerations
 	clusterComp := cluster.Spec.GetComponentByName(compKey.componentName)
-	if clusterComp != nil {
-		if len(clusterComp.Tolerations) != 0 {
-			tolerations = clusterComp.Tolerations
-		}
+	tolerations, err := componetutil.BuildTolerations(cluster, clusterComp)
+	if err != nil {
+		return err
 	}
-	// add built-in toleration
-	tolerations = componetutil.PatchBuiltInToleration(tolerations)
 	job.Spec.Template.Spec.Tolerations = tolerations
+	return nil
 }
 
 // completeExecConfig override the image of execConfig if version is not nil.
 func completeExecConfig(execConfig *appsv1alpha1.CmdExecutorConfig, version *appsv1alpha1.ClusterComponentVersion) {
-	if version == nil {
+	if version == nil || version.SystemAccountSpec == nil || version.SystemAccountSpec.CmdExecutorConfig == nil {
 		return
 	}
-	if len(version.ClientImage) == 0 {
+	sysAccountSpec := version.SystemAccountSpec
+	if len(sysAccountSpec.CmdExecutorConfig.Image) > 0 {
+		execConfig.Image = sysAccountSpec.CmdExecutorConfig.Image
+	}
+
+	// envs from sysAccountSpec will override the envs from execConfig
+	if sysAccountSpec.CmdExecutorConfig.Env == nil {
 		return
 	}
-	execConfig.Image = version.ClientImage
+	if len(sysAccountSpec.CmdExecutorConfig.Env) == 0 {
+		// clean up envs
+		execConfig.Env = nil
+	} else {
+		execConfig.Env = sysAccountSpec.CmdExecutorConfig.Env
+	}
 }

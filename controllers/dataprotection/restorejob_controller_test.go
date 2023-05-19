@@ -82,7 +82,7 @@ var _ = Describe("RestoreJob Controller", func() {
 		By("By assure an backup obj")
 		return testapps.NewBackupFactory(testCtx.DefaultNamespace, "backup-job-").
 			WithRandomName().SetBackupPolicyName(backupPolicy).
-			SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+			SetBackupType(dataprotectionv1alpha1.BackupTypeDataFile).
 			Create(&testCtx).GetObject()
 	}
 
@@ -152,7 +152,7 @@ var _ = Describe("RestoreJob Controller", func() {
 	testRestoreJob := func(withResources ...bool) {
 		By("By creating a statefulset and pod")
 		sts := assureStatefulSetObj()
-		testapps.MockConsensusComponentPods(testCtx, sts, clusterName, compName)
+		testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, compName)
 
 		By("By creating a backupTool")
 		backupTool := assureBackupToolObj(withResources...)

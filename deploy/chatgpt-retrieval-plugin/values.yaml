@@ -51,7 +51,7 @@ website:
   legal_info_url: hello@legal.com
 
 datastore:
-  # in list of (pinecone, weaviate, zilliz, milvus, qdrant, redis)
+  # in list of (pinecone, weaviate, zilliz, milvus, qdrant, redis, llama, chroma, azuresearch, supabase, postgres)
   DATASTORE:
   # Yes	Your secret token to protect the local plugin API
   BEARER_TOKEN:
@@ -131,6 +131,59 @@ datastore:
   REDIS_DISTANCE_METRIC: COSINE
   # Optional Vector index algorithm type default:FLAT
   REDIS_INDEX_TYPE: FLAT
+
+  # Optional Index type (see below for details)
+  LLAMA_INDEX_TYPE: simple_dict
+  # Optional Path to saved Index json file
+  LLAMA_INDEX_JSON_PATH:
+  # Optional Path to saved query kwargs json file
+  LLAMA_QUERY_KWARGS_JSON_PATH:
+  # Optional Response mode for query
+  LLAMA_RESPONSE_MODE: no_text
+
+  # Optional Your chosen Chroma collection name to store your embeddings
+  CHROMA_COLLECTION: openaiembeddings
+  # Optional If set to True, ignore CHROMA_HOST and CHROMA_PORT and just use an in-memory Chroma instance
+  CHROMA_IN_MEMORY: True
+  # Optional If set, and CHROMA_IN_MEMORY is set, persist to and load from this directory.
+  CHROMA_PERSISTENCE_DIR: openai
+  # Optional Your Chroma instance host address (see notes below)
+  CHROMA_HOST: http://127.0.0.1
+  # Optional Your Chroma port number
+  CHROMA_PORT: 8000
+
+  # Required Name of your search service
+  AZURESEARCH_SERVICE:
+  # Required Name of your search index
+  AZURESEARCH_INDEX:
+  # Optional Your API key, if using key-based auth instead of Azure managed identity
+  AZURESEARCH_API_KEY:
+  # Optional Disable hybrid search and only use vector similarity
+  AZURESEARCH_DISABLE_HYBRID:
+  # Optional Enable L2 re-ranking with this configuration name see re-ranking below
+  AZURESEARCH_SEMANTIC_CONFIG:
+  # Optional If using L2 re-ranking, language for queries/documents (valid values listed here)
+  AZURESEARCH_LANGUAGE: en-us
+  # Optional Vector size for embeddings
+  AZURESEARCH_DIMENSIONS: 1536
+
+  # Required Supabase Project URL
+  SUPABASE_URL:
+  # Optional Supabase Project API anon key
+  SUPABASE_ANON_KEY:
+  # Optional Supabase Project API service key, will be used if provided instead of anon key
+  SUPABASE_SERVICE_ROLE_KEY:
+
+  # Optional Postgres host
+  PG_HOST: localhost
+  # Optional Postgres port
+  PG_PORT: 5432
+  # Optional Postgres password
+  PG_PASSWORD: postgres
+  # Optional Postgres username
+  PG_USER: postgres
+  # Optional Postgres database
+  PG_DB: postgres
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious

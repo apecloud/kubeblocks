@@ -9,6 +9,7 @@ env:
   GO_CACHE: "go-cache"
   GO_CACHE_DIR: "/root/.cache"
   GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
 jobs:
   trigger-mode:
@@ -56,9 +57,9 @@ jobs:
           bash .github/utils/utils.sh --type 8
 
   remove-runner:
-    needs: make-test
+    needs: [ trigger-mode, make-test ]
     runs-on: ubuntu-latest
-    if: ${{ always() }}
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && always() }}
     steps:
       - uses: actions/checkout@v3
       - name: remove runner
@@ -70,7 +71,7 @@ jobs:
   check-image:
     name: check image
     needs: trigger-mode
-    if: needs.trigger-mode.outputs.trigger-mode == '[docker]'
+    if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
     uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
     with:
       MAKE_OPS_PRE: "generate"
@@ -83,7 +84,7 @@ jobs:
   check-tools-image:
     name: check image
     needs: trigger-mode
-    if: needs.trigger-mode.outputs.trigger-mode == '[docker]'
+    if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
     uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
     with:
       MAKE_OPS_PRE: "generate"
@@ -96,7 +97,7 @@ jobs:
   check-helm:
     name: check helm
     needs: trigger-mode
-    if: needs.trigger-mode.outputs.trigger-mode == '[deploy]'
+    if: contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]')
     uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.5.2
     with:
       MAKE_OPS: "bump-chart-ver"

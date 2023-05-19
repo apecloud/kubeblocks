@@ -12,16 +12,17 @@ kbcli cluster reconfigure NAME --set key=value[,key=value] [--component=componen
 
 ```
   # update component params
-  kbcli cluster configure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=1000,general_log=OFF
+  kbcli cluster reconfigure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=1000,general_log=OFF
   
   # if only one component, and one config spec, and one config file, simplify the use of configure. e.g:
   # update mysql max_connections, cluster name is mycluster
-  kbcli cluster configure mycluster --set max_connections=2000
+  kbcli cluster reconfigure mycluster --set max_connections=2000
 ```
 
 ### Options
 
 ```
+      --auto-approve                   Skip interactive approval before reconfigure the cluster
       --component string               Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.
       --config-file string             Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-config'.
       --config-spec string             Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-config'.

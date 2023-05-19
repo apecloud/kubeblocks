@@ -69,7 +69,8 @@ var (
 		CharacterType: "stateless",
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{{
-				Name: DefaultNginxContainerName,
+				Name:  DefaultNginxContainerName,
+				Image: NginxImage,
 			}},
 		},
 		Service: &appsv1alpha1.ServiceSpec{
@@ -118,6 +119,7 @@ var (
 
 	defaultMySQLContainer = corev1.Container{
 		Name:            DefaultMySQLContainerName,
+		Image:           ApeCloudMySQLImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Ports: []corev1.ContainerPort{
 			{
@@ -181,7 +183,9 @@ var (
 			Name:       "follower",
 			AccessMode: appsv1alpha1.Readonly,
 		}},
-		UpdateStrategy: appsv1alpha1.BestEffortParallelStrategy,
+		StatefulSetSpec: appsv1alpha1.StatefulSetSpec{
+			UpdateStrategy: appsv1alpha1.BestEffortParallelStrategy,
+		},
 	}
 
 	defaultMySQLService = appsv1alpha1.ServiceSpec{
@@ -236,6 +240,7 @@ var (
 
 	defaultRedisInitContainer = corev1.Container{
 		Name:            DefaultRedisInitContainerName,
+		Image:           DefaultRedisImageName,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		VolumeMounts:    defaultReplicationRedisVolumeMounts,
 		Command:         []string{"/scripts/init.sh"},
@@ -243,6 +248,7 @@ var (
 
 	defaultRedisContainer = corev1.Container{
 		Name:            DefaultRedisContainerName,
+		Image:           DefaultRedisImageName,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Ports: []corev1.ContainerPort{
 			{

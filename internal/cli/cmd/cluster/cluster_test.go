@@ -79,22 +79,11 @@ var _ = Describe("Cluster", func() {
 					IOStreams: streams,
 				},
 			}
-			Expect(o.Validate()).To(Succeed())
+			o.Options = o
+			Expect(o.Complete()).To(Succeed())
 			Expect(o.Name).ShouldNot(BeEmpty())
+			Expect(o.Run()).Should(HaveOccurred())
 		})
-
-		It("new command", func() {
-			cmd := NewCreateCmd(tf, streams)
-			Expect(cmd).ShouldNot(BeNil())
-			Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
-			Expect(cmd.Flags().Set("cluster-version", testing.ClusterVersionName)).Should(Succeed())
-			Expect(cmd.Flags().Set("set-file", testComponentPath)).Should(Succeed())
-			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
-
-			// must succeed otherwise exit 1 and make test fails
-			cmd.Run(nil, []string{"test1"})
-		})
-
 	})
 
 	Context("run", func() {
@@ -105,6 +94,7 @@ var _ = Describe("Cluster", func() {
 			tf.FakeDynamicClient = testing.FakeDynamicClient(
 				clusterDef,
 				testing.FakeStorageClass(testing.StorageClassName, testing.IsDefautl),
+				testing.FakeClusterVersion(),
 				testing.FakeComponentClassDef(fmt.Sprintf("custom-%s", testing.ComponentDefName), clusterDef.Name, testing.ComponentDefName),
 				testing.FakeComponentClassDef("custom-mysql", clusterDef.Name, "mysql"),
 			)
@@ -119,7 +109,7 @@ var _ = Describe("Cluster", func() {
 				},
 				SetFile:           "",
 				ClusterDefRef:     testing.ClusterDefName,
-				ClusterVersionRef: "cluster-version",
+				ClusterVersionRef: testing.ClusterVersionName,
 				UpdatableFlags: UpdatableFlags{
 					PodAntiAffinity: "Preferred",
 					TopologyKeys:    []string{"kubernetes.io/hostname"},

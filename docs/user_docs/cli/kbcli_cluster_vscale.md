@@ -21,8 +21,9 @@ kbcli cluster vscale NAME [flags]
 ### Options
 
 ```
+      --auto-approve                   Skip interactive approval before vertically scaling the cluster
       --class string                   Component class
-      --components strings              Component names to this operations
+      --components strings             Component names to this operations
       --cpu string                     Requested and limited size of component cpu
       --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
   -h, --help                           help for vscale

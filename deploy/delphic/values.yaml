@@ -82,11 +82,11 @@ tolerations: []
 
 affinity: {}
 
-postgres:
+pgcluster:
   enabled: true
   nameOverride: postgres
 
-redis:
+redis-cluster:
   enabled: true
   nameOverride: redis
 

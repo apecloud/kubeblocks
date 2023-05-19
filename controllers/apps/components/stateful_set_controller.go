@@ -59,9 +59,10 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	)
 
 	reqCtx := intctrlutil.RequestCtx{
-		Ctx: ctx,
-		Req: req,
-		Log: log.FromContext(ctx).WithValues("statefulSet", req.NamespacedName),
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithValues("statefulSet", req.NamespacedName),
+		Recorder: r.Recorder,
 	}
 
 	if err = r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, sts); err != nil {
@@ -78,12 +79,11 @@ func (r *StatefulSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			compCtx := newComponentContext(reqCtx, r.Client, r.Recorder, component, sts, componentSpec)
 			// update component info to pods' annotations
 			if err := updateComponentInfoToPods(reqCtx.Ctx, r.Client, cluster, componentSpec); err != nil {
-				reqCtx.Recorder.Event(cluster, corev1.EventTypeWarning, "StatefulSet Controller updateComponentInfoToPods Failed", err.Error())
 				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			}
 			// patch the current componentSpec workload's custom labels
 			if err := patchWorkloadCustomLabel(reqCtx.Ctx, r.Client, cluster, componentSpec); err != nil {
-				reqCtx.Recorder.Event(cluster, corev1.EventTypeWarning, "StatefulSet Controller PatchWorkloadCustomLabelFailed", err.Error())
+				reqCtx.Event(cluster, corev1.EventTypeWarning, "StatefulSet Controller PatchWorkloadCustomLabelFailed", err.Error())
 				return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 			}
 			reqCtx.Log.V(1).Info("before updateComponentStatusInClusterStatus",

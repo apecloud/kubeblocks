@@ -161,7 +161,7 @@ func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	// sort pods
-	consensus.SortPods(pods, consensus.ComposeRolePriorityMap(*params.Component))
+	util.SortPods(pods, consensus.ComposeRolePriorityMap(params.Component), constant.RoleLabelKey)
 	r := make([]corev1.Pod, 0, len(pods))
 	for i := len(pods); i > 0; i-- {
 		r = append(r, pods[i-1:i]...)

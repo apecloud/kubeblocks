@@ -97,10 +97,10 @@ var _ = Describe("Consensus Component", func() {
 	Context("Consensus Component test", func() {
 		It("Consensus Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			clusterDef, _, cluster := testapps.InitConsensusMysql(testCtx, clusterDefName,
+			clusterDef, _, cluster := testapps.InitConsensusMysql(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, "consensus", consensusCompName)
 
-			sts := testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusCompName)
+			sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
 			componentName := consensusCompName
 			compDefName := cluster.Spec.GetComponentDefRefName(componentName)
 			componentDef := clusterDef.GetComponentDefByName(compDefName)
@@ -130,7 +130,7 @@ var _ = Describe("Consensus Component", func() {
 			Expect(isRunning == false).Should(BeTrue())
 
 			podName := sts.Name + "-0"
-			podList := testapps.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
+			podList := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
 			By("expect for pod is available")
 			Expect(consensusComponent.PodIsAvailable(podList[0], defaultMinReadySeconds)).Should(BeTrue())
 

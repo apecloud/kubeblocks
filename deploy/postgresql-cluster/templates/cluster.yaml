@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ include "postgresqlcluster.fullname" . }}
+  name: {{ include "clustername" . }}
   labels: {{ include "postgresqlcluster.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: postgresql # ref clusterdefinition.name

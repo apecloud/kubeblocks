@@ -1,6 +1,5 @@
 # Patroni bootstrap parameters
 staticParameters:
-  - archive_command
   - shared_buffers
   - logging_collector
   - log_destination
@@ -22,7 +21,6 @@ staticParameters:
   - extwlist.custom_path
 
 immutableParameters:
-  - archive_command
   - archive_timeout
   - backtrace_functions
   - config_file

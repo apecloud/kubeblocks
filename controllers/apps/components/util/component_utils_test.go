@@ -162,11 +162,11 @@ var _ = Describe("Consensus Component", func() {
 	Context("Consensus Component test", func() {
 		It("Consensus Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			_, _, cluster := testapps.InitClusterWithHybridComps(testCtx, clusterDefName,
+			_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
-			sts := testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusCompName)
-			testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
-			_ = testapps.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
+			sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
+			testapps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessCompName)
+			_ = testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
 
 			By("test GetComponentDefByCluster function")
 			componentDef, _ := GetComponentDefByCluster(ctx, k8sClient, *cluster, consensusCompDefRef)

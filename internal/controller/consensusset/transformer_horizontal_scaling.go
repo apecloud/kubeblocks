@@ -81,7 +81,7 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 
 	// cluster initialization done, handle dynamic membership reconfiguration
 
-	// consensus cluster is ready and no pending action log
+	// consensus cluster is ready
 	if isConsensusSetReady(csSet) {
 		return cleanAction(transCtx, dag)
 	}
@@ -90,7 +90,7 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 		return nil
 	}
 
-	// immutable reset condition 1 check
+	// no enough replicas in scale out, tell sts to create them.
 	sts, _ := stsVertex.OriObj.(*apps.StatefulSet)
 	memberReadyReplicas := int32(len(csSet.Status.MembersStatus))
 	if memberReadyReplicas < csSet.Spec.Replicas &&
@@ -100,7 +100,7 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 
 	stsVertex.Immutable = true
 
-	// barrier 1: the underlying sts is ready and has enough replicas
+	// barrier: the underlying sts is ready and has enough replicas
 	if sts.Status.ReadyReplicas < csSet.Spec.Replicas || !isStatefulSetReady(sts) {
 		return nil
 	}

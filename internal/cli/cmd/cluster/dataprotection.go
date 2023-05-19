@@ -74,8 +74,8 @@ var (
 		# create a snapshot backup
 		kbcli cluster backup cluster-name --type snapshot
 
-		# create a full backup
-		kbcli cluster backup cluster-name --type full
+		# create a datafile backup
+		kbcli cluster backup cluster-name --type datafile
 
 		# create a backup with specified backup policy
 		kbcli cluster backup cluster-name --backup-policy <backup-policy-name>

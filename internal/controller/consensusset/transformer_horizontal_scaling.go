@@ -306,30 +306,50 @@ func buildAllActionList(transCtx *CSSetTransformContext) ([]*batchv1.Job, error)
 // pop the stack into a list and reverse it
 func buildFinalActionList(allActionList []*batchv1.Job, readyMembers, expectedMembers int32) []*batchv1.Job {
 	currentMembers := getCurrentMembers(allActionList, readyMembers)
-
-	var finalActionList []*batchv1.Job
-	for _, action := range allActionList {
-		if action.Spec.Suspend != nil && !*action.Spec.Suspend {
-			finalActionList = append(finalActionList, action)
+	groupActionList := convertToGroupList(allActionList)
+	var finalGroupActionList [][]*batchv1.Job
+	for _, groupAction := range groupActionList {
+		if groupAction[0].Spec.Suspend != nil && !*groupAction[0].Spec.Suspend {
+			finalGroupActionList = append(finalGroupActionList, groupAction)
 			continue
 		}
-		if isOutOfScope(action, currentMembers, expectedMembers) {
+		if isOutOfScope(groupAction[0], currentMembers, expectedMembers) {
 			continue
 		}
-		if len(finalActionList) == 0 {
-			finalActionList = append(finalActionList, action)
+		if len(finalGroupActionList) == 0 {
+			finalGroupActionList = append(finalGroupActionList, groupAction)
 			continue
 		}
-		lastIndex := len(finalActionList) - 1
-		lastAction := finalActionList[lastIndex]
+		lastIndex := len(finalGroupActionList) - 1
+		lastGroupAction := finalGroupActionList[lastIndex]
 		switch {
-		case isSuspendPair(lastAction, action):
-			finalActionList = finalActionList[:lastIndex]
-		case isAdjacentPair(lastAction, action):
-			finalActionList = append(finalActionList, action)
+		case isSuspendPair(lastGroupAction[0], groupAction[0]):
+			finalGroupActionList = finalGroupActionList[:lastIndex]
+		case isAdjacentPair(lastGroupAction[0], groupAction[0]):
+			finalGroupActionList = append(finalGroupActionList, groupAction)
 		}
 	}
+	var finalActionList []*batchv1.Job
+	for _, groupAction := range finalGroupActionList {
+		finalActionList = append(finalActionList, groupAction...)
+	}
 	return finalActionList
+}
+
+func convertToGroupList(allActionList []*batchv1.Job) [][]*batchv1.Job {
+	var groupActionList [][]*batchv1.Job
+	for i := 0; i < len(allActionList); {
+		var j int
+		for j = i + 1; j < len(allActionList); j++ {
+			if !isPreOrPostGroup(allActionList[i], allActionList[j]) {
+				break
+			}
+		}
+		groupAction := allActionList[i:j]
+		groupActionList = append(groupActionList, groupAction)
+		i = j
+	}
+	return groupActionList
 }
 
 func isOutOfScope(action *batchv1.Job, currentMembers, expectedMembers int32) bool {
@@ -370,6 +390,15 @@ func isAdjacentPair(lastAction, currentAction *batchv1.Job) bool {
 	default:
 		return currentOrdinal-lastOrdinal == 1
 	}
+}
+
+func isPreOrPostGroup(lastAction, currentAction *batchv1.Job) bool {
+	// same generation, same ordinal, same pre/post
+	lastGeneration, lastOrdinal, lastActionType, _ := getActionGenerationOrdinalAndType(lastAction.Name)
+	currentGeneration, currentOrdinal, currentActionType, _ := getActionGenerationOrdinalAndType(currentAction.Name)
+	return lastGeneration == currentGeneration &&
+		lastOrdinal == currentOrdinal &&
+		isPreAction(lastActionType) == isPreAction(currentActionType)
 }
 
 func getCurrentMembers(allActionList []*batchv1.Job, readyMembers int32) int32 {
@@ -603,7 +632,12 @@ func doActions(csSet *workloads.ConsensusSet, dag *graph.DAG, leaderPodName stri
 		if !shouldCreateAction(csSet, actionType, checker) {
 			continue
 		}
-		env := buildActionEnv(csSet, leaderPodName, podName)
+		// TODO(free6om): switchover to ordinal 0, need a better strategy
+		targetPodName := podName
+		if actionType == jobTypeSwitchover {
+			targetPodName = getPodName(csSet.Name, 0)
+		}
+		env := buildActionEnv(csSet, leaderPodName, targetPodName)
 		if err := createAction(csSet, dag, env, actionType, ordinal, true); err != nil {
 			return err
 		}

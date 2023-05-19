@@ -435,14 +435,12 @@ func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
 // envFrom.configMapRef with name of "$(cluster.metadata.name)-$(component.name)-env" pattern.
 func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli client.Client) (*corev1.ConfigMap, error) {
 	const tplFile = "env_config_template.cue"
-	prefix := constant.KBPrefix + "_" + strings.ToUpper(params.Component.Type) + "_"
-	svcName := strings.Join([]string{params.Cluster.Name, params.Component.Name, "headless"}, "-")
 	envData := map[string]string{}
-	envData[prefix+"N"] = strconv.Itoa(int(params.Component.Replicas))
-	for j := 0; j < int(params.Component.Replicas); j++ {
-		hostNameTplKey := prefix + strconv.Itoa(j) + "_HOSTNAME"
-		hostNameTplValue := params.Cluster.Name + "-" + params.Component.Name + "-" + strconv.Itoa(j)
-		envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
+
+	// build common env
+	commonEnv := buildWorkloadCommonEnv(params)
+	for k, v := range commonEnv {
+		envData[k] = v
 	}
 
 	// build env for replication workload
@@ -453,12 +451,69 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 
 	// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
 	// build consensus env from cluster.status
+	consensusEnv := buildConsensusSetEnv(params)
+	for k, v := range consensusEnv {
+		envData[k] = v
+	}
+
+	config := corev1.ConfigMap{}
+	if err := buildFromCUE(tplFile, map[string]any{
+		"cluster":     params.Cluster,
+		"component":   params.Component,
+		"config.data": envData,
+	}, "config", &config); err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+// buildWorkloadCommonEnv build common env for all workload types.
+func buildWorkloadCommonEnv(params BuilderParams) map[string]string {
+	env := map[string]string{}
+	prefix := constant.KBPrefix + "_" + strings.ToUpper(params.Component.Type) + "_"
+	svcName := strings.Join([]string{params.Cluster.Name, params.Component.Name, "headless"}, "-")
+	env[prefix+"N"] = strconv.Itoa(int(params.Component.Replicas))
+	for j := 0; j < int(params.Component.Replicas); j++ {
+		hostNameTplKey := prefix + strconv.Itoa(j) + "_HOSTNAME"
+		hostNameTplValue := params.Cluster.Name + "-" + params.Component.Name + "-" + strconv.Itoa(j)
+		env[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
+	}
+	// set cluster uid to let pod know if the cluster is recreated
+	env[prefix+"CLUSTER_UID"] = string(params.Cluster.UID)
+	return env
+}
+
+// buildReplicationSetEnv build env for replication workload.
+func buildReplicationSetEnv(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli client.Client) map[string]string {
+	if params.Component.WorkloadType != appsv1alpha1.Replication {
+		return nil
+	}
+	env := map[string]string{}
+	svcName := strings.Join([]string{params.Cluster.Name, params.Component.Name, "headless"}, "-")
+	podList, _ := replication.GetReplicationSetPrimaryPod(reqCtx.Ctx, cli, params.Cluster, params.Component.Name)
+	if len(podList) > 0 {
+		env[constant.KBReplicationSetPrimaryPodName] = podList[0].Name
+		env[constant.KBReplicationSetPrimaryPodFQDN] = fmt.Sprintf("%s.%s.%s.svc", podList[0].Name, svcName, params.Cluster.Namespace)
+	} else {
+		// If there is no primaryPod in the cluster, it means that the cluster is new created for the first time,
+		// and index=0 is used as the primary pod by default.
+		primaryPodName := fmt.Sprintf("%s-%s-%d", params.Cluster.Name, params.Component.Name, 0)
+		env[constant.KBReplicationSetPrimaryPodName] = primaryPodName
+		env[constant.KBReplicationSetPrimaryPodFQDN] = fmt.Sprintf("%s.%s.%s.svc", primaryPodName, svcName, params.Cluster.Namespace)
+	}
+	return env
+}
+
+// buildConsensusSetEnv build env for consensus workload.
+func buildConsensusSetEnv(params BuilderParams) map[string]string {
+	env := map[string]string{}
 	if params.Cluster.Status.Components != nil {
 		if v, ok := params.Cluster.Status.Components[params.Component.Name]; ok {
 			consensusSetStatus := v.ConsensusSetStatus
+			prefix := constant.KBPrefix + "_" + strings.ToUpper(params.Component.Type) + "_"
 			if consensusSetStatus != nil {
 				if consensusSetStatus.Leader.Pod != componentutil.ComponentStatusDefaultPodName {
-					envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
+					env[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
 				}
 
 				followers := ""
@@ -471,41 +526,9 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 					}
 					followers += follower.Pod
 				}
-				envData[prefix+"FOLLOWERS"] = followers
+				env[prefix+"FOLLOWERS"] = followers
 			}
 		}
-	}
-
-	// set cluster uid to let pod know if the cluster is recreated
-	envData[prefix+"CLUSTER_UID"] = string(params.Cluster.UID)
-	config := corev1.ConfigMap{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster":     params.Cluster,
-		"component":   params.Component,
-		"config.data": envData,
-	}, "config", &config); err != nil {
-		return nil, err
-	}
-	return &config, nil
-}
-
-// buildReplicationSetEnv build env for replication workload.
-func buildReplicationSetEnv(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli client.Client) map[string]string {
-	if params.Component.WorkloadType != appsv1alpha1.Replication {
-		return nil
-	}
-	env := map[string]string{}
-	svcName := strings.Join([]string{params.Cluster.Name, params.Component.Name, "headless"}, "-")
-	podList, _ := replication.GetReplicationSetPrimaryPod(reqCtx.Ctx, cli, params.Cluster, params.Component.Name)
-	if podList != nil && len(podList) > 0 {
-		env[constant.KBReplicationSetPrimaryPodName] = podList[0].Name
-		env[constant.KBReplicationSetPrimaryPodFQDN] = fmt.Sprintf("%s.%s.%s.svc", podList[0].Name, svcName, params.Cluster.Namespace)
-	} else {
-		// If there is no primaryPod in the cluster, it means that the cluster is new created for the first time,
-		// and index=0 is used as the primary pod by default.
-		primaryPodName := fmt.Sprintf("%s-%s-%d", params.Cluster.Name, params.Component.Name, 0)
-		env[constant.KBReplicationSetPrimaryPodName] = primaryPodName
-		env[constant.KBReplicationSetPrimaryPodFQDN] = fmt.Sprintf("%s.%s.%s.svc", primaryPodName, svcName, params.Cluster.Namespace)
 	}
 	return env
 }

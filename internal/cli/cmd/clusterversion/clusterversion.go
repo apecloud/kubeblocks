@@ -114,8 +114,8 @@ func getIsDefault(cv *v1alpha1.ClusterVersion) string {
 	if cv.Annotations == nil {
 		return "false"
 	}
-	if _, ok := cv.Annotations[constant.IsDefaultClusterVersionAnnotationKey]; !ok {
+	if _, ok := cv.Annotations[constant.DefaultClusterVersionAnnotationKey]; !ok {
 		return "false"
 	}
-	return cv.Annotations[constant.IsDefaultClusterVersionAnnotationKey]
+	return cv.Annotations[constant.DefaultClusterVersionAnnotationKey]
 }

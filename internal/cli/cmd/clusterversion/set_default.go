@@ -184,7 +184,7 @@ func patchDefaultClusterVersionAnnotations(client dynamic.Interface, cvName stri
 	patchData := map[string]interface{}{
 		"metadata": map[string]interface{}{
 			"annotations": map[string]interface{}{
-				constant.IsDefaultClusterVersionAnnotationKey: value,
+				constant.DefaultClusterVersionAnnotationKey: value,
 			},
 		},
 	}

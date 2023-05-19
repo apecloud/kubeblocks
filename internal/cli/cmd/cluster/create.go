@@ -997,7 +997,7 @@ func GetClusterVersions(dynamic dynamic.Interface, clusterDef string) (map[strin
 	for _, item := range list.Items {
 		allClusterVersions[item.GetName()] = struct{}{}
 		annotations := item.GetAnnotations()
-		if annotations != nil && annotations[constant.IsDefaultClusterVersionAnnotationKey] == annotationTrueValue {
+		if annotations != nil && annotations[constant.DefaultClusterVersionAnnotationKey] == annotationTrueValue {
 			if existedDefault {
 				return nil, defaultVersion, existedDefault, fmt.Errorf("clusterDef %s has more than one default cluster version", clusterDef)
 			}

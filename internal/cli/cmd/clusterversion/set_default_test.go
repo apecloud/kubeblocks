@@ -66,10 +66,10 @@ var _ = Describe("set-default", func() {
 		cv := &appsv1alpha1.ClusterVersion{}
 		Expect(getIsDefault(cv)).Should(Equal(annotationFalseValue))
 		cv.SetAnnotations(map[string]string{
-			constant.IsDefaultClusterVersionAnnotationKey: annotationFalseValue,
+			constant.DefaultClusterVersionAnnotationKey: annotationFalseValue,
 		})
 		Expect(getIsDefault(cv)).Should(Equal(annotationFalseValue))
-		cv.Annotations[constant.IsDefaultClusterVersionAnnotationKey] = annotationTrueValue
+		cv.Annotations[constant.DefaultClusterVersionAnnotationKey] = annotationTrueValue
 		Expect(getIsDefault(cv)).Should(Equal(annotationTrueValue))
 	})
 

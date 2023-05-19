@@ -153,7 +153,9 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 				emitAbnormalEvent(transCtx, action.Labels[jobTypeLabel], action.Name, err)
 				return err
 			}
-			startAction(dag, action)
+			// update leader env in case re-election
+			leaderPodName := getLeaderPodName(transCtx.CSSet.Status.MembersStatus)
+			startAction(transCtx.CSSet, dag, action, leaderPodName)
 		}
 	case index < 0:
 		// last finished action
@@ -664,6 +666,19 @@ func createAction(csSet *workloads.ConsensusSet, dag *graph.DAG, env []corev1.En
 	return nil
 }
 
+func buildAction(csSet *workloads.ConsensusSet, actionName, actionType string, leader, target string, suspend bool) *batchv1.Job {
+	env := buildActionEnv(csSet, leader, target)
+	template := buildActionPodTemplate(csSet, env, actionType)
+	return builder.NewJobBuilder(csSet.Namespace, actionName).
+		AddLabels(model.AppInstanceLabelKey, csSet.Name).
+		AddLabels(model.KBManagedByKey, kindConsensusSet).
+		AddLabels(jobTypeLabel, actionType).
+		AddLabels(jobHandledLabel, jobHandledFalse).
+		SetPodTemplateSpec(*template).
+		SetSuspend(suspend).
+		GetObject()
+}
+
 func buildActionPodTemplate(csSet *workloads.ConsensusSet, env []corev1.EnvVar, actionType string) *corev1.PodTemplateSpec {
 	credential := csSet.Spec.Credential
 	credentialEnv := make([]corev1.EnvVar, 0)
@@ -788,12 +803,20 @@ func getActionCommand(reconfiguration *workloads.MembershipReconfiguration, acti
 	return nil
 }
 
-func startAction(dag *graph.DAG, action *batchv1.Job) {
+func startAction(csSet *workloads.ConsensusSet, dag *graph.DAG, action *batchv1.Job, leaderPodName string) {
 	actionOld := action.DeepCopy()
-	actionNew := actionOld.DeepCopy()
-	suspend := false
-	actionNew.Spec.Suspend = &suspend
-	model.PrepareUpdate(dag, actionOld, actionNew)
+	actionType := actionOld.Labels[jobTypeLabel]
+	ordinal, _ := getActionOrdinal(actionOld.Name)
+	if actionType == jobTypeSwitchover {
+		ordinal = 0
+	}
+	target := getPodName(csSet.Name, ordinal)
+	actionNew := buildAction(csSet, actionOld.Name, actionOld.Labels[jobTypeLabel], leaderPodName, target, false)
+	// delete and re-create as job.spec.template is immutable
+	model.PrepareDelete(dag, actionOld)
+	model.PrepareCreate(dag, actionNew)
+	model.DependOn(dag, actionNew, actionOld)
+
 }
 
 func doActionCleanup(dag *graph.DAG, action *batchv1.Job) {

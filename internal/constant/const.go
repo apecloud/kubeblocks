@@ -102,6 +102,7 @@ const (
 	BackupPolicyTemplateAnnotationKey        = "apps.kubeblocks.io/backup-policy-template"
 	RestoreFromTimeAnnotationKey             = "kubeblocks.io/restore-from-time"           // RestoreFromTimeAnnotationKey specifies the time to recover from the backup.
 	RestoreFromSrcClusterAnnotationKey       = "kubeblocks.io/restore-from-source-cluster" // RestoreFromSrcClusterAnnotationKey specifies the source cluster to recover from the backup.
+	ReconfigureRefAnnotationKey              = "dataprotection.kubeblocks.io/reconfigure-ref"
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"

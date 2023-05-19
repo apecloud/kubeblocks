@@ -312,6 +312,18 @@ func (r *BackupPolicySpec) GetCommonPolicy(backupType BackupType) *CommonBackupP
 	return nil
 }
 
+func (r *BackupPolicySpec) GetCommonSchedulePolicy(backupType BackupType) *SchedulePolicy {
+	switch backupType {
+	case BackupTypeSnapshot:
+		return r.Schedule.Snapshot
+	case BackupTypeDataFile:
+		return r.Schedule.Datafile
+	case BackupTypeLogFile:
+		return r.Schedule.Logfile
+	}
+	return nil
+}
+
 // ToDuration converts the ttl string to time.Duration.
 func ToDuration(ttl *string) time.Duration {
 	if ttl == nil {

@@ -38,8 +38,8 @@ const (
 	csSetFinalizerName = "cs.workloads.kubeblocks.io/finalizer"
 
 	jobHandledLabel             = "cs.workloads.kubeblocks.io/job-handled"
-	jobNameLabel                = "cs.workloads.kubeblocks.io/job-name"
 	jobTypeLabel                = "cs.workloads.kubeblocks.io/job-type"
+	jobScenarioLabel            = "cs.workloads.kubeblocks.io/job-scenario"
 	jobHandledTrue              = "true"
 	jobHandledFalse             = "false"
 	jobTypeSwitchover           = "switchover"
@@ -47,6 +47,8 @@ const (
 	jobTypeMemberLeaveNotifying = "member-leave"
 	jobTypeLogSync              = "log-sync"
 	jobTypePromote              = "promote"
+	jobScenarioMembership       = "membership-reconfiguration"
+	jobScenarioUpdate           = "pod-update"
 
 	roleObservationName                                    = "role-observe"
 	roleAgentVolumeName                                    = "role-agent"

@@ -23,19 +23,14 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-	"strings"
 
 	"github.com/go-logr/logr"
 	apps "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
-	"github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // HorizontalScalingTransformer Pod level horizontal scaling handling
@@ -106,7 +101,7 @@ func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag
 	}
 
 	// get last action
-	actionList, err := getActionList(transCtx)
+	actionList, err := getActionList(transCtx, jobScenarioMembership)
 	if err != nil {
 		return err
 	}
@@ -180,7 +175,7 @@ func isMemberReady(podName string, membersStatus []workloads.ConsensusMemberStat
 }
 
 func cleanAction(transCtx *CSSetTransformContext, dag *graph.DAG) error {
-	actionList, err := getActionList(transCtx)
+	actionList, err := getActionList(transCtx, jobScenarioMembership)
 	if err != nil {
 		return err
 	}
@@ -259,11 +254,11 @@ func createNextAction(transCtx *CSSetTransformContext, dag *graph.DAG, csSet *wo
 		ordinal = 0
 	}
 	target := getPodName(csSet.Name, ordinal)
-	actionName := buildActionName(csSet.Name, int(csSet.Generation), nextActionInfo.ordinal, nextActionInfo.actionType)
-	nextAction := buildAction(csSet, actionName, nextActionInfo.actionType, leader, target, false)
+	actionName := getActionName(csSet.Name, int(csSet.Generation), nextActionInfo.ordinal, nextActionInfo.actionType)
+	nextAction := buildAction(csSet, actionName, nextActionInfo.actionType, jobScenarioMembership, leader, target)
 
 	if err := abnormalAnalysis(csSet, nextAction); err != nil {
-		emitAbnormalEvent(transCtx, nextActionInfo.actionType, nextActionInfo.shortActionName, err)
+		emitAbnormalEvent(transCtx, nextActionInfo.actionType, actionName, err)
 		return err
 	}
 
@@ -351,32 +346,6 @@ func shouldCreateAction(csSet *workloads.ConsensusSet, actionType string, checke
 	return false
 }
 
-func getActionList(transCtx *CSSetTransformContext) ([]*batchv1.Job, error) {
-	var actionList []*batchv1.Job
-	ml := client.MatchingLabels{
-		model.AppInstanceLabelKey: transCtx.CSSet.Name,
-		model.KBManagedByKey:      kindConsensusSet,
-		jobHandledLabel:           jobHandledFalse,
-	}
-	jobList := &batchv1.JobList{}
-	if err := transCtx.Client.List(transCtx.Context, jobList, ml); err != nil {
-		return nil, err
-	}
-	for i := range jobList.Items {
-		actionList = append(actionList, &jobList.Items[i])
-	}
-	printActionList(transCtx.Logger, actionList)
-	return actionList, nil
-}
-
-func getPodName(parent string, ordinal int) string {
-	return fmt.Sprintf("%s-%d", parent, ordinal)
-}
-
-func buildActionName(parent string, generation, ordinal int, actionType string) string {
-	return fmt.Sprintf("%s-%d-%d-%s", parent, generation, ordinal, actionType)
-}
-
 func buildShortActionName(parent string, ordinal int, actionType string) string {
 	return fmt.Sprintf("%s-%d-%s", parent, ordinal, actionType)
 }
@@ -396,15 +365,6 @@ func getUnderlyingStsVertex(dag *graph.DAG) (*model.ObjectVertex, error) {
 	}
 	stsVertex, _ := vertices[0].(*model.ObjectVertex)
 	return stsVertex, nil
-}
-
-func getLeaderPodName(membersStatus []workloads.ConsensusMemberStatus) string {
-	for _, memberStatus := range membersStatus {
-		if memberStatus.IsLeader {
-			return memberStatus.PodName
-		}
-	}
-	return ""
 }
 
 // all members with ordinal less than action target pod should be in a good consensus state:
@@ -473,187 +433,6 @@ func generateActionInfos(csSet *workloads.ConsensusSet, ordinal int, actionTypeL
 		actionInfos = append(actionInfos, info)
 	}
 	return actionInfos
-}
-
-// ordinal is the ordinal of pod which this action apply to
-func createAction(dag *graph.DAG, csSet *workloads.ConsensusSet, action *batchv1.Job) error {
-	if err := controllerutil.SetOwnership(csSet, action, model.GetScheme(), csSetFinalizerName); err != nil {
-		return err
-	}
-	model.PrepareCreate(dag, action)
-	return nil
-}
-
-func buildAction(csSet *workloads.ConsensusSet, actionName, actionType string, leader, target string, suspend bool) *batchv1.Job {
-	env := buildActionEnv(csSet, leader, target)
-	template := buildActionPodTemplate(csSet, env, actionType)
-	return builder.NewJobBuilder(csSet.Namespace, actionName).
-		AddLabels(model.AppInstanceLabelKey, csSet.Name).
-		AddLabels(model.KBManagedByKey, kindConsensusSet).
-		AddLabels(jobTypeLabel, actionType).
-		AddLabels(jobHandledLabel, jobHandledFalse).
-		SetPodTemplateSpec(*template).
-		SetSuspend(suspend).
-		GetObject()
-}
-
-func buildActionPodTemplate(csSet *workloads.ConsensusSet, env []corev1.EnvVar, actionType string) *corev1.PodTemplateSpec {
-	credential := csSet.Spec.Credential
-	credentialEnv := make([]corev1.EnvVar, 0)
-	if credential != nil {
-		credentialEnv = append(credentialEnv,
-			corev1.EnvVar{
-				Name:      usernameCredentialVarName,
-				Value:     credential.Username.Value,
-				ValueFrom: credential.Username.ValueFrom,
-			},
-			corev1.EnvVar{
-				Name:      passwordCredentialVarName,
-				Value:     credential.Password.Value,
-				ValueFrom: credential.Password.ValueFrom,
-			})
-	}
-	env = append(env, credentialEnv...)
-	reconfiguration := csSet.Spec.MembershipReconfiguration
-	image := findActionImage(reconfiguration, actionType)
-	command := getActionCommand(reconfiguration, actionType)
-	container := corev1.Container{
-		Name:            actionType,
-		Image:           image,
-		ImagePullPolicy: corev1.PullIfNotPresent,
-		Command:         command,
-		Env:             env,
-	}
-	template := &corev1.PodTemplateSpec{
-		Spec: corev1.PodSpec{
-			Containers:    []corev1.Container{container},
-			RestartPolicy: corev1.RestartPolicyOnFailure,
-		},
-	}
-	return template
-}
-
-func buildActionEnv(csSet *workloads.ConsensusSet, leader, target string) []corev1.EnvVar {
-	svcName := getHeadlessSvcName(*csSet)
-	leaderHost := fmt.Sprintf("%s.%s", leader, svcName)
-	targetHost := fmt.Sprintf("%s.%s", target, svcName)
-	svcPort := findSvcPort(*csSet)
-	return []corev1.EnvVar{
-		{
-			Name:  leaderHostVarName,
-			Value: leaderHost,
-		},
-		{
-			Name:  servicePortVarName,
-			Value: strconv.Itoa(svcPort),
-		},
-		{
-			Name:  targetHostVarName,
-			Value: targetHost,
-		},
-	}
-}
-
-func findActionImage(reconfiguration *workloads.MembershipReconfiguration, actionType string) string {
-	if reconfiguration == nil {
-		return ""
-	}
-
-	getImage := func(action *workloads.Action) string {
-		if action != nil && len(action.Image) > 0 {
-			return action.Image
-		}
-		return ""
-	}
-	switch actionType {
-	case jobTypePromote:
-		if image := getImage(reconfiguration.PromoteAction); len(image) > 0 {
-			return image
-		}
-		fallthrough
-	case jobTypeLogSync:
-		if image := getImage(reconfiguration.LogSyncAction); len(image) > 0 {
-			return image
-		}
-		fallthrough
-	case jobTypeMemberLeaveNotifying:
-		if image := getImage(reconfiguration.MemberLeaveAction); len(image) > 0 {
-			return image
-		}
-		fallthrough
-	case jobTypeMemberJoinNotifying:
-		if image := getImage(reconfiguration.MemberJoinAction); len(image) > 0 {
-			return image
-		}
-		fallthrough
-	case jobTypeSwitchover:
-		if image := getImage(reconfiguration.SwitchoverAction); len(image) > 0 {
-			return image
-		}
-		return defaultActionImage
-	}
-
-	return ""
-}
-
-func getActionCommand(reconfiguration *workloads.MembershipReconfiguration, actionType string) []string {
-	if reconfiguration == nil {
-		return nil
-	}
-	getCommand := func(action *workloads.Action) []string {
-		if action == nil {
-			return nil
-		}
-		return action.Command
-	}
-	switch actionType {
-	case jobTypeSwitchover:
-		return getCommand(reconfiguration.SwitchoverAction)
-	case jobTypeMemberJoinNotifying:
-		return getCommand(reconfiguration.MemberJoinAction)
-	case jobTypeMemberLeaveNotifying:
-		return getCommand(reconfiguration.MemberLeaveAction)
-	case jobTypeLogSync:
-		return getCommand(reconfiguration.LogSyncAction)
-	case jobTypePromote:
-		return getCommand(reconfiguration.PromoteAction)
-	}
-	return nil
-}
-
-func doActionCleanup(dag *graph.DAG, action *batchv1.Job) {
-	actionOld := action.DeepCopy()
-	actionNew := actionOld.DeepCopy()
-	actionNew.Labels[jobHandledLabel] = jobHandledTrue
-	model.PrepareUpdate(dag, actionOld, actionNew)
-}
-
-func emitEvent(transCtx *CSSetTransformContext, action *batchv1.Job) {
-	switch {
-	case action.Status.Succeeded > 0:
-		emitActionSucceedEvent(transCtx, action.Labels[jobTypeLabel], action.Name)
-	case action.Status.Failed > 0:
-		emitActionFailedEvent(transCtx, action.Labels[jobTypeLabel], action.Name)
-	}
-}
-
-func emitActionSucceedEvent(transCtx *CSSetTransformContext, actionType, actionName string) {
-	message := fmt.Sprintf("%s succeed, job name: %s", actionType, actionName)
-	emitActionEvent(transCtx, corev1.EventTypeNormal, actionType, message)
-}
-
-func emitActionFailedEvent(transCtx *CSSetTransformContext, actionType, actionName string) {
-	message := fmt.Sprintf("%s failed, job name: %s", actionType, actionName)
-	emitActionEvent(transCtx, corev1.EventTypeWarning, actionType, message)
-}
-
-func emitAbnormalEvent(transCtx *CSSetTransformContext, actionType, actionName string, err error) {
-	message := fmt.Sprintf("%s, job name: %s", err.Error(), actionName)
-	emitActionEvent(transCtx, corev1.EventTypeWarning, actionType, message)
-}
-
-func emitActionEvent(transCtx *CSSetTransformContext, eventType, reason, message string) {
-	transCtx.EventRecorder.Event(transCtx.CSSet, eventType, strings.ToUpper(reason), message)
 }
 
 var _ graph.Transformer = &HorizontalScalingTransformer{}

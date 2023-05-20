@@ -94,12 +94,20 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 
 // return true means action created or in progress, should wait it to the termination state
 func doSwitchoverIfNeeded(transCtx *CSSetTransformContext, dag *graph.DAG, pods []corev1.Pod, podsToBeUpdated []*corev1.Pod) (bool, error) {
+	if len(podsToBeUpdated) == 0 {
+		return false, nil
+	}
+
 	csSet := transCtx.CSSet
+	if !shouldSwitchover(csSet, podsToBeUpdated) {
+		return false, nil
+	}
+
 	actionList, err := getActionList(transCtx, jobScenarioUpdate)
 	if err != nil {
 		return true, err
 	}
-	if shouldSwitchover(csSet, podsToBeUpdated) && len(actionList) == 0 {
+	if len(actionList) == 0 {
 		return true, createSwitchoverAction(dag, csSet, pods)
 	}
 
@@ -116,7 +124,7 @@ func doSwitchoverIfNeeded(transCtx *CSSetTransformContext, dag *graph.DAG, pods 
 	//    return and wait it reaches termination state.
 	action := actionList[0]
 	switch {
-	case action.Status.Succeeded == 0 && action.Status.Failed > 0:
+	case action.Status.Succeeded == 0 && action.Status.Failed == 0:
 		// action in progress, wait
 		return true, nil
 	case action.Status.Failed > 0:
@@ -131,9 +139,10 @@ func doSwitchoverIfNeeded(transCtx *CSSetTransformContext, dag *graph.DAG, pods 
 
 func createSwitchoverAction(dag *graph.DAG, csSet *workloads.ConsensusSet, pods []corev1.Pod) error {
 	leader := getLeaderPodName(csSet.Status.MembersStatus)
-	ordinal := selectSwitchoverTarget(csSet, pods)
-	target := getPodName(csSet.Name, ordinal)
+	targetOrdinal := selectSwitchoverTarget(csSet, pods)
+	target := getPodName(csSet.Name, targetOrdinal)
 	actionType := jobTypeSwitchover
+	ordinal, _ := getPodOrdinal(leader)
 	actionName := getActionName(csSet.Name, int(csSet.Generation), ordinal, actionType)
 	action := buildAction(csSet, actionName, actionType, jobScenarioUpdate, leader, target)
 

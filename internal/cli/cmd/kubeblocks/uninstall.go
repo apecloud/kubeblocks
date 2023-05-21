@@ -168,7 +168,7 @@ func (o *UninstallOptions) Uninstall() error {
 		helm.RemoveRepo(&repo.Entry{Name: types.KubeBlocksChartName}))
 
 	// get KubeBlocks objects, then try to remove them
-	objs, err := getKBObjects(o.Dynamic, o.Namespace, o.addons)
+	objs, err := getKBObjects(o.Dynamic, "", o.addons)
 	if err != nil {
 		fmt.Fprintf(o.ErrOut, "Failed to get KubeBlocks objects %s", err.Error())
 	}

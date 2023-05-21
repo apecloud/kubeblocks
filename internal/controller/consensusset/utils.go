@@ -22,6 +22,7 @@ package consensusset
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"regexp"
 	"sort"
 	"strconv"
@@ -44,6 +45,9 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+type getRole func(int) string
+type getOrdinal func(int) int
+
 const (
 	leaderPriority            = 1 << 5
 	followerReadWritePriority = 1 << 4
@@ -60,16 +64,41 @@ var podNameRegex = regexp.MustCompile(`(.*)-([0-9]+)$`)
 // e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
 // reverse it if reverse==true
 func sortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
-	sort.SliceStable(pods, func(i, j int) bool {
-		roleI := getRoleName(pods[i])
-		roleJ := getRoleName(pods[j])
+	getRoleFunc := func(i int) string {
+		return getRoleName(pods[i])
+	}
+	getOrdinalFunc := func(i int) int {
+		_, ordinal := intctrlutil.GetParentNameAndOrdinal(&pods[i])
+		return ordinal
+	}
+	sortMembers(pods, rolePriorityMap, getRoleFunc, getOrdinalFunc, reverse)
+}
+
+func sortMembersStatus(membersStatus []workloads.ConsensusMemberStatus, rolePriorityMap map[string]int) {
+	getRoleFunc := func(i int) string {
+		return membersStatus[i].Name
+	}
+	getOrdinalFunc := func(i int) int {
+		ordinal, _ := getPodOrdinal(membersStatus[i].PodName)
+		return ordinal
+	}
+	sortMembers(membersStatus, rolePriorityMap, getRoleFunc, getOrdinalFunc, true)
+}
+
+func sortMembers[T any](membersStatus []T,
+	rolePriorityMap map[string]int,
+	getRoleFunc getRole, getOrdinalFunc getOrdinal,
+	reverse bool) {
+	sort.SliceStable(membersStatus, func(i, j int) bool {
+		roleI := getRoleFunc(i)
+		roleJ := getRoleFunc(j)
 		if reverse {
 			roleI, roleJ = roleJ, roleI
 		}
 
 		if rolePriorityMap[roleI] == rolePriorityMap[roleJ] {
-			_, ordinal1 := intctrlutil.GetParentNameAndOrdinal(&pods[i])
-			_, ordinal2 := intctrlutil.GetParentNameAndOrdinal(&pods[j])
+			ordinal1 := getOrdinalFunc(i)
+			ordinal2 := getOrdinalFunc(j)
 			return ordinal1 < ordinal2
 		}
 
@@ -136,11 +165,9 @@ func composeRoleMap(set workloads.ConsensusSet) map[string]workloads.ConsensusRo
 }
 
 func setMembersStatus(set *workloads.ConsensusSet, pods []corev1.Pod) {
-	rolePriorityMap := composeRolePriorityMap(*set)
-	sortPods(pods, rolePriorityMap, true)
-	roleMap := composeRoleMap(*set)
-
+	// compose new status
 	newMembersStatus := make([]workloads.ConsensusMemberStatus, 0)
+	roleMap := composeRoleMap(*set)
 	for _, pod := range pods {
 		if !intctrlutil.PodIsReadyWithLabel(pod) {
 			continue
@@ -156,6 +183,30 @@ func setMembersStatus(set *workloads.ConsensusSet, pods []corev1.Pod) {
 		}
 		newMembersStatus = append(newMembersStatus, memberStatus)
 	}
+
+	// members(pods) being scheduled should be kept
+	oldMemberMap := make(map[string]*workloads.ConsensusMemberStatus, len(set.Status.MembersStatus))
+	for i, status := range set.Status.MembersStatus {
+		oldMemberMap[status.PodName] = &set.Status.MembersStatus[i]
+	}
+	newMemberMap := make(map[string]*workloads.ConsensusMemberStatus, len(newMembersStatus))
+	for i, status := range newMembersStatus {
+		newMemberMap[status.PodName] = &newMembersStatus[i]
+	}
+	oldMemberSet := sets.KeySet(oldMemberMap)
+	newMemberSet := sets.KeySet(newMemberMap)
+	memberToKeepSet := oldMemberSet.Difference(newMemberSet)
+	for podName, _ := range memberToKeepSet {
+		ordinal, _ := getPodOrdinal(podName)
+		// members have left because of scale-in
+		if ordinal >= int(set.Spec.Replicas) {
+			continue
+		}
+		newMembersStatus = append(newMembersStatus, *oldMemberMap[podName])
+	}
+
+	rolePriorityMap := composeRolePriorityMap(*set)
+	sortMembersStatus(newMembersStatus, rolePriorityMap)
 	set.Status.MembersStatus = newMembersStatus
 }
 
@@ -258,7 +309,6 @@ func getPodOrdinal(podName string) (int, error) {
 	}
 	return strconv.Atoi(subMatches[2])
 }
-
 
 // ordinal is the ordinal of pod which this action apply to
 func createAction(dag *graph.DAG, csSet *workloads.ConsensusSet, action *batchv1.Job) error {

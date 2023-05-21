@@ -27,6 +27,7 @@ spec:
       configSpecs:
         - name: weaviate-config-template
           templateRef: weaviate-config-template
+          constraintRef: weaviate-config-constraints
           volumeName: weaviate-config
           namespace: {{ .Release.Namespace }}
       service:

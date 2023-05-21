@@ -63,8 +63,11 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 
 	emitError := func(newCondition metav1.Condition) error {
 		oldCondition := meta.FindStatusCondition(cluster.Status.Conditions, newCondition.Type)
-		*oldCondition = newCondition
-
+		if oldCondition == nil {
+			cluster.Status.Conditions = append(cluster.Status.Conditions, newCondition)
+		} else {
+			*oldCondition = newCondition
+		}
 		transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning, newCondition.Reason, newCondition.Message)
 		return graph.ErrPrematureStop
 	}

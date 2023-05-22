@@ -22,17 +22,20 @@ package preflight
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	analyzerunner "github.com/replicatedhq/troubleshoot/pkg/analyze"
 )
 
 var _ = Describe("text_results_test", func() {
 	var (
-		preflightName = "stdoutPreflightName"
-		jsonFormat    = "json"
-		yamlFormat    = "yaml"
-		kbcliFormat   = "kbcli"
-		unknownFormat = "unknown"
+		preflightName    = "stdoutPreflightName"
+		jsonFormat       = "json"
+		yamlFormat       = "yaml"
+		kbcliFormat      = "kbcli"
+		unknownFormat    = "unknown"
+		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		out              = streams.Out
 	)
 	It("ShowStdoutResults Test", func() {
 		analyzeResults := []*analyzerunner.AnalyzeResult{
@@ -51,13 +54,13 @@ var _ = Describe("text_results_test", func() {
 			},
 		}
 		Eventually(func(g Gomega) {
-			err := ShowTextResults(preflightName, analyzeResults, jsonFormat, true, nil)
+			err := ShowTextResults(preflightName, analyzeResults, jsonFormat, true, out)
 			g.Expect(err).NotTo(HaveOccurred())
-			err = ShowTextResults(preflightName, analyzeResults, yamlFormat, false, nil)
+			err = ShowTextResults(preflightName, analyzeResults, yamlFormat, false, out)
 			g.Expect(err).NotTo(HaveOccurred())
-			err = ShowTextResults(preflightName, analyzeResults, kbcliFormat, false, nil)
+			err = ShowTextResults(preflightName, analyzeResults, kbcliFormat, false, out)
 			g.Expect(err).NotTo(HaveOccurred())
-			err = ShowTextResults(preflightName, analyzeResults, unknownFormat, false, nil)
+			err = ShowTextResults(preflightName, analyzeResults, unknownFormat, false, out)
 			g.Expect(err).To(HaveOccurred())
 		}).ShouldNot(HaveOccurred())
 	})
@@ -71,9 +74,11 @@ var _ = Describe("text_results_test", func() {
 			},
 		}
 		Eventually(func(g Gomega) {
-			err := ShowTextResults(preflightName, analyzeResults, jsonFormat, true, nil)
+			err := ShowTextResults(preflightName, analyzeResults, jsonFormat, true, out)
 			g.Expect(err).NotTo(HaveOccurred())
-			err = ShowTextResults(preflightName, analyzeResults, yamlFormat, false, nil)
+			err = ShowTextResults(preflightName, analyzeResults, yamlFormat, false, out)
+			g.Expect(err).NotTo(HaveOccurred())
+			err = ShowTextResults(preflightName, analyzeResults, kbcliFormat, false, out)
 			g.Expect(err).NotTo(HaveOccurred())
 			err = ShowTextResults(preflightName, analyzeResults, unknownFormat, false, nil)
 			g.Expect(err).To(HaveOccurred())

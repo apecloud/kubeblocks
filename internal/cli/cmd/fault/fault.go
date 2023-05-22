@@ -76,6 +76,7 @@ func NewFaultCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		NewTimeChaosCmd(f, streams),
 		NewIOChaosCmd(f, streams),
 		NewStressChaosCmd(f, streams),
+		NewNodeChaosCmd(f, streams),
 	)
 	return cmd
 }

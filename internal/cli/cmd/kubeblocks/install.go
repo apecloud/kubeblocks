@@ -31,6 +31,7 @@ import (
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"golang.org/x/exp/maps"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/repo"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -78,6 +79,13 @@ type InstallOptions struct {
 	CreateNamespace bool
 	Check           bool
 	ValueOpts       values.Options
+}
+
+type addonStatus struct {
+	allEnabled  bool
+	allDisabled bool
+	hasFailed   bool
+	outputMsg   string
 }
 
 var (
@@ -190,7 +198,7 @@ func (o *InstallOptions) PreCheck() error {
 	if v.KubeBlocks != "" {
 		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", v.KubeBlocks)
 		fmt.Fprintln(o.Out, "If you want to upgrade it, please use \"kbcli kubeblocks upgrade\".")
-		return nil
+		return cmdutil.ErrExit
 	}
 
 	// check whether the namespace exists
@@ -234,6 +242,7 @@ func (o *InstallOptions) Install() error {
 
 	// wait for auto-install addons to be ready
 	if err = o.waitAddonsEnabled(); err != nil {
+		fmt.Fprintf(o.Out, "Failed to wait for auto-install addons to be enabled, run \"kbcli kubeblocks status\" to check the status\n")
 		return err
 	}
 
@@ -257,102 +266,82 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 		return nil
 	}
 
-	// addons record the addons and its status
-	addons := make(map[string]string)
-	checkAddons := func() (bool, error) {
-		allEnabled := true
+	addons := make(map[string]*extensionsv1alpha1.Addon)
+	fetchAddons := func() error {
 		objs, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: buildKubeBlocksSelectorLabels(),
 		})
 		if err != nil && !apierrors.IsNotFound(err) {
-			return false, err
+			return err
 		}
 		if objs == nil || len(objs.Items) == 0 {
 			klog.V(1).Info("No Addons found")
-			return true, nil
+			return nil
 		}
 
 		for _, obj := range objs.Items {
-			addon := extensionsv1alpha1.Addon{}
-			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &addon); err != nil {
-				return false, err
+			addon := &extensionsv1alpha1.Addon{}
+			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, addon); err != nil {
+				return err
 			}
 
 			if addon.Status.ObservedGeneration == 0 {
 				klog.V(1).Infof("Addon %s is not observed yet", addon.Name)
-				allEnabled = false
 				continue
 			}
 
 			// addon should be auto installed, check its status
 			if addon.Spec.InstallSpec.GetEnabled() {
-				addons[addon.Name] = string(addon.Status.Phase)
+				addons[addon.Name] = addon
 				if addon.Status.Phase != extensionsv1alpha1.AddonEnabled {
 					klog.V(1).Infof("Addon %s is not enabled yet, status %s", addon.Name, addon.Status.Phase)
-					allEnabled = false
+				}
+				if addon.Status.Phase == extensionsv1alpha1.AddonFailed {
+					klog.V(1).Infof("Addon %s failed:", addon.Name)
+					for _, c := range addon.Status.Conditions {
+						klog.V(1).Infof("  %s: %s", c.Reason, c.Message)
+					}
 				}
 			}
 		}
-		return allEnabled, nil
+		return nil
 	}
 
 	suffixMsg := func(msg string) string {
 		return fmt.Sprintf("%-50s", msg)
 	}
 
-	addonMsg := func(msg, status string) string {
-		return fmt.Sprintf("%-48s %s", msg, status)
-	}
-
 	// create spinner
-	allMsg := ""
-	msg := "Wait for addons to be enabled"
-	s := spinner.New(o.Out, spinnerMsg(msg))
-
-	// check addon installing progress
-	checkProgress := func() {
-		if len(addons) == 0 {
-			return
-		}
-		all := make([]string, 0)
-		for k, v := range addons {
-			if v == string(extensionsv1alpha1.AddonEnabled) {
-				all = append(all, addonMsg("Addon "+k, printer.BoldGreen("OK")))
-				continue
-			}
-			all = append(all, addonMsg("Addon "+k, v))
-		}
-		sort.Strings(all)
-		allMsg = fmt.Sprintf("%s\n  %s", msg, strings.Join(all, "\n  "))
-		s.SetMessage(suffixMsg(allMsg))
-	}
-
+	msg := ""
+	header := "Wait for addons to be enabled"
+	failedErr := errors.New("there are some addons failed to be enabled")
+	s := spinner.New(o.Out, spinnerMsg(header))
 	var (
-		allEnabled  bool
 		err         error
-		spinnerDone = func(s spinner.Interface) {
-			s.SetFinalMsg(allMsg)
+		spinnerDone = func() {
+			s.SetFinalMsg(msg)
 			s.Done("")
 			fmt.Fprintln(o.Out)
 		}
 	)
 	// wait all addons to be enabled, or timeout
 	if err = wait.PollImmediate(5*time.Second, o.Timeout, func() (bool, error) {
-		allEnabled, err = checkAddons()
-		if err != nil {
+		if err = fetchAddons(); err != nil || len(addons) == 0 {
 			return false, err
 		}
-		checkProgress()
-		if allEnabled {
-			spinnerDone(s)
+		status := checkAddons(maps.Values(addons), true)
+		msg = suffixMsg(fmt.Sprintf("%s\n  %s", header, status.outputMsg))
+		s.SetMessage(msg)
+		if status.allEnabled {
+			spinnerDone()
 			return true, nil
+		} else if status.hasFailed {
+			return false, failedErr
 		}
 		return false, nil
 	}); err != nil {
-		spinnerDone(s)
-		if err == wait.ErrWaitTimeout {
-			return errors.New("timeout waiting for auto-install addons to be enabled, run \"kbcli addon list\" to check addon status")
-		}
+		spinnerDone()
+		printAddonMsg(o.Out, maps.Values(addons), true)
 		return err
 	}
 

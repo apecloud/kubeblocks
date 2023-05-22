@@ -57,7 +57,7 @@ jobs:
       - name: pcregrep Chinese
         run: |
           FILE_PATH=`git diff --name-only HEAD HEAD^`
-          
+
           python ${{ github.workspace }}/.github/utils/pcregrep.py \
             --source="${{ github.workspace }}/pcregrep.out" \
             --filter="$FILE_PATH"
@@ -168,7 +168,7 @@ jobs:
   check-image:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') && github.ref_name != 'main' }}
-    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
+    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.6.1
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-manager-image"
@@ -176,12 +176,13 @@ jobs:
       VERSION: "check"
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
+      SYNC_ENABLE: false
     secrets: inherit
 
   check-tools-image:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') && github.ref_name != 'main' }}
-    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
+    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.6.1
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-tools-image"
@@ -189,18 +190,20 @@ jobs:
       VERSION: "check"
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
+      SYNC_ENABLE: false
     secrets: inherit
 
   check-helm:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]') && github.ref_name != 'main' }}
-    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.5.2
+    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.6.1
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "v0.4.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
       PUSH_ENABLE: false
+      DEP_REPO: "helm dep update deploy/delphic"
     secrets: inherit
 
   deploy-kubeblocks-io:

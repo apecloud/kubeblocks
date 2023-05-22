@@ -125,7 +125,7 @@ func (o *SetOrUnsetDefaultOption) run(args []string) error {
 	alreadySet := make(map[string]string)
 	for _, cv := range args {
 		cd := cv2Cd[cv]
-		if _, ok := cd2DefaultCv[cd]; ok {
+		if _, ok := cd2DefaultCv[cd]; ok && cv != cd2DefaultCv[cd] {
 			allErrs = append(allErrs, fmt.Errorf("clusterdefinition \"%s\" already has a default cluster version \"%s\"", cv2Cd[cv], cd2DefaultCv[cd]))
 			continue
 		}

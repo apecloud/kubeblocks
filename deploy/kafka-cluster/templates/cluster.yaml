@@ -77,6 +77,11 @@ spec:
     {{- else }}
     - name: controller
       componentDefRef: kafka-controller
+      tls: {{ $.Values.tls }}
+      {{- if $.Values.tls }}
+      issuer:
+        name: KubeBlocks
+      {{- end }}
       replicas: {{ $.Values.kafkaController.replicaCount }}
       monitor: {{ $.Values.monitor.enabled }}
       {{- with $.Values.tolerations }}
@@ -120,6 +125,11 @@ spec:
       {{- end }}
     - name: broker
       componentDefRef: kafka-broker
+      tls: {{ $.Values.tls }}
+      {{- if $.Values.tls }}
+      issuer:
+        name: KubeBlocks
+      {{- end }}
       replicas: {{ $.Values.kafkaBroker.replicaCount }}
       monitor: {{ $.Values.monitor.enabled }}
       {{- with $.Values.tolerations }}

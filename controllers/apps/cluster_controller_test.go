@@ -772,7 +772,7 @@ var _ = Describe("Cluster Controller", func() {
 		pvcSpec.StorageClassName = &storageClass.Name
 
 		By("Create cluster and waiting for the cluster initialized")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(compName, compDefName).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
@@ -989,7 +989,7 @@ var _ = Describe("Cluster Controller", func() {
 		const tolerationValue = "testClusterTolerationValue"
 		By("Creating a cluster with Toleration")
 		Expect(compDefName).Should(BeElementOf(statelessCompDefName, statefulCompDefName, replicationCompDefName, consensusCompDefName))
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddComponent(compName, compDefName).SetReplicas(1).
 			AddClusterToleration(corev1.Toleration{
@@ -1029,7 +1029,7 @@ var _ = Describe("Cluster Controller", func() {
 			Operator: corev1.TolerationOpEqual,
 			Effect:   corev1.TaintEffectNoSchedule,
 		}
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 			AddClusterToleration(corev1.Toleration{
 				Key:      clusterTolerationKey,

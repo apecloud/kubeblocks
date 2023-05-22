@@ -354,7 +354,7 @@ func (pgOps *PostgresOperations) SwitchOverOps(ctx context.Context, req *binding
 // Checks whether there are nodes that could take it over after demoting the primary
 func (pgOps *PostgresOperations) isSwitchOverPossible(primary string, candidate string) (bool, error) {
 	if pgOps.config.Cluster.Leader != nil && pgOps.config.Cluster.Leader.Member.GetName() != primary {
-		return false, errors.Errorf("leader name does not match")
+		return false, errors.Errorf("leader name does not match ,leader name: %s, primary: %s", pgOps.config.Cluster.Leader.Member.GetName(), primary)
 	}
 	if !pgOps.config.Cluster.Sync.SynchronizedToLeader(candidate) {
 		//return false, errors.Errorf("candidate name does not match with sync_standby")
@@ -366,12 +366,11 @@ func (pgOps *PostgresOperations) isSwitchOverPossible(primary string, candidate 
 
 // 更改配置
 func (pgOps *PostgresOperations) manualSwitchOver(ctx context.Context, primary string, candidate string) error {
-	configMap, err := pgOps.config.GetConfigMap("default", "pg-cluster-pg-replication-env")
+	configMap, err := pgOps.config.GetConfigMap("default", "test")
 	if err != nil {
 		return err
 	}
-	configMap.Data["KB_PRIMARY_POD_NAME"] = candidate + ".pg-cluster-pg-replication-headless"
-	configMap.Data["KB_PG-REPLICATION_1_HOSTNAME"] = primary + ".pg-cluster-pg-replication-headless"
+	configMap.Data["primary"] = candidate
 
 	_, err = pgOps.config.UpdateConfigMap("default", configMap)
 	return nil
@@ -379,7 +378,7 @@ func (pgOps *PostgresOperations) manualSwitchOver(ctx context.Context, primary s
 
 func (pgOps *PostgresOperations) getSwitchOverResult(candidate string) (bool, error) {
 	pgOps.config.GetCluster()
-	time.Sleep(time.Second)
+	time.Sleep(30 * time.Second)
 	if pgOps.config.Cluster.Leader.Member.GetName() != candidate {
 		return false, errors.New("switchover fail")
 	}

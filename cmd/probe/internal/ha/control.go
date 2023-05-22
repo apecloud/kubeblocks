@@ -9,8 +9,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
-	"os"
-	"strings"
 	"time"
 )
 
@@ -37,8 +35,9 @@ func NewHa() *Ha {
 	informer := sharedInformers.Core().V1().ConfigMaps().Informer()
 
 	return &Ha{
-		ctx:      context.Background(),
-		db:       os.Getenv("HOSTNAME"),
+		ctx: context.Background(),
+		//db:       os.Getenv("HOSTNAME"),
+		db:       "pg-1-pg-replication-0",
 		log:      logger.NewLogger("ha"),
 		Informer: informer,
 		config:   config.NewConfig(),
@@ -56,14 +55,15 @@ func (h *Ha) HaControl(stopCh chan struct{}) {
 func (h *Ha) UpdateRecall(oldObj, newObj interface{}) {
 	newConfigMap := newObj.(*corev1.ConfigMap)
 	oldConfigMap := oldObj.(*corev1.ConfigMap)
-	if oldConfigMap.Name != "pg-cluster-pg-replication-env" {
+	if oldConfigMap.Name != "test" {
 		return
 	}
 
-	oldPrimary := strings.Split(oldConfigMap.Data["KB_PRIMARY_POD_NAME"], ".")[0]
-	newPrimary := strings.Split(newConfigMap.Data["KB_PRIMARY_POD_NAME"], ".")[0]
-
-	h.db = "pg-cluster-pg-replication-1-0"
+	oldPrimary := oldConfigMap.Data["primary"]
+	newPrimary := newConfigMap.Data["primary"]
+	if oldPrimary == newPrimary {
+		return
+	}
 
 	if h.db == oldPrimary && h.db != newPrimary {
 		_ = h.demote()
@@ -75,6 +75,7 @@ func (h *Ha) UpdateRecall(oldObj, newObj interface{}) {
 }
 
 func (h *Ha) promote() error {
+	time.Sleep(5 * time.Second)
 	resp, err := h.config.ExecCommand(h.db, "default", "su -c 'pg_ctl promote' postgres")
 	if err != nil {
 		h.log.Errorf("promote err: %v", err)
@@ -85,12 +86,30 @@ func (h *Ha) promote() error {
 }
 
 func (h *Ha) demote() error {
-	time.Sleep(time.Second)
 	resp, err := h.config.ExecCommand(h.db, "default", "su -c 'pg_ctl stop -m fast' postgres")
 	if err != nil {
 		h.log.Errorf("demote err: %v", err)
 		return err
 	}
+
+	_, err = h.config.ExecCommand(h.db, "default", "touch /postgresql/data/standby.signal")
+	if err != nil {
+		h.log.Errorf("touch err: %v", err)
+		return err
+	}
+
+	time.Sleep(5 * time.Second)
+	_, err = h.config.ExecCommand(h.db, "default", "su -c 'postgres -D /postgresql/data --config-file=/opt/bitnami/postgresql/conf/postgresql.conf --external_pid_file=/opt/bitnami/postgresql/tmp/postgresql.pid --hba_file=/opt/bitnami/postgresql/conf/pg_hba.conf' postgres &")
+	if err != nil {
+		h.log.Errorf("start err: %v", err)
+		return err
+	}
+	_, err = h.config.ExecCommand(h.db, "default", "su -c './scripts/on_role_change.sh' postgres")
+	if err != nil {
+		h.log.Errorf("shell err: %v", err)
+		return err
+	}
+
 	h.log.Infof("response: ", resp)
 	return nil
 }

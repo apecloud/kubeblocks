@@ -37,32 +37,50 @@ func NewConfig() *Config {
 		panic(err)
 	}
 
-	return &Config{
+	initConfigmap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test",
+		},
+		Data: map[string]string{
+			"primary":   "pg-1-pg-replication-0",
+			"secondary": "pg-1-pg-replication-1",
+		},
+	}
+
+	if resp, err := clientSet.CoreV1().ConfigMaps("default").Get(ctx, "test", metav1.GetOptions{}); err != nil || resp == nil {
+		_, err = clientSet.CoreV1().ConfigMaps("default").Create(ctx, initConfigmap, metav1.CreateOptions{})
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	c := &Config{
 		ctx:       ctx,
 		config:    config,
 		ClientSet: clientSet,
 		Cluster:   &Cluster{},
 	}
+
+	c.GetCluster()
+
+	return c
 }
 
 func (c *Config) GetCluster() {
-	clusterEnv, err := c.ClientSet.CoreV1().ConfigMaps("default").Get(c.ctx, "pg-cluster-pg-replication-env", metav1.GetOptions{})
+	clusterEnv, err := c.ClientSet.CoreV1().ConfigMaps("default").Get(c.ctx, "test", metav1.GetOptions{})
 	if err != nil {
 		panic(err)
 	}
 
 	members := []*Member{
 		{
-			name: strings.Split(clusterEnv.Data["KB_PG-REPLICATION_1_HOSTNAME"], ".")[0],
-		},
-		{
-			name: strings.Split(clusterEnv.Data["KB_PG-REPLICATION_2_HOSTNAME"], ".")[0],
+			name: clusterEnv.Data["secondary"],
 		},
 	}
 
 	leader := &Leader{
 		Member: &Member{
-			name: strings.Split(clusterEnv.Data["KB_PRIMARY_POD_NAME"], ".")[0],
+			name: clusterEnv.Data["primary"],
 		},
 	}
 

@@ -163,6 +163,21 @@ spec:
                         real primary or leader  of the current instance, and the result
                         of instance failover will not be synchronized to candidateInstance.
                       properties:
+                        failoverSync:
+                          default: true
+                          description: failoverSync indicates whether to synchronize
+                            the results of failover to candidateInstance. true indicates
+                            that the results of the failover will be asynchronously
+                            synchronized to candidateInstance field, the index will
+                            be synchronized with the new primary or leader index,
+                            and the operator will be synchronized to Equal. false
+                            indicates that the results of failover will not be synchronized
+                            to the candidateInstance. At this situation, there may
+                            be inconsistencies between the candidateInstance and the
+                            real primary/leader instance, If consistency is required,
+                            the user needs to manually update the index and operator
+                            value.
+                          type: boolean
                         index:
                           description: index of the candidate instance, 0 <= index
                             <= componentSpecs[x].replicas-1.

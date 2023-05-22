@@ -304,11 +304,23 @@ type CandidateInstance struct {
 	Index int32 `json:"index"`
 
 	// operator represents a relationship to the index value. Valid operators are Equal and NotEqual.
-	// Equal indicates that the user expects that new candidate primary or leader is equal to index, which is often used in the scenario of specifying the candidate primary or leader for switchover.
-	// NotEqual indicates that the user expects that the value of the new candidate primary or leader is not equal to index, which is often used in scenarios where the candidate primary or leader is not specified for switchover.
+	// Equal indicates that the user expects that new candidate primary or leader is equal to index,
+	// which is often used in the scenario of specifying the candidate primary or leader for switchover.
+	// NotEqual indicates that the user expects that the value of the new candidate primary or leader is not equal to index,
+	// which is often used in scenarios where the candidate primary or leader is not specified for switchover.
 	// In particular, if operator is NotEqual and the specified index is not the real primary or leader of the current instance, no switchover will be performed.
 	// +kubebuilder:validation:Required
 	Operator CandidateOperator `json:"operator"`
+
+	// failoverSync indicates whether to synchronize the results of failover to candidateInstance.
+	// true indicates that the results of the failover will be asynchronously synchronized to candidateInstance field,
+	// the index will be synchronized with the new primary or leader index, and the operator will be synchronized to Equal.
+	// false indicates that the results of failover will not be synchronized to the candidateInstance.
+	// At this situation, there may be inconsistencies between the candidateInstance and the real primary/leader instance,
+	// If consistency is required, the user needs to manually update the index and operator value.
+	// +kubebuilder:default=true
+	// +optional
+	FailoverSync bool `json:"failoverSync"`
 }
 
 type ClusterSwitchPolicy struct {

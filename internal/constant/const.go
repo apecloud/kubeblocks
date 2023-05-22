@@ -88,32 +88,39 @@ const (
 	BackupTypeLabelKeyKey           = "dataprotection.kubeblocks.io/backup-type"
 
 	// kubeblocks.io annotations
-	OpsRequestAnnotationKey                  = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
-	ReconcileAnnotationKey                   = "kubeblocks.io/reconcile"   // ReconcileAnnotationKey Notify k8s object to reconcile
-	RestartAnnotationKey                     = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	SnapShotForStartAnnotationKey            = "kubeblocks.io/snapshot-for-start"
-	RestoreFromBackUpAnnotationKey           = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
-	ClusterSnapshotAnnotationKey             = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
-	LeaderAnnotationKey                      = "cs.apps.kubeblocks.io/leader"
-	ComponentReplicasAnnotationKey           = "apps.kubeblocks.io/component-replicas"                   // ComponentReplicasAnnotationKey specifies the number of pods in replicas
-	DefaultBackupPolicyAnnotationKey         = "dataprotection.kubeblocks.io/is-default-policy"          // DefaultBackupPolicyAnnotationKey specifies the default backup policy.
-	DefaultBackupPolicyTemplateAnnotationKey = "dataprotection.kubeblocks.io/is-default-policy-template" // DefaultBackupPolicyTemplateAnnotationKey specifies the default backup policy template.
-	BackupDataPathPrefixAnnotationKey        = "dataprotection.kubeblocks.io/path-prefix"                // BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
-	BackupPolicyTemplateAnnotationKey        = "apps.kubeblocks.io/backup-policy-template"
-	RestoreFromTimeAnnotationKey             = "kubeblocks.io/restore-from-time"           // RestoreFromTimeAnnotationKey specifies the time to recover from the backup.
-	RestoreFromSrcClusterAnnotationKey       = "kubeblocks.io/restore-from-source-cluster" // RestoreFromSrcClusterAnnotationKey specifies the source cluster to recover from the backup.
-	ReconfigureRefAnnotationKey              = "dataprotection.kubeblocks.io/reconfigure-ref"
-
-	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
-	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
-	ConfigurationConstraintsLabelPrefixKey = "config.kubeblocks.io/constraints"
-
-	LastAppliedOpsCRAnnotation                  = "config.kubeblocks.io/last-applied-ops-name"
-	LastAppliedConfigAnnotation                 = "config.kubeblocks.io/last-applied-configuration"
+	OpsRequestAnnotationKey                     = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	ReconcileAnnotationKey                      = "kubeblocks.io/reconcile"   // ReconcileAnnotationKey Notify k8s object to reconcile
+	RestartAnnotationKey                        = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	SnapShotForStartAnnotationKey               = "kubeblocks.io/snapshot-for-start"
+	RestoreFromBackUpAnnotationKey              = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
+	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
+	LeaderAnnotationKey                         = "cs.apps.kubeblocks.io/leader"
+	ComponentReplicasAnnotationKey              = "apps.kubeblocks.io/component-replicas" // ComponentReplicasAnnotationKey specifies the number of pods in replicas
+	BackupPolicyTemplateAnnotationKey           = "apps.kubeblocks.io/backup-policy-template"
+	AllowInconsistentCVAnnotationKey            = "clusters.apps.kubeblocks.io/allow-inconsistent-cv"
+	LastAppliedClusterAnnotationKey             = "apps.kubeblocks.io/last-applied-cluster"
+	DefaultBackupPolicyAnnotationKey            = "dataprotection.kubeblocks.io/is-default-policy"          // DefaultBackupPolicyAnnotationKey specifies the default backup policy.
+	DefaultBackupPolicyTemplateAnnotationKey    = "dataprotection.kubeblocks.io/is-default-policy-template" // DefaultBackupPolicyTemplateAnnotationKey specifies the default backup policy template.
+	BackupDataPathPrefixAnnotationKey           = "dataprotection.kubeblocks.io/path-prefix"                // BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
+	RestoreFromTimeAnnotationKey                = "kubeblocks.io/restore-from-time"                         // RestoreFromTimeAnnotationKey specifies the time to recover from the backup.
+	RestoreFromSrcClusterAnnotationKey          = "kubeblocks.io/restore-from-source-cluster"               // RestoreFromSrcClusterAnnotationKey specifies the source cluster to recover from the backup.
+	ReconfigureRefAnnotationKey                 = "dataprotection.kubeblocks.io/reconfigure-ref"
+	DefaultClusterVersionAnnotationKey          = "kubeblocks.io/is-default-cluster-version" // DefaultClusterVersionAnnotationKey specifies the default cluster version.
+	LastAppliedOpsCRAnnotationKey               = "config.kubeblocks.io/last-applied-ops-name"
+	LastAppliedConfigAnnotationKey              = "config.kubeblocks.io/last-applied-configuration"
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
 	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
+	LastAppliedOpsCRAnnotation                  = "config.kubeblocks.io/last-applied-ops-name"
+	LastAppliedConfigAnnotation                 = "config.kubeblocks.io/last-applied-configuration"
+
+	// kubeblocks.io well-known finalizers
+	DBClusterFinalizerName = "cluster.kubeblocks.io/finalizer"
+
+	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
+	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
+	ConfigurationConstraintsLabelPrefixKey = "config.kubeblocks.io/constraints"
 
 	// CMConfigurationTypeLabelKey configmap is config template type, e.g: "tpl", "instance"
 	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"

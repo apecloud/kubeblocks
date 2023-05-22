@@ -129,6 +129,7 @@ const (
 const (
 	// define the cluster condition type
 	ConditionTypeLatestOpsRequestProcessed = "LatestOpsRequestProcessed" // ConditionTypeLatestOpsRequestProcessed describes whether the latest OpsRequest that affect the cluster lifecycle has been processed.
+	ConditionTypeHaltRecovery              = "HaltRecovery"              // ConditionTypeHaltRecovery describe Halt recovery processing stage
 	ConditionTypeProvisioningStarted       = "ProvisioningStarted"       // ConditionTypeProvisioningStarted the operator starts resource provisioning to create or change the cluster
 	ConditionTypeApplyResources            = "ApplyResources"            // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
 	ConditionTypeReplicasReady             = "ReplicasReady"             // ConditionTypeReplicasReady all pods of components are ready

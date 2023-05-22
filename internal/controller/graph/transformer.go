@@ -45,9 +45,9 @@ type Transformer interface {
 // TransformerChain chains a group Transformer together
 type TransformerChain []Transformer
 
-// ErrFastReturn is used to stop the Transformer chain for some purpose.
+// ErrPrematureStop is used to stop the Transformer chain for some purpose.
 // Use it in Transformer.Transform when all jobs have done and no need to run following transformers
-var ErrFastReturn = errors.New("fast return")
+var ErrPrematureStop = errors.New("Premature-Stop")
 
 // ApplyTo applies TransformerChain t to dag
 func (t *TransformerChain) ApplyTo(ctx TransformContext, dag *DAG) error {
@@ -56,14 +56,14 @@ func (t *TransformerChain) ApplyTo(ctx TransformContext, dag *DAG) error {
 	}
 	for _, transformer := range *t {
 		if err := transformer.Transform(ctx, dag); err != nil {
-			return fastReturnErrorToNil(err)
+			return ignoredIfPrematureStop(err)
 		}
 	}
 	return nil
 }
 
-func fastReturnErrorToNil(err error) error {
-	if err == ErrFastReturn {
+func ignoredIfPrematureStop(err error) error {
+	if err == ErrPrematureStop {
 		return nil
 	}
 	return err

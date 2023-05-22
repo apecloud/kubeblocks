@@ -83,6 +83,7 @@ type TargetSelector struct {
 	TargetNamespaceSelectors []string `json:"namespaces,omitempty"`
 }
 
+// NetworkLoss Loss command
 type NetworkLoss struct {
 	// The percentage of packet loss
 	Loss string `json:"loss,omitempty"`
@@ -90,6 +91,7 @@ type NetworkLoss struct {
 	Correlation string `json:"correlation,omitempty"`
 }
 
+// NetworkDelay Delay command
 type NetworkDelay struct {
 	// The latency of delay
 	Latency string `json:"latency,omitempty"`
@@ -99,6 +101,7 @@ type NetworkDelay struct {
 	Correlation string `json:"correlation,omitempty"`
 }
 
+// NetworkDuplicate Duplicate command
 type NetworkDuplicate struct {
 	// The percentage of packet duplication
 	Duplicate string `json:"duplicate,omitempty"`
@@ -106,6 +109,7 @@ type NetworkDuplicate struct {
 	Correlation string `json:"correlation,omitempty"`
 }
 
+// NetworkCorrupt Corrupt command
 type NetworkCorrupt struct {
 	// The percentage of packet corruption
 	Corrupt string `json:"corrupt,omitempty"`
@@ -113,12 +117,17 @@ type NetworkCorrupt struct {
 	Correlation string `json:"correlation,omitempty"`
 }
 
+// NetworkBandwidth Bandwidth command
 type NetworkBandwidth struct {
-	// Bandwidth command
-	Rate     string `json:"rate,omitempty"`
-	Limit    uint32 `json:"limit,omitempty"`
-	Buffer   uint32 `json:"buffer,omitempty"`
+	// the rate at which the bandwidth is limited.
+	Rate string `json:"rate,omitempty"`
+	// the number of bytes waiting in the queue.
+	Limit uint32 `json:"limit,omitempty"`
+	// the maximum number of bytes that can be sent instantaneously.
+	Buffer uint32 `json:"buffer,omitempty"`
+	// the bucket's maximum consumption rate. Reference: https://man7.org/linux/man-pages/man8/tc-tbf.8.html.
 	Peakrate uint64 `json:"peakrate,omitempty"`
+	// the size of the peakrate bucket. Reference: https://man7.org/linux/man-pages/man8/tc-tbf.8.html.
 	Minburst uint32 `json:"minburst,omitempty"`
 }
 
@@ -126,10 +135,11 @@ type NetworkChaosOptions struct {
 	// Specify the network direction
 	Direction string `json:"direction"`
 
-	// Indicates a network target outside of Kubernetes, which can be an IPv4 address or a domain name,
-	// such as "www.baidu.com". Only works with direction: to.
+	// A network target outside of Kubernetes, which can be an IPv4 address or a domain name,
+	// such as "kubeblocks.io". Only works with direction: to.
 	ExternalTargets []string `json:"externalTargets,omitempty"`
 
+	// A collection of target pods. Pods can be selected by namespace and label.
 	Target `json:"target,omitempty"`
 
 	NetworkLoss `json:"loss,omitempty"`
@@ -181,20 +191,15 @@ func NewNetworkChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 
 func NewPartitionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.PartitionAction))
-
 	cmd := o.NewCobraCommand(Partition, PartitionShort)
 
 	o.AddCommonFlag(cmd)
-
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
 
 	return cmd
 }
 
 func NewLossCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.LossAction))
-
 	cmd := o.NewCobraCommand(Loss, LossShort)
 
 	o.AddCommonFlag(cmd)
@@ -203,15 +208,11 @@ func NewLossCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 
 	util.CheckErr(cmd.MarkFlagRequired("loss"))
 
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
-
 	return cmd
 }
 
 func NewDelayCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.DelayAction))
-
 	cmd := o.NewCobraCommand(Delay, DelayShort)
 
 	o.AddCommonFlag(cmd)
@@ -221,15 +222,11 @@ func NewDelayCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 
 	util.CheckErr(cmd.MarkFlagRequired("latency"))
 
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
-
 	return cmd
 }
 
 func NewDuplicateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.DuplicateAction))
-
 	cmd := o.NewCobraCommand(Duplicate, DuplicateShort)
 
 	o.AddCommonFlag(cmd)
@@ -238,15 +235,11 @@ func NewDuplicateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 
 	util.CheckErr(cmd.MarkFlagRequired("duplicate"))
 
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
-
 	return cmd
 }
 
 func NewCorruptCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.CorruptAction))
-
 	cmd := o.NewCobraCommand(Corrupt, CorruptShort)
 
 	o.AddCommonFlag(cmd)
@@ -255,19 +248,14 @@ func NewCorruptCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 	util.CheckErr(cmd.MarkFlagRequired("corrupt"))
 
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
-
 	return cmd
 }
 
 func NewBandwidthCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewNetworkChaosOptions(f, streams, string(v1alpha1.BandwidthAction))
-
 	cmd := o.NewCobraCommand(Bandwidth, BandwidthShort)
 
 	o.AddCommonFlag(cmd)
-
 	cmd.Flags().StringVar(&o.Rate, "rate", "", `the rate at which the bandwidth is limited. For example : 10 bps/kbps/mbps/gbps.`)
 	cmd.Flags().Uint32Var(&o.Limit, "limit", 1, `the number of bytes waiting in the queue.`)
 	cmd.Flags().Uint32Var(&o.Buffer, "buffer", 1, `the maximum number of bytes that can be sent instantaneously.`)
@@ -275,9 +263,6 @@ func NewBandwidthCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd.Flags().Uint32Var(&o.Minburst, "minburst", 0, `the size of the peakrate bucket.`)
 
 	util.CheckErr(cmd.MarkFlagRequired("rate"))
-
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
 
 	return cmd
 }
@@ -306,6 +291,9 @@ func (o *NetworkChaosOptions) AddCommonFlag(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.TargetValue, "target-value", "", `If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.`)
 	cmd.Flags().StringToStringVar(&o.TargetLabelSelectors, "target-label", nil, `label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"'`)
 	cmd.Flags().StringArrayVar(&o.TargetNamespaceSelectors, "target-ns-fault", nil, `Specifies the namespace into which you want to inject faults.`)
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, o.Factory)
 }
 
 func (o *NetworkChaosOptions) Validate() error {
@@ -315,6 +303,10 @@ func (o *NetworkChaosOptions) Validate() error {
 
 	if (o.TargetNamespaceSelectors != nil || o.TargetLabelSelectors != nil) && o.TargetMode == "" {
 		return fmt.Errorf("--target-mode is required to specify a target mode")
+	}
+
+	if o.ExternalTargets != nil && o.Direction != "to" {
+		return fmt.Errorf("--direction=to is required when specifying external targets")
 	}
 
 	if ok, err := IsInteger(o.TargetValue); !ok {

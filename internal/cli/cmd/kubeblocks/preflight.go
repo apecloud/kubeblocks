@@ -218,6 +218,9 @@ func (p *PreflightOptions) run() error {
 		return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
 	}
 	// 2. collect data
+	if p.verbose {
+
+	}
 	s := spinner.New(p.Out, spinner.WithMessage(fmt.Sprintf("%-50s", "Collecting data from cluster")))
 	collectResults, err = kbpreflight.CollectPreflight(p.factory, &p.ValueOpts, ctx, kbPreflight, kbHostPreflight, progressCh)
 	if err != nil {

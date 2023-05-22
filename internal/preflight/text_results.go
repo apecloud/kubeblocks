@@ -27,7 +27,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	analyzerunner "github.com/replicatedhq/troubleshoot/pkg/analyze"
 	"gopkg.in/yaml.v2"
@@ -117,7 +116,7 @@ func showResultsKBCli(preflightName string, analyzeResults []*analyzerunner.Anal
 		showResults(data.Fail)
 		isFailed = true
 	}
-	allMsg = fmt.Sprintf("%s\n  %s", msg, strings.Join(all, "\n  "))
+	allMsg = fmt.Sprintf("  %s", strings.Join(all, "\n  "))
 	s.SetFinalMsg(suffixMsg(allMsg))
 	if isFailed {
 		s.Fail()
@@ -149,34 +148,28 @@ func showTextResultsJSON(preflightName string, analyzeResults []*analyzerunner.A
 
 func showStdoutResultsYAML(preflightName string, analyzeResults []*analyzerunner.AnalyzeResult, verbose bool, out io.Writer) error {
 	data := showStdoutResultsStructured(preflightName, analyzeResults, verbose)
-	var (
-		passInfo = color.New(color.FgGreen)
-		warnInfo = color.New(color.FgYellow)
-		failInfo = color.New(color.FgRed)
-	)
 	if len(data.Pass) > 0 {
-		passInfo.Println("Pass items")
 		fmt.Fprintln(out, printer.BoldGreen("Pass items"))
 		if b, err := yaml.Marshal(data.Pass); err != nil {
 			return errors.Wrap(err, "failed to marshal results as yaml")
 		} else {
-			fmt.Fprintf(out, "%s\n", b)
+			fmt.Fprintf(out, "%s", b)
 		}
 	}
 	if len(data.Warn) > 0 {
-		warnInfo.Println("Warn items")
+		fmt.Fprintln(out, printer.BoldYellow("Warn items"))
 		if b, err := yaml.Marshal(data.Warn); err != nil {
 			return errors.Wrap(err, "failed to marshal results as yaml")
 		} else {
-			fmt.Fprintf(out, "%s\n", b)
+			fmt.Fprintf(out, "%s", b)
 		}
 	}
 	if len(data.Fail) > 0 {
-		failInfo.Println("Fail items")
+		fmt.Fprintln(out, printer.BoldRed("Pass items"))
 		if b, err := yaml.Marshal(data.Fail); err != nil {
 			return errors.Wrap(err, "failed to marshal results as yaml")
 		} else {
-			fmt.Fprintf(out, "%s\n", b)
+			fmt.Fprintf(out, "%s", b)
 		}
 		return errors.New(FailMessage)
 	}

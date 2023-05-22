@@ -48,8 +48,8 @@ var _ = Describe("Fault Node", func() {
 	Context("test fault node", func() {
 		It("fault node stop", func() {
 			inputs := [][]string{
-				{"-c=aws", "--region=cn-northwest-1", "--secret-name=cloud-key-secret", "--dry-run=client"},
-				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--secret-name=cloud-key-secret", "--dry-run=client"},
+				{"-c=aws", "--region=cn-northwest-1", "--dry-run=client"},
+				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--dry-run=client"},
 			}
 			o := NewNodeOptions(tf, streams)
 			cmd := o.NewCobraCommand(Stop, StopShort)
@@ -58,14 +58,14 @@ var _ = Describe("Fault Node", func() {
 			o.Args = []string{"node1", "node2"}
 			for _, input := range inputs {
 				Expect(cmd.Flags().Parse(input)).Should(Succeed())
-				Expect(o.Execute(Stop, o.Args)).Should(Succeed())
+				Expect(o.Execute(Stop, o.Args, true)).Should(Succeed())
 			}
 		})
 
 		It("fault node restart", func() {
 			inputs := [][]string{
-				{"-c=aws", "--region=cn-northwest-1", "--secret-name=cloud-key-secret", "--dry-run=client"},
-				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--secret-name=cloud-key-secret", "--dry-run=client"},
+				{"-c=aws", "--region=cn-northwest-1", "--dry-run=client"},
+				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--dry-run=client"},
 			}
 			o := NewNodeOptions(tf, streams)
 			cmd := o.NewCobraCommand(Restart, RestartShort)
@@ -74,14 +74,14 @@ var _ = Describe("Fault Node", func() {
 			o.Args = []string{"node1", "node2"}
 			for _, input := range inputs {
 				Expect(cmd.Flags().Parse(input)).Should(Succeed())
-				Expect(o.Execute(Restart, o.Args)).Should(Succeed())
+				Expect(o.Execute(Restart, o.Args, true)).Should(Succeed())
 			}
 		})
 
 		It("fault node detach-volume", func() {
 			inputs := [][]string{
-				{"-c=aws", "--region=cn-northwest-1", "--secret-name=cloud-key-secret", "--volume-id=v1,v2", "--device-name=/d1,/d2", "--dry-run=client"},
-				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--secret-name=cloud-key-secret", "--device-name=/d1,/d2", "--dry-run=client"},
+				{"-c=aws", "--region=cn-northwest-1", "--volume-id=v1,v2", "--device-name=/d1,/d2", "--dry-run=client"},
+				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--device-name=/d1,/d2", "--dry-run=client"},
 			}
 			o := NewNodeOptions(tf, streams)
 			cmd := o.NewCobraCommand(DetachVolume, DetachVolumeShort)
@@ -92,7 +92,7 @@ var _ = Describe("Fault Node", func() {
 			o.Args = []string{"node1", "node2"}
 			for _, input := range inputs {
 				Expect(cmd.Flags().Parse(input)).Should(Succeed())
-				Expect(o.Execute(DetachVolume, o.Args)).Should(Succeed())
+				Expect(o.Execute(DetachVolume, o.Args, true)).Should(Succeed())
 				o.VolumeIDs = nil
 				o.DeviceNames = nil
 			}

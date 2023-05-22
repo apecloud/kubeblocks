@@ -20,13 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package fault
 
 import (
+	"bufio"
+	"context"
+	"encoding/base64"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -38,25 +49,25 @@ import (
 
 var faultNodeExample = templates.Examples(`
 	# Stop a specified EC2 instance.
-	kbcli fault node stop node1 -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --duration=3m
+	kbcli fault node stop node1 -c=aws --region=cn-northwest-1 --duration=3m
 
 	# Stop two specified EC2 instances.
-	kbcli fault node stop node1 node2 -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --duration=3m
+	kbcli fault node stop node1 node2 -c=aws --region=cn-northwest-1 --duration=3m
 
 	# Restart two specified EC2 instances.
-	kbcli fault node restart node1 node2 -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --duration=3m
+	kbcli fault node restart node1 node2 -c=aws --region=cn-northwest-1 --duration=3m
 
 	# Detach two specified volume from two specified EC2 instances.
-	kbcli fault node detach-volume node1 node2 -c=aws --secret-name=cloud-key-secret --region=cn-northwest-1 --duration=1m --volume-id=v1,v2 --device-name=/d1,/d2
+	kbcli fault node detach-volume node1 node2 -c=aws --region=cn-northwest-1 --duration=1m --volume-id=v1,v2 --device-name=/d1,/d2
 
 	# Stop two specified GCK instances.
-	kbcli fault node stop node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --secret-name=cloud-key-secret	
+	kbcli fault node stop node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering	
 
 	# Restart two specified GCK instances.
-	kbcli fault node restart node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --secret-name=cloud-key-secret
+	kbcli fault node restart node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering
 
 	# Detach two specified volume from two specified GCK instances.
-	kbcli fault node detach-volume node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --secret-name=cloud-key-secret --device-name=/d1,/d2
+	kbcli fault node detach-volume node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --device-name=/d1,/d2
 `)
 
 type NodeChaoOptions struct {
@@ -146,12 +157,12 @@ func (o *NodeChaoOptions) NewCobraCommand(use, short string) *cobra.Command {
 		Short:   short,
 		Example: faultNodeExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Execute(use, args))
+			cmdutil.CheckErr(o.Execute(use, args, false))
 		},
 	}
 }
 
-func (o *NodeChaoOptions) Execute(action string, args []string) error {
+func (o *NodeChaoOptions) Execute(action string, args []string, testEnv bool) error {
 	o.Args = args
 	if err := o.CreateOptions.Complete(); err != nil {
 		return err
@@ -171,6 +182,9 @@ func (o *NodeChaoOptions) Execute(action string, args []string) error {
 		if o.VolumeIDs != nil {
 			o.VolumeID = o.VolumeIDs[idx]
 		}
+		if err := o.CreateSecret(testEnv); err != nil {
+			return err
+		}
 		if err := o.Run(); err != nil {
 			return err
 		}
@@ -180,7 +194,6 @@ func (o *NodeChaoOptions) Execute(action string, args []string) error {
 
 func (o *NodeChaoOptions) AddCommonFlag(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&o.CloudProvider, "cloud-provider", "c", "", fmt.Sprintf("Cloud provider type, one of %v", supportedCloudProviders))
-	cmd.Flags().StringVar(&o.SecretName, "secret-name", "", "The name of the Kubernetes Secret that stores the kubernetes cluster authentication information.")
 	cmd.Flags().StringVar(&o.Region, "region", "", "The region of the node.")
 	cmd.Flags().StringVar(&o.Project, "project", "", "The name of the GCP project. Only available when cloud-provider=gcp.")
 	cmd.Flags().StringVar(&o.Duration, "duration", "30s", "Supported formats of the duration are: ms / s / m / h.")
@@ -190,7 +203,6 @@ func (o *NodeChaoOptions) AddCommonFlag(cmd *cobra.Command) {
 	printer.AddOutputFlagForCreate(cmd, &o.Format)
 
 	util.CheckErr(cmd.MarkFlagRequired("cloud-provider"))
-	util.CheckErr(cmd.MarkFlagRequired("secret-name"))
 	util.CheckErr(cmd.MarkFlagRequired("region"))
 
 	// register flag completion func
@@ -238,6 +250,7 @@ func (o *NodeChaoOptions) Complete(action string) error {
 	if o.CloudProvider == cp.AWS {
 		o.GVR = GetGVR(Group, Version, ResourceAWSChaos)
 		o.Kind = KindAWSChaos
+		o.SecretName = AWSSecretName
 		switch action {
 		case Stop:
 			o.Action = string(v1alpha1.Ec2Stop)
@@ -249,6 +262,7 @@ func (o *NodeChaoOptions) Complete(action string) error {
 	} else if o.CloudProvider == cp.GCP {
 		o.GVR = GetGVR(Group, Version, ResourceGCPChaos)
 		o.Kind = KindGCPChaos
+		o.SecretName = GCPSecretName
 		switch action {
 		case Stop:
 			o.Action = string(v1alpha1.NodeStop)
@@ -280,4 +294,141 @@ func (o *NodeChaoOptions) PreCreate(obj *unstructured.Unstructured) error {
 	}
 	obj.SetUnstructuredContent(data)
 	return nil
+}
+
+func (o *NodeChaoOptions) CreateSecret(testEnv bool) error {
+	if testEnv {
+		return nil
+	}
+
+	config, err := o.Factory.ToRESTConfig()
+	if err != nil {
+		return err
+	}
+
+	clientSet, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
+
+	// Check if Secret already exists
+	secretClient := clientSet.CoreV1().Secrets(o.Namespace)
+	_, err = secretClient.Get(context.TODO(), o.SecretName, metav1.GetOptions{})
+	if err == nil {
+		fmt.Println("Secret already exists under the current namespace.")
+		return nil
+	} else if !k8serrors.IsNotFound(err) {
+		return err
+	}
+
+	switch o.CloudProvider {
+	case "aws":
+		err := handleAWS(clientSet, o.Namespace, o.SecretName)
+		if err != nil {
+			return err
+		}
+	case "gcp":
+		err := handleGCP(clientSet, o.Namespace, o.SecretName)
+		if err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unknown cloud provider:%s", o.CloudProvider)
+	}
+	return nil
+}
+
+func handleAWS(clientSet *kubernetes.Clientset, namespace, secretName string) error {
+	accessKeyID, secretAccessKey, err := readAWSCredentials()
+	if err != nil {
+		return err
+	}
+
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: namespace,
+		},
+		Type: corev1.SecretTypeOpaque,
+		StringData: map[string]string{
+			"aws_access_key_id":     accessKeyID,
+			"aws_secret_access_key": secretAccessKey,
+		},
+	}
+
+	createdSecret, err := clientSet.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Secret %s created successfully\n", createdSecret.Name)
+	return nil
+}
+
+func handleGCP(clientSet *kubernetes.Clientset, namespace, secretName string) error {
+	filePath := filepath.Join(os.Getenv("HOME"), ".config", "gcloud", "application_default_credentials.json")
+	data, err := ioutil.ReadFile(filePath)
+	jsonData := string(data)
+	fmt.Println(jsonData)
+	if err != nil {
+		return err
+	}
+
+	encodedData := base64.StdEncoding.EncodeToString([]byte(jsonData))
+	fmt.Println(encodedData)
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: namespace,
+		},
+		Type: corev1.SecretTypeOpaque,
+		StringData: map[string]string{
+			"service_account": encodedData,
+		},
+	}
+
+	_, err = clientSet.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("GCP Secret created successfully")
+	return nil
+}
+
+func readAWSCredentials() (string, string, error) {
+	file, err := os.Open(os.Getenv("HOME") + "/.aws/credentials")
+	if err != nil {
+		return "", "", err
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			fmt.Printf("unable to close file: %s", err)
+		}
+	}(file)
+
+	// Read file content line by line using bufio.Scanner
+	scanner := bufio.NewScanner(file)
+	accessKeyID := ""
+	secretAccessKey := ""
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "aws_access_key_id") {
+			accessKeyID = strings.TrimSpace(strings.SplitN(line, "=", 2)[1])
+		} else if strings.HasPrefix(line, "aws_secret_access_key") {
+			secretAccessKey = strings.TrimSpace(strings.SplitN(line, "=", 2)[1])
+		}
+	}
+
+	if scanner.Err() != nil {
+		return "", "", scanner.Err()
+	}
+
+	if accessKeyID == "" || secretAccessKey == "" {
+		return "", "", fmt.Errorf("unable to find valid AWS access key information")
+	}
+
+	return accessKeyID, secretAccessKey, nil
 }

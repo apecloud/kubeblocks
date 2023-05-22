@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/authzed/controller-idioms/hash"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -125,14 +124,10 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 	// check every components' equality
 	for _, comp := range cluster.Spec.ComponentSpecs {
 		found := false
-		h := hash.Object(comp)
 		for _, lastUsedComp := range lc.Spec.ComponentSpecs {
+			// only need to verify [name, componentDefRef, replicas] for equality
 			if comp.Name != lastUsedComp.Name {
 				continue
-			}
-			if h == hash.Object(lastUsedComp) {
-				found = true
-				break
 			}
 			if comp.ComponentDefRef != lastUsedComp.ComponentDefRef {
 				return emitError(metav1.Condition{
@@ -150,13 +145,8 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 						comp.Name, lastUsedComp.Replicas),
 				})
 			}
-			objJSON, _ := json.Marshal(&lastUsedComp)
-			return emitError(metav1.Condition{
-				Type:   appsv1alpha1.ConditionTypeHaltRecovery,
-				Reason: "HaltRecoveryFailed",
-				Message: fmt.Sprintf("inconsistent with last applied cluster.spec.componetSpecs[%s]='%s'",
-					comp.Name, objJSON),
-			})
+			found = true
+			break
 		}
 		if !found {
 			return emitError(metav1.Condition{

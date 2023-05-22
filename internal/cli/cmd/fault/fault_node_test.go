@@ -49,6 +49,7 @@ var _ = Describe("Fault Node", func() {
 		It("fault node stop", func() {
 			inputs := [][]string{
 				{"-c=aws", "--region=cn-northwest-1", "--dry-run=client"},
+				{"-c=aws", "--region=cn-northwest-1", "--secret=test-secret", "--dry-run=client"},
 				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--dry-run=client"},
 			}
 			o := NewNodeOptions(tf, streams)
@@ -65,6 +66,7 @@ var _ = Describe("Fault Node", func() {
 		It("fault node restart", func() {
 			inputs := [][]string{
 				{"-c=aws", "--region=cn-northwest-1", "--dry-run=client"},
+				{"-c=aws", "--region=cn-northwest-1", "--secret=test-secret", "--dry-run=client"},
 				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--dry-run=client"},
 			}
 			o := NewNodeOptions(tf, streams)
@@ -81,6 +83,7 @@ var _ = Describe("Fault Node", func() {
 		It("fault node detach-volume", func() {
 			inputs := [][]string{
 				{"-c=aws", "--region=cn-northwest-1", "--volume-id=v1,v2", "--device-name=/d1,/d2", "--dry-run=client"},
+				{"-c=aws", "--region=cn-northwest-1", "--volume-id=v1,v2", "--device-name=/d1,/d2", "--secret=test-secret", "--dry-run=client"},
 				{"-c=gcp", "--region=us-central1-c", "--project=apecloud-platform-engineering", "--device-name=/d1,/d2", "--dry-run=client"},
 			}
 			o := NewNodeOptions(tf, streams)

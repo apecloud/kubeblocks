@@ -45,6 +45,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 )
 
 var faultNodeExample = templates.Examples(`
@@ -92,6 +93,8 @@ type NodeChaoOptions struct {
 	Project string `json:"project"`
 
 	Duration string `json:"duration"`
+
+	AutoApprove bool `json:"-"`
 
 	create.CreateOptions `json:"-"`
 }
@@ -196,8 +199,10 @@ func (o *NodeChaoOptions) AddCommonFlag(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&o.CloudProvider, "cloud-provider", "c", "", fmt.Sprintf("Cloud provider type, one of %v", supportedCloudProviders))
 	cmd.Flags().StringVar(&o.Region, "region", "", "The region of the node.")
 	cmd.Flags().StringVar(&o.Project, "project", "", "The name of the GCP project. Only available when cloud-provider=gcp.")
+	cmd.Flags().StringVar(&o.SecretName, "secret", "", "The name of the secret containing cloud provider specific credentials.")
 	cmd.Flags().StringVar(&o.Duration, "duration", "30s", "Supported formats of the duration are: ms / s / m / h.")
 
+	cmd.Flags().BoolVar(&o.AutoApprove, "auto-approve", false, "Skip interactive approval before create secret.")
 	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = Unchanged
 	printer.AddOutputFlagForCreate(cmd, &o.Format)
@@ -250,7 +255,9 @@ func (o *NodeChaoOptions) Complete(action string) error {
 	if o.CloudProvider == cp.AWS {
 		o.GVR = GetGVR(Group, Version, ResourceAWSChaos)
 		o.Kind = KindAWSChaos
-		o.SecretName = AWSSecretName
+		if o.SecretName == "" {
+			o.SecretName = AWSSecretName
+		}
 		switch action {
 		case Stop:
 			o.Action = string(v1alpha1.Ec2Stop)
@@ -262,7 +269,9 @@ func (o *NodeChaoOptions) Complete(action string) error {
 	} else if o.CloudProvider == cp.GCP {
 		o.GVR = GetGVR(Group, Version, ResourceGCPChaos)
 		o.Kind = KindGCPChaos
-		o.SecretName = GCPSecretName
+		if o.SecretName == "" {
+			o.SecretName = GCPSecretName
+		}
 		switch action {
 		case Stop:
 			o.Action = string(v1alpha1.NodeStop)
@@ -301,6 +310,10 @@ func (o *NodeChaoOptions) CreateSecret(testEnv bool) error {
 		return nil
 	}
 
+	if o.DryRun != "none" {
+		return nil
+	}
+
 	config, err := o.Factory.ToRESTConfig()
 	if err != nil {
 		return err
@@ -315,26 +328,41 @@ func (o *NodeChaoOptions) CreateSecret(testEnv bool) error {
 	secretClient := clientSet.CoreV1().Secrets(o.Namespace)
 	_, err = secretClient.Get(context.TODO(), o.SecretName, metav1.GetOptions{})
 	if err == nil {
-		fmt.Println("Secret already exists under the current namespace.")
+		fmt.Printf("Secret %s exists under %s namespace.\n", o.SecretName, o.Namespace)
 		return nil
 	} else if !k8serrors.IsNotFound(err) {
 		return err
 	}
 
+	if err := o.confirmToContinue(); err != nil {
+		return err
+	}
+
 	switch o.CloudProvider {
 	case "aws":
-		err := handleAWS(clientSet, o.Namespace, o.SecretName)
-		if err != nil {
+		if err := handleAWS(clientSet, o.Namespace, o.SecretName); err != nil {
 			return err
 		}
 	case "gcp":
-		err := handleGCP(clientSet, o.Namespace, o.SecretName)
-		if err != nil {
+		if err := handleGCP(clientSet, o.Namespace, o.SecretName); err != nil {
 			return err
 		}
 	default:
 		return fmt.Errorf("unknown cloud provider:%s", o.CloudProvider)
 	}
+	return nil
+}
+
+func (o *NodeChaoOptions) confirmToContinue() error {
+	if !o.AutoApprove {
+		printer.Warning(o.Out, "A secret will be created for the cloud account to access %s, do you want to continue to create this secret: %s  ?\n  Only 'yes' will be accepted to confirm.\n\n", o.CloudProvider, o.SecretName)
+		entered, _ := prompt.NewPrompt("Enter a value:", nil, o.In).Run()
+		if entered != "yes" {
+			fmt.Fprintf(o.Out, "\nCancel automatic secert creation. You will not be able to access the nodes on the cluster.\n")
+			return cmdutil.ErrExit
+		}
+	}
+	fmt.Fprintf(o.Out, "Continue to create secret: %s\n", o.SecretName)
 	return nil
 }
 
@@ -366,16 +394,20 @@ func handleAWS(clientSet *kubernetes.Clientset, namespace, secretName string) er
 }
 
 func handleGCP(clientSet *kubernetes.Clientset, namespace, secretName string) error {
-	filePath := filepath.Join(os.Getenv("HOME"), ".config", "gcloud", "application_default_credentials.json")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	filePath := filepath.Join(home, ".config", "gcloud", "application_default_credentials.json")
 	data, err := ioutil.ReadFile(filePath)
 	jsonData := string(data)
 	fmt.Println(jsonData)
 	if err != nil {
 		return err
 	}
-
 	encodedData := base64.StdEncoding.EncodeToString([]byte(jsonData))
-	fmt.Println(encodedData)
+
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
@@ -387,17 +419,22 @@ func handleGCP(clientSet *kubernetes.Clientset, namespace, secretName string) er
 		},
 	}
 
-	_, err = clientSet.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
+	createdSecret, err := clientSet.CoreV1().Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("GCP Secret created successfully")
+	fmt.Printf("Secret %s created successfully\n", createdSecret.Name)
 	return nil
 }
 
 func readAWSCredentials() (string, string, error) {
-	file, err := os.Open(os.Getenv("HOME") + "/.aws/credentials")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", "", err
+	}
+	filePath := filepath.Join(home, ".aws", "credentials")
+	file, err := os.Open(filePath)
 	if err != nil {
 		return "", "", err
 	}

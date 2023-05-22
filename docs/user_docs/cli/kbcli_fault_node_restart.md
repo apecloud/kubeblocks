@@ -36,6 +36,7 @@ kbcli fault node restart [flags]
 ### Options
 
 ```
+      --auto-approve                   Skip interactive approval before create secret.
   -c, --cloud-provider string          Cloud provider type, one of [aws gcp]
       --dry-run string[="unchanged"]   Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
       --duration string                Supported formats of the duration are: ms / s / m / h. (default "30s")
@@ -43,6 +44,7 @@ kbcli fault node restart [flags]
   -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --project string                 The name of the GCP project. Only available when cloud-provider=gcp.
       --region string                  The region of the node.
+      --secret string                  The name of the secret containing cloud provider specific credentials.
 ```
 
 ### Options inherited from parent commands

@@ -36,6 +36,7 @@ kbcli fault node detach-volume [flags]
 ### Options
 
 ```
+      --auto-approve                   Skip interactive approval before create secret.
   -c, --cloud-provider string          Cloud provider type, one of [aws gcp]
       --device-name strings            The device name of the volume.
       --dry-run string[="unchanged"]   Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
@@ -44,6 +45,7 @@ kbcli fault node detach-volume [flags]
   -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --project string                 The name of the GCP project. Only available when cloud-provider=gcp.
       --region string                  The region of the node.
+      --secret string                  The name of the secret containing cloud provider specific credentials.
       --volume-id strings              The volume ids of the ec2. Only available when cloud-provider=aws.
 ```
 

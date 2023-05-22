@@ -34,6 +34,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -151,7 +152,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 				Phase: compPhase,
 			},
 		}
-		handleClusterPhaseWhenCompsNotReady(clusterObj, nil, nil)
+		lifecycle.HandleClusterPhaseWhenCompsNotReady(clusterObj, nil, nil)
 		Expect(clusterObj.Status.Phase).Should(Equal(expectClusterPhase))
 	}
 

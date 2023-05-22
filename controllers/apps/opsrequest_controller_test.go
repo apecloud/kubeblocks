@@ -375,7 +375,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			for i := 0; i < int(replicas); i++ {
 				pvcName := fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterKey.Name, mysqlCompName, i)
 				pvc := testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterKey.Name,
-					mysqlCompName, "data").SetStorage("1Gi").Create(&testCtx).GetObject()
+					mysqlCompName, testapps.DataVolumeName).SetStorage("1Gi").Create(&testCtx).GetObject()
 				// mock pvc bound
 				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(pvc *corev1.PersistentVolumeClaim) {
 					pvc.Status.Phase = corev1.ClaimBound
@@ -527,6 +527,15 @@ var _ = Describe("OpsRequest Controller", func() {
 				Create(&testCtx).GetObject()
 			// mock sts ready and create pod
 			createStsPodAndMockStsReady()
+			// mock pvc creation
+			for i := 0; i < testapps.DefaultReplicationReplicas; i++ {
+				pvcName := fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterObj.Name, mysqlCompName, i)
+				testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterObj.Name,
+					mysqlCompName, testapps.DataVolumeName).AddLabels(constant.AppInstanceLabelKey, clusterObj.Name,
+					constant.VolumeClaimTemplateNameLabelKey, testapps.DataVolumeName,
+					constant.KBAppComponentLabelKey, testapps.DefaultRedisCompName).
+					SetStorage("1Gi").SetStorageClass(storageClassName).Create(&testCtx).GetObject()
+			}
 			// wait for cluster to running
 			Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObj))).
 				Should(Equal(appsv1alpha1.RunningClusterPhase))
@@ -552,12 +561,6 @@ var _ = Describe("OpsRequest Controller", func() {
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
 			opsKey := client.ObjectKeyFromObject(volumeExpandOps)
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
-			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmlCluster *appsv1alpha1.Cluster) {
-				opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(tmlCluster)
-				g.Expect(opsSlice).Should(HaveLen(1))
-				g.Expect(tmlCluster.Status.Components[testapps.DefaultRedisCompName].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // VolumeExpandingPhase
-				// TODO: status conditions for VolumeExpandingPhase
-			})).Should(Succeed())
 
 			By("delete the Running ops")
 			testapps.DeleteObject(&testCtx, opsKey, volumeExpandOps)

@@ -40,6 +40,7 @@ import (
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -141,45 +142,6 @@ func getEventInvolvedObject(ctx context.Context, cli client.Client, event *corev
 	return nil, err
 }
 
-// handleClusterPhaseWhenCompsNotReady handles the Cluster.status.phase when some components are Abnormal or Failed.
-// TODO: Clear definitions need to be added to determine whether components will affect cluster availability in ClusterDefinition.
-func handleClusterPhaseWhenCompsNotReady(cluster *appsv1alpha1.Cluster,
-	componentMap map[string]string,
-	clusterAvailabilityEffectMap map[string]bool) {
-	var (
-		clusterIsFailed   bool
-		failedCompCount   int
-		isVolumeExpanding bool
-	)
-	opsRecords, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
-	if len(opsRecords) != 0 && opsRecords[0].Type == appsv1alpha1.VolumeExpansionType {
-		isVolumeExpanding = true
-	}
-	for k, v := range cluster.Status.Components {
-		// determine whether other components are still doing operation, i.e., create/restart/scaling.
-		// waiting for operation to complete except for volumeExpansion operation.
-		// because this operation will not affect cluster availability.
-		if !slices.Contains(appsv1alpha1.GetComponentTerminalPhases(), v.Phase) && !isVolumeExpanding {
-			return
-		}
-		if v.Phase == appsv1alpha1.FailedClusterCompPhase {
-			failedCompCount += 1
-			componentDefName := componentMap[k]
-			// if the component can affect cluster availability, set Cluster.status.phase to Failed
-			if clusterAvailabilityEffectMap[componentDefName] {
-				clusterIsFailed = true
-				break
-			}
-		}
-	}
-	// If all components fail or there are failed components that affect the availability of the cluster, set phase to Failed
-	if failedCompCount == len(cluster.Status.Components) || clusterIsFailed {
-		cluster.Status.Phase = appsv1alpha1.FailedClusterPhase
-	} else {
-		cluster.Status.Phase = appsv1alpha1.AbnormalClusterPhase
-	}
-}
-
 // getComponentRelatedInfo gets componentMap, clusterAvailabilityMap and component definition information
 func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition,
 	componentName string) (map[string]string, map[string]bool, *appsv1alpha1.ClusterComponentDefinition, error) {
@@ -256,7 +218,7 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 		return nil
 	}
 	// handle Cluster.status.phase when some components are not ready.
-	handleClusterPhaseWhenCompsNotReady(cluster, componentMap, clusterAvailabilityEffectMap)
+	lifecycle.HandleClusterPhaseWhenCompsNotReady(cluster, componentMap, clusterAvailabilityEffectMap)
 	if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
 		return err
 	}

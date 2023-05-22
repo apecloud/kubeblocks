@@ -161,6 +161,7 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	// check whether --namespace is specified, if not, KubeBlocks will be installed
 	// to the kb-system namespace
+	// fixme: where "kb-system" come from
 	var targetNamespace string
 	cmd.Flags().Visit(func(flag *pflag.Flag) {
 		if flag.Name == "namespace" {

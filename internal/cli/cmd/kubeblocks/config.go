@@ -21,17 +21,17 @@ package kubeblocks
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"sort"
+	"reflect"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/maps"
+	"helm.sh/helm/v3/pkg/action"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -44,6 +44,35 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
+
+type configInfos struct {
+	image                     map[string]interface{}
+	updateStrategy            map[string]interface{}
+	podDisruptionBudget       map[string]interface{}
+	loggerSettings            map[string]interface{}
+	serviceAccount            map[string]interface{}
+	securityContext           map[string]interface{}
+	podSecurityContext        map[string]interface{}
+	service                   map[string]interface{}
+	serviceMonitor            map[string]interface{}
+	Resources                 map[string]interface{}
+	autoscaling               map[string]interface{}
+	nodeSelector              map[string]interface{}
+	affinity                  map[string]interface{}
+	dataPlane                 map[string]interface{}
+	admissionWebhooks         map[string]interface{}
+	dataProtection            map[string]interface{}
+	addonController           map[string]interface{}
+	topologySpreadConstraints []interface{}
+	tolerations               []interface{}
+	priorityClassName         string
+	nameOverride              string
+	fullnameOverride          string
+	dnsPolicy                 string
+	replicaCount              int
+	hostNetwork               bool
+	keepAddons                bool
+}
 
 const configKey = "config.yaml"
 
@@ -129,44 +158,35 @@ func NewDescribeConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 }
 
 func describeConfig(o *InstallOptions) error {
-	config := map[string]string{}
-	// get KubeBlocks configmap
-	configMap, err := getKubeBlocksConfigMap(o)
+	if len(o.HelmCfg.Namespace()) == 0 {
+		o.HelmCfg.SetNamespace("kb-system")
+	}
+	actionConfig, err := helm.NewActionConfig(o.HelmCfg)
+	client := action.NewGetValues(actionConfig)
+	client.AllValues = true
+	res, err := client.Run(types.KubeBlocksChartName)
+	//fmt.Println(res)
+	if err != nil {
+		return nil
+	}
+
+	p := printer.NewTablePrinter(o.Out)
+	p.SetHeader("KEY", "VALUE")
+	config := &configInfos{}
+	t := reflect.TypeOf(*config)
+	toJsonData := make(map[string]interface{})
+	for i := 0; i < t.NumField(); i++ {
+		addRows(t.Field(i).Name, res[t.Field(i).Name], p)
+		//toJsonData[t.Field(i).Name] = res[t.Field(i).Name]
+		//fmt.Println(res[t.Field(i).Name])
+	}
+	p.Print()
+	//bytes, err := json.Marshal(toJsonData)
+	jsonData, err := json.MarshalIndent(toJsonData, "", "  ")
 	if err != nil {
 		return err
 	}
-	if configMap != nil {
-		values := configMap.Data[configKey]
-		if len(values) != 0 {
-			if err = yaml.Unmarshal([]byte(values), &config); err != nil {
-				return err
-			}
-		}
-	}
-	// get the KubeBlocks config from the deployment env.
-	// variables with the same name in env will overwrite variables in the configmap.
-	deploy, err := util.GetKubeBlocksDeploy(o.Client)
-	if err != nil {
-		return err
-	}
-	if deploy != nil {
-		containers := deploy.Spec.Template.Spec.Containers
-		if len(containers) > 0 {
-			for _, env := range containers[0].Env {
-				if env.ValueFrom != nil {
-					continue
-				}
-				config[env.Name] = env.Value
-			}
-		}
-	}
-	// in alphabetical order by variable name
-	keys := maps.Keys(config)
-	sort.Strings(keys)
-	for _, k := range keys {
-		line := fmt.Sprintf("%s=%v", k, config[k])
-		printer.PrintLine(line)
-	}
+	fmt.Println(string(jsonData))
 	return nil
 }
 
@@ -234,4 +254,22 @@ func markKubeBlocksPodsToLoadConfigMap(client kubernetes.Interface) error {
 		_, _ = client.CoreV1().Pods(deploy.Namespace).Update(context.TODO(), &pod, metav1.UpdateOptions{})
 	}
 	return nil
+}
+
+func addRows(key string, value interface{}, p *printer.TablePrinter) {
+	if value == nil {
+		p.AddRow(key, value)
+		return
+	}
+	if reflect.TypeOf(value).Kind() == reflect.Map {
+		for k, v := range value.(map[string]interface{}) {
+			addRows(key+"."+k, v, p)
+		}
+	} else if reflect.TypeOf(value).Kind() == reflect.Slice {
+		for _, elem := range value.([]interface{}) {
+			addRows(key, elem, p)
+		}
+	} else {
+		p.AddRow(key, value)
+	}
 }

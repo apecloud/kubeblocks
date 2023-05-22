@@ -166,8 +166,6 @@ type ClusterComponentSpec struct {
 	Services []ClusterComponentService `json:"services,omitempty"`
 
 	// candidateInstance is used to trigger switchover and describe the information of the candidate primary or leader.
-	// the value of candidateInstance index does not represent the real primary or leader  of the current instance,
-	// and the result of instance failover will not be synchronized to candidateInstance.
 	// +optional
 	CandidateInstance *CandidateInstance `json:"candidateInstance,omitempty"`
 

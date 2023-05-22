@@ -44,6 +44,7 @@ mountOptions:
 ## @param storageClassParameters.metadata.awsEBSVolumeType
 ## @param storageClassParameters.metadata.awsEBSEnableBlockExpress
 storageClassParameters:
+  install: false
   ## storageclass for KRaft metadata
   ##
   metadata:

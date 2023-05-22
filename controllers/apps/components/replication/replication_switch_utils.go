@@ -31,8 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	componetutil "github.com/apecloud/kubeblocks/internal/controller/component"
+	intctrlcomputil "github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -102,7 +103,7 @@ func HandleReplicationSetHASwitch(ctx context.Context,
 		return nil
 	}
 
-	candidateInstanceChanged, currentPrimaryInstanceName, err := CheckCandidateInstanceChanged(ctx, cli, cluster, clusterCompSpec)
+	candidateInstanceChanged, currentPrimaryInstanceName, err := componentutil.CheckCandidateInstanceChanged(ctx, cli, cluster, clusterCompSpec)
 	if err != nil {
 		return err
 	}
@@ -320,9 +321,9 @@ func getSwitchStatementsBySwitchPolicyType(switchPolicyType appsv1alpha1.SwitchP
 
 // replaceSwitchCmdExecutorConfigEnv replaces switch execute config secret env.
 func replaceSwitchCmdExecutorConfigEnv(clusterName string, switchCmdExecuteConfig *appsv1alpha1.SwitchCmdExecutorConfig) {
-	namedValuesMap := componetutil.GetEnvReplacementMapForConnCredential(clusterName)
+	namedValuesMap := intctrlcomputil.GetEnvReplacementMapForConnCredential(clusterName)
 	if switchCmdExecuteConfig != nil {
-		switchCmdExecuteConfig.Env = componetutil.ReplaceSecretEnvVars(namedValuesMap, switchCmdExecuteConfig.Env)
+		switchCmdExecuteConfig.Env = intctrlcomputil.ReplaceSecretEnvVars(namedValuesMap, switchCmdExecuteConfig.Env)
 	}
 }
 
@@ -472,30 +473,4 @@ func getSwitchCmdJobLabel(clusterName, componentName string) map[string]string {
 		constant.AppManagedByLabelKey:   constant.AppName,
 		KBSwitchJobLabelKey:             KBSwitchJobLabelValue,
 	}
-}
-
-// CheckCandidateInstanceChanged checks whether candidateInstance has changed.
-// @return bool - true is candidateInstance inconsistent
-// @return string - current primaryInstance name; "" if error
-// @return error
-func CheckCandidateInstanceChanged(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (bool, string, error) {
-	if clusterCompSpec == nil || clusterCompSpec.CandidateInstance == nil {
-		return false, "", nil
-	}
-	// get the Pod object whose current role label is primary
-	pod, err := GetAndCheckReplicationSetPrimaryPod(ctx, cli, cluster, clusterCompSpec.Name)
-	if err != nil {
-		return false, "", err
-	}
-	candidateInstanceName := fmt.Sprintf("%s-%s-%d", cluster.Name, clusterCompSpec.Name, clusterCompSpec.CandidateInstance.Index)
-	if clusterCompSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual {
-		return pod.Name != candidateInstanceName, pod.Name, nil
-	}
-	if clusterCompSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpNotEqual {
-		return pod.Name == candidateInstanceName, pod.Name, nil
-	}
-	return false, pod.Name, nil
 }

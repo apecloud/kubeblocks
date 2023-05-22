@@ -152,31 +152,16 @@ func checkObjRoleLabelIsPrimary[T generics.Object, PT generics.PObject[T]](obj P
 	return obj.GetLabels()[constant.RoleLabelKey] == constant.Primary, nil
 }
 
-// GetReplicationSetPrimaryPod gets the primary Pod of the replication workload.
-func GetReplicationSetPrimaryPod(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, compSpecName string) ([]corev1.Pod, error) {
-	matchLabels := client.MatchingLabels{
-		constant.AppInstanceLabelKey:    cluster.Name,
-		constant.KBAppComponentLabelKey: compSpecName,
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.RoleLabelKey:           constant.Primary,
-	}
-	podList := &corev1.PodList{}
-	if err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace), matchLabels); err != nil {
-		return nil, err
-	}
-	return podList.Items, nil
-}
-
 // GetAndCheckReplicationSetPrimaryPod gets and checks the primary Pod of the replication workload.
-func GetAndCheckReplicationSetPrimaryPod(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, compSpecName string) (*corev1.Pod, error) {
-	podList, err := GetReplicationSetPrimaryPod(ctx, cli, cluster, compSpecName)
+func GetAndCheckReplicationSetPrimaryPod(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compSpecName string) (*corev1.Pod, error) {
+	podList, err := util.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, constant.Primary)
 	if err != nil {
 		return nil, err
 	}
-	if len(podList) != 1 {
+	if len(podList.Items) != 1 {
 		return nil, fmt.Errorf("the number of current replicationSet primary obj is not 1, pls check")
 	}
-	return &podList[0], nil
+	return &podList.Items[0], nil
 }
 
 // updateObjRoleLabel updates the value of the role label of the object.
@@ -247,7 +232,7 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 		return nil
 	}
 
-	oldPrimaryPod, err := GetAndCheckReplicationSetPrimaryPod(reqCtx.Ctx, cli, cluster, compName)
+	oldPrimaryPod, err := GetAndCheckReplicationSetPrimaryPod(reqCtx.Ctx, cli, *cluster, compName)
 	if err != nil {
 		reqCtx.Log.Info("handleReplicationSetRoleChangeEvent get old primary pod failed", "error", err)
 		return err

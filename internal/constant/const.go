@@ -231,6 +231,23 @@ const (
 const (
 	Primary   = "primary"
 	Secondary = "secondary"
+
+	Leader   = "leader"
+	Follower = "follower"
+	Learner  = "learner"
+)
+
+// switchover constants
+const (
+	KBSwitchoverJobLabelKey                = "kubeblocks.io/switchover-job"
+	KBSwitchoverJobLabelValue              = "kb-switchover-job"
+	KBSwitchoverJobNamePrefix              = "kb-switchover-job"
+	KBSwitchoverJobContainerName           = "kb-switchover-job-container"
+	KBSwitchoverJobTTLSecondsAfterFinished = 5
+
+	KBSwitchoverCandidateInstanceName     = "KB_SWITCHOVER_CANDIDATE_INSTANCE_NAME"
+	KBSwitchoverReplicationPrimaryPodName = "KB_REPLICATION_PRIMARY_POD_NAME"
+	KBSwitchoverConsensusLeaderPodName    = "KB_CONSENSUS_LEADER_POD_NAME"
 )
 
 // username and password are keys in created secrets for others to refer to.

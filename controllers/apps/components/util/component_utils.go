@@ -110,6 +110,21 @@ func GetComponentPodList(ctx context.Context, cli client.Client, cluster appsv1a
 	return podList, err
 }
 
+// GetComponentPodListWithRole gets the pod list with target role by cluster and componentName
+func GetComponentPodListWithRole(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compSpecName, role string) (*corev1.PodList, error) {
+	matchLabels := client.MatchingLabels{
+		constant.AppInstanceLabelKey:    cluster.Name,
+		constant.KBAppComponentLabelKey: compSpecName,
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.RoleLabelKey:           role,
+	}
+	podList := &corev1.PodList{}
+	if err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace), matchLabels); err != nil {
+		return nil, err
+	}
+	return podList, nil
+}
+
 func GetComponentStatusMessageKey(kind, name string) string {
 	return fmt.Sprintf("%s/%s", kind, name)
 }

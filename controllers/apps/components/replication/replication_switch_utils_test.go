@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
@@ -118,7 +119,7 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 		clusterComponentSpec := &clusterObj.Spec.ComponentSpecs[0]
 
 		By("Test candidateInstance has not changed.")
-		changed, currentPrimaryInstanceName, err := CheckCandidateInstanceChanged(testCtx.Ctx, k8sClient, clusterObj, clusterComponentSpec)
+		changed, currentPrimaryInstanceName, err := componentutil.CheckCandidateInstanceChanged(testCtx.Ctx, k8sClient, clusterObj, clusterComponentSpec)
 		Expect(err).Should(Succeed())
 		Expect(changed).Should(BeFalse())
 

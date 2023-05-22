@@ -99,6 +99,9 @@ func sortMembers[T any](membersStatus []T,
 		if rolePriorityMap[roleI] == rolePriorityMap[roleJ] {
 			ordinal1 := getOrdinalFunc(i)
 			ordinal2 := getOrdinalFunc(j)
+			if reverse {
+				ordinal1, ordinal2 = ordinal2, ordinal1
+			}
 			return ordinal1 < ordinal2
 		}
 

@@ -51,6 +51,7 @@ func init() {
 
 const (
 	// TODO: deduplicate
+	dbClusterFinalizerName = "cluster.kubeblocks.io/finalizer"
 	clusterDefLabelKey     = "clusterdefinition.kubeblocks.io/name"
 	clusterVersionLabelKey = "clusterversion.kubeblocks.io/name"
 )
@@ -67,9 +68,9 @@ const (
 // default reconcile requeue after duration
 var requeueDuration = time.Millisecond * 100
 
-type gvkNObjKey struct {
-	schema.GroupVersionKind
-	client.ObjectKey
+type gvkName struct {
+	gvk      schema.GroupVersionKind
+	ns, name string
 }
 
 // lifecycleVertex describes expected object spec and how to reach it
@@ -95,7 +96,7 @@ func (v lifecycleVertex) String() string {
 	return fmt.Sprintf("{obj:%T, immutable: %v, action: %v}", v.obj, v.immutable, *v.action)
 }
 
-type clusterOwningObjects map[gvkNObjKey]client.Object
+type clusterSnapshot map[gvkName]client.Object
 
 type RequeueError interface {
 	RequeueAfter() time.Duration

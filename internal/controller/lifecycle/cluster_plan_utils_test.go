@@ -27,30 +27,27 @@ import (
 var _ = Describe("cluster plan utils test", func() {
 	Context("test mergeServiceAnnotations", func() {
 		It("original and target annotations are nil", func() {
-			mergeServiceAnnotations(nil, nil)
+			Expect(mergeServiceAnnotations(nil, nil)).Should(BeNil())
 		})
 		It("target annotations is nil", func() {
 			originalAnnotations := map[string]string{"k1": "v1"}
-			mergeServiceAnnotations(originalAnnotations, nil)
+			Expect(mergeServiceAnnotations(originalAnnotations, nil)).To(Equal(originalAnnotations))
 		})
 		It("original annotations is nil", func() {
 			targetAnnotations := map[string]string{"k1": "v1"}
-			mergeServiceAnnotations(nil, &targetAnnotations)
-			Expect(targetAnnotations).To(Equal(targetAnnotations))
+			Expect(mergeServiceAnnotations(nil, targetAnnotations)).To(Equal(targetAnnotations))
 		})
 		It("original annotations have prometheus annotations which should be removed", func() {
 			originalAnnotations := map[string]string{"k1": "v1", "prometheus.io/path": "/metrics"}
 			targetAnnotations := map[string]string{"k2": "v2"}
 			expectAnnotations := map[string]string{"k1": "v1", "k2": "v2"}
-			mergeServiceAnnotations(originalAnnotations, &targetAnnotations)
-			Expect(targetAnnotations).To(Equal(expectAnnotations))
+			Expect(mergeServiceAnnotations(originalAnnotations, targetAnnotations)).To(Equal(expectAnnotations))
 		})
 		It("target annotations should override original annotations", func() {
 			originalAnnotations := map[string]string{"k1": "v1", "prometheus.io/path": "/metrics"}
 			targetAnnotations := map[string]string{"k1": "v11"}
 			expectAnnotations := map[string]string{"k1": "v11"}
-			mergeServiceAnnotations(originalAnnotations, &targetAnnotations)
-			Expect(targetAnnotations).To(Equal(expectAnnotations))
+			Expect(mergeServiceAnnotations(originalAnnotations, targetAnnotations)).To(Equal(expectAnnotations))
 		})
 
 		It("should merge annotations from original that not exist in target to final result", func() {

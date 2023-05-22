@@ -38,7 +38,7 @@ func (t *ObjectActionTransformer) Transform(ctx graph.TransformContext, dag *gra
 
 	// get the old objects snapshot
 	ml := getAppInstanceAndManagedByML(*origCluster)
-	oldSnapshot, err := getClusterOwningObjects(transCtx, *origCluster, ml, ownKinds()...)
+	oldSnapshot, err := readCacheSnapshot(transCtx, *origCluster, ml, ownKinds()...)
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (t *ObjectActionTransformer) Transform(ctx graph.TransformContext, dag *gra
 	}
 
 	// we have the target objects snapshot in dag
-	newNameVertices := make(map[gvkNObjKey]graph.Vertex)
+	newNameVertices := make(map[gvkName]graph.Vertex)
 	for _, vertex := range dag.Vertices() {
 		v, _ := vertex.(*lifecycleVertex)
 		if v == rootVertex {

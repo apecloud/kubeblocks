@@ -297,7 +297,7 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 	)
 
 	if len(cm.Annotations) != 0 {
-		lastOpsRequest = cm.Annotations[constant.LastAppliedOpsCRAnnotationKey]
+		lastOpsRequest = cm.Annotations[constant.LastAppliedOpsCRAnnotation]
 	}
 
 	eventContext := cfgcore.ConfigEventContext{

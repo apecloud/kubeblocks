@@ -73,17 +73,15 @@ func findRootVertex(dag *graph.DAG) (*lifecycleVertex, error) {
 	return rootVertex, nil
 }
 
-func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkNObjKey, error) {
+func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkName, error) {
 	gvk, err := apiutil.GVKForObject(object, scheme)
 	if err != nil {
 		return nil, err
 	}
-	return &gvkNObjKey{
-		GroupVersionKind: gvk,
-		ObjectKey: client.ObjectKey{
-			Namespace: object.GetNamespace(),
-			Name:      object.GetName(),
-		},
+	return &gvkName{
+		gvk:  gvk,
+		ns:   object.GetNamespace(),
+		name: object.GetName(),
 	}, nil
 }
 
@@ -178,11 +176,10 @@ func getAppInstanceAndManagedByML(cluster appsv1alpha1.Cluster) client.MatchingL
 	}
 }
 
-// getClusterOwningObjects read objects owned by our cluster with kinds and label matching specifier.
-func getClusterOwningObjects(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster,
-	matchLabels client.MatchingLabels, kinds ...client.ObjectList) (clusterOwningObjects, error) {
+// read all objects owned by our cluster
+func readCacheSnapshot(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster, matchLabels client.MatchingLabels, kinds ...client.ObjectList) (clusterSnapshot, error) {
 	// list what kinds of object cluster owns
-	objs := make(clusterOwningObjects)
+	snapshot := make(clusterSnapshot)
 	inNS := client.InNamespace(cluster.Namespace)
 	for _, list := range kinds {
 		if err := transCtx.Client.List(transCtx.Context, list, inNS, matchLabels); err != nil {
@@ -198,10 +195,11 @@ func getClusterOwningObjects(transCtx *ClusterTransformContext, cluster appsv1al
 			if err != nil {
 				return nil, err
 			}
-			objs[*name] = object
+			snapshot[*name] = object
 		}
 	}
-	return objs, nil
+
+	return snapshot, nil
 }
 
 // sendWaringEventForCluster sends a warning event when occurs error.

@@ -341,6 +341,9 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 		} else {
 			mergeAnnotations(pvcProto.Annotations, &pvcObj.Annotations)
 		}
+		if pvcObj.Spec.Resources.Requests == nil {
+			pvcObj.Spec.Resources.Requests = corev1.ResourceList{}
+		}
 		pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] = pvcProto.Spec.Resources.Requests[corev1.ResourceStorage]
 		return pvcObj, nil
 	}

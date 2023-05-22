@@ -475,7 +475,7 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 		},
 	}...).WithLabels(labels)
 
-	// postgresql need more rules for patronic
+	// postgresql need more rules for patroni
 	if ok, err := o.isPostgresqlCluster(); err != nil {
 		return err
 	} else if ok {

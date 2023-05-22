@@ -60,6 +60,22 @@ var faultHTTPExample = templates.Examples(`
 	kbcli fault network http patch --method=POST --port=4399 --body="you are good luck" --type=JSON --duration=30s
 `)
 
+type HTTPReplace struct {
+	ReplaceBody      []byte `json:"body,omitempty"`
+	InputReplaceBody string `json:"-"`
+	ReplacePath      string `json:"path,omitempty"`
+	ReplaceMethod    string `json:"method,omitempty"`
+}
+
+type HTTPPatch struct {
+	HTTPPatchBody `json:"body,omitempty"`
+}
+
+type HTTPPatchBody struct {
+	PatchBodyValue string `json:"value,omitempty"`
+	PatchBodyType  string `json:"type,omitempty"`
+}
+
 type HTTPChaosOptions struct {
 	Target string `json:"target"`
 	Port   int32  `json:"port"`
@@ -72,15 +88,9 @@ type HTTPChaosOptions struct {
 	// delay command
 	Delay string `json:"delay,omitempty"`
 
-	// replace command
-	ReplaceBody      []byte `json:"replaceBody,omitempty"`
-	InputReplaceBody string `json:"-"`
-	ReplacePath      string `json:"replacePath,omitempty"`
-	ReplaceMethod    string `json:"replaceMethod,omitempty"`
+	HTTPReplace `json:"replace,omitempty"`
 
-	// patch command
-	PatchBodyValue string `json:"patchBodyValue,omitempty"`
-	PatchBodyType  string `json:"patchBodyType,omitempty"`
+	HTTPPatch `json:"patch,omitempty"`
 
 	FaultBaseOptions
 }

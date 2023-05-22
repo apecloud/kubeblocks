@@ -104,7 +104,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 
 	// check clusterVersionRef equality but allow clusters.apps.kubeblocks.io/allow-inconsistent-cv=true annotation override
 	if cluster.Spec.ClusterVersionRef != lc.Spec.ClusterVersionRef &&
-		cluster.Annotations[constant.AllowInconsistentCVAnnotationKey] != "true" {
+		cluster.Annotations[constant.AllowInconsistentCVAnnotationKey] != trueVal {
 		return emitError(metav1.Condition{
 			Type:   appsv1alpha1.ConditionTypeHaltRecovery,
 			Reason: "HaltRecoveryFailed",

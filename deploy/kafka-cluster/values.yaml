@@ -7,6 +7,8 @@ terminationPolicy: Halt
 ##
 mode: combined
 
+# Enable TLS
+# Todo: Monitoring is not supported when tls is enabled
 tls: false
 
 ## Enable persistence using Persistent Volume Claims

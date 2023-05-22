@@ -107,7 +107,7 @@ const (
 	ReconfigureRefAnnotationKey                 = "dataprotection.kubeblocks.io/reconfigure-ref"
 	DefaultClusterVersionAnnotationKey          = "kubeblocks.io/is-default-cluster-version" // DefaultClusterVersionAnnotationKey specifies the default cluster version.
 	LastAppliedOpsCRAnnotationKey               = "config.kubeblocks.io/last-applied-ops-name"
-	LastAppliedConfigAnnotationKet              = "config.kubeblocks.io/last-applied-configuration"
+	LastAppliedConfigAnnotationKey              = "config.kubeblocks.io/last-applied-configuration"
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"

@@ -1415,29 +1415,14 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(clusterObj.UID).ShouldNot(Equal(lastClusterUID))
 			lastPVCList, lastSecretList, lastCMList := checkPreservedObjects("")
 
-			Expect(outOfOrderEqualFunc(initPVCList.Items, lastPVCList.Items, func(i corev1.PersistentVolumeClaim, claims []corev1.PersistentVolumeClaim) bool {
-				for _, j := range claims {
-					if i.UID == j.UID {
-						return true
-					}
-				}
-				return false
+			Expect(outOfOrderEqualFunc(initPVCList.Items, lastPVCList.Items, func(i corev1.PersistentVolumeClaim, j corev1.PersistentVolumeClaim) bool {
+				return i.UID == j.UID
 			})).Should(BeTrue())
-			Expect(outOfOrderEqualFunc(initSecretList.Items, lastSecretList.Items, func(i corev1.Secret, claims []corev1.Secret) bool {
-				for _, j := range claims {
-					if i.UID == j.UID {
-						return true
-					}
-				}
-				return false
+			Expect(outOfOrderEqualFunc(initSecretList.Items, lastSecretList.Items, func(i corev1.Secret, j corev1.Secret) bool {
+				return i.UID == j.UID
 			})).Should(BeTrue())
-			Expect(outOfOrderEqualFunc(initCMList.Items, lastCMList.Items, func(i corev1.ConfigMap, claims []corev1.ConfigMap) bool {
-				for _, j := range claims {
-					if i.UID == j.UID {
-						return true
-					}
-				}
-				return false
+			Expect(outOfOrderEqualFunc(initCMList.Items, lastCMList.Items, func(i corev1.ConfigMap, j corev1.ConfigMap) bool {
+				return i.UID == j.UID
 			})).Should(BeTrue())
 
 			By("delete the cluster and should preserved PVC,Secret,CM resources but result updated the new last applied cluster UID")
@@ -1684,17 +1669,6 @@ var _ = Describe("Cluster Controller", func() {
 				clusterVersionNameRand, clusterNameRand, consensusCompDefName, consensusCompName)
 			clusterKey := client.ObjectKeyFromObject(cluster)
 
-			By("mock pvc created")
-			for i := 0; i < 3; i++ {
-				pvcName := fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterKey.Name, consensusCompName, i)
-				pvc := testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterKey.Name,
-					consensusCompName, "data").SetStorage("2Gi").Create(&testCtx).GetObject()
-				// mock pvc bound
-				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(pvc *corev1.PersistentVolumeClaim) {
-					pvc.Status.Phase = corev1.ClaimBound
-				})()).ShouldNot(HaveOccurred())
-			}
-
 			By("test when clusterDefinition not found")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				g.Expect(tmpCluster.Status.ObservedGeneration).Should(BeZero())
@@ -1803,12 +1777,19 @@ func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {
 	bpt.Create(&testCtx)
 }
 
-func outOfOrderEqualFunc[E1, E2 any](s1 []E1, s2 []E2, eq func(E1, []E2) bool) bool {
-	if len(s1) != len(s2) {
+func outOfOrderEqualFunc[E1, E2 any](s1 []E1, s2 []E2, eq func(E1, E2) bool) bool {
+	if l := len(s1); l != len(s2) {
 		return false
 	}
+
 	for _, v1 := range s1 {
-		if !eq(v1, s2) {
+		isEq := false
+		for _, v2 := range s2 {
+			if isEq = eq(v1, v2); isEq {
+				break
+			}
+		}
+		if !isEq {
 			return false
 		}
 	}

@@ -90,7 +90,7 @@ func newUnSetDefaultCMD(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	o := newSetOrUnsetDefaultOptions(f, streams, false)
 	cmd := &cobra.Command{
 		Use:               "unset-default NAME",
-		Short:             "Unset the clusterversion to the default clusterversion if it's default.",
+		Short:             "Unset the clusterversion if it's default.",
 		Example:           unsetDefaultExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, clusterVersionGVR),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -124,30 +124,27 @@ func (o *SetOrUnsetDefaultOption) run(args []string) error {
 	// alreadySet is to marks if two input args have the same clusterdefintion
 	alreadySet := make(map[string]string)
 	for _, cv := range args {
-		if len(cd2DefaultCv[cv2Cd[cv]]) != 0 {
-			allErrs = append(allErrs, fmt.Errorf("clusterdefinition \"%s\" already has a default cluster version \"%s\"", cv2Cd[cv], cd2DefaultCv[cv2Cd[cv]]))
+		cd := cv2Cd[cv]
+		if _, ok := cd2DefaultCv[cd]; ok {
+			allErrs = append(allErrs, fmt.Errorf("clusterdefinition \"%s\" already has a default cluster version \"%s\"", cv2Cd[cv], cd2DefaultCv[cd]))
 			continue
 		}
-		if len(alreadySet[cv2Cd[cv]]) != 0 {
-			allErrs = append(allErrs, fmt.Errorf("\"%s\" has the same clusterdefinition with \"%s\"", cv, alreadySet[cv2Cd[cv]]))
+		if _, ok := alreadySet[cd]; ok {
+			allErrs = append(allErrs, fmt.Errorf("\"%s\" has the same clusterdefinition with \"%s\"", cv, alreadySet[cd]))
 			continue
 		}
 		if err := patchDefaultClusterVersionAnnotations(client, cv, annotationTrueValue); err != nil {
 			allErrs = append(allErrs, err)
 			continue
 		}
-		alreadySet[cv2Cd[cv]] = cv
+		alreadySet[cd] = cv
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
 
 func (o *SetOrUnsetDefaultOption) validate(args []string) error {
 	if len(args) == 0 {
-		if o.setDefault {
-			return fmt.Errorf("set-default shuold specify the clusterversions. use \"kbcli clusterversion list\" to list the clusterversions")
-		} else {
-			return fmt.Errorf("unset-default shuold specify the clusterversions. use \"kbcli clusterversion list\" to list the clusterversions")
-		}
+		return fmt.Errorf("clusterversion name should be specified, run \"kbcli clusterversion list\" to list the clusterversions")
 	}
 	return nil
 }
@@ -178,12 +175,13 @@ func getMapsBetweenCvAndCd(client dynamic.Interface) (map[string]string, map[str
 		annotations := item.GetAnnotations()
 		labels := item.GetLabels()
 		if labels == nil {
-			// allErrs = append(allErrs, fmt.Errorf("cluterversion \"%s\" lacks of \"labels\" field"))
+			continue
+		}
+		if _, ok := labels[constant.ClusterDefLabelKey]; !ok {
 			continue
 		}
 		cvToCd[name] = labels[constant.ClusterDefLabelKey]
 		if annotations == nil {
-			// allErrs = append(allErrs, fmt.Errorf("cluterversion \"%s\" lacks of \"annotations\" field"))
 			continue
 		}
 		if annotations[constant.DefaultClusterVersionAnnotationKey] == annotationTrueValue {

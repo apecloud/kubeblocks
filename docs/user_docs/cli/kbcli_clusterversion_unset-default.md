@@ -2,7 +2,7 @@
 title: kbcli clusterversion unset-default
 ---
 
-Unset the clusterversion to the default clusterversion if it's default.
+Unset the clusterversion if it's default.
 
 ```
 kbcli clusterversion unset-default NAME [flags]

@@ -39,7 +39,7 @@ ClusterVersion command.
 
 * [kbcli clusterversion list](kbcli_clusterversion_list.md)	 - List ClusterVersions.
 * [kbcli clusterversion set-default](kbcli_clusterversion_set-default.md)	 - Set the clusterversion to the default clusterversion for its clusterdefinition.
-* [kbcli clusterversion unset-default](kbcli_clusterversion_unset-default.md)	 - Unset the clusterversion to the default clusterversion if it's default.
+* [kbcli clusterversion unset-default](kbcli_clusterversion_unset-default.md)	 - Unset the clusterversion if it's default.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

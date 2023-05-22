@@ -24,6 +24,7 @@ kbcli cluster expose NAME --enable=[true|false] --type=[vpc|internet] [flags]
 ### Options
 
 ```
+      --auto-approve                   Skip interactive approval before exposing the cluster
       --components strings             Component names to this operations
       --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
       --enable string                  Enable or disable the expose, values can be true or false

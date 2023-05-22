@@ -1792,3 +1792,9 @@ aws-load-balancer-controller:
             operator: In
             values:
             - "true"
+
+## k8s cluster feature gates, ref: https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/
+enabledAlphaFeatureGates:
+  ## @param enabledAlphaFeatureGates.recoverVolumeExpansionFailure -- Specifies whether feature gates RecoverVolumeExpansionFailure is enabled in k8s cluster.
+  ##
+  recoverVolumeExpansionFailure: false

@@ -80,7 +80,7 @@ var _ = Describe("text_results_test", func() {
 			g.Expect(err).NotTo(HaveOccurred())
 			err = ShowTextResults(preflightName, analyzeResults, kbcliFormat, false, out)
 			g.Expect(err).NotTo(HaveOccurred())
-			err = ShowTextResults(preflightName, analyzeResults, unknownFormat, false, nil)
+			err = ShowTextResults(preflightName, analyzeResults, unknownFormat, false, out)
 			g.Expect(err).To(HaveOccurred())
 		}).Should(HaveOccurred())
 	})

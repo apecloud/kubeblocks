@@ -1072,13 +1072,13 @@ func buildResourceLabels(clusterName string) map[string]string {
 // build the cluster definition
 // if the cluster definition is not specified, we will use the cluster definition in the cluster component
 // if both of them are not specified, we will return an error
-func (o *CreateOptions) buildClusterDef(comp *appsv1alpha1.Cluster) error {
+func (o *CreateOptions) buildClusterDef(cls *appsv1alpha1.Cluster) error {
 	if o.ClusterDefRef != "" {
 		return nil
 	}
 
-	if comp != nil && comp.Spec.ClusterDefRef != "" {
-		o.ClusterDefRef = comp.Spec.ClusterDefRef
+	if cls != nil && cls.Spec.ClusterDefRef != "" {
+		o.ClusterDefRef = cls.Spec.ClusterDefRef
 		return nil
 	}
 
@@ -1088,23 +1088,23 @@ func (o *CreateOptions) buildClusterDef(comp *appsv1alpha1.Cluster) error {
 // build the cluster version
 // if the cluster version is not specified, we will use the cluster version in the cluster component
 // if both of them are not specified, we use default cluster version
-func (o *CreateOptions) buildClusterVersion(comp *appsv1alpha1.Cluster) {
+func (o *CreateOptions) buildClusterVersion(cls *appsv1alpha1.Cluster) {
 	if o.ClusterVersionRef != "" {
 		return
 	}
 
-	if comp != nil && comp.Spec.ClusterVersionRef != "" {
-		o.ClusterVersionRef = comp.Spec.ClusterVersionRef
+	if cls != nil && cls.Spec.ClusterVersionRef != "" {
+		o.ClusterVersionRef = cls.Spec.ClusterVersionRef
 	}
 }
 
-func (o *CreateOptions) buildAnnotation(comp *appsv1alpha1.Cluster) {
-	if comp == nil {
+func (o *CreateOptions) buildAnnotation(cls *appsv1alpha1.Cluster) {
+	if cls == nil {
 		return
 	}
 
 	if o.Annotations == nil {
-		o.Annotations = comp.Annotations
+		o.Annotations = cls.Annotations
 	}
 }
 

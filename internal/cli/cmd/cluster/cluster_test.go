@@ -42,6 +42,7 @@ var _ = Describe("Cluster", func() {
 		testComponentWithInvalidClassPath    = "../../testing/testdata/component_with_invalid_class.yaml"
 		testComponentWithResourcePath        = "../../testing/testdata/component_with_resource_1c1g.yaml"
 		testComponentWithInvalidResourcePath = "../../testing/testdata/component_with_invalid_resource.yaml"
+		testClusterPath                      = "../../testing/testdata/cluster.yaml"
 	)
 
 	const (
@@ -244,6 +245,12 @@ var _ = Describe("Cluster", func() {
 		It("should fail if create cluster by file with resource not matching to any class", func() {
 			o.SetFile = testComponentWithInvalidResourcePath
 			Expect(o.Complete()).Should(HaveOccurred())
+		})
+
+		It("should succeed if create cluster with a complete config file", func() {
+			o.SetFile = testClusterPath
+			Expect(o.Complete()).Should(Succeed())
+			Expect(o.Validate()).Should(Succeed())
 		})
 	})
 

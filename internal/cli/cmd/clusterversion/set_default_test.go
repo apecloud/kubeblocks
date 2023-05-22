@@ -43,23 +43,17 @@ var _ = Describe("set-default", func() {
 	var tf *cmdtesting.TestFactory
 
 	const (
-		cluterversionName       = testing.ClusterVersionName
-		otherClusterversionName = testing.ClusterName + "-other"
+		cluterversion          = testing.ClusterVersionName
+		clusterversionInSameCD = testing.ClusterVersionName + "-sameCD"
+		ClusterversionOtherCD  = testing.ClusterName + "-other"
+		errorClusterversion    = "08jfa2"
 	)
-	BeforeEach(func() {
-		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
-		_ = metav1.AddMetaToScheme(scheme.Scheme)
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
-		tf = testing.NewTestFactory(testing.Namespace)
-		tf.Client = &clientfake.RESTClient{}
-		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterVersion())
-	})
 
-	beginWithTwoClusterversion := func() {
+	beginWithMultipleClusterversion := func() {
 		tf.FakeDynamicClient = testing.FakeDynamicClient([]runtime.Object{
 			&appsv1alpha1.ClusterVersion{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: cluterversionName,
+					Name: cluterversion,
 					Labels: map[string]string{
 						constant.ClusterDefLabelKey: testing.ClusterDefName,
 					},
@@ -67,7 +61,15 @@ var _ = Describe("set-default", func() {
 			},
 			&appsv1alpha1.ClusterVersion{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: otherClusterversionName,
+					Name: clusterversionInSameCD,
+					Labels: map[string]string{
+						constant.ClusterDefLabelKey: testing.ClusterDefName,
+					},
+				},
+			},
+			&appsv1alpha1.ClusterVersion{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: ClusterversionOtherCD,
 					Labels: map[string]string{
 						constant.ClusterDefLabelKey: testing.ClusterDefName + "-other",
 					},
@@ -100,6 +102,15 @@ var _ = Describe("set-default", func() {
 		validateSetOrUnsetResult(needToChecks[1:], value[1:])
 	}
 
+	BeforeEach(func() {
+		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
+		_ = metav1.AddMetaToScheme(scheme.Scheme)
+		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		tf = testing.NewTestFactory(testing.Namespace)
+		tf.Client = &clientfake.RESTClient{}
+		beginWithMultipleClusterversion()
+	})
+
 	It("test isDefault Func", func() {
 		cv := testing.FakeClusterVersion()
 		Expect(isDefault(cv)).Should(Equal(annotationFalseValue))
@@ -126,49 +137,58 @@ var _ = Describe("set-default", func() {
 		Expect(o.validate([]string{})).Should(HaveOccurred())
 	})
 
+	It("set-default error args", func() {
+		o := newSetOrUnsetDefaultOptions(tf, streams, true)
+		Expect(o.run([]string{errorClusterversion})).Should(HaveOccurred())
+	})
+
 	It("unset-default empty args", func() {
 		o := newSetOrUnsetDefaultOptions(tf, streams, false)
 		Expect(o.validate([]string{})).Should(HaveOccurred())
 	})
 
+	It("unset-default error args", func() {
+		o := newSetOrUnsetDefaultOptions(tf, streams, false)
+		Expect(o.run([]string{errorClusterversion})).Should(HaveOccurred())
+	})
+
 	It("set-default and unset-default", func() {
 		// before set-default
-		validateSetOrUnsetResult([]string{cluterversionName}, []string{annotationFalseValue})
+		validateSetOrUnsetResult([]string{cluterversion}, []string{annotationFalseValue})
 		// set-default
 		cmd := newSetDefaultCMD(tf, streams)
-		cmd.Run(cmd, []string{cluterversionName})
-		validateSetOrUnsetResult([]string{cluterversionName}, []string{annotationTrueValue})
+		cmd.Run(cmd, []string{cluterversion})
+		validateSetOrUnsetResult([]string{cluterversion}, []string{annotationTrueValue})
 		// unset-default
 		cmd = newUnSetDefaultCMD(tf, streams)
-		cmd.Run(cmd, []string{cluterversionName})
-		validateSetOrUnsetResult([]string{cluterversionName}, []string{annotationFalseValue})
+		cmd.Run(cmd, []string{cluterversion})
+		validateSetOrUnsetResult([]string{cluterversion}, []string{annotationFalseValue})
 	})
 
 	It("the clusterDef already have a default cv when set-default", func() {
 		cmd := newSetDefaultCMD(tf, streams)
-		cmd.Run(cmd, []string{cluterversionName})
-		validateSetOrUnsetResult([]string{cluterversionName}, []string{annotationTrueValue})
+		cmd.Run(cmd, []string{cluterversion})
+		validateSetOrUnsetResult([]string{cluterversion, clusterversionInSameCD}, []string{annotationTrueValue, annotationFalseValue})
 		o := newSetOrUnsetDefaultOptions(tf, streams, true)
-		err := o.run([]string{cluterversionName})
+		err := o.run([]string{clusterversionInSameCD})
 		Expect(err).Should(HaveOccurred())
 	})
 
 	It("set-default args belong the same cd", func() {
 		o := newSetOrUnsetDefaultOptions(tf, streams, true)
-		err := o.run([]string{cluterversionName, cluterversionName})
+		err := o.run([]string{cluterversion, cluterversion})
 		Expect(err).Should(HaveOccurred())
 	})
 
 	It("set-default and unset-default more than one args", func() {
-		beginWithTwoClusterversion()
 		cmd := newSetDefaultCMD(tf, streams)
-		validateSetOrUnsetResult([]string{cluterversionName, otherClusterversionName}, []string{annotationFalseValue, annotationFalseValue})
+		validateSetOrUnsetResult([]string{cluterversion, ClusterversionOtherCD}, []string{annotationFalseValue, annotationFalseValue})
 		// set-default
-		cmd.Run(cmd, []string{cluterversionName, otherClusterversionName})
-		validateSetOrUnsetResult([]string{cluterversionName, otherClusterversionName}, []string{annotationTrueValue, annotationTrueValue})
+		cmd.Run(cmd, []string{cluterversion, ClusterversionOtherCD})
+		validateSetOrUnsetResult([]string{cluterversion, ClusterversionOtherCD}, []string{annotationTrueValue, annotationTrueValue})
 		// unset-defautl
 		cmd = newUnSetDefaultCMD(tf, streams)
-		cmd.Run(cmd, []string{cluterversionName, otherClusterversionName})
-		validateSetOrUnsetResult([]string{cluterversionName, otherClusterversionName}, []string{annotationFalseValue, annotationFalseValue})
+		cmd.Run(cmd, []string{cluterversion, ClusterversionOtherCD})
+		validateSetOrUnsetResult([]string{cluterversion, ClusterversionOtherCD}, []string{annotationFalseValue, annotationFalseValue})
 	})
 })

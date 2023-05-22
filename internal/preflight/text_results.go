@@ -99,7 +99,6 @@ func showResultsKBCli(preflightName string, analyzeResults []*analyzerunner.Anal
 	)
 	msg := fmt.Sprintf("%-50s", "Kubernetes cluster preflight")
 	s := spinner.New(out, spinner.WithMessage(msg))
-	defer s.Fail()
 	data := showStdoutResultsStructured(preflightName, analyzeResults, verbose)
 	isFailed := false
 

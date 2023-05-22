@@ -1428,11 +1428,15 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(podSpec.TopologySpreadConstraints).Should(BeEmpty())
 
 			By("Check should create env configmap")
-			Eventually(testapps.List(&testCtx, generics.ConfigMapSignature,
-				client.MatchingLabels{
+			Eventually(func(g Gomega) {
+				cmList := &corev1.ConfigMapList{}
+				Expect(k8sClient.List(testCtx.Ctx, cmList, client.MatchingLabels{
 					constant.AppInstanceLabelKey:   clusterKey.Name,
 					constant.AppConfigTypeLabelKey: "kubeblocks-env",
-				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(len(compNameNDef)))
+				}, client.InNamespace(clusterKey.Namespace))).Should(Succeed())
+				Expect(cmList.Items).ShouldNot(BeEmpty())
+				Expect(cmList.Items).Should(HaveLen(len(compNameNDef)))
+			}).Should(Succeed())
 
 			By("Checking stateless services")
 			statelessExpectServices := map[string]ExpectService{
@@ -1512,24 +1516,21 @@ var _ = Describe("Cluster Controller", func() {
 			}
 
 			By("delete the cluster and should preserved PVC,Secret,CM resources")
-			deleteCluster := func() {
+			deleteCluster := func(termPolicy appsv1alpha1.TerminationPolicyType) {
 				// TODO: would be better that cluster is created with terminationPolicy=Halt instead of
 				// reassign the value after created
 				Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-					cluster.Spec.TerminationPolicy = appsv1alpha1.Halt
+					cluster.Spec.TerminationPolicy = termPolicy
 				})()).ShouldNot(HaveOccurred())
 				testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
 				Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
 			}
-			deleteCluster()
+			deleteCluster(appsv1alpha1.Halt)
 
 			By("check should preserved PVC,Secret,CM resources")
-			var secretList *corev1.SecretList
-			var cmList *corev1.ConfigMapList
-			var pvcList *corev1.PersistentVolumeClaimList
 
-			checkPreservedObjects := func(uid types.UID) {
-				checkObject := func(obj client.Object, uid types.UID) {
+			checkPreservedObjects := func(uid types.UID) (*corev1.PersistentVolumeClaimList, *corev1.SecretList, *corev1.ConfigMapList) {
+				checkObject := func(obj client.Object) {
 					clusterJSON, ok := obj.GetAnnotations()[constant.LastAppliedClusterAnnotationKey]
 					Expect(ok).Should(BeTrue())
 					Expect(clusterJSON).ShouldNot(BeEmpty())
@@ -1543,39 +1544,54 @@ var _ = Describe("Cluster Controller", func() {
 						constant.AppInstanceLabelKey: clusterKey.Name,
 					},
 				}
-				By("check pvc resources preserved")
-				pvcList = &corev1.PersistentVolumeClaimList{}
+				pvcList := &corev1.PersistentVolumeClaimList{}
 				Expect(k8sClient.List(testCtx.Ctx, pvcList, listOptions...)).Should(Succeed())
-				Expect(pvcList.Items).ShouldNot(BeEmpty())
-				for _, pvc := range pvcList.Items {
-					checkObject(&pvc, uid)
-				}
 
-				By("check configmap resources preserved")
-				cmList = &corev1.ConfigMapList{}
+				cmList := &corev1.ConfigMapList{}
 				Expect(k8sClient.List(testCtx.Ctx, cmList, listOptions...)).Should(Succeed())
-				Expect(cmList.Items).ShouldNot(BeEmpty())
-				for _, cm := range cmList.Items {
-					checkObject(&cm, uid)
-				}
 
-				By("check secret resources preserved")
-				secretList = &corev1.SecretList{}
+				secretList := &corev1.SecretList{}
 				Expect(k8sClient.List(testCtx.Ctx, secretList, listOptions...)).Should(Succeed())
-				Expect(secretList.Items).ShouldNot(BeEmpty())
-				for _, secret := range secretList.Items {
-					checkObject(&secret, uid)
+				if uid != "" {
+					By("check pvc resources preserved")
+					Expect(pvcList.Items).ShouldNot(BeEmpty())
+
+					for _, pvc := range pvcList.Items {
+						checkObject(&pvc)
+					}
+					By("check secret resources preserved")
+					Expect(cmList.Items).ShouldNot(BeEmpty())
+					for _, secret := range secretList.Items {
+						checkObject(&secret)
+					}
+					By("check configmap resources preserved")
+					Expect(secretList.Items).ShouldNot(BeEmpty())
+					for _, cm := range cmList.Items {
+						checkObject(&cm)
+					}
 				}
+				return pvcList, secretList, cmList
 			}
-			checkPreservedObjects(clusterObj.UID)
+			initPVCList, initSecretList, initCMList := checkPreservedObjects(clusterObj.UID)
 
 			By("create recovering cluster")
 			lastClusterUID := clusterObj.UID
 			checkAllResourcesCreated(compNameNDef)
 			Expect(clusterObj.UID).ShouldNot(Equal(lastClusterUID))
+			lastPVCList, lastSecretList, lastCMList := checkPreservedObjects("")
+
+			Expect(outOfOrderEqualFunc(initPVCList.Items, lastPVCList.Items, func(i corev1.PersistentVolumeClaim, j corev1.PersistentVolumeClaim) bool {
+				return i.UID == j.UID
+			})).Should(BeTrue())
+			Expect(outOfOrderEqualFunc(initSecretList.Items, lastSecretList.Items, func(i corev1.Secret, j corev1.Secret) bool {
+				return i.UID == j.UID
+			})).Should(BeTrue())
+			Expect(outOfOrderEqualFunc(initCMList.Items, lastCMList.Items, func(i corev1.ConfigMap, j corev1.ConfigMap) bool {
+				return i.UID == j.UID
+			})).Should(BeTrue())
 
 			By("delete the cluster and should preserved PVC,Secret,CM resources but result updated the new last applied cluster UID")
-			deleteCluster()
+			deleteCluster(appsv1alpha1.Halt)
 			checkPreservedObjects(clusterObj.UID)
 		})
 
@@ -1947,4 +1963,25 @@ func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {
 		}
 	}
 	bpt.Create(&testCtx)
+}
+
+func outOfOrderEqualFunc[E1, E2 any](s1 []E1, s2 []E2, eq func(E1, E2) bool) bool {
+	if l := len(s1); l != len(s2) {
+		return false
+	} else if l == 0 {
+		return true
+	}
+
+	for _, v1 := range s1 {
+		isEq := false
+		for _, v2 := range s2 {
+			if isEq = eq(v1, v2); isEq {
+				break
+			}
+		}
+		if !isEq {
+			return false
+		}
+	}
+	return true
 }

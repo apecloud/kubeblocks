@@ -22,7 +22,6 @@ package consensusset
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"regexp"
 	"sort"
 	"strconv"
@@ -33,6 +32,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -199,7 +199,7 @@ func setMembersStatus(set *workloads.ConsensusSet, pods []corev1.Pod) {
 	oldMemberSet := sets.KeySet(oldMemberMap)
 	newMemberSet := sets.KeySet(newMemberMap)
 	memberToKeepSet := oldMemberSet.Difference(newMemberSet)
-	for podName, _ := range memberToKeepSet {
+	for podName := range memberToKeepSet {
 		ordinal, _ := getPodOrdinal(podName)
 		// members have left because of scale-in
 		if ordinal >= int(set.Spec.Replicas) {

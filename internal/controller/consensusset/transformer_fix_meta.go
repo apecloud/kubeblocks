@@ -42,7 +42,9 @@ func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		return nil
 	}
 	controllerutil.AddFinalizer(csSet, csSetFinalizerName)
-	model.PrepareRootUpdate(dag)
+	if err := model.PrepareRootUpdate(dag); err != nil {
+		return err
+	}
 
 	return graph.ErrNoops
 }

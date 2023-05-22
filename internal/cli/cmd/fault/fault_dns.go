@@ -82,9 +82,6 @@ func NewRandomCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o.AddCommonFlag(cmd)
 	util.CheckErr(cmd.MarkFlagRequired("patterns"))
 
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
-
 	return cmd
 }
 
@@ -94,9 +91,6 @@ func NewErrorCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 
 	o.AddCommonFlag(cmd)
 	util.CheckErr(cmd.MarkFlagRequired("patterns"))
-
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
 
 	return cmd
 }
@@ -120,6 +114,9 @@ func (o *DNSChaosOptions) AddCommonFlag(cmd *cobra.Command) {
 	o.FaultBaseOptions.AddCommonFlag(cmd)
 
 	cmd.Flags().StringArrayVar(&o.Patterns, "patterns", nil, `Select the domain name template that matches the failure behavior, and support placeholders ? and wildcards *.`)
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, o.Factory)
 }
 
 func (o *DNSChaosOptions) Validate() error {

@@ -24,7 +24,7 @@ import (
 )
 
 // mergeAnnotations keeps the original annotations.
-// if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
+// if annotations exist and are replaced.
 func mergeAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string, filters ...func(k, v string) bool) {
 	if targetAnnotations == nil {
 		return

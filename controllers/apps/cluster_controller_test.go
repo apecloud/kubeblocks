@@ -1669,17 +1669,6 @@ var _ = Describe("Cluster Controller", func() {
 				clusterVersionNameRand, clusterNameRand, consensusCompDefName, consensusCompName)
 			clusterKey := client.ObjectKeyFromObject(cluster)
 
-			By("mock pvc created")
-			for i := 0; i < 3; i++ {
-				pvcName := fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterKey.Name, consensusCompName, i)
-				pvc := testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterKey.Name,
-					consensusCompName, "data").SetStorage("2Gi").Create(&testCtx).GetObject()
-				// mock pvc bound
-				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(pvc *corev1.PersistentVolumeClaim) {
-					pvc.Status.Phase = corev1.ClaimBound
-				})()).ShouldNot(HaveOccurred())
-			}
-
 			By("test when clusterDefinition not found")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 				g.Expect(tmpCluster.Status.ObservedGeneration).Should(BeZero())
@@ -1791,8 +1780,6 @@ func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {
 func outOfOrderEqualFunc[E1, E2 any](s1 []E1, s2 []E2, eq func(E1, E2) bool) bool {
 	if l := len(s1); l != len(s2) {
 		return false
-	} else if l == 0 {
-		return true
 	}
 
 	for _, v1 := range s1 {

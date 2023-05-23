@@ -93,12 +93,12 @@ var _ = Describe("set-default", func() {
 
 	var validateSetOrUnsetResult func(needToChecks []string, value []string)
 	validateSetOrUnsetResult = func(needToChecks []string, value []string) {
-		if len(needToChecks) == 1 {
-			cv, err := getFakeClusterVersion(tf.FakeDynamicClient, needToChecks[0])
-			Expect(err).Should(Succeed())
-			Expect(isDefault(cv)).Should(Equal(value[0]))
+		if len(needToChecks) == 0 {
 			return
 		}
+		cv, err := getFakeClusterVersion(tf.FakeDynamicClient, needToChecks[0])
+		Expect(err).Should(Succeed())
+		Expect(isDefault(cv)).Should(Equal(value[0]))
 		validateSetOrUnsetResult(needToChecks[1:], value[1:])
 	}
 

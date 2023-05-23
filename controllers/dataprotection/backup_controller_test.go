@@ -166,7 +166,7 @@ var _ = Describe("Backup Controller test", func() {
 			It("should succeed after job completes", func() {
 				By("Check backup job's nodeName equals pod's nodeName")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *batchv1.Job) {
-					g.Expect(fetched.Spec.Template.Spec.NodeName).To(Equal(nodeName))
+					g.Expect(fetched.Spec.Template.Spec.NodeSelector[hostNameLabelKey]).To(Equal(nodeName))
 				})).Should(Succeed())
 
 				patchK8sJobStatus(backupKey, batchv1.JobComplete)

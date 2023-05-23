@@ -46,6 +46,8 @@ const (
 
 	// the key of persistentVolumeTemplate in the configmap.
 	persistentVolumeTemplateKey = "persistentVolume"
+
+	hostNameLabelKey = "kubernetes.io/hostname"
 )
 
 var reconcileInterval = time.Second

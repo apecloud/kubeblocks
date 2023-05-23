@@ -73,7 +73,7 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:     "destroy",
-		Short:   "Destroy the playground kubernetes cluster.",
+		Short:   "Destroy the playground KubeBlocks and kubernetes cluster.",
 		Example: destroyExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.validate())
@@ -82,19 +82,8 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&o.purge, "purge", true, "Purge all resources before destroy kubernetes cluster, delete all clusters created by KubeBlocks and uninstall KubeBlocks.")
-	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for installing KubeBlocks, such as --timeout=10m")
+	cmd.Flags().DurationVar(&o.timeout, "timeout", 300*time.Second, "Time to wait for installing KubeBlocks, such as --timeout=10m")
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before destroying the playground")
-	return cmd
-}
-
-func newGuideCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "guide",
-		Short: "Display playground cluster user guide.",
-		Run: func(cmd *cobra.Command, args []string) {
-			printGuide()
-		},
-	}
 	return cmd
 }
 
@@ -309,7 +298,7 @@ func (o *destroyOptions) deleteClusters(dynamic dynamic.Interface) error {
 
 	// check all clusters termination policy is WipeOut
 	if checkWipeOut {
-		if err = wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
+		if err = wait.PollImmediate(5*time.Second, o.timeout, func() (bool, error) {
 			return checkClusters(func(cluster *appsv1alpha1.Cluster) bool {
 				if cluster.Spec.TerminationPolicy != appsv1alpha1.WipeOut {
 					klog.V(1).Infof("Cluster %s termination policy is %s", cluster.Name, cluster.Spec.TerminationPolicy)
@@ -327,7 +316,7 @@ func (o *destroyOptions) deleteClusters(dynamic dynamic.Interface) error {
 	}
 
 	// check and wait all clusters are deleted
-	if err = wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
+	if err = wait.PollImmediate(5*time.Second, o.timeout, func() (bool, error) {
 		return checkClusters(func(cluster *appsv1alpha1.Cluster) bool {
 			// always return false if any cluster is not deleted
 			klog.V(1).Infof("Cluster %s is not deleted", cluster.Name)

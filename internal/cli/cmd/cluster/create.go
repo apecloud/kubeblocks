@@ -1011,6 +1011,20 @@ func (o *CreateOptions) validateClusterVersion() error {
 	if err != nil {
 		return err
 	}
+
+	dryRun, err := o.GetDryRunStrategy()
+	if err != nil {
+		return err
+	}
+
+	printCvInfo := func(cv string) {
+		// if dryRun is not None, we don't need to print the info, avoid the output yaml file including the info
+		if dryRun != create.DryRunNone {
+			return
+		}
+		fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", cv)
+	}
+
 	switch {
 	case o.ClusterVersionRef != "":
 		if _, ok := existedClusterVersions[o.ClusterVersionRef]; !ok {
@@ -1020,7 +1034,7 @@ func (o *CreateOptions) validateClusterVersion() error {
 		// if default version is not set and there is only one version, use it
 		if len(existedClusterVersions) == 1 {
 			o.ClusterVersionRef = maps.Keys(existedClusterVersions)[0]
-			fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
+			printCvInfo(o.ClusterVersionRef)
 		} else {
 			return fmt.Errorf("failed to find the default cluster version, use '--cluster-version ClusterVersion' to set it")
 		}
@@ -1028,7 +1042,7 @@ func (o *CreateOptions) validateClusterVersion() error {
 		// TODO: achieve this in operator
 		if existedDefault {
 			o.ClusterVersionRef = defaultVersion
-			fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
+			printCvInfo(o.ClusterVersionRef)
 		}
 	}
 

@@ -82,6 +82,7 @@ var _ = Describe("Cluster", func() {
 			}
 			o.Options = o
 			Expect(o.Complete()).To(Succeed())
+			Expect(o.Validate()).To(Succeed())
 			Expect(o.Name).ShouldNot(BeEmpty())
 			Expect(o.Run()).Should(HaveOccurred())
 		})

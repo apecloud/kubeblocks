@@ -809,8 +809,10 @@ func BuildNodeAffinity(nodeLabels map[string]string) *corev1.NodeAffinity {
 			MatchExpressions: matchExpressions,
 		}
 		nodeAffinity = &corev1.NodeAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-				NodeSelectorTerms: []corev1.NodeSelectorTerm{nodeSelectorTerm},
+			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+				{
+					Preference: nodeSelectorTerm,
+				},
 			},
 		}
 	}

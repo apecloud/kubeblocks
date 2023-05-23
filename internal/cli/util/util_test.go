@@ -271,4 +271,38 @@ var _ = Describe("util", func() {
 		_, err = ConvertObjToUnstructured(struct{ name string }{name: "test"})
 		Expect(err).Should(HaveOccurred())
 	})
+
+	It("test build toleration", func() {
+		validRaws := []string{"dev=true:NoSchedule,large=true:NoSchedule"}
+		_, err := BuildTolerations(validRaws)
+		Expect(err).Should(BeNil())
+
+		// optimize these codes
+		invalidRaws := []string{"dev=true"}
+		_, err = BuildTolerations(invalidRaws)
+		Expect(err).Should(HaveOccurred())
+
+		invalidRaws = []string{"true:NoSchedule"}
+		_, err = BuildTolerations(invalidRaws)
+		Expect(err).Should(HaveOccurred())
+	})
+
+	It("test build node affinity", func() {
+		nodeLabels := make(map[string]string)
+		Expect(BuildNodeAffinity(nodeLabels)).Should(BeNil())
+
+		nodeLabels["testNodeLabels"] = "testNodeLabels"
+		Expect(BuildNodeAffinity(nodeLabels)).ShouldNot(BeNil())
+	})
+
+	It("test build pod affinity", func() {
+		topologyKey := "testTopologyKey"
+
+		topologyKeys := []string{topologyKey}
+		podAntiAffinityStrategy := "testPodAntiAffinityStrategy"
+		podAntiAffinity := BuildPodAntiAffinity(podAntiAffinityStrategy, topologyKeys)
+		Expect(podAntiAffinity).ShouldNot(BeNil())
+		Expect(podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].Weight).ShouldNot(BeNil())
+		Expect(podAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.TopologyKey).Should(Equal(topologyKey))
+	})
 })

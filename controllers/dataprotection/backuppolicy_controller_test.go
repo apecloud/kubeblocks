@@ -357,7 +357,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					fetched.Spec.Schedule.Logfile = &dpv1alpha1.SchedulePolicy{Enable: true, CronExpression: "* * * * *"}
 				})).Should(Succeed())
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-					g.Expect(fetched.Annotations[constant.LastAppliedConfigAnnotation]).To(Equal(`[{"key":"archive_command","value":"''"}]`))
+					g.Expect(fetched.Annotations[constant.LastAppliedConfigAnnotationKey]).To(Equal(`[{"key":"archive_command","value":"''"}]`))
 				})).Should(Succeed())
 
 				By("disable schedule for reconfigure")
@@ -365,7 +365,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					fetched.Spec.Schedule.Logfile.Enable = false
 				})).Should(Succeed())
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-					g.Expect(fetched.Annotations[constant.LastAppliedConfigAnnotation]).To(Equal(`[{"key":"archive_command","value":"'/bin/true'"}]`))
+					g.Expect(fetched.Annotations[constant.LastAppliedConfigAnnotationKey]).To(Equal(`[{"key":"archive_command","value":"'/bin/true'"}]`))
 				})).Should(Succeed())
 			})
 		})

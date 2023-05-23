@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/authzed/controller-idioms/hash"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -103,12 +104,12 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 
 	// check clusterVersionRef equality but allow clusters.apps.kubeblocks.io/allow-inconsistent-cv=true annotation override
 	if cluster.Spec.ClusterVersionRef != lc.Spec.ClusterVersionRef &&
-		cluster.Annotations[constant.AllowInconsistentCVAnnotationKey] != trueVal {
+		cluster.Annotations[constant.HaltRecoveryAllowInconsistentCVAnnotKey] != trueVal {
 		return emitError(metav1.Condition{
 			Type:   appsv1alpha1.ConditionTypeHaltRecovery,
 			Reason: "HaltRecoveryFailed",
 			Message: fmt.Sprintf("not equal to last applied cluster.spec.clusterVersionRef %s; add '%s=true' annotation if void this check",
-				lc.Spec.ClusterVersionRef, constant.AllowInconsistentCVAnnotationKey),
+				lc.Spec.ClusterVersionRef, constant.HaltRecoveryAllowInconsistentCVAnnotKey),
 		})
 	}
 
@@ -143,6 +144,25 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 					Reason: "HaltRecoveryFailed",
 					Message: fmt.Sprintf("not equal to last applied cluster.spec.componetSpecs[%s].replicas=%d",
 						comp.Name, lastUsedComp.Replicas),
+				})
+			}
+			if hash.Object(comp.VolumeClaimTemplates) != hash.Object(lastUsedComp.VolumeClaimTemplates) {
+				objJSON, _ := json.Marshal(&lastUsedComp.VolumeClaimTemplates)
+				return emitError(metav1.Condition{
+					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
+					Reason: "HaltRecoveryFailed",
+					Message: fmt.Sprintf("not equal to last applied cluster.spec.componetSpecs[%s].volumeClaimTemplates=%s",
+						comp.Name, objJSON),
+				})
+			}
+			if hash.Object(comp.Resources) != hash.Object(lastUsedComp.Resources) &&
+				cluster.Annotations[constant.HaltRecoveryAllowInconsistentResAnnotKey] != trueVal {
+				objJSON, _ := json.Marshal(&lastUsedComp.Resources)
+				return emitError(metav1.Condition{
+					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
+					Reason: "HaltRecoveryFailed",
+					Message: fmt.Sprintf("not equal to last applied cluster.spec.componetSpecs[%s].resources=%s; add '%s=true' annotation to void this check",
+						comp.Name, objJSON, constant.HaltRecoveryAllowInconsistentResAnnotKey),
 				})
 			}
 			found = true

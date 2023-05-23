@@ -54,8 +54,8 @@ kbcli playground init [flags]
 ```
       --auto-approve                Skip interactive approval during the initialization of playground
       --cloud-provider string       Cloud provider type, one of [local aws gcp alicloud tencentcloud] (default "local")
-      --cluster-definition string   Specify the cluster definition, run "kbcli cd list" to get the available clusterdefinitions (default "apecloud-mysql")
-      --cluster-version string      Specify the clusterversion, run "kbcli cv list" to get the available clusterversions
+      --cluster-definition string   Specify the cluster definition, run "kbcli cd list" to get the available cluster definitions (default "apecloud-mysql")
+      --cluster-version string      Specify the cluster version, run "kbcli cv list" to get the available cluster versions
   -h, --help                        help for init
       --region string               The region to create kubernetes cluster
       --timeout duration            Time to wait for init playground, such as --timeout=10m (default 5m0s)

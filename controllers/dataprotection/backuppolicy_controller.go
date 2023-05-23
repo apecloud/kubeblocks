@@ -554,7 +554,10 @@ func (r *BackupPolicyReconciler) reconfigure(reqCtx intctrlutil.RequestCtx,
 		backupPolicy.Annotations = map[string]string{}
 	}
 	backupPolicy.Annotations[constant.LastAppliedConfigAnnotationKey] = updateParameterPairs
-	return r.Client.Patch(reqCtx.Ctx, backupPolicy, patch)
+	if err := r.Client.Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
+		return err
+	}
+	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting ops %s finished.", ops.Name)
 }
 
 func (r *BackupPolicyReconciler) reconcileReconfigure(reqCtx intctrlutil.RequestCtx,

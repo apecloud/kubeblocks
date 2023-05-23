@@ -173,8 +173,7 @@ func buildSts(csSet workloads.ConsensusSet, headlessSvcName string, envConfig co
 		AddMatchLabel(model.KBManagedByKey, kindConsensusSet).
 		SetServiceName(headlessSvcName).
 		SetReplicas(csSet.Spec.Replicas).
-		SetMinReadySeconds(10).
-		SetPodManagementPolicy(apps.ParallelPodManagement).
+		SetPodManagementPolicy(apps.OrderedReadyPodManagement).
 		SetVolumeClaimTemplates(csSet.Spec.VolumeClaimTemplates...).
 		SetTemplate(*template).
 		SetUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType)

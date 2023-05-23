@@ -1276,7 +1276,12 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	podSpec.NodeSelector = map[string]string{
 		hostNameLabelKey: clusterPod.Spec.NodeName,
 	}
-
+	// ignore taints
+	podSpec.Tolerations = []corev1.Toleration{
+		{
+			Operator: corev1.TolerationOpExists,
+		},
+	}
 	return podSpec, nil
 }
 

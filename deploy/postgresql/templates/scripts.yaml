@@ -99,13 +99,12 @@ data:
     set -o nounset
     SHOW_START_TIME=$1
     LOG_START_TIME=""
+    LOG_STOP_TIME=""
     if [ "$SHOW_START_TIME" == "false" ]; then
-      latest_transaction=$(pg_waldump $(psql -Atc "select pg_walfile_name(pg_current_wal_lsn())") --rmgr=Transaction 2>/dev/null |tail -n 1)
-      if [ "${latest_transaction}" != "" ]; then
-        psql -c "select pg_switch_wal()" >/dev/null 2>&1
-        sleep 1
+      latest_done_wal=$(ls -t ${PGDATA}/pg_wal/archive_status/|grep ".done"|head -n 1)
+      if [ "${latest_done_wal}" != "" ]; then
+        LOG_STOP_TIME=$(pg_waldump ${latest_done_wal%.*} --rmgr=Transaction 2>/dev/null |tail -n 1|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
       fi
-      LOG_STOP_TIME=$(echo ${latest_transaction}|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
       [[ "${LOG_STOP_TIME}" != "" ]] && printf "{\"stopTime\": \"$(date -d "$LOG_STOP_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')\"}" || printf "{}"
     else
       LOG_START_TIME=$(pg_waldump $(ls -Ftr $PGDATA/pg_wal/ | grep '[[:xdigit:]]$\|.partial$'|head -n 1) --rmgr=Transaction 2>/dev/null |head -n 1|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')

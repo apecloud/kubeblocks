@@ -61,6 +61,7 @@ type Action string
 const (
 	CREATE = Action("CREATE")
 	UPDATE = Action("UPDATE")
+	PATCH  = Action("PATCH")
 	DELETE = Action("DELETE")
 	STATUS = Action("STATUS")
 )

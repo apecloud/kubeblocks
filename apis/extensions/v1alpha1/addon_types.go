@@ -60,6 +60,10 @@ type AddonSpec struct {
 	// Addon installable spec., provide selector and auto-install settings.
 	// +optional
 	Installable *InstallableSpec `json:"installable,omitempty"`
+
+	// Plugin installation spec.
+	// +optional
+	CliPlugins []CliPlugin `json:"cliPlugins,omitempty"`
 }
 
 // AddonStatus defines the observed state of Addon
@@ -231,6 +235,20 @@ type ResourceMappingItem struct {
 	// memory sets Memory requests and limits mapping keys.
 	// +optional
 	Memory *ResourceReqLimItem `json:"memory,omitempty"`
+}
+
+type CliPlugin struct {
+	// Name of the plugin.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// The index repository of the plugin.
+	// +kubebuilder:validation:Required
+	IndexRepository string `json:"indexRepository"`
+
+	// The description of the plugin.
+	// +optional
+	Description string `json:"description,omitempty"`
 }
 
 func (r *ResourceMappingItem) HasStorageMapping() bool {

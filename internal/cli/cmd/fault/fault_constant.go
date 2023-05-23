@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package fault
 
+import cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
+
 // Unchanged DryRun flag
 const (
 	Unchanged = "unchanged"
@@ -31,26 +33,28 @@ const (
 
 	ResourcePodChaos     = "podchaos"
 	ResourceNetworkChaos = "networkchaos"
+	ResourceDNSChaos     = "dnschaos"
+	ResourceHTTPChaos    = "httpchaos"
 	ResourceIOChaos      = "iochaos"
 	ResourceStressChaos  = "stresschaos"
-	ResourceDNSChaos     = "dnschaos"
 	ResourceTimeChaos    = "timechaos"
-	ResourceHTTPChaos    = "httpchaos"
 	ResourceAWSChaos     = "awschaos"
 	ResourceGCPChaos     = "gcpchaos"
+
+	KindAWSChaos = "AWSChaos"
+	KindGCPChaos = "GCPChaos"
 )
 
 // Cue Template Name
 const (
 	CueTemplatePodChaos     = "pod_chaos_template.cue"
 	CueTemplateNetworkChaos = "network_chaos_template.cue"
+	CueTemplateDNSChaos     = "dns_chaos_template.cue"
+	CueTemplateHTTPChaos    = "http_chaos_template.cue"
 	CueTemplateIOChaos      = "io_chaos_template.cue"
 	CueTemplateStressChaos  = "stress_chaos_template.cue"
-	CueTemplateDNSChaos     = "dns_chaos_template.cue"
 	CueTemplateTimeChaos    = "time_chaos_template.cue"
-	CueTemplateHTTPChaos    = "http_chaos_template.cue"
-	CueTemplateAWSChaos     = "aws_chaos_template.cue"
-	CueTemplateGCPChaos     = "gcp_chaos_template.cue"
+	CueTemplateNodeChaos    = "node_chaos_template.cue"
 )
 
 // Pod Chaos Command
@@ -87,7 +91,19 @@ const (
 	ErrorShort  = "Make DNS return an error when resolving external domain names."
 )
 
-// Network Chaos Command
+// HTTP Chaos Command
+const (
+	Abort          = "abort"
+	AbortShort     = "Abort the HTTP request and response."
+	HTTPDelay      = "delay"
+	HTTPDelayShort = "Delay the HTTP request and response."
+	Replace        = "replace"
+	ReplaceShort   = "Replace the HTTP request and response."
+	Patch          = "patch"
+	PatchShort     = "Patch the HTTP request and response."
+)
+
+// IO Chaos Command
 const (
 	Latency        = "latency"
 	LatencyShort   = "Delayed IO operations."
@@ -111,19 +127,7 @@ const (
 	TimeShort = "Clock skew failure."
 )
 
-// HTTP Chaos Command
-const (
-	Abort          = "abort"
-	AbortShort     = "Abort the HTTP request and response."
-	HTTPDelay      = "delay"
-	HTTPDelayShort = "Delay the HTTP request and response."
-	Replace        = "replace"
-	ReplaceShort   = "Replace the HTTP request and response."
-	Patch          = "patch"
-	PatchShort     = "Patch the HTTP request and response."
-)
-
-// AWS And GCP Chaos Command
+// Node Chaos Command
 const (
 	Stop              = "stop"
 	StopShort         = "Stop instance"
@@ -132,3 +136,5 @@ const (
 	DetachVolume      = "detach-volume"
 	DetachVolumeShort = "Detach volume"
 )
+
+var supportedCloudProviders = []string{cp.AWS, cp.GCP}

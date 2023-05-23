@@ -8,13 +8,6 @@ metadata:
 spec:
   image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
   deployKind: job
-  resources:
-    limits:
-      cpu: "1"
-      memory: 2Gi
-    requests:
-      cpu: "500m"
-      memory: 128Mi
   env:
     - name: RESTORE_DATA_DIR
       value: /home/postgres/pgdata/kb_restore

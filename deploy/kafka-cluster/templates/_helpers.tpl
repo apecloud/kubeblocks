@@ -50,9 +50,13 @@ app.kubernetes.io/name: {{ include "kafka-cluster.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{- define "clustername" -}}
+{{ include "kafka-cluster.fullname" .}}
+{{- end}}
+
 {{/*
 Create the name of the service account to use
 */}}
 {{- define "kafka-cluster.serviceAccountName" -}}
-{{- default ((printf "kb-sa-%s" .Release.Name) | trunc 63 | trimSuffix "-") .Values.serviceAccount.name }}
+{{- default (printf "kb-%s" (include "clustername" .)) .Values.serviceAccount.name }}
 {{- end }}

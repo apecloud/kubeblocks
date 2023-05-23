@@ -19,6 +19,7 @@ spec:
       componentDefRef: mysql # ref clusterdefinition componentDefs.name
       monitor: {{ .Values.monitor.enabled | default false }}
       replicas: {{ .Values.replicaCount | default 3 }}
+      serviceAccountName: {{ include "apecloud-mysql-cluster.serviceAccountName" . }}
       enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}
       {{- with  .Values.resources }}
       resources:

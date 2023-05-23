@@ -21,6 +21,7 @@ spec:
       monitor: {{ .Values.monitor.enabled }}
       serviceType: {{ $.Values.service.type | default "ClusterIP" }}
       replicas: {{ .Values.replicaCount | default "3" }}
+      serviceAccountName: {{ include "etcd-cluster.serviceAccountName" . }}
       {{- with .Values.resources }}
       resources:
         limits:

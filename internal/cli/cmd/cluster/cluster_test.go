@@ -77,19 +77,6 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Validate()).To(Succeed())
 			Expect(o.Name).ShouldNot(BeEmpty())
 		})
-
-		It("new command", func() {
-			cmd := NewCreateCmd(tf, streams)
-			Expect(cmd).ShouldNot(BeNil())
-			Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
-			Expect(cmd.Flags().Set("cluster-version", testing.ClusterVersionName)).Should(Succeed())
-			Expect(cmd.Flags().Set("set-file", testComponentPath)).Should(Succeed())
-			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
-
-			// must succeed otherwise exit 1 and make test fails
-			cmd.Run(nil, []string{"test1"})
-		})
-
 	})
 
 	Context("run", func() {

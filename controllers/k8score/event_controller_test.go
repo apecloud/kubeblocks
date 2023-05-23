@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	probeutil "github.com/apecloud/kubeblocks/cmd/probe/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -125,7 +126,7 @@ involvedObject:
   kind: Pod
   name: {{ .PodName }}
   namespace: default
-message: "Readiness probe failed: {\"event\":\"roleChanged\",\"originalRole\":\"secondary\",\"role\":\"{{ .Role }}\"}"
+message: "{\"event\":\"roleChanged\",\"originalRole\":\"secondary\",\"role\":\"{{ .Role }}\"}"
 reason: RoleChanged
 type: Normal
 `
@@ -149,12 +150,14 @@ type: Normal
 		return nil, err
 	}
 
-	event, _, err := scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, nil)
+	event := &corev1.Event{}
+	_, _, err = scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, event)
 	if err != nil {
 		return nil, err
 	}
+	event.Reason = string(probeutil.CheckRoleOperation)
 
-	return event.(*corev1.Event), nil
+	return event, nil
 }
 
 func createInvolvedPod(name string) corev1.Pod {

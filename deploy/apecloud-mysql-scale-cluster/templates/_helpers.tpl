@@ -54,9 +54,5 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Create the name of the service account to use
 */}}
 {{- define "apecloud-mysql-cluster.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "apecloud-mysql-cluster.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
+{{- default ((printf "kb-sa-%s" .Release.Name) | trunc 63 | trimSuffix "-") .Values.serviceAccount.name }}
 {{- end }}

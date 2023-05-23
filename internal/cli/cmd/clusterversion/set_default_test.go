@@ -45,7 +45,7 @@ var _ = Describe("set-default", func() {
 	const (
 		cluterversion          = testing.ClusterVersionName
 		clusterversionInSameCD = testing.ClusterVersionName + "-sameCD"
-		ClusterversionOtherCD  = testing.ClusterName + "-other"
+		ClusterversionOtherCD  = testing.ClusterVersionName + "-other"
 		errorClusterversion    = "08jfa2"
 	)
 

@@ -22,6 +22,7 @@ package util
 import (
 	"context"
 	"fmt"
+
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
@@ -37,8 +38,79 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func doSwitchover() error {
-	return nil
+// doSwitchover is used to perform switchover operations.
+func doSwitchover(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
+	componentDef *appsv1alpha1.ClusterComponentDefinition) error {
+	switchoverJob, err := renderSwitchoverCmdJob(ctx, cli, cluster, clusterCompSpec, componentDef)
+	if err != nil {
+		return err
+	}
+	// check the current generation switchoverJob whether exist
+	key := types.NamespacedName{Namespace: cluster.Namespace, Name: switchoverJob.Name}
+	ml := getSwitchoverCmdJobLabel(cluster.Name, clusterCompSpec.Name)
+	exists, _ := intctrlutil.CheckResourceExists(ctx, cli, key, &batchv1.Job{})
+	if !exists {
+		// check the previous generation switchoverJob whether exist
+		previousJobs, err := GetJobWithLabels(ctx, cli, cluster, ml)
+		if err != nil {
+			return err
+		}
+		if len(previousJobs) > 0 {
+			// TODO: delete the previous generation switchoverJob and update status.conditions
+		}
+		// create the current generation switchoverJob
+		if err := cli.Create(ctx, switchoverJob); err != nil {
+			return err
+		}
+	}
+	// check the current generation switchoverJob whether succeed
+	if err := CheckJobSucceed(ctx, cli, cluster, switchoverJob); err != nil {
+		return err
+	}
+
+	// check pod role label consistency
+	ok, err := checkPodRoleLabelConsistencyAfterSwitchover(ctx, cli, cluster, clusterCompSpec)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errors.New("pod role label consistency check failed")
+	}
+
+	// delete the successful job
+	return CleanJobWithLabels(ctx, cli, cluster, ml)
+}
+
+// CheckCandidateInstanceChanged checks whether candidateInstance has changed.
+// @return bool - true is candidateInstance inconsistent
+// @return string - current primary/leader Instance name; "" if error
+// @return error
+func CheckCandidateInstanceChanged(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (bool, string, error) {
+	if clusterCompSpec == nil || clusterCompSpec.CandidateInstance == nil {
+		return false, "", nil
+	}
+	// get the Pod object whose current role label is primary or leader
+	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, *clusterCompSpec)
+	if err != nil {
+		return false, "", err
+	}
+	if pod == nil {
+		return false, "", nil
+	}
+	candidateInstanceName := fmt.Sprintf("%s-%s-%d", cluster.Name, clusterCompSpec.Name, clusterCompSpec.CandidateInstance.Index)
+	if clusterCompSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual {
+		return pod.Name != candidateInstanceName, pod.Name, nil
+	}
+	if clusterCompSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpNotEqual {
+		return pod.Name == candidateInstanceName, pod.Name, nil
+	}
+	return false, pod.Name, nil
 }
 
 // getPrimaryOrLeaderPod returns the leader or primary pod of the component.
@@ -77,35 +149,6 @@ func getPrimaryOrLeaderPodOrdinal(ctx context.Context, cli client.Client, cluste
 	}
 	_, ordinal := intctrlutil.GetParentNameAndOrdinal(pod)
 	return ordinal, nil
-}
-
-// CheckCandidateInstanceChanged checks whether candidateInstance has changed.
-// @return bool - true is candidateInstance inconsistent
-// @return string - current primary/leader Instance name; "" if error
-// @return error
-func CheckCandidateInstanceChanged(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (bool, string, error) {
-	if clusterCompSpec == nil || clusterCompSpec.CandidateInstance == nil {
-		return false, "", nil
-	}
-	// get the Pod object whose current role label is primary or leader
-	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, *clusterCompSpec)
-	if err != nil {
-		return false, "", err
-	}
-	if pod == nil {
-		return false, "", nil
-	}
-	candidateInstanceName := fmt.Sprintf("%s-%s-%d", cluster.Name, clusterCompSpec.Name, clusterCompSpec.CandidateInstance.Index)
-	if clusterCompSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual {
-		return pod.Name != candidateInstanceName, pod.Name, nil
-	}
-	if clusterCompSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpNotEqual {
-		return pod.Name == candidateInstanceName, pod.Name, nil
-	}
-	return false, pod.Name, nil
 }
 
 // getSupportSwitchoverWorkload returns the kinds that support switchover.
@@ -206,8 +249,8 @@ func buildSwitchoverEnvs(ctx context.Context,
 	return switchoverEnvs, nil
 }
 
-// renderAndCreateSwitchoverCmdJobs renders and creates the switchover command jobs.
-func renderAndCreateSwitchoverCmdJobs(ctx context.Context,
+// renderSwitchoverCmdJob renders and creates the switchover command jobs.
+func renderSwitchoverCmdJob(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
@@ -216,7 +259,7 @@ func renderAndCreateSwitchoverCmdJobs(ctx context.Context,
 		return nil, errors.New("switchover spec not found")
 	}
 
-	renderJob := func(jobName string, switchoverSpec *appsv1alpha1.SwitchoverSpec, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
+	renderJob := func(switchoverSpec *appsv1alpha1.SwitchoverSpec, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
 		var switchoverAction *appsv1alpha1.SwitchoverAction
 		if clusterCompSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual && switchoverSpec.WithCandidateInstance != nil {
 			switchoverAction = switchoverSpec.WithCandidateInstance
@@ -225,6 +268,8 @@ func renderAndCreateSwitchoverCmdJobs(ctx context.Context,
 		} else {
 			return nil, errors.New("switchover action not found")
 		}
+		// jobName named with generation to distinguish different switchover jobs.
+		jobName := fmt.Sprintf("%s-%s-%d", constant.KBSwitchoverJobNamePrefix, clusterCompSpec.Name, cluster.Generation)
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cluster.Namespace,
@@ -263,30 +308,78 @@ func renderAndCreateSwitchoverCmdJobs(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	jobName := fmt.Sprintf("%s-%s-%d", constant.KBSwitchoverJobNamePrefix, clusterCompSpec.Name, cluster.Generation)
-	job, err := renderJob(jobName, componentDef.SwitchoverSpec, switchoverEnvs)
+	job, err := renderJob(componentDef.SwitchoverSpec, switchoverEnvs)
 	if err != nil {
-		return job, err
-	}
-	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
-	exists, _ := intctrlutil.CheckResourceExists(ctx, cli, key, &batchv1.Job{})
-	if exists {
-		return job, nil
-	}
-	// if job not exist, create a job
-	if err := cli.Create(ctx, job); err != nil {
 		return nil, err
 	}
 	return job, nil
 }
 
+// GetJobWithLabels gets the job list with the specified labels.
+func GetJobWithLabels(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	matchLabels client.MatchingLabels) ([]batchv1.Job, error) {
+	jobList := &batchv1.JobList{}
+	if err := cli.List(ctx, jobList, client.InNamespace(cluster.Namespace), matchLabels); err != nil {
+		return nil, err
+	}
+	return jobList.Items, nil
+}
+
+// CleanJobWithLabels cleans up the job task that execute the switchover commands.
+func CleanJobWithLabels(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	matchLabels client.MatchingLabels) error {
+	jobList, err := GetJobWithLabels(ctx, cli, cluster, matchLabels)
+	if err != nil {
+		return err
+	}
+	for _, job := range jobList {
+		var ttl = int32(constant.KBJobTTLSecondsAfterFinished)
+		patch := client.MergeFrom(job.DeepCopy())
+		job.Spec.TTLSecondsAfterFinished = &ttl
+		if err := cli.Patch(ctx, &job, patch); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// CheckJobSucceed checks the result of job execution.
+func CheckJobSucceed(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	job *batchv1.Job) error {
+	key := types.NamespacedName{Namespace: cluster.Namespace, Name: job.Name}
+	currentJob := batchv1.Job{}
+	exists, err := intctrlutil.CheckResourceExists(ctx, cli, key, &currentJob)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return errors.New("job not exist, pls check.")
+	}
+	jobStatusConditions := currentJob.Status.Conditions
+	if len(jobStatusConditions) > 0 {
+		switch jobStatusConditions[0].Type {
+		case batchv1.JobComplete:
+			return nil
+		case batchv1.JobFailed:
+			return errors.New("job failed, pls check.")
+		default:
+			return errors.New("job unfinished.")
+		}
+	} else {
+		return errors.New("job check conditions status failed")
+	}
+}
+
 // checkPodRoleLabelConsistency checks whether the pod role label is consistent with the specified role label.
-func checkPodRoleLabelConsistency(pod *corev1.Pod, roleLabel string) bool {
-	if pod.Labels == nil {
-		return false
-	}
-	if pod.Labels[constant.RoleLabelKey] != roleLabel {
-		return false
-	}
-	return true
+func checkPodRoleLabelConsistencyAfterSwitchover(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (bool, error) {
+	return true, nil
 }

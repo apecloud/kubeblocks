@@ -146,7 +146,7 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 		By("Test HandleReplicationSetHASwitch failed when candidateInstance has changed because controller reconciles many times, and switch job has not finished.")
 		err = HandleReplicationSetHASwitch(ctx, k8sClient, clusterObj, clusterComponentSpec)
 		Expect(err).ShouldNot(Succeed())
-		Expect(err.Error()).Should(ContainSubstring("switch command job"))
+		Expect(err.Error()).Should(ContainSubstring("job check conditions status failed"))
 
 		By("Test clean switch job.")
 		err = cleanSwitchCmdJobs(s)

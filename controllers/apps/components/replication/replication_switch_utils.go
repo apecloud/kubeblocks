@@ -70,11 +70,10 @@ const (
 )
 
 const (
-	KBSwitchJobLabelKey                = "kubeblocks.io/switch-job"
-	KBSwitchJobLabelValue              = "kb-switch-job"
-	KBSwitchJobNamePrefix              = "kb-switch-job"
-	KBSwitchJobContainerName           = "switch-job-container"
-	KBSwitchJobTTLSecondsAfterFinished = 5
+	KBSwitchJobLabelKey      = "kubeblocks.io/switch-job"
+	KBSwitchJobLabelValue    = "kb-switch-job"
+	KBSwitchJobNamePrefix    = "kb-switch-job"
+	KBSwitchJobContainerName = "switch-job-container"
 )
 
 var _ SwitchDetectManager = &ProbeDetectManager{}
@@ -413,35 +412,8 @@ func renderAndCreateSwitchCmdJobs(s *Switch, switchEnvs []corev1.EnvVar,
 // checkSwitchCmdJobSucceed checks the result of switch command job execution.
 func checkSwitchCmdJobSucceed(s *Switch, cmdJobs []*batchv1.Job) error {
 	for _, cmdJob := range cmdJobs {
-		key := types.NamespacedName{Namespace: s.SwitchResource.Cluster.Namespace, Name: cmdJob.Name}
-		currentJob := batchv1.Job{}
-		exists, err := intctrlutil.CheckResourceExists(s.SwitchResource.Ctx, s.SwitchResource.Cli, key, &currentJob)
-		if err != nil {
+		if err := componentutil.CheckJobSucceed(s.SwitchResource.Ctx, s.SwitchResource.Cli, s.SwitchResource.Cluster, cmdJob); err != nil {
 			return err
-		}
-		if !exists {
-			// REVIEW/TODO: need avoid using dynamic error string, this is bad for
-			// error type checking (errors.Is)
-			return fmt.Errorf("switch command job %s not exist", cmdJob.Name)
-		}
-		jobStatusConditions := currentJob.Status.Conditions
-		if len(jobStatusConditions) > 0 {
-			switch jobStatusConditions[0].Type {
-			case batchv1.JobComplete:
-				continue
-			case batchv1.JobFailed:
-				// REVIEW/TODO: need avoid using dynamic error string, this is bad for
-				// error type checking (errors.Is)
-				return fmt.Errorf("switch command job %s failed", cmdJob.Name)
-			default:
-				// REVIEW/TODO: need avoid using dynamic error string, this is bad for
-				// error type checking (errors.Is)
-				return fmt.Errorf("switch command job %s unfinished", cmdJob.Name)
-			}
-		} else {
-			// REVIEW/TODO: need avoid using dynamic error string, this is bad for
-			// error type checking (errors.Is)
-			return fmt.Errorf("switch command job %s check status conditions failed", cmdJob.Name)
 		}
 	}
 	return nil
@@ -449,20 +421,8 @@ func checkSwitchCmdJobSucceed(s *Switch, cmdJobs []*batchv1.Job) error {
 
 // cleanSwitchCmdJobs cleans up the job tasks that execute the switch commands.
 func cleanSwitchCmdJobs(s *Switch) error {
-	jobList := &batchv1.JobList{}
-	if err := s.SwitchResource.Cli.List(s.SwitchResource.Ctx, jobList, client.InNamespace(s.SwitchResource.Cluster.Namespace),
-		client.MatchingLabels(getSwitchCmdJobLabel(s.SwitchResource.Cluster.Name, s.SwitchResource.CompSpec.Name))); err != nil {
-		return err
-	}
-	for _, job := range jobList.Items {
-		var ttl = int32(KBSwitchJobTTLSecondsAfterFinished)
-		patch := client.MergeFrom(job.DeepCopy())
-		job.Spec.TTLSecondsAfterFinished = &ttl
-		if err := s.SwitchResource.Cli.Patch(s.SwitchResource.Ctx, &job, patch); err != nil {
-			return err
-		}
-	}
-	return nil
+	return componentutil.CleanJobWithLabels(s.SwitchResource.Ctx, s.SwitchResource.Cli,
+		s.SwitchResource.Cluster, getSwitchCmdJobLabel(s.SwitchResource.Cluster.Name, s.SwitchResource.CompSpec.Name))
 }
 
 // getSwitchCmdJobLabel gets the labels for job that execute the switch commands.

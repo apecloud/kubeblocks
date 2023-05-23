@@ -239,11 +239,12 @@ const (
 
 // switchover constants
 const (
-	KBSwitchoverJobLabelKey                = "kubeblocks.io/switchover-job"
-	KBSwitchoverJobLabelValue              = "kb-switchover-job"
-	KBSwitchoverJobNamePrefix              = "kb-switchover-job"
-	KBSwitchoverJobContainerName           = "kb-switchover-job-container"
-	KBSwitchoverJobTTLSecondsAfterFinished = 5
+	KBJobTTLSecondsAfterFinished = 5
+
+	KBSwitchoverJobLabelKey      = "kubeblocks.io/switchover-job"
+	KBSwitchoverJobLabelValue    = "kb-switchover-job"
+	KBSwitchoverJobNamePrefix    = "kb-switchover-job"
+	KBSwitchoverJobContainerName = "kb-switchover-job-container"
 
 	KBSwitchoverCandidateInstanceName     = "KB_SWITCHOVER_CANDIDATE_INSTANCE_NAME"
 	KBSwitchoverReplicationPrimaryPodName = "KB_REPLICATION_PRIMARY_POD_NAME"

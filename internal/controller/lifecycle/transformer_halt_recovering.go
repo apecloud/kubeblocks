@@ -62,6 +62,10 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 	}
 
 	emitError := func(newCondition metav1.Condition) error {
+		if newCondition.LastTransitionTime.IsZero() {
+			newCondition.LastTransitionTime = metav1.Now()
+		}
+		newCondition.Status = metav1.ConditionFalse
 		oldCondition := meta.FindStatusCondition(cluster.Status.Conditions, newCondition.Type)
 		if oldCondition == nil {
 			cluster.Status.Conditions = append(cluster.Status.Conditions, newCondition)

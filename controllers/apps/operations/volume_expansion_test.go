@@ -141,11 +141,11 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 	}
 
 	mockVolumeExpansionActionAndReconcile := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, newOps *appsv1alpha1.OpsRequest) {
-		Expect(testapps.ChangeObjStatus(&testCtx, newOps, func() {
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(newOps), func(newOps *appsv1alpha1.OpsRequest) {
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			newOps.Status.Phase = appsv1alpha1.OpsRunningPhase
 			newOps.Status.StartTimestamp = metav1.Time{Time: time.Now()}
-		})).ShouldNot(HaveOccurred())
+		})()).ShouldNot(HaveOccurred())
 
 		// do volume-expand action
 		_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)

@@ -1273,9 +1273,15 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	r.appendBackupVolumeMount(pvcName, &podSpec, &podSpec.Containers[0])
 
 	// the pod of job needs to be scheduled on the same node as the workload pod, because it needs to share one pvc
-	// see: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename
-	podSpec.NodeName = clusterPod.Spec.NodeName
-
+	podSpec.NodeSelector = map[string]string{
+		hostNameLabelKey: clusterPod.Spec.NodeName,
+	}
+	// ignore taints
+	podSpec.Tolerations = []corev1.Toleration{
+		{
+			Operator: corev1.TolerationOpExists,
+		},
+	}
 	return podSpec, nil
 }
 

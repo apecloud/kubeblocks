@@ -97,23 +97,22 @@ const (
 	LeaderAnnotationKey                         = "cs.apps.kubeblocks.io/leader"
 	ComponentReplicasAnnotationKey              = "apps.kubeblocks.io/component-replicas" // ComponentReplicasAnnotationKey specifies the number of pods in replicas
 	BackupPolicyTemplateAnnotationKey           = "apps.kubeblocks.io/backup-policy-template"
-	AllowInconsistentCVAnnotationKey            = "clusters.apps.kubeblocks.io/allow-inconsistent-cv"
 	LastAppliedClusterAnnotationKey             = "apps.kubeblocks.io/last-applied-cluster"
+	HaltRecoveryAllowInconsistentCVAnnotKey     = "clusters.apps.kubeblocks.io/allow-inconsistent-cv"
+	HaltRecoveryAllowInconsistentResAnnotKey    = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"
 	DefaultBackupPolicyAnnotationKey            = "dataprotection.kubeblocks.io/is-default-policy"          // DefaultBackupPolicyAnnotationKey specifies the default backup policy.
 	DefaultBackupPolicyTemplateAnnotationKey    = "dataprotection.kubeblocks.io/is-default-policy-template" // DefaultBackupPolicyTemplateAnnotationKey specifies the default backup policy template.
 	BackupDataPathPrefixAnnotationKey           = "dataprotection.kubeblocks.io/path-prefix"                // BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
 	RestoreFromTimeAnnotationKey                = "kubeblocks.io/restore-from-time"                         // RestoreFromTimeAnnotationKey specifies the time to recover from the backup.
 	RestoreFromSrcClusterAnnotationKey          = "kubeblocks.io/restore-from-source-cluster"               // RestoreFromSrcClusterAnnotationKey specifies the source cluster to recover from the backup.
+	DefaultClusterVersionAnnotationKey          = "kubeblocks.io/is-default-cluster-version"                // DefaultClusterVersionAnnotationKey specifies the default cluster version.
 	ReconfigureRefAnnotationKey                 = "dataprotection.kubeblocks.io/reconfigure-ref"
-	DefaultClusterVersionAnnotationKey          = "kubeblocks.io/is-default-cluster-version" // DefaultClusterVersionAnnotationKey specifies the default cluster version.
 	LastAppliedOpsCRAnnotationKey               = "config.kubeblocks.io/last-applied-ops-name"
 	LastAppliedConfigAnnotationKey              = "config.kubeblocks.io/last-applied-configuration"
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
 	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
-	LastAppliedOpsCRAnnotation                  = "config.kubeblocks.io/last-applied-ops-name"
-	LastAppliedConfigAnnotation                 = "config.kubeblocks.io/last-applied-configuration"
 
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName = "cluster.kubeblocks.io/finalizer"

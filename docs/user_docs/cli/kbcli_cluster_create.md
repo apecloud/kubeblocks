@@ -55,7 +55,7 @@ kbcli cluster create [NAME] [flags]
   
   # Create a cluster with more than one component, use "--set type=component-name" to specify the component,
   # if not specified, the main component will be used, run "kbcli cd list-components CLUSTER-DEFINITION-NAME"
-  # to show the component list in the cluster definition
+  # to show the components in the cluster definition
   kbcli cluster create mycluster --cluster-definition redis --set type=redis,cpu=1 --set type=redis-sentinel,cpu=200m
   
   # Create a cluster and use a URL to set cluster resource

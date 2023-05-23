@@ -10,27 +10,6 @@ Bootstrap a kubernetes cluster and install KubeBlocks for playground.
 
  If no any cloud provider be specified, a k3d cluster named kb-playground will be created on local host, otherwise a kubernetes cluster will be created on the specified cloud. Then KubeBlocks will be installed on the created kubernetes cluster, and an apecloud-mysql cluster named mycluster will be created.
 
-Run the following commands to experience KubeBlocks quickly:
-
-1. Basic commands for cluster:
-
-  kbcli cluster list                     # list database cluster and check its status
-  kbcli cluster describe mycluster       # get cluster information
-
-2. Connect to database
-
-  kbcli cluster connect mycluster
-  
-3. View the Grafana:
-
-  kbcli dashboard open kubeblocks-grafana
-	
-4. Destroy playground:
-
-  kbcli playground destroy
-
-
-
 ```
 kbcli playground init [flags]
 ```
@@ -52,19 +31,35 @@ kbcli playground init [flags]
   
   # create a Google cloud GKE cluster and install KubeBlocks, the region is required
   kbcli playground init --cloud-provider gcp --region us-east1
+  
+  # after init, run the following commands to experience KubeBlocks quickly
+  # list database cluster and check its status
+  kbcli cluster list
+  
+  # get cluster information
+  kbcli cluster describe mycluster
+  
+  # connect to database
+  kbcli cluster connect mycluster
+  
+  # view the Grafana
+  kbcli dashboard open kubeblocks-grafana
+  
+  # destroy playground
+  kbcli playground destroy
 ```
 
 ### Options
 
 ```
-      --auto-approve                       Skip interactive approval during the initialization of playground
-      --cloud-provider string              Cloud provider type, one of [local aws gcp alicloud tencentcloud] (default "local")
-      --cluster-definition kbcli cd list   Specify the cluster definition, run kbcli cd list to get the available clusterdefinitions (default "apecloud-mysql")
-      --cluster-version kbcli cv list      Specify the clusterversion, run kbcli cv list to get the available clusterversions
-  -h, --help                               help for init
-      --region string                      The region to create kubernetes cluster
-      --timeout duration                   Time to wait for init playground, such as --timeout=10m (default 5m0s)
-      --version string                     KubeBlocks version
+      --auto-approve                Skip interactive approval during the initialization of playground
+      --cloud-provider string       Cloud provider type, one of [local aws gcp alicloud tencentcloud] (default "local")
+      --cluster-definition string   Specify the cluster definition, run "kbcli cd list" to get the available clusterdefinitions (default "apecloud-mysql")
+      --cluster-version string      Specify the clusterversion, run "kbcli cv list" to get the available clusterversions
+  -h, --help                        help for init
+      --region string               The region to create kubernetes cluster
+      --timeout duration            Time to wait for init playground, such as --timeout=10m (default 5m0s)
+      --version string              KubeBlocks version
 ```
 
 ### Options inherited from parent commands

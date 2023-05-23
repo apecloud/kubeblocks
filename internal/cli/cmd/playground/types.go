@@ -57,30 +57,25 @@ var (
 	kubeClusterUnreachableErr = errors.New("Kubernetes cluster unreachable")
 )
 
-var (
-	guideStr = `
+var guideStr = `
 1. Basic commands for cluster:
 
   kbcli cluster list                     # list database cluster and check its status
-  kbcli cluster describe mycluster       # get cluster information
+  kbcli cluster describe %[1]s       # get cluster information
 
 2. Connect to database
 
-  kbcli cluster connect mycluster
+  kbcli cluster connect %[1]s
   
 3. View the Grafana:
 
   kbcli dashboard open kubeblocks-grafana
 	
-4. Destroy playground:
+4. Destroy Playground:
 
   kbcli playground destroy
 
-`
-
-	helpStr = `
 --------------------------------------------------------------------
 To get more help: kbcli help
 Use "kbcli [command] --help" for more information about a command.
 `
-)

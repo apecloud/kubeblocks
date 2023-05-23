@@ -45,34 +45,63 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
-type configInfos struct {
-	image                     map[string]interface{}
-	updateStrategy            map[string]interface{}
-	podDisruptionBudget       map[string]interface{}
-	loggerSettings            map[string]interface{}
-	serviceAccount            map[string]interface{}
-	securityContext           map[string]interface{}
-	podSecurityContext        map[string]interface{}
-	service                   map[string]interface{}
-	serviceMonitor            map[string]interface{}
-	Resources                 map[string]interface{}
-	autoscaling               map[string]interface{}
-	nodeSelector              map[string]interface{}
-	affinity                  map[string]interface{}
-	dataPlane                 map[string]interface{}
-	admissionWebhooks         map[string]interface{}
-	dataProtection            map[string]interface{}
-	addonController           map[string]interface{}
-	topologySpreadConstraints []interface{}
-	tolerations               []interface{}
-	priorityClassName         string
-	nameOverride              string
-	fullnameOverride          string
-	dnsPolicy                 string
-	replicaCount              int
-	hostNetwork               bool
-	keepAddons                bool
+var helmValuesKey = []string{
+	"image",
+	"updateStrategy",
+	"podDisruptionBudget",
+	"loggerSettings",
+	"serviceAccount",
+	"securityContext",
+	"podSecurityContext",
+	"service",
+	"serviceMonitor",
+	"Resources",
+	"autoscaling",
+	"nodeSelector",
+	"affinity",
+	"dataPlane",
+	"admissionWebhooks",
+	"dataProtection",
+	"addonController",
+	"topologySpreadConstraints",
+	"tolerations",
+	"priorityClassName",
+	"nameOverride",
+	"fullnameOverride",
+	"dnsPolicy",
+	"replicaCount",
+	"hostNetwork",
+	"keepAddons",
 }
+
+//type configInfos struct {
+//	image                     map[string]interface{}
+//	updateStrategy            map[string]interface{}
+//	podDisruptionBudget       map[string]interface{}
+//	loggerSettings            map[string]interface{}
+//	serviceAccount            map[string]interface{}
+//	securityContext           map[string]interface{}
+//	podSecurityContext        map[string]interface{}
+//	service                   map[string]interface{}
+//	serviceMonitor            map[string]interface{}
+//	Resources                 map[string]interface{}
+//	autoscaling               map[string]interface{}
+//	nodeSelector              map[string]interface{}
+//	affinity                  map[string]interface{}
+//	dataPlane                 map[string]interface{}
+//	admissionWebhooks         map[string]interface{}
+//	dataProtection            map[string]interface{}
+//	addonController           map[string]interface{}
+//	topologySpreadConstraints []interface{}
+//	tolerations               []interface{}
+//	priorityClassName         string
+//	nameOverride              string
+//	fullnameOverride          string
+//	dnsPolicy                 string
+//	replicaCount              int
+//	hostNetwork               bool
+//	keepAddons                bool
+//}
 
 const configKey = "config.yaml"
 
@@ -169,19 +198,15 @@ func describeConfig(o *InstallOptions) error {
 	if err != nil {
 		return nil
 	}
-
-	p := printer.NewTablePrinter(o.Out)
-	p.SetHeader("KEY", "VALUE")
-	config := &configInfos{}
-	t := reflect.TypeOf(*config)
 	toJsonData := make(map[string]interface{})
-	for i := 0; i < t.NumField(); i++ {
-		addRows(t.Field(i).Name, res[t.Field(i).Name], p)
-		//toJsonData[t.Field(i).Name] = res[t.Field(i).Name]
-		//fmt.Println(res[t.Field(i).Name])
+	//p := printer.NewTablePrinter(o.Out)
+	//p.SetHeader("KEY", "VALUE")
+	for i := range helmValuesKey {
+		//addRows(helmValuesKey[i], res[helmValuesKey[i]], p) // to table
+		toJsonData[helmValuesKey[i]] = res[helmValuesKey[i]]
 	}
-	p.Print()
-	//bytes, err := json.Marshal(toJsonData)
+	//p.Print()
+
 	jsonData, err := json.MarshalIndent(toJsonData, "", "  ")
 	if err != nil {
 		return err

@@ -125,8 +125,8 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&o.clusterDef, "cluster-definition", defaultClusterDef, "Specify the cluster definition, run \"kbcli cd list\" to get the available clusterdefinitions")
-	cmd.Flags().StringVar(&o.clusterVersion, "cluster-version", "", "Specify the clusterversion, run \"kbcli cv list\" to get the available clusterversions")
+	cmd.Flags().StringVar(&o.clusterDef, "cluster-definition", defaultClusterDef, "Specify the cluster definition, run \"kbcli cd list\" to get the available cluster definitions")
+	cmd.Flags().StringVar(&o.clusterVersion, "cluster-version", "", "Specify the cluster version, run \"kbcli cv list\" to get the available cluster versions")
 	cmd.Flags().StringVar(&o.kbVersion, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringVar(&o.cloudProvider, "cloud-provider", defaultCloudProvider, fmt.Sprintf("Cloud provider type, one of %v", supportedCloudProviders))
 	cmd.Flags().StringVar(&o.region, "region", "", "The region to create kubernetes cluster")

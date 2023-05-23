@@ -1,13 +1,50 @@
 ---
-title: kbcli fault
+title: kbcli fault node restart
 ---
 
-Inject faults to pod.
+Restart instance
+
+```
+kbcli fault node restart [flags]
+```
+
+### Examples
+
+```
+  # Stop a specified EC2 instance.
+  kbcli fault node stop node1 -c=aws --region=cn-northwest-1 --duration=3m
+  
+  # Stop two specified EC2 instances.
+  kbcli fault node stop node1 node2 -c=aws --region=cn-northwest-1 --duration=3m
+  
+  # Restart two specified EC2 instances.
+  kbcli fault node restart node1 node2 -c=aws --region=cn-northwest-1 --duration=3m
+  
+  # Detach two specified volume from two specified EC2 instances.
+  kbcli fault node detach-volume node1 node2 -c=aws --region=cn-northwest-1 --duration=1m --volume-id=v1,v2 --device-name=/d1,/d2
+  
+  # Stop two specified GCK instances.
+  kbcli fault node stop node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering
+  
+  # Restart two specified GCK instances.
+  kbcli fault node restart node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering
+  
+  # Detach two specified volume from two specified GCK instances.
+  kbcli fault node detach-volume node1 node2 -c=gcp --region=us-central1-c --project=apecloud-platform-engineering --device-name=/d1,/d2
+```
 
 ### Options
 
 ```
-  -h, --help   help for fault
+      --auto-approve                   Skip interactive approval before create secret.
+  -c, --cloud-provider string          Cloud provider type, one of [aws gcp]
+      --dry-run string[="unchanged"]   Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --duration string                Supported formats of the duration are: ms / s / m / h. (default "30s")
+  -h, --help                           help for restart
+  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --project string                 The name of the GCP project. Only available when cloud-provider=gcp.
+      --region string                  The region of the node.
+      --secret string                  The name of the secret containing cloud provider specific credentials.
 ```
 
 ### Options inherited from parent commands
@@ -36,13 +73,7 @@ Inject faults to pod.
 
 ### SEE ALSO
 
-
-* [kbcli fault io](kbcli_fault_io.md)	 - IO chaos.
-* [kbcli fault network](kbcli_fault_network.md)	 - Network chaos.
 * [kbcli fault node](kbcli_fault_node.md)	 - Node chaos.
-* [kbcli fault pod](kbcli_fault_pod.md)	 - Pod chaos.
-* [kbcli fault stress](kbcli_fault_stress.md)	 - Add memory pressure or CPU load to the system.
-* [kbcli fault time](kbcli_fault_time.md)	 - Clock skew failure.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

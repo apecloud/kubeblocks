@@ -70,7 +70,7 @@ kbcli fault network bandwidth [flags]
       --rate string                    the rate at which the bandwidth is limited. For example : 10 bps/kbps/mbps/gbps.
       --target-label stringToString    label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"' (default [])
       --target-mode string             You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.
-      --target-ns-fault stringArray    Specifies the namespace into which you want to inject faults. (default [default])
+      --target-ns-fault stringArray    Specifies the namespace into which you want to inject faults.
       --target-value string            If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
       --value string                   If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
 ```

@@ -17,60 +17,49 @@
 
 // required, command line input options for parameters and flags
 options: {
-	namespace:        string
-	selector:					{}
-	mode:							string
-	value:						string
+	kind: 						string
+	namespace: 				string
+	action: 					string
+	secretName: 			string
+	region: 					string
+	instance: 				string
+	volumeID: 				string
+	deviceName?: 			string
 	duration: 				string
 
-	target:						string
-	port:							int32
-	path:							string
-	method:						string
-	code?:						int32
-
-	abort?:						bool
-	delay?:						string
-	replace?:					{}
-	patch?:						{}
+	project: 					string
 }
 
 // required, k8s api resource content
 content: {
-  kind: "HTTPChaos"
+  kind: options.kind
   apiVersion: "chaos-mesh.org/v1alpha1"
   metadata:{
-  	generateName: "http-chaos-"
+  	generateName: "node-chaos-"
     namespace: options.namespace
   }
   spec:{
-    selector: options.selector
-    mode: options.mode
-    value: options.value
-    duration: options.duration
+  	action: options.action
+		secretName: options.secretName
+		duration: options.duration
 
-		target: options.target
-    port: options.port
-    path: options.path
-    method: options.method
-    if options.code != _|_ {
-    	code: options.code
-    }
-
-    if options.abort != _|_ {
-    	abort: options.abort
-    }
-
-    if options.delay != _|_ {
-			delay: options.delay
+		if options.kind == "AWSChaos"  {
+			awsRegion: options.region
+			ec2Instance: options.instance
+			if options.deviceName != _|_ {
+				volumeID: options.volumeID
+				deviceName: options.deviceName
+			}
 		}
 
-		if len(options.replace) != 0 {
-			replace: options.replace
-		}
+		if options.kind == "GCPChaos"  {
+			project: options.project
+			zone: options.region
+			instance: options.instance
+			if options.deviceName != _|_ {
+				deviceNames:[options.deviceName]
+			}
 
-		if len(options.patch["body"]) != 0 {
-			patch: options.patch
 		}
 	}
 }

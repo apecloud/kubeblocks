@@ -33,6 +33,7 @@ const (
 	CREATE = LifecycleAction("CREATE")
 	DELETE = LifecycleAction("DELETE")
 	UPDATE = LifecycleAction("UPDATE")
+	PATCH  = LifecycleAction("PATCH")
 	STATUS = LifecycleAction("STATUS")
 	NOOP   = LifecycleAction("NOOP")
 )
@@ -78,6 +79,10 @@ func ActionUpdatePtr() *LifecycleAction {
 	return ActionPtr(UPDATE)
 }
 
+func ActionPatchPtr() *LifecycleAction {
+	return ActionPtr(PATCH)
+}
+
 func ActionStatusPtr() *LifecycleAction {
 	return ActionPtr(STATUS)
 }
@@ -98,6 +103,12 @@ func LifecycleObjectDelete(dag *graph.DAG, obj client.Object, parent *LifecycleV
 
 func LifecycleObjectUpdate(dag *graph.DAG, obj client.Object, parent *LifecycleVertex) *LifecycleVertex {
 	return addObject(dag, obj, ActionUpdatePtr(), parent)
+}
+
+func LifecycleObjectPatch(dag *graph.DAG, obj client.Object, objCopy client.Object, parent *LifecycleVertex) *LifecycleVertex {
+	vertex := addObject(dag, obj, ActionPatchPtr(), parent)
+	vertex.ObjCopy = objCopy
+	return vertex
 }
 
 func LifecycleObjectNoop(dag *graph.DAG, obj client.Object, parent *LifecycleVertex) *LifecycleVertex {

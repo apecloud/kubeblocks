@@ -249,6 +249,12 @@ func (c *clusterPlanBuilder) reconcileObject(node *ictrltypes.LifecycleVertex) e
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
+	case ictrltypes.PATCH:
+		patch := client.MergeFrom(node.ObjCopy)
+		if err := c.cli.Patch(c.transCtx.Context, node.Obj, patch); !apierrors.IsNotFound(err) {
+			c.transCtx.Logger.Error(err, fmt.Sprintf("patch %T error", node.ObjCopy))
+			return err
+		}
 	case ictrltypes.DELETE:
 		if controllerutil.RemoveFinalizer(node.Obj, dbClusterFinalizerName) {
 			err := c.cli.Update(c.transCtx.Context, node.Obj)

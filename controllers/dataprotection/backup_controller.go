@@ -1212,6 +1212,10 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	container.Command = []string{"sh", "-c"}
 	container.Args = backupTool.Spec.BackupCommands
 	container.Image = backupTool.Spec.Image
+	if container.Image == "" {
+		// TODO(dsj): need determine container name to get, temporary use first container
+		container.Image = clusterPod.Spec.Containers[0].Image
+	}
 	if backupTool.Spec.Resources != nil {
 		container.Resources = *backupTool.Spec.Resources
 	}

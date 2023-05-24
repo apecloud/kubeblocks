@@ -13,11 +13,6 @@ import (
 	"strings"
 )
 
-type Annotations struct {
-	Leader string
-	Member string
-}
-
 type Config struct {
 	ctx       context.Context
 	Cluster   *Cluster

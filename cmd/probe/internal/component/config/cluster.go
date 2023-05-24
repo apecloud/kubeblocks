@@ -19,23 +19,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package config
 
-import "time"
+import (
+	"golang.org/x/exp/slices"
+	"time"
+)
 
 type Cluster struct {
-	Initialize string
-	Config     *ClusterConfig
-	Leader     *Leader
-	LastLsn    int64     //包含最后一个已知领导者 LSN 的位置
-	Members    []*Member //Member对象列表，包括leader在内的所有PostgreSQL集群成员
-	FailOver   *FailOver
-	Sync       *SyncState
-	// TODO: history,slots,failsafe,workers'
+	sysID    string
+	Config   *ClusterConfig
+	Leader   *Leader
+	Members  []*Member
+	FailOver *FailOver
+	Sync     *SyncState
+	Extra    map[string]string
 }
 
 type ClusterConfig struct {
-	index       int64 //对象上一次修改的索引ID
-	modifyIndex int64 //会话id或者时间戳
-	//data
+	index       int64
+	modifyIndex int64
+	data        *clusterData
 }
 
 type Leader struct {
@@ -67,14 +69,25 @@ type FailOver struct {
 type SyncState struct {
 	index       int64
 	leader      *Leader
-	syncStandby string // synchronous standby list (comma delimited) which are last synchronized to leader
+	syncStandby []string // synchronous standby list which are last synchronized to leader
 }
 
 func (s *SyncState) SynchronizedToLeader(candidate string) bool {
-	// TODO: how to maintain candidate state
-	return false
+	return slices.Contains(s.syncStandby, candidate)
 }
 
 type MemberData struct {
-	// TODO
+	connUrl string
+	state   string
+	role    string
+}
+
+type TimelineHistory struct {
+	index int64
+	value int64
+	lines []string
+}
+
+type clusterData struct {
+	ttl int32
 }

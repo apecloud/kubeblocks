@@ -30,3 +30,4 @@ To address these challenges, and solve the problem of complexity, KubeBlocks int
 - Simplifies day-2 operations, such as upgrading, scaling, monitoring, backup, and restore.
 - Contains a powerful and intuitive command line tool.
 - Sets up a full-stack, production-ready data infrastructure in minutes.
+![KubeBlocks Architecture](./../../img/kubeblocks-structure.png)

@@ -1,76 +1,37 @@
 ---
 title: Migrate data in PostgreSQL to KubeBlocks
 description: How to migrate data in PostgreSQL v14 to KubeBlocks by kbcli migration
-keywords: [postgresql, migration, kbcli migration]
-sidebar_position: 1
+keywords: [postgresql, migration, kbcli migration, migrate data in PostgreSQL to KubeBlocks]
+sidebar_position: 2
 sidebar_label: Migration
 ---
 
 # Migrate data in PostgreSQL to KubeBlocks
 
-## The environment and aim
+## Environment and aim
 
-* Source database: PostgreSQL version 14 installed by Pigsty on Alibaba Cloud ECS. PostGIS plugin is also installed and the open-source map data is imported by osm2pgsql.
+* Source: PostgreSQL version 14 installed by Pigsty on Alibaba Cloud ECS. PostGIS plugin is also installed and the open-source map data is imported by osm2pgsql.
 
-* Target database: PostgreSQL version 14.7.0 installed by KubeBlocks on AWS EKS. No plugin is installed.
+* Sink: PostgreSQL version 14.7.0 installed by KubeBlocks on AWS EKS. No plugin is installed.
 
-* Aim: Migrate db_test.public.table_test_1 and db_test.public.table_test2 in the source database to the target database.
-
-## Full feature and limit lists
-
-### Full feature list
-
-* Precheck
-  * Database connection
-  * Database version
-  * Whether the incremental migration is supported by a database
-  * The existence of the table structure
-  * Whether the table structure of the source database is supported
-* Structure initialization
-  * PostgreSQL
-    * Table Struct
-    * Table Constraint
-    * Table Index
-    * Table Comment
-    * Table Sequence
-* Data initialization
-  * Supports all major data types
-* Incremental data migration
-  * Supports all major data types
-  * Support the resumable upload capability of eventual consistency
-
-### Limit list
-
-* Overall limits
-  * If the incremental data migration is used, the source database should enable CDC (Change Data Capture) related configurations (both are checked and blocked in precheck). For detailed configurations, see [Configure the source database](#configure-the-source-database).
-  * A table without a primary key is not supported. And a table with a foreign key is not supported (both are checked and blocked in precheck).
-  * Except for the incremental data migration module, other modules do not support resumable upload, i.e. if an exception occurs in this module, such as pod failure caused by downtime and network disconnection, a re-migration is required.
-  * During the data transmission task, DDL on the migration objects in the source database is not supported.
-  * The table name and field name cannot contain Chinese characters and special characters like a single quotation mark (') and a comma (,).
-  * During the migration process, the PrimarySecondary switchover in the source library is not supported, which may cause the connection string specified in the task configuration to change. This further causes the migration link failure.
-* Permission limits
-  * The source account
-    * LOGIN
-    * The read permission of the source migration objects
-    * REPLICATION
-  * The target account
-    * LOGIN
-    * The read/write permission of the target database
-* Precheck module: None
-* Init-struct module
-  * The Array data type is not supported, such as text[], text[3][3], integer[].
-  * The user-defined type is not supported.
-  * The database character set other than UTF-8 is not supported.
-* Init-data module
-  * Character sets of the source and target databases should be the same.
-* Data incremental migration module
-  * Character sets of the source and target databases should be the same.
+* Aim: Migrate db_test.public.table_test_1 and db_test.public.table_test2 in the source to the sink.
 
 ## Before you start
 
-### Configure the source database
+### Enable kbcli migration
 
-Modify the configuration of the source database to support CDC.
+1. [Install KubeBlocks](./../../installation/introduction.md): Choose one guide that fits your actual environments.
+2. [Enable the migration add-on](./../../installation/enable-addons.md).
+
+   ```bash
+   kbcli addon list
+
+   kbcli addon enable migration
+   ```
+
+### Configure the source
+
+Modify the configuration of the source to support CDC.
 
 * (1) Set 'wal_level' configuration to 'logical'.
 * (2) Make sure that the number of 'max_replication_slots' configured is sufficient.
@@ -82,10 +43,10 @@ If you install PostgreSQL by Pigsty, you can modify the configuration by executi
 
 :::
 
-### Enable public network access to the source database
+### Enable public network access to the source
 
 ```bash
-# Other hosts can access the source database
+# Other hosts can access the source
 vim /pg/data/pg_hba.conf
 
 # Add the following configuration
@@ -102,17 +63,17 @@ host    all             all             0.0.0.0/0            md5
 
 ### Check the account permission
 
-Make sure both the source and target account meet the following permissions.
+Make sure both the source and sink account meet the following permissions.
 
 * The source account
   * LOGIN permission
   * The read permission of the source migration objects
   * REPLICATION permission
-* The target account
+* The sink account
   * LOGIN permission
-  * The read/write permission of the target database
+  * The read/write permission of the sink
 
-### Initialize the target database
+### Initialize the sink
 
 1. Create a database named `db_test`.
 
@@ -138,17 +99,6 @@ Make sure both the source and target account meet the following permissions.
 
 It is recommended to prepare data sampling for verification after the migration to ensure correctness.
 
-## Enable kbcli migration
-
-1. [Install KubeBlocks](./../../installation/introduction.md): Choose one guide that fits your actual environments.
-2. [Enable the migration add-on](./../../installation/enable-addons.md).
-
-   ```bash
-   kbcli addon list
-
-   kbcli addon enable migration
-   ```
-
 ## Migrate data
 
 ### Steps
@@ -160,7 +110,6 @@ It is recommended to prepare data sampling for verification after the migration 
    --source user:123456@127.0.0.1:5432/db_test \
    --sink user:123456@127.0.0.2:5432/db_test \
    --migration-object '"public.table_test_1","public.table_test_2"'
-
    ```
 
    :paperclip: Table 1. Options explanation
@@ -169,9 +118,9 @@ It is recommended to prepare data sampling for verification after the migration 
    | :--------- | :---------- |
    | mystask    | The name of the migration task. You can customize it. |
    | --template | It specifies the migration template. `--template apecloud-pg2pg` stands for this migration task uses the template of migrating from PostgreSQL to PostgreSQL created by ApeCloud. Run `kbcli migration templates` to view all available templates and the supported database information.   |
-   | --source   | It specifies the source database. `user:123456@127.0.0.1:5432/db_test` in the above example stands for `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connect URL uses the public network address. |
-   | --sink     | It specifies the target database. `user:123456@127.0.0.2:5432/db_test` in the above example stands for `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connection URL uses the service address inside the Kubernetes cluster. |
-   | --migration-object  | It specifies the migration object. The above example describes data in "public.table_test_1" and "public.table_test_2", including structure data, stock data, and incremental data generated during running migration task, will be migrated to the target database.    |
+   | --source   | It specifies the source. `user:123456@127.0.0.1:5432/db_test` in the above example stands for `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connect URL uses the public network address. |
+   | --sink     | It specifies the destination. `user:123456@127.0.0.2:5432/db_test` in the above example stands for `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connection URL uses the service address inside the Kubernetes cluster. |
+   | --migration-object  | It specifies the migration object. The above example describes data in "public.table_test_1" and "public.table_test_2", including structure data, stock data, and incremental data generated during running migration task, will be migrated to the sink.    |
 
    :::note
 
@@ -205,25 +154,23 @@ It is recommended to prepare data sampling for verification after the migration 
 
    ![Describe migration task](../../../img/pgsql-migration-describe-task.png)
 
-   Example of `kbcli migration describe`.
-
    Pay attention to Initialization, CDC, and CDC Metrics.
 
    * Initialization
      * Precheck
-       If the status shows `Failed`, it means the initialization precheck does not pass. Troubleshoot the initialization by [the following examples](#troubleshooting).
+       If the status shows `Failed`, it means the initialization precheck does not pass. Troubleshoot the initialization by [the following examples in troubleshooting](#troubleshooting).
      * Init-struct
        Structure initialization. Idempotent processing logic is adopted. A failure occurs only when a severe problem occurs, such as failing to connect a database.
      * Init-data
        Data initialization. If there are a large amount of stock data, it takes a long time to perform this step and you should pay attention to Status.
    * CDC
-     Incremental migration. Based on the timestamp recorded by the system before the init-data step, the system starts data migration following eventual consistency and performs capturing the source library WAL (Write Ahead Log) changes -> writing to the target database. Under normal circumstances, the CDC phase continues if the migration link is not actively terminated.
+     Incremental migration. Based on the timestamp recorded by the system before the init-data step, the system starts data migration following eventual consistency and performs capturing the source library WAL (Write Ahead Log) changes -> writing to the sink. Under normal circumstances, the CDC phase continues if the migration link is not actively terminated.
    * CDC Metrics
      Incremental migration indicators. Currently, the indicators mainly provide the WAL LSN (Log Sequencer Number) of the source library and the corresponding timestamp (note that the timestamp shows the local time zone of the Pod Container runtime) when the CDC process has completed "capturing -> writing" process.
 
      :::note
 
-     The CDC Metrics are updated every 10 minutes by the system, i.e. if there exists continuous data writing into the source database, metrics.timestamp here delays 10 minutes compared with the current time.
+     The CDC Metrics are updated every 10 minutes by the system, i.e. if there exists continuous data writing into the source, metrics.timestamp here delays 10 minutes compared with the current time.
 
      :::
 
@@ -244,14 +191,14 @@ kbcli migration logs ${migration-task-name} --step ${step-name}
 
 * Make sure the KubeBlocks migration task runs normally.
 * To differentiate the dialogue information and to improve data security, it is recommended to create and authorize another account dedicated to data migration.
-* For the sake of safety, it is necessary to stop the business write and switch the application during off-peak hours.
+* For safety concerns, it is necessary to stop the business write and switch the application during off-peak hours.
 * Before switching the application, it is recommended to prepare data sampling for verification after switching to ensure correctness.
 * Pay attention to serial, sequence, and slot.
 * Serial and sequence
 
-   Search the max. value of Sequence before switching applications and set it as the initial value of Sequence in the target database.
+   Search and record the max. value of Sequence before switching applications and set it as the initial value of Sequence in the sink.
 
-   After the business is switched to the target database, the new written Sequence does not take the max. value in the source database as the initial value to continue in an increment order by default.
+   After the business is switched to the sink, the new written Sequence does not take the max. value in the source as the initial value to continue in an increment order by default. You need to set it manually.
 
     ```bash
     # PostgreSQL Function Sample:
@@ -282,7 +229,7 @@ kbcli migration logs ${migration-task-name} --step ${step-name}
     NOTICE:  select setval('public.seq_test_3'::regclass, 203);
     NOTICE:  select setval('public.seq_test_4'::regclass, 476);
 
-    # Execute the above script in the target database
+    # Execute the above script in the sink
     ```
 
 * Slot lifecycle
@@ -301,8 +248,8 @@ kbcli migration logs ${migration-task-name} --step ${step-name}
 
   Cleanup operations adopt the idempotent logic, and the reasons for general cleanup failures include but are not limited to the following:
 
-  * While the migration task is running, the connection string of the source library changes, which causes the migration task cannot connect to the source database.
-  * While the migration task is running, the account and password of the source database change, which causes the migration task cannot connect to the source database.
+  * While the migration task is running, the connection string of the source library changes, which causes the migration task cannot connect to the source.
+  * While the migration task is running, the account and password of the source change, which causes the migration task cannot connect to the source.
   * While the migration task is running, the permissions of the source library account change, which causes the migration task cannot be deleted.
 
   :::
@@ -316,7 +263,7 @@ kbcli migration logs ${migration-task-name} --step ${step-name}
       kbcli migration describe ${migration-task-name}
       ```
 
-   2. Under the prerequisite that there exists continuous write into the source database, observe whether the timestamp is still in progress and whether there is almost no delay. For example,
+   2. Under the prerequisite that there exists continuous write into the source, observe whether the timestamp is still in progress and whether there is almost no delay. For example,
 
       ```bash
       kbcli migration logs ${migration-task-name} --step cdc | grep current_position
@@ -325,11 +272,11 @@ kbcli migration logs ${migration-task-name} --step ${step-name}
       The results update every minute.
 
       ![Timestamp](../../../img/pgsql-migration-timestamp.png)
-2. Pause the business and stop new business data from being written in the source database.
+2. Pause the business and stop new business data from being written in the source.
 3. View the migration status again and ensure the migration task runs normally, lasting at least one minute.
 
    Refer to the operations in step 1 and observe whether the link is normal and the timestamp meets the expectation.
-4. Use the target database to restore the business.
+4. Use the sink to restore the business.
 5. Validate the switch with the prepared data sampling.
 
 ## Clean up the environment
@@ -338,7 +285,7 @@ After the migration task is completed, you can terminate the migration task and 
 
 ### Terminate the migration task
 
-Deleting the migration task does not affect the data in the source and target databases.
+Deleting the migration task does not affect the data in the source and sink.
 
 ```bash
 kbcli migration terminate ${migration-task-name}

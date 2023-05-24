@@ -23,9 +23,11 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 	"helm.sh/helm/v3/pkg/repo"
@@ -35,6 +37,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
@@ -160,4 +163,109 @@ func buildKubeBlocksSelectorLabels() string {
 // in `configuration.updateConfigMapFinalizerImpl`.
 func buildConfigTypeSelectorLabels() string {
 	return fmt.Sprintf("%s=%s", constant.CMConfigurationTypeLabelKey, constant.ConfigTemplateType)
+}
+
+// printAddonMsg print addon message when has failed addon or timeout
+func printAddonMsg(out io.Writer, addons []*extensionsv1alpha1.Addon, install bool) {
+	var (
+		enablingAddons  []string
+		disablingAddons []string
+		failedAddons    []*extensionsv1alpha1.Addon
+	)
+
+	for _, addon := range addons {
+		switch addon.Status.Phase {
+		case extensionsv1alpha1.AddonEnabling:
+			enablingAddons = append(enablingAddons, addon.Name)
+		case extensionsv1alpha1.AddonDisabling:
+			disablingAddons = append(disablingAddons, addon.Name)
+		case extensionsv1alpha1.AddonFailed:
+			for _, c := range addon.Status.Conditions {
+				if c.Status == metav1.ConditionFalse {
+					failedAddons = append(failedAddons, addon)
+					break
+				}
+			}
+		}
+	}
+
+	// print failed addon messages
+	if len(failedAddons) > 0 {
+		printFailedAddonMsg(out, failedAddons)
+	}
+
+	// print enabling addon messages
+	if install && len(enablingAddons) > 0 {
+		fmt.Fprintf(out, "\nEnabling addons: %s\n", strings.Join(enablingAddons, ", "))
+		fmt.Fprintf(out, "Please wait for a while and try to run \"kbcli addon list\" to check addons status.\n")
+	}
+
+	if !install && len(disablingAddons) > 0 {
+		fmt.Fprintf(out, "\nDisabling addons: %s\n", strings.Join(disablingAddons, ", "))
+		fmt.Fprintf(out, "Please wait for a while and try to run \"kbcli addon list\" to check addons status.\n")
+	}
+}
+
+func printFailedAddonMsg(out io.Writer, addons []*extensionsv1alpha1.Addon) {
+	fmt.Fprintf(out, "\nFailed addons:\n")
+	tbl := printer.NewTablePrinter(out)
+	tbl.Tbl.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 4, WidthMax: 120},
+	})
+	tbl.SetHeader("NAME", "TIME", "REASON", "MESSAGE")
+	for _, addon := range addons {
+		var times, reasons, messages []string
+		for _, c := range addon.Status.Conditions {
+			if c.Status != metav1.ConditionFalse {
+				continue
+			}
+			times = append(times, util.TimeFormat(&c.LastTransitionTime))
+			reasons = append(reasons, c.Reason)
+			messages = append(messages, c.Message)
+		}
+		tbl.AddRow(addon.Name, strings.Join(times, "\n"), strings.Join(reasons, "\n"), strings.Join(messages, "\n"))
+	}
+	tbl.Print()
+}
+
+func checkAddons(addons []*extensionsv1alpha1.Addon, install bool) *addonStatus {
+	status := &addonStatus{
+		allEnabled:  true,
+		allDisabled: true,
+		hasFailed:   false,
+		outputMsg:   "",
+	}
+
+	if len(addons) == 0 {
+		return status
+	}
+
+	all := make([]string, 0)
+	for _, addon := range addons {
+		s := string(addon.Status.Phase)
+		switch addon.Status.Phase {
+		case extensionsv1alpha1.AddonEnabled:
+			if install {
+				s = printer.BoldGreen("OK")
+			}
+			status.allDisabled = false
+		case extensionsv1alpha1.AddonDisabled:
+			if !install {
+				s = printer.BoldGreen("OK")
+			}
+			status.allEnabled = false
+		case extensionsv1alpha1.AddonFailed:
+			status.hasFailed = true
+			status.allEnabled = false
+			status.allDisabled = false
+		case extensionsv1alpha1.AddonDisabling:
+			status.allDisabled = false
+		case extensionsv1alpha1.AddonEnabling:
+			status.allEnabled = false
+		}
+		all = append(all, fmt.Sprintf("%-48s %s", addon.Name, s))
+	}
+	sort.Strings(all)
+	status.outputMsg = strings.Join(all, "\n  ")
+	return status
 }

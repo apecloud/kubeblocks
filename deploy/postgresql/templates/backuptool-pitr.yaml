@@ -25,7 +25,7 @@ spec:
       value: 2006-01-02 15:04:05 MST
     - name: LOG_DIR
       value: $(VOLUME_DATA_DIR)/pgroot/data/pg_wal
-  image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+  image: ""
   logical:
     restoreCommands:
       - |
@@ -61,10 +61,22 @@ spec:
       set -e;
       EXPIRED_INCR_LOG=${BACKUP_DIR}/$(date -d"7 day ago" +%Y%m%d);
       if [ -d ${EXPIRED_INCR_LOG} ]; then rm -rf ${EXPIRED_INCR_LOG}; fi
+      export PGPASSWORD=${DB_PASSWORD}
+      PSQL="psql -h ${DB_HOST} -U ${DB_USER}"
+      LAST_TRANS=$(pg_waldump $(${PSQL} -Atc "select pg_walfile_name(pg_current_wal_lsn())") --rmgr=Transaction |tail -n 1)
+      if [ "${LAST_TRANS}" != "" ] && [ "$(find ${LOG_DIR}/archive_status/ -name '*.ready')" = "" ]; then
+        echo "switch wal file"
+        ${PSQL} -c "select pg_switch_wal()"
+        for i in $(seq 1 60); do
+          echo "waiting wal ready ..."
+          if [ "$(find ${LOG_DIR}/archive_status/ -name '*.ready')" != "" ]; then break; fi
+          sleep 1
+        done
+      fi
       TODAY_INCR_LOG=${BACKUP_DIR}/$(date +%Y%m%d);
       mkdir -p ${TODAY_INCR_LOG};
       cd ${LOG_DIR}
-      for i in $(find ./archive_status/ -name "*.ready"); do
+      for i in $(ls -tr ./archive_status/*.ready); do
         wal_ready_name="${i##*/}"
         wal_name=${wal_ready_name%.*}
         echo "uploading ${wal_name}";

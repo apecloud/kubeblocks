@@ -213,7 +213,7 @@ var _ = Describe("backupconfig", func() {
 		}
 		cmd := NewConfigCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-		Expect(o.PreCheck()).Should(Succeed())
+		Expect(o.PreCheck()).Should(HaveOccurred())
 	})
 	Context("run describe config cmd", func() {
 		var output printer.Format

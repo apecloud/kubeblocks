@@ -60,6 +60,22 @@ var faultHTTPExample = templates.Examples(`
 	kbcli fault network http patch --method=POST --port=4399 --body="you are good luck" --type=JSON --duration=30s
 `)
 
+type HTTPReplace struct {
+	ReplaceBody      []byte `json:"body,omitempty"`
+	InputReplaceBody string `json:"-"`
+	ReplacePath      string `json:"path,omitempty"`
+	ReplaceMethod    string `json:"method,omitempty"`
+}
+
+type HTTPPatch struct {
+	HTTPPatchBody `json:"body,omitempty"`
+}
+
+type HTTPPatchBody struct {
+	PatchBodyValue string `json:"value,omitempty"`
+	PatchBodyType  string `json:"type,omitempty"`
+}
+
 type HTTPChaosOptions struct {
 	Target string `json:"target"`
 	Port   int32  `json:"port"`
@@ -71,16 +87,10 @@ type HTTPChaosOptions struct {
 	Abort bool `json:"abort,omitempty"`
 	// delay command
 	Delay string `json:"delay,omitempty"`
-
 	// replace command
-	ReplaceBody      []byte `json:"replaceBody,omitempty"`
-	InputReplaceBody string `json:"-"`
-	ReplacePath      string `json:"replacePath,omitempty"`
-	ReplaceMethod    string `json:"replaceMethod,omitempty"`
-
+	HTTPReplace `json:"replace,omitempty"`
 	// patch command
-	PatchBodyValue string `json:"patchBodyValue,omitempty"`
-	PatchBodyType  string `json:"patchBodyType,omitempty"`
+	HTTPPatch `json:"patch,omitempty"`
 
 	FaultBaseOptions
 }
@@ -118,35 +128,26 @@ func NewHTTPChaosCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 
 func NewAbortCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewHTTPChaosOptions(f, streams, "")
-
 	cmd := o.NewCobraCommand(Abort, AbortShort)
 
 	o.AddCommonFlag(cmd)
 	cmd.Flags().BoolVar(&o.Abort, "abort", true, `Indicates whether to inject the fault that interrupts the connection.`)
-
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
 
 	return cmd
 }
 
 func NewHTTPDelayCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewHTTPChaosOptions(f, streams, "")
-
 	cmd := o.NewCobraCommand(HTTPDelay, HTTPDelayShort)
 
 	o.AddCommonFlag(cmd)
 	cmd.Flags().StringVar(&o.Delay, "delay", "10s", `The time for delay.`)
-
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
 
 	return cmd
 }
 
 func NewReplaceCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewHTTPChaosOptions(f, streams, "")
-
 	cmd := o.NewCobraCommand(Replace, ReplaceShort)
 
 	o.AddCommonFlag(cmd)
@@ -154,23 +155,16 @@ func NewReplaceCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVar(&o.ReplacePath, "replace-path", "", `The URI path used to replace content.`)
 	cmd.Flags().StringVar(&o.ReplaceMethod, "replace-method", "", `The replaced content of the HTTP request method.`)
 
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
-
 	return cmd
 }
 
 func NewPatchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewHTTPChaosOptions(f, streams, "")
-
 	cmd := o.NewCobraCommand(Patch, PatchShort)
 
 	o.AddCommonFlag(cmd)
 	cmd.Flags().StringVar(&o.PatchBodyValue, "body", "", `The fault of the request body or response body with patch faults.`)
 	cmd.Flags().StringVar(&o.PatchBodyType, "type", "", `The type of patch faults of the request body or response body. Currently, it only supports JSON.`)
-
-	// register flag completion func
-	registerFlagCompletionFunc(cmd, f)
 
 	return cmd
 }
@@ -198,26 +192,29 @@ func (o *HTTPChaosOptions) AddCommonFlag(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.Path, "path", "*", `The URI path of the target request. Supports Matching wildcards.`)
 	cmd.Flags().StringVar(&o.Method, "method", "GET", `The HTTP method of the target request method.For example: GET, POST, PUT, DELETE, HEAD, OPTIONS, PATCH.`)
 	cmd.Flags().Int32Var(&o.Code, "code", 0, `The status code responded by target.`)
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, o.Factory)
 }
 
 func (o *HTTPChaosOptions) Validate() error {
 	if o.PatchBodyType != "" && o.PatchBodyType != "JSON" {
-		return fmt.Errorf("the --type only supports JSON")
+		return fmt.Errorf("--type only supports JSON")
 	}
 	if o.PatchBodyValue != "" && o.PatchBodyType == "" {
-		return fmt.Errorf("the --type is required when --body is specified")
+		return fmt.Errorf("--type is required when --body is specified")
 	}
 	if o.PatchBodyType != "" && o.PatchBodyValue == "" {
-		return fmt.Errorf("the --body is required when --type is specified")
+		return fmt.Errorf("--body is required when --type is specified")
 	}
 
 	var msg interface{}
 	if o.PatchBodyValue != "" && json.Unmarshal([]byte(o.PatchBodyValue), &msg) != nil {
-		return fmt.Errorf("the --body is not a valid JSON")
+		return fmt.Errorf("--body is not a valid JSON")
 	}
 
 	if o.Target == "Request" && o.Code != 0 {
-		return fmt.Errorf("the --code is only supported when --target is Response")
+		return fmt.Errorf("--code is only supported when --target=Response")
 	}
 
 	if ok, err := IsRegularMatch(o.Delay); !ok {

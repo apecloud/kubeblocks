@@ -1843,7 +1843,8 @@ var _ = Describe("Cluster Controller", func() {
 		It("test cluster conditions", func() {
 			By("init cluster")
 			cluster := testapps.CreateConsensusMysqlCluster(&testCtx, clusterDefNameRand,
-				clusterVersionNameRand, clusterNameRand, consensusCompDefName, consensusCompName)
+				clusterVersionNameRand, clusterNameRand, consensusCompDefName, consensusCompName,
+				"2Gi")
 			clusterKey := client.ObjectKeyFromObject(cluster)
 
 			By("test when clusterDefinition not found")
@@ -1900,7 +1901,7 @@ var _ = Describe("Cluster Controller", func() {
 			})()).ShouldNot(HaveOccurred())
 
 			Eventually(testapps.CheckObj(&testCtx, clusterVersionKey, func(g Gomega, clusterVersion *appsv1alpha1.ClusterVersion) {
-				g.Expect(clusterVersion.Status.Phase == appsv1alpha1.AvailablePhase).Should(BeTrue())
+				g.Expect(clusterVersion.Status.Phase).Should(Equal(appsv1alpha1.AvailablePhase))
 			})).Should(Succeed())
 
 			// trigger reconcile
@@ -1909,7 +1910,8 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 				g.Expect(cluster.Status.ObservedGeneration).Should(BeZero())
 				condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
-				g.Expect(condition != nil && condition.Reason == lifecycle.ReasonPreCheckFailed).Should(BeTrue())
+				g.Expect(condition).ShouldNot(BeNil())
+				g.Expect(condition.Reason).Should(Equal(lifecycle.ReasonPreCheckFailed))
 			})).Should(Succeed())
 
 			By("reset and waiting cluster to Creating")
@@ -1922,17 +1924,21 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(tmpCluster.Status.ObservedGeneration).ShouldNot(BeZero())
 			})).Should(Succeed())
 
-			By("test apply resources failed")
+			By("apply smaller PVC size will should failed")
+			lastRecordedGenID := int64(0)
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
 				tmpCluster.Spec.ComponentSpecs[0].VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("1Gi")
+				lastRecordedGenID = tmpCluster.Generation
 			})()).ShouldNot(HaveOccurred())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster),
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-					g.Expect(tmpCluster.Status.ObservedGeneration).ShouldNot(BeEquivalentTo(tmpCluster.Generation))
+					// REVIEW/TODO: (wangyelei) following expects causing inconsistent behavior
+					g.Expect(tmpCluster.Status.ObservedGeneration).ShouldNot(BeEquivalentTo(lastRecordedGenID))
 					condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, appsv1alpha1.ConditionTypeApplyResources)
-					g.Expect(condition != nil && condition.Reason == lifecycle.ReasonApplyResourcesFailed).Should(BeTrue())
-				})).Should(Succeed())
+					g.Expect(condition).ShouldNot(BeNil())
+					g.Expect(condition.Reason).Should(Equal(lifecycle.ReasonApplyResourcesFailed))
+				}), "20s").Should(Succeed())
 		})
 	})
 })

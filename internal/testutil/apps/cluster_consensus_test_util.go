@@ -61,8 +61,12 @@ func CreateConsensusMysqlCluster(
 	clusterVersionName,
 	clusterName,
 	workloadType,
-	consensusCompName string) *appsv1alpha1.Cluster {
-	pvcSpec := NewPVCSpec("2Gi")
+	consensusCompName string, pvcSize ...string) *appsv1alpha1.Cluster {
+	size := "2Gi"
+	if len(pvcSize) > 0 {
+		size = pvcSize[0]
+	}
+	pvcSpec := NewPVCSpec(size)
 	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 		AddComponent(consensusCompName, workloadType).SetReplicas(3).SetEnabledLogs(errorLogName).
 		AddVolumeClaimTemplate("data", pvcSpec).Create(testCtx).GetObject()

@@ -172,8 +172,6 @@ type CreateOptions struct {
 	SetFile           string                   `json:"-"`
 	Values            []string                 `json:"-"`
 
-	shouldCreateDependencies bool `json:"-"`
-
 	// backup name to restore in creation
 	Backup string `json:"backup,omitempty"`
 	UpdatableFlags
@@ -385,7 +383,6 @@ func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
 
 	// set component service account name
 	compSpec.ServiceAccountName = saNamePrefix + o.Name
-	o.shouldCreateDependencies = true
 	return nil
 }
 
@@ -395,10 +392,6 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 		roleName        = roleNamePrefix + o.Name
 		roleBindingName = roleBindingNamePrefix + o.Name
 	)
-
-	if !o.shouldCreateDependencies {
-		return nil
-	}
 
 	klog.V(1).Infof("create dependencies for cluster %s", o.Name)
 	// create service account

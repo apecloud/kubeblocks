@@ -35,7 +35,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	. "github.com/apecloud/kubeblocks/cmd/probe/util"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 // List of operations.

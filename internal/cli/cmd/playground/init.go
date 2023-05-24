@@ -457,10 +457,13 @@ func (o *initOptions) createCluster() error {
 	}
 
 	inputs := create.Inputs{
-		BaseOptionsObj:  &options.BaseOptions,
-		Options:         options,
-		CueTemplateName: cmdcluster.CueTemplateName,
-		ResourceName:    types.ResourceClusters,
+		BaseOptionsObj:     &options.BaseOptions,
+		Options:            options,
+		CueTemplateName:    cmdcluster.CueTemplateName,
+		ResourceName:       types.ResourceClusters,
+		PreCreate:          options.PreCreate,
+		CleanUpFn:          options.CleanUp,
+		CreateDependencies: options.CreateDependencies,
 	}
 
 	return options.Run(inputs)
@@ -496,7 +499,12 @@ func (o *initOptions) checkExistedCluster() error {
 }
 
 func (o *initOptions) newCreateOptions() (*cmdcluster.CreateOptions, error) {
-	dynamicClient, err := util.NewFactory().DynamicClient()
+	factory := util.NewFactory()
+	dynamicClient, err := factory.DynamicClient()
+	if err != nil {
+		return nil, err
+	}
+	client, err := factory.KubernetesClientSet()
 	if err != nil {
 		return nil, err
 	}
@@ -506,6 +514,8 @@ func (o *initOptions) newCreateOptions() (*cmdcluster.CreateOptions, error) {
 			Namespace: defaultNamespace,
 			Name:      kbClusterName,
 			Dynamic:   dynamicClient,
+			Client:    client,
+			Quiet:     true,
 		},
 		UpdatableFlags: cmdcluster.UpdatableFlags{
 			TerminationPolicy: "WipeOut",

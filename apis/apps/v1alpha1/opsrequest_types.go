@@ -30,6 +30,10 @@ type OpsRequestSpec struct {
 	// +kubebuilder:validation:Required
 	ClusterRef string `json:"clusterRef"`
 
+	// once cancel is set to true, this opsRequest will be canceled and modifying this property again will not take effect.
+	// +optional
+	Cancel bool `json:"cancel,omitempty"`
+
 	// type defines the operation type.
 	// +kubebuilder:validation:Required
 	Type OpsType `json:"type"`
@@ -292,6 +296,10 @@ type OpsRequestStatus struct {
 	// completionTimestamp defines the OpsRequest completion time.
 	// +optional
 	CompletionTimestamp metav1.Time `json:"completionTimestamp,omitempty"`
+
+	// CancelTimestamp defines cancel time.
+	// +optional
+	CancelTimestamp metav1.Time `json:"cancelTimestamp,omitempty"`
 
 	// reconfiguringStatus defines the status information of reconfiguring.
 	// +optional

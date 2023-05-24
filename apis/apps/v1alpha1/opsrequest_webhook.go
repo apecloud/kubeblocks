@@ -67,15 +67,22 @@ func (r *OpsRequest) ValidateCreate() error {
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 	opsrequestlog.Info("validate update", "name", r.Name)
-	lastOpsRequest := old.(*OpsRequest)
-	if r.isForbiddenUpdate() && !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
-		return fmt.Errorf("update OpsRequest: %s is forbidden when status.Phase is %s", r.Name, r.Status.Phase)
-	}
+	lastOpsRequest := old.(*OpsRequest).DeepCopy()
 	// if no spec updated, we should skip validation.
 	// if not, we can not delete the OpsRequest when cluster has been deleted.
 	// because when cluster not existed, r.validate will report an error.
 	if reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
 		return nil
+	}
+
+	if r.IsComplete() {
+		return fmt.Errorf("update OpsRequest: %s is forbidden when status.Phase is %s", r.Name, r.Status.Phase)
+	}
+
+	// Keep the cancel consistent between the two opsRequest for comparing the diff.
+	lastOpsRequest.Spec.Cancel = r.Spec.Cancel
+	if r.Status.Phase != OpsPendingPhase && !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
+		return fmt.Errorf("update OpsRequest: %s is forbidden except for cancel when status.Phase is %s", r.Name, r.Status.Phase)
 	}
 	return r.validateEntry(false)
 }
@@ -86,15 +93,18 @@ func (r *OpsRequest) ValidateDelete() error {
 	return nil
 }
 
-// IsForbiddenUpdate OpsRequest cannot modify the spec when status is in [Succeed,Running,Failed].
-func (r *OpsRequest) isForbiddenUpdate() bool {
-	return slices.Contains([]OpsPhase{OpsCreatingPhase, OpsRunningPhase, OpsSucceedPhase, OpsFailedPhase}, r.Status.Phase)
+// IsComplete checks if opsRequest has been completed.
+func (r *OpsRequest) IsComplete(phases ...OpsPhase) bool {
+	if len(phases) == 0 {
+		return slices.Contains([]OpsPhase{OpsCancelledPhase, OpsSucceedPhase, OpsFailedPhase}, r.Status.Phase)
+	}
+	return slices.Contains([]OpsPhase{OpsCancelledPhase, OpsSucceedPhase, OpsFailedPhase}, phases[0])
 }
 
 // validateClusterPhase validates whether the current cluster state supports the OpsRequest
 func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	opsBehaviour := OpsRequestBehaviourMapper[r.Spec.Type]
-	// if the OpsType has no cluster phases, ignores it
+	// if the OpsType has no cluster phases, ignore it
 	if len(opsBehaviour.FromClusterPhases) == 0 {
 		return nil
 	}
@@ -123,7 +133,7 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	// check if the opsRequest can be executed in the current cluster phase unless this opsRequest is reentrant.
 	if !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) &&
 		!slices.Contains(opsNamesInQueue, r.Name) {
-		return fmt.Errorf("opsRequest kind: %s is forbidden when Cluster.status.Phase is %s", r.Spec.Type, cluster.Status.Phase)
+		return fmt.Errorf("opsRequest Type: %s is forbidden when Cluster.status.Phase is %s", r.Spec.Type, cluster.Status.Phase)
 	}
 	return nil
 }

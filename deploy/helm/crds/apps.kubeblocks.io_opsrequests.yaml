@@ -60,6 +60,10 @@ spec:
           spec:
             description: OpsRequestSpec defines the desired state of OpsRequest
             properties:
+              cancel:
+                description: once cancel is set to true, this opsRequest will be canceled
+                  and modifying this property again will not take effect.
+                type: boolean
               clusterRef:
                 description: clusterRef references clusterDefinition.
                 type: string
@@ -404,6 +408,10 @@ spec:
           status:
             description: OpsRequestStatus defines the observed state of OpsRequest
             properties:
+              cancelTimestamp:
+                description: CancelTimestamp defines cancel time.
+                format: date-time
+                type: string
               clusterGeneration:
                 description: ClusterGeneration records the cluster generation after
                   handling the opsRequest action.
@@ -698,6 +706,8 @@ spec:
                 - Pending
                 - Creating
                 - Running
+                - Cancelling
+                - Cancelled
                 - Failed
                 - Succeed
                 type: string

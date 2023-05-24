@@ -191,18 +191,40 @@ var _ = Describe("OpsRequest webhook", func() {
 		newCluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, newClusterName)
 		Expect(testCtx.CheckedCreateObj(ctx, newCluster)).Should(Succeed())
 
-		By("By testing Immutable when status.phase in Succeed")
-		// if running in real cluster, the opsRequest will reconcile all the time.
-		// so we should add eventually block.
-		Eventually(func() bool {
+		testSpecImmutable := func(phase OpsPhase) {
+			By(fmt.Sprintf("By testing Immutable when status.phase in %s", phase))
 			patch := client.MergeFrom(opsRequest.DeepCopy())
-			opsRequest.Status.Phase = OpsSucceedPhase
+			opsRequest.Status.Phase = phase
 			Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
 
 			patch = client.MergeFrom(opsRequest.DeepCopy())
 			opsRequest.Spec.ClusterRef = newClusterName
-			return Expect(k8sClient.Patch(ctx, opsRequest, patch).Error()).To(ContainSubstring("is forbidden when status.Phase is Succeed"))
-		}).Should(BeTrue())
+			Expect(k8sClient.Patch(ctx, opsRequest, patch).Error()).To(ContainSubstring(fmt.Sprintf("is forbidden when status.Phase is %s", phase)))
+		}
+		phaseList := []OpsPhase{OpsSucceedPhase, OpsFailedPhase, OpsCancelledPhase}
+		for _, phase := range phaseList {
+			testSpecImmutable(phase)
+		}
+
+		testSpecImmutableExpectForCancel := func(phase OpsPhase) {
+			patch := client.MergeFrom(opsRequest.DeepCopy())
+			opsRequest.Status.Phase = phase
+			Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
+
+			patch = client.MergeFrom(opsRequest.DeepCopy())
+			By(fmt.Sprintf("cancel opsRequest when ops phase is %s", phase))
+			opsRequest.Spec.Cancel = !opsRequest.Spec.Cancel
+			Expect(k8sClient.Patch(ctx, opsRequest, patch)).ShouldNot(HaveOccurred())
+
+			By(fmt.Sprintf("expect an error for updating spec.ClusterRef when ops phase is %s", phase))
+			opsRequest.Spec.ClusterRef = newClusterName
+			Expect(k8sClient.Patch(ctx, opsRequest, patch).Error()).To(ContainSubstring(fmt.Sprintf("is forbidden except for cancel when status.Phase is %s", phase)))
+		}
+
+		phaseList = []OpsPhase{OpsCreatingPhase, OpsRunningPhase, OpsCancellingPhase}
+		for _, phase := range phaseList {
+			testSpecImmutableExpectForCancel(phase)
+		}
 	}
 
 	testVerticalScaling := func(cluster *Cluster) {

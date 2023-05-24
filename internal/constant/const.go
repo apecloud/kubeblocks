@@ -92,6 +92,7 @@ const (
 	BackupToolTypeLabelKey          = "kubeblocks.io/backup-tool-type"
 	BackupTypeLabelKeyKey           = "dataprotection.kubeblocks.io/backup-type"
 	AddonProviderLableKey           = "kubeblocks.io/provider" // AddonProviderLableKey marks the addon provider
+	OpsRequestTypeLabelKey          = "ops.kubeblocks.io/ops-type"
 
 	// kubeblocks.io annotations
 	OpsRequestAnnotationKey                  = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster

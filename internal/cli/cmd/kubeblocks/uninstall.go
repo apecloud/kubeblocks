@@ -249,7 +249,7 @@ func (o *UninstallOptions) uninstallAddons() error {
 
 			if uninstall {
 				// we only need to uninstall addons that are not disabled
-				if addon.Status.Phase == extensionsv1alpha1.AddonDisabled {
+				if addon.Spec.InstallSpec.IsDisabled() {
 					continue
 				}
 				addons[addon.Name] = addon

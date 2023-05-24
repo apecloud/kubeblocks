@@ -74,6 +74,10 @@ func deleteCluster(o *delete.DeleteOptions, args []string) error {
 }
 
 func clusterPreDeleteHook(o *delete.DeleteOptions, object runtime.Object) error {
+	if object == nil {
+		return nil
+	}
+
 	cluster, err := getClusterFromObject(object)
 	if err != nil {
 		return err
@@ -85,6 +89,10 @@ func clusterPreDeleteHook(o *delete.DeleteOptions, object runtime.Object) error 
 }
 
 func clusterPostDeleteHook(o *delete.DeleteOptions, object runtime.Object) error {
+	if object == nil {
+		return nil
+	}
+
 	c, err := getClusterFromObject(object)
 	if err != nil {
 		return err
@@ -115,11 +123,11 @@ func clusterPostDeleteHook(o *delete.DeleteOptions, object runtime.Object) error
 
 func deleteCompDependencies(client kubernetes.Interface, ns string, name string, cd *appsv1alpha1.ClusterDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec) error {
-	// if d, err := shouldCreateDependencies(cd, compSpec); err != nil {
-	// 	return err
-	// } else if !d {
-	// 	return nil
-	// }
+	if d, err := shouldCreateDependencies(cd, compSpec); err != nil {
+		return err
+	} else if !d {
+		return nil
+	}
 	return deleteDependencies(client, ns, name)
 }
 
@@ -167,9 +175,9 @@ func getClusterFromObject(object runtime.Object) (*appsv1alpha1.Cluster, error) 
 	if object.GetObjectKind().GroupVersionKind().Kind != appsv1alpha1.ClusterKind {
 		return nil, fmt.Errorf("object %s is not of kind %s", object.GetObjectKind().GroupVersionKind().Kind, appsv1alpha1.ClusterKind)
 	}
-	unstructured := object.(*unstructured.Unstructured)
+	u := object.(*unstructured.Unstructured)
 	cluster := &appsv1alpha1.Cluster{}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructured.Object, cluster); err != nil {
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, cluster); err != nil {
 		return nil, err
 	}
 	return cluster, nil

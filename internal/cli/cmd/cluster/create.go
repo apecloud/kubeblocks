@@ -383,6 +383,13 @@ const (
 func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec) error {
 
+	// HACK: now we only support postgresql cluster definition
+	if c, err := shouldCreateDependencies(cd, compSpec); err != nil {
+		return err
+	} else if !c {
+		return nil
+	}
+
 	// set component service account name
 	compSpec.ServiceAccountName = saNamePrefix + o.Name
 	o.shouldCreateDependencies = true
@@ -416,35 +423,20 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 	role := rbacv1ac.Role(roleName, o.Namespace).WithRules([]*rbacv1ac.PolicyRuleApplyConfiguration{
 		{
 			APIGroups: []string{""},
-			Resources: []string{"events"},
-			Verbs:     []string{"create"},
+			Resources: []string{"configmaps"},
+			Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
+		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"endpoints"},
+			Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
+		},
+		{
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+			Verbs:     []string{"get", "list", "patch", "update", "watch"},
 		},
 	}...).WithLabels(labels)
-
-	// postgresql need more rules for patronic
-	if ok, err := o.isPostgresqlCluster(); err != nil {
-		return err
-	} else if ok {
-		rules := []rbacv1ac.PolicyRuleApplyConfiguration{
-			{
-				APIGroups: []string{""},
-				Resources: []string{"configmaps"},
-				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"endpoints"},
-				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"pods"},
-				Verbs:     []string{"get", "list", "patch", "update", "watch"},
-			},
-		}
-		role.Rules = append(role.Rules, rules...)
-	}
-
 	if _, err := o.Client.RbacV1().Roles(o.Namespace).Apply(context.TODO(), role, applyOptions); err != nil {
 		return err
 	}
@@ -566,40 +558,6 @@ func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
 	}
 	obj.SetUnstructuredContent(data)
 	return nil
-}
-
-func (o *CreateOptions) isPostgresqlCluster() (bool, error) {
-	cd, err := cluster.GetClusterDefByName(o.Dynamic, o.ClusterDefRef)
-	if err != nil {
-		return false, err
-	}
-
-	var compDef *appsv1alpha1.ClusterComponentDefinition
-	if cd.Spec.Type != "postgresql" {
-		return false, nil
-	}
-
-	// get cluster component definition
-	if len(o.ComponentSpecs) == 0 {
-		return false, fmt.Errorf("find no cluster componnet")
-	}
-	compSpec := o.ComponentSpecs[0]
-	for i, def := range cd.Spec.ComponentDefs {
-		compDefRef := compSpec["componentDefRef"]
-		if compDefRef != nil && def.Name == compDefRef.(string) {
-			compDef = &cd.Spec.ComponentDefs[i]
-		}
-	}
-
-	if compDef == nil {
-		return false, fmt.Errorf("failed to find component definition for componnet %v", compSpec["Name"])
-	}
-
-	// for postgresql, we need to create a service account, a role and a rolebinding
-	if compDef.CharacterType != "postgresql" {
-		return false, nil
-	}
-	return true, nil
 }
 
 // setEnableAllLog set enable all logs, and ignore enabledLogs of component level.
@@ -952,6 +910,30 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 		}
 	}
 	return allStorageClasses, existedDefault, nil
+}
+
+func shouldCreateDependencies(cd *appsv1alpha1.ClusterDefinition, compSpec *appsv1alpha1.ClusterComponentSpec) (bool, error) {
+	var compDef *appsv1alpha1.ClusterComponentDefinition
+	if cd.Spec.Type != "postgresql" {
+		return false, nil
+	}
+
+	// get cluster component definition
+	for i, def := range cd.Spec.ComponentDefs {
+		if def.Name == compSpec.ComponentDefRef {
+			compDef = &cd.Spec.ComponentDefs[i]
+		}
+	}
+
+	if compDef == nil {
+		return false, fmt.Errorf("failed to find component definition for componnet %s", compSpec.Name)
+	}
+
+	// for postgresql, we need to create a service account, a role and a rolebinding
+	if compDef.CharacterType != "postgresql" {
+		return false, nil
+	}
+	return true, nil
 }
 
 func buildResourceLabels(clusterName string) map[string]string {

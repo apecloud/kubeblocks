@@ -8,7 +8,7 @@ unix_socket_dir =
 user = postgres
 auth_file = /etc/pgbouncer/userlist.txt
 auth_type = md5
-pool_mode = transaction
+pool_mode = session
 max_client_conn = 100
 ignore_startup_parameters = extra_float_digits
 

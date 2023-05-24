@@ -39,7 +39,7 @@ func (t *CSSetDeletionTransformer) Transform(ctx graph.TransformContext, dag *gr
 	// there is chance that objects leak occurs because of cache stale
 	// ignore the problem currently
 	// TODO: GC the leaked objects
-	ml := client.MatchingLabels{model.AppInstanceLabelKey: obj.Name, model.KBManagedByKey: kindConsensusSet}
+	ml := client.MatchingLabels{model.AppInstanceLabelKey: obj.Name}
 	snapshot, err := model.ReadCacheSnapshot(transCtx, obj, ml, deletionKinds()...)
 	if err != nil {
 		return err

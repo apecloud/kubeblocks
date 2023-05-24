@@ -153,10 +153,16 @@ func buildHeadlessSvc(csSet workloads.ConsensusSet) *corev1.Service {
 	for _, container := range csSet.Spec.Template.Spec.Containers {
 		for _, port := range container.Ports {
 			servicePort := corev1.ServicePort{
-				Name:       port.Name,
 				Protocol:   port.Protocol,
 				Port:       port.ContainerPort,
-				TargetPort: intstr.FromString(port.Name),
+			}
+			switch {
+			case len(port.Name) > 0:
+				servicePort.Name = port.Name
+				servicePort.TargetPort = intstr.FromString(port.Name)
+			default:
+				servicePort.Name = fmt.Sprintf("%s-%d", strings.ToLower(string(port.Protocol)), port.ContainerPort)
+				servicePort.TargetPort = intstr.FromInt(int(port.ContainerPort))
 			}
 			hdlBuilder.AddPorts(servicePort)
 		}
@@ -465,7 +471,9 @@ func buildEnvConfigData(set workloads.ConsensusSet) map[string]string {
 	}
 
 	// set owner uid to let pod know if the owner is recreated
-	envData[prefix+"OWNER_UID"] = string(set.UID)
+	uid := string(set.UID)
+	envData[prefix+"OWNER_UID"] = uid
+	envData[constant.KBPrefix+"_CONSENSUS_SET_OWNER_UID_SUFFIX8"] = uid[len(uid)-4:]
 
 	return envData
 }

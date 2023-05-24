@@ -121,10 +121,13 @@ func (o *UninstallOptions) PreCheck() error {
 			fmt.Fprintf(o.Out, "to find out the namespace where KubeBlocks is installed, please use:\n\t'kbcli kubeblocks status'\n")
 			fmt.Fprintf(o.Out, "to uninstall KubeBlocks completely, please use:\n\t`kbcli kubeblocks uninstall -n <namespace>`\n")
 		}
-	} else if o.Namespace != kbNamespace {
-		o.Namespace = kbNamespace
+	}
+
+	o.Namespace = kbNamespace
+	if kbNamespace != "" {
 		fmt.Fprintf(o.Out, "Uninstall KubeBlocks in namespace \"%s\"\n", kbNamespace)
 	}
+
 	return nil
 }
 
@@ -206,7 +209,7 @@ func (o *UninstallOptions) Uninstall() error {
 	if o.Wait {
 		fmt.Fprintln(o.Out, "Uninstall KubeBlocks done.")
 	} else {
-		fmt.Fprintf(o.Out, "KubeBlocks is uninstalling, run \"kbcli kubeblocks status\" to check status.\n")
+		fmt.Fprintf(o.Out, "KubeBlocks is uninstalling, run \"kbcli kubeblocks status -A\" to check kubeblocks resources.\n")
 	}
 	return nil
 }
@@ -340,7 +343,7 @@ func checkResources(dynamic dynamic.Interface) error {
 	crs := map[string][]string{}
 	for _, gvr := range gvrList {
 		objList, err := dynamic.Resource(gvr).List(ctx, metav1.ListOptions{})
-		if err != nil {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 		for _, item := range objList.Items {

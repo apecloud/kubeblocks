@@ -162,7 +162,7 @@ func NewDescribeConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 
 func getConfigs(o *InstallOptions) (map[string]interface{}, error) {
 	if len(o.HelmCfg.Namespace()) == 0 {
-		o.HelmCfg.SetNamespace("kb-system")
+		o.HelmCfg.SetNamespace(constant.KBDefaultNameSpace)
 	}
 	actionConfig, err := helm.NewActionConfig(o.HelmCfg)
 	if err != nil {

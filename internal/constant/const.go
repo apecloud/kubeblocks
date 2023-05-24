@@ -66,6 +66,8 @@ const (
 
 	AppName = "kubeblocks"
 
+	KBDefaultNameSpace = "kb-system"
+
 	// K8s recommonded and well-known label and annotation keys
 	AppInstanceLabelKey  = "app.kubernetes.io/instance"
 	AppNameLabelKey      = "app.kubernetes.io/name"

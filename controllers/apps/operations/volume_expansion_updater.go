@@ -24,7 +24,6 @@ import (
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -56,28 +55,21 @@ func init() {
 // handleVolumeExpansionOperation handles the pvc for the volume expansion OpsRequest.
 // it will be triggered when the PersistentVolumeClaim has changed.
 func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Client, pvc *corev1.PersistentVolumeClaim) error {
-	clusterName := pvc.Labels[constant.AppInstanceLabelKey]
-	cluster := &appsv1alpha1.Cluster{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: clusterName, Namespace: pvc.Namespace}, cluster); err != nil {
+	opsRequestList, err := appsv1alpha1.GetRunningOpsByOpsType(reqCtx.Ctx, cli,
+		pvc.Labels[constant.AppInstanceLabelKey], pvc.Namespace, string(appsv1alpha1.VolumeExpansionType))
+	if err != nil {
 		return err
 	}
-	// check whether the cluster is expanding volume
-	opsRequestName := getOpsRequestNameFromAnnotation(cluster, appsv1alpha1.VolumeExpansionType)
-	if opsRequestName == nil {
+	if len(opsRequestList) == 0 {
 		return nil
 	}
 	// notice the OpsRequest to reconcile
-	err := opsutil.PatchOpsRequestReconcileAnnotation(reqCtx.Ctx, cli, cluster.Namespace, *opsRequestName)
-	// if the OpsRequest is not found, means it is deleted by user.
-	// we should delete the invalid OpsRequest annotation in the cluster and reconcile the cluster phase.
-	if apierrors.IsNotFound(err) {
-		opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
-		notExistOps := map[string]struct{}{
-			*opsRequestName: {},
+	for _, ops := range opsRequestList {
+		if err = opsutil.PatchOpsRequestReconcileAnnotation(reqCtx.Ctx, cli, pvc.Namespace, ops.Name); err != nil {
+			return err
 		}
-		return opsutil.RemoveClusterInvalidOpsRequestAnnotation(reqCtx.Ctx, cli, cluster, opsRequestSlice, notExistOps)
 	}
-	return err
+	return nil
 }
 
 // Handle the warning events on pvcs. if the events are resize failed events, update the OpsRequest.status.
@@ -109,7 +101,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) Handle(cli client.Clien
 	}
 
 	// here, if the volume expansion ops is running. we will change the pvc status to Failed on the OpsRequest.
-	return pvcEventHandler.handlePVCFailedStatusOnOpsRequest(cli, reqCtx, recorder, event, pvc)
+	return pvcEventHandler.handlePVCFailedStatusOnRunningOpsRequests(cli, reqCtx, recorder, event, pvc)
 }
 
 // isTargetResizeFailedEvents checks the event is the resize failed events.
@@ -120,7 +112,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) isTargetResizeFailedEve
 }
 
 // handlePVCFailedStatusOnOpsRequest if the volume expansion ops is running. we will change the pvc status to Failed on the OpsRequest,
-func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOnOpsRequest(cli client.Client,
+func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOnRunningOpsRequests(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
 	recorder record.EventRecorder,
 	event *corev1.Event,
@@ -136,15 +128,28 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOn
 	}, cluster); err != nil {
 		return err
 	}
-	// get the volume expansion ops which is running on cluster.
-	opsRequestName := getOpsRequestNameFromAnnotation(cluster, appsv1alpha1.VolumeExpansionType)
-	if opsRequestName == nil {
-		return nil
-	}
-	opsRequest := &appsv1alpha1.OpsRequest{}
-	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: *opsRequestName, Namespace: pvc.Namespace}, opsRequest); err != nil {
+	opsRequestList, err := appsv1alpha1.GetRunningOpsByOpsType(reqCtx.Ctx, cli,
+		pvc.Labels[constant.AppInstanceLabelKey], pvc.Namespace, string(appsv1alpha1.VolumeExpansionType))
+	if err != nil {
 		return err
 	}
+	if len(opsRequestList) == 0 {
+		return nil
+	}
+	for _, ops := range opsRequestList {
+		if err = pvcEventHandler.handlePVCFailedStatus(cli, reqCtx, recorder, event, pvc, &ops); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatus(cli client.Client,
+	reqCtx intctrlutil.RequestCtx,
+	recorder record.EventRecorder,
+	event *corev1.Event,
+	pvc *corev1.PersistentVolumeClaim,
+	opsRequest *appsv1alpha1.OpsRequest) error {
 	compsStatus := opsRequest.Status.Components
 	if compsStatus == nil {
 		return nil
@@ -178,7 +183,7 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOn
 	if !isChanged {
 		return nil
 	}
-	if err = cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
+	if err := cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
 		return err
 	}
 	recorder.Event(opsRequest, corev1.EventTypeWarning, event.Reason, event.Message)

@@ -251,26 +251,16 @@ func (t *ClusterStatusTransformer) cleanupAnnotationsAfterRunning(cluster *appsv
 }
 
 // handleClusterPhaseWhenCompsNotReady handles the Cluster.status.phase when some components are Abnormal or Failed.
-// REVIEW: seem duplicated handling
-// Deprecated:
 func handleClusterPhaseWhenCompsNotReady(cluster *appsv1alpha1.Cluster,
 	componentMap map[string]string,
 	clusterAvailabilityEffectMap map[string]bool) {
 	var (
-		clusterIsFailed   bool
-		failedCompCount   int
-		isVolumeExpanding bool
+		clusterIsFailed bool
+		failedCompCount int
 	)
 
-	opsRecords, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
-	if len(opsRecords) != 0 && opsRecords[0].Type == appsv1alpha1.VolumeExpansionType {
-		isVolumeExpanding = true
-	}
 	for k, v := range cluster.Status.Components {
-		// determine whether other components are still doing operation, i.e., create/restart/scaling.
-		// waiting for operation to complete except for volumeExpansion operation.
-		// because this operation will not affect cluster availability.
-		if !slices.Contains(appsv1alpha1.GetComponentTerminalPhases(), v.Phase) && !isVolumeExpanding {
+		if !slices.Contains(appsv1alpha1.GetComponentTerminalPhases(), v.Phase) {
 			return
 		}
 		if v.Phase == appsv1alpha1.FailedClusterCompPhase {

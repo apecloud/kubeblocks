@@ -31,12 +31,14 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
+	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
@@ -377,7 +379,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			for i := 0; i < int(replicas); i++ {
 				pvcName := fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterKey.Name, mysqlCompName, i)
 				pvc := testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterKey.Name,
-					mysqlCompName, "data").SetStorage("1Gi").Create(&testCtx).GetObject()
+					mysqlCompName, testapps.DataVolumeName).SetStorage("1Gi").Create(&testCtx).GetObject()
 				// mock pvc bound
 				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(pvc *corev1.PersistentVolumeClaim) {
 					pvc.Status.Phase = corev1.ClaimBound
@@ -565,49 +567,51 @@ var _ = Describe("OpsRequest Controller", func() {
 				Create(&testCtx).GetObject()
 			// mock sts ready and create pod
 			createStsPodAndMockStsReady()
+			// mock pvc creation
+			for i := 0; i < testapps.DefaultReplicationReplicas; i++ {
+				pvcName := fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterObj.Name, mysqlCompName, i)
+				testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterObj.Name,
+					mysqlCompName, testapps.DataVolumeName).AddLabels(constant.AppInstanceLabelKey, clusterObj.Name,
+					constant.VolumeClaimTemplateNameLabelKey, testapps.DataVolumeName,
+					constant.KBAppComponentLabelKey, testapps.DefaultRedisCompName).
+					SetStorage("1Gi").SetStorageClass(storageClassName).Create(&testCtx).GetObject()
+			}
 			// wait for cluster to running
 			Eventually(testapps.GetClusterPhase(&testCtx, client.ObjectKeyFromObject(clusterObj))).Should(Equal(appsv1alpha1.RunningClusterPhase))
 		})
 
-		// TODO(refactor): support the start/stop ops
-		// It("delete Running opsRequest", func() {
-		//	By("Create a volume-expand ops")
-		//	opsName := "volume-expand" + testCtx.GetRandomStr()
-		//	volumeExpandOps := testapps.NewOpsRequestObj(opsName, clusterObj.Namespace,
-		//		clusterObj.Name, appsv1alpha1.VolumeExpansionType)
-		//	volumeExpandOps.Spec.VolumeExpansionList = []appsv1alpha1.VolumeExpansion{
-		//		{
-		//			ComponentOps: appsv1alpha1.ComponentOps{ComponentName: testapps.DefaultRedisCompName},
-		//			VolumeClaimTemplates: []appsv1alpha1.OpsRequestVolumeClaimTemplate{
-		//				{
-		//					Name:    testapps.DataVolumeName,
-		//					Storage: resource.MustParse("3Gi"),
-		//				},
-		//			},
-		//		},
-		//	}
-		//	Expect(testCtx.CreateObj(testCtx.Ctx, volumeExpandOps)).Should(Succeed())
-		//	clusterKey = client.ObjectKeyFromObject(clusterObj)
-		//	opsKey := client.ObjectKeyFromObject(volumeExpandOps)
-		//	Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
-		//	Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmlCluster *appsv1alpha1.Cluster) {
-		//		opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(tmlCluster)
-		//		g.Expect(opsSlice).Should(HaveLen(1))
-		//		g.Expect(tmlCluster.Status.Components[testapps.DefaultRedisCompName].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // VolumeExpandingPhase
-		//		// TODO: status conditions for VolumeExpandingPhase
-		//	})).Should(Succeed())
-		//
-		//	By("delete the Running ops")
-		//	testapps.DeleteObject(&testCtx, opsKey, volumeExpandOps)
-		//	Expect(testapps.ChangeObj(&testCtx, volumeExpandOps, func(lopsReq *appsv1alpha1.OpsRequest) {
-		//		lopsReq.SetFinalizers([]string{})
-		//	})).ShouldNot(HaveOccurred())
-		//
-		//	By("check the cluster annotation")
-		//	Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmlCluster *appsv1alpha1.Cluster) {
-		//		opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(tmlCluster)
-		//		g.Expect(opsSlice).Should(HaveLen(0))
-		//	})).Should(Succeed())
-		// })
+		It("delete Running opsRequest", func() {
+			By("Create a volume-expand ops")
+			opsName := "volume-expand" + testCtx.GetRandomStr()
+			volumeExpandOps := testapps.NewOpsRequestObj(opsName, clusterObj.Namespace,
+				clusterObj.Name, appsv1alpha1.VolumeExpansionType)
+			volumeExpandOps.Spec.VolumeExpansionList = []appsv1alpha1.VolumeExpansion{
+				{
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: testapps.DefaultRedisCompName},
+					VolumeClaimTemplates: []appsv1alpha1.OpsRequestVolumeClaimTemplate{
+						{
+							Name:    testapps.DataVolumeName,
+							Storage: resource.MustParse("3Gi"),
+						},
+					},
+				},
+			}
+			Expect(testCtx.CreateObj(testCtx.Ctx, volumeExpandOps)).Should(Succeed())
+			clusterKey = client.ObjectKeyFromObject(clusterObj)
+			opsKey := client.ObjectKeyFromObject(volumeExpandOps)
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
+
+			By("delete the Running ops")
+			testapps.DeleteObject(&testCtx, opsKey, volumeExpandOps)
+			Expect(testapps.ChangeObj(&testCtx, volumeExpandOps, func(lopsReq *appsv1alpha1.OpsRequest) {
+				lopsReq.SetFinalizers([]string{})
+			})).ShouldNot(HaveOccurred())
+
+			By("check the cluster annotation")
+			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmlCluster *appsv1alpha1.Cluster) {
+				opsSlice, _ := opsutil.GetOpsRequestSliceFromCluster(tmlCluster)
+				g.Expect(opsSlice).Should(HaveLen(0))
+			})).Should(Succeed())
+		})
 	})
 })

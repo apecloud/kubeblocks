@@ -118,15 +118,6 @@ const (
 	SpecReconcilingClusterCompPhase ClusterComponentPhase = "Updating"
 	CreatingClusterCompPhase        ClusterComponentPhase = "Creating"
 	// DeletingClusterCompPhase        ClusterComponentPhase = "Deleting" // DO REVIEW: may merged with  Stopping
-
-	// REVIEW: following are variant of "Updating", why not have "Updating" phase with detail Status.Conditions
-	// VolumeExpandingClusterCompPhase   ClusterComponentPhase = "VolumeExpanding"
-	// HorizontalScalingClusterCompPhase ClusterComponentPhase = "HorizontalScaling"
-	// VerticalScalingClusterCompPhase   ClusterComponentPhase = "VerticalScaling"
-	// VersionUpgradingClusterCompPhase  ClusterComponentPhase = "Upgrading"
-	// ReconfiguringClusterCompPhase     ClusterComponentPhase = "Reconfiguring"
-	// ExposingClusterCompPhase          ClusterComponentPhase = "Exposing"
-	// RollingClusterCompPhase           ClusterComponentPhase = "Rolling" // REVIEW: original value is Rebooting, and why not having stopping -> stopped -> starting -> running
 )
 
 const (

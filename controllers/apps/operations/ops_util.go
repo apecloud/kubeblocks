@@ -218,17 +218,6 @@ func patchValidateErrorCondition(ctx context.Context, cli client.Client, opsRes 
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
 }
 
-// getOpsRequestNameFromAnnotation gets OpsRequest.name from cluster.annotations
-func getOpsRequestNameFromAnnotation(cluster *appsv1alpha1.Cluster, opsType appsv1alpha1.OpsType) *string {
-	opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
-	for _, v := range opsRequestSlice {
-		if v.Type == opsType {
-			return &v.Name
-		}
-	}
-	return nil
-}
-
 // GetOpsRecorderFromSlice gets OpsRequest recorder from slice by target cluster phase
 func GetOpsRecorderFromSlice(opsRequestSlice []appsv1alpha1.OpsRecorder,
 	opsRequestName string) (int, appsv1alpha1.OpsRecorder) {

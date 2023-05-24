@@ -19,6 +19,16 @@ data:
       limit: 100
     debug: false
 
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: weaviate-env-template
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+  {{- include "weaviate.labels" . | nindent 4 }}
+
+data:
   envs: |-
     ENABLE_MODULES=""
     TRANSFORMERS_INFERENCE_API=""
@@ -38,3 +48,9 @@ data:
     AZURE_STORAGE_ACCOUNT=""
     AZURE_STORAGE_KEY=""
     AZURE_STORAGE_CONNECTION_STRING=""
+    AUTHENTICATION_APIKEY_ENABLED=""
+    AUTHENTICATION_APIKEY_ALLOWED_KEYS=""
+    AUTHENTICATION_APIKEY_USERS=""
+    AUTHORIZATION_ADMINLIST_ENABLED=""
+    AUTHORIZATION_ADMINLIST_USERS=""
+    AUTHORIZATION_ADMINLIST_READONLY_USERS=""

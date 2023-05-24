@@ -18,7 +18,8 @@ kbcli kubeblocks describe-config [flags]
 ### Options
 
 ```
-  -h, --help   help for describe-config
+  -h, --help            help for describe-config
+  -o, --output format   prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
 ```
 
 ### Options inherited from parent commands

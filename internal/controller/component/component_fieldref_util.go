@@ -64,7 +64,7 @@ func buildCompoentRef(clusterDef *appsv1alpha1.ClusterDefinition,
 			}
 		}
 
-		if fieldEnvs, err := resolveFieldRefs(compRef.FieldRefs, referredComponent, referredComponentDef); err != nil {
+		if fieldEnvs, err := resolveFieldRefs(compRef.FieldRefs, referredComponent); err != nil {
 			return err
 		} else if len(fieldEnvs) > 0 {
 			envs = append(envs, fieldEnvs...)
@@ -75,7 +75,7 @@ func buildCompoentRef(clusterDef *appsv1alpha1.ClusterDefinition,
 		} else if len(serviceEnvs) > 0 {
 			envs = append(envs, serviceEnvs...)
 		}
-		if resourceEnvs, err := resolveResourceFieldRefs(compRef.ResourceFieldRefs, referredComponent, referredComponentDef); err != nil {
+		if resourceEnvs, err := resolveResourceFieldRefs(compRef.ResourceFieldRefs, referredComponent); err != nil {
 			return err
 		} else if len(resourceEnvs) > 0 {
 			envs = append(envs, resourceEnvs...)
@@ -86,8 +86,7 @@ func buildCompoentRef(clusterDef *appsv1alpha1.ClusterDefinition,
 }
 
 func resolveFieldRefs(fieldRefs []*appsv1alpha1.ComponentFieldRef,
-	referredComponent *appsv1alpha1.ClusterComponentSpec,
-	referredComponentDef *appsv1alpha1.ClusterComponentDefinition) ([]corev1.EnvVar, error) {
+	referredComponent *appsv1alpha1.ClusterComponentSpec) ([]corev1.EnvVar, error) {
 	if len(fieldRefs) == 0 {
 		return nil, nil
 	}
@@ -134,8 +133,7 @@ func resolveServiceFieldRefs(serviceRefs []*appsv1alpha1.ComponentServiceRef,
 }
 
 func resolveResourceFieldRefs(resourceFieldRefs []*appsv1alpha1.ComponentResourceFieldRef,
-	referredComponent *appsv1alpha1.ClusterComponentSpec,
-	referredComponentDef *appsv1alpha1.ClusterComponentDefinition) ([]corev1.EnvVar, error) {
+	referredComponent *appsv1alpha1.ClusterComponentSpec) ([]corev1.EnvVar, error) {
 	if len(resourceFieldRefs) == 0 {
 		return nil, nil
 	}

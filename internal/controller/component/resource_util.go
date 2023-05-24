@@ -55,14 +55,10 @@ func extractComponentResourceValue(fs *appsv1alpha1.ComponentResourceFieldRef, c
 		return convertResourceCPUToString(comp.Resources.Limits.Cpu(), divisor)
 	case "limits.memory":
 		return convertResourceMemoryToString(comp.Resources.Limits.Memory(), divisor)
-	case "limits.ephemeral-storage":
-		return convertResourceEphemeralStorageToString(comp.Resources.Limits.StorageEphemeral(), divisor)
 	case "requests.cpu":
 		return convertResourceCPUToString(comp.Resources.Requests.Cpu(), divisor)
 	case "requests.memory":
 		return convertResourceMemoryToString(comp.Resources.Requests.Memory(), divisor)
-	case "requests.ephemeral-storage":
-		return convertResourceEphemeralStorageToString(comp.Resources.Requests.StorageEphemeral(), divisor)
 	}
 	// handle extended standard resources with dynamic names
 	// example: requests.hugepages-<pageSize> or limits.hugepages-<pageSize>
@@ -99,13 +95,6 @@ func convertResourceMemoryToString(memory *resource.Quantity, divisor resource.Q
 // ceiling of the value.
 func convertResourceHugePagesToString(hugePages *resource.Quantity, divisor resource.Quantity) (string, error) {
 	m := int64(math.Ceil(float64(hugePages.Value()) / float64(divisor.Value())))
-	return strconv.FormatInt(m, 10), nil
-}
-
-// convertResourceEphemeralStorageToString converts ephemeral storage value to the format of divisor and returns
-// ceiling of the value.
-func convertResourceEphemeralStorageToString(ephemeralStorage *resource.Quantity, divisor resource.Quantity) (string, error) {
-	m := int64(math.Ceil(float64(ephemeralStorage.Value()) / float64(divisor.Value())))
 	return strconv.FormatInt(m, 10), nil
 }
 

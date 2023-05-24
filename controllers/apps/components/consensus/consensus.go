@@ -275,6 +275,10 @@ func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) 
 	return vertexes, nil
 }
 
+func (r *ConsensusSet) HandleHA(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
+	return nil, nil
+}
+
 // func (r *ConsensusSet) HandleUpdate(ctx context.Context, obj client.Object) error {
 //	if r == nil {
 //		return nil

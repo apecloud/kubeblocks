@@ -113,6 +113,10 @@ func (r *Stateful) HandleRoleChange(context.Context, client.Object) ([]graph.Ver
 	return nil, nil
 }
 
+func (r *Stateful) HandleHA(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
+	return nil, nil
+}
+
 // HandleUpdateWithProcessors extended HandleUpdate() with custom processors
 // REVIEW/TODO: (nashtsai)
 //  1. too many args

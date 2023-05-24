@@ -118,6 +118,10 @@ func (stateless *Stateless) HandleRoleChange(context.Context, client.Object) ([]
 	return nil, nil
 }
 
+func (stateless *Stateless) HandleHA(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
+	return nil, nil
+}
+
 func newStateless(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	spec *appsv1alpha1.ClusterComponentSpec,

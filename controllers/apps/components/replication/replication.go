@@ -63,6 +63,7 @@ func (r *ReplicationSet) getReplicas() int32 {
 	}
 	return r.ComponentSpec.Replicas
 }
+
 func (r *ReplicationSet) getPrimaryIndex() int32 {
 	if r.Component != nil {
 		return r.Component.GetPrimaryIndex()
@@ -182,18 +183,13 @@ func (r *ReplicationSet) HandleRestart(ctx context.Context, obj client.Object) (
 }
 
 func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	sts := util.ConvertToStatefulSet(obj)
-	if sts.Generation != sts.Status.ObservedGeneration {
-		return nil, nil
-	}
-	podList, err := util.GetPodListByStatefulSet(ctx, r.Cli, sts)
+	podList, err := r.getRunningPods(ctx, obj)
 	if err != nil {
 		return nil, err
 	}
 	if len(podList) == 0 {
 		return nil, nil
 	}
-
 	vertexes := make([]graph.Vertex, 0)
 	podsToSyncStatus := make([]*corev1.Pod, 0)
 	for i := range podList {
@@ -231,6 +227,39 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 		return nil, err
 	}
 	return vertexes, nil
+}
+
+// TODO(refactor): imple HandleHA asynchronously
+
+func (r *ReplicationSet) HandleHA(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
+	pods, err := r.getRunningPods(ctx, obj)
+	if err != nil {
+		return nil, err
+	}
+	if len(pods) == 0 {
+		return nil, nil
+	}
+	// If the Pods already exists, check whether there is an HA switching and the HA process is prioritized to handle.
+	// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
+	primaryIndexChanged, _, err := CheckPrimaryIndexChanged(ctx, r.Cli, r.Cluster, r.getName(), r.getPrimaryIndex())
+	if err != nil {
+		return nil, err
+	}
+	if primaryIndexChanged {
+		compSpec := util.GetClusterComponentSpecByName(*r.Cluster, r.getName())
+		if err := HandleReplicationSetHASwitch(ctx, r.Cli, r.Cluster, compSpec); err != nil {
+			return nil, err
+		}
+	}
+	return nil, nil
+}
+
+func (r *ReplicationSet) getRunningPods(ctx context.Context, obj client.Object) ([]corev1.Pod, error) {
+	sts := util.ConvertToStatefulSet(obj)
+	if sts.Generation != sts.Status.ObservedGeneration {
+		return nil, nil
+	}
+	return util.GetPodListByStatefulSet(ctx, r.Cli, sts)
 }
 
 func newReplicationSet(cli client.Client,

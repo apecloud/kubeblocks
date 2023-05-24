@@ -106,28 +106,3 @@ func (c *replicationComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.
 func (c *replicationComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	return c.StatefulComponentBase.Status(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionNoopPtr()))
 }
-
-//// TODO(refactor): impl it
-// func (c *replicationComponent) handleHA(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-//	pods, err := util.ListPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
-//	if err != nil {
-//		return err
-//	}
-//	if len(pods) == 0 {
-//		return nil
-//	}
-//	// If the Pods already exists, check whether there is an HA switching and the HA process is prioritized to handle.
-//	// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
-//	cluster := c.GetCluster()
-//	primaryIndexChanged, _, err := CheckPrimaryIndexChanged(reqCtx.Ctx, cli, cluster, c.GetName(), c.Component.GetPrimaryIndex())
-//	if err != nil {
-//		return err
-//	}
-//	if primaryIndexChanged {
-//		compSpec := util.GetClusterComponentSpecByName(*cluster, c.GetName())
-//		if err := HandleReplicationSetHASwitch(reqCtx.Ctx, cli, cluster, compSpec); err != nil {
-//			return err
-//		}
-//	}
-//	return nil
-// }

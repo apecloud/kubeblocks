@@ -187,6 +187,14 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 		}
 	}
 
+	if vertexes, err := c.ComponentSet.HandleHA(reqCtx.Ctx, c.runningWorkload); err != nil {
+		return err
+	} else {
+		for _, v := range vertexes {
+			c.Dag.AddVertex(v)
+		}
+	}
+
 	if vertexes, err := c.ComponentSet.HandleRoleChange(reqCtx.Ctx, c.runningWorkload); err != nil {
 		return err
 	} else {

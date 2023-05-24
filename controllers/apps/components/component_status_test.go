@@ -389,12 +389,16 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				testk8s.InitStatefulSetStatus(testCtx, statefulset, controllerRevision)
 				for i := 0; i < replicas; i++ {
 					podName := fmt.Sprintf("%s-%d", stsName, i)
+					podRole := "primary"
+					if i > 0 {
+						podRole = "secondary"
+					}
 					pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
 						SetOwnerReferences("apps/v1", constant.StatefulSetKind, statefulset).
 						AddAppInstanceLabel(clusterName).
 						AddAppComponentLabel(compName).
 						AddAppManangedByLabel().
-						AddRoleLabel("leader").
+						AddRoleLabel(podRole).
 						AddControllerRevisionHashLabel(controllerRevision).
 						AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 						Create(&testCtx).GetObject()

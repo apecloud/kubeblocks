@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -98,37 +97,16 @@ func clusterPostDeleteHook(o *delete.DeleteOptions, object runtime.Object) error
 		return err
 	}
 
-	dynamic, err := o.Factory.DynamicClient()
-	if err != nil {
-		return err
-	}
-
 	client, err := o.Factory.KubernetesClientSet()
 	if err != nil {
 		return err
 	}
 
 	// HACK: for a postgresql cluster, we need to delete the sa, role and rolebinding
-	cd, err := cluster.GetClusterDefByName(dynamic, c.Spec.ClusterDefRef)
-	if err != nil {
+	if err = deleteDependencies(client, c.Namespace, c.Name); err != nil {
 		return err
-	}
-	for _, compSpec := range c.Spec.ComponentSpecs {
-		if err = deleteCompDependencies(client, c.Namespace, c.Name, cd, &compSpec); err != nil {
-			return err
-		}
 	}
 	return nil
-}
-
-func deleteCompDependencies(client kubernetes.Interface, ns string, name string, cd *appsv1alpha1.ClusterDefinition,
-	compSpec *appsv1alpha1.ClusterComponentSpec) error {
-	if d, err := shouldCreateDependencies(cd, compSpec); err != nil {
-		return err
-	} else if !d {
-		return nil
-	}
-	return deleteDependencies(client, ns, name)
 }
 
 func deleteDependencies(client kubernetes.Interface, ns string, name string) error {

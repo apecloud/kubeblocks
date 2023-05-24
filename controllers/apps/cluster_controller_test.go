@@ -1949,7 +1949,7 @@ var _ = Describe("Cluster Controller", func() {
 					condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, appsv1alpha1.ConditionTypeApplyResources)
 					g.Expect(condition).ShouldNot(BeNil())
 					g.Expect(condition.Reason).Should(Equal(lifecycle.ReasonApplyResourcesFailed))
-				}), "20s").Should(Succeed())
+				})).Should(Succeed())
 		})
 	})
 })

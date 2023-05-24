@@ -22,7 +22,6 @@ package kubeblocks
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
@@ -76,5 +75,10 @@ var _ = Describe("kubeblocks uninstall", func() {
 			AutoApprove: true,
 		}
 		Expect(o.Uninstall()).Should(Succeed())
+	})
+
+	It("checkResources", func() {
+		fakeDynamic := testing.FakeDynamicClient()
+		Expect(checkResources(fakeDynamic)).Should(Succeed())
 	})
 })

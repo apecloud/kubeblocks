@@ -21,15 +21,10 @@ package kubeblocks
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"reflect"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 	"helm.sh/helm/v3/pkg/action"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -47,7 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
-var helmValuesKey = []string{
+var helmExpectValuesKey = []string{
 	"image",
 	"updateStrategy",
 	"podDisruptionBudget",
@@ -57,7 +52,7 @@ var helmValuesKey = []string{
 	"podSecurityContext",
 	"service",
 	"serviceMonitor",
-	"Resources",
+	"resources",
 	"autoscaling",
 	"nodeSelector",
 	"affinity",
@@ -151,61 +146,51 @@ func NewDescribeConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f, cmd))
-			configs, err := getConfigs(o)
-			util.CheckErr(err)
-			util.CheckErr(describeConfig(configs, output, o.Out))
+			util.CheckErr(describeConfig(o, output, func(release string, opt *Options) (map[string]interface{}, error) {
+				values, err := GetHelmValues(release, opt)
+				if err != nil {
+					return nil, err
+				}
+				res := make(map[string]interface{})
+				// filter the addons values
+				for i := range helmExpectValuesKey {
+					res[helmExpectValuesKey[i]] = values[helmExpectValuesKey[i]]
+				}
+				return res, nil
+			}))
 		},
 	}
 	printer.AddOutputFlag(cmd, &output)
 	return cmd
 }
 
-func getConfigs(o *InstallOptions) (map[string]interface{}, error) {
-	if len(o.HelmCfg.Namespace()) == 0 {
-		o.HelmCfg.SetNamespace(constant.KBDefaultNameSpace)
+// GetHelmValues gives an implementation of 'helm get values' for target release
+func GetHelmValues(release string, opt *Options) (map[string]interface{}, error) {
+	if len(opt.HelmCfg.Namespace()) == 0 {
+		namespace, err := util.GetKubeBlocksNamespace(opt.Client)
+		if err != nil {
+			return nil, err
+		}
+		opt.HelmCfg.SetNamespace(namespace)
 	}
-	actionConfig, err := helm.NewActionConfig(o.HelmCfg)
+	actionConfig, err := helm.NewActionConfig(opt.HelmCfg)
 	if err != nil {
 		return nil, err
 	}
 	client := action.NewGetValues(actionConfig)
 	client.AllValues = true
-	res, err := client.Run(types.KubeBlocksChartName)
-	if err != nil {
-		return nil, err
-	}
-	return res, nil
+	return client.Run(release)
 }
 
-func describeConfig(configs map[string]interface{}, format printer.Format, out io.Writer) error {
-	var err error
-	inTable := func() {
-		p := printer.NewTablePrinter(out)
-		p.SetHeader("KEY", "VALUE")
-		p.SortBy(1)
-		for i := range helmValuesKey {
-			addRows(helmValuesKey[i], configs[helmValuesKey[i]], p, true) // to table
-		}
-		p.Print()
-	}
-	if format.IsHumanReadable() {
-		inTable()
-		return nil
-	}
-	toJSONData := make(map[string]interface{})
-	for i := range helmValuesKey {
-		toJSONData[helmValuesKey[i]] = configs[helmValuesKey[i]]
-	}
-	var data []byte
-	if format == printer.YAML {
-		data, err = yaml.Marshal(toJSONData)
-	} else {
-		data, err = json.MarshalIndent(toJSONData, "", "  ")
-	}
+type fn func(release string, opt *Options) (map[string]interface{}, error)
+
+// describeConfig will output the configs get by the fn in specified format
+func describeConfig(o *InstallOptions, format printer.Format, f fn) error {
+	values, err := f(types.KubeBlocksReleaseName, &o.Options)
 	if err != nil {
 		return err
 	}
-	fmt.Fprint(out, string(data))
+	printer.PrintHelmValues(values, format, o.Out)
 	return nil
 }
 
@@ -254,20 +239,4 @@ func markKubeBlocksPodsToLoadConfigMap(client kubernetes.Interface) error {
 		_, _ = client.CoreV1().Pods(deploy.Namespace).Update(context.TODO(), &pod, metav1.UpdateOptions{})
 	}
 	return nil
-}
-
-// addRows parse the interface value two depth at most and add it to the Table
-func addRows(key string, value interface{}, p *printer.TablePrinter, ori bool) {
-	if value == nil {
-		p.AddRow(key, value)
-		return
-	}
-	if reflect.TypeOf(value).Kind() == reflect.Map && ori {
-		for k, v := range value.(map[string]interface{}) {
-			addRows(key+"."+k, v, p, false)
-		}
-	} else {
-		data, _ := json.Marshal(value)
-		p.AddRow(key, string(data))
-	}
 }

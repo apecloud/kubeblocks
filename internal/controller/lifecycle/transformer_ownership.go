@@ -44,6 +44,9 @@ func (f *OwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.
 	for _, vertex := range vertices {
 		v, _ := vertex.(*ictrltypes.LifecycleVertex)
 		if err := intctrlutil.SetOwnership(rootVertex.Obj, v.Obj, scheme, dbClusterFinalizerName); err != nil {
+			if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
+				continue
+			}
 			return err
 		}
 	}

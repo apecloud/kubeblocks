@@ -182,7 +182,7 @@ func describeConfig(configs map[string]interface{}, format printer.Format, out i
 	inTable := func() {
 		p := printer.NewTablePrinter(out)
 		p.SetHeader("KEY", "VALUE")
-
+		p.SortBy(1)
 		for i := range helmValuesKey {
 			addRows(helmValuesKey[i], configs[helmValuesKey[i]], p, true) // to table
 		}
@@ -192,20 +192,20 @@ func describeConfig(configs map[string]interface{}, format printer.Format, out i
 		inTable()
 		return nil
 	}
-	toJsonData := make(map[string]interface{})
+	toJSONData := make(map[string]interface{})
 	for i := range helmValuesKey {
-		toJsonData[helmValuesKey[i]] = configs[helmValuesKey[i]]
+		toJSONData[helmValuesKey[i]] = configs[helmValuesKey[i]]
 	}
 	var data []byte
 	if format == printer.YAML {
-		data, err = yaml.Marshal(toJsonData)
+		data, err = yaml.Marshal(toJSONData)
 	} else {
-		data, err = json.MarshalIndent(toJsonData, "", "  ")
+		data, err = json.MarshalIndent(toJSONData, "", "  ")
 	}
 	if err != nil {
 		return err
 	}
-	fmt.Println(string(data))
+	fmt.Fprint(out, string(data))
 	return nil
 }
 

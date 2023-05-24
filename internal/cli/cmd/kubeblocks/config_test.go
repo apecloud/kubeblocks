@@ -21,7 +21,6 @@ package kubeblocks
 
 import (
 	"bytes"
-	"github.com/apecloud/kubeblocks/internal/cli/printer"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -32,6 +31,7 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
@@ -215,6 +215,7 @@ var _ = Describe("backupconfig", func() {
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(o.PreCheck()).Should(HaveOccurred())
 	})
+
 	Context("run describe config cmd", func() {
 		var output printer.Format
 		var configs map[string]interface{}
@@ -228,92 +229,271 @@ var _ = Describe("backupconfig", func() {
 			err := describeConfig(configs, output, streams.Out)
 			Expect(err).Should(Succeed())
 			expect := `KEY                                          VALUE                                                                                                                                                 
-image.tag                                    ""                                                                                                                                                    
-image.tools                                  {"repository":"apecloud/kubeblocks-tools"}                                                                                                            
-image.imagePullSecrets                       []                                                                                                                                                    
-image.pullPolicy                             "IfNotPresent"                                                                                                                                        
-image.registry                               "registry.cn-hangzhou.aliyuncs.com"                                                                                                                   
-image.repository                             "apecloud/kubeblocks"                                                                                                                                 
-updateStrategy.rollingUpdate                 {"maxSurge":1,"maxUnavailable":"40%"}                                                                                                                 
-updateStrategy.type                          "RollingUpdate"                                                                                                                                       
-podDisruptionBudget.minAvailable             1                                                                                                                                                     
-loggerSettings.developmentMode               false                                                                                                                                                 
-loggerSettings.encoder                       "console"                                                                                                                                             
-loggerSettings.timeEncoding                  "iso8601"                                                                                                                                             
-serviceAccount.create                        true                                                                                                                                                  
-serviceAccount.name                          ""                                                                                                                                                    
-serviceAccount.annotations                   {}                                                                                                                                                    
-securityContext.allowPrivilegeEscalation     false                                                                                                                                                 
-securityContext.capabilities                 {"drop":["ALL"]}                                                                                                                                      
-podSecurityContext.runAsNonRoot              true                                                                                                                                                  
-service.port                                 9999                                                                                                                                                  
-service.type                                 "ClusterIP"                                                                                                                                           
-serviceMonitor.port                          8080                                                                                                                                                  
-serviceMonitor.enabled                       false                                                                                                                                                 
 Resources                                    <nil>                                                                                                                                                 
-autoscaling.minReplicas                      1                                                                                                                                                     
-autoscaling.targetCPUUtilizationPercentage   80                                                                                                                                                    
-autoscaling.enabled                          false                                                                                                                                                 
-autoscaling.maxReplicas                      100                                                                                                                                                   
-affinity.nodeAffinity                        {"preferredDuringSchedulingIgnoredDuringExecution":{"preference":{"matchExpressions":[{"key":"kb-controller","operator":"In","values":["true"]}]}}}   
-dataPlane                                    ""                                                                                                                                                    
-admissionWebhooks.ignoreReplicasCheck        false                                                                                                                                                 
+addonController.enabled                      true                                                                                                                                                  
+addonController.jobImagePullPolicy           "IfNotPresent"                                                                                                                                        
+addonController.jobTTL                       "5m"                                                                                                                                                  
 admissionWebhooks.createSelfSignedCert       true                                                                                                                                                  
 admissionWebhooks.enabled                    false                                                                                                                                                 
-dataProtection.backupPVConfigMapNamespace    ""                                                                                                                                                    
-dataProtection.enableVolumeSnapshot          false                                                                                                                                                 
+admissionWebhooks.ignoreReplicasCheck        false                                                                                                                                                 
+affinity.nodeAffinity                        {"preferredDuringSchedulingIgnoredDuringExecution":{"preference":{"matchExpressions":[{"key":"kb-controller","operator":"In","values":["true"]}]}}}   
+autoscaling.enabled                          false                                                                                                                                                 
+autoscaling.maxReplicas                      100                                                                                                                                                   
+autoscaling.minReplicas                      1                                                                                                                                                     
+autoscaling.targetCPUUtilizationPercentage   80                                                                                                                                                    
+dataPlane                                    ""                                                                                                                                                    
 dataProtection.backupPVCCreatePolicy         ""                                                                                                                                                    
 dataProtection.backupPVCInitCapacity         ""                                                                                                                                                    
 dataProtection.backupPVCName                 ""                                                                                                                                                    
 dataProtection.backupPVCStorageClassName     ""                                                                                                                                                    
 dataProtection.backupPVConfigMapName         ""                                                                                                                                                    
-addonController.enabled                      true                                                                                                                                                  
-addonController.jobImagePullPolicy           "IfNotPresent"                                                                                                                                        
-addonController.jobTTL                       "5m"                                                                                                                                                  
-topologySpreadConstraints                    []                                                                                                                                                    
-tolerations.tolerations                      [{"effect":"NoSchedule","key":"kb-controller","operator":"Equal","value":true}]                                                                       
-priorityClassName                            <nil>                                                                                                                                                 
-nameOverride                                 ""                                                                                                                                                    
-fullnameOverride                             <nil>                                                                                                                                                 
+dataProtection.backupPVConfigMapNamespace    ""                                                                                                                                                    
+dataProtection.enableVolumeSnapshot          false                                                                                                                                                 
 dnsPolicy                                    "ClusterFirst"                                                                                                                                        
-replicaCount                                 1                                                                                                                                                     
+fullnameOverride                             <nil>                                                                                                                                                 
 hostNetwork                                  false                                                                                                                                                 
+image.imagePullSecrets                       []                                                                                                                                                    
+image.pullPolicy                             "IfNotPresent"                                                                                                                                        
+image.registry                               "registry.cn-hangzhou.aliyuncs.com"                                                                                                                   
+image.repository                             "apecloud/kubeblocks"                                                                                                                                 
+image.tag                                    ""                                                                                                                                                    
+image.tools                                  {"repository":"apecloud/kubeblocks-tools"}                                                                                                            
 keepAddons                                   false                                                                                                                                                 
+loggerSettings.developmentMode               false                                                                                                                                                 
+loggerSettings.encoder                       "console"                                                                                                                                             
+loggerSettings.timeEncoding                  "iso8601"                                                                                                                                             
+nameOverride                                 ""                                                                                                                                                    
+podDisruptionBudget.minAvailable             1                                                                                                                                                     
+podSecurityContext.runAsNonRoot              true                                                                                                                                                  
+priorityClassName                            <nil>                                                                                                                                                 
+replicaCount                                 1                                                                                                                                                     
+securityContext.allowPrivilegeEscalation     false                                                                                                                                                 
+securityContext.capabilities                 {"drop":["ALL"]}                                                                                                                                      
+service.port                                 9999                                                                                                                                                  
+service.type                                 "ClusterIP"                                                                                                                                           
+serviceAccount.annotations                   {}                                                                                                                                                    
+serviceAccount.create                        true                                                                                                                                                  
+serviceAccount.name                          ""                                                                                                                                                    
+serviceMonitor.enabled                       false                                                                                                                                                 
+serviceMonitor.port                          8080                                                                                                                                                  
+tolerations.tolerations                      [{"effect":"NoSchedule","key":"kb-controller","operator":"Equal","value":true}]                                                                       
+topologySpreadConstraints                    []                                                                                                                                                    
+updateStrategy.rollingUpdate                 {"maxSurge":1,"maxUnavailable":"40%"}                                                                                                                 
+updateStrategy.type                          "RollingUpdate"                                                                                                                                       
 `
 			Expect(out.String()).Should(Equal(expect))
 		})
 
 		It("describe-config --output json", func() {
 			output = printer.JSON
+			expect := `{
+  "Resources": null,
+  "addonController": {
+    "enabled": true,
+    "jobImagePullPolicy": "IfNotPresent",
+    "jobTTL": "5m"
+  },
+  "admissionWebhooks": {
+    "createSelfSignedCert": true,
+    "enabled": false,
+    "ignoreReplicasCheck": false
+  },
+  "affinity": {
+    "nodeAffinity": {
+      "preferredDuringSchedulingIgnoredDuringExecution": {
+        "preference": {
+          "matchExpressions": [
+            {
+              "key": "kb-controller",
+              "operator": "In",
+              "values": [
+                "true"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "autoscaling": {
+    "enabled": false,
+    "maxReplicas": 100,
+    "minReplicas": 1,
+    "targetCPUUtilizationPercentage": 80
+  },
+  "dataPlane": "",
+  "dataProtection": {
+    "backupPVCCreatePolicy": "",
+    "backupPVCInitCapacity": "",
+    "backupPVCName": "",
+    "backupPVCStorageClassName": "",
+    "backupPVConfigMapName": "",
+    "backupPVConfigMapNamespace": "",
+    "enableVolumeSnapshot": false
+  },
+  "dnsPolicy": "ClusterFirst",
+  "fullnameOverride": null,
+  "hostNetwork": false,
+  "image": {
+    "imagePullSecrets": [],
+    "pullPolicy": "IfNotPresent",
+    "registry": "registry.cn-hangzhou.aliyuncs.com",
+    "repository": "apecloud/kubeblocks",
+    "tag": "",
+    "tools": {
+      "repository": "apecloud/kubeblocks-tools"
+    }
+  },
+  "keepAddons": false,
+  "loggerSettings": {
+    "developmentMode": false,
+    "encoder": "console",
+    "timeEncoding": "iso8601"
+  },
+  "nameOverride": "",
+  "nodeSelector": {},
+  "podDisruptionBudget": {
+    "minAvailable": 1
+  },
+  "podSecurityContext": {
+    "runAsNonRoot": true
+  },
+  "priorityClassName": null,
+  "replicaCount": 1,
+  "securityContext": {
+    "allowPrivilegeEscalation": false,
+    "capabilities": {
+      "drop": [
+        "ALL"
+      ]
+    }
+  },
+  "service": {
+    "port": 9999,
+    "type": "ClusterIP"
+  },
+  "serviceAccount": {
+    "annotations": {},
+    "create": true,
+    "name": ""
+  },
+  "serviceMonitor": {
+    "enabled": false,
+    "port": 8080
+  },
+  "tolerations": {
+    "tolerations": [
+      {
+        "effect": "NoSchedule",
+        "key": "kb-controller",
+        "operator": "Equal",
+        "value": true
+      }
+    ]
+  },
+  "topologySpreadConstraints": [],
+  "updateStrategy": {
+    "rollingUpdate": {
+      "maxSurge": 1,
+      "maxUnavailable": "40%"
+    },
+    "type": "RollingUpdate"
+  }
+}`
 			err := describeConfig(configs, output, streams.Out)
 			Expect(err).Should(Succeed())
-
+			Expect(out.String()).Should(Equal(expect))
 		})
 
 		It("describe-config --output yaml", func() {
 			output = printer.YAML
+			expect := `Resources: null
+addonController:
+  enabled: true
+  jobImagePullPolicy: IfNotPresent
+  jobTTL: 5m
+admissionWebhooks:
+  createSelfSignedCert: true
+  enabled: false
+  ignoreReplicasCheck: false
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      preference:
+        matchExpressions:
+        - key: kb-controller
+          operator: In
+          values:
+          - "true"
+autoscaling:
+  enabled: false
+  maxReplicas: 100
+  minReplicas: 1
+  targetCPUUtilizationPercentage: 80
+dataPlane: ""
+dataProtection:
+  backupPVCCreatePolicy: ""
+  backupPVCInitCapacity: ""
+  backupPVCName: ""
+  backupPVCStorageClassName: ""
+  backupPVConfigMapName: ""
+  backupPVConfigMapNamespace: ""
+  enableVolumeSnapshot: false
+dnsPolicy: ClusterFirst
+fullnameOverride: null
+hostNetwork: false
+image:
+  imagePullSecrets: []
+  pullPolicy: IfNotPresent
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/kubeblocks
+  tag: ""
+  tools:
+    repository: apecloud/kubeblocks-tools
+keepAddons: false
+loggerSettings:
+  developmentMode: false
+  encoder: console
+  timeEncoding: iso8601
+nameOverride: ""
+nodeSelector: {}
+podDisruptionBudget:
+  minAvailable: 1
+podSecurityContext:
+  runAsNonRoot: true
+priorityClassName: null
+replicaCount: 1
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+service:
+  port: 9999
+  type: ClusterIP
+serviceAccount:
+  annotations: {}
+  create: true
+  name: ""
+serviceMonitor:
+  enabled: false
+  port: 8080
+tolerations:
+  tolerations:
+  - effect: NoSchedule
+    key: kb-controller
+    operator: Equal
+    value: true
+topologySpreadConstraints: []
+updateStrategy:
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 40%
+  type: RollingUpdate
+`
 			err := describeConfig(configs, output, streams.Out)
 			Expect(err).Should(Succeed())
-
+			Expect(out.String()).Should(Equal(expect))
 		})
 	})
-
-	//It("run describe config cmd", func() {
-	//	o := &InstallOptions{
-	//		Options: Options{
-	//			IOStreams: streams,
-	//			HelmCfg:   helm.NewFakeConfig(testing.Namespace),
-	//			Namespace: "default",
-	//			Client:    testing.FakeClientSet(mockDeploy(), mockConfigMap()),
-	//		},
-	//	}
-	//	cmd := NewDescribeConfigCmd(tf, streams)
-	//	Expect(cmd).ShouldNot(BeNil())
-	//	done := testing.Capture()
-	//	Expect(describeConfig(o)).Should(Succeed())
-	//	capturedOutput, err := done()
-	//	Expect(err).Should(Succeed())
-	//	Expect(capturedOutput).Should(ContainSubstring("VOLUMESNAPSHOT=true"))
-	//	Expect(capturedOutput).Should(ContainSubstring("BACKUP_PVC_NAME=test-pvc"))
-	//})
 })

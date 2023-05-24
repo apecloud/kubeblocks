@@ -233,8 +233,9 @@ func BuildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.Persi
 	}
 }
 
-func BuildSvcListWithCustomAttributes(params BuilderParams, customAttributeSetter func(*corev1.Service)) ([]*corev1.Service, error) {
-	services, err := BuildSvcListLow(params.Cluster, params.Component)
+func BuildSvcListWithCustomAttributes(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent,
+	customAttributeSetter func(*corev1.Service)) ([]*corev1.Service, error) {
+	services, err := BuildSvcListLow(cluster, component)
 	if err != nil {
 		return nil, err
 	}

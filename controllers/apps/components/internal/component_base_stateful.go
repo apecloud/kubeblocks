@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -215,19 +216,15 @@ func (c *StatefulComponentBase) Restart(reqCtx intctrlutil.RequestCtx, cli clien
 
 func (c *StatefulComponentBase) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {
-		var proto *corev1.PersistentVolumeClaimSpec
+		var proto *corev1.PersistentVolumeClaimTemplate
 		for _, v := range c.Component.VolumeClaimTemplates {
 			if v.Name == vct.Name {
-				proto = &v.Spec
+				proto = &v
 				break
 			}
 		}
 		// REVIEW: seems we can remove a volume claim from templates at runtime, without any changes and warning messages?
 		if proto == nil {
-			continue
-		}
-
-		if vct.Spec.Resources.Requests[corev1.ResourceStorage] == proto.Resources.Requests[corev1.ResourceStorage] {
 			continue
 		}
 
@@ -239,249 +236,177 @@ func (c *StatefulComponentBase) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli 
 }
 
 func (c *StatefulComponentBase) expandVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	vctName string, proto *corev1.PersistentVolumeClaimSpec) error {
-	volumes, err := c.getRunningVolumes(reqCtx, cli, vctName, c.runningWorkload)
-	if err != nil {
-		return err
-	}
-	if len(volumes) == 0 {
-		return nil
-	}
-
-	quantity := volumes[0].Spec.Resources.Requests[corev1.ResourceStorage]
-	protoQuantity := proto.Resources.Requests[corev1.ResourceStorage]
-	ret := quantity.Cmp(protoQuantity)
-	if ret == 0 {
-		return nil
-	}
-	if ret > 0 {
-		return fmt.Errorf("can't decrease the volume size from %s to %s, component: %s, volume template: %s",
-			quantity.String(), protoQuantity.String(), c.GetName(), vctName)
-	}
-
-	for _, pvc := range volumes {
-		pvc.Spec.Resources.Requests[corev1.ResourceStorage] = proto.Resources.Requests[corev1.ResourceStorage]
-		c.UpdateResource(pvc, c.WorkloadVertex)
+	vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
+	pvcNotFound := false
+	for i := *c.runningWorkload.Spec.Replicas - 1; i >= 0; i-- {
+		pvc := &corev1.PersistentVolumeClaim{}
+		pvcKey := types.NamespacedName{
+			Namespace: c.GetNamespace(),
+			Name:      fmt.Sprintf("%s-%s-%d", vctName, c.runningWorkload.Name, i),
+		}
+		if err := cli.Get(reqCtx.Ctx, pvcKey, pvc); err != nil {
+			if apierrors.IsNotFound(err) {
+				pvcNotFound = true
+			} else {
+				return err
+			}
+		}
+		if err := c.updatePVCSize(reqCtx, cli, pvcKey, pvc, pvcNotFound, proto); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (c *StatefulComponentBase) expandVolumes2(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	vctName string, proto *corev1.PersistentVolumeClaimSpec) error {
-	// pvcNotFound := false
-	// for i := *stsObj.Spec.Replicas - 1; i >= 0; i-- {
-	//	pvc := &corev1.PersistentVolumeClaim{}
-	//	pvcKey := types.NamespacedName{
-	//		Namespace: stsObj.Namespace,
-	//		Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-	//	}
-	//	if err := transCtx.Client.Get(transCtx.Context, pvcKey, pvc); err != nil {
-	//		if errors.IsNotFound(err) {
-	//			pvcNotFound = true
-	//		} else {
-	//			return err
-	//		}
-	//	}
-	//
-	//	//if err := c.updatePVCSize(vertex, pvcKey, pvc, pvcNotFound, vctProto); err != nil {
-	//	//	return err
-	//	//}
-	// }
+func (c *StatefulComponentBase) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli client.Client, pvcKey types.NamespacedName,
+	pvc *corev1.PersistentVolumeClaim, pvcNotFound bool, vctProto *corev1.PersistentVolumeClaimTemplate) error {
+	// reference: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#recovering-from-failure-when-expanding-volumes
+	// 1. Mark the PersistentVolume(PV) that is bound to the PersistentVolumeClaim(PVC) with Retain reclaim policy.
+	// 2. Delete the PVC. Since PV has Retain reclaim policy - we will not lose any data when we recreate the PVC.
+	// 3. Delete the claimRef entry from PV specs, so as new PVC can bind to it. This should make the PV Available.
+	// 4. Re-create the PVC with smaller size than PV and set volumeName field of the PVC to the name of the PV. This should bind new PVC to existing PV.
+	// 5. Don't forget to restore the reclaim policy of the PV.
+	newPVC := pvc.DeepCopy()
+	if pvcNotFound {
+		newPVC.Name = pvcKey.Name
+		newPVC.Namespace = pvcKey.Namespace
+		newPVC.SetLabels(vctProto.Labels)
+		newPVC.Spec = vctProto.Spec
+		ml := client.MatchingLabels{
+			constant.PVCNameLabelKey: pvcKey.Name,
+		}
+		pvList := corev1.PersistentVolumeList{}
+		if err := cli.List(reqCtx.Ctx, &pvList, ml); err != nil {
+			return err
+		}
+		for _, pv := range pvList.Items {
+			// find pv referenced this pvc
+			if pv.Spec.ClaimRef == nil {
+				continue
+			}
+			if pv.Spec.ClaimRef.Name == pvcKey.Name {
+				newPVC.Spec.VolumeName = pv.Name
+				break
+			}
+		}
+	} else {
+		newPVC.Spec.Resources.Requests[corev1.ResourceStorage] = vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
+		// delete annotation to make it re-bind
+		delete(newPVC.Annotations, "pv.kubernetes.io/bind-completed")
+	}
+
+	pvNotFound := false
+
+	// step 1: update pv to retain
+	pv := &corev1.PersistentVolume{}
+	pvKey := types.NamespacedName{
+		Namespace: pvcKey.Namespace,
+		Name:      newPVC.Spec.VolumeName,
+	}
+	if err := cli.Get(reqCtx.Ctx, pvKey, pv); err != nil {
+		if apierrors.IsNotFound(err) {
+			pvNotFound = true
+		} else {
+			return err
+		}
+	}
+
+	type pvcRecreateStep int
+	const (
+		pvPolicyRetainStep pvcRecreateStep = iota
+		deletePVCStep
+		removePVClaimRefStep
+		createPVCStep
+		pvRestorePolicyStep
+	)
+
+	addStepMap := map[pvcRecreateStep]func(fromVertex *ictrltypes.LifecycleVertex, step pvcRecreateStep) *ictrltypes.LifecycleVertex{
+		pvPolicyRetainStep: func(fromVertex *ictrltypes.LifecycleVertex, step pvcRecreateStep) *ictrltypes.LifecycleVertex {
+			// step 1: update pv to retain
+			retainPV := pv.DeepCopy()
+			if retainPV.Labels == nil {
+				retainPV.Labels = make(map[string]string)
+			}
+			// add label to pv, in case pvc get deleted, and we can't find pv
+			retainPV.Labels[constant.PVCNameLabelKey] = pvcKey.Name
+			if retainPV.Annotations == nil {
+				retainPV.Annotations = make(map[string]string)
+			}
+			retainPV.Annotations[constant.PVLastClaimPolicyAnnotationKey] = string(pv.Spec.PersistentVolumeReclaimPolicy)
+			retainPV.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimRetain
+			return c.PatchResource(retainPV, pv, fromVertex)
+		},
+		deletePVCStep: func(fromVertex *ictrltypes.LifecycleVertex, step pvcRecreateStep) *ictrltypes.LifecycleVertex {
+			// step 2: delete pvc, this will not delete pv because policy is 'retain'
+			removeFinalizerPVC := pvc.DeepCopy()
+			removeFinalizerPVC.SetFinalizers([]string{})
+			removeFinalizerPVCVertex := c.PatchResource(removeFinalizerPVC, pvc, fromVertex)
+			return c.DeleteResource(pvc, removeFinalizerPVCVertex)
+		},
+		removePVClaimRefStep: func(fromVertex *ictrltypes.LifecycleVertex, step pvcRecreateStep) *ictrltypes.LifecycleVertex {
+			// step 3: remove claimRef in pv
+			removeClaimRefPV := pv.DeepCopy()
+			if removeClaimRefPV.Spec.ClaimRef != nil {
+				removeClaimRefPV.Spec.ClaimRef.UID = ""
+				removeClaimRefPV.Spec.ClaimRef.ResourceVersion = ""
+			}
+			return c.PatchResource(removeClaimRefPV, pv, fromVertex)
+		},
+		createPVCStep: func(fromVertex *ictrltypes.LifecycleVertex, step pvcRecreateStep) *ictrltypes.LifecycleVertex {
+			// step 4: create new pvc
+			newPVC.SetResourceVersion("")
+			return c.CreateResource(newPVC, fromVertex)
+		},
+		pvRestorePolicyStep: func(fromVertex *ictrltypes.LifecycleVertex, step pvcRecreateStep) *ictrltypes.LifecycleVertex {
+			// step 5: restore to previous pv policy
+			restorePV := pv.DeepCopy()
+			policy := corev1.PersistentVolumeReclaimPolicy(restorePV.Annotations[constant.PVLastClaimPolicyAnnotationKey])
+			if len(policy) == 0 {
+				policy = corev1.PersistentVolumeReclaimDelete
+			}
+			restorePV.Spec.PersistentVolumeReclaimPolicy = policy
+			return c.PatchResource(restorePV, pv, fromVertex)
+		},
+	}
+
+	updatePVCByRecreateFromStep := func(fromStep pvcRecreateStep) {
+		lastVertex := c.WorkloadVertex
+		for step := pvRestorePolicyStep; step >= fromStep && step >= pvPolicyRetainStep; step-- {
+			lastVertex = addStepMap[step](lastVertex, step)
+		}
+	}
+
+	targetQuantity := vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
+	if pvcNotFound && !pvNotFound {
+		// this could happen if create pvc step failed when recreating pvc
+		updatePVCByRecreateFromStep(removePVClaimRefStep)
+		return nil
+	}
+	if pvcNotFound && pvNotFound {
+		// if both pvc and pv not found, do nothing
+		return nil
+	}
+	if reflect.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) && pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
+		// this could happen if create pvc succeeded but last step failed
+		updatePVCByRecreateFromStep(pvRestorePolicyStep)
+		return nil
+	}
+	if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; !viper.GetBool(constant.CfgRecoverVolumeExpansionFailure) &&
+		pvcQuantity.Cmp(targetQuantity) == 1 && // check if it's compressing volume
+		targetQuantity.Cmp(*pvc.Status.Capacity.Storage()) >= 0 { // check if target size is greater than or equal to actual size
+		// this branch means we can update pvc size by recreate it
+		updatePVCByRecreateFromStep(pvPolicyRetainStep)
+		return nil
+	}
+	if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; pvcQuantity.Cmp(vctProto.Spec.Resources.Requests[corev1.ResourceStorage]) != 0 {
+		// use pvc's update without anything extra
+		c.UpdateResource(newPVC, c.WorkloadVertex)
+		return nil
+	}
+	// all the else means no need to update
+
 	return nil
 }
-
-// func (c *StatefulComponentBase) updatePVCSize(vertex *lifecycleVertex, pvcKey types.NamespacedName, pvc *corev1.PersistentVolumeClaim, pvcNotFound bool, vctProto *corev1.PersistentVolumeClaim) error {
-// reference: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#recovering-from-failure-when-expanding-volumes
-// 1. Mark the PersistentVolume(PV) that is bound to the PersistentVolumeClaim(PVC) with Retain reclaim policy.
-// 2. Delete the PVC. Since PV has Retain reclaim policy - we will not lose any data when we recreate the PVC.
-// 3. Delete the claimRef entry from PV specs, so as new PVC can bind to it. This should make the PV Available.
-// 4. Re-create the PVC with smaller size than PV and set volumeName field of the PVC to the name of the PV. This should bind new PVC to existing PV.
-// 5. Don't forget to restore the reclaim policy of the PV.
-//	newPVC := pvc.DeepCopy()
-//	if pvcNotFound {
-//		newPVC.Name = pvcKey.Name
-//		newPVC.Namespace = pvcKey.Namespace
-//		newPVC.SetLabels(vctProto.Labels)
-//		newPVC.Spec = vctProto.Spec
-//		ml := client.MatchingLabels{
-//			constant.PVCNameLabelKey: pvcKey.Name,
-//		}
-//		pvList := corev1.PersistentVolumeList{}
-//		if err := transCtx.Client.List(transCtx.Context, &pvList, ml); err != nil {
-//			return err
-//		}
-//		for _, pv := range pvList.Items {
-//			// find pv referenced this pvc
-//			if pv.Spec.ClaimRef == nil {
-//				continue
-//			}
-//			if pv.Spec.ClaimRef.Name == pvcKey.Name {
-//				newPVC.Spec.VolumeName = pv.Name
-//				break
-//			}
-//		}
-//	} else {
-//		newPVC.Spec.Resources.Requests[corev1.ResourceStorage] = vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
-//		// delete annotation to make it re-bind
-//		delete(newPVC.Annotations, "pv.kubernetes.io/bind-completed")
-//	}
-//
-//	// for simple update
-//	simpleUpdateVertex := &lifecycleVertex{
-//		obj:    newPVC,
-//		oriObj: pvc,
-//		action: actionPtr(UPDATE),
-//	}
-//
-//	pvNotFound := false
-//
-//	// step 1: update pv to retain
-//	pv := &corev1.PersistentVolume{}
-//	pvKey := types.NamespacedName{
-//		Namespace: pvcKey.Namespace,
-//		Name:      newPVC.Spec.VolumeName,
-//	}
-//	if err := transCtx.Client.Get(transCtx.Context, pvKey, pv); err != nil {
-//		if errors.IsNotFound(err) {
-//			pvNotFound = true
-//		} else {
-//			return err
-//		}
-//	}
-//
-//	type pvcRecreateStep int
-//	const (
-//		pvPolicyRetainStep pvcRecreateStep = iota
-//		deletePVCStep
-//		removePVClaimRefStep
-//		createPVCStep
-//		pvRestorePolicyStep
-//	)
-//
-//	addStepMap := map[pvcRecreateStep]func(fromVertex *lifecycleVertex, step pvcRecreateStep) *lifecycleVertex{
-//		pvPolicyRetainStep: func(fromVertex *lifecycleVertex, step pvcRecreateStep) *lifecycleVertex {
-//			// step 1: update pv to retain
-//			retainPV := pv.DeepCopy()
-//			if retainPV.Labels == nil {
-//				retainPV.Labels = make(map[string]string)
-//			}
-//			// add label to pv, in case pvc get deleted, and we can't find pv
-//			retainPV.Labels[constant.PVCNameLabelKey] = pvcKey.Name
-//			if retainPV.Annotations == nil {
-//				retainPV.Annotations = make(map[string]string)
-//			}
-//			retainPV.Annotations[constant.PVLastClaimPolicyAnnotationKey] = string(pv.Spec.PersistentVolumeReclaimPolicy)
-//			retainPV.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimRetain
-//			retainPVVertex := &lifecycleVertex{
-//				obj:    retainPV,
-//				oriObj: pv,
-//				action: actionPtr(PATCH),
-//			}
-//			dag.AddVertex(retainPVVertex)
-//			dag.Connect(fromVertex, retainPVVertex)
-//			return retainPVVertex
-//		},
-//		deletePVCStep: func(fromVertex *lifecycleVertex, step pvcRecreateStep) *lifecycleVertex {
-//			// step 2: delete pvc, this will not delete pv because policy is 'retain'
-//			deletePVCVertex := &lifecycleVertex{obj: pvc, action: actionPtr(DELETE)}
-//			removeFinalizerPVC := pvc.DeepCopy()
-//			removeFinalizerPVC.SetFinalizers([]string{})
-//			removeFinalizerPVCVertex := &lifecycleVertex{
-//				obj:    removeFinalizerPVC,
-//				oriObj: pvc,
-//				action: actionPtr(PATCH),
-//			}
-//			dag.AddVertex(deletePVCVertex)
-//			dag.AddVertex(removeFinalizerPVCVertex)
-//			dag.Connect(removeFinalizerPVCVertex, deletePVCVertex)
-//			dag.Connect(fromVertex, removeFinalizerPVCVertex)
-//			return deletePVCVertex
-//		},
-//		removePVClaimRefStep: func(fromVertex *lifecycleVertex, step pvcRecreateStep) *lifecycleVertex {
-//			// step 3: remove claimRef in pv
-//			removeClaimRefPV := pv.DeepCopy()
-//			if removeClaimRefPV.Spec.ClaimRef != nil {
-//				removeClaimRefPV.Spec.ClaimRef.UID = ""
-//				removeClaimRefPV.Spec.ClaimRef.ResourceVersion = ""
-//			}
-//			removeClaimRefVertex := &lifecycleVertex{
-//				obj:    removeClaimRefPV,
-//				oriObj: pv,
-//				action: actionPtr(PATCH),
-//			}
-//			dag.AddVertex(removeClaimRefVertex)
-//			dag.Connect(fromVertex, removeClaimRefVertex)
-//			return removeClaimRefVertex
-//		},
-//		createPVCStep: func(fromVertex *lifecycleVertex, step pvcRecreateStep) *lifecycleVertex {
-//			// step 4: create new pvc
-//			newPVC.SetResourceVersion("")
-//			createNewPVCVertex := &lifecycleVertex{
-//				obj:    newPVC,
-//				action: actionPtr(CREATE),
-//			}
-//			dag.AddVertex(createNewPVCVertex)
-//			dag.Connect(fromVertex, createNewPVCVertex)
-//			return createNewPVCVertex
-//		},
-//		pvRestorePolicyStep: func(fromVertex *lifecycleVertex, step pvcRecreateStep) *lifecycleVertex {
-//			// step 5: restore to previous pv policy
-//			restorePV := pv.DeepCopy()
-//			policy := corev1.PersistentVolumeReclaimPolicy(restorePV.Annotations[constant.PVLastClaimPolicyAnnotationKey])
-//			if len(policy) == 0 {
-//				policy = corev1.PersistentVolumeReclaimDelete
-//			}
-//			restorePV.Spec.PersistentVolumeReclaimPolicy = policy
-//			restorePVVertex := &lifecycleVertex{
-//				obj:    restorePV,
-//				oriObj: pv,
-//				action: actionPtr(PATCH),
-//			}
-//			dag.AddVertex(restorePVVertex)
-//			dag.Connect(fromVertex, restorePVVertex)
-//			return restorePVVertex
-//		},
-//	}
-//
-//	updatePVCByRecreateFromStep := func(fromStep pvcRecreateStep) {
-//		lastVertex := vertex
-//		for step := pvRestorePolicyStep; step >= fromStep && step >= pvPolicyRetainStep; step-- {
-//			lastVertex = addStepMap[step](lastVertex, step)
-//		}
-//	}
-//
-//	targetQuantity := vctProto.Spec.Resources.Requests[corev1.ResourceStorage]
-//	if pvcNotFound && !pvNotFound {
-//		// this could happen if create pvc step failed when recreating pvc
-//		updatePVCByRecreateFromStep(removePVClaimRefStep)
-//		return nil
-//	}
-//	if pvcNotFound && pvNotFound {
-//		// if both pvc and pv not found, do nothing
-//		return nil
-//	}
-//	if reflect.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) && pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
-//		// this could happen if create pvc succeeded but last step failed
-//		updatePVCByRecreateFromStep(pvRestorePolicyStep)
-//		return nil
-//	}
-//	if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; !viper.GetBool(constant.CfgRecoverVolumeExpansionFailure) &&
-//		pvcQuantity.Cmp(targetQuantity) == 1 && // check if it's compressing volume
-//		targetQuantity.Cmp(*pvc.Status.Capacity.Storage()) >= 0 { // check if target size is greater than or equal to actual size
-//		// this branch means we can update pvc size by recreate it
-//		updatePVCByRecreateFromStep(pvPolicyRetainStep)
-//		return nil
-//	}
-//	if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; pvcQuantity.Cmp(vctProto.Spec.Resources.Requests[corev1.ResourceStorage]) != 0 {
-//		// use pvc's update without anything extra
-//		dag.AddVertex(simpleUpdateVertex)
-//		dag.Connect(vertex, simpleUpdateVertex)
-//		return nil
-//	}
-//	// all the else means no need to update
-//
-//	return nil
-// }
 
 func (c *StatefulComponentBase) statusExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
 	for _, vct := range c.runningWorkload.Spec.VolumeClaimTemplates {

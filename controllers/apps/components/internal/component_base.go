@@ -155,6 +155,10 @@ func (c *ComponentBase) UpdateResource(obj client.Object, parent *ictrltypes.Lif
 	return ictrltypes.LifecycleObjectUpdate(c.Dag, obj, parent)
 }
 
+func (c *ComponentBase) PatchResource(obj client.Object, objCopy client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
+	return ictrltypes.LifecycleObjectPatch(c.Dag, obj, objCopy, parent)
+}
+
 func (c *ComponentBase) NoopResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
 	return ictrltypes.LifecycleObjectNoop(c.Dag, obj, parent)
 }

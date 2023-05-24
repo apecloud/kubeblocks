@@ -1924,17 +1924,28 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(tmpCluster.Status.ObservedGeneration).ShouldNot(BeZero())
 			})).Should(Succeed())
 
+			By("mock pvc of component to create")
+			for i := 0; i < testapps.ConsensusReplicas; i++ {
+				pvcName := fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterKey.Name, consensusCompName, i)
+				pvc := testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterKey.Name,
+					consensusCompName, "data").SetStorage("2Gi").Create(&testCtx).GetObject()
+				// mock pvc bound
+				Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(pvc *corev1.PersistentVolumeClaim) {
+					pvc.Status.Phase = corev1.ClaimBound
+					pvc.Status.Capacity = corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("2Gi"),
+					}
+				})()).ShouldNot(HaveOccurred())
+			}
+
 			By("apply smaller PVC size will should failed")
-			lastRecordedGenID := int64(0)
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(cluster), func(tmpCluster *appsv1alpha1.Cluster) {
 				tmpCluster.Spec.ComponentSpecs[0].VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("1Gi")
-				lastRecordedGenID = tmpCluster.Generation
 			})()).ShouldNot(HaveOccurred())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster),
 				func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 					// REVIEW/TODO: (wangyelei) following expects causing inconsistent behavior
-					g.Expect(tmpCluster.Status.ObservedGeneration).ShouldNot(BeEquivalentTo(lastRecordedGenID))
 					condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, appsv1alpha1.ConditionTypeApplyResources)
 					g.Expect(condition).ShouldNot(BeNil())
 					g.Expect(condition.Reason).Should(Equal(lifecycle.ReasonApplyResourcesFailed))

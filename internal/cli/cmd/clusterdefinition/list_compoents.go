@@ -88,7 +88,7 @@ func run(o *list.ListOptions) error {
 		}
 		for i, comp := range cd.Spec.ComponentDefs {
 			if i == 0 {
-				p.AddRow(comp.Name, comp.WorkloadType, comp.CharacterType, cd.Name, "true")
+				p.AddRow(printer.BoldGreen(comp.Name), comp.WorkloadType, comp.CharacterType, cd.Name, "true")
 			} else {
 				p.AddRow(comp.Name, comp.WorkloadType, comp.CharacterType, cd.Name, "false")
 			}

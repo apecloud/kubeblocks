@@ -98,6 +98,8 @@ ClusterDefinition command.
 ClusterVersion command.
 
 * [kbcli clusterversion list](kbcli_clusterversion_list.md)	 - List ClusterVersions.
+* [kbcli clusterversion set-default](kbcli_clusterversion_set-default.md)	 - Set the clusterversion to the default clusterversion for its clusterdefinition.
+* [kbcli clusterversion unset-default](kbcli_clusterversion_unset-default.md)	 - Unset the clusterversion if it's default.
 
 
 ## [dashboard](kbcli_dashboard.md)
@@ -114,6 +116,7 @@ Inject faults to pod.
 
 * [kbcli fault io](kbcli_fault_io.md)	 - IO chaos.
 * [kbcli fault network](kbcli_fault_network.md)	 - Network chaos.
+* [kbcli fault node](kbcli_fault_node.md)	 - Node chaos.
 * [kbcli fault pod](kbcli_fault_pod.md)	 - Pod chaos.
 * [kbcli fault stress](kbcli_fault_stress.md)	 - Add memory pressure or CPU load to the system.
 * [kbcli fault time](kbcli_fault_time.md)	 - Clock skew failure.

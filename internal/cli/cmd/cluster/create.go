@@ -198,8 +198,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
 			cmdutil.CheckErr(o.CreateOptions.Complete())
-			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -216,9 +216,6 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 	// add print flags
 	printer.AddOutputFlagForCreate(cmd, &o.Format)
-
-	// set required flag
-	util.CheckErr(cmd.MarkFlagRequired("cluster-definition"))
 
 	// register flag completion func
 	registerFlagCompletionFunc(cmd, f)
@@ -319,11 +316,43 @@ func (o *CreateOptions) Validate() error {
 }
 
 func (o *CreateOptions) Complete() error {
-	if err := o.Validate(); err != nil {
+	var (
+		compByte         []byte
+		cls              *appsv1alpha1.Cluster
+		clusterCompSpecs []appsv1alpha1.ClusterComponentSpec
+		err              error
+	)
+	if len(o.SetFile) > 0 {
+		if compByte, err = MultipleSourceComponents(o.SetFile, o.IOStreams.In); err != nil {
+			return err
+		}
+		if compByte, err = yaml.YAMLToJSON(compByte); err != nil {
+			return err
+		}
+
+		// compatible with old file format that only specify the components
+		if err = json.Unmarshal(compByte, &cls); err != nil {
+			if clusterCompSpecs, err = parseClusterComponentSpec(compByte); err != nil {
+				return err
+			}
+		} else {
+			clusterCompSpecs = cls.Spec.ComponentSpecs
+		}
+	}
+
+	// build annotation
+	o.buildAnnotation(cls)
+
+	// build cluster definition
+	if err := o.buildClusterDef(cls); err != nil {
 		return err
 	}
 
-	components, err := o.buildComponents()
+	// build cluster version
+	o.buildClusterVersion(cls)
+
+	// build components
+	components, err := o.buildComponents(clusterCompSpecs)
 	if err != nil {
 		return err
 	}
@@ -353,7 +382,7 @@ func (o *CreateOptions) CleanUp() error {
 }
 
 // buildComponents build components from file or set values
-func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
+func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterComponentSpec) ([]map[string]interface{}, error) {
 	var (
 		err       error
 		cd        *appsv1alpha1.ClusterDefinition
@@ -370,27 +399,9 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 		return nil, err
 	}
 
-	// build components from file
-	if len(o.SetFile) > 0 {
-		var (
-			compByte []byte
-			comps    []map[string]interface{}
-		)
-		if compByte, err = MultipleSourceComponents(o.SetFile, o.IOStreams.In); err != nil {
-			return nil, err
-		}
-		if compByte, err = yaml.YAMLToJSON(compByte); err != nil {
-			return nil, err
-		}
-		if err = json.Unmarshal(compByte, &comps); err != nil {
-			return nil, err
-		}
-		for _, comp := range comps {
-			var compSpec appsv1alpha1.ClusterComponentSpec
-			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(comp, &compSpec); err != nil {
-				return nil, err
-			}
-			compSpecs = append(compSpecs, &compSpec)
+	if clusterCompSpecs != nil {
+		for _, comp := range clusterCompSpecs {
+			compSpecs = append(compSpecs, &comp)
 		}
 	} else {
 		// build components from set values or environment variables
@@ -1056,4 +1067,62 @@ func buildResourceLabels(clusterName string) map[string]string {
 		constant.AppInstanceLabelKey:  clusterName,
 		constant.AppManagedByLabelKey: "kbcli",
 	}
+}
+
+// build the cluster definition
+// if the cluster definition is not specified, we will use the cluster definition in the cluster component
+// if both of them are not specified, we will return an error
+func (o *CreateOptions) buildClusterDef(cls *appsv1alpha1.Cluster) error {
+	if o.ClusterDefRef != "" {
+		return nil
+	}
+
+	if cls != nil && cls.Spec.ClusterDefRef != "" {
+		o.ClusterDefRef = cls.Spec.ClusterDefRef
+		return nil
+	}
+
+	return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one, run \"kbcli clusterdefinition list\" to show all cluster definition")
+}
+
+// build the cluster version
+// if the cluster version is not specified, we will use the cluster version in the cluster component
+// if both of them are not specified, we use default cluster version
+func (o *CreateOptions) buildClusterVersion(cls *appsv1alpha1.Cluster) {
+	if o.ClusterVersionRef != "" {
+		return
+	}
+
+	if cls != nil && cls.Spec.ClusterVersionRef != "" {
+		o.ClusterVersionRef = cls.Spec.ClusterVersionRef
+	}
+}
+
+func (o *CreateOptions) buildAnnotation(cls *appsv1alpha1.Cluster) {
+	if cls == nil {
+		return
+	}
+
+	if o.Annotations == nil {
+		o.Annotations = cls.Annotations
+	}
+}
+
+// parse the cluster component spec
+// compatible with old file format that only specify the components
+func parseClusterComponentSpec(compByte []byte) ([]appsv1alpha1.ClusterComponentSpec, error) {
+	var compSpecs []appsv1alpha1.ClusterComponentSpec
+	var comps []map[string]interface{}
+	if err := json.Unmarshal(compByte, &comps); err != nil {
+		return nil, err
+	}
+	for _, comp := range comps {
+		var compSpec appsv1alpha1.ClusterComponentSpec
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(comp, &compSpec); err != nil {
+			return nil, err
+		}
+		compSpecs = append(compSpecs, compSpec)
+	}
+
+	return compSpecs, nil
 }

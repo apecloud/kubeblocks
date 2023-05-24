@@ -57,4 +57,4 @@ spec:
         - path: manifests.backupLog
           containerName: postgresql
           script: /kb-scripts/backup-log-collector.sh false
-          updateStage: pre
+          updateStage: post

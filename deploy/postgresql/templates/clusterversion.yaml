@@ -13,9 +13,13 @@ spec:
       initContainers:
         - name: pg-init-container
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+        - name: init-pgbouncer
+          image: {{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}
       containers:
       - name: postgresql
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+      - name: pgbouncer
+        image: {{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}
     systemAccountSpec:
       cmdExecutorConfig:
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
@@ -52,9 +56,13 @@ spec:
         initContainers:
           - name: pg-init-container
             image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1
+          - name: init-pgbouncer
+            image: {{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}
         containers:
           - name: postgresql
             image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1
+          - name: pgbouncer
+            image: {{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}
       systemAccountSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1

@@ -13,6 +13,15 @@ data:
     chmod +777 -R /home/postgres/pgdata/conf
     cp /home/postgres/conf/postgresql.conf /home/postgres/pgdata/conf
     chmod +777 /home/postgres/pgdata/conf/postgresql.conf
+  init_pgbouncer.sh: |
+    #!/bin/bash
+    set -o errexit
+    set -ex
+    mkdir -p /opt/bitnami/pgbouncer/conf/
+    chmod +777 -R /opt/bitnami/pgbouncer/conf/
+    cp /home/pgbouncer/conf/pgbouncer.ini /opt/bitnami/pgbouncer/conf/
+    chmod +777 /opt/bitnami/pgbouncer/conf/pgbouncer.ini
+    chown 1001:1001 /opt/bitnami/pgbouncer/conf
   generate_patroni_yaml.py: |
     #!/usr/bin/env python3
     # -*- coding: utf-8 -*-

@@ -41,7 +41,7 @@ pvc: {
 		name:      pvc_key.Name
 		namespace: pvc_key.Namespace
 		labels: {
-			"vct.kubeblocks.io/name": volumeClaimTemplate.metadata.name
+			"apps.kubeblocks.io/vct-name": volumeClaimTemplate.metadata.name
 			for k, v in sts.metadata.labels {
 				"\(k)": "\(v)"
 			}

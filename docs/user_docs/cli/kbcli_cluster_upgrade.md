@@ -18,6 +18,7 @@ kbcli cluster upgrade NAME [flags]
 ### Options
 
 ```
+      --auto-approve                   Skip interactive approval before upgrading the cluster
       --cluster-version string         Reference cluster version (required)
       --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
   -h, --help                           help for upgrade

@@ -17,33 +17,33 @@
 
 // required, command line input options for parameters and flags
 options: {
-	namespace:        string
-	selector:         {}
-	mode:							string
-	value:						string
-	duration: 				string
-	
-	timeOffset:				string
-	clockIds:				[...]
-	containerNames:				[...]
+	namespace: string
+	selector: {}
+	mode:     string
+	value:    string
+	duration: string
+
+	timeOffset: string
+	clockIds: [...]
+	containerNames: [...]
 }
 
 // required, k8s api resource content
 content: {
-  kind: "TimeChaos"
-  apiVersion: "chaos-mesh.org/v1alpha1"
-  metadata:{
-  	generateName: "time-chaos-"
-    namespace: options.namespace
-  }
-  spec:{
-    selector: options.selector
-    mode: options.mode
-    value: options.value
-    duration: options.duration
+	kind:       "TimeChaos"
+	apiVersion: "chaos-mesh.org/v1alpha1"
+	metadata: {
+		generateName: "time-chaos-"
+		namespace:    options.namespace
+	}
+	spec: {
+		selector: options.selector
+		mode:     options.mode
+		value:    options.value
+		duration: options.duration
 
-    timeOffset: options.timeOffset
-    clockIds: options.clockIds
-    containerNames: options.containerNames
-  }
+		timeOffset:     options.timeOffset
+		clockIds:       options.clockIds
+		containerNames: options.containerNames
+	}
 }

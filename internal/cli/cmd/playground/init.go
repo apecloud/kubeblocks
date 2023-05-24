@@ -82,6 +82,7 @@ type initOptions struct {
 	clusterVersion string
 	cloudProvider  string
 	region         string
+	autoApprove    bool
 
 	baseOptions
 }
@@ -106,7 +107,8 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd.Flags().StringVar(&o.kbVersion, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringVar(&o.cloudProvider, "cloud-provider", defaultCloudProvider, fmt.Sprintf("Cloud provider type, one of %v", supportedCloudProviders))
 	cmd.Flags().StringVar(&o.region, "region", "", "The region to create kubernetes cluster")
-	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for init playground, such as --timeout=10m")
+	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for initing playground, such as --timeout=10m")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval during the initialization of playground")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cloud-provider",
@@ -263,11 +265,13 @@ func (o *initOptions) cloud() error {
 // confirmToContinue confirms to continue init or not if there is an existed kubernetes cluster
 func (o *initOptions) confirmToContinue() error {
 	clusterName := o.prevCluster.ClusterName
-	printer.Warning(o.Out, "Found an existed cluster %s, do you want to continue to initialize this cluster?\n  Only 'yes' will be accepted to confirm.\n\n", clusterName)
-	entered, _ := prompt.NewPrompt("Enter a value:", nil, o.In).Run()
-	if entered != yesStr {
-		fmt.Fprintf(o.Out, "\nPlayground init cancelled, please destroy the old cluster first.\n")
-		return cmdutil.ErrExit
+	if !o.autoApprove {
+		printer.Warning(o.Out, "Found an existed cluster %s, do you want to continue to initialize this cluster?\n  Only 'yes' will be accepted to confirm.\n\n", clusterName)
+		entered, _ := prompt.NewPrompt("Enter a value:", nil, o.In).Run()
+		if entered != yesStr {
+			fmt.Fprintf(o.Out, "\nPlayground init cancelled, please destroy the old cluster first.\n")
+			return cmdutil.ErrExit
+		}
 	}
 	fmt.Fprintf(o.Out, "Continue to initialize %s %s cluster %s... \n",
 		o.cloudProvider, cp.K8sService(o.cloudProvider), clusterName)
@@ -285,6 +289,9 @@ The whole process will take about %s, please wait patiently,
 if it takes a long time, please check the network environment and try again.
 `, printer.BoldRed("20 minutes"))
 
+	if o.autoApprove {
+		return nil
+	}
 	// confirm to run
 	fmt.Fprintf(o.Out, "\nDo you want to perform this action?\n  Only 'yes' will be accepted to approve.\n\n")
 	entered, _ := prompt.NewPrompt("Enter a value:", nil, o.In).Run()

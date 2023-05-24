@@ -24,7 +24,7 @@ cluster: {
 component: {
 	clusterDefName: string
 	name:           string
-	minAvailable: string | int
+	minAvailable:   string | int
 }
 
 pdb: {

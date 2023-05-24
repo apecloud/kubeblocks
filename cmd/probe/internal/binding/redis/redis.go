@@ -38,7 +38,7 @@ import (
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	rediscomponent "github.com/apecloud/kubeblocks/cmd/probe/internal/component/redis"
-	. "github.com/apecloud/kubeblocks/cmd/probe/util"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 var (

@@ -32,6 +32,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type OperationClient struct {

@@ -30,7 +30,7 @@ import (
 	"github.com/dapr/kit/logger"
 	"github.com/valyala/fasthttp"
 
-	. "github.com/apecloud/kubeblocks/cmd/probe/util"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 const (

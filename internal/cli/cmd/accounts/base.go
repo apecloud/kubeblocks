@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/sqlchannel"
+	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type AccountBaseOptions struct {
@@ -156,20 +157,20 @@ func (o *AccountBaseOptions) Run(f cmdutil.Factory, streams genericclioptions.IO
 
 	switch o.AccountOp {
 	case
-		sqlchannel.DeleteUserOp,
-		sqlchannel.RevokeUserRoleOp,
-		sqlchannel.GrantUserRoleOp:
+		channelutil.DeleteUserOp,
+		channelutil.RevokeUserRoleOp,
+		channelutil.GrantUserRoleOp:
 		o.printGeneralInfo(response)
 		err = nil
-	case sqlchannel.CreateUserOp:
+	case channelutil.CreateUserOp:
 		o.printGeneralInfo(response)
-		if response.Event == sqlchannel.RespEveSucc {
+		if response.Event == channelutil.RespEveSucc {
 			printer.Alert(o.Out, "Please do REMEMBER the password for the new user! Once forgotten, it cannot be retrieved!")
 		}
 		err = nil
-	case sqlchannel.DescribeUserOp:
+	case channelutil.DescribeUserOp:
 		err = o.printRoleInfo(response)
-	case sqlchannel.ListUsersOp:
+	case channelutil.ListUsersOp:
 		err = o.printUserInfo(response)
 	default:
 		err = errInvalidOp
@@ -185,15 +186,15 @@ func (o *AccountBaseOptions) Run(f cmdutil.Factory, streams genericclioptions.IO
 	return err
 }
 
-func (o *AccountBaseOptions) Do() (sqlchannel.SQLChannelResponse, error) {
+func (o *AccountBaseOptions) Do() (channelutil.SQLChannelResponse, error) {
 	klog.V(1).Info(fmt.Sprintf("connect to cluster %s, component %s, instance %s\n", o.ClusterName, o.ComponentName, o.PodName))
-	response := sqlchannel.SQLChannelResponse{}
+	response := channelutil.SQLChannelResponse{}
 	sqlClient, err := sqlchannel.NewHTTPClientWithChannelPod(o.Pod, o.CharType)
 	if err != nil {
 		return response, err
 	}
 
-	request := sqlchannel.SQLChannelRequest{Operation: (string)(o.AccountOp), Metadata: o.RequestMeta}
+	request := channelutil.SQLChannelRequest{Operation: (string)(o.AccountOp), Metadata: o.RequestMeta}
 	response, err = sqlClient.SendRequest(o.ExecOptions, request)
 	return response, err
 }
@@ -206,13 +207,13 @@ func (o *AccountBaseOptions) newTblPrinterWithStyle(title string, header []inter
 	return tblPrinter
 }
 
-func (o *AccountBaseOptions) printGeneralInfo(response sqlchannel.SQLChannelResponse) {
+func (o *AccountBaseOptions) printGeneralInfo(response channelutil.SQLChannelResponse) {
 	tblPrinter := o.newTblPrinterWithStyle("QUERY RESULT", []interface{}{"RESULT", "MESSAGE"})
 	tblPrinter.AddRow(response.Event, response.Message)
 	tblPrinter.Print()
 }
 
-func (o *AccountBaseOptions) printMeta(response sqlchannel.SQLChannelResponse) {
+func (o *AccountBaseOptions) printMeta(response channelutil.SQLChannelResponse) {
 	meta := response.Metadata
 	tblPrinter := o.newTblPrinterWithStyle("QUERY META", []interface{}{"START TIME", "END TIME", "OPERATION", "DATA"})
 	tblPrinter.SetStyle(printer.KubeCtlStyle)
@@ -220,13 +221,13 @@ func (o *AccountBaseOptions) printMeta(response sqlchannel.SQLChannelResponse) {
 	tblPrinter.Print()
 }
 
-func (o *AccountBaseOptions) printUserInfo(response sqlchannel.SQLChannelResponse) error {
-	if response.Event == sqlchannel.RespEveFail {
+func (o *AccountBaseOptions) printUserInfo(response channelutil.SQLChannelResponse) error {
+	if response.Event == channelutil.RespEveFail {
 		o.printGeneralInfo(response)
 		return nil
 	}
 	// decode user info from metadata
-	users := []sqlchannel.UserInfo{}
+	users := []channelutil.UserInfo{}
 	err := json.Unmarshal([]byte(response.Message), &users)
 	if err != nil {
 		return err
@@ -242,14 +243,14 @@ func (o *AccountBaseOptions) printUserInfo(response sqlchannel.SQLChannelRespons
 	return nil
 }
 
-func (o *AccountBaseOptions) printRoleInfo(response sqlchannel.SQLChannelResponse) error {
-	if response.Event == sqlchannel.RespEveFail {
+func (o *AccountBaseOptions) printRoleInfo(response channelutil.SQLChannelResponse) error {
+	if response.Event == channelutil.RespEveFail {
 		o.printGeneralInfo(response)
 		return nil
 	}
 
 	// decode role info from metadata
-	users := []sqlchannel.UserInfo{}
+	users := []channelutil.UserInfo{}
 	err := json.Unmarshal([]byte(response.Message), &users)
 	if err != nil {
 		return err

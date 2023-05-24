@@ -111,9 +111,7 @@ func (o *UninstallOptions) PreCheck() error {
 	// check if there is any resource should be removed first, if so, return error
 	// and ask user to remove them manually
 	if err := checkResources(o.Dynamic); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
+		return err
 	}
 
 	// verify where kubeblocks is installed
@@ -125,8 +123,11 @@ func (o *UninstallOptions) PreCheck() error {
 			fmt.Fprintf(o.Out, "to uninstall KubeBlocks completely, please use:\n\t`kbcli kubeblocks uninstall -n <namespace>`\n")
 		}
 	}
+
 	o.Namespace = kbNamespace
-	fmt.Fprintf(o.Out, "Uninstall KubeBlocks in namespace \"%s\"\n", kbNamespace)
+	if kbNamespace != "" {
+		fmt.Fprintf(o.Out, "Uninstall KubeBlocks in namespace \"%s\"\n", kbNamespace)
+	}
 
 	return nil
 }
@@ -332,7 +333,7 @@ func checkResources(dynamic dynamic.Interface) error {
 	crs := map[string][]string{}
 	for _, gvr := range gvrList {
 		objList, err := dynamic.Resource(gvr).List(ctx, metav1.ListOptions{})
-		if err != nil {
+		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 		for _, item := range objList.Items {

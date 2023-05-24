@@ -23,11 +23,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v2"
 	"helm.sh/helm/v3/pkg/action"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -73,37 +75,6 @@ var helmValuesKey = []string{
 	"hostNetwork",
 	"keepAddons",
 }
-
-//type configInfos struct {
-//	image                     map[string]interface{}
-//	updateStrategy            map[string]interface{}
-//	podDisruptionBudget       map[string]interface{}
-//	loggerSettings            map[string]interface{}
-//	serviceAccount            map[string]interface{}
-//	securityContext           map[string]interface{}
-//	podSecurityContext        map[string]interface{}
-//	service                   map[string]interface{}
-//	serviceMonitor            map[string]interface{}
-//	Resources                 map[string]interface{}
-//	autoscaling               map[string]interface{}
-//	nodeSelector              map[string]interface{}
-//	affinity                  map[string]interface{}
-//	dataPlane                 map[string]interface{}
-//	admissionWebhooks         map[string]interface{}
-//	dataProtection            map[string]interface{}
-//	addonController           map[string]interface{}
-//	topologySpreadConstraints []interface{}
-//	tolerations               []interface{}
-//	priorityClassName         string
-//	nameOverride              string
-//	fullnameOverride          string
-//	dnsPolicy                 string
-//	replicaCount              int
-//	hostNetwork               bool
-//	keepAddons                bool
-//}
-
-const configKey = "config.yaml"
 
 var backupConfigExample = templates.Examples(`
 		# Enable the snapshot-controller and volume snapshot, to support snapshot backup.
@@ -172,7 +143,7 @@ func NewDescribeConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 			IOStreams: streams,
 		},
 	}
-
+	var output printer.Format
 	cmd := &cobra.Command{
 		Use:     "describe-config",
 		Short:   "describe KubeBlocks config.",
@@ -180,58 +151,62 @@ func NewDescribeConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f, cmd))
-			util.CheckErr(describeConfig(o))
+			configs, err := getConfigs(o)
+			util.CheckErr(err)
+			util.CheckErr(describeConfig(configs, output, o.Out))
 		},
 	}
+	printer.AddOutputFlag(cmd, &output)
 	return cmd
 }
 
-func describeConfig(o *InstallOptions) error {
+func getConfigs(o *InstallOptions) (map[string]interface{}, error) {
 	if len(o.HelmCfg.Namespace()) == 0 {
 		o.HelmCfg.SetNamespace("kb-system")
 	}
 	actionConfig, err := helm.NewActionConfig(o.HelmCfg)
-	client := action.NewGetValues(actionConfig)
-	client.AllValues = true
-	res, err := client.Run(types.KubeBlocksChartName)
-	//fmt.Println(res)
-	if err != nil {
-		return nil
-	}
-	toJsonData := make(map[string]interface{})
-	//p := printer.NewTablePrinter(o.Out)
-	//p.SetHeader("KEY", "VALUE")
-	for i := range helmValuesKey {
-		//addRows(helmValuesKey[i], res[helmValuesKey[i]], p) // to table
-		toJsonData[helmValuesKey[i]] = res[helmValuesKey[i]]
-	}
-	//p.Print()
-
-	jsonData, err := json.MarshalIndent(toJsonData, "", "  ")
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(jsonData))
-	return nil
-}
-
-// getKubeBlocksConfigMap get the configmap of the KubeBlocks.
-func getKubeBlocksConfigMap(o *InstallOptions) (*corev1.ConfigMap, error) {
-	configMapList, err := o.Client.CoreV1().ConfigMaps(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/name=" + types.KubeBlocksChartName,
-	})
 	if err != nil {
 		return nil, err
 	}
-	configMapName := fmt.Sprintf("%s-manager-config", types.KubeBlocksChartName)
-	var configMap *corev1.ConfigMap
-	for _, v := range configMapList.Items {
-		if v.Name == configMapName {
-			configMap = &v
-			break
-		}
+	client := action.NewGetValues(actionConfig)
+	client.AllValues = true
+	res, err := client.Run(types.KubeBlocksChartName)
+	if err != nil {
+		return nil, err
 	}
-	return configMap, nil
+	return res, nil
+}
+
+func describeConfig(configs map[string]interface{}, format printer.Format, out io.Writer) error {
+	var err error
+	inTable := func() {
+		p := printer.NewTablePrinter(out)
+		p.SetHeader("KEY", "VALUE")
+
+		for i := range helmValuesKey {
+			addRows(helmValuesKey[i], configs[helmValuesKey[i]], p, true) // to table
+		}
+		p.Print()
+	}
+	if format.IsHumanReadable() {
+		inTable()
+		return nil
+	}
+	toJsonData := make(map[string]interface{})
+	for i := range helmValuesKey {
+		toJsonData[helmValuesKey[i]] = configs[helmValuesKey[i]]
+	}
+	var data []byte
+	if format == printer.YAML {
+		data, err = yaml.Marshal(toJsonData)
+	} else {
+		data, err = json.MarshalIndent(toJsonData, "", "  ")
+	}
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(data))
+	return nil
 }
 
 // markKubeBlocksPodsToLoadConfigMap marks an annotation of the KubeBlocks pods to load the projected volumes of configmap.
@@ -281,20 +256,18 @@ func markKubeBlocksPodsToLoadConfigMap(client kubernetes.Interface) error {
 	return nil
 }
 
-func addRows(key string, value interface{}, p *printer.TablePrinter) {
+// addRows parse the interface value two depth at most and add it to the Table
+func addRows(key string, value interface{}, p *printer.TablePrinter, ori bool) {
 	if value == nil {
 		p.AddRow(key, value)
 		return
 	}
-	if reflect.TypeOf(value).Kind() == reflect.Map {
+	if reflect.TypeOf(value).Kind() == reflect.Map && ori {
 		for k, v := range value.(map[string]interface{}) {
-			addRows(key+"."+k, v, p)
-		}
-	} else if reflect.TypeOf(value).Kind() == reflect.Slice {
-		for _, elem := range value.([]interface{}) {
-			addRows(key, elem, p)
+			addRows(key+"."+k, v, p, false)
 		}
 	} else {
-		p.AddRow(key, value)
+		data, _ := json.Marshal(value)
+		p.AddRow(key, string(data))
 	}
 }

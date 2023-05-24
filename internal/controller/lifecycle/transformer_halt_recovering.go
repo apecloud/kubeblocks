@@ -150,17 +150,43 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 						comp.Name, lastUsedComp.Replicas),
 				})
 			}
+
+			// following only check resource related spec., will skip check if HaltRecoveryAllowInconsistentResAnnotKey
+			// annotation is specified
+			if cluster.Annotations[constant.HaltRecoveryAllowInconsistentResAnnotKey] == trueVal {
+				found = true
+				break
+			}
 			if hash.Object(comp.VolumeClaimTemplates) != hash.Object(lastUsedComp.VolumeClaimTemplates) {
 				objJSON, _ := json.Marshal(&lastUsedComp.VolumeClaimTemplates)
 				return emitError(metav1.Condition{
 					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
 					Reason: "HaltRecoveryFailed",
-					Message: fmt.Sprintf("not equal to last applied cluster.spec.componetSpecs[%s].volumeClaimTemplates=%s",
-						comp.Name, objJSON),
+					Message: fmt.Sprintf("not equal to last applied cluster.spec.componetSpecs[%s].volumeClaimTemplates=%s; add '%s=true' annotation to void this check",
+						comp.Name, objJSON, constant.HaltRecoveryAllowInconsistentResAnnotKey),
 				})
 			}
-			if hash.Object(comp.Resources) != hash.Object(lastUsedComp.Resources) &&
-				cluster.Annotations[constant.HaltRecoveryAllowInconsistentResAnnotKey] != trueVal {
+
+			if lastUsedComp.ClassDefRef != nil {
+				if comp.ClassDefRef == nil || hash.Object(*comp.ClassDefRef) != hash.Object(*lastUsedComp.ClassDefRef) {
+					objJSON, _ := json.Marshal(lastUsedComp.ClassDefRef)
+					return emitError(metav1.Condition{
+						Type:   appsv1alpha1.ConditionTypeHaltRecovery,
+						Reason: "HaltRecoveryFailed",
+						Message: fmt.Sprintf("not equal to last applied cluster.spec.componetSpecs[%s].classDefRef=%s; add '%s=true' annotation to void this check",
+							comp.Name, objJSON, constant.HaltRecoveryAllowInconsistentResAnnotKey),
+					})
+				}
+			} else if comp.ClassDefRef != nil {
+				return emitError(metav1.Condition{
+					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
+					Reason: "HaltRecoveryFailed",
+					Message: fmt.Sprintf("not equal to last applied cluster.spec.componetSpecs[%s].classDefRef=null; add '%s=true' annotation to void this check",
+						comp.Name, constant.HaltRecoveryAllowInconsistentResAnnotKey),
+				})
+			}
+
+			if hash.Object(comp.Resources) != hash.Object(lastUsedComp.Resources) {
 				objJSON, _ := json.Marshal(&lastUsedComp.Resources)
 				return emitError(metav1.Condition{
 					Type:   appsv1alpha1.ConditionTypeHaltRecovery,

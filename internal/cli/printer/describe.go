@@ -121,6 +121,7 @@ func PrintHelmValues(configs map[string]interface{}, format Format, out io.Write
 		data, _ = yaml.Marshal(configs)
 	} else {
 		data, _ = json.MarshalIndent(configs, "", "  ")
+		data = append(data, '\n')
 	}
 	fmt.Fprint(out, string(data))
 }

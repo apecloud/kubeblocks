@@ -177,7 +177,8 @@ updateStrategy.type                "RollingUpdate"
     },
     "type": "RollingUpdate"
   }
-}`
+}
+`
 			err := describeConfig(o, output, mockHelmConfig)
 			Expect(err).Should(Succeed())
 			Expect(out.String()).Should(Equal(expect))

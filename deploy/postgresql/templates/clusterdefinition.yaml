@@ -114,7 +114,7 @@ spec:
               - /kb-scripts/setup.sh
             readinessProbe:
               failureThreshold: 3
-              initialDelaySeconds: 25
+              initialDelaySeconds: 10
               periodSeconds: 30
               successThreshold: 1
               timeoutSeconds: 5
@@ -221,6 +221,22 @@ spec:
             volumeMounts:
               - name: pgbouncer-config
                 mountPath: /home/pgbouncer/conf
+            livenessProbe:
+              failureThreshold: 3
+              initialDelaySeconds: 15
+              periodSeconds: 30
+              successThreshold: 1
+              timeoutSeconds: 5
+              tcpSocket:
+                port: tcp-pgbouncer
+            readinessProbe:
+              failureThreshold: 3
+              initialDelaySeconds: 15
+              periodSeconds: 30
+              successThreshold: 1
+              timeoutSeconds: 5
+              tcpSocket:
+                port: tcp-pgbouncer
             env:
               - name: POSTGRESQL_HOST
                 value:

@@ -266,7 +266,7 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 		return nil
 	}
 
-	findPVCsToBeDeleted := func(pvcSnapshot clusterSnapshot) []*corev1.PersistentVolumeClaim {
+	findPVCsToBeDeleted := func(pvcSnapshot clusterOwningObjects) []*corev1.PersistentVolumeClaim {
 		stsToBeDeleted := make([]*appsv1.StatefulSet, 0)
 		// list sts to be deleted
 		for _, vertex := range dag.Vertices() {
@@ -321,7 +321,7 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 	// by h-scale transformer: we handle the pvc creation and deletion, the creation is handled in h-scale funcs.
 	// so all in all, here we should only handle the pvc deletion of both types.
 	ml := getAppInstanceML(*cluster)
-	oldSnapshot, err := readCacheSnapshot(transCtx, *cluster, ml, &corev1.PersistentVolumeClaimList{})
+	oldSnapshot, err := getClusterOwningObjects(transCtx, *cluster, ml, &corev1.PersistentVolumeClaimList{})
 	if err != nil {
 		return err
 	}
@@ -808,7 +808,7 @@ func createPVCFromSnapshot(vct corev1.PersistentVolumeClaimTemplate,
 	}
 	rootVertex, _ := root.(*lifecycleVertex)
 	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
-	if err = intctrlutil.SetOwnership(cluster, pvc, scheme, dbClusterFinalizerName); err != nil {
+	if err = intctrlutil.SetOwnership(cluster, pvc, scheme, constant.DBClusterFinalizerName); err != nil {
 		return err
 	}
 	vertex := &lifecycleVertex{obj: pvc, action: actionPtr(CREATE)}

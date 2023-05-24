@@ -165,10 +165,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// handle deletion
 			// handle cluster deletion first
 			&lifecycle.ClusterDeletionTransformer{},
-			// fix meta
-			// fix finalizer and cd&cv labels
-			&lifecycle.FixMetaTransformer{},
-			// validate
+			// check is recovering from halted cluster
+			&lifecycle.HaltRecoveryTransformer{},
+			// assure meta-data info
+			// update finalizer and cd&cv labels
+			&lifecycle.AssureMetaTransformer{},
+			// validate ref objects
 			// validate cd & cv's existence and availability
 			&lifecycle.ValidateAndLoadRefResourcesTransformer{},
 			// validate config
@@ -217,7 +219,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if errBuild != nil {
 		return requeueError(errBuild)
 	}
-
 	return intctrlutil.Reconciled()
 }
 

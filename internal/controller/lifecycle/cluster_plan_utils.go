@@ -21,39 +21,45 @@ package lifecycle
 
 import (
 	"strings"
-
-	"golang.org/x/exp/maps"
 )
 
 // mergeAnnotations keeps the original annotations.
-// if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
-func mergeAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
+// if annotations exist and are replaced.
+func mergeAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string, filters ...func(k, v string) bool) {
 	if targetAnnotations == nil {
+		return
+	}
+	if len(originalAnnotations) == 0 {
 		return
 	}
 	if *targetAnnotations == nil {
 		*targetAnnotations = map[string]string{}
 	}
 	for k, v := range originalAnnotations {
+		filtered := false
+		for _, filter := range filters {
+			if filter != nil && filter(k, v) {
+				filtered = true
+				break
+			}
+		}
+		if filtered {
+			continue
+		}
+
 		// if the annotation not exist in targetAnnotations, copy it from original.
 		if _, ok := (*targetAnnotations)[k]; !ok {
 			(*targetAnnotations)[k] = v
+			continue
 		}
 	}
 }
 
 // mergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.
 // if annotations exist and are replaced, the Service will be updated.
-func mergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
-	if len(originalAnnotations) == 0 {
-		return targetAnnotations
-	}
-	tmpAnnotations := make(map[string]string, len(originalAnnotations)+len(targetAnnotations))
-	for k, v := range originalAnnotations {
-		if !strings.HasPrefix(k, "prometheus.io") {
-			tmpAnnotations[k] = v
-		}
-	}
-	maps.Copy(tmpAnnotations, targetAnnotations)
-	return tmpAnnotations
+func mergeServiceAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
+	mergeAnnotations(originalAnnotations, targetAnnotations,
+		func(k, v string) bool {
+			return strings.HasPrefix(k, "prometheus.io")
+		})
 }

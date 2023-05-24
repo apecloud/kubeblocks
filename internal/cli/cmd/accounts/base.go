@@ -152,7 +152,7 @@ func (o *AccountBaseOptions) Run(cmd *cobra.Command, f cmdutil.Factory, streams 
 	var err error
 	response, err := o.Do()
 	if err != nil {
-		if sqlchannel.IsUnSupportedError(err) {
+		if channelutil.IsUnSupportedError(err) {
 			return fmt.Errorf("command `%s` on characterType `%s` (defined in cluster: %s, component: %s) is not supported yet", cmd.Use, o.CharType, o.ClusterName, o.ComponentName)
 		}
 		return err

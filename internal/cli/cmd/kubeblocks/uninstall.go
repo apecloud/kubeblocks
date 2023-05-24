@@ -346,6 +346,11 @@ func checkResources(dynamic dynamic.Interface) error {
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
+
+		if objList == nil {
+			continue
+		}
+
 		for _, item := range objList.Items {
 			crs[gvr.Resource] = append(crs[gvr.Resource], item.GetName())
 		}

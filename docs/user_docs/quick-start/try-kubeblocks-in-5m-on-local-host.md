@@ -57,7 +57,7 @@ Meet the following requirements for smooth operation of Playground and other fun
 
    You just created a cluster named `mycluster` in the default namespace.
 
-   You can find the Playground user guide under the installation success tip. View this guide again by running `kbcli playground guide`.
+   You can find the Playground user guide under the installation success tip. View this guide again by running `kbcli playground init -h`.
 
 
 

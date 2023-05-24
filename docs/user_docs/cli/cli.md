@@ -156,10 +156,9 @@ Print the list of flags inherited by all commands.
 
 ## [playground](kbcli_playground.md)
 
-Bootstrap a playground KubeBlocks in local host or cloud.
+Bootstrap or destroy a playground KubeBlocks in local host or cloud.
 
-* [kbcli playground destroy](kbcli_playground_destroy.md)	 - Destroy the playground kubernetes cluster.
-* [kbcli playground guide](kbcli_playground_guide.md)	 - Display playground cluster user guide.
+* [kbcli playground destroy](kbcli_playground_destroy.md)	 - Destroy the playground KubeBlocks and kubernetes cluster.
 * [kbcli playground init](kbcli_playground_init.md)	 - Bootstrap a kubernetes cluster and install KubeBlocks for playground.
 
 

@@ -768,7 +768,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 			}
 			return nil
 		}
-		backup, err := builder.BuildBackup(sts, backupPolicyName, backupKey)
+		backup, err := builder.BuildBackup(sts, backupPolicyName, backupKey, "snapshot")
 		if err != nil {
 			return err
 		}

@@ -493,12 +493,14 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 
 func BuildBackup(sts *appsv1.StatefulSet,
 	backupPolicyName string,
-	backupKey types.NamespacedName) (*dataprotectionv1alpha1.Backup, error) {
+	backupKey types.NamespacedName,
+	backupType string) (*dataprotectionv1alpha1.Backup, error) {
 	backup := dataprotectionv1alpha1.Backup{}
 	if err := buildFromCUE("backup_job_template.cue", map[string]any{
 		"sts":                sts,
 		"backup_policy_name": backupPolicyName,
 		"backup_job_key":     backupKey,
+		"backup_type":        backupType,
 	}, "backup_job", &backup); err != nil {
 		return nil, err
 	}
@@ -673,4 +675,27 @@ func BuildPITRJob(name string, cluster *appsv1alpha1.Cluster, image string, comm
 		return nil, err
 	}
 	return job, nil
+}
+
+// TODO: CT - refactor restore to use common code
+// TODO: CT - consider affinity
+// buildRestoreJobForFullBackup
+func BuildRestoreJobForFullBackup(
+	restoreJobName string,
+	component *component.SynthesizedComponent,
+	backup *dataprotectionv1alpha1.Backup,
+	backupTool *dataprotectionv1alpha1.BackupTool,
+	pvcName string) (*batchv1.Job, error) {
+	const tplFile = "restore_full_backup_job.cue"
+	job := batchv1.Job{}
+	if err := buildFromCUE(tplFile, map[string]any{
+		"restoreJobName": restoreJobName,
+		"component":      component,
+		"backup":         backup,
+		"backupTool":     backupTool,
+		"pvcName":        pvcName,
+	}, "job", &job); err != nil {
+		return nil, err
+	}
+	return &job, nil
 }

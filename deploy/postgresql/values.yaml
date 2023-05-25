@@ -109,5 +109,15 @@ metrics:
     ##
     pullSecrets: [ ]
 
+## @section pgbouncer Parameters
+pgbouncer:
+  image:
+    # refer: https://hub.docker.com/r/bitnami/pgbouncer
+    registry: hub.docker.com
+    repository: bitnami/pgbouncer
+    tag: 1.19.0
+    pullPolicy: IfNotPresent
+
+
 logConfigs:
   running: /home/postgres/pgdata/pgroot/data/log/postgresql-*

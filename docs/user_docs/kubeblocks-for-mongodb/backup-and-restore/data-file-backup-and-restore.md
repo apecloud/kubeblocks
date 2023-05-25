@@ -21,28 +21,28 @@ Currently, KubeBlocks backups and restores data on storage path predefined.
 
 Enable CSI-S3 and fill in the values based on your actual environment.
 
-   ```bash
-   helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
+```bash
+helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
 
-   helm install csi-s3  kubeblocks/csi-s3 --version=0.5.0 \
-   --set secret.accessKey=<your_accessKey> \
-   --set secret.secretKey=<your_secretKey> \
-   --set storageClass.singleBucket=<s3_bucket>  \
-   --set secret.endpoint=https://s3.<region>.amazonaws.com.cn \
-   --set secret.region=<region> -n kb-system
+helm install csi-s3  kubeblocks/csi-s3 --version=0.5.0 \
+--set secret.accessKey=<your_accessKey> \
+--set secret.secretKey=<your_secretKey> \
+--set storageClass.singleBucket=<s3_bucket>  \
+--set secret.endpoint=https://s3.<region>.amazonaws.com.cn \
+--set secret.region=<region> -n kb-system
 
-   # CSI-S3 installs a daemonSet pod on all nodes and you can set tolerations to install daemonSet pods on the specified nodes
-   --set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
-   ```
+# CSI-S3 installs a daemonSet pod on all nodes and you can set tolerations to install daemonSet pods on the specified nodes
+--set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
+```
 
-   :::note
+:::note
 
-   Endpoint format:
+Endpoint format:
 
-   * China: `https://s3.<region>.amazonaws.com.cn`
-   * Other countries/regions: `https://s3.<region>.amazonaws.com`
+* China: `https://s3.<region>.amazonaws.com.cn`
+* Other countries/regions: `https://s3.<region>.amazonaws.com`
 
-   :::
+:::
 
 </TabItem>
 
@@ -62,6 +62,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
 # CSI-S3 installs a daemonSet pod on all nodes and you can set tolerations to install daemonSet pods on the specified nodes
 --set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
 ```
+
 </TabItem>
 
 <TabItem value="minIO" label="Use minIO as the backup storage">
@@ -87,13 +88,14 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
    # CSI-S3 installs a daemonSet pod on all nodes and you can set tolerations to install daemonSet pods on the specified nodes
    --set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
    ```
+
 </TabItem>
 </Tabs>
 
 You can configure a global backup storage to make this storage the default backup destination path of all new clusters. But currently, the global backup storage cannot be synchronized as the backup destination path of created clusters.
- 
+
 If there is no PVC, the system creates one automatically based on the configuration.
- 
+
 It takes about 1 minute to make the configuration effective.
 
 :::note
@@ -103,16 +105,17 @@ It takes about 1 minute to make the configuration effective.
 :::
 
 Set the backup policy with the following command.
-  ```bash
 
-    kbcli kubeblocks config --set dataProtection.backupPVCName=kubeblocks-backup-data \
-    --set dataProtection.backupPVCStorageClassName=csi-s3 -n kb-system
+```bash
 
-    # dataProtection.backupPVCName: PersistentVolumeClaim Name for backup storage
-    # dataProtection.backupPVCStorageClassName: StorageClass Name
-    # -n kb-system namespace where KubeBlocks is installed
+kbcli kubeblocks config --set dataProtection.backupPVCName=kubeblocks-backup-data \
+--set dataProtection.backupPVCStorageClassName=csi-s3 -n kb-system
 
-  ```
+# dataProtection.backupPVCName: PersistentVolumeClaim Name for backup storage
+# dataProtection.backupPVCStorageClassName: StorageClass Name
+# -n kb-system namespace where KubeBlocks is installed
+
+```
 
 ## Step 2. Create backup
 
@@ -146,7 +149,6 @@ Set the backup policy with the following command.
    ```
 
 **Option 2. Enable scheduled backup**
-
 
 ```bash
 kbcli cluster edit-backup-policy mongodb-cluster-mongodb-backup-policy

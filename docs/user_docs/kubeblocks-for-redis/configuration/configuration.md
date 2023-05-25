@@ -28,9 +28,9 @@ You can also view the details of this configuration file and parameters.
 
 * View the details of the current configuration file.
 
-   ```bash
-   kbcli cluster describe-config redis-cluster --component=redis --show-detail
-   ```
+  ```bash
+  kbcli cluster describe-config redis-cluster --component=redis --show-detail
+  ```
 
 * View the parameter description.
 
@@ -39,11 +39,11 @@ You can also view the details of this configuration file and parameters.
   ```
 
 * View the user guide of a specified parameter.
-  
+
   ```bash
   kbcli cluster explain-config redis-cluster --component=redis --param=acllog-max-len
   ```
-  
+
   <details>
   <summary>Output</summary>
   
@@ -176,7 +176,7 @@ The example below reconfigures `maxclients` and `databases`.
    4) "10000"
    ```
 
-3. Adjust the values of `maxclients` and `databases`.
+2. Adjust the values of `maxclients` and `databases`.
 
    ```bash
    kbcli cluster configure redis-cluster --component=redis --set=maxclients=20000,databases=32
@@ -201,7 +201,7 @@ The example below reconfigures `maxclients` and `databases`.
 
    :::
 
-4. View the status of the parameter reconfiguration.
+3. View the status of the parameter reconfiguration.
 
    `Status.Progress` and `Status.Status` shows the overall status of the parameter reconfiguration and `Conditions` show the details.
 
@@ -213,9 +213,8 @@ The example below reconfigures `maxclients` and `databases`.
 
    <details>
    <summary>Output</summary>
-
-
-   ```bash 
+   
+   ```bash
    Spec:
      Name: redis-cluster-reconfiguring-zrkq7	NameSpace: default	Cluster: redis-cluster	Type: Reconfiguring
 
@@ -239,7 +238,7 @@ The example below reconfigures `maxclients` and `databases`.
    ```
    </details>
 
-5. Connect to the database to verify whether the parameters are modified.
+4. Connect to the database to verify whether the parameters are modified.
 
    The whole searching process has a 30-second delay since it takes some time for kubelete to synchronize modifications to the volume of the pod.
 
@@ -267,7 +266,6 @@ kbcli cluster describe-config redis-cluster --component=redis
 
 <details>
 <summary>Output</summary>
-
 ```bash
 ConfigSpecs Meta:
 CONFIG-SPEC-NAME           FILE         ENABLED   TEMPLATE                 CONSTRAINT                  RENDERED                                       COMPONENT   CLUSTER

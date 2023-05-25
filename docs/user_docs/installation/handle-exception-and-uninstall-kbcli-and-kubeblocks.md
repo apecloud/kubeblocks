@@ -33,8 +33,6 @@ There are three types of results:
 
 # Uninstall KubeBlocks and kbcli
 
-:::note
-
 Uninstallation order:
 
 1. Delete your cluster if you have created a cluster.
@@ -46,8 +44,6 @@ Uninstallation order:
 2. Uninstall KubeBlocks.
 
 3. Uninstall `kbcli`.
-
-:::
 
 ## Uninstall KubeBlocks
 
@@ -69,11 +65,13 @@ helm uninstall kubeblocks -n kb-system
 ```
 
 </TabItem>
+</Tabs>
 
 ## Uninstall kbcli
 
 Uninstall `kbcli` if you want to delete `kbcli` after your trial.
 
+<Tabs>
 <TabItem value="macOS" label="macOS" default>
 
 <TabItem value="cURL" label="cURL" default>

@@ -34,10 +34,11 @@ import (
 )
 
 const (
-	errorLogName = "error"
-	leader       = "leader"
-	follower     = "follower"
-	learner      = "learner"
+	errorLogName      = "error"
+	leader            = "leader"
+	follower          = "follower"
+	learner           = "learner"
+	ConsensusReplicas = 3
 )
 
 // InitConsensusMysql initializes a cluster environment which only contains a component of ConsensusSet type for testing,
@@ -61,10 +62,14 @@ func CreateConsensusMysqlCluster(
 	clusterVersionName,
 	clusterName,
 	workloadType,
-	consensusCompName string) *appsv1alpha1.Cluster {
-	pvcSpec := NewPVCSpec("2Gi")
+	consensusCompName string, pvcSize ...string) *appsv1alpha1.Cluster {
+	size := "2Gi"
+	if len(pvcSize) > 0 {
+		size = pvcSize[0]
+	}
+	pvcSpec := NewPVCSpec(size)
 	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-		AddComponent(consensusCompName, workloadType).SetReplicas(3).SetEnabledLogs(errorLogName).
+		AddComponent(consensusCompName, workloadType).SetReplicas(ConsensusReplicas).SetEnabledLogs(errorLogName).
 		AddVolumeClaimTemplate("data", pvcSpec).Create(testCtx).GetObject()
 }
 
@@ -87,7 +92,7 @@ func MockConsensusComponentStatefulSet(
 	clusterName,
 	consensusCompName string) *appsv1.StatefulSet {
 	stsName := clusterName + "-" + consensusCompName
-	return NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, consensusCompName).SetReplicas(int32(3)).
+	return NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, consensusCompName).SetReplicas(ConsensusReplicas).
 		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(testCtx).GetObject()
 }
 
@@ -130,8 +135,8 @@ func MockConsensusComponentPods(
 	sts *appsv1.StatefulSet,
 	clusterName,
 	consensusCompName string) []*corev1.Pod {
-	podList := make([]*corev1.Pod, 3)
-	for i := 0; i < 3; i++ {
+	podList := make([]*corev1.Pod, ConsensusReplicas)
+	for i := 0; i < ConsensusReplicas; i++ {
 		podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusCompName, i)
 		podRole := "follower"
 		accessMode := "Readonly"

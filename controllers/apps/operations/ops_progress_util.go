@@ -31,8 +31,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/stateless"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -203,18 +201,9 @@ func handleStatelessProgress(reqCtx intctrlutil.RequestCtx,
 		return 0, intctrlutil.NewError(intctrlutil.ErrorWaitCacheRefresh, "wait for the pods of deployment to be synchronized")
 	}
 
-	currComponent, err := stateless.NewStatelessComponent(cli, opsRes.Cluster,
-		pgRes.clusterComponent, *pgRes.clusterComponentDef)
-	if err != nil {
-		return 0, err
-	}
-
-	if currComponent == nil {
-		return 0, nil
-	}
 	var componentName = pgRes.clusterComponent.Name
-	minReadySeconds, err := util.GetComponentDeployMinReadySeconds(reqCtx.Ctx,
-		cli, *opsRes.Cluster, componentName)
+	var workloadType = pgRes.clusterComponentDef.WorkloadType
+	minReadySeconds, err := util.GetComponentDeployMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, componentName)
 	if err != nil {
 		return 0, err
 	}
@@ -224,8 +213,7 @@ func handleStatelessProgress(reqCtx intctrlutil.RequestCtx,
 	for _, v := range podList.Items {
 		objectKey := getProgressObjectKey(v.Kind, v.Name)
 		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
-		if podProcessedSuccessful(currComponent, opsStartTime, &v,
-			minReadySeconds, compStatus.Phase, pgRes.opsIsCompleted) {
+		if podProcessedSuccessful(workloadType, opsStartTime, &v, minReadySeconds, compStatus.Phase, pgRes.opsIsCompleted) {
 			completedCount += 1
 			handleSucceedProgressDetail(opsRes, pgRes, compStatus, progressDetail)
 			continue
@@ -248,7 +236,9 @@ func handleStatefulSetProgress(reqCtx intctrlutil.RequestCtx,
 	podList *corev1.PodList,
 	pgRes progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
-	currComponent, minReadySeconds, err := getCompImplAndMinReadySeconds(reqCtx, cli, opsRes, pgRes)
+	var componentName = pgRes.clusterComponent.Name
+	var workloadType = pgRes.clusterComponentDef.WorkloadType
+	minReadySeconds, err := util.GetComponentStsMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, componentName)
 	if err != nil {
 		return 0, err
 	}
@@ -258,8 +248,7 @@ func handleStatefulSetProgress(reqCtx intctrlutil.RequestCtx,
 	for _, v := range podList.Items {
 		objectKey := getProgressObjectKey(v.Kind, v.Name)
 		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
-		if podProcessedSuccessful(currComponent, opsStartTime, &v,
-			minReadySeconds, compStatus.Phase, pgRes.opsIsCompleted) {
+		if podProcessedSuccessful(workloadType, opsStartTime, &v, minReadySeconds, compStatus.Phase, pgRes.opsIsCompleted) {
 			completedCount += 1
 			handleSucceedProgressDetail(opsRes, pgRes, compStatus, progressDetail)
 			continue
@@ -271,23 +260,6 @@ func handleStatefulSetProgress(reqCtx intctrlutil.RequestCtx,
 		completedCount += handleFailedOrProcessingProgressDetail(opsRes, pgRes, compStatus, progressDetail, &v)
 	}
 	return completedCount, err
-}
-
-func getCompImplAndMinReadySeconds(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	pgRes progressResource) (types.Component, int32, error) {
-	currComponent, err := components.NewComponentByType(cli,
-		opsRes.Cluster, pgRes.clusterComponent, *pgRes.clusterComponentDef)
-	if err != nil {
-		return nil, 0, err
-	}
-	minReadySeconds, err := util.GetComponentStsMinReadySeconds(reqCtx.Ctx,
-		cli, *opsRes.Cluster, pgRes.clusterComponent.Name)
-	if err != nil {
-		return nil, 0, err
-	}
-	return currComponent, minReadySeconds, nil
 }
 
 // handlePendingProgressDetail handles the pending progressDetail and sets it to progressDetails.
@@ -358,13 +330,13 @@ func podIsFailedDuringOperation(
 // podProcessedSuccessful checks if the pod has been processed successfully:
 // 1. the pod is recreated after OpsRequest.status.startTime and pod is available.
 // 2. the component is running and pod is available.
-func podProcessedSuccessful(componentImpl types.Component,
+func podProcessedSuccessful(workloadType appsv1alpha1.WorkloadType,
 	opsStartTime metav1.Time,
 	pod *corev1.Pod,
 	minReadySeconds int32,
 	componentPhase appsv1alpha1.ClusterComponentPhase,
 	opsIsCompleted bool) bool {
-	if !componentImpl.PodIsAvailable(pod, minReadySeconds) {
+	if !components.PodIsAvailable(workloadType, pod, minReadySeconds) {
 		return false
 	}
 	return (opsIsCompleted && componentPhase == appsv1alpha1.RunningClusterCompPhase) || !pod.CreationTimestamp.Before(&opsStartTime)
@@ -465,7 +437,9 @@ func handleScaleOutProgress(reqCtx intctrlutil.RequestCtx,
 	pgRes progressResource,
 	podList *corev1.PodList,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
-	currComponent, minReadySeconds, err := getCompImplAndMinReadySeconds(reqCtx, cli, opsRes, pgRes)
+	var componentName = pgRes.clusterComponent.Name
+	var workloadType = pgRes.clusterComponentDef.WorkloadType
+	minReadySeconds, err := util.GetComponentWorkloadMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, workloadType, componentName)
 	if err != nil {
 		return 0, err
 	}
@@ -477,7 +451,7 @@ func handleScaleOutProgress(reqCtx intctrlutil.RequestCtx,
 		}
 		objectKey := getProgressObjectKey(v.Kind, v.Name)
 		progressDetail := appsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey}
-		if currComponent.PodIsAvailable(&v, minReadySeconds) {
+		if components.PodIsAvailable(workloadType, &v, minReadySeconds) {
 			completedCount += 1
 			pgRes.opsMessageKey = "created"
 			handleSucceedProgressDetail(opsRes, pgRes, compStatus, progressDetail)
@@ -530,7 +504,9 @@ func handleScaleDownProgress(
 			&compStatus.ProgressDetails, progressDetail)
 	}
 	// handle the re-created pods if these pods are failed before doing horizontal scaling.
-	currComponent, minReadySeconds, err := getCompImplAndMinReadySeconds(reqCtx, cli, opsRes, pgRes)
+	var componentName = pgRes.clusterComponent.Name
+	var workloadType = pgRes.clusterComponentDef.WorkloadType
+	minReadySeconds, err := util.GetComponentWorkloadMinReadySeconds(reqCtx.Ctx, cli, *opsRes.Cluster, workloadType, componentName)
 	if err != nil {
 		return 0, err
 	}
@@ -545,7 +521,7 @@ func handleScaleDownProgress(
 			continue
 		}
 		pgRes.opsMessageKey = "re-create"
-		if currComponent.PodIsAvailable(&v, minReadySeconds) {
+		if components.PodIsAvailable(workloadType, &v, minReadySeconds) {
 			completedCount += 1
 			handleSucceedProgressDetail(opsRes, pgRes, compStatus, *progressDetail)
 			continue

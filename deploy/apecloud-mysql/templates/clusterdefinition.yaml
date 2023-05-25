@@ -216,19 +216,14 @@ spec:
                 creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO $(USERNAME); GRANT LOCK TABLES,RELOAD,PROCESS,REPLICATION CLIENT, SUPER,SELECT,EVENT,TRIGGER,SHOW VIEW ON *.* TO $(USERNAME);
                 update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
           - name: kbprobe
-            provisionPolicy:
+            provisionPolicy: &kbReadonlyAcctRef
               type: CreateByStmt
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
                 update: ALTER USER (USERNAME) IDENTIFIED BY '$(PASSWD)';
           - name: kbmonitoring
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AnyPods
-              statements:
-                creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
-                update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
+            provisionPolicy: *kbReadonlyAcctRef
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt

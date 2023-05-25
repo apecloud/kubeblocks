@@ -79,14 +79,20 @@ func run(o *list.ListOptions) error {
 		return err
 	}
 	p := printer.NewTablePrinter(o.Out)
-	p.SetHeader("NAME", "WORKLOAD-TYPE", "CHARACTER-TYPE", "CLUSTER-DEFINITION")
+	p.SetHeader("NAME", "WORKLOAD-TYPE", "CHARACTER-TYPE", "CLUSTER-DEFINITION", "IS-MAIN")
+	p.SortBy(4, 1)
 	for _, info := range infos {
 		var cd v1alpha1.ClusterDefinition
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cd); err != nil {
 			return err
 		}
-		for _, comp := range cd.Spec.ComponentDefs {
-			p.AddRow(comp.Name, comp.WorkloadType, comp.CharacterType, cd.Name)
+		for i, comp := range cd.Spec.ComponentDefs {
+			if i == 0 {
+				p.AddRow(printer.BoldGreen(comp.Name), comp.WorkloadType, comp.CharacterType, cd.Name, "true")
+			} else {
+				p.AddRow(comp.Name, comp.WorkloadType, comp.CharacterType, cd.Name, "false")
+			}
+
 		}
 	}
 	p.Print()

@@ -51,6 +51,12 @@ import (
 )
 
 var (
+	initLong = templates.LongDesc(`Bootstrap a kubernetes cluster and install KubeBlocks for playground.
+
+If no any cloud provider be specified, a k3d cluster named kb-playground will be created on local host,
+otherwise a kubernetes cluster will be created on the specified cloud. Then KubeBlocks will be installed
+on the created kubernetes cluster, and an apecloud-mysql cluster named mycluster will be created.`)
+
 	initExample = templates.Examples(`
 		# create a k3d cluster on local host and install KubeBlocks
 		kbcli playground init
@@ -65,7 +71,23 @@ var (
 		kbcli playground init --cloud-provider tencentcloud --region ap-chengdu
 
 		# create a Google cloud GKE cluster and install KubeBlocks, the region is required
-		kbcli playground init --cloud-provider gcp --region us-central1`)
+		kbcli playground init --cloud-provider gcp --region us-east1
+
+		# after init, run the following commands to experience KubeBlocks quickly
+		# list database cluster and check its status
+		kbcli cluster list
+
+		# get cluster information
+		kbcli cluster describe mycluster
+
+		# connect to database
+		kbcli cluster connect mycluster
+
+		# view the Grafana
+		kbcli dashboard open kubeblocks-grafana
+
+		# destroy playground
+		kbcli playground destroy`)
 
 	supportedCloudProviders = []string{cp.Local, cp.AWS, cp.GCP, cp.AliCloud, cp.TencentCloud}
 
@@ -95,6 +117,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "init",
 		Short:   "Bootstrap a kubernetes cluster and install KubeBlocks for playground.",
+		Long:    initLong,
 		Example: initExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.validate())
@@ -102,12 +125,12 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&o.clusterDef, "cluster-definition", defaultClusterDef, "Cluster definition")
-	cmd.Flags().StringVar(&o.clusterVersion, "cluster-version", "", "Cluster definition")
+	cmd.Flags().StringVar(&o.clusterDef, "cluster-definition", defaultClusterDef, "Specify the cluster definition, run \"kbcli cd list\" to get the available cluster definitions")
+	cmd.Flags().StringVar(&o.clusterVersion, "cluster-version", "", "Specify the cluster version, run \"kbcli cv list\" to get the available cluster versions")
 	cmd.Flags().StringVar(&o.kbVersion, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringVar(&o.cloudProvider, "cloud-provider", defaultCloudProvider, fmt.Sprintf("Cloud provider type, one of %v", supportedCloudProviders))
 	cmd.Flags().StringVar(&o.region, "region", "", "The region to create kubernetes cluster")
-	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for initing playground, such as --timeout=10m")
+	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for init playground, such as --timeout=10m")
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval during the initialization of playground")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
@@ -302,10 +325,6 @@ if it takes a long time, please check the network environment and try again.
 	return nil
 }
 
-func printGuide() {
-	fmt.Fprintf(os.Stdout, guideStr, kbClusterName)
-}
-
 // writeStateFile writes cluster info to state file and return the new cluster info with kubeconfig
 func (o *initOptions) writeStateFile(provider cp.Interface) (*cp.K8sClusterInfo, error) {
 	clusterInfo, err := provider.GetClusterInfo()
@@ -399,7 +418,7 @@ func (o *initOptions) installKBAndCluster(info *cp.K8sClusterInfo) error {
 		fmt.Fprintf(o.Out, "Elapsed time: %s\n", time.Since(o.startTime).Truncate(time.Second))
 	}
 
-	printGuide()
+	fmt.Fprintf(o.Out, guideStr, kbClusterName)
 	return nil
 }
 

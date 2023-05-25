@@ -135,6 +135,9 @@ const (
 	RestartShort      = "Restart instance"
 	DetachVolume      = "detach-volume"
 	DetachVolumeShort = "Detach volume"
+
+	AWSSecretName = "cloud-key-secret-aws"
+	GCPSecretName = "cloud-key-secret-gcp"
 )
 
 var supportedCloudProviders = []string{cp.AWS, cp.GCP}

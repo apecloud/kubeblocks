@@ -155,6 +155,7 @@ var _ = Describe("builder", func() {
 		component, err := component.BuildComponent(
 			reqCtx,
 			*cluster,
+			nil,
 			*clusterDef,
 			clusterDef.Spec.ComponentDefs[0],
 			cluster.Spec.ComponentSpecs[0],

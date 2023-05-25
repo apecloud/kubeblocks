@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -254,9 +255,9 @@ var _ = Describe("OpsRequest Controller", func() {
 		} else {
 			targetRequests = scalingCtx.target.resource.Requests
 		}
-		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
-			g.Expect(fetched.Spec.ComponentSpecs[0].Resources.Requests).To(Equal(targetRequests))
-		})).Should(Succeed())
+		stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, mysqlCompName)
+		mysqlSts = stsList.Items[0]
+		Expect(reflect.DeepEqual(mysqlSts.Spec.Template.Spec.Containers[0].Resources.Requests, targetRequests)).Should(BeTrue())
 
 		By("check OpsRequest reclaimed after ttl")
 		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func(lopsReq *appsv1alpha1.OpsRequest) {

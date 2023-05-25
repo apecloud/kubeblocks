@@ -21,6 +21,7 @@ package component
 
 import (
 	"fmt"
+	"reflect"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -85,6 +86,7 @@ var _ = Describe("component module", func() {
 			component, err := BuildComponent(
 				reqCtx,
 				*cluster,
+				nil,
 				*clusterDef,
 				clusterDef.Spec.ComponentDefs[0],
 				cluster.Spec.ComponentSpecs[0],
@@ -98,6 +100,7 @@ var _ = Describe("component module", func() {
 			component, err = BuildComponent(
 				reqCtx,
 				*cluster,
+				nil,
 				*clusterDef,
 				clusterDef.Spec.ComponentDefs[0],
 				cluster.Spec.ComponentSpecs[0],
@@ -109,6 +112,7 @@ var _ = Describe("component module", func() {
 			component, err = BuildComponent(
 				reqCtx,
 				*cluster,
+				nil,
 				*clusterDef,
 				clusterDef.Spec.ComponentDefs[0],
 				cluster.Spec.ComponentSpecs[0],
@@ -120,12 +124,63 @@ var _ = Describe("component module", func() {
 			component, err = BuildComponent(
 				reqCtx,
 				*cluster,
+				nil,
 				*clusterDef,
 				clusterDef.Spec.ComponentDefs[0],
 				cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[1])
 			Expect(err).Should(Succeed())
 			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
+		})
+
+		It("classDefRef has higher precedence than resources", func() {
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: tlog,
+			}
+
+			By("component without class")
+			resources := corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    testapps.Class2c4g.CPU,
+					corev1.ResourceMemory: testapps.Class2c4g.Memory,
+				},
+			}
+			cluster.Spec.ComponentSpecs[0].Resources = resources
+			component, err := BuildComponent(
+				reqCtx,
+				*cluster,
+				nil,
+				*clusterDef,
+				clusterDef.Spec.ComponentDefs[0],
+				cluster.Spec.ComponentSpecs[0],
+				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
+			Expect(reflect.DeepEqual(component.PodSpec.Containers[0].Resources, resources)).Should(BeTrue())
+
+			By("component with class")
+			classes := map[string]map[string]*appsv1alpha1.ComponentClassInstance{
+				cluster.Spec.ComponentSpecs[0].ComponentDefRef: {
+					testapps.Class1c1gName: &appsv1alpha1.ComponentClassInstance{
+						ComponentClass: testapps.Class1c1g,
+					},
+				},
+			}
+			cluster.Spec.ComponentSpecs[0].ClassDefRef = &appsv1alpha1.ClassDefRef{Class: testapps.Class1c1gName}
+			component, err = BuildComponent(
+				reqCtx,
+				*cluster,
+				classes,
+				*clusterDef,
+				clusterDef.Spec.ComponentDefs[0],
+				cluster.Spec.ComponentSpecs[0],
+				&clusterVersion.Spec.ComponentVersions[0])
+			container := component.PodSpec.Containers[0]
+			Expect(err).Should(Succeed())
+			Expect(container.Resources.Requests.Cpu().Equal(testapps.Class1c1g.CPU)).Should(BeTrue())
+			Expect(container.Resources.Limits.Cpu().Equal(testapps.Class1c1g.CPU)).Should(BeTrue())
+			Expect(container.Resources.Requests.Memory().Equal(testapps.Class1c1g.Memory)).Should(BeTrue())
+			Expect(container.Resources.Limits.Memory().Equal(testapps.Class1c1g.Memory)).Should(BeTrue())
 		})
 
 		It("Test replace secretRef env placeholder token", func() {

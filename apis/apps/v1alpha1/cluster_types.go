@@ -117,6 +117,7 @@ type ClusterComponentSpec struct {
 	ComponentDefRef string `json:"componentDefRef"`
 
 	// classDefRef reference class defined in ComponentClassDefinition.
+	// If both ClassDefRef and Resources are specified, ClassDefRef has higher precedence than Resources.
 	// +optional
 	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
 

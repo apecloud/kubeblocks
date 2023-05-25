@@ -24,27 +24,30 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
-// CredentialTransformer puts the credential Secret at the beginning of the DAG
-type CredentialTransformer struct{}
+// SecretTransformer puts all the secrets at the beginning of the DAG
+type SecretTransformer struct{}
 
-func (c *CredentialTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+var _ graph.Transformer = &SecretTransformer{}
+
+func (c *SecretTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	var secretVertices, noneRootVertices []graph.Vertex
-	secretVertices = findAll[*corev1.Secret](dag)
-	noneRootVertices = findAllNot[*appsv1alpha1.Cluster](dag)
+	secretVertices = ictrltypes.FindAll[*corev1.Secret](dag)
+	noneRootVertices = ictrltypes.FindAllNot[*appsv1alpha1.Cluster](dag)
 	for _, secretVertex := range secretVertices {
-		secret, _ := secretVertex.(*lifecycleVertex)
-		secret.immutable = true
+		secret, _ := secretVertex.(*ictrltypes.LifecycleVertex)
+		secret.Immutable = true
 		for _, vertex := range noneRootVertices {
-			v, _ := vertex.(*lifecycleVertex)
+			v, _ := vertex.(*ictrltypes.LifecycleVertex)
 			// connect all none secret vertices to all secret vertices
-			if _, ok := v.obj.(*corev1.Secret); !ok {
-				dag.Connect(vertex, secretVertex)
+			if _, ok := v.Obj.(*corev1.Secret); !ok {
+				if *v.Action != *ictrltypes.ActionDeletePtr() {
+					dag.Connect(vertex, secretVertex)
+				}
 			}
 		}
 	}
 	return nil
 }
-
-var _ graph.Transformer = &CredentialTransformer{}

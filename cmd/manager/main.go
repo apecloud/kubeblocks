@@ -47,6 +47,7 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -55,7 +56,6 @@ import (
 
 	discoverycli "k8s.io/client-go/discovery"
 
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -391,20 +391,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&components.StatefulSetReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("stateful-set-controller"),
-	}).SetupWithManager(mgr); err != nil {
+	if err = components.NewStatefulSetReconciler(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "StatefulSet")
 		os.Exit(1)
 	}
 
-	if err = (&components.DeploymentReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("deployment-controller"),
-	}).SetupWithManager(mgr); err != nil {
+	if err = components.NewDeploymentReconciler(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Deployment")
 		os.Exit(1)
 	}

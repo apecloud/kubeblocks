@@ -227,3 +227,7 @@ const (
 )
 
 const DefaultBackupPvcInitCapacity = "20Gi"
+
+const (
+	ComponentStatusDefaultPodName = "Unknown"
+)

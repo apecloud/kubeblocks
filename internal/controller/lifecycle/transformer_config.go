@@ -24,22 +24,23 @@ import (
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 // ConfigTransformer makes all config related ConfigMaps immutable
 type ConfigTransformer struct{}
 
+var _ graph.Transformer = &ConfigTransformer{}
+
 func (c *ConfigTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	for _, vertex := range findAll[*corev1.ConfigMap](dag) {
-		v, _ := vertex.(*lifecycleVertex)
-		cm, _ := v.obj.(*corev1.ConfigMap)
+	for _, vertex := range ictrltypes.FindAll[*corev1.ConfigMap](dag) {
+		v, _ := vertex.(*ictrltypes.LifecycleVertex)
+		cm, _ := v.Obj.(*corev1.ConfigMap)
 		// Note: Disable updating of the config resources.
 		// Labels and Annotations have the necessary meta information for controller.
 		if cfgcore.IsSchedulableConfigResource(cm) {
-			v.immutable = true
+			v.Immutable = true
 		}
 	}
 	return nil
 }
-
-var _ graph.Transformer = &ConfigTransformer{}

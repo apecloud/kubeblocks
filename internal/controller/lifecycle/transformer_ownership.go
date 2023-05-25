@@ -25,27 +25,31 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // OwnershipTransformer add finalizer to all none cluster objects
 type OwnershipTransformer struct{}
 
+var _ graph.Transformer = &OwnershipTransformer{}
+
 func (f *OwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	rootVertex, err := findRootVertex(dag)
+	rootVertex, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err
 	}
-	vertices := findAllNot[*appsv1alpha1.Cluster](dag)
+	vertices := ictrltypes.FindAllNot[*appsv1alpha1.Cluster](dag)
 
-	controllerutil.AddFinalizer(rootVertex.obj, constant.DBClusterFinalizerName)
+	controllerutil.AddFinalizer(rootVertex.Obj, constant.DBClusterFinalizerName)
 	for _, vertex := range vertices {
-		v, _ := vertex.(*lifecycleVertex)
-		if err := intctrlutil.SetOwnership(rootVertex.obj, v.obj, scheme, constant.DBClusterFinalizerName); err != nil {
+		v, _ := vertex.(*ictrltypes.LifecycleVertex)
+		if err := intctrlutil.SetOwnership(rootVertex.Obj, v.Obj, scheme, constant.DBClusterFinalizerName); err != nil {
+			if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
+				continue
+			}
 			return err
 		}
 	}
 	return nil
 }
-
-var _ graph.Transformer = &OwnershipTransformer{}

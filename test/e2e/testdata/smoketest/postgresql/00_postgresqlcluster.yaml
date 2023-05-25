@@ -3,10 +3,10 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: kb-sa-mycluster
+  name: kb-mycluster-pgcluster
   labels:
     
-    helm.sh/chart: pgcluster-0.5.0-beta.24
+    helm.sh/chart: pgcluster-0.5.1-beta.0
     app.kubernetes.io/name: pgcluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "14.7.1"
@@ -16,11 +16,11 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: kb-role-default-mycluster
+  name: kb-mycluster-pgcluster
   namespace: default
   labels:
     
-    helm.sh/chart: pgcluster-0.5.0-beta.24
+    helm.sh/chart: pgcluster-0.5.1-beta.0
     app.kubernetes.io/name: pgcluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "14.7.1"
@@ -62,15 +62,21 @@ rules:
       - patch
       - update
       - watch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
 ---
 # Source: pgcluster/templates/rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: kb-rolebinding-default-mycluster
+  name: kb-mycluster-pgcluster
   labels:
     
-    helm.sh/chart: pgcluster-0.5.0-beta.24
+    helm.sh/chart: pgcluster-0.5.1-beta.0
     app.kubernetes.io/name: pgcluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "14.7.1"
@@ -78,10 +84,10 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: kb-role-default-mycluster
+  name: kb-mycluster-pgcluster
 subjects:
   - kind: ServiceAccount
-    name: kb-sa-mycluster
+    name: kb-mycluster-pgcluster
     namespace: default
 ---
 # Source: pgcluster/templates/cluster.yaml
@@ -90,7 +96,7 @@ kind: Cluster
 metadata:
   name: mycluster-pgcluster
   labels: 
-    helm.sh/chart: pgcluster-0.5.0-beta.24
+    helm.sh/chart: pgcluster-0.5.1-beta.0
     app.kubernetes.io/name: pgcluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "14.7.1"
@@ -105,7 +111,7 @@ spec:
       componentDefRef: postgresql # ref clusterdefinition components.name
       monitor: false
       replicas: 2
-      serviceAccountName: kb-sa-mycluster
+      serviceAccountName: kb-mycluster-pgcluster
       primaryIndex: 0
       switchPolicy:
         type: Noop

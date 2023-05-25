@@ -35,18 +35,21 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 // ClusterDeletionTransformer handles cluster deletion
 type ClusterDeletionTransformer struct{}
 
+var _ graph.Transformer = &ClusterDeletionTransformer{}
+
 func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.OrigCluster
-	if !isClusterDeleting(*cluster) {
+	if !cluster.IsDeleting() {
 		return nil
 	}
-	root, err := findRootVertex(dag)
+	root, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err
 	}
@@ -121,7 +124,7 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 			// annotated last-applied Cluster spec
 			annot[constant.LastAppliedClusterAnnotationKey] = clusterJSON
 			o.SetAnnotations(annot)
-			vertex := &lifecycleVertex{obj: o, oriObj: origObj, action: actionPtr(UPDATE)}
+			vertex := &ictrltypes.LifecycleVertex{Obj: o, ObjCopy: origObj, Action: ictrltypes.ActionUpdatePtr()}
 			dag.AddVertex(vertex)
 			dag.Connect(root, vertex)
 		}
@@ -138,11 +141,11 @@ func (t *ClusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		return err
 	}
 	for _, o := range objs {
-		vertex := &lifecycleVertex{obj: o, action: actionPtr(DELETE)}
+		vertex := &ictrltypes.LifecycleVertex{Obj: o, Action: ictrltypes.ActionDeletePtr()}
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
 	}
-	root.action = actionPtr(DELETE)
+	root.Action = ictrltypes.ActionDeletePtr()
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop
@@ -184,5 +187,3 @@ func kindsForWipeOut() []client.ObjectList {
 	}
 	return append(kinds, kindsPlus...)
 }
-
-var _ graph.Transformer = &ClusterDeletionTransformer{}

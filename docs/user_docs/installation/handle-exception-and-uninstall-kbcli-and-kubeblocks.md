@@ -30,7 +30,7 @@ There are three types of results:
 * `congratulation`: All checks pass and you can continue the following installation.
 
 
-## Uninstall KubeBlocks and kbcli
+# Uninstall KubeBlocks and kbcli
 
 :::note
 
@@ -48,7 +48,7 @@ Uninstallation order:
 
 :::
 
-### Uninstall KubeBlocks
+## Uninstall KubeBlocks
 
 Uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
 
@@ -68,7 +68,7 @@ helm uninstall kubeblocks -n kb-system
 
 </TabItem>
 
-### Uninstall kbcli
+## Uninstall kbcli
 
 Uninstall `kbcli` if you want to delete `kbcli` after your trial.
 

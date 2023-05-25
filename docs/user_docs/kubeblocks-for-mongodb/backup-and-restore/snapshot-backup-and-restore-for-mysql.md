@@ -123,4 +123,3 @@ This section shows how to use `kbcli` to back up and restore a MySQL cluster.
    ```bash
    kbcli cluster restore mysql-new-from-snapshot --backup backup-default-mysql-cluster-20221124113440
    ```
-

@@ -46,7 +46,7 @@ You can also view the details of this configuration file and parameters.
 
   <details>
   <summary>Output</summary>
-  
+
   ```bash
   template meta:
     ConfigSpec: redis-replication-config	ComponentName: redis	ClusterName: redis-cluster
@@ -59,6 +59,7 @@ You can also view the details of this configuration file and parameters.
     Type:               integer
     Description: 
   ```
+
   </details>
 
   * Allowed Values: It defines the valid value range of this parameter.
@@ -142,6 +143,7 @@ The example below reconfigures `acllog-max-len`.
    Apr 17,2023 17:22 UTC+0800   Reconfigure          ReconfigureStarted             True     Start to reconfigure in Cluster: redis-cluster, Component: redis
    Apr 17,2023 17:22 UTC+0800   ReconfigureRunning   ReconfigureRunning             True     Reconfiguring in Cluster: redis-cluster, Component: redis, ConfigSpec: redis-replication-config
    ```
+
    </details>
 
 4. Connect to the database to verify whether the parameters are modified.
@@ -213,7 +215,7 @@ The example below reconfigures `maxclients` and `databases`.
 
    <details>
    <summary>Output</summary>
-   
+
    ```bash
    Spec:
      Name: redis-cluster-reconfiguring-zrkq7	NameSpace: default	Cluster: redis-cluster	Type: Reconfiguring
@@ -236,6 +238,7 @@ The example below reconfigures `maxclients` and `databases`.
    Apr 17,2023 17:28 UTC+0800   ReconfigureMerged    ReconfigureMerged              True     Reconfiguring in Cluster: redis-cluster, Component: redis, ConfigSpec: redis-replication-config, info: updated: map[redis.conf:{"databases":"32","maxclients":"20000"}], added: map[], deleted:map[]
    Apr 17,2023 17:28 UTC+0800   ReconfigureRunning   ReconfigureRunning             True     Reconfiguring in Cluster: redis-cluster, Component: redis, ConfigSpec: redis-replication-config
    ```
+
    </details>
 
 4. Connect to the database to verify whether the parameters are modified.
@@ -266,6 +269,7 @@ kbcli cluster describe-config redis-cluster --component=redis
 
 <details>
 <summary>Output</summary>
+
 ```bash
 ConfigSpecs Meta:
 CONFIG-SPEC-NAME           FILE         ENABLED   TEMPLATE                 CONSTRAINT                  RENDERED                                       COMPONENT   CLUSTER
@@ -277,6 +281,7 @@ redis-cluster-reconfiguring-zjztm   redis-cluster   redis       redis-replicatio
 redis-cluster-reconfiguring-zrkq7   redis-cluster   redis       redis-replication-config   redis.conf   Succeed   restart   1/1        Apr 17,2023 17:28 UTC+0800   {"redis.conf":"{\"databases\":\"32\",\"maxclients\":\"20000\"}"}
 redis-cluster-reconfiguring-mwbnw   redis-cluster   redis       redis-replication-config   redis.conf   Succeed   restart   1/1        Apr 17,2023 17:35 UTC+0800   {"redis.conf":"{\"maxclients\":\"40000\"}"}
 ```
+
 </details>
 
 From the above results, there are three parameter modifications.

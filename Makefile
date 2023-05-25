@@ -133,15 +133,22 @@ preflight-manifests: generate ## Generate external Preflight API
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./externalapis/preflight/..." output:crd:artifacts:config=config/crd/preflight
 
 .PHONY: generate
+generate: CODEGEN_GENERATORS=all # deepcopy,defaulter,client,lister,informer or all
+generate: OUTPUT_PACKAGE=github.com/apecloud/kubeblocks/pkg/client
+generate: OUTPUT_DIR=./clientgen_work_temp
+generate: APIS_PACKAGE=github.com/apecloud/kubeblocks/apis
+generate: CODEGEN_GROUP_VERSIONS="apps.kubeblocks.io:v1alpha1 dataprotection.kubeblocks.io:v1alpha1"
 generate: controller-gen client-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	# $(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
-	rm -rf clientset/
 	# $(CLIENT_GEN) --clientset-name versioned --input-base "" --input="./apis/dbaas/v1alpha1" --go-header-file ./hack/boilerplate.go.txt --output-package clientset
-	/bin/bash ./vendor/k8s.io/code-generator/generate-groups.sh all clientset apis "dbaas:v1alpha1 dataprotection:v1alpha1" -h ./hack/boilerplate.go.txt
+	mkdir -p $(OUTPUT_DIR)
+	bash ./vendor/k8s.io/code-generator/generate-groups.sh $(CODEGEN_GENERATORS) $(OUTPUT_PACKAGE) $(APIS_PACKAGE) "$(CODEGEN_GROUP_VERSIONS)" \
+		--output-base $(OUTPUT_DIR) \
+		--go-header-file ./hack/boilerplate_apache2.go.txt
+	rm -rf ./pkg/client/{clientset,informers,listers}
+	mv "$(OUTPUT_DIR)"/$(OUTPUT_PACKAGE)/* ./pkg/client
 #   echo "Generating clientset for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}"
 #   "${gobin}/client-gen" --clientset-name "${CLIENTSET_NAME_VERSIONED:-versioned}" --input-base "" --input "$(codegen::join , "${FQ_APIS[@]}")" --output-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}" "$@"
-
-
 
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/...;./externalapis/..."
 

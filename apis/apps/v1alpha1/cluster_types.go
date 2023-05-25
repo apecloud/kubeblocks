@@ -473,6 +473,8 @@ type ClassDefRef struct {
 	Class string `json:"class"`
 }
 
+// +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks,all}

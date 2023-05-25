@@ -273,6 +273,8 @@ type BackupPolicyStatus struct {
 	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
 }
 
+// +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced,shortName=bp

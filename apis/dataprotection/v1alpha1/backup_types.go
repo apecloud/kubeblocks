@@ -155,6 +155,8 @@ type BackupToolManifestsStatus struct {
 	CheckPoint string `json:"CheckPoint,omitempty"`
 }
 
+// +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced

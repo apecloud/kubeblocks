@@ -921,6 +921,9 @@ type GVKResource struct {
 	Selector map[string]string `json:"selector,omitempty"`
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cd

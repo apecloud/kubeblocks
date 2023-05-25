@@ -1,12 +1,14 @@
 ---
 title: Configure pod affinity for database clusters
-description: How to configure pods affinity for database clusters
+description: How to configure pod affinity for database clusters
+keywords: [pod affinity]
 sidebar_position: 1
 ---
 
 # Configure pod affinity for database clusters
 
-Affinity controls the selection logic of pod allocation on nodes. By a reasonable allocation of Kubernetes pods on different nodes, the business availability, resource usage rate, and stability are improved. 
+Affinity controls the selection logic of pod allocation on nodes. By a reasonable allocation of Kubernetes pods on different nodes, the business availability, resource usage rate, and stability are improved.
+
 Affinity and toleration can be set by `kbcli` or the CR YAML file of the cluster. `kbcli` only supports the cluster-level configuration and the CR YAML file supports both the cluster-level and component-level configurations.
 
 ## Option 1. Use kbcli
@@ -58,9 +60,9 @@ Options:
 
 ## Option 2. Use a YAML file
 
-You can configure pod affinity and toleration in either the spec of a cluster or the spec of a component. 
+You can configure pod affinity and toleration in either the spec of a cluster or the spec of a component.
 
-The cluster-level configuration is used as the default configuration of all components; if the pod affinity configuration exists in a component, the component-level configuration will take effect and cover the default cluster-level configuration. 
+The cluster-level configuration is used as the default configuration of all components; if the pod affinity configuration exists in a component, the component-level configuration will take effect and cover the default cluster-level configuration.
 
 ```yaml
 spec:
@@ -69,7 +71,7 @@ spec:
     topologyKeys:
     - kubernetes.io/hostname
     nodeLabels:
-    - topology.kubernetes.io/zone: us-east-1a
+      topology.kubernetes.io/zone: us-east-1a
     tenancy: sharedNode
   tolerations:
   - key: EngineType
@@ -131,7 +133,7 @@ kbcli cluster create --topology-keys kubernetes.io/hostname --pod-anti-affinity 
 
 ### Deploy pods in specified nodes
 
-You can specify a node label to deploy a cluster on the specified node. 
+You can specify a node label to deploy a cluster on the specified node.
 The example below creates and sets a cluster to be deployed on the node with an available zone label of `topology.kubernetes.io/zone=us-east-1a`.
 
 ```bash

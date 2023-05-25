@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"helm.sh/helm/v3/pkg/action"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,35 +40,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
-
-var helmExpectValuesKey = []string{
-	"image",
-	"updateStrategy",
-	"podDisruptionBudget",
-	"loggerSettings",
-	"serviceAccount",
-	"securityContext",
-	"podSecurityContext",
-	"service",
-	"serviceMonitor",
-	"resources",
-	"autoscaling",
-	"nodeSelector",
-	"affinity",
-	"dataPlane",
-	"admissionWebhooks",
-	"dataProtection",
-	"addonController",
-	"topologySpreadConstraints",
-	"tolerations",
-	"priorityClassName",
-	"nameOverride",
-	"fullnameOverride",
-	"dnsPolicy",
-	"replicaCount",
-	"hostNetwork",
-	"keepAddons",
-}
 
 var backupConfigExample = templates.Examples(`
 		# Enable the snapshot-controller and volume snapshot, to support snapshot backup.
@@ -146,26 +116,15 @@ func NewDescribeConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f, cmd))
-			util.CheckErr(describeConfig(o, output, func(release string, opt *Options) (map[string]interface{}, error) {
-				values, err := GetHelmValues(release, opt)
-				if err != nil {
-					return nil, err
-				}
-				res := make(map[string]interface{})
-				// filter the addons values
-				for i := range helmExpectValuesKey {
-					res[helmExpectValuesKey[i]] = values[helmExpectValuesKey[i]]
-				}
-				return res, nil
-			}))
+			util.CheckErr(describeConfig(o, output, getHelmValues))
 		},
 	}
 	printer.AddOutputFlag(cmd, &output)
 	return cmd
 }
 
-// GetHelmValues gives an implementation of 'helm get values' for target release
-func GetHelmValues(release string, opt *Options) (map[string]interface{}, error) {
+// getHelmValues get all kubeblocks values by helm and filter the addons values
+func getHelmValues(release string, opt *Options) (map[string]interface{}, error) {
 	if len(opt.HelmCfg.Namespace()) == 0 {
 		namespace, err := util.GetKubeBlocksNamespace(opt.Client)
 		if err != nil {
@@ -173,13 +132,19 @@ func GetHelmValues(release string, opt *Options) (map[string]interface{}, error)
 		}
 		opt.HelmCfg.SetNamespace(namespace)
 	}
-	actionConfig, err := helm.NewActionConfig(opt.HelmCfg)
+	values, err := helm.GetValues(release, opt.HelmCfg)
 	if err != nil {
 		return nil, err
 	}
-	client := action.NewGetValues(actionConfig)
-	client.AllValues = true
-	return client.Run(release)
+	// filter the addons values
+	list, err := opt.Dynamic.Resource(types.AddonGVR()).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range list.Items {
+		delete(values, item.GetName())
+	}
+	return values, nil
 }
 
 type fn func(release string, opt *Options) (map[string]interface{}, error)

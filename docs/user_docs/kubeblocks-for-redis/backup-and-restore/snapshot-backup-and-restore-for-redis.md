@@ -1,16 +1,17 @@
 ---
-title: Snapshot backup and restore for MongoDB
-description: Guide for backup and restore for MongoDB
-keywords: [mongodb, snapshot, backup, restore]
+title: Snapshot backup and restore for Redis
+description: Guide for backup and restore for Redis
+keywords: [redis, snapshot, backup, restore]
 sidebar_position: 2
 sidebar_label: Snapshot backup and restore
 ---
+
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Snapshot backup and restore for mongodb
+# Snapshot backup and restore for Redis
 
-This section shows how to use `kbcli` to back up and restore a mongodb cluster.
+This section shows how to use `kbcli` to back up and restore a Redis cluster.
 
 ***Steps:***
 
@@ -52,7 +53,7 @@ This section shows how to use `kbcli` to back up and restore a mongodb cluster.
 
      - Configure the storage class of the snapshot (the assigned EBS volume is gp3).
 
-       ```yaml
+       ```bash
        kubectl create -f - <<EOF
        kind: StorageClass
        apiVersion: storage.k8s.io/v1
@@ -98,7 +99,7 @@ This section shows how to use `kbcli` to back up and restore a mongodb cluster.
 3. Create a snapshot backup.
 
     ```bash
-    kbcli cluster backup mongodb-cluster
+    kbcli cluster backup redis-cluster
     ```
 
 4. Check the backup.
@@ -113,12 +114,12 @@ This section shows how to use `kbcli` to back up and restore a mongodb cluster.
 
    :::note
 
-   You do not need to specify other parameters for creating a cluster. The restoration automatically reads the parameters of the source cluster, including specification, disk size, etc., and creates a new mongodb cluster with the same specifications.
+   You do not need to specify other parameters for creating a cluster. The restoration automatically reads the parameters of the source cluster, including specification, disk size, etc., and creates a new Redis cluster with the same specifications.
 
    :::
 
    Execute the following command.
 
    ```bash
-   kbcli cluster restore mongodb-new-from-snapshot --backup backup-default-mongodb-cluster-20221124113440
+   kbcli cluster restore redis-new-from-snapshot --backup backup-default-redis-cluster-20230411115450
    ```

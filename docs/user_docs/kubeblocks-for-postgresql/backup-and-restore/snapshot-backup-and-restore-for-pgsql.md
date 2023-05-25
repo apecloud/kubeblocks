@@ -1,53 +1,57 @@
 ---
 title: Snapshot backup and restore for PostgreSQL
-description: Snapshot backup and restore for a PostgreSQL cluster
-sidebar_position: 1
-sidebar_label: By snapshot
+description: Guide for backup and restore for PostgreSQL
+keywords: [postgresql, snapshot, backup, restore]
+sidebar_position: 2
+sidebar_label: Snapshot backup and restore
 ---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 # Snapshot backup and restore for PostgreSQL
 
-Snapshot backup is one type of full backup. Snapshot backup and restore is the recommended option of KubeBlocks but it also depends on whether your environment support snapshot. If snapshot backup is not supported, try [Data file backup and restore](./data-file-backup-and-restore.md).
-
-This guide shows how to use `kbcli` to back up and restore a PostgreSQL cluster.
-
-***Before you start***
-
-- Prepare a clean EKS cluster, and install EBS CSI driver plug-in, with at least one node and the memory of each node is not less than 4GB.
-- [Install `kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl-macos/) to ensure that you can connect to the EKS cluster.
-- [Install `kbcli`](./../../installation/introduction.md): Choose one guide that fits your actual environments.
+This section shows how to use `kbcli` to back up and restore a PostgreSQL cluster.
 
 ***Steps:***
 
 1. Install KubeBlocks and the snapshot-controller add-on.
 
-    ```bash
-    kbcli kubeblocks install --set snapshot-controller.enabled=true
-    ```
+     ```bash
+     kbcli kubeblocks install --set snapshot-controller.enabled=true
+     ```
 
-    Since your `kubectl` is already connected to the EKS cluster, this command installs the latest version of KubeBlocks in the default namespace `kb-system` in your EKS environment.
+     If you have installed KubeBlock without enabling the snapshot-controller, run the command below.
 
-    Verify the installation with the following command.
+     ```bash
+     kbcli kubeblocks upgrade --set snapshot-controller.enabled=true
+     ```
 
-    ```bash
-    kubectl get pod -n kb-system
-    ```
+     Since your `kubectl` is already connected to the cluster of cloud Kubernetes service, this command installs the latest version of KubeBlocks in the default namespace `kb-system` in your environment.
 
-    The pod with `kubeblocks` and `kb-addon-snapshot-controller` is shown. See the information below.
+     Verify the installation with the following command.
 
-    ```bash
-    NAME                                              READY   STATUS             RESTARTS      AGE
-    kubeblocks-5c8b9d76d6-m984n                       1/1     Running            0             9m
-    kb-addon-snapshot-controller-6b4f656c99-zgq7g     1/1     Running            0             9m
-    ```
+     ```bash
+     kubectl get pod -n kb-system
+     ```
 
-    If the output result does not show `kb-addon-snapshot-controller`, it means the snapshot-controller add-on is not enabled. It may be caused by failing to meet the installable condition of this add-on. Refer to [Enable add-ons](../../installation/enable-addons.md) to find the environment requirements and then enable the snapshot-controller add-on.
+     The pod with `kubeblocks` and  `kb-addon-snapshot-controller` is shown. See the information below.
 
-2. Configure EKS to support the snapshot function.
+     ```bash
+     NAME                                              READY   STATUS             RESTARTS      AGE
+     kubeblocks-5c8b9d76d6-m984n                       1/1     Running            0             9m
+     kb-addon-snapshot-controller-6b4f656c99-zgq7g     1/1     Running            0             9m
+     ```
 
-    The backup is realized by the volume snapshot function, you need to configure EKS to support the snapshot function.
+     If the output result does not show `kb-addon-snapshot-controller`, it means the snapshot-controller add-on is not enabled. It may be caused by failing to meet the installable condition of this add-on. Refer to [Enable add-ons](../../installation/enable-add-ons.md) to find the environment requirements and then enable the snapshot-controller add-on.
 
-    - Configure the storage class of snapshot (the assigned EBS volume is gp3).
+2. Configure cloud managed Kubernetes environment to support the snapshot function. For ACK and GKE, the snapshot function is enabled by default, you can skip this step.
+
+    <TabItem value="EKS" label="EKS" default>
+
+     The backup is realized by the volume snapshot function, you need to configure EKS to support the snapshot function.
+
+     - Configure the storage class of the snapshot (the assigned EBS volume is gp3).
 
        ```bash
        kubectl create -f - <<EOF
@@ -64,92 +68,58 @@ This guide shows how to use `kbcli` to back up and restore a PostgreSQL cluster.
        allowVolumeExpansion: true
        volumeBindingMode: WaitForFirstConsumer
        EOF
-  
+       ```
+
+       ```bash
+       # Disable the default options if an exception occurs to the default gp2 snapshot
        kubectl patch sc/gp2 -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
        ```
 
-3. Create a PostgreSQL Standalone.
+     </TabItem>
 
-    ```bash
-    kbcli cluster create pg-cluster --cluster-definition='postgresql'
-    ```
+     <TabItem value="TKE" label="TKE">
 
-4. Insert test data to test backup.
+     Configure the default volumesnapshot class.
 
-    Connect to the PostgreSQL cluster created in the previous steps and insert a piece of data. See the example below.
+       ```yaml
+       kubectl create -f - <<EOF
+       apiVersion: snapshot.storage.k8s.io/v1beta1
+       kind: VolumeSnapshotClass
+       metadata:
+         name: cbs-snapclass
+         annotations: 
+           snapshot.storage.kubernetes.io/is-default-class: "true"
+       driver: com.tencent.cloud.csi.cbs
+       deletionPolicy: Delete
+       EOF
+       ```
 
-    ```bash
-    kbcli cluster connect pg-cluster
-   
-    create database if not exists demo;
-    create table if not exists demo.msg(id int NOT NULL AUTO_INCREMENT, msg text, time datetime, PRIMARY KEY (id));
-    insert into demo.msg (msg, time) value ("hello", now());
-    select * from demo.msg;
-    ```
-  
-5. Create a snapshot backup.
+     </TabItem>
+
+3. Create a snapshot backup.
 
     ```bash
     kbcli cluster backup pg-cluster
     ```
 
-6. Check the backup.
+4. Check the backup.
 
     ```bash
     kbcli cluster list-backups
     ```
 
-7. Restore to a new cluster.
+5. Restore to a new cluster.
 
-    Copy the backup name to the clipboard, and restore to the new cluster.
+   Copy the backup name to the clipboard, and restore to the new cluster.
 
-    :::note
+   :::note
 
-    You do not need to specify other parameters for creating a cluster. The restoration automatically reads the parameters of the source cluster, including specification, disk size, etc., and creates a new PostgreSQL cluster with the same specifications.
+   You do not need to specify other parameters for creating a cluster. The restoration automatically reads the parameters of the source cluster, including specification, disk size, etc., and creates a new PostgreSQL cluster with the same specifications.
 
-    :::
+   :::
 
-    Execute the following command.
+   Execute the following command.
 
-    ```bash
-    kbcli cluster restore postgresql-new-from-snapshot --backup backup-default-postgresql-cluster-20221124113440
-    ```
-
-8. Verify the data restored.
-
-    Execute the following command to verify the data restored.
-
-    ```bash
-    kbcli cluster connect postgresql-new-from-snapshot
-
-    select * from demo.msg;
-    ```
-
-9. Delete the PostgreSQL cluster and clean up the backup.
-
-:warning: Data deleted here is only for test. In real scenarios, deleting backup is a critically high-risk operation.
-
-    :::note
-
-    Expenses incurred when you have snapshots on the cloud. So it is recommended to delete the test cluster.
-
-    :::
-  
-    Delete a PostgreSQL cluster with the following command.
-
-    ```bash
-    kbcli cluster delete pg-cluster
-    kbcli cluster delete postgresql-new-from-snapshot
-    ```
-
-    Delete the backup specified.
-
-    ```bash
-    kbcli cluster delete-backup pg-cluster --name backup-default-pg-cluster-20221124113440 
-    ```
-
-    Delete all backups with `pg-cluster`.
-
-    ```bash
-    kbcli cluster delete-backup pg-cluster --force
-    ```
+   ```bash
+   kbcli cluster restore pg-new-from-snapshot --backup backup-default-pg-cluster-20221124113440
+   ```

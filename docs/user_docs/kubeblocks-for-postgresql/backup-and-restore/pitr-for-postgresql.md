@@ -90,7 +90,7 @@ Prepare a clean EKS cluster, and install EBS CSI driver plug-in, with at least o
 | :------------------------ | :--------------------------------------- |
 | secret.accessKey          | S3 access key.                                                            |
 | secret.secretKey          | S3 secret key.                                                            |
-| secret.endpoint           | S3 access address. Example: AWS global: <https://s3.><region>.amazonaws.com |
+| secret.endpoint           | S3 access address. Example: AWS global: `<https://s3.><region>.amazonaws.com` |
 | secret.region             | S3 region                                                                 |
 | storageClass.singleBucket | S3 bucket                                                                 |
 | secret.region             | S3 region                                                                 |

@@ -32,11 +32,11 @@ KubeBlocks offers a variety of services to enhance the usability, availability, 
   
   For different database engines, the detailed permission are varied. Check the table below.
 
-    | Role    | MySQL    | PostgreSQL | Redis  |
-    | :------ | :------- | :------    | :----- |
+    | Role      | MySQL    | PostgreSQL | Redis  |
+    | :------   | :------- | :------    | :----- |
     | Superuser | GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, SHUTDOWN, PROCESS, FILE, REFERENCES, INDEX, ALTER, SHOW DATABASES, SUPER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EVENT, TRIGGER, CREATE TABLESPACE, CREATE ROLE, DROP ROLE ON * a user | ALTER USER WITH SUPERUSER | +@ALL allkeys|
     | ReadWrite | GRANT SELECT, INSERT, DELETE ON * TO a user | GRANT pg_write_all_data TO a user | -@ALL +@Write +@READ allkeys |
-    | ReadOnly | GRANT SELECT, SHOW VIEW ON * TO a user | GRANT pg_read_all_data TO a user | -@ALL +@READ allkeys |
+    | ReadOnly  | GRANT SELECT, SHOW VIEW ON * TO a user | GRANT pg_read_all_data TO a user | -@ALL +@READ allkeys |
 
 - Check role level of a user account
 
@@ -61,8 +61,8 @@ KubeBlocks offers a variety of services to enhance the usability, availability, 
   For security reasons, ```list-accounts```command does not showw all accounts. Accounts with high previledge such as operational accounts and superuser accounts that meet certain rules are hidden.
   | Database | Hidden Accounts                |
   | :---     | :---                           |
-  | MySQL    | root<br>kb* <br>Localhost = '' |
-  | postGre  | Postgres <br> kb*              |
+  | MySQL    | root <br />kb* <br />Localhost = '' |
+  | postGre  | Postgres <br />kb*              |
 
   :::
 

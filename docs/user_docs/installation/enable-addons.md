@@ -6,8 +6,6 @@ sidebar_position: 5
 sidebar_label: Enable add-ons 
 ---
 
-
-
 # Enable add-ons
 
 An add-on provides extension capabilities, i.e., manifests or application software, to the KubeBlocks control plane.
@@ -15,8 +13,6 @@ An add-on provides extension capabilities, i.e., manifests or application softwa
 By default, all add-ons supported are automatically installed.
 
 To list supported add-ons, run `kbcli addon list` command.
-
-**Example**
 
 ```bash
 kbcli addon list
@@ -34,8 +30,6 @@ You can perform the following steps to check and enable the add-on.
 
 1. Check the *Installable* part in the output information.
   
-    **Example**
-
     ```bash
     kbcli addon describe snapshot-controller
     ```
@@ -54,8 +48,6 @@ You can perform the following steps to check and enable the add-on.
     As the printed output suggested, *eks* is included. And you can go on with the next step. In the case that *eks* is not included, it is invalid to enable the add-on.
 
 2. To enable the add-on, use `kbcli addon enable`.
-
-    **Example**
 
     ```bash
     kbcli addon enable snapshot-controller

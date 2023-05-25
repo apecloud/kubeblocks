@@ -40,7 +40,6 @@ import (
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	cmdcluster "github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
-	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -478,45 +477,36 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 
 // createCluster construct a cluster create options and run
 func (o *initOptions) createCluster() error {
-	options := &cmdcluster.CreateOptions{
-		CreateOptions: create.CreateOptions{
-			Factory:         util.NewFactory(),
-			IOStreams:       genericclioptions.NewTestIOStreamsDiscard(),
-			Namespace:       defaultNamespace,
-			Name:            kbClusterName,
-			CueTemplateName: cmdcluster.CueTemplateName,
-			GVR:             types.ClusterGVR(),
-		},
-		UpdatableFlags: cmdcluster.UpdatableFlags{
-			TerminationPolicy: "WipeOut",
-			Monitor:           true,
-			PodAntiAffinity:   "Preferred",
-			Tenancy:           "SharedNode",
-		},
-		ClusterDefRef:     o.clusterDef,
-		ClusterVersionRef: o.clusterVersion,
+	c := cmdcluster.NewCreateOptions(util.NewFactory(), genericclioptions.NewTestIOStreamsDiscard())
+	c.ClusterDefRef = o.clusterDef
+	c.ClusterVersionRef = o.clusterVersion
+	c.Namespace = defaultNamespace
+	c.Name = kbClusterName
+	c.UpdatableFlags = cmdcluster.UpdatableFlags{
+		TerminationPolicy: "WipeOut",
+		Monitor:           true,
+		PodAntiAffinity:   "Preferred",
+		Tenancy:           "SharedNode",
 	}
-	options.CreateOptions.Options = options
-	options.CreateOptions.PreCreate = options.PreCreate
 
 	// if we are running on local, create cluster with one replica
 	if o.cloudProvider == cp.Local {
-		options.Values = append(options.Values, "replicas=1")
+		c.Values = append(c.Values, "replicas=1")
 	} else {
 		// if we are running on cloud, create cluster with three replicas
-		options.Values = append(options.Values, "replicas=3")
+		c.Values = append(c.Values, "replicas=3")
 	}
 
-	if err := options.CreateOptions.Complete(); err != nil {
+	if err := c.CreateOptions.Complete(); err != nil {
 		return err
 	}
-	if err := options.Validate(); err != nil {
+	if err := c.Validate(); err != nil {
 		return err
 	}
-	if err := options.Complete(); err != nil {
+	if err := c.Complete(); err != nil {
 		return err
 	}
-	return options.Run()
+	return c.Run()
 }
 
 // checkExistedCluster check playground kubernetes cluster exists or not, playground

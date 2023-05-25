@@ -96,15 +96,6 @@ spec:
                 mountPath: /home/postgres/conf
               - name: scripts
                 mountPath: /kb-scripts
-          - name: init-pgbouncer
-            imagePullPolicy: {{ default .Values.pgbouncer.image.pullPolicy "IfNotPresent" }}
-            command:
-              - /kb-scripts/init_pgbouncer.sh
-            volumeMounts:
-              - name: pgbouncer-config
-                mountPath: /home/pgbouncer/conf
-              - name: scripts
-                mountPath: /kb-scripts
         containers:
           - name: postgresql
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
@@ -221,6 +212,10 @@ spec:
             volumeMounts:
               - name: pgbouncer-config
                 mountPath: /home/pgbouncer/conf
+              - name: scripts
+                mountPath: /kb-scripts
+            command:
+              - /kb-scripts/pgbouncer_setup.sh
             livenessProbe:
               failureThreshold: 3
               initialDelaySeconds: 15
@@ -238,8 +233,6 @@ spec:
               tcpSocket:
                 port: tcp-pgbouncer
             env:
-              - name: POSTGRESQL_HOST
-                value:
               - name: PGBOUNCER_AUTH_TYPE
                 value: md5
               - name: POSTGRESQL_USERNAME

@@ -188,8 +188,8 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 		}...)
 	}
 
-	if len(params.Component.ComponentRefEnvs) > 0 {
-		toInjectEnvs = append(toInjectEnvs, params.Component.ComponentRefEnvs...)
+	if len(component.ComponentRefEnvs) > 0 {
+		toInjectEnvs = append(toInjectEnvs, component.ComponentRefEnvs...)
 	}
 
 	// have injected variables placed at the front of the slice

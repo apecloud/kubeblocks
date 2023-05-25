@@ -22,22 +22,23 @@ package lifecycle
 import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-type FixMetaTransformer struct{}
+type AssureMetaTransformer struct{}
 
-var _ graph.Transformer = &FixMetaTransformer{}
+var _ graph.Transformer = &AssureMetaTransformer{}
 
-func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *AssureMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
 
 	// The object is not being deleted, so if it does not have our finalizer,
 	// then lets add the finalizer and update the object. This is equivalent
 	// registering our finalizer.
-	if !controllerutil.ContainsFinalizer(cluster, dbClusterFinalizerName) {
-		controllerutil.AddFinalizer(cluster, dbClusterFinalizerName)
+	if !controllerutil.ContainsFinalizer(cluster, constant.DBClusterFinalizerName) {
+		controllerutil.AddFinalizer(cluster, constant.DBClusterFinalizerName)
 	}
 
 	// patch the label to prevent the label from being modified by the user.

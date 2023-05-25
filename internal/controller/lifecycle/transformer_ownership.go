@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -40,10 +41,10 @@ func (f *OwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.
 	}
 	vertices := ictrltypes.FindAllNot[*appsv1alpha1.Cluster](dag)
 
-	controllerutil.AddFinalizer(rootVertex.Obj, dbClusterFinalizerName)
+	controllerutil.AddFinalizer(rootVertex.Obj, constant.DBClusterFinalizerName)
 	for _, vertex := range vertices {
 		v, _ := vertex.(*ictrltypes.LifecycleVertex)
-		if err := intctrlutil.SetOwnership(rootVertex.Obj, v.Obj, scheme, dbClusterFinalizerName); err != nil {
+		if err := intctrlutil.SetOwnership(rootVertex.Obj, v.Obj, scheme, constant.DBClusterFinalizerName); err != nil {
 			if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
 				continue
 			}

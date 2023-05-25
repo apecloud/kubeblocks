@@ -256,7 +256,7 @@ func (c *clusterPlanBuilder) reconcileObject(node *ictrltypes.LifecycleVertex) e
 			return err
 		}
 	case ictrltypes.DELETE:
-		if controllerutil.RemoveFinalizer(node.Obj, dbClusterFinalizerName) {
+		if controllerutil.RemoveFinalizer(node.Obj, constant.DBClusterFinalizerName) {
 			err := c.cli.Update(c.transCtx.Context, node.Obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err

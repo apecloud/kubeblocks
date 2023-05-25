@@ -38,9 +38,8 @@ import (
 type ReplicationRole string
 
 const (
-	Primary                ReplicationRole = "primary"
-	Secondary              ReplicationRole = "secondary"
-	DBClusterFinalizerName                 = "cluster.kubeblocks.io/finalizer"
+	Primary   ReplicationRole = "primary"
+	Secondary ReplicationRole = "secondary"
 )
 
 // syncReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.

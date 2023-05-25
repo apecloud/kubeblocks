@@ -51,7 +51,6 @@ func init() {
 
 const (
 	// TODO: deduplicate
-	dbClusterFinalizerName = "cluster.kubeblocks.io/finalizer"
 	clusterDefLabelKey     = "clusterdefinition.kubeblocks.io/name"
 	clusterVersionLabelKey = "clusterversion.kubeblocks.io/name"
 )
@@ -59,12 +58,12 @@ const (
 // default reconcile requeue after duration
 var requeueDuration = time.Millisecond * 100
 
-type gvkName struct {
-	gvk      schema.GroupVersionKind
-	ns, name string
+type gvkNObjKey struct {
+	schema.GroupVersionKind
+	client.ObjectKey
 }
 
-type clusterSnapshot map[gvkName]client.Object
+type clusterOwningObjects map[gvkNObjKey]client.Object
 
 type RequeueError interface {
 	RequeueAfter() time.Duration
@@ -86,12 +85,6 @@ func (r *realRequeueError) RequeueAfter() time.Duration {
 
 func (r *realRequeueError) Reason() string {
 	return r.reason
-}
-
-// IsRequeueError checks if the error is a RequeueError
-func IsRequeueError(err error) bool {
-	_, ok := err.(RequeueError)
-	return ok
 }
 
 type delegateClient struct {

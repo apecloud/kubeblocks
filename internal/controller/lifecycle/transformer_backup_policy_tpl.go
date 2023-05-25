@@ -46,6 +46,10 @@ type BackupPolicyTPLTransformer struct {
 
 var _ graph.Transformer = &BackupPolicyTPLTransformer{}
 
+const (
+	trueVal = "true"
+)
+
 func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	clusterDefName := transCtx.ClusterDef.Name
@@ -370,10 +374,10 @@ func (r *BackupPolicyTPLTransformer) convertCommonPolicy(bp *appsv1alpha1.Common
 }
 
 func (r *BackupPolicyTPLTransformer) defaultPolicyAnnotationValue() string {
-	if r.tplCount > 1 && r.isDefaultTemplate != "true" {
+	if r.tplCount > 1 && r.isDefaultTemplate != trueVal {
 		return "false"
 	}
-	return "true"
+	return trueVal
 }
 
 // DeriveBackupPolicyName generates the backup policy name which is created from backup policy template.

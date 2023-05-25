@@ -492,7 +492,7 @@ func (r *BackupPolicyReconciler) reconfigure(reqCtx intctrlutil.RequestCtx,
 	if commonSchedule != nil {
 		enable = commonSchedule.Enable
 	}
-	if backupPolicy.Annotations[constant.LastAppliedConfigAnnotation] == "" && !enable {
+	if backupPolicy.Annotations[constant.LastAppliedConfigAnnotationKey] == "" && !enable {
 		// disable in the first policy created, no need reconfigure because default configs had been set.
 		return nil
 	}
@@ -510,7 +510,7 @@ func (r *BackupPolicyReconciler) reconfigure(reqCtx intctrlutil.RequestCtx,
 	}
 	updateParameterPairsBytes, _ := json.Marshal(parameters)
 	updateParameterPairs := string(updateParameterPairsBytes)
-	if updateParameterPairs == backupPolicy.Annotations[constant.LastAppliedConfigAnnotation] {
+	if updateParameterPairs == backupPolicy.Annotations[constant.LastAppliedConfigAnnotationKey] {
 		// reconcile the config job if finished
 		return r.reconcileReconfigure(reqCtx, backupPolicy)
 	}
@@ -553,7 +553,7 @@ func (r *BackupPolicyReconciler) reconfigure(reqCtx intctrlutil.RequestCtx,
 	if backupPolicy.Annotations == nil {
 		backupPolicy.Annotations = map[string]string{}
 	}
-	backupPolicy.Annotations[constant.LastAppliedConfigAnnotation] = updateParameterPairs
+	backupPolicy.Annotations[constant.LastAppliedConfigAnnotationKey] = updateParameterPairs
 	if err := r.Client.Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
 		return err
 	}

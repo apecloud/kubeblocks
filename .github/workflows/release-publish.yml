@@ -1,13 +1,15 @@
 name: RELEASE-PUBLISH
 
 on:
+  push:
   release:
     types:
       - published
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  TAG_NAME: ${{ github.ref_name }}
+  # TAG_NAME: ${{ github.ref_name }}
+  TAG_NAME: "latest"
   GO_VERSION: "1.20"
   CLI_NAME: 'kbcli'
   CLI_REPO: 'apecloud/kbcli'
@@ -16,31 +18,31 @@ env:
   RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
 
 jobs:
-  create-release-kbcli:
-    name: Create Release kbcli
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: create release ${{ env.CLI_NAME }}
-        id: create_release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ env.TAG_NAME }}
-          name: KubeBlocks ${{ env.TAG_NAME }}
-          repository: ${{ env.CLI_REPO }}
-          token: ${{ env.GITHUB_TOKEN }}
-          prerelease: true
-      - name: create gitlab release ${{ env.CLI_NAME }}
-        run: |
-          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
-            --type 1 \
-            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
-            --tag-name ${{ env.TAG_NAME }} \
-            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
+  # create-release-kbcli:
+  #   name: Create Release kbcli
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - name: create release ${{ env.CLI_NAME }}
+  #       id: create_release
+  #       uses: softprops/action-gh-release@v1
+  #       with:
+  #         tag_name: ${{ env.TAG_NAME }}
+  #         name: KubeBlocks ${{ env.TAG_NAME }}
+  #         repository: ${{ env.CLI_REPO }}
+  #         token: ${{ env.GITHUB_TOKEN }}
+  #         prerelease: true
+  #     - name: create gitlab release ${{ env.CLI_NAME }}
+  #       run: |
+  #         bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
+  #           --type 1 \
+  #           --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
+  #           --tag-name ${{ env.TAG_NAME }} \
+  #           --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
             
 
   upload-release-assert:
-    needs: create-release-kbcli
+    # needs: create-release-kbcli
     name: Upload ${{ matrix.os }}
     runs-on: ubuntu-latest
     strategy:
@@ -64,9 +66,9 @@ jobs:
       - name: make generate
         run: make generate
 
-      - name: Get release
-        id: get_release
-        uses: bruceadams/get-release@v1.3.2
+      # - name: Get release
+      #   id: get_release
+      #   uses: bruceadams/get-release@v1.3.2
 
       - name: make build
         run: |    
@@ -86,6 +88,7 @@ jobs:
         if: matrix.os == 'windows-amd64'
         run: |
           mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }}.exe 
+          cp ${{ matrix.os }}/${{ env.CLI_NAME }}.exe bin/
           zip -r -o ${{ env.CLI_FILENAME }}.zip  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.zip  # for debug 
           mv ${{ env.CLI_FILENAME }}.zip bin/
@@ -102,17 +105,17 @@ jobs:
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.tar.gz" >> $GITHUB_ENV
           echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
 
-      - name: upload gitlab kbcli asset ${{ matrix.os }}
-        env:
-          CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
-        run: |
-          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
-            --type 2 \
-            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
-            --tag-name ${{ env.TAG_NAME }} \
-            --asset-path ./bin/${{ env.ASSET_NAME }} \
-            --asset-name ${{ env.ASSET_NAME }} \
-            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
+      # - name: upload gitlab kbcli asset ${{ matrix.os }}
+      #   env:
+      #     CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
+      #   run: |
+      #     bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
+      #       --type 2 \
+      #       --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
+      #       --tag-name ${{ env.TAG_NAME }} \
+      #       --asset-path ./bin/${{ env.ASSET_NAME }} \
+      #       --asset-name ${{ env.ASSET_NAME }} \
+      #       --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
 
       - name: get release kbcli upload url
         run: |
@@ -130,29 +133,38 @@ jobs:
           asset_name: ${{ env.ASSET_NAME }}
           asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
 
-      - name: upload release asset ${{ matrix.os }}
-        continue-on-error: true
+      - name: upload kbcli binary release for winget
+        if: matrix.os == 'windows-amd64'
         uses: actions/upload-release-asset@main
         with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./bin/${{ env.ASSET_NAME }}
-          asset_name: ${{ env.ASSET_NAME }}
-          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ./bin/${{ env.CLI_NAME }}.exe
+          asset_name: ${{ env.CLI_NAME }}.exe
+          asset_content_type: application/octet-stream
 
-  send-message:
-    runs-on: ubuntu-latest
-    needs: upload-release-assert
-    if: ${{ always() }}
-    steps:
-      - uses: actions/checkout@v3
-      - name: send message
-        run: |
-          CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0error"
-          if [[ "${{ needs.upload-release-assert.result }}" == "success" ]]; then
-              CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0success"
-          fi
+      # - name: upload release asset ${{ matrix.os }}
+      #   continue-on-error: true
+      #   uses: actions/upload-release-asset@main
+      #   with:
+      #     upload_url: ${{ steps.get_release.outputs.upload_url }}
+      #     asset_path: ./bin/${{ env.ASSET_NAME }}
+      #     asset_name: ${{ env.ASSET_NAME }}
+      #     asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
+
+  # send-message:
+  #   runs-on: ubuntu-latest
+  #   needs: upload-release-assert
+  #   if: ${{ always() }}
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - name: send message
+  #       run: |
+  #         CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0error"
+  #         if [[ "${{ needs.upload-release-assert.result }}" == "success" ]]; then
+  #             CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0success"
+  #         fi
           
-          bash .github/utils/utils.sh --type 12 \
-            --content "${CONTENT}"\
-            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
-            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+  #         bash .github/utils/utils.sh --type 12 \
+  #           --content "${CONTENT}"\
+  #           --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
+  #           --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

@@ -104,6 +104,12 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
+	err = NewStatefulSetReconciler(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = NewDeploymentReconciler(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 
 	go func() {

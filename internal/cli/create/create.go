@@ -67,13 +67,14 @@ type CreateOptions struct {
 	Namespace string
 
 	// Name Resource name of the command line operation
-	Name      string
-	Args      []string
-	Dynamic   dynamic.Interface
-	Client    kubernetes.Interface
-	Format    printer.Format
-	ToPrinter func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error)
-	DryRun    string
+	Name             string
+	Args             []string
+	Dynamic          dynamic.Interface
+	Client           kubernetes.Interface
+	Format           printer.Format
+	ToPrinter        func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error)
+	DryRun           string
+	EditBeforeCreate bool
 
 	// CueTemplateName cue template file name to render the resource
 	CueTemplateName string

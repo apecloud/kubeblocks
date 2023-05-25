@@ -40,11 +40,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	res "k8s.io/cli-runtime/pkg/resource"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	rbacv1ac "k8s.io/client-go/applyconfigurations/rbac/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/cmd/util/editor"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/storage"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -197,6 +199,10 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Example: clusterCreateExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			if o.EditBeforeCreate {
+				cmdutil.CheckErr(o.RunEditOnCreate(f, streams, cmd))
+				return
+			}
 			cmdutil.CheckErr(o.CreateOptions.Complete())
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Complete())
@@ -211,6 +217,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
+	cmd.Flags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
+	cmdutil.AddValidateFlags(cmd)
 	// add updatable flags
 	o.UpdatableFlags.addFlags(cmd)
 
@@ -342,6 +350,25 @@ func (o *CreateOptions) Complete() error {
 
 	// validate default storageClassName
 	return validateStorageClass(o.Dynamic, o.ComponentSpecs)
+}
+
+// RunEditOnCreate performs edit on creation
+func (o *CreateOptions) RunEditOnCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams, cmd *cobra.Command) error {
+	editOptions := editor.NewEditOptions(editor.EditBeforeCreateMode, ioStreams)
+	editOptions.FilenameOptions = res.FilenameOptions{Filenames: []string{o.SetFile}}
+	validationDirective, err := cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return err
+	}
+	editOptions.ValidateOptions = cmdutil.ValidateOptions{
+		ValidationDirective: validationDirective,
+	}
+
+	err = editOptions.Complete(f, []string{}, cmd)
+	if err != nil {
+		return err
+	}
+	return editOptions.Run()
 }
 
 func (o *CreateOptions) CleanUp() error {

@@ -1,0 +1,11 @@
+- name: mysql
+  replicas: 3
+  componentDefRef: mysql
+  volumeClaimTemplates:
+  - name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 20Gi

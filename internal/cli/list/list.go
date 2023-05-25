@@ -145,7 +145,6 @@ func (o *ListOptions) Run() (*resource.Result, error) {
 	if err := o.Complete(); err != nil {
 		return nil, err
 	}
-
 	r := o.Factory.NewBuilder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).

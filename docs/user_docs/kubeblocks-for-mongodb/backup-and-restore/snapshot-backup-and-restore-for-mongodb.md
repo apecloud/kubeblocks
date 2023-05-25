@@ -1,16 +1,16 @@
 ---
 title: Snapshot backup and restore for MongoDB
 description: Guide for backup and restore for MongoDB
-keywords: [mysql, snapshot, backup, restore]
+keywords: [mongodb, snapshot, backup, restore]
 sidebar_position: 2
 sidebar_label: Snapshot backup and restore
 ---
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Snapshot backup and restore for MySQL
+# Snapshot backup and restore for mongodb
 
-This section shows how to use `kbcli` to back up and restore a MySQL cluster.
+This section shows how to use `kbcli` to back up and restore a mongodb cluster.
 
 ***Steps:***
 
@@ -99,7 +99,7 @@ This section shows how to use `kbcli` to back up and restore a MySQL cluster.
 3. Create a snapshot backup.
 
     ```bash
-    kbcli cluster backup mysql-cluster
+    kbcli cluster backup mongodb-cluster
     ```
 
 4. Check the backup.
@@ -114,12 +114,12 @@ This section shows how to use `kbcli` to back up and restore a MySQL cluster.
 
    :::note
 
-   You do not need to specify other parameters for creating a cluster. The restoration automatically reads the parameters of the source cluster, including specification, disk size, etc., and creates a new MySQL cluster with the same specifications.
+   You do not need to specify other parameters for creating a cluster. The restoration automatically reads the parameters of the source cluster, including specification, disk size, etc., and creates a new mongodb cluster with the same specifications.
 
    :::
 
    Execute the following command.
 
    ```bash
-   kbcli cluster restore mysql-new-from-snapshot --backup backup-default-mysql-cluster-20221124113440
+   kbcli cluster restore mongodb-new-from-snapshot --backup backup-default-mongodb-cluster-20221124113440
    ```

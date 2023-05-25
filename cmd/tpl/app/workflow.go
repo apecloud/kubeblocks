@@ -108,7 +108,7 @@ func (w *templateRenderWorkflow) Prepare(ctx intctrlutil.RequestCtx, componentTy
 		return nil, cfgcore.MakeError("component[%s] is not defined in cluster definition", componentType)
 	}
 
-	return component.BuildComponent(ctx, *cluster, *w.clusterDefObj, *clusterCompDef, clusterCompSpec[0]), nil
+	return component.BuildComponent(ctx, *cluster, nil, *w.clusterDefObj, *clusterCompDef, clusterCompSpec[0])
 }
 
 func (w *templateRenderWorkflow) getRenderedConfigSpec() ([]componentedConfigSpec, error) {

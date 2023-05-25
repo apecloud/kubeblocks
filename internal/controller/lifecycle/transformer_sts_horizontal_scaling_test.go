@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -109,6 +110,14 @@ var _ = Describe("sts horizontal scaling test", func() {
 						return nil
 					}).AnyTimes()
 
+			By("mock client.List classes")
+			k8sMock.EXPECT().
+				List(gomock.Any(), &appsv1alpha1.ComponentClassDefinitionList{}, gomock.Any()).
+				DoAndReturn(
+					func(_ context.Context, list *appsv1alpha1.ComponentClassDefinitionList, _ ...client.ListOption) error {
+						list.Items = []appsv1alpha1.ComponentClassDefinition{}
+						return nil
+					}).AnyTimes()
 			transformer := &StsHorizontalScalingTransformer{}
 
 			By("do transform")

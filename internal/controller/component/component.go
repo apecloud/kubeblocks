@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/class"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -37,11 +38,12 @@ import (
 func BuildComponent(
 	reqCtx intctrlutil.RequestCtx,
 	cluster appsv1alpha1.Cluster,
+	classes map[string]map[string]*appsv1alpha1.ComponentClassInstance,
 	clusterDef appsv1alpha1.ClusterDefinition,
 	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
 	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
-) *SynthesizedComponent {
+) (*SynthesizedComponent, error) {
 
 	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
@@ -64,6 +66,11 @@ func BuildComponent(
 		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
 		ComponentDef:          clusterCompSpec.ComponentDefRef,
 		ServiceAccountName:    clusterCompSpec.ServiceAccountName,
+	}
+
+	if err := fillClassResources(component, clusterCompSpec, classes); err != nil {
+		reqCtx.Log.Error(err, "fill class resources failed")
+		return nil, err
 	}
 
 	// resolve component.ConfigTemplates
@@ -102,14 +109,6 @@ func BuildComponent(
 	}
 	component.PodSpec.Tolerations = PatchBuiltInToleration(tolerations)
 
-	if clusterCompSpec.VolumeClaimTemplates != nil {
-		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()
-	}
-
-	if clusterCompSpec.Resources.Requests != nil || clusterCompSpec.Resources.Limits != nil {
-		component.PodSpec.Containers[0].Resources = clusterCompSpec.Resources
-	}
-
 	if clusterCompDefObj.Service != nil {
 		service := corev1.Service{Spec: clusterCompDefObj.Service.ToSVCSpec()}
 		service.Spec.Type = corev1.ServiceTypeClusterIP
@@ -146,12 +145,12 @@ func BuildComponent(
 	err := buildProbeContainers(reqCtx, component)
 	if err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
-		return nil
+		return nil, err
 	}
 
 	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
 
-	return component
+	return component, nil
 }
 
 // appendOrOverrideContainerAttr is used to append targetContainer to compContainers or override the attributes of compContainers with a given targetContainer,
@@ -305,4 +304,60 @@ func GetClusterDefCompByName(clusterDef appsv1alpha1.ClusterDefinition,
 
 func GenerateConnCredential(clusterName string) string {
 	return fmt.Sprintf("%s-conn-credential", clusterName)
+}
+
+func fillClassResources(component *SynthesizedComponent, clusterCompSpec appsv1alpha1.ClusterComponentSpec, compClasses map[string]map[string]*appsv1alpha1.ComponentClassInstance) error {
+	if clusterCompSpec.Resources.Requests != nil || clusterCompSpec.Resources.Limits != nil {
+		component.PodSpec.Containers[0].Resources = clusterCompSpec.Resources
+	}
+
+	if clusterCompSpec.VolumeClaimTemplates != nil {
+		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()
+	}
+
+	if compClasses == nil {
+		return nil
+	}
+
+	cls, err := class.ValidateComponentClass(&clusterCompSpec, compClasses)
+	if err != nil {
+		return err
+	}
+	if cls == nil {
+		// TODO reconsider handling policy for this case
+		return nil
+	}
+
+	requests := corev1.ResourceList{
+		corev1.ResourceCPU:    cls.CPU,
+		corev1.ResourceMemory: cls.Memory,
+	}
+	requests.DeepCopyInto(&component.PodSpec.Containers[0].Resources.Requests)
+	requests.DeepCopyInto(&component.PodSpec.Containers[0].Resources.Limits)
+
+	if len(clusterCompSpec.VolumeClaimTemplates) == 0 {
+		component.VolumeClaimTemplates = (&appsv1alpha1.ClusterComponentSpec{
+			VolumeClaimTemplates: buildVolumeClaimByClass(cls),
+		}).ToVolumeClaimTemplates()
+	}
+	return nil
+}
+
+func buildVolumeClaimByClass(cls *appsv1alpha1.ComponentClassInstance) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
+	var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
+	for _, volume := range cls.Volumes {
+		volumes = append(volumes, appsv1alpha1.ClusterComponentVolumeClaimTemplate{
+			Name: volume.Name,
+			Spec: appsv1alpha1.PersistentVolumeClaimSpec{
+				// TODO define access mode in class
+				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: volume.Size,
+					},
+				},
+			},
+		})
+	}
+	return volumes
 }

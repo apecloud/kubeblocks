@@ -23,7 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/config"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
 	"strconv"
 	"sync"
 	"time"
@@ -88,9 +88,9 @@ var (
 
 // PostgresOperations represents PostgreSQL output binding.
 type PostgresOperations struct {
-	mu     sync.Mutex
-	db     *pgxpool.Pool
-	config *config.Config
+	mu sync.Mutex
+	db *pgxpool.Pool
+	cs *configuration_store.ConfigurationStore
 	BaseOperations
 }
 
@@ -122,7 +122,8 @@ func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	pgOps.RegisterOperation(CheckStatusOperation, pgOps.CheckStatusOps)
 	pgOps.RegisterOperation(ExecOperation, pgOps.ExecOps)
 	pgOps.RegisterOperation(QueryOperation, pgOps.QueryOps)
-	pgOps.RegisterOperation(SwitchOverOperation, pgOps.SwitchOverOps)
+	pgOps.RegisterOperation(SwitchoverOperation, pgOps.SwitchoverOps)
+	pgOps.RegisterOperation(FailoverOperation, pgOps.FailoverOps)
 
 	// following are ops for account management
 	pgOps.RegisterOperation(ListUsersOp, pgOps.listUsersOps)
@@ -307,22 +308,23 @@ func (pgOps *PostgresOperations) QueryOps(ctx context.Context, req *bindings.Inv
 	return result, nil
 }
 
-func (pgOps *PostgresOperations) SwitchOverOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+// SwitchoverOps switchover and failover share this
+func (pgOps *PostgresOperations) SwitchoverOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	result := OpsResult{}
 	primary, ok := req.Metadata[PRIMARY]
-	if !ok || primary == "" {
+	if !ok {
 		result["event"] = OperationFailed
-		result["message"] = "no primary provided"
+		result["message"] = "get primary from request failed"
 		return result, nil
 	}
 	candidate, ok := req.Metadata[CANDIDATE]
-	if !ok || candidate == "" {
+	if !ok {
 		result["event"] = OperationFailed
-		result["message"] = "no candidate provided"
+		result["message"] = "get candidate from request failed"
 		return result, nil
 	}
 
-	pgOps.config = config.NewConfig()
+	pgOps.cs = configuration_store.NewConfig()
 
 	if can, err := pgOps.isSwitchOverPossible(primary, candidate); !can || err != nil {
 		result["event"] = OperationFailed
@@ -353,10 +355,10 @@ func (pgOps *PostgresOperations) SwitchOverOps(ctx context.Context, req *binding
 
 // Checks whether there are nodes that could take it over after demoting the primary
 func (pgOps *PostgresOperations) isSwitchOverPossible(primary string, candidate string) (bool, error) {
-	if pgOps.config.Cluster.Leader != nil && pgOps.config.Cluster.Leader.Member.GetName() != primary {
-		return false, errors.Errorf("leader name does not match ,leader name: %s, primary: %s", pgOps.config.Cluster.Leader.Member.GetName(), primary)
+	if pgOps.cs.Cluster.Leader != nil && pgOps.cs.Cluster.Leader.Member.GetName() != primary {
+		return false, errors.Errorf("leader name does not match ,leader name: %s, primary: %s", pgOps.cs.Cluster.Leader.Member.GetName(), primary)
 	}
-	if !pgOps.config.Cluster.Sync.SynchronizedToLeader(candidate) {
+	if !pgOps.cs.Cluster.Sync.SynchronizedToLeader(candidate) {
 		//return false, errors.Errorf("candidate name does not match with sync_standby")
 	}
 
@@ -366,24 +368,28 @@ func (pgOps *PostgresOperations) isSwitchOverPossible(primary string, candidate 
 
 // 更改配置
 func (pgOps *PostgresOperations) manualSwitchOver(ctx context.Context, primary string, candidate string) error {
-	configMap, err := pgOps.config.GetConfigMap("default", "test")
+	configMap, err := pgOps.cs.GetConfigMap("default", "test")
 	if err != nil {
 		return err
 	}
 	configMap.Data["primary"] = candidate
 
-	_, err = pgOps.config.UpdateConfigMap("default", configMap)
+	_, err = pgOps.cs.UpdateConfigMap("default", configMap)
 	return nil
 }
 
 func (pgOps *PostgresOperations) getSwitchOverResult(candidate string) (bool, error) {
-	pgOps.config.GetCluster()
+	pgOps.cs.GetCluster()
 	time.Sleep(30 * time.Second)
-	if pgOps.config.Cluster.Leader.Member.GetName() != candidate {
+	if pgOps.cs.Cluster.Leader.Member.GetName() != candidate {
 		return false, errors.New("switchover fail")
 	}
 
 	return true, nil
+}
+
+func (pgOps *PostgresOperations) FailoverOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	return pgOps.SwitchoverOps(ctx, req, resp)
 }
 
 func (pgOps *PostgresOperations) query(ctx context.Context, sql string) (result []byte, err error) {

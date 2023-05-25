@@ -198,6 +198,8 @@ data:
     echo "current replicas: $current_component_replicas" >> /data/mysql/.kb_pre_stop.log
     if [ ! $idx -lt $current_component_replicas ] && [ $current_component_replicas -ne 0 ]; then 
         # if idx greater than or equal to current_component_replicas means the cluster's scaling in
+        # put .restore on pvc for next scaling out, if pvc not deleted
+        touch /data/mysql/data/.restore; sync
         # switch leader before leader scaling in itself
         switchover
         # only scaling in need to drop followers

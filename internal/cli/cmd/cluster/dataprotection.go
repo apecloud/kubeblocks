@@ -113,7 +113,10 @@ type ListBackupOptions struct {
 	BackupName string
 }
 
-func (o *CreateBackupOptions) Complete() error {
+func (o *CreateBackupOptions) CompleteBackup() error {
+	if err := o.Complete(); err != nil {
+		return err
+	}
 	// generate backupName
 	if len(o.BackupName) == 0 {
 		o.BackupName = strings.Join([]string{"backup", o.Namespace, o.Name, time.Now().Format("20060102150405")}, "-")
@@ -207,7 +210,7 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
-			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.CompleteBackup())
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},

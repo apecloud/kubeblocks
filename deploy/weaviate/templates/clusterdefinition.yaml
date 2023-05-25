@@ -22,11 +22,12 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: 9187
+          scrapePort: 2112
       logConfigs:
       configSpecs:
         - name: weaviate-config-template
           templateRef: weaviate-config-template
+          constraintRef: weaviate-config-constraints
           volumeName: weaviate-config
           namespace: {{ .Release.Namespace }}
       service:
@@ -44,18 +45,11 @@ spec:
           - name: weaviate
             imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
             command:
-              - /bin/weaviate
-            args:
-              - --host
-              - 0.0.0.0
-              - --port
-              - "8080"
-              - --scheme
-              - http
-              - --config-file
-              - /weaviate-config/conf.yaml
-              - --read-timeout=60s
-              - --write-timeout=60s
+            - /bin/sh
+            - -c
+            - |
+              export $(cat /weaviate-config/envs | xargs)
+              /bin/weaviate --host 0.0.0.0 --port "8080" --scheme http --config-file /weaviate-config/conf.yaml --read-timeout=60s --write-timeout=60s
             securityContext:
               runAsUser: 0
             livenessProbe:
@@ -100,7 +94,7 @@ spec:
               - name: tcp-weaviate
                 containerPort: 8080
               - name: tcp-metrics
-                containerPort: 9091
+                containerPort: 2112
             env:
               - name: CLUSTER_DATA_BIND_PORT
                 value: "7001"
@@ -109,7 +103,9 @@ spec:
               - name: GOGC
                 value: "100"
               - name: PROMETHEUS_MONITORING_ENABLED
-                value: "false"
+                value: "true"
+              - name: PROMETHEUS_MONITORING_PORT
+                value: "2112"
               - name: QUERY_MAXIMUM_RESULTS
                 value: "100000"
               - name: REINDEX_VECTOR_DIMENSIONS_AT_STARTUP
@@ -126,3 +122,4 @@ spec:
                 value: "7000"
               - name: CLUSTER_DATA_BIND_PORT
                 value: "7001"
+

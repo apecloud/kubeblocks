@@ -361,7 +361,7 @@ func findConfigTemplateInfo(dynamic dynamic.Interface, configSpec *appsv1alpha1.
 }
 
 func newConfigTemplateEngine() *template.Template {
-	customizedFuncMap := plan.BuiltInCustomFunctions(nil, nil)
+	customizedFuncMap := plan.BuiltInCustomFunctions(nil, nil, nil)
 	engine := gotemplate.NewTplEngine(nil, customizedFuncMap, logsTemplateName, nil, context.TODO())
 	return engine.GetTplEngine()
 }

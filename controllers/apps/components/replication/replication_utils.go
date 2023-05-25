@@ -25,9 +25,7 @@ import (
 	"reflect"
 
 	"golang.org/x/exp/slices"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -40,43 +38,29 @@ import (
 type ReplicationRole string
 
 const (
-	Primary                ReplicationRole = "primary"
-	Secondary              ReplicationRole = "secondary"
-	DBClusterFinalizerName                 = "cluster.kubeblocks.io/finalizer"
+	Primary   ReplicationRole = "primary"
+	Secondary ReplicationRole = "secondary"
 )
 
 // syncReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
-func syncReplicationSetClusterStatus(
-	cli client.Client,
-	ctx context.Context,
-	cluster *appsv1alpha1.Cluster,
-	podList []corev1.Pod) error {
+func syncReplicationSetClusterStatus(cluster *appsv1alpha1.Cluster,
+	workloadType appsv1alpha1.WorkloadType, compName string, podList []*corev1.Pod) error {
 	if len(podList) == 0 {
 		return nil
 	}
-	// update cluster status
-	componentName, componentDef, err := util.GetComponentInfoByPod(ctx, cli, *cluster, &podList[0])
-	if err != nil {
-		return err
-	}
-	if componentDef == nil {
-		return nil
-	}
-	oldReplicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
-	if oldReplicationSetStatus == nil {
-		if err = util.InitClusterComponentStatusIfNeed(cluster, componentName, *componentDef); err != nil {
+
+	replicationStatus := cluster.Status.Components[compName].ReplicationSetStatus
+	if replicationStatus == nil {
+		if err := util.InitClusterComponentStatusIfNeed(cluster, compName, workloadType); err != nil {
 			return err
 		}
-		oldReplicationSetStatus = cluster.Status.Components[componentName].ReplicationSetStatus
+		replicationStatus = cluster.Status.Components[compName].ReplicationSetStatus
 	}
-	if err := syncReplicationSetStatus(oldReplicationSetStatus, podList); err != nil {
-		return err
-	}
-	return nil
+	return syncReplicationSetStatus(replicationStatus, podList)
 }
 
 // syncReplicationSetStatus syncs the target pod info in cluster.status.components.
-func syncReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []corev1.Pod) error {
+func syncReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []*corev1.Pod) error {
 	for _, pod := range podList {
 		role := pod.Labels[constant.RoleLabelKey]
 		if role == "" {
@@ -112,31 +96,9 @@ func syncReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStat
 	return nil
 }
 
-// RemoveReplicationSetClusterStatus removes replicationSet pod status from cluster.status.component[componentName].ReplicationStatus.
-func RemoveReplicationSetClusterStatus(cli client.Client,
-	ctx context.Context,
-	cluster *appsv1alpha1.Cluster,
-	stsList []*appsv1.StatefulSet,
-	componentReplicas int32) error {
-	if len(stsList) == 0 {
-		return nil
-	}
-	var allPodList []corev1.Pod
-	for _, stsObj := range stsList {
-		podList, err := util.GetPodListByStatefulSet(ctx, cli, stsObj)
-		if err != nil {
-			return err
-		}
-		allPodList = append(allPodList, podList...)
-	}
-	componentName := stsList[0].Labels[constant.KBAppComponentLabelKey]
-	replicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
-	return removeTargetPodsInfoInStatus(replicationSetStatus, allPodList, componentReplicas)
-}
-
 // removeTargetPodsInfoInStatus remove the target pod info from cluster.status.components.
 func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus,
-	targetPodList []corev1.Pod,
+	targetPodList []*corev1.Pod,
 	componentReplicas int32) error {
 	if replicationStatus == nil {
 		return nil
@@ -150,7 +112,7 @@ func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSet
 			return fmt.Errorf("primary pod cannot be removed")
 		}
 		replicationStatus.Primary = appsv1alpha1.ReplicationMemberStatus{
-			Pod: util.ComponentStatusDefaultPodName,
+			Pod: constant.ComponentStatusDefaultPodName,
 		}
 	}
 	newSecondaries := make([]appsv1alpha1.ReplicationMemberStatus, 0)
@@ -212,31 +174,6 @@ func updateObjRoleLabel[T generics.Object, PT generics.PObject[T]](
 		return err
 	}
 	return nil
-}
-
-// GeneratePVCFromVolumeClaimTemplates generates the required pvc object according to the name of statefulSet and volumeClaimTemplates.
-func GeneratePVCFromVolumeClaimTemplates(sts *appsv1.StatefulSet, vctList []corev1.PersistentVolumeClaimTemplate) map[string]*corev1.PersistentVolumeClaim {
-	claims := make(map[string]*corev1.PersistentVolumeClaim, len(vctList))
-	for index := range vctList {
-		claim := &corev1.PersistentVolumeClaim{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "PersistentVolumeClaim",
-				APIVersion: "v1",
-			},
-			Spec: vctList[index].Spec,
-		}
-		// The replica of replicationSet statefulSet defaults to 1, so the ordinal here is 0
-		claim.Name = GetPersistentVolumeClaimName(sts, &vctList[index], 0)
-		claim.Namespace = sts.Namespace
-		claims[vctList[index].Name] = claim
-	}
-	return claims
-}
-
-// GetPersistentVolumeClaimName gets the name of PersistentVolumeClaim for a replicationSet pod with an ordinal.
-// claimTpl must be a PersistentVolumeClaimTemplate from the VolumeClaimsTemplate in the Cluster API.
-func GetPersistentVolumeClaimName(sts *appsv1.StatefulSet, claimTpl *corev1.PersistentVolumeClaimTemplate, ordinal int) string {
-	return fmt.Sprintf("%s-%s-%d", claimTpl.Name, sts.Name, ordinal)
 }
 
 // filterReplicationWorkload filters workload which workloadType is not Replication.

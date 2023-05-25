@@ -98,6 +98,8 @@ ClusterDefinition command.
 ClusterVersion command.
 
 * [kbcli clusterversion list](kbcli_clusterversion_list.md)	 - List ClusterVersions.
+* [kbcli clusterversion set-default](kbcli_clusterversion_set-default.md)	 - Set the clusterversion to the default clusterversion for its clusterdefinition.
+* [kbcli clusterversion unset-default](kbcli_clusterversion_unset-default.md)	 - Unset the clusterversion if it's default.
 
 
 ## [dashboard](kbcli_dashboard.md)
@@ -154,10 +156,9 @@ Print the list of flags inherited by all commands.
 
 ## [playground](kbcli_playground.md)
 
-Bootstrap a playground KubeBlocks in local host or cloud.
+Bootstrap or destroy a playground KubeBlocks in local host or cloud.
 
-* [kbcli playground destroy](kbcli_playground_destroy.md)	 - Destroy the playground kubernetes cluster.
-* [kbcli playground guide](kbcli_playground_guide.md)	 - Display playground cluster user guide.
+* [kbcli playground destroy](kbcli_playground_destroy.md)	 - Destroy the playground KubeBlocks and kubernetes cluster.
 * [kbcli playground init](kbcli_playground_init.md)	 - Bootstrap a kubernetes cluster and install KubeBlocks for playground.
 
 

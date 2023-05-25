@@ -117,6 +117,24 @@ func (t *TablePrinter) Print() {
 	t.Tbl.Render()
 }
 
+// SortBy will sort the table alphabetically by the column you specify, it will be sorted by the first table column in default.
+// The columnNumber index start from 1
+func (t *TablePrinter) SortBy(columnNumber ...int) {
+	if len(columnNumber) == 0 {
+		t.Tbl.SortBy([]table.SortBy{
+			{
+				Number: 1,
+			},
+		})
+		return
+	}
+	res := make([]table.SortBy, len(columnNumber))
+	for i := range columnNumber {
+		res[i].Number = columnNumber[i]
+	}
+	t.Tbl.SortBy(res)
+}
+
 // PrintPairStringToLine print pair string for a line , the format is as follows "<space>*<key>:\t<value>".
 // spaceCount is the space character count which is placed in the offset of field string.
 // the default values of tabCount is 2.

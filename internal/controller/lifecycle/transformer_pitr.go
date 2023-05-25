@@ -30,14 +30,17 @@ type PITRTransformer struct {
 	client.Client
 }
 
+var _ graph.Transformer = &PITRTransformer{}
+
 func (t *PITRTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
 	// handle PITR only when cluster is in status reconciliation stage
-	if !isClusterStatusUpdating(*cluster) {
+	if !cluster.IsStatusUpdating() {
 		return nil
 	}
 	// TODO: (free6om) refactor: remove client.Client
+	// TODO(refactor): PITR will update cluster annotations and sts spec, create and delete pvc & job resources, resolve them later.
 	if shouldRequeue, err := plan.DoPITRIfNeed(transCtx.Context, t.Client, cluster); err != nil {
 		return err
 	} else if shouldRequeue {
@@ -48,5 +51,3 @@ func (t *PITRTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	}
 	return nil
 }
-
-var _ graph.Transformer = &PITRTransformer{}

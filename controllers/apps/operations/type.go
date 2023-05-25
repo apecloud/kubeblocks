@@ -101,8 +101,6 @@ const (
 	ProcessingReasonHorizontalScaling = "HorizontalScaling"
 	// ProcessingReasonVerticalScaling is the reason of the "OpsRequestProcessed" condition for the vertical scaling opsRequest processing in cluster.
 	ProcessingReasonVerticalScaling = "VerticalScaling"
-	// ProcessingReasonVolumeExpanding is the reason of the "OpsRequestProcessed" condition for the volume expansion opsRequest processing in cluster.
-	ProcessingReasonVolumeExpanding = "VolumeExpanding"
 	// ProcessingReasonStarting is the reason of the "OpsRequestProcessed" condition for the start opsRequest processing in cluster.
 	ProcessingReasonStarting = "Starting"
 	// ProcessingReasonStopping is the reason of the "OpsRequestProcessed" condition for the stop opsRequest processing in cluster.

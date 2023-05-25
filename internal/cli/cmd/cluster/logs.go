@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -33,10 +36,12 @@ import (
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	computil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -45,12 +50,15 @@ var (
 		kbcli cluster logs mycluster
 
 		# Display only the most recent 20 lines from cluster mycluster with default primary instance (stdout)
-		kbcli cluster logs --tail=20 mycluster
+		kbcli cluster logs mycluster --tail=20
 
-		# Return snapshot logs from cluster mycluster with specify instance my-instance-0 (stdout)
+		# Display stdout info of specific instance my-instance-0 (cluster name comes from annotation app.kubernetes.io/instance)
+		kbcli cluster logs --instance my-instance-0
+
+		# Return snapshot logs from cluster mycluster with specific instance my-instance-0 (stdout)
 		kbcli cluster logs mycluster --instance my-instance-0
 
-		# Return snapshot logs from cluster mycluster with specify instance my-instance-0 and specify container
+		# Return snapshot logs from cluster mycluster with specific instance my-instance-0 and specific container
         # my-container (stdout)
 		kbcli cluster logs mycluster --instance my-instance-0 -c my-container
 
@@ -60,10 +68,10 @@ var (
 		# Begin streaming the slow logs from cluster mycluster with default primary instance
 		kbcli cluster logs -f mycluster --file-type=slow
 
-		# Return the specify file logs from cluster mycluster with specify instance my-instance-0
+		# Return the specific file logs from cluster mycluster with specific instance my-instance-0
 		kbcli cluster logs mycluster --instance my-instance-0 --file-path=/var/log/yum.log
 
-		# Return the specify file logs from cluster mycluster with specify instance my-instance-0 and specify
+		# Return the specific file logs from cluster mycluster with specific instance my-instance-0 and specific
         # container my-container
 		kbcli cluster logs mycluster --instance my-instance-0 -c my-container --file-path=/var/log/yum.log`)
 )
@@ -87,7 +95,7 @@ func NewLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	}
 	cmd := &cobra.Command{
 		Use:               "logs NAME",
-		Short:             "Access cluster log file",
+		Short:             "Access cluster log file.",
 		Example:           logsExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -131,15 +139,16 @@ func (o *LogsOptions) run() error {
 
 // complete customs complete function for logs
 func (o *LogsOptions) complete(args []string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("you must specify the cluster name to retrieve logs")
+	if len(args) == 0 && len(o.PodName) == 0 {
+		return fmt.Errorf("cluster name or instance name should be specified")
 	}
-	o.clusterName = args[0]
-
+	if len(args) > 0 {
+		o.clusterName = args[0]
+	}
 	// no set podName and find the default pod of cluster
 	if len(o.PodName) == 0 {
 		infos := cluster.GetSimpleInstanceInfos(o.Dynamic, o.clusterName, o.Namespace)
-		if infos == nil {
+		if len(infos) == 0 || infos[0].Name == computil.ComponentStatusDefaultPodName {
 			return fmt.Errorf("failed to find the default instance, please check cluster status")
 		}
 		// first element is the default instance to connect
@@ -148,6 +157,14 @@ func (o *LogsOptions) complete(args []string) error {
 	pod, err := o.Client.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{})
 	if err != nil {
 		return err
+	}
+	// cluster name is not specified, get from pod label
+	if o.clusterName == "" {
+		if name, ok := pod.Annotations[constant.AppInstanceLabelKey]; !ok {
+			return fmt.Errorf("failed to find the cluster to which the instance belongs")
+		} else {
+			o.clusterName = name
+		}
 	}
 	var command string
 	switch {
@@ -222,23 +239,23 @@ func (o *LogsOptions) validate() error {
 // createFileTypeCommand creates command against log file type
 func (o *LogsOptions) createFileTypeCommand(pod *corev1.Pod, obj *cluster.ClusterObjects) (string, error) {
 	var command string
-	componentName, ok := pod.Labels[types.ComponentLabelKey]
+	componentName, ok := pod.Labels[constant.KBAppComponentLabelKey]
 	if !ok {
 		return command, fmt.Errorf("get component name from pod labels fail")
 	}
-	var comTypeName string
-	for _, comCluster := range obj.Cluster.Spec.Components {
+	var compDefName string
+	for _, comCluster := range obj.Cluster.Spec.ComponentSpecs {
 		if strings.EqualFold(comCluster.Name, componentName) {
-			comTypeName = comCluster.Type
+			compDefName = comCluster.ComponentDefRef
 			break
 		}
 	}
-	if len(comTypeName) == 0 {
-		return command, fmt.Errorf("get pod component type in cluster.yaml fail")
+	if len(compDefName) == 0 {
+		return command, fmt.Errorf("get pod component definition name in cluster.yaml fail")
 	}
 	var filePathPattern string
-	for _, com := range obj.ClusterDef.Spec.Components {
-		if strings.EqualFold(com.TypeName, comTypeName) {
+	for _, com := range obj.ClusterDef.Spec.ComponentDefs {
+		if strings.EqualFold(com.Name, compDefName) {
 			for _, logConfig := range com.LogConfigs {
 				if strings.EqualFold(logConfig.Name, o.fileType) {
 					filePathPattern = logConfig.FilePathPattern

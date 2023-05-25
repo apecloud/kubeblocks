@@ -1,0 +1,35 @@
+# Default values for wesqlcluster.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+terminationPolicy: Delete
+
+clusterVersionOverride: ""
+nameOverride: ""
+fullnameOverride: ""
+
+monitor:
+  enabled: false
+
+resources: { }
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+
+  # limits:
+  #   cpu: 500m
+  #   memory: 2Gi
+  # requests:
+  #   cpu: 100m
+  #   memory: 1Gi 
+persistence:
+  enabled: true
+  data:
+    storageClassName:
+    size: 10Gi
+
+
+serviceAccount:
+  name:

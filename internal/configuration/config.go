@@ -1,63 +1,86 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configuration
 
 import (
-	"bytes"
-	"reflect"
-
-	"os"
+	"encoding/json"
 	"path"
-	"path/filepath"
+	"reflect"
 	"strings"
 
-	"github.com/spf13/viper"
+	"github.com/StudioSol/set"
+	"github.com/spf13/cast"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/unstructured"
 )
 
 type ConfigLoaderProvider func(option CfgOption) (*cfgWrapper, error)
 
-const (
-	cfgKeyDelimiter = "."
-	emptyJSON       = "{}"
-)
+// ReconfiguringProgress defines the progress percentage.
+// range: 0~100
+// Unconfirmed(-1) describes an uncertain progress, e.g: fsm is failed.
+// +enum
+type ReconfiguringProgress int32
+
+type PolicyExecStatus struct {
+	PolicyName string
+	ExecStatus string
+	Status     string
+
+	SucceedCount  int32
+	ExpectedCount int32
+}
 
 type ConfigEventContext struct {
 	Client  client.Client
 	ReqCtx  intctrlutil.RequestCtx
-	Cluster *dbaasv1alpha1.Cluster
+	Cluster *appsv1alpha1.Cluster
 
-	ClusterComponent *dbaasv1alpha1.ClusterComponent
-	Component        *dbaasv1alpha1.ClusterDefinitionComponent
+	ClusterComponent *appsv1alpha1.ClusterComponentSpec
+	Component        *appsv1alpha1.ClusterComponentDefinition
 	ComponentUnits   []appv1.StatefulSet
 
-	Meta *ConfigDiffInformation
-	Cfg  *corev1.ConfigMap
-	Tpl  *dbaasv1alpha1.ConfigConstraintSpec
+	ConfigSpecName   string
+	ConfigPatch      *ConfigPatchInfo
+	ConfigMap        *corev1.ConfigMap
+	ConfigConstraint *appsv1alpha1.ConfigConstraintSpec
+
+	PolicyStatus PolicyExecStatus
 }
 
 type ConfigEventHandler interface {
-	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase dbaasv1alpha1.Phase, err error) error
+	Handle(eventContext ConfigEventContext, lastOpsRequest string, phase appsv1alpha1.OpsPhase, err error) error
 }
+
+const (
+	Unconfirmed int32 = -1
+	NotStarted  int32 = 0
+)
+
+const emptyJSON = "{}"
 
 var (
 	loaderProvider        = map[ConfigType]ConfigLoaderProvider{}
@@ -74,17 +97,16 @@ func init() {
 		meta := cfgWrapper{
 			name:      "raw",
 			fileCount: 0,
-			v:         make([]*viper.Viper, 1),
-			indexer:   make(map[string]*viper.Viper, 1),
+			v:         make([]unstructured.ConfigObject, 1),
+			indexer:   make(map[string]unstructured.ConfigObject, 1),
 		}
 
-		v := viper.NewWithOptions(viper.KeyDelimiter(cfgKeyDelimiter))
-
-		v.SetConfigType(string(option.CfgType))
-		if err := v.ReadConfig(bytes.NewReader(option.RawData)); err != nil {
+		v, err := unstructured.LoadConfig(meta.name, string(option.RawData), option.CfgType)
+		if err != nil {
 			option.Log.Error(err, "failed to parse config!", "context", option.RawData)
 			return nil, err
 		}
+
 		meta.v[0] = v
 		meta.indexer[meta.name] = v
 		return &meta, nil
@@ -92,32 +114,35 @@ func init() {
 
 	// For CM/TPL
 	loaderProvider[CfgCmType] = func(option CfgOption) (*cfgWrapper, error) {
-		if option.K8sKey == nil {
+		if option.ConfigResource == nil {
 			return nil, MakeError("invalid k8s resource[%v]", option)
 		}
 
-		ctx := option.K8sKey
-		if ctx.Configurations == nil && ctx.ResourceFn != nil {
-			configs, err := ctx.ResourceFn(ctx.CfgKey)
+		ctx := option.ConfigResource
+		if ctx.ConfigData == nil && ctx.ResourceReader != nil {
+			configs, err := ctx.ResourceReader(ctx.CfgKey)
 			if err != nil {
 				return nil, WrapError(err, "failed to get cm, cm key: [%v]", ctx.CfgKey)
 			}
-			ctx.Configurations = configs
+			ctx.ConfigData = configs
 		}
 
-		fileCount := len(ctx.Configurations)
+		fileCount := len(ctx.ConfigData)
 		meta := cfgWrapper{
 			name:      path.Base(ctx.CfgKey.Name),
 			fileCount: fileCount,
-			v:         make([]*viper.Viper, fileCount),
-			indexer:   make(map[string]*viper.Viper, 1),
+			v:         make([]unstructured.ConfigObject, fileCount),
+			indexer:   make(map[string]unstructured.ConfigObject, 1),
 		}
 
+		var err error
 		var index = 0
-		for fileName, content := range ctx.Configurations {
-			v := viper.NewWithOptions(viper.KeyDelimiter(cfgKeyDelimiter))
-			v.SetConfigType(string(option.CfgType))
-			if err := v.ReadConfig(bytes.NewReader([]byte(content))); err != nil {
+		var v unstructured.ConfigObject
+		for fileName, content := range ctx.ConfigData {
+			if ctx.CMKeys != nil && !ctx.CMKeys.InArray(fileName) {
+				continue
+			}
+			if v, err = unstructured.LoadConfig(fileName, content, option.CfgType); err != nil {
 				return nil, WrapError(err, "failed to load config: filename[%s]", fileName)
 			}
 			meta.indexer[fileName] = v
@@ -138,8 +163,9 @@ type cfgWrapper struct {
 
 	// fileCount
 	fileCount int
-	indexer   map[string]*viper.Viper
-	v         []*viper.Viper
+	// indexer   map[string]*viper.Viper
+	indexer map[string]unstructured.ConfigObject
+	v       []unstructured.ConfigObject
 }
 
 type dataConfig struct {
@@ -171,46 +197,36 @@ func NewConfigLoader(option CfgOption) (*dataConfig, error) {
 type Option func(ctx *CfgOpOption)
 
 func (c *cfgWrapper) MergeFrom(params map[string]interface{}, option CfgOpOption) error {
-	cfg := c.getCfgViper(option)
+	cfg := c.getConfigObject(option)
 	if cfg == nil {
-		return MakeError("not any configuration. option:[%v]", option)
+		return MakeError("not found the config file:[%s]", option.FileName)
 	}
 
 	// TODO support param delete
 	for paramKey, paramValue := range params {
 		vi := reflect.ValueOf(paramValue)
 		if vi.Kind() != reflect.Ptr || !vi.IsNil() {
-			cfg.Set(c.generateKey(paramKey, option, cfg), paramValue)
+			if err := cfg.Update(c.generateKey(paramKey, option), paramValue); err != nil {
+				return err
+			}
 		}
 	}
-
 	return nil
 }
 
 func (c *cfgWrapper) ToCfgContent() (map[string]string, error) {
 	fileContents := make(map[string]string, c.fileCount)
-
-	// Viper not support writer to buffer
-	tmpDir, err := os.MkdirTemp(os.TempDir(), "configuration-")
-	if err != nil {
-		return nil, WrapError(err, "failed to create temp directory!")
-	}
-	defer os.RemoveAll(tmpDir)
-
 	for fileName, v := range c.indexer {
-		tmpFile := filepath.Join(tmpDir, strings.ReplaceAll(fileName, ".", "_"))
-		content, err := DumpCfgContent(v, tmpFile)
+		content, err := v.Marshal()
 		if err != nil {
-			return nil, WrapError(err,
-				"failed to generate config file[%s], meta: [%v]", fileName, v)
+			return nil, err
 		}
 		fileContents[fileName] = content
 	}
-
 	return fileContents, nil
 }
 
-type ConfigDiffInformation struct {
+type ConfigPatchInfo struct {
 	IsModify bool
 	// new config
 	AddConfig map[string]interface{}
@@ -226,51 +242,6 @@ type ConfigDiffInformation struct {
 	LastVersion *cfgWrapper
 }
 
-func (c *cfgWrapper) Diff(target *cfgWrapper) (*ConfigDiffInformation, error) {
-	fromOMap := ToSet(c.indexer)
-	fromNMap := ToSet(target.indexer)
-
-	addSet := Difference(fromNMap, fromOMap)
-	deleteSet := Difference(fromOMap, fromNMap)
-	updateSet := Difference(fromOMap, deleteSet)
-
-	reconfigureInfo := &ConfigDiffInformation{
-		IsModify:     false,
-		AddConfig:    make(map[string]interface{}, addSet.Length()),
-		DeleteConfig: make(map[string]interface{}, deleteSet.Length()),
-		UpdateConfig: make(map[string][]byte, updateSet.Length()),
-
-		Target:      target,
-		LastVersion: c,
-	}
-
-	for elem := range addSet.Iter() {
-		reconfigureInfo.AddConfig[elem] = target.indexer[elem].AllSettings()
-		reconfigureInfo.IsModify = true
-	}
-
-	for elem := range deleteSet.Iter() {
-		reconfigureInfo.DeleteConfig[elem] = c.indexer[elem].AllSettings()
-		reconfigureInfo.IsModify = true
-	}
-
-	for elem := range updateSet.Iter() {
-		old := c.indexer[elem]
-		new := target.indexer[elem]
-
-		patch, err := jsonPatch(old.AllSettings(), new.AllSettings())
-		if err != nil {
-			return nil, err
-		}
-		if len(patch) > len(emptyJSON) {
-			reconfigureInfo.UpdateConfig[elem] = patch
-			reconfigureInfo.IsModify = true
-		}
-	}
-
-	return reconfigureInfo, nil
-}
-
 func NewCfgOptions(filename string, options ...Option) CfgOpOption {
 	context := CfgOpOption{
 		FileName: filename,
@@ -283,41 +254,54 @@ func NewCfgOptions(filename string, options ...Option) CfgOpOption {
 	return context
 }
 
+func WithFormatterConfig(formatConfig *appsv1alpha1.FormatterConfig) Option {
+	return func(ctx *CfgOpOption) {
+		if formatConfig.Format == appsv1alpha1.Ini && formatConfig.IniConfig != nil {
+			ctx.IniContext = &IniContext{
+				SectionName: formatConfig.IniConfig.SectionName,
+			}
+		}
+	}
+}
+
+func NestedPrefixField(formatConfig *appsv1alpha1.FormatterConfig) string {
+	if formatConfig != nil && formatConfig.Format == appsv1alpha1.Ini && formatConfig.IniConfig != nil {
+		return formatConfig.IniConfig.SectionName
+	}
+	return ""
+}
+
 func (c *cfgWrapper) Query(jsonpath string, option CfgOpOption) ([]byte, error) {
 	if option.AllSearch && c.fileCount > 1 {
 		return c.queryAllCfg(jsonpath, option)
 	}
 
-	cfg := c.getCfgViper(option)
+	cfg := c.getConfigObject(option)
 	if cfg == nil {
-		return nil, MakeError("not any configuration. option:[%v]", option)
+		return nil, MakeError("not found the config file:[%s]", option.FileName)
 	}
 
 	iniContext := option.IniContext
 	if iniContext != nil && len(iniContext.SectionName) > 0 {
-		if !cfg.InConfig(iniContext.SectionName) {
-			return nil, MakeError("configuration not exist section [%s]", iniContext.SectionName)
+		cfg = cfg.SubConfig(iniContext.SectionName)
+		if cfg == nil {
+			return nil, MakeError("the section[%s] does not exist in the config file", iniContext.SectionName)
 		}
-		cfg = cfg.Sub(iniContext.SectionName)
 	}
 
-	// var jsonString interface{}
-	// if err := cfg.Unmarshal(&jsonString); err != nil {
-	//	 return nil, WrapError(err, "failed to unmarshalled configure! [%v]", cfg)
-	// }
-	return retrievalWithJSONPath(cfg.AllSettings(), jsonpath)
+	return util.RetrievalWithJSONPath(cfg.GetAllParameters(), jsonpath)
 }
 
 func (c *cfgWrapper) queryAllCfg(jsonpath string, option CfgOpOption) ([]byte, error) {
 	tops := make(map[string]interface{}, c.fileCount)
 
 	for filename, v := range c.indexer {
-		tops[filename] = v.AllSettings()
+		tops[filename] = v.GetAllParameters()
 	}
-	return retrievalWithJSONPath(tops, jsonpath)
+	return util.RetrievalWithJSONPath(tops, jsonpath)
 }
 
-func (c cfgWrapper) getCfgViper(option CfgOpOption) *viper.Viper {
+func (c cfgWrapper) getConfigObject(option CfgOpOption) unstructured.ConfigObject {
 	if len(c.v) == 0 {
 		return nil
 	}
@@ -329,49 +313,121 @@ func (c cfgWrapper) getCfgViper(option CfgOpOption) *viper.Viper {
 	}
 }
 
-func (c *cfgWrapper) generateKey(paramKey string, option CfgOpOption, v *viper.Viper) string {
+func (c *cfgWrapper) generateKey(paramKey string, option CfgOpOption) string {
 	if option.IniContext != nil && len(option.IniContext.SectionName) > 0 {
-		return strings.Join([]string{option.IniContext.SectionName, paramKey}, cfgKeyDelimiter)
+		return strings.Join([]string{option.IniContext.SectionName, paramKey}, unstructured.DelimiterDot)
 	}
 
 	return paramKey
 }
 
-func DumpCfgContent(v *viper.Viper, tmpPath string) (string, error) {
-	dirPath := filepath.Dir(tmpPath)
-	v.AddConfigPath(dirPath)
-	if err := v.WriteConfigAs(tmpPath); err != nil {
-		return "", err
+func FromCMKeysSelector(keys []string) *set.LinkedHashSetString {
+	var cmKeySet *set.LinkedHashSetString
+	if len(keys) > 0 {
+		cmKeySet = set.NewLinkedHashSetString(keys...)
 	}
-
-	content, err := os.ReadFile(tmpPath)
-	if err != nil {
-		return "", err
-	}
-
-	return string(content), nil
+	return cmKeySet
 }
 
-func CreateMergePatch(oldcfg, target interface{}, option CfgOption) (*ConfigDiffInformation, error) {
-
-	ok, err := compareWithConfig(oldcfg, target, option)
-	if err != nil {
-		return nil, err
-	} else if ok {
-		return &ConfigDiffInformation{
-			IsModify: false,
-		}, err
+func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, formatConfig *appsv1alpha1.FormatterConfig, sets *set.LinkedHashSetString) []VisualizedParam {
+	if !configPatch.IsModify {
+		return nil
 	}
 
-	old, err := NewConfigLoader(withOption(option, oldcfg))
-	if err != nil {
-		return nil, WrapError(err, "failed to create config: [%s]", oldcfg)
+	var trimPrefix = NestedPrefixField(formatConfig)
+
+	r := make([]VisualizedParam, 0)
+	r = append(r, generateUpdateParam(configPatch.UpdateConfig, trimPrefix, sets)...)
+	r = append(r, generateUpdateKeyParam(configPatch.AddConfig, trimPrefix, AddedType, sets)...)
+	r = append(r, generateUpdateKeyParam(configPatch.DeleteConfig, trimPrefix, DeletedType, sets)...)
+	return r
+}
+
+func generateUpdateParam(updatedParams map[string][]byte, trimPrefix string, sets *set.LinkedHashSetString) []VisualizedParam {
+	r := make([]VisualizedParam, 0, len(updatedParams))
+
+	for key, b := range updatedParams {
+		// TODO support keys
+		if sets != nil && sets.Length() > 0 && !sets.InArray(key) {
+			continue
+		}
+		var v any
+		if err := json.Unmarshal(b, &v); err != nil {
+			return nil
+		}
+		if params := checkAndFlattenMap(v, trimPrefix); params != nil {
+			r = append(r, VisualizedParam{
+				Key:        key,
+				Parameters: params,
+				UpdateType: UpdatedType,
+			})
+		}
+	}
+	return r
+}
+
+func checkAndFlattenMap(v any, trim string) []ParameterPair {
+	m := cast.ToStringMap(v)
+	if m != nil && trim != "" {
+		m = cast.ToStringMap(m[trim])
+	}
+	if m != nil {
+		return flattenMap(m, "")
+	}
+	return nil
+}
+
+func flattenMap(m map[string]interface{}, prefix string) []ParameterPair {
+	if prefix != "" {
+		prefix += unstructured.DelimiterDot
 	}
 
-	new, err := NewConfigLoader(withOption(option, target))
-	if err != nil {
-		return nil, WrapError(err, "failed to create config: [%s]", oldcfg)
+	r := make([]ParameterPair, 0)
+	for k, val := range m {
+		fullKey := prefix + k
+		switch m2 := val.(type) {
+		case map[string]interface{}:
+			r = append(r, flattenMap(m2, fullKey)...)
+		default:
+			r = append(r, ParameterPair{
+				Key:   fullKey,
+				Value: cast.ToString(val),
+			})
+		}
+	}
+	return r
+}
+
+func generateUpdateKeyParam(files map[string]interface{}, trimPrefix string, updatedType ParameterUpdateType, sets *set.LinkedHashSetString) []VisualizedParam {
+	r := make([]VisualizedParam, 0, len(files))
+
+	for key, params := range files {
+		if sets != nil && sets.Length() > 0 && !sets.InArray(key) {
+			continue
+		}
+		if params := checkAndFlattenMap(params, trimPrefix); params != nil {
+			r = append(r, VisualizedParam{
+				Key:        key,
+				Parameters: params,
+				UpdateType: updatedType,
+			})
+		}
+	}
+	return r
+}
+
+// isQuotesString check whether a string is quoted.
+func isQuotesString(str string) bool {
+	const (
+		singleQuotes = '\''
+		doubleQuotes = '"'
+	)
+
+	if len(str) < 2 {
+		return false
 	}
 
-	return old.Diff(new.cfgWrapper)
+	firstChar := str[0]
+	lastChar := str[len(str)-1]
+	return (firstChar == singleQuotes && lastChar == singleQuotes) || (firstChar == doubleQuotes && lastChar == doubleQuotes)
 }

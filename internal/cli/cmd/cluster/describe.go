@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -20,9 +23,11 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
@@ -30,7 +35,8 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -76,7 +82,7 @@ func NewDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	o := newOptions(f, streams)
 	cmd := &cobra.Command{
 		Use:               "describe NAME",
-		Short:             "Show details of a specific cluster",
+		Short:             "Show details of a specific cluster.",
 		Example:           describeExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -125,10 +131,11 @@ func (o *describeOptions) describeCluster(name string) error {
 		Name:      name,
 		Namespace: o.namespace,
 		GetOptions: cluster.GetOptions{
-			WithClusterDef: true,
-			WithService:    true,
-			WithPod:        true,
-			WithEvent:      true,
+			WithClusterDef:     true,
+			WithService:        true,
+			WithPod:            true,
+			WithPVC:            true,
+			WithDataProtection: true,
 		},
 	}
 
@@ -140,9 +147,8 @@ func (o *describeOptions) describeCluster(name string) error {
 	// cluster summary
 	showCluster(o.Cluster, o.Out)
 
-	// consider first component as primary component, use it's endpoints as cluster endpoints
-	primaryComponent := cluster.FindClusterComp(o.Cluster, o.ClusterDef.Spec.Components[0].TypeName)
-	showNetwork(o.Services, primaryComponent, o.Out)
+	// show endpoints
+	showEndpoints(o.Cluster, o.Services, o.Out)
 
 	// topology
 	showTopology(o.ClusterObjects.GetInstanceInfo(), o.Out)
@@ -154,14 +160,20 @@ func (o *describeOptions) describeCluster(name string) error {
 	// images
 	showImages(comps, o.Out)
 
+	// data protection info
+	showDataProtection(o.BackupPolicies, o.Backups, o.Out)
+
 	// events
-	showEvents(o.Events, o.Cluster.Name, o.Cluster.Namespace, o.Out)
+	showEvents(o.Cluster.Name, o.Cluster.Namespace, o.Out)
 	fmt.Fprintln(o.Out)
 
 	return nil
 }
 
-func showCluster(c *dbaasv1alpha1.Cluster, out io.Writer) {
+func showCluster(c *appsv1alpha1.Cluster, out io.Writer) {
+	if c == nil {
+		return
+	}
 	title := fmt.Sprintf("Name: %s\t Created Time: %s", c.Name, util.TimeFormat(&c.CreationTimestamp))
 	tbl := newTbl(out, title, "NAMESPACE", "CLUSTER-DEFINITION", "VERSION", "STATUS", "TERMINATION-POLICY")
 	tbl.AddRow(c.Namespace, c.Spec.ClusterDefRef, c.Spec.ClusterVersionRef, string(c.Status.Phase), string(c.Spec.TerminationPolicy))
@@ -192,32 +204,86 @@ func showImages(comps []*cluster.ComponentInfo, out io.Writer) {
 	tbl.Print()
 }
 
-func showEvents(events *corev1.EventList, name string, namespace string, out io.Writer) {
-	objs := util.SortEventsByLastTimestamp(events, corev1.EventTypeWarning)
-
-	// print last 5 events
-	title := fmt.Sprintf("\nEvents(last 5 warnings, see more:kbcli cluster list-events -n %s %s):", namespace, name)
-	tbl := newTbl(out, title, "TIME", "TYPE", "REASON", "OBJECT", "MESSAGE")
-	cnt := 0
-	for _, o := range *objs {
-		e := o.(*corev1.Event)
-		tbl.AddRow(util.GetEventTimeStr(e), e.Type, e.Reason, util.GetEventObject(e), e.Message)
-		cnt++
-		if cnt == 5 {
-			break
-		}
-	}
-	tbl.Print()
+func showEvents(name string, namespace string, out io.Writer) {
+	// hint user how to get events
+	fmt.Fprintf(out, "\nShow cluster events: kbcli cluster list-events -n %s %s", namespace, name)
 }
 
-func showNetwork(svcList *corev1.ServiceList, c *dbaasv1alpha1.ClusterComponent, out io.Writer) {
-	internalEndpoints, externalEndpoints := cluster.GetComponentEndpoints(svcList, c)
-	if len(internalEndpoints) == 0 && len(externalEndpoints) == 0 {
+func showEndpoints(c *appsv1alpha1.Cluster, svcList *corev1.ServiceList, out io.Writer) {
+	if c == nil {
 		return
 	}
 
 	tbl := newTbl(out, "\nEndpoints:", "COMPONENT", "MODE", "INTERNAL", "EXTERNAL")
-	tbl.AddRow(c.Name, "ReadWrite", util.CheckEmpty(strings.Join(internalEndpoints, "\n")),
-		util.CheckEmpty(strings.Join(externalEndpoints, "\n")))
+	for _, comp := range c.Spec.ComponentSpecs {
+		internalEndpoints, externalEndpoints := cluster.GetComponentEndpoints(svcList, &comp)
+		if len(internalEndpoints) == 0 && len(externalEndpoints) == 0 {
+			continue
+		}
+		tbl.AddRow(comp.Name, "ReadWrite", util.CheckEmpty(strings.Join(internalEndpoints, "\n")),
+			util.CheckEmpty(strings.Join(externalEndpoints, "\n")))
+	}
 	tbl.Print()
+}
+
+func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1alpha1.Backup, out io.Writer) {
+	if len(backupPolicies) == 0 {
+		return
+	}
+	tbl := newTbl(out, "\nData Protection:", "AUTO-BACKUP", "BACKUP-SCHEDULE", "TYPE", "BACKUP-TTL", "LAST-SCHEDULE", "RECOVERABLE-TIME")
+	for _, policy := range backupPolicies {
+		if policy.Status.Phase != dpv1alpha1.PolicyAvailable {
+			continue
+		}
+		ttlString := printer.NoneString
+		backupSchedule := printer.NoneString
+		backupType := printer.NoneString
+		scheduleEnable := "Disabled"
+		if policy.Spec.Schedule.Snapshot != nil {
+			if policy.Spec.Schedule.Snapshot.Enable {
+				scheduleEnable = "Enabled"
+				backupSchedule = policy.Spec.Schedule.Snapshot.CronExpression
+				backupType = string(dpv1alpha1.BackupTypeSnapshot)
+			}
+		}
+		if policy.Spec.Schedule.Datafile != nil {
+			if policy.Spec.Schedule.Datafile.Enable {
+				scheduleEnable = "Enabled"
+				backupSchedule = policy.Spec.Schedule.Datafile.CronExpression
+				backupType = string(dpv1alpha1.BackupTypeDataFile)
+			}
+		}
+		if policy.Spec.Retention != nil && policy.Spec.Retention.TTL != nil {
+			ttlString = *policy.Spec.Retention.TTL
+		}
+		lastScheduleTime := printer.NoneString
+		if policy.Status.LastScheduleTime != nil {
+			lastScheduleTime = util.TimeFormat(policy.Status.LastScheduleTime)
+		}
+
+		tbl.AddRow(scheduleEnable, backupSchedule, backupType, ttlString, lastScheduleTime, getBackupRecoverableTime(backups))
+	}
+	tbl.Print()
+}
+
+// getBackupRecoverableTime return the recoverable time range string
+func getBackupRecoverableTime(backups []dpv1alpha1.Backup) string {
+	recoverabelTime := dpv1alpha1.GetRecoverableTimeRange(backups)
+	var result string
+	for _, i := range recoverabelTime {
+		result = addTimeRange(result, i.StartTime, i.StopTime)
+	}
+	if result == "" {
+		return printer.NoneString
+	}
+	return result
+}
+
+func addTimeRange(result string, start, end *metav1.Time) string {
+	if result != "" {
+		result += ", "
+	}
+	result += fmt.Sprintf("%s ~ %s", util.TimeFormatWithDuration(start, time.Second),
+		util.TimeFormatWithDuration(end, time.Second))
+	return result
 }

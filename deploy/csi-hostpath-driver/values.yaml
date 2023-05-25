@@ -1,0 +1,103 @@
+# Default values for csi-hostpath-driver.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  registry: registry.cn-hangzhou.aliyuncs.com/google_containers/
+  repository: hostpathplugin
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+
+tolerations:
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: kb-controller
+              operator: In
+              values:
+                - "true"
+
+sidecars:
+  healthmonitor:
+    image:
+      repository: csi-external-health-monitor-controller
+      tag: v0.7.0
+  registrar:
+    image:
+      repository: csi-node-driver-registrar
+      tag: v2.6.0
+  livenessprobe:
+    image:
+      repository: livenessprobe
+      tag: v2.8.0
+  attacher:
+    image:
+      repository: csi-attacher
+      tag: v4.0.0
+  provisioner:
+    image:
+      repository: csi-provisioner
+      tag: v3.3.0
+  resizer:
+    image:
+      repository: csi-resizer
+      tag: v1.6.0
+  snapshotter:
+    image:
+      repository: csi-snapshotter
+      tag: v6.1.0
+
+storageClass:
+  create: true
+  default: true

@@ -1,15 +1,27 @@
-## kbcli playground destroy
+---
+title: kbcli playground destroy
+---
 
-Destroy the playground cluster.
+Destroy the playground KubeBlocks and kubernetes cluster.
 
 ```
 kbcli playground destroy [flags]
 ```
 
+### Examples
+
+```
+  # destroy playground cluster
+  kbcli playground destroy
+```
+
 ### Options
 
 ```
-  -h, --help   help for destroy
+      --auto-approve       Skip interactive approval before destroying the playground
+  -h, --help               help for destroy
+      --purge              Purge all resources before destroy kubernetes cluster, delete all clusters created by KubeBlocks and uninstall KubeBlocks. (default true)
+      --timeout duration   Time to wait for installing KubeBlocks, such as --timeout=10m (default 5m0s)
 ```
 
 ### Options inherited from parent commands
@@ -24,6 +36,7 @@ kbcli playground destroy [flags]
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
+      --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -37,5 +50,7 @@ kbcli playground destroy [flags]
 
 ### SEE ALSO
 
-* [kbcli playground](kbcli_playground.md)	 - Bootstrap a KubeBlocks in local host
+* [kbcli playground](kbcli_playground.md)	 - Bootstrap or destroy a playground KubeBlocks in local host or cloud.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

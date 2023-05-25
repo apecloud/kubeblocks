@@ -2,10 +2,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: {{ include "nyancat.fullname" . }}
+  labels:
+    {{- include "nyancat.labels" . | nindent 4 }}
 subjects:
   - kind: ServiceAccount
     name: {{ include "nyancat.serviceAccountName" . }}
-    namespace: {{ .Values.namespace }}
+    namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
   name: {{ include "nyancat.fullname" . }}

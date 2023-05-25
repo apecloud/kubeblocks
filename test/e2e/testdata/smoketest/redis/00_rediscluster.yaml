@@ -1,0 +1,61 @@
+---
+# Source: redis-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mycluster-redis-cluster
+  labels: 
+    helm.sh/chart: redis-cluster-0.5.0-beta.24
+    app.kubernetes.io/name: redis-cluster
+    app.kubernetes.io/instance: mycluster
+    app.kubernetes.io/version: "7.0.6"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  clusterDefinitionRef: redis  # ref clusterDefinition.name
+  clusterVersionRef: redis-7.0.6 # ref clusterVersion.name
+  terminationPolicy: Delete
+  affinity:
+    topologyKeys: 
+      - kubernetes.io/hostname
+  componentSpecs:
+    - name: redis # user-defined
+      componentDefRef: redis # ref clusterDefinition componentDefs.name
+      monitor: false
+      enabledLogs:     ["running"]
+      replicas: 2
+      primaryIndex: 0
+      switchPolicy:
+        type: Noop
+      resources:
+        limits:
+          cpu: "500m"
+          memory: "3Gi"
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+    - name: redis-sentinel # user-defined
+      componentDefRef: redis-sentinel # ref clusterDefinition componentDefs.name
+      replicas: 3
+      resources:
+        limits:
+          cpu: "500m"
+          memory: "3Gi"
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi

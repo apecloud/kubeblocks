@@ -1,18 +1,33 @@
-## kbcli cluster restart
+---
+title: kbcli cluster restart
+---
 
-Restart the specified components in the cluster
+Restart the specified components in the cluster.
 
 ```
-kbcli cluster restart [flags]
+kbcli cluster restart NAME [flags]
+```
+
+### Examples
+
+```
+  # restart all components
+  kbcli cluster restart mycluster
+  
+  # restart specifies the component, separate with commas when component more than one
+  kbcli cluster restart mycluster --components=mysql
 ```
 
 ### Options
 
 ```
-      --component-names strings       Component names to this operations (required)
-  -h, --help                         help for restart
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
-      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
+      --auto-approve                   Skip interactive approval before restarting the cluster
+      --components strings             Component names to this operations
+      --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+  -h, --help                           help for restart
+      --name string                    OpsRequest name. if not specified, it will be randomly generated 
+  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```
 
 ### Options inherited from parent commands
@@ -27,6 +42,7 @@ kbcli cluster restart [flags]
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
+      --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -40,5 +56,7 @@ kbcli cluster restart [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

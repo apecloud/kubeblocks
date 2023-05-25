@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package v1alpha1
@@ -27,25 +30,24 @@ type BackupToolSpec struct {
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
-	// database engine to support in the backup.
-	// +kubebuilder:validation:Enum={mysql}
-	DatabaseEngine string `json:"databaseEngine,omitempty"`
-
-	// database engine to support in the backup.
-	// +kubebuilder:validation:Enum={"5.6","5.7","8.0"}
-	DatabaseEngineVersions []string `json:"databaseEngineVersions,omitempty"`
-
 	// which kind for run a backup tool.
 	// +kubebuilder:validation:Enum={job,daemon}
 	// +kubebuilder:default=job
 	DeployKind string `json:"deployKind,omitempty"`
 
+	// the type of backup tool, file or pitr
+	// +kubebuilder:validation:Enum={file,pitr}
+	// +kubebuilder:default=file
+	Type string `json:"type,omitempty"`
+
 	// Compute Resources required by this container.
 	// Cannot be updated.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// List of environment variables to set in the container.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name"`
 
@@ -55,16 +57,17 @@ type BackupToolSpec struct {
 	// sources, the value associated with the last source will take precedence.
 	// Values defined by an Env with a duplicate key will take precedence.
 	// Cannot be updated.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 
-	// Array of command that dbaas can do database backup.
+	// Array of command that apps can do database backup.
 	// from invoke args
 	// the order of commands follows the order of array.
 	// +kubebuilder:validation:Required
 	BackupCommands []string `json:"backupCommands"`
 
-	// Array of command that dbaas can do database incremental backup.
+	// Array of command that apps can do database incremental backup.
 	// like xtrabackup, that can performs an incremental backup file.
 	// +optional
 	IncrementalBackupCommands []string `json:"incrementalBackupCommands,omitempty"`
@@ -80,7 +83,7 @@ type BackupToolSpec struct {
 
 // BackupToolRestoreCommand defines the restore commands of BackupTool
 type BackupToolRestoreCommand struct {
-	// Array of command that dbaas can perform database restore.
+	// Array of command that apps can perform database restore.
 	// like xtrabackup, that can performs restore mysql from files.
 	// +optional
 	RestoreCommands []string `json:"restoreCommands"`
@@ -108,7 +111,7 @@ type BackupTool struct {
 	Status BackupToolStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // BackupToolList contains a list of BackupTool
 type BackupToolList struct {

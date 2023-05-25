@@ -1,4 +1,4 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterVersion
 metadata:
   name: clickhouse-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
@@ -11,24 +11,24 @@ metadata:
   annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
   {{- end }}
 spec:
-  clusterDefinitionRef: apecloud-clickhouse
-  components:
-    - type: clickhouse
-      podSpec:
+  clusterDefinitionRef: clickhouse
+  componentVersions:
+    - componentDefRef: clickhouse
+      versionsContext:
         containers:
           - name: clickhouse
             image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
-            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-    - type: ch-keeper
-      podSpec:
+            imagePullPolicy: {{ default "IfNotPresent" .Values.image.pullPolicy }}
+    - componentDefRef: ch-keeper
+      versionsContext:
         containers:
           - name: clickhouse
             image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
-            imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
-    - type: zookeeper
-      podSpec:
+            imagePullPolicy: {{ default "IfNotPresent" .Values.image.pullPolicy }}
+    - componentDefRef: zookeeper
+      versionsContext:
         containers:
           - name: zookeeper
             image: {{ .Values.zookeeper.image.repository }}:{{ .Values.zookeeper.image.tag }}
-            imagePullPolicy: {{ default .Values.zookeeper.image.pullPolicy "IfNotPresent" }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.zookeeper.image.pullPolicy }}
   

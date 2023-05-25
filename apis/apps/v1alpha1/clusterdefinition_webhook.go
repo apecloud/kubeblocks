@@ -1,0 +1,287 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+package v1alpha1
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/pkg/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	ctrl "sigs.k8s.io/controller-runtime"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
+)
+
+// log is for logging in this package.
+var (
+	clusterdefinitionlog = logf.Log.WithName("clusterdefinition-resource")
+)
+
+// DefaultRoleProbeTimeoutAfterPodsReady the default role probe timeout for application when all pods of component are ready.
+// default values are 60 seconds.
+const DefaultRoleProbeTimeoutAfterPodsReady int32 = 60
+
+func (r *ClusterDefinition) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewWebhookManagedBy(mgr).
+		For(r).
+		Complete()
+}
+
+// +kubebuilder:webhook:path=/mutate-apps-kubeblocks-io-v1alpha1-clusterdefinition,mutating=true,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=clusterdefinitions,verbs=create;update,versions=v1alpha1,name=mclusterdefinition.kb.io,admissionReviewVersions=v1
+
+var _ webhook.Defaulter = &ClusterDefinition{}
+
+// Default implements webhook.Defaulter so a webhook will be registered for the type
+func (r *ClusterDefinition) Default() {
+	clusterdefinitionlog.Info("default", "name", r.Name)
+	for i := range r.Spec.ComponentDefs {
+		probes := r.Spec.ComponentDefs[i].Probes
+		if probes == nil {
+			continue
+		}
+		if probes.RoleProbe != nil {
+			// set default values
+			if probes.RoleProbeTimeoutAfterPodsReady == 0 {
+				probes.RoleProbeTimeoutAfterPodsReady = DefaultRoleProbeTimeoutAfterPodsReady
+			}
+		} else {
+			// if component does not support RoleProbe, reset RoleProbeTimeoutAtPodsReady to zero
+			if probes.RoleProbeTimeoutAfterPodsReady != 0 {
+				probes.RoleProbeTimeoutAfterPodsReady = 0
+			}
+		}
+	}
+}
+
+// TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
+// +kubebuilder:webhook:path=/validate-apps-kubeblocks-io-v1alpha1-clusterdefinition,mutating=false,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=clusterdefinitions,verbs=create;update,versions=v1alpha1,name=vclusterdefinition.kb.io,admissionReviewVersions=v1
+
+var _ webhook.Validator = &ClusterDefinition{}
+
+// ValidateCreate implements webhook.Validator so a webhook will be registered for the type
+func (r *ClusterDefinition) ValidateCreate() error {
+	clusterdefinitionlog.Info("validate create", "name", r.Name)
+	return r.validate()
+}
+
+// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
+func (r *ClusterDefinition) ValidateUpdate(old runtime.Object) error {
+	clusterdefinitionlog.Info("validate update", "name", r.Name)
+	return r.validate()
+}
+
+// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
+func (r *ClusterDefinition) ValidateDelete() error {
+	clusterdefinitionlog.Info("validate delete", "name", r.Name)
+	return nil
+}
+
+// Validate ClusterDefinition.spec is legal
+func (r *ClusterDefinition) validate() error {
+	var (
+		allErrs field.ErrorList
+	)
+	// clusterDefinition components to map
+	componentMap := make(map[string]struct{})
+	for _, v := range r.Spec.ComponentDefs {
+		componentMap[v.Name] = struct{}{}
+	}
+
+	r.validateComponents(&allErrs)
+	r.validateLogFilePatternPrefix(&allErrs)
+
+	if len(allErrs) > 0 {
+		return apierrors.NewInvalid(
+			schema.GroupKind{Group: APIVersion, Kind: ClusterDefinitionKind},
+			r.Name, allErrs)
+	}
+	return nil
+}
+
+// validateLogsPatternPrefix validate spec.components[*].logConfigs[*].filePathPattern
+func (r *ClusterDefinition) validateLogFilePatternPrefix(allErrs *field.ErrorList) {
+	for idx1, component := range r.Spec.ComponentDefs {
+		if len(component.LogConfigs) == 0 {
+			continue
+		}
+		volumeMounts := component.PodSpec.Containers[0].VolumeMounts
+		for idx2, logConfig := range component.LogConfigs {
+			flag := false
+			for _, v := range volumeMounts {
+				if strings.HasPrefix(logConfig.FilePathPattern, v.MountPath) {
+					flag = true
+					break
+				}
+			}
+			if !flag {
+				*allErrs = append(*allErrs, field.Required(field.NewPath(fmt.Sprintf("spec.components[%d].logConfigs[%d].filePathPattern", idx1, idx2)),
+					fmt.Sprintf("filePathPattern %s should have a prefix string which in container VolumeMounts", logConfig.FilePathPattern)))
+			}
+		}
+	}
+}
+
+// ValidateComponents validate spec.components is legal.
+func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
+
+	validateSystemAccount := func(component *ClusterComponentDefinition) {
+		sysAccountSpec := component.SystemAccounts
+		if sysAccountSpec != nil {
+			sysAccountSpec.validateSysAccounts(allErrs)
+		}
+	}
+
+	validateConsensus := func(component *ClusterComponentDefinition) {
+		consensusSpec := component.ConsensusSpec
+		// roleObserveQuery and Leader are required
+		if consensusSpec.Leader.Name == "" {
+			*allErrs = append(*allErrs,
+				field.Required(field.NewPath("spec.components[*].consensusSpec.leader.name"),
+					"leader name can't be blank when workloadType is Consensus"))
+		}
+
+		// Leader.Replicas should not be present or should set to 1
+		if *consensusSpec.Leader.Replicas != 0 && *consensusSpec.Leader.Replicas != 1 {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].consensusSpec.leader.replicas"),
+					consensusSpec.Leader.Replicas,
+					"leader replicas can only be 1"))
+		}
+
+		// Leader.replicas + Follower.replicas should be odd
+		candidates := int32(1)
+		for _, member := range consensusSpec.Followers {
+			if member.Replicas != nil {
+				candidates += *member.Replicas
+			}
+		}
+		if candidates%2 == 0 {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].consensusSpec.candidates(leader.replicas+followers[*].replicas)"),
+					candidates,
+					"candidates(leader+followers) should be odd"))
+		}
+		// if component.replicas is 1, then only Leader should be present. just omit if present
+
+		// if Followers.Replicas present, Leader.Replicas(that is 1) + Followers.Replicas + Learner.Replicas should equal to component.defaultReplicas
+	}
+
+	for _, component := range r.Spec.ComponentDefs {
+		if err := r.validateConfigSpec(component); err != nil {
+			*allErrs = append(*allErrs, field.Duplicate(field.NewPath("spec.components[*].configSpec.configTemplateRefs"), err))
+			continue
+		}
+
+		// validate system account defined in spec.components[].systemAccounts
+		validateSystemAccount(&component)
+
+		switch component.WorkloadType {
+		case Consensus:
+			// if consensus
+			consensusSpec := component.ConsensusSpec
+			if consensusSpec == nil {
+				*allErrs = append(*allErrs,
+					field.Required(field.NewPath("spec.components[*].consensusSpec"),
+						"consensusSpec is required when workloadType=Consensus"))
+				continue
+			}
+			validateConsensus(&component)
+		case Replication:
+		default:
+			continue
+		}
+	}
+}
+
+// validateSysAccounts validate spec.components[].systemAccounts
+func (r *SystemAccountSpec) validateSysAccounts(allErrs *field.ErrorList) {
+	accountName := make(map[AccountName]bool)
+	for _, sysAccount := range r.Accounts {
+		// validate provision policy
+		provisionPolicy := sysAccount.ProvisionPolicy
+		if provisionPolicy.Type == CreateByStmt && sysAccount.ProvisionPolicy.Statements == nil {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].systemAccounts.accounts.provisionPolicy.statements"),
+					sysAccount.Name, "statements should not be empty when provisionPolicy = CreateByStmt."))
+			continue
+		}
+
+		if provisionPolicy.Type == ReferToExisting && sysAccount.ProvisionPolicy.SecretRef == nil {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].systemAccounts.accounts.provisionPolicy.secretRef"),
+					sysAccount.Name, "SecretRef should not be empty when provisionPolicy = ReferToExisting. "))
+			continue
+		}
+		// account names should be unique
+		if _, exists := accountName[sysAccount.Name]; exists {
+			*allErrs = append(*allErrs,
+				field.Invalid(field.NewPath("spec.components[*].systemAccounts.accounts"),
+					sysAccount.Name, "duplicated system account names are not allowed."))
+			continue
+		} else {
+			accountName[sysAccount.Name] = true
+		}
+	}
+
+	passwdConfig := r.PasswordConfig
+	if passwdConfig.Length < passwdConfig.NumDigits+passwdConfig.NumSymbols {
+		*allErrs = append(*allErrs,
+			field.Invalid(field.NewPath("spec.components[*].systemAccounts.passwordConfig"),
+				passwdConfig, "numDigits plus numSymbols exceeds password length. "))
+	}
+}
+
+func (r *ClusterDefinition) validateConfigSpec(component ClusterComponentDefinition) error {
+	if len(component.ConfigSpecs) <= 1 && len(component.ScriptSpecs) <= 1 {
+		return nil
+	}
+	return validateConfigTemplateList(component.ConfigSpecs)
+}
+
+func validateConfigTemplateList(ctpls []ComponentConfigSpec) error {
+	var (
+		volumeSet = map[string]struct{}{}
+		cmSet     = map[string]struct{}{}
+		tplSet    = map[string]struct{}{}
+	)
+
+	for _, tpl := range ctpls {
+		if len(tpl.VolumeName) == 0 {
+			return errors.Errorf("ConfigTemplate.VolumeName not empty.")
+		}
+		if _, ok := tplSet[tpl.Name]; ok {
+			return errors.Errorf("configTemplate[%s] already existed.", tpl.Name)
+		}
+		if _, ok := volumeSet[tpl.VolumeName]; ok {
+			return errors.Errorf("volume[%s] already existed.", tpl.VolumeName)
+		}
+		if _, ok := cmSet[tpl.TemplateRef]; ok {
+			return errors.Errorf("configmap[%s] already existed.", tpl.TemplateRef)
+		}
+		tplSet[tpl.Name] = struct{}{}
+		cmSet[tpl.TemplateRef] = struct{}{}
+		volumeSet[tpl.VolumeName] = struct{}{}
+	}
+	return nil
+}

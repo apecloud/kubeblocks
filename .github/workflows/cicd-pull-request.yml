@@ -5,48 +5,39 @@ on:
     types: [submitted]
 
 env:
+  GITLAB_GO_CACHE_PROJECT_ID: 98800
+  GO_CACHE: "go-cache"
+  GO_CACHE_DIR: "/root/.cache"
+  GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
-
 jobs:
-  pre-pull-request:
+  trigger-mode:
+    name: trigger mode
     if: github.event.review.state == 'approved'
     runs-on: ubuntu-latest
-    name: PR Pre-Check
+    outputs:
+      trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
     steps:
       - uses: actions/checkout@v3
-      - name: install pcregrep
+        with:
+          fetch-depth: 2
+      - name: Get trigger mode
+        id: get_trigger_mode
         run: |
-          sudo apt-get update
-          sudo apt-get install pcregrep
-
-      - name: gen pcregrep
-        run: |
-          pcregrep --exclude-dir=mtr -r -n -I '[^\x00-\x7f]' . > pcregrep.out
-
-      - name: pcregrep Chinese
-        run: |
-          SHA=${{ github.sha }}
-          
-          git fetch
-          git checkout origin/main
-          MAIN_SHA=`git rev-parse HEAD`
-          
-          git reset --hard $SHA
-          
-          FILE_PATH=`git diff --name-only $SHA $MAIN_SHA`
-          
-          python ${{ github.workspace }}/.github/utils/pcregrep.py \
-            --source="${{ github.workspace }}/pcregrep.out" \
-            --filter="$FILE_PATH"
+          TRIGGER_MODE=`bash .github/utils/utils.sh --type 6`
+          echo $TRIGGER_MODE
+          echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
 
   make-test:
-    if: github.event.review.state == 'approved'
     name: make test
-    needs: pre-pull-request
+    needs: trigger-mode
+    if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
+    outputs:
+      runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
     runs-on: [ self-hosted, eks-fargate-runner ]
     steps:
-      - uses: JashBook/checkout@main
+      - uses: apecloud/checkout@main
       - name: make mod-vendor and lint
         run: |
           mkdir -p ./bin
@@ -57,3 +48,66 @@ jobs:
       - name: make test
         run: |
           make test
+
+      - name: kill kube-apiserver and etcd
+        id: get_runner_name
+        if: ${{ always() }}
+        run: |
+          echo runner_name=${RUNNER_NAME} >> $GITHUB_OUTPUT
+          bash .github/utils/utils.sh --type 8
+
+  remove-runner:
+    needs: [ trigger-mode, make-test ]
+    runs-on: ubuntu-latest
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && always() }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: remove runner
+        run: |
+          bash .github/utils/utils.sh --type 9 \
+            --github-token ${{ env.GITHUB_TOKEN }} \
+            --runner-name ${{ needs.make-test.outputs.runner-name }}
+
+  check-image:
+    name: check image
+    needs: trigger-mode
+    if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
+    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.6.1
+    with:
+      MAKE_OPS_PRE: "generate"
+      MAKE_OPS: "build-manager-image"
+      IMG: "apecloud/kubeblocks"
+      VERSION: "check"
+      GO_VERSION: "1.20"
+      BUILDX_PLATFORMS: "linux/amd64"
+      SYNC_ENABLE: false
+    secrets: inherit
+
+  check-tools-image:
+    name: check image
+    needs: trigger-mode
+    if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
+    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.6.1
+    with:
+      MAKE_OPS_PRE: "generate"
+      MAKE_OPS: "build-tools-image"
+      IMG: "apecloud/kubeblocks-tools"
+      VERSION: "check"
+      GO_VERSION: "1.20"
+      BUILDX_PLATFORMS: "linux/amd64"
+      SYNC_ENABLE: false
+    secrets: inherit
+
+  check-helm:
+    name: check helm
+    needs: trigger-mode
+    if: contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]')
+    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.6.1
+    with:
+      MAKE_OPS: "bump-chart-ver"
+      VERSION: "v0.4.0-check"
+      CHART_NAME: "kubeblocks"
+      CHART_DIR: "deploy/helm"
+      PUSH_ENABLE: false
+      DEP_REPO: "helm dep update deploy/delphic"
+    secrets: inherit

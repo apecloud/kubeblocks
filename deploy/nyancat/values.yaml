@@ -5,8 +5,9 @@
 replicaCount: 2
 
 image:
-  repository: docker.io/apecloud/nyancat
-  pullPolicy: IfNotPresent
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/nyancat
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: "latest"
 
@@ -62,8 +63,19 @@ autoscaling:
 
 nodeSelector: {}
 
-tolerations: []
+tolerations:
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
 
-affinity: {}
-
-namespace: ""
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: kb-controller
+              operator: In
+              values:
+                - "true"

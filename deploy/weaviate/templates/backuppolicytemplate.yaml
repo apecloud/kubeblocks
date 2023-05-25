@@ -1,0 +1,22 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: weaviate-backup-policy-template
+  labels:
+    clusterdefinition.kubeblocks.io/name: weaviate
+    {{- include "weaviate.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: weaviate
+  backupPolicies:
+  - componentDefRef: weaviate
+    retention:
+      ttl: 7d
+    schedule:
+      snapshot:
+        enable: false
+        cronExpression: "0 18 * * 0"
+    snapshot:
+      target:
+        connectionCredentialKey:
+          passwordKey: password
+          usernameKey: username

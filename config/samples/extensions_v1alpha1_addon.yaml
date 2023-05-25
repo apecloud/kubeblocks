@@ -1,0 +1,191 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  labels:
+    app.kubernetes.io/name: addon
+    app.kubernetes.io/instance: addon-sample
+    app.kubernetes.io/part-of: kubeblocks
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kubeblocks
+  name: prometheus-sample
+spec:
+  # Addon spec. description.
+  description: Prometheus is a monitoring system and time series database.
+
+  # Addon type, valid value is Helm. （Required)
+  type: Helm
+
+  # helm spec., it's only being processed if type=helm.
+  helm:
+    chartLocationURL: https://github.com/prometheus-community/helm-charts/releases/download/prometheus-15.16.1/prometheus-15.16.1.tgz
+    # helm install options
+    installOptions: # <map[string]string>
+#      # following assigned values are default options
+#      # wait: true
+#      atomic: "false"
+#      no-hooks: "false"
+#      timeout: "10m"
+#      # specify values in a YAML file or a URL (can specify multiple)
+
+    installValues:
+      # via URL
+      urls: []
+
+      # via YAML contents reside in configMap.data.<key>
+      configMapRefs:
+#        - name:
+#          namepsace:
+#          key:
+      # via YAML contents reside in secret.data.<key>
+      secretRefs:
+#        - name:
+#          namepsace:
+#          key:
+      setValues:
+        - "alertmanager.image.repository=registry.cn-hangzhou.aliyuncs.com/apecloud/alertmanager"
+        - "alertmanager.image.tag=v0.24.0"
+        - "kubeStateMetrics.enabled=false"
+        - "nodeExporter.enabled=false"
+        - "nodeExporter.image.repository=registry.cn-hangzhou.aliyuncs.com/apecloud/node-exporter"
+        - "nodeExporter.image.tag=v1.3.1"
+        - "configmapReload.prometheus.image.repository=registry.cn-hangzhou.aliyuncs.com/apecloud/configmap-reload"
+        - "configmapReload.prometheus.image.tag=v0.5.0"
+        - "configmapReload.alertmanager.image.repository=registry.cn-hangzhou.aliyuncs.com/apecloud/configmap-reload"
+        - "configmapReload.alertmanager.image.tag=v0.5.0"
+        - "server.image.repository=registry.cn-hangzhou.aliyuncs.com/apecloud/prometheus"
+        - "server.image.tag=v2.39.1"
+        - "pushgateway.enabled=false"
+
+      setJSONValues: []
+
+    # values mapping specific to resources related context, i.e., replicaCount, storage, CPU & Memory.
+    valuesMapping:
+      valueMap:
+        replicaCount: server.replicaCount
+        storageClass: server.persistentVolume.storageClass
+        persistentVolumeEnabled: server.persistentVolume.enabled
+
+      jsonMap:
+        tolerations: server.tolerations
+
+      resources:
+        storage: server.persistentVolume.size
+        cpu:
+          requests: server.resources.requests.cpu
+          limits: server.resources.limits.cpu
+        memory:
+          requests: server.resources.requests.memory
+          limits: server.resources.limits.memory
+      extras:
+        - name: alertmanager
+          valueMap: # map[KeyHelmValueKey]string
+            replicaCount: alertmanager.replicaCount
+            storageClass: alertmanager.persistentVolume.storageClass
+            persistentVolumeEnabled: alertmanager.persistentVolume.enabled
+
+          jsonMap: # map[KeyHelmValueKey]string
+            tolerations: alertmanager.tolerations
+
+          resources:
+            storage: alertmanager.persistentVolume.size
+            cpu:
+              requests: alertmanager.resources.requests.cpu
+              limits: alertmanager.resources.limits.cpu
+            memory:
+              requests: alertmanager.resources.requests.memory
+              limits: alertmanager.resources.limits.memory
+
+  # defaultInstall provides default installSpec template. (Required)
+  defaultInstallValues:
+    - replicas: 1
+      storageClass:
+      tolerations: "[]"
+      resources:
+        requests:
+          storage: 1Gi
+      extras:
+        - name: alertmanager
+          storageClass:
+          tolerations: "[]"
+          replicas: 1
+          resources:
+            requests:
+              storage: 1Gi
+    - # Addon default install value selectors. If multiple selectors are provided
+      # that all selectors must evaluate to true.
+      selectors:
+        - # selector key, valid values are kubeGitVersion, kubeVersion.
+          # "kubeVersion" the semver expression of Kubernetes versions, i.e., v1.24.
+          # "kubeGitVersion" may contain distro info, i.e., v1.24.4+k3s1.
+          key: KubeGitVersion
+          # cluster version comparator opreator
+          # Possible enum values:
+          # - `"Contains"` line contains string (symbol: "|="）
+          # - `"DoesNotContain"` line does not contain string (symbol: "!=")
+          # - `"MatchRegex"` line contains a match to the regular expression (symbol: "|~"）
+          # - `"DoesNoteMatchRegex"` line does not contain a match to the regular expression (symbol: "!~")
+          operator: Contains
+          # An array of string values. Server as "OR" expression to operator.
+          values:
+            - ack
+      replicas: 1
+      storageClass: alicloud-disk-efficiency
+      tolerations: "[]"
+      resources:
+        requests:
+          storage: 20Gi
+      extras:
+        - name: alertmanager
+          replicas: 1
+          storageClass: alicloud-disk-efficiency
+          resources:
+            requests:
+              storage: 20Gi
+
+#  # addon enabled install spec, if its empty for disabled addon.
+#  install:
+#    # primary component resources attributes.
+#    replicas: 1
+##    storageClass:
+##    # JSON array string
+##    tolerations: '[]'
+##    resources:
+##      requests:
+##        storage: 8Gi
+##        memory: 512Mi
+##      limits:
+##        memory: 4Gi
+#    # extra components resources attributes.
+#    extras:
+#      - name: alertmanager
+##        replicas: 1
+##        storageClass:
+##        resources:
+##          requests:
+##            storage: 1Gi
+##            memory: 16Mi
+##          limits:
+##            memory: 256Mi
+
+  # Addon installable spec., provide selector and auto-install settings.
+  installable:
+    # autoInstall defines an addon should auto installed
+    autoInstall: true
+    # Addon installable selectors. If multiple selectors are provided
+    # that all selectors must evaluate to true.
+    selectors:
+      - # selector key, valid values are kubeGitVersion, kubeVersion.
+        # "kubeVersion" the semver expression of Kubernetes versions, i.e., v1.24.
+        # "kubeGitVersion" may contain distro info, i.e., v1.24.4+k3s1.
+        key: KubeGitVersion
+        # cluster version comparator opreator
+        # Possible enum values:
+        # - `"Contains"` line contains string (symbol: "|="）
+        # - `"DoesNotContain"` line does not contain string (symbol: "!=")
+        # - `"MatchRegex"` line contains a match to the regular expression (symbol: "|~"）
+        # - `"DoesNoteMatchRegex"` line does not contain a match to the regular expression (symbol: "!~")
+        operator: Contains
+        # An array of string values. Server as "OR" expression to operator.
+        values:
+          - eks
+          - ack

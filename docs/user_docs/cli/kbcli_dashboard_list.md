@@ -1,9 +1,18 @@
-## kbcli dashboard list
+---
+title: kbcli dashboard list
+---
 
-List all dashboards
+List all dashboards.
 
 ```
 kbcli dashboard list [flags]
+```
+
+### Examples
+
+```
+  # List all dashboards
+  kbcli dashboard list
 ```
 
 ### Options
@@ -24,6 +33,7 @@ kbcli dashboard list [flags]
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
+      --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -37,5 +47,7 @@ kbcli dashboard list [flags]
 
 ### SEE ALSO
 
-* [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards
+* [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

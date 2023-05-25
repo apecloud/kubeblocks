@@ -1,0 +1,24 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mycluster-snapshot
+  annotations:
+    kubeblocks.io/restore-from-backup: "{\"postgresql\":\"backup-snapshot-mycluster\"}"
+spec:
+  clusterDefinitionRef: postgresql
+  clusterVersionRef: postgresql-14.7.1
+  terminationPolicy: WipeOut
+  componentSpecs:
+    - name: postgresql
+      componentDefRef: postgresql
+      serviceAccountName: kb-sa-mycluster
+      monitor: false
+      replicas: 1
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi

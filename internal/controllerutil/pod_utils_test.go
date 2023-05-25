@@ -1,35 +1,43 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package controllerutil
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
+	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metautil "k8s.io/apimachinery/pkg/util/intstr"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 type TestResourceUnit struct {
@@ -38,41 +46,120 @@ type TestResourceUnit struct {
 	expectCPU        int
 }
 
-var _ = Describe("tpl template", func() {
+func TestPodIsReady(t *testing.T) {
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
+	pod.Status.Conditions = []corev1.PodCondition{
+		{
+			Type:   corev1.PodReady,
+			Status: corev1.ConditionTrue,
+		},
+	}
+	pod.Labels = map[string]string{constant.RoleLabelKey: "leader"}
+	if !PodIsReadyWithLabel(*pod) {
+		t.Errorf("isReady returned false negative")
+	}
+
+	pod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+	if PodIsReadyWithLabel(*pod) {
+		t.Errorf("isReady returned false positive")
+	}
+
+	pod.Labels = nil
+	if PodIsReadyWithLabel(*pod) {
+		t.Errorf("isReady returned false positive")
+	}
+
+	pod.Status.Conditions = nil
+	if PodIsReadyWithLabel(*pod) {
+		t.Errorf("isReady returned false positive")
+	}
+
+	pod.Status.Conditions = []corev1.PodCondition{}
+	if PodIsReadyWithLabel(*pod) {
+		t.Errorf("isReady returned false positive")
+	}
+}
+
+func TestPodIsControlledByLatestRevision(t *testing.T) {
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
+	pod.Labels = map[string]string{
+		appsv1.ControllerRevisionHashLabelKey: "test",
+	}
+	set.Generation = 1
+	set.Status.UpdateRevision = "test"
+	if PodIsControlledByLatestRevision(pod, set) {
+		t.Errorf("PodIsControlledByLatestRevision returned false positive")
+	}
+	set.Status.ObservedGeneration = 1
+	if !PodIsControlledByLatestRevision(pod, set) {
+		t.Errorf("PodIsControlledByLatestRevision returned false positive")
+	}
+}
+
+func TestGetPodRevision(t *testing.T) {
+	set := testk8s.NewFakeStatefulSet("foo", 3)
+	pod := testk8s.NewFakeStatefulSetPod(set, 1)
+	if GetPodRevision(pod) != "" {
+		t.Errorf("revision should be empty")
+	}
+
+	pod.Labels = make(map[string]string, 0)
+	pod.Labels[appsv1.StatefulSetRevisionLabel] = "bar"
+
+	if GetPodRevision(pod) != "bar" {
+		t.Errorf("revision not matched")
+	}
+}
+
+var _ = Describe("pod utils", func() {
 
 	var (
 		statefulSet     *appsv1.StatefulSet
 		pod             *corev1.Pod
-		configTemplates = []dbaasv1alpha1.ConfigTemplate{
+		configTemplates = []appsv1alpha1.ComponentConfigSpec{
 			{
-				Name:       "xxxxx",
-				VolumeName: "config1",
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx",
+					VolumeName: "config1",
+				},
 			},
 			{
-				Name:       "xxxxx2",
-				VolumeName: "config2",
-			},
-		}
-
-		foundInitContainerConfigTemplates = []dbaasv1alpha1.ConfigTemplate{
-			{
-				Name:       "xxxxx",
-				VolumeName: "config1_init_container",
-			},
-			{
-				Name:       "xxxxx2",
-				VolumeName: "config2_init_container",
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx2",
+					VolumeName: "config2",
+				},
 			},
 		}
 
-		notFoundConfigTemplates = []dbaasv1alpha1.ConfigTemplate{
+		foundInitContainerConfigTemplates = []appsv1alpha1.ComponentConfigSpec{
 			{
-				Name:       "xxxxx",
-				VolumeName: "config1_not_fount",
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx",
+					VolumeName: "config1_init_container",
+				},
 			},
 			{
-				Name:       "xxxxx2",
-				VolumeName: "config2_not_fount",
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx2",
+					VolumeName: "config2_init_container",
+				},
+			},
+		}
+
+		notFoundConfigTemplates = []appsv1alpha1.ComponentConfigSpec{
+			{
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx",
+					VolumeName: "config1_not_fount",
+				},
+			},
+			{
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name:       "xxxxx2",
+					VolumeName: "config2_not_fount",
+				},
 			},
 		}
 	)
@@ -186,22 +273,22 @@ var _ = Describe("tpl template", func() {
 
 	})
 
-	// for test GetContainerUsingConfig
-	Context("GetContainerUsingConfig test", func() {
+	// for test GetContainerByConfigSpec
+	Context("GetContainerByConfigSpec test", func() {
 		// found name: mysql3
 		It("Should success with no error", func() {
 			podSpec := &statefulSet.Spec.Template.Spec
-			Expect(GetContainerUsingConfig(podSpec, configTemplates)).To(Equal(&podSpec.Containers[2]))
+			Expect(GetContainerByConfigSpec(podSpec, configTemplates)).To(Equal(&podSpec.Containers[2]))
 		})
 		// found name: init_mysql
 		It("Should success with no error", func() {
 			podSpec := &statefulSet.Spec.Template.Spec
-			Expect(GetContainerUsingConfig(podSpec, foundInitContainerConfigTemplates)).To(Equal(&podSpec.InitContainers[0]))
+			Expect(GetContainerByConfigSpec(podSpec, foundInitContainerConfigTemplates)).To(Equal(&podSpec.InitContainers[0]))
 		})
 		// not found container
 		It("Should failed", func() {
 			podSpec := &statefulSet.Spec.Template.Spec
-			Expect(GetContainerUsingConfig(podSpec, notFoundConfigTemplates)).To(BeNil(), "get container is nil!")
+			Expect(GetContainerByConfigSpec(podSpec, notFoundConfigTemplates)).To(BeNil(), "get container is nil!")
 		})
 	})
 
@@ -244,7 +331,7 @@ var _ = Describe("tpl template", func() {
 		})
 	})
 
-	// for test MemroySize or CoreNum
+	// for test MemorySize or CoreNum
 	Context("Get Resource test", func() {
 		It("Resource exists limit", func() {
 			testResources := []TestResourceUnit{
@@ -363,7 +450,7 @@ var _ = Describe("tpl template", func() {
 	})
 
 	Context("common funcs test", func() {
-		It("GetContainersUsingConfigmap Should success with no error", func() {
+		It("GetContainersByConfigmap Should success with no error", func() {
 			type args struct {
 				containers []corev1.Container
 				volumeName string
@@ -406,7 +493,7 @@ var _ = Describe("tpl template", func() {
 				want: []string{},
 			}}
 			for _, tt := range tests {
-				Expect(GetContainersUsingConfigmap(tt.args.containers, tt.args.volumeName, tt.args.filters...)).Should(BeEquivalentTo(tt.want))
+				Expect(GetContainersByConfigmap(tt.args.containers, tt.args.volumeName, tt.args.filters...)).Should(BeEquivalentTo(tt.want))
 			}
 
 		})
@@ -445,6 +532,22 @@ var _ = Describe("tpl template", func() {
 				Expect(val).Should(BeEquivalentTo(tt.want))
 				Expect(isPercent).Should(BeEquivalentTo(tt.isPercent))
 			}
+		})
+	})
+	Context("test sort by pod name", func() {
+		It("Should success with no error", func() {
+			pods := []corev1.Pod{{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-2"},
+			}, {
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-3"},
+			}, {
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-0"},
+			}, {
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-1"},
+			}}
+			sort.Sort(ByPodName(pods))
+			Expect(pods[0].Name).Should(Equal("pod-0"))
+			Expect(pods[3].Name).Should(Equal("pod-3"))
 		})
 	})
 })

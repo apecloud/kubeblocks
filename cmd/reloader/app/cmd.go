@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package app
@@ -19,28 +22,34 @@ package app
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
 	zaplogfmt "github.com/sykesm/zap-logfmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"google.golang.org/grpc"
+	"k8s.io/apimachinery/pkg/util/yaml"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/configmap"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
+	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 )
 
 var logger *zap.SugaredLogger
 
-// NewConfigReloadCommand This command is used to reload configuration
-func NewConfigReloadCommand(ctx context.Context, name string) *cobra.Command {
+// NewConfigManagerCommand This command is used to reload configuration
+func NewConfigManagerCommand(ctx context.Context, name string) *cobra.Command {
 	opt := NewVolumeWatcherOpts()
 	cmd := &cobra.Command{
 		Use:   name,
-		Short: name + " Provides a mechanism to implement reload config files in a sidecar for kubeblocks.",
+		Short: name + " provides a mechanism to implement reload config files in a sidecar for kubeblocks.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runVolumeWatchCommand(ctx, opt)
+			return runConfigManagerCommand(ctx, opt)
 		},
 	}
 
@@ -49,7 +58,7 @@ func NewConfigReloadCommand(ctx context.Context, name string) *cobra.Command {
 	return cmd
 }
 
-func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
+func runConfigManagerCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 	zapLog := initLog(opt.LogLevel)
 	defer func() {
 		_ = zapLog.Sync()
@@ -61,41 +70,143 @@ func runVolumeWatchCommand(ctx context.Context, opt *VolumeWatcherOpts) error {
 		return err
 	}
 
-	// new volume watcher
-	watcher := cfgcore.NewVolumeWatcher(opt.VolumeDirs, ctx, logger)
-
-	// set regex filter
-	if len(opt.FileRegex) > 0 {
-		filter, err := cfgcore.CreateCfgRegexFilter(opt.FileRegex)
+	if opt.NotifyHandType == TPLScript && opt.BackupPath == "" {
+		tmpDir, err := os.MkdirTemp(os.TempDir(), "reload-backup-")
 		if err != nil {
 			return err
 		}
-		watcher.AddFilter(filter)
+		opt.BackupPath = tmpDir
+		defer os.RemoveAll(tmpDir)
 	}
 
-	defer watcher.Close()
-	err := watcher.AddHandler(createHandlerWithWatchType(opt)).Run()
+	return run(ctx, opt)
+}
+
+func run(ctx context.Context, opt *VolumeWatcherOpts) error {
+	volumeWatcher, err := startVolumeWatcher(ctx, opt)
+	if err != nil {
+		return err
+	}
+	defer volumeWatcher.Close()
+
+	serviceOpt := opt.ServiceOpt
+	if serviceOpt.ContainerRuntimeEnable || serviceOpt.RemoteOnlineUpdateEnable {
+		if err := startGRPCService(opt, ctx); err != nil {
+			logger.Error(err, "failed to start grpc service.")
+			return err
+		}
+	}
+
+	logger.Info("config manager started.")
+	<-ctx.Done()
+	logger.Info("config manager shutdown.")
+	return nil
+
+}
+
+func startVolumeWatcher(ctx context.Context, opt *VolumeWatcherOpts) (*cfgcore.ConfigMapVolumeWatcher, error) {
+	volumeWatcher := cfgcore.NewVolumeWatcher(opt.VolumeDirs, ctx, logger)
+
+	logger.Info("config backup path: ", opt.BackupPath)
+	eventHandle, err := createHandlerWithVolumeWatch(opt)
+	if err != nil {
+		logger.Error(err, "failed to create event handle.")
+		return nil, err
+	}
+	err = volumeWatcher.AddHandler(eventHandle).Run()
 	if err != nil {
 		logger.Error(err, "failed to handle VolumeWatcher.")
+		return nil, err
+	}
+	return volumeWatcher, nil
+}
+
+func startGRPCService(opt *VolumeWatcherOpts, ctx context.Context) error {
+	var (
+		server *grpc.Server
+		proxy  = &reconfigureProxy{opt: opt.ServiceOpt, ctx: ctx, logger: logger.Named("grpcProxy")}
+	)
+
+	if err := proxy.Init(opt); err != nil {
 		return err
 	}
 
-	logger.Info("reload started.")
-	<-ctx.Done()
-	logger.Info("reload started shutdown.")
+	tcpSpec := fmt.Sprintf("%s:%d", proxy.opt.PodIP, proxy.opt.GrpcPort)
 
+	logger.Infof("starting reconfigure service: %s", tcpSpec)
+	listener, err := net.Listen("tcp", tcpSpec)
+	if err != nil {
+		return cfgutil.WrapError(err, "failed to create listener: [%s]", tcpSpec)
+	}
+
+	server = grpc.NewServer(grpc.UnaryInterceptor(logUnaryServerInterceptor))
+	cfgproto.RegisterReconfigureServer(server, proxy)
+
+	go func() {
+		if err := server.Serve(listener); err != nil {
+			logger.Error(err, "failed to serve connections from cri")
+			os.Exit(1)
+		}
+	}()
+	logger.Info("reconfigure service started.")
 	return nil
 }
 
-func checkOptions(opt *VolumeWatcherOpts) error {
-	if len(opt.ProcessName) == 0 {
-		return cfgutil.MakeError("require process name is null.")
-	}
+func logUnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	logger.Debugf("info: [%+v]", info)
+	return handler(ctx, req)
+}
 
-	if len(opt.VolumeDirs) == 0 {
+func checkOptions(opt *VolumeWatcherOpts) error {
+	if len(opt.VolumeDirs) == 0 && opt.NotifyHandType != TPLScript {
 		return cfgutil.MakeError("require volume directory is null.")
 	}
 
+	if opt.NotifyHandType == TPLScript {
+		return checkTPLScriptOptions(opt)
+	}
+
+	if opt.NotifyHandType == ShellTool && opt.Command == "" {
+		return cfgutil.MakeError("require command is null.")
+	}
+
+	if len(opt.ProcessName) == 0 {
+		return cfgutil.MakeError("require process name is null.")
+	}
+	return nil
+}
+
+type TplScriptConfig struct {
+	Scripts         string                       `json:"scripts"`
+	FileRegex       string                       `json:"fileRegex"`
+	DataType        string                       `json:"dataType"`
+	DSN             string                       `json:"dsn"`
+	FormatterConfig appsv1alpha1.FormatterConfig `json:"formatterConfig"`
+}
+
+func checkTPLScriptOptions(opt *VolumeWatcherOpts) error {
+	if opt.TPLConfig == "" {
+		return cfgutil.MakeError("require tpl config is not null")
+	}
+
+	if _, err := os.Stat(opt.TPLConfig); err != nil {
+		return err
+	}
+
+	b, err := os.ReadFile(opt.TPLConfig)
+	if err != nil {
+		return err
+	}
+	tplConfig := TplScriptConfig{}
+	if err := yaml.Unmarshal(b, &tplConfig); err != nil {
+		return err
+	}
+
+	opt.FormatterConfig = &tplConfig.FormatterConfig
+	opt.DSN = tplConfig.DSN
+	opt.DataType = tplConfig.DataType
+	opt.FileRegex = tplConfig.FileRegex
+	opt.TPLScriptPath = filepath.Join(filepath.Dir(opt.TPLConfig), tplConfig.Scripts)
 	return nil
 }
 
@@ -127,15 +238,18 @@ func initLog(level string) *zap.Logger {
 	return zapLog
 }
 
-func createHandlerWithWatchType(opt *VolumeWatcherOpts) cfgcore.WatchEventHandler {
+func createHandlerWithVolumeWatch(opt *VolumeWatcherOpts) (cfgcore.WatchEventHandler, error) {
 	logger.Infof("access info: [%d] [%s]", opt.NotifyHandType, opt.ProcessName)
 	switch opt.NotifyHandType {
 	case UnixSignal:
 		return cfgcore.CreateSignalHandler(opt.Signal, opt.ProcessName)
-	case SQL, ShellTool, WebHook:
-		logger.Fatalf("event type[%s]: not yet, but in the future", opt.NotifyHandType.String())
+	case ShellTool:
+		return cfgcore.CreateExecHandler(opt.Command)
+	case TPLScript:
+		return cfgcore.CreateTPLScriptHandler(opt.TPLScriptPath, opt.VolumeDirs, opt.FileRegex, opt.BackupPath, opt.FormatterConfig, opt.DataType, opt.DSN)
+	case SQL, WebHook:
+		return nil, cfgutil.MakeError("event type[%s]: not yet, but in the future", opt.NotifyHandType.String())
 	default:
-		logger.Fatal("not support event type.")
+		return nil, cfgutil.MakeError("not support event type.")
 	}
-	return nil
 }

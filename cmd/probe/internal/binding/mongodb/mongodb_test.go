@@ -1,16 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
-Copyright 2021 The Dapr Authors
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-    http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package mongodb
@@ -24,7 +28,10 @@ import (
 	"github.com/dapr/kit/logger"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
+
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 )
 
 func TestGetMongoDBMetadata(t *testing.T) {
@@ -190,21 +197,21 @@ func TestGetRole(t *testing.T) {
 	defer mt.Close()
 
 	mt.AddMockResponses(bson.D{
-		{"ok", 1},
-		{"myState", 1},
-		{"members", bson.A{
+		primitive.E{Key: "ok", Value: 1},
+		primitive.E{Key: "myState", Value: 1},
+		primitive.E{Key: "members", Value: bson.A{
 			bson.D{
-				{"_id", 0},
-				{"state", 1},
-				{"stateStr", "PRIMARY"},
+				primitive.E{Key: "_id", Value: 0},
+				primitive.E{Key: "state", Value: 1},
+				primitive.E{Key: "stateStr", Value: "PRIMARY"},
 			},
 		}},
 	})
-	m := &MongoDB{
-		database: mt.Client.Database(adminDatabase),
-		logger:   logger.NewLogger("mongodb-test"),
+	m := &MongoDBOperations{
+		database:       mt.Client.Database(adminDatabase),
+		BaseOperations: BaseOperations{Logger: logger.NewLogger("mongodb-test")},
 	}
-	role, err := m.GetRole(context.Background(), "")
+	role, err := m.GetRole(context.Background(), &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
 	if err != nil {
 		t.Errorf("getRole error: %s", err)
 	}

@@ -1,0 +1,22 @@
+apiVersion: v2
+name: apecloud-mysql
+description: ApeCloud MySQL is a database that is compatible with MySQL syntax and achieves high availability
+  through the utilization of the RAFT consensus protocol.
+
+type: application
+
+version: 0.5.0-beta.24
+
+appVersion: "8.0.30"
+
+home: https://kubeblocks.io/
+icon: https://github.com/apecloud/kubeblocks/raw/main/img/logo.png
+
+
+maintainers:
+- name: ApeCloud
+  url: https://github.com/apecloud/kubeblocks/
+
+
+sources:
+- https://github.com/apecloud/kubeblocks/

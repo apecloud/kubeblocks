@@ -1,11 +1,12 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+{{- if eq .Values.architecture "sharding" }}
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ .Release.Name }}
+  name: {{ include "clustername" . }}-sharding
   labels:
     {{- include "mongodb-cluster.labels" . | nindent 4}}
 spec:
-  clusterDefinitionRef: apecloud-mongodb
+  clusterDefinitionRef: mongodb
   clusterVersionRef: mongodb-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   terminationPolicy: {{ .Values.terminationPolicy }}
   affinity:
@@ -15,13 +16,12 @@ spec:
   {{- with $.Values.tolerations }}
   tolerations: {{ . | toYaml | nindent 4 }}
   {{- end }}
-  components:
+  componentSpecs:
     {{- $i := 0 }}
     {{- range .Values.shard }}
     - name: shard-{{ $i }}
-      type: shard
+      componentDefRef: shard
       monitor: {{ $.Values.monitor.enabled }}
-      serviceType: {{ $.Values.service.type | default "ClusterIP" }}
       replicas: {{ .replicas | default "3" }}
       {{- with .tolerations }}
       tolerations: {{ .| toYaml | nindent 8 }}
@@ -50,7 +50,7 @@ spec:
     {{- end }}
     {{- if gt ( len $.Values.shard ) 0 }}
     - name: configsvr
-      type: configsvr
+      componentDefRef: configsvr
       monitor: {{ $.Values.monitor.enabled }}
       replicas: {{ $.Values.configsvr.replicas }}
       {{- with $.Values.configsvr.tolerations }}
@@ -79,9 +79,8 @@ spec:
     {{- $i := 0 }}
     {{- range .Values.mongos }}
     - name: mongos-{{ $i }}
-      type: mongos
+      componentDefRef: mongos
       monitor: {{ $.Values.monitor.enabled }}
-      serviceType: {{ $.Values.service.type | default "ClusterIP" }}
       replicas: {{ .replicas | default 1 }}
       {{- with .tolerations }}
       tolerations: {{ .| toYaml | nindent 8 }}
@@ -98,3 +97,4 @@ spec:
     {{- $i := add1 $i }}
     {{- end }}
     {{- end }}
+{{- end }}

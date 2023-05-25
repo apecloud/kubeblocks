@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package printer
@@ -27,18 +30,19 @@ import (
 )
 
 var (
-	colTitleIndex     = "#"
-	colTitleFirstName = "First Name"
-	colTitleLastName  = "Last Name"
-	colTitleSalary    = "Salary"
+	header = []string{"NAME", "NAMESPACE", "CLUSTER-DEFINITION", "VERSION", "TERMINATION-POLICY", "CREATED-TIME"}
 )
 
 func TestPrintTable(t *testing.T) {
 	printer := NewTablePrinter(os.Stdout)
-	printer.SetHeader(colTitleIndex, colTitleFirstName, colTitleLastName, colTitleSalary)
+	headerRow := make([]interface{}, len(header))
+	for i, h := range header {
+		headerRow[i] = h
+	}
+	printer.SetHeader(headerRow...)
 	for _, r := range [][]string{
-		{"1", "Arya", "Stark", "3000"},
-		{"20", "Jon", "Snow", "2000"},
+		{"brier63", "default", "apecloud-mysql", "ac-mysql-8.0.30", "Delete", "Feb 20,2023 16:39 UTC+0800"},
+		{"cedar51", "default", "apecloud-mysql", "ac-mysql-8.0.30", "Delete", "Feb 20,2023 16:39 UTC+0800"},
 	} {
 		row := make([]interface{}, len(r))
 		for i, rr := range r {
@@ -84,9 +88,49 @@ func TestPrintLineWithTabSeparator(t *testing.T) {
 	done := clitesting.Capture()
 	key, value := "key", "value"
 	PrintLineWithTabSeparator(NewPair(key, value))
-	capturedOutput, err := done()
+	checkOutPut(t, done, fmt.Sprintf("%s: %s\t\n", key, value))
+}
+
+func TestPrintTitle(t *testing.T) {
+	done := clitesting.Capture()
+	line := "Title"
+	PrintTitle(line)
+	checkOutPut(t, done, fmt.Sprintf("\n%s:\n", line))
+}
+
+func TestPrintLine(t *testing.T) {
+	done := clitesting.Capture()
+	line := "test line"
+	PrintLine(line)
+	checkOutPut(t, done, "test line\n")
+}
+
+func checkOutPut(t *testing.T, captureFunc func() (string, error), expect string) {
+	capturedOutput, err := captureFunc()
 	if err != nil {
 		t.Error("capture stdout failed:" + err.Error())
 	}
-	assert.Equal(t, fmt.Sprintf("%s: %s\t\n", key, value), capturedOutput)
+	assert.Equal(t, expect, capturedOutput)
+}
+
+func TestSort(t *testing.T) {
+	printer := NewTablePrinter(os.Stdout)
+	headerRow := make([]interface{}, len(header))
+	for i, h := range header {
+		headerRow[i] = h
+	}
+	printer.SetHeader(headerRow...)
+	printer.SortBy(1)
+	for _, r := range [][]string{
+		{"cedar51", "default", "apecloud-mysql", "ac-mysql-8.0.30", "Delete", "Feb 20,2023 16:39 UTC+0800"},
+		{"brier63", "default", "apecloud-mysql", "ac-mysql-8.0.30", "Delete", "Feb 20,2023 16:39 UTC+0800"},
+		{"alpha19", "default", "apecloud-mysql", "ac-mysql-8.0.30", "Delete", "Feb 20,2023 16:39 UTC+0800"},
+	} {
+		row := make([]interface{}, len(r))
+		for i, rr := range r {
+			row[i] = rr
+		}
+		printer.AddRow(row...)
+	}
+	printer.Print()
 }

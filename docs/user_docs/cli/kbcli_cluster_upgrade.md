@@ -1,18 +1,30 @@
-## kbcli cluster upgrade
+---
+title: kbcli cluster upgrade
+---
 
-Upgrade the cluster version
+Upgrade the cluster version.
 
 ```
-kbcli cluster upgrade [flags]
+kbcli cluster upgrade NAME [flags]
+```
+
+### Examples
+
+```
+  # upgrade the cluster to the specified version
+  kbcli cluster upgrade mycluster --cluster-version=ac-mysql-8.0.30
 ```
 
 ### Options
 
 ```
-      --cluster-version string       Reference cluster version (required)
-  -h, --help                         help for upgrade
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
-      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
+      --auto-approve                   Skip interactive approval before upgrading the cluster
+      --cluster-version string         Reference cluster version (required)
+      --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+  -h, --help                           help for upgrade
+      --name string                    OpsRequest name. if not specified, it will be randomly generated 
+  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```
 
 ### Options inherited from parent commands
@@ -27,6 +39,7 @@ kbcli cluster upgrade [flags]
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
+      --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -40,5 +53,7 @@ kbcli cluster upgrade [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

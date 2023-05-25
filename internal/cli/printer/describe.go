@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package printer
@@ -23,7 +26,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 const NoneString = "<none>"
@@ -57,6 +63,36 @@ func PrintConditions(conditions []metav1.Condition, out io.Writer) {
 	tbl.SetHeader("LAST-TRANSITION-TIME", "TYPE", "REASON", "STATUS", "MESSAGE")
 	for _, con := range conditions {
 		tbl.AddRow(util.TimeFormat(&con.LastTransitionTime), con.Type, con.Reason, con.Status, con.Message)
+	}
+	tbl.Print()
+}
+
+// PrintComponentConfigMeta prints the conditions of resource.
+func PrintComponentConfigMeta(tplInfos []types.ConfigTemplateInfo, clusterName, componentName string, out io.Writer) {
+	if len(tplInfos) == 0 {
+		return
+	}
+	tbl := NewTablePrinter(out)
+	PrintTitle("ConfigSpecs Meta")
+	enableReconfiguring := func(tpl appsv1alpha1.ComponentConfigSpec, key string) string {
+		if len(tpl.ConfigConstraintRef) > 0 && cfgcore.CheckConfigTemplateReconfigureKey(tpl, key) {
+			return "true"
+		}
+		return "false"
+	}
+	tbl.SetHeader("CONFIG-SPEC-NAME", "FILE", "ENABLED", "TEMPLATE", "CONSTRAINT", "RENDERED", "COMPONENT", "CLUSTER")
+	for _, info := range tplInfos {
+		for key := range info.CMObj.Data {
+			tbl.AddRow(
+				BoldYellow(info.Name),
+				key,
+				BoldYellow(enableReconfiguring(info.TPL, key)),
+				info.TPL.TemplateRef,
+				info.TPL.ConfigConstraintRef,
+				info.CMObj.Name,
+				componentName,
+				clusterName)
+		}
 	}
 	tbl.Print()
 }

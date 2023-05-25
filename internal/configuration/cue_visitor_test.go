@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configuration
@@ -71,19 +74,28 @@ func TestCueTypeExtractorVisit(t *testing.T) {
 		}
 		`,
 			fieldTypes: map[string]CueType{
-				"#a": StructType,
-				"b":  StructType,
-				"g":  StructType,
-				"#c": StructType,
-				"e":  IntType,
-				"f":  StringType,
-				"#j": StructType,
-				"x":  StringType,
-				"y":  IntType,
-				"#n": StructType,
-				"m":  StructType,
-				"d":  StructType,
-				"j":  NullableType,
+				"#a":    StructType,
+				"b":     StructType,
+				"g":     StructType,
+				"#c":    StructType,
+				"e":     IntType,
+				"f":     StringType,
+				"#j":    StructType,
+				"x":     StringType,
+				"y":     IntType,
+				"#n":    StructType,
+				"m":     StructType,
+				"d":     StructType,
+				"j":     NullableType,
+				"b.e":   IntType,
+				"b.f":   StringType,
+				"g.x":   StringType,
+				"g.y":   IntType,
+				"g.m":   StructType,
+				"g.m.d": StructType,
+				"g.m.j": NullableType,
+				"m.d":   StructType,
+				"m.j":   NullableType,
 			},
 		},
 	}, {
@@ -102,14 +114,13 @@ func TestCueTypeExtractorVisit(t *testing.T) {
 		i:[int]
 		}`,
 			fieldTypes: map[string]CueType{
-				"#a":  StructType,
-				"b":   IntType,
-				"c":   StringType,
-				"d":   StringType,
-				"e":   StringType,
-				"g":   StructType,
-				"i":   ListType,
-				"i_0": IntType,
+				"#a": StructType,
+				"b":  IntType,
+				"c":  StringType,
+				"d":  StringType,
+				"e":  StringType,
+				"g":  StructType,
+				"i":  IntType,
 			},
 		},
 	}, {
@@ -137,6 +148,22 @@ func TestCueTypeExtractorVisit(t *testing.T) {
 				"a": K8SQuantityType,
 			},
 		},
+	}, {
+		name: "attr_test",
+		args: args{
+			cue: `a : int @storeResource()`,
+			fieldTypes: map[string]CueType{
+				"a": ClassicStorageType,
+			},
+		},
+	}, {
+		name: "attr_test",
+		args: args{
+			cue: `a : int @timeDurationResource()`,
+			fieldTypes: map[string]CueType{
+				"a": ClassicTimeDurationType,
+			},
+		},
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -157,6 +184,7 @@ func TestTransNumberOrBoolType(t *testing.T) {
 		t        CueType
 		objs     []string
 		expected []interface{}
+		expand   string
 		// obj reflect.Value
 		// fn  UpdateFn
 	}
@@ -220,13 +248,54 @@ func TestTransNumberOrBoolType(t *testing.T) {
 			expected: []interface{}{1024 * 1024 * 1024, 1000 * 1000 * 1000, 10 * 1000 * 1000, 100, 1},
 		},
 		wantErr: false,
+	}, {
+		name: "testClassResource",
+		args: args{
+			t:        ClassicStorageType,
+			objs:     []string{"1G", "1GB", "1K", "1M", "1MB", "100T", "10TB", "888", "20mb", "-1"},
+			expected: []interface{}{1024 * 1024 * 1024, 1024 * 1024 * 1024, 1024, 1024 * 1024, 1024 * 1024, 100 * TByte, 10 * TByte, 888, 20 * 1024 * 1024, -1},
+		},
+		wantErr: false,
+	}, {
+		name: "testClassResource",
+		args: args{
+			t:        ClassicStorageType,
+			objs:     []string{"1G", "1MB", "100T", "10TB"},
+			expected: []interface{}{1024 * 1024 / 16, 1024 / 16, 100 * GByte / 16, 10 * GByte / 16},
+			expand:   "16KB",
+		},
+		wantErr: false,
+	}, {
+		name: "testClassResource",
+		args: args{
+			t:        ClassicStorageType,
+			objs:     []string{"G", "", "1KK", "1o", "1MB1"},
+			expected: []interface{}{0, 0, 0, 0, 0},
+		},
+		wantErr: true,
+	}, {
+		name: "testClassResource",
+		args: args{
+			t:        ClassicTimeDurationType,
+			objs:     []string{"1", "100", "1s", "1min", "20m", "5d", "10000ms", "20MIN"},
+			expected: []interface{}{1, 100, 1000, 60 * 1000, 20 * 60 * 1000, 5 * Day, 10000, 20 * 60 * 1000},
+		},
+		wantErr: false,
+	}, {
+		name: "testClassResource",
+		args: args{
+			t:        ClassicTimeDurationType,
+			objs:     []string{"", "100yy", "s", "min45", "second"},
+			expected: []interface{}{0, 0, 0, 0, 0},
+		},
+		wantErr: true,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for i := 0; i < len(tt.args.objs); i++ {
 				if err := transNumberOrBoolType(tt.args.t, reflect.ValueOf(tt.args.objs[i]), func(v interface{}) {
 					require.EqualValues(t, v, tt.args.expected[i])
-				}); (err != nil) != tt.wantErr {
+				}, tt.args.expand, false); (err != nil) != tt.wantErr {
 					t.Errorf("transNumberOrBoolType() error = %v, wantErr %v", err, tt.wantErr)
 				}
 			}

@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package printer
@@ -19,21 +22,45 @@ package printer
 import (
 	"fmt"
 	"io"
+	"os"
 
-	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
 )
 
 var (
-	boxStyle = table.BoxStyle{
-		PaddingLeft:   "",
-		PaddingRight:  "\t",
-		PageSeparator: "\n",
-		UnfinishedRow: " ~",
-	}
+	// KubeCtlStyle renders a Table like kubectl
+	KubeCtlStyle table.Style
 
-	// StyleKubeCtl renders a Table like kubectl
-	StyleKubeCtl = table.Style{
+	// TerminalStyle renders a Table like below:
+	//  +-----+------------+-----------+--------+-----------------------------+
+	//  |   # | FIRST NAME | LAST NAME | SALARY |                             |
+	//  +-----+------------+-----------+--------+-----------------------------+
+	//  |   1 | Arya       | Stark     |   3000 |                             |
+	//  |  20 | Jon        | Snow      |   2000 | You know nothing, Jon Snow! |
+	//  | 300 | Tyrion     | Lannister |   5000 |                             |
+	//  +-----+------------+-----------+--------+-----------------------------+
+	//  |     |            | TOTAL     |  10000 |                             |
+	//  +-----+------------+-----------+--------+-----------------------------+
+	TerminalStyle = table.Style{
+		Name:    "TerminalStyle",
+		Box:     table.StyleBoxDefault,
+		Color:   table.ColorOptionsDefault,
+		Format:  table.FormatOptionsDefault,
+		HTML:    table.DefaultHTMLOptions,
+		Options: table.OptionsDefault,
+		Title:   table.TitleOptionsDefault,
+	}
+)
+
+type TablePrinter struct {
+	Tbl table.Writer
+}
+
+func init() {
+	boxStyle := table.StyleBoxDefault
+	boxStyle.PaddingLeft = ""
+	boxStyle.PaddingRight = "   "
+	KubeCtlStyle = table.Style{
 		Name:    "StyleKubeCtl",
 		Box:     boxStyle,
 		Color:   table.ColorOptionsDefault,
@@ -42,21 +69,37 @@ var (
 		Options: table.OptionsNoBordersAndSeparators,
 		Title:   table.TitleOptionsDefault,
 	}
-)
+}
 
-type TablePrinter struct {
-	tbl table.Writer
+// PrintTable high level wrapper function.
+func PrintTable(out io.Writer, customSettings func(*TablePrinter), rowFeeder func(*TablePrinter) error, header ...interface{}) error {
+	t := NewTablePrinter(out)
+	t.SetHeader(header...)
+	if customSettings != nil {
+		customSettings(t)
+	}
+	if rowFeeder != nil {
+		if err := rowFeeder(t); err != nil {
+			return err
+		}
+	}
+	t.Print()
+	return nil
 }
 
 func NewTablePrinter(out io.Writer) *TablePrinter {
 	t := table.NewWriter()
-	t.SetStyle(StyleKubeCtl)
+	t.SetStyle(KubeCtlStyle)
 	t.SetOutputMirror(out)
-	return &TablePrinter{tbl: t}
+	return &TablePrinter{Tbl: t}
+}
+
+func (t *TablePrinter) SetStyle(style table.Style) {
+	t.Tbl.SetStyle(style)
 }
 
 func (t *TablePrinter) SetHeader(header ...interface{}) {
-	t.tbl.AppendHeader(header)
+	t.Tbl.AppendHeader(header)
 }
 
 func (t *TablePrinter) AddRow(row ...interface{}) {
@@ -64,11 +107,32 @@ func (t *TablePrinter) AddRow(row ...interface{}) {
 	for _, col := range row {
 		rowObj = append(rowObj, col)
 	}
-	t.tbl.AppendRow(rowObj)
+	t.Tbl.AppendRow(rowObj)
 }
 
 func (t *TablePrinter) Print() {
-	t.tbl.Render()
+	if t == nil || t.Tbl == nil {
+		return
+	}
+	t.Tbl.Render()
+}
+
+// SortBy will sort the table alphabetically by the column you specify, it will be sorted by the first table column in default.
+// The columnNumber index start from 1
+func (t *TablePrinter) SortBy(columnNumber ...int) {
+	if len(columnNumber) == 0 {
+		t.Tbl.SortBy([]table.SortBy{
+			{
+				Number: 1,
+			},
+		})
+		return
+	}
+	res := make([]table.SortBy, len(columnNumber))
+	for i := range columnNumber {
+		res[i].Number = columnNumber[i]
+	}
+	t.Tbl.SortBy(res)
 }
 
 // PrintPairStringToLine print pair string for a line , the format is as follows "<space>*<key>:\t<value>".
@@ -110,7 +174,14 @@ func PrintTitle(title string) {
 	fmt.Println(titleTpl)
 }
 
-// BoldYellow returns a string formatted with yellow and bold.
-func BoldYellow(msg interface{}) string {
-	return color.New(color.FgYellow).Add(color.Bold).Sprint(msg)
+func PrintLine(line string) {
+	fmt.Println(line)
+}
+
+// PrintBlankLine print a blank line
+func PrintBlankLine(out io.Writer) {
+	if out == nil {
+		out = os.Stdout
+	}
+	fmt.Fprintln(out)
 }

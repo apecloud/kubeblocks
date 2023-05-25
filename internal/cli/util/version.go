@@ -1,25 +1,30 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package util
 
 import (
 	"context"
-	"strings"
+	"fmt"
+	"reflect"
 
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
@@ -28,54 +33,55 @@ import (
 	"github.com/apecloud/kubeblocks/version"
 )
 
-type AppName string
+type Version struct {
+	KubeBlocks string
+	Kubernetes string
+	Cli        string
+}
 
-const (
-	KubernetesApp AppName = "Kubernetes"
-	KubeBlocksApp AppName = "KubeBlocks"
-	KBCLIApp      AppName = "kbcli"
-)
-
-// GetVersionInfo get application version include KubeBlocks, CLI and kubernetes
-func GetVersionInfo(client kubernetes.Interface) (map[AppName]string, error) {
+// GetVersionInfo get version include KubeBlocks, CLI and kubernetes
+func GetVersionInfo(client kubernetes.Interface) (Version, error) {
 	var err error
-	versionInfo := map[AppName]string{}
-	if versionInfo[KubernetesApp], err = getK8sVersion(client.Discovery()); err != nil {
-		return versionInfo, err
+	version := Version{
+		Cli: version.GetVersion(),
 	}
 
-	if versionInfo[KubeBlocksApp], err = getKubeBlocksVersion(client); err != nil {
-		return versionInfo, err
+	if client == nil || reflect.ValueOf(client).IsNil() {
+		return version, nil
 	}
 
-	versionInfo[KBCLIApp] = version.GetVersion()
-	return versionInfo, nil
+	if version.Kubernetes, err = GetK8sVersion(client.Discovery()); err != nil {
+		return version, err
+	}
+
+	if version.KubeBlocks, err = getKubeBlocksVersion(client); err != nil {
+		return version, err
+	}
+
+	return version, nil
 }
 
 // getKubeBlocksVersion get KubeBlocks version
 func getKubeBlocksVersion(client kubernetes.Interface) (string, error) {
-	kubeBlocksDeploys, err := client.AppsV1().Deployments(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/name=" + types.KubeBlocksChartName,
-	})
-	if err != nil {
+	deploy, err := GetKubeBlocksDeploy(client)
+	if err != nil || deploy == nil {
 		return "", err
 	}
 
-	var versions []string
-	for _, deploy := range kubeBlocksDeploys.Items {
-		labels := deploy.GetLabels()
-		if labels == nil {
-			continue
-		}
-		if v, ok := labels["app.kubernetes.io/version"]; ok {
-			versions = append(versions, v)
-		}
+	labels := deploy.GetLabels()
+	if labels == nil {
+		return "", fmt.Errorf("KubeBlocks deployment has no labels")
 	}
-	return strings.Join(versions, " "), nil
+
+	v, ok := labels["app.kubernetes.io/version"]
+	if !ok {
+		return "", fmt.Errorf("KubeBlocks deployment has no version label")
+	}
+	return v, nil
 }
 
-// getK8sVersion get k8s server version
-func getK8sVersion(discoveryClient discovery.DiscoveryInterface) (string, error) {
+// GetK8sVersion get k8s server version
+func GetK8sVersion(discoveryClient discovery.DiscoveryInterface) (string, error) {
 	if discoveryClient == nil {
 		return "", nil
 	}
@@ -89,4 +95,22 @@ func getK8sVersion(discoveryClient discovery.DiscoveryInterface) (string, error)
 		return serverVersion.GitVersion, nil
 	}
 	return "", nil
+}
+
+// GetKubeBlocksDeploy gets KubeBlocks deployments, now one kubernetes cluster
+// only support one KubeBlocks
+func GetKubeBlocksDeploy(client kubernetes.Interface) (*appsv1.Deployment, error) {
+	deploys, err := client.AppsV1().Deployments(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/name=" + types.KubeBlocksChartName,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if deploys == nil || len(deploys.Items) == 0 {
+		return nil, nil
+	}
+	if len(deploys.Items) > 1 {
+		return nil, fmt.Errorf("found multiple KubeBlocks deployments, please check your cluster")
+	}
+	return &deploys.Items[0], nil
 }

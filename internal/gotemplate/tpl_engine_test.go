@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package gotemplate
@@ -20,10 +23,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -96,8 +98,8 @@ my friend name is test2
 	// funcB.2 call funcB.1 in C module
 	Context("Support export function library", func() {
 		It("call function in other module", func() {
-			ctrl, k8sMock := testutil.SetupK8sMock()
-			defer ctrl.Finish()
+			k8sMockClient := testutil.NewK8sMockClient()
+			defer k8sMockClient.Finish()
 
 			testRenderString := fmt.Sprintf(`
 {{- import "%s.moduleB" }}
@@ -137,45 +139,30 @@ mathAvg = {{ $mathAvg -}}
 total = 10
 mathAvg = [8-9][0-9]\.?\d*`
 
-			moduleB := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "moduleB",
-					Namespace:   defaultNamespace,
-					Annotations: map[string]string{GoTemplateLibraryAnnotationKey: "true"},
-				},
-				Data: map[string]string{
-					"calMathAvg":    calMathAvg,
-					"calTotalMatch": calTotalMatch,
-				},
-			}
-			moduleC := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "moduleC",
-					Namespace:   defaultNamespace,
-					Annotations: map[string]string{GoTemplateLibraryAnnotationKey: "true"},
-				},
-				Data: map[string]string{
-					"getAllStudentMeta": getAllStudentMeta,
-					"calTotalStudent":   calTotalStudent,
-				},
-			}
+			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "moduleB",
+						Namespace:   defaultNamespace,
+						Annotations: map[string]string{GoTemplateLibraryAnnotationKey: "true"},
+					},
+					Data: map[string]string{
+						"calMathAvg":    calMathAvg,
+						"calTotalMatch": calTotalMatch,
+					}},
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "moduleC",
+						Namespace:   defaultNamespace,
+						Annotations: map[string]string{GoTemplateLibraryAnnotationKey: "true"},
+					},
+					Data: map[string]string{
+						"getAllStudentMeta": getAllStudentMeta,
+						"calTotalStudent":   calTotalStudent,
+					}},
+			}), testutil.WithAnyTimes()))
 
-			k8sMock.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					var ret client.Object
-					switch key {
-					case client.ObjectKeyFromObject(moduleB):
-						ret = moduleB
-					case client.ObjectKeyFromObject(moduleC):
-						ret = moduleC
-					default:
-						return cfgcore.MakeError("failed to get cm: %v", key)
-					}
-					testutil.SetGetReturnedObject(obj, ret)
-					return nil
-				}).AnyTimes()
-
-			engine := NewTplEngine(&TplValues{}, nil, "for_test", k8sMock, ctx)
+			engine := NewTplEngine(&TplValues{}, nil, "for_test", k8sMockClient.Client(), ctx)
 			rendered, err := engine.Render(testRenderString)
 			Expect(err).Should(Succeed())
 			Expect(rendered).Should(MatchRegexp(expectedRenderedString))
@@ -237,7 +224,7 @@ mathAvg = [8-9][0-9]\.?\d*`
 
 		It("test failed", func() {
 
-			testFaieldFunc := `
+			testFailedFunc := `
 {{ $testBoundary := 1000 }}
 {{- if gt $.testCondition $testBoundary }}
 {{- failed "testCondition require <= %d" $testBoundary }}
@@ -247,14 +234,14 @@ mathAvg = [8-9][0-9]\.?\d*`
 				"testCondition": 100,
 			}, nil, "for_test", nil, nil)
 
-			_, err := engine.Render(testFaieldFunc)
+			_, err := engine.Render(testFailedFunc)
 			Expect(err).Should(Succeed())
 
 			engine = NewTplEngine(&TplValues{
 				"testCondition": 5000,
 			}, nil, "for_test", nil, nil)
 
-			_, err = engine.Render(testFaieldFunc)
+			_, err = engine.Render(testFailedFunc)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(ContainSubstring("testCondition require <= 1000"))
 		})

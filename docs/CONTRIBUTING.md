@@ -34,7 +34,7 @@ Currently, there are 4 types of issues:
 
 ### Make your changes
 - Fork the KubeBlocks repository to your Github account, create a new branch and clone to your host.
-  - Branch naming style should match the pattern: `feature/|bugfix/|release/|hotfix/|support/`. KubeBlocks performs a pull request check to verify the pull request branch name.
+  - Branch naming style should match the pattern: `feature/|bugfix/|release/|hotfix/|support/|dependabot/`. KubeBlocks performs a pull request check to verify the pull request branch name.
 - See the [Developing KubeBlocks docs](./DEVELOPING.md) for more information about setting up a KubeBlocks development environment.
 - Make your changes.
 - Update relevant documentation for the change.
@@ -52,7 +52,7 @@ The pull request title must follow the format outlined in the [conventional comm
 
 The following are all good examples of pull request titles:
 ```shell
-feat(dbaas): add foo bar baz feature
+feat(apps): add foo bar baz feature
 fix(kbcli): fix foo bar baz bug
 chore: tidy up Makefile
 docs: fix typos

@@ -1,0 +1,15 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: postgresql-14.7.1-latest
+spec:
+  clusterDefinitionRef: postgresql
+  componentVersions:
+    - componentDefRef: postgresql
+      versionsContext:
+        containers:
+          - name: postgresql
+            image: registry.cn-hangzhou.aliyuncs.com/apecloud/spilo:14.7.1
+        initContainers:
+          - image: registry.cn-hangzhou.aliyuncs.com/apecloud/spilo:14.7.1
+            name: pg-init-container

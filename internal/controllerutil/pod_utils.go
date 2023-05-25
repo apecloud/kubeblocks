@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package controllerutil
@@ -23,12 +26,14 @@ import (
 	"strings"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metautil "k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // statefulPodRegex is a regular expression that extracts the parent StatefulSet and ordinal from the Name of a Pod
@@ -51,7 +56,7 @@ func GetParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
 	return parent, ordinal
 }
 
-// GetContainerUsingConfig function description:
+// GetContainerByConfigSpec function description:
 // Search the container using the configmap of config from the pod
 //
 // Return: The first container pointer of using configs
@@ -69,7 +74,7 @@ func GetParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
 //		   name: data
 //		 - mountPath: /log
 //		   name: log
-func GetContainerUsingConfig(podSpec *corev1.PodSpec, configs []dbaasv1alpha1.ConfigTemplate) *corev1.Container {
+func GetContainerByConfigSpec(podSpec *corev1.PodSpec, configs []appsv1alpha1.ComponentConfigSpec) *corev1.Container {
 	containers := podSpec.Containers
 	initContainers := podSpec.InitContainers
 	if container := getContainerWithTplList(containers, configs); container != nil {
@@ -120,7 +125,7 @@ func GetVolumeMountName(volumes []corev1.Volume, resourceName string) *corev1.Vo
 
 type containerNameFilter func(containerName string) bool
 
-func GetContainersUsingConfigmap(containers []corev1.Container, volumeName string, filters ...containerNameFilter) []string {
+func GetContainersByConfigmap(containers []corev1.Container, volumeName string, filters ...containerNameFilter) []string {
 	containerFilter := func(c corev1.Container) bool {
 		for _, f := range filters {
 			if len(c.VolumeMounts) == 0 || f(c.Name) {
@@ -145,7 +150,7 @@ func GetContainersUsingConfigmap(containers []corev1.Container, volumeName strin
 	return tmpList
 }
 
-func getContainerWithTplList(containers []corev1.Container, configs []dbaasv1alpha1.ConfigTemplate) *corev1.Container {
+func getContainerWithTplList(containers []corev1.Container, configs []appsv1alpha1.ComponentConfigSpec) *corev1.Container {
 	if len(containers) == 0 {
 		return nil
 	}
@@ -158,7 +163,7 @@ func getContainerWithTplList(containers []corev1.Container, configs []dbaasv1alp
 	return nil
 }
 
-func checkContainerWithVolumeMount(volumeMounts []corev1.VolumeMount, configs []dbaasv1alpha1.ConfigTemplate) bool {
+func checkContainerWithVolumeMount(volumeMounts []corev1.VolumeMount, configs []appsv1alpha1.ComponentConfigSpec) bool {
 	volumes := make(map[string]int)
 	for _, c := range configs {
 		for j, vm := range volumeMounts {
@@ -215,6 +220,16 @@ func GetMemorySize(container corev1.Container) int64 {
 	return 0
 }
 
+// GetRequestMemorySize function description:
+// if not Resource field, return 0 else Resources.Limits.memory
+func GetRequestMemorySize(container corev1.Container) int64 {
+	requests := container.Resources.Requests
+	if val, ok := (requests)[corev1.ResourceMemory]; ok {
+		return val.Value()
+	}
+	return 0
+}
+
 // PodIsReady check the pod is ready
 func PodIsReady(pod *corev1.Pod) bool {
 	if pod.Status.Conditions == nil {
@@ -251,21 +266,12 @@ func isRunning(pod *corev1.Pod) bool {
 	return pod.Status.Phase == corev1.PodRunning && pod.DeletionTimestamp == nil
 }
 
-func IsReady(pod *corev1.Pod) bool {
-	if !isRunning(pod) {
-		return false
-	}
-
-	condition := getPodCondition(&pod.Status, corev1.PodReady)
-	return condition != nil && condition.Status == corev1.ConditionTrue
-}
-
 func IsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	if !isRunning(pod) {
 		return false
 	}
 
-	condition := getPodCondition(&pod.Status, corev1.PodReady)
+	condition := GetPodCondition(&pod.Status, corev1.PodReady)
 	if condition == nil || condition.Status != corev1.ConditionTrue {
 		return false
 	}
@@ -282,14 +288,14 @@ func IsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	return !lastTransitionTime.IsZero() && lastTransitionTime.Add(minDuration).Before(now.Time)
 }
 
-func getPodCondition(status *corev1.PodStatus, conditionType corev1.PodConditionType) *corev1.PodCondition {
+func GetPodCondition(status *corev1.PodStatus, conditionType corev1.PodConditionType) *corev1.PodCondition {
 	if len(status.Conditions) == 0 {
 		return nil
 	}
 
-	for _, condition := range status.Conditions {
+	for i, condition := range status.Conditions {
 		if condition.Type == conditionType {
-			return &condition
+			return &status.Conditions[i]
 		}
 	}
 	return nil
@@ -316,11 +322,84 @@ func GetIntOrPercentValue(intOrStr *metautil.IntOrString) (int, bool, error) {
 	if strings.HasSuffix(s, "%") {
 		s = strings.TrimSuffix(intOrStr.StrVal, "%")
 	} else {
-		return 0, false, fmt.Errorf("falied to parse percentage. [%s]", intOrStr.StrVal)
+		return 0, false, fmt.Errorf("failed to parse percentage. [%s]", intOrStr.StrVal)
 	}
 	v, err := strconv.Atoi(s)
 	if err != nil {
 		return 0, false, fmt.Errorf("failed to atoi. [%s], error: %v", intOrStr.StrVal, err)
 	}
 	return v, true, nil
+}
+
+// GetPortByPortName find the Port from pod by name
+func GetPortByPortName(pod *corev1.Pod, portName string) (int32, error) {
+	for _, container := range pod.Spec.Containers {
+		for _, port := range container.Ports {
+			if port.Name == portName {
+				return port.ContainerPort, nil
+			}
+		}
+	}
+	return 0, fmt.Errorf("port %s not found", portName)
+}
+
+func GetProbeGRPCPort(pod *corev1.Pod) (int32, error) {
+	return GetPortByPortName(pod, constant.ProbeGRPCPortName)
+}
+
+func GetProbeHTTPPort(pod *corev1.Pod) (int32, error) {
+	return GetPortByPortName(pod, constant.ProbeHTTPPortName)
+}
+
+// GetProbeContainerName find the probe container from pod
+func GetProbeContainerName(pod *corev1.Pod) (string, error) {
+	for _, container := range pod.Spec.Containers {
+		if container.Name == constant.RoleProbeContainerName {
+			return constant.RoleProbeContainerName, nil
+		}
+	}
+	return "", fmt.Errorf("container %s not found", constant.RoleProbeContainerName)
+
+}
+
+// PodIsReadyWithLabel checks whether pod is ready or not if the component is ConsensusSet or ReplicationSet,
+// it will be available when the pod is ready and labeled with its role.
+func PodIsReadyWithLabel(pod corev1.Pod) bool {
+	if _, ok := pod.Labels[constant.RoleLabelKey]; !ok {
+		return false
+	}
+
+	return PodIsReady(&pod)
+}
+
+// PodIsControlledByLatestRevision checks if the pod is controlled by latest controller revision.
+func PodIsControlledByLatestRevision(pod *corev1.Pod, sts *appsv1.StatefulSet) bool {
+	return GetPodRevision(pod) == sts.Status.UpdateRevision && sts.Status.ObservedGeneration == sts.Generation
+}
+
+// GetPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty
+// string is returned.
+func GetPodRevision(pod *corev1.Pod) string {
+	if pod.Labels == nil {
+		return ""
+	}
+	return pod.Labels[appsv1.StatefulSetRevisionLabel]
+}
+
+// ByPodName sorts a list of jobs by pod name
+type ByPodName []corev1.Pod
+
+// Len return the length of byPodName, for the sort.Sort
+func (c ByPodName) Len() int {
+	return len(c)
+}
+
+// Swap the items, for the sort.Sort
+func (c ByPodName) Swap(i, j int) {
+	c[i], c[j] = c[j], c[i]
+}
+
+// Less define how to compare items, for the sort.Sort
+func (c ByPodName) Less(i, j int) bool {
+	return c[i].Name < c[j].Name
 }

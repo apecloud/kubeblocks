@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package controllerutil
@@ -20,6 +23,7 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -32,68 +36,31 @@ type RequestCtx struct {
 	Recorder record.EventRecorder
 }
 
-const (
-	AppName = "kubeblocks"
-	// common label and annotation keys
+// Event is wrapper for Recorder.Event, if Recorder is nil, then it's no-op.
+func (r *RequestCtx) Event(object runtime.Object, eventtype, reason, message string) {
+	if r == nil || r.Recorder == nil {
+		return
+	}
+	r.Recorder.Event(object, eventtype, reason, message)
+}
 
-	AppInstanceLabelKey             = "app.kubernetes.io/instance"
-	AppComponentLabelKey            = "app.kubernetes.io/component-name"
-	AppNameLabelKey                 = "app.kubernetes.io/name"
-	AppManagedByLabelKey            = "app.kubernetes.io/managed-by"
-	AppCreatedByLabelKey            = "app.kubernetes.io/created-by" // resources created temporarily by kubeblocks
-	AppConfigTypeLabelKey           = "app.kubernetes.io/config-type"
-	ConsensusSetRoleLabelKey        = "cs.dbaas.kubeblocks.io/role"
-	ConsensusSetAccessModeLabelKey  = "cs.dbaas.kubeblocks.io/access-mode"
-	VolumeClaimTemplateNameLabelKey = "vct.kubeblocks.io/name"
+// Eventf is wrapper for Recorder.Eventf, if Recorder is nil, then it's no-op.
+func (r *RequestCtx) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	if r == nil || r.Recorder == nil {
+		return
+	}
+	r.Recorder.Eventf(object, eventtype, reason, messageFmt, args...)
+}
 
-	// OpsRequestAnnotationKey OpsRequest annotation key in Cluster
-	OpsRequestAnnotationKey = "kubeblocks.io/ops-request"
+// UpdateCtxValue update Context value, return parent Context.
+func (r *RequestCtx) UpdateCtxValue(key, val any) context.Context {
+	p := r.Ctx
+	r.Ctx = context.WithValue(r.Ctx, key, val)
+	return p
+}
 
-	// OpsRequestReconcileAnnotationKey Notify OpsRequest to reconcile
-	OpsRequestReconcileAnnotationKey = "kubeblocks.io/reconcile"
-
-	// StorageClassAnnotationKey StorageClass annotation key in Cluster
-	StorageClassAnnotationKey = "kubeblocks.io/storage-class"
-
-	// RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	RestartAnnotationKey = "kubeblocks.io/restart"
-
-	// BackupProtectionLabelKey Backup delete protection policy label
-	BackupProtectionLabelKey = "kubeblocks.io/backup-protection"
-)
-
-const (
-	// ReasonNotFoundCR referenced custom resource not found
-	ReasonNotFoundCR = "NotFound"
-	// ReasonRefCRUnavailable  referenced custom resource is unavailable
-	ReasonRefCRUnavailable = "Unavailable"
-	// ReasonDeletedCR deleted custom resource
-	ReasonDeletedCR = "DeletedCR"
-	// ReasonDeletingCR deleting custom resource
-	ReasonDeletingCR = "DeletingCR"
-	// ReasonCreatedCR created custom resource
-	ReasonCreatedCR = "CreatedCR"
-	// ReasonRunTaskFailed run task failed
-	ReasonRunTaskFailed = "RunTaskFailed"
-	// ReasonDeleteFailed delete failed
-	ReasonDeleteFailed = "DeleteFailed"
-)
-
-const (
-	DeploymentKind            = "Deployment"
-	StatefulSetKind           = "StatefulSet"
-	PodKind                   = "Pod"
-	PersistentVolumeClaimKind = "PersistentVolumeClaim"
-	CronJob                   = "CronJob"
-)
-
-const (
-	// BackupRetain always retained, unless manually deleted by the user
-	BackupRetain = "Retain"
-
-	// BackupRetainUntilExpired retains backup till it expires
-	BackupRetainUntilExpired = "RetainUntilExpired"
-
-	// BackupDelete (default) deletes backup immediately when cluster's terminationPolicy is WipeOut
-	BackupDelete = "Delete"
-)
+// WithValue returns a copy of parent in which the value associated with key is
+// val.
+func (r *RequestCtx) WithValue(key, val any) context.Context {
+	return context.WithValue(r.Ctx, key, val)
+}

@@ -1,6 +1,14 @@
 # Mac OS X files
 .DS_Store
 
+# ignore go generate code files
+internal/testutil/k8s/mocks/*_mocks.go
+internal/configuration/proto/mocks/*_mocks.go
+internal/configuration/container/mocks/*_mocks.go
+# internal/configuration/proto/*.pb.go
+
+# ignore go mock temporary files
+**/gomock_reflect*/
 
 # Binaries for programs and plugins
 *.exe
@@ -9,9 +17,10 @@
 *.so
 *.dylib
 *.tar.gz
-*.tgz
+**/*.tgz
 bin
 testbin/*
+__debug_bin
 
 # Test binary, build with `go test -c`
 *.test
@@ -47,3 +56,6 @@ _dist/
 bin/
 tmp/
 
+
+# helm dependency charts
+deploy/**/charts

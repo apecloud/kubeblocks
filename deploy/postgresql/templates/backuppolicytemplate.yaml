@@ -1,0 +1,60 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: postgresql-backup-policy-template
+  labels:
+    clusterdefinition.kubeblocks.io/name: postgresql
+    {{- include "postgresql.labels" . | nindent 4 }}
+  annotations:
+    dataprotection.kubeblocks.io/reconfigure-ref: |
+      {
+        "name": "postgresql-configuration",
+        "key": "postgresql.conf",
+        "enable": {
+          "logfile": [{"key": "archive_command","value": "''"}]
+        },
+        "disable": {
+          "logfile": [{ "key": "archive_command","value": "'/bin/true'"}]
+        }
+      }
+spec:
+  clusterDefinitionRef: postgresql
+  backupPolicies:
+  - componentDefRef: postgresql
+    retention:
+      ttl: 7d
+    schedule:
+      snapshot:
+        enable: false
+        cronExpression: "0 18 * * *"
+      datafile:
+        enable: false
+        cronExpression: "0 18 * * *"
+      logfile:
+        enable: false
+        cronExpression: "*/5 * * * *"
+    snapshot:
+      target:
+        connectionCredentialKey:
+          passwordKey: password
+          usernameKey: username
+      hooks:
+        containerName: postgresql
+        preCommands:
+          - psql -c "CHECKPOINT;"
+      backupStatusUpdates:
+        - path: manifests.backupLog
+          containerName: postgresql
+          script: /kb-scripts/backup-log-collector.sh true
+          updateStage: post
+    datafile:
+      backupToolName: postgres-basebackup
+    logfile:
+      backupToolName: postgres-pitr
+      target:
+        role: primary
+      backupStatusUpdates:
+        - path: manifests.backupLog
+          containerName: postgresql
+          script: /kb-scripts/backup-log-collector.sh false
+          updateStage: post

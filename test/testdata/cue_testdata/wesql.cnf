@@ -40,6 +40,8 @@ table_open_cache=4000
 # if so, change it to 100000 or higher.
 max_prepared_stmt_count=16382
 
+innodb_buffer_pool_size=1024M
+
 performance_schema_digests_size=10000
 performance_schema_events_stages_history_long_size=10000
 performance_schema_events_transactions_history_long_size=10000
@@ -103,7 +105,7 @@ log_bin_index=mysql-bin.index
 max_binlog_size=134217728
 log_replica_updates=1
 # binlog_rows_query_log_events=ON #AWS not set
-# binlog_transaction_dependency_tracking=WRITESET    #Defautl Commit Order, Aws not set
+# binlog_transaction_dependency_tracking=WRITESET    #Default Commit Order, Aws not set
 
 # replay log
 # relay_log_info_repository=TABLE

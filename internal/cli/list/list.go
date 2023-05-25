@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package list
@@ -60,8 +63,8 @@ type ListOptions struct {
 
 	// print the result or not, if true, use default printer to print, otherwise,
 	// only return the result to caller.
-	Print bool
-
+	Print  bool
+	SortBy string
 	genericclioptions.IOStreams
 }
 
@@ -72,13 +75,17 @@ func NewListOptions(f cmdutil.Factory, streams genericclioptions.IOStreams,
 		IOStreams: streams,
 		GVR:       gvr,
 		Print:     true,
+		SortBy:    ".metadata.name",
 	}
 }
 
-func (o *ListOptions) AddFlags(cmd *cobra.Command) {
-	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespace", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+func (o *ListOptions) AddFlags(cmd *cobra.Command, isClusterScope ...bool) {
+	if len(isClusterScope) == 0 || !isClusterScope[0] {
+		cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespace", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	}
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
 	cmd.Flags().BoolVar(&o.ShowLabels, "show-labels", false, "When printing, show all labels as the last column (default hide labels column)")
+	//Todo: --sortBy supports custom field sorting, now `list` is to sort using the `.metadata.name` field in default
 	printer.AddOutputFlag(cmd, &o.Format)
 }
 
@@ -125,6 +132,7 @@ func (o *ListOptions) Complete() error {
 		}
 
 		if o.Format.IsHumanReadable() {
+			p = &cmdget.SortingPrinter{Delegate: p, SortField: o.SortBy}
 			p = &cmdget.TablePrinter{Delegate: p}
 		}
 		return p.PrintObj, nil
@@ -173,6 +181,9 @@ func (o *ListOptions) transformRequests(req *rest.Request) {
 		fmt.Sprintf("application/json;as=Table;v=%s;g=%s", metav1beta1.SchemeGroupVersion.Version, metav1beta1.GroupName),
 		"application/json",
 	}, ","))
+	if len(o.SortBy) > 0 {
+		req.Param("includeObject", "Object")
+	}
 }
 
 func (o *ListOptions) printResult(r *resource.Result) error {
@@ -242,11 +253,7 @@ func (o *ListOptions) printResult(r *resource.Result) error {
 
 	w.Flush()
 	if tracingWriter.Written == 0 && len(allErrs) == 0 {
-		if allResourceNamespaced {
-			fmt.Fprintf(o.ErrOut, "No %s found in %s namespace.\n", o.GVR.Resource, o.Namespace)
-		} else {
-			fmt.Fprintf(o.ErrOut, "No %s found\n", o.GVR.Resource)
-		}
+		o.PrintNotFoundResources()
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
@@ -369,4 +376,12 @@ func (o *ListOptions) printGeneric(r *resource.Result) error {
 	}
 
 	return utilerrors.Reduce(utilerrors.Flatten(utilerrors.NewAggregate(errs)))
+}
+
+func (o *ListOptions) PrintNotFoundResources() {
+	if !o.AllNamespaces {
+		fmt.Fprintf(o.ErrOut, "No %s found in %s namespace.\n", o.GVR.Resource, o.Namespace)
+	} else {
+		fmt.Fprintf(o.ErrOut, "No %s found\n", o.GVR.Resource)
+	}
 }

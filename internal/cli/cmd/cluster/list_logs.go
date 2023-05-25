@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -30,12 +33,13 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -72,7 +76,7 @@ func NewListLogsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 
 	cmd := &cobra.Command{
 		Use:               "list-logs NAME",
-		Short:             "List supported log files in cluster",
+		Short:             "List supported log files in cluster.",
 		Example:           logsListExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -142,7 +146,8 @@ func (o *ListLogsOptions) printListLogs(dataObj *cluster.ClusterObjects) error {
 	tbl := printer.NewTablePrinter(o.Out)
 	logFilesData := o.gatherLogFilesData(dataObj.Cluster, dataObj.ClusterDef, dataObj.Pods)
 	if len(logFilesData) == 0 {
-		fmt.Fprintln(o.ErrOut, "No log files found. \nYou can enable the log feature when creating a cluster with option of \"--enable-all-logs=true\"")
+		fmt.Fprintf(o.ErrOut, "No log files found. You can enable the log feature with the kbcli command below.\n"+
+			"kbcli cluster update %s --enable-all-logs=true --namespace %s\n", dataObj.Cluster.Name, dataObj.Cluster.Namespace)
 	} else {
 		tbl.SetHeader("INSTANCE", "LOG-TYPE", "FILE-PATH", "SIZE", "LAST-WRITTEN", "COMPONENT")
 		for _, f := range logFilesData {
@@ -163,34 +168,34 @@ type logFileInfo struct {
 }
 
 // gatherLogFilesData gathers all log files data from every instance of the cluster.
-func (o *ListLogsOptions) gatherLogFilesData(c *dbaasv1alpha1.Cluster, cd *dbaasv1alpha1.ClusterDefinition, pods *corev1.PodList) []logFileInfo {
+func (o *ListLogsOptions) gatherLogFilesData(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinition, pods *corev1.PodList) []logFileInfo {
 	logFileInfoList := make([]logFileInfo, 0, len(pods.Items))
 	for _, p := range pods.Items {
 		if len(o.instName) > 0 && !strings.EqualFold(p.Name, o.instName) {
 			continue
 		}
-		componentName, ok := p.Labels[types.ComponentLabelKey]
+		componentName, ok := p.Labels[constant.KBAppComponentLabelKey]
 		if !ok || (len(o.componentName) > 0 && !strings.EqualFold(o.componentName, componentName)) {
 			continue
 		}
-		var comTypeName string
+		var compDefName string
 		logTypeMap := make(map[string]struct{})
-		// find component typeName and enabledLogs config against componentName in pod's label.
-		for _, comCluster := range c.Spec.Components {
+		// find component compDefName and enabledLogs config against componentName in pod's label.
+		for _, comCluster := range c.Spec.ComponentSpecs {
 			if !strings.EqualFold(comCluster.Name, componentName) {
 				continue
 			}
-			comTypeName = comCluster.Type
+			compDefName = comCluster.ComponentDefRef
 			for _, logType := range comCluster.EnabledLogs {
 				logTypeMap[logType] = struct{}{}
 			}
 			break
 		}
-		if len(comTypeName) == 0 || len(logTypeMap) == 0 {
+		if len(compDefName) == 0 || len(logTypeMap) == 0 {
 			continue
 		}
-		for _, com := range cd.Spec.Components {
-			if !strings.EqualFold(com.TypeName, comTypeName) {
+		for _, com := range cd.Spec.ComponentDefs {
+			if !strings.EqualFold(com.Name, compDefName) {
 				continue
 			}
 			for _, logConfig := range com.LogConfigs {

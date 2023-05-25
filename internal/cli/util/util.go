@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package util
@@ -21,6 +24,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -37,10 +41,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/briandowns/spinner"
-	"github.com/fatih/color"
 	"github.com/go-logr/logr"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
@@ -51,27 +52,24 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	cmdget "k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
-
-var (
-	green = color.New(color.FgHiGreen, color.Bold).SprintFunc()
-	red   = color.New(color.FgHiRed, color.Bold).SprintFunc()
-)
-
-func init() {
-	if _, err := GetCliHomeDir(); err != nil {
-		fmt.Println("Failed to create kbcli home dir:", err)
-	}
-}
 
 // CloseQuietly closes `io.Closer` quietly. Very handy and helpful for code
 // quality too.
@@ -206,10 +204,6 @@ func DoWithRetry(ctx context.Context, logger logr.Logger, operation func() error
 	return err
 }
 
-func GenRequestID() string {
-	return uuid.New().String()
-}
-
 func PrintGoTemplate(wr io.Writer, tpl string, values interface{}) error {
 	tmpl, err := template.New("output").Parse(tpl)
 	if err != nil {
@@ -228,41 +222,10 @@ func SetKubeConfig(cfg string) error {
 	return os.Setenv("KUBECONFIG", cfg)
 }
 
-func Spinner(w io.Writer, fmtstr string, a ...any) func(result bool) {
-	msg := fmt.Sprintf(fmtstr, a...)
-	var once sync.Once
-	var s *spinner.Spinner
-
-	if runtime.GOOS == types.GoosWindows {
-		fmt.Fprintf(w, "%s\n", msg)
-		return func(result bool) {}
-	} else {
-		s = spinner.New(spinner.CharSets[11], 100*time.Millisecond)
-		s.Writer = w
-		_ = s.Color("cyan")
-		s.Suffix = fmt.Sprintf("  %s", msg)
-		s.Start()
-	}
-
-	return func(result bool) {
-		once.Do(func() {
-			if s != nil {
-				s.Stop()
-			}
-			if result {
-				fmt.Fprintf(w, "%s %s\n", msg, green("OK"))
-			} else {
-				fmt.Fprintf(w, "%s %s\n", msg, red("FAIL"))
-			}
-		})
-	}
-}
-
 var addToScheme sync.Once
 
 func NewFactory() cmdutil.Factory {
-	getter := genericclioptions.NewConfigFlags(true)
-
+	configFlags := NewConfigFlagNoWarnings()
 	// Add CRDs to the scheme. They are missing by default.
 	addToScheme.Do(func() {
 		if err := apiextv1.AddToScheme(scheme.Scheme); err != nil {
@@ -270,60 +233,21 @@ func NewFactory() cmdutil.Factory {
 			panic(err)
 		}
 	})
-	return cmdutil.NewFactory(getter)
+	return cmdutil.NewFactory(configFlags)
 }
 
-func PlaygroundDir() (string, error) {
-	cliPath, err := GetCliHomeDir()
-	if err != nil {
-		return "", err
+// NewConfigFlagNoWarnings returns a ConfigFlags that disables warnings.
+func NewConfigFlagNoWarnings() *genericclioptions.ConfigFlags {
+	configFlags := genericclioptions.NewConfigFlags(true)
+	configFlags.WrapConfigFn = func(c *rest.Config) *rest.Config {
+		c.WarningHandler = rest.NoWarnings{}
+		return c
 	}
-
-	return filepath.Join(cliPath, "playground"), nil
+	return configFlags
 }
 
 func GVRToString(gvr schema.GroupVersionResource) string {
 	return strings.Join([]string{gvr.Resource, gvr.Version, gvr.Group}, ".")
-}
-
-// CheckErr prints a user-friendly error to STDERR and exits with a non-zero exit code.
-func CheckErr(err error) {
-	// unwrap aggregates of 1
-	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) == 1 {
-		err = agg.Errors()[0]
-	}
-
-	if err == nil {
-		return
-	}
-
-	// ErrExit and other valid api errors will be checked by cmdutil.CheckErr, now
-	// we only check invalid api errors that can not be converted to StatusError.
-	if err != cmdutil.ErrExit && apierrors.IsInvalid(err) {
-		if _, ok := err.(*apierrors.StatusError); !ok {
-			printErr(err)
-			os.Exit(cmdutil.DefaultErrorExitCode)
-		}
-	}
-
-	cmdutil.CheckErr(err)
-}
-
-func printErr(err error) {
-	msg, ok := cmdutil.StandardErrorMessage(err)
-	if !ok {
-		msg = err.Error()
-		if !strings.HasPrefix(msg, "error: ") {
-			msg = fmt.Sprintf("error: %s", msg)
-		}
-	}
-	if len(msg) > 0 {
-		// add newline if needed
-		if !strings.HasSuffix(msg, "\n") {
-			msg += "\n"
-		}
-		fmt.Fprint(os.Stderr, msg)
-	}
 }
 
 // GetNodeByName choose node by name from a node array
@@ -333,7 +257,7 @@ func GetNodeByName(nodes []*corev1.Node, name string) *corev1.Node {
 			return node
 		}
 	}
-	return &corev1.Node{}
+	return nil
 }
 
 // ResourceIsEmpty check if resource is empty or not
@@ -378,16 +302,44 @@ func OpenBrowser(url string) error {
 }
 
 func TimeFormat(t *metav1.Time) string {
-	const layout = "Jan 02,2006 15:04 UTC-0700"
+	return TimeFormatWithDuration(t, time.Minute)
+}
 
+// TimeFormatWithDuration format time with specified precision
+func TimeFormatWithDuration(t *metav1.Time, duration time.Duration) string {
 	if t == nil || t.IsZero() {
 		return ""
 	}
+	return TimeTimeFormatWithDuration(t.Time, duration)
+}
 
+func TimeTimeFormat(t time.Time) string {
+	const layout = "Jan 02,2006 15:04 UTC-0700"
 	return t.Format(layout)
 }
 
-// GetHumanReadableDuration returns a succint representation of the provided startTime and endTime
+func timeLayout(precision time.Duration) string {
+	layout := "Jan 02,2006 15:04 UTC-0700"
+	switch precision {
+	case time.Second:
+		layout = "Jan 02,2006 15:04:05 UTC-0700"
+	case time.Millisecond:
+		layout = "Jan 02,2006 15:04:05.000 UTC-0700"
+	}
+	return layout
+}
+
+func TimeTimeFormatWithDuration(t time.Time, precision time.Duration) string {
+	layout := timeLayout(precision)
+	return t.Format(layout)
+}
+
+func TimeParse(t string, precision time.Duration) (time.Time, error) {
+	layout := timeLayout(precision)
+	return time.Parse(layout, t)
+}
+
+// GetHumanReadableDuration returns a succinct representation of the provided startTime and endTime
 // with limited precision for consumption by humans.
 func GetHumanReadableDuration(startTime metav1.Time, endTime metav1.Time) string {
 	if startTime.IsZero() {
@@ -416,10 +368,10 @@ func CheckEmpty(str string) string {
 // like "instance-key in (name1, name2)"
 func BuildLabelSelectorByNames(selector string, names []string) string {
 	if len(names) == 0 {
-		return ""
+		return selector
 	}
 
-	label := fmt.Sprintf("%s in (%s)", types.InstanceLabelKey, strings.Join(names, ","))
+	label := fmt.Sprintf("%s in (%s)", constant.AppInstanceLabelKey, strings.Join(names, ","))
 	if len(selector) == 0 {
 		return label
 	} else {
@@ -455,4 +407,364 @@ func GetEventObject(e *corev1.Event) string {
 		kind = "Instance"
 	}
 	return fmt.Sprintf("%s/%s", kind, e.InvolvedObject.Name)
+}
+
+// GetConfigTemplateList returns ConfigTemplate list used by the component.
+func GetConfigTemplateList(clusterName string, namespace string, cli dynamic.Interface, componentName string, reloadTpl bool) ([]appsv1alpha1.ComponentConfigSpec, error) {
+	var (
+		clusterObj        = appsv1alpha1.Cluster{}
+		clusterDefObj     = appsv1alpha1.ClusterDefinition{}
+		clusterVersionObj = appsv1alpha1.ClusterVersion{}
+	)
+
+	clusterKey := client.ObjectKey{
+		Namespace: namespace,
+		Name:      clusterName,
+	}
+	if err := GetResourceObjectFromGVR(types.ClusterGVR(), clusterKey, cli, &clusterObj); err != nil {
+		return nil, err
+	}
+	clusterDefKey := client.ObjectKey{
+		Namespace: "",
+		Name:      clusterObj.Spec.ClusterDefRef,
+	}
+	if err := GetResourceObjectFromGVR(types.ClusterDefGVR(), clusterDefKey, cli, &clusterDefObj); err != nil {
+		return nil, err
+	}
+	clusterVerKey := client.ObjectKey{
+		Namespace: "",
+		Name:      clusterObj.Spec.ClusterVersionRef,
+	}
+	if clusterVerKey.Name != "" {
+		if err := GetResourceObjectFromGVR(types.ClusterVersionGVR(), clusterVerKey, cli, &clusterVersionObj); err != nil {
+			return nil, err
+		}
+	}
+	return GetConfigTemplateListWithResource(clusterObj.Spec.ComponentSpecs, clusterDefObj.Spec.ComponentDefs, clusterVersionObj.Spec.ComponentVersions, componentName, reloadTpl)
+}
+
+func GetConfigTemplateListWithResource(cComponents []appsv1alpha1.ClusterComponentSpec,
+	dComponents []appsv1alpha1.ClusterComponentDefinition,
+	vComponents []appsv1alpha1.ClusterComponentVersion,
+	componentName string,
+	reloadTpl bool) ([]appsv1alpha1.ComponentConfigSpec, error) {
+
+	configSpecs, err := cfgcore.GetConfigTemplatesFromComponent(cComponents, dComponents, vComponents, componentName)
+	if err != nil {
+		return nil, err
+	}
+	if !reloadTpl {
+		return configSpecs, nil
+	}
+
+	validConfigSpecs := make([]appsv1alpha1.ComponentConfigSpec, 0, len(configSpecs))
+	for _, configSpec := range configSpecs {
+		if configSpec.ConfigConstraintRef != "" && configSpec.TemplateRef != "" {
+			validConfigSpecs = append(validConfigSpecs, configSpec)
+		}
+	}
+	return validConfigSpecs, nil
+}
+
+// GetResourceObjectFromGVR query the resource object using GVR.
+func GetResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.ObjectKey, client dynamic.Interface, k8sObj interface{}) error {
+	unstructuredObj, err := client.
+		Resource(gvr).
+		Namespace(key.Namespace).
+		Get(context.TODO(), key.Name, metav1.GetOptions{})
+	if err != nil {
+		return cfgcore.WrapError(err, "failed to get resource[%v]", key)
+	}
+	return apiruntime.DefaultUnstructuredConverter.FromUnstructured(unstructuredObj.Object, k8sObj)
+}
+
+// GetComponentsFromClusterName returns name of component.
+func GetComponentsFromClusterName(key client.ObjectKey, cli dynamic.Interface) ([]string, error) {
+	clusterObj := appsv1alpha1.Cluster{}
+	clusterDefObj := appsv1alpha1.ClusterDefinition{}
+	if err := GetResourceObjectFromGVR(types.ClusterGVR(), key, cli, &clusterObj); err != nil {
+		return nil, err
+	}
+
+	if err := GetResourceObjectFromGVR(types.ClusterDefGVR(), client.ObjectKey{
+		Namespace: "",
+		Name:      clusterObj.Spec.ClusterDefRef,
+	}, cli, &clusterDefObj); err != nil {
+		return nil, err
+	}
+
+	return GetComponentsFromResource(clusterObj.Spec.ComponentSpecs, &clusterDefObj)
+}
+
+// GetComponentsFromResource returns name of component.
+func GetComponentsFromResource(componentSpecs []appsv1alpha1.ClusterComponentSpec, clusterDefObj *appsv1alpha1.ClusterDefinition) ([]string, error) {
+	componentNames := make([]string, 0, len(componentSpecs))
+	for _, component := range componentSpecs {
+		cdComponent := clusterDefObj.GetComponentDefByName(component.ComponentDefRef)
+		if enableReconfiguring(cdComponent) {
+			componentNames = append(componentNames, component.Name)
+		}
+	}
+	return componentNames, nil
+}
+
+func enableReconfiguring(component *appsv1alpha1.ClusterComponentDefinition) bool {
+	if component == nil {
+		return false
+	}
+	for _, tpl := range component.ConfigSpecs {
+		if len(tpl.ConfigConstraintRef) > 0 && len(tpl.TemplateRef) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// IsSupportReconfigureParams check whether all updated parameters belong to config template parameters.
+func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map[string]string, cli dynamic.Interface) (bool, error) {
+	var (
+		err              error
+		configConstraint = appsv1alpha1.ConfigConstraint{}
+	)
+
+	if err := GetResourceObjectFromGVR(types.ConfigConstraintGVR(), client.ObjectKey{
+		Namespace: "",
+		Name:      tpl.ConfigConstraintRef,
+	}, cli, &configConstraint); err != nil {
+		return false, err
+	}
+
+	if configConstraint.Spec.ConfigurationSchema == nil {
+		return true, nil
+	}
+
+	schema := configConstraint.Spec.ConfigurationSchema.DeepCopy()
+	if schema.Schema == nil {
+		schema.Schema, err = cfgcore.GenerateOpenAPISchema(schema.CUE, configConstraint.Spec.CfgSchemaTopLevelName)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	schemaSpec := schema.Schema.Properties["spec"]
+	for key := range values {
+		if _, ok := schemaSpec.Properties[key]; !ok {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func getIPLocation() (string, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequest("GET", "https://ifconfig.io/country_code", nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	location, err := io.ReadAll(resp.Body)
+	if len(location) == 0 || err != nil {
+		return "", err
+	}
+
+	// remove last "\n"
+	return string(location[:len(location)-1]), nil
+}
+
+// GetHelmChartRepoURL get helm chart repo, we will choose one from GitHub and GitLab based on the IP location
+func GetHelmChartRepoURL() string {
+	if types.KubeBlocksChartURL == testing.KubeBlocksChartURL {
+		return testing.KubeBlocksChartURL
+	}
+
+	location, _ := getIPLocation()
+	// if location is CN, or we can not get location, use GitLab helm chart repo
+	if location == "CN" || location == "" {
+		return types.GitLabHelmChartRepo
+	}
+	return types.KubeBlocksChartURL
+}
+
+// GetKubeBlocksNamespace gets namespace of KubeBlocks installation, infer namespace from helm secrets
+func GetKubeBlocksNamespace(client kubernetes.Interface) (string, error) {
+	secrets, err := client.CoreV1().Secrets(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{LabelSelector: types.KubeBlocksHelmLabel})
+	// if KubeBlocks is upgraded, there will be multiple secrets
+	if err == nil && len(secrets.Items) >= 1 {
+		return secrets.Items[0].Namespace, nil
+	}
+	return "", errors.New("failed to get KubeBlocks installation namespace")
+}
+
+type ExposeType string
+
+const (
+	ExposeToVPC      ExposeType = "vpc"
+	ExposeToInternet ExposeType = "internet"
+
+	EnableValue  string = "true"
+	DisableValue string = "false"
+)
+
+var ProviderExposeAnnotations = map[K8sProvider]map[ExposeType]map[string]string{
+	EKSProvider: {
+		ExposeToVPC: map[string]string{
+			"service.beta.kubernetes.io/aws-load-balancer-type":     "nlb",
+			"service.beta.kubernetes.io/aws-load-balancer-internal": "true",
+		},
+		ExposeToInternet: map[string]string{
+			"service.beta.kubernetes.io/aws-load-balancer-type":     "nlb",
+			"service.beta.kubernetes.io/aws-load-balancer-internal": "false",
+		},
+	},
+	GKEProvider: {
+		ExposeToVPC: map[string]string{
+			"networking.gke.io/load-balancer-type": "Internal",
+		},
+		ExposeToInternet: map[string]string{},
+	},
+	AKSProvider: {
+		ExposeToVPC: map[string]string{
+			"service.beta.kubernetes.io/azure-load-balancer-internal": "true",
+		},
+		ExposeToInternet: map[string]string{
+			"service.beta.kubernetes.io/azure-load-balancer-internal": "false",
+		},
+	},
+	ACKProvider: {
+		ExposeToVPC: map[string]string{
+			"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type": "intranet",
+		},
+		ExposeToInternet: map[string]string{
+			"service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type": "internet",
+		},
+	},
+	// TKE VPC LoadBalancer needs the subnet id, it's difficult for KB to get it, so we just support the internet on TKE now.
+	// reference: https://cloud.tencent.com/document/product/457/45487
+	TKEProvider: {
+		ExposeToInternet: map[string]string{},
+	},
+}
+
+func GetExposeAnnotations(provider K8sProvider, exposeType ExposeType) (map[string]string, error) {
+	exposeAnnotations, ok := ProviderExposeAnnotations[provider]
+	if !ok {
+		return nil, fmt.Errorf("unsupported provider: %s", provider)
+	}
+	annotations, ok := exposeAnnotations[exposeType]
+	if !ok {
+		return nil, fmt.Errorf("unsupported expose type: %s on provider %s", exposeType, provider)
+	}
+	return annotations, nil
+}
+
+// BuildAddonReleaseName returns the release name of addon, its f
+func BuildAddonReleaseName(addon string) string {
+	return fmt.Sprintf("%s-%s", types.AddonReleasePrefix, addon)
+}
+
+// CombineLabels combines labels into a string
+func CombineLabels(labels map[string]string) string {
+	var labelStr []string
+	for k, v := range labels {
+		labelStr = append(labelStr, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	// sort labelStr to make sure the order is stable
+	sort.Strings(labelStr)
+
+	return strings.Join(labelStr, ",")
+}
+
+func BuildComponentNameLabels(prefix string, names []string) string {
+	return buildLabelSelectors(prefix, constant.KBAppComponentLabelKey, names)
+}
+
+// buildLabelSelectors build the label selector by given label key, the label selector is
+// like "label-key in (name1, name2)"
+func buildLabelSelectors(prefix string, key string, names []string) string {
+	if len(names) == 0 {
+		return prefix
+	}
+
+	label := fmt.Sprintf("%s in (%s)", key, strings.Join(names, ","))
+	if len(prefix) == 0 {
+		return label
+	} else {
+		return prefix + "," + label
+	}
+}
+
+// NewOpsRequestForReconfiguring returns a new common OpsRequest for Reconfiguring operation
+func NewOpsRequestForReconfiguring(opsName, namespace, clusterName string) *appsv1alpha1.OpsRequest {
+	return &appsv1alpha1.OpsRequest{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.AppsAPIGroup, types.AppsAPIVersion),
+			Kind:       types.KindOps,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opsName,
+			Namespace: namespace,
+		},
+		Spec: appsv1alpha1.OpsRequestSpec{
+			ClusterRef:  clusterName,
+			Type:        appsv1alpha1.ReconfiguringType,
+			Reconfigure: &appsv1alpha1.Reconfigure{},
+		},
+	}
+}
+func ConvertObjToUnstructured(obj any) (*unstructured.Unstructured, error) {
+	var (
+		contentBytes    []byte
+		err             error
+		unstructuredObj = &unstructured.Unstructured{}
+	)
+
+	if contentBytes, err = json.Marshal(obj); err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(contentBytes, unstructuredObj); err != nil {
+		return nil, err
+	}
+	return unstructuredObj, nil
+}
+
+func CreateResourceIfAbsent(
+	dynamic dynamic.Interface,
+	gvr schema.GroupVersionResource,
+	namespace string,
+	unstructuredObj *unstructured.Unstructured) error {
+	objectName, isFound, err := unstructured.NestedString(unstructuredObj.Object, "metadata", "name")
+	if !isFound || err != nil {
+		return err
+	}
+	objectByte, err := json.Marshal(unstructuredObj)
+	if err != nil {
+		return err
+	}
+	if _, err = dynamic.Resource(gvr).Namespace(namespace).Patch(
+		context.TODO(), objectName, k8sapitypes.MergePatchType,
+		objectByte, metav1.PatchOptions{}); err != nil {
+		if apierrors.IsNotFound(err) {
+			if _, err = dynamic.Resource(gvr).Namespace(namespace).Create(
+				context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return nil
+}
+
+func BuildClusterDefinitionRefLable(prefix string, clusterDef []string) string {
+	return buildLabelSelectors(prefix, constant.AppNameLabelKey, clusterDef)
+}
+
+// IsWindows return true if the kbcli runtime situation is windows
+func IsWindows() bool {
+	return runtime.GOOS == types.GoosWindows
 }

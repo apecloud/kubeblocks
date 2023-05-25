@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package prompt
@@ -20,44 +23,29 @@ import (
 	"io"
 
 	"github.com/manifoldco/promptui"
-	"github.com/pkg/errors"
 )
 
-type prompt struct {
-	errorMsg string
-	label    string
-	in       io.ReadCloser
-}
-
-func NewPrompt(errMsg string, label string, in io.Reader) *prompt {
-	return &prompt{
-		errorMsg: errMsg,
-		label:    label,
-		in:       io.NopCloser(in),
-	}
-}
-
-func (p *prompt) GetInput() (string, error) {
-	validate := func(input string) error {
-		if len(input) == 0 {
-			return errors.New(p.errorMsg)
-		}
-		return nil
-	}
-
-	templates := &promptui.PromptTemplates{
+func NewPrompt(label string, validate promptui.ValidateFunc, in io.Reader) *promptui.Prompt {
+	template := &promptui.PromptTemplates{
 		Prompt:  "{{ . }} ",
 		Valid:   "{{ . | green }} ",
 		Invalid: "{{ . | red }} ",
 		Success: "{{ . | bold }} ",
 	}
 
-	prompt := promptui.Prompt{
-		Label:     p.label,
-		Templates: templates,
-		Validate:  validate,
-		Stdin:     p.in,
+	if validate == nil {
+		template = &promptui.PromptTemplates{
+			Prompt:  "{{ . }} ",
+			Valid:   "{{ . | red }} ",
+			Invalid: "{{ . | red }} ",
+			Success: "{{ . | bold }} ",
+		}
 	}
-
-	return prompt.Run()
+	p := promptui.Prompt{
+		Label:     label,
+		Stdin:     io.NopCloser(in),
+		Templates: template,
+		Validate:  validate,
+	}
+	return &p
 }

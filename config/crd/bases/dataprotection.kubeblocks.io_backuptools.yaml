@@ -39,22 +39,8 @@ spec:
             description: BackupToolSpec defines the desired state of BackupTool
             properties:
               backupCommands:
-                description: Array of command that dbaas can do database backup. from
+                description: Array of command that apps can do database backup. from
                   invoke args the order of commands follows the order of array.
-                items:
-                  type: string
-                type: array
-              databaseEngine:
-                description: database engine to support in the backup.
-                enum:
-                - mysql
-                type: string
-              databaseEngineVersions:
-                description: database engine to support in the backup.
-                enum:
-                - "5.6"
-                - "5.7"
-                - "8.0"
                 items:
                   type: string
                 type: array
@@ -170,6 +156,7 @@ spec:
                   - name
                   type: object
                 type: array
+                x-kubernetes-preserve-unknown-fields: true
               envFrom:
                 description: List of sources to populate environment variables in
                   the container. The keys defined within a source must be a C_IDENTIFIER.
@@ -208,11 +195,12 @@ spec:
                       type: object
                   type: object
                 type: array
+                x-kubernetes-preserve-unknown-fields: true
               image:
                 description: Backup tool Container image name.
                 type: string
               incrementalBackupCommands:
-                description: Array of command that dbaas can do database incremental
+                description: Array of command that apps can do database incremental
                   backup. like xtrabackup, that can performs an incremental backup
                   file.
                 items:
@@ -228,9 +216,8 @@ spec:
                       type: string
                     type: array
                   restoreCommands:
-                    description: Array of command that dbaas can perform database
-                      restore. like xtrabackup, that can performs restore mysql from
-                      files.
+                    description: Array of command that apps can perform database restore.
+                      like xtrabackup, that can performs restore mysql from files.
                     items:
                       type: string
                     type: array
@@ -245,9 +232,8 @@ spec:
                       type: string
                     type: array
                   restoreCommands:
-                    description: Array of command that dbaas can perform database
-                      restore. like xtrabackup, that can performs restore mysql from
-                      files.
+                    description: Array of command that apps can perform database restore.
+                      like xtrabackup, that can performs restore mysql from files.
                     items:
                       type: string
                     type: array
@@ -256,6 +242,26 @@ spec:
                 description: Compute Resources required by this container. Cannot
                   be updated.
                 properties:
+                  claims:
+                    description: "Claims lists the names of resources, defined in
+                      spec.resourceClaims, that are used by this container. \n This
+                      is an alpha field and requires enabling the DynamicResourceAllocation
+                      feature gate. \n This field is immutable."
+                    items:
+                      description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                      properties:
+                        name:
+                          description: Name must match the name of one entry in pod.spec.resourceClaims
+                            of the Pod where this field is used. It makes that resource
+                            available inside a container.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                   limits:
                     additionalProperties:
                       anyOf:
@@ -279,6 +285,14 @@ spec:
                       to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                     type: object
                 type: object
+                x-kubernetes-preserve-unknown-fields: true
+              type:
+                default: file
+                description: the type of backup tool, file or pitr
+                enum:
+                - file
+                - pitr
+                type: string
             required:
             - backupCommands
             - image

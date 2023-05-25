@@ -1,34 +1,43 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cloudprovider
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
 	"io"
-	"net/http"
 	"os"
-	"path"
-	"runtime"
-	"strings"
+	"path/filepath"
+	"time"
 
-	"github.com/docker/docker/pkg/ioutils"
-	terraform "github.com/hashicorp/terraform/libterraform"
+	"github.com/hashicorp/go-version"
+	"github.com/hashicorp/hc-install/product"
+	"github.com/hashicorp/hc-install/releases"
+	"github.com/hashicorp/terraform-exec/tfexec"
 	"github.com/pkg/errors"
+
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+)
+
+const (
+	tfStateFileName = "terraform.tfstate"
 )
 
 type TFPlugin struct {
@@ -39,158 +48,103 @@ type TFPlugin struct {
 }
 
 var (
-	CLIBaseDir  string
-	TFBaseDir   string
-	TFPluginDir string
-	providerCfg string
+	TFExecPath string
 )
 
-func init() {
-	homeDir, err := os.UserHomeDir()
+func initTerraform() error {
+	cliHomeDir, err := util.GetCliHomeDir()
 	if err != nil {
-		panic(errors.Wrap(err, "Failed to get current user home dir"))
+		return err
 	}
-	CLIBaseDir = path.Join(homeDir, ".kubeblocks")
-	TFBaseDir = path.Join(CLIBaseDir, "terraform")
-	TFPluginDir = path.Join(TFBaseDir, "providers")
 
-	providerCfg = path.Join(CLIBaseDir, "cloud_provider.json")
+	// check if terraform exists
+	TFExecPath = filepath.Join(cliHomeDir, product.Terraform.BinaryName())
+	v, err := product.Terraform.GetVersion(context.Background(), TFExecPath)
+	if err == nil && v != nil {
+		return nil
+	}
+
+	// does not exist, install it to cli home dir
+	installer := &releases.ExactVersion{
+		Product:                  product.Terraform,
+		Version:                  version.Must(version.NewVersion("1.3.9")),
+		Timeout:                  180 * time.Second,
+		SkipChecksumVerification: true,
+		InstallDir:               cliHomeDir,
+	}
+	execPath, err := installer.Install(context.Background())
+	if err != nil {
+		return err
+	}
+	TFExecPath = execPath
+	return nil
 }
 
-func NewTFPlugin(name, registry, source, version string) *TFPlugin {
-	return &TFPlugin{
-		Name:     name,
-		Registry: registry,
-		Source:   source,
-		Version:  version,
-	}
-}
-
-func (p *TFPlugin) Install() error {
-	pluginPath := path.Join(
-		TFPluginDir,
-		p.Registry,
-		p.Source,
-		p.Version,
-		fmt.Sprintf("%s_%s", runtime.GOOS, runtime.GOARCH),
-		p.Name,
-	)
-	if err := os.MkdirAll(path.Dir(pluginPath), os.FileMode(0700)); err != nil {
-		return errors.Wrap(err, "Failed to create plugin dir")
-	}
-
-	if stat, err := os.Stat(pluginPath); err == nil {
-		if stat.Size() > 0 {
-			fmt.Printf("Plugin %s has already exists, skip downloading", p.Source)
-			return nil
-		} else if err := os.RemoveAll(pluginPath); err != nil {
-			return errors.Wrap(err, "Failed to remove corrupted plugin")
-		}
-	} else {
-		if !os.IsNotExist(err) {
-			return errors.Wrap(err, fmt.Sprintf("Failed to check if plugin %s exists", p.Source))
-		}
-	}
-
-	fmt.Printf("Downloading plugin %s", p.Source)
-	// Create the file
-	out, err := os.Create(pluginPath)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	// TODO optimize, move to another place
-	// Get the data
-	resp, err := http.Get(fmt.Sprintf("http://54.223.93.54:8000/apecloud/v0.2.0/%s", p.Name))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	// Writer the body to file
-	_, err = io.Copy(out, resp.Body)
+func tfInitAndApply(workingDir string, stdout, stderr io.Writer, opts ...tfexec.ApplyOption) error {
+	ctx := context.Background()
+	tf, err := newTerraform(workingDir, stdout, stderr)
 	if err != nil {
 		return err
 	}
 
-	if err := os.Chmod(pluginPath, os.FileMode(0700)); err != nil {
+	if err = tf.Init(ctx, tfexec.Upgrade(false)); err != nil {
+		return err
+	}
+
+	if err = tf.Apply(ctx, opts...); err != nil {
 		return err
 	}
 	return nil
 }
 
-func tfApply(template string, tfDir string, destroy bool) error {
-	if err := os.MkdirAll(tfDir, 0700); err != nil {
-		return errors.Wrap(err, "Failed to create terraform working directory")
+func tfInitAndDestroy(workingDir string, stdout, stderr io.Writer, opts ...tfexec.DestroyOption) error {
+	ctx := context.Background()
+	tf, err := newTerraform(workingDir, stdout, stderr)
+	if err != nil {
+		return err
 	}
 
-	wd, _ := os.Getwd()
-	// nolint
-	defer os.Chdir(wd)
-
-	if err := os.Chdir(tfDir); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Failed to change working directory to %s", tfDir))
+	if err = tf.Init(ctx, tfexec.Upgrade(false)); err != nil {
+		return err
 	}
 
-	tfCfg := path.Join(tfDir, "demo.tf")
-	var args []string
-	if err := ioutils.AtomicWriteFile(tfCfg, []byte(template), 0700); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Failed to create %s", tfCfg))
-	}
-
-	if _, err := os.Stat(tfCfg); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("Terraform config %s not exists", tfCfg))
-	}
-
-	cmd := fmt.Sprintf("terraform -chdir=%s", tfDir)
-
-	// terraform init
-	args = []string{cmd, "init", fmt.Sprintf("-plugin-dir=%s", TFPluginDir)}
-	fmt.Printf("Execute terraform init: %s", strings.Join(args, " "))
-	if err := terraform.RunCli(args); err != nil {
-		return errors.Wrap(err, "Failed to init terraform project")
-	}
-
-	// terraform apply
-	args = []string{cmd, "apply", "-auto-approve"}
-	if destroy {
-		args = append(args, "-destroy")
-	}
-	fmt.Printf("Execute terraform apply: %s", strings.Join(args, " "))
-	if err := terraform.RunCli(args); err != nil {
-		return errors.Wrap(err, "Failed to apply resources")
-	}
-	return nil
+	return tf.Destroy(ctx, opts...)
 }
 
-func parseInstancePublicIP(stateFile string) (string, error) {
+func newTerraform(workingDir string, stdout, stderr io.Writer) (*tfexec.Terraform, error) {
+	tf, err := tfexec.NewTerraform(workingDir, TFExecPath)
+	if err != nil {
+		return nil, err
+	}
+
+	tf.SetStdout(stdout)
+	tf.SetStderr(stderr)
+	return tf, nil
+}
+
+func getOutputValues(tfPath string, keys ...outputKey) ([]string, error) {
+	stateFile := filepath.Join(tfPath, tfStateFileName)
 	content, err := os.ReadFile(stateFile)
-	if err != nil {
-		return "", errors.Wrap(err, "Failed to read terraform state")
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
 	}
+
 	var state map[string]interface{}
-	if err := json.Unmarshal(content, &state); err != nil {
-		return "", errors.Wrap(err, "Failed to unmarshal terraform state")
+	if err = json.Unmarshal(content, &state); err != nil {
+		return nil, err
 	}
-	resources := state["resources"].([]interface{})
-	var result string
-	for _, item := range resources {
-		resource := item.(map[string]interface{})
-		if resource["type"] != "aws_instance" {
+	outputs, ok := state["outputs"].(map[string]interface{})
+	if !ok {
+		return nil, nil
+	}
+
+	vals := make([]string, len(keys))
+	for i, k := range keys {
+		v, ok := outputs[string(k)].(map[string]interface{})
+		if !ok {
 			continue
 		}
-		instances, ok := resource["instances"].([]interface{})
-		if !ok {
-			return "", errors.Wrap(nil, "Failed to find instances")
-		}
-		instance := instances[0].(map[string]interface{})
-		attributes := instance["attributes"].(map[string]interface{})
-		result = attributes["public_ip"].(string)
-		break
+		vals[i] = v["value"].(string)
 	}
-	if result == "" {
-		return "", errors.New("Failed to find instance public IP")
-	}
-	return result, nil
+	return vals, nil
 }

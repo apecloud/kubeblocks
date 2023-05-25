@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -24,7 +27,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +38,7 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -64,7 +66,7 @@ var _ = Describe("Expose", func() {
 		}
 
 		tf.UnstructuredClient = &clientfake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Group: types.Group, Version: types.Version},
+			GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
 			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				urlPrefix := "/api/v1/namespaces/" + namespace
@@ -100,20 +102,20 @@ var _ = Describe("Expose", func() {
 		Expect(o.namespace).Should(Equal(namespace))
 	})
 
-	generateOpsObject := func(opsName string, opsType dbaasv1alpha1.OpsType) *dbaasv1alpha1.OpsRequest {
-		return &dbaasv1alpha1.OpsRequest{
+	generateOpsObject := func(opsName string, opsType appsv1alpha1.OpsType) *appsv1alpha1.OpsRequest {
+		return &appsv1alpha1.OpsRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      opsName,
 				Namespace: namespace,
 			},
-			Spec: dbaasv1alpha1.OpsRequestSpec{
+			Spec: appsv1alpha1.OpsRequestSpec{
 				ClusterRef: "test-cluster",
 				Type:       opsType,
 			},
 		}
 	}
 
-	describeOps := func(opsType dbaasv1alpha1.OpsType, completeOps func(ops *dbaasv1alpha1.OpsRequest)) {
+	describeOps := func(opsType appsv1alpha1.OpsType, completeOps func(ops *appsv1alpha1.OpsRequest)) {
 		randomStr := clitesting.GetRandomStr()
 		ops := generateOpsObject(opsName+randomStr, opsType)
 		completeOps(ops)
@@ -123,28 +125,28 @@ var _ = Describe("Expose", func() {
 		Expect(o.run()).Should(Succeed())
 	}
 
-	fakeOpsStatusAndProgress := func() dbaasv1alpha1.OpsRequestStatus {
+	fakeOpsStatusAndProgress := func() appsv1alpha1.OpsRequestStatus {
 		objectKey := "Pod/test-pod-wessxd"
 		objectKey1 := "Pod/test-pod-xsdfwe"
-		return dbaasv1alpha1.OpsRequestStatus{
+		return appsv1alpha1.OpsRequestStatus{
 			StartTimestamp:      metav1.NewTime(time.Now().Add(-1 * time.Minute)),
 			CompletionTimestamp: metav1.NewTime(time.Now()),
 			Progress:            "1/2",
-			Phase:               dbaasv1alpha1.FailedPhase,
-			Components: map[string]dbaasv1alpha1.OpsRequestStatusComponent{
+			Phase:               appsv1alpha1.OpsFailedPhase,
+			Components: map[string]appsv1alpha1.OpsRequestComponentStatus{
 				componentName: {
-					Phase: dbaasv1alpha1.FailedPhase,
-					ProgressDetails: []dbaasv1alpha1.ProgressDetail{
+					Phase: appsv1alpha1.FailedClusterCompPhase,
+					ProgressDetails: []appsv1alpha1.ProgressStatusDetail{
 						{
 							ObjectKey: objectKey,
-							Status:    dbaasv1alpha1.SucceedProgressStatus,
+							Status:    appsv1alpha1.SucceedProgressStatus,
 							StartTime: metav1.NewTime(time.Now().Add(-59 * time.Second)),
 							EndTime:   metav1.NewTime(time.Now().Add(-39 * time.Second)),
 							Message:   fmt.Sprintf("Successfully vertical scale Pod: %s in Component: %s", objectKey, componentName),
 						},
 						{
 							ObjectKey: objectKey1,
-							Status:    dbaasv1alpha1.FailedProgressStatus,
+							Status:    appsv1alpha1.FailedProgressStatus,
 							StartTime: metav1.NewTime(time.Now().Add(-39 * time.Second)),
 							EndTime:   metav1.NewTime(time.Now().Add(-1 * time.Second)),
 							Message:   fmt.Sprintf("Failed to vertical scale Pod: %s in Component: %s", objectKey1, componentName),
@@ -169,10 +171,10 @@ var _ = Describe("Expose", func() {
 		}
 	}
 
-	testPrintLastConfiguration := func(config dbaasv1alpha1.LastConfiguration,
-		opsType dbaasv1alpha1.OpsType, expectStrings ...string) {
+	testPrintLastConfiguration := func(config appsv1alpha1.LastConfiguration,
+		opsType appsv1alpha1.OpsType, expectStrings ...string) {
 		o := newDescribeOpsOptions(tf, streams)
-		if opsType == dbaasv1alpha1.UpgradeType {
+		if opsType == appsv1alpha1.UpgradeType {
 			// capture stdout
 			done := clitesting.Capture()
 			o.printLastConfiguration(config, opsType)
@@ -188,15 +190,15 @@ var _ = Describe("Expose", func() {
 
 	It("run", func() {
 		By("test describe Upgrade")
-		describeOps(dbaasv1alpha1.UpgradeType, func(ops *dbaasv1alpha1.OpsRequest) {
-			ops.Spec.Upgrade = &dbaasv1alpha1.Upgrade{
+		describeOps(appsv1alpha1.UpgradeType, func(ops *appsv1alpha1.OpsRequest) {
+			ops.Spec.Upgrade = &appsv1alpha1.Upgrade{
 				ClusterVersionRef: clusterVersionName,
 			}
 		})
 
 		By("test describe Restart")
-		describeOps(dbaasv1alpha1.RestartType, func(ops *dbaasv1alpha1.OpsRequest) {
-			ops.Spec.RestartList = []dbaasv1alpha1.ComponentOps{
+		describeOps(appsv1alpha1.RestartType, func(ops *appsv1alpha1.OpsRequest) {
+			ops.Spec.RestartList = []appsv1alpha1.ComponentOps{
 				{ComponentName: componentName},
 				{ComponentName: componentName1},
 			}
@@ -213,25 +215,25 @@ var _ = Describe("Expose", func() {
 				"memory": apiresource.MustParse("400Mi"),
 			},
 		}
-		fakeVerticalScalingSpec := func() []dbaasv1alpha1.VerticalScaling {
-			return []dbaasv1alpha1.VerticalScaling{
+		fakeVerticalScalingSpec := func() []appsv1alpha1.VerticalScaling {
+			return []appsv1alpha1.VerticalScaling{
 				{
-					ComponentOps: dbaasv1alpha1.ComponentOps{
+					ComponentOps: appsv1alpha1.ComponentOps{
 						ComponentName: componentName,
 					},
 					ResourceRequirements: resourceRequirements,
 				},
 			}
 		}
-		describeOps(dbaasv1alpha1.VerticalScalingType, func(ops *dbaasv1alpha1.OpsRequest) {
+		describeOps(appsv1alpha1.VerticalScalingType, func(ops *appsv1alpha1.OpsRequest) {
 			ops.Spec.VerticalScalingList = fakeVerticalScalingSpec()
 		})
 
 		By("test describe HorizontalScaling")
-		describeOps(dbaasv1alpha1.HorizontalScalingType, func(ops *dbaasv1alpha1.OpsRequest) {
-			ops.Spec.HorizontalScalingList = []dbaasv1alpha1.HorizontalScaling{
+		describeOps(appsv1alpha1.HorizontalScalingType, func(ops *appsv1alpha1.OpsRequest) {
+			ops.Spec.HorizontalScalingList = []appsv1alpha1.HorizontalScaling{
 				{
-					ComponentOps: dbaasv1alpha1.ComponentOps{
+					ComponentOps: appsv1alpha1.ComponentOps{
 						ComponentName: componentName,
 					},
 					Replicas: 1,
@@ -240,7 +242,7 @@ var _ = Describe("Expose", func() {
 		})
 
 		By("test describe VolumeExpansion and print OpsRequest status")
-		volumeClaimTemplates := []dbaasv1alpha1.OpsRequestVolumeClaimTemplate{
+		volumeClaimTemplates := []appsv1alpha1.OpsRequestVolumeClaimTemplate{
 			{
 				Name:    "data",
 				Storage: apiresource.MustParse("2Gi"),
@@ -250,10 +252,10 @@ var _ = Describe("Expose", func() {
 				Storage: apiresource.MustParse("4Gi"),
 			},
 		}
-		describeOps(dbaasv1alpha1.VolumeExpansionType, func(ops *dbaasv1alpha1.OpsRequest) {
-			ops.Spec.VolumeExpansionList = []dbaasv1alpha1.VolumeExpansion{
+		describeOps(appsv1alpha1.VolumeExpansionType, func(ops *appsv1alpha1.OpsRequest) {
+			ops.Spec.VolumeExpansionList = []appsv1alpha1.VolumeExpansion{
 				{
-					ComponentOps: dbaasv1alpha1.ComponentOps{
+					ComponentOps: appsv1alpha1.ComponentOps{
 						ComponentName: componentName,
 					},
 					VolumeClaimTemplates: volumeClaimTemplates,
@@ -262,44 +264,45 @@ var _ = Describe("Expose", func() {
 		})
 
 		By("test printing OpsRequest status and conditions")
-		describeOps(dbaasv1alpha1.VerticalScalingType, func(ops *dbaasv1alpha1.OpsRequest) {
+		describeOps(appsv1alpha1.VerticalScalingType, func(ops *appsv1alpha1.OpsRequest) {
 			ops.Spec.VerticalScalingList = fakeVerticalScalingSpec()
 			ops.Status = fakeOpsStatusAndProgress()
 		})
 
 		By("test printing OpsRequest last configuration")
-		testPrintLastConfiguration(dbaasv1alpha1.LastConfiguration{
+		testPrintLastConfiguration(appsv1alpha1.LastConfiguration{
 			ClusterVersionRef: clusterVersionName,
-		}, dbaasv1alpha1.UpgradeType, "\nLast Configuration",
+		}, appsv1alpha1.UpgradeType, "\nLast Configuration",
 			fmt.Sprintf("%-20s%s", "Cluster Version:", clusterVersionName+"\n"))
 
 		By("test verticalScaling last configuration")
-		testPrintLastConfiguration(dbaasv1alpha1.LastConfiguration{
-			Components: map[string]dbaasv1alpha1.LastComponentConfiguration{
+		testPrintLastConfiguration(appsv1alpha1.LastConfiguration{
+			Components: map[string]appsv1alpha1.LastComponentConfiguration{
 				componentName: {
 					ResourceRequirements: resourceRequirements,
 				},
 			},
-		}, dbaasv1alpha1.VerticalScalingType, "100m", "200Mi", "300m", "400Mi",
+		}, appsv1alpha1.VerticalScalingType, "100m", "200Mi", "300m", "400Mi",
 			"REQUEST-CPU", "REQUEST-MEMORY", "LIMIT-CPU", "LIMIT-MEMORY")
 
 		By("test HorizontalScaling last configuration")
-		testPrintLastConfiguration(dbaasv1alpha1.LastConfiguration{
-			Components: map[string]dbaasv1alpha1.LastComponentConfiguration{
+		replicas := int32(2)
+		testPrintLastConfiguration(appsv1alpha1.LastConfiguration{
+			Components: map[string]appsv1alpha1.LastComponentConfiguration{
 				componentName: {
-					Replicas: 2,
+					Replicas: &replicas,
 				},
 			},
-		}, dbaasv1alpha1.HorizontalScalingType, "COMPONENT", "REPLICAS", componentName, "2")
+		}, appsv1alpha1.HorizontalScalingType, "COMPONENT", "REPLICAS", componentName, "2")
 
 		By("test VolumeExpansion last configuration")
-		testPrintLastConfiguration(dbaasv1alpha1.LastConfiguration{
-			Components: map[string]dbaasv1alpha1.LastComponentConfiguration{
+		testPrintLastConfiguration(appsv1alpha1.LastConfiguration{
+			Components: map[string]appsv1alpha1.LastComponentConfiguration{
 				componentName: {
 					VolumeClaimTemplates: volumeClaimTemplates,
 				},
 			},
-		}, dbaasv1alpha1.VolumeExpansionType, "VOLUME-CLAIM-TEMPLATE", "STORAGE", "data", "2Gi", "log")
+		}, appsv1alpha1.VolumeExpansionType, "VOLUME-CLAIM-TEMPLATE", "STORAGE", "data", "2Gi", "log")
 
 	})
 })

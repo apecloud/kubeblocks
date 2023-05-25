@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package helm
@@ -23,48 +26,54 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/containers/common/pkg/retry"
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
+	"github.com/spf13/pflag"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
+	"helm.sh/helm/v3/pkg/helmpath"
 	kubefake "helm.sh/helm/v3/pkg/kube/fake"
 	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
+
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
-const timeOut = time.Second * 600
+const defaultTimeout = time.Second * 600
 
 type InstallOpts struct {
 	Name            string
 	Chart           string
 	Namespace       string
-	Sets            []string
 	Wait            bool
 	Version         string
 	TryTimes        int
 	Login           bool
 	CreateNamespace bool
+	ValueOpts       *values.Options
+	Timeout         time.Duration
+	Atomic          bool
+	DisableHooks    bool
 }
 
 type Option func(*cli.EnvSettings)
-
-func WithContext(context string) Option {
-	return func(es *cli.EnvSettings) {
-		es.KubeContext = context
-	}
-}
 
 // AddRepo will add a repo
 func AddRepo(r *repo.Entry) error {
@@ -82,15 +91,15 @@ func AddRepo(r *repo.Entry) error {
 
 	// Check if the repo Name is legal
 	if strings.Contains(r.Name, "/") {
-		return errors.Errorf("repository Name (%s) contains '/', please specify a different Name without '/'", r.Name)
+		return errors.Errorf("repository name (%s) contains '/', please specify a different name without '/'", r.Name)
 	}
 
 	if f.Has(r.Name) {
 		existing := f.Get(r.Name)
-		if *r != *existing {
+		if *r != *existing && r.Name != types.KubeBlocksChartName {
 			// The input coming in for the Name is different from what is already
 			// configured. Return an error.
-			return errors.Errorf("repository Name (%s) already exists, please specify a different Name", r.Name)
+			return errors.Errorf("repository name (%s) already exists, please specify a different name", r.Name)
 		}
 	}
 
@@ -105,7 +114,7 @@ func AddRepo(r *repo.Entry) error {
 
 	f.Update(r)
 
-	if err := f.WriteFile(repoFile, 0644); err != nil {
+	if err = f.WriteFile(repoFile, 0644); err != nil {
 		return err
 	}
 	return nil
@@ -134,8 +143,8 @@ func RemoveRepo(r *repo.Entry) error {
 	return nil
 }
 
-// getInstalled get helm package if installed.
-func (i *InstallOpts) getInstalled(cfg *action.Configuration) (*release.Release, error) {
+// GetInstalled get helm package release info if installed.
+func (i *InstallOpts) GetInstalled(cfg *action.Configuration) (*release.Release, error) {
 	res, err := action.NewGet(cfg).Run(i.Name)
 	if err != nil {
 		return nil, err
@@ -144,22 +153,28 @@ func (i *InstallOpts) getInstalled(cfg *action.Configuration) (*release.Release,
 		return nil, driver.ErrReleaseNotFound
 	}
 	if !statusDeployed(res) {
-		return nil, ErrReleaseNotDeployed
+		return nil, errors.Wrapf(ErrReleaseNotDeployed, "current version not in right status, try to fix it first, \n"+
+			"uninstall and install kubeblocks could be a way to fix error")
 	}
 	return res, nil
 }
 
 // Install will install a Chart
-func (i *InstallOpts) Install(cfg *action.Configuration) (string, error) {
+func (i *InstallOpts) Install(cfg *Config) (string, error) {
 	ctx := context.Background()
 	opts := retry.Options{
 		MaxRetry: 1 + i.TryTimes,
 	}
 
+	actionCfg, err := NewActionConfig(cfg)
+	if err != nil {
+		return "", err
+	}
+
 	var notes string
 	if err := retry.IfNecessary(ctx, func() error {
 		var err1 error
-		if notes, err1 = i.tryInstall(cfg); err1 != nil {
+		if notes, err1 = i.tryInstall(actionCfg); err1 != nil {
 			return err1
 		}
 		return nil
@@ -171,7 +186,7 @@ func (i *InstallOpts) Install(cfg *action.Configuration) (string, error) {
 }
 
 func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
-	released, err := i.getInstalled(cfg)
+	released, err := i.GetInstalled(cfg)
 	if released != nil {
 		return released.Info.Notes, nil
 	}
@@ -194,20 +209,22 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	client.Namespace = i.Namespace
 	client.CreateNamespace = i.CreateNamespace
 	client.Wait = i.Wait
-	client.Timeout = timeOut
+	client.WaitForJobs = i.Wait
+	client.Timeout = i.Timeout
 	client.Version = i.Version
+	client.Atomic = i.Atomic
+
+	if client.Timeout == 0 {
+		client.Timeout = defaultTimeout
+	}
 
 	cp, err := client.ChartPathOptions.LocateChart(i.Chart, settings)
 	if err != nil {
 		return "", err
 	}
 
-	setOpts := values.Options{
-		Values: i.Sets,
-	}
-
 	p := getter.All(settings)
-	vals, err := setOpts.MergeValues(p)
+	vals, err := i.ValueOpts.MergeValues(p)
 	if err != nil {
 		return "", err
 	}
@@ -240,15 +257,23 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	return released.Info.Notes, nil
 }
 
-// UnInstall will uninstall a Chart
-func (i *InstallOpts) UnInstall(cfg *action.Configuration) error {
+// Uninstall will uninstall a Chart
+func (i *InstallOpts) Uninstall(cfg *Config) error {
 	ctx := context.Background()
 	opts := retry.Options{
 		MaxRetry: 1 + i.TryTimes,
 	}
+	if cfg.Namespace() == "" {
+		cfg.SetNamespace(i.Namespace)
+	}
+
+	actionCfg, err := NewActionConfig(cfg)
+	if err != nil {
+		return err
+	}
 
 	if err := retry.IfNecessary(ctx, func() error {
-		if err := i.tryUnInstall(cfg); err != nil {
+		if err := i.tryUninstall(actionCfg); err != nil {
 			return err
 		}
 		return nil
@@ -258,10 +283,11 @@ func (i *InstallOpts) UnInstall(cfg *action.Configuration) error {
 	return nil
 }
 
-func (i *InstallOpts) tryUnInstall(cfg *action.Configuration) error {
+func (i *InstallOpts) tryUninstall(cfg *action.Configuration) error {
 	client := action.NewUninstall(cfg)
 	client.Wait = i.Wait
-	client.Timeout = timeOut
+	client.Timeout = defaultTimeout
+	client.DisableHooks = i.DisableHooks
 
 	// Create context and prepare the handle of SIGTERM
 	ctx := context.Background()
@@ -284,17 +310,22 @@ func (i *InstallOpts) tryUnInstall(cfg *action.Configuration) error {
 	return nil
 }
 
-func NewActionConfig(ns string, config string, opts ...Option) (*action.Configuration, error) {
+func NewActionConfig(cfg *Config) (*action.Configuration, error) {
+	if cfg.fake {
+		return fakeActionConfig(), nil
+	}
+
 	var err error
 	settings := cli.New()
-	cfg := new(action.Configuration)
-
-	settings.SetNamespace(ns)
-	settings.KubeConfig = config
-	for _, opt := range opts {
-		opt(settings)
+	actionCfg := new(action.Configuration)
+	settings.SetNamespace(cfg.namespace)
+	settings.KubeConfig = cfg.kubeConfig
+	if cfg.kubeContext != "" {
+		settings.KubeContext = cfg.kubeContext
 	}
-	if cfg.RegistryClient, err = registry.NewClient(
+	settings.Debug = cfg.debug
+
+	if actionCfg.RegistryClient, err = registry.NewClient(
 		registry.ClientOptDebug(settings.Debug),
 		registry.ClientOptEnableCache(true),
 		registry.ClientOptWriter(io.Discard),
@@ -302,15 +333,24 @@ func NewActionConfig(ns string, config string, opts ...Option) (*action.Configur
 	); err != nil {
 		return nil, err
 	}
-	if err = cfg.Init(settings.RESTClientGetter(), settings.Namespace(),
+
+	// do not output warnings
+	getter := settings.RESTClientGetter()
+	getter.(*genericclioptions.ConfigFlags).WrapConfigFn = func(c *rest.Config) *rest.Config {
+		c.WarningHandler = rest.NoWarnings{}
+		return c
+	}
+
+	if err = actionCfg.Init(settings.RESTClientGetter(),
+		settings.Namespace(),
 		os.Getenv("HELM_DRIVER"),
-		func(format string, v ...interface{}) {}); err != nil {
+		cfg.logFn); err != nil {
 		return nil, err
 	}
-	return cfg, nil
+	return actionCfg, nil
 }
 
-func FakeActionConfig() *action.Configuration {
+func fakeActionConfig() *action.Configuration {
 	registryClient, err := registry.NewClient()
 	if err != nil {
 		return nil
@@ -326,15 +366,20 @@ func FakeActionConfig() *action.Configuration {
 }
 
 // Upgrade will upgrade a Chart
-func (i *InstallOpts) Upgrade(cfg *action.Configuration) error {
+func (i *InstallOpts) Upgrade(cfg *Config) error {
 	ctx := context.Background()
 	opts := retry.Options{
 		MaxRetry: 1 + i.TryTimes,
 	}
 
-	if err := retry.IfNecessary(ctx, func() error {
+	actionCfg, err := NewActionConfig(cfg)
+	if err != nil {
+		return err
+	}
+
+	if err = retry.IfNecessary(ctx, func() error {
 		var err1 error
-		if _, err1 = i.tryUpgrade(cfg); err1 != nil {
+		if _, err1 = i.tryUpgrade(actionCfg); err1 != nil {
 			return err1
 		}
 		return nil
@@ -346,7 +391,7 @@ func (i *InstallOpts) Upgrade(cfg *action.Configuration) error {
 }
 
 func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
-	installed, err := i.getInstalled(cfg)
+	installed, err := i.GetInstalled(cfg)
 	if err != nil {
 		return "", err
 	}
@@ -356,25 +401,39 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 	client := action.NewUpgrade(cfg)
 	client.Namespace = i.Namespace
 	client.Wait = i.Wait
-	client.Timeout = timeOut
+	client.WaitForJobs = i.Wait
+	client.Timeout = i.Timeout
+	if client.Timeout == 0 {
+		client.Timeout = defaultTimeout
+	}
+
 	if len(i.Version) > 0 {
 		client.Version = i.Version
 	} else {
 		client.Version = installed.Chart.AppVersion()
 	}
-	client.ReuseValues = true
+	// do not use helm's ReuseValues, do it ourselves, helm's default upgrade also set it to false
+	// if ReuseValues set to true, helm will use old values instead of new ones, which will cause nil pointer error if new values added.
+	client.ReuseValues = false
 
 	cp, err := client.ChartPathOptions.LocateChart(i.Chart, settings)
 	if err != nil {
 		return "", err
 	}
 
-	setOpts := values.Options{
-		Values: i.Sets,
-	}
-
 	p := getter.All(settings)
-	vals, err := setOpts.MergeValues(p)
+	vals, err := i.ValueOpts.MergeValues(p)
+	if err != nil {
+		return "", err
+	}
+	// get coalesced values of current chart
+	currentValues, err := chartutil.CoalesceValues(installed.Chart, installed.Config)
+	if err != nil {
+		return "", err
+	}
+	// merge current values into vals, so current release's user values can be kept
+	installed.Chart.Values = currentValues
+	vals, err = chartutil.CoalesceValues(installed.Chart, vals)
 	if err != nil {
 		return "", err
 	}
@@ -421,4 +480,82 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 		return "", err
 	}
 	return released.Info.Notes, nil
+}
+
+func GetChartVersions(chartName string) ([]*semver.Version, error) {
+	settings := cli.New()
+	rf, err := repo.LoadFile(settings.RepositoryConfig)
+	if err != nil {
+		if os.IsNotExist(errors.Cause(err)) {
+			return nil, nil
+		} else {
+			return nil, err
+		}
+	}
+
+	var ind *repo.IndexFile
+	for _, re := range rf.Repositories {
+		n := re.Name
+		if n != types.KubeBlocksRepoName {
+			continue
+		}
+
+		// load index file
+		f := filepath.Join(settings.RepositoryCache, helmpath.CacheIndexFile(n))
+		ind, err = repo.LoadIndexFile(f)
+		if err != nil {
+			return nil, err
+		}
+		break
+	}
+
+	// do not find any index file
+	if ind == nil {
+		return nil, nil
+	}
+
+	var versions []*semver.Version
+	for chart, entry := range ind.Entries {
+		if len(entry) == 0 || chart != chartName {
+			continue
+		}
+		for _, v := range entry {
+			ver, err := semver.NewVersion(v.Version)
+			if err != nil {
+				return nil, err
+			}
+			versions = append(versions, ver)
+		}
+	}
+	return versions, nil
+}
+
+// AddValueOptionsFlags add helm value flags
+func AddValueOptionsFlags(f *pflag.FlagSet, v *values.Options) {
+	f.StringSliceVarP(&v.ValueFiles, "values", "f", []string{}, "Specify values in a YAML file or a URL (can specify multiple)")
+	f.StringArrayVar(&v.Values, "set", []string{}, "Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
+	f.StringArrayVar(&v.StringValues, "set-string", []string{}, "Set STRING values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)")
+	f.StringArrayVar(&v.FileValues, "set-file", []string{}, "Set values from respective files specified via the command line (can specify multiple or separate values with commas: key1=path1,key2=path2)")
+	f.StringArrayVar(&v.JSONValues, "set-json", []string{}, "Set JSON values on the command line (can specify multiple or separate values with commas: key1=jsonval1,key2=jsonval2)")
+}
+
+func ValueOptsIsEmpty(valueOpts *values.Options) bool {
+	if valueOpts == nil {
+		return true
+	}
+	return len(valueOpts.ValueFiles) == 0 &&
+		len(valueOpts.StringValues) == 0 &&
+		len(valueOpts.Values) == 0 &&
+		len(valueOpts.FileValues) == 0 &&
+		len(valueOpts.JSONValues) == 0
+}
+
+func GetQuiteLog() action.DebugLog {
+	return func(format string, v ...interface{}) {}
+}
+
+func GetVerboseLog() action.DebugLog {
+	return func(format string, v ...interface{}) {
+		klog.Infof(format+"\n", v...)
+	}
 }

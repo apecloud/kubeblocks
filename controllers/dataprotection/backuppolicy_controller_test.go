@@ -1,54 +1,57 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package dataprotection
 
 import (
-	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/sethvargo/go-password/password"
 	"github.com/spf13/viper"
-
-	appv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("Backup Policy Controller", func() {
-	type Key = types.NamespacedName
-	const timeout = time.Second * 20
-	const interval = time.Second
-	const TRUE = "true"
+	const clusterName = "wesql-cluster"
+	const componentName = "replicasets-primary"
+	const containerName = "mysql"
+	const defaultPVCSize = "1Gi"
+	const backupPolicyName = "test-backup-policy"
+	const backupRemotePVCName = "backup-remote-pvc"
+	const defaultSchedule = "0 3 * * *"
+	const defaultTTL = "7d"
+	const backupNamePrefix = "test-backup-job-"
+	const mgrNamespace = "kube-system"
 
-	var ctx = context.Background()
-
-	viper.SetDefault("DP_BACKUP_SCHEDULE", "0 3 * * *")
-	viper.SetDefault("DP_BACKUP_TTL", "168h0m0s")
+	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
@@ -56,449 +59,328 @@ var _ = Describe("Backup Policy Controller", func() {
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
 		By("clean resources")
-
+		viper.SetDefault(constant.CfgKeyCtrlrMgrNS, mgrNamespace)
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS)
+		// mgr namespaced
+		inMgrNS := client.InNamespace(mgrNamespace)
+		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inMgrNS, ml)
 		// non-namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
-		testdbaas.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, ml)
 	}
 
-	BeforeEach(cleanEnv)
+	BeforeEach(func() {
+		cleanEnv()
+
+		By("By mocking a statefulset")
+		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, clusterName+"-"+componentName, clusterName, componentName).
+			AddAppInstanceLabel(clusterName).
+			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
+			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
+				Spec:       testapps.NewPVC(defaultPVCSize),
+			}).Create(&testCtx).GetObject()
+
+		By("By mocking a pod belonging to the statefulset")
+		pod := testapps.NewPodFactory(testCtx.DefaultNamespace, sts.Name+"-0").
+			AddAppInstanceLabel(clusterName).
+			AddContainer(corev1.Container{Name: containerName, Image: testapps.ApeCloudMySQLImage}).
+			Create(&testCtx).GetObject()
+
+		By("By mocking a pvc belonging to the pod")
+		_ = testapps.NewPersistentVolumeClaimFactory(
+			testCtx.DefaultNamespace, "data-"+pod.Name, clusterName, componentName, "data").
+			SetStorage("1Gi").
+			Create(&testCtx)
+	})
 
 	AfterEach(cleanEnv)
 
-	genarateNS := func(prefix string) Key {
-		randomStr, _ := password.Generate(6, 0, 0, true, false)
-		key := Key{
-			Name:      prefix + randomStr,
-			Namespace: testCtx.DefaultNamespace,
-		}
-		return key
-	}
-
-	assureBackupPolicyObj := func(backupTool string, schedule string, ttl *metav1.Duration) *dpv1alpha1.BackupPolicy {
-		By("By assure an backupPolicy obj")
-		backupPolicyYaml := `
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: BackupPolicy
-metadata:
-  name: backup-policy-demo
-spec:
-  backupToolName: xtrabackup-mysql
-  backupsHistoryLimit: 1
-  target:
-    databaseEngine: mysql
-    labelsSelector:
-      matchLabels:
-        app.kubernetes.io/instance: wesql-cluster	
-    secret:
-      name: wesql-cluster
-  hooks:
-    preCommands:
-    - touch /data/mysql/.restore;sync
-    postCommands:
-    - rm -f /data/mysql/.restore;sync
-  remoteVolume:
-    name: backup-remote-volume
-    persistentVolumeClaim:
-      claimName: backup-host-path-pvc
-  onFailAttempted: 3
-`
-		backupPolicy := &dpv1alpha1.BackupPolicy{}
-		Expect(yaml.Unmarshal([]byte(backupPolicyYaml), backupPolicy)).Should(Succeed())
-		ns := genarateNS("backup-policy-")
-		backupPolicy.Name = ns.Name
-		backupPolicy.Namespace = ns.Namespace
-		backupPolicy.Spec.BackupToolName = backupTool
-		backupPolicy.Spec.Schedule = schedule
-		if nil != ttl {
-			backupPolicy.Spec.TTL = ttl
-		}
-		Expect(testCtx.CreateObj(ctx, backupPolicy)).Should(Succeed())
-		return backupPolicy
-	}
-
-	assureBackupToolObj := func(withoutResources ...bool) *dpv1alpha1.BackupTool {
-		By("By assure an backupTool obj")
-		backupToolYaml := `
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: BackupTool
-metadata:
-  name: xtrabackup-mysql
-spec:
-  image: percona/percona-xtrabackup
-  databaseEngine: mysql
-  deployKind: job
-  resources:
-    limits:
-      cpu: "1"
-      memory: 2Gi
-
-  env:
-    - name: DATA_DIR
-      value: /var/lib/mysql
-  physical:
-    restoreCommands:
-      - |
-        echo "BACKUP_DIR=${BACKUP_DIR} BACKUP_NAME=${BACKUP_NAME} DATA_DIR=${DATA_DIR}" && \
-        mkdir -p /tmp/data/ && cd /tmp/data \
-        && xbstream -x < /${BACKUP_DIR}/${BACKUP_NAME}.xbstream \
-        && xtrabackup --decompress  --target-dir=/tmp/data/ \
-        && find . -name "*.qp"|xargs rm -f \
-        && rm -rf ${DATA_DIR}/* \
-        && rsync -avrP /tmp/data/ ${DATA_DIR}/ \
-        && rm -rf /tmp/data/ \
-        && chmod -R 0777 ${DATA_DIR}
-    incrementalRestoreCommands: []
-  logical:
-    restoreCommands: []
-    incrementalRestoreCommands: []
-  backupCommands:
-    - echo "DB_HOST=${DB_HOST} DB_USER=${DB_USER} DB_PASSWORD=${DB_PASSWORD} DATA_DIR=${DATA_DIR} BACKUP_DIR=${BACKUP_DIR} BACKUP_NAME=${BACKUP_NAME}";
-      mkdir -p /${BACKUP_DIR};
-      xtrabackup --compress --backup  --safe-slave-backup --slave-info --stream=xbstream --host=${DB_HOST} --user=${DB_USER} --password=${DB_PASSWORD} --datadir=${DATA_DIR} > /${BACKUP_DIR}/${BACKUP_NAME}.xbstream
-  incrementalBackupCommands: []
-`
-		backupTool := &dpv1alpha1.BackupTool{}
-		Expect(yaml.Unmarshal([]byte(backupToolYaml), backupTool)).Should(Succeed())
-		nilResources := false
-		// optional arguments, only use the first one.
-		if len(withoutResources) > 0 {
-			nilResources = withoutResources[0]
-		}
-		if nilResources {
-			backupTool.Spec.Resources = nil
-		}
-		ns := genarateNS("backup-tool-")
-		backupTool.Name = ns.Name
-		backupTool.Namespace = ns.Namespace
-		Expect(testCtx.CreateObj(ctx, backupTool)).Should(Succeed())
-		return backupTool
-	}
-
-	assureStatefulSetObj := func() *appv1.StatefulSet {
-		By("By assure an stateful obj")
-		statefulYaml := `
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  labels:
-    app.kubernetes.io/instance: wesql-cluster
-  name: wesql-cluster-replicasets-primary
-spec:
-  minReadySeconds: 10
-  podManagementPolicy: Parallel
-  replicas: 1
-  revisionHistoryLimit: 10
-  selector:
-    matchLabels:
-      app.kubernetes.io/component: replicasets-replicasets
-      app.kubernetes.io/instance: wesql-cluster-replicasets-primary
-      app.kubernetes.io/name: state.mysql-wesql-clusterdefinition
-  serviceName: wesql-cluster-replicasets-primary
-  template:
-    metadata:
-      creationTimestamp: null
-      labels:
-        app.kubernetes.io/component: replicasets-replicasets
-        app.kubernetes.io/instance: wesql-cluster-replicasets-primary
-        app.kubernetes.io/name: state.mysql-wesql-clusterdefinition
-    spec:
-      containers:
-      - args: []
-        command:
-        - /bin/bash
-        - -c
-        image: docker.io/apecloud/wesql-server:latest
-        imagePullPolicy: IfNotPresent
-        name: mysql
-        ports:
-        - containerPort: 3306
-          name: mysql
-          protocol: TCP
-        - containerPort: 13306
-          name: paxos
-          protocol: TCP
-        resources: {}
-        terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: File
-        volumeMounts:
-        - mountPath: /var/lib/mysql
-          name: data
-      dnsPolicy: ClusterFirst
-      restartPolicy: Always
-      schedulerName: default-scheduler
-      securityContext: {}
-      terminationGracePeriodSeconds: 30
-  updateStrategy:
-    rollingUpdate:
-      partition: 0
-    type: RollingUpdate
-  volumeClaimTemplates:
-  - apiVersion: v1
-    kind: PersistentVolumeClaim
-    metadata:
-      creationTimestamp: null
-      name: data
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 1Gi
-      volumeMode: Filesystem
-`
-		podYaml := `
-apiVersion: v1
-kind: Pod
-metadata:
-  generateName: wesql-cluster-replicasets-primary-
-  labels:
-    statefulset.kubernetes.io/pod-name: wesql-cluster-replicasets-primary-0
-  name: wesql-cluster-replicasets-primary-0
-  namespace: default
-spec:
-  containers:
-    - args:
-        - docker-entrypoint.sh mysqld
-      command:
-        - /bin/bash
-        - '-c'
-      env:
-        - name: KB_POD_NAME
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: metadata.name
-        - name: KB_REPLICASETS_PRIMARY_N
-          value: '1'
-        - name: KB_REPLICASETS_PRIMARY_0_HOSTNAME
-          value: wesql-cluster-replicasets-primary-0
-      image: 'docker.io/apecloud/wesql-server:latest'
-      imagePullPolicy: IfNotPresent
-      name: mysql
-      ports:
-        - containerPort: 3306
-          name: mysql
-          protocol: TCP
-        - containerPort: 13306
-          name: paxos
-          protocol: TCP
-      resources: {}
-      terminationMessagePath: /dev/termination-log
-      terminationMessagePolicy: File
-      volumeMounts:
-        - mountPath: /var/lib/mysql
-          name: data
-  hostname: wesql-cluster-replicasets-primary-0
-  preemptionPolicy: PreemptLowerPriority
-  priority: 0
-  restartPolicy: Always
-  securityContext: {}
-  subdomain: wesql-cluster-replicasets-primary
-  terminationGracePeriodSeconds: 30
-  tolerations:
-    - effect: NoExecute
-      key: node.kubernetes.io/not-ready
-      operator: Exists
-      tolerationSeconds: 300
-    - effect: NoExecute
-      key: node.kubernetes.io/unreachable
-      operator: Exists
-      tolerationSeconds: 300
-  volumes:
-    - name: data
-      persistentVolumeClaim:
-        claimName: data-wesql-cluster-replicasets-primary-0
-  phase: Running
-  qosClass: BestEffort
-`
-		statefulSet := &appv1.StatefulSet{}
-		Expect(yaml.Unmarshal([]byte(statefulYaml), statefulSet)).Should(Succeed())
-		statefulSet.SetNamespace(testCtx.DefaultNamespace)
-		statefulSet.Spec.Template.GetLabels()[testCtx.TestObjLabelKey] = TRUE
-		Expect(testCtx.CreateObj(ctx, statefulSet)).Should(Succeed())
-
-		if viper.GetBool("USE_EXISTING_CLUSTER") {
-			return statefulSet
-		}
-		pod := &corev1.Pod{}
-		Expect(yaml.Unmarshal([]byte(podYaml), pod)).Should(Succeed())
-		pod.GetLabels()[testCtx.TestObjLabelKey] = TRUE
-		Expect(testCtx.CreateObj(ctx, pod)).Should(Succeed())
-		return statefulSet
-	}
-
-	assureBackupObj := func(backupPolicy string) *dpv1alpha1.Backup {
-		By("By assure an backup obj")
-		backupYaml := `
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: Backup
-metadata:
-  name: backup-success-demo
-
-  labels:
-    dataprotection.kubeblocks.io/backup-type: full
-    dataprotection.kubeblocks.io/backup-policy-name: backup-policy-demo
-    dataprotection.kubeblocks.io/backup-index: "0"
-    app.kubernetes.io/instance: wesql-cluster
-spec:
-  backupPolicyName: backup-policy-demo
-  backupType: full
-  ttl: 168h0m0s
-`
-		backup := &dpv1alpha1.Backup{}
-		Expect(yaml.Unmarshal([]byte(backupYaml), backup)).Should(Succeed())
-		ns := genarateNS("backup-job-")
-		backup.Name = ns.Name
-		backup.Namespace = ns.Namespace
-		backup.Spec.BackupPolicyName = backupPolicy
-		backup.Labels[dataProtectionLabelAutoBackupKey] = TRUE
-
-		Expect(testCtx.CreateObj(ctx, backup)).Should(Succeed())
-		return backup
-	}
-
-	patchBackupStatus := func(status dpv1alpha1.BackupStatus, key Key) {
-		backup := dpv1alpha1.Backup{}
-		Eventually(func() error {
-			return k8sClient.Get(ctx, key, &backup)
-		}, timeout, interval).Should(Succeed())
-
-		patch := client.MergeFrom(backup.DeepCopy())
-		backup.Status = status
-		Expect(k8sClient.Status().Patch(ctx, &backup, patch)).Should(Succeed())
-
-		Eventually(func() bool {
-			if err := k8sClient.Get(ctx, key, &backup); err != nil {
-				return false
+	When("creating backup policy with default settings", func() {
+		var backupToolName string
+		getCronjobKey := func(backupType dpv1alpha1.BackupType) types.NamespacedName {
+			return types.NamespacedName{
+				Name:      fmt.Sprintf("%s-%s-%s", backupPolicyName, testCtx.DefaultNamespace, backupType),
+				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 			}
-			return backup.Status.Expiration != nil
-		}, timeout, interval).Should(BeTrue())
-	}
+		}
 
-	patchCronJobStatus := func(key Key) {
-		cronJob := batchv1.CronJob{}
-		Eventually(func() error {
-			return k8sClient.Get(ctx, key, &cronJob)
-		}, timeout, interval).Should(Succeed())
-
-		now := metav1.Now()
-		patch := client.MergeFrom(cronJob.DeepCopy())
-		cronJob.Status = batchv1.CronJobStatus{LastSuccessfulTime: &now, LastScheduleTime: &now}
-		Expect(k8sClient.Status().Patch(ctx, &cronJob, patch)).Should(Succeed())
-
-		Eventually(func() bool {
-			if err := k8sClient.Get(ctx, key, &cronJob); err != nil {
-				return false
-			}
-			return cronJob.Status.LastScheduleTime != nil
-		}, timeout, interval).Should(BeTrue())
-	}
-
-	Context("When creating backup policy", func() {
-		It("Should success with no error", func() {
-
-			By("By creating a statefulset")
-			_ = assureStatefulSetObj()
-
+		BeforeEach(func() {
+			viper.Set(constant.CfgKeyCtrlrMgrNS, mgrNamespace)
 			By("By creating a backupTool")
-			backupTool := assureBackupToolObj()
-
-			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
-			toCreate := assureBackupPolicyObj(backupTool.Name, "0 3 * * *", nil)
-			key := Key{
-				Name:      toCreate.Name,
-				Namespace: toCreate.Namespace,
-			}
-
-			result := &dpv1alpha1.BackupPolicy{}
-			Eventually(func() bool {
-				if err := k8sClient.Get(ctx, key, result); err != nil {
-					return false
-				}
-				return result.Status.Phase == dpv1alpha1.ConfigAvailable
-			}, timeout, interval).Should(BeTrue())
-			Expect(result.Status.Phase).Should(Equal(dpv1alpha1.ConfigAvailable))
-
-			now := metav1.Now()
-			backupStatus := dpv1alpha1.BackupStatus{
-				Phase:               dpv1alpha1.BackupCompleted,
-				Expiration:          &now,
-				StartTimestamp:      &now,
-				CompletionTimestamp: &now,
-			}
-
-			backupExpired := assureBackupObj(toCreate.Name)
-			patchBackupStatus(backupStatus, Key{Namespace: backupExpired.Namespace, Name: backupExpired.Name})
-
-			backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
-			backupOutLimit1 := assureBackupObj(toCreate.Name)
-			patchBackupStatus(backupStatus, Key{Namespace: backupOutLimit1.Namespace, Name: backupOutLimit1.Name})
-
-			backupOutLimit2 := assureBackupObj(toCreate.Name)
-			patchBackupStatus(backupStatus, Key{Namespace: backupOutLimit2.Namespace, Name: backupOutLimit2.Name})
-
-			patchCronJobStatus(key)
-		})
-		It("Should success without schedule and ttl", func() {
-
-			By("By creating a statefulset")
-			_ = assureStatefulSetObj()
-
-			By("By creating a backupTool")
-			backupTool := assureBackupToolObj()
-
-			By("By creating a backupPolicy from backupTool: " + backupTool.Name)
-			toCreate := assureBackupPolicyObj(backupTool.Name, "", nil)
-			key := Key{
-				Name:      toCreate.Name,
-				Namespace: toCreate.Namespace,
-			}
-
-			result := &dpv1alpha1.BackupPolicy{}
-			Eventually(func() bool {
-				if err := k8sClient.Get(ctx, key, result); err != nil {
-					return false
-				}
-				return result.Status.Phase == dpv1alpha1.ConfigAvailable
-			}, timeout, interval).Should(BeTrue())
-			Expect(result.Status.Phase).Should(Equal(dpv1alpha1.ConfigAvailable))
+			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
+				&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
+			backupToolName = backupTool.Name
 		})
 
-		Context("When failed creating backup", func() {
-			It("Should failed with no error", func() {
-				By("By creating a statefulset")
-				_ = assureStatefulSetObj()
+		AfterEach(func() {
+			viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
+		})
 
-				By("By creating a backupTool")
-				backupTool := assureBackupToolObj()
-
-				By("By creating a backupPolicy from backupTool: " + backupTool.Name)
-				toCreate := assureBackupPolicyObj(backupTool.Name, "error schedule", nil)
-				key := Key{
-					Name:      toCreate.Name,
-					Namespace: toCreate.Namespace,
+		Context("creates a backup policy", func() {
+			var backupPolicyKey types.NamespacedName
+			var backupPolicy *dpv1alpha1.BackupPolicy
+			BeforeEach(func() {
+				By("By creating a backupPolicy from backupTool: " + backupToolName)
+				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					AddFullPolicy().
+					SetBackupToolName(backupToolName).
+					SetBackupsHistoryLimit(1).
+					SetSchedule(defaultSchedule, true).
+					SetTTL(defaultTTL).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					SetTargetSecretName(clusterName).
+					AddHookPreCommand("touch /data/mysql/.restore;sync").
+					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
+					SetPVC(backupRemotePVCName).
+					Create(&testCtx).GetObject()
+				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
+			})
+			It("should success", func() {
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
+				})).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, getCronjobKey(dpv1alpha1.BackupTypeDataFile), func(g Gomega, fetched *batchv1.CronJob) {
+					g.Expect(fetched.Spec.Schedule).To(Equal(defaultSchedule))
+				})).Should(Succeed())
+			})
+			It("limit backups to 1", func() {
+				now := metav1.Now()
+				backupStatus := dpv1alpha1.BackupStatus{
+					Phase:               dpv1alpha1.BackupCompleted,
+					Expiration:          &now,
+					StartTimestamp:      &now,
+					CompletionTimestamp: &now,
 				}
 
-				result := &dpv1alpha1.BackupPolicy{}
-				Eventually(func() bool {
-					if err := k8sClient.Get(ctx, key, result); err != nil {
-						return false
+				autoBackupLabel := map[string]string{
+					dataProtectionLabelAutoBackupKey:   "true",
+					dataProtectionLabelBackupPolicyKey: backupPolicyName,
+					dataProtectionLabelBackupTypeKey:   string(dpv1alpha1.BackupTypeDataFile),
+				}
+
+				By("create a expired backup")
+				backupExpired := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
+					WithRandomName().AddLabelsInMap(autoBackupLabel).
+					SetBackupPolicyName(backupPolicyName).
+					SetBackupType(dpv1alpha1.BackupTypeDataFile).
+					Create(&testCtx).GetObject()
+				By("create 1st limit backup")
+				backupOutLimit1 := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
+					WithRandomName().AddLabelsInMap(autoBackupLabel).
+					SetBackupPolicyName(backupPolicyName).
+					SetBackupType(dpv1alpha1.BackupTypeDataFile).
+					Create(&testCtx).GetObject()
+				By("create 2nd limit backup")
+				backupOutLimit2 := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupNamePrefix).
+					WithRandomName().AddLabelsInMap(autoBackupLabel).
+					SetBackupPolicyName(backupPolicyName).
+					SetBackupType(dpv1alpha1.BackupTypeDataFile).
+					Create(&testCtx).GetObject()
+
+				By("waiting expired backup completed")
+				backupExpiredKey := client.ObjectKeyFromObject(backupExpired)
+				patchK8sJobStatus(backupExpiredKey, batchv1.JobComplete)
+				Eventually(testapps.CheckObj(&testCtx, backupExpiredKey,
+					func(g Gomega, fetched *dpv1alpha1.Backup) {
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					})).Should(Succeed())
+				By("mock update expired backup status to expire")
+				backupStatus.Expiration = &metav1.Time{Time: now.Add(-time.Hour * 24)}
+				backupStatus.StartTimestamp = backupStatus.Expiration
+				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupExpired))
+
+				By("waiting 1st limit backup completed")
+				backupOutLimit1Key := client.ObjectKeyFromObject(backupOutLimit1)
+				patchK8sJobStatus(backupOutLimit1Key, batchv1.JobComplete)
+				Eventually(testapps.CheckObj(&testCtx, backupOutLimit1Key,
+					func(g Gomega, fetched *dpv1alpha1.Backup) {
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					})).Should(Succeed())
+				By("mock update 1st limit backup NOT to expire")
+				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
+				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour)}
+				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit1))
+
+				By("waiting 2nd limit backup completed")
+				backupOutLimit2Key := client.ObjectKeyFromObject(backupOutLimit2)
+				patchK8sJobStatus(backupOutLimit2Key, batchv1.JobComplete)
+				Eventually(testapps.CheckObj(&testCtx, backupOutLimit2Key,
+					func(g Gomega, fetched *dpv1alpha1.Backup) {
+						g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					})).Should(Succeed())
+				By("mock update 2nd limit backup NOT to expire")
+				backupStatus.Expiration = &metav1.Time{Time: now.Add(time.Hour * 24)}
+				backupStatus.StartTimestamp = &metav1.Time{Time: now.Add(time.Hour * 2)}
+				patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupOutLimit2))
+
+				// trigger the backup policy controller through update cronjob
+				patchCronJobStatus(getCronjobKey(dpv1alpha1.BackupTypeDataFile))
+
+				By("retain the latest backup")
+				Eventually(testapps.List(&testCtx, intctrlutil.BackupSignature,
+					client.MatchingLabels(backupPolicy.Spec.Datafile.Target.LabelsSelector.MatchLabels),
+					client.InNamespace(backupPolicy.Namespace))).Should(HaveLen(1))
+			})
+		})
+
+		Context("creates a backup policy with empty schedule", func() {
+			var backupPolicyKey types.NamespacedName
+			var backupPolicy *dpv1alpha1.BackupPolicy
+			BeforeEach(func() {
+				By("By creating a backupPolicy from backupTool: " + backupToolName)
+				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					SetBackupToolName(backupToolName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					SetTargetSecretName(clusterName).
+					AddHookPreCommand("touch /data/mysql/.restore;sync").
+					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
+					SetPVC(backupRemotePVCName).
+					Create(&testCtx).GetObject()
+				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
+			})
+			It("should success", func() {
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
+				})).Should(Succeed())
+			})
+		})
+
+		Context("creates a backup policy with invalid schedule", func() {
+			var backupPolicyKey types.NamespacedName
+			var backupPolicy *dpv1alpha1.BackupPolicy
+			BeforeEach(func() {
+				By("By creating a backupPolicy from backupTool: " + backupToolName)
+				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					AddSnapshotPolicy().
+					SetBackupToolName(backupToolName).
+					SetSchedule("invalid schedule", true).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					SetTargetSecretName(clusterName).
+					AddHookPreCommand("touch /data/mysql/.restore;sync").
+					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
+					SetPVC(backupRemotePVCName).
+					Create(&testCtx).GetObject()
+				backupPolicyKey = client.ObjectKeyFromObject(backupPolicy)
+			})
+			It("should failed", func() {
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).NotTo(Equal(dpv1alpha1.PolicyAvailable))
+				})).Should(Succeed())
+			})
+		})
+
+		Context("creating a backupPolicy with secret", func() {
+			It("creating a backupPolicy with secret", func() {
+				By("By creating a backupPolicy with empty secret")
+				randomSecretName := testCtx.GetRandomStr()
+				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					AddFullPolicy().
+					SetBackupToolName(backupToolName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					SetTargetSecretName(randomSecretName).
+					AddHookPreCommand("touch /data/mysql/.restore;sync").
+					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
+					SetPVC(backupRemotePVCName).
+					Create(&testCtx).GetObject()
+				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
+					g.Expect(fetched.Spec.Datafile.Target.Secret.Name).To(Equal(randomSecretName))
+				})).Should(Succeed())
+			})
+		})
+
+		Context("creating a backupPolicy with global backup config", func() {
+			It("creating a backupPolicy with global backup config", func() {
+				By("By creating a backupPolicy with empty secret")
+				pvcName := "backup-data"
+				pvcInitCapacity := "10Gi"
+				viper.SetDefault(constant.CfgKeyBackupPVCName, pvcName)
+				viper.SetDefault(constant.CfgKeyBackupPVCInitCapacity, pvcInitCapacity)
+				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					AddFullPolicy().
+					SetBackupToolName(backupToolName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					AddHookPreCommand("touch /data/mysql/.restore;sync").
+					AddHookPostCommand("rm -f /data/mysql/.restore;sync").
+					Create(&testCtx).GetObject()
+				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
+					g.Expect(fetched.Spec.Datafile.PersistentVolumeClaim.Name).To(Equal(pvcName))
+					g.Expect(fetched.Spec.Datafile.PersistentVolumeClaim.InitCapacity.String()).To(Equal(pvcInitCapacity))
+				})).Should(Succeed())
+			})
+		})
+		Context("creating a logfile backupPolicy", func() {
+			It("with reconfigure config", func() {
+				By("creating a backupPolicy")
+				pvcName := "backup-data"
+				pvcInitCapacity := "10Gi"
+				viper.SetDefault(constant.CfgKeyBackupPVCName, pvcName)
+				viper.SetDefault(constant.CfgKeyBackupPVCInitCapacity, pvcInitCapacity)
+				reconfigureRef := `{
+					"name": "postgresql-configuration",
+					"key": "postgresql.conf",
+					"enable": {
+					  "logfile": [{"key":"archive_command","value":"''"}]
+					},
+					"disable": {
+					  "logfile": [{"key": "archive_command","value":"'/bin/true'"}]
 					}
-					return result.Status.Phase != dpv1alpha1.ConfigAvailable
-				}, timeout, interval).Should(BeTrue())
-				Expect(result.Status.Phase).ShouldNot(Equal(dpv1alpha1.ConfigAvailable))
+				  }`
+				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					AddAnnotations(constant.ReconfigureRefAnnotationKey, reconfigureRef).
+					SetBackupToolName(backupToolName).
+					AddIncrementalPolicy().
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					AddSnapshotPolicy().
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					Create(&testCtx).GetObject()
+				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
+				})).Should(Succeed())
+				By("enable schedule for reconfigure")
+				Eventually(testapps.GetAndChangeObj(&testCtx, backupPolicyKey, func(fetched *dpv1alpha1.BackupPolicy) {
+					fetched.Spec.Schedule.Logfile = &dpv1alpha1.SchedulePolicy{Enable: true, CronExpression: "* * * * *"}
+				})).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Annotations[constant.LastAppliedConfigAnnotation]).To(Equal(`[{"key":"archive_command","value":"''"}]`))
+				})).Should(Succeed())
+
+				By("disable schedule for reconfigure")
+				Eventually(testapps.GetAndChangeObj(&testCtx, backupPolicyKey, func(fetched *dpv1alpha1.BackupPolicy) {
+					fetched.Spec.Schedule.Logfile.Enable = false
+				})).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					g.Expect(fetched.Annotations[constant.LastAppliedConfigAnnotation]).To(Equal(`[{"key":"archive_command","value":"'/bin/true'"}]`))
+				})).Should(Succeed())
 			})
 		})
 	})
 })
+
+func patchBackupStatus(status dpv1alpha1.BackupStatus, key types.NamespacedName) {
+	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *dpv1alpha1.Backup) {
+		fetched.Status = status
+	})).Should(Succeed())
+}
+
+func patchCronJobStatus(key types.NamespacedName) {
+	now := metav1.Now()
+	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *batchv1.CronJob) {
+		fetched.Status = batchv1.CronJobStatus{LastSuccessfulTime: &now, LastScheduleTime: &now}
+	})).Should(Succeed())
+}

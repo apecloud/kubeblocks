@@ -106,7 +106,7 @@ jobs:
           github.event.action == 'published'
         run: |
           cd ${{ github.workspace }}
-          bash ${{ github.workspace }}/.github/utils/issue-prerelease.sh \
+          bash ${{ github.workspace }}/.github/utils/issue_prerelease.sh \
             ${{ env.GITHUB_TOKEN }} \
             ${{ github.repository }} \
             ${{ github.repository_owner }} \

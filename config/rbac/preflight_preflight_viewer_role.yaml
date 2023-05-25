@@ -1,0 +1,27 @@
+# permissions for end users to view preflights.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: preflight-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: kubeblocks
+    app.kubernetes.io/part-of: kubeblocks
+    app.kubernetes.io/managed-by: kustomize
+  name: preflight-viewer-role
+rules:
+- apiGroups:
+  - troubleshoot.sh
+  resources:
+  - preflights
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - troubleshoot.sh
+  resources:
+  - preflights/status
+  verbs:
+  - get

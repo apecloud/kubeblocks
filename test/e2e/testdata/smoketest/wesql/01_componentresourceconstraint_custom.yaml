@@ -1,0 +1,42 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ComponentResourceConstraint
+metadata:
+  annotations:
+    meta.helm.sh/release-name: kubeblocks
+    meta.helm.sh/release-namespace: default
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    resourceconstraint.kubeblocks.io/provider: kubeblocks
+  name: kb-resource-constraint-custom
+spec:
+  constraints:
+    - cpu:
+        max: 2
+        min: "0.1"
+        step: "0.1"
+      memory:
+        sizePerCPU: 1Gi
+    - cpu:
+        max: 2
+        min: "0.1"
+        step: "0.1"
+      memory:
+        sizePerCPU: 2Gi
+    - cpu:
+        max: 2
+        min: "0.1"
+        step: "0.1"
+      memory:
+        sizePerCPU: 3Gi
+    - cpu:
+        max: 2
+        min: "0.1"
+        step: "0.1"
+      memory:
+        sizePerCPU: 4Gi
+    - cpu:
+        max: 2
+        min: "0.1"
+        step: "0.1"
+      memory:
+        sizePerCPU: 5Gi

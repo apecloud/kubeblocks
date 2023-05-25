@@ -1,18 +1,22 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-	http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
 package cluster
 
 import (
@@ -22,13 +26,12 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -36,17 +39,20 @@ import (
 
 var _ = Describe("Expose", func() {
 	const (
-		namespace = "test"
-		pending   = "pending"
-		running   = "running"
-		failed    = "failed"
-		succeed   = "succeed"
-		all       = "all"
+		namespace         = "test"
+		pending           = "pending"
+		running           = "running"
+		failed            = "failed"
+		succeed           = "succeed"
+		all               = "all"
+		statelessCompName = "stateless"
+		statefulCompName  = "stateful"
 	)
 
 	var (
 		streams genericclioptions.IOStreams
 		tf      *cmdtesting.TestFactory
+		opsName string
 	)
 
 	BeforeEach(func() {
@@ -58,45 +64,45 @@ var _ = Describe("Expose", func() {
 		tf.Cleanup()
 	})
 
-	generateOpsObject := func(opsType dbaasv1alpha1.OpsType, phase dbaasv1alpha1.Phase) *dbaasv1alpha1.OpsRequest {
-		return &dbaasv1alpha1.OpsRequest{
+	generateOpsObject := func(opsType appsv1alpha1.OpsType, phase appsv1alpha1.OpsPhase) *appsv1alpha1.OpsRequest {
+		ops := &appsv1alpha1.OpsRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "list-ops-" + clitesting.GetRandomStr(),
 				Namespace: namespace,
 			},
-			Spec: dbaasv1alpha1.OpsRequestSpec{
+			Spec: appsv1alpha1.OpsRequestSpec{
 				ClusterRef: "test-cluster",
 				Type:       opsType,
 			},
-			Status: dbaasv1alpha1.OpsRequestStatus{
+			Status: appsv1alpha1.OpsRequestStatus{
 				Phase: phase,
 			},
 		}
+		ops.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{
+			statelessCompName: {},
+			statefulCompName:  {},
+		}
+		return ops
 	}
 
 	initOpsRequests := func() {
-		opsTypes := []dbaasv1alpha1.OpsType{
-			dbaasv1alpha1.UpgradeType,
-			dbaasv1alpha1.HorizontalScalingType,
-			dbaasv1alpha1.HorizontalScalingType,
-			dbaasv1alpha1.RestartType,
-			dbaasv1alpha1.VerticalScalingType,
-			dbaasv1alpha1.VerticalScalingType,
-			dbaasv1alpha1.VerticalScalingType,
+		opsKeys := []struct {
+			opsType appsv1alpha1.OpsType
+			phase   appsv1alpha1.OpsPhase
+		}{
+			{appsv1alpha1.UpgradeType, appsv1alpha1.OpsPendingPhase},
+			{appsv1alpha1.HorizontalScalingType, appsv1alpha1.OpsFailedPhase},
+			{appsv1alpha1.HorizontalScalingType, appsv1alpha1.OpsSucceedPhase},
+			{appsv1alpha1.RestartType, appsv1alpha1.OpsSucceedPhase},
+			{appsv1alpha1.VerticalScalingType, appsv1alpha1.OpsRunningPhase},
+			{appsv1alpha1.VerticalScalingType, appsv1alpha1.OpsFailedPhase},
+			{appsv1alpha1.VerticalScalingType, appsv1alpha1.OpsRunningPhase},
 		}
-		phases := []dbaasv1alpha1.Phase{
-			dbaasv1alpha1.PendingPhase,
-			dbaasv1alpha1.FailedPhase,
-			dbaasv1alpha1.SucceedPhase,
-			dbaasv1alpha1.SucceedPhase,
-			dbaasv1alpha1.RunningPhase,
-			dbaasv1alpha1.FailedPhase,
-			dbaasv1alpha1.RunningPhase,
+		opsList := make([]runtime.Object, len(opsKeys))
+		for i := range opsKeys {
+			opsList[i] = generateOpsObject(opsKeys[i].opsType, opsKeys[i].phase)
 		}
-		opsList := make([]runtime.Object, len(opsTypes))
-		for i := range opsTypes {
-			opsList[i] = generateOpsObject(opsTypes[i], phases[i])
-		}
+		opsName = opsList[0].(*appsv1alpha1.OpsRequest).Name
 		tf.FakeDynamicClient = clitesting.FakeDynamicClient(opsList...)
 	}
 
@@ -120,8 +126,11 @@ var _ = Describe("Expose", func() {
 		cmd := NewListOpsCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
-		By("init opsrequests for testing")
+		By("init opsRequests for testing")
 		initOpsRequests()
+
+		By("test run cmd")
+		cmd.Run(cmd, nil)
 
 		By("test status flag with default values")
 		o := initOpsOption([]string{pending, running, failed}, nil)
@@ -147,15 +156,41 @@ var _ = Describe("Expose", func() {
 		Expect(getStdoutLinesCount(o.Out)).Should(Equal(3))
 
 		By("test type flag")
-		o = initOpsOption([]string{all}, []string{string(dbaasv1alpha1.RestartType)})
+		o = initOpsOption([]string{all}, []string{string(appsv1alpha1.RestartType)})
 		Expect(o.printOpsList()).Should(Succeed())
 		// title + filter ops
 		Expect(getStdoutLinesCount(o.Out)).Should(Equal(2))
 
-		o = initOpsOption([]string{all}, []string{string(dbaasv1alpha1.RestartType), string(dbaasv1alpha1.VerticalScalingType)})
+		o = initOpsOption([]string{all}, []string{string(appsv1alpha1.RestartType), string(appsv1alpha1.VerticalScalingType)})
 		Expect(o.printOpsList()).Should(Succeed())
 		// title + filter ops
 		Expect(getStdoutLinesCount(o.Out)).Should(Equal(5))
+
+		By("test component for upgrade ops")
+		o = initOpsOption([]string{all}, []string{string(appsv1alpha1.UpgradeType)})
+		Expect(o.printOpsList()).Should(Succeed())
+		Expect(o.Out).Should(ContainSubstring(statefulCompName + "," + statelessCompName))
+
+		By("list-ops with specified name")
+		o = initOpsOption(nil, nil)
+		o.opsRequestName = opsName
+		Expect(o.printOpsList()).Should(Succeed())
+		Expect(getStdoutLinesCount(o.Out)).Should(Equal(2))
+
+		By("list-ops with not exist ops")
+		o = initOpsOption(nil, nil)
+		o.opsRequestName = "not-exist-ops"
+		done := clitesting.Capture()
+		Expect(o.printOpsList()).Should(Succeed())
+		capturedOutput, _ := done()
+		Expect(clitesting.ContainExpectStrings(capturedOutput, "No opsRequests found")).Should(BeTrue())
+
+		By("list-ops with not exist ops")
+		o = initOpsOption([]string{pending}, []string{string(appsv1alpha1.RestartType)})
+		done = clitesting.Capture()
+		Expect(o.printOpsList()).Should(Succeed())
+		capturedOutput, _ = done()
+		Expect(clitesting.ContainExpectStrings(capturedOutput, "kbcli cluster list-ops --status all")).Should(BeTrue())
 	})
 
 })

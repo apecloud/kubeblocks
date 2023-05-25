@@ -1,0 +1,34 @@
+---
+# Source: apecloud-mysql-cluster/templates/cluster.yaml
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mycluster-apecloud-mysql-cluster
+  labels: 
+    helm.sh/chart: apecloud-mysql-cluster-0.5.0-beta.24
+    app.kubernetes.io/name: apecloud-mysql-cluster
+    app.kubernetes.io/instance: mycluster
+    app.kubernetes.io/version: "8.0.30"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  clusterDefinitionRef: apecloud-mysql  # ref clusterdefinition.name
+  clusterVersionRef: ac-mysql-8.0.30 # ref clusterversion.name
+  terminationPolicy: Delete
+  affinity:
+    topologyKeys: 
+      - kubernetes.io/hostname
+  componentSpecs:
+    - name: mysql # user-defined
+      componentDefRef: mysql # ref clusterdefinition componentDefs.name
+      monitor: false
+      replicas: 3
+      enabledLogs:     ["slow","error"]
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: 
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi

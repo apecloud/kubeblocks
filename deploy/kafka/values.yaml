@@ -1,0 +1,48 @@
+## Common override values:
+##
+## @param clusterVersionOverride
+## @param nameOverride
+## @param fullnameOverride
+clusterVersionOverride: ""
+nameOverride: ""
+fullnameOverride: ""
+
+## @param commonLabels Labels to add to all deployed objects
+##
+commonLabels: {}
+
+## @param application images
+##
+images:
+  pullPolicy: IfNotPresent
+  kafka:
+    repository: docker.io/bitnami/kafka
+    tag: 3.4.0-debian-11-r8
+  kafkaExporter:
+    repository: docker.io/bitnami/kafka-exporter
+    tag: 1.6.0-debian-11-r67
+  jmxExporter:
+    repository: docker.io/bitnami/jmx-exporter
+    tag: 0.17.2-debian-11-r55
+
+
+## @param debugEnabled enables containers' debug logging
+##
+debugEnabled: true
+
+## @param mountOptions set the storageclass mountOptions attributes
+##
+mountOptions:
+  - noatime
+  - nobarrier
+
+## storageclass parameters settings
+##
+## @param storageClassParameters.metadata.awsEBSVolumeType
+## @param storageClassParameters.metadata.awsEBSEnableBlockExpress
+storageClassParameters:
+  ## storageclass for KRaft metadata
+  ##
+  metadata:
+    awsEBSVolumeType: io2
+    awsEBSEnableBlockExpress: false

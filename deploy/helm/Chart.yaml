@@ -15,13 +15,13 @@ type: application
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 0.4.0-alpha.0
+version: 0.5.0-beta.24
 
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application. Versions are not expected to
 # follow Semantic Versioning. They should reflect the version the application is using.
 # It is recommended to use it with quotes.
-appVersion: 0.4.0
+appVersion: 0.5.0-beta.24
 
 
 kubeVersion: '>=1.22.0-0'
@@ -49,28 +49,36 @@ annotations:
   artifacthub.io/operator: "true"
   artifacthub.io/prerelease: "true"
 
-dependencies:
-  - condition: wesql.enabled
-    name: wesql
-    repository: file://../wesql
-    version: 0.1.*
-  - condition: grafana.enabled
-    name: grafana
-    repository: https://grafana.github.io/helm-charts
-    version: 6.43.*
-  - condition: prometheus.enabled
-    name: prometheus
-    repository: https://prometheus-community.github.io/helm-charts
-    version: 15.15 - 15.16
-  - condition: loadbalancer.enabled
-    name: loadbalancer
-    repository: file://../loadbalancer
-    version: 0.1.*
-  - condition: snapshot-controller.enabled
-    name: snapshot-controller
-    repository: https://piraeus.io/helm-charts
-    version: 1.*
-  - condition: csi-s3.enabled
-    name: csi-s3
-    repository: https://github.com/CloudVE/helm-charts/raw/master
-    version: 0.*
+dependencies: []
+#  - condition: apecloud-mysql.enabled
+#    name: apecloud-mysql
+#    repository: file://../apecloud-mysql
+#    version: 0.1.*
+#  - condition: postgresql.enabled
+#    name: postgresql
+#    repository: file://../postgresql
+#    version: 0.2.*
+#  - condition: loadbalancer.enabled
+#    name: loadbalancer
+#    repository: file://../loadbalancer
+#    version: 0.1.*
+#  - condition: grafana.enabled
+#    name: grafana
+#    # repository: https://grafana.github.io/helm-charts
+#    version: 6.43.*
+#  - condition: prometheus.enabled
+#    name: prometheus
+#    # repository: https://prometheus-community.github.io/helm-charts
+#    version: 15.15 - 15.16
+#  - condition: snapshot-controller.enabled
+#    name: snapshot-controller
+#    # repository: https://piraeus.io/helm-charts
+#    version: 1.*
+#  - condition: csi-s3.enabled
+#    name: csi-s3
+#    # repository: https://github.com/CloudVE/helm-charts/raw/master
+#    version: 0.*
+#  - condition: alertmanager-webhook-adaptor.enabled
+#    name: alertmanager-webhook-adaptor
+#    # repository: https://apecloud.github.io/helm-charts
+#    version: 0.1.*

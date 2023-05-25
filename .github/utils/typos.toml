@@ -1,0 +1,7 @@
+[default.extend-identifiers]
+# *sigh* this just isn't worth the cost of fixing
+
+[default.extend-words]
+# Don't correct the "AKS"
+AKS = "AKS"
+ons = "ons"

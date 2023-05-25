@@ -1,6 +1,8 @@
-## kbcli kubeblocks
+---
+title: kbcli kubeblocks
+---
 
-KubeBlocks operation commands
+KubeBlocks operation commands.
 
 ### Options
 
@@ -20,6 +22,7 @@ KubeBlocks operation commands
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
+      --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -33,8 +36,15 @@ KubeBlocks operation commands
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks
-* [kbcli kubeblocks uninstall](kbcli_kubeblocks_uninstall.md)	 - Uninstall KubeBlocks
-* [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks
+
+* [kbcli kubeblocks config](kbcli_kubeblocks_config.md)	 - KubeBlocks config.
+* [kbcli kubeblocks describe-config](kbcli_kubeblocks_describe-config.md)	 - describe KubeBlocks config.
+* [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks.
+* [kbcli kubeblocks list-versions](kbcli_kubeblocks_list-versions.md)	 - List KubeBlocks versions.
+* [kbcli kubeblocks preflight](kbcli_kubeblocks_preflight.md)	 - Run and retrieve preflight checks for KubeBlocks.
+* [kbcli kubeblocks status](kbcli_kubeblocks_status.md)	 - Show list of resource KubeBlocks uses or owns.
+* [kbcli kubeblocks uninstall](kbcli_kubeblocks_uninstall.md)	 - Uninstall KubeBlocks.
+* [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package bench
@@ -36,7 +39,7 @@ var tpccConfig tpcc.Config
 func NewTpccCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "tpcc",
-		Short: "Run a TPCC benchmark",
+		Short: "Run a TPCC benchmark.",
 	}
 
 	cmd.PersistentFlags().IntVar(&tpccConfig.Parts, "parts", 1, "Number to partition warehouses")
@@ -52,7 +55,7 @@ func NewTpccCmd() *cobra.Command {
 func newPrepareCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "prepare",
-		Short: "Prepare data for TPCC",
+		Short: "Prepare data for TPCC.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return executeTpcc("prepare")
 		},
@@ -72,7 +75,7 @@ func newPrepareCmd() *cobra.Command {
 func newRunCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
-		Short: "Run workload",
+		Short: "Run workload.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return executeTpcc("run")
 		},
@@ -88,7 +91,7 @@ func newRunCmd() *cobra.Command {
 func newCleanCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cleanup",
-		Short: "Cleanup data for TPCC",
+		Short: "Cleanup data for TPCC.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return executeTpcc("cleanup")
 		},
@@ -113,6 +116,7 @@ func executeTpcc(action string) error {
 	tpccConfig.DBName = dbName
 	tpccConfig.Threads = threads
 	tpccConfig.Isolation = isolationLevel
+	tpccConfig.Driver = driver
 
 	switch tpccConfig.OutputType {
 	case "csv", "CSV":

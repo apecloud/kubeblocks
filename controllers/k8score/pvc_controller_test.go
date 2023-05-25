@@ -1,44 +1,40 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package k8score
 
 import (
-	"context"
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	testdbaas "github.com/apecloud/kubeblocks/internal/testutil/dbaas"
+	"github.com/apecloud/kubeblocks/internal/generics"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("PersistentVolumeClaim Controller", func() {
-	var (
-		ctx      = context.Background()
-		timeout  = time.Second * 20
-		interval = time.Second
-	)
-
 	cleanEnv := func() {
 		// must wait until resources deleted and no longer exist before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -50,7 +46,7 @@ var _ = Describe("PersistentVolumeClaim Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testdbaas.ClearResources(&testCtx, intctrlutil.PersistentVolumeClaimSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -59,38 +55,9 @@ var _ = Describe("PersistentVolumeClaim Controller", func() {
 
 	createPVC := func(pvcName string) *corev1.PersistentVolumeClaim {
 		By("By assure an default storageClass")
-		pvcYAML := fmt.Sprintf(`apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  annotations:
-     test: test
-  labels:
-    app.kubernetes.io/component-name: replicasets
-    app.kubernetes.io/instance: wesql
-    app.kubernetes.io/managed-by: kubeblocks
-    app.kubernetes.io/name: state.mysql-apecloud-mysql
-    vct.kubeblocks.io/name: data
-  name: %s
-  namespace: default
-spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: "1Gi"
-  storageClassName: csi-hostpath-sc
-  volumeMode: Filesystem
-  volumeName: pvc-e7cecbe9-524c-4071-bfb2-6e145269c245
-`, pvcName)
-		pvc := &corev1.PersistentVolumeClaim{}
-		Expect(yaml.Unmarshal([]byte(pvcYAML), pvc)).Should(Succeed())
-		Expect(testCtx.CreateObj(ctx, pvc)).Should(Succeed())
-		// wait until cluster created
-		Eventually(func() bool {
-			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, &corev1.PersistentVolumeClaim{})
-			return err == nil
-		}, timeout, interval).Should(BeTrue())
-		return pvc
+		return testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, "apecloud-mysql",
+			"consensus", "data").SetStorage("2Gi").
+			SetStorageClass("csi-hostpath-sc").Create(&testCtx).GetObject()
 	}
 
 	handlePersistentVolumeClaim := func(reqCtx intctrlutil.RequestCtx, cli client.Client, pvc *corev1.PersistentVolumeClaim) error {
@@ -101,21 +68,20 @@ spec:
 
 	Context("test creating PersistentVolumeClaim", func() {
 		It("should handle it properly", func() {
-			By("test PersistentVolumeClaim changes")
+			By("register an pvcHandler for testing")
 			PersistentVolumeClaimHandlerMap["pvc-controller"] = handlePersistentVolumeClaim
-			pvcName := fmt.Sprintf("pvc-%s", testCtx.GetRandomStr())
-			createPVC(pvcName)
-			pvc := &corev1.PersistentVolumeClaim{}
-			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, pvc)).Should(Succeed())
-			pvc.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
-			Expect(k8sClient.Update(ctx, pvc))
 
-			// wait until storageClass patched
-			Eventually(func() bool {
-				tmpPVC := &corev1.PersistentVolumeClaim{}
-				_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: pvcName, Namespace: testCtx.DefaultNamespace}, tmpPVC)
-				return tmpPVC.Annotations["kubeblocks.io/test"] == "test_pvc"
-			}, timeout, interval).Should(BeTrue())
+			By("test PersistentVolumeClaim changes")
+			pvcName := fmt.Sprintf("pvc-%s", testCtx.GetRandomStr())
+			pvc := createPVC(pvcName)
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(pvc), func(tmpPvc *corev1.PersistentVolumeClaim) {
+				pvc.Spec.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("4Gi")
+			})()).Should(Succeed())
+
+			// wait until pvc patched the annotation by storageClass controller.
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pvc), func(g Gomega, tmpPVC *corev1.PersistentVolumeClaim) {
+				g.Expect(tmpPVC.Annotations["kubeblocks.io/test"] == "test_pvc").Should(BeTrue())
+			})).Should(Succeed())
 		})
 	})
 })

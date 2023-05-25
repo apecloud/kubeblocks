@@ -1,0 +1,238 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: apecloud-mysql
+  labels:
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+spec:
+  type: mysql
+  connectionCredential:
+    username: root
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_mysql)"
+  componentDefs:
+    - name: mysql
+      characterType: mysql
+      probes:
+        roleProbe:
+          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9104
+      logConfigs:
+        {{- range $name,$pattern := .Values.logConfigs }}
+        - name: {{ $name }}
+          filePathPattern: {{ $pattern }}
+        {{- end }}
+      configSpecs:
+        - name: mysql-consensusset-config
+          templateRef: mysql8.0-config-template
+          constraintRef: mysql8.0-config-constraints
+          volumeName: mysql-config
+          namespace: {{ .Release.Namespace }}
+      scriptSpecs:
+        - name: apecloud-mysql-scripts
+          templateRef: apecloud-mysql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
+      workloadType: Consensus
+      consensusSpec:
+        leader:
+          name: leader
+          accessMode: ReadWrite
+        followers:
+          - name: follower
+            accessMode: Readonly
+        learner:
+          name: learner
+          accessMode: Readonly
+      service:
+        ports:
+          - name: mysql
+            port: 3306
+            targetPort: mysql
+      horizontalScalePolicy:
+        type: Snapshot
+        backupPolicyTemplateName: apecloud-mysql-backup-policy-for-hscale
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        containers:
+          - name: mysql
+            imagePullPolicy: IfNotPresent
+            volumeMounts:
+              - mountPath: /data/mysql
+                name: data
+              - mountPath: /opt/mysql
+                name: mysql-config
+              - name: scripts
+                mountPath: /scripts
+              - name: annotations
+                mountPath: /etc/annotations
+            ports:
+              - containerPort: 3306
+                name: mysql
+              - containerPort: 13306
+                name: paxos
+            env:
+              - name: MYSQL_ROOT_HOST
+                value: {{ .Values.auth.rootHost | default "%" | quote }}
+              - name: MYSQL_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+              - name: MYSQL_DATABASE
+                value: {{- if .Values.auth.createDatabase }} {{ .Values.auth.database | quote }}  {{- else }} "" {{- end }}
+              - name: MYSQL_USER
+                value: {{ .Values.auth.username | default "" | quote }}
+              - name: MYSQL_PASSWORD
+                value: {{ .Values.auth.password | default "" | quote }}
+              - name: CLUSTER_ID
+                value: {{ .Values.cluster.clusterId | default "1" | quote }}
+              - name: CLUSTER_START_INDEX
+                value: {{ .Values.cluster.clusterStartIndex | default "1" | quote }}
+              - name: REPLICATION_USER
+                value: {{ .Values.auth.replicationUser | default "replicator" | quote }}
+              - name: REPLICATION_PASSWORD
+                value: {{ .Values.auth.replicationPassword | default "" | quote }}
+              - name: MYSQL_TEMPLATE_CONFIG
+                value: {{ if .Values.cluster.templateConfig }}{{ .Values.cluster.templateConfig }}{{ end }}
+              - name: MYSQL_CUSTOM_CONFIG
+                value: {{ if .Values.cluster.customConfig }}{{ .Values.cluster.customConfig }}{{ end }}
+              - name: MYSQL_DYNAMIC_CONFIG
+                value: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
+            command: ["/scripts/setup.sh"]
+            lifecycle:
+              preStop:
+                exec:
+                  command: ["/scripts/pre-stop.sh"]
+          - name: metrics
+            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001
+            env:
+              - name: MYSQL_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: MYSQL_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+              - name: DATA_SOURCE_NAME
+                value: "$(MYSQL_USER):$(MYSQL_PASSWORD)@(localhost:3306)/"
+            command:
+              - "/bin/mysqld_exporter"
+              - "--collect.info_schema.wesql_consensus"
+            ports:
+              - name: http-metrics
+                containerPort: 9104
+            livenessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              httpGet:
+                path: /
+                port: http-metrics
+            readinessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              httpGet:
+                path: /
+                port: http-metrics
+        volumes:
+          - name: annotations
+            downwardAPI:
+              items:
+                - path: "leader"
+                  fieldRef:
+                    fieldPath: metadata.annotations['cs.apps.kubeblocks.io/leader']
+                - path: "component-replicas"
+                  fieldRef:
+                    fieldPath: metadata.annotations['apps.kubeblocks.io/component-replicas']
+      systemAccounts:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+          command:
+          - mysql
+          args:
+          - -u$(MYSQL_ROOT_USER)
+          - -p$(MYSQL_ROOT_PASSWORD)
+          - -h$(KB_ACCOUNT_ENDPOINT)
+          - -e
+          - $(KB_ACCOUNT_STATEMENT)
+          env:
+          - name: MYSQL_ROOT_USER
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: username
+          - name: MYSQL_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: $(CONN_CREDENTIAL_SECRET_NAME)
+                key: password
+        passwordConfig:
+          length: 10
+          numDigits: 5
+          numSymbols: 0
+          letterCase: MixedCases
+        accounts:
+          - name: kbadmin
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);
+                update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
+          - name: kbdataprotection
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO $(USERNAME); GRANT LOCK TABLES,RELOAD,PROCESS,REPLICATION CLIENT, SUPER,SELECT,EVENT,TRIGGER,SHOW VIEW ON *.* TO $(USERNAME);
+                update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
+          - name: kbprobe
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
+                update: ALTER USER (USERNAME) IDENTIFIED BY '$(PASSWD)';
+          - name: kbmonitoring
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
+                update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
+          - name: kbreplicator
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION SLAVE ON *.* TO $(USERNAME) WITH GRANT OPTION;
+                update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';

@@ -1,0 +1,31 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: mysql-tree-node-template-8.0
+spec:
+  # configmap reference
+  tplRef: mysql-tree-node-template-8.0
+
+  #  cfgSchemaTopLevelName: MysqlParameter
+
+  # ConfigurationSchema that impose restrictions on engine parameter's rule
+  #  configurationSchema:
+  #    # schema: auto generate from cue scripts
+  #    # example: ../../internal/configuration/testdata/mysql_openapi.json
+  #    cue:
+
+  #  require db instance restart
+  staticParameters:
+    - automatic_sp_privileges
+
+  # mysql configuration file format
+  formatterConfig:
+    format: ini
+    iniConfig:
+      sectionName: mysqld
+
+  # Immutable, if set to true, ensures that data stored in the ConfigMap cannot be updated (only object metadata can be modified).
+  # If set to true, Configmap object referenced by TplRef will also be modified to immutable
+  # Defaulted to true
+  # It is recommended to turn this option on only during the development or testing phase.
+  immutable: true

@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package dashboard
@@ -33,6 +36,7 @@ import (
 	"k8s.io/client-go/transport/spdy"
 	cmdpf "k8s.io/kubectl/pkg/cmd/portforward"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/utils/pointer"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -46,6 +50,7 @@ const (
 
 type dashboard struct {
 	Name         string
+	AddonName    string
 	Port         string
 	TargetPort   string
 	Namespace    string
@@ -56,18 +61,44 @@ type dashboard struct {
 }
 
 var (
+	listExample = templates.Examples(`
+		# List all dashboards
+		kbcli dashboard list
+	`)
+
+	openExample = templates.Examples(`
+		# Open a dashboard, such as kube-grafana
+		kbcli dashboard open kubeblocks-grafana
+
+		# Open a dashboard with a specific local port
+		kbcli dashboard open kubeblocks-grafana --port 8080
+	`)
+
+	// we do not use the default port to port-forward to avoid conflict with other services
 	dashboards = [...]*dashboard{
 		{
-			Name:  "kubeblocks-grafana",
-			Label: "app.kubernetes.io/instance=kubeblocks,app.kubernetes.io/name=grafana",
+			Name:       "kubeblocks-grafana",
+			AddonName:  "kb-addon-grafana",
+			Label:      "app.kubernetes.io/instance=kb-addon-grafana,app.kubernetes.io/name=grafana",
+			TargetPort: "13000",
 		},
 		{
-			Name:  "kubeblocks-prometheus-alertmanager",
-			Label: "app=prometheus,component=alertmanager,release=kubeblocks",
+			Name:       "kubeblocks-prometheus-alertmanager",
+			AddonName:  "kb-addon-prometheus-alertmanager",
+			Label:      "app=prometheus,component=alertmanager,release=kb-addon-prometheus",
+			TargetPort: "19093",
 		},
 		{
-			Name:  "kubeblocks-prometheus-server",
-			Label: "app=prometheus,component=server,release=kubeblocks",
+			Name:       "kubeblocks-prometheus-server",
+			AddonName:  "kb-addon-prometheus-server",
+			Label:      "app=prometheus,component=server,release=kb-addon-prometheus",
+			TargetPort: "19090",
+		},
+		{
+			Name:       "kubeblocks-nyancat",
+			AddonName:  "kb-addon-nyancat",
+			Label:      "app.kubernetes.io/instance=kb-addon-nyancat",
+			TargetPort: "8087",
 		},
 	}
 )
@@ -89,7 +120,7 @@ func newListOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *lis
 func NewDashboardCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dashboard",
-		Short: "List and open the KubeBlocks dashboards",
+		Short: "List and open the KubeBlocks dashboards.",
 	}
 
 	// add subcommands
@@ -104,9 +135,10 @@ func NewDashboardCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newListOptions(f, streams)
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List all dashboards",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Short:   "List all dashboards.",
+		Example: listExample,
+		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete())
 			util.CheckErr(o.run())
@@ -165,8 +197,9 @@ func newOpenOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *ope
 func newOpenCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newOpenOptions(f, streams)
 	cmd := &cobra.Command{
-		Use:   "open",
-		Short: "Open one dashboard",
+		Use:     "open",
+		Short:   "Open one dashboard.",
+		Example: openExample,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			var names []string
 			for _, d := range dashboards {
@@ -211,7 +244,7 @@ func (o *openOptions) complete(cmd *cobra.Command, args []string) error {
 		o.localPort = dash.TargetPort
 	}
 
-	pfArgs := []string{fmt.Sprintf("svc/%s", o.name), fmt.Sprintf("%s:%s", o.localPort, dash.Port)}
+	pfArgs := []string{fmt.Sprintf("svc/%s", dash.AddonName), fmt.Sprintf("%s:%s", o.localPort, dash.Port)}
 	o.portForwardOptions.Namespace = dash.Namespace
 	o.portForwardOptions.Address = []string{"127.0.0.1"}
 	return o.portForwardOptions.Complete(newFactory(dash.Namespace), cmd, pfArgs)
@@ -258,7 +291,7 @@ func getDashboardInfo(client *kubernetes.Clientset) error {
 
 		// find the dashboard service
 		for i, s := range svcs.Items {
-			if s.Name == d.Name {
+			if s.Name == d.AddonName {
 				svc = &svcs.Items[i]
 				break
 			}
@@ -273,14 +306,16 @@ func getDashboardInfo(client *kubernetes.Clientset) error {
 		d.CreationTime = util.TimeFormat(&svc.CreationTimestamp)
 		if len(svc.Spec.Ports) > 0 {
 			d.Port = fmt.Sprintf("%d", svc.Spec.Ports[0].Port)
-			d.TargetPort = svc.Spec.Ports[0].TargetPort.String()
+			if d.TargetPort == "" {
+				d.TargetPort = svc.Spec.Ports[0].TargetPort.String()
+			}
 		}
 	}
 	return nil
 }
 
 func newFactory(namespace string) cmdutil.Factory {
-	cf := genericclioptions.NewConfigFlags(true)
+	cf := util.NewConfigFlagNoWarnings()
 	cf.Namespace = pointer.String(namespace)
 	return cmdutil.NewFactory(cf)
 }

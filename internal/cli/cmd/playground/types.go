@@ -1,105 +1,81 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package playground
 
 import (
-	"github.com/apecloud/kubeblocks/version"
+	"github.com/pkg/errors"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 const (
+	yesStr = "yes"
+)
+
+const (
+	defaultCloudProvider = cloudprovider.Local
 	defaultClusterDef    = "apecloud-mysql"
-	defaultCloudProvider = "local"
-	localHost            = "127.0.0.1"
 
 	// defaultNamespace is the namespace of playground cluster
 	defaultNamespace = "default"
 
-	// CliDockerNetwork is docker network for k3d cluster when `kbcli playground`
-	// all cluster will be created in this network, so they can communicate with each other
-	CliDockerNetwork = "k3d-kbcli-playground"
+	// stateFileName is the file name of playground state file
+	stateFileName = "kb-playground.state"
+
+	// CloudClusterNamePrefix the prefix of cloud kubernetes cluster name
+	cloudClusterNamePrefix = "kb-playground"
 )
 
 var (
 	// kbClusterName is the playground cluster name that created by KubeBlocks
 	kbClusterName = "mycluster"
-	// k8sClusterName is the k3d cluster name for playground
-	k8sClusterName = "kubeblocks-playground"
 
-	// K3sImage is k3s image repo
-	K3sImage = "rancher/k3s:" + version.K3sImageTag
-	// K3dToolsImage is k3d tools image repo
-	K3dToolsImage = "docker.io/apecloud/k3d-tools:" + version.K3dVersion
-	// K3dProxyImage is k3d proxy image repo
-	K3dProxyImage = "docker.io/apecloud/k3d-proxy:" + version.K3dVersion
+	// defaultKubeConfigPath is the default kubeconfig path, it is ~/.kube/config
+	defaultKubeConfigPath = util.ConfigPath("config")
 )
 
-type clusterInfo struct {
-	Name          string
-	HostIP        string
-	KubeConfig    string
-	CloudProvider string
-}
+// errors
+var (
+	kubeClusterUnreachableErr = errors.New("Kubernetes cluster unreachable")
+)
 
-var kubeConfig = `
-apiVersion: v1
-clusters:
-- cluster:
-    insecure-skip-tls-verify: true
-    server: https://${KUBERNETES_API_SERVER_ADDRESS}:6444
-  name: k3d-kubeblocks-playground
-contexts:
-- context:
-    cluster: k3d-kubeblocks-playground
-    user: admin@k3d-kubeblocks-playground
-  name: k3d-kubeblocks-playground
-current-context: k3d-kubeblocks-playground
-kind: Config
-preferences: {}
-users:
-- name: admin@k3d-kubeblocks-playground
-  user:
-    client-certificate-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJrRENDQVRlZ0F3SUJBZ0lJR1dEc0wyWmFtWjB3Q2dZSUtvWkl6ajBFQXdJd0l6RWhNQjhHQTFVRUF3d1kKYXpOekxXTnNhV1Z1ZEMxallVQXhOalU1TlRnek1EUTBNQjRYRFRJeU1EZ3dOREF6TVRjeU5Gb1hEVEl6TURndwpOREF6TVRjeU5Gb3dNREVYTUJVR0ExVUVDaE1PYzNsemRHVnRPbTFoYzNSbGNuTXhGVEFUQmdOVkJBTVRESE41CmMzUmxiVHBoWkcxcGJqQlpNQk1HQnlxR1NNNDlBZ0VHQ0NxR1NNNDlBd0VIQTBJQUJKbkxHR1FNUmZva2srWDcKSS9HNWRSbG5sUzYwODlqWGV3Q0l1OGVvNmc5bUVlU203NWRmdzc2R2IrZ29BbXFXK244MkNqRVd1QTNrSEQyeQpQTUxSS2JhalNEQkdNQTRHQTFVZER3RUIvd1FFQXdJRm9EQVRCZ05WSFNVRUREQUtCZ2dyQmdFRkJRY0RBakFmCkJnTlZIU01FR0RBV2dCU1Fhd1VYVEZjMzVCdWJkQkdrK3ExZXZ4VW5SVEFLQmdncWhrak9QUVFEQWdOSEFEQkUKQWlBVXl0dWxOQzVVbnRCcmlvOGlhd1gxUUdjTEVxUENPWk04VmFETXozMTBoUUlnTWIxSHJGa3JXUHFWSTVvQgpBdyttN2szK0I5SzBWem1mcTJtSmx3V2pNdmM9Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0KLS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJkekNDQVIyZ0F3SUJBZ0lCQURBS0JnZ3Foa2pPUFFRREFqQWpNU0V3SHdZRFZRUUREQmhyTTNNdFkyeHAKWlc1MExXTmhRREUyTlRrMU9ETXdORFF3SGhjTk1qSXdPREEwTURNeE56STBXaGNOTXpJd09EQXhNRE14TnpJMApXakFqTVNFd0h3WURWUVFEREJock0zTXRZMnhwWlc1MExXTmhRREUyTlRrMU9ETXdORFF3V1RBVEJnY3Foa2pPClBRSUJCZ2dxaGtqT1BRTUJCd05DQUFRUWF0NDNGSFl0ZlpyT2YreHZwaFhacUEvaEFSTUhFd2JBcDBGSVdzTUcKMmlGVnZCbThBWE9MUWxYY0VKSW5EVmppZjFZYkFISWhiYVl2WjY4NXk0SzNvMEl3UURBT0JnTlZIUThCQWY4RQpCQU1DQXFRd0R3WURWUjBUQVFIL0JBVXdBd0VCL3pBZEJnTlZIUTRFRmdRVWtHc0ZGMHhYTitRYm0zUVJwUHF0ClhyOFZKMFV3Q2dZSUtvWkl6ajBFQXdJRFNBQXdSUUloQUxZUU1qMkRqbnNRd2lKUGd0UlE3d3VDN1piMDd1VzEKZXU2SDhoaFBCN2l4QWlCbkJmQlU3M3BkSWFCdVBxNGR2TGw1MDloTWNtU1FXTVo4VVpoV1lPS0FNUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
-    client-key-data: LS0tLS1CRUdJTiBFQyBQUklWQVRFIEtFWS0tLS0tCk1IY0NBUUVFSUM1VUgzOC91VXJVQWJZbENnSTZmU25kTEhVUi9lNFJ4L3JQNkdUMUNoeXRvQW9HQ0NxR1NNNDkKQXdFSG9VUURRZ0FFbWNzWVpBeEYraVNUNWZzajhibDFHV2VWTHJUejJOZDdBSWk3eDZqcUQyWVI1S2J2bDEvRAp2b1p2NkNnQ2FwYjZmellLTVJhNERlUWNQYkk4d3RFcHRnPT0KLS0tLS1FTkQgRUMgUFJJVkFURSBLRVktLS0tLQo=
-`
-
-var guideTmpl = `
+var guideStr = `
 1. Basic commands for cluster:
 
-  export KUBECONFIG={{.KubeConfig}}
-
   kbcli cluster list                     # list database cluster and check its status
-  kbcli cluster describe {{.Name}}       # get cluster information
+  kbcli cluster describe %[1]s       # get cluster information
 
 2. Connect to database
 
-  kbcli cluster connect {{.Name}}
+  kbcli cluster connect %[1]s
   
 3. View the Grafana:
 
   kbcli dashboard open kubeblocks-grafana
 	
-4. Uninstall Playground:
+4. Destroy Playground:
 
   kbcli playground destroy
 
 --------------------------------------------------------------------
-To view this guide: kbcli playground guide
 To get more help: kbcli help
-{{if ne .CloudProvider "local"}}To login to remote host:              ssh -i ~/.kubeblocks/ssh/id_rsa ec2-user@{{.HostIP}}{{end}}
 Use "kbcli [command] --help" for more information about a command.
-
 `

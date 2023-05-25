@@ -1,6 +1,8 @@
-## kbcli bench tpcc run
+---
+title: kbcli bench tpcc run
+---
 
-Run workload
+Run workload.
 
 ```
 kbcli bench tpcc run [flags]
@@ -30,6 +32,7 @@ kbcli bench tpcc run [flags]
       --context string                 The name of the kubeconfig context to use
       --count int                      Total execution count, 0 means infinite
   -D, --db string                      Database name (default "kb_test")
+      --disable-compression            If true, opt-out of response compression for all requests to the server
   -d, --driver string                  Database driver: mysql (default "mysql")
       --dropdata                       Cleanup data before prepare
   -H, --host string                    Database host (default "127.0.0.1")
@@ -57,5 +60,7 @@ kbcli bench tpcc run [flags]
 
 ### SEE ALSO
 
-* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark
+* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

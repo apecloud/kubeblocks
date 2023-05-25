@@ -1,0 +1,5 @@
+position: 10
+label: Command Line
+collapsible: true 
+collapsed: true 
+className: hide-children

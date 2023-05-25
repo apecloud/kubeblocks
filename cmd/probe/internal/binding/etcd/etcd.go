@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package etcd
@@ -27,15 +30,15 @@ import (
 	"github.com/dapr/kit/logger"
 	v3 "go.etcd.io/etcd/client/v3"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal"
+	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	. "github.com/apecloud/kubeblocks/cmd/probe/util"
 )
 
 type Etcd struct {
 	lock     sync.Mutex
 	etcd     *v3.Client
 	endpoint string
-	logger   logger.Logger
-	base     internal.ProbeBase
+	BaseOperations
 }
 
 const (
@@ -47,28 +50,31 @@ const (
 
 // NewEtcd returns a new etcd binding instance.
 func NewEtcd(logger logger.Logger) bindings.OutputBinding {
-	return &Etcd{logger: logger}
+	return &Etcd{BaseOperations: BaseOperations{Logger: logger}}
 }
 
 func (e *Etcd) Init(metadata bindings.Metadata) error {
 	e.endpoint = metadata.Properties[endpoint]
-	e.base = internal.ProbeBase{
-		Logger:    e.logger,
-		Operation: e,
-	}
-	e.base.Init()
+	e.BaseOperations.Init(metadata)
+	e.DBType = "etcd"
+	e.InitIfNeed = e.initIfNeed
+	e.DBPort = e.GetRunningPort()
+	e.OperationMap[GetRoleOperation] = e.GetRoleOps
 	return nil
 }
 
-func (e *Etcd) Operations() []bindings.OperationKind {
-	return e.base.Operations()
+func (e *Etcd) initIfNeed() bool {
+	if e.etcd == nil {
+		go func() {
+			err := e.InitDelay()
+			e.Logger.Errorf("MongoDB connection init failed: %v", err)
+		}()
+		return true
+	}
+	return false
 }
 
-func (e *Etcd) Invoke(ctx context.Context, req *bindings.InvokeRequest) (*bindings.InvokeResponse, error) {
-	return e.base.Invoke(ctx, req)
-}
-
-func (e *Etcd) InitIfNeed() error {
+func (e *Etcd) InitDelay() error {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
@@ -97,21 +103,31 @@ func (e *Etcd) InitIfNeed() error {
 	return nil
 }
 
-func (e *Etcd) GetRole(ctx context.Context, cmd string) (string, error) {
-	resp, err := e.etcd.Status(ctx, e.endpoint)
+func (e *Etcd) GetRole(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (string, error) {
+	etcdResp, err := e.etcd.Status(ctx, e.endpoint)
 	if err != nil {
 		return "", err
 	}
 
 	role := "follower"
 	switch {
-	case resp.Leader == resp.Header.MemberId:
+	case etcdResp.Leader == etcdResp.Header.MemberId:
 		role = "leader"
-	case resp.IsLearner:
+	case etcdResp.IsLearner:
 		role = "learner"
 	}
 
 	return role, nil
+}
+
+func (e *Etcd) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	role, err := e.GetRole(ctx, req, resp)
+	if err != nil {
+		return nil, err
+	}
+	opsRes := OpsResult{}
+	opsRes["role"] = role
+	return opsRes, nil
 }
 
 func (e *Etcd) GetRunningPort() int {
@@ -128,7 +144,7 @@ func (e *Etcd) GetRunningPort() int {
 }
 
 func (e *Etcd) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
-	//TODO implement me when proposal is passed
+	// TODO implement me when proposal is passed
 	// proposal: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 	return nil, nil
 }

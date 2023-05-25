@@ -1,15 +1,15 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: apecloud-etcd
+  name: etcd
   labels:
     {{- include "etcd.labels" . | nindent 4}}
 spec:
-  type: state.etcd
-  components:
-    - typeName: etcd
+  type: etcd
+  componentDefs:
+    - name: etcd
       characterType: etcd
-      componentType: Consensus
+      workloadType: Consensus
       consensusSpec:
         leader:
           name: "leader"
@@ -19,24 +19,22 @@ spec:
             accessMode: ReadWrite
         updateStrategy: BestEffortParallel
       probes:
-        roleChangedProbe:
+        roleProbe:
           periodSeconds: 1
           failureThreshold: 3
       service:
         ports:
-          - protocol: TCP
+          - name: client
             port: 2379
-      defaultReplicas: 3
+            targetPort: client
       podSpec:
         containers:
           - name: etcd
             imagePullPolicy: IfNotPresent
             ports:
               - containerPort: 2379
-                protocol: TCP
                 name: client
               - containerPort: 2380
-                protocol: TCP
                 name: peer
             volumeMounts:
               - name: data

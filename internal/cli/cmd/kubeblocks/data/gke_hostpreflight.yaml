@@ -1,0 +1,20 @@
+apiVersion: troubleshoot.sh/v1beta2
+kind: HostPreflight
+metadata:
+  name: host-utility
+spec:
+  collectors:
+  analyzers:
+  extendCollectors:
+    - hostUtility :
+        collectorName: gcloud-cli
+        utilityName: gcloud
+  extendAnalyzers:
+    - hostUtility:
+        checkName: gcloudCli-Check
+        collectorName: gcloud-cli
+        outcomes:
+          - pass:
+              message: gcloud-cli has been installed
+          - warn:
+              message: gcloud-cli isn't installed

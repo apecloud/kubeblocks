@@ -1,12 +1,12 @@
-apiVersion: dbaas.kubeblocks.io/v1alpha1
-kind:       ClusterVersion
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
 metadata:
-  name:     wesql-8.0.32
+  name: wesql-8.0.32
 spec:
   clusterDefinitionRef: wesql
   components:
   - type: replicasets
-    podSpec:
+    versionsContext:
       containers:
       - name: mysql
-        image: docker.io/apecloud/wesql-server:latest
+        image: docker.io/apecloud/apecloud-mysql-server:latest

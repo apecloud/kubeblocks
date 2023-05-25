@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -22,6 +25,8 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,10 +35,14 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubectl/pkg/util/resource"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
+
+// ConditionsError cluster will display this status on list cmd when the status of ApplyResources or ProvisioningStarted condition is not "True".
+const ConditionsError = "ConditionsError"
 
 type GetOptions struct {
 	WithClusterDef     bool
@@ -44,6 +53,7 @@ type GetOptions struct {
 	WithSecret         bool
 	WithPod            bool
 	WithEvent          bool
+	WithDataProtection bool
 }
 
 type ObjectsGetter struct {
@@ -56,14 +66,33 @@ type ObjectsGetter struct {
 
 func NewClusterObjects() *ClusterObjects {
 	return &ClusterObjects{
-		Cluster: &dbaasv1alpha1.Cluster{},
+		Cluster: &appsv1alpha1.Cluster{},
 		Nodes:   []*corev1.Node{},
 	}
+}
+
+func listResources[T any](dynamic dynamic.Interface, gvr schema.GroupVersionResource, ns string, opts metav1.ListOptions, items *[]T) error {
+	if *items == nil {
+		*items = []T{}
+	}
+	obj, err := dynamic.Resource(gvr).Namespace(ns).List(context.TODO(), opts)
+	if err != nil {
+		return err
+	}
+	for _, i := range obj.Items {
+		var object T
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(i.Object, &object); err != nil {
+			return err
+		}
+		*items = append(*items, object)
+	}
+	return nil
 }
 
 // Get all kubernetes objects belonging to the database cluster
 func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 	var err error
+
 	objs := NewClusterObjects()
 	ctx := context.TODO()
 	corev1 := o.Client.CoreV1()
@@ -77,7 +106,9 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 
 	listOpts := func() metav1.ListOptions {
 		return metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s", types.InstanceLabelKey, o.Name),
+			LabelSelector: fmt.Sprintf("%s=%s,%s=%s",
+				constant.AppInstanceLabelKey, o.Name,
+				constant.AppManagedByLabelKey, constant.AppName),
 		}
 	}
 
@@ -86,9 +117,25 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 		return nil, err
 	}
 
+	if objs.Cluster.Status.Phase == appsv1alpha1.SpecReconcilingClusterPhase {
+		// wrap the cluster phase if the latest ops request is processing
+		latestOpsProcessedCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
+		if latestOpsProcessedCondition != nil && latestOpsProcessedCondition.Status == metav1.ConditionFalse {
+			objs.Cluster.Status.Phase = appsv1alpha1.ClusterPhase(latestOpsProcessedCondition.Reason)
+		}
+	}
+	provisionCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
+	if provisionCondition != nil && provisionCondition.Status == metav1.ConditionFalse {
+		objs.Cluster.Status.Phase = ConditionsError
+	}
+
+	applyResourcesCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeApplyResources)
+	if applyResourcesCondition != nil && applyResourcesCondition.Status == metav1.ConditionFalse {
+		objs.Cluster.Status.Phase = ConditionsError
+	}
 	// get cluster definition
 	if o.WithClusterDef {
-		cd := &dbaasv1alpha1.ClusterDefinition{}
+		cd := &appsv1alpha1.ClusterDefinition{}
 		if err = getResource(types.ClusterDefGVR(), objs.Cluster.Spec.ClusterDefRef, "", cd); err != nil {
 			return nil, err
 		}
@@ -97,7 +144,7 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 
 	// get cluster version
 	if o.WithClusterVersion {
-		v := &dbaasv1alpha1.ClusterVersion{}
+		v := &appsv1alpha1.ClusterVersion{}
 		if err = getResource(types.ClusterVersionGVR(), objs.Cluster.Spec.ClusterVersionRef, "", v); err != nil {
 			return nil, err
 		}
@@ -152,10 +199,13 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 			}
 
 			node, err := corev1.Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-			if err != nil {
+			if err != nil && !apierrors.IsNotFound(err) {
 				return nil, err
 			}
-			objs.Nodes = append(objs.Nodes, node)
+
+			if node != nil {
+				objs.Nodes = append(objs.Nodes, node)
+			}
 		}
 	}
 
@@ -179,6 +229,19 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 			}
 		}
 	}
+
+	if o.WithDataProtection {
+		dpListOpts := metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s",
+				constant.AppInstanceLabelKey, o.Name),
+		}
+		if err = listResources(o.Dynamic, types.BackupPolicyGVR(), o.Namespace, dpListOpts, &objs.BackupPolicies); err != nil {
+			return nil, err
+		}
+		if err = listResources(o.Dynamic, types.BackupGVR(), o.Namespace, dpListOpts, &objs.Backups); err != nil {
+			return nil, err
+		}
+	}
 	return objs, nil
 }
 
@@ -194,13 +257,14 @@ func (o *ClusterObjects) GetClusterInfo() *ClusterInfo {
 		CreatedTime:       util.TimeFormat(&c.CreationTimestamp),
 		InternalEP:        types.None,
 		ExternalEP:        types.None,
+		Labels:            util.CombineLabels(c.Labels),
 	}
 
 	if o.ClusterDef == nil {
 		return cluster
 	}
 
-	primaryComponent := FindClusterComp(o.Cluster, o.ClusterDef.Spec.Components[0].TypeName)
+	primaryComponent := FindClusterComp(o.Cluster, o.ClusterDef.Spec.ComponentDefs[0].Name)
 	internalEndpoints, externalEndpoints := GetComponentEndpoints(o.Services, primaryComponent)
 	if len(internalEndpoints) > 0 {
 		cluster.InternalEP = strings.Join(internalEndpoints, ",")
@@ -213,22 +277,18 @@ func (o *ClusterObjects) GetClusterInfo() *ClusterInfo {
 
 func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 	var comps []*ComponentInfo
-	for _, cdComp := range o.ClusterDef.Spec.Components {
-		c := FindClusterComp(o.Cluster, cdComp.TypeName)
-		if c == nil {
-			continue
-		}
-
-		if c.Replicas == nil {
-			r := cdComp.DefaultReplicas
-			c.Replicas = &r
-		}
-
+	for _, c := range o.Cluster.Spec.ComponentSpecs {
+		// get all pods belonging to current component
 		var pods []*corev1.Pod
 		for _, p := range o.Pods.Items {
-			if n, ok := p.Labels[types.ComponentLabelKey]; ok && n == c.Name {
+			if n, ok := p.Labels[constant.KBAppComponentLabelKey]; ok && n == c.Name {
 				pods = append(pods, &p)
 			}
+		}
+
+		// current component has no pod corresponding to it
+		if len(pods) == 0 {
+			continue
 		}
 
 		image := types.None
@@ -240,14 +300,14 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 		comp := &ComponentInfo{
 			Name:      c.Name,
 			NameSpace: o.Cluster.Namespace,
-			Type:      c.Type,
+			Type:      c.ComponentDefRef,
 			Cluster:   o.Cluster.Name,
-			Replicas:  fmt.Sprintf("%d / %d", *c.Replicas, len(pods)),
+			Replicas:  fmt.Sprintf("%d / %d", c.Replicas, len(pods)),
 			Status:    fmt.Sprintf("%d / %d / %d / %d ", running, waiting, succeeded, failed),
 			Image:     image,
 		}
 		comp.CPU, comp.Memory = getResourceInfo(c.Resources.Requests, c.Resources.Limits)
-		comp.Storage = o.getStorageInfo(c)
+		comp.Storage = o.getStorageInfo(&c)
 		comps = append(comps, comp)
 	}
 	return comps
@@ -259,18 +319,18 @@ func (o *ClusterObjects) GetInstanceInfo() []*InstanceInfo {
 		instance := &InstanceInfo{
 			Name:        pod.Name,
 			Namespace:   pod.Namespace,
-			Cluster:     getLabelVal(pod.Labels, types.InstanceLabelKey),
-			Component:   getLabelVal(pod.Labels, types.ComponentLabelKey),
+			Cluster:     getLabelVal(pod.Labels, constant.AppInstanceLabelKey),
+			Component:   getLabelVal(pod.Labels, constant.KBAppComponentLabelKey),
 			Status:      string(pod.Status.Phase),
-			Role:        getLabelVal(pod.Labels, types.ConsensusSetRoleLabelKey),
-			AccessMode:  getLabelVal(pod.Labels, types.ConsensusSetAccessModeLabelKey),
+			Role:        getLabelVal(pod.Labels, constant.RoleLabelKey),
+			AccessMode:  getLabelVal(pod.Labels, constant.ConsensusSetAccessModeLabelKey),
 			CreatedTime: util.TimeFormat(&pod.CreationTimestamp),
 		}
 
-		var component *dbaasv1alpha1.ClusterComponent
-		for i, c := range o.Cluster.Spec.Components {
+		var component *appsv1alpha1.ClusterComponentSpec
+		for i, c := range o.Cluster.Spec.ComponentSpecs {
 			if c.Name == instance.Component {
-				component = &o.Cluster.Spec.Components[i]
+				component = &o.Cluster.Spec.ComponentSpecs[i]
 			}
 		}
 		instance.Storage = o.getStorageInfo(component)
@@ -281,19 +341,39 @@ func (o *ClusterObjects) GetInstanceInfo() []*InstanceInfo {
 	return instances
 }
 
-func (o *ClusterObjects) getStorageInfo(component *dbaasv1alpha1.ClusterComponent) []StorageInfo {
+func (o *ClusterObjects) getStorageInfo(component *appsv1alpha1.ClusterComponentSpec) []StorageInfo {
 	if component == nil {
 		return nil
 	}
 
-	getClassName := func(vcTpl *dbaasv1alpha1.ClusterComponentVolumeClaimTemplate) string {
+	getClassName := func(vcTpl *appsv1alpha1.ClusterComponentVolumeClaimTemplate) string {
 		if vcTpl.Spec.StorageClassName != nil {
 			return *vcTpl.Spec.StorageClassName
 		}
 
-		// get storage class name from cluster annotations
-		if name, ok := o.Cluster.Annotations[types.StorageClassAnnotationKey]; ok {
-			return name
+		if o.PVCs == nil {
+			return types.None
+		}
+
+		// get storage class name from PVC
+		for _, pvc := range o.PVCs.Items {
+			labels := pvc.Labels
+			if len(labels) == 0 {
+				continue
+			}
+
+			if labels[constant.KBAppComponentLabelKey] != component.Name {
+				continue
+			}
+
+			if labels[constant.VolumeClaimTemplateNameLabelKey] != vcTpl.Name {
+				continue
+			}
+			if pvc.Spec.StorageClassName != nil {
+				return *pvc.Spec.StorageClassName
+			} else {
+				return types.None
+			}
 		}
 
 		return types.None
@@ -325,8 +405,8 @@ func getInstanceNodeInfo(nodes []*corev1.Node, pod *corev1.Pod, i *InstanceInfo)
 		return
 	}
 
-	i.Region = getLabelVal(node.Labels, types.RegionLabelKey)
-	i.AZ = getLabelVal(node.Labels, types.ZoneLabelKey)
+	i.Region = getLabelVal(node.Labels, constant.RegionLabelKey)
+	i.AZ = getLabelVal(node.Labels, constant.ZoneLabelKey)
 }
 
 func getResourceInfo(reqs, limits corev1.ResourceList) (string, string) {
@@ -335,6 +415,11 @@ func getResourceInfo(reqs, limits corev1.ResourceList) (string, string) {
 	for _, name := range names {
 		res := types.None
 		limit, req := limits[name], reqs[name]
+
+		// if request is empty and limit is not, set limit to request
+		if util.ResourceIsEmpty(&req) && !util.ResourceIsEmpty(&limit) {
+			req = limit
+		}
 
 		// if both limit and request are empty, only output none
 		if !util.ResourceIsEmpty(&limit) || !util.ResourceIsEmpty(&req) {

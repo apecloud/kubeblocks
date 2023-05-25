@@ -62,11 +62,25 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
+Create the addon installer name of the service account to use
+*/}}
+{{- define "kubeblocks.addonSAName" -}}
+{{- printf "%s-%s" (include "kubeblocks.serviceAccountName" .) "addon-installer" }}
+{{- end }}
+
+{{/*
 Create the name of the webhook service.
 */}}
 {{- define "kubeblocks.svcName" -}}
 {{ include "kubeblocks.fullname" . }}
 {{- end }}
+
+{{/*
+matchLabels
+*/}}
+{{- define "kubeblocks.matchLabels" -}}
+{{ template "kubeblocks.selectorLabels" . }}
+{{- end -}}
 
 {{/*
 Create the default PodDisruptionBudget to use.
@@ -132,6 +146,9 @@ Allow the release namespace to be overridden for multi-namespace deployments in 
     {{- .Release.Namespace -}}
   {{- end -}}
 {{- end -}}
+
+
+
 
 {{/*
 Use the prometheus namespace override for multi-namespace deployments in combined charts
@@ -206,3 +223,42 @@ If release name contains chart name it will be used as a full name.
 {{- end -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Specify KubeBlocks Operator deployment with priorityClassName=system-cluster-critical, if deployed to "kube-system"
+namespace and unspecified priorityClassName.
+*/}}
+{{- define "kubeblocks.priorityClassName" -}}
+{{- if .Values.priorityClassName -}}
+{{- .Values.priorityClassName }}
+{{- else if ( eq ( include "kubeblocks.namespace" . ) "kube-system" ) -}}
+{{- "system-cluster-critical" -}}
+{{- else -}}
+{{- "" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Get addon controller enabled attributes.
+*/}}
+{{- define "kubeblocks.addonControllerEnabled" -}}
+{{- if and .Values.addonController .Values.addonController.enabled }}
+{{- true }}
+{{- else }}
+{{- false }}
+{{- end }}
+{{- end }}
+
+{{/*
+Define addon prometheus name
+*/}}
+{{- define "addon.prometheus.name" -}}
+{{- print "prometheus" }}
+{{- end }}
+
+{{/*
+Define addon alertmanager-webhook-adaptor name
+*/}}
+{{- define "addon.alertmanager-webhook-adaptor.name" -}}
+{{- print "alertmanager-webhook-adaptor" }}
+{{- end }}

@@ -1,0 +1,31 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: mongodb-backup-policy-template
+  labels:
+    clusterdefinition.kubeblocks.io/name: mongodb
+    {{- include "mongodb.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: mongodb
+  backupPolicies:
+  - componentDefRef: mongodb
+    retention:
+      ttl: 7d
+    schedule:
+      snapshot:
+        enable: false
+        cronExpression: "0 18 * * *"
+      datafile:
+        enable: false
+        cronExpression: "0 18 * * *"
+    snapshot:
+      target:
+        role: primary
+        connectionCredentialKey:
+          passwordKey: password
+          usernameKey: username
+    datafile:
+      backupToolName: mongodb-physical-backup-tool
+      backupsHistoryLimit: 7
+      target:
+        role: primary

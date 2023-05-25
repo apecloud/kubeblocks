@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -21,7 +24,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -57,7 +59,7 @@ var _ = Describe("connection", func() {
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
 		}
 		tf.UnstructuredClient = &clientfake.RESTClient{
-			GroupVersion:         schema.GroupVersion{Group: types.Group, Version: types.Version},
+			GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
 			NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
 			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				urlPrefix := "/api/v1/namespaces/" + namespace
@@ -84,45 +86,53 @@ var _ = Describe("connection", func() {
 		Expect(cmd).ShouldNot(BeNil())
 	})
 
-	It("connection", func() {
+	It("validate", func() {
 		o := &ConnectOptions{ExecOptions: exec.NewExecOptions(tf, streams)}
 
 		By("specified more than one cluster")
-		Expect(o.connect([]string{"c1", "c2"})).Should(HaveOccurred())
+		Expect(o.validate([]string{"c1", "c2"})).Should(HaveOccurred())
 
 		By("without cluster name")
-		Expect(o.connect(nil)).Should(HaveOccurred())
+		Expect(o.validate(nil)).Should(HaveOccurred())
 
-		By("specify cluster name")
-		Expect(o.ExecOptions.Complete()).Should(Succeed())
-		_ = o.connect([]string{clusterName})
-		Expect(len(o.ContainerName) > 0).Should(BeTrue())
+		Expect(o.validate([]string{clusterName})).Should(Succeed())
+
+		// set instance name and cluster name, should fail
+		o.PodName = "test-pod-0"
+		Expect(o.validate([]string{clusterName})).Should(HaveOccurred())
+		o.componentName = "test-component"
+		Expect(o.validate([]string{})).Should(HaveOccurred())
+
+		// unset pod name
+		o.PodName = ""
+		Expect(o.validate([]string{clusterName})).Should(Succeed())
+		// unset component name as well
+		o.componentName = ""
+		Expect(o.validate([]string{clusterName})).Should(Succeed())
+	})
+
+	It("complete by cluster name", func() {
+		o := &ConnectOptions{ExecOptions: exec.NewExecOptions(tf, streams)}
+		Expect(o.validate([]string{clusterName})).Should(Succeed())
+		Expect(o.complete()).Should(Succeed())
 		Expect(o.Pod).ShouldNot(BeNil())
 	})
 
-	It("getEngineByPod", func() {
-		pod := mockPod()
-		e, err := getEngineByPod(pod)
-		Expect(err).Should(Succeed())
-		Expect(e.EngineName()).Should(Equal("mysql"))
-
-		pod.SetLabels(nil)
-		_, err = getEngineByPod(pod)
-		Expect(err).Should(HaveOccurred())
+	It("complete by pod name", func() {
+		o := &ConnectOptions{ExecOptions: exec.NewExecOptions(tf, streams)}
+		o.PodName = "test-pod-0"
+		Expect(o.validate([]string{})).Should(Succeed())
+		Expect(o.complete()).Should(Succeed())
+		Expect(o.Pod).ShouldNot(BeNil())
 	})
 
 	It("show example", func() {
 		o := &ConnectOptions{ExecOptions: exec.NewExecOptions(tf, streams)}
-		Expect(o.ExecOptions.Complete()).Should(Succeed())
-
-		By("without args")
-		Expect(o.runShowExample(nil)).Should(HaveOccurred())
-
-		By("specify more than one cluster")
-		Expect(o.runShowExample([]string{"c1", "c2"})).Should(HaveOccurred())
+		Expect(o.validate([]string{clusterName})).Should(Succeed())
+		Expect(o.complete()).Should(Succeed())
 
 		By("specify one cluster")
-		Expect(o.runShowExample([]string{clusterName})).Should(Succeed())
+		Expect(o.runShowExample()).Should(Succeed())
 	})
 
 	It("getUserAndPassword", func() {
@@ -131,13 +141,14 @@ var _ = Describe("connection", func() {
 			password = "test-password"
 		)
 		secret := corev1.Secret{}
+		secret.Name = "test-conn-credential"
 		secret.Data = map[string][]byte{
 			"username": []byte(user),
 			"password": []byte(password),
 		}
 		secretList := &corev1.SecretList{}
 		secretList.Items = []corev1.Secret{secret}
-		u, p, err := getUserAndPassword(secretList)
+		u, p, err := getUserAndPassword(testing.FakeClusterDef(), secretList)
 		Expect(err).Should(Succeed())
 		Expect(u).Should(Equal(user))
 		Expect(p).Should(Equal(password))
@@ -151,7 +162,7 @@ func mockPod() *corev1.Pod {
 			Namespace:       "test",
 			ResourceVersion: "10",
 			Labels: map[string]string{
-				"app.kubernetes.io/name": "state.mysql-apecloud-mysql",
+				"app.kubernetes.io/name": "mysql-apecloud-mysql",
 			},
 		},
 		Spec: corev1.PodSpec{

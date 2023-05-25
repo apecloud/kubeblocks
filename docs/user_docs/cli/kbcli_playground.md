@@ -1,6 +1,8 @@
-## kbcli playground
+---
+title: kbcli playground
+---
 
-Bootstrap a KubeBlocks in local host
+Bootstrap or destroy a playground KubeBlocks in local host or cloud.
 
 ### Options
 
@@ -20,6 +22,7 @@ Bootstrap a KubeBlocks in local host
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
+      --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -33,8 +36,9 @@ Bootstrap a KubeBlocks in local host
 
 ### SEE ALSO
 
-* [kbcli](kbcli.md)	 - KubeBlocks CLI
-* [kbcli playground destroy](kbcli_playground_destroy.md)	 - Destroy the playground cluster.
-* [kbcli playground guide](kbcli_playground_guide.md)	 - Display playground cluster user guide.
-* [kbcli playground init](kbcli_playground_init.md)	 - Bootstrap a KubeBlocks for playground
+
+* [kbcli playground destroy](kbcli_playground_destroy.md)	 - Destroy the playground KubeBlocks and kubernetes cluster.
+* [kbcli playground init](kbcli_playground_init.md)	 - Bootstrap a kubernetes cluster and install KubeBlocks for playground.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

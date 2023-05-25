@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configuration
@@ -19,10 +22,12 @@ package configuration
 import (
 	"fmt"
 
+	"github.com/StudioSol/set"
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type ConfigType string
@@ -36,7 +41,7 @@ const (
 
 type RawConfig struct {
 	// formatter
-	Type dbaasv1alpha1.ConfigurationFormatter
+	Type appsv1alpha1.CfgFileFormat
 
 	RawData string
 }
@@ -65,13 +70,34 @@ type CfgOpOption struct {
 	XMLContext *XMLContext
 }
 
+type ParameterPair struct {
+	Key   string
+	Value string
+}
+
+// ParameterUpdateType describes how to update the parameters.
+// +enum
+type ParameterUpdateType string
+
+const (
+	AddedType   ParameterUpdateType = "add"
+	DeletedType ParameterUpdateType = "delete"
+	UpdatedType ParameterUpdateType = "update"
+)
+
+type VisualizedParam struct {
+	Key        string
+	UpdateType ParameterUpdateType
+	Parameters []ParameterPair
+}
+
 type ConfigOperator interface {
 	// MergeFrom update parameter by keyvalue
 	MergeFrom(params map[string]interface{}, option CfgOpOption) error
 
 	// MergeFromConfig(fileContent []byte, option CfgOpOption) error
 	// MergePatch(jsonPatch []byte, option CfgOpOption) error
-	// Diff(target *ConfigOperator) (*ConfigDiffInformation, error)
+	// Diff(target *ConfigOperator) (*ConfigPatchInfo, error)
 
 	// Query get parameter
 	Query(jsonpath string, option CfgOpOption) ([]byte, error)
@@ -82,12 +108,13 @@ type ConfigOperator interface {
 
 type GetResourceFn func(key client.ObjectKey) (map[string]string, error)
 
-type K8sConfig struct {
-	CfgKey     client.ObjectKey
-	ResourceFn GetResourceFn
+type ConfigResource struct {
+	CfgKey         client.ObjectKey
+	ResourceReader GetResourceFn
 
 	// configmap data
-	Configurations map[string]string
+	ConfigData map[string]string
+	CMKeys     *set.LinkedHashSetString
 }
 
 type CfgOption struct {
@@ -95,20 +122,27 @@ type CfgOption struct {
 	Log  logr.Logger
 
 	// formatter
-	CfgType dbaasv1alpha1.ConfigurationFormatter
+	CfgType appsv1alpha1.CfgFileFormat
 
 	// Path for CfgLocalType test
 	Path    string
 	RawData []byte
 
-	// K8sKey for k8s resource
-	K8sKey *K8sConfig
+	// ConfigResource for k8s resource
+	ConfigResource *ConfigResource
+}
+
+func FromConfigData(data map[string]string, cmKeys *set.LinkedHashSetString) *ConfigResource {
+	return &ConfigResource{
+		ConfigData: data,
+		CMKeys:     cmKeys,
+	}
 }
 
 // GenerateTPLUniqLabelKeyWithConfig generate uniq key for configuration template
 // reference: docs/img/reconfigure-cr-relationship.drawio.png
 func GenerateTPLUniqLabelKeyWithConfig(configKey string) string {
-	return GenerateUniqKeyWithConfig(ConfigurationTplLabelPrefixKey, configKey)
+	return GenerateUniqKeyWithConfig(constant.ConfigurationTplLabelPrefixKey, configKey)
 }
 
 // GenerateUniqKeyWithConfig is similar to getInstanceCfgCMName, generate uniq label or annotations for configuration template
@@ -119,12 +153,12 @@ func GenerateUniqKeyWithConfig(label string, configKey string) string {
 // GenerateConstraintsUniqLabelKeyWithConfig generate uniq key for configure template
 // reference: docs/img/reconfigure-cr-relationship.drawio.png
 func GenerateConstraintsUniqLabelKeyWithConfig(configKey string) string {
-	return GenerateUniqKeyWithConfig(ConfigurationConstraintsLabelPrefixKey, configKey)
+	return GenerateUniqKeyWithConfig(constant.ConfigurationConstraintsLabelPrefixKey, configKey)
 }
 
 // GetInstanceCMName  {{statefull.Name}}-{{clusterVersion.Name}}-{{tpl.Name}}-"config"
-func GetInstanceCMName(obj client.Object, tpl *dbaasv1alpha1.ConfigTemplate) string {
-	return getInstanceCfgCMName(obj.GetName(), tpl.VolumeName)
+func GetInstanceCMName(obj client.Object, tpl *appsv1alpha1.ComponentTemplateSpec) string {
+	return getInstanceCfgCMName(obj.GetName(), tpl.Name)
 	// return fmt.Sprintf("%s-%s-config", sts.GetName(), tpl.VolumeName)
 }
 

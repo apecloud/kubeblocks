@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -21,13 +24,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/dbaas/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var _ = Describe("helper", func() {
@@ -38,65 +39,19 @@ var _ = Describe("helper", func() {
 		Expect(len(infos) == 1).Should(BeTrue())
 	})
 
-	It("Get type from pod", func() {
-		mockPod := func(name string) *corev1.Pod {
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "foo",
-					Namespace:       "test",
-					ResourceVersion: "10",
-					Labels: map[string]string{
-						types.NameLabelKey: name,
-					},
-				},
-			}
-			return pod
-		}
-
-		pod := mockPod("state.mysql-apecloud-mysql")
-		typeName, err := GetClusterTypeByPod(pod)
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(typeName).Should(Equal("state.mysql"))
-
-		pod = mockPod("")
-		typeName, err = GetClusterTypeByPod(pod)
-		Expect(err).Should(HaveOccurred())
-		Expect(typeName).Should(Equal(""))
-	})
-
-	It("find component in cluster by type name", func() {
+	It("find component in cluster by name", func() {
 		cluster := testing.FakeCluster("test", "test")
 		component := FindClusterComp(cluster, "test")
 		Expect(component).Should(BeNil())
 
-		component = FindClusterComp(cluster, testing.ComponentType)
+		component = FindClusterComp(cluster, testing.ComponentDefName)
 		Expect(component).ShouldNot(BeNil())
-	})
-
-	It("get all clusters", func() {
-		cluster := testing.FakeCluster("test", "test")
-		dynamic := testing.FakeDynamicClient(cluster)
-		clusters := &dbaasv1alpha1.ClusterList{}
-
-		By("get clusters from specified namespace")
-		Expect(GetAllCluster(dynamic, "test", clusters)).ShouldNot(HaveOccurred())
-		Expect(len(clusters.Items)).Should(Equal(1))
-
-		By("get clusters from nonexistent namespace")
-		Expect(GetAllCluster(dynamic, "nonexistent", clusters)).ShouldNot(HaveOccurred())
-		Expect(len(clusters.Items)).Should(Equal(0))
-
-		By("get clusters from all namespace")
-		anotherCluster := testing.FakeCluster("test", "test1")
-		dynamic = testing.FakeDynamicClient(cluster, anotherCluster)
-		Expect(GetAllCluster(dynamic, "", clusters)).ShouldNot(HaveOccurred())
-		Expect(len(clusters.Items)).Should(Equal(2))
 	})
 
 	It("get cluster endpoints", func() {
 		cluster := testing.FakeCluster("test", "test")
 		svcs := testing.FakeServices()
-		internalEPs, externalEPs := GetComponentEndpoints(svcs, &cluster.Spec.Components[0])
+		internalEPs, externalEPs := GetComponentEndpoints(svcs, &cluster.Spec.ComponentSpecs[0])
 		Expect(len(internalEPs)).Should(Equal(3))
 		Expect(len(externalEPs)).Should(Equal(1))
 	})
@@ -133,15 +88,15 @@ var _ = Describe("helper", func() {
 
 	It("find latest version", func() {
 		const clusterDefName = "test-cluster-def"
-		genVersion := func(name string, t time.Time) dbaasv1alpha1.ClusterVersion {
-			v := dbaasv1alpha1.ClusterVersion{}
+		genVersion := func(name string, t time.Time) appsv1alpha1.ClusterVersion {
+			v := appsv1alpha1.ClusterVersion{}
 			v.Name = name
-			v.SetLabels(map[string]string{types.ClusterDefLabelKey: clusterDefName})
+			v.SetLabels(map[string]string{constant.ClusterDefLabelKey: clusterDefName})
 			v.SetCreationTimestamp(metav1.NewTime(t))
 			return v
 		}
 
-		versionList := &dbaasv1alpha1.ClusterVersionList{}
+		versionList := &appsv1alpha1.ClusterVersionList{}
 		versionList.Items = append(versionList.Items,
 			genVersion("old-version", time.Now().AddDate(0, 0, -1)),
 			genVersion("now-version", time.Now()))
@@ -149,5 +104,25 @@ var _ = Describe("helper", func() {
 		latestVer := findLatestVersion(versionList)
 		Expect(latestVer).ShouldNot(BeNil())
 		Expect(latestVer.Name).Should(Equal("now-version"))
+	})
+
+	It("get configmap by name", func() {
+		cmName := "test-cm"
+		dynamic := testing.FakeDynamicClient(testing.FakeConfigMap(cmName))
+		cm, err := GetConfigMapByName(dynamic, testing.Namespace, cmName)
+		Expect(err).Should(Succeed())
+		Expect(cm).ShouldNot(BeNil())
+
+		cm, err = GetConfigMapByName(dynamic, testing.Namespace, cmName+"error")
+		Expect(err).Should(HaveOccurred())
+		Expect(cm).Should(BeNil())
+	})
+
+	It("get config constraint by name", func() {
+		ccName := "test-cc"
+		dynamic := testing.FakeDynamicClient(testing.FakeConfigConstraint(ccName))
+		cm, err := GetConfigConstraintByName(dynamic, ccName)
+		Expect(err).Should(Succeed())
+		Expect(cm).ShouldNot(BeNil())
 	})
 })

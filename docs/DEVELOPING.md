@@ -1,39 +1,40 @@
 # Developing KubeBlocks
 This document covers basic needs to work with KubeBlocks codebase.
 
-- [Setup development environment](#setup-development-environment)
-  - [Bring your own toolbox](#bring-your-own-toolbox)
-    - [Install Go](#install-go)
-    - [Install Make](#install-make)
-    - [Build KubeBlocks](#build-kubeblocks)
-  - [Use VSCode and development container](#use-vscode-and-development-container)
-    - [Setup the development container](#setup-the-development-container)
-    - [Customize your dev container](#customize-your-dev-container)
-      - [Use a custom dev container image](#use-a-custom-dev-container-image)
-      - [Connect existing Kubernetes cluster](#connect-existing-kubernetes-cluster)
-  - [Setup a Kubernetes development environment](#setup-a-kubernetes-development-environment)
-    - [Docker environment](#docker-environment)
-    - [Kubernetes environment](#kubernetes-environment)
-- [Basics](#basics)
-  - [Kubebuilder](#kubebuilder)
-  - [Makefile](#makefile)
-  - [\[TODO\] kbcli](#todo-kbcli)
-  - [Code style](#code-style)
-- [Test](#test)
-  - [Envtest](#envtest)
-  - [Use existing Kubernetes cluster](#use-existing-kubernetes-cluster)
-  - [Check test code coverage](#check-test-code-coverage)
-- [Debug](#debug)
-  - [Install Delve](#install-delve)
-  - [Start a delve debug server](#start-a-delve-debug-server)
-    - [Debug specific package](#debug-specific-package)
-    - [Pass arguements](#pass-arguements)
-    - [Debug envtest](#debug-envtest)
-    - [Change debug server port](#change-debug-server-port)
-  - [Connect the debug server with a frontend client](#connect-the-debug-server-with-a-frontend-client)
-    - [Delve CLI](#delve-cli)
-    - [JetBrains GoLand / IntelliJ IDEA with go plugin](#jetbrains-goland--intellij-idea-with-go-plugin)
-    - [VSCode](#vscode)
+- [Developing KubeBlocks](#developing-kubeblocks)
+  - [Setup development environment](#setup-development-environment)
+    - [Bring your own toolbox](#bring-your-own-toolbox)
+      - [Install Go](#install-go)
+      - [Install Make](#install-make)
+      - [Build KubeBlocks](#build-kubeblocks)
+    - [Use VSCode and development container](#use-vscode-and-development-container)
+      - [Setup the development container](#setup-the-development-container)
+      - [Customize your dev container](#customize-your-dev-container)
+        - [Use a custom dev container image](#use-a-custom-dev-container-image)
+        - [Connect existing Kubernetes cluster](#connect-existing-kubernetes-cluster)
+    - [Setup a Kubernetes development environment](#setup-a-kubernetes-development-environment)
+      - [Docker environment](#docker-environment)
+      - [Kubernetes environment](#kubernetes-environment)
+  - [Basics](#basics)
+    - [Kubebuilder](#kubebuilder)
+    - [Makefile](#makefile)
+    - [\[TODO\] kbcli](#todo-kbcli)
+    - [Code style](#code-style)
+  - [Test](#test)
+    - [Envtest](#envtest)
+    - [Use existing Kubernetes cluster](#use-existing-kubernetes-cluster)
+    - [Check test code coverage](#check-test-code-coverage)
+  - [Debug](#debug)
+    - [Install Delve](#install-delve)
+    - [Start a delve debug server](#start-a-delve-debug-server)
+      - [Debug specific package](#debug-specific-package)
+      - [Pass arguments](#pass-arguments)
+      - [Debug envtest](#debug-envtest)
+      - [Change debug server port](#change-debug-server-port)
+    - [Connect the debug server with a frontend client](#connect-the-debug-server-with-a-frontend-client)
+      - [Delve CLI](#delve-cli)
+      - [JetBrains GoLand / IntelliJ IDEA with go plugin](#jetbrains-goland--intellij-idea-with-go-plugin)
+      - [VSCode](#vscode)
 
 
 ## Setup development environment
@@ -45,7 +46,7 @@ To build `KubeBlocks` on your own host, needs to install the following tools:
 - Make
 
 #### Install Go
-Download and install [Go 1.19 or later](https://go.dev/doc/install).
+Download and install [Go 1.20 or later](https://go.dev/doc/install).
 #### Install Make
 `KubeBlocks` uses `make` for a variety of build and test actions, and needs to be installed as appropriate for your platform:
 
@@ -73,7 +74,7 @@ When `go` and `make` are installed, you can clone the `KubeBlocks` repository, a
   ```
 
 ### Use VSCode and development container
-If you are using Visual Studio Code, you can connect to a [development container](https://code.visualstudio.com/docs/devcontainers/containers) configured for KuberBlocks development. With development container, you don't need to manually install all of the tools and frameworks needed.
+If you are using Visual Studio Code, you can connect to a [development container](https://code.visualstudio.com/docs/devcontainers/containers) configured for KubeBlocks development. With development container, you don't need to manually install all of the tools and frameworks needed.
 
 #### Setup the development container
 1. Install VSCode [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
@@ -82,12 +83,12 @@ If you are using Visual Studio Code, you can connect to a [development container
       ![reopen dev container by pop notification](./img/reopen_dev_container_notification.png)
     - Alternatively, you can open the command palette and use the Remote-Containers: Reopen in Container command:
       ![reopen dev container by command](./img/reopen_dev_container_command.png)
-    - VSCode will pull image and start dev cotnainer automatically, once the container is loaded, open an integrated terminal in VS Code and you're ready to develop `KubeBlocks` in a containerized environment.
+    - VSCode will pull image and start dev container automatically, once the container is loaded, open an integrated terminal in VS Code and you're ready to develop `KubeBlocks` in a containerized environment.
 3. And you can run `make all` to build `KubeBlocks` in the dev container.
 
 #### Customize your dev container
 ##### Use a custom dev container image
-The [devcontainer.json](../.devcontainer/devcontainer.json) uses the latest image from [ApeCloud Dokcer hub](https://hub.docker.com/r/apecloud/kubeblocks-dev), you can customize image to suit your need. 
+The [devcontainer.json](../.devcontainer/devcontainer.json) uses the latest image from [ApeCloud Docker hub](https://hub.docker.com/r/apecloud/kubeblocks-dev), you can customize image to suit your need. 
 1. Edit the [docker/Dockerfile-dev](../docker/Dockerfile-dev) dev container image definition, you can change the `[Option]` configuration or install additional tools.
     ```Dockerfile
     # Copy library scripts to execute
@@ -193,10 +194,10 @@ Test specific packages:
 
 ```shell
 # Directory `controllers` contains many packages, it will build and run each package individually.
-make test TEST_PACKAGE=./controllers/
+make test TEST_PACKAGES=./controllers/...
 
 # Test single package
-make test-delve TEST_PACKAGE=./controllers/dbaas/
+make test-delve TEST_PACKAGES=./controllers/apps/...
 ```
 
 ### Use existing Kubernetes cluster
@@ -230,21 +231,21 @@ We can use [Delve](https://github.com/go-delve/delve) for Go debugging.
     ```
 
 ### Start a delve debug server
-You can start a delve debug server for running and debuging specific package or [envtest](https://book.kubebuilder.io/reference/envtest.html).
+You can start a delve debug server for running and debugging specific package or [envtest](https://book.kubebuilder.io/reference/envtest.html).
 
 #### Debug specific package
 ```shell
 make run-delve GO_PACKAGE=./cmd/manager/main.go
 ```
 
-#### Pass arguements
+#### Pass arguments
 ```shell
  make run-delve GO_PACKAGE=./cmd/cli/main.go ARGUMENTS='cluster create test-cluster --termination-policy=Halt'
 ```
 
 #### Debug envtest
 ```shell
-make test-delve TEST_PACKAGE=./controllers/dbaas/
+make test-delve TEST_PACKAGES=./controllers/apps/...
 ```
 > Unlike `go test` supports multiple packages, `Delve` needs a single executable to work, it only support single package.
 
@@ -259,7 +260,7 @@ API server listening at: [::]:2347
 ```
 
 ### Connect the debug server with a frontend client
-`Delve` support lots of code editors ([editor plugins for Delve](https://github.com/go-delve/delve/blob/master/Documentation/EditorIntegration.md)), you can choose your favourite editor to connect with the listen address for debugging. 
+`Delve` support lots of code editors ([editor plugins for Delve](https://github.com/go-delve/delve/blob/master/Documentation/EditorIntegration.md)), you can choose your favorite editor to connect with the listen address for debugging. 
 
 This section introduces how to start debugging with the Delve CLI, Goland and VSCode. Please refer to the Delve or editors documentation for more details.
 
@@ -307,5 +308,5 @@ Create/modify .vscode/launch.json file for connecting debug server:
     ]
 }
 ```
-Set breakpoints and run `Start Debuging`.
+Set breakpoints and run `Start Debugging`.
 ![vscode debug result](./img/vscode_debug_result.png)

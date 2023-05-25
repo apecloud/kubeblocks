@@ -1,90 +1,64 @@
 name: RELEASE-CHART
 
 on:
+  workflow_dispatch:
+    inputs:
+      chart_version:
+        description: 'The version of helm chart'
+        required: true
+        default: ''
   release:
     types:
       - published
 
 env:
-  CR_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  CHART_RELEASER_VERSION: "v1.4.1"
   RELEASE_VERSION: ${{ github.ref_name }}
-  K3S_VERSION: v1.22
+  RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
+
 
 jobs:
-  release:
-    permissions:
-      contents: write
+  chart-version:
     runs-on: ubuntu-latest
+    outputs:
+      chart-version: ${{ steps.get_version.outputs.chart_version }}
     steps:
-      - name: Checkout Kubeblocks
-        uses: actions/checkout@v3
-
-      - name: Fetch Kubeblocks History
-        run: git fetch --prune --unshallow
-
-      - name: Configure Git
+      - name: Get Chart Version
+        id: get_version
         run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+          VERSION=${{ inputs.chart_version }}
+          if [ -z "$VERSION" ]; then
+              VERSION=${{ env.RELEASE_VERSION }}
+          fi
+          echo chart_version=$VERSION >> $GITHUB_OUTPUT
 
-      - name: Install Helm
-        uses: azure/setup-helm@v3
-        with:
-          version: v3.10.0
+  release-chart:
+    needs: chart-version
+    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.6.1
+    with:
+      MAKE_OPS: "bump-chart-ver"
+      VERSION: "${{ needs.chart-version.outputs.chart-version }}"
+      CHART_NAME: "kubeblocks"
+      CHART_DIR: "deploy/helm"
+      DEP_CHART_DIR: "deploy/helm/depend-charts"
+      DEP_REPO: "helm dep update deploy/delphic"
+    secrets: inherit
 
-      - name: Add Dependency Chart Repos
+  send-message:
+    runs-on: ubuntu-latest
+    needs: release-chart
+    if: ${{ always() && github.event.action == 'published' }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: send message
         run: |
-          helm repo add grafana https://grafana.github.io/helm-charts
-          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-          helm repo add piraeus-charts https://piraeus.io/helm-charts
-          helm repo add cloudve https://github.com/CloudVE/helm-charts/raw/master
-          helm dep update deploy/helm
-
-      - name: Package Kubeblocks Helm Chart
-        run: |
-          RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh ${{ env.RELEASE_VERSION }} 1`
-          VERSION=$RELEASE_VERSION make bump-chart-ver
-
-          args=(--owner "apecloud" --repo "kubeclocks" --charts-dir "deploy" --version ${{ env.CHART_RELEASER_VERSION }})
-          "${{ github.workspace }}/.github/utils/helm_package.sh" "${args[@]}"
+          CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0chart\u00a0error"
+          if [[ "${{ needs.release-chart.result }}" == "success" ]]; then
+              CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0chart\u00a0success"
+          fi
           
-          cp .cr-release-packages/kubeblocks-$RELEASE_VERSION.tgz ./
-          tar -zxvf kubeblocks-$RELEASE_VERSION.tgz
-        shell: bash
+          bash .github/utils/utils.sh --type 12 \
+            --content "${CONTENT}"\
+            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
-      - name: setup k3s ${{ env.K3S_VERSION }}
-        uses: nolar/setup-k3d-k3s@v1
-        with:
-          version: ${{ env.K3S_VERSION }}
-          github-token: ${{ env.CR_TOKEN }}
 
-      - name: helm validate
-        run: |
-          helm install kubeblocks kubeblocks
-          helm template kubeblocks kubeblocks --validate
-
-      - name: Checkout HelmCharts
-        uses: actions/checkout@v3
-        with:
-          repository: apecloud/helm-charts
-          path: helm-charts
-          token: ${{ env.CR_TOKEN }}
-
-      - name: Fetch HelmCharts History
-        run: |
-          cd helm-charts
-          git fetch --prune --unshallow
-
-      - name: Configure Git
-        run: |
-          cd helm-charts
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-
-      - name: Upload and Index Kubeblocks Helm Charts
-        run: |
-          cd helm-charts
-          args=(--owner "apecloud" --repo "helm-charts" --version ${{ env.CHART_RELEASER_VERSION }})
-          "${{ github.workspace }}/.github/utils/helm_release.sh" "${args[@]}"
-        shell: bash

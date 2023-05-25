@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-vscale
+spec:
+  clusterRef: mycluster-pgcluster
+  type: VerticalScaling
+  verticalScaling:
+    - componentName: postgresql
+      requests:
+        cpu: "500m"
+        memory: 500Mi

@@ -1,0 +1,74 @@
+---
+images:
+  # Source: quay.io/k8scsi/csi-attacher:v3.0.1
+  attacher: registry.cn-hangzhou.aliyuncs.com/apecloud/csi-attacher:v3.4.0
+  # Source: quay.io/k8scsi/csi-node-driver-registrar:v1.2.0
+  registrar: registry.cn-hangzhou.aliyuncs.com/apecloud/csi-node-driver-registrar:v2.5.1
+  # Source: quay.io/k8scsi/csi-provisioner:v2.1.0
+  provisioner: registry.cn-hangzhou.aliyuncs.com/apecloud/csi-provisioner:v3.1.0
+  # Main image
+  csi: registry.cn-hangzhou.aliyuncs.com/apecloud/csi-s3-driver:0.31.3
+
+storageClass:
+  # Specifies whether the storage class should be created
+  create: true
+  # Name
+  name: csi-s3
+  # Use a single bucket for all dynamically provisioned persistent volumes
+  singleBucket: ""
+  # mounter to use - either geesefs, s3fs or rclone (default geesefs)
+  mounter: geesefs
+  # GeeseFS mount options
+  #  mounter: geesefs
+  #  mountOptions: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666"
+
+  # S3FS mount options
+  #  mounter: s3fs
+  #  use legacy API calling style which do not support the virtual-host request style:
+  #  mountOptions: "-o use_path_request_style"
+  #  NOTE:
+  #    aliyun OSS only support s3fs, and DO NOT set "-o use_path_request_style":
+  #    mounter: s3fs
+  #    mountOptions: ""
+  mountOptions: ""
+  # Volume reclaim policy
+  reclaimPolicy: Retain
+  # Annotations for the storage class
+  # Example:
+  # annotations:
+  #   storageclass.kubernetes.io/is-default-class: "true"
+  annotations: {}
+
+secret:
+  # Specifies whether the secret should be created
+  create: true
+  # Name of the secret
+  name: csi-s3-secret
+  # S3 Access Key
+  accessKey: ""
+  # S3 Secret Key
+  secretKey: ""
+  # Endpoint
+  # For AWS set it to "https://s3.<region>.amazonaws.com", for example https://s3.eu-central-1.amazonaws.com
+  # In China set it to "https://s3.<region>.amazonaws.com.cn", for example https://s3.cn-north-1.amazonaws.com.cn
+  endpoint: https://storage.yandexcloud.net
+  region: ""
+
+tolerations:
+  - operator: Exists
+
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: kb-controller
+              operator: In
+              values:
+                - "true"
+            - key: kubernetes.io/arch
+              operator: In
+              values:
+                - "amd64"
+

@@ -22,7 +22,7 @@ spec:
       name: STATUS
       type: string
     - jsonPath: .status.completionTimestamp
-      name: COMPLETIONTIME
+      name: COMPLETION-TIME
       type: date
     - jsonPath: .metadata.creationTimestamp
       name: AGE
@@ -58,22 +58,8 @@ spec:
               target:
                 description: the target database workload to restore
                 properties:
-                  databaseEngine:
-                    description: database engine to support in the backup.
-                    enum:
-                    - mysql
-                    type: string
-                  databaseEngineVersion:
-                    description: database engine to support in the backup.
-                    enum:
-                    - 5.6
-                    - 5.7
-                    - 8
-                    items:
-                      type: string
-                    type: array
                   labelsSelector:
-                    description: LabelSelector is used to find matching pods. Pods
+                    description: labelsSelector is used to find matching pods. Pods
                       that match this label selector are counted to determine the
                       number of pods in their corresponding topology domain.
                     properties:
@@ -118,30 +104,32 @@ spec:
                           "value". The requirements are ANDed.
                         type: object
                     type: object
+                    x-kubernetes-preserve-unknown-fields: true
                   secret:
-                    description: target db cluster access secret
+                    description: secret is used to connect to the target database
+                      cluster. If not set, secret will be inherited from backup policy
+                      template. if still not set, the controller will check if any
+                      system account for dataprotection has been created.
                     properties:
                       name:
                         description: the secret name
                         pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
-                      passwordKeyword:
+                      passwordKey:
                         default: password
-                        description: PasswordKeyword the map keyword of the password
-                          in the connection credential secret
-                        type: string
-                      userKeyword:
-                        default: username
-                        description: UserKeyword the map keyword of the user in the
+                        description: passwordKey the map key of the password in the
                           connection credential secret
+                        type: string
+                      usernameKey:
+                        default: username
+                        description: usernameKey the map key of the user in the connection
+                          credential secret
                         type: string
                     required:
                     - name
                     type: object
                 required:
-                - databaseEngine
                 - labelsSelector
-                - secret
                 type: object
               targetVolumeMounts:
                 description: array of restore volume mounts .
@@ -183,6 +171,7 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+                x-kubernetes-preserve-unknown-fields: true
               targetVolumes:
                 description: array of restore volumes .
                 items:
@@ -649,9 +638,12 @@ spec:
                                     provisioner or an external controller can support
                                     the specified data source, it will create a new
                                     volume based on the contents of the specified
-                                    data source. If the AnyVolumeDataSource feature
-                                    gate is enabled, this field will always have the
-                                    same contents as the DataSourceRef field.'
+                                    data source. When the AnyVolumeDataSource feature
+                                    gate is enabled, dataSource contents will be copied
+                                    to dataSourceRef, and dataSourceRef contents will
+                                    be copied to dataSource when dataSourceRef.namespace
+                                    is not specified. If the namespace is specified,
+                                    then dataSourceRef will not be copied to dataSource.'
                                   properties:
                                     apiGroup:
                                       description: APIGroup is the group for the resource
@@ -676,27 +668,35 @@ spec:
                                   description: 'dataSourceRef specifies the object
                                     from which to populate the volume with data, if
                                     a non-empty volume is desired. This may be any
-                                    local object from a non-empty API group (non core
-                                    object) or a PersistentVolumeClaim object. When
-                                    this field is specified, volume binding will only
-                                    succeed if the type of the specified object matches
-                                    some installed volume populator or dynamic provisioner.
+                                    object from a non-empty API group (non core object)
+                                    or a PersistentVolumeClaim object. When this field
+                                    is specified, volume binding will only succeed
+                                    if the type of the specified object matches some
+                                    installed volume populator or dynamic provisioner.
                                     This field will replace the functionality of the
-                                    DataSource field and as such if both fields are
+                                    dataSource field and as such if both fields are
                                     non-empty, they must have the same value. For
-                                    backwards compatibility, both fields (DataSource
-                                    and DataSourceRef) will be set to the same value
+                                    backwards compatibility, when namespace isn''t
+                                    specified in dataSourceRef, both fields (dataSource
+                                    and dataSourceRef) will be set to the same value
                                     automatically if one of them is empty and the
-                                    other is non-empty. There are two important differences
-                                    between DataSource and DataSourceRef: * While
-                                    DataSource only allows two specific types of objects,
-                                    DataSourceRef allows any non-core object, as well
-                                    as PersistentVolumeClaim objects. * While DataSource
-                                    ignores disallowed values (dropping them), DataSourceRef
-                                    preserves all values, and generates an error if
-                                    a disallowed value is specified. (Beta) Using
-                                    this field requires the AnyVolumeDataSource feature
-                                    gate to be enabled.'
+                                    other is non-empty. When namespace is specified
+                                    in dataSourceRef, dataSource isn''t set to the
+                                    same value and must be empty. There are three
+                                    important differences between dataSource and dataSourceRef:
+                                    * While dataSource only allows two specific types
+                                    of objects, dataSourceRef allows any non-core
+                                    object, as well as PersistentVolumeClaim objects.
+                                    * While dataSource ignores disallowed values (dropping
+                                    them), dataSourceRef preserves all values, and
+                                    generates an error if a disallowed value is specified.
+                                    * While dataSource only allows local objects,
+                                    dataSourceRef allows objects in any namespaces.
+                                    (Beta) Using this field requires the AnyVolumeDataSource
+                                    feature gate to be enabled. (Alpha) Using the
+                                    namespace field of dataSourceRef requires the
+                                    CrossNamespaceVolumeDataSource feature gate to
+                                    be enabled.'
                                   properties:
                                     apiGroup:
                                       description: APIGroup is the group for the resource
@@ -713,6 +713,17 @@ spec:
                                       description: Name is the name of resource being
                                         referenced
                                       type: string
+                                    namespace:
+                                      description: Namespace is the namespace of resource
+                                        being referenced Note that when a namespace
+                                        is specified, a gateway.networking.k8s.io/ReferenceGrant
+                                        object is required in the referent namespace
+                                        to allow that namespace's owner to accept
+                                        the reference. See the ReferenceGrant documentation
+                                        for details. (Alpha) This field requires the
+                                        CrossNamespaceVolumeDataSource feature gate
+                                        to be enabled.
+                                      type: string
                                   required:
                                   - kind
                                   - name
@@ -725,6 +736,30 @@ spec:
                                     value but must still be higher than capacity recorded
                                     in the status field of the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources'
                                   properties:
+                                    claims:
+                                      description: "Claims lists the names of resources,
+                                        defined in spec.resourceClaims, that are used
+                                        by this container. \n This is an alpha field
+                                        and requires enabling the DynamicResourceAllocation
+                                        feature gate. \n This field is immutable."
+                                      items:
+                                        description: ResourceClaim references one
+                                          entry in PodSpec.ResourceClaims.
+                                        properties:
+                                          name:
+                                            description: Name must match the name
+                                              of one entry in pod.spec.resourceClaims
+                                              of the Pod where this field is used.
+                                              It makes that resource available inside
+                                              a container.
+                                            type: string
+                                        required:
+                                        - name
+                                        type: object
+                                      type: array
+                                      x-kubernetes-list-map-keys:
+                                      - name
+                                      x-kubernetes-list-type: map
                                     limits:
                                       additionalProperties:
                                         anyOf:
@@ -1696,6 +1731,7 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+                x-kubernetes-preserve-unknown-fields: true
             required:
             - backupJobName
             - target
@@ -1716,10 +1752,17 @@ spec:
                 format: date-time
                 type: string
               failureReason:
+                description: Job failed reason.
                 type: string
               phase:
                 description: RestoreJobPhase The current phase. Valid values are New,
-                  InProgress, Completed, Failed.
+                  InProgressPhy, InProgressLogic, Completed, Failed.
+                enum:
+                - New
+                - InProgressPhy
+                - InProgressLogic
+                - Completed
+                - Failed
                 type: string
               startTimestamp:
                 description: Date/time when the backup started being processed.

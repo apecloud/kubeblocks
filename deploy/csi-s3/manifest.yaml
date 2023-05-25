@@ -1,0 +1,104 @@
+helm_chart:
+  name: cr.yandex/crp9ftr22d26age3hulg/yandex-cloud/csi-s3/csi-s3
+  tag: 0.31.3
+requirements:
+  k8s_version: ">=1.13"
+images:
+  - full: images.attacher
+  - full: images.registrar
+  - full: images.provisioner
+  - full: images.csi
+user_values:
+  - name: storageClass.create
+    title:
+      en: Create storage class
+      ru: Создать класс хранения
+    description:
+      en: Specifies whether the storage class should be created
+      ru: 'Если "да", при установке будет создан класс хранения S3'
+    boolean_value:
+      default_value: true
+  - name: secret.create
+    title:
+      en: Create secret
+      ru: Создать секрет
+    description:
+      en: Specifies whether the secret should be created
+      ru: 'Если "да", при установке будет создан секрет, иначе для класса хранения будет использован существующий'
+    boolean_value:
+      default_value: true
+  - name: secret.accessKey
+    title:
+      en: S3 Access Key ID
+      ru: Идентификатор ключа S3
+    description:
+      en: S3 Access Key ID
+      ru: Идентификатор ключа S3
+    string_value:
+      default_value: ""
+  - name: secret.secretKey
+    title:
+      en: S3 Secret Key
+      ru: Секретный ключ S3
+    description:
+      en: S3 Secret Key
+      ru: Секретный ключ S3
+    string_value:
+      default_value: ""
+  - name: storageClass.singleBucket
+    title:
+      en: Single S3 bucket for volumes
+      ru: Общий S3 бакет для томов
+    description:
+      en: Single S3 bucket to use for all dynamically provisioned persistent volumes
+      ru: Общий бакет S3, в котором будут создаваться все динамически распределяемые тома. Если пусто, под каждый том будет создаваться новый бакет
+    string_value:
+      default_value: ""
+  - name: secret.endpoint
+    title:
+      en: S3 endpoint
+      ru: Адрес S3-сервиса
+    description:
+      en: S3 service endpoint to use
+      ru: Адрес S3-сервиса, который будет использоваться
+    string_value:
+      default_value: "https://storage.yandexcloud.net"
+  - name: storageClass.mountOptions
+    title:
+      en: GeeseFS mount options
+      ru: Опции монтирования GeeseFS
+    description:
+      en: GeeseFS mount options to use. Consult GeeseFS (https://github.com/yandex-cloud/geesefs) help for the full option list
+      ru: Опции монтирования GeeseFS. Смотрите справку GeeseFS (https://github.com/yandex-cloud/geesefs) для полного перечня опций
+    string_value:
+      default_value: "--memory-limit 1000 --dir-mode 0777 --file-mode 0666"
+  - name: storageClass.reclaimPolicy
+    title:
+      en: Volume reclaim policy
+      ru: Политика очистки томов
+    description:
+      en: Volume reclaim policy for the storage class (Retain or Delete)
+      ru: Политика очистки PV, связанных с PVC (Retain - сохранять при удалении PVC, Delete - удалять при удалении PVC)
+    string_selector_value:
+      default_value: Delete
+      values:
+        - Delete
+        - Retain
+  - name: storageClass.name
+    title:
+      en: Storage class name
+      ru: Название класса хранения
+    description:
+      en: Name of the storage class that will be created
+      ru: Название класса хранения, который будет создан при установке
+    string_value:
+      default_value: csi-s3
+  - name: secret.name
+    title:
+      en: Name of the secret
+      ru: Название секрета
+    description:
+      en: Name of the secret to create or use for the storage class
+      ru: Название секрета, который будет создан или использован для класса хранения
+    string_value:
+      default_value: csi-s3-secret

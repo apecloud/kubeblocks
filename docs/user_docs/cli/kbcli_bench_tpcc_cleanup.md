@@ -1,6 +1,8 @@
-## kbcli bench tpcc cleanup
+---
+title: kbcli bench tpcc cleanup
+---
 
-Cleanup data for TPCC
+Cleanup data for TPCC.
 
 ```
 kbcli bench tpcc cleanup [flags]
@@ -27,6 +29,7 @@ kbcli bench tpcc cleanup [flags]
       --context string                 The name of the kubeconfig context to use
       --count int                      Total execution count, 0 means infinite
   -D, --db string                      Database name (default "kb_test")
+      --disable-compression            If true, opt-out of response compression for all requests to the server
   -d, --driver string                  Database driver: mysql (default "mysql")
       --dropdata                       Cleanup data before prepare
   -H, --host string                    Database host (default "127.0.0.1")
@@ -54,5 +57,7 @@ kbcli bench tpcc cleanup [flags]
 
 ### SEE ALSO
 
-* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark
+* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark.
+
+#### Go Back to [CLI Overview](cli.md) Homepage.
 

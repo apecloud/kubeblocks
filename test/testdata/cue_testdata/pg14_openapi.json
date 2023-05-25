@@ -1,0 +1,2745 @@
+{
+  "type": "object",
+  "properties": {
+    "spec": {
+      "type": "object",
+      "required": [
+        "archive_timeout",
+        "autovacuum_analyze_scale_factor",
+        "autovacuum_naptime",
+        "autovacuum_vacuum_scale_factor",
+        "checkpoint_completion_target",
+        "cron.max_running_jobs",
+        "fsync",
+        "full_page_writes",
+        "idle_in_transaction_session_timeout",
+        "ignore_invalid_pages",
+        "jit",
+        "lo_compat_privileges",
+        "log_autovacuum_min_duration",
+        "log_checkpoints",
+        "logging_collector",
+        "log_rotation_age",
+        "log_truncate_on_rotation",
+        "max_locks_per_transaction",
+        "max_prepared_transactions",
+        "max_replication_slots",
+        "max_stack_depth",
+        "max_wal_senders",
+        "max_wal_size",
+        "min_wal_size",
+        "pgaudit.log_rows",
+        "pgaudit.log_statement",
+        "pg_bigm.gin_key_limit",
+        "pg_bigm.similarity_limit",
+        "rds.adaptive_autovacuum",
+        "rds.custom_dns_resolution",
+        "rds.force_ssl",
+        "rds.logical_replication",
+        "rds.log_retention_period",
+        "rds.max_tcp_buffers",
+        "rds.pg_stat_ramdisk_size",
+        "rds.rds_superuser_reserved_connections",
+        "remove_temp_files_after_crash",
+        "ssl",
+        "superuser_reserved_connections",
+        "track_activity_query_size",
+        "track_io_timing",
+        "update_process_title",
+        "vacuum_cost_page_miss",
+        "vacuum_failsafe_age",
+        "vacuum_multixact_failsafe_age",
+        "wal_compression",
+        "wal_keep_size",
+        "wal_receiver_create_temp_slot",
+        "wal_receiver_timeout",
+        "wal_sender_timeout"
+      ],
+      "properties": {
+        "application_name": {
+          "description": "Sets the application name to be reported in statistics and logs.",
+          "type": "string"
+        },
+        "archive_command": {
+          "description": "Sets the shell command that will be called to archive a WAL file.",
+          "type": "string"
+        },
+        "archive_timeout": {
+          "description": "(s) Forces a switch to the next xlog file if a new file has not been started within N seconds.",
+          "type": "integer",
+          "default": 300,
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "array_nulls": {
+          "description": "Enable input of NULL elements in arrays.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "authentication_timeout": {
+          "description": "(s) Sets the maximum allowed time to complete client authentication.",
+          "type": "integer",
+          "maximum": 600,
+          "minimum": 1
+        },
+        "auto_explain.log_analyze": {
+          "description": "Use EXPLAIN ANALYZE for plan logging.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "auto_explain.log_buffers": {
+          "description": "Log buffers usage.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "auto_explain.log_format": {
+          "description": "EXPLAIN format to be used for plan logging.",
+          "type": "string",
+          "enum": [
+            "text",
+            "xml",
+            "json",
+            "yaml"
+          ]
+        },
+        "auto_explain.log_min_duration": {
+          "description": "(ms) Sets the minimum execution time above which plans will be logged.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": -1
+        },
+        "auto_explain.log_nested_statements": {
+          "description": "Log nested statements.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "auto_explain.log_timing": {
+          "description": "Collect timing data, not just row counts.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "auto_explain.log_triggers": {
+          "description": "Include trigger statistics in plans.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "auto_explain.log_verbose": {
+          "description": "Use EXPLAIN VERBOSE for plan logging.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "auto_explain.sample_rate": {
+          "description": "Fraction of queries to process.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "autovacuum": {
+          "description": "Starts the autovacuum subprocess.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "autovacuum_analyze_scale_factor": {
+          "description": "Number of tuple inserts, updates or deletes prior to analyze as a fraction of reltuples.",
+          "type": "number",
+          "default": 0.05,
+          "maximum": 100,
+          "minimum": 0
+        },
+        "autovacuum_analyze_threshold": {
+          "description": "Minimum number of tuple inserts, updates or deletes prior to analyze.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "autovacuum_freeze_max_age": {
+          "description": "Age at which to autovacuum a table to prevent transaction ID wraparound.",
+          "type": "integer",
+          "maximum": 750000000,
+          "minimum": 100000000
+        },
+        "autovacuum_max_workers": {
+          "description": "Sets the maximum number of simultaneously running autovacuum worker processes.",
+          "type": "integer",
+          "maximum": 8388607,
+          "minimum": 1
+        },
+        "autovacuum_multixact_freeze_max_age": {
+          "description": "Multixact age at which to autovacuum a table to prevent multixact wraparound.",
+          "type": "integer",
+          "maximum": 2000000000,
+          "minimum": 10000000
+        },
+        "autovacuum_naptime": {
+          "description": "(s) Time to sleep between autovacuum runs.",
+          "type": "integer",
+          "default": 15,
+          "maximum": 2147483,
+          "minimum": 1
+        },
+        "autovacuum_vacuum_cost_delay": {
+          "description": "(ms) Vacuum cost delay in milliseconds, for autovacuum.",
+          "type": "integer",
+          "maximum": 100,
+          "minimum": -1
+        },
+        "autovacuum_vacuum_cost_limit": {
+          "description": "Vacuum cost amount available before napping, for autovacuum.",
+          "type": "integer",
+          "maximum": 10000,
+          "minimum": -1
+        },
+        "autovacuum_vacuum_insert_scale_factor": {
+          "description": "Number of tuple inserts prior to vacuum as a fraction of reltuples.",
+          "type": "number",
+          "maximum": 100,
+          "minimum": 0
+        },
+        "autovacuum_vacuum_insert_threshold": {
+          "description": "Minimum number of tuple inserts prior to vacuum, or -1 to disable insert vacuums.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": -1
+        },
+        "autovacuum_vacuum_scale_factor": {
+          "description": "Number of tuple updates or deletes prior to vacuum as a fraction of reltuples.",
+          "type": "number",
+          "default": 0.1,
+          "maximum": 100,
+          "minimum": 0
+        },
+        "autovacuum_vacuum_threshold": {
+          "description": "Minimum number of tuple updates or deletes prior to vacuum.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "autovacuum_work_mem": {
+          "description": "(kB) Sets the maximum memory to be used by each autovacuum worker process.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": -1
+        },
+        "aws_lambda.connect_timeout_ms": {
+          "description": "Sets the maximum time to wait while connecting to AWS Lambda.",
+          "type": "integer",
+          "maximum": 900000,
+          "minimum": 1
+        },
+        "aws_lambda.request_timeout_ms": {
+          "description": "Sets the maximum time to wait while waiting for response from AWS Lambda",
+          "type": "integer",
+          "maximum": 900000,
+          "minimum": 1
+        },
+        "backend_flush_after": {
+          "description": "(8Kb) Number of pages after which previously performed writes are flushed to disk.",
+          "type": "integer",
+          "maximum": 256,
+          "minimum": 0
+        },
+        "backslash_quote": {
+          "description": "Sets whether \\ is allowed in string literals.",
+          "type": "string",
+          "enum": [
+            "safe_encoding",
+            "on",
+            "off"
+          ]
+        },
+        "backtrace_functions": {
+          "description": "Log backtrace for errors in these functions.",
+          "type": "string"
+        },
+        "bgwriter_delay": {
+          "description": "(ms) Background writer sleep time between rounds.",
+          "type": "integer",
+          "maximum": 10000,
+          "minimum": 10
+        },
+        "bgwriter_flush_after": {
+          "description": "(8Kb) Number of pages after which previously performed writes are flushed to disk.",
+          "type": "integer",
+          "maximum": 256,
+          "minimum": 0
+        },
+        "bgwriter_lru_maxpages": {
+          "description": "Background writer maximum number of LRU pages to flush per round.",
+          "type": "integer",
+          "maximum": 1000,
+          "minimum": 0
+        },
+        "bgwriter_lru_multiplier": {
+          "description": "Multiple of the average buffer usage to free per round.",
+          "type": "number",
+          "maximum": 10,
+          "minimum": 0
+        },
+        "bytea_output": {
+          "description": "Sets the output format for bytea.",
+          "type": "string",
+          "enum": [
+            "escape",
+            "hex"
+          ]
+        },
+        "check_function_bodies": {
+          "description": "Check function bodies during CREATE FUNCTION.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "checkpoint_completion_target": {
+          "description": "Time spent flushing dirty buffers during checkpoint, as fraction of checkpoint interval.",
+          "type": "number",
+          "default": 0.9,
+          "maximum": 1,
+          "minimum": 0
+        },
+        "checkpoint_flush_after": {
+          "description": "(8kB) Number of pages after which previously performed writes are flushed to disk.",
+          "type": "integer",
+          "maximum": 256,
+          "minimum": 0
+        },
+        "checkpoint_timeout": {
+          "description": "(s) Sets the maximum time between automatic WAL checkpoints.",
+          "type": "integer",
+          "maximum": 3600,
+          "minimum": 30
+        },
+        "checkpoint_warning": {
+          "description": "(s) Enables warnings if checkpoint segments are filled more frequently than this.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "client_connection_check_interval": {
+          "description": "time between checks for client disconnection while running queries",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "client_encoding": {
+          "description": "Sets the clients character set encoding.",
+          "type": "string"
+        },
+        "client_min_messages": {
+          "description": "Sets the message levels that are sent to the client.",
+          "type": "string",
+          "enum": [
+            "debug5",
+            "debug4",
+            "debug3",
+            "debug2",
+            "debug1",
+            "log",
+            "notice",
+            "warning",
+            "error"
+          ]
+        },
+        "commit_delay": {
+          "description": "Sets the delay in microseconds between transaction commit and flushing WAL to disk.",
+          "type": "integer",
+          "maximum": 100000,
+          "minimum": 0
+        },
+        "commit_siblings": {
+          "description": "Sets the minimum concurrent open transactions before performing commit_delay.",
+          "type": "integer",
+          "maximum": 1000,
+          "minimum": 0
+        },
+        "compute_query_id": {
+          "description": "Enables in-core computation of a query identifier",
+          "type": "string",
+          "enum": [
+            "on",
+            "auto"
+          ]
+        },
+        "config_file": {
+          "description": "Sets the servers main configuration file.",
+          "type": "string"
+        },
+        "constraint_exclusion": {
+          "description": "Enables the planner to use constraints to optimize queries.",
+          "type": "string",
+          "enum": [
+            "partition",
+            "on",
+            "off"
+          ]
+        },
+        "cpu_index_tuple_cost": {
+          "description": "Sets the planners estimate of the cost of processing each index entry during an index scan.",
+          "type": "number",
+          "maximum": 1.79769,
+          "minimum": 0
+        },
+        "cpu_operator_cost": {
+          "description": "Sets the planners estimate of the cost of processing each operator or function call.",
+          "type": "number",
+          "maximum": 1.79769,
+          "minimum": 0
+        },
+        "cpu_tuple_cost": {
+          "description": "Sets the planners estimate of the cost of processing each tuple (row).",
+          "type": "number",
+          "maximum": 1.79769,
+          "minimum": 0
+        },
+        "cron.database_name": {
+          "description": "Sets the database to store pg_cron metadata tables",
+          "type": "string"
+        },
+        "cron.log_run": {
+          "description": "Log all jobs runs into the job_run_details table",
+          "type": "string",
+          "enum": [
+            "on",
+            "off"
+          ]
+        },
+        "cron.log_statement": {
+          "description": "Log all cron statements prior to execution.",
+          "type": "string",
+          "enum": [
+            "on",
+            "off"
+          ]
+        },
+        "cron.max_running_jobs": {
+          "description": "Maximum number of jobs that can run concurrently.",
+          "type": "integer",
+          "default": 5,
+          "maximum": 100,
+          "minimum": 0
+        },
+        "cron.use_background_workers": {
+          "description": "Enables background workers for pg_cron",
+          "type": "string"
+        },
+        "cursor_tuple_fraction": {
+          "description": "Sets the planners estimate of the fraction of a cursors rows that will be retrieved.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "data_directory": {
+          "description": "Sets the servers data directory.",
+          "type": "string"
+        },
+        "datestyle": {
+          "description": "Sets the display format for date and time values.",
+          "type": "string"
+        },
+        "db_user_namespace": {
+          "description": "Enables per-database user names.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "deadlock_timeout": {
+          "description": "(ms) Sets the time to wait on a lock before checking for deadlock.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 1
+        },
+        "debug_pretty_print": {
+          "description": "Indents parse and plan tree displays.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "debug_print_parse": {
+          "description": "Logs each querys parse tree.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "debug_print_plan": {
+          "description": "Logs each querys execution plan.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "debug_print_rewritten": {
+          "description": "Logs each querys rewritten parse tree.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "default_statistics_target": {
+          "description": "Sets the default statistics target.",
+          "type": "integer",
+          "maximum": 10000,
+          "minimum": 1
+        },
+        "default_tablespace": {
+          "description": "Sets the default tablespace to create tables and indexes in.",
+          "type": "string"
+        },
+        "default_toast_compression": {
+          "description": "Sets the default TOAST compression method for columns of newly-created tables",
+          "type": "string",
+          "enum": [
+            "pglz",
+            "lz4"
+          ]
+        },
+        "default_transaction_deferrable": {
+          "description": "Sets the default deferrable status of new transactions.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "default_transaction_isolation": {
+          "description": "Sets the transaction isolation level of each new transaction.",
+          "type": "string",
+          "enum": [
+            "serializable",
+            "repeatable read",
+            "read committed",
+            "read uncommitted"
+          ]
+        },
+        "default_transaction_read_only": {
+          "description": "Sets the default read-only status of new transactions.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "effective_cache_size": {
+          "description": "(8kB) Sets the planners assumption about the size of the disk cache.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 1
+        },
+        "effective_io_concurrency": {
+          "description": "Number of simultaneous requests that can be handled efficiently by the disk subsystem.",
+          "type": "integer",
+          "maximum": 1000,
+          "minimum": 0
+        },
+        "enable_async_append": {
+          "description": "Enables or disables the query planner's use of async-aware append plan types",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_bitmapscan": {
+          "description": "Enables the planners use of bitmap-scan plans.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_gathermerge": {
+          "description": "Enables the planner's use of gather merge plans.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_hashagg": {
+          "description": "Enables the planners use of hashed aggregation plans.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_hashjoin": {
+          "description": "Enables the planners use of hash join plans.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_incremental_sort": {
+          "description": "Enables the planner's use of incremental sort steps.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_indexonlyscan": {
+          "description": "Enables the planner's use of index-only-scan plans.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_indexscan": {
+          "description": "Enables the planners use of index-scan plans.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_material": {
+          "description": "Enables the planners use of materialization.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_memoize": {
+          "description": "Enables the planner's use of memoization",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_mergejoin": {
+          "description": "Enables the planners use of merge join plans.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_nestloop": {
+          "description": "Enables the planners use of nested-loop join plans.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_parallel_append": {
+          "description": "Enables the planner's use of parallel append plans.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_parallel_hash": {
+          "description": "Enables the planner's user of parallel hash plans.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_partition_pruning": {
+          "description": "Enable plan-time and run-time partition pruning.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_partitionwise_aggregate": {
+          "description": "Enables partitionwise aggregation and grouping.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_partitionwise_join": {
+          "description": "Enables partitionwise join.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_seqscan": {
+          "description": "Enables the planners use of sequential-scan plans.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_sort": {
+          "description": "Enables the planners use of explicit sort steps.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "enable_tidscan": {
+          "description": "Enables the planners use of TID scan plans.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "escape_string_warning": {
+          "description": "Warn about backslash escapes in ordinary string literals.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "exit_on_error": {
+          "description": "Terminate session on any error.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "extra_float_digits": {
+          "description": "Sets the number of digits displayed for floating-point values.",
+          "type": "integer",
+          "maximum": 3,
+          "minimum": -15
+        },
+        "force_parallel_mode": {
+          "description": "Forces use of parallel query facilities.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "from_collapse_limit": {
+          "description": "Sets the FROM-list size beyond which subqueries are not collapsed.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 1
+        },
+        "fsync": {
+          "description": "Forces synchronization of updates to disk.",
+          "type": "boolean",
+          "default": true,
+          "enum": [
+            true,
+            false
+          ]
+        },
+        "full_page_writes": {
+          "description": "Writes full pages to WAL when first modified after a checkpoint.",
+          "type": "boolean",
+          "default": true,
+          "enum": [
+            true,
+            false
+          ]
+        },
+        "geqo": {
+          "description": "Enables genetic query optimization.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "geqo_effort": {
+          "description": "GEQO: effort is used to set the default for other GEQO parameters.",
+          "type": "integer",
+          "maximum": 10,
+          "minimum": 1
+        },
+        "geqo_generations": {
+          "description": "GEQO: number of iterations of the algorithm.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "geqo_pool_size": {
+          "description": "GEQO: number of individuals in the population.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "geqo_seed": {
+          "description": "GEQO: seed for random path selection.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "geqo_selection_bias": {
+          "description": "GEQO: selective pressure within the population.",
+          "type": "number",
+          "maximum": 2,
+          "minimum": 1.5
+        },
+        "geqo_threshold": {
+          "description": "Sets the threshold of FROM items beyond which GEQO is used.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 2
+        },
+        "gin_fuzzy_search_limit": {
+          "description": "Sets the maximum allowed result for exact search by GIN.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "gin_pending_list_limit": {
+          "description": "(kB) Sets the maximum size of the pending list for GIN index.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 64
+        },
+        "hash_mem_multiplier": {
+          "description": "Multiple of work_mem to use for hash tables.",
+          "type": "number",
+          "maximum": 1000,
+          "minimum": 1
+        },
+        "hba_file": {
+          "description": "Sets the servers hba configuration file.",
+          "type": "string"
+        },
+        "hll.force_groupagg": {
+          "description": "Force group aggregation for hll",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "hot_standby_feedback": {
+          "description": "Allows feedback from a hot standby to the primary that will avoid query conflicts.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "huge_pages": {
+          "description": "Use of huge pages on Linux.",
+          "type": "string",
+          "enum": [
+            "on",
+            "off",
+            "try"
+          ]
+        },
+        "ident_file": {
+          "description": "Sets the servers ident configuration file.",
+          "type": "string"
+        },
+        "idle_in_transaction_session_timeout": {
+          "description": "(ms) Sets the maximum allowed duration of any idling transaction.",
+          "type": "integer",
+          "default": 86400000,
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "idle_session_timeout": {
+          "description": "Terminate any session that has been idle (that is, waiting for a client query), but not within an open transaction, for longer than the specified amount of time",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "ignore_invalid_pages": {
+          "description": "Continues recovery after an invalid pages failure.",
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "intervalstyle": {
+          "description": "Sets the display format for interval values.",
+          "type": "string",
+          "enum": [
+            "postgres",
+            "postgres_verbose",
+            "sql_standard",
+            "iso_8601"
+          ]
+        },
+        "jit": {
+          "description": "Allow JIT compilation.",
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "jit_above_cost": {
+          "description": "Perform JIT compilation if query is more expensive.",
+          "type": "number",
+          "maximum": 1.79769,
+          "minimum": -1
+        },
+        "jit_inline_above_cost": {
+          "description": "Perform JIT inlining if query is more expensive.",
+          "type": "number",
+          "maximum": 1.79769,
+          "minimum": -1
+        },
+        "jit_optimize_above_cost": {
+          "description": "Optimize JITed functions if query is more expensive.",
+          "type": "number",
+          "maximum": 1.79769,
+          "minimum": -1
+        },
+        "join_collapse_limit": {
+          "description": "Sets the FROM-list size beyond which JOIN constructs are not flattened.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 1
+        },
+        "lc_messages": {
+          "description": "Sets the language in which messages are displayed.",
+          "type": "string"
+        },
+        "lc_monetary": {
+          "description": "Sets the locale for formatting monetary amounts.",
+          "type": "string"
+        },
+        "lc_numeric": {
+          "description": "Sets the locale for formatting numbers.",
+          "type": "string"
+        },
+        "lc_time": {
+          "description": "Sets the locale for formatting date and time values.",
+          "type": "string"
+        },
+        "listen_addresses": {
+          "description": "Sets the host name or IP address(es) to listen to.",
+          "type": "string"
+        },
+        "lo_compat_privileges": {
+          "description": "Enables backward compatibility mode for privilege checks on large objects.",
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "log_autovacuum_min_duration": {
+          "description": "(ms) Sets the minimum execution time above which autovacuum actions will be logged.",
+          "type": "integer",
+          "default": 10000,
+          "maximum": 2147483647,
+          "minimum": -1
+        },
+        "log_checkpoints": {
+          "description": "Logs each checkpoint.",
+          "type": "boolean",
+          "default": true,
+          "enum": [
+            true,
+            false
+          ]
+        },
+        "log_connections": {
+          "description": "Logs each successful connection.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "log_destination": {
+          "description": "Sets the destination for server log output.",
+          "type": "string",
+          "enum": [
+            "stderr",
+            "csvlog"
+          ]
+        },
+        "log_directory": {
+          "description": "Sets the destination directory for log files.",
+          "type": "string"
+        },
+        "log_disconnections": {
+          "description": "Logs end of a session, including duration.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "log_duration": {
+          "description": "Logs the duration of each completed SQL statement.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "log_error_verbosity": {
+          "description": "Sets the verbosity of logged messages.",
+          "type": "string",
+          "enum": [
+            "terse",
+            "default",
+            "verbose"
+          ]
+        },
+        "log_executor_stats": {
+          "description": "Writes executor performance statistics to the server log.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "log_file_mode": {
+          "description": "Sets the file permissions for log files.",
+          "type": "string"
+        },
+        "log_filename": {
+          "description": "Sets the file name pattern for log files.",
+          "type": "string"
+        },
+        "log_hostname": {
+          "description": "Logs the host name in the connection logs.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "log_line_prefix": {
+          "description": "Controls information prefixed to each log line.",
+          "type": "string"
+        },
+        "log_lock_waits": {
+          "description": "Logs long lock waits.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "log_min_duration_sample": {
+          "description": "(ms) Sets the minimum execution time above which a sample of statements will be logged. Sampling is determined by log_statement_sample_rate.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": -1
+        },
+        "log_min_duration_statement": {
+          "description": "(ms) Sets the minimum execution time above which statements will be logged.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": -1
+        },
+        "log_min_error_statement": {
+          "description": "Causes all statements generating error at or above this level to be logged.",
+          "type": "string",
+          "enum": [
+            "debug5",
+            "debug4",
+            "debug3",
+            "debug2",
+            "debug1",
+            "info",
+            "notice",
+            "warning",
+            "error",
+            "log",
+            "fatal",
+            "panic"
+          ]
+        },
+        "log_min_messages": {
+          "description": "Sets the message levels that are logged.",
+          "type": "string",
+          "enum": [
+            "debug5",
+            "debug4",
+            "debug3",
+            "debug2",
+            "debug1",
+            "info",
+            "notice",
+            "warning",
+            "error",
+            "log",
+            "fatal"
+          ]
+        },
+        "log_parameter_max_length": {
+          "description": "When logging statements, limit logged parameter values to first N bytes.",
+          "type": "integer",
+          "maximum": 1073741823,
+          "minimum": -1
+        },
+        "log_parameter_max_length_on_error": {
+          "description": "When reporting an error, limit logged parameter values to first N bytes.",
+          "type": "integer",
+          "maximum": 1073741823,
+          "minimum": -1
+        },
+        "log_parser_stats": {
+          "description": "Writes parser performance statistics to the server log.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "log_planner_stats": {
+          "description": "Writes planner performance statistics to the server log.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "log_recovery_conflict_waits": {
+          "description": "Controls whether a log message is produced when the startup process waits longer than deadlock_timeout for recovery conflicts",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "log_replication_commands": {
+          "description": "Logs each replication command.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "log_rotation_age": {
+          "description": "(min) Automatic log file rotation will occur after N minutes.",
+          "type": "integer",
+          "default": 60,
+          "maximum": 1440,
+          "minimum": 1
+        },
+        "log_rotation_size": {
+          "description": "(kB) Automatic log file rotation will occur after N kilobytes.",
+          "type": "integer",
+          "maximum": 2097151,
+          "minimum": 0
+        },
+        "log_statement": {
+          "description": "Sets the type of statements logged.",
+          "type": "string",
+          "enum": [
+            "none",
+            "ddl",
+            "mod",
+            "all"
+          ]
+        },
+        "log_statement_sample_rate": {
+          "description": "Fraction of statements exceeding log_min_duration_sample to be logged.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "log_statement_stats": {
+          "description": "Writes cumulative performance statistics to the server log.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "log_temp_files": {
+          "description": "(kB) Log the use of temporary files larger than this number of kilobytes.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": -1
+        },
+        "log_timezone": {
+          "description": "Sets the time zone to use in log messages.",
+          "type": "string"
+        },
+        "log_transaction_sample_rate": {
+          "description": "Set the fraction of transactions to log for new transactions.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "log_truncate_on_rotation": {
+          "description": "Truncate existing log files of same name during log rotation.",
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "logging_collector": {
+          "description": "Start a subprocess to capture stderr output and/or csvlogs into log files.",
+          "type": "boolean",
+          "default": true,
+          "enum": [
+            true,
+            false
+          ]
+        },
+        "logical_decoding_work_mem": {
+          "description": "(kB) Sets the maximum memory to be used for logical decoding.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 64
+        },
+        "maintenance_io_concurrency": {
+          "description": "A variant of effective_io_concurrency that is used for maintenance work.",
+          "type": "integer",
+          "maximum": 1000,
+          "minimum": 0
+        },
+        "maintenance_work_mem": {
+          "description": "(kB) Sets the maximum memory to be used for maintenance operations.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 1024
+        },
+        "max_connections": {
+          "description": "Sets the maximum number of concurrent connections.",
+          "type": "integer",
+          "maximum": 8388607,
+          "minimum": 6
+        },
+        "max_files_per_process": {
+          "description": "Sets the maximum number of simultaneously open files for each server process.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 64
+        },
+        "max_locks_per_transaction": {
+          "description": "Sets the maximum number of locks per transaction.",
+          "type": "integer",
+          "default": 64,
+          "maximum": 2147483647,
+          "minimum": 10
+        },
+        "max_logical_replication_workers": {
+          "description": "Maximum number of logical replication worker processes.",
+          "type": "integer",
+          "maximum": 262143,
+          "minimum": 0
+        },
+        "max_parallel_maintenance_workers": {
+          "description": "Sets the maximum number of parallel processes per maintenance operation.",
+          "type": "integer",
+          "maximum": 1024,
+          "minimum": 0
+        },
+        "max_parallel_workers": {
+          "description": "Sets the maximum number of parallel workers than can be active at one time.",
+          "type": "integer",
+          "maximum": 1024,
+          "minimum": 0
+        },
+        "max_parallel_workers_per_gather": {
+          "description": "Sets the maximum number of parallel processes per executor node.",
+          "type": "integer",
+          "maximum": 1024,
+          "minimum": 0
+        },
+        "max_pred_locks_per_page": {
+          "description": "Sets the maximum number of predicate-locked tuples per page.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "max_pred_locks_per_relation": {
+          "description": "Sets the maximum number of predicate-locked pages and tuples per relation.",
+          "type": "integer",
+          "format": "int32"
+        },
+        "max_pred_locks_per_transaction": {
+          "description": "Sets the maximum number of predicate locks per transaction.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 10
+        },
+        "max_prepared_transactions": {
+          "description": "Sets the maximum number of simultaneously prepared transactions.",
+          "type": "integer",
+          "default": 0,
+          "maximum": 8388607,
+          "minimum": 0
+        },
+        "max_replication_slots": {
+          "description": "Sets the maximum number of replication slots that the server can support.",
+          "type": "integer",
+          "default": 20,
+          "maximum": 8388607,
+          "minimum": 5
+        },
+        "max_slot_wal_keep_size": {
+          "description": "(MB) Sets the maximum WAL size that can be reserved by replication slots.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": -1
+        },
+        "max_stack_depth": {
+          "description": "(kB) Sets the maximum stack depth, in kilobytes.",
+          "type": "integer",
+          "default": 6144,
+          "maximum": 2147483647,
+          "minimum": 100
+        },
+        "max_standby_archive_delay": {
+          "description": "(ms) Sets the maximum delay before canceling queries when a hot standby server is processing archived WAL data.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": -1
+        },
+        "max_standby_streaming_delay": {
+          "description": "(ms) Sets the maximum delay before canceling queries when a hot standby server is processing streamed WAL data.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": -1
+        },
+        "max_sync_workers_per_subscription": {
+          "description": "Maximum number of synchronization workers per subscription",
+          "type": "integer",
+          "maximum": 262143,
+          "minimum": 0
+        },
+        "max_wal_senders": {
+          "description": "Sets the maximum number of simultaneously running WAL sender processes.",
+          "type": "integer",
+          "default": 20,
+          "maximum": 8388607,
+          "minimum": 5
+        },
+        "max_wal_size": {
+          "description": "(MB) Sets the WAL size that triggers a checkpoint.",
+          "type": "integer",
+          "default": 2048,
+          "maximum": 201326592,
+          "minimum": 128
+        },
+        "max_worker_processes": {
+          "description": "Sets the maximum number of concurrent worker processes.",
+          "type": "integer",
+          "maximum": 262143,
+          "minimum": 0
+        },
+        "min_dynamic_shared_memory": {
+          "description": "Specifies the amount of memory that should be allocated at server startup for use by parallel queries",
+          "type": "integer",
+          "maximum": 715827882,
+          "minimum": 0
+        },
+        "min_parallel_index_scan_size": {
+          "description": "(8kB) Sets the minimum amount of index data for a parallel scan.",
+          "type": "integer",
+          "maximum": 715827882,
+          "minimum": 0
+        },
+        "min_parallel_table_scan_size": {
+          "description": "(8kB) Sets the minimum amount of table data for a parallel scan.",
+          "type": "integer",
+          "maximum": 715827882,
+          "minimum": 0
+        },
+        "min_wal_size": {
+          "description": "(MB) Sets the minimum size to shrink the WAL to.",
+          "type": "integer",
+          "default": 192,
+          "maximum": 201326592,
+          "minimum": 128
+        },
+        "old_snapshot_threshold": {
+          "description": "(min) Time before a snapshot is too old to read pages changed after the snapshot was taken.",
+          "type": "integer",
+          "maximum": 86400,
+          "minimum": -1
+        },
+        "orafce.nls_date_format": {
+          "description": "Emulate oracle's date output behaviour.",
+          "type": "string"
+        },
+        "orafce.timezone": {
+          "description": "Specify timezone used for sysdate function.",
+          "type": "string"
+        },
+        "parallel_leader_participation": {
+          "description": "Controls whether Gather and Gather Merge also run subplans.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "parallel_setup_cost": {
+          "description": "Sets the planner's estimate of the cost of starting up worker processes for parallel query.",
+          "type": "number",
+          "maximum": 1.79769,
+          "minimum": 0
+        },
+        "parallel_tuple_cost": {
+          "description": "Sets the planner's estimate of the cost of passing each tuple (row) from worker to master backend.",
+          "type": "number",
+          "maximum": 1.79769,
+          "minimum": 0
+        },
+        "password_encryption": {
+          "description": "Encrypt passwords.",
+          "type": "string",
+          "enum": [
+            "md5",
+            "scram-sha-256"
+          ]
+        },
+        "pg_bigm.enable_recheck": {
+          "description": "It specifies whether to perform Recheck which is an internal process of full text search.",
+          "type": "string",
+          "enum": [
+            "on",
+            "off"
+          ]
+        },
+        "pg_bigm.gin_key_limit": {
+          "description": "It specifies the maximum number of 2-grams of the search keyword to be used for full text search.",
+          "type": "integer",
+          "default": 0,
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "pg_bigm.similarity_limit": {
+          "description": "It specifies the minimum threshold used by the similarity search.",
+          "type": "number",
+          "default": 0.3,
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_hint_plan.debug_print": {
+          "description": "Logs results of hint parsing.",
+          "type": "string",
+          "enum": [
+            "off",
+            "on",
+            "detailed",
+            "verbose"
+          ]
+        },
+        "pg_hint_plan.enable_hint": {
+          "description": "Force planner to use plans specified in the hint comment preceding to the query.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_hint_plan.enable_hint_table": {
+          "description": "Force planner to not get hint by using table lookups.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_hint_plan.message_level": {
+          "description": "Message level of debug messages.",
+          "type": "string",
+          "enum": [
+            "debug5",
+            "debug4",
+            "debug3",
+            "debug2",
+            "debug1",
+            "log",
+            "info",
+            "notice",
+            "warning",
+            "error"
+          ]
+        },
+        "pg_hint_plan.parse_messages": {
+          "description": "Message level of parse errors.",
+          "type": "string",
+          "enum": [
+            "debug5",
+            "debug4",
+            "debug3",
+            "debug2",
+            "debug1",
+            "log",
+            "info",
+            "notice",
+            "warning",
+            "error"
+          ]
+        },
+        "pg_prewarm.autoprewarm": {
+          "description": "Starts the autoprewarm worker.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_prewarm.autoprewarm_interval": {
+          "description": "Sets the interval between dumps of shared buffers",
+          "type": "integer",
+          "maximum": 2147483,
+          "minimum": 0
+        },
+        "pg_similarity.block_is_normalized": {
+          "description": "Sets if the result value is normalized or not.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_similarity.block_threshold": {
+          "description": "Sets the threshold used by the Block similarity function.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_similarity.block_tokenizer": {
+          "description": "Sets the tokenizer for Block similarity function.",
+          "type": "string",
+          "enum": [
+            "alnum",
+            "gram",
+            "word",
+            "camelcase"
+          ]
+        },
+        "pg_similarity.cosine_is_normalized": {
+          "description": "Sets if the result value is normalized or not.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_similarity.cosine_threshold": {
+          "description": "Sets the threshold used by the Cosine similarity function.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_similarity.cosine_tokenizer": {
+          "description": "Sets the tokenizer for Cosine similarity function.",
+          "type": "string",
+          "enum": [
+            "alnum",
+            "gram",
+            "word",
+            "camelcase"
+          ]
+        },
+        "pg_similarity.dice_is_normalized": {
+          "description": "Sets if the result value is normalized or not.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_similarity.dice_threshold": {
+          "description": "Sets the threshold used by the Dice similarity measure.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_similarity.dice_tokenizer": {
+          "description": "Sets the tokenizer for Dice similarity measure.",
+          "type": "string",
+          "enum": [
+            "alnum",
+            "gram",
+            "word",
+            "camelcase"
+          ]
+        },
+        "pg_similarity.euclidean_is_normalized": {
+          "description": "Sets if the result value is normalized or not.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_similarity.euclidean_threshold": {
+          "description": "Sets the threshold used by the Euclidean similarity measure.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_similarity.euclidean_tokenizer": {
+          "description": "Sets the tokenizer for Euclidean similarity measure.",
+          "type": "string",
+          "enum": [
+            "alnum",
+            "gram",
+            "word",
+            "camelcase"
+          ]
+        },
+        "pg_similarity.hamming_is_normalized": {
+          "description": "Sets if the result value is normalized or not.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_similarity.hamming_threshold": {
+          "description": "Sets the threshold used by the Block similarity metric.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_similarity.jaccard_is_normalized": {
+          "description": "Sets if the result value is normalized or not.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_similarity.jaccard_threshold": {
+          "description": "Sets the threshold used by the Jaccard similarity measure.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_similarity.jaccard_tokenizer": {
+          "description": "Sets the tokenizer for Jaccard similarity measure.",
+          "type": "string",
+          "enum": [
+            "alnum",
+            "gram",
+            "word",
+            "camelcase"
+          ]
+        },
+        "pg_similarity.jaro_is_normalized": {
+          "description": "Sets if the result value is normalized or not.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_similarity.jaro_threshold": {
+          "description": "Sets the threshold used by the Jaro similarity measure.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_similarity.jarowinkler_is_normalized": {
+          "description": "Sets if the result value is normalized or not.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_similarity.jarowinkler_threshold": {
+          "description": "Sets the threshold used by the Jarowinkler similarity measure.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_similarity.levenshtein_is_normalized": {
+          "description": "Sets if the result value is normalized or not.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_similarity.levenshtein_threshold": {
+          "description": "Sets the threshold used by the Levenshtein similarity measure.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_similarity.matching_is_normalized": {
+          "description": "Sets if the result value is normalized or not.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_similarity.matching_threshold": {
+          "description": "Sets the threshold used by the Matching Coefficient similarity measure.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_similarity.matching_tokenizer": {
+          "description": "Sets the tokenizer for Matching Coefficient similarity measure.",
+          "type": "string",
+          "enum": [
+            "alnum",
+            "gram",
+            "word",
+            "camelcase"
+          ]
+        },
+        "pg_similarity.mongeelkan_is_normalized": {
+          "description": "Sets if the result value is normalized or not.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_similarity.mongeelkan_threshold": {
+          "description": "Sets the threshold used by the Monge-Elkan similarity measure.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_similarity.mongeelkan_tokenizer": {
+          "description": "Sets the tokenizer for Monge-Elkan similarity measure.",
+          "type": "string",
+          "enum": [
+            "alnum",
+            "gram",
+            "word",
+            "camelcase"
+          ]
+        },
+        "pg_similarity.nw_gap_penalty": {
+          "description": "Sets the gap penalty used by the Needleman-Wunsch similarity measure.",
+          "type": "number",
+          "maximum": 9223370000000000000,
+          "minimum": -9223370000000000000
+        },
+        "pg_similarity.nw_is_normalized": {
+          "description": "Sets if the result value is normalized or not.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_similarity.nw_threshold": {
+          "description": "Sets the threshold used by the Needleman-Wunsch similarity measure.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_similarity.overlap_is_normalized": {
+          "description": "Sets if the result value is normalized or not.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_similarity.overlap_threshold": {
+          "description": "Sets the threshold used by the Overlap Coefficient similarity measure.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_similarity.overlap_tokenizer": {
+          "description": "Sets the tokenizer for Overlap Coefficientsimilarity measure.",
+          "type": "string",
+          "enum": [
+            "alnum",
+            "gram",
+            "word",
+            "camelcase"
+          ]
+        },
+        "pg_similarity.qgram_is_normalized": {
+          "description": "Sets if the result value is normalized or not.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_similarity.qgram_threshold": {
+          "description": "Sets the threshold used by the Q-Gram similarity measure.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_similarity.qgram_tokenizer": {
+          "description": "Sets the tokenizer for Q-Gram measure.",
+          "type": "string",
+          "enum": [
+            "alnum",
+            "gram",
+            "word",
+            "camelcase"
+          ]
+        },
+        "pg_similarity.sw_is_normalized": {
+          "description": "Sets if the result value is normalized or not.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_similarity.sw_threshold": {
+          "description": "Sets the threshold used by the Smith-Waterman similarity measure.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_similarity.swg_is_normalized": {
+          "description": "Sets if the result value is normalized or not.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_similarity.swg_threshold": {
+          "description": "Sets the threshold used by the Smith-Waterman-Gotoh similarity measure.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "pg_stat_statements.max": {
+          "description": "Sets the maximum number of statements tracked by pg_stat_statements.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 100
+        },
+        "pg_stat_statements.save": {
+          "description": "Save pg_stat_statements statistics across server shutdowns.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_stat_statements.track": {
+          "description": "Selects which statements are tracked by pg_stat_statements.",
+          "type": "string",
+          "enum": [
+            "none",
+            "top",
+            "all"
+          ]
+        },
+        "pg_stat_statements.track_planning": {
+          "description": "Selects whether planning duration is tracked by pg_stat_statements.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_stat_statements.track_utility": {
+          "description": "Selects whether utility commands are tracked by pg_stat_statements.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_transport.num_workers": {
+          "description": "Number of workers to use for a physical transport.",
+          "type": "integer",
+          "maximum": 32,
+          "minimum": 1
+        },
+        "pg_transport.timing": {
+          "description": "Specifies whether to report timing information during transport.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pg_transport.work_mem": {
+          "description": "(kB) Amount of memory each worker can allocate for a physical transport.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 65536
+        },
+        "pgaudit.log": {
+          "description": "Specifies which classes of statements will be logged by session audit logging.",
+          "type": "string",
+          "enum": [
+            "ddl",
+            "function",
+            "misc",
+            "read",
+            "role",
+            "write",
+            "none",
+            "all",
+            "-ddl",
+            "-function",
+            "-misc",
+            "-read",
+            "-role",
+            "-write"
+          ]
+        },
+        "pgaudit.log_catalog": {
+          "description": "Specifies that session logging should be enabled in the case where all relations in a statement are in pg_catalog.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pgaudit.log_level": {
+          "description": "Specifies the log level that will be used for log entries.",
+          "type": "string",
+          "enum": [
+            "debug5",
+            "debug4",
+            "debug3",
+            "debug2",
+            "debug1",
+            "info",
+            "notice",
+            "warning",
+            "log"
+          ]
+        },
+        "pgaudit.log_parameter": {
+          "description": "Specifies that audit logging should include the parameters that were passed with the statement.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pgaudit.log_relation": {
+          "description": "Specifies whether session audit logging should create a separate log entry for each relation (TABLE, VIEW, etc.) referenced in a SELECT or DML statement.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pgaudit.log_rows": {
+          "description": "Specifies that audit logging should include the rows retrieved or affected by a statement.",
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pgaudit.log_statement": {
+          "description": "Specifies whether logging will include the statement text and parameters (if enabled).",
+          "type": "boolean",
+          "default": true,
+          "enum": [
+            true,
+            false
+          ]
+        },
+        "pgaudit.log_statement_once": {
+          "description": "Specifies whether logging will include the statement text and parameters with the first log entry for a statement/substatement combination or with every entry.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pgaudit.role": {
+          "description": "Specifies the master role to use for object audit logging.",
+          "type": "string",
+          "enum": [
+            "rds_pgaudit"
+          ]
+        },
+        "pglogical.batch_inserts": {
+          "description": "Batch inserts if possible",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pglogical.conflict_log_level": {
+          "description": "Sets log level used for logging resolved conflicts.",
+          "type": "string",
+          "enum": [
+            "debug5",
+            "debug4",
+            "debug3",
+            "debug2",
+            "debug1",
+            "info",
+            "notice",
+            "warning",
+            "error",
+            "log",
+            "fatal",
+            "panic"
+          ]
+        },
+        "pglogical.conflict_resolution": {
+          "description": "Sets method used for conflict resolution for resolvable conflicts.",
+          "type": "string",
+          "enum": [
+            "error",
+            "apply_remote",
+            "keep_local",
+            "last_update_wins",
+            "first_update_wins"
+          ]
+        },
+        "pglogical.extra_connection_options": {
+          "description": "connection options to add to all peer node connections",
+          "type": "string"
+        },
+        "pglogical.synchronous_commit": {
+          "description": "pglogical specific synchronous commit value",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pglogical.use_spi": {
+          "description": "Use SPI instead of low-level API for applying changes",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "pgtle.enable_password_check": {
+          "description": "Sets the behavior for interacting with passcheck feature.",
+          "type": "string",
+          "enum": [
+            "on",
+            "off",
+            "require"
+          ]
+        },
+        "plan_cache_mode": {
+          "description": "Controls the planner selection of custom or generic plan.",
+          "type": "string",
+          "enum": [
+            "auto",
+            "force_generic_plan",
+            "force_custom_plan"
+          ]
+        },
+        "port": {
+          "description": "Sets the TCP port the server listens on.",
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": 1
+        },
+        "postgis.gdal_enabled_drivers": {
+          "description": "Enable for disable GDAL drivers used with PostGIS in Postgres 9.3.5 and above.",
+          "type": "string",
+          "enum": [
+            "ENABLE_ALL",
+            "DISABLE_ALL"
+          ]
+        },
+        "quote_all_identifiers": {
+          "description": "When generating SQL fragments, quote all identifiers.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "random_page_cost": {
+          "description": "Sets the planners estimate of the cost of a nonsequentially fetched disk page.",
+          "type": "number",
+          "maximum": 1.79769,
+          "minimum": 0
+        },
+        "rdkit.dice_threshold": {
+          "description": "Lower threshold of Dice similarity. Molecules with similarity lower than threshold are not similar by # operation.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "rdkit.do_chiral_sss": {
+          "description": "Should stereochemistry be taken into account in substructure matching. If false, no stereochemistry information is used in substructure matches.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "rdkit.do_enhanced_stereo_sss": {
+          "description": "Should enhanced stereochemistry be taken into account in substructure matching.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "rdkit.tanimoto_threshold": {
+          "description": "Lower threshold of Tanimoto similarity. Molecules with similarity lower than threshold are not similar by % operation.",
+          "type": "number",
+          "maximum": 1,
+          "minimum": 0
+        },
+        "rds.accepted_password_auth_method": {
+          "description": "Force authentication for connections with password stored locally",
+          "type": "string",
+          "enum": [
+            "md5+scram",
+            "scram"
+          ]
+        },
+        "rds.adaptive_autovacuum": {
+          "description": "RDS parameter to enable/disable adaptive autovacuum.",
+          "type": "boolean",
+          "default": true,
+          "enum": [
+            true,
+            false
+          ]
+        },
+        "rds.allowed_extensions": {
+          "description": "Comma-delimited list of extensions that may be installed.",
+          "type": "string"
+        },
+        "rds.custom_dns_resolution": {
+          "description": "Allow DNS resolution in Customer VPC.",
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "rds.force_admin_logging_level": {
+          "description": "See log messages for RDS admin user actions in customer databases.",
+          "type": "string",
+          "enum": [
+            "disabled",
+            "debug5",
+            "debug4",
+            "debug3",
+            "debug2",
+            "debug1",
+            "info",
+            "notice",
+            "warning",
+            "error",
+            "log",
+            "fatal",
+            "panic"
+          ]
+        },
+        "rds.force_autovacuum_logging_level": {
+          "description": "See log messages related to autovacuum operations.",
+          "type": "string",
+          "enum": [
+            "disabled",
+            "debug5",
+            "debug4",
+            "debug3",
+            "debug2",
+            "debug1",
+            "info",
+            "notice",
+            "warning",
+            "error",
+            "log",
+            "fatal",
+            "panic"
+          ]
+        },
+        "rds.force_ssl": {
+          "description": "Force SSL connections.",
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "rds.log_retention_period": {
+          "description": "Amazon RDS will delete PostgreSQL log that are older than N minutes.",
+          "type": "integer",
+          "default": 4320,
+          "maximum": 10080,
+          "minimum": 1440
+        },
+        "rds.logical_replication": {
+          "description": "Enables logical decoding.",
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "rds.max_tcp_buffers": {
+          "description": "Sets the maximum size for tcp buffers.",
+          "type": "integer",
+          "default": 33554432,
+          "maximum": 1000000000,
+          "minimum": 4096
+        },
+        "rds.pg_stat_ramdisk_size": {
+          "description": "Size of the stats ramdisk in MB. A nonzero value signals HM to set up the ramdisk.",
+          "type": "integer",
+          "default": 0,
+          "maximum": 8196,
+          "minimum": 0
+        },
+        "rds.rds_superuser_reserved_connections": {
+          "description": "Sets the number of connection slots reserved for rds_superusers.",
+          "type": "integer",
+          "default": 2,
+          "maximum": 8388607,
+          "minimum": 0
+        },
+        "rds.restrict_password_commands": {
+          "description": "restricts password-related commands to members of rds_password",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "recovery_init_sync_method": {
+          "description": "When set to fsync, PostgreSQL will recursively open and synchronize all files in the data directory before crash recovery begins",
+          "type": "string",
+          "enum": [
+            "fsync",
+            "syncfs"
+          ]
+        },
+        "remove_temp_files_after_crash": {
+          "description": "When set to on, which is the default, PostgreSQL will automatically remove temporary files after a backend crash",
+          "type": "number",
+          "default": 0,
+          "oneOf": [
+            {
+              "enum": [
+                0
+              ]
+            },
+            {
+              "maximum": 1,
+              "minimum": 0
+            }
+          ]
+        },
+        "restart_after_crash": {
+          "description": "Reinitialize server after backend crash.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "row_security": {
+          "description": "Enable row security.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "search_path": {
+          "description": "Sets the schema search order for names that are not schema-qualified.",
+          "type": "string"
+        },
+        "seq_page_cost": {
+          "description": "Sets the planners estimate of the cost of a sequentially fetched disk page.",
+          "type": "number",
+          "maximum": 1.79769,
+          "minimum": 0
+        },
+        "session_preload_libraries": {
+          "description": "Lists shared libraries to preload into each backend.",
+          "type": "string",
+          "enum": [
+            "auto_explain",
+            "orafce",
+            "pg_bigm",
+            "pg_hint_plan",
+            "pg_prewarm",
+            "pg_similarity",
+            "pg_stat_statements",
+            "pg_transport",
+            "plprofiler"
+          ]
+        },
+        "session_replication_role": {
+          "description": "Sets the sessions behavior for triggers and rewrite rules.",
+          "type": "string",
+          "enum": [
+            "origin",
+            "replica",
+            "local"
+          ]
+        },
+        "shared_buffers": {
+          "description": "(8kB) Sets the number of shared memory buffers used by the server.",
+          "type": "integer",
+          "maximum": 1073741823,
+          "minimum": 16
+        },
+        "shared_preload_libraries": {
+          "description": "Lists shared libraries to preload into server.",
+          "type": "string",
+          "enum": [
+            "auto_explain",
+            "orafce",
+            "pgaudit",
+            "pglogical",
+            "pg_bigm",
+            "pg_cron",
+            "pg_hint_plan",
+            "pg_prewarm",
+            "pg_similarity",
+            "pg_stat_statements",
+            "pg_tle",
+            "pg_transport",
+            "plprofiler"
+          ]
+        },
+        "ssl": {
+          "description": "Enables SSL connections.",
+          "type": "boolean",
+          "default": true,
+          "enum": [
+            true,
+            false
+          ]
+        },
+        "ssl_ca_file": {
+          "description": "Location of the SSL server authority file.",
+          "type": "string"
+        },
+        "ssl_cert_file": {
+          "description": "Location of the SSL server certificate file.",
+          "type": "string"
+        },
+        "ssl_ciphers": {
+          "description": "Sets the list of allowed SSL ciphers.",
+          "type": "string"
+        },
+        "ssl_key_file": {
+          "description": "Location of the SSL server private key file",
+          "type": "string"
+        },
+        "ssl_max_protocol_version": {
+          "description": "Sets the maximum SSL/TLS protocol version to use.",
+          "type": "string",
+          "enum": [
+            "TLSv1",
+            "TLSv1.1",
+            "TLSv1.2"
+          ]
+        },
+        "ssl_min_protocol_version": {
+          "description": "Sets the minimum SSL/TLS protocol version to use.",
+          "type": "string",
+          "enum": [
+            "TLSv1",
+            "TLSv1.1",
+            "TLSv1.2"
+          ]
+        },
+        "standard_conforming_strings": {
+          "description": "Causes ... strings to treat backslashes literally.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "statement_timeout": {
+          "description": "(ms) Sets the maximum allowed duration of any statement.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "stats_temp_directory": {
+          "description": "Writes temporary statistics files to the specified directory.",
+          "type": "string"
+        },
+        "superuser_reserved_connections": {
+          "description": "Sets the number of connection slots reserved for superusers.",
+          "type": "integer",
+          "default": 3,
+          "maximum": 8388607,
+          "minimum": 0
+        },
+        "synchronize_seqscans": {
+          "description": "Enable synchronized sequential scans.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "synchronous_commit": {
+          "description": "Sets the current transactions synchronization level.",
+          "type": "string",
+          "enum": [
+            "local",
+            "on",
+            "off"
+          ]
+        },
+        "tcp_keepalives_count": {
+          "description": "Maximum number of TCP keepalive retransmits.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "tcp_keepalives_idle": {
+          "description": "(s) Time between issuing TCP keepalives.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "tcp_keepalives_interval": {
+          "description": "(s) Time between TCP keepalive retransmits.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "temp_buffers": {
+          "description": "(8kB) Sets the maximum number of temporary buffers used by each session.",
+          "type": "integer",
+          "maximum": 1073741823,
+          "minimum": 100
+        },
+        "temp_file_limit": {
+          "description": "(kB) Limits the total size of all temporary files used by each process.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": -1
+        },
+        "temp_tablespaces": {
+          "description": "Sets the tablespace(s) to use for temporary tables and sort files.",
+          "type": "string"
+        },
+        "timezone": {
+          "description": "Sets the time zone for displaying and interpreting time stamps.",
+          "type": "string"
+        },
+        "track_activities": {
+          "description": "Collects information about executing commands.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "track_activity_query_size": {
+          "description": "Sets the size reserved for pg_stat_activity.current_query, in bytes.",
+          "type": "integer",
+          "default": 4096,
+          "maximum": 1048576,
+          "minimum": 100
+        },
+        "track_commit_timestamp": {
+          "description": "Collects transaction commit time.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "track_counts": {
+          "description": "Collects statistics on database activity.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "track_functions": {
+          "description": "Collects function-level statistics on database activity.",
+          "type": "string",
+          "enum": [
+            "none",
+            "pl",
+            "all"
+          ]
+        },
+        "track_io_timing": {
+          "description": "Collects timing statistics on database IO activity.",
+          "type": "boolean",
+          "default": true,
+          "enum": [
+            true,
+            false
+          ]
+        },
+        "track_wal_io_timing": {
+          "description": "Enables timing of WAL I/O calls.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "transform_null_equals": {
+          "description": "Treats expr=NULL as expr IS NULL.",
+          "type": "boolean",
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "unix_socket_directories": {
+          "description": "Sets the directory where the Unix-domain socket will be created.",
+          "type": "string"
+        },
+        "unix_socket_group": {
+          "description": "Sets the owning group of the Unix-domain socket.",
+          "type": "string"
+        },
+        "unix_socket_permissions": {
+          "description": "Sets the access permissions of the Unix-domain socket.",
+          "type": "integer",
+          "maximum": 511,
+          "minimum": 0
+        },
+        "update_process_title": {
+          "description": "Updates the process title to show the active SQL command.",
+          "type": "boolean",
+          "default": true,
+          "enum": [
+            true,
+            false
+          ]
+        },
+        "vacuum_cost_delay": {
+          "description": "(ms) Vacuum cost delay in milliseconds.",
+          "type": "integer",
+          "maximum": 100,
+          "minimum": 0
+        },
+        "vacuum_cost_limit": {
+          "description": "Vacuum cost amount available before napping.",
+          "type": "integer",
+          "maximum": 10000,
+          "minimum": 1
+        },
+        "vacuum_cost_page_dirty": {
+          "description": "Vacuum cost for a page dirtied by vacuum.",
+          "type": "integer",
+          "maximum": 10000,
+          "minimum": 0
+        },
+        "vacuum_cost_page_hit": {
+          "description": "Vacuum cost for a page found in the buffer cache.",
+          "type": "integer",
+          "maximum": 10000,
+          "minimum": 0
+        },
+        "vacuum_cost_page_miss": {
+          "description": "Vacuum cost for a page not found in the buffer cache.",
+          "type": "integer",
+          "default": 5,
+          "maximum": 10000,
+          "minimum": 0
+        },
+        "vacuum_defer_cleanup_age": {
+          "description": "Number of transactions by which VACUUM and HOT cleanup should be deferred, if any.",
+          "type": "integer",
+          "maximum": 1000000,
+          "minimum": 0
+        },
+        "vacuum_failsafe_age": {
+          "description": "Specifies the maximum age (in transactions) that a table's pg_class.relfrozenxid field can attain before VACUUM takes extraordinary measures to avoid system-wide transaction ID wraparound failure",
+          "type": "integer",
+          "default": 1200000000,
+          "maximum": 1200000000,
+          "minimum": 0
+        },
+        "vacuum_freeze_min_age": {
+          "description": "Minimum age at which VACUUM should freeze a table row.",
+          "type": "integer",
+          "maximum": 1000000000,
+          "minimum": 0
+        },
+        "vacuum_freeze_table_age": {
+          "description": "Age at which VACUUM should scan whole table to freeze tuples.",
+          "type": "integer",
+          "maximum": 2000000000,
+          "minimum": 0
+        },
+        "vacuum_multixact_failsafe_age": {
+          "description": "Specifies the maximum age (in transactions) that a table's pg_class.relminmxid field can attain before VACUUM takes extraordinary measures to avoid system-wide multixact ID wraparound failure",
+          "type": "integer",
+          "default": 1200000000,
+          "maximum": 1200000000,
+          "minimum": 0
+        },
+        "vacuum_multixact_freeze_min_age": {
+          "description": "Minimum age at which VACUUM should freeze a MultiXactId in a table row.",
+          "type": "integer",
+          "maximum": 1000000000,
+          "minimum": 0
+        },
+        "vacuum_multixact_freeze_table_age": {
+          "description": "Multixact age at which VACUUM should scan whole table to freeze tuples.",
+          "type": "integer",
+          "maximum": 2000000000,
+          "minimum": 0
+        },
+        "wal_buffers": {
+          "description": "(8kB) Sets the number of disk-page buffers in shared memory for WAL.",
+          "type": "integer",
+          "maximum": 262143,
+          "minimum": -1
+        },
+        "wal_compression": {
+          "description": "Compresses full-page writes written in WAL file.",
+          "type": "boolean",
+          "default": true,
+          "enum": [
+            true,
+            false
+          ]
+        },
+        "wal_keep_size": {
+          "description": "(MB) Sets the size of WAL files held for standby servers.",
+          "type": "integer",
+          "default": 2048,
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "wal_receiver_create_temp_slot": {
+          "description": "Sets whether a WAL receiver should create a temporary replication slot if no permanent slot is configured.",
+          "type": "boolean",
+          "default": false,
+          "enum": [
+            false,
+            true
+          ]
+        },
+        "wal_receiver_status_interval": {
+          "description": "(s) Sets the maximum interval between WAL receiver status reports to the primary.",
+          "type": "integer",
+          "maximum": 2147483,
+          "minimum": 0
+        },
+        "wal_receiver_timeout": {
+          "description": "(ms) Sets the maximum wait time to receive data from the primary.",
+          "type": "integer",
+          "default": 30000,
+          "maximum": 3600000,
+          "minimum": 0
+        },
+        "wal_sender_timeout": {
+          "description": "(ms) Sets the maximum time to wait for WAL replication.",
+          "type": "integer",
+          "default": 30000,
+          "maximum": 3600000,
+          "minimum": 0
+        },
+        "wal_skip_threshold": {
+          "description": "(kB) Size of new file to fsync instead of writing WAL.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "wal_sync_method": {
+          "description": "Selects the method used for forcing WAL updates to disk.",
+          "type": "string",
+          "enum": [
+            "fsync",
+            "fdatasync",
+            "open_sync",
+            "open_datasync"
+          ]
+        },
+        "wal_writer_delay": {
+          "description": "(ms) WAL writer sleep time between WAL flushes.",
+          "type": "integer",
+          "maximum": 10000,
+          "minimum": 1
+        },
+        "wal_writer_flush_after": {
+          "description": "(8Kb) Amount of WAL written out by WAL writer triggering a flush.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 0
+        },
+        "work_mem": {
+          "description": "(kB) Sets the maximum memory to be used for query workspaces.",
+          "type": "integer",
+          "maximum": 2147483647,
+          "minimum": 64
+        },
+        "xmlbinary": {
+          "description": "Sets how binary values are to be encoded in XML.",
+          "type": "string",
+          "enum": [
+            "base64",
+            "hex"
+          ]
+        },
+        "xmloption": {
+          "description": "Sets whether XML data in implicit parsing and serialization operations is to be considered as documents or content fragments.",
+          "type": "string",
+          "enum": [
+            "content",
+            "document"
+          ]
+        }
+      }
+    }
+  }
+}

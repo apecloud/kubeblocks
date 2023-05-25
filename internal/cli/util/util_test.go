@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package util
@@ -31,10 +34,17 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes/scheme"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("util", func() {
@@ -77,7 +87,7 @@ var _ = Describe("util", func() {
 				"spec": map[string]interface{}{
 					"backupPolicyName": "backup-policy-demo",
 					"backupType":       "full",
-					"ttl":              "168h0m0s",
+					"ttl":              "7d",
 				},
 			},
 		}
@@ -88,21 +98,6 @@ var _ = Describe("util", func() {
 		Expect(PrintGoTemplate(os.Stdout, `key: {{.Value}}`, struct {
 			Value string
 		}{"test"})).Should(Succeed())
-	})
-
-	It("Test Spinner", func() {
-		spinner := Spinner(os.Stdout, "spinner test ... ")
-		spinner(true)
-
-		spinner = Spinner(os.Stdout, "spinner test ... ")
-		spinner(false)
-	})
-
-	It("Check errors", func() {
-		CheckErr(nil)
-
-		err := fmt.Errorf("test error")
-		printErr(err)
 	})
 
 	It("GetNodeByName", func() {
@@ -116,7 +111,10 @@ var _ = Describe("util", func() {
 
 		testFn := func(name string) bool {
 			n := GetNodeByName(nodes, name)
-			return n.Name == name
+			if n != nil {
+				return n.Name == name
+			}
+			return false
 		}
 		Expect(testFn("test")).Should(BeTrue())
 		Expect(testFn("non-exists")).Should(BeFalse())
@@ -146,6 +144,9 @@ var _ = Describe("util", func() {
 		t, _ := time.Parse(time.RFC3339, "2023-01-04T01:00:00.000Z")
 		metav1Time := metav1.Time{Time: t}
 		Expect(TimeFormat(&metav1Time)).Should(Equal("Jan 04,2023 01:00 UTC+0000"))
+		Expect(TimeFormatWithDuration(&metav1Time, time.Minute)).Should(Equal("Jan 04,2023 01:00 UTC+0000"))
+		Expect(TimeFormatWithDuration(&metav1Time, time.Second)).Should(Equal("Jan 04,2023 01:00:00 UTC+0000"))
+		Expect(TimeFormatWithDuration(&metav1Time, time.Millisecond)).Should(Equal("Jan 04,2023 01:00:00.000 UTC+0000"))
 	})
 
 	It("CheckEmpty", func() {
@@ -159,7 +160,7 @@ var _ = Describe("util", func() {
 		Expect(BuildLabelSelectorByNames("", nil)).Should(Equal(""))
 
 		names := []string{"n1", "n2"}
-		expected := fmt.Sprintf("%s in (%s)", types.InstanceLabelKey, strings.Join(names, ","))
+		expected := fmt.Sprintf("%s in (%s)", constant.AppInstanceLabelKey, strings.Join(names, ","))
 		Expect(BuildLabelSelectorByNames("", names)).Should(Equal(expected))
 		Expect(BuildLabelSelectorByNames("label1", names)).Should(Equal("label1," + expected))
 	})
@@ -182,11 +183,6 @@ var _ = Describe("util", func() {
 		Expect(SetKubeConfig("test")).Should(Succeed())
 		Expect(NewFactory()).ShouldNot(BeNil())
 
-		By("playground dir")
-		dir, err := PlaygroundDir()
-		Expect(err).ShouldNot(HaveOccurred())
-		Expect(dir).ShouldNot(Equal(""))
-
 		By("resource is empty")
 		res := resource.Quantity{}
 		Expect(ResourceIsEmpty(&res)).Should(BeTrue())
@@ -195,5 +191,84 @@ var _ = Describe("util", func() {
 
 		By("GVRToString")
 		Expect(len(GVRToString(types.ClusterGVR())) > 0).Should(BeTrue())
+	})
+
+	It("IsSupportReconfigureParams", func() {
+		const (
+			ccName = "mysql_cc"
+			testNS = "default"
+		)
+
+		configConstraintObj := testapps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
+			&appsv1alpha1.ConfigConstraint{}, testapps.WithNamespacedName(ccName, ""), func(cc *appsv1alpha1.ConfigConstraint) {
+				if ccContext, err := testdata.GetTestDataFileContent("/cue_testdata/mysql_for_cli.cue"); err == nil {
+					cc.Spec.ConfigurationSchema = &appsv1alpha1.CustomParametersValidation{
+						CUE: string(ccContext),
+					}
+				}
+			})
+
+		tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
+		defer tf.Cleanup()
+
+		Expect(appsv1alpha1.AddToScheme(scheme.Scheme)).Should(Succeed())
+		mockClient := dynamicfakeclient.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, nil, configConstraintObj)
+		configSpec := appsv1alpha1.ComponentConfigSpec{
+			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+				Name:        "for_test",
+				TemplateRef: ccName,
+				VolumeName:  "config",
+			},
+			ConfigConstraintRef: ccName,
+		}
+
+		type args struct {
+			configSpec    appsv1alpha1.ComponentConfigSpec
+			updatedParams map[string]string
+		}
+		tests := []struct {
+			name     string
+			args     args
+			expected bool
+		}{{
+			name: "normal test",
+			args: args{
+				configSpec:    configSpec,
+				updatedParams: testapps.WithMap("automatic_sp_privileges", "OFF", "innodb_autoinc_lock_mode", "1"),
+			},
+			expected: true,
+		}, {
+			name: "not match test",
+			args: args{
+				configSpec:    configSpec,
+				updatedParams: testapps.WithMap("not_exist_field", "1"),
+			},
+			expected: false,
+		}}
+
+		for _, tt := range tests {
+			Expect(IsSupportReconfigureParams(tt.args.configSpec, tt.args.updatedParams, mockClient)).Should(BeEquivalentTo(tt.expected))
+		}
+	})
+
+	It("get IP location", func() {
+		_, _ = getIPLocation()
+	})
+
+	It("get helm chart repo url", func() {
+		Expect(GetHelmChartRepoURL()).ShouldNot(BeEmpty())
+	})
+
+	It("new OpsRequest for Reconfiguring ", func() {
+		Expect(NewOpsRequestForReconfiguring("logs", "test", "cluster")).ShouldNot(BeNil())
+	})
+
+	It("convert obj to unstructured ", func() {
+		unstructuredObj, err := ConvertObjToUnstructured(testing.FakeConfigMap("cm-test"))
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(unstructuredObj.Object).Should(HaveLen(4))
+
+		_, err = ConvertObjToUnstructured(struct{ name string }{name: "test"})
+		Expect(err).Should(HaveOccurred())
 	})
 })

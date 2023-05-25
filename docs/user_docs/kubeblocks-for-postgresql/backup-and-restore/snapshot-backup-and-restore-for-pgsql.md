@@ -43,10 +43,10 @@ This section shows how to use `kbcli` to back up and restore a PostgreSQL cluste
      kb-addon-snapshot-controller-6b4f656c99-zgq7g     1/1     Running            0             9m
      ```
 
-     If the output result does not show `kb-addon-snapshot-controller`, it means the snapshot-controller add-on is not enabled. It may be caused by failing to meet the installable condition of this add-on. Refer to [Enable add-ons](../../installation/enable-add-ons.md) to find the environment requirements and then enable the snapshot-controller add-on.
+     If the output result does not show `kb-addon-snapshot-controller`, it means the snapshot-controller add-on is not enabled. It may be caused by failing to meet the installable condition of this add-on. Refer to [Enable add-ons](./../../installation/enable-addons.md) to find the environment requirements and then enable the snapshot-controller add-on.
 
 2. Configure cloud managed Kubernetes environment to support the snapshot function. For ACK and GKE, the snapshot function is enabled by default, you can skip this step.
-
+    <Tabs>
     <TabItem value="EKS" label="EKS" default>
 
      The backup is realized by the volume snapshot function, you need to configure EKS to support the snapshot function.
@@ -95,6 +95,7 @@ This section shows how to use `kbcli` to back up and restore a PostgreSQL cluste
        ```
 
      </TabItem>
+     </Tabs>
 
 3. Create a snapshot backup.
 

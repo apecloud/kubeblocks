@@ -49,11 +49,11 @@ With the built-in database observability, you can observe the database health st
 
 :::note
 
-Refer to [Enable add-ons](./../../installation/enable-addons.md) for details.
+Refer to [Enable add-ons](./../installation/enable-addons.md) for details.
 
 :::
 
-2. Enable the database monitoring function.
+1. Enable the database monitoring function.
 
     The monitoring function is enabled by default when a database is created. The open-source or customized Exporter is injected after the monitoring function is enabled. This Exporter can be found by Prometheus server automatically and scrape monitoring indicators at regular intervals.
 

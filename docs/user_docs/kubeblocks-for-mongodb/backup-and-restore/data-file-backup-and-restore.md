@@ -16,6 +16,7 @@ For KubeBlocks, configuring backup and restoring data is simple with 3 steps. Co
 
 Currently, KubeBlocks backups and restores data on storage path predefined.
 
+<Tabs>
 <TabItem value="S3" label="Use S3 as the backup storage" default>
 
 Enable CSI-S3 and fill in the values based on your actual environment.
@@ -45,7 +46,7 @@ Enable CSI-S3 and fill in the values based on your actual environment.
 
 </TabItem>
 
-<TabItem value="OSS" label="Use OSS as the backup storage" default>
+<TabItem value="OSS" label="Use OSS as the backup storage">
 
 ```bash
 helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
@@ -63,7 +64,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
 ```
 </TabItem>
 
-<TabItem value="minIO" label="Use minIO as the backup storage" default>
+<TabItem value="minIO" label="Use minIO as the backup storage">
 
 1. Install minIO.
 
@@ -87,18 +88,19 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
    --set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
    ```
 </TabItem>
+</Tabs>
 
- You can configure a global backup storage to make this storage the default backup destination path of all new clusters. But currently, the global backup storage cannot be synchronized as the backup destination path of created clusters.
+You can configure a global backup storage to make this storage the default backup destination path of all new clusters. But currently, the global backup storage cannot be synchronized as the backup destination path of created clusters.
  
- If there is no PVC, the system creates one automatically based on the configuration.
+If there is no PVC, the system creates one automatically based on the configuration.
  
- It takes about 1 minute to make the configuration effective.
+It takes about 1 minute to make the configuration effective.
 
-  :::note
+:::note
 
-  `-n kb-system` specifies the namespace in which KubeBlocks is installed. If you install KubeBlocks in another namespace, specify your namespace instead.
+`-n kb-system` specifies the namespace in which KubeBlocks is installed. If you install KubeBlocks in another namespace, specify your namespace instead.
 
-  :::
+:::
 
 Set the backup policy with the following command.
   ```bash

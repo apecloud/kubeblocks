@@ -36,6 +36,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -218,4 +219,15 @@ func sendWaringEventWithError(
 		reason = string(controllerErr.Type)
 	}
 	recorder.Event(cluster, corev1.EventTypeWarning, reason, err.Error())
+}
+
+func getComponentClasses(ctx context.Context, cli types2.ReadonlyClient, cluster *appsv1alpha1.Cluster) (map[string]map[string]*appsv1alpha1.ComponentClassInstance, error) {
+	var classDefinitionList appsv1alpha1.ComponentClassDefinitionList
+	ml := []client.ListOption{
+		client.MatchingLabels{constant.ClusterDefLabelKey: cluster.Spec.ClusterDefRef},
+	}
+	if err := cli.List(ctx, &classDefinitionList, ml...); err != nil {
+		return nil, err
+	}
+	return class.GetClasses(classDefinitionList)
 }

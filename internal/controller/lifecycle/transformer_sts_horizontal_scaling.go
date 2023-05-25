@@ -75,13 +75,23 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 			Namespace: stsObj.Namespace,
 			Name:      stsObj.Name + "-scaling",
 		}
+
+		classes, err := getComponentClasses(transCtx.Context, transCtx.Client, cluster)
+		if err != nil {
+			return err
+		}
+
 		// find component of current statefulset
 		componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
-		components := mergeComponentsList(reqCtx,
+		components, err := mergeComponentsList(reqCtx,
 			*cluster,
+			classes,
 			*transCtx.ClusterDef,
 			transCtx.ClusterDef.Spec.ComponentDefs,
 			cluster.Spec.ComponentSpecs)
+		if err != nil {
+			return err
+		}
 		comp := getComponent(components, componentName)
 		if comp == nil {
 			if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
@@ -243,7 +253,6 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 		}
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
 		// log is not reliable enough since it can be recycled
-		var err error
 		switch {
 		// scale out
 		case *stsObj.Spec.Replicas < *stsProto.Spec.Replicas:
@@ -348,20 +357,24 @@ func isPVCExists(cli roclient.ReadonlyClient,
 
 func mergeComponentsList(reqCtx intctrlutil.RequestCtx,
 	cluster appsv1alpha1.Cluster,
+	classes map[string]map[string]*appsv1alpha1.ComponentClassInstance,
 	clusterDef appsv1alpha1.ClusterDefinition,
 	clusterCompDefList []appsv1alpha1.ClusterComponentDefinition,
-	clusterCompSpecList []appsv1alpha1.ClusterComponentSpec) []component.SynthesizedComponent {
+	clusterCompSpecList []appsv1alpha1.ClusterComponentSpec) ([]component.SynthesizedComponent, error) {
 	var compList []component.SynthesizedComponent
 	for _, compDef := range clusterCompDefList {
 		for _, compSpec := range clusterCompSpecList {
 			if compSpec.ComponentDefRef != compDef.Name {
 				continue
 			}
-			comp := component.BuildComponent(reqCtx, cluster, clusterDef, compDef, compSpec)
+			comp, err := component.BuildComponent(reqCtx, cluster, classes, clusterDef, compDef, compSpec)
+			if err != nil {
+				return nil, err
+			}
 			compList = append(compList, *comp)
 		}
 	}
-	return compList
+	return compList, nil
 }
 
 func getComponent(componentList []component.SynthesizedComponent, name string) *component.SynthesizedComponent {

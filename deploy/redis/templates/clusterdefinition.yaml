@@ -138,7 +138,7 @@ spec:
           - sh
           - -c
           args:
-          - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT)"
+          - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT) | redis-cli -h $(KB_ACCOUNT_ENDPOINT) acl save "
         passwordConfig:
           length: 10
           numDigits: 5

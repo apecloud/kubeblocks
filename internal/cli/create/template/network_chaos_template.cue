@@ -17,46 +17,46 @@
 
 // required, command line input options for parameters and flags
 options: {
-	namespace:        string
-	action:						string
-	selector:					{}
-	mode:							string
-	value:						string
-	duration: 				string
+	namespace: string
+	action:    string
+	selector: {}
+	mode:     string
+	value:    string
+	duration: string
 
-	direction: 				string
-	externalTargets?:  [...]
-	target?: 						{}
+	direction: string
+	externalTargets?: [...]
+	target?: {}
 
-	loss?: 							{}
-	delay?: 						{}
-	duplicate?:					{}
-	corrupt?:						{}
-	bandwidth?:					{}
+	loss?: {}
+	delay?: {}
+	duplicate?: {}
+	corrupt?: {}
+	bandwidth?: {}
 }
 
 // required, k8s api resource content
 content: {
-  kind: "NetworkChaos"
-  apiVersion: "chaos-mesh.org/v1alpha1"
-  metadata:{
-  	generateName: "network-chaos-"
-    namespace: options.namespace
-  }
-  spec:{
-    selector: options.selector
-    mode: options.mode
-    value: options.value
-    action: options.action
-    duration: options.duration
+	kind:       "NetworkChaos"
+	apiVersion: "chaos-mesh.org/v1alpha1"
+	metadata: {
+		generateName: "network-chaos-"
+		namespace:    options.namespace
+	}
+	spec: {
+		selector: options.selector
+		mode:     options.mode
+		value:    options.value
+		action:   options.action
+		duration: options.duration
 
-    direction: options.direction
+		direction: options.direction
 
-    if options.externalTargets != _|_ {
-  		externalTargets: options.externalTargets
-    }
+		if options.externalTargets != _|_ {
+			externalTargets: options.externalTargets
+		}
 
-    if options.target["mode"] != _|_ || len(options.target["selector"]) !=0 {
+		if options.target["mode"] != _|_ || len(options.target["selector"]) != 0 {
 			target: options.target
 		}
 

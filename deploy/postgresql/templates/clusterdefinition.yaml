@@ -276,33 +276,23 @@ spec:
           letterCase: MixedCases
         accounts:
           - name: kbadmin
-            provisionPolicy:
+            provisionPolicy: &kbAdminAcctRef
               type: CreateByStmt
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
                 update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
           - name: kbdataprotection
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AnyPods
-              statements:
-                creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
-                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
+            provisionPolicy: *kbAdminAcctRef
           - name: kbprobe
-            provisionPolicy:
+            provisionPolicy: &kbReadonlyAcctRef
               type: CreateByStmt
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
                 update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
           - name: kbmonitoring
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AnyPods
-              statements:
-                creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
-                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
+            provisionPolicy: *kbReadonlyAcctRef
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt

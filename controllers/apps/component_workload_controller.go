@@ -101,10 +101,6 @@ func (r *componentWorkloadReconciler[T, PT, S, PS]) Reconcile(ctx context.Contex
 			reqCtx.Event(cluster, corev1.EventTypeWarning, "Component Workload Controller PatchWorkloadCustomLabelFailed", err.Error())
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 		}
-
-		if err := notifyClusterStatusChange(reqCtx.Ctx, r.Client, r.Recorder, cluster, nil); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
 		return intctrlutil.Reconciled()
 	}
 	return workloadCompClusterReconcile(reqCtx, r.Client, pObj, handler)

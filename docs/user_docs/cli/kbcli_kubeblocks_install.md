@@ -29,15 +29,17 @@ kbcli kubeblocks install [flags]
 ```
       --check                    Check kubernetes environment before install (default true)
       --create-namespace         Create the namespace if not present
+      --force                    If present, just print fail item and continue with the following steps
   -h, --help                     help for install
       --monitor                  Auto install monitoring add-ons including prometheus, grafana and alertmanager-webhook-adaptor (default true)
       --set stringArray          Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
       --set-file stringArray     Set values from respective files specified via the command line (can specify multiple or separate values with commas: key1=path1,key2=path2)
       --set-json stringArray     Set JSON values on the command line (can specify multiple or separate values with commas: key1=jsonval1,key2=jsonval2)
       --set-string stringArray   Set STRING values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
-      --timeout duration         Time to wait for installing KubeBlocks (default 30m0s)
+      --timeout duration         Time to wait for installing KubeBlocks, such as --timeout=10m (default 5m0s)
   -f, --values strings           Specify values in a YAML file or a URL (can specify multiple)
       --version string           KubeBlocks version
+      --wait                     Wait for KubeBlocks to be ready, including all the auto installed add-ons. It will wait for as long as --timeout (default true)
 ```
 
 ### Options inherited from parent commands

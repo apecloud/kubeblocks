@@ -152,7 +152,7 @@ var _ = Describe("MySQL data protection function", func() {
 		backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 			WithRandomName().
 			SetBackupPolicyName(backupPolicyKey.Name).
-			SetBackupType(dpv1alpha1.BackupTypeFull).
+			SetBackupType(dpv1alpha1.BackupTypeDataFile).
 			Create(&testCtx).GetObject()
 		backupKey = client.ObjectKeyFromObject(backup)
 	}

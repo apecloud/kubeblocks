@@ -25,6 +25,7 @@ import (
 
 	"github.com/pkg/errors"
 	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
+	"helm.sh/helm/v3/pkg/cli/values"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 )
@@ -38,19 +39,21 @@ type KBAnalyzer interface {
 type GetCollectedFileContents func(string) ([]byte, error)
 type GetChildCollectedFileContents func(string, []string) (map[string][]byte, error)
 
-func GetAnalyzer(analyzer *preflightv1beta2.ExtendAnalyze) (KBAnalyzer, bool) {
+func GetAnalyzer(analyzer *preflightv1beta2.ExtendAnalyze, options *values.Options) (KBAnalyzer, bool) {
 	switch {
 	case analyzer.ClusterAccess != nil:
 		return &AnalyzeClusterAccess{analyzer: analyzer.ClusterAccess}, true
 	case analyzer.StorageClass != nil:
 		return &AnalyzeStorageClassByKb{analyzer: analyzer.StorageClass}, true
+	case analyzer.Taint != nil:
+		return &AnalyzeTaintClassByKb{analyzer: analyzer.Taint, HelmOpts: options}, true
 	default:
 		return nil, false
 	}
 }
 
-func KBAnalyze(ctx context.Context, kbAnalyzer *preflightv1beta2.ExtendAnalyze, getFile func(string) ([]byte, error), findFiles func(string, []string) (map[string][]byte, error)) []*analyze.AnalyzeResult {
-	analyzer, ok := GetAnalyzer(kbAnalyzer)
+func KBAnalyze(ctx context.Context, kbAnalyzer *preflightv1beta2.ExtendAnalyze, getFile func(string) ([]byte, error), findFiles func(string, []string) (map[string][]byte, error), options *values.Options) []*analyze.AnalyzeResult {
+	analyzer, ok := GetAnalyzer(kbAnalyzer, options)
 	if !ok {
 		return NewAnalyzeResultError(analyzer, errors.New("invalid analyzer"))
 	}

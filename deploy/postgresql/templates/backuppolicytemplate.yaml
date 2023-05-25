@@ -5,17 +5,32 @@ metadata:
   labels:
     clusterdefinition.kubeblocks.io/name: postgresql
     {{- include "postgresql.labels" . | nindent 4 }}
+  annotations:
+    dataprotection.kubeblocks.io/reconfigure-ref: |
+      {
+        "name": "postgresql-configuration",
+        "key": "postgresql.conf",
+        "enable": {
+          "logfile": [{"key": "archive_command","value": "''"}]
+        },
+        "disable": {
+          "logfile": [{ "key": "archive_command","value": "'/bin/true'"}]
+        }
+      }
 spec:
   clusterDefinitionRef: postgresql
   backupPolicies:
   - componentDefRef: postgresql
-    ttl: 7d
+    retention:
+      ttl: 7d
     schedule:
-      baseBackup:
-        type: snapshot
+      snapshot:
         enable: false
         cronExpression: "0 18 * * *"
-      incremental:
+      datafile:
+        enable: false
+        cronExpression: "0 18 * * *"
+      logfile:
         enable: false
         cronExpression: "*/5 * * * *"
     snapshot:
@@ -26,18 +41,20 @@ spec:
       hooks:
         containerName: postgresql
         preCommands:
-          - psql -c "SELECT txid_current();CHECKPOINT;"
+          - psql -c "CHECKPOINT;"
       backupStatusUpdates:
         - path: manifests.backupLog
           containerName: postgresql
           script: /kb-scripts/backup-log-collector.sh true
           updateStage: post
-    full:
+    datafile:
       backupToolName: postgres-basebackup
-    incremental:
+    logfile:
       backupToolName: postgres-pitr
+      target:
+        role: primary
       backupStatusUpdates:
         - path: manifests.backupLog
           containerName: postgresql
           script: /kb-scripts/backup-log-collector.sh false
-          updateStage: pre
+          updateStage: post

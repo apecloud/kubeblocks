@@ -41,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterdefinition"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterversion"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/dashboard"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/fault"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/migration"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
@@ -53,6 +54,12 @@ import (
 const (
 	cliName = "kbcli"
 )
+
+func init() {
+	if _, err := util.GetCliHomeDir(); err != nil {
+		fmt.Println("Failed to create kbcli home dir:", err)
+	}
+}
 
 func NewDefaultCliCmd() *cobra.Command {
 	cmd := NewCliCmd()
@@ -124,6 +131,9 @@ A Command Line Interface for KubeBlocks`,
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(flags)
 
+	// add klog flags
+	util.AddKlogFlags(flags)
+
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 	ioStreams := genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
 
@@ -142,6 +152,7 @@ A Command Line Interface for KubeBlocks`,
 		addon.NewAddonCmd(f, ioStreams),
 		migration.NewMigrationCmd(f, ioStreams),
 		plugin.NewPluginCmd(ioStreams),
+		fault.NewFaultCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

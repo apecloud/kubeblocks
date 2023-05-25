@@ -5,7 +5,7 @@ title: kbcli migration create
 Create a migration task.
 
 ```
-kbcli migration create name [flags]
+kbcli migration create NAME [flags]
 ```
 
 ### Examples

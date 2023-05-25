@@ -259,7 +259,6 @@ func (d *DAG) topologicalOrder(reverse bool) []Vertex {
 	for v := range d.vertices {
 		walk(v)
 	}
-
 	return orders
 }
 

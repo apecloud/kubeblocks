@@ -91,7 +91,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		}
 		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
 			clusterObj.Name+"-"+testapps.DefaultRedisCompName, clusterObj.Name, testapps.DefaultRedisCompName).
-			AddFinalizers([]string{DBClusterFinalizerName}).
+			AddFinalizers([]string{constant.DBClusterFinalizerName}).
 			AddContainer(container).
 			AddAppInstanceLabel(clusterObj.Name).
 			AddAppComponentLabel(testapps.DefaultRedisCompName).

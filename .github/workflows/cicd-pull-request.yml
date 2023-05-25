@@ -9,6 +9,7 @@ env:
   GO_CACHE: "go-cache"
   GO_CACHE_DIR: "/root/.cache"
   GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
 jobs:
   trigger-mode:
@@ -32,6 +33,8 @@ jobs:
     name: make test
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
+    outputs:
+      runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
     runs-on: [ self-hosted, eks-fargate-runner ]
     steps:
       - uses: apecloud/checkout@main
@@ -46,41 +49,65 @@ jobs:
         run: |
           make test
 
+      - name: kill kube-apiserver and etcd
+        id: get_runner_name
+        if: ${{ always() }}
+        run: |
+          echo runner_name=${RUNNER_NAME} >> $GITHUB_OUTPUT
+          bash .github/utils/utils.sh --type 8
+
+  remove-runner:
+    needs: [ trigger-mode, make-test ]
+    runs-on: ubuntu-latest
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && always() }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: remove runner
+        run: |
+          bash .github/utils/utils.sh --type 9 \
+            --github-token ${{ env.GITHUB_TOKEN }} \
+            --runner-name ${{ needs.make-test.outputs.runner-name }}
+
   check-image:
     name: check image
     needs: trigger-mode
-    if: needs.trigger-mode.outputs.trigger-mode == '[docker]'
-    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
+    if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
+    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.6.1
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-manager-image"
       IMG: "apecloud/kubeblocks"
       VERSION: "check"
       GO_VERSION: "1.20"
+      BUILDX_PLATFORMS: "linux/amd64"
+      SYNC_ENABLE: false
     secrets: inherit
 
   check-tools-image:
     name: check image
     needs: trigger-mode
-    if: needs.trigger-mode.outputs.trigger-mode == '[docker]'
-    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
+    if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
+    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.6.1
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-tools-image"
       IMG: "apecloud/kubeblocks-tools"
       VERSION: "check"
       GO_VERSION: "1.20"
+      BUILDX_PLATFORMS: "linux/amd64"
+      SYNC_ENABLE: false
     secrets: inherit
 
   check-helm:
     name: check helm
     needs: trigger-mode
-    if: needs.trigger-mode.outputs.trigger-mode == '[deploy]'
-    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.5.2
+    if: contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]')
+    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.6.1
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "v0.4.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
       PUSH_ENABLE: false
+      DEP_REPO: "helm dep update deploy/delphic"
     secrets: inherit

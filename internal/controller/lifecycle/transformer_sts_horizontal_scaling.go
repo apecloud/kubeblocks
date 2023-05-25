@@ -75,13 +75,18 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 			Namespace: stsObj.Namespace,
 			Name:      stsObj.Name + "-scaling",
 		}
+
 		// find component of current statefulset
 		componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
-		components := mergeComponentsList(reqCtx,
+		components, err := mergeComponentsList(reqCtx,
 			*cluster,
 			*transCtx.ClusterDef,
 			transCtx.ClusterDef.Spec.ComponentDefs,
 			cluster.Spec.ComponentSpecs)
+		if err != nil {
+			return err
+		}
+
 		comp := getComponent(components, componentName)
 		if comp == nil {
 			if *stsObj.Spec.Replicas != *stsProto.Spec.Replicas {
@@ -243,26 +248,25 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 		}
 		// when horizontal scaling up, sometimes db needs backup to sync data from master,
 		// log is not reliable enough since it can be recycled
-		var err error
 		switch {
 		// scale out
 		case *stsObj.Spec.Replicas < *stsProto.Spec.Replicas:
-			err = scaleOut()
+			if err := scaleOut(); err != nil {
+				return err
+			}
 		case *stsObj.Spec.Replicas > *stsProto.Spec.Replicas:
-			err = scaleIn()
-		}
-		if err != nil {
-			return err
+			if err := scaleIn(); err != nil {
+				return err
+			}
 		}
 		emitHorizontalScalingEvent()
-
-		if err = postScaleOut(); err != nil {
+		if err := postScaleOut(); err != nil {
 			return err
 		}
-
 		return nil
 	}
-	findPVCsToBeDeleted := func(pvcSnapshot clusterSnapshot) []*corev1.PersistentVolumeClaim {
+
+	findPVCsToBeDeleted := func(pvcSnapshot clusterOwningObjects) []*corev1.PersistentVolumeClaim {
 		stsToBeDeleted := make([]*appsv1.StatefulSet, 0)
 		// list sts to be deleted
 		for _, vertex := range dag.Vertices() {
@@ -317,7 +321,7 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 	// by h-scale transformer: we handle the pvc creation and deletion, the creation is handled in h-scale funcs.
 	// so all in all, here we should only handle the pvc deletion of both types.
 	ml := getAppInstanceML(*cluster)
-	oldSnapshot, err := readCacheSnapshot(transCtx, *cluster, ml, &corev1.PersistentVolumeClaimList{})
+	oldSnapshot, err := getClusterOwningObjects(transCtx, *cluster, ml, &corev1.PersistentVolumeClaimList{})
 	if err != nil {
 		return err
 	}
@@ -345,18 +349,21 @@ func mergeComponentsList(reqCtx intctrlutil.RequestCtx,
 	cluster appsv1alpha1.Cluster,
 	clusterDef appsv1alpha1.ClusterDefinition,
 	clusterCompDefList []appsv1alpha1.ClusterComponentDefinition,
-	clusterCompSpecList []appsv1alpha1.ClusterComponentSpec) []component.SynthesizedComponent {
+	clusterCompSpecList []appsv1alpha1.ClusterComponentSpec) ([]component.SynthesizedComponent, error) {
 	var compList []component.SynthesizedComponent
 	for _, compDef := range clusterCompDefList {
 		for _, compSpec := range clusterCompSpecList {
 			if compSpec.ComponentDefRef != compDef.Name {
 				continue
 			}
-			comp := component.BuildComponent(reqCtx, cluster, clusterDef, compDef, compSpec)
+			comp, err := component.BuildComponent(reqCtx, cluster, clusterDef, compDef, compSpec)
+			if err != nil {
+				return nil, err
+			}
 			compList = append(compList, *comp)
 		}
 	}
-	return compList
+	return compList, nil
 }
 
 func getComponent(componentList []component.SynthesizedComponent, name string) *component.SynthesizedComponent {
@@ -388,7 +395,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 	// use backup tool such as xtrabackup
 	case appsv1alpha1.HScaleDataClonePolicyFromBackup:
 		// TODO: db core not support yet, leave it empty
-		reqCtx.Recorder.Eventf(cluster,
+		reqCtx.Eventf(cluster,
 			corev1.EventTypeWarning,
 			"HorizontalScaleFailed",
 			"scale with backup tool not support yet")
@@ -400,7 +407,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 		}
 		vcts := component.VolumeClaimTemplates
 		if len(vcts) == 0 {
-			reqCtx.Recorder.Eventf(cluster,
+			reqCtx.Eventf(cluster,
 				corev1.EventTypeNormal,
 				"HorizontalScale",
 				"no VolumeClaimTemplates, no need to do data clone.")
@@ -504,13 +511,13 @@ func checkedCreateDeletePVCCronJob(cli roclient.ReadonlyClient,
 		vertex := &lifecycleVertex{obj: cronJob, action: actionPtr(CREATE)}
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
-		reqCtx.Recorder.Eventf(cluster,
+		reqCtx.Eventf(cluster,
 			corev1.EventTypeNormal,
 			"CronJobCreate",
 			"create cronjob to delete pvc/%s",
 			pvcKey.Name)
+		return nil
 	}
-
 	return nil
 }
 
@@ -572,7 +579,7 @@ func deleteSnapshot(cli roclient.ReadonlyClient,
 	vertex := &lifecycleVertex{obj: vs, oriObj: vs, action: actionPtr(DELETE)}
 	dag.AddVertex(vertex)
 	dag.Connect(root, vertex)
-	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumeSnapshot/%s", snapshotKey.Name)
+	reqCtx.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumeSnapshot/%s", snapshotKey.Name)
 	return nil
 }
 
@@ -593,7 +600,7 @@ func deleteBackup(reqCtx intctrlutil.RequestCtx, cli roclient.ReadonlyClient,
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
 	}
-	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", snapshotName)
+	reqCtx.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", snapshotName)
 	return nil
 }
 
@@ -636,35 +643,32 @@ func doSnapshot(cli roclient.ReadonlyClient,
 	backupPolicyTemplateName string,
 	dag *graph.DAG,
 	root graph.Vertex) error {
-
 	ctx := reqCtx.Ctx
-
 	backupPolicyTemplate := &appsv1alpha1.BackupPolicyTemplate{}
-	if err := cli.Get(ctx, client.ObjectKey{Name: backupPolicyTemplateName}, backupPolicyTemplate); err != nil && !apierrors.IsNotFound(err) {
-		return err
-	}
-	if len(backupPolicyTemplate.Name) > 0 {
-		// if there is backuppolicytemplate created by provider
-		// create backupjob CR, will ignore error if already exists
-		err := createBackup(reqCtx, cli, stsObj, componentDef, backupPolicyTemplateName, snapshotKey, cluster, dag, root)
-		if err != nil {
+	if err := cli.Get(ctx, client.ObjectKey{Name: backupPolicyTemplateName}, backupPolicyTemplate); err != nil {
+		if !apierrors.IsNotFound(err) {
 			return err
 		}
-	} else {
 		// no backuppolicytemplate, then try native volumesnapshot
 		pvcName := strings.Join([]string{vcts[0].Name, stsObj.Name, "0"}, "-")
 		snapshot, err := builder.BuildVolumeSnapshot(snapshotKey, pvcName, stsObj)
 		if err != nil {
 			return err
 		}
-		if err := controllerutil.SetControllerReference(cluster, snapshot, scheme); err != nil {
+		if err = controllerutil.SetControllerReference(cluster, snapshot, scheme); err != nil {
 			return err
 		}
 		vertex := &lifecycleVertex{obj: snapshot, action: actionPtr(CREATE)}
 		dag.AddVertex(vertex)
 		dag.Connect(root, vertex)
+		reqCtx.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create volumesnapshot/%s", snapshotKey.Name)
+		return nil
+	}
 
-		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotCreate", "Create volumesnapshot/%s", snapshotKey.Name)
+	// if there is backuppolicytemplate created by provider
+	// create backupjob CR, will ignore error if already exists
+	if err := createBackup(reqCtx, cli, stsObj, componentDef, backupPolicyTemplateName, snapshotKey, cluster, dag, root); err != nil {
+		return err
 	}
 	return nil
 }
@@ -787,7 +791,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 
-	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobCreate", "Create backupJob/%s", backupKey.Name)
+	reqCtx.Eventf(cluster, corev1.EventTypeNormal, "BackupJobCreate", "Create backupJob/%s", backupKey.Name)
 	return nil
 }
 
@@ -804,7 +808,7 @@ func createPVCFromSnapshot(vct corev1.PersistentVolumeClaimTemplate,
 	}
 	rootVertex, _ := root.(*lifecycleVertex)
 	cluster, _ := rootVertex.obj.(*appsv1alpha1.Cluster)
-	if err = intctrlutil.SetOwnership(cluster, pvc, scheme, dbClusterFinalizerName); err != nil {
+	if err = intctrlutil.SetOwnership(cluster, pvc, scheme, constant.DBClusterFinalizerName); err != nil {
 		return err
 	}
 	vertex := &lifecycleVertex{obj: pvc, action: actionPtr(CREATE)}

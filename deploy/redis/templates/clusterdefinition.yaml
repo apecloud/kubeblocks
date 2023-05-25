@@ -133,7 +133,7 @@ spec:
 # to pass $(KB_ACCOUNT_STATEMENT) to redis-cli without causing parsing error.
 # Instead, using a shell script to wrap redis-cli and pass $(KB_ACCOUNT_STATEMENT) to it will do.
         cmdExecutorConfig:
-          image: docker.io/redis:7.0.5
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
           command:
           - sh
           - -c
@@ -146,33 +146,23 @@ spec:
           letterCase: MixedCases
         accounts:
           - name: kbadmin
-            provisionPolicy:
+            provisionPolicy: &kbadminAcctRef
               type: CreateByStmt
               scope: AllPods
               statements:
                 creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allcommands allkeys
                 update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbdataprotection
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AllPods
-              statements:
-                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allcommands allkeys
-                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
+            provisionPolicy: *kbadminAcctRef
           - name: kbmonitoring
-            provisionPolicy:
+            provisionPolicy: &kbReadOnlyAcctRef
               type: CreateByStmt
               scope: AllPods
               statements:
                 creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allkeys +get
                 update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbprobe
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AllPods
-              statements:
-                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allkeys +get
-                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
+            provisionPolicy: *kbReadOnlyAcctRef
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt

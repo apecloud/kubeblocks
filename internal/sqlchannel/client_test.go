@@ -36,7 +36,7 @@ import (
 	"google.golang.org/grpc"
 	corev1 "k8s.io/api/core/v1"
 
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -80,12 +80,12 @@ func TestNewClientWithPod(t *testing.T) {
 		GetObject()
 	pod.Spec.Containers[0].Ports = []corev1.ContainerPort{{
 		ContainerPort: int32(3501),
-		Name:          intctrlutil.ProbeHTTPPortName,
+		Name:          constant.ProbeHTTPPortName,
 		Protocol:      "TCP",
 	},
 		{
 			ContainerPort: int32(port),
-			Name:          intctrlutil.ProbeGRPCPortName,
+			Name:          constant.ProbeGRPCPortName,
 			Protocol:      "TCP",
 		},
 	}
@@ -324,12 +324,12 @@ func initSQLChannelClient(t *testing.T) (*testDaprServer, *OperationClient, func
 	pod.Spec.Containers[0].Ports = []corev1.ContainerPort{
 		{
 			ContainerPort: int32(3501),
-			Name:          intctrlutil.ProbeHTTPPortName,
+			Name:          constant.ProbeHTTPPortName,
 			Protocol:      "TCP",
 		},
 		{
 			ContainerPort: int32(port),
-			Name:          intctrlutil.ProbeGRPCPortName,
+			Name:          constant.ProbeGRPCPortName,
 			Protocol:      "TCP",
 		},
 	}

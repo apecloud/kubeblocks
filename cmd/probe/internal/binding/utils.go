@@ -20,12 +20,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package binding
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"text/template"
 	"time"
 
 	"github.com/dapr/components-contrib/bindings"
+	"github.com/dapr/kit/logger"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 )
 
 type UserInfo struct {
@@ -211,4 +222,89 @@ func String2RoleType(roleName string) RoleType {
 		return NoPrivileges
 	}
 	return CustomizedRole
+}
+
+func SentProbeEvent(ctx context.Context, opsResult OpsResult, log logger.Logger) {
+	log.Infof("send event: %v", opsResult)
+	event, err := createProbeEvent(opsResult)
+	if err != nil {
+		log.Infof("generate event failed: %v", err)
+		return
+	}
+
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Infof("get k8s client config failed: %v", err)
+		return
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Infof("k8s client create failed: %v", err)
+		return
+	}
+	namespace := os.Getenv("KB_NAMESPACE")
+	for i := 0; i < 3; i++ {
+		_, err = clientset.CoreV1().Events(namespace).Create(ctx, event, metav1.CreateOptions{})
+		if err == nil {
+			break
+		}
+		log.Infof("send event failed: %v", err)
+	}
+}
+
+func createProbeEvent(opsResult OpsResult) (*corev1.Event, error) {
+	eventTmpl := `
+apiVersion: v1
+kind: Event
+metadata:
+  name: {{ .PodName }}.{{ .EventSeq }}
+  namespace: {{ .Namespace }}
+involvedObject:
+  apiVersion: v1
+  fieldPath: spec.containers{sqlchannel}
+  kind: Pod
+  name: {{ .PodName }}
+  namespace: {{ .Namespace }}
+reason: RoleChanged
+type: Normal
+source:
+  component: sqlchannel
+`
+
+	// get pod object
+	podName := os.Getenv("KB_POD_NAME")
+	podUID := os.Getenv("KB_POD_UID")
+	nodeName := os.Getenv("KB_NODENAME")
+	namespace := os.Getenv("KB_NAMESPACE")
+	msg, _ := json.Marshal(opsResult)
+	seq := rand.String(16)
+	roleValue := map[string]string{
+		"PodName":   podName,
+		"Namespace": namespace,
+		"EventSeq":  seq,
+	}
+	tmpl, err := template.New("event-tmpl").Parse(eventTmpl)
+	if err != nil {
+		return nil, err
+	}
+	buf := new(bytes.Buffer)
+	err = tmpl.Execute(buf, roleValue)
+	if err != nil {
+		return nil, err
+	}
+
+	event := &corev1.Event{}
+	_, _, err = scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, event)
+	if err != nil {
+		return nil, err
+	}
+	event.Message = string(msg)
+	event.InvolvedObject.UID = types.UID(podUID)
+	event.Source.Host = nodeName
+	event.Reason = string(opsResult["operation"].(bindings.OperationKind))
+	event.FirstTimestamp = metav1.Now()
+	event.LastTimestamp = metav1.Now()
+
+	return event, nil
 }

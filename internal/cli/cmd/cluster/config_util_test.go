@@ -32,10 +32,10 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
-func NewFakeOperationsOptions(ns, cName string, opsType appsv1alpha1.OpsType, objs ...runtime.Object) (*cmdtesting.TestFactory, *create.BaseOptions) {
+func NewFakeOperationsOptions(ns, cName string, opsType appsv1alpha1.OpsType, objs ...runtime.Object) (*cmdtesting.TestFactory, *create.CreateOptions) {
 	streams, _, _, _ := genericclioptions.NewTestIOStreams()
 	tf := cmdtesting.NewTestFactory().WithNamespace(ns)
-	baseOptions := &create.BaseOptions{
+	baseOptions := &create.CreateOptions{
 		IOStreams: streams,
 		Name:      cName,
 		Namespace: ns,

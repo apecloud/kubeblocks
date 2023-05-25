@@ -102,12 +102,12 @@ var _ = Describe("DataProtection", func() {
 		It("validate create backup", func() {
 			By("without cluster name")
 			o := &CreateBackupOptions{
-				BaseOptions: create.BaseOptions{
+				CreateOptions: create.CreateOptions{
 					Dynamic:   testing.FakeDynamicClient(),
 					IOStreams: streams,
+					Factory:   tf,
 				},
 			}
-			o.IOStreams = streams
 			Expect(o.Validate()).To(MatchError("missing cluster name"))
 
 			By("test without default backupPolicy")
@@ -258,7 +258,7 @@ var _ = Describe("DataProtection", func() {
 		baseBackup.TypeMeta = backupTypeMeta
 		baseBackup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 		incrBackup := testapps.NewBackupFactory(testing.Namespace, backupName).
-			SetBackupType(dataprotectionv1alpha1.BackupTypeIncremental).
+			SetBackupType(dataprotectionv1alpha1.BackupTypeLogFile).
 			SetBackLog(now.Add(-time.Minute), now.Add(time.Minute)).
 			SetLabels(backupLabels).GetObject()
 		incrBackup.TypeMeta = backupTypeMeta

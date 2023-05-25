@@ -60,6 +60,10 @@ type AddonSpec struct {
 	// Addon installable spec., provide selector and auto-install settings.
 	// +optional
 	Installable *InstallableSpec `json:"installable,omitempty"`
+
+	// Plugin installation spec.
+	// +optional
+	CliPlugins []CliPlugin `json:"cliPlugins,omitempty"`
 }
 
 // AddonStatus defines the observed state of Addon
@@ -233,6 +237,40 @@ type ResourceMappingItem struct {
 	Memory *ResourceReqLimItem `json:"memory,omitempty"`
 }
 
+type CliPlugin struct {
+	// Name of the plugin.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// The index repository of the plugin.
+	// +kubebuilder:validation:Required
+	IndexRepository string `json:"indexRepository"`
+
+	// The description of the plugin.
+	// +optional
+	Description string `json:"description,omitempty"`
+}
+
+func (r *ResourceMappingItem) HasStorageMapping() bool {
+	return !(r == nil || r.Storage == "")
+}
+
+func (r *ResourceMappingItem) HasCPUReqMapping() bool {
+	return !(r == nil || r.CPU == nil || r.CPU.Requests == "")
+}
+
+func (r *ResourceMappingItem) HasMemReqMapping() bool {
+	return !(r == nil || r.CPU == nil || r.Memory.Requests == "")
+}
+
+func (r *ResourceMappingItem) HasCPULimMapping() bool {
+	return !(r == nil || r.CPU == nil || r.CPU.Limits == "")
+}
+
+func (r *ResourceMappingItem) HasMemLimMapping() bool {
+	return !(r == nil || r.CPU == nil || r.Memory.Limits == "")
+}
+
 type ResourceReqLimItem struct {
 	// Requests value mapping key.
 	// +optional
@@ -278,6 +316,26 @@ type AddonInstallSpec struct {
 	ExtraItems []AddonInstallExtraItem `json:"extras,omitempty"`
 }
 
+func (r *AddonInstallSpec) IsDisabled() bool {
+	return r == nil || !r.Enabled
+}
+
+func (r *AddonInstallSpec) HasSetValues() bool {
+	if r == nil {
+		return false
+	}
+
+	if !r.AddonInstallSpecItem.IsEmpty() {
+		return true
+	}
+	for _, i := range r.ExtraItems {
+		if !i.IsEmpty() {
+			return true
+		}
+	}
+	return false
+}
+
 type AddonInstallExtraItem struct {
 	AddonInstallSpecItem `json:",inline"`
 
@@ -306,6 +364,14 @@ type AddonInstallSpecItem struct {
 	// Resource requirements.
 	// +optional
 	Resources ResourceRequirements `json:"resources,omitempty"`
+}
+
+func (r AddonInstallSpecItem) IsEmpty() bool {
+	return r.Replicas == nil &&
+		r.PVEnabled == nil &&
+		r.StorageClass == "" &&
+		r.Tolerations == "" &&
+		len(r.Resources.Requests) == 0
 }
 
 type ResourceRequirements struct {
@@ -483,6 +549,19 @@ func (r *HelmTypeInstallSpec) BuildMergedValues(installSpec *AddonInstallSpec) H
 	}
 	installValues := r.InstallValues
 	processor := func(installSpecItem AddonInstallSpecItem, valueMapping HelmValuesMappingItem) {
+		var pvEnabled *bool
+		defer func() {
+			if v := valueMapping.HelmValueMap.PVEnabled; v != "" && pvEnabled != nil {
+				installValues.SetValues = append(installValues.SetValues,
+					fmt.Sprintf("%s=%v", v, *pvEnabled))
+			}
+		}()
+
+		if installSpecItem.PVEnabled != nil {
+			b := *installSpecItem.PVEnabled
+			pvEnabled = &b
+		}
+
 		if installSpecItem.Replicas != nil && *installSpecItem.Replicas >= 0 {
 			if v := valueMapping.HelmValueMap.ReplicaCount; v != "" {
 				installValues.SetValues = append(installValues.SetValues,
@@ -502,13 +581,6 @@ func (r *HelmTypeInstallSpec) BuildMergedValues(installSpec *AddonInstallSpec) H
 			}
 		}
 
-		if installSpecItem.PVEnabled != nil {
-			if v := valueMapping.HelmValueMap.PVEnabled; v != "" {
-				installValues.SetValues = append(installValues.SetValues,
-					fmt.Sprintf("%s=%v", v, *installSpecItem.PVEnabled))
-			}
-		}
-
 		if installSpecItem.Tolerations != "" {
 			if v := valueMapping.HelmJSONMap.Tolerations; v != "" {
 				installValues.SetJSONValues = append(installValues.SetJSONValues,
@@ -516,20 +588,24 @@ func (r *HelmTypeInstallSpec) BuildMergedValues(installSpec *AddonInstallSpec) H
 			}
 		}
 
+		if valueMapping.ResourcesMapping == nil {
+			return
+		}
+
 		for k, v := range installSpecItem.Resources.Requests {
 			switch k {
 			case corev1.ResourceStorage:
-				if valueMapping.ResourcesMapping.Storage != "" {
+				if valueMapping.ResourcesMapping.HasStorageMapping() {
 					installValues.SetValues = append(installValues.SetValues,
 						fmt.Sprintf("%s=%v", valueMapping.ResourcesMapping.Storage, v.ToUnstructured()))
 				}
 			case corev1.ResourceCPU:
-				if valueMapping.ResourcesMapping.CPU.Requests != "" {
+				if valueMapping.ResourcesMapping.HasCPUReqMapping() {
 					installValues.SetValues = append(installValues.SetValues,
 						fmt.Sprintf("%s=%v", valueMapping.ResourcesMapping.CPU.Requests, v.ToUnstructured()))
 				}
 			case corev1.ResourceMemory:
-				if valueMapping.ResourcesMapping.Memory.Requests != "" {
+				if valueMapping.ResourcesMapping.HasMemReqMapping() {
 					installValues.SetValues = append(installValues.SetValues,
 						fmt.Sprintf("%s=%v", valueMapping.ResourcesMapping.Memory.Requests, v.ToUnstructured()))
 				}
@@ -539,17 +615,18 @@ func (r *HelmTypeInstallSpec) BuildMergedValues(installSpec *AddonInstallSpec) H
 		for k, v := range installSpecItem.Resources.Limits {
 			switch k {
 			case corev1.ResourceCPU:
-				if valueMapping.ResourcesMapping.CPU.Limits != "" {
+				if valueMapping.ResourcesMapping.HasCPULimMapping() {
 					installValues.SetValues = append(installValues.SetValues,
 						fmt.Sprintf("%s=%v", valueMapping.ResourcesMapping.CPU.Limits, v.ToUnstructured()))
 				}
 			case corev1.ResourceMemory:
-				if valueMapping.ResourcesMapping.Memory.Limits != "" {
+				if valueMapping.ResourcesMapping.HasMemLimMapping() {
 					installValues.SetValues = append(installValues.SetValues,
 						fmt.Sprintf("%s=%v", valueMapping.ResourcesMapping.Memory.Limits, v.ToUnstructured()))
 				}
 			}
 		}
+
 	}
 	processor(installSpec.AddonInstallSpecItem, r.ValuesMapping.HelmValuesMappingItem)
 	for _, ei := range installSpec.ExtraItems {
@@ -562,6 +639,34 @@ func (r *HelmTypeInstallSpec) BuildMergedValues(installSpec *AddonInstallSpec) H
 		}
 	}
 	return installValues
+}
+
+// BuildContainerArgs derive helm container args
+func (r *HelmTypeInstallSpec) BuildContainerArgs(helmContainer *corev1.Container, installValues HelmInstallValues) error {
+	// add extra helm install option flags
+	for k, v := range r.InstallOptions {
+		helmContainer.Args = append(helmContainer.Args, fmt.Sprintf("--%s", k))
+		if v != "" {
+			helmContainer.Args = append(helmContainer.Args, v)
+		}
+	}
+
+	// set values from URL
+	for _, urlValue := range installValues.URLs {
+		helmContainer.Args = append(helmContainer.Args, "--values", urlValue)
+	}
+
+	// set key1=val1,key2=val2 value
+	if len(installValues.SetValues) > 0 {
+		helmContainer.Args = append(helmContainer.Args, "--set",
+			strings.Join(installValues.SetValues, ","))
+	}
+
+	// set key1=jsonval1,key2=jsonval2 JSON value, applied multiple
+	for _, v := range installValues.SetJSONValues {
+		helmContainer.Args = append(helmContainer.Args, "--set-json", v)
+	}
+	return nil
 }
 
 // GetSortedDefaultInstallValues return DefaultInstallValues items with items that has

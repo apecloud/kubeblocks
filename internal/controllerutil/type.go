@@ -23,6 +23,7 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -35,9 +36,31 @@ type RequestCtx struct {
 	Recorder record.EventRecorder
 }
 
+// Event is wrapper for Recorder.Event, if Recorder is nil, then it's no-op.
+func (r *RequestCtx) Event(object runtime.Object, eventtype, reason, message string) {
+	if r == nil || r.Recorder == nil {
+		return
+	}
+	r.Recorder.Event(object, eventtype, reason, message)
+}
+
+// Eventf is wrapper for Recorder.Eventf, if Recorder is nil, then it's no-op.
+func (r *RequestCtx) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	if r == nil || r.Recorder == nil {
+		return
+	}
+	r.Recorder.Eventf(object, eventtype, reason, messageFmt, args...)
+}
+
 // UpdateCtxValue update Context value, return parent Context.
 func (r *RequestCtx) UpdateCtxValue(key, val any) context.Context {
 	p := r.Ctx
 	r.Ctx = context.WithValue(r.Ctx, key, val)
 	return p
+}
+
+// WithValue returns a copy of parent in which the value associated with key is
+// val.
+func (r *RequestCtx) WithValue(key, val any) context.Context {
+	return context.WithValue(r.Ctx, key, val)
 }

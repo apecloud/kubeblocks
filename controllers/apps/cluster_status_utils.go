@@ -40,6 +40,7 @@ import (
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -141,78 +142,34 @@ func getEventInvolvedObject(ctx context.Context, cli client.Client, event *corev
 	return nil, err
 }
 
-// handleClusterPhaseWhenCompsNotReady handles the Cluster.status.phase when some components are Abnormal or Failed.
-// TODO: Clear definitions need to be added to determine whether components will affect cluster availability in ClusterDefinition.
-func handleClusterPhaseWhenCompsNotReady(cluster *appsv1alpha1.Cluster,
-	componentMap map[string]string,
-	clusterAvailabilityEffectMap map[string]bool) {
-	var (
-		clusterIsFailed   bool
-		failedCompCount   int
-		isVolumeExpanding bool
-	)
-	opsRecords, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
-	if len(opsRecords) != 0 && opsRecords[0].Type == appsv1alpha1.VolumeExpansionType {
-		isVolumeExpanding = true
-	}
-	for k, v := range cluster.Status.Components {
-		// determine whether other components are still doing operation, i.e., create/restart/scaling.
-		// waiting for operation to complete except for volumeExpansion operation.
-		// because this operation will not affect cluster availability.
-		if !slices.Contains(appsv1alpha1.GetComponentTerminalPhases(), v.Phase) && !isVolumeExpanding {
-			return
-		}
-		if v.Phase == appsv1alpha1.FailedClusterCompPhase {
-			failedCompCount += 1
-			componentDefName := componentMap[k]
-			// if the component can affect cluster availability, set Cluster.status.phase to Failed
-			if clusterAvailabilityEffectMap[componentDefName] {
-				clusterIsFailed = true
-				break
-			}
-		}
-	}
-	// If all components fail or there are failed components that affect the availability of the cluster, set phase to Failed
-	if failedCompCount == len(cluster.Status.Components) || clusterIsFailed {
-		cluster.Status.Phase = appsv1alpha1.FailedClusterPhase
-	} else {
-		cluster.Status.Phase = appsv1alpha1.AbnormalClusterPhase
-	}
-}
-
-// getClusterAvailabilityEffect whether the component will affect the cluster availability.
-// if the component can affect and be Failed, the cluster will be Failed too.
-func getClusterAvailabilityEffect(componentDef *appsv1alpha1.ClusterComponentDefinition) bool {
-	switch componentDef.WorkloadType {
-	case appsv1alpha1.Replication, appsv1alpha1.Consensus:
-		return true
-	default:
-		return componentDef.MaxUnavailable != nil
-	}
-}
-
 // getComponentRelatedInfo gets componentMap, clusterAvailabilityMap and component definition information
 func getComponentRelatedInfo(cluster *appsv1alpha1.Cluster, clusterDef *appsv1alpha1.ClusterDefinition,
-	componentName string) (map[string]string, map[string]bool, *appsv1alpha1.ClusterComponentDefinition) {
+	componentName string) (map[string]string, map[string]bool, *appsv1alpha1.ClusterComponentDefinition, error) {
 	var (
 		compDefName  string
 		componentMap = map[string]string{}
 		componentDef *appsv1alpha1.ClusterComponentDefinition
 	)
 	for _, v := range cluster.Spec.ComponentSpecs {
-		if v.Name == componentName {
+		componentMap[v.Name] = v.ComponentDefRef
+		if compDefName == "" && v.Name == componentName {
 			compDefName = v.ComponentDefRef
 		}
-		componentMap[v.Name] = v.ComponentDefRef
+	}
+	if compDefName == "" {
+		return nil, nil, nil, fmt.Errorf("expected %s component not found", componentName)
 	}
 	clusterAvailabilityEffectMap := map[string]bool{}
 	for i, v := range clusterDef.Spec.ComponentDefs {
-		clusterAvailabilityEffectMap[v.Name] = getClusterAvailabilityEffect(&v)
-		if v.Name == compDefName {
+		clusterAvailabilityEffectMap[v.Name] = componentDef.GetMaxUnavailable() != nil
+		if componentDef == nil && v.Name == compDefName {
 			componentDef = &clusterDef.Spec.ComponentDefs[i]
 		}
 	}
-	return componentMap, clusterAvailabilityEffectMap, componentDef
+	if componentDef == nil {
+		return nil, nil, nil, fmt.Errorf("expected %s componentDef not found", compDefName)
+	}
+	return componentMap, clusterAvailabilityEffectMap, componentDef, nil
 }
 
 // handleClusterStatusByEvent handles the cluster status when warning event happened
@@ -240,10 +197,13 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 	componentName := labels[constant.KBAppComponentLabelKey]
 	// get the component phase by component name and sync to Cluster.status.components
 	patch := client.MergeFrom(cluster.DeepCopy())
-	componentMap, clusterAvailabilityEffectMap, componentDef := getComponentRelatedInfo(cluster, clusterDef, componentName)
 	clusterComponent := cluster.Spec.GetComponentByName(componentName)
 	if clusterComponent == nil {
 		return nil
+	}
+	componentMap, clusterAvailabilityEffectMap, componentDef, err := getComponentRelatedInfo(cluster, clusterDef, componentName)
+	if err != nil {
+		return err
 	}
 	// get the component status by event and check whether the component status needs to be synchronized to the cluster
 	component, err := components.NewComponentByType(cli, cluster, clusterComponent, *componentDef)
@@ -258,7 +218,7 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 		return nil
 	}
 	// handle Cluster.status.phase when some components are not ready.
-	handleClusterPhaseWhenCompsNotReady(cluster, componentMap, clusterAvailabilityEffectMap)
+	lifecycle.HandleClusterPhaseWhenCompsNotReady(cluster, componentMap, clusterAvailabilityEffectMap)
 	if err = cli.Status().Patch(ctx, cluster, patch); err != nil {
 		return err
 	}
@@ -269,14 +229,11 @@ func handleClusterStatusByEvent(ctx context.Context, cli client.Client, recorder
 // TODO: Unified cluster event processing
 // handleEventForClusterStatus handles event for cluster Warning and Failed phase
 func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorder record.EventRecorder, event *corev1.Event) error {
-
 	type predicateProcessor struct {
 		pred      func() bool
 		processor func() error
 	}
-
 	nilReturnHandler := func() error { return nil }
-
 	pps := []predicateProcessor{
 		{
 			// handle cronjob complete or fail event
@@ -313,7 +270,6 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 			},
 		},
 	}
-
 	for _, pp := range pps {
 		if pp.pred() {
 			return pp.processor()

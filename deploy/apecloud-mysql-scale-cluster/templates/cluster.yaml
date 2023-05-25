@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ .Release.Name }}
+  name: {{ include "clustername" . }}
   labels: {{ include "apecloud-mysql-cluster.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: apecloud-mysql-scale  # ref clusterdefinition.name
@@ -20,6 +20,7 @@ spec:
       monitor: {{ .Values.monitor.enabled | default false }}
       replicas: {{ .Values.replicaCount | default 3 }}
       enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}
+      serviceAccountName: {{ include "apecloud-mysql-cluster.serviceAccountName" . }}
       {{- with  .Values.resources }}
       resources:
         limits:

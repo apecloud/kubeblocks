@@ -32,6 +32,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -67,19 +68,20 @@ var clusterCreateExample = templates.Examples(`
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql
 
 	# Output resource information in YAML format, but do not create resources.
-	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=client -o yaml
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run -o yaml
 
-	# Output resource information in YAML format, the information will be sent to the server, but the resource will not be actually created.
+	# Output resource information in YAML format, the information will be sent to the server
+	# but the resource will not be actually created.
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=server -o yaml
 	
 	# Create a cluster and set termination policy DoNotTerminate that will prevent the cluster from being deleted
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy DoNotTerminate
 
-	# In scenarios where you want to delete resources such as statements, deployments, services, pdb, but keep PVCs
+	# In scenarios where you want to delete resources such as statefulsets, deployments, services, pdb, but keep PVCs
 	# when deleting the cluster, use termination policy Halt
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy Halt
 
-	# In scenarios where you want to delete resource such as statements, deployments, services, pdb, and including
+	# In scenarios where you want to delete resource such as statefulsets, deployments, services, pdb, and including
 	# PVCs when deleting the cluster, use termination policy Delete
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy Delete
 
@@ -90,27 +92,40 @@ var clusterCreateExample = templates.Examples(`
 	# Create a cluster and set cpu to 1 core, memory to 1Gi, storage size to 20Gi and replicas to 3
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set cpu=1,memory=1Gi,storage=20Gi,replicas=3
 
-	# Create a cluster and set the class to general-1c1g, valid classes can be found by executing the command "kbcli class list --cluster-definition=<cluster-definition-name>"
+	# Create a cluster and set storageClass to csi-hostpath-sc, if storageClass is not specified,
+	# the default storage class will be used
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set storageClass=csi-hostpath-sc
+
+	# Create a cluster and set the class to general-1c1g
+	# run "kbcli class list --cluster-definition=cluster-definition-name" to get the class list
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set class=general-1c1g
 
 	# Create a cluster with replicationSet workloadType and set switchPolicy to Noop
 	kbcli cluster create mycluster --cluster-definition postgresql --set switchPolicy=Noop
 
+	# Create a cluster with more than one component, use "--set type=component-name" to specify the component,
+	# if not specified, the main component will be used, run "kbcli cd list-components CLUSTER-DEFINITION-NAME"
+	# to show the components in the cluster definition
+	kbcli cluster create mycluster --cluster-definition redis --set type=redis,cpu=1 --set type=redis-sentinel,cpu=200m
+
 	# Create a cluster and use a URL to set cluster resource
-	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file https://kubeblocks.io/yamls/apecloud-mysql.yaml
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql \
+		--set-file https://kubeblocks.io/yamls/apecloud-mysql.yaml
 
 	# Create a cluster and load cluster resource set from stdin
 	cat << EOF | kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file -
 	- name: my-test ...
 
 	# Create a cluster forced to scatter by node
-	kbcli cluster create --cluster-definition apecloud-mysql --topology-keys kubernetes.io/hostname --pod-anti-affinity Required
+	kbcli cluster create --cluster-definition apecloud-mysql --topology-keys kubernetes.io/hostname \
+		--pod-anti-affinity Required
 
 	# Create a cluster in specific labels nodes
-	kbcli cluster create --cluster-definition apecloud-mysql --node-labels '"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
+	kbcli cluster create --cluster-definition apecloud-mysql \
+		--node-labels '"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
 
 	# Create a Cluster with two tolerations 
-	kbcli cluster create --cluster-definition apecloud-mysql --tolerations '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+	kbcli cluster create --cluster-definition apecloud-mysql --tolerations \ '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
 
     # Create a cluster, with each pod runs on their own dedicated node
     kbcli cluster create --cluster-definition apecloud-mysql --tenancy=DedicatedNode
@@ -180,7 +195,54 @@ type CreateOptions struct {
 	// backup name to restore in creation
 	Backup string `json:"backup,omitempty"`
 	UpdatableFlags
-	create.BaseOptions
+	create.CreateOptions `json:"-"`
+}
+
+func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := NewCreateOptions(f, streams)
+	cmd := &cobra.Command{
+		Use:     "create [NAME]",
+		Short:   "Create a cluster.",
+		Example: clusterCreateExample,
+		Run: func(cmd *cobra.Command, args []string) {
+			o.Args = args
+			cmdutil.CheckErr(o.CreateOptions.Complete())
+			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
+		},
+	}
+
+	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cd list\" to show all available cluster definitions")
+	cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cv list\" to show all available cluster versions, use the latest version if not specified")
+	cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
+	cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, or you can just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
+	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
+	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
+	// add updatable flags
+	o.UpdatableFlags.addFlags(cmd)
+
+	// add print flags
+	printer.AddOutputFlagForCreate(cmd, &o.Format)
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, f)
+
+	return cmd
+}
+
+func NewCreateOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *CreateOptions {
+	o := &CreateOptions{CreateOptions: create.CreateOptions{
+		Factory:         f,
+		IOStreams:       streams,
+		CueTemplateName: CueTemplateName,
+		GVR:             types.ClusterGVR(),
+	}}
+	o.CreateOptions.Options = o
+	o.CreateOptions.PreCreate = o.PreCreate
+	o.CreateOptions.CreateDependencies = o.CreateDependencies
+	return o
 }
 
 func setMonitor(monitor bool, components []map[string]interface{}) {
@@ -236,13 +298,8 @@ func (o *CreateOptions) Validate() error {
 		return fmt.Errorf("a valid termination policy is needed, use --termination-policy to specify one of: DoNotTerminate, Halt, Delete, WipeOut")
 	}
 
-	if o.ClusterVersionRef == "" {
-		version, err := cluster.GetLatestVersion(o.Dynamic, o.ClusterDefRef)
-		if err != nil {
-			return err
-		}
-		o.ClusterVersionRef = version
-		fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
+	if err := o.validateClusterVersion(); err != nil {
+		return err
 	}
 
 	if len(o.Values) > 0 && len(o.SetFile) > 0 {
@@ -268,17 +325,49 @@ func (o *CreateOptions) Validate() error {
 }
 
 func (o *CreateOptions) Complete() error {
-	if err := o.Validate(); err != nil {
+	var (
+		compByte         []byte
+		cls              *appsv1alpha1.Cluster
+		clusterCompSpecs []appsv1alpha1.ClusterComponentSpec
+		err              error
+	)
+	if len(o.SetFile) > 0 {
+		if compByte, err = MultipleSourceComponents(o.SetFile, o.IOStreams.In); err != nil {
+			return err
+		}
+		if compByte, err = yaml.YAMLToJSON(compByte); err != nil {
+			return err
+		}
+
+		// compatible with old file format that only specify the components
+		if err = json.Unmarshal(compByte, &cls); err != nil {
+			if clusterCompSpecs, err = parseClusterComponentSpec(compByte); err != nil {
+				return err
+			}
+		} else {
+			clusterCompSpecs = cls.Spec.ComponentSpecs
+		}
+	}
+
+	// build annotation
+	o.buildAnnotation(cls)
+
+	// build cluster definition
+	if err := o.buildClusterDef(cls); err != nil {
 		return err
 	}
 
-	components, err := o.buildComponents()
+	// build cluster version
+	o.buildClusterVersion(cls)
+
+	// build components
+	components, err := o.buildComponents(clusterCompSpecs)
 	if err != nil {
 		return err
 	}
 
 	setMonitor(o.Monitor, components)
-	if err := setBackup(o, components); err != nil {
+	if err = setBackup(o, components); err != nil {
 		return err
 	}
 	o.ComponentSpecs = components
@@ -302,7 +391,7 @@ func (o *CreateOptions) CleanUp() error {
 }
 
 // buildComponents build components from file or set values
-func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
+func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterComponentSpec) ([]map[string]interface{}, error) {
 	var (
 		err       error
 		cd        *appsv1alpha1.ClusterDefinition
@@ -319,27 +408,9 @@ func (o *CreateOptions) buildComponents() ([]map[string]interface{}, error) {
 		return nil, err
 	}
 
-	// build components from file
-	if len(o.SetFile) > 0 {
-		var (
-			compByte []byte
-			comps    []map[string]interface{}
-		)
-		if compByte, err = MultipleSourceComponents(o.SetFile, o.IOStreams.In); err != nil {
-			return nil, err
-		}
-		if compByte, err = yaml.YAMLToJSON(compByte); err != nil {
-			return nil, err
-		}
-		if err = json.Unmarshal(compByte, &comps); err != nil {
-			return nil, err
-		}
-		for _, comp := range comps {
-			var compSpec appsv1alpha1.ClusterComponentSpec
-			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(comp, &compSpec); err != nil {
-				return nil, err
-			}
-			compSpecs = append(compSpecs, &compSpec)
+	if clusterCompSpecs != nil {
+		for _, comp := range clusterCompSpecs {
+			compSpecs = append(compSpecs, &comp)
 		}
 	} else {
 		// build components from set values or environment variables
@@ -386,13 +457,6 @@ const (
 func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec) error {
 
-	// HACK: now we only support postgresql cluster definition
-	if c, err := shouldCreateDependencies(cd, compSpec); err != nil {
-		return err
-	} else if !c {
-		return nil
-	}
-
 	// set component service account name
 	compSpec.ServiceAccountName = saNamePrefix + o.Name
 	o.shouldCreateDependencies = true
@@ -426,20 +490,35 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 	role := rbacv1ac.Role(roleName, o.Namespace).WithRules([]*rbacv1ac.PolicyRuleApplyConfiguration{
 		{
 			APIGroups: []string{""},
-			Resources: []string{"configmaps"},
-			Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
-		},
-		{
-			APIGroups: []string{""},
-			Resources: []string{"endpoints"},
-			Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
-		},
-		{
-			APIGroups: []string{""},
-			Resources: []string{"pods"},
-			Verbs:     []string{"get", "list", "patch", "update", "watch"},
+			Resources: []string{"events"},
+			Verbs:     []string{"create"},
 		},
 	}...).WithLabels(labels)
+
+	// postgresql need more rules for patroni
+	if ok, err := o.isPostgresqlCluster(); err != nil {
+		return err
+	} else if ok {
+		rules := []rbacv1ac.PolicyRuleApplyConfiguration{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"configmaps"},
+				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"endpoints"},
+				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+				Verbs:     []string{"get", "list", "patch", "update", "watch"},
+			},
+		}
+		role.Rules = append(role.Rules, rules...)
+	}
+
 	if _, err := o.Client.RbacV1().Roles(o.Namespace).Apply(context.TODO(), role, applyOptions); err != nil {
 		return err
 	}
@@ -490,46 +569,6 @@ func MultipleSourceComponents(fileName string, in io.Reader) ([]byte, error) {
 	return io.ReadAll(data)
 }
 
-func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &CreateOptions{BaseOptions: create.BaseOptions{IOStreams: streams}}
-	inputs := create.Inputs{
-		Use:                "create [NAME]",
-		Short:              "Create a cluster.",
-		Example:            clusterCreateExample,
-		CueTemplateName:    CueTemplateName,
-		ResourceName:       types.ResourceClusters,
-		BaseOptionsObj:     &o.BaseOptions,
-		Options:            o,
-		Factory:            f,
-		Complete:           o.Complete,
-		PreCreate:          o.PreCreate,
-		CleanUpFn:          o.CleanUp,
-		CreateDependencies: o.CreateDependencies,
-		BuildFlags: func(cmd *cobra.Command) {
-			cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli cd list\" to show all available cluster definitions")
-			cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Specify cluster version, run \"kbcli cv list\" to show all available cluster versions, use the latest version if not specified")
-			cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
-			cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, or you can just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
-			cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
-			cmd.Flags().StringVar(&o.DryRunStrategy, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
-			cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
-			// add updatable flags
-			o.UpdatableFlags.addFlags(cmd)
-
-			// add print flags
-			printer.AddOutputFlagForCreate(cmd, &o.Format)
-
-			// set required flag
-			util.CheckErr(cmd.MarkFlagRequired("cluster-definition"))
-
-			// register flag completion func
-			registerFlagCompletionFunc(cmd, f)
-		},
-	}
-
-	return create.BuildCommand(inputs)
-}
-
 func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster-definition",
@@ -539,7 +578,15 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cluster-version",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+			var clusterVersion []string
+			clusterDefinition, err := cmd.Flags().GetString("cluster-definition")
+			if clusterDefinition == "" || err != nil {
+				clusterVersion = utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete)
+			} else {
+				label := fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDefinition)
+				clusterVersion = util.CompGetResourceWithLabels(f, cmd, util.GVRToString(types.ClusterVersionGVR()), []string{label}, toComplete)
+			}
+			return clusterVersion, cobra.ShellCompDirectiveNoFileComp
 		}))
 
 	var formatsWithDesc = map[string]string{
@@ -580,6 +627,40 @@ func (o *CreateOptions) PreCreate(obj *unstructured.Unstructured) error {
 	}
 	obj.SetUnstructuredContent(data)
 	return nil
+}
+
+func (o *CreateOptions) isPostgresqlCluster() (bool, error) {
+	cd, err := cluster.GetClusterDefByName(o.Dynamic, o.ClusterDefRef)
+	if err != nil {
+		return false, err
+	}
+
+	var compDef *appsv1alpha1.ClusterComponentDefinition
+	if cd.Spec.Type != "postgresql" {
+		return false, nil
+	}
+
+	// get cluster component definition
+	if len(o.ComponentSpecs) == 0 {
+		return false, fmt.Errorf("find no cluster componnet")
+	}
+	compSpec := o.ComponentSpecs[0]
+	for i, def := range cd.Spec.ComponentDefs {
+		compDefRef := compSpec["componentDefRef"]
+		if compDefRef != nil && def.Name == compDefRef.(string) {
+			compDef = &cd.Spec.ComponentDefs[i]
+		}
+	}
+
+	if compDef == nil {
+		return false, fmt.Errorf("failed to find component definition for componnet %v", compSpec["Name"])
+	}
+
+	// for postgresql, we need to create a service account, a role and a rolebinding
+	if compDef.CharacterType != "postgresql" {
+		return false, nil
+	}
+	return true, nil
 }
 
 // setEnableAllLog set enable all logs, and ignore enabledLogs of component level.
@@ -927,35 +1008,81 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 	for _, item := range list.Items {
 		allStorageClasses[item.GetName()] = struct{}{}
 		annotations := item.GetAnnotations()
-		if !existedDefault && annotations != nil && (annotations[storage.IsDefaultStorageClassAnnotation] == "true" || annotations[storage.BetaIsDefaultStorageClassAnnotation] == "true") {
+		if !existedDefault && annotations != nil && (annotations[storage.IsDefaultStorageClassAnnotation] == annotationTrueValue || annotations[storage.BetaIsDefaultStorageClassAnnotation] == annotationTrueValue) {
 			existedDefault = true
 		}
 	}
 	return allStorageClasses, existedDefault, nil
 }
 
-func shouldCreateDependencies(cd *appsv1alpha1.ClusterDefinition, compSpec *appsv1alpha1.ClusterComponentSpec) (bool, error) {
-	var compDef *appsv1alpha1.ClusterComponentDefinition
-	if cd.Spec.Type != "postgresql" {
-		return false, nil
+// validateClusterVersion check whether the cluster version we need is exist in K8S or
+// the default cluster version is exist
+func (o *CreateOptions) validateClusterVersion() error {
+	existedClusterVersions, defaultVersion, existedDefault, err := getClusterVersions(o.Dynamic, o.ClusterDefRef)
+	if err != nil {
+		return err
 	}
 
-	// get cluster component definition
-	for i, def := range cd.Spec.ComponentDefs {
-		if def.Name == compSpec.ComponentDefRef {
-			compDef = &cd.Spec.ComponentDefs[i]
+	dryRun, err := o.GetDryRunStrategy()
+	if err != nil {
+		return err
+	}
+
+	printCvInfo := func(cv string) {
+		// if dryRun is not None, we don't need to print the info, avoid the output yaml file including the info
+		if dryRun != create.DryRunNone {
+			return
+		}
+		fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", cv)
+	}
+
+	switch {
+	case o.ClusterVersionRef != "":
+		if _, ok := existedClusterVersions[o.ClusterVersionRef]; !ok {
+			return fmt.Errorf("failed to find the specified cluster version \"%s\"", o.ClusterVersionRef)
+		}
+	case !existedDefault:
+		// if default version is not set and there is only one version, use it
+		if len(existedClusterVersions) == 1 {
+			o.ClusterVersionRef = maps.Keys(existedClusterVersions)[0]
+			printCvInfo(o.ClusterVersionRef)
+		} else {
+			return fmt.Errorf("failed to find the default cluster version, use '--cluster-version ClusterVersion' to set it")
+		}
+	case existedDefault:
+		// TODO: achieve this in operator
+		if existedDefault {
+			o.ClusterVersionRef = defaultVersion
+			printCvInfo(o.ClusterVersionRef)
 		}
 	}
 
-	if compDef == nil {
-		return false, fmt.Errorf("failed to find component definition for componnet %s", compSpec.Name)
-	}
+	return nil
+}
 
-	// for postgresql, we need to create a service account, a role and a rolebinding
-	if compDef.CharacterType != "postgresql" {
-		return false, nil
+// getClusterVersions return all cluster versions in K8S and return true if the cluster have a default cluster version
+func getClusterVersions(dynamic dynamic.Interface, clusterDef string) (map[string]struct{}, string, bool, error) {
+	allClusterVersions := make(map[string]struct{})
+	existedDefault := false
+	defaultVersion := ""
+	list, err := dynamic.Resource(types.ClusterVersionGVR()).List(context.Background(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDef),
+	})
+	if err != nil {
+		return nil, defaultVersion, false, err
 	}
-	return true, nil
+	for _, item := range list.Items {
+		allClusterVersions[item.GetName()] = struct{}{}
+		annotations := item.GetAnnotations()
+		if annotations != nil && annotations[constant.DefaultClusterVersionAnnotationKey] == annotationTrueValue {
+			if existedDefault {
+				return nil, defaultVersion, existedDefault, fmt.Errorf("clusterDef %s has more than one default cluster version", clusterDef)
+			}
+			existedDefault = true
+			defaultVersion = item.GetName()
+		}
+	}
+	return allClusterVersions, defaultVersion, existedDefault, nil
 }
 
 func buildResourceLabels(clusterName string) map[string]string {
@@ -963,4 +1090,62 @@ func buildResourceLabels(clusterName string) map[string]string {
 		constant.AppInstanceLabelKey:  clusterName,
 		constant.AppManagedByLabelKey: "kbcli",
 	}
+}
+
+// build the cluster definition
+// if the cluster definition is not specified, we will use the cluster definition in the cluster component
+// if both of them are not specified, we will return an error
+func (o *CreateOptions) buildClusterDef(cls *appsv1alpha1.Cluster) error {
+	if o.ClusterDefRef != "" {
+		return nil
+	}
+
+	if cls != nil && cls.Spec.ClusterDefRef != "" {
+		o.ClusterDefRef = cls.Spec.ClusterDefRef
+		return nil
+	}
+
+	return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one, run \"kbcli clusterdefinition list\" to show all cluster definition")
+}
+
+// build the cluster version
+// if the cluster version is not specified, we will use the cluster version in the cluster component
+// if both of them are not specified, we use default cluster version
+func (o *CreateOptions) buildClusterVersion(cls *appsv1alpha1.Cluster) {
+	if o.ClusterVersionRef != "" {
+		return
+	}
+
+	if cls != nil && cls.Spec.ClusterVersionRef != "" {
+		o.ClusterVersionRef = cls.Spec.ClusterVersionRef
+	}
+}
+
+func (o *CreateOptions) buildAnnotation(cls *appsv1alpha1.Cluster) {
+	if cls == nil {
+		return
+	}
+
+	if o.Annotations == nil {
+		o.Annotations = cls.Annotations
+	}
+}
+
+// parse the cluster component spec
+// compatible with old file format that only specify the components
+func parseClusterComponentSpec(compByte []byte) ([]appsv1alpha1.ClusterComponentSpec, error) {
+	var compSpecs []appsv1alpha1.ClusterComponentSpec
+	var comps []map[string]interface{}
+	if err := json.Unmarshal(compByte, &comps); err != nil {
+		return nil, err
+	}
+	for _, comp := range comps {
+		var compSpec appsv1alpha1.ClusterComponentSpec
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(comp, &compSpec); err != nil {
+			return nil, err
+		}
+		compSpecs = append(compSpecs, compSpec)
+	}
+
+	return compSpecs, nil
 }

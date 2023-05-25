@@ -18,19 +18,20 @@ kbcli cluster create [NAME] [flags]
   kbcli cluster create mycluster --cluster-definition apecloud-mysql
   
   # Output resource information in YAML format, but do not create resources.
-  kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=client -o yaml
+  kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run -o yaml
   
-  # Output resource information in YAML format, the information will be sent to the server, but the resource will not be actually created.
+  # Output resource information in YAML format, the information will be sent to the server
+  # but the resource will not be actually created.
   kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=server -o yaml
   
   # Create a cluster and set termination policy DoNotTerminate that will prevent the cluster from being deleted
   kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy DoNotTerminate
   
-  # In scenarios where you want to delete resources such as statements, deployments, services, pdb, but keep PVCs
+  # In scenarios where you want to delete resources such as statefulsets, deployments, services, pdb, but keep PVCs
   # when deleting the cluster, use termination policy Halt
   kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy Halt
   
-  # In scenarios where you want to delete resource such as statements, deployments, services, pdb, and including
+  # In scenarios where you want to delete resource such as statefulsets, deployments, services, pdb, and including
   # PVCs when deleting the cluster, use termination policy Delete
   kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy Delete
   
@@ -41,27 +42,40 @@ kbcli cluster create [NAME] [flags]
   # Create a cluster and set cpu to 1 core, memory to 1Gi, storage size to 20Gi and replicas to 3
   kbcli cluster create mycluster --cluster-definition apecloud-mysql --set cpu=1,memory=1Gi,storage=20Gi,replicas=3
   
-  # Create a cluster and set the class to general-1c1g, valid classes can be found by executing the command "kbcli class list --cluster-definition=<cluster-definition-name>"
+  # Create a cluster and set storageClass to csi-hostpath-sc, if storageClass is not specified,
+  # the default storage class will be used
+  kbcli cluster create mycluster --cluster-definition apecloud-mysql --set storageClass=csi-hostpath-sc
+  
+  # Create a cluster and set the class to general-1c1g
+  # run "kbcli class list --cluster-definition=cluster-definition-name" to get the class list
   kbcli cluster create mycluster --cluster-definition apecloud-mysql --set class=general-1c1g
   
   # Create a cluster with replicationSet workloadType and set switchPolicy to Noop
   kbcli cluster create mycluster --cluster-definition postgresql --set switchPolicy=Noop
   
+  # Create a cluster with more than one component, use "--set type=component-name" to specify the component,
+  # if not specified, the main component will be used, run "kbcli cd list-components CLUSTER-DEFINITION-NAME"
+  # to show the components in the cluster definition
+  kbcli cluster create mycluster --cluster-definition redis --set type=redis,cpu=1 --set type=redis-sentinel,cpu=200m
+  
   # Create a cluster and use a URL to set cluster resource
-  kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file https://kubeblocks.io/yamls/apecloud-mysql.yaml
+  kbcli cluster create mycluster --cluster-definition apecloud-mysql \
+  --set-file https://kubeblocks.io/yamls/apecloud-mysql.yaml
   
   # Create a cluster and load cluster resource set from stdin
   cat << EOF | kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file -
   - name: my-test ...
   
   # Create a cluster forced to scatter by node
-  kbcli cluster create --cluster-definition apecloud-mysql --topology-keys kubernetes.io/hostname --pod-anti-affinity Required
+  kbcli cluster create --cluster-definition apecloud-mysql --topology-keys kubernetes.io/hostname \
+  --pod-anti-affinity Required
   
   # Create a cluster in specific labels nodes
-  kbcli cluster create --cluster-definition apecloud-mysql --node-labels '"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
+  kbcli cluster create --cluster-definition apecloud-mysql \
+  --node-labels '"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
   
   # Create a Cluster with two tolerations
-  kbcli cluster create --cluster-definition apecloud-mysql --tolerations '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+  kbcli cluster create --cluster-definition apecloud-mysql --tolerations \ '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
   
   # Create a cluster, with each pod runs on their own dedicated node
   kbcli cluster create --cluster-definition apecloud-mysql --tenancy=DedicatedNode

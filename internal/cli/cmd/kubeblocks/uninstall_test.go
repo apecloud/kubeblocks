@@ -77,4 +77,9 @@ var _ = Describe("kubeblocks uninstall", func() {
 		}
 		Expect(o.Uninstall()).Should(Succeed())
 	})
+
+	It("checkResources", func() {
+		fakeDynamic := testing.FakeDynamicClient()
+		Expect(checkResources(fakeDynamic)).Should(Succeed())
+	})
 })

@@ -21,18 +21,29 @@ package clusterversion
 
 import (
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var listExample = templates.Examples(`
 		# list all ClusterVersion
 		kbcli clusterversion list`)
+
+type ListClusterVersionOptions struct {
+	*list.ListOptions
+	clusterDefinitionRef string
+}
 
 func NewClusterVersionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
@@ -42,11 +53,15 @@ func NewClusterVersionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 	}
 
 	cmd.AddCommand(NewListCmd(f, streams))
+	cmd.AddCommand(newSetDefaultCMD(f, streams))
+	cmd.AddCommand(newUnSetDefaultCMD(f, streams))
 	return cmd
 }
 
 func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := list.NewListOptions(f, streams, types.ClusterVersionGVR())
+	o := &ListClusterVersionOptions{
+		ListOptions: list.NewListOptions(f, streams, types.ClusterVersionGVR()),
+	}
 	cmd := &cobra.Command{
 		Use:               "list",
 		Short:             "List ClusterVersions.",
@@ -54,11 +69,53 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Aliases:           []string{"ls"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
+			if len(o.clusterDefinitionRef) != 0 {
+				o.LabelSelector = util.BuildClusterDefinitionRefLable(o.LabelSelector, []string{o.clusterDefinitionRef})
+			}
 			o.Names = args
-			_, err := o.Run()
-			util.CheckErr(err)
+			util.CheckErr(run(o))
 		},
 	}
 	o.AddFlags(cmd, true)
+	flags.AddClusterDefinitionFlag(f, cmd, &o.clusterDefinitionRef)
 	return cmd
+}
+
+func run(o *ListClusterVersionOptions) error {
+	if !o.Format.IsHumanReadable() {
+		_, err := o.Run()
+		return err
+	}
+	o.Print = false
+	r, err := o.Run()
+	if err != nil {
+		return err
+	}
+	infos, err := r.Infos()
+	if err != nil {
+		return err
+	}
+	p := printer.NewTablePrinter(o.Out)
+	p.SetHeader("NAME", "CLUSTER-DEFINITION", "STATUS", "IS-DEFAULT", "CREATED-TIME")
+	p.SortBy(1)
+	for _, info := range infos {
+		var cv v1alpha1.ClusterVersion
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cv); err != nil {
+			return err
+		}
+		isDefaultValue := isDefault(&cv)
+		p.AddRow(cv.Name, cv.Labels[constant.ClusterDefLabelKey], cv.Status.Phase, isDefaultValue, util.TimeFormat(&cv.CreationTimestamp))
+	}
+	p.Print()
+	return nil
+}
+
+func isDefault(cv *v1alpha1.ClusterVersion) string {
+	if cv.Annotations == nil {
+		return "false"
+	}
+	if _, ok := cv.Annotations[constant.DefaultClusterVersionAnnotationKey]; !ok {
+		return "false"
+	}
+	return cv.Annotations[constant.DefaultClusterVersionAnnotationKey]
 }

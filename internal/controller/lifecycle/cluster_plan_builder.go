@@ -24,10 +24,12 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -146,13 +148,12 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		sendWaringEventWithError(c.transCtx.GetRecorder(), c.transCtx.Cluster, ReasonApplyResourcesFailed, err)
 	}()
 
-	// new a DAG and apply chain on it, after that we should get the final Plan
+	// new a DAG and apply chain on it
 	dag := graph.NewDAG()
 	err = c.transformers.ApplyTo(c.transCtx, dag)
-	// log for debug
-	c.transCtx.Logger.Info(fmt.Sprintf("DAG: %s", dag))
+	c.transCtx.Logger.V(1).Info(fmt.Sprintf("DAG: %s", dag))
 
-	// we got the execution plan
+	// construct execution plan
 	plan := &clusterPlan{
 		dag:      dag,
 		walkFunc: c.defaultWalkFunc,
@@ -175,10 +176,11 @@ func (p *clusterPlan) Execute() error {
 }
 
 func (p *clusterPlan) handlePlanExecutionError(err error) error {
+	clusterCopy := p.transCtx.OrigCluster.DeepCopy()
 	condition := newFailedApplyResourcesCondition(err)
-	meta.SetStatusCondition(&p.transCtx.Cluster.Status.Conditions, condition)
-	sendWaringEventWithError(p.transCtx.GetRecorder(), p.transCtx.Cluster, ReasonApplyResourcesFailed, err)
-	return p.cli.Status().Patch(p.transCtx.Context, p.transCtx.Cluster, client.MergeFrom(p.transCtx.OrigCluster.DeepCopy()))
+	meta.SetStatusCondition(&clusterCopy.Status.Conditions, condition)
+	sendWaringEventWithError(p.transCtx.GetRecorder(), clusterCopy, ReasonApplyResourcesFailed, err)
+	return p.cli.Status().Patch(p.transCtx.Context, clusterCopy, client.MergeFrom(p.transCtx.OrigCluster))
 }
 
 // Do the real works
@@ -255,8 +257,14 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 			c.transCtx.Logger.Error(err, fmt.Sprintf("update %T error: %s", o, node.oriObj.GetName()))
 			return err
 		}
+	case PATCH:
+		patch := client.MergeFrom(node.oriObj)
+		if err := c.cli.Patch(c.transCtx.Context, node.obj, patch); !apierrors.IsNotFound(err) {
+			c.transCtx.Logger.Error(err, fmt.Sprintf("patch %T error", node.oriObj))
+			return err
+		}
 	case DELETE:
-		if controllerutil.RemoveFinalizer(node.obj, dbClusterFinalizerName) {
+		if controllerutil.RemoveFinalizer(node.obj, constant.DBClusterFinalizerName) {
 			err := c.cli.Update(c.transCtx.Context, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				c.transCtx.Logger.Error(err, fmt.Sprintf("delete %T error: %s", node.obj, node.obj.GetName()))
@@ -265,6 +273,10 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		}
 		// delete secondary objects
 		if _, ok := node.obj.(*appsv1alpha1.Cluster); !ok {
+			// retain backup for data protection even if the cluster is wiped out.
+			if strings.EqualFold(node.obj.GetLabels()[constant.BackupProtectionLabelKey], constant.BackupRetain) {
+				return nil
+			}
 			err := intctrlutil.BackgroundDeleteObject(c.cli, c.transCtx.Context, node.obj)
 			// err := c.cli.Delete(c.transCtx.Context, node.obj)
 			if err != nil && !apierrors.IsNotFound(err) {
@@ -299,10 +311,9 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 				*stsObj.Spec.Replicas,
 				*stsProto.Spec.Replicas)
 		}
-		// keep the original template annotations.
-		// if annotations exist and are replaced, the statefulSet will be updated.
-		mergeAnnotations(stsObj.Spec.Template.Annotations,
-			&stsProto.Spec.Template.Annotations)
+		// merge stsObj.Spec.Template.Annotations to stsProto.Spec.Template.Annotations
+		// then reassign it with stsObj.Spec.Template = stsProto.Spec.Template
+		mergeAnnotations(stsObj.Spec.Template.Annotations, &stsProto.Spec.Template.Annotations)
 		stsObj.Spec.Template = stsProto.Spec.Template
 		stsObj.Spec.Replicas = stsProto.Spec.Replicas
 		stsObj.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
@@ -311,8 +322,9 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 
 	handleDeploy := func(origObj, deployProto *appsv1.Deployment) (client.Object, error) {
 		deployObj := origObj.DeepCopy()
-		mergeAnnotations(deployObj.Spec.Template.Annotations,
-			&deployProto.Spec.Template.Annotations)
+		// merge deployObj.Spec.Template.Annotations to deployProto.Spec.Template.Annotations
+		// then reassign it with deployObj.Spec = deployProto.Spec
+		mergeAnnotations(deployObj.Spec.Template.Annotations, &deployProto.Spec.Template.Annotations)
 		deployObj.Spec = deployProto.Spec
 		return deployObj, nil
 	}
@@ -320,17 +332,33 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 	handleSvc := func(origObj, svcProto *corev1.Service) (client.Object, error) {
 		svcObj := origObj.DeepCopy()
 		svcObj.Spec = svcProto.Spec
-		svcObj.Annotations = mergeServiceAnnotations(svcObj.Annotations, svcProto.Annotations)
+		mergeServiceAnnotations(svcProto.Annotations, &svcObj.Annotations)
 		return svcObj, nil
 	}
 
 	handlePVC := func(origObj, pvcProto *corev1.PersistentVolumeClaim) (client.Object, error) {
 		pvcObj := origObj.DeepCopy()
-		if pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] == pvcProto.Spec.Resources.Requests[corev1.ResourceStorage] {
-			return pvcObj, nil
+		if pvcObj.Spec.Resources.Requests == nil {
+			pvcObj.Spec.Resources.Requests = pvcProto.Spec.Resources.Requests
+		} else {
+			pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] = pvcProto.Spec.Resources.Requests[corev1.ResourceStorage]
 		}
-		pvcObj.Spec.Resources.Requests[corev1.ResourceStorage] = pvcProto.Spec.Resources.Requests[corev1.ResourceStorage]
+		// if proto object is a real object resources, simply override annotations, this could happen
+		// due to ClusterDeletionTransformer may result preserved PVC objects when cluster termination
+		// policy is equal to Halt.
+		if pvcProto.UID != "" {
+			pvcObj.Annotations = pvcProto.Annotations
+			pvcObj.OwnerReferences = pvcProto.OwnerReferences
+		} else {
+			mergeAnnotations(pvcProto.Annotations, &pvcObj.Annotations)
+		}
 		return pvcObj, nil
+	}
+
+	handlePDB := func(origObj, pdbProto *policyv1.PodDisruptionBudget) (client.Object, error) {
+		pdbObj := origObj.DeepCopy()
+		pdbObj.Spec = pdbProto.Spec
+		return pdbObj, nil
 	}
 
 	switch v := node.obj.(type) {
@@ -342,10 +370,9 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 		return handleSvc(node.oriObj.(*corev1.Service), v)
 	case *corev1.PersistentVolumeClaim:
 		return handlePVC(node.oriObj.(*corev1.PersistentVolumeClaim), v)
-	case *corev1.Secret, *corev1.ConfigMap:
-		return v, nil
+	case *policyv1.PodDisruptionBudget:
+		return handlePDB(node.oriObj.(*policyv1.PodDisruptionBudget), v)
 	}
-
 	return node.obj, nil
 }
 

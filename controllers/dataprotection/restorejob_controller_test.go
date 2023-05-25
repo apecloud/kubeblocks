@@ -82,7 +82,7 @@ var _ = Describe("RestoreJob Controller", func() {
 		By("By assure an backup obj")
 		return testapps.NewBackupFactory(testCtx.DefaultNamespace, "backup-job-").
 			WithRandomName().SetBackupPolicyName(backupPolicy).
-			SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+			SetBackupType(dataprotectionv1alpha1.BackupTypeDataFile).
 			Create(&testCtx).GetObject()
 	}
 
@@ -129,34 +129,30 @@ var _ = Describe("RestoreJob Controller", func() {
 	}
 
 	patchBackupStatus := func(phase dataprotectionv1alpha1.BackupPhase, key types.NamespacedName) {
-		backup := dataprotectionv1alpha1.Backup{}
-		Eventually(func() error {
-			return k8sClient.Get(ctx, key, &backup)
-		}).Should(Succeed())
-		Expect(k8sClient.Get(ctx, key, &backup)).Should(Succeed())
-
-		patch := client.MergeFrom(backup.DeepCopy())
-		backup.Status.Phase = phase
-		Expect(k8sClient.Status().Patch(ctx, &backup, patch)).Should(Succeed())
+		Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(backup *dataprotectionv1alpha1.Backup) {
+			backup.Status.Phase = phase
+		})).Should(Succeed())
 	}
 
 	patchK8sJobStatus := func(jobStatus batchv1.JobConditionType, key types.NamespacedName) {
-		k8sJob := batchv1.Job{}
-		Eventually(func() error {
-			return k8sClient.Get(ctx, key, &k8sJob)
-		}).Should(Succeed())
-		Expect(k8sClient.Get(ctx, key, &k8sJob)).Should(Succeed())
-
-		patch := client.MergeFrom(k8sJob.DeepCopy())
-		jobCondition := batchv1.JobCondition{Type: jobStatus}
-		k8sJob.Status.Conditions = append(k8sJob.Status.Conditions, jobCondition)
-		Expect(k8sClient.Status().Patch(ctx, &k8sJob, patch)).Should(Succeed())
+		Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(job *batchv1.Job) {
+			found := false
+			for _, cond := range job.Status.Conditions {
+				if cond.Type == jobStatus {
+					found = true
+				}
+			}
+			if !found {
+				jobCondition := batchv1.JobCondition{Type: jobStatus}
+				job.Status.Conditions = append(job.Status.Conditions, jobCondition)
+			}
+		})).Should(Succeed())
 	}
 
 	testRestoreJob := func(withResources ...bool) {
 		By("By creating a statefulset and pod")
 		sts := assureStatefulSetObj()
-		testapps.MockConsensusComponentPods(testCtx, sts, clusterName, compName)
+		testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, compName)
 
 		By("By creating a backupTool")
 		backupTool := assureBackupToolObj(withResources...)

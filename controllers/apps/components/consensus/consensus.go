@@ -179,85 +179,44 @@ func (r *ConsensusComponent) HandleUpdate(ctx context.Context, obj client.Object
 	if r == nil {
 		return nil
 	}
-
-	stsObj := util.ConvertToStatefulSet(obj)
-	// get compDefName from stsObj.name
-	compDefName := r.Cluster.Spec.GetComponentDefRefName(stsObj.Labels[constant.KBAppComponentLabelKey])
-
-	// get component from ClusterDefinition by compDefName
-	component, err := util.GetComponentDefByCluster(ctx, r.Cli, *r.Cluster, compDefName)
-	if err != nil {
-		return err
-	}
-
-	if component == nil || component.WorkloadType != appsv1alpha1.Consensus {
-		return nil
-	}
-	pods, err := util.GetPodListByStatefulSet(ctx, r.Cli, stsObj)
-	if err != nil {
-		return err
-	}
-
-	// update cluster.status.component.consensusSetStatus based on all pods currently exist
-	componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
-
-	// first, get the old status
-	var oldConsensusSetStatus *appsv1alpha1.ConsensusSetStatus
-	if v, ok := r.Cluster.Status.Components[componentName]; ok {
-		oldConsensusSetStatus = v.ConsensusSetStatus
-	}
-	// create the initial status
-	newConsensusSetStatus := &appsv1alpha1.ConsensusSetStatus{
-		Leader: appsv1alpha1.ConsensusMemberStatus{
-			Name:       "",
-			Pod:        util.ComponentStatusDefaultPodName,
-			AccessMode: appsv1alpha1.None,
-		},
-	}
-	// then, calculate the new status
-	setConsensusSetStatusRoles(newConsensusSetStatus, component, pods)
-	// if status changed, do update
-	if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
-		patch := client.MergeFrom((*r.Cluster).DeepCopy())
-		if err = util.InitClusterComponentStatusIfNeed(r.Cluster, componentName, *component); err != nil {
-			return err
-		}
-		componentStatus := r.Cluster.Status.Components[componentName]
-		componentStatus.ConsensusSetStatus = newConsensusSetStatus
-		r.Cluster.Status.SetComponentStatus(componentName, componentStatus)
-		if err = r.Cli.Status().Patch(ctx, r.Cluster, patch); err != nil {
-			return err
-		}
-		// add consensus role info to pod env
-		if err := updateConsensusRoleInfo(ctx, r.Cli, r.Cluster, component, componentName, pods); err != nil {
-			return err
-		}
-	}
-
-	// prepare to do pods Deletion, that's the only thing we should do,
-	// the statefulset reconciler will do the others.
-	// to simplify the process, we do pods Deletion after statefulset reconcile done,
-	// that is stsObj.Generation == stsObj.Status.ObservedGeneration
-	if stsObj.Generation != stsObj.Status.ObservedGeneration {
-		return nil
-	}
-
-	// then we wait all pods' presence, that is len(pods) == stsObj.Spec.Replicas
-	// only then, we have enough info about the previous pods before delete the current one
-	if len(pods) != int(*stsObj.Spec.Replicas) {
-		return nil
-	}
-
-	// we don't check whether pod role label present: prefer stateful set's Update done than role probing ready
-
-	// generate the pods Deletion plan
-	plan := generateConsensusUpdatePlan(ctx, r.Cli, stsObj, pods, *component)
-	// execute plan
-	if _, err := plan.WalkOneStep(); err != nil {
-		return err
-	}
-	return nil
+	return r.StatefulComponent.HandleUpdateWithProcessors(ctx, obj,
+		func(componentDef *appsv1alpha1.ClusterComponentDefinition, pods []corev1.Pod, componentName string) error {
+			// first, get the old status
+			var oldConsensusSetStatus *appsv1alpha1.ConsensusSetStatus
+			if v, ok := r.Cluster.Status.Components[componentName]; ok {
+				oldConsensusSetStatus = v.ConsensusSetStatus
+			}
+			// create the initial status
+			newConsensusSetStatus := &appsv1alpha1.ConsensusSetStatus{
+				Leader: appsv1alpha1.ConsensusMemberStatus{
+					Name:       "",
+					Pod:        util.ComponentStatusDefaultPodName,
+					AccessMode: appsv1alpha1.None,
+				},
+			}
+			// then, calculate the new status
+			setConsensusSetStatusRoles(newConsensusSetStatus, componentDef, pods)
+			// if status changed, do update
+			if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {
+				patch := client.MergeFrom((*r.Cluster).DeepCopy())
+				if err := util.InitClusterComponentStatusIfNeed(r.Cluster, componentName, *componentDef); err != nil {
+					return err
+				}
+				componentStatus := r.Cluster.Status.Components[componentName]
+				componentStatus.ConsensusSetStatus = newConsensusSetStatus
+				r.Cluster.Status.SetComponentStatus(componentName, componentStatus)
+				if err := r.Cli.Status().Patch(ctx, r.Cluster, patch); err != nil {
+					return err
+				}
+				// add consensus role info to pod env
+				if err := updateConsensusRoleInfo(ctx, r.Cli, r.Cluster, componentDef, componentName, pods); err != nil {
+					return err
+				}
+			}
+			return nil
+		}, ComposeRolePriorityMap, generateConsensusSerialPlan, generateConsensusBestEffortParallelPlan, generateConsensusParallelPlan)
 }
+
 func NewConsensusComponent(
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,

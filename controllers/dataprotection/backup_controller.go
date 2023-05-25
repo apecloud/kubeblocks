@@ -223,9 +223,9 @@ func (r *BackupReconciler) doNewPhaseAction(
 	// update Phase to InProgress
 	backup.Status.Phase = dataprotectionv1alpha1.BackupInProgress
 	backup.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
-	if backupPolicy.Spec.TTL != nil {
+	if backupPolicy.Spec.Retention != nil && backupPolicy.Spec.Retention.TTL != nil {
 		backup.Status.Expiration = &metav1.Time{
-			Time: backup.Status.StartTimestamp.Add(dataprotectionv1alpha1.ToDuration(backupPolicy.Spec.TTL)),
+			Time: backup.Status.StartTimestamp.Add(dataprotectionv1alpha1.ToDuration(backupPolicy.Spec.Retention.TTL)),
 		}
 	}
 
@@ -289,8 +289,6 @@ func (r *BackupReconciler) createPVCWithStorageClassName(reqCtx intctrlutil.Requ
 			},
 		},
 	}
-	// add a finalizer
-	controllerutil.AddFinalizer(pvc, dataProtectionFinalizerName)
 	err := r.Client.Create(reqCtx.Ctx, pvc)
 	return client.IgnoreAlreadyExists(err)
 }
@@ -450,7 +448,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 			backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
 			backup.Status.FailureReason = job.Status.Conditions[0].Reason
 		}
-		if backup.Spec.BackupType == dataprotectionv1alpha1.BackupTypeIncremental {
+		if backup.Spec.BackupType == dataprotectionv1alpha1.BackupTypeLogFile {
 			if backup.Status.Manifests != nil &&
 				backup.Status.Manifests.BackupLog != nil &&
 				backup.Status.Manifests.BackupLog.StartTime == nil {
@@ -746,11 +744,44 @@ func (r *BackupReconciler) createDeleteBackupFileJob(
 	backupPVCName string,
 	backupFilePath string) error {
 
+	// make sure the path has a leading slash
+	if !strings.HasPrefix(backupFilePath, "/") {
+		backupFilePath = "/" + backupFilePath
+	}
+
+	// this script first deletes the directory where the backup is located (including files
+	// in the directory), and then traverses up the path level by level to clean up empty directories.
+	deleteScript := fmt.Sprintf(`
+		backupPathBase=%s;
+		targetPath="${backupPathBase}%s";
+
+		echo "removing backup files in ${targetPath}";
+		rm -rf "${targetPath}";
+
+		absBackupPathBase=$(realpath "${backupPathBase}");
+		curr=$(realpath "${targetPath}");
+		while true; do
+			parent=$(dirname "${curr}");
+			if [ "${parent}" == "${absBackupPathBase}" ]; then
+				echo "reach backupPathBase ${backupPathBase}, done";
+				break;
+			fi;
+			if [ ! "$(ls -A "${parent}")" ]; then
+				echo "${parent} is empty, removing it...";
+				rmdir "${parent}";
+			else
+				echo "${parent} is not empty, done";
+				break;
+			fi;
+			curr="${parent}";
+		done
+	`, backupPathBase, backupFilePath)
+
 	// build container
 	container := corev1.Container{}
 	container.Name = backup.Name
 	container.Command = []string{"sh", "-c"}
-	container.Args = []string{fmt.Sprintf("rm -rf %s%s", backupPathBase, backupFilePath)}
+	container.Args = []string{deleteScript}
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 
@@ -1181,6 +1212,10 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	container.Command = []string{"sh", "-c"}
 	container.Args = backupTool.Spec.BackupCommands
 	container.Image = backupTool.Spec.Image
+	if container.Image == "" {
+		// TODO(dsj): need determine container name to get, temporary use first container
+		container.Image = clusterPod.Spec.Containers[0].Image
+	}
 	if backupTool.Spec.Resources != nil {
 		container.Resources = *backupTool.Spec.Resources
 	}
@@ -1242,9 +1277,15 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	r.appendBackupVolumeMount(pvcName, &podSpec, &podSpec.Containers[0])
 
 	// the pod of job needs to be scheduled on the same node as the workload pod, because it needs to share one pvc
-	// see: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodename
-	podSpec.NodeName = clusterPod.Spec.NodeName
-
+	podSpec.NodeSelector = map[string]string{
+		hostNameLabelKey: clusterPod.Spec.NodeName,
+	}
+	// ignore taints
+	podSpec.Tolerations = []corev1.Toleration{
+		{
+			Operator: corev1.TolerationOpExists,
+		},
+	}
 	return podSpec, nil
 }
 

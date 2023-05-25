@@ -89,19 +89,19 @@ func (m *mockClient) List(ctx context.Context, list client.ObjectList, opts ...c
 }
 
 func (m mockClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
-	return cfgcore.MakeError("not support")
+	return nil
 }
 
 func (m mockClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
-	return cfgcore.MakeError("not support")
+	return nil
 }
 
 func (m mockClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-	return cfgcore.MakeError("not support")
+	return nil
 }
 
 func (m mockClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-	return cfgcore.MakeError("not support")
+	return nil
 }
 
 func (m mockClient) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {

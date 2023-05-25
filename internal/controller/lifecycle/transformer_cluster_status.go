@@ -354,7 +354,7 @@ func (t *ClusterStatusTransformer) handleExistAbnormalOrFailed(transCtx *Cluster
 	componentMap, clusterAvailabilityEffectMap, _ := getComponentRelatedInfo(cluster,
 		*transCtx.ClusterDef, "")
 	// handle the cluster status when some components are not ready.
-	handleClusterPhaseWhenCompsNotReady(cluster, componentMap, clusterAvailabilityEffectMap)
+	HandleClusterPhaseWhenCompsNotReady(cluster, componentMap, clusterAvailabilityEffectMap)
 }
 
 // cleanupAnnotationsAfterRunning cleans up the cluster annotations after cluster is Running.
@@ -456,27 +456,17 @@ func (t *ClusterStatusTransformer) removeStsInitContainerForRestore(
 	return doRemoveInitContainers, nil
 }
 
-// handleClusterPhaseWhenCompsNotReady handles the Cluster.status.phase when some components are Abnormal or Failed.
-// REVIEW: seem duplicated handling
-// Deprecated:
-func handleClusterPhaseWhenCompsNotReady(cluster *appsv1alpha1.Cluster,
+// HandleClusterPhaseWhenCompsNotReady handles the Cluster.status.phase when some components are Abnormal or Failed.
+func HandleClusterPhaseWhenCompsNotReady(cluster *appsv1alpha1.Cluster,
 	componentMap map[string]string,
 	clusterAvailabilityEffectMap map[string]bool) {
 	var (
-		clusterIsFailed   bool
-		failedCompCount   int
-		isVolumeExpanding bool
+		clusterIsFailed bool
+		failedCompCount int
 	)
 
-	opsRecords, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
-	if len(opsRecords) != 0 && opsRecords[0].Type == appsv1alpha1.VolumeExpansionType {
-		isVolumeExpanding = true
-	}
 	for k, v := range cluster.Status.Components {
-		// determine whether other components are still doing operation, i.e., create/restart/scaling.
-		// waiting for operation to complete except for volumeExpansion operation.
-		// because this operation will not affect cluster availability.
-		if !slices.Contains(appsv1alpha1.GetComponentTerminalPhases(), v.Phase) && !isVolumeExpanding {
+		if !slices.Contains(appsv1alpha1.GetComponentTerminalPhases(), v.Phase) {
 			return
 		}
 		if v.Phase == appsv1alpha1.FailedClusterCompPhase {
@@ -504,7 +494,7 @@ func getClusterAvailabilityEffect(componentDef *appsv1alpha1.ClusterComponentDef
 	case appsv1alpha1.Consensus, appsv1alpha1.Replication:
 		return true
 	default:
-		return componentDef.MaxUnavailable != nil
+		return componentDef.GetMaxUnavailable() != nil
 	}
 }
 

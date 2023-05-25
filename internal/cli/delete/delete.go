@@ -171,7 +171,6 @@ func (o *DeleteOptions) deleteResult(r *resource.Result) error {
 		if err != nil {
 			return err
 		}
-		var runtimeObj runtime.Object
 		deleteInfos = append(deleteInfos, info)
 		found++
 
@@ -182,10 +181,10 @@ func (o *DeleteOptions) deleteResult(r *resource.Result) error {
 		if err = o.preDeleteResource(info); err != nil {
 			return err
 		}
-		if runtimeObj, err = o.deleteResource(info, options); err != nil {
+		if _, err = o.deleteResource(info, options); err != nil {
 			return err
 		}
-		if err = o.postDeleteResource(runtimeObj); err != nil {
+		if err = o.postDeleteResource(info.Object); err != nil {
 			return err
 		}
 		fmt.Fprintf(o.Out, "%s %s deleted\n", info.Mapping.GroupVersionKind.Kind, info.Name)
@@ -213,15 +212,16 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 }
 
 func (o *DeleteOptions) preDeleteResource(info *resource.Info) error {
-	if o.PreDeleteHook != nil {
-		if info.Object == nil {
-			if err := info.Get(); err != nil {
-				return err
-			}
-		}
-		return o.PreDeleteHook(o, info.Object)
+	if o.PreDeleteHook == nil {
+		return nil
 	}
-	return nil
+
+	if info.Object == nil {
+		if err := info.Get(); err != nil {
+			return err
+		}
+	}
+	return o.PreDeleteHook(o, info.Object)
 }
 
 func (o *DeleteOptions) postDeleteResource(object runtime.Object) error {

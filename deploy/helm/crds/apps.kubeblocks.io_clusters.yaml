@@ -158,8 +158,8 @@ spec:
                       type: object
                     classDefRef:
                       description: classDefRef reference class defined in ComponentClassDefinition.
-                        If both ClassDefRef and Resources are specified, ClassDefRef
-                        has higher precedence than Resources.
+                        If both classDefRef and resources are specified, classDefRef
+                        has higher precedence than resources.
                       properties:
                         class:
                           description: class refers to the name of the class that

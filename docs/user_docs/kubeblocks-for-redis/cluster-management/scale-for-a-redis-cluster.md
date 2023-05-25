@@ -148,7 +148,7 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
 ### Before you start
 
-- Refer to [Backup and restore for Redis](./../backup-and-restore/backup-and-restore-for-redis-standalone.md) to make sure the EKS environment is configured properly since the horizontal scaling relies on the backup function.
+- Refer to [Backup and restore for Redis](./../backup-and-restore/snapshot-backup-and-restore-for-redis.md) to make sure the EKS environment is configured properly since the horizontal scaling relies on the backup function.
 - Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
   ```bash

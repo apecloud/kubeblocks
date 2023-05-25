@@ -6,6 +6,8 @@ sidebar_position: 4
 sidebar_label: kbcli and KubeBlocks
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 # Handle an exception
 
@@ -29,10 +31,7 @@ There are three types of results:
 * `warn`: The target environment affects the stability and performance of KubeBlocks and clusters, but running KubeBlocks and clusters is not affected, and you can continue the following installation.
 * `congratulation`: All checks pass and you can continue the following installation.
 
-
 # Uninstall KubeBlocks and kbcli
-
-:::note
 
 Uninstallation order:
 
@@ -46,12 +45,11 @@ Uninstallation order:
 
 3. Uninstall `kbcli`.
 
-:::
-
 ## Uninstall KubeBlocks
 
 Uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
 
+<Tabs>
 <TabItem value="kbcli" label="kbcli" default>
 
 ```bash
@@ -67,11 +65,13 @@ helm uninstall kubeblocks -n kb-system
 ```
 
 </TabItem>
+</Tabs>
 
 ## Uninstall kbcli
 
 Uninstall `kbcli` if you want to delete `kbcli` after your trial.
 
+<Tabs>
 <TabItem value="macOS" label="macOS" default>
 
 <TabItem value="cURL" label="cURL" default>

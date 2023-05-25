@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # Install kbcli and KubeBlocks on new Kubernetes cluster
 
-To install kbcli and KubeBlocks to an new Kubernetes cluster on both local and cloud environment, you can use Playground. To install kbcli and KubeBlocks on existed Kubernetes cluster, see <link>
+To install kbcli and KubeBlocks to an new Kubernetes cluster on both local and cloud environment, you can use Playground. To install kbcli and KubeBlocks on existed Kubernetes cluster, see [Install kbcli and KubeBlocks on the existed Kubernetes cluster](./install-kbcli-and-kubeblocks-on-the-existed-kubernetes-clusters.md).
 
 ## Install kbcli and KubeBlocks on local host
 
@@ -35,6 +35,7 @@ You can install the kbcli and KubeBlocks on your local host, and now MacOS and W
 
 **Step 1. Install kbcli.**
 
+<Tabs>
 <TabItem value="MacOS" label="MacOS">
 
 - Option 1: Install kbcli using the `CurL` command.
@@ -121,8 +122,8 @@ If you need to customize the installation path, use the zip file.
     4. Click New to add the path of the kbcli installation package to the user and system variables.
     5. Click Apply and OK.
 
-
 </TabItem>
+</Tabs>
 
 **Step 2: One-click Deployment of KubeBlocks**
 Use the `kbcli playground init` command. This command:

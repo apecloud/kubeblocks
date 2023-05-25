@@ -20,9 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package binding
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/remotecommand"
 	"net"
 	"strconv"
 	"strings"
@@ -322,4 +328,41 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 	opsRes["event"] = OperationSuccess
 	opsRes["message"] = message
 	return opsRes, nil
+}
+
+func (ops *BaseOperations) ExecCmd(ctx context.Context, clientSet *kubernetes.Clientset, config *rest.Config, podName, namespace, cmd string) (map[string]string, error) {
+	req := clientSet.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(podName).
+		Namespace(namespace).
+		SubResource("exec").
+		VersionedParams(&v1.PodExecOptions{
+			Container: dbTypeToContainer[ops.DBType],
+			Command:   []string{"sh", "-c", cmd},
+			Stdin:     true,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       false,
+		}, scheme.ParameterCodec)
+
+	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
+	if err != nil {
+		return nil, err
+	}
+
+	var stdout, stderr bytes.Buffer
+	if err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdin:  strings.NewReader(""),
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}); err != nil {
+		return nil, err
+	}
+
+	res := map[string]string{
+		"stdout": stdout.String(),
+		"stderr": stderr.String(),
+	}
+
+	return res, nil
 }

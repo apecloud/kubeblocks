@@ -1,7 +1,7 @@
 package ha
 
 import (
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
+	"github.com/apecloud/kubeblocks/cmd/probe/util"
 	"os"
 	"time"
 
@@ -12,14 +12,20 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
 )
 
 type Ha struct {
 	ctx      context.Context
+	name     string
 	log      logger.Logger
-	db       *db
 	Informer cache.SharedIndexInformer
-	config   *configuration_store.ConfigurationStore
+	cs       *configuration_store.ConfigurationStore
+	DB
 }
 
 func NewHa() *Ha {
@@ -36,12 +42,43 @@ func NewHa() *Ha {
 	sharedInformers := informers.NewSharedInformerFactory(clientSet, 10*time.Second)
 	informer := sharedInformers.Core().V1().ConfigMaps().Informer()
 
-	return &Ha{
+	cs := configuration_store.NewConfigurationStore()
+
+	ha := &Ha{
 		ctx:      context.Background(),
-		db:       &db{name: os.Getenv("HOSTNAME")},
+		name:     os.Getenv(util.HostName),
 		log:      logger.NewLogger("ha"),
 		Informer: informer,
-		config:   configuration_store.NewConfig(),
+		cs:       cs,
+	}
+
+	ha.DB = ha.newDbInterface(ha.log)
+	if ha.DB == nil {
+		panic("unknown db type")
+	}
+
+	return ha
+}
+
+func (h *Ha) Init() {
+	sysid, err := h.DB.GetSysID(h.ctx)
+	if err != nil {
+		h.log.Errorf("can't get sysID, err:%v", err)
+	}
+
+	h.cs.Init(sysid)
+}
+
+func (h *Ha) newDbInterface(logger logger.Logger) DB {
+	dbType := os.Getenv(util.KbServiceCharacterType)
+	switch dbType {
+	case binding.Postgresql:
+		return postgres.NewPostgres(logger).(DB)
+	case binding.Mysql:
+		return mysql.NewMysql(logger).(DB)
+	default:
+		h.log.Fatalf("unknown db type:%s", dbType)
+		return nil
 	}
 }
 
@@ -66,18 +103,19 @@ func (h *Ha) UpdateRecall(oldObj, newObj interface{}) {
 		return
 	}
 
-	if h.db.name == oldPrimary && h.db.name != newPrimary {
-		_ = h.demote()
+	if h.name == oldPrimary && h.name != newPrimary {
+		_ = h.DB.Demote()
 	}
 
-	if h.db.name != oldPrimary && h.db.name == newPrimary {
-		_ = h.promote()
+	if h.name != oldPrimary && h.name == newPrimary {
+		_ = h.DB.Promote()
 	}
 }
 
+/*
 func (h *Ha) promote() error {
 	time.Sleep(5 * time.Second)
-	resp, err := h.config.ExecCommand(h.db.name, "default", "su -c 'pg_ctl promote' postgres")
+	resp, err := h.cs.ExecCommand(h.db.name, "default", "su -c 'pg_ctl promote' postgres")
 	if err != nil {
 		h.log.Errorf("promote err: %v", err)
 		return err
@@ -87,25 +125,25 @@ func (h *Ha) promote() error {
 }
 
 func (h *Ha) demote() error {
-	resp, err := h.config.ExecCommand(h.db.name, "default", "su -c 'pg_ctl stop -m fast' postgres")
+	resp, err := h.cs.ExecCommand(h.db.name, "default", "su -c 'pg_ctl stop -m fast' postgres")
 	if err != nil {
 		h.log.Errorf("demote err: %v", err)
 		return err
 	}
 
-	_, err = h.config.ExecCommand(h.db.name, "default", "touch /postgresql/data/standby.signal")
+	_, err = h.cs.ExecCommand(h.db.name, "default", "touch /postgresql/data/standby.signal")
 	if err != nil {
 		h.log.Errorf("touch err: %v", err)
 		return err
 	}
 
 	time.Sleep(5 * time.Second)
-	_, err = h.config.ExecCommand(h.db.name, "default", "su -c 'postgres -D /postgresql/data --config-file=/opt/bitnami/postgresql/conf/postgresql.conf --external_pid_file=/opt/bitnami/postgresql/tmp/postgresql.pid --hba_file=/opt/bitnami/postgresql/conf/pg_hba.conf' postgres &")
+	_, err = h.cs.ExecCommand(h.db.name, "default", "su -c 'postgres -D /postgresql/data --config-file=/opt/bitnami/postgresql/conf/postgresql.conf --external_pid_file=/opt/bitnami/postgresql/tmp/postgresql.pid --hba_file=/opt/bitnami/postgresql/conf/pg_hba.conf' postgres &")
 	if err != nil {
 		h.log.Errorf("start err: %v", err)
 		return err
 	}
-	_, err = h.config.ExecCommand(h.db.name, "default", "su -c './scripts/on_role_change.sh' postgres")
+	_, err = h.cs.ExecCommand(h.db.name, "default", "su -c './scripts/on_role_change.sh' postgres")
 	if err != nil {
 		h.log.Errorf("shell err: %v", err)
 		return err
@@ -113,4 +151,4 @@ func (h *Ha) demote() error {
 
 	h.log.Infof("response: ", resp)
 	return nil
-}
+}*/

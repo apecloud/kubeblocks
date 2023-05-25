@@ -48,3 +48,11 @@ const (
 	OperationSuccess        = "Success"
 	OperationFailed         = "Failed"
 )
+
+const (
+	HostName               = "HOSTNAME"
+	KbClusterName          = "KB_CLUSTER_NAME"
+	KbClusterCompName      = "KB_CLUSTER_COMP_NAME"
+	KbServiceCharacterType = "KB_SERVICE_CHARACTER_TYPE"
+	KbNamespace            = "KB_NAMESPACE"
+)

@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/ha"
 	"strconv"
 	"sync"
 	"time"
@@ -94,6 +95,7 @@ type PostgresOperations struct {
 	BaseOperations
 }
 
+var _ ha.DB = &PostgresOperations{}
 var _ BaseInternalOps = &PostgresOperations{}
 
 // NewPostgres returns a new PostgreSQL output binding.
@@ -324,7 +326,7 @@ func (pgOps *PostgresOperations) SwitchoverOps(ctx context.Context, req *binding
 		return result, nil
 	}
 
-	pgOps.cs = configuration_store.NewConfig()
+	pgOps.cs = configuration_store.NewConfigurationStore()
 
 	if can, err := pgOps.isSwitchOverPossible(primary, candidate); !can || err != nil {
 		result["event"] = OperationFailed
@@ -664,4 +666,25 @@ func (pgOps *PostgresOperations) role2PGRole(roleName string) (string, error) {
 		return "pg_read_all_data", nil
 	}
 	return "", fmt.Errorf("role name: %s is not supported", roleName)
+}
+
+func (pgOps *PostgresOperations) Stop(ctx context.Context) error {
+	return nil
+}
+
+func (pgOps *PostgresOperations) GetSysID(ctx context.Context) (string, error) {
+	sql := "select system_identifier from pg_control_system();"
+	res, err := pgOps.query(ctx, sql)
+	if err != nil {
+		return "", err
+	}
+	return string(res), nil
+}
+
+func (pgOps *PostgresOperations) Promote() error {
+	return nil
+}
+
+func (pgOps *PostgresOperations) Demote() error {
+	return nil
 }

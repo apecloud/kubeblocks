@@ -126,3 +126,18 @@ var (
 type SlaveStatus struct {
 	SecondsBehindMaster int64 `json:"Seconds_Behind_Master"`
 }
+
+const (
+	Postgres   = "postgres"
+	Postgresql = "postgresql"
+	Mysql      = "mysql"
+	Mongodb    = "mongodb"
+	Redis      = "redis"
+	Etcd       = "etcd"
+)
+
+var (
+	dbTypeToContainer = map[string]string{
+		Postgres: Postgresql,
+	}
+)

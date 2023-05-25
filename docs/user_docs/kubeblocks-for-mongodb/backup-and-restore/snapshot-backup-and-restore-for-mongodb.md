@@ -26,7 +26,7 @@ This section shows how to use `kbcli` to back up and restore a mongodb cluster.
      kbcli kubeblocks upgrade --set snapshot-controller.enabled=true
      ```
 
-     Since your `kubectl` is already connected to the EKS cluster, this command installs the latest version of KubeBlocks in the default namespace `kb-system` in your EKS environment.
+     Since your `kubectl` is already connected to the cluster of cloud Kubernetes service, this command installs the latest version of KubeBlocks in the default namespace `kb-system` in your environment.
 
      Verify the installation with the following command.
 

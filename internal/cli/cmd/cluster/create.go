@@ -208,10 +208,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Example: clusterCreateExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
-			if o.EditBeforeCreate {
-				cmdutil.CheckErr(o.RunEditOnCreate(f, streams, cmd))
-				return
-			}
+			o.Cmd = cmd
 			cmdutil.CheckErr(o.CreateOptions.Complete())
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.Validate())

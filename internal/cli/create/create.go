@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package create
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
@@ -30,6 +31,7 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 	cuejson "cuelang.org/go/encoding/json"
 	"github.com/leaanthony/debme"
+	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,9 +39,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
+	res "k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/cmd/util/editor"
 	"k8s.io/kubectl/pkg/scheme"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -78,6 +82,7 @@ type CreateOptions struct {
 
 	// CueTemplateName cue template file name to render the resource
 	CueTemplateName string
+	Cmd             *cobra.Command
 
 	// Options a command options object which extends CreateOptions that will be used
 	// to render the cue template
@@ -157,6 +162,13 @@ func (o *CreateOptions) Run() error {
 		}
 	}
 
+	if o.EditBeforeCreate {
+		if err = o.editResourceBeforeCreate(resObj); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	dryRunStrategy, err := o.GetDryRunStrategy()
 	if err != nil {
 		return err
@@ -208,6 +220,40 @@ func (o *CreateOptions) Run() error {
 		return err
 	}
 	return printer.PrintObj(resObj, o.Out)
+}
+
+func (o *CreateOptions) editResourceBeforeCreate(obj *unstructured.Unstructured) error {
+
+	editOptions := editor.NewEditOptions(editor.EditBeforeCreateMode, o.IOStreams)
+	editOptions.ValidateOptions = cmdutil.ValidateOptions{
+		ValidationDirective: metav1.FieldValidationStrict,
+	}
+	editOptions.FilenameOptions = res.FilenameOptions{Filenames: []string{"-"}}
+
+	if err := o.EditComplete(editOptions, obj); err != nil {
+		return err
+	}
+
+	return editOptions.Run()
+}
+
+func (o *CreateOptions) EditComplete(oe *editor.EditOptions, obj *unstructured.Unstructured) error {
+	contentByte, err := json.Marshal(obj)
+	if err != nil {
+		return err
+	}
+	if err := oe.Complete(o.Factory, []string{}, o.Cmd); err != nil {
+		return err
+	}
+	r := o.Factory.NewBuilder().
+		Unstructured().
+		Stream(bytes.NewReader(contentByte), "edit").
+		ContinueOnError().
+		Flatten().
+		Do()
+
+	oe.OriginalResult = r
+	return nil
 }
 
 func (o *CreateOptions) CleanUp() error {

@@ -358,7 +358,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 		if !isOK {
-			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+			return intctrlutil.Reconciled()
 		}
 		if err = r.createUpdatesJobs(reqCtx, backup, &backupPolicy.Spec.Snapshot.BasePolicy, dataprotectionv1alpha1.PRE); err != nil {
 			r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPreUpdatesJob", err.Error())
@@ -373,7 +373,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 		if !isOK {
-			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+			return intctrlutil.Reconciled()
 		}
 		msg := fmt.Sprintf("Created volumeSnapshot %s ready.", key.Name)
 		r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedVolumeSnapshot", msg)
@@ -383,7 +383,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 		if !isOK {
-			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+			return intctrlutil.Reconciled()
 		}
 
 		// Failure MetadataCollectionJob does not affect the backup status.
@@ -421,7 +421,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 		if !isOK {
-			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+			return intctrlutil.Reconciled()
 		}
 		job, err := r.getBatchV1Job(reqCtx, backup)
 		if err != nil {
@@ -643,7 +643,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		controllerutil.AddFinalizer(snap, dataProtectionFinalizerName)
 
 		scheme, _ := dataprotectionv1alpha1.SchemeBuilder.Build()
-		if err = controllerutil.SetOwnerReference(backup, snap, scheme); err != nil {
+		if err = controllerutil.SetControllerReference(backup, snap, scheme); err != nil {
 			return err
 		}
 
@@ -716,9 +716,9 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 	}
 	jobName := backup.Name
 	if len(backup.Name) > 30 {
-		jobName = backup.Name[:30] + "-" + strings.ToLower(updatePath)
+		jobName = backup.Name[:30]
 	}
-	key := types.NamespacedName{Namespace: mgrNS, Name: jobName}
+	key := types.NamespacedName{Namespace: mgrNS, Name: jobName + "-" + strings.ToLower(updatePath)}
 	job := &batchv1.Job{}
 	// check if job is created
 	if exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, job); err != nil {
@@ -944,6 +944,9 @@ func (r *BackupReconciler) createBatchV1Job(
 		},
 	}
 	controllerutil.AddFinalizer(job, dataProtectionFinalizerName)
+	if err := controllerutil.SetControllerReference(backup, job, r.Scheme); err != nil {
+		return err
+	}
 
 	reqCtx.Log.V(1).Info("create a built-in job from backup", "job", job)
 	return client.IgnoreAlreadyExists(r.Client.Create(reqCtx.Ctx, job))

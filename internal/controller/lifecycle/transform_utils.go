@@ -31,12 +31,14 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	ictrl "github.com/apecloud/kubeblocks/internal/controller"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func newRequeueError(after time.Duration, reason string) error {
-	return ictrl.NewRequeueError(after, reason)
+	return &realRequeueError{
+		reason:       reason,
+		requeueAfter: after,
+	}
 }
 
 func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkNObjKey, error) {

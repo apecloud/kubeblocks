@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package lifecycle
 
 import (
+	"fmt"
 	"time"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -64,8 +65,31 @@ type gvkNObjKey struct {
 
 type clusterOwningObjects map[gvkNObjKey]client.Object
 
+type RequeueError interface {
+	RequeueAfter() time.Duration
+	Reason() string
+}
+
+type realRequeueError struct {
+	reason       string
+	requeueAfter time.Duration
+}
+
+func (r *realRequeueError) Error() string {
+	return fmt.Sprintf("requeue after: %v as: %s", r.requeueAfter, r.reason)
+}
+
+func (r *realRequeueError) RequeueAfter() time.Duration {
+	return r.requeueAfter
+}
+
+func (r *realRequeueError) Reason() string {
+	return r.reason
+}
+
 type delegateClient struct {
 	client.Client
 }
 
 var _ client2.ReadonlyClient = delegateClient{}
+var _ RequeueError = &realRequeueError{}

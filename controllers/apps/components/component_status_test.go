@@ -21,7 +21,6 @@ package components
 
 import (
 	"fmt"
-	ictrl "github.com/apecloud/kubeblocks/internal/controller"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -232,7 +231,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(mockContainerError(pods[0])).Should(Succeed())
 				Expect(mockContainerError(pods[1])).Should(Succeed())
 
-				Expect(ictrl.IsDelayedRequeueError(component.Status(*reqCtx, testCtx.Cli))).Should(BeTrue())
+				Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 			})
 
@@ -318,7 +317,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			It("should set component status to failed if container is not ready and have error message", func() {
 				Expect(mockContainerError(pods[0])).Should(Succeed())
 
-				Expect(ictrl.IsDelayedRequeueError(component.Status(*reqCtx, testCtx.Cli))).Should(BeTrue())
+				Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 			})
 
@@ -418,7 +417,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			It("should set component status to failed if container is not ready and have error message", func() {
 				Expect(mockContainerError(pods[0])).Should(Succeed())
 
-				Expect(ictrl.IsDelayedRequeueError(component.Status(*reqCtx, testCtx.Cli))).Should(BeTrue())
+				Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 			})
 

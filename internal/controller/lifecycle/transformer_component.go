@@ -25,7 +25,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
-	ictrl "github.com/apecloud/kubeblocks/internal/controller"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -139,7 +138,6 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 
 func (c *ComponentTransformer) transform4StatusUpdate(reqCtx ictrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
-	var delayedError error
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		dag := graph.NewDAG()
 		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compSpec.Name, dag)
@@ -147,14 +145,9 @@ func (c *ComponentTransformer) transform4StatusUpdate(reqCtx ictrlutil.RequestCt
 			return err
 		}
 		if err := comp.Status(reqCtx, c.Client); err != nil {
-			if !ictrl.IsDelayedRequeueError(err) {
-				return err
-			}
-			if delayedError == nil {
-				delayedError = err
-			}
+			return err
 		}
 		*dags = append(*dags, dag)
 	}
-	return delayedError
+	return nil
 }

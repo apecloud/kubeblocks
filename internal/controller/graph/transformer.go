@@ -26,7 +26,6 @@ import (
 	"github.com/go-logr/logr"
 	"k8s.io/client-go/tools/record"
 
-	ictrl "github.com/apecloud/kubeblocks/internal/controller"
 	"github.com/apecloud/kubeblocks/internal/controller/client"
 )
 
@@ -52,19 +51,12 @@ var ErrPrematureStop = errors.New("Premature-Stop")
 
 // ApplyTo applies TransformerChain t to dag
 func (r TransformerChain) ApplyTo(ctx TransformContext, dag *DAG) error {
-	var delayedError error
 	for _, transformer := range r {
 		if err := transformer.Transform(ctx, dag); err != nil {
-			if ictrl.IsDelayedRequeueError(err) {
-				if delayedError == nil {
-					delayedError = err
-				}
-				continue
-			}
 			return ignoredIfPrematureStop(err)
 		}
 	}
-	return delayedError
+	return nil
 }
 
 func ignoredIfPrematureStop(err error) error {

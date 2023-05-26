@@ -25,7 +25,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
@@ -39,7 +38,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	ictrl "github.com/apecloud/kubeblocks/internal/controller"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
@@ -218,12 +216,6 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 	c.updateWorkload(c.runningWorkload)
-
-	phase := c.GetPhase()
-	if phase == appsv1alpha1.FailedClusterCompPhase || phase == appsv1alpha1.AbnormalClusterCompPhase {
-		reason := fmt.Sprintf("component %s status not ready: %s", c.GetName(), phase)
-		return ictrl.NewDelayedRequeueError(time.Second, reason)
-	}
 	return nil
 }
 

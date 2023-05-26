@@ -474,6 +474,7 @@ type ClassDefRef struct {
 }
 
 // +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks,all}
@@ -492,7 +493,6 @@ type Cluster struct {
 	Status ClusterStatus `json:"status,omitempty"`
 }
 
-// +genclient
 // +kubebuilder:object:root=true
 
 // ClusterList contains a list of Cluster

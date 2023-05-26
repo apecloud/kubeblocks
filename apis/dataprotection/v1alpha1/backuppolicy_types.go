@@ -274,6 +274,7 @@ type BackupPolicyStatus struct {
 }
 
 // +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced,shortName=bp
@@ -290,7 +291,6 @@ type BackupPolicy struct {
 	Status BackupPolicyStatus `json:"status,omitempty"`
 }
 
-// +genclient
 // +kubebuilder:object:root=true
 
 // BackupPolicyList contains a list of BackupPolicy

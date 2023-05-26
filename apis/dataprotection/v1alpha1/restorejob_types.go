@@ -74,6 +74,7 @@ type RestoreJobStatus struct {
 }
 
 // +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
@@ -90,7 +91,6 @@ type RestoreJob struct {
 	Status RestoreJobStatus `json:"status,omitempty"`
 }
 
-// +genclient
 // +kubebuilder:object:root=true
 
 // RestoreJobList contains a list of RestoreJob

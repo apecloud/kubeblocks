@@ -225,6 +225,9 @@ type BackupStatusUpdate struct {
 type BackupPolicyTemplateStatus struct {
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=bpt
@@ -240,7 +243,6 @@ type BackupPolicyTemplate struct {
 	Status BackupPolicyTemplateStatus `json:"status,omitempty"`
 }
 
-// +genclient
 // +kubebuilder:object:root=true
 
 // BackupPolicyTemplateList contains a list of BackupPolicyTemplate

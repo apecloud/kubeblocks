@@ -452,6 +452,7 @@ type UpdatedParameters struct {
 }
 
 // +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks,all},shortName=ops
@@ -470,7 +471,6 @@ type OpsRequest struct {
 	Status OpsRequestStatus `json:"status,omitempty"`
 }
 
-// +genclient
 // +kubebuilder:object:root=true
 
 // OpsRequestList contains a list of OpsRequest

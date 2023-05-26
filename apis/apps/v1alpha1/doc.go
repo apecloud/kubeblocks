@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //go:generate go run github.com/ahmetb/gen-crd-api-reference-docs -api-dir . -config ../../../hack/docgen/api/gen-api-doc-config.json -template-dir ../../../hack/docgen/api/template -out-file ../../../docs/user_docs/api-reference/apps.md
 
+// +k8s:deepcopy-gen=package,register
+// +k8s:openapi-gen=true
 // +groupName=apps.kubeblocks.io
-
 package v1alpha1

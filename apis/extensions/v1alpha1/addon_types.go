@@ -388,6 +388,8 @@ type ResourceRequirements struct {
 }
 
 // +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster
@@ -404,7 +406,6 @@ type Addon struct {
 	Status AddonStatus `json:"status,omitempty"`
 }
 
-// +genclient
 // +kubebuilder:object:root=true
 
 // AddonList contains a list of Addon

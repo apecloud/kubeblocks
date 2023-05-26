@@ -123,6 +123,8 @@ type VersionsContext struct {
 }
 
 // +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cv
@@ -139,7 +141,6 @@ type ClusterVersion struct {
 	Status ClusterVersionStatus `json:"status,omitempty"`
 }
 
-// +genclient
 // +kubebuilder:object:root=true
 
 // ClusterVersionList contains a list of ClusterVersion

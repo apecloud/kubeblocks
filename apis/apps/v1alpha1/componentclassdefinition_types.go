@@ -155,6 +155,8 @@ type ComponentClassInstance struct {
 }
 
 // +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=ccd
@@ -168,7 +170,6 @@ type ComponentClassDefinition struct {
 	Status ComponentClassDefinitionStatus `json:"status,omitempty"`
 }
 
-// +genclient
 // +kubebuilder:object:root=true
 
 // ComponentClassDefinitionList contains a list of ComponentClassDefinition

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package stateful
 
 import (
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -32,6 +33,7 @@ import (
 )
 
 func NewStatefulComponent(cli client.Client,
+	recorder record.EventRecorder,
 	cluster *appsv1alpha1.Cluster,
 	clusterVersion *appsv1alpha1.ClusterVersion,
 	synthesizedComponent *component.SynthesizedComponent,
@@ -40,6 +42,7 @@ func NewStatefulComponent(cli client.Client,
 		StatefulComponentBase: internal.StatefulComponentBase{
 			ComponentBase: internal.ComponentBase{
 				Client:         cli,
+				Recorder:       recorder,
 				Cluster:        cluster,
 				ClusterVersion: clusterVersion,
 				Component:      synthesizedComponent,

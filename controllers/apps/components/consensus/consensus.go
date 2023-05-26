@@ -122,6 +122,13 @@ func (r *ConsensusSet) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) 
 		isFailed       = true
 		statusMessages appsv1alpha1.ComponentMessageMap
 	)
+	compStatus, ok := r.Cluster.Status.Components[r.getName()]
+	if !ok || compStatus.PodsReadyTime == nil {
+		return "", nil
+	}
+	if !util.IsProbeTimeout(r.ComponentDef, compStatus.PodsReadyTime) {
+		return "", nil
+	}
 	for _, pod := range pods {
 		role := pod.Labels[constant.RoleLabelKey]
 		if role == r.getConsensusSpec().Leader.Name {

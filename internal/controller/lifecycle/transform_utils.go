@@ -35,10 +35,7 @@ import (
 )
 
 func newRequeueError(after time.Duration, reason string) error {
-	return &realRequeueError{
-		reason:       reason,
-		requeueAfter: after,
-	}
+	return intctrlutil.NewRequeueError(after, reason)
 }
 
 func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkNObjKey, error) {

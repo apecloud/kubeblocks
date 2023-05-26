@@ -42,6 +42,7 @@ func NewStatelessComponent(cli client.Client,
 	recorder record.EventRecorder,
 	cluster *appsv1alpha1.Cluster,
 	clusterVersion *appsv1alpha1.ClusterVersion,
+	compDef *appsv1alpha1.ClusterComponentDefinition,
 	synthesizedComponent *component.SynthesizedComponent,
 	dag *graph.DAG) *statelessComponent {
 	comp := &statelessComponent{
@@ -55,8 +56,8 @@ func NewStatelessComponent(cli client.Client,
 				ComponentSetBase: types.ComponentSetBase{
 					Cli:           cli,
 					Cluster:       cluster,
-					ComponentSpec: nil,
-					ComponentDef:  nil,
+					ComponentSpec: cluster.Spec.GetComponentByName(synthesizedComponent.Name),
+					ComponentDef:  compDef,
 					Component:     nil,
 				},
 			},
@@ -264,7 +265,7 @@ func (c *statelessComponent) createWorkload() {
 	deployProto := c.WorkloadVertex.Obj.(*appsv1.Deployment)
 	c.WorkloadVertex.Obj = deployProto
 	c.WorkloadVertex.Action = ictrltypes.ActionCreatePtr()
-	c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload created")
+	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "Component workload created")
 }
 
 func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {

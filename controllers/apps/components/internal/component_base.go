@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 
 	"golang.org/x/exp/slices"
@@ -283,12 +284,12 @@ func (c *ComponentBase) SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase,
 		if status.Phase == phase {
 			return nil
 		}
-
-		// TODO(impl): define the status phase transition diagram
-		if phase == appsv1alpha1.SpecReconcilingClusterCompPhase && status.Phase != appsv1alpha1.RunningClusterCompPhase {
-			return nil
-		}
-
+		/*
+			// TODO(impl): define the status phase transition diagram
+			if phase == appsv1alpha1.SpecReconcilingClusterCompPhase && status.Phase != appsv1alpha1.RunningClusterCompPhase {
+				return nil
+			}
+		*/
 		status.Phase = phase
 		if status.Message == nil {
 			status.Message = statusMessage
@@ -331,8 +332,11 @@ func (c *ComponentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client
 
 	hasFailedPodTimedOut := false
 	timedOutPodStatusMessage := appsv1alpha1.ComponentMessageMap{}
-	if !isRunning && (podsReady == nil || !*podsReady) {
-		hasFailedPodTimedOut, timedOutPodStatusMessage = hasFailedAndTimedOutPod(pods)
+	var requeueAfter time.Duration
+	clusterGenerationFromWorkload := obj.GetAnnotations()[constant.KubeBlocksGenerationKey]
+	// check if it is the latest obj after cluster does updates.
+	if !isRunning && (podsReady == nil || !*podsReady) && clusterGenerationFromWorkload == strconv.FormatInt(c.Cluster.Generation, 10) {
+		hasFailedPodTimedOut, timedOutPodStatusMessage, requeueAfter = hasFailedAndTimedOutPod(pods)
 	}
 
 	phase, statusMessage, err := c.buildStatus(reqCtx.Ctx, pods, isRunning, podsReady, hasFailedPodTimedOut, timedOutPodStatusMessage)
@@ -370,7 +374,13 @@ func (c *ComponentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client
 		return nil
 	}
 	// TODO(refactor): wait = true to requeue.
-	return c.updateStatus(phaseTransitionCondMsg, updatefn)
+	if err = c.updateStatus(phaseTransitionCondMsg, updatefn); err != nil {
+		return err
+	}
+	if requeueAfter != 0 {
+		return intctrlutil.NewRequeueError(requeueAfter, "requeue for workload status to reconcile.")
+	}
+	return nil
 }
 
 func (c *ComponentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isRunning bool, podsReady *bool,
@@ -395,18 +405,15 @@ func (c *ComponentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isR
 	if podsReady != nil && *podsReady {
 		// check if the role probe timed out when component phase is not Running but all pods of component are ready.
 		phase, statusMessage = c.ComponentSet.GetPhaseWhenPodsReadyAndProbeTimeout(pods)
+		// if component is not running and probe is not timed out, requeue.
+		if phase == "" {
+			return phase, statusMessage, intctrlutil.NewRequeueError(time.Second*30, "wait for probe timed out")
+		}
 		return phase, statusMessage, nil
 	}
 
-	// if there is no running operation in cluster or failed pod timed-out, that means the component is Failed or Abnormal.
-	// TODO(refactor): should review and check this condition carefully.
-	//// clusterUpRunning checks if the cluster is up running, includes the partially running.
-	// clusterUpRunning := func(cluster *appsv1alpha1.Cluster) bool {
-	//	return cluster.Status.ObservedGeneration != cluster.Generation &&
-	//		slices.Contains(appsv1alpha1.GetClusterUpRunningPhases(), cluster.Status.Phase)
-	// }
-	// if clusterUpRunning(c.Cluster) || hasFailedPodTimedOut {
-	if hasFailedPodTimedOut {
+	// get the phase if failed pods have timed out or the pods are not running when there are no changes to the component.
+	if hasFailedPodTimedOut || slices.Contains(appsv1alpha1.GetComponentUpRunningPhase(), c.GetPhase()) {
 		phase, statusMessage, err = c.ComponentSet.GetPhaseWhenPodsNotReady(ctx, c.GetName())
 		if err != nil {
 			return "", nil, err
@@ -552,24 +559,50 @@ func (c *ComponentBase) updateStatus(phaseTransitionMsg string, updatefn func(st
 
 // hasFailedAndTimedOutPod returns whether the pod of components is still failed after a PodFailedTimeout period.
 // if return true, component phase will be set to Failed/Abnormal.
-func hasFailedAndTimedOutPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMessageMap) {
-	hasTimedoutPod := false
-	messages := appsv1alpha1.ComponentMessageMap{}
+func hasFailedAndTimedOutPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMessageMap, time.Duration) {
+	var (
+		hasTimedOutPod bool
+		messages       = appsv1alpha1.ComponentMessageMap{}
+		hasFailedPod   bool
+		requeueAfter   time.Duration
+	)
 	for _, pod := range pods {
 		isFailed, isTimedOut, messageStr := isPodFailedAndTimedOut(pod)
 		if !isFailed {
 			continue
 		}
 		if isTimedOut {
-			hasTimedoutPod = true
+			hasTimedOutPod = true
 			messages.SetObjectMessage(pod.Kind, pod.Name, messageStr)
+		} else {
+			hasFailedPod = true
 		}
 	}
-	return hasTimedoutPod, messages
+	if hasFailedPod && !hasTimedOutPod {
+		requeueAfter = time.Second * 30
+	}
+	return hasTimedOutPod, messages, requeueAfter
+}
+
+// isPodScheduledFailedAndTimedOut checks whether the unscheduled pod has timed out.
+func isPodScheduledFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type != corev1.PodScheduled {
+			continue
+		}
+		if cond.Status == corev1.ConditionTrue {
+			return false, false, ""
+		}
+		return true, time.Now().After(cond.LastTransitionTime.Add(types.PodScheduledFailedTimeout)), cond.Message
+	}
+	return false, false, ""
 }
 
 // isPodFailedAndTimedOut checks if the pod is failed and timed out.
 func isPodFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
+	if isFailed, isTimedOut, message := isPodScheduledFailedAndTimedOut(pod); isFailed {
+		return isFailed, isTimedOut, message
+	}
 	initContainerFailed, message := isAnyContainerFailed(pod.Status.InitContainerStatuses)
 	if initContainerFailed {
 		return initContainerFailed, isContainerFailedAndTimedOut(pod, corev1.PodInitialized), message

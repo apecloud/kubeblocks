@@ -728,10 +728,13 @@ func (c *StatefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet) bool 
 	// keep the original template annotations.
 	// if annotations exist and are replaced, the statefulSet will be updated.
 	util.MergeAnnotations(stsObjCopy.Spec.Template.Annotations, &stsProto.Spec.Template.Annotations)
+	// record the cluster generation to check if the sts is latest
+	stsObjCopy.Annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(c.Cluster.Generation, 10)
 	stsObjCopy.Spec.Template = stsProto.Spec.Template
 	stsObjCopy.Spec.Replicas = stsProto.Spec.Replicas
 	stsObjCopy.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
+		// TODO(REVIEW): always return true and update component phase to Updating. stsObj.Spec contains default values which set by Kubernetes
 		c.WorkloadVertex.Obj = stsObjCopy
 		c.WorkloadVertex.Action = ictrltypes.ActionPtr(ictrltypes.UPDATE)
 		return true

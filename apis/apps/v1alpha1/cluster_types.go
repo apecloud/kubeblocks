@@ -727,3 +727,12 @@ func GetComponentTerminalPhases() []ClusterComponentPhase {
 		AbnormalClusterCompPhase,
 	}
 }
+
+// GetComponentUpRunningPhase returns component running or partially running phases.
+func GetComponentUpRunningPhase() []ClusterComponentPhase {
+	return []ClusterComponentPhase{
+		RunningClusterCompPhase,
+		AbnormalClusterCompPhase,
+		FailedClusterCompPhase,
+	}
+}

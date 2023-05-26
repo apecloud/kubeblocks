@@ -41,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -232,6 +233,9 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 	}
 	tbl := newTbl(out, "\nData Protection:", "AUTO-BACKUP", "BACKUP-SCHEDULE", "TYPE", "BACKUP-TTL", "LAST-SCHEDULE", "RECOVERABLE-TIME")
 	for _, policy := range backupPolicies {
+		if policy.Annotations[constant.DefaultBackupPolicyAnnotationKey] != "true" {
+			continue
+		}
 		if policy.Status.Phase != dpv1alpha1.PolicyAvailable {
 			continue
 		}
@@ -260,7 +264,6 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 		if policy.Status.LastScheduleTime != nil {
 			lastScheduleTime = util.TimeFormat(policy.Status.LastScheduleTime)
 		}
-
 		tbl.AddRow(scheduleEnable, backupSchedule, backupType, ttlString, lastScheduleTime, getBackupRecoverableTime(backups))
 	}
 	tbl.Print()

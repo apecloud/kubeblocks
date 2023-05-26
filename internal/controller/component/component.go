@@ -109,6 +109,10 @@ func BuildComponent(
 	}
 	component.PodSpec.Tolerations = PatchBuiltInToleration(tolerations)
 
+	if clusterCompSpec.VolumeClaimTemplates != nil {
+		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()
+	}
+
 	if clusterCompDefObj.Service != nil {
 		service := corev1.Service{Spec: clusterCompDefObj.Service.ToSVCSpec()}
 		service.Spec.Type = corev1.ServiceTypeClusterIP
@@ -311,10 +315,6 @@ func fillClassResources(component *SynthesizedComponent, clusterCompSpec appsv1a
 		component.PodSpec.Containers[0].Resources = clusterCompSpec.Resources
 	}
 
-	if clusterCompSpec.VolumeClaimTemplates != nil {
-		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()
-	}
-
 	if compClasses == nil {
 		return nil
 	}
@@ -334,30 +334,5 @@ func fillClassResources(component *SynthesizedComponent, clusterCompSpec appsv1a
 	}
 	requests.DeepCopyInto(&component.PodSpec.Containers[0].Resources.Requests)
 	requests.DeepCopyInto(&component.PodSpec.Containers[0].Resources.Limits)
-
-	if len(clusterCompSpec.VolumeClaimTemplates) == 0 {
-		component.VolumeClaimTemplates = (&appsv1alpha1.ClusterComponentSpec{
-			VolumeClaimTemplates: buildVolumeClaimByClass(cls),
-		}).ToVolumeClaimTemplates()
-	}
 	return nil
-}
-
-func buildVolumeClaimByClass(cls *appsv1alpha1.ComponentClassInstance) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
-	var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
-	for _, volume := range cls.Volumes {
-		volumes = append(volumes, appsv1alpha1.ClusterComponentVolumeClaimTemplate{
-			Name: volume.Name,
-			Spec: appsv1alpha1.PersistentVolumeClaimSpec{
-				// TODO define access mode in class
-				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-				Resources: corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceStorage: volume.Size,
-					},
-				},
-			},
-		})
-	}
-	return volumes
 }

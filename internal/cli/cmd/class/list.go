@@ -102,14 +102,10 @@ func (o *ListOptions) run() error {
 func (o *ListOptions) printClass(constraintName string, compName string, classes []*appsv1alpha1.ComponentClassInstance) {
 	tbl := printer.NewTablePrinter(o.Out)
 	_, _ = fmt.Fprintf(o.Out, "\nConstraint %s:\n", constraintName)
-	tbl.SetHeader("COMPONENT", "CLASS", "CPU", "MEMORY", "STORAGE")
+	tbl.SetHeader("COMPONENT", "CLASS", "CPU", "MEMORY")
 	sort.Sort(class.ByClassCPUAndMemory(classes))
 	for _, cls := range classes {
-		var volumes []string
-		for _, volume := range cls.Volumes {
-			volumes = append(volumes, fmt.Sprintf("%s=%s", volume.Name, volume.Size.String()))
-		}
-		tbl.AddRow(compName, cls.Name, cls.CPU.String(), normalizeMemory(cls.Memory), strings.Join(volumes, ","))
+		tbl.AddRow(compName, cls.Name, cls.CPU.String(), normalizeMemory(cls.Memory))
 	}
 	tbl.Print()
 }

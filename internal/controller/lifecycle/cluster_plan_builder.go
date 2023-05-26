@@ -206,9 +206,9 @@ func (c *clusterPlanBuilder) defaultWalkFuncWithLogging(vertex graph.Vertex) err
 			c.transCtx.Logger.Error(err, "")
 		} else {
 			if node.Action == nil {
-				c.transCtx.Logger.Error(err, "%T", node)
+				c.transCtx.Logger.Error(err, fmt.Sprintf("%T", node))
 			} else {
-				c.transCtx.Logger.Error(err, "%s %T error", *node.Action, node.Obj)
+				c.transCtx.Logger.Error(err, fmt.Sprintf("%s %T error", *node.Action, node.Obj))
 			}
 		}
 	}

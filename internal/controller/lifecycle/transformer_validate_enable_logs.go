@@ -29,7 +29,7 @@ type ValidateEnableLogsTransformer struct{}
 func (e *ValidateEnableLogsTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
-	if isClusterDeleting(*cluster) {
+	if cluster.IsDeleting() {
 		return nil
 	}
 

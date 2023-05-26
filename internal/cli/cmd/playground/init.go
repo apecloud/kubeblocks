@@ -40,7 +40,6 @@ import (
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	cmdcluster "github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
-	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -51,6 +50,12 @@ import (
 )
 
 var (
+	initLong = templates.LongDesc(`Bootstrap a kubernetes cluster and install KubeBlocks for playground.
+
+If no any cloud provider be specified, a k3d cluster named kb-playground will be created on local host,
+otherwise a kubernetes cluster will be created on the specified cloud. Then KubeBlocks will be installed
+on the created kubernetes cluster, and an apecloud-mysql cluster named mycluster will be created.`)
+
 	initExample = templates.Examples(`
 		# create a k3d cluster on local host and install KubeBlocks
 		kbcli playground init
@@ -65,7 +70,23 @@ var (
 		kbcli playground init --cloud-provider tencentcloud --region ap-chengdu
 
 		# create a Google cloud GKE cluster and install KubeBlocks, the region is required
-		kbcli playground init --cloud-provider gcp --region us-central1`)
+		kbcli playground init --cloud-provider gcp --region us-east1
+
+		# after init, run the following commands to experience KubeBlocks quickly
+		# list database cluster and check its status
+		kbcli cluster list
+
+		# get cluster information
+		kbcli cluster describe mycluster
+
+		# connect to database
+		kbcli cluster connect mycluster
+
+		# view the Grafana
+		kbcli dashboard open kubeblocks-grafana
+
+		# destroy playground
+		kbcli playground destroy`)
 
 	supportedCloudProviders = []string{cp.Local, cp.AWS, cp.GCP, cp.AliCloud, cp.TencentCloud}
 
@@ -95,6 +116,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "init",
 		Short:   "Bootstrap a kubernetes cluster and install KubeBlocks for playground.",
+		Long:    initLong,
 		Example: initExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.validate())
@@ -102,12 +124,12 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&o.clusterDef, "cluster-definition", defaultClusterDef, "Cluster definition")
-	cmd.Flags().StringVar(&o.clusterVersion, "cluster-version", "", "Cluster definition")
+	cmd.Flags().StringVar(&o.clusterDef, "cluster-definition", defaultClusterDef, "Specify the cluster definition, run \"kbcli cd list\" to get the available cluster definitions")
+	cmd.Flags().StringVar(&o.clusterVersion, "cluster-version", "", "Specify the cluster version, run \"kbcli cv list\" to get the available cluster versions")
 	cmd.Flags().StringVar(&o.kbVersion, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringVar(&o.cloudProvider, "cloud-provider", defaultCloudProvider, fmt.Sprintf("Cloud provider type, one of %v", supportedCloudProviders))
 	cmd.Flags().StringVar(&o.region, "region", "", "The region to create kubernetes cluster")
-	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for initing playground, such as --timeout=10m")
+	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for init playground, such as --timeout=10m")
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval during the initialization of playground")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
@@ -302,10 +324,6 @@ if it takes a long time, please check the network environment and try again.
 	return nil
 }
 
-func printGuide() {
-	fmt.Fprintf(os.Stdout, guideStr, kbClusterName)
-}
-
 // writeStateFile writes cluster info to state file and return the new cluster info with kubeconfig
 func (o *initOptions) writeStateFile(provider cp.Interface) (*cp.K8sClusterInfo, error) {
 	clusterInfo, err := provider.GetClusterInfo()
@@ -399,7 +417,7 @@ func (o *initOptions) installKBAndCluster(info *cp.K8sClusterInfo) error {
 		fmt.Fprintf(o.Out, "Elapsed time: %s\n", time.Since(o.startTime).Truncate(time.Second))
 	}
 
-	printGuide()
+	fmt.Fprintf(o.Out, guideStr, kbClusterName)
 	return nil
 }
 
@@ -459,45 +477,36 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 
 // createCluster construct a cluster create options and run
 func (o *initOptions) createCluster() error {
-	options := &cmdcluster.CreateOptions{
-		CreateOptions: create.CreateOptions{
-			Factory:         util.NewFactory(),
-			IOStreams:       genericclioptions.NewTestIOStreamsDiscard(),
-			Namespace:       defaultNamespace,
-			Name:            kbClusterName,
-			CueTemplateName: cmdcluster.CueTemplateName,
-			GVR:             types.ClusterGVR(),
-		},
-		UpdatableFlags: cmdcluster.UpdatableFlags{
-			TerminationPolicy: "WipeOut",
-			Monitor:           true,
-			PodAntiAffinity:   "Preferred",
-			Tenancy:           "SharedNode",
-		},
-		ClusterDefRef:     o.clusterDef,
-		ClusterVersionRef: o.clusterVersion,
+	c := cmdcluster.NewCreateOptions(util.NewFactory(), genericclioptions.NewTestIOStreamsDiscard())
+	c.ClusterDefRef = o.clusterDef
+	c.ClusterVersionRef = o.clusterVersion
+	c.Namespace = defaultNamespace
+	c.Name = kbClusterName
+	c.UpdatableFlags = cmdcluster.UpdatableFlags{
+		TerminationPolicy: "WipeOut",
+		Monitor:           true,
+		PodAntiAffinity:   "Preferred",
+		Tenancy:           "SharedNode",
 	}
-	options.CreateOptions.Options = options
-	options.CreateOptions.PreCreate = options.PreCreate
 
 	// if we are running on local, create cluster with one replica
 	if o.cloudProvider == cp.Local {
-		options.Values = append(options.Values, "replicas=1")
+		c.Values = append(c.Values, "replicas=1")
 	} else {
 		// if we are running on cloud, create cluster with three replicas
-		options.Values = append(options.Values, "replicas=3")
+		c.Values = append(c.Values, "replicas=3")
 	}
 
-	if err := options.CreateOptions.Complete(); err != nil {
+	if err := c.CreateOptions.Complete(); err != nil {
 		return err
 	}
-	if err := options.Validate(); err != nil {
+	if err := c.Validate(); err != nil {
 		return err
 	}
-	if err := options.Complete(); err != nil {
+	if err := c.Complete(); err != nil {
 		return err
 	}
-	return options.Run()
+	return c.Run()
 }
 
 // checkExistedCluster check playground kubernetes cluster exists or not, playground

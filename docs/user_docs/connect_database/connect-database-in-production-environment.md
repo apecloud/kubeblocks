@@ -1,6 +1,7 @@
 ---
 title: Connect database in production environment
 description: How to connect to a database in production environment
+keywords: [connect to a database, production environment]
 sidebar_position: 3
 sidebar_label: Production environment
 ---
@@ -8,16 +9,18 @@ sidebar_label: Production environment
 # Connect database in production environment
 
 In the production environment, it is normal to connect a database with CLI and SDK clients. There are three scenarios.
+
 - Scenario 1: Client1 and the database are in the same Kubernetes cluster. To connect client1 and the database, see [Procedure 3](#procedure-3-connect-database-in-the-same-kubernetes-cluster).
 - Scenario 2: Client2 is outside the Kubernetes cluster, but it is in the same VPC as the database. To connect client2 and the database, see [Procedure 5](#procedure-5-client-outside-the-kubernetes-cluster-but-in-the-same-vpc-as-the-kubernetes-cluster).
 - Scenario 3: Client3 and the database are in different VPCs, such as other VPCs or the public network. To connect client3 and the database, see [Procedure 4](#procedure-4-connect-database-with-clients-in-other-vpcs-or-public-networks).
 
 See the figure below to get a clear image of the network location.
+
 ![Example](./../../img/connect_database_in_a_production_environment.png)
 
 ## Procedure 3. Connect database in the same Kubernetes cluster
 
-You can connect with the database ClusterIP or domain name. To check the database endpoint, use ```kbcli cluster describe ${cluster-name}```.
+You can connect with the database ClusterIP or domain name. To check the database endpoint, use `kbcli cluster describe ${cluster-name}`.
 
 ```bash
 kbcli cluster describe x
@@ -52,13 +55,14 @@ You can enable the External LoadBalancer of the cloud vendor.
 
 :::note
 
-The following command will create a LoadBalancer instance for the database instance, which will cause costs from your cloud vendor.
+The following command creates a LoadBalancer instance for the database instance, which may incur expenses from your cloud vendor.
 
 :::
 
 ```bash
 kbcli cluster expose ${cluster-name} --type internet --enable=true
 ```
+
 To disable the LoadBalancer instance, execute the following command.
 
 ```bash
@@ -77,7 +81,7 @@ A stable domain name for long-term connections is required. An Internal LoadBala
 
 :::note
 
-The following command will create a LoadBalancer instance for the database instance, which will cause costs from your cloud vendor.
+The following command creates a LoadBalancer instance for the database instance, which may incur expenses from your cloud vendor.
 
 :::
 

@@ -182,7 +182,8 @@ func (r *OpsRequestReconciler) addClusterLabelAndSetOwnerReference(reqCtx intctr
 	// add label of clusterRef
 	opsRequest := opsRes.OpsRequest
 	clusterName := opsRequest.Labels[constant.AppInstanceLabelKey]
-	if clusterName == opsRequest.Spec.ClusterRef {
+	opsType := opsRequest.Labels[constant.OpsRequestTypeLabelKey]
+	if clusterName == opsRequest.Spec.ClusterRef && opsType == string(opsRequest.Spec.Type) {
 		return nil, nil
 	}
 	patch := client.MergeFrom(opsRequest.DeepCopy())
@@ -190,6 +191,7 @@ func (r *OpsRequestReconciler) addClusterLabelAndSetOwnerReference(reqCtx intctr
 		opsRequest.Labels = map[string]string{}
 	}
 	opsRequest.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.ClusterRef
+	opsRequest.Labels[constant.OpsRequestTypeLabelKey] = string(opsRequest.Spec.Type)
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	if err := controllerutil.SetOwnerReference(opsRes.Cluster, opsRequest, scheme); err != nil {
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))

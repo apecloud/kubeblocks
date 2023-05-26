@@ -27,7 +27,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/sethvargo/go-password/password"
-	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -95,11 +94,41 @@ var _ = Describe("OpsRequest webhook", func() {
 			AllowVolumeExpansion: &allowVolumeExpansion,
 		}
 		err := testCtx.CheckedCreateObj(ctx, storageClass)
-		if err != nil {
-			fmt.Printf("create storage class error: %s\n", err.Error())
-		}
 		Expect(err).Should(BeNil())
 		return storageClass
+	}
+
+	createPVC := func(clusterName, compName, storageClassName, vctName string, index int) *corev1.PersistentVolumeClaim {
+		pvc := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-%s-%s-%d", vctName, clusterName, compName, index),
+				Namespace: testCtx.DefaultNamespace,
+				Labels: map[string]string{
+					constant.AppInstanceLabelKey:             clusterName,
+					constant.VolumeClaimTemplateNameLabelKey: vctName,
+					constant.KBAppComponentLabelKey:          compName,
+				},
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{
+					corev1.ReadWriteOnce,
+				},
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						"storage": resource.MustParse("1Gi"),
+					},
+				},
+				StorageClassName: &storageClassName,
+			},
+		}
+		Expect(testCtx.CheckedCreateObj(ctx, pvc)).ShouldNot(HaveOccurred())
+		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(pvc), pvc)).ShouldNot(HaveOccurred())
+		patch := client.MergeFrom(pvc.DeepCopy())
+		pvc.Status.Capacity = corev1.ResourceList{
+			"storage": resource.MustParse("1Gi"),
+		}
+		Expect(k8sClient.Status().Patch(ctx, pvc, patch)).ShouldNot(HaveOccurred())
+		return pvc
 	}
 
 	notFoundComponentsString := func(notFoundComponents string) string {
@@ -237,19 +266,24 @@ var _ = Describe("OpsRequest webhook", func() {
 	}
 
 	testVolumeExpansion := func(cluster *Cluster) {
-		By("By testing volumeExpansion - target component not exist")
-		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VolumeExpansionType)
-		opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{
-			{
-				ComponentOps: ComponentOps{ComponentName: "ve-not-exist"},
-				VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{
-					{
-						Name:    "data",
-						Storage: resource.MustParse("2Gi"),
+		getSingleVolumeExpansionList := func(compName, vctName, storage string) []VolumeExpansion {
+			return []VolumeExpansion{
+				{
+					ComponentOps: ComponentOps{ComponentName: compName},
+					VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{
+						{
+							Name:    vctName,
+							Storage: resource.MustParse(storage),
+						},
 					},
 				},
-			},
+			}
 		}
+		defaultVCTName := "data"
+		targetStorage := "2Gi"
+		By("By testing volumeExpansion - target component not exist")
+		opsRequest := createTestOpsRequest(clusterName, opsRequestName, VolumeExpansionType)
+		opsRequest.Spec.VolumeExpansionList = getSingleVolumeExpansionList("ve-not-exist", defaultVCTName, targetStorage)
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(notFoundComponentsString("ve-not-exist")))
 
 		By("By testing volumeExpansion - target volume not exist")
@@ -258,11 +292,11 @@ var _ = Describe("OpsRequest webhook", func() {
 			VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{
 				{
 					Name:    "log",
-					Storage: resource.MustParse("2Gi"),
+					Storage: resource.MustParse(targetStorage),
 				},
 				{
-					Name:    "data",
-					Storage: resource.MustParse("2Gi"),
+					Name:    defaultVCTName,
+					Storage: resource.MustParse(targetStorage),
 				},
 			},
 		},
@@ -271,17 +305,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("volumeClaimTemplates: [log] not found in component: " + componentName))
 
 		By("By testing volumeExpansion - storageClass do not support volume expansion")
-		volumeExpansionList = []VolumeExpansion{
-			{
-				ComponentOps: ComponentOps{ComponentName: componentName},
-				VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{
-					{
-						Name:    "data",
-						Storage: resource.MustParse("2Gi"),
-					},
-				},
-			},
-		}
+		volumeExpansionList = getSingleVolumeExpansionList(componentName, defaultVCTName, targetStorage)
 		opsRequest.Spec.VolumeExpansionList = volumeExpansionList
 		notSupportMsg := fmt.Sprintf("volumeClaimTemplate: [data] not support volume expansion in component: %s, you can view infos by command: kubectl get sc", componentName)
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(notSupportMsg))
@@ -290,34 +314,25 @@ var _ = Describe("OpsRequest webhook", func() {
 		storageClassName := "standard"
 		storageClass := createStorageClass(testCtx.Ctx, storageClassName, "true", true)
 		Expect(storageClass).ShouldNot(BeNil())
+		// mock to create pvc
+		createPVC(clusterName, componentName, storageClassName, defaultVCTName, 0)
 
 		By("testing volumeExpansion with smaller storage, expect an error occurs")
-		opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{
-			{
-				ComponentOps: ComponentOps{ComponentName: "replicasets"},
-				VolumeClaimTemplates: []OpsRequestVolumeClaimTemplate{
-					{
-						Name:    "data",
-						Storage: resource.MustParse("500Mi"),
-					},
-				},
-			},
-		}
+		opsRequest.Spec.VolumeExpansionList = getSingleVolumeExpansionList(componentName, defaultVCTName, "500Mi")
 		Expect(testCtx.CreateObj(ctx, opsRequest)).Should(HaveOccurred())
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("can not less than previous values"))
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(`requested storage size of volumeClaimTemplate "data" can not less than status.capacity.storage "1Gi"`))
 
-		By("test volumeExpansion with smaller storage and RECOVER_VOLUME_EXPANSION_FAILURE=true, expect succeed")
-		viper.Set(constant.CfgRecoverVolumeExpansionFailure, true)
-		Expect(testCtx.CreateObj(ctx, opsRequest)).Should(Succeed())
-
-		// TODO
-		By("testing volumeExpansion - pvc exists")
-		// TODO
-		By("By testing volumeExpansion - (TODO)use specified storage class")
-		// Eventually(func() bool {
-		// 	 opsRequest.Spec.VolumeExpansionList = []VolumeExpansion{volumeExpansionList[3]}
-		// 	 Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(BeNil())
-		// }).Should(BeTrue())
+		By("testing other volumeExpansion opsRequest exists")
+		opsRequest.Spec.VolumeExpansionList = getSingleVolumeExpansionList(componentName, defaultVCTName, targetStorage)
+		Expect(testCtx.CreateObj(ctx, opsRequest)).ShouldNot(HaveOccurred())
+		// mock ops to running
+		patch := client.MergeFrom(opsRequest.DeepCopy())
+		opsRequest.Status.Phase = OpsRunningPhase
+		Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).ShouldNot(HaveOccurred())
+		// create another ops
+		opsRequest1 := createTestOpsRequest(clusterName, opsRequestName+"1", VolumeExpansionType)
+		opsRequest1.Spec.VolumeExpansionList = getSingleVolumeExpansionList(componentName, defaultVCTName, "3Gi")
+		Expect(testCtx.CreateObj(ctx, opsRequest1).Error()).Should(ContainSubstring("existing other VolumeExpansion OpsRequest"))
 	}
 
 	testHorizontalScaling := func(clusterDef *ClusterDefinition, cluster *Cluster) {
@@ -461,10 +476,13 @@ kind: OpsRequest
 metadata:
   name: %s
   namespace: default
+  labels:
+     app.kubernetes.io/instance: %s
+     ops.kubeblocks.io/ops-type: %s
 spec:
   clusterRef: %s
   type: %s
-`, opsRequestName+randomStr, clusterName, opsType)
+`, opsRequestName+randomStr, clusterName, opsType, clusterName, opsType)
 	opsRequest := &OpsRequest{}
 	_ = yaml.Unmarshal([]byte(opsRequestYaml), opsRequest)
 	return opsRequest

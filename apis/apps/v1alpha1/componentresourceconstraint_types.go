@@ -94,6 +94,7 @@ type MemoryConstraint struct {
 	MinPerCPU *resource.Quantity `json:"minPerCPU,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:categories={kubeblocks,all},scope=Cluster,shortName=crc
 
@@ -105,6 +106,7 @@ type ComponentResourceConstraint struct {
 	Spec ComponentResourceConstraintSpec `json:"spec,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 
 // ComponentResourceConstraintList contains a list of ComponentResourceConstraint

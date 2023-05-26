@@ -155,6 +155,7 @@ type BackupToolManifestsStatus struct {
 	CheckPoint string `json:"CheckPoint,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
@@ -174,6 +175,7 @@ type Backup struct {
 	Status BackupStatus `json:"status,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 
 // BackupList contains a list of Backup

@@ -1,6 +1,3 @@
-//go:build tools
-// +build tools
-
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
@@ -20,10 +17,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// This package imports things required by build scripts, to force `go mod` to see them as dependencies
-package tools
+//go:generate go run github.com/ahmetb/gen-crd-api-reference-docs -api-dir . -config ../../../hack/docgen/api/gen-api-doc-config.json -template-dir ../../../hack/docgen/api/template -out-file ../../../docs/user_docs/api-reference/dataprotection.md
 
-import (
-	_ "github.com/ahmetb/gen-crd-api-reference-docs"
-	_ "github.com/golang/mock/mockgen"
-)
+// +groupName=dataprotection.kubeblocks.io
+
+package v1alpha1

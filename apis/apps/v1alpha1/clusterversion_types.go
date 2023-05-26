@@ -122,6 +122,7 @@ type VersionsContext struct {
 	Containers []corev1.Container `json:"containers,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cv
@@ -138,6 +139,7 @@ type ClusterVersion struct {
 	Status ClusterVersionStatus `json:"status,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 
 // ClusterVersionList contains a list of ClusterVersion

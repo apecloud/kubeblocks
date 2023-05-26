@@ -240,6 +240,7 @@ type BackupPolicyTemplate struct {
 	Status BackupPolicyTemplateStatus `json:"status,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 
 // BackupPolicyTemplateList contains a list of BackupPolicyTemplate

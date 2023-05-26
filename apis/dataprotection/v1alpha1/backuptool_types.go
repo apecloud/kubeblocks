@@ -98,6 +98,7 @@ type BackupToolStatus struct {
 	// TODO(dsj): define backup tool status.
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster
@@ -111,6 +112,7 @@ type BackupTool struct {
 	Status BackupToolStatus `json:"status,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 
 // BackupToolList contains a list of BackupTool

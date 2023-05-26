@@ -154,6 +154,7 @@ type ComponentClassInstance struct {
 	ResourceConstraintRef string `json:"resourceConstraintRef,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=ccd
@@ -167,7 +168,8 @@ type ComponentClassDefinition struct {
 	Status ComponentClassDefinitionStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +genclient
+// +kubebuilder:object:root=true
 
 // ComponentClassDefinitionList contains a list of ComponentClassDefinition
 type ComponentClassDefinitionList struct {

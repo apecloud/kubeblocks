@@ -273,6 +273,7 @@ type BackupPolicyStatus struct {
 	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced,shortName=bp
@@ -289,6 +290,7 @@ type BackupPolicy struct {
 	Status BackupPolicyStatus `json:"status,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 
 // BackupPolicyList contains a list of BackupPolicy

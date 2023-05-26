@@ -131,9 +131,6 @@ const (
 	Postgres   = "postgres"
 	Postgresql = "postgresql"
 	Mysql      = "mysql"
-	Mongodb    = "mongodb"
-	Redis      = "redis"
-	Etcd       = "etcd"
 )
 
 var (
@@ -141,3 +138,5 @@ var (
 		Postgres: Postgresql,
 	}
 )
+
+func

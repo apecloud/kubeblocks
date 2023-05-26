@@ -55,4 +55,6 @@ const (
 	KbClusterCompName      = "KB_CLUSTER_COMP_NAME"
 	KbServiceCharacterType = "KB_SERVICE_CHARACTER_TYPE"
 	KbNamespace            = "KB_NAMESPACE"
+	KbPrimaryPodName       = "KB_PRIMARY_POD_NAME"
+	KbTtl                  = "KB_TTL"
 )

@@ -681,6 +681,14 @@ func (pgOps *PostgresOperations) GetSysID(ctx context.Context) (string, error) {
 	return string(res), nil
 }
 
+func (pgOps *PostgresOperations) GetState(ctx context.Context) (string, error) {
+	return "running", nil
+}
+
+func (pgOps *PostgresOperations) GetExtra(ctx context.Context) map[string]string {
+	return nil
+}
+
 func (pgOps *PostgresOperations) Promote() error {
 	return nil
 }

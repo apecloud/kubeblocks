@@ -21,7 +21,8 @@ import (
 
 type Ha struct {
 	ctx      context.Context
-	name     string
+	podName  string
+	dbType   string
 	log      logger.Logger
 	Informer cache.SharedIndexInformer
 	cs       *configuration_store.ConfigurationStore
@@ -46,7 +47,8 @@ func NewHa() *Ha {
 
 	ha := &Ha{
 		ctx:      context.Background(),
-		name:     os.Getenv(util.HostName),
+		podName:  os.Getenv(util.HostName),
+		dbType:   os.Getenv(util.KbServiceCharacterType),
 		log:      logger.NewLogger("ha"),
 		Informer: informer,
 		cs:       cs,
@@ -66,18 +68,32 @@ func (h *Ha) Init() {
 		h.log.Errorf("can't get sysID, err:%v", err)
 	}
 
-	h.cs.Init(sysid)
+	dbState, err := h.DB.GetState(h.ctx)
+
+	err = h.cs.Init(sysid, h.podName, dbState, h.newDbExtra())
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (h *Ha) newDbInterface(logger logger.Logger) DB {
-	dbType := os.Getenv(util.KbServiceCharacterType)
-	switch dbType {
+	switch h.dbType {
 	case binding.Postgresql:
 		return postgres.NewPostgres(logger).(DB)
 	case binding.Mysql:
 		return mysql.NewMysql(logger).(DB)
 	default:
-		h.log.Fatalf("unknown db type:%s", dbType)
+		h.log.Fatalf("unknown db type:%s", h.dbType)
+		return nil
+	}
+}
+
+func (h *Ha) newDbExtra() map[string]string {
+	switch h.dbType {
+	case binding.Postgresql:
+		return h.DB.GetExtra(h.ctx)
+	default:
+		h.log.Fatalf("unknown db type:%s", h.dbType)
 		return nil
 	}
 }
@@ -103,11 +119,11 @@ func (h *Ha) UpdateRecall(oldObj, newObj interface{}) {
 		return
 	}
 
-	if h.name == oldPrimary && h.name != newPrimary {
+	if h.podName == oldPrimary && h.podName != newPrimary {
 		_ = h.DB.Demote()
 	}
 
-	if h.name != oldPrimary && h.name == newPrimary {
+	if h.podName != oldPrimary && h.podName == newPrimary {
 		_ = h.DB.Promote()
 	}
 }

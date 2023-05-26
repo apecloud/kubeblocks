@@ -22,7 +22,6 @@ package configuration_store
 import (
 	"strconv"
 	"strings"
-	"time"
 
 	"golang.org/x/exp/slices"
 	v1 "k8s.io/api/core/v1"
@@ -94,19 +93,18 @@ type Member struct {
 
 func getMemberFromPod(pod *v1.Pod) *Member {
 	annotations := pod.Annotations
-	member := newMember(pod.ResourceVersion, pod.Name, annotations)
+	member := newMember(pod.ResourceVersion, pod.Name, annotations, pod.Labels)
 	member.podLabel = pod.Labels
 	return member
 }
 
-func newMember(index string, name string, data map[string]string) *Member {
+func newMember(index string, name string, annotations map[string]string, labels map[string]string) *Member {
 	return &Member{
 		index: index,
 		name:  name,
 		data: &MemberData{
-			connUrl: data[ConnURL],
-			state:   data[State],
-			role:    data[Role],
+			state: annotations[State],
+			role:  labels[KbLabelRole],
 		},
 	}
 }
@@ -120,10 +118,10 @@ type Failover struct {
 	index       string
 	leader      string
 	candidate   string
-	scheduledAt time.Time
+	scheduledAt int64
 }
 
-func newFailover(index string, leader string, candidate string, scheduledAt time.Time) *Failover {
+func newFailover(index string, leader string, candidate string, scheduledAt int64) *Failover {
 	return &Failover{
 		index:       index,
 		leader:      leader,
@@ -153,9 +151,8 @@ func (s *SyncState) SynchronizedToLeader(candidate string) bool {
 }
 
 type MemberData struct {
-	connUrl string
-	state   string
-	role    string
+	state string
+	role  string
 }
 
 type TimelineHistory struct {

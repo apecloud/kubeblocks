@@ -5,6 +5,8 @@
 </li>
 </ul>
 <h2 id="extensions.kubeblocks.io/v1alpha1">extensions.kubeblocks.io/v1alpha1</h2>
+<div>
+</div>
 Resource Types:
 <ul><li>
 <a href="#extensions.kubeblocks.io/v1alpha1.Addon">Addon</a>

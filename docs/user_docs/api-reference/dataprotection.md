@@ -5,6 +5,8 @@
 </li>
 </ul>
 <h2 id="dataprotection.kubeblocks.io/v1alpha1">dataprotection.kubeblocks.io/v1alpha1</h2>
+<div>
+</div>
 Resource Types:
 <ul><li>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.Backup">Backup</a>

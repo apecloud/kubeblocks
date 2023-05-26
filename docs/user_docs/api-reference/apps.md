@@ -5,8 +5,12 @@
 </li>
 </ul>
 <h2 id="apps.kubeblocks.io/v1alpha1">apps.kubeblocks.io/v1alpha1</h2>
+<div>
+</div>
 Resource Types:
 <ul><li>
+<a href="#apps.kubeblocks.io/v1alpha1.BackupPolicyTemplate">BackupPolicyTemplate</a>
+</li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.Cluster">Cluster</a>
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.ClusterDefinition">ClusterDefinition</a>
@@ -21,6 +25,117 @@ Resource Types:
 </li><li>
 <a href="#apps.kubeblocks.io/v1alpha1.OpsRequest">OpsRequest</a>
 </li></ul>
+<h3 id="apps.kubeblocks.io/v1alpha1.BackupPolicyTemplate">BackupPolicyTemplate
+</h3>
+<div>
+<p>BackupPolicyTemplate is the Schema for the BackupPolicyTemplates API (defined by provider)</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>apps.kubeblocks.io/v1alpha1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>BackupPolicyTemplate</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.BackupPolicyTemplateSpec">
+BackupPolicyTemplateSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>clusterDefinitionRef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>clusterDefinitionRef references ClusterDefinition name, this is an immutable attribute.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backupPolicies</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.BackupPolicy">
+[]BackupPolicy
+</a>
+</em>
+</td>
+<td>
+<p>backupPolicies is a list of backup policy template for the specified componentDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>identifier</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Identifier is a unique identifier for this BackupPolicyTemplate.
+this identifier will be the suffix of the automatically generated backupPolicy name.
+and must be added when multiple BackupPolicyTemplates exist,
+otherwise the generated backupPolicy override will occur.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.BackupPolicyTemplateStatus">
+BackupPolicyTemplateStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.Cluster">Cluster
 </h3>
 <div>
@@ -1238,102 +1353,6 @@ string
 <td>
 <em>(Optional)</em>
 <p>which container can exec command</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.BackupPolicyTemplate">BackupPolicyTemplate
-</h3>
-<div>
-<p>BackupPolicyTemplate is the Schema for the BackupPolicyTemplates API (defined by provider)</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>metadata</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
-Kubernetes meta/v1.ObjectMeta
-</a>
-</em>
-</td>
-<td>
-Refer to the Kubernetes API documentation for the fields of the
-<code>metadata</code> field.
-</td>
-</tr>
-<tr>
-<td>
-<code>spec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.BackupPolicyTemplateSpec">
-BackupPolicyTemplateSpec
-</a>
-</em>
-</td>
-<td>
-<br/>
-<br/>
-<table>
-<tr>
-<td>
-<code>clusterDefinitionRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>clusterDefinitionRef references ClusterDefinition name, this is an immutable attribute.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>backupPolicies</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.BackupPolicy">
-[]BackupPolicy
-</a>
-</em>
-</td>
-<td>
-<p>backupPolicies is a list of backup policy template for the specified componentDefinition.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>identifier</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Identifier is a unique identifier for this BackupPolicyTemplate.
-this identifier will be the suffix of the automatically generated backupPolicy name.
-and must be added when multiple BackupPolicyTemplates exist,
-otherwise the generated backupPolicy override will occur.</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td>
-<code>status</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.BackupPolicyTemplateStatus">
-BackupPolicyTemplateStatus
-</a>
-</em>
-</td>
-<td>
 </td>
 </tr>
 </tbody>

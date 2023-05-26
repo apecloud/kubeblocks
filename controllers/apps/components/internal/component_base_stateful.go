@@ -530,7 +530,7 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 		Namespace: stsObj.Namespace,
 		Name:      stsObj.Name,
 	}
-	snapshotKey := types.NamespacedName{
+	backupKey := types.NamespacedName{
 		Namespace: stsObj.Namespace,
 		Name:      stsObj.Name + "-scaling",
 	}
@@ -593,7 +593,7 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 			return nil
 		}
 		// if all pvc bounded, clean backup resources
-		objs, err := deleteSnapshot(cli, reqCtx, snapshotKey, c.GetCluster(), c.GetName())
+		objs, err := deleteSnapshot(cli, reqCtx, backupKey, c.GetCluster(), c.GetName())
 		if err != nil {
 			return err
 		}
@@ -619,7 +619,7 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 		// do backup according to component's horizontal scale policy
 		c.WorkloadVertex.Immutable = true
 		stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
-		objs, err := doBackup(reqCtx, cli, c.Cluster, c.Component, snapshotKey, stsProto, stsObj)
+		objs, err := doBackup(reqCtx, cli, c.Cluster, c.Component, backupKey, stsProto, stsObj)
 		if err != nil {
 			return err
 		}

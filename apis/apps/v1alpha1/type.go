@@ -244,7 +244,7 @@ const (
 
 // HScaleDataClonePolicyType defines data clone policy when horizontal scaling.
 // +enum
-// +kubebuilder:validation:Enum={None,Snapshot}
+// +kubebuilder:validation:Enum={None,Snapshot,Backup}
 type HScaleDataClonePolicyType string
 
 const (

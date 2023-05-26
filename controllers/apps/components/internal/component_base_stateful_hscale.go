@@ -160,10 +160,10 @@ func getBackupMatchingLabels(clusterName string, componentName string) client.Ma
 }
 
 func doBackup(reqCtx intctrlutil.RequestCtx,
-	cli types2.ReadonlyClient,
+	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
-	snapshotKey types.NamespacedName,
+	backupKey types.NamespacedName,
 	stsProto *appsv1.StatefulSet,
 	stsObj *appsv1.StatefulSet) ([]client.Object, error) {
 	if component.HorizontalScalePolicy == nil {
@@ -181,6 +181,17 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 			corev1.EventTypeWarning,
 			"HorizontalScaleFailed",
 			"scale with backup tool not support yet")
+		backupObjs, err := Backup(reqCtx,
+			cli,
+			backupKey,
+			stsObj,
+			cluster,
+			component.ComponentDef,
+			component.HorizontalScalePolicy.BackupPolicyTemplateName)
+		if err != nil {
+			return nil, err
+		}
+		objs = append(objs, backupObjs...)
 	// use volume snapshot
 	case appsv1alpha1.HScaleDataClonePolicyFromSnapshot:
 		if !isSnapshotAvailable(cli, reqCtx.Ctx) {
@@ -204,7 +215,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 			if snapshots, err := doSnapshot(cli,
 				reqCtx,
 				cluster,
-				snapshotKey,
+				backupKey,
 				stsObj,
 				vcts,
 				component.ComponentDef,
@@ -289,7 +300,7 @@ func isVolumeSnapshotExists(cli types2.ReadonlyClient,
 	return false, nil
 }
 
-func doSnapshot(cli types2.ReadonlyClient,
+func doSnapshot(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
 	snapshotKey types.NamespacedName,
@@ -381,7 +392,7 @@ func checkedCreatePVCFromSnapshot(cli types2.ReadonlyClient,
 
 // createBackup create backup resources required to do backup,
 func createBackup(reqCtx intctrlutil.RequestCtx,
-	cli types2.ReadonlyClient,
+	cli client.Client,
 	sts *appsv1.StatefulSet,
 	componentDef,
 	backupPolicyTemplateName string,
@@ -417,7 +428,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		objs = append(objs, backup)
 		return nil
 	}
-	backupPolicy, err := getBackupPolicyFromTemplate(reqCtx, cli, cluster, componentDef, backupPolicyTemplateName)
+	backupPolicy, err := GetBackupPolicyFromTemplate(reqCtx, cli, cluster, componentDef, backupPolicyTemplateName)
 	if err != nil {
 		return nil, err
 	}
@@ -430,28 +441,6 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 
 	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobCreate", "Create backupJob/%s", backupKey.Name)
 	return objs, nil
-}
-
-// getBackupPolicyFromTemplate gets backup policy from template policy template.
-func getBackupPolicyFromTemplate(reqCtx intctrlutil.RequestCtx,
-	cli types2.ReadonlyClient,
-	cluster *appsv1alpha1.Cluster,
-	componentDef, backupPolicyTemplateName string) (*dataprotectionv1alpha1.BackupPolicy, error) {
-	backupPolicyList := &dataprotectionv1alpha1.BackupPolicyList{}
-	if err := cli.List(reqCtx.Ctx, backupPolicyList,
-		client.InNamespace(cluster.Namespace),
-		client.MatchingLabels{
-			constant.AppInstanceLabelKey:          cluster.Name,
-			constant.KBAppComponentDefRefLabelKey: componentDef,
-		}); err != nil {
-		return nil, err
-	}
-	for _, backupPolicy := range backupPolicyList.Items {
-		if backupPolicy.Annotations[constant.BackupPolicyTemplateAnnotationKey] == backupPolicyTemplateName {
-			return &backupPolicy, nil
-		}
-	}
-	return nil, nil
 }
 
 func createPVCFromSnapshot(vct corev1.PersistentVolumeClaimTemplate,

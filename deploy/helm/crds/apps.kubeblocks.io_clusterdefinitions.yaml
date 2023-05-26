@@ -362,6 +362,7 @@ spec:
                           enum:
                           - None
                           - Snapshot
+                          - Backup
                           type: string
                         volumeMountsName:
                           description: volumeMountsName defines which volumeMount

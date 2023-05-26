@@ -1,18 +1,17 @@
-package lifecycle
+package internal
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -33,36 +32,30 @@ const (
 )
 
 func Backup(reqCtx intctrlutil.RequestCtx,
-	cli roclient.ReadonlyClient,
+	cli client.Client,
 	backupKey types.NamespacedName,
 	sts *appsv1.StatefulSet,
 	cluster *appsv1alpha1.Cluster,
 	componentDefName string,
-	backupPolicyTplName string,
-	dag *graph.DAG,
-	root graph.Vertex) error {
-	backupPolicy, err := getBackupPolicyFromTemplate(reqCtx, cli, cluster, componentDefName, backupPolicyTplName)
+	backupPolicyTplName string) ([]client.Object, error) {
+	objs := make([]client.Object, 0)
+	backupPolicy, err := GetBackupPolicyFromTemplate(reqCtx, cli, cluster, componentDefName, backupPolicyTplName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if backupPolicy == nil {
-		return intctrlutil.NewNotFound("not found any backup policy created by %s", backupPolicyTplName)
+		return nil, intctrlutil.NewNotFound("not found any backup policy created by %s", backupPolicyTplName)
 	}
 	backup, err := builder.BuildBackup(sts, backupPolicy.Name, backupKey, "datafile")
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if err := controllerutil.SetControllerReference(cluster, backup, scheme); err != nil {
-		return err
-	}
-	vertex := &lifecycleVertex{obj: backup, action: actionPtr(CREATE)}
-	dag.AddVertex(vertex)
-	dag.Connect(root, vertex)
-	return nil
+	objs = append(objs, backup)
+	return objs, nil
 }
 
 func CheckBackupStatus(reqCtx intctrlutil.RequestCtx,
-	cli roclient.ReadonlyClient,
+	cli client.Client,
 	backupKey types.NamespacedName) (BackupStatus, error) {
 	backup := dataprotectionv1alpha1.Backup{}
 	if err := cli.Get(reqCtx.Ctx, backupKey, &backup); err != nil {
@@ -80,27 +73,25 @@ func CheckBackupStatus(reqCtx intctrlutil.RequestCtx,
 
 func Restore(restoreJobKey types.NamespacedName,
 	cluster *appsv1alpha1.Cluster,
+	sts *appsv1.StatefulSet,
 	component *component.SynthesizedComponent,
 	backup *dataprotectionv1alpha1.Backup,
 	backupTool *dataprotectionv1alpha1.BackupTool,
-	pvcName string,
-	dag *graph.DAG,
-	root graph.Vertex) error {
-	job, err := builder.BuildRestoreJobForFullBackup(restoreJobKey.Name, component, backup, backupTool, pvcName)
+	pvcKey types.NamespacedName) ([]client.Object, error) {
+	objs := make([]client.Object, 0)
+	// TODO: CT - need to check parameters
+	pvc, err := builder.BuildPVCFromSnapshot(sts, component.VolumeClaimTemplates[0], pvcKey, "", component)
+	objs = append(objs, pvc)
+	job, err := builder.BuildRestoreJobForFullBackup(restoreJobKey.Name, component, backup, backupTool, pvcKey.Name)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if err := controllerutil.SetControllerReference(cluster, backup, scheme); err != nil {
-		return err
-	}
-	vertex := &lifecycleVertex{obj: job, action: actionPtr(CREATE)}
-	dag.AddVertex(vertex)
-	dag.Connect(root, vertex)
-	return nil
+	objs = append(objs, job)
+	return objs, nil
 }
 
 func CheckRestoreStatus(reqCtx intctrlutil.RequestCtx,
-	cli roclient.ReadonlyClient,
+	cli client.Client,
 	restoreJobKey types.NamespacedName) (RestoreStatus, error) {
 	job := v1.Job{}
 	if err := cli.Get(reqCtx.Ctx, restoreJobKey, &job); err != nil {
@@ -114,4 +105,26 @@ func CheckRestoreStatus(reqCtx intctrlutil.RequestCtx,
 		return RestoreStatusReadyToUse, nil
 	}
 	return RestoreStatusProcessing, nil
+}
+
+// GetBackupPolicyFromTemplate gets backup policy from template policy template.
+func GetBackupPolicyFromTemplate(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	componentDef, backupPolicyTemplateName string) (*dataprotectionv1alpha1.BackupPolicy, error) {
+	backupPolicyList := &dataprotectionv1alpha1.BackupPolicyList{}
+	if err := cli.List(reqCtx.Ctx, backupPolicyList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabels{
+			constant.AppInstanceLabelKey:          cluster.Name,
+			constant.KBAppComponentDefRefLabelKey: componentDef,
+		}); err != nil {
+		return nil, err
+	}
+	for _, backupPolicy := range backupPolicyList.Items {
+		if backupPolicy.Annotations[constant.BackupPolicyTemplateAnnotationKey] == backupPolicyTemplateName {
+			return &backupPolicy, nil
+		}
+	}
+	return nil, nil
 }

@@ -98,7 +98,7 @@ kbcli cluster create [NAME] [flags]
   -f, --set-file string                Use yaml file, URL, or stdin to set the cluster resource
       --tenancy string                 Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
       --termination-policy string      Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
-      --tolerations strings            Tolerations for cluster, the format is "key=value:effect", for example '"engineType=mongo:NoSchedule"'
+      --tolerations strings            Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
       --topology-keys stringArray      Topology keys for affinity
 ```
 

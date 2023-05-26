@@ -42,7 +42,7 @@ kbcli cluster update NAME [flags]
       --template string                Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
       --tenancy string                 Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
       --termination-policy string      Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
-      --tolerations strings            Tolerations for cluster, the format is "key=value:effect", for example '"engineType=mongo:NoSchedule"'
+      --tolerations strings            Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
       --topology-keys stringArray      Topology keys for affinity
 ```
 

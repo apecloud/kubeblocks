@@ -941,7 +941,7 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&f.TerminationPolicy, "termination-policy", "Delete", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
 	cmd.Flags().StringArrayVar(&f.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
 	cmd.Flags().StringToStringVar(&f.NodeLabels, "node-labels", nil, "Node label selector")
-	cmd.Flags().StringSliceVar(&f.TolerationsRaw, "tolerations", nil, `Tolerations for cluster, the format is "key=value:effect", for example '"engineType=mongo:NoSchedule"'`)
+	cmd.Flags().StringSliceVar(&f.TolerationsRaw, "tolerations", nil, `Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'`)
 	cmd.Flags().StringVar(&f.Tenancy, "tenancy", "SharedNode", "Tenancy options, one of: (SharedNode, DedicatedNode)")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(

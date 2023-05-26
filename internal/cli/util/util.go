@@ -769,22 +769,30 @@ func IsWindows() bool {
 	return runtime.GOOS == types.GoosWindows
 }
 
-// BuildTolerations toleration format: key=value:effect
+// BuildTolerations toleration format: key=value:effect or key:effect,
 func BuildTolerations(raw []string) ([]interface{}, error) {
 	tolerations := make([]interface{}, 0)
 	for _, tolerationRaw := range raw {
 		for _, entries := range strings.Split(tolerationRaw, ",") {
 			toleration := make(map[string]interface{})
-			toleration["operator"] = "Equal"
-			parts := strings.FieldsFunc(entries, func(r rune) bool {
-				return r == '=' || r == ':'
-			})
-			if len(parts) != 3 {
-				return nil, fmt.Errorf("invalid toleration %s", entries)
+			parts := strings.Split(entries, ":")
+			if len(parts) != 2 {
+				return tolerations, fmt.Errorf("invalid toleration %s", entries)
 			}
-			toleration["key"] = parts[0]
-			toleration["value"] = parts[1]
-			toleration["effect"] = parts[2]
+			toleration["effect"] = parts[1]
+
+			partsKV := strings.Split(parts[0], "=")
+			switch len(partsKV) {
+			case 1:
+				toleration["operator"] = "Exists"
+				toleration["key"] = partsKV[0]
+			case 2:
+				toleration["operator"] = "Equal"
+				toleration["key"] = partsKV[0]
+				toleration["value"] = partsKV[1]
+			default:
+				return tolerations, fmt.Errorf("invalid toleration %s", entries)
+			}
 			tolerations = append(tolerations, toleration)
 		}
 	}

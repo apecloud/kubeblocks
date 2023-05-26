@@ -273,16 +273,13 @@ var _ = Describe("util", func() {
 	})
 
 	It("test build toleration", func() {
-		validRaws := []string{"dev=true:NoSchedule,large=true:NoSchedule"}
-		_, err := BuildTolerations(validRaws)
+		validRaws := []string{"dev=true:NoSchedule,large:NoSchedule"}
+		tolerations, err := BuildTolerations(validRaws)
 		Expect(err).Should(BeNil())
+		Expect(len(tolerations)).Should(Equal(2))
 
 		// optimize these codes
 		invalidRaws := []string{"dev=true"}
-		_, err = BuildTolerations(invalidRaws)
-		Expect(err).Should(HaveOccurred())
-
-		invalidRaws = []string{"true:NoSchedule"}
 		_, err = BuildTolerations(invalidRaws)
 		Expect(err).Should(HaveOccurred())
 	})

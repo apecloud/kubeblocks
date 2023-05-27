@@ -32,14 +32,14 @@ jobs:
           repository: ${{ env.CLI_REPO }}
           token: ${{ env.GITHUB_TOKEN }}
           prerelease: true
-      - name: create gitlab release ${{ env.CLI_NAME }}
-        run: |
-          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
-            --type 1 \
-            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
-            --tag-name ${{ env.TAG_NAME }} \
-            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
-            
+#      - name: create gitlab release ${{ env.CLI_NAME }}
+#        run: |
+#          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
+#            --type 1 \
+#            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
+#            --tag-name ${{ env.TAG_NAME }} \
+#            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
+
 
   upload-release-assert:
     needs: create-release-kbcli
@@ -66,9 +66,9 @@ jobs:
       - name: make generate
         run: make generate
 
-      - name: Get release
-        id: get_release
-        uses: bruceadams/get-release@v1.3.2
+#      - name: Get release
+#        id: get_release
+#        uses: bruceadams/get-release@v1.3.2
 
       - name: make build
         run: |    

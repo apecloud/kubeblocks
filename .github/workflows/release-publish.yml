@@ -71,7 +71,7 @@ jobs:
 #        uses: bruceadams/get-release@v1.3.2
 
       - name: make build
-        run: |    
+        run: |
           CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh \
             --tag-name ${{ matrix.os }} \
             --type 2`
@@ -83,7 +83,7 @@ jobs:
           echo "CLI_OS_ARCH=${CLI_OS_ARCH}" >> $GITHUB_ENV
           echo "CLI_FILENAME=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}" >> $GITHUB_ENV
           echo "CLI_DIR=${{ matrix.os }}" >> $GITHUB_ENV
-  
+
       - name: make zip
         if: matrix.os == 'windows-amd64'
         run: |

@@ -202,7 +202,6 @@ func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (m
 			}
 			class.CPU = cls.CPU
 			class.Memory = cls.Memory
-			class.Volumes = cls.Volumes
 		}
 		result := &v1alpha1.ComponentClassInstance{
 			ComponentClass: v1alpha1.ComponentClass{
@@ -211,13 +210,6 @@ func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (m
 				Memory: class.Memory,
 			},
 			ResourceConstraintRef: group.ResourceConstraintRef,
-		}
-		for _, volume := range class.Volumes {
-			result.Volumes = append(result.Volumes, v1alpha1.Volume{
-				Name:             volume.Name,
-				StorageClassName: volume.StorageClassName,
-				Size:             volume.Size,
-			})
 		}
 		return result, nil
 	}

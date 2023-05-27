@@ -45,7 +45,6 @@ var _ = Describe("create", func() {
 	fillResources := func(o *CreateOptions, cpu string, memory string, storage []string) {
 		o.CPU = cpu
 		o.Memory = memory
-		o.Storage = storage
 		o.ClassName = fmt.Sprintf("custom-%s-%s", cpu, memory)
 		o.Constraint = generalResourceConstraint.Name
 	}

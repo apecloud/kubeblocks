@@ -248,8 +248,3 @@ func (o *CreateOptions) run() error {
 	_, _ = fmt.Fprintf(o.Out, "Successfully created class [%s].\n", strings.Join(classNames, ","))
 	return nil
 }
-
-func (o *CreateOptions) buildClass() (*v1alpha1.ComponentClass, error) {
-	cls := v1alpha1.ComponentClass{Name: o.ClassName, CPU: resource.MustParse(o.CPU), Memory: resource.MustParse(o.Memory)}
-	return &cls, nil
-}

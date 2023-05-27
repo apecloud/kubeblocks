@@ -46,11 +46,6 @@ type ComponentClassGroup struct {
 	//	template: |
 	//	  cpu: "{{ or .cpu 1 }}"
 	//	  memory: "{{ or .memory 4 }}Gi"
-	//	  storage:
-	//	  - name: data
-	//	    size: "{{ or .dataStorageSize 10 }}Gi"
-	//	  - name: log
-	//	    size: "{{ or .logStorageSize 1 }}Gi"
 	//
 	// +optional
 	Template string `json:"template,omitempty"`

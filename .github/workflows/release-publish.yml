@@ -91,7 +91,7 @@ jobs:
           zip -r -o ${{ env.CLI_FILENAME }}.zip  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.zip  # for debug 
           mv ${{ env.CLI_FILENAME }}.zip bin/
-          shasum -a bin/${{ env.CLI_FILENAME }}.zip > bin/${{ env.CLI_FILENAME }}.zip.sha256
+          shasum -a 256 bin/${{ env.CLI_FILENAME }}.zip > bin/${{ env.CLI_FILENAME }}.zip.sha256
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.zip" >> $GITHUB_ENV
           echo "ASSET_CONTENT_TYPE=application/zip" >> $GITHUB_ENV
           echo "CheckSum=${{ env.CLI_FILENAME }}.zip.sha256" >> $GITHUB_ENV
@@ -103,7 +103,7 @@ jobs:
           tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.tar.gz  # for debug 
           mv ${{ env.CLI_FILENAME }}.tar.gz bin/
-          shasum -a bin/${{ env.CLI_FILENAME }}.tar.gz > bin/${{ env.CLI_FILENAME }}.tar.gz.sha256
+          shasum -a 256 bin/${{ env.CLI_FILENAME }}.tar.gz > bin/${{ env.CLI_FILENAME }}.tar.gz.sha256
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.tar.gz" >> $GITHUB_ENV
           echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
           echo "CheckSum=${{ env.CLI_FILENAME }}.tar.gz.sha256" >> $GITHUB_ENV

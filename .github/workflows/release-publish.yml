@@ -87,13 +87,16 @@ jobs:
       - name: make zip
         if: matrix.os == 'windows-amd64'
         run: |
-          mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }}.exe 
+          mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }}.exe
           cp ${{ matrix.os }}/${{ env.CLI_NAME }}.exe bin/
+          shasum -a 256  ${{ matrix.os }}/${{ env.CLI_NAME }}.exe > bin/{{ matrix.os }}.exe.sha256
           zip -r -o ${{ env.CLI_FILENAME }}.zip  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.zip  # for debug 
+          shasum -a 256 ${{ env.CLI_FILENAME }}.zip > bin/${{ env.CLI_FILENAME }}.zip.sha256
           mv ${{ env.CLI_FILENAME }}.zip bin/
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.zip" >> $GITHUB_ENV
           echo "ASSET_CONTENT_TYPE=application/zip" >> $GITHUB_ENV
+          echo "CHECKSUM=${{ env.CLI_FILENAME }}.zip.sha256" >> $GITHUB_ENV
 
       - name: make tar
         if: matrix.os != 'windows-amd64'
@@ -102,8 +105,10 @@ jobs:
           tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.tar.gz  # for debug 
           mv ${{ env.CLI_FILENAME }}.tar.gz bin/
+          shasum -a 256 ${{ env.CLI_FILENAME }}.tar.gz > bin/${{ env.CLI_FILENAME }}.tar.gz.sha256
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.tar.gz" >> $GITHUB_ENV
           echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
+          echo "CHECKSUM=${{ env.CLI_FILENAME }}.tar.gz.sha256" >> $GITHUB_ENV
 
 #      - name: upload gitlab kbcli asset ${{ matrix.os }}
 #        env:
@@ -143,6 +148,14 @@ jobs:
           asset_name: ${{ env.CLI_NAME }}.exe
           asset_content_type: application/octet-stream
 
+      - name: upload release kbcli asset 256sumcheck ${{ matrix.os }}
+        uses: actions/upload-release-asset@main
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ./bin/${{ env.CHECKSUM }}
+          asset_name: ${{ env.CHECKSUM }}
+          asset_content_type: text/plain
+
 #      - name: upload release asset ${{ matrix.os }}
 #        continue-on-error: true
 #        uses: actions/upload-release-asset@main
@@ -152,14 +165,6 @@ jobs:
 #          asset_name: ${{ env.ASSET_NAME }}
 #          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
 
-      - uses: MCJack123/ghaction-generate-release-hashes@v3
-        with:
-          hash-type: sha1
-          file-name: hashes.txt
-      - uses: actions/upload-artifact@v2
-        with:
-          name: Asset Hashes
-          path: hashes.txt
 
 #  send-message:
 #    runs-on: ubuntu-latest

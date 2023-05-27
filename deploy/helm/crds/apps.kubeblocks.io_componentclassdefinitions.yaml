@@ -104,8 +104,7 @@ spec:
                         value is sufficient, as the complete class definition will
                         be generated through rendering the template. \n For example:
                         template: | cpu: \"{{ or .cpu 1 }}\" memory: \"{{ or .memory
-                        4 }}Gi\" storage: - name: data size: \"{{ or .dataStorageSize
-                        10 }}Gi\" - name: log size: \"{{ or .logStorageSize 1 }}Gi\""
+                        4 }}Gi\""
                       type: string
                     vars:
                       description: vars defines the variables declared in the template

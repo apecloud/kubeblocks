@@ -64,10 +64,7 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 			},
 		},
 	}
-	component := &appsv1alpha1.ClusterComponentDefinition{
-		WorkloadType: appsv1alpha1.Consensus,
-	}
-	if err := util.InitClusterComponentStatusIfNeed(cluster, componentName, *component); err != nil {
+	if err := util.InitClusterComponentStatusIfNeed(cluster, componentName, appsv1alpha1.Consensus); err != nil {
 		t.Errorf("caught error %v", err)
 	}
 
@@ -82,7 +79,7 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 		t.Errorf("cluster.Status.ComponentDefs[componentName].ConsensusSetStatus not initialized properly")
 	} else if consensusSetStatus.Leader.Name != "" ||
 		consensusSetStatus.Leader.AccessMode != appsv1alpha1.None ||
-		consensusSetStatus.Leader.Pod != util.ComponentStatusDefaultPodName {
+		consensusSetStatus.Leader.Pod != constant.ComponentStatusDefaultPodName {
 		t.Errorf("cluster.Status.ComponentDefs[componentName].ConsensusSetStatus.Leader not initialized properly")
 	}
 }
@@ -199,14 +196,14 @@ func TestComposeRoleEnv(t *testing.T) {
 		pods = append(pods, *pod)
 	}
 	pods[0].Labels = map[string]string{constant.RoleLabelKey: "leader"}
-	leader, followers := composeRoleEnv(componentDef, pods)
+	leader, followers := composeRoleEnv(componentDef.ConsensusSpec, pods)
 	assert.Equal(t, "foo-0", leader)
 	assert.Equal(t, "foo-1,foo-2,foo-3,foo-4", followers)
 
 	dt := time.Now()
 	pods[3].DeletionTimestamp = &metav1.Time{Time: dt}
 	pods[4].DeletionTimestamp = &metav1.Time{Time: dt}
-	leader, followers = composeRoleEnv(componentDef, pods)
+	leader, followers = composeRoleEnv(componentDef.ConsensusSpec, pods)
 	assert.Equal(t, "foo-0", leader)
 	assert.Equal(t, "foo-1,foo-2", followers)
 }

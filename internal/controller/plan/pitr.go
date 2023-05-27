@@ -38,7 +38,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	computil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -597,7 +597,7 @@ func (p *PointInTimeRecoveryManager) removeStsInitContainer(
 	componentName string) error {
 	// get the sts list of component
 	stsList := &appsv1.StatefulSetList{}
-	if err := util.GetObjectListByComponentName(p.Ctx, p.Client, *cluster, stsList, componentName); err != nil {
+	if err := computil.GetObjectListByComponentName(p.Ctx, p.Client, *cluster, stsList, componentName); err != nil {
 		return err
 	}
 	for _, sts := range stsList.Items {

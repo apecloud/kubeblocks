@@ -26,6 +26,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 type initTransformer struct {
@@ -33,15 +34,17 @@ type initTransformer struct {
 	originCluster *appsv1alpha1.Cluster
 }
 
+var _ graph.Transformer = &initTransformer{}
+
 func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	// put the cluster object first, it will be root vertex of DAG
-	rootVertex := &lifecycleVertex{obj: t.cluster, oriObj: t.originCluster, action: actionPtr(STATUS)}
+	rootVertex := &ictrltypes.LifecycleVertex{Obj: t.cluster, ObjCopy: t.originCluster, Action: ictrltypes.ActionStatusPtr()}
 	dag.AddVertex(rootVertex)
 
-	if !isClusterDeleting(*t.cluster) {
+	if !t.cluster.IsDeleting() {
 		t.handleLatestOpsRequestProcessingCondition()
 	}
-	if isClusterUpdating(*t.cluster) {
+	if t.cluster.IsUpdating() {
 		t.handleClusterPhase()
 	}
 	return nil
@@ -77,5 +80,3 @@ func (t *initTransformer) handleLatestOpsRequestProcessingCondition() {
 		meta.SetStatusCondition(&t.cluster.Status.Conditions, opsCondition)
 	}
 }
-
-var _ graph.Transformer = &initTransformer{}

@@ -504,6 +504,18 @@ func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
 }
 
+func (r Cluster) IsDeleting() bool {
+	return !r.GetDeletionTimestamp().IsZero()
+}
+
+func (r Cluster) IsUpdating() bool {
+	return r.Status.ObservedGeneration != r.Generation
+}
+
+func (r Cluster) IsStatusUpdating() bool {
+	return !r.IsDeleting() && !r.IsUpdating()
+}
+
 // GetVolumeClaimNames gets all PVC names of component compName
 //
 // r.Spec.GetComponentByName(compName).VolumeClaimTemplates[*].Name will be used if no claimNames provided

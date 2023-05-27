@@ -28,6 +28,8 @@ import (
 
 type AssureMetaTransformer struct{}
 
+var _ graph.Transformer = &AssureMetaTransformer{}
+
 func (t *AssureMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
@@ -56,5 +58,3 @@ func (t *AssureMetaTransformer) Transform(ctx graph.TransformContext, dag *graph
 
 	return nil
 }
-
-var _ graph.Transformer = &AssureMetaTransformer{}

@@ -50,6 +50,13 @@ spec:
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-config
           defaultMode: 0777
+        - name: pgbouncer-configuration
+          templateRef: pgbouncer-configuration
+          keys:
+            - pgbouncer.ini
+          namespace: {{ .Release.Namespace }}
+          volumeName: pgbouncer-config
+          defaultMode: 0777
         - name: postgresql-custom-metrics
           templateRef: postgresql14-custom-metrics
           namespace: {{ .Release.Namespace }}
@@ -66,6 +73,9 @@ spec:
           - name: tcp-postgresql
             port: 5432
             targetPort: tcp-postgresql
+          - name: tcp-pgbouncer
+            port: 6432
+            targetPort: tcp-pgbouncer
       volumeTypes:
         - name: data
           type: data
@@ -95,7 +105,7 @@ spec:
               - /kb-scripts/setup.sh
             readinessProbe:
               failureThreshold: 3
-              initialDelaySeconds: 25
+              initialDelaySeconds: 10
               periodSeconds: 30
               successThreshold: 1
               timeoutSeconds: 5
@@ -192,6 +202,60 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+          - name: pgbouncer
+            imagePullPolicy: {{ .Values.pgbouncer.image.pullPolicy | quote }}
+            securityContext:
+              runAsUser: 0
+            ports:
+              - name: tcp-pgbouncer
+                containerPort: 6432
+            volumeMounts:
+              - name: pgbouncer-config
+                mountPath: /home/pgbouncer/conf
+              - name: scripts
+                mountPath: /kb-scripts
+            command:
+              - /kb-scripts/pgbouncer_setup.sh
+            livenessProbe:
+              failureThreshold: 3
+              initialDelaySeconds: 15
+              periodSeconds: 30
+              successThreshold: 1
+              timeoutSeconds: 5
+              tcpSocket:
+                port: tcp-pgbouncer
+            readinessProbe:
+              failureThreshold: 3
+              initialDelaySeconds: 15
+              periodSeconds: 30
+              successThreshold: 1
+              timeoutSeconds: 5
+              tcpSocket:
+                port: tcp-pgbouncer
+            env:
+              - name: PGBOUNCER_AUTH_TYPE
+                value: md5
+              - name: POSTGRESQL_USERNAME
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+              - name: POSTGRESQL_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+              - name: POSTGRESQL_PORT
+                value: "5432"
+              - name: POSTGRESQL_HOST
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: PGBOUNCER_PORT
+                value: "6432"
+              - name: PGBOUNCER_BIND_ADDRESS
+                value: "0.0.0.0"
           - name: metrics
             image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}

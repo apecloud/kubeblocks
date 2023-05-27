@@ -25,9 +25,10 @@ import (
 	"math"
 
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
@@ -271,12 +272,12 @@ func getKeyFile() string {
 }
 
 // BuiltInCustomFunctions builds a map of customized functions for KubeBlocks
-func BuiltInCustomFunctions(c *configTemplateBuilder, task *intctrltypes.ReconcileTask) *gotemplate.BuiltInObjectsFunc {
+func BuiltInCustomFunctions(c *configTemplateBuilder, component *component.SynthesizedComponent, localObjs []client.Object) *gotemplate.BuiltInObjectsFunc {
 	return &gotemplate.BuiltInObjectsFunc{
 		builtInMysqlCalBufferFunctionName:            calDBPoolSize,
 		builtInGetVolumeFunctionName:                 getVolumeMountPathByName,
 		builtInGetPvcFunctionName:                    getPVCByName,
-		builtInGetEnvFunctionName:                    wrapGetEnvByName(c, task),
+		builtInGetEnvFunctionName:                    wrapGetEnvByName(c, component, localObjs),
 		builtInGetPortFunctionName:                   getPortByName,
 		builtInGetArgFunctionName:                    getArgByName,
 		builtInGetContainerFunctionName:              getPodContainerByName,
@@ -287,4 +288,5 @@ func BuiltInCustomFunctions(c *configTemplateBuilder, task *intctrltypes.Reconci
 		builtInGetCertFile:                           getCertFile,
 		builtInGetKeyFile:                            getKeyFile,
 	}
+
 }

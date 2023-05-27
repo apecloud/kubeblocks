@@ -93,6 +93,20 @@ data:
     export SPILO_CONFIGURATION=$(cat tmp_patroni.yaml)
     # export SCOPE="$KB_CLUSTER_NAME-$KB_CLUSTER_NAME"
     exec /launch.sh init
+  pgbouncer_setup.sh: |
+    #!/bin/bash
+    set -o errexit
+    set -ex
+    mkdir -p /opt/bitnami/pgbouncer/conf/ /opt/bitnami/pgbouncer/logs/ /opt/bitnami/pgbouncer/tmp/
+    cp /home/pgbouncer/conf/pgbouncer.ini /opt/bitnami/pgbouncer/conf/
+    echo "\"$POSTGRESQL_USERNAME\" \"$POSTGRESQL_PASSWORD\"" > /opt/bitnami/pgbouncer/conf/userlist.txt
+    echo -e "\\n[databases]" >> /opt/bitnami/pgbouncer/conf/pgbouncer.ini
+    echo "postgres=host=$KB_POD_IP port=5432 dbname=postgres" >> /opt/bitnami/pgbouncer/conf/pgbouncer.ini
+    chmod +777 /opt/bitnami/pgbouncer/conf/pgbouncer.ini
+    chmod +777 /opt/bitnami/pgbouncer/conf/userlist.txt
+    useradd pgbouncer
+    chown -R pgbouncer:pgbouncer /opt/bitnami/pgbouncer/conf/ /opt/bitnami/pgbouncer/logs/ /opt/bitnami/pgbouncer/tmp/
+    /opt/bitnami/scripts/pgbouncer/run.sh
   backup-log-collector.sh: |
     #!/bin/bash
     set -o errexit

@@ -35,10 +35,12 @@ import (
 // FillClassTransformer fill the class related info to cluster
 type FillClassTransformer struct{}
 
+var _ graph.Transformer = &FillClassTransformer{}
+
 func (r *FillClassTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
-	if isClusterDeleting(*cluster) {
+	if cluster.IsDeleting() {
 		return nil
 	}
 	return r.fillClass(transCtx)
@@ -142,5 +144,3 @@ func buildVolumeClaimByClass(cls *appsv1alpha1.ComponentClassInstance) []appsv1a
 	}
 	return volumes
 }
-
-var _ graph.Transformer = &FillClassTransformer{}

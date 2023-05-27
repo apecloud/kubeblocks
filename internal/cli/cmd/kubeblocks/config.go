@@ -41,6 +41,14 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
+var showAllConfig = false
+var keyWhiteList = []string{
+	"addonController",
+	"dataProtection",
+	"affinity",
+	"tolerations",
+}
+
 var backupConfigExample = templates.Examples(`
 		# Enable the snapshot-controller and volume snapshot, to support snapshot backup.
 		kbcli kubeblocks config --set snapshot-controller.enabled=true
@@ -120,6 +128,7 @@ func NewDescribeConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 		},
 	}
 	printer.AddOutputFlag(cmd, &output)
+	cmd.Flags().BoolVarP(&showAllConfig, "all", "A", false, "show all kubeblocks configs value")
 	return cmd
 }
 
@@ -144,7 +153,14 @@ func getHelmValues(release string, opt *Options) (map[string]interface{}, error)
 	for _, item := range list.Items {
 		delete(values, item.GetName())
 	}
-	return values, nil
+	if showAllConfig {
+		return values, nil
+	}
+	res := make(map[string]interface{})
+	for i := range keyWhiteList {
+		res[keyWhiteList[i]] = values[keyWhiteList[i]]
+	}
+	return res, nil
 }
 
 type fn func(release string, opt *Options) (map[string]interface{}, error)

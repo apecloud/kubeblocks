@@ -24,14 +24,71 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// Component is the interface to use for component status
+const (
+	// ComponentPhaseTransition the event reason indicates that the component transits  to a new phase.
+	ComponentPhaseTransition = "ComponentPhaseTransition"
+
+	// RoleProbeTimeoutReason the event reason when all pods of the component role probe timed out.
+	RoleProbeTimeoutReason = "RoleProbeTimeout"
+
+	// PodContainerFailedTimeout the timeout for container of pod failures, the component phase will be set to Failed/Abnormal after this time.
+	PodContainerFailedTimeout = time.Minute
+)
+
 type Component interface {
+	GetName() string
+	GetNamespace() string
+	GetClusterName() string
+	GetDefinitionName() string
+	GetWorkloadType() appsv1alpha1.WorkloadType
+
+	GetCluster() *appsv1alpha1.Cluster
+	GetClusterVersion() *appsv1alpha1.ClusterVersion
+	GetSynthesizedComponent() *component.SynthesizedComponent
+
+	GetMatchingLabels() client.MatchingLabels
+
+	GetReplicas() int32
+
+	GetConsensusSpec() *appsv1alpha1.ConsensusSetSpec
+	GetPrimaryIndex() int32
+
+	GetPhase() appsv1alpha1.ClusterComponentPhase
+	// GetStatus() appsv1alpha1.ClusterComponentStatus
+
+	// GetBuiltObjects returns all objects that will be created by this component
+	GetBuiltObjects(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]client.Object, error)
+
+	Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error
+	Delete(reqCtx intctrlutil.RequestCtx, cli client.Client) error
+	Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error
+	Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error
+
+	Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error
+
+	ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error
+
+	HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error
+
+	// TODO(impl): impl-related, replace them with component workload
+	SetWorkload(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex)
+	AddResource(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex
+}
+
+// TODO(impl): replace it with ComponentWorkload and <*>Set implementation.
+
+type ComponentSet interface {
+	SetComponent(component Component)
+
 	// IsRunning when relevant k8s workloads changes, it checks whether the component is running.
 	// you can also reconcile the pods of component till the component is Running here.
 	IsRunning(ctx context.Context, obj client.Object) (bool, error)
@@ -47,32 +104,26 @@ type Component interface {
 	// if the component is ConsensusSet,it will be available when the pod is ready and labeled with its role.
 	PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool
 
-	// HandleProbeTimeoutWhenPodsReady if the component has no role probe, return false directly. otherwise,
-	// we should handle the component phase when the role probe timeout and return a bool.
-	// if return true, means probe is not timing out and need to requeue after an interval time to handle probe timeout again.
-	// else return false, means probe has timed out and needs to update the component phase to Failed or Abnormal.
-	HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error)
+	// GetPhaseWhenPodsReadyAndProbeTimeout when the pods of component are ready but the probe timed-out,
+	//  calculate the component phase is Failed or Abnormal.
+	GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap)
 
 	// GetPhaseWhenPodsNotReady when the pods of component are not ready, calculate the component phase is Failed or Abnormal.
 	// if return an empty phase, means the pods of component are ready and skips it.
-	GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, error)
+	GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error)
 
-	// HandleUpdate handles component updating when basic workloads of the components are updated
-	HandleUpdate(ctx context.Context, obj client.Object) error
+	HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
+
+	HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
+
+	HandleHA(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
 }
 
-// ComponentBase is a common component base struct
-type ComponentBase struct {
-	Cli          client.Client
-	Cluster      *appsv1alpha1.Cluster
-	Component    *appsv1alpha1.ClusterComponentSpec
-	ComponentDef *appsv1alpha1.ClusterComponentDefinition
+// ComponentSetBase is a common component set base struct.
+type ComponentSetBase struct {
+	Cli           client.Client
+	Cluster       *appsv1alpha1.Cluster
+	ComponentSpec *appsv1alpha1.ClusterComponentSpec
+	ComponentDef  *appsv1alpha1.ClusterComponentDefinition
+	Component     Component
 }
-
-const (
-	// RoleProbeTimeoutReason the event reason when all pods of the component role probe timed out.
-	RoleProbeTimeoutReason = "RoleProbeTimeout"
-
-	// PodContainerFailedTimeout the timeout for container of pod failures, the component phase will be set to Failed/Abnormal after this time.
-	PodContainerFailedTimeout = time.Minute
-)

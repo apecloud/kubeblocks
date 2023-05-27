@@ -31,6 +31,7 @@ spec:
       - |
         set -e;
         rm -f ${CONF_DIR}/recovery.conf;
+        rm -rf ${PITR_DIR};
   physical:
     restoreCommands:
       - |
@@ -52,7 +53,10 @@ spec:
         echo "[[ -d '${DATA_DIR}.old' ]] && mv -f ${DATA_DIR}.old/* ${DATA_DIR}/;" >> ${RESTORE_SCRIPT_DIR}/kb_restore.sh;
         echo "sync;" >> ${RESTORE_SCRIPT_DIR}/kb_restore.sh;
         chmod +x ${RESTORE_SCRIPT_DIR}/kb_restore.sh;
-        echo "restore_command='mv ${PITR_DIR}/%f %p'\nrecovery_target_time='${RECOVERY_TIME}'\nrecovery_target_action='promote'" > ${CONF_DIR}/recovery.conf;
+        echo "restore_command='case "%f" in *history) cp ${PITR_DIR}/%f %p ;; *) mv ${PITR_DIR}/%f %p ;; esac'" > ${CONF_DIR}/recovery.conf;
+        echo "recovery_target_time='${RECOVERY_TIME}'" >> ${CONF_DIR}/recovery.conf;
+        echo "recovery_target_action='promote'" >> ${CONF_DIR}/recovery.conf;
+        echo "recovery_target_timeline='latest'" >> ${CONF_DIR}/recovery.conf;
         mv ${DATA_DIR} ${DATA_DIR}.old;
         echo "done.";
         sync;

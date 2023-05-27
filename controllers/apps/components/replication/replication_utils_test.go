@@ -25,10 +25,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -91,7 +92,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		}
 		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
 			clusterObj.Name+"-"+testapps.DefaultRedisCompName, clusterObj.Name, testapps.DefaultRedisCompName).
-			AddFinalizers([]string{DBClusterFinalizerName}).
+			AddFinalizers([]string{constant.DBClusterFinalizerName}).
 			AddContainer(container).
 			AddAppInstanceLabel(clusterObj.Name).
 			AddAppComponentLabel(testapps.DefaultRedisCompName).
@@ -140,7 +141,7 @@ var _ = Describe("ReplicationSet Util", func() {
 
 		By("testing sync cluster status with add pod")
 
-		var podList []corev1.Pod
+		var podList []*corev1.Pod
 		sts := testk8s.NewFakeStatefulSet(clusterObj.Name+testapps.DefaultRedisCompName, 4)
 
 		for i := int32(0); i < *sts.Spec.Replicas; i++ {
@@ -148,51 +149,19 @@ var _ = Describe("ReplicationSet Util", func() {
 				AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 				AddRoleLabel(DefaultRole(i)).
 				Create(&testCtx).GetObject()
-			podList = append(podList, *pod)
+			podList = append(podList, pod)
 		}
 		err := syncReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus, podList)
 		Expect(err).Should(Succeed())
 		Expect(len(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus.Secondaries)).Should(Equal(3))
 
 		By("testing sync cluster status with remove pod")
-		var podRemoveList []corev1.Pod
+		var podRemoveList []*corev1.Pod
 		*sts.Spec.Replicas -= 1
 		podRemoveList = append(podRemoveList, podList[len(podList)-1])
 		Expect(removeTargetPodsInfoInStatus(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus,
 			podRemoveList, clusterObj.Spec.ComponentSpecs[0].Replicas)).Should(Succeed())
 		Expect(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus.Secondaries).Should(HaveLen(2))
-	}
-
-	testGeneratePVCFromVolumeClaimTemplates := func() {
-		By("Creating a cluster with replication workloadType.")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
-			SetReplicas(testapps.DefaultReplicationReplicas).
-			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
-			Create(&testCtx).GetObject()
-
-		By("Creating a statefulSet of replication workloadType.")
-		mockStsName := "mock-stateful-set-0"
-		mockSts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, mockStsName, clusterObj.Name, testapps.DefaultRedisCompName).
-			AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
-			Create(&testCtx).GetObject()
-
-		mockVCTList := []corev1.PersistentVolumeClaimTemplate{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "mock-vct",
-					Namespace: testCtx.DefaultNamespace,
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{
-					VolumeName: "data",
-				},
-			},
-		}
-		pvcMap := GeneratePVCFromVolumeClaimTemplates(mockSts, mockVCTList)
-		for _, pvc := range pvcMap {
-			Expect(pvc.Name).Should(BeEquivalentTo("mock-vct-mock-stateful-set-0-0"))
-		}
 	}
 
 	testHandleReplicationSetRoleChangeEvent := func() {
@@ -278,10 +247,6 @@ var _ = Describe("ReplicationSet Util", func() {
 
 		It("Test need update replicationSet status when horizontal scaling adds pod or removes pod", func() {
 			testNeedUpdateReplicationSetStatus()
-		})
-
-		It("Test generatePVC from volume claim templates", func() {
-			testGeneratePVCFromVolumeClaimTemplates()
 		})
 
 		It("Test update pod role label by roleChangedEvent when ha switch", func() {

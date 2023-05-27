@@ -17,51 +17,51 @@
 
 // required, command line input options for parameters and flags
 options: {
-	namespace:        string
-	selector:					{}
-	mode:							string
-	value:						string
-	duration: 				string
+	namespace: string
+	selector: {}
+	mode:     string
+	value:    string
+	duration: string
 
-	target:						string
-	port:							int32
-	path:							string
-	method:						string
-	code?:						int32
+	target: string
+	port:   int32
+	path:   string
+	method: string
+	code?:  int32
 
-	abort?:						bool
-	delay?:						string
-	replace?:					{}
-	patch?:						{}
+	abort?: bool
+	delay?: string
+	replace?: {}
+	patch?: {}
 }
 
 // required, k8s api resource content
 content: {
-  kind: "HTTPChaos"
-  apiVersion: "chaos-mesh.org/v1alpha1"
-  metadata:{
-  	generateName: "http-chaos-"
-    namespace: options.namespace
-  }
-  spec:{
-    selector: options.selector
-    mode: options.mode
-    value: options.value
-    duration: options.duration
+	kind:       "HTTPChaos"
+	apiVersion: "chaos-mesh.org/v1alpha1"
+	metadata: {
+		generateName: "http-chaos-"
+		namespace:    options.namespace
+	}
+	spec: {
+		selector: options.selector
+		mode:     options.mode
+		value:    options.value
+		duration: options.duration
 
 		target: options.target
-    port: options.port
-    path: options.path
-    method: options.method
-    if options.code != _|_ {
-    	code: options.code
-    }
+		port:   options.port
+		path:   options.path
+		method: options.method
+		if options.code != _|_ {
+			code: options.code
+		}
 
-    if options.abort != _|_ {
-    	abort: options.abort
-    }
+		if options.abort != _|_ {
+			abort: options.abort
+		}
 
-    if options.delay != _|_ {
+		if options.delay != _|_ {
 			delay: options.delay
 		}
 

@@ -30,6 +30,8 @@ type ParallelTransformers struct {
 	transformers []graph.Transformer
 }
 
+var _ graph.Transformer = &ParallelTransformers{}
+
 func (t *ParallelTransformers) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	var group sync.WaitGroup
 	var errs error
@@ -48,5 +50,3 @@ func (t *ParallelTransformers) Transform(ctx graph.TransformContext, dag *graph.
 	group.Wait()
 	return errs
 }
-
-var _ graph.Transformer = &ParallelTransformers{}

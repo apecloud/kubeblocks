@@ -8,7 +8,6 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-#  TAG_NAME: ${{ github.ref_name }}
   TAG_NAME: "0.5.99"
   GO_VERSION: "1.20"
   CLI_NAME: 'kbcli'
@@ -39,7 +38,7 @@ jobs:
 #            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
 #            --tag-name ${{ env.TAG_NAME }} \
 #            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
-
+  
 
   upload-release-assert:
     needs: create-release-kbcli
@@ -87,16 +86,15 @@ jobs:
       - name: make zip
         if: matrix.os == 'windows-amd64'
         run: |
-          mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }}.exe
+          mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }}.exe 
           cp ${{ matrix.os }}/${{ env.CLI_NAME }}.exe bin/
-#          shasum -a 256  bin/${{ env.CLI_NAME }}.exe > bin/{{ matrix.os }}.exe.sha256
           zip -r -o ${{ env.CLI_FILENAME }}.zip  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.zip  # for debug 
-          shasum -a 256 bin/${{ env.CLI_FILENAME }}.zip > bin/${{ env.CLI_FILENAME }}.zip.sha256
           mv ${{ env.CLI_FILENAME }}.zip bin/
+          shasum -a bin/${{ env.CLI_FILENAME }}.zip > bin/${{ env.CLI_FILENAME }}.zip.sha256
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.zip" >> $GITHUB_ENV
           echo "ASSET_CONTENT_TYPE=application/zip" >> $GITHUB_ENV
-          echo "CHECKSUM=${{ env.CLI_FILENAME }}.zip.sha256" >> $GITHUB_ENV
+          echo "CheckSum=${{ env.CLI_FILENAME }}.zip.sha256" >> $GITHUB_ENV
 
       - name: make tar
         if: matrix.os != 'windows-amd64'
@@ -105,10 +103,10 @@ jobs:
           tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.tar.gz  # for debug 
           mv ${{ env.CLI_FILENAME }}.tar.gz bin/
-          shasum -a 256 bin/${{ env.CLI_FILENAME }}.tar.gz > bin/${{ env.CLI_FILENAME }}.tar.gz.sha256
+          shasum -a bin/${{ env.CLI_FILENAME }}.tar.gz > bin/${{ env.CLI_FILENAME }}.tar.gz.sha256
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.tar.gz" >> $GITHUB_ENV
           echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
-          echo "CHECKSUM=${{ env.CLI_FILENAME }}.tar.gz.sha256" >> $GITHUB_ENV
+          echo "CheckSum=${{ env.CLI_FILENAME }}.tar.gz.sha256" >> $GITHUB_ENV
 
 #      - name: upload gitlab kbcli asset ${{ matrix.os }}
 #        env:
@@ -129,7 +127,6 @@ jobs:
             --type 3 \
             --github-repo ${{ env.CLI_REPO }} \
             --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
-  
 
       - name: upload release kbcli asset ${{ matrix.os }}
         uses: actions/upload-release-asset@main
@@ -148,14 +145,13 @@ jobs:
           asset_name: ${{ env.CLI_NAME }}.exe
           asset_content_type: application/octet-stream
 
-      - name: upload release kbcli asset 256sumcheck ${{ matrix.os }}
+      - name: upload checksum for kbcli assets
         uses: actions/upload-release-asset@main
         with:
           upload_url: ${{ env.UPLOAD_URL }}
-          asset_path: ./bin/${{ env.CHECKSUM }}
-          asset_name: ${{ env.CHECKSUM }}
+          asset_path: ./bin/${{ env.CheckSum }}
+          asset_name: ${{ env.CheckSum }}
           asset_content_type: text/plain
-
 #      - name: upload release asset ${{ matrix.os }}
 #        continue-on-error: true
 #        uses: actions/upload-release-asset@main
@@ -164,7 +160,6 @@ jobs:
 #          asset_path: ./bin/${{ env.ASSET_NAME }}
 #          asset_name: ${{ env.ASSET_NAME }}
 #          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
-
 
 #  send-message:
 #    runs-on: ubuntu-latest

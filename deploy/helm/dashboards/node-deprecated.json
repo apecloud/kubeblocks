@@ -22422,8 +22422,8 @@
     ]
   },
   "timezone": "",
-  "title": "Node Exporter",
-  "uid": "nodeexporter1af4132",
+  "title": "[Deprecated] Node Exporter",
+  "uid": "nodeexporter1af4132_deprecated",
   "version": 1,
   "weekStart": ""
 }

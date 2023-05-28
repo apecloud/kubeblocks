@@ -303,32 +303,12 @@ var (
 		Name:   Class1c1gName,
 		CPU:    resource.MustParse("1"),
 		Memory: resource.MustParse("1Gi"),
-		Volumes: []appsv1alpha1.Volume{
-			{
-				Name: "data",
-				Size: resource.MustParse("20Gi"),
-			},
-			{
-				Name: "log",
-				Size: resource.MustParse("10Gi"),
-			},
-		},
 	}
 
 	Class2c4g = appsv1alpha1.ComponentClass{
 		Name:   Class2c4gName,
 		CPU:    resource.MustParse("2"),
 		Memory: resource.MustParse("4Gi"),
-		Volumes: []appsv1alpha1.Volume{
-			{
-				Name: "data",
-				Size: resource.MustParse("20Gi"),
-			},
-			{
-				Name: "log",
-				Size: resource.MustParse("10Gi"),
-			},
-		},
 	}
 
 	DefaultClasses = map[string]appsv1alpha1.ComponentClass{

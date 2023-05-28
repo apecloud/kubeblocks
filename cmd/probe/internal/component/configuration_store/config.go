@@ -62,7 +62,7 @@ func NewConfigurationStore() *ConfigurationStore {
 	}
 }
 
-func (cs *ConfigurationStore) Init(sysID string, podName string, dbState string, extra map[string]string) error {
+func (cs *ConfigurationStore) Init(sysID string, podName string, dbState string, mode string, extra map[string]string) error {
 	var getOpt metav1.GetOptions
 	var updateOpt metav1.UpdateOptions
 	var createOpt metav1.CreateOptions
@@ -96,6 +96,7 @@ func (cs *ConfigurationStore) Init(sysID string, podName string, dbState string,
 				SysID:            sysID,
 				TTL:              ttl,
 				MaxLagOnFailover: maxLagOnFailover,
+				ReplicationMode:  mode,
 			},
 		},
 	}, createOpt); err != nil {
@@ -126,18 +127,18 @@ func (cs *ConfigurationStore) Init(sysID string, podName string, dbState string,
 	return nil
 }
 
-func (cs *ConfigurationStore) GetCluster() (*Cluster, error) {
+func (cs *ConfigurationStore) GetCluster() error {
 	podList, err := cs.ClientSet.CoreV1().Pods(cs.namespace).List(cs.ctx, metav1.ListOptions{})
 	if err != nil || podList == nil {
-		return nil, err
+		return err
 	}
 	configMapList, err := cs.ClientSet.CoreV1().ConfigMaps(cs.namespace).List(cs.ctx, metav1.ListOptions{})
 	if err != nil || configMapList == nil {
-		return nil, err
+		return err
 	}
 	clusterObj := &appsv1alpha1.Cluster{}
 	if err = cluster.GetK8SClientObject(cs.DynamicClient, clusterObj, types.ClusterGVR(), cs.namespace, cs.clusterName); err != nil {
-		return nil, err
+		return err
 	}
 
 	pods := make([]*v1.Pod, 0, len(podList.Items))
@@ -157,7 +158,9 @@ func (cs *ConfigurationStore) GetCluster() (*Cluster, error) {
 		}
 	}
 
-	return cs.loadClusterFromKubernetes(config, failoverConfig, syncConfig, pods, clusterObj, map[string]string{}), nil
+	cs.Cluster = cs.loadClusterFromKubernetes(config, failoverConfig, syncConfig, pods, clusterObj, map[string]string{})
+
+	return nil
 }
 
 func (cs *ConfigurationStore) loadClusterFromKubernetes(config, failoverConfig, syncConfig *v1.ConfigMap, pods []*v1.Pod, clusterObj *appsv1alpha1.Cluster, extra map[string]string) *Cluster {

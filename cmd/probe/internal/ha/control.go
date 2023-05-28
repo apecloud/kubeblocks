@@ -20,12 +20,13 @@ import (
 )
 
 type Ha struct {
-	ctx      context.Context
-	podName  string
-	dbType   string
-	log      logger.Logger
-	Informer cache.SharedIndexInformer
-	cs       *configuration_store.ConfigurationStore
+	ctx             context.Context
+	podName         string
+	dbType          string
+	replicationMode string
+	log             logger.Logger
+	Informer        cache.SharedIndexInformer
+	cs              *configuration_store.ConfigurationStore
 	DB
 }
 
@@ -70,7 +71,7 @@ func (h *Ha) Init() {
 
 	dbState, err := h.DB.GetState(h.ctx)
 
-	err = h.cs.Init(sysid, h.podName, dbState, h.newDbExtra())
+	err = h.cs.Init(sysid, h.podName, dbState, h.replicationMode, h.newDbExtra())
 	if err != nil {
 		panic(err)
 	}

@@ -139,4 +139,6 @@ var (
 	}
 )
 
-func
+const (
+	SynchronousMode = "synchronous_mode"
+)

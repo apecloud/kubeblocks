@@ -6,6 +6,7 @@ const (
 	Role             = "role"
 	TTL              = "ttl"
 	MaxLagOnFailover = "max_lag_on_failover"
+	ReplicationMode  = "replication_mode"
 	AcquireTime      = "acquire_time"
 	LeaderName       = "leader_name"
 	RenewTime        = "renew_time"
@@ -23,5 +24,5 @@ const (
 )
 
 const (
-	KbLabelRole = "kubeblocks.io/role"
+	KbRoleLabel = "kubeblocks.io/role"
 )

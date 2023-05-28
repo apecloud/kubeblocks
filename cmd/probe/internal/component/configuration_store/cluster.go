@@ -28,7 +28,7 @@ import (
 )
 
 type Cluster struct {
-	sysID    string
+	SysID    string
 	Config   *ClusterConfig
 	Leader   *Leader
 	Members  []*Member
@@ -37,7 +37,7 @@ type Cluster struct {
 	Extra    map[string]string
 }
 
-func (c *Cluster) hasMember(memberName string) bool {
+func (c *Cluster) HasMember(memberName string) bool {
 	for _, member := range c.Members {
 		if memberName == member.name {
 			return true
@@ -46,10 +46,23 @@ func (c *Cluster) hasMember(memberName string) bool {
 	return false
 }
 
+func (c *Cluster) GetMemberName() []string {
+	var memberList []string
+	for _, member := range c.Members {
+		memberList = append(memberList, member.name)
+	}
+
+	return memberList
+}
+
 type ClusterConfig struct {
 	index       string
 	modifyIndex int64
-	data        *clusterData
+	data        *ClusterData
+}
+
+func (c *ClusterConfig) GetData() *ClusterData {
+	return c.data
 }
 
 func getClusterConfigFromConfigMap(configmap *v1.ConfigMap) *ClusterConfig {
@@ -63,7 +76,7 @@ func getClusterConfigFromConfigMap(configmap *v1.ConfigMap) *ClusterConfig {
 		maxLagOnFailover = 1048576
 	}
 
-	data := newClusterData(int64(ttl), int64(maxLagOnFailover))
+	data := newClusterData(int64(ttl), int64(maxLagOnFailover), annotations[ReplicationMode])
 
 	return &ClusterConfig{
 		index:       configmap.ResourceVersion,
@@ -74,13 +87,17 @@ func getClusterConfigFromConfigMap(configmap *v1.ConfigMap) *ClusterConfig {
 
 type Leader struct {
 	index  string
-	Member *Member
+	member *Member
+}
+
+func (l *Leader) GetMember() *Member {
+	return l.member
 }
 
 func newLeader(index string, member *Member) *Leader {
 	return &Leader{
 		index:  index,
-		Member: member,
+		member: member,
 	}
 }
 
@@ -104,7 +121,7 @@ func newMember(index string, name string, annotations map[string]string, labels 
 		name:  name,
 		data: &MemberData{
 			state: annotations[State],
-			role:  labels[KbLabelRole],
+			role:  labels[KbRoleLabel],
 		},
 	}
 }
@@ -161,14 +178,28 @@ type TimelineHistory struct {
 	lines []string
 }
 
-type clusterData struct {
+type ClusterData struct {
 	ttl              int64
 	maxLagOnFailover int64
+	replicationMode  string
 }
 
-func newClusterData(ttl int64, maxLagOnFailover int64) *clusterData {
-	return &clusterData{
+func newClusterData(ttl int64, maxLagOnFailover int64, mode string) *ClusterData {
+	return &ClusterData{
 		ttl:              ttl,
 		maxLagOnFailover: maxLagOnFailover,
+		replicationMode:  mode,
 	}
+}
+
+func (c *ClusterData) GetTtl() int64 {
+	return c.ttl
+}
+
+func (c *ClusterData) GetMaxLagOnFailover() int64 {
+	return c.maxLagOnFailover
+}
+
+func (c *ClusterData) GetReplicationMode() string {
+	return c.replicationMode
 }

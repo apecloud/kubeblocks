@@ -393,20 +393,19 @@ func updateConsensusRoleInfo(ctx context.Context,
 	consensusSpec *appsv1alpha1.ConsensusSetSpec,
 	componentName string,
 	compDefName string,
-	pods []corev1.Pod,
-	vertexes []graph.Vertex) error {
+	pods []corev1.Pod) ([]graph.Vertex, error) {
 	leader, followers := composeRoleEnv(consensusSpec, pods)
 	ml := client.MatchingLabels{
 		constant.AppInstanceLabelKey:    cluster.GetName(),
 		constant.KBAppComponentLabelKey: componentName,
 		constant.AppConfigTypeLabelKey:  "kubeblocks-env",
 	}
-
 	configList := &corev1.ConfigMapList{}
 	if err := cli.List(ctx, configList, ml); err != nil {
-		return err
+		return nil, err
 	}
 
+	vertexes := make([]graph.Vertex, 0)
 	for idx := range configList.Items {
 		config := configList.Items[idx]
 		config.Data["KB_"+strings.ToUpper(compDefName)+"_LEADER"] = leader
@@ -430,7 +429,7 @@ func updateConsensusRoleInfo(ctx context.Context,
 		})
 	}
 
-	return nil
+	return vertexes, nil
 }
 
 func composeRoleEnv(consensusSpec *appsv1alpha1.ConsensusSetSpec, pods []corev1.Pod) (leader, followers string) {

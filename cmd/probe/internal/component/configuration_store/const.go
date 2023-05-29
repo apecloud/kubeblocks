@@ -18,7 +18,6 @@ const (
 
 const (
 	ConfigSuffix   = "-config"
-	SyncSuffix     = "-sync"
 	FailoverSuffix = "-failover"
 	ExtraSuffix    = "-extra"
 )

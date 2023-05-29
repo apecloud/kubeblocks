@@ -4,6 +4,7 @@ import (
 	"context"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"os"
 	"strconv"
 	"strings"
@@ -25,10 +26,10 @@ type ConfigurationStore struct {
 	clusterName          string
 	clusterCompName      string
 	namespace            string
-	Cluster              *Cluster
-	Config               *rest.Config
-	ClientSet            *kubernetes.Clientset
-	DynamicClient        *dynamic.DynamicClient
+	cluster              *Cluster
+	config               *rest.Config
+	clientSet            *kubernetes.Clientset
+	dynamicClient        *dynamic.DynamicClient
 	leaderObservedRecord *LeaderRecord
 	LeaderObservedTime   int64
 }
@@ -55,10 +56,10 @@ func NewConfigurationStore() *ConfigurationStore {
 		clusterName:     os.Getenv(util.KbClusterName),
 		clusterCompName: os.Getenv(util.KbClusterCompName),
 		namespace:       os.Getenv(util.KbNamespace),
-		Config:          config,
-		ClientSet:       clientSet,
-		DynamicClient:   dynamicClient,
-		Cluster:         &Cluster{},
+		config:          config,
+		clientSet:       clientSet,
+		dynamicClient:   dynamicClient,
+		cluster:         &Cluster{},
 	}
 }
 
@@ -67,7 +68,7 @@ func (cs *ConfigurationStore) Init(sysID string, extra map[string]string) error 
 	var updateOpt metav1.UpdateOptions
 	var createOpt metav1.CreateOptions
 
-	clusterObj, err := cs.DynamicClient.Resource(types.ClusterGVR()).Namespace(cs.namespace).Get(cs.ctx, cs.clusterName, getOpt)
+	clusterObj, err := cs.dynamicClient.Resource(types.ClusterGVR()).Namespace(cs.namespace).Get(cs.ctx, cs.clusterName, getOpt)
 	if err != nil {
 		return err
 	}
@@ -83,12 +84,12 @@ func (cs *ConfigurationStore) Init(sysID string, extra map[string]string) error 
 		TTL:         ttl,
 	}
 	clusterObj.SetAnnotations(annotations)
-	if _, err = cs.DynamicClient.Resource(types.ClusterGVR()).Namespace(cs.namespace).Update(cs.ctx, clusterObj, updateOpt); err != nil {
+	if _, err = cs.dynamicClient.Resource(types.ClusterGVR()).Namespace(cs.namespace).Update(cs.ctx, clusterObj, updateOpt); err != nil {
 		return err
 	}
 
 	maxLagOnFailover := os.Getenv(MaxLagOnFailover)
-	if _, err = cs.ClientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
+	if _, err = cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cs.clusterCompName + ConfigSuffix,
 			Namespace: cs.namespace,
@@ -103,7 +104,7 @@ func (cs *ConfigurationStore) Init(sysID string, extra map[string]string) error 
 	}
 
 	if extra != nil {
-		if _, err = cs.ClientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
+		if _, err = cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        cs.clusterCompName + ExtraSuffix,
 				Namespace:   cs.namespace,
@@ -117,21 +118,21 @@ func (cs *ConfigurationStore) Init(sysID string, extra map[string]string) error 
 	return nil
 }
 
-func (cs *ConfigurationStore) GetNamespace() string {
-	return cs.namespace
+func (cs *ConfigurationStore) GetCluster() *Cluster {
+	return cs.cluster
 }
 
-func (cs *ConfigurationStore) GetCluster() error {
-	podList, err := cs.ClientSet.CoreV1().Pods(cs.namespace).List(cs.ctx, metav1.ListOptions{})
+func (cs *ConfigurationStore) GetClusterFromKubernetes() error {
+	podList, err := cs.clientSet.CoreV1().Pods(cs.namespace).List(cs.ctx, metav1.ListOptions{})
 	if err != nil || podList == nil {
 		return err
 	}
-	configMapList, err := cs.ClientSet.CoreV1().ConfigMaps(cs.namespace).List(cs.ctx, metav1.ListOptions{})
+	configMapList, err := cs.clientSet.CoreV1().ConfigMaps(cs.namespace).List(cs.ctx, metav1.ListOptions{})
 	if err != nil || configMapList == nil {
 		return err
 	}
 	clusterObj := &appsv1alpha1.Cluster{}
-	if err = cluster.GetK8SClientObject(cs.DynamicClient, clusterObj, types.ClusterGVR(), cs.namespace, cs.clusterName); err != nil {
+	if err = cluster.GetK8SClientObject(cs.dynamicClient, clusterObj, types.ClusterGVR(), cs.namespace, cs.clusterName); err != nil {
 		return err
 	}
 
@@ -150,7 +151,7 @@ func (cs *ConfigurationStore) GetCluster() error {
 		}
 	}
 
-	cs.Cluster = cs.loadClusterFromKubernetes(config, failoverConfig, pods, clusterObj, map[string]string{})
+	cs.cluster = cs.loadClusterFromKubernetes(config, failoverConfig, pods, clusterObj, map[string]string{})
 
 	return nil
 }
@@ -197,12 +198,20 @@ func (cs *ConfigurationStore) loadClusterFromKubernetes(config, failoverConfig *
 	}
 }
 
-func (cs *ConfigurationStore) GetConfigMap(namespace string, name string) (*v1.ConfigMap, error) {
-	return cs.ClientSet.CoreV1().ConfigMaps(namespace).Get(cs.ctx, name, metav1.GetOptions{})
+func (cs *ConfigurationStore) GetConfigMap(name string) (*v1.ConfigMap, error) {
+	return cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Get(cs.ctx, name, metav1.GetOptions{})
 }
 
-func (cs *ConfigurationStore) UpdateConfigMap(namespace string, configMap *v1.ConfigMap) (*v1.ConfigMap, error) {
-	return cs.ClientSet.CoreV1().ConfigMaps(namespace).Update(cs.ctx, configMap, metav1.UpdateOptions{})
+func (cs *ConfigurationStore) UpdateConfigMap(configMap *v1.ConfigMap) (*v1.ConfigMap, error) {
+	return cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Update(cs.ctx, configMap, metav1.UpdateOptions{})
+}
+
+func (cs *ConfigurationStore) ListPods() (*v1.PodList, error) {
+	return cs.clientSet.CoreV1().Pods(cs.namespace).List(cs.ctx, metav1.ListOptions{})
+}
+
+func (cs *ConfigurationStore) GetClusterObj() (*unstructured.Unstructured, error) {
+	return cs.dynamicClient.Resource(types.ClusterGVR()).Namespace(cs.namespace).Get(cs.ctx, cs.clusterName, metav1.GetOptions{})
 }
 
 type LeaderRecord struct {

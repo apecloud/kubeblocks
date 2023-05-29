@@ -26,7 +26,6 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/ha"
 	"github.com/apecloud/kubeblocks/internal/sqlchannel"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strconv"
 	"strings"
 	"sync"
@@ -324,7 +323,7 @@ func (pgOps *PostgresOperations) SwitchoverOps(ctx context.Context, req *binding
 	candidate, _ := req.Metadata[CANDIDATE]
 	operation := req.Operation
 
-	err := pgOps.Cs.GetCluster()
+	err := pgOps.Cs.GetClusterFromKubernetes()
 	if err != nil {
 		pgOps.Logger.Errorf("get cluster err:%v", err)
 		result["event"] = OperationFailed
@@ -372,20 +371,20 @@ func (pgOps *PostgresOperations) isSwitchOverPossible(ctx context.Context, prima
 		return false, errors.Errorf("get replication mode failed, err:%v", err)
 	}
 	if candidate != "" {
-		if pgOps.Cs.Cluster.Leader != nil && pgOps.Cs.Cluster.Leader.GetMember().GetName() != primary {
-			return false, errors.Errorf("leader name does not match ,leader name: %s, primary: %s", pgOps.Cs.Cluster.Leader.GetMember().GetName(), primary)
+		if pgOps.Cs.GetCluster().Leader != nil && pgOps.Cs.GetCluster().Leader.GetMember().GetName() != primary {
+			return false, errors.Errorf("leader name does not match ,leader name: %s, primary: %s", pgOps.Cs.GetCluster().Leader.GetMember().GetName(), primary)
 		}
 		// candidate存在时，即使candidate并未同步也可以进行failover
 		if operation == SwitchoverOperation && replicationMode == SynchronousMode && !pgOps.checkStandbySynchronizedToLeader(ctx, candidate) {
 			return false, errors.Errorf("candidate name does not match with sync_standby")
 		}
 
-		if !pgOps.Cs.Cluster.HasMember(candidate) {
+		if !pgOps.Cs.GetCluster().HasMember(candidate) {
 			return false, errors.Errorf("candidate does not exist")
 		}
 	} else if replicationMode == SynchronousMode {
 		syncToLeader := 0
-		for _, member := range pgOps.Cs.Cluster.GetMemberName() {
+		for _, member := range pgOps.Cs.GetCluster().GetMemberName() {
 			if pgOps.checkStandbySynchronizedToLeader(ctx, member) {
 				syncToLeader++
 			}
@@ -395,8 +394,8 @@ func (pgOps *PostgresOperations) isSwitchOverPossible(ctx context.Context, prima
 		}
 	} else {
 		hasMemberExceptLeader := false
-		for _, member := range pgOps.Cs.Cluster.Members {
-			if member.GetName() != pgOps.Cs.Cluster.Leader.GetMember().GetName() {
+		for _, member := range pgOps.Cs.GetCluster().Members {
+			if member.GetName() != pgOps.Cs.GetCluster().Leader.GetMember().GetName() {
 				hasMemberExceptLeader = true
 			}
 		}
@@ -406,7 +405,7 @@ func (pgOps *PostgresOperations) isSwitchOverPossible(ctx context.Context, prima
 	}
 
 	runningMembers := 0
-	pods, err := pgOps.Cs.ClientSet.CoreV1().Pods(pgOps.Cs.GetNamespace()).List(ctx, metav1.ListOptions{})
+	pods, err := pgOps.Cs.ListPods()
 	for _, pod := range pods.Items {
 		client, err := sqlchannel.NewClientWithPod(&pod, pgOps.DBType)
 		if err != nil {
@@ -427,22 +426,21 @@ func (pgOps *PostgresOperations) isSwitchOverPossible(ctx context.Context, prima
 	return true, nil
 }
 
-// 更改配置
 func (pgOps *PostgresOperations) manualSwitchOver(ctx context.Context, primary string, candidate string) error {
-	configMap, err := pgOps.Cs.GetConfigMap("default", "test")
+	clusterObj, err := pgOps.Cs.GetClusterObj()
 	if err != nil {
 		return err
 	}
-	configMap.Data["primary"] = candidate
+	annotations := clusterObj.GetAnnotations()
+	annotations[configuration_store.LeaderName] = candidate
 
-	_, err = pgOps.Cs.UpdateConfigMap("default", configMap)
 	return nil
 }
 
 func (pgOps *PostgresOperations) getSwitchOverResult(candidate string) (bool, error) {
 	pgOps.Cs.GetCluster()
 	time.Sleep(30 * time.Second)
-	if pgOps.Cs.Cluster.Leader.GetMember().GetName() != candidate {
+	if pgOps.Cs.GetCluster().Leader.GetMember().GetName() != candidate {
 		return false, errors.New("switchover fail")
 	}
 

@@ -1489,6 +1489,36 @@ prometheus:
     ##
     enabled: false
 
+## loki settings for kubeblocks
+loki:
+  enabled: false
+  singleBinary:
+    replicas: 1
+    tolerations:
+      - key: kb-controller
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+  monitoring:
+    lokiCanary:
+      enabled: false
+    selfMonitoring:
+      enabled: false
+      grafanaAgent:
+        installOperator: false
+    dashboards:
+      enabled: false
+    rules:
+      enabled: false
+    serviceMonitor:
+      enabled: false
+  test:
+    enabled: false
+  loki:
+    podSecurityContext:
+      runAsNonRoot: false
+      runAsUser: 0
+
 grafana:
   ## If false, grafana sub-chart will not be installed
   ##

@@ -262,3 +262,10 @@ Define addon alertmanager-webhook-adaptor name
 {{- define "addon.alertmanager-webhook-adaptor.name" -}}
 {{- print "alertmanager-webhook-adaptor" }}
 {{- end }}
+
+{{/*
+Define addon loki name
+*/}}
+{{- define "addon.loki.name" -}}
+{{- print "loki" }}
+{{- end }}

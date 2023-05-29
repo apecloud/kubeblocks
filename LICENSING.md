@@ -14,6 +14,7 @@ cmd/probe/internal/binding/
 cmd/probe/internal/component/
 cmd/probe/internal/middleware/
 deploy/**
+docker/**
 externalapis/**
 internal/cli/cmd/plugin/download/**
 hack/**

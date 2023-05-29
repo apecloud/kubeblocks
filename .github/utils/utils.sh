@@ -308,6 +308,11 @@ release_message() {
 }
 
 send_message() {
+    if [[ "$TAG_NAME" != "v"*"."*"."* ]]; then
+        echo "invalid tag name"
+        return
+    fi
+
     if [[ "$CONTENT" == *"success" ]]; then
         curl -H "Content-Type: application/json" -X POST $BOT_WEBHOOK \
             -d '{"msg_type":"post","content":{"post":{"zh_cn":{"title":"Success:","content":[[{"tag":"text","text":"'$CONTENT'"}]]}}}}'

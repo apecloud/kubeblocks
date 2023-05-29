@@ -33,7 +33,6 @@ type Cluster struct {
 	Leader   *Leader
 	Members  []*Member
 	FailOver *Failover
-	Sync     *SyncState
 	Extra    map[string]string
 }
 
@@ -76,7 +75,7 @@ func getClusterConfigFromConfigMap(configmap *v1.ConfigMap) *ClusterConfig {
 		maxLagOnFailover = 1048576
 	}
 
-	data := newClusterData(int64(ttl), int64(maxLagOnFailover), annotations[ReplicationMode])
+	data := newClusterData(int64(ttl), int64(maxLagOnFailover))
 
 	return &ClusterConfig{
 		index:       configmap.ResourceVersion,
@@ -108,20 +107,22 @@ type Member struct {
 	podLabel map[string]string
 }
 
+func (m *Member) GetData() *MemberData {
+	return m.data
+}
+
 func getMemberFromPod(pod *v1.Pod) *Member {
-	annotations := pod.Annotations
-	member := newMember(pod.ResourceVersion, pod.Name, annotations, pod.Labels)
+	member := newMember(pod.ResourceVersion, pod.Name, pod.Labels)
 	member.podLabel = pod.Labels
 	return member
 }
 
-func newMember(index string, name string, annotations map[string]string, labels map[string]string) *Member {
+func newMember(index string, name string, labels map[string]string) *Member {
 	return &Member{
 		index: index,
 		name:  name,
 		data: &MemberData{
-			state: annotations[State],
-			role:  labels[KbRoleLabel],
+			role: labels[KbRoleLabel],
 		},
 	}
 }
@@ -168,8 +169,7 @@ func (s *SyncState) SynchronizedToLeader(candidate string) bool {
 }
 
 type MemberData struct {
-	state string
-	role  string
+	role string
 }
 
 type TimelineHistory struct {
@@ -181,14 +181,12 @@ type TimelineHistory struct {
 type ClusterData struct {
 	ttl              int64
 	maxLagOnFailover int64
-	replicationMode  string
 }
 
-func newClusterData(ttl int64, maxLagOnFailover int64, mode string) *ClusterData {
+func newClusterData(ttl int64, maxLagOnFailover int64) *ClusterData {
 	return &ClusterData{
 		ttl:              ttl,
 		maxLagOnFailover: maxLagOnFailover,
-		replicationMode:  mode,
 	}
 }
 
@@ -198,8 +196,4 @@ func (c *ClusterData) GetTtl() int64 {
 
 func (c *ClusterData) GetMaxLagOnFailover() int64 {
 	return c.maxLagOnFailover
-}
-
-func (c *ClusterData) GetReplicationMode() string {
-	return c.replicationMode
 }

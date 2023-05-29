@@ -57,4 +57,5 @@ const (
 	KbNamespace            = "KB_NAMESPACE"
 	KbPrimaryPodName       = "KB_PRIMARY_POD_NAME"
 	KbTtl                  = "KB_TTL"
+	KbPodIP                = "KB_PODIP"
 )

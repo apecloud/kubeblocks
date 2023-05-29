@@ -24,10 +24,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	"net"
 	"strconv"
@@ -76,6 +75,7 @@ type BaseOperations struct {
 	DBRoles                map[string]AccessMode
 	Logger                 logger.Logger
 	Metadata               bindings.Metadata
+	Cs                     *configuration_store.ConfigurationStore
 	InitIfNeed             func() bool
 	GetRole                func(context.Context, *bindings.InvokeRequest, *bindings.InvokeResponse) (string, error)
 	OperationMap           map[bindings.OperationKind]Operation
@@ -330,14 +330,14 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 	return opsRes, nil
 }
 
-func (ops *BaseOperations) ExecCmd(ctx context.Context, clientSet *kubernetes.Clientset, config *rest.Config, podName, namespace, cmd string) (map[string]string, error) {
-	req := clientSet.CoreV1().RESTClient().Post().
+func (ops *BaseOperations) ExecCmd(ctx context.Context, podName, namespace, cmd string) (map[string]string, error) {
+	req := ops.Cs.ClientSet.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(podName).
 		Namespace(namespace).
 		SubResource("exec").
 		VersionedParams(&v1.PodExecOptions{
-			Container: dbTypeToContainer[ops.DBType],
+			Container: ops.DBType,
 			Command:   []string{"sh", "-c", cmd},
 			Stdin:     true,
 			Stdout:    true,
@@ -345,7 +345,7 @@ func (ops *BaseOperations) ExecCmd(ctx context.Context, clientSet *kubernetes.Cl
 			TTY:       false,
 		}, scheme.ParameterCodec)
 
-	exec, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
+	exec, err := remotecommand.NewSPDYExecutor(ops.Cs.Config, "POST", req.URL())
 	if err != nil {
 		return nil, err
 	}

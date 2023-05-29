@@ -3,7 +3,7 @@ package configuration_store
 const (
 	SysID            = "sys_id"
 	State            = "state"
-	Role             = "role"
+	ProbeUrl         = "probe_url"
 	TTL              = "ttl"
 	MaxLagOnFailover = "max_lag_on_failover"
 	ReplicationMode  = "replication_mode"

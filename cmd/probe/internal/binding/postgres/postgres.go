@@ -25,7 +25,10 @@ import (
 	"fmt"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/ha"
+	"github.com/apecloud/kubeblocks/internal/sqlchannel"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -91,7 +94,6 @@ var (
 type PostgresOperations struct {
 	mu sync.Mutex
 	db *pgxpool.Pool
-	cs *configuration_store.ConfigurationStore
 	BaseOperations
 }
 
@@ -101,8 +103,10 @@ var _ BaseInternalOps = &PostgresOperations{}
 // NewPostgres returns a new PostgreSQL output binding.
 func NewPostgres(logger logger.Logger) bindings.OutputBinding {
 	return &PostgresOperations{
-		BaseOperations: BaseOperations{Logger: logger},
-		cs:             configuration_store.NewConfigurationStore(),
+		BaseOperations: BaseOperations{
+			Logger: logger,
+			Cs:     configuration_store.NewConfigurationStore(),
+		},
 	}
 }
 
@@ -118,7 +122,7 @@ func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	}
 
 	pgOps.Logger.Debug("Initializing Postgres binding")
-	pgOps.DBType = "postgres"
+	pgOps.DBType = "postgresql" // TODO: check postgres or postgresql
 	pgOps.InitIfNeed = pgOps.initIfNeed
 	pgOps.BaseOperations.GetRole = pgOps.GetRole
 	pgOps.DBPort = pgOps.GetRunningPort()
@@ -320,7 +324,7 @@ func (pgOps *PostgresOperations) SwitchoverOps(ctx context.Context, req *binding
 	candidate, _ := req.Metadata[CANDIDATE]
 	operation := req.Operation
 
-	err := pgOps.cs.GetCluster()
+	err := pgOps.Cs.GetCluster()
 	if err != nil {
 		pgOps.Logger.Errorf("get cluster err:%v", err)
 		result["event"] = OperationFailed
@@ -328,7 +332,7 @@ func (pgOps *PostgresOperations) SwitchoverOps(ctx context.Context, req *binding
 		return result, nil
 	}
 
-	if can, err := pgOps.isSwitchOverPossible(primary, candidate, operation); !can || err != nil {
+	if can, err := pgOps.isSwitchOverPossible(ctx, primary, candidate, operation); !can || err != nil {
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 		return result, nil
@@ -339,6 +343,7 @@ func (pgOps *PostgresOperations) SwitchoverOps(ctx context.Context, req *binding
 		result["message"] = err.Error()
 		return result, nil
 	}
+
 	if ok, err := pgOps.getSwitchOverResult(candidate); err != nil {
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
@@ -348,7 +353,6 @@ func (pgOps *PostgresOperations) SwitchoverOps(ctx context.Context, req *binding
 		result["message"] = fmt.Sprintf("switchover to candidate: %s fail", candidate)
 		return result, nil
 	}
-
 	result["event"] = OperationSuccess
 	result["message"] = fmt.Sprintf("Successfully switch over to: %s", candidate)
 
@@ -356,50 +360,89 @@ func (pgOps *PostgresOperations) SwitchoverOps(ctx context.Context, req *binding
 }
 
 // Checks whether there are nodes that could take it over after demoting the primary
-func (pgOps *PostgresOperations) isSwitchOverPossible(primary string, candidate string, operation bindings.OperationKind) (bool, error) {
+func (pgOps *PostgresOperations) isSwitchOverPossible(ctx context.Context, primary string, candidate string, operation bindings.OperationKind) (bool, error) {
 	if operation == FailoverOperation && candidate == "" {
 		return false, errors.Errorf("failover need a candidate")
 	} else if operation == SwitchoverOperation && primary == "" {
 		return false, errors.Errorf("switchover need a primary")
 	}
 
-	clusterConfig := pgOps.cs.Cluster.Config.GetData()
+	replicationMode, err := pgOps.getReplicationMode(ctx)
+	if err != nil {
+		return false, errors.Errorf("get replication mode failed, err:%v", err)
+	}
 	if candidate != "" {
-		if pgOps.cs.Cluster.Leader != nil && pgOps.cs.Cluster.Leader.GetMember().GetName() != primary {
-			return false, errors.Errorf("leader name does not match ,leader name: %s, primary: %s", pgOps.cs.Cluster.Leader.GetMember().GetName(), primary)
+		if pgOps.Cs.Cluster.Leader != nil && pgOps.Cs.Cluster.Leader.GetMember().GetName() != primary {
+			return false, errors.Errorf("leader name does not match ,leader name: %s, primary: %s", pgOps.Cs.Cluster.Leader.GetMember().GetName(), primary)
 		}
 		// candidate存在时，即使candidate并未同步也可以进行failover
-		if operation == SwitchoverOperation && clusterConfig.GetReplicationMode() == SynchronousMode && !pgOps.cs.Cluster.Sync.SynchronizedToLeader(candidate) {
+		if operation == SwitchoverOperation && replicationMode == SynchronousMode && !pgOps.checkStandbySynchronizedToLeader(ctx, candidate) {
 			return false, errors.Errorf("candidate name does not match with sync_standby")
 		}
 
-		if !pgOps.cs.Cluster.HasMember(candidate) {
+		if !pgOps.Cs.Cluster.HasMember(candidate) {
 			return false, errors.Errorf("candidate does not exist")
 		}
-	} else if clusterConfig.GetReplicationMode() == SynchronousMode {
-
+	} else if replicationMode == SynchronousMode {
+		syncToLeader := 0
+		for _, member := range pgOps.Cs.Cluster.GetMemberName() {
+			if pgOps.checkStandbySynchronizedToLeader(ctx, member) {
+				syncToLeader++
+			}
+		}
+		if syncToLeader == 0 {
+			return false, errors.Errorf("can not find sync standby")
+		}
+	} else {
+		hasMemberExceptLeader := false
+		for _, member := range pgOps.Cs.Cluster.Members {
+			if member.GetName() != pgOps.Cs.Cluster.Leader.GetMember().GetName() {
+				hasMemberExceptLeader = true
+			}
+		}
+		if !hasMemberExceptLeader {
+			return false, errors.Errorf("cluster does not have member except leader")
+		}
 	}
 
-	// TODO: isFailOverPossible还依赖很多其他状态，先不做
+	runningMembers := 0
+	pods, err := pgOps.Cs.ClientSet.CoreV1().Pods(pgOps.Cs.GetNamespace()).List(ctx, metav1.ListOptions{})
+	for _, pod := range pods.Items {
+		client, err := sqlchannel.NewClientWithPod(&pod, pgOps.DBType)
+		if err != nil {
+			return false, errors.Errorf("new client with pod err:%v", err)
+		}
+		resp, err := client.CheckStatus()
+		if err != nil {
+			return false, errors.Errorf("client check status err:%v", err)
+		}
+		if resp == OperationSuccess {
+			runningMembers++
+		}
+	}
+	if runningMembers == 0 {
+		return false, errors.Errorf("no running candidates have been found")
+	}
+
 	return true, nil
 }
 
 // 更改配置
 func (pgOps *PostgresOperations) manualSwitchOver(ctx context.Context, primary string, candidate string) error {
-	configMap, err := pgOps.cs.GetConfigMap("default", "test")
+	configMap, err := pgOps.Cs.GetConfigMap("default", "test")
 	if err != nil {
 		return err
 	}
 	configMap.Data["primary"] = candidate
 
-	_, err = pgOps.cs.UpdateConfigMap("default", configMap)
+	_, err = pgOps.Cs.UpdateConfigMap("default", configMap)
 	return nil
 }
 
 func (pgOps *PostgresOperations) getSwitchOverResult(candidate string) (bool, error) {
-	pgOps.cs.GetCluster()
+	pgOps.Cs.GetCluster()
 	time.Sleep(30 * time.Second)
-	if pgOps.cs.Cluster.Leader.GetMember().GetName() != candidate {
+	if pgOps.Cs.Cluster.Leader.GetMember().GetName() != candidate {
 		return false, errors.New("switchover fail")
 	}
 
@@ -458,6 +501,46 @@ func (pgOps *PostgresOperations) exec(ctx context.Context, sql string) (result i
 	result = res.RowsAffected()
 
 	return
+}
+
+func (pgOps *PostgresOperations) getReplicationMode(ctx context.Context) (string, error) {
+	sql := "show synchronous_commit;"
+	mode, err := pgOps.query(ctx, sql)
+	if err != nil {
+		return "", err
+	}
+
+	switch string(mode) {
+	case "off":
+		return AsynchronousMode, nil
+	case "local":
+		return AsynchronousMode, nil
+	case "remote_write":
+		return AsynchronousMode, nil
+	case "on":
+		return SynchronousMode, nil
+	case "remote_apply":
+		return SynchronousMode, nil
+	default: // default "on"
+		return SynchronousMode, nil
+	}
+}
+
+func (pgOps *PostgresOperations) checkStandbySynchronizedToLeader(ctx context.Context, member string) bool {
+	sql := "show synchronous_standby_names;"
+	resp, err := pgOps.query(ctx, sql)
+	if err != nil {
+		pgOps.Logger.Errorf("query sql:%s, err:%v", sql, err)
+		return false
+	}
+	syncStandbys := strings.Split(string(resp), ",")
+	for _, standby := range syncStandbys {
+		if member == standby {
+			return true
+		}
+	}
+
+	return false
 }
 
 // InternalQuery is used for internal query, implement BaseInternalOps interface
@@ -697,10 +780,6 @@ func (pgOps *PostgresOperations) GetSysID(ctx context.Context) (string, error) {
 	return string(res), nil
 }
 
-func (pgOps *PostgresOperations) GetState(ctx context.Context) (string, error) {
-	return "running", nil
-}
-
 func (pgOps *PostgresOperations) GetExtra(ctx context.Context) map[string]string {
 	return nil
 }
@@ -711,4 +790,15 @@ func (pgOps *PostgresOperations) Promote() error {
 
 func (pgOps *PostgresOperations) Demote() error {
 	return nil
+}
+
+func (pgOps *PostgresOperations) GetStatus(ctx context.Context) (string, error) {
+	resp, err := pgOps.CheckStatusOps(ctx, &bindings.InvokeRequest{}, &bindings.InvokeResponse{
+		Metadata: map[string]string{},
+	})
+	if err != nil || resp["event"] == OperationFailed {
+		return "", errors.Errorf("get status failed:%s", resp["message"])
+	}
+
+	return "is_running", nil
 }

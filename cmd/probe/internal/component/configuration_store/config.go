@@ -26,7 +26,7 @@ type ConfigurationStore struct {
 	clusterCompName      string
 	namespace            string
 	Cluster              *Cluster
-	config               *rest.Config
+	Config               *rest.Config
 	ClientSet            *kubernetes.Clientset
 	DynamicClient        *dynamic.DynamicClient
 	leaderObservedRecord *LeaderRecord
@@ -55,14 +55,14 @@ func NewConfigurationStore() *ConfigurationStore {
 		clusterName:     os.Getenv(util.KbClusterName),
 		clusterCompName: os.Getenv(util.KbClusterCompName),
 		namespace:       os.Getenv(util.KbNamespace),
-		config:          config,
+		Config:          config,
 		ClientSet:       clientSet,
 		DynamicClient:   dynamicClient,
 		Cluster:         &Cluster{},
 	}
 }
 
-func (cs *ConfigurationStore) Init(sysID string, podName string, dbState string, mode string, extra map[string]string) error {
+func (cs *ConfigurationStore) Init(sysID string, extra map[string]string) error {
 	var getOpt metav1.GetOptions
 	var updateOpt metav1.UpdateOptions
 	var createOpt metav1.CreateOptions
@@ -96,19 +96,9 @@ func (cs *ConfigurationStore) Init(sysID string, podName string, dbState string,
 				SysID:            sysID,
 				TTL:              ttl,
 				MaxLagOnFailover: maxLagOnFailover,
-				ReplicationMode:  mode,
 			},
 		},
 	}, createOpt); err != nil {
-		return err
-	}
-
-	pod, err := cs.ClientSet.CoreV1().Pods(cs.namespace).Get(cs.ctx, podName, getOpt)
-	if err != nil {
-		return err
-	}
-	pod.Annotations[State] = dbState
-	if _, err = cs.ClientSet.CoreV1().Pods(cs.namespace).Update(cs.ctx, pod, updateOpt); err != nil {
 		return err
 	}
 
@@ -125,6 +115,10 @@ func (cs *ConfigurationStore) Init(sysID string, podName string, dbState string,
 	}
 
 	return nil
+}
+
+func (cs *ConfigurationStore) GetNamespace() string {
+	return cs.namespace
 }
 
 func (cs *ConfigurationStore) GetCluster() error {
@@ -146,30 +140,27 @@ func (cs *ConfigurationStore) GetCluster() error {
 		pods[i] = &pod
 	}
 
-	var config, failoverConfig, syncConfig *v1.ConfigMap
+	var config, failoverConfig *v1.ConfigMap
 	for _, cf := range configMapList.Items {
 		switch cf.Name {
 		case cs.clusterCompName + ConfigSuffix:
 			config = &cf
 		case cs.clusterCompName + FailoverSuffix:
 			failoverConfig = &cf
-		case cs.clusterCompName + SyncSuffix:
-			syncConfig = &cf
 		}
 	}
 
-	cs.Cluster = cs.loadClusterFromKubernetes(config, failoverConfig, syncConfig, pods, clusterObj, map[string]string{})
+	cs.Cluster = cs.loadClusterFromKubernetes(config, failoverConfig, pods, clusterObj, map[string]string{})
 
 	return nil
 }
 
-func (cs *ConfigurationStore) loadClusterFromKubernetes(config, failoverConfig, syncConfig *v1.ConfigMap, pods []*v1.Pod, clusterObj *appsv1alpha1.Cluster, extra map[string]string) *Cluster {
+func (cs *ConfigurationStore) loadClusterFromKubernetes(config, failoverConfig *v1.ConfigMap, pods []*v1.Pod, clusterObj *appsv1alpha1.Cluster, extra map[string]string) *Cluster {
 	var (
 		sysID         string
 		clusterConfig *ClusterConfig
 		leader        *Leader
 		failover      *Failover
-		sync          *SyncState
 	)
 
 	if config != nil {
@@ -180,7 +171,7 @@ func (cs *ConfigurationStore) loadClusterFromKubernetes(config, failoverConfig, 
 	if clusterObj != nil {
 		cs.leaderObservedRecord = newLeaderRecord(clusterObj.Annotations)
 		cs.LeaderObservedTime = time.Now().Unix()
-		leader = newLeader(clusterObj.ResourceVersion, newMember("-1", clusterObj.Annotations[LeaderName], map[string]string{}, map[string]string{}))
+		leader = newLeader(clusterObj.ResourceVersion, newMember("-1", clusterObj.Annotations[LeaderName], map[string]string{}))
 	}
 
 	members := make([]*Member, 0, len(pods))
@@ -196,18 +187,12 @@ func (cs *ConfigurationStore) loadClusterFromKubernetes(config, failoverConfig, 
 		}
 	}
 
-	if syncConfig != nil {
-		annotations := syncConfig.Annotations
-		sync = newSyncState(syncConfig.ResourceVersion, annotations[LeaderName], annotations[SyncStandby])
-	}
-
 	return &Cluster{
-		sysID:    sysID,
+		SysID:    sysID,
 		Config:   clusterConfig,
 		Leader:   leader,
 		Members:  members,
 		FailOver: failover,
-		Sync:     sync,
 		Extra:    extra,
 	}
 }

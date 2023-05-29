@@ -105,6 +105,31 @@ func (cli *OperationClient) GetRole() (string, error) {
 	return result["role"], nil
 }
 
+func (cli *OperationClient) CheckStatus() (string, error) {
+	ctxWithReconcileTimeout, cancel := context.WithTimeout(context.Background(), cli.ReconcileTimeout)
+	defer cancel()
+
+	// Request sql channel via Dapr SDK
+	req := &dapr.InvokeBindingRequest{
+		Name:      cli.CharacterType,
+		Operation: "checkStatus",
+		Data:      []byte(""),
+		Metadata:  map[string]string{},
+	}
+
+	resp, err := cli.InvokeComponentInRoutine(ctxWithReconcileTimeout, req)
+	if err != nil {
+		return "", err
+	}
+	result := map[string]string{}
+	err = json.Unmarshal(resp.Data, &result)
+	if err != nil {
+		return "", err
+	}
+
+	return result["event"], nil
+}
+
 // GetSystemAccounts list all system accounts created
 func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 	ctxWithReconcileTimeout, cancel := context.WithTimeout(context.Background(), cli.ReconcileTimeout)

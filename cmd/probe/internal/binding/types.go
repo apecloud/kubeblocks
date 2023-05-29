@@ -128,17 +128,11 @@ type SlaveStatus struct {
 }
 
 const (
-	Postgres   = "postgres"
 	Postgresql = "postgresql"
 	Mysql      = "mysql"
 )
 
-var (
-	dbTypeToContainer = map[string]string{
-		Postgres: Postgresql,
-	}
-)
-
 const (
-	SynchronousMode = "synchronous_mode"
+	SynchronousMode  = "synchronous"
+	AsynchronousMode = "asynchronous"
 )

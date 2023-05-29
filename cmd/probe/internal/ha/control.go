@@ -20,13 +20,12 @@ import (
 )
 
 type Ha struct {
-	ctx             context.Context
-	podName         string
-	dbType          string
-	replicationMode string
-	log             logger.Logger
-	Informer        cache.SharedIndexInformer
-	cs              *configuration_store.ConfigurationStore
+	ctx      context.Context
+	podName  string
+	dbType   string
+	log      logger.Logger
+	Informer cache.SharedIndexInformer
+	cs       *configuration_store.ConfigurationStore
 	DB
 }
 
@@ -66,13 +65,13 @@ func NewHa() *Ha {
 func (h *Ha) Init() {
 	sysid, err := h.DB.GetSysID(h.ctx)
 	if err != nil {
-		h.log.Errorf("can't get sysID, err:%v", err)
+		h.log.Errorf("can not get sysID, err:%v", err)
+		panic(err)
 	}
 
-	dbState, err := h.DB.GetState(h.ctx)
-
-	err = h.cs.Init(sysid, h.podName, dbState, h.replicationMode, h.newDbExtra())
+	err = h.cs.Init(sysid, h.newDbExtra())
 	if err != nil {
+		h.log.Errorf("configuration store init err:%v", err)
 		panic(err)
 	}
 }

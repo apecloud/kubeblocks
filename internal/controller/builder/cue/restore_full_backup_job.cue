@@ -40,6 +40,7 @@ job: {
   spec: {
     template: {
       spec: {
+      	restartPolicy: "Never"
       	containers: [
       		{
       			name: "restore"

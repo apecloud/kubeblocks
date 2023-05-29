@@ -268,7 +268,7 @@ func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) 
 		// TODO: does the update order between cluster and env configmap matter?
 
 		// add consensus role info to pod env
-		if err := updateConsensusRoleInfo(ctx, r.Cli, r.Cluster, r.getConsensusSpec(), r.getDefName(), componentName, pods, vertexes); err != nil {
+		if err := updateConsensusRoleInfo(ctx, r.Cli, r.Cluster, r.getConsensusSpec(), r.getDefName(), componentName, pods, &vertexes); err != nil {
 			return nil, err
 		}
 	}

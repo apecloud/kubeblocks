@@ -394,7 +394,7 @@ func updateConsensusRoleInfo(ctx context.Context,
 	componentName string,
 	compDefName string,
 	pods []corev1.Pod,
-	vertexes []graph.Vertex) error {
+	vertexes *[]graph.Vertex) error {
 	leader, followers := composeRoleEnv(consensusSpec, pods)
 	ml := client.MatchingLabels{
 		constant.AppInstanceLabelKey:    cluster.GetName(),
@@ -411,7 +411,7 @@ func updateConsensusRoleInfo(ctx context.Context,
 		config := configList.Items[idx]
 		config.Data["KB_"+strings.ToUpper(compDefName)+"_LEADER"] = leader
 		config.Data["KB_"+strings.ToUpper(compDefName)+"_FOLLOWERS"] = followers
-		vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+		*vertexes = append(*vertexes, &ictrltypes.LifecycleVertex{
 			Obj:    &config,
 			Action: ictrltypes.ActionUpdatePtr(),
 		})
@@ -424,7 +424,7 @@ func updateConsensusRoleInfo(ctx context.Context,
 			pod.Annotations = map[string]string{}
 		}
 		pod.Annotations[constant.LeaderAnnotationKey] = leader
-		vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+		*vertexes = append(*vertexes, &ictrltypes.LifecycleVertex{
 			Obj:    &pod,
 			Action: ictrltypes.ActionUpdatePtr(),
 		})

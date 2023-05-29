@@ -23,7 +23,6 @@ import (
 	"context"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
@@ -43,8 +42,6 @@ type KafkaOperations struct {
 	publishTopic string
 	topics       []string
 	closeCh      chan struct{}
-	closed       atomic.Bool
-	wg           sync.WaitGroup
 	mu           sync.Mutex
 	BaseOperations
 }

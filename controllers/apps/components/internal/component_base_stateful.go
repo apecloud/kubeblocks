@@ -603,6 +603,12 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 		return nil
 	}
 
+	createObjs := func(objs []client.Object) {
+		for _, obj := range objs {
+			c.CreateResource(obj, nil)
+		}
+	}
+
 	if err := cleanCronJobs(); err != nil {
 		return err
 	}
@@ -621,11 +627,13 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 		stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
 		objs, err := doBackup(reqCtx, cli, c.Cluster, c.Component, backupKey, stsProto, stsObj)
 		if err != nil {
+			// if it's requeue error, create object before return error
+			if _, ok := err.(ictrltypes.RequeueError); ok {
+				createObjs(objs)
+			}
 			return err
 		}
-		for _, obj := range objs {
-			c.CreateResource(obj, nil)
-		}
+		createObjs(objs)
 		return nil
 	}
 	// pvcs are ready, stateful_set.replicas should be updated

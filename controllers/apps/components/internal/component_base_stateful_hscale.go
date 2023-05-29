@@ -218,6 +218,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 		}
 		switch backupStatus {
 		case BackupStatusNotCreated:
+			// create backup
 			backupObjs, err := Backup(reqCtx,
 				cli,
 				backupKey,
@@ -231,6 +232,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 			objs = append(objs, backupObjs...)
 			return objs, controllertypes.NewRequeueError(controllertypes.RequeueDuration, "")
 		case BackupStatusProcessing:
+			// requeue to waiting for backup ready
 			return objs, controllertypes.NewRequeueError(controllertypes.RequeueDuration, "")
 		case BackupStatusReadyToUse:
 			break

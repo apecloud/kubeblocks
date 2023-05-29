@@ -33,7 +33,7 @@ backup_job: {
 	apiVersion: "dataprotection.kubeblocks.io/v1alpha1"
 	kind:       "Backup"
 	metadata: {
-		generateName: "\(backup_job_key.Name)-"
+		name: backup_job_key.Name
 		namespace:    backup_job_key.Namespace
 		labels: {
 			"dataprotection.kubeblocks.io/backup-type":         backup_type

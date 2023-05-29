@@ -2,12 +2,7 @@ restoreJobName: string
 component: {
 	name: string
 	podSpec: {
-		containers: [
-			{
-				resources: {...}
-				volumeMounts: [...]
-			}
-		]
+		containers: [...]
 		volumes: [...]
 	}
 }

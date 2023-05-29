@@ -80,6 +80,9 @@ func Restore(restoreJobKey types.NamespacedName,
 	objs := make([]client.Object, 0)
 	// TODO: CT - need to check parameters
 	pvc, err := builder.BuildPVCFromSnapshot(sts, component.VolumeClaimTemplates[0], pvcKey, "", component)
+	if err != nil {
+		return nil, err
+	}
 	objs = append(objs, pvc)
 	job, err := builder.BuildRestoreJobForFullBackup(restoreJobKey.Name, component, backup, backupTool, pvcKey.Name)
 	if err != nil {

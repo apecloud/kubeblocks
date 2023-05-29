@@ -10,8 +10,12 @@ The following directories and their subdirectories are licensed under Apache-2.0
 
 ```
 apis/**
+cmd/probe/internal/binding/
+cmd/probe/internal/component/
+cmd/probe/internal/middleware/
 deploy/**
 externalapis/**
+internal/cli/cmd/plugin/download/**
 hack/**
 pkg/**
 test/**

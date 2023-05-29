@@ -26,8 +26,8 @@ set -e -o pipefail
 # Initialize vars
 ERR=false
 FAIL=false
-EXCLUDES_DIRS="vendor/\|apis/\|tools/\|externalapis/\|cmd/probe/internal/\|internal/cli/cmd/plugin/download"
-APACHE2_DIRS="apis/\|externalapis/\|cmd/probe/internal/"
+EXCLUDES_DIRS="vendor/\|apis/\|tools/\|externalapis/\|cmd/probe/internal/component/\|internal/cli/cmd/plugin/download"
+APACHE2_DIRS="apis/\|externalapis/"
 
 for file in $(git ls-files | grep '\.cue\|\.go$' | grep -v ${EXCLUDES_DIRS}); do
   echo -n "Header check: $file... "

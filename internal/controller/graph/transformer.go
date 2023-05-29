@@ -45,22 +45,22 @@ type Transformer interface {
 // TransformerChain chains a group Transformer together
 type TransformerChain []Transformer
 
-// ErrNoops is used to stop the Transformer chain for some purpose.
+// ErrPrematureStop is used to stop the Transformer chain for some purpose.
 // Use it in Transformer.Transform when all jobs have done and no need to run following transformers
-var ErrNoops = errors.New("No-Ops")
+var ErrPrematureStop = errors.New("Premature-Stop")
 
 // ApplyTo applies TransformerChain t to dag
 func (r TransformerChain) ApplyTo(ctx TransformContext, dag *DAG) error {
 	for _, transformer := range r {
 		if err := transformer.Transform(ctx, dag); err != nil {
-			return ignoredIfNoops(err)
+			return ignoredIfPrematureStop(err)
 		}
 	}
 	return nil
 }
 
-func ignoredIfNoops(err error) error {
-	if err == ErrNoops {
+func ignoredIfPrematureStop(err error) error {
+	if err == ErrPrematureStop {
 		return nil
 	}
 	return err

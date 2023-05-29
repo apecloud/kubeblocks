@@ -490,6 +490,9 @@ func CheckPrimaryIndexChanged(ctx context.Context,
 	if err != nil {
 		return false, -1, err
 	}
+	if pod == nil {
+		return false, -1, nil
+	}
 	_, o := util.ParseParentNameAndOrdinal(pod.Name)
 	return currentPrimaryIndex != o, o, nil
 }

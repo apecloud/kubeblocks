@@ -77,11 +77,11 @@ var clusterCreateExample = templates.Examples(`
 	# Create a cluster and set termination policy DoNotTerminate that will prevent the cluster from being deleted
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy DoNotTerminate
 
-	# In scenarios where you want to delete resources such as statements, deployments, services, pdb, but keep PVCs
+	# In scenarios where you want to delete resources such as statefulsets, deployments, services, pdb, but keep PVCs
 	# when deleting the cluster, use termination policy Halt
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy Halt
 
-	# In scenarios where you want to delete resource such as statements, deployments, services, pdb, and including
+	# In scenarios where you want to delete resource such as statefulsets, deployments, services, pdb, and including
 	# PVCs when deleting the cluster, use termination policy Delete
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy Delete
 
@@ -92,12 +92,21 @@ var clusterCreateExample = templates.Examples(`
 	# Create a cluster and set cpu to 1 core, memory to 1Gi, storage size to 20Gi and replicas to 3
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set cpu=1,memory=1Gi,storage=20Gi,replicas=3
 
+	# Create a cluster and set storageClass to csi-hostpath-sc, if storageClass is not specified,
+	# the default storage class will be used
+	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set storageClass=csi-hostpath-sc
+
 	# Create a cluster and set the class to general-1c1g
 	# run "kbcli class list --cluster-definition=cluster-definition-name" to get the class list
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --set class=general-1c1g
 
 	# Create a cluster with replicationSet workloadType and set switchPolicy to Noop
 	kbcli cluster create mycluster --cluster-definition postgresql --set switchPolicy=Noop
+
+	# Create a cluster with more than one component, use "--set type=component-name" to specify the component,
+	# if not specified, the main component will be used, run "kbcli cd list-components CLUSTER-DEFINITION-NAME"
+	# to show the components in the cluster definition
+	kbcli cluster create mycluster --cluster-definition redis --set type=redis,cpu=1 --set type=redis-sentinel,cpu=200m
 
 	# Create a cluster and use a URL to set cluster resource
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql \
@@ -1013,6 +1022,20 @@ func (o *CreateOptions) validateClusterVersion() error {
 	if err != nil {
 		return err
 	}
+
+	dryRun, err := o.GetDryRunStrategy()
+	if err != nil {
+		return err
+	}
+
+	printCvInfo := func(cv string) {
+		// if dryRun is not None, we don't need to print the info, avoid the output yaml file including the info
+		if dryRun != create.DryRunNone {
+			return
+		}
+		fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", cv)
+	}
+
 	switch {
 	case o.ClusterVersionRef != "":
 		if _, ok := existedClusterVersions[o.ClusterVersionRef]; !ok {
@@ -1022,7 +1045,7 @@ func (o *CreateOptions) validateClusterVersion() error {
 		// if default version is not set and there is only one version, use it
 		if len(existedClusterVersions) == 1 {
 			o.ClusterVersionRef = maps.Keys(existedClusterVersions)[0]
-			fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
+			printCvInfo(o.ClusterVersionRef)
 		} else {
 			return fmt.Errorf("failed to find the default cluster version, use '--cluster-version ClusterVersion' to set it")
 		}
@@ -1030,7 +1053,7 @@ func (o *CreateOptions) validateClusterVersion() error {
 		// TODO: achieve this in operator
 		if existedDefault {
 			o.ClusterVersionRef = defaultVersion
-			fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
+			printCvInfo(o.ClusterVersionRef)
 		}
 	}
 

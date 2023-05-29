@@ -23,6 +23,11 @@ import (
 	"context"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
@@ -38,11 +43,9 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -70,6 +73,8 @@ import (
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;watch;update;patch
 
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=replicasets/status,verbs=get
@@ -107,15 +112,6 @@ type ClusterReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
-}
-
-// ClusterStatusEventHandler is the event handler for the cluster status event
-type ClusterStatusEventHandler struct{}
-
-var _ k8score.EventHandler = &ClusterStatusEventHandler{}
-
-func init() {
-	k8score.EventHandlerMap["cluster-status-handler"] = &ClusterStatusEventHandler{}
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -165,10 +161,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// handle deletion
 			// handle cluster deletion first
 			&lifecycle.ClusterDeletionTransformer{},
-			// fix meta
-			// fix finalizer and cd&cv labels
-			&lifecycle.FixMetaTransformer{},
-			// validate
+			// check is recovering from halted cluster
+			&lifecycle.HaltRecoveryTransformer{},
+			// assure meta-data info
+			// update finalizer and cd&cv labels
+			&lifecycle.AssureMetaTransformer{},
+			// validate ref objects
 			// validate cd & cv's existence and availability
 			&lifecycle.ValidateAndLoadRefResourcesTransformer{},
 			// validate config
@@ -176,34 +174,22 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// fix spec
 			// fill class related info
 			&lifecycle.FillClassTransformer{},
-			// generate objects
-			// cluster to K8s objects and put them into dag
-			&lifecycle.ClusterTransformer{Client: r.Client},
-			// tls certs secret
-			&lifecycle.TLSCertsTransformer{},
+			// create cluster connection credential secret object
+			&lifecycle.ClusterCredentialTransformer{},
+			// create all components objects
+			&lifecycle.ComponentTransformer{Client: r.Client},
 			// transform backupPolicy tpl to backuppolicy.dataprotection.kubeblocks.io
 			&lifecycle.BackupPolicyTPLTransformer{},
 			// add our finalizer to all objects
 			&lifecycle.OwnershipTransformer{},
 			// make all workload objects depending on credential secret
-			&lifecycle.CredentialTransformer{},
-			// make all workload objects depending on all none workload objects
-			&lifecycle.WorkloadsLastTransformer{},
+			&lifecycle.SecretTransformer{},
 			// make config configmap immutable
 			&lifecycle.ConfigTransformer{},
-			// read old snapshot from cache, and generate diff plan
-			&lifecycle.ObjectActionTransformer{},
-			// day-2 ops
-			// horizontal scaling
-			&lifecycle.StsHorizontalScalingTransformer{},
-			// stateful set pvc Update
-			&lifecycle.StsPVCTransformer{},
 			// update cluster status
 			&lifecycle.ClusterStatusTransformer{},
 			// handle PITR
 			&lifecycle.PITRTransformer{Client: r.Client},
-			// update the real-time component replicas info to pods
-			&lifecycle.StsPodsTransformer{},
 			// always safe to put your transformer below
 		).
 		Build()
@@ -217,7 +203,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if errBuild != nil {
 		return requeueError(errBuild)
 	}
-
 	return intctrlutil.Reconciled()
 }
 
@@ -235,7 +220,8 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
 		Owns(&dataprotectionv1alpha1.BackupPolicy{}).
-		Owns(&dataprotectionv1alpha1.Backup{})
+		Owns(&dataprotectionv1alpha1.Backup{}).
+		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterPods))
 	if viper.GetBool("VOLUMESNAPSHOT") {
 		if intctrlutil.InVolumeSnapshotV1Beta1() {
 			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
@@ -246,22 +232,20 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return b.Complete(r)
 }
 
-// Handle is the event handler for the cluster status event.
-func (r *ClusterStatusEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.Reason != string(probeutil.CheckRoleOperation) {
-		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
+func (r *ClusterReconciler) filterClusterPods(obj client.Object) []reconcile.Request {
+	labels := obj.GetLabels()
+	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
+		return []reconcile.Request{}
 	}
-
-	// parse probe event message when field path is probe-role-changed-check
-	message := k8score.ParseProbeEventMessage(reqCtx, event)
-	if message == nil {
-		reqCtx.Log.Info("parse probe event message failed", "message", event.Message)
-		return nil
+	if _, ok := labels[constant.AppInstanceLabelKey]; !ok {
+		return []reconcile.Request{}
 	}
-
-	// if probe message event is checkRoleFailed, it means the cluster is abnormal, need to handle the cluster status
-	if message.Event == probeutil.OperationFailed {
-		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: obj.GetNamespace(),
+				Name:      labels[constant.AppInstanceLabelKey],
+			},
+		},
 	}
-	return nil
 }

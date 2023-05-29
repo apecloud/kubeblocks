@@ -64,9 +64,4 @@ var _ = Describe("playground", func() {
 		}
 		Expect(o.validate()).Should(HaveOccurred())
 	})
-
-	It("guide", func() {
-		cmd := newGuideCmd()
-		Expect(cmd).ShouldNot(BeNil())
-	})
 })

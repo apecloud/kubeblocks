@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/sqlchannel"
@@ -535,4 +536,11 @@ func (r *SystemAccountReconciler) clusterDeletionHander() builder.Predicates {
 		},
 	}
 	return builder.WithPredicates(predicate)
+}
+
+// existsOperations checks if the cluster is doing operations
+func existsOperations(cluster *appsv1alpha1.Cluster) bool {
+	opsRequestMap, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
+	_, isRestoring := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	return len(opsRequestMap) > 0 || isRestoring
 }

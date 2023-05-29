@@ -27,15 +27,14 @@ import (
 // NewPlaygroundCmd creates the playground command
 func NewPlaygroundCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "playground [init | destroy | guide]",
-		Short: "Bootstrap a playground KubeBlocks in local host or cloud.",
+		Use:   "playground [init | destroy]",
+		Short: "Bootstrap or destroy a playground KubeBlocks in local host or cloud.",
 	}
 
 	// add subcommands
 	cmd.AddCommand(
 		newInitCmd(streams),
 		newDestroyCmd(streams),
-		newGuideCmd(),
 	)
 
 	return cmd

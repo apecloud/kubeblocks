@@ -51,53 +51,19 @@ func init() {
 
 const (
 	// TODO: deduplicate
-	dbClusterFinalizerName = "cluster.kubeblocks.io/finalizer"
 	clusterDefLabelKey     = "clusterdefinition.kubeblocks.io/name"
 	clusterVersionLabelKey = "clusterversion.kubeblocks.io/name"
-)
-
-type Action string
-
-const (
-	CREATE = Action("CREATE")
-	UPDATE = Action("UPDATE")
-	PATCH  = Action("PATCH")
-	DELETE = Action("DELETE")
-	STATUS = Action("STATUS")
 )
 
 // default reconcile requeue after duration
 var requeueDuration = time.Millisecond * 100
 
-type gvkName struct {
-	gvk      schema.GroupVersionKind
-	ns, name string
+type gvkNObjKey struct {
+	schema.GroupVersionKind
+	client.ObjectKey
 }
 
-// lifecycleVertex describes expected object spec and how to reach it
-// obj always represents the expected part: new object in Create/Update action and old object in Delete action
-// oriObj is set in Update action
-// all transformers doing their object manipulation works on obj.spec
-// the root vertex(i.e. the cluster vertex) will be treated specially:
-// as all its meta, spec and status can be updated in one reconciliation loop
-// Update is ignored when immutable=true
-// orphan object will be force deleted when action is DELETE
-type lifecycleVertex struct {
-	obj       client.Object
-	oriObj    client.Object
-	immutable bool
-	isOrphan  bool
-	action    *Action
-}
-
-func (v lifecycleVertex) String() string {
-	if v.action == nil {
-		return fmt.Sprintf("{obj:%T, immutable: %v, action: nil}", v.obj, v.immutable)
-	}
-	return fmt.Sprintf("{obj:%T, immutable: %v, action: %v}", v.obj, v.immutable, *v.action)
-}
-
-type clusterSnapshot map[gvkName]client.Object
+type clusterOwningObjects map[gvkNObjKey]client.Object
 
 type RequeueError interface {
 	RequeueAfter() time.Duration
@@ -119,12 +85,6 @@ func (r *realRequeueError) RequeueAfter() time.Duration {
 
 func (r *realRequeueError) Reason() string {
 	return r.reason
-}
-
-// IsRequeueError checks if the error is a RequeueError
-func IsRequeueError(err error) bool {
-	_, ok := err.(RequeueError)
-	return ok
 }
 
 type delegateClient struct {

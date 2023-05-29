@@ -115,6 +115,8 @@ spec:
                 value: {{ if .Values.cluster.customConfig }}{{ .Values.cluster.customConfig }}{{ end }}
               - name: MYSQL_DYNAMIC_CONFIG
                 value: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
+              - name: KB_EMBEDDED_WESQL
+                value: {{ .Values.cluster.kbWeSQLImage | default "1" | quote }}
             command: ["/scripts/setup.sh"]
             lifecycle:
               preStop:

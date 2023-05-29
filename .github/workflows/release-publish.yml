@@ -1,13 +1,15 @@
 name: RELEASE-PUBLISH
 
 on:
+  push:
   release:
     types:
       - published
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  TAG_NAME: ${{ github.ref_name }}
+#  TAG_NAME: ${{ github.ref_name }}
+  TAG_NAME: "v0.5.98"
   GO_VERSION: "1.20"
   CLI_NAME: 'kbcli'
   CLI_REPO: 'apecloud/kbcli'
@@ -30,13 +32,13 @@ jobs:
           repository: ${{ env.CLI_REPO }}
           token: ${{ env.GITHUB_TOKEN }}
           prerelease: true
-      - name: create gitlab release ${{ env.CLI_NAME }}
-        run: |
-          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
-            --type 1 \
-            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
-            --tag-name ${{ env.TAG_NAME }} \
-            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
+#      - name: create gitlab release ${{ env.CLI_NAME }}
+#        run: |
+#          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
+#            --type 1 \
+#            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
+#            --tag-name ${{ env.TAG_NAME }} \
+#            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
   
 
   upload-release-assert:
@@ -64,9 +66,9 @@ jobs:
       - name: make generate
         run: make generate
 
-      - name: Get release
-        id: get_release
-        uses: bruceadams/get-release@v1.3.2
+#      - name: Get release
+#        id: get_release
+#        uses: bruceadams/get-release@v1.3.2
 
       - name: make build
         run: |
@@ -90,7 +92,8 @@ jobs:
           zip -r -o ${{ env.CLI_FILENAME }}.zip  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.zip  # for debug 
           mv ${{ env.CLI_FILENAME }}.zip bin/
-          shasum -a 256 bin/${{ env.CLI_FILENAME }}.zip > bin/${{ env.CLI_FILENAME }}.zip.sha256.txt
+          mkdir -p sha256
+          shasum -a 256 bin/${{ env.CLI_FILENAME }}.zip > sha256/${{ env.CLI_FILENAME }}.zip.sha256.txt
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.zip" >> $GITHUB_ENV
           echo "ASSET_CONTENT_TYPE=application/zip" >> $GITHUB_ENV
           echo "CheckSum=${{ env.CLI_FILENAME }}.zip.sha256.txt" >> $GITHUB_ENV
@@ -102,22 +105,23 @@ jobs:
           tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.tar.gz  # for debug 
           mv ${{ env.CLI_FILENAME }}.tar.gz bin/
-          shasum -a 256 bin/${{ env.CLI_FILENAME }}.tar.gz > bin/${{ env.CLI_FILENAME }}.tar.gz.sha256.txt
+          mkdir -p sha256
+          shasum -a 256 bin/${{ env.CLI_FILENAME }}.tar.gz > sha256/${{ env.CLI_FILENAME }}.tar.gz.sha256.txt
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.tar.gz" >> $GITHUB_ENV
           echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
           echo "CheckSum=${{ env.CLI_FILENAME }}.tar.gz.sha256.txt" >> $GITHUB_ENV
 
-      - name: upload gitlab kbcli asset ${{ matrix.os }}
-        env:
-          CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
-        run: |
-          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
-            --type 2 \
-            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
-            --tag-name ${{ env.TAG_NAME }} \
-            --asset-path ./bin/${{ env.ASSET_NAME }} \
-            --asset-name ${{ env.ASSET_NAME }} \
-            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
+#      - name: upload gitlab kbcli asset ${{ matrix.os }}
+#        env:
+#          CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
+#        run: |
+#          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
+#            --type 2 \
+#            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
+#            --tag-name ${{ env.TAG_NAME }} \
+#            --asset-path ./bin/${{ env.ASSET_NAME }} \
+#            --asset-name ${{ env.ASSET_NAME }} \
+#            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
 
       - name: get release kbcli upload url
         run: |
@@ -145,35 +149,57 @@ jobs:
           asset_content_type: application/octet-stream
 
       - name: upload checksum for kbcli assets
-        uses: actions/upload-release-asset@main
+        uses: actions/upload-artifact@v3
         with:
-          upload_url: ${{ env.UPLOAD_URL }}
-          asset_path: ./bin/${{ env.CheckSum }}
-          asset_name: ${{ env.CheckSum }}
-          asset_content_type: text/plain
-      - name: upload release asset ${{ matrix.os }}
-        continue-on-error: true
-        uses: actions/upload-release-asset@main
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./bin/${{ env.ASSET_NAME }}
-          asset_name: ${{ env.ASSET_NAME }}
-          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
+          name: sha256
+          path: sha256/
 
-  send-message:
+#      - name: upload release asset ${{ matrix.os }}
+#        continue-on-error: true
+#        uses: actions/upload-release-asset@main
+#        with:
+#          upload_url: ${{ steps.get_release.outputs.upload_url }}
+#          asset_path: ./bin/${{ env.ASSET_NAME }}
+#          asset_name: ${{ env.ASSET_NAME }}
+#          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
+
+  generate-kbcli-sha256:
     runs-on: ubuntu-latest
     needs: upload-release-assert
-    if: ${{ always() }}
     steps:
       - uses: actions/checkout@v3
-      - name: send message
-        run: |
-          CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0error"
-          if [[ "${{ needs.upload-release-assert.result }}" == "success" ]]; then
-              CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0success"
-          fi
 
-          bash .github/utils/utils.sh --type 12 \
-            --content "${CONTENT}"\
-            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
-            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+      - uses: actions/download-artifact@v3
+        with:
+          name: sha256
+          path: sha256
+
+      - name: generate kbcli release-notes
+        run: |
+          python ./.github/utils/generate_kbcli_sha256.py ${{ github.ref_name }} sha256
+
+      - name: release kbcli with release notes
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: ./docs/release_notes/v${{ env.REL_VERSION }}/v${{ env.REL_VERSION }}.md
+          token: ${{ env.GITLAB_ACCESS_TOKEN }}
+          name: KBCLI ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+
+#  send-message:
+#    runs-on: ubuntu-latest
+#    needs: upload-release-assert
+#    if: ${{ always() }}
+#    steps:
+#      - uses: actions/checkout@v3
+#      - name: send message
+#        run: |
+#          CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0error"
+#          if [[ "${{ needs.upload-release-assert.result }}" == "success" ]]; then
+#              CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0success"
+#          fi
+#
+#          bash .github/utils/utils.sh --type 12 \
+#            --content "${CONTENT}"\
+#            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
+#            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

@@ -736,3 +736,8 @@ func GetComponentUpRunningPhase() []ClusterComponentPhase {
 		FailedClusterCompPhase,
 	}
 }
+
+// ComponentPodsAreReady checks if the pods of component are ready.
+func ComponentPodsAreReady(podsAreReady *bool) bool {
+	return podsAreReady != nil && *podsAreReady
+}

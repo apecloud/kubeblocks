@@ -335,7 +335,8 @@ func (c *ComponentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client
 	var requeueAfter time.Duration
 	clusterGenerationFromWorkload := obj.GetAnnotations()[constant.KubeBlocksGenerationKey]
 	// check if it is the latest obj after cluster does updates.
-	if !isRunning && (podsReady == nil || !*podsReady) && clusterGenerationFromWorkload == strconv.FormatInt(c.Cluster.Generation, 10) {
+	if !isRunning && !appsv1alpha1.ComponentPodsAreReady(podsReady) &&
+		clusterGenerationFromWorkload == strconv.FormatInt(c.Cluster.Generation, 10) {
 		hasFailedPodTimedOut, timedOutPodStatusMessage, requeueAfter = hasFailedAndTimedOutPod(pods)
 	}
 
@@ -356,12 +357,13 @@ func (c *ComponentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client
 			status.Phase = phase
 		}
 		status.SetMessage(statusMessage)
-		status.PodsReady = podsReady
-		if podsReady != nil && *podsReady {
-			status.PodsReadyTime = &metav1.Time{Time: time.Now()}
-		} else {
+		if !appsv1alpha1.ComponentPodsAreReady(podsReady) {
 			status.PodsReadyTime = nil
+		} else if *podsReady && !appsv1alpha1.ComponentPodsAreReady(status.PodsReady) {
+			// set podsReadyTime when pods of component are ready at the moment.
+			status.PodsReadyTime = &metav1.Time{Time: time.Now()}
 		}
+		status.PodsReady = podsReady
 		return nil
 	}
 
@@ -402,7 +404,7 @@ func (c *ComponentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isR
 		return phase, statusMessage, nil
 	}
 
-	if podsReady != nil && *podsReady {
+	if appsv1alpha1.ComponentPodsAreReady(podsReady) {
 		// check if the role probe timed out when component phase is not Running but all pods of component are ready.
 		phase, statusMessage = c.ComponentSet.GetPhaseWhenPodsReadyAndProbeTimeout(pods)
 		// if component is not running and probe is not timed out, requeue.

@@ -123,7 +123,9 @@ spec:
                 value: {{ if .Values.cluster.customConfig }}{{ .Values.cluster.customConfig }}{{ end }}
               - name: MYSQL_DYNAMIC_CONFIG
                 value: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
-            command: ["/scripts/setup.sh"]       
+              - name: KB_EMBEDDED_WESQL
+                value: {{ .Values.cluster.kbWeSQLImage | default "1" | quote }}
+            command: ["/scripts/setup.sh"]
           - name: metrics
             image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}

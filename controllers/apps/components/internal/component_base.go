@@ -353,11 +353,9 @@ func (c *ComponentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client
 		status.SetMessage(statusMessage)
 		if !appsv1alpha1.ComponentPodsAreReady(podsReady) {
 			status.PodsReadyTime = nil
-		} else {
-			if !appsv1alpha1.ComponentPodsAreReady(status.PodsReady) {
-				// set podsReadyTime when pods of component are ready at the moment.
-				status.PodsReadyTime = &metav1.Time{Time: time.Now()}
-			}
+		} else if !appsv1alpha1.ComponentPodsAreReady(status.PodsReady) {
+			// set podsReadyTime when pods of component are ready at the moment.
+			status.PodsReadyTime = &metav1.Time{Time: time.Now()}
 		}
 		status.PodsReady = podsReady
 		return nil

@@ -202,6 +202,10 @@ func (cs *ConfigurationStore) GetConfigMap(name string) (*v1.ConfigMap, error) {
 	return cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Get(cs.ctx, name, metav1.GetOptions{})
 }
 
+func (cs *ConfigurationStore) GetPod(name string) (*v1.Pod, error) {
+	return cs.clientSet.CoreV1().Pods(cs.namespace).Get(cs.ctx, name, metav1.GetOptions{})
+}
+
 func (cs *ConfigurationStore) UpdateConfigMap(configMap *v1.ConfigMap) (*v1.ConfigMap, error) {
 	return cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Update(cs.ctx, configMap, metav1.UpdateOptions{})
 }
@@ -212,6 +216,10 @@ func (cs *ConfigurationStore) ListPods() (*v1.PodList, error) {
 
 func (cs *ConfigurationStore) GetClusterObj() (*unstructured.Unstructured, error) {
 	return cs.dynamicClient.Resource(types.ClusterGVR()).Namespace(cs.namespace).Get(cs.ctx, cs.clusterName, metav1.GetOptions{})
+}
+
+func (cs *ConfigurationStore) UpdateClusterObj(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	return cs.dynamicClient.Resource(types.ClusterGVR()).Namespace(cs.namespace).Update(cs.ctx, obj, metav1.UpdateOptions{})
 }
 
 type LeaderRecord struct {

@@ -194,8 +194,7 @@ min_parallel_index_scan_size = '512kB'
 # min_parallel_table_scan_size unit is 8KB, 1024 = 8MB
 min_parallel_table_scan_size = '8MB'
 {{- if gt $phy_memory 0 }}
-# min_wal_size={LEAST(GREATEST(DBInstanceClassMemory/8388608, 256), 8192)} # patroni 1/20 disk size
-min_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 8388608 ) 256 ) 8192 ) }}'
+min_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 8388608 ) 2048 ) 8192 ) }}'
 {{- end }}
 
 old_snapshot_threshold = '-1'

@@ -1,4 +1,5 @@
 {{- if (.Capabilities.KubeVersion.GitVersion | contains "-eks") }}
+---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -13,7 +14,9 @@ parameters:
 provisioner: ebs.csi.aws.com
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
+---
 {{- else if (.Capabilities.KubeVersion.GitVersion | contains "-gke") }}
+---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -28,7 +31,9 @@ parameters:
 provisioner: pd.csi.storage.gke.io
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
+---
 {{- else if (.Capabilities.KubeVersion.GitVersion | contains "-aliyun") }}
+---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -43,7 +48,9 @@ parameters:
 provisioner: diskplugin.csi.alibabacloud.com
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
+---
 {{- else if (.Capabilities.KubeVersion.GitVersion | contains "-tke") }}
+---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -56,7 +63,9 @@ parameters:
 reclaimPolicy: Delete
 provisioner: com.tencent.cloud.csi.cbs
 volumeBindingMode: WaitForFirstConsumer
+---
 {{- else if (.Capabilities.KubeVersion.GitVersion | contains "-aks") }}
+---
 ## it doesn't work here because aks does not support .Capabilities.KubeVersion.GitVersion to judge the provider.
 ## refer: https://github.com/Azure/AKS/issues/3375
 apiVersion: storage.k8s.io/v1
@@ -73,4 +82,5 @@ parameters:
 provisioner: kubernetes.io/azure-disk
 reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
+---
 {{- end }}

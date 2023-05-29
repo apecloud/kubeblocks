@@ -309,5 +309,8 @@ func InitPlugin() {
 		if err := AddIndex(paths, DefaultIndexName, DefaultIndexURI); err != nil {
 			klog.Fatal("failed to download default index", err)
 		}
+		if err := AddIndex(paths, KrewIndexName, KrewIndexURI); err != nil {
+			klog.Fatal("failed to download krew index", err)
+		}
 	}
 }

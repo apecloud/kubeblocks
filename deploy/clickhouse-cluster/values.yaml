@@ -14,13 +14,13 @@ monitor:
 service:
   ## @param service.type ClickHouse service type, valid options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
   ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
-  ## 
+  ##
   type: ClusterIP
 
 
 ## ClickHouse per shard component configurations
 ##
-clickhouse: 
+clickhouse:
   -
     ## @param clickhouse[*].replicaCount Number of ClickHouse replicas per shard to deploy
     ##
@@ -67,52 +67,52 @@ clickhouse:
     ##
     tolerations: []
 
-  # -
-  #   ## @param clickhouse[*].replicaCount Number of ClickHouse replicas per shard to deploy
-  #   ##
-  #   replicaCount: 2
-  #   ## ClickHouse workload pod resource requests and limits
-  #   ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
-  #   ## @param clickhouse[*].resources.limits The resources limits for the init container
-  #   ## @param clickhouse[*].resources.requests The requested resources for the init container
-  #   ##
-  #   resources: {}
-  #     ## We usually recommend not to specify default resources and to leave this as a conscious
-  #     ## choice for the user. This also increases chances charts run on environments with little
-  #     ## resources, such as Minikube. If you do want to specify resources, uncomment the following
-  #     ## lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  #     ##
-  #     # limits:
-  #     #   cpu: 100m
-  #     #   memory: 128Mi
-  #     # requests:
-  #     #   cpu: 100m
-  #     #   memory: 128Mi
-  #   ## Enable persistence using Persistent Volume Claims
-  #   ## ref: https://kubernetes.io/docs/user-guide/persistent-volumes/
-  #   ##
-  #   persistence:
-  #     ## @param clickhouse[*].persistence.enabled Enable persistence using Persistent Volume Claims
-  #     ##
-  #     enabled: false
-  #     ## `data` volume settings
-  #     ##
-  #     data:
-  #       ## @param clickhouse[*].persistence.data.storageClassName Storage class of backing PVC
-  #       ## If defined, storageClassName: <storageClass>
-  #       ## If set to "-", storageClassName: "", which disables dynamic provisioning
-  #       ## If undefined (the default) or set to null, no storageClassName spec is
-  #       ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
-  #       ##   GKE, AWS & OpenStack)
-  #       ##
-  #       storageClassName:
-  #       ## @param clickhouse[*].persistence.size Size of data volume
-  #       ##
-  #       size: 10Gi
-  #   ## @param clickhouse[*].tolerations Tolerations for ClickHouse pods assignment
-  #   ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
-  #   ##
-  #   tolerations: []
+  -
+    ## @param clickhouse[*].replicaCount Number of ClickHouse replicas per shard to deploy
+    ##
+    replicaCount: 2
+    ## ClickHouse workload pod resource requests and limits
+    ## ref: http://kubernetes.io/docs/user-guide/compute-resources/
+    ## @param clickhouse[*].resources.limits The resources limits for the init container
+    ## @param clickhouse[*].resources.requests The requested resources for the init container
+    ##
+    resources: {}
+      ## We usually recommend not to specify default resources and to leave this as a conscious
+      ## choice for the user. This also increases chances charts run on environments with little
+      ## resources, such as Minikube. If you do want to specify resources, uncomment the following
+      ## lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+      ##
+      # limits:
+      #   cpu: 100m
+      #   memory: 128Mi
+      # requests:
+      #   cpu: 100m
+      #   memory: 128Mi
+    ## Enable persistence using Persistent Volume Claims
+    ## ref: https://kubernetes.io/docs/user-guide/persistent-volumes/
+    ##
+    persistence:
+      ## @param clickhouse[*].persistence.enabled Enable persistence using Persistent Volume Claims
+      ##
+      enabled: false
+      ## `data` volume settings
+      ##
+      data:
+        ## @param clickhouse[*].persistence.data.storageClassName Storage class of backing PVC
+        ## If defined, storageClassName: <storageClass>
+        ## If set to "-", storageClassName: "", which disables dynamic provisioning
+        ## If undefined (the default) or set to null, no storageClassName spec is
+        ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+        ##   GKE, AWS & OpenStack)
+        ##
+        storageClassName:
+        ## @param clickhouse[*].persistence.size Size of data volume
+        ##
+        size: 10Gi
+    ## @param clickhouse[*].tolerations Tolerations for ClickHouse pods assignment
+    ## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+    ##
+    tolerations: []
 
 
 ## @param tolerations define global Tolerations for the cluster all pod's assignment

@@ -38,15 +38,6 @@ func newRequeueError(after time.Duration, reason string) error {
 	return intctrlutil.NewRequeueError(after, reason)
 }
 
-// newValidationError creates a new validation error.
-// The reason is used to generate the error message.
-// When validation fails, cluster reconciler should prefer `RequeWithError` over `RequeueAfter`.
-func newValidationError(reason string) error {
-	return &validationError{
-		reason: reason,
-	}
-}
-
 func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkNObjKey, error) {
 	gvk, err := apiutil.GVKForObject(object, scheme)
 	if err != nil {

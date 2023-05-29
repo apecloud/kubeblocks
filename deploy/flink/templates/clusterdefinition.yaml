@@ -70,7 +70,7 @@ spec:
       characterType: flink
       workloadType: Stateless
       constraints:
-        numberOfOccurrence: ExactlyOnce
+        numberOfOccurrence: OnceOrMore
       # two envs will be injected into the pod before user-defined envs are
       # JOBMANAGER_RPC_NAME: $clusterName-$componentName
       # JOBMANAGER_RPC_PORT: 6123

@@ -373,7 +373,7 @@ type ClusterComponentDefinition struct {
 type Constraints struct {
 	// numberOfOccurrence is the number of occurrences of the component.
 	// +kubebuilder:validation:Enum={ZeroOrOnce,ExactlyOnce, OnceOrMore, Unlimited}
-	// +default="ExactlyOnce"
+	// +default="Unlimited"
 	// +optional
 	NumberOfOccurrence CompNumberOfOccType `json:"numberOfOccurrence,omitempty"`
 }

@@ -378,11 +378,6 @@ func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemp
 }
 
 func injectCustomRoleObservationContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
-	// TODO(free6om): implementation
-	// 1. shell2http image
-	// 2. probe http binding
-	// 3. init container & action container; shared volume; copy shell2http binary & injection
-
 	// inject shared volume
 	agentVolume := corev1.Volume{
 		Name: roleAgentVolumeName,

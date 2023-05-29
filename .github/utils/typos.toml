@@ -5,4 +5,5 @@
 # Don't correct the "AKS"
 AKS = "AKS"
 ons = "ons"
-HashiCorp= "HashiCorp"
+HashiCorp = "HashiCorp"
+Hashi = "Hashi"

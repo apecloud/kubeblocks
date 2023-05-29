@@ -159,7 +159,10 @@ func getReplicationSetPrimaryObj[T generics.Object, PT generics.PObject[T], L ge
 	}
 	objListItems := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
 	if len(objListItems) != 1 {
-		return nil, fmt.Errorf("the number of current replicationSet primary obj is not 1, pls check")
+		// TODO:(xingran) Temporary modification to fix the issue where the cluster state cannot reach the final state
+		// due to the update order of the role label. Subsequent PR will immediately reconstruct this part.
+		return nil, nil
+		// return nil, fmt.Errorf("the number of current replicationSet primary obj is not 1, pls check")
 	}
 	return &objListItems[0], nil
 }
@@ -223,6 +226,9 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	if err != nil {
 		reqCtx.Log.Info("handleReplicationSetRoleChangeEvent get old primary pod failed", "error", err)
 		return err
+	}
+	if oldPrimaryPod == nil {
+		return nil
 	}
 	// pod is old primary and newRole is secondary, it means that the old primary needs to be changed to secondary,
 	// we do not deal with this situation because only change the old primary to secondary when the new primary

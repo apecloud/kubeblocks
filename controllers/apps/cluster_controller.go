@@ -23,6 +23,11 @@ import (
 	"context"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
+
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
@@ -69,6 +74,8 @@ import (
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;watch;update;patch
 
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=replicasets/status,verbs=get
@@ -214,7 +221,8 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
 		Owns(&dataprotectionv1alpha1.BackupPolicy{}).
-		Owns(&dataprotectionv1alpha1.Backup{})
+		Owns(&dataprotectionv1alpha1.Backup{}).
+		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterPods))
 	if viper.GetBool("VOLUMESNAPSHOT") {
 		if intctrlutil.InVolumeSnapshotV1Beta1() {
 			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
@@ -223,4 +231,22 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 	}
 	return b.Complete(r)
+}
+
+func (r *ClusterReconciler) filterClusterPods(obj client.Object) []reconcile.Request {
+	labels := obj.GetLabels()
+	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
+		return []reconcile.Request{}
+	}
+	if _, ok := labels[constant.AppInstanceLabelKey]; !ok {
+		return []reconcile.Request{}
+	}
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: obj.GetNamespace(),
+				Name:      labels[constant.AppInstanceLabelKey],
+			},
+		},
+	}
 }

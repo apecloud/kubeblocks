@@ -320,3 +320,4 @@ wal_writer_flush_after = '1MB'
 work_mem = '{{ printf "%dkB" ( max ( div $phy_memory 4194304 ) 4096 ) }}'
 xmlbinary = 'base64'
 xmloption = 'content'
+wal_init_zero = off

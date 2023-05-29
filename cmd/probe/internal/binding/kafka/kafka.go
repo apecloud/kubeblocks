@@ -21,7 +21,6 @@ package kafka
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -51,7 +50,7 @@ type KafkaOperations struct {
 }
 
 // NewKafka returns a new kafka binding instance.
-func NewKafka(logger logger.Logger) bindings.InputOutputBinding {
+func NewKafka(logger logger.Logger) bindings.OutputBinding {
 	k := kafka.NewKafka(logger)
 	// in kafka binding component, disable consumer retry by default
 	k.DefaultConsumeRetryEnabled = false
@@ -111,60 +110,6 @@ func (kafkaOps *KafkaOperations) InitDelay() error {
 	}
 
 	return nil
-}
-
-func (kafkaOps *KafkaOperations) Close() (err error) {
-	if kafkaOps.closed.CompareAndSwap(false, true) {
-		close(kafkaOps.closeCh)
-	}
-	defer kafkaOps.wg.Wait()
-	return kafkaOps.kafka.Close()
-}
-
-func (kafkaOps *KafkaOperations) Read(ctx context.Context, handler bindings.Handler) error {
-	if kafkaOps.closed.Load() {
-		return errors.New("error: binding is closed")
-	}
-
-	if len(kafkaOps.topics) == 0 {
-		kafkaOps.Logger.Warnf("kafka binding: no topic defined, input bindings will not be started")
-		return nil
-	}
-
-	handlerConfig := kafka.SubscriptionHandlerConfig{
-		IsBulkSubscribe: false,
-		Handler:         adaptHandler(handler),
-	}
-	for _, t := range kafkaOps.topics {
-		kafkaOps.kafka.AddTopicHandler(t, handlerConfig)
-	}
-	kafkaOps.wg.Add(1)
-	go func() {
-		defer kafkaOps.wg.Done()
-		// Wait for context cancelation or closure.
-		select {
-		case <-ctx.Done():
-		case <-kafkaOps.closeCh:
-		}
-
-		// Remove the topic handlers.
-		for _, t := range kafkaOps.topics {
-			kafkaOps.kafka.RemoveTopicHandler(t)
-		}
-	}()
-
-	return kafkaOps.kafka.Subscribe(ctx)
-}
-
-func adaptHandler(handler bindings.Handler) kafka.EventHandler {
-	return func(ctx context.Context, event *kafka.NewEvent) error {
-		_, err := handler(ctx, &bindings.ReadResponse{
-			Data:        event.Data,
-			Metadata:    event.Metadata,
-			ContentType: event.ContentType,
-		})
-		return err
-	}
 }
 
 // CheckStatusOps design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad

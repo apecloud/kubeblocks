@@ -76,9 +76,6 @@ func init() {
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(func(log logger.Logger) bindings.OutputBinding {
 		return kafka.NewKafka(log)
 	}, "kafka")
-	bindingsLoader.DefaultRegistry.RegisterInputBinding(func(log logger.Logger) bindings.InputBinding {
-		return kafka.NewKafka(log)
-	}, "kafka")
 	nrLoader.DefaultRegistry.RegisterComponent(mdns.NewResolver, "mdns")
 	httpMiddlewareLoader.DefaultRegistry.RegisterComponent(func(log logger.Logger) httpMiddlewareLoader.FactoryMethod {
 		return func(metadata middleware.Metadata) (httpMiddleware.Middleware, error) {

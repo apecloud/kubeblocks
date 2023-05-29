@@ -378,7 +378,7 @@ func (c *ComponentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 	if requeueAfter != 0 {
-		return intctrlutil.NewRequeueError(requeueAfter, "requeue for workload status to reconcile.")
+		return intctrlutil.NewDelayedRequeueError(requeueAfter, "requeue for workload status to reconcile.")
 	}
 	return nil
 }
@@ -407,7 +407,7 @@ func (c *ComponentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isR
 		phase, statusMessage = c.ComponentSet.GetPhaseWhenPodsReadyAndProbeTimeout(pods)
 		// if component is not running and probe is not timed out, requeue.
 		if phase == "" {
-			return phase, statusMessage, intctrlutil.NewRequeueError(time.Second*30, "wait for probe timed out")
+			return phase, statusMessage, intctrlutil.NewDelayedRequeueError(time.Second*30, "wait for probe timed out")
 		}
 		return phase, statusMessage, nil
 	}

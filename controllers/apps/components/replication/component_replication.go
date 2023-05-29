@@ -37,7 +37,6 @@ func NewReplicationComponent(cli client.Client,
 	recorder record.EventRecorder,
 	cluster *appsv1alpha1.Cluster,
 	clusterVersion *appsv1alpha1.ClusterVersion,
-	compDef *appsv1alpha1.ClusterComponentDefinition,
 	synthesizedComponent *component.SynthesizedComponent,
 	dag *graph.DAG) *replicationComponent {
 	comp := &replicationComponent{
@@ -53,8 +52,8 @@ func NewReplicationComponent(cli client.Client,
 						ComponentSetBase: types.ComponentSetBase{
 							Cli:           cli,
 							Cluster:       cluster,
-							ComponentSpec: cluster.Spec.GetComponentByName(synthesizedComponent.Name),
-							ComponentDef:  compDef,
+							ComponentSpec: nil,
+							ComponentDef:  nil,
 							Component:     nil,
 						},
 					},

@@ -41,12 +41,34 @@ func NewRequeueError(after time.Duration, reason string) error {
 	}
 }
 
+// NewDelayedRequeueError creates a delayed requeue error which only returns in the last step of the DAG.
+func NewDelayedRequeueError(after time.Duration, reason string) error {
+	return &delayedRequeueError{
+		requeueError{
+			reason:       reason,
+			requeueAfter: after,
+		},
+	}
+}
+
+func IsDelayedRequeueError(err error) bool {
+	if _, ok := err.(DelayedRequeueError); ok {
+		return true
+	}
+	return false
+}
+
 type requeueError struct {
 	reason       string
 	requeueAfter time.Duration
 }
 
+type delayedRequeueError struct {
+	requeueError
+}
+
 var _ RequeueError = &requeueError{}
+var _ DelayedRequeueError = &delayedRequeueError{}
 
 func (r *requeueError) Error() string {
 	return fmt.Sprintf("requeue after: %v as: %s", r.requeueAfter, r.reason)
@@ -59,3 +81,5 @@ func (r *requeueError) RequeueAfter() time.Duration {
 func (r *requeueError) Reason() string {
 	return r.reason
 }
+
+func (r *delayedRequeueError) Delayed() {}

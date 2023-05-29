@@ -37,7 +37,6 @@ func NewConsensusComponent(cli client.Client,
 	recorder record.EventRecorder,
 	cluster *appsv1alpha1.Cluster,
 	clusterVersion *appsv1alpha1.ClusterVersion,
-	componentDef *appsv1alpha1.ClusterComponentDefinition,
 	synthesizedComponent *component.SynthesizedComponent,
 	dag *graph.DAG) *consensusComponent {
 	comp := &consensusComponent{
@@ -53,8 +52,8 @@ func NewConsensusComponent(cli client.Client,
 						ComponentSetBase: types.ComponentSetBase{
 							Cli:           cli,
 							Cluster:       cluster,
-							ComponentSpec: cluster.Spec.GetComponentByName(synthesizedComponent.Name),
-							ComponentDef:  componentDef,
+							ComponentSpec: nil,
+							ComponentDef:  nil,
 							Component:     nil,
 						},
 					},

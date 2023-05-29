@@ -22,7 +22,6 @@ package stateless
 import (
 	"fmt"
 	"reflect"
-	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,7 +32,6 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
@@ -44,7 +42,6 @@ func NewStatelessComponent(cli client.Client,
 	recorder record.EventRecorder,
 	cluster *appsv1alpha1.Cluster,
 	clusterVersion *appsv1alpha1.ClusterVersion,
-	compDef *appsv1alpha1.ClusterComponentDefinition,
 	synthesizedComponent *component.SynthesizedComponent,
 	dag *graph.DAG) *statelessComponent {
 	comp := &statelessComponent{
@@ -58,8 +55,8 @@ func NewStatelessComponent(cli client.Client,
 				ComponentSetBase: types.ComponentSetBase{
 					Cli:           cli,
 					Cluster:       cluster,
-					ComponentSpec: cluster.Spec.GetComponentByName(synthesizedComponent.Name),
-					ComponentDef:  compDef,
+					ComponentSpec: nil,
+					ComponentDef:  nil,
 					Component:     nil,
 				},
 			},
@@ -267,7 +264,7 @@ func (c *statelessComponent) createWorkload() {
 	deployProto := c.WorkloadVertex.Obj.(*appsv1.Deployment)
 	c.WorkloadVertex.Obj = deployProto
 	c.WorkloadVertex.Action = ictrltypes.ActionCreatePtr()
-	c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, nil, "Component workload created")
+	c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload created")
 }
 
 func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
@@ -275,11 +272,7 @@ func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
 	deployProto := c.WorkloadVertex.Obj.(*appsv1.Deployment)
 
 	util.MergeAnnotations(deployObj.Spec.Template.Annotations, &deployProto.Spec.Template.Annotations)
-	if deployObjCopy.Annotations == nil {
-		deployObjCopy.Annotations = map[string]string{}
-	}
-	// record the cluster generation to check if the sts is latest
-	deployObjCopy.Annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(c.Cluster.Generation, 10)
+	util.BuildWorkLoadAnnotations(deployObjCopy, c.Cluster)
 	deployObjCopy.Spec = deployProto.Spec
 	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
 		// TODO(REVIEW): always return true and update component phase to Updating. deployObj.Spec contains default values which set by Kubernetes

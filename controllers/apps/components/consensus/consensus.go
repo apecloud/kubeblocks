@@ -78,6 +78,13 @@ func (r *ConsensusSet) getConsensusSpec() *appsv1alpha1.ConsensusSetSpec {
 	return r.ComponentDef.ConsensusSpec
 }
 
+func (r *ConsensusSet) getProbes() *appsv1alpha1.ClusterDefinitionProbes {
+	if r.Component != nil {
+		return r.Component.GetSynthesizedComponent().Probes
+	}
+	return r.ComponentDef.Probes
+}
+
 func (r *ConsensusSet) SetComponent(comp types.Component) {
 	r.Component = comp
 }
@@ -126,7 +133,7 @@ func (r *ConsensusSet) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) 
 	if !ok || compStatus.PodsReadyTime == nil {
 		return "", nil
 	}
-	if !util.IsProbeTimeout(r.ComponentDef, compStatus.PodsReadyTime) {
+	if !util.IsProbeTimeout(r.getProbes(), compStatus.PodsReadyTime) {
 		return "", nil
 	}
 	for _, pod := range pods {

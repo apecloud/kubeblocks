@@ -21,6 +21,7 @@ package components
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -125,6 +126,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			BeforeEach(func() {
 				deploymentName := clusterName + "-" + compName
 				deployment = testapps.NewDeploymentFactory(testCtx.DefaultNamespace, deploymentName, clusterName, compName).
+					AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 					SetMinReadySeconds(int32(10)).
 					SetReplicas(int32(1)).
 					AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).
@@ -202,6 +204,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			BeforeEach(func() {
 				stsName := clusterName + "-" + compName
 				statefulset = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
+					AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 					SetReplicas(int32(3)).
 					AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 					Create(&testCtx).GetObject()
@@ -290,6 +293,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			BeforeEach(func() {
 				stsName := clusterName + "-" + compName
 				statefulset = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
+					AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 					SetReplicas(int32(3)).
 					AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 					Create(&testCtx).GetObject()
@@ -383,6 +387,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			BeforeEach(func() {
 				stsName := clusterName + "-" + compName
 				statefulset = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
+					AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 					SetReplicas(int32(replicas)).
 					AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 					Create(&testCtx).GetObject()

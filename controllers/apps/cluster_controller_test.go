@@ -1219,7 +1219,7 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(pod.Annotations[constant.ComponentReplicasAnnotationKey]).Should(Equal(strconv.Itoa(int(*sts.Spec.Replicas))))
 			}
 		}).Should(Succeed())
-
+		stsPatch := client.MergeFrom(sts.DeepCopy())
 		By("Updating StatefulSet's status")
 		sts.Status.UpdateRevision = "mock-version"
 		sts.Status.Replicas = int32(replicas)
@@ -1227,7 +1227,7 @@ var _ = Describe("Cluster Controller", func() {
 		sts.Status.CurrentReplicas = int32(replicas)
 		sts.Status.ReadyReplicas = int32(replicas)
 		sts.Status.ObservedGeneration = sts.Generation
-		Expect(k8sClient.Status().Update(ctx, sts)).Should(Succeed())
+		Expect(k8sClient.Status().Patch(ctx, sts, stsPatch)).Should(Succeed())
 
 		By("Checking consensus set pods' role are updated in cluster status")
 		Eventually(func(g Gomega) {

@@ -18,13 +18,13 @@ release_note_template_path = "docs/release_notes/template.md"
 
 def main(argv: list[str]) -> None:
     """
-    :param: the kbcli version and the current direct
+    :param: the kbcli version and the sha256 files direct
     :return None
     """
-    tag_name = argv[1]
+    kbcli_version = argv[1]
     sha256_direct = argv[2]
     release_note_template_path = "docs/release_notes/kbcli_template.md"
-    release_note_path = f"docs/release_notes/{tag_name}/kbcli.md"
+    release_note_path = f"docs/release_notes/{kbcli_version}/kbcli.md"
 
 
     template = ""
@@ -36,7 +36,7 @@ def main(argv: list[str]) -> None:
 
     with open(release_note_path,'a') as f_dest: # 没
         f_dest.write(Template(template).safe_substitute(
-            kbcli_version = tag_name[1:],
+            kbcli_version = kbcli_version[1:],
             today = date.today().strftime("%Y-%m-%d"),
         ))
         for file in os.listdir(sha256_direct):

@@ -183,7 +183,7 @@ jobs:
       - name: release kbcli with release notes
         uses: softprops/action-gh-release@v1
         with:
-          body_path: ./docs/release_notes/v${{ env.TAG_NAME }}/v${{ env.REL_VERSION }}.md
+          body_path: ./docs/release_notes/${{ env.TAG_NAME }}/kbcli.md
           token: ${{ env.GITLAB_ACCESS_TOKEN }}
           name: KBCLI ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
@@ -192,7 +192,6 @@ jobs:
         uses: geekyeggo/delete-artifact@v2
         with:
           name: sha256
-
 
 
 #  send-message:

@@ -30,11 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
-	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
@@ -81,34 +79,34 @@ func (w *templateRenderWorkflow) Do(outputDir string) error {
 			tplSpec.component))
 	}
 
-	cache := make(map[string]*intctrltypes.ReconcileTask)
+	cache := make(map[string][]client.Object)
 	for _, configSpec := range configSpecs {
-		task, ok := cache[configSpec.component]
+		compName, err := w.getComponentName(configSpec.component, cluster)
+		if err != nil {
+			return err
+		}
+		objects, ok := cache[configSpec.component]
 		if !ok {
-			param, err := createComponentParams(w, ctx, cli, configSpec.component, cluster)
+			objs, err := createComponentObjects(w, ctx, cli, configSpec.component, cluster)
 			if err != nil {
 				return err
 			}
-			cache[configSpec.component] = param
-			task = param
+			cache[configSpec.component] = objs
+			objects = objs
 		}
-		if err := renderTemplates(configSpec.configSpec, outputDir, task); err != nil {
+		if err := renderTemplates(configSpec.configSpec, outputDir, cluster.Name, compName, objects); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (w *templateRenderWorkflow) Prepare(ctx intctrlutil.RequestCtx, componentType string, cluster *appsv1alpha1.Cluster) (*component.SynthesizedComponent, error) {
-	clusterCompDef := w.clusterDefObj.GetComponentDefByName(componentType)
-	clusterCompSpecMap := cluster.Spec.GetDefNameMappingComponents()
-	clusterCompSpec := clusterCompSpecMap[componentType]
-
-	if clusterCompDef == nil || len(clusterCompSpec) == 0 {
-		return nil, cfgcore.MakeError("component[%s] is not defined in cluster definition", componentType)
+func (w *templateRenderWorkflow) getComponentName(componentType string, cluster *appsv1alpha1.Cluster) (string, error) {
+	clusterCompSpec := cluster.Spec.GetDefNameMappingComponents()[componentType]
+	if len(clusterCompSpec) == 0 {
+		return "", cfgcore.MakeError("component[%s] is not defined in cluster definition", componentType)
 	}
-
-	return component.BuildComponent(ctx, *cluster, *w.clusterDefObj, *clusterCompDef, clusterCompSpec[0]), nil
+	return clusterCompSpec[0].Name, nil
 }
 
 func (w *templateRenderWorkflow) getRenderedConfigSpec() ([]componentedConfigSpec, error) {
@@ -208,8 +206,8 @@ func checkAndFillPortProtocol(clusterDefComponents []appsv1alpha1.ClusterCompone
 	}
 }
 
-func renderTemplates(configSpec appsv1alpha1.ComponentTemplateSpec, outputDir string, task *intctrltypes.ReconcileTask) error {
-	cfgName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, configSpec.Name)
+func renderTemplates(configSpec appsv1alpha1.ComponentTemplateSpec, outputDir string, clusterName, compName string, objects []client.Object) error {
+	cfgName := cfgcore.GetComponentCfgName(clusterName, compName, configSpec.Name)
 	output := filepath.Join(outputDir, cfgName)
 	log.Log.Info(fmt.Sprintf("dump rendering template spec: %s, output directory: %s", configSpec.Name, output))
 
@@ -219,7 +217,7 @@ func renderTemplates(configSpec appsv1alpha1.ComponentTemplateSpec, outputDir st
 
 	var ok bool
 	var cm *corev1.ConfigMap
-	for _, obj := range *task.Resources {
+	for _, obj := range objects {
 		if cm, ok = obj.(*corev1.ConfigMap); !ok || cm.Name != cfgName {
 			continue
 		}
@@ -233,21 +231,30 @@ func renderTemplates(configSpec appsv1alpha1.ComponentTemplateSpec, outputDir st
 	return nil
 }
 
-func createComponentParams(w *templateRenderWorkflow, ctx intctrlutil.RequestCtx, cli client.Client, componentType string, cluster *appsv1alpha1.Cluster) (*intctrltypes.ReconcileTask, error) {
-	component, err := w.Prepare(ctx, componentType, cluster)
+func createComponentObjects(w *templateRenderWorkflow, ctx intctrlutil.RequestCtx, cli client.Client,
+	componentType string, cluster *appsv1alpha1.Cluster) ([]client.Object, error) {
+	compName, err := w.getComponentName(componentType, cluster)
 	if err != nil {
 		return nil, err
 	}
 	clusterVersionObj := GetTypedResourceObjectBySignature(w.localObjects, generics.ClusterVersionSignature)
-	task := intctrltypes.InitReconcileTask(w.clusterDefObj, clusterVersionObj, cluster, component)
-	secret, err := builder.BuildConnCredential(task.GetBuilderParams())
+	component, err := components.NewComponent(ctx, cli, w.clusterDefObj, clusterVersionObj, cluster, compName, nil)
 	if err != nil {
 		return nil, err
 	}
-	// must make sure secret resources are created before workloads resources
-	task.AppendResource(secret)
-	if err := plan.PrepareComponentResources(ctx, cli, task); err != nil {
+
+	objs := make([]client.Object, 0)
+	secret, err := builder.BuildConnCredentialLow(w.clusterDefObj, cluster, component.GetSynthesizedComponent())
+	if err != nil {
 		return nil, err
 	}
-	return task, nil
+	objs = append(objs, secret)
+
+	compObjs, err := component.GetBuiltObjects(ctx, cli)
+	if err != nil {
+		return nil, err
+	}
+	objs = append(objs, compObjs...)
+
+	return objs, nil
 }

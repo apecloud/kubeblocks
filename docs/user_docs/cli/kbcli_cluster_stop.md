@@ -5,19 +5,20 @@ title: kbcli cluster stop
 Stop the cluster and release all the pods of the cluster.
 
 ```
-kbcli cluster stop [flags]
+kbcli cluster stop NAME [flags]
 ```
 
 ### Examples
 
 ```
   # stop the cluster and release all the pods of the cluster
-  kbcli cluster stop <my-cluster>
+  kbcli cluster stop mycluster
 ```
 
 ### Options
 
 ```
+      --auto-approve                   Skip interactive approval before stopping the cluster
       --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
   -h, --help                           help for stop
       --name string                    OpsRequest name. if not specified, it will be randomly generated 

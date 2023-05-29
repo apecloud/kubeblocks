@@ -13,11 +13,17 @@ jobs:
   publish:
     name: create a release
     runs-on: ubuntu-latest
+    outputs:
+      rel-version: ${{ steps.get_rel_version.outputs.rel_version }}
     steps:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3
       - name: Parse release version and set REL_VERSION
-        run: python ./.github/utils/is_rc_or_stable_release_version.py
+        id: get_rel_version
+        run: |
+          python ./.github/utils/is_rc_or_stable_release_version.py
+          echo rel_version=v${{ env.REL_VERSION }} >> $GITHUB_OUTPUT
+
       - name: release pre-release without release notes
         uses: softprops/action-gh-release@v1
         if: not ${{ env.WITH_RELEASE_NOTES }}
@@ -50,6 +56,6 @@ jobs:
       - name: send message
         run: |
           bash .github/utils/utils.sh --type 12 \
-            --content "release\u00a0create\u00a0error"\
+            --content "release\u00a0${{ needs.publish.outputs.rel-version }}\u00a0create\u00a0error"\
             --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

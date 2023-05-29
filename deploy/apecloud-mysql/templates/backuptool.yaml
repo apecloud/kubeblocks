@@ -8,13 +8,6 @@ metadata:
 spec:
   image: registry.cn-hangzhou.aliyuncs.com/apecloud/percona-xtrabackup
   deployKind: job
-  resources:
-    limits:
-      cpu: "1"
-      memory: 2Gi
-    requests:
-      cpu: "500m"
-      memory: 128Mi
   env:
     - name: DATA_DIR
       value: /data/mysql/data

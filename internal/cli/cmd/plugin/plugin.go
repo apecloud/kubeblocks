@@ -25,7 +25,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -35,6 +34,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
@@ -50,6 +50,7 @@ var (
 	`)
 
 	ValidPluginFilenamePrefixes = []string{"kbcli", "kubectl"}
+	paths                       = GetKbcliPluginPath()
 )
 
 func NewPluginCmd(streams genericclioptions.IOStreams) *cobra.Command {
@@ -57,9 +58,20 @@ func NewPluginCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Use:   "plugin",
 		Short: "Provides utilities for interacting with plugins.",
 		Long:  pluginLong,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			InitPlugin()
+		},
 	}
 
-	cmd.AddCommand(NewPluginListCmd(streams))
+	cmd.AddCommand(
+		NewPluginListCmd(streams),
+		NewPluginIndexCmd(streams),
+		NewPluginInstallCmd(streams),
+		NewPluginUninstallCmd(streams),
+		NewPluginSearchCmd(streams),
+		NewPluginDescribeCmd(streams),
+		NewPluginUpgradeCmd(streams),
+	)
 	return cmd
 }
 
@@ -117,7 +129,7 @@ func (o *PluginListOptions) Run() error {
 				pluginWarnings++
 			}
 		}
-		addRow(name, path, p)
+		addPluginRow(name, path, p)
 	}
 	p.Print()
 	klog.V(1).Info(errMsg)
@@ -228,7 +240,7 @@ func isExecutable(fullPath string) (bool, error) {
 		return false, err
 	}
 
-	if runtime.GOOS == "windows" {
+	if util.IsWindows() {
 		fileExt := strings.ToLower(filepath.Ext(fullPath))
 
 		switch fileExt {
@@ -273,6 +285,29 @@ func NewPluginPrinter(out io.Writer) *printer.TablePrinter {
 	return t
 }
 
-func addRow(name, path string, p *printer.TablePrinter) {
+func addPluginRow(name, path string, p *printer.TablePrinter) {
 	p.AddRow(name, path)
+}
+
+func InitPlugin() {
+	// Ensure that the base directories exist
+	if err := EnsureDirs(paths.BasePath(),
+		paths.BinPath(),
+		paths.InstallPath(),
+		paths.IndexBase(),
+		paths.InstallReceiptsPath()); err != nil {
+		klog.Fatal(err)
+	}
+
+	// check if index exist, if indexes don't exist, download default index
+	indexes, err := ListIndexes(paths)
+	if err != nil {
+		klog.Fatal(err)
+	}
+	if len(indexes) == 0 {
+		klog.V(1).Info("no indexes found, downloading default index")
+		if err := AddIndex(paths, DefaultIndexName, DefaultIndexURI); err != nil {
+			klog.Fatal("failed to download default index", err)
+		}
+	}
 }

@@ -152,13 +152,14 @@ var _ = Describe("builder", func() {
 		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDef, clusterVersion, false)
 		reqCtx := newReqCtx()
 		By("assign every available fields")
-		component := component.BuildComponent(
+		component, err := component.BuildComponent(
 			reqCtx,
 			*cluster,
 			*clusterDef,
 			clusterDef.Spec.ComponentDefs[0],
 			cluster.Spec.ComponentSpecs[0],
 			&clusterVersion.Spec.ComponentVersions[0])
+		Expect(err).Should(Succeed())
 		Expect(component).ShouldNot(BeNil())
 		return component
 	}
@@ -203,7 +204,7 @@ var _ = Describe("builder", func() {
 
 		It("builds Service correctly", func() {
 			params := newParams()
-			svcList, err := BuildSvcList(*params)
+			svcList, err := BuildSvcListWithCustomAttributes(params.Cluster, params.Component, nil)
 			Expect(err).Should(BeNil())
 			Expect(svcList).ShouldNot(BeEmpty())
 		})
@@ -374,13 +375,8 @@ var _ = Describe("builder", func() {
 				stsName := fmt.Sprintf("%s-%s", params.Cluster.Name, params.Component.Name)
 				svcName := fmt.Sprintf("%s-headless", stsName)
 				By("Checking KB_PRIMARY_POD_NAME value be right")
-				if int(params.Component.GetPrimaryIndex()) == 0 {
-					Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
-						Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "." + svcName))
-				} else {
-					Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
-						Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "-0." + svcName))
-				}
+				Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
+					Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "." + svcName))
 				for i := 0; i < int(params.Component.Replicas); i++ {
 					if i == 0 {
 						By("Checking the 1st replica's hostname should not have suffix '-0'")
@@ -388,7 +384,7 @@ var _ = Describe("builder", func() {
 							Should(Equal(stsName + "-" + strconv.Itoa(0) + "." + svcName))
 					} else {
 						Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_"+strconv.Itoa(i)+"_HOSTNAME"]).
-							Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "-0." + svcName))
+							Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "." + svcName))
 					}
 				}
 			}

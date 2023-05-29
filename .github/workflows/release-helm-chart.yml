@@ -33,13 +33,14 @@ jobs:
 
   release-chart:
     needs: chart-version
-    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.5.2
+    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.6.1
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "${{ needs.chart-version.outputs.chart-version }}"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
       DEP_CHART_DIR: "deploy/helm/depend-charts"
+      DEP_REPO: "helm dep update deploy/delphic"
     secrets: inherit
 
   send-message:
@@ -50,9 +51,9 @@ jobs:
       - uses: actions/checkout@v3
       - name: send message
         run: |
-          CONTENT="release\u00a0chart\u00a0error"
+          CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0chart\u00a0error"
           if [[ "${{ needs.release-chart.result }}" == "success" ]]; then
-              CONTENT="release\u00a0chart\u00a0success"
+              CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0chart\u00a0success"
           fi
           
           bash .github/utils/utils.sh --type 12 \

@@ -5,19 +5,20 @@ title: kbcli cluster upgrade
 Upgrade the cluster version.
 
 ```
-kbcli cluster upgrade [flags]
+kbcli cluster upgrade NAME [flags]
 ```
 
 ### Examples
 
 ```
   # upgrade the cluster to the specified version
-  kbcli cluster upgrade <my-cluster> --cluster-version=<cluster-version>
+  kbcli cluster upgrade mycluster --cluster-version=ac-mysql-8.0.30
 ```
 
 ### Options
 
 ```
+      --auto-approve                   Skip interactive approval before upgrading the cluster
       --cluster-version string         Reference cluster version (required)
       --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
   -h, --help                           help for upgrade

@@ -154,17 +154,17 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 		replicas       = param.getTargetReplicas()
 	)
 
-	if param.Component.MaxUnavailable == nil {
+	if param.Component.GetMaxUnavailable() == nil {
 		return defaultRolling
 	}
 
-	v, isPercent, err := intctrlutil.GetIntOrPercentValue(param.Component.MaxUnavailable)
+	v, isPercentage, err := intctrlutil.GetIntOrPercentValue(param.Component.GetMaxUnavailable())
 	if err != nil {
-		param.Ctx.Log.Error(err, "failed to get MaxUnavailable!")
+		param.Ctx.Log.Error(err, "failed to get maxUnavailable!")
 		return defaultRolling
 	}
 
-	if isPercent {
+	if isPercentage {
 		r = int32(math.Floor(float64(v) * float64(replicas) / 100))
 	} else {
 		r = int32(util.Min(v, param.getTargetReplicas()))

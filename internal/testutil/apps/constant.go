@@ -69,7 +69,8 @@ var (
 		CharacterType: "stateless",
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{{
-				Name: DefaultNginxContainerName,
+				Name:  DefaultNginxContainerName,
+				Image: NginxImage,
 			}},
 		},
 		Service: &appsv1alpha1.ServiceSpec{
@@ -118,6 +119,7 @@ var (
 
 	defaultMySQLContainer = corev1.Container{
 		Name:            DefaultMySQLContainerName,
+		Image:           ApeCloudMySQLImage,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Ports: []corev1.ContainerPort{
 			{
@@ -181,7 +183,9 @@ var (
 			Name:       "follower",
 			AccessMode: appsv1alpha1.Readonly,
 		}},
-		UpdateStrategy: appsv1alpha1.BestEffortParallelStrategy,
+		StatefulSetSpec: appsv1alpha1.StatefulSetSpec{
+			UpdateStrategy: appsv1alpha1.BestEffortParallelStrategy,
+		},
 	}
 
 	defaultMySQLService = appsv1alpha1.ServiceSpec{
@@ -236,6 +240,7 @@ var (
 
 	defaultRedisInitContainer = corev1.Container{
 		Name:            DefaultRedisInitContainerName,
+		Image:           DefaultRedisImageName,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		VolumeMounts:    defaultReplicationRedisVolumeMounts,
 		Command:         []string{"/scripts/init.sh"},
@@ -243,6 +248,7 @@ var (
 
 	defaultRedisContainer = corev1.Container{
 		Name:            DefaultRedisContainerName,
+		Image:           DefaultRedisImageName,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Ports: []corev1.ContainerPort{
 			{
@@ -299,32 +305,12 @@ var (
 		Name:   Class1c1gName,
 		CPU:    resource.MustParse("1"),
 		Memory: resource.MustParse("1Gi"),
-		Volumes: []appsv1alpha1.Volume{
-			{
-				Name: "data",
-				Size: resource.MustParse("20Gi"),
-			},
-			{
-				Name: "log",
-				Size: resource.MustParse("10Gi"),
-			},
-		},
 	}
 
 	Class2c4g = appsv1alpha1.ComponentClass{
 		Name:   Class2c4gName,
 		CPU:    resource.MustParse("2"),
 		Memory: resource.MustParse("4Gi"),
-		Volumes: []appsv1alpha1.Volume{
-			{
-				Name: "data",
-				Size: resource.MustParse("20Gi"),
-			},
-			{
-				Name: "log",
-				Size: resource.MustParse("10Gi"),
-			},
-		},
 	}
 
 	DefaultClasses = map[string]appsv1alpha1.ComponentClass{

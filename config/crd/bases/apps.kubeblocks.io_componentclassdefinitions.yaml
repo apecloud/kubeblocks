@@ -86,26 +86,6 @@ spec:
                                 name:
                                   description: name is the class name
                                   type: string
-                                variants:
-                                  description: the variants of the class in different
-                                    clouds.
-                                  items:
-                                    properties:
-                                      args:
-                                        description: cloud provider specific variables
-                                        items:
-                                          type: string
-                                        type: array
-                                      provider:
-                                        description: cloud provider name
-                                        type: string
-                                    required:
-                                    - provider
-                                    type: object
-                                  type: array
-                                  x-kubernetes-list-map-keys:
-                                  - provider
-                                  x-kubernetes-list-type: map
                                 volumes:
                                   description: the volumes of the class
                                   items:
@@ -201,25 +181,6 @@ spec:
                       description: resourceConstraintRef reference to the resource
                         constraint object name.
                       type: string
-                    variants:
-                      description: the variants of the class in different clouds.
-                      items:
-                        properties:
-                          args:
-                            description: cloud provider specific variables
-                            items:
-                              type: string
-                            type: array
-                          provider:
-                            description: cloud provider name
-                            type: string
-                        required:
-                        - provider
-                        type: object
-                      type: array
-                      x-kubernetes-list-map-keys:
-                      - provider
-                      x-kubernetes-list-type: map
                     volumes:
                       description: the volumes of the class
                       items:

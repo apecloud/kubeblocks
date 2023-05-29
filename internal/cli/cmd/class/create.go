@@ -56,13 +56,12 @@ type CreateOptions struct {
 	ClassName     string
 	CPU           string
 	Memory        string
-	Storage       []string
 	File          string
 }
 
 var classCreateExamples = templates.Examples(`
-    # Create a class following constraint kb-resource-constraint-general for component mysql in cluster definition apecloud-mysql, which have 1 cpu core, 1Gi memory and storage is 10Gi
-    kbcli class create custom-1c1g --cluster-definition apecloud-mysql --type mysql --constraint kb-resource-constraint-general --cpu 1 --memory 1Gi --storage name=data,size=10Gi
+    # Create a class following constraint kb-resource-constraint-general for component mysql in cluster definition apecloud-mysql, which have 1 cpu core and 1Gi memory
+    kbcli class create custom-1c1g --cluster-definition apecloud-mysql --type mysql --constraint kb-resource-constraint-general --cpu 1 --memory 1Gi
 
     # Create classes for component mysql in cluster definition apecloud-mysql, where classes is defined in file
     kbcli class create --cluster-definition apecloud-mysql --type mysql --file ./classes.yaml
@@ -88,7 +87,6 @@ func NewCreateCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	cmd.Flags().StringVar(&o.Constraint, "constraint", "", "Specify resource constraint")
 	cmd.Flags().StringVar(&o.CPU, corev1.ResourceCPU.String(), "", "Specify component cpu cores")
 	cmd.Flags().StringVar(&o.Memory, corev1.ResourceMemory.String(), "", "Specify component memory size")
-	cmd.Flags().StringArrayVar(&o.Storage, corev1.ResourceStorage.String(), []string{}, "Specify component storage disks")
 
 	cmd.Flags().StringVar(&o.File, "file", "", "Specify file path which contains YAML definition of class")
 
@@ -170,7 +168,7 @@ func (o *CreateOptions) run() error {
 		if _, ok = constraints[o.Constraint]; !ok {
 			return fmt.Errorf("resource constraint %s is not found", o.Constraint)
 		}
-		cls, err := o.buildClass()
+		cls := v1alpha1.ComponentClass{Name: o.ClassName, CPU: resource.MustParse(o.CPU), Memory: resource.MustParse(o.Memory)}
 		if err != nil {
 			return err
 		}
@@ -179,12 +177,12 @@ func (o *CreateOptions) run() error {
 				ResourceConstraintRef: o.Constraint,
 				Series: []v1alpha1.ComponentClassSeries{
 					{
-						Classes: []v1alpha1.ComponentClass{*cls},
+						Classes: []v1alpha1.ComponentClass{cls},
 					},
 				},
 			},
 		}
-		classInstances = append(classInstances, &v1alpha1.ComponentClassInstance{ComponentClass: *cls, ResourceConstraintRef: o.Constraint})
+		classInstances = append(classInstances, &v1alpha1.ComponentClassInstance{ComponentClass: cls, ResourceConstraintRef: o.Constraint})
 	}
 
 	var classNames []string
@@ -252,33 +250,4 @@ func (o *CreateOptions) run() error {
 	}
 	_, _ = fmt.Fprintf(o.Out, "Successfully created class [%s].\n", strings.Join(classNames, ","))
 	return nil
-}
-
-func (o *CreateOptions) buildClass() (*v1alpha1.ComponentClass, error) {
-	cls := v1alpha1.ComponentClass{Name: o.ClassName, CPU: resource.MustParse(o.CPU), Memory: resource.MustParse(o.Memory)}
-	for _, item := range o.Storage {
-		kvs := strings.Split(item, ",")
-		volume := v1alpha1.Volume{}
-		for _, kv := range kvs {
-			parts := strings.Split(kv, "=")
-			if len(parts) != 2 {
-				return nil, fmt.Errorf("invalid storage item: %s", item)
-			}
-			switch parts[0] {
-			case "name":
-				volume.Name = parts[1]
-			case "size":
-				volume.Size = resource.MustParse(parts[1])
-			case "class":
-				volume.StorageClassName = &parts[1]
-			default:
-				return nil, fmt.Errorf("invalid storage item: %s", item)
-			}
-		}
-		if volume.Name == "" {
-			return nil, fmt.Errorf("invalid item name: %s", item)
-		}
-		cls.Volumes = append(cls.Volumes, volume)
-	}
-	return &cls, nil
 }

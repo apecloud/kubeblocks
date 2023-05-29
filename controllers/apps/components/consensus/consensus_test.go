@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -88,27 +89,20 @@ var _ = Describe("Consensus Component", func() {
 		})).Should(Succeed())
 	}
 
-	validateComponentStatus := func(cluster *appsv1alpha1.Cluster) {
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
-			g.Expect(tmpCluster.Status.Components[consensusCompName].Phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
-		})).Should(Succeed())
-	}
-
 	Context("Consensus Component test", func() {
 		It("Consensus Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			clusterDef, _, cluster := testapps.InitConsensusMysql(testCtx, clusterDefName,
+			clusterDef, _, cluster := testapps.InitConsensusMysql(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, "consensus", consensusCompName)
 
-			sts := testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusCompName)
+			sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
 			componentName := consensusCompName
 			compDefName := cluster.Spec.GetComponentDefRefName(componentName)
 			componentDef := clusterDef.GetComponentDefByName(compDefName)
 			component := cluster.Spec.GetComponentByName(componentName)
 
 			By("test pods are not ready")
-			consensusComponent, err := NewConsensusComponent(k8sClient, cluster, component, *componentDef)
-			Expect(err).Should(Succeed())
+			consensusComponent := newConsensusSet(k8sClient, cluster, component, *componentDef)
 			sts.Status.AvailableReplicas = *sts.Spec.Replicas - 1
 			podsReady, _ := consensusComponent.PodsReady(ctx, sts)
 			Expect(podsReady == false).Should(BeTrue())
@@ -130,7 +124,7 @@ var _ = Describe("Consensus Component", func() {
 			Expect(isRunning == false).Should(BeTrue())
 
 			podName := sts.Name + "-0"
-			podList := testapps.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
+			podList := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
 			By("expect for pod is available")
 			Expect(consensusComponent.PodIsAvailable(podList[0], defaultMinReadySeconds)).Should(BeTrue())
 
@@ -139,16 +133,17 @@ var _ = Describe("Consensus Component", func() {
 			// mock leader pod is not ready
 			testk8s.UpdatePodStatusNotReady(ctx, testCtx, podName)
 			testk8s.DeletePodLabelKey(ctx, testCtx, podName, constant.RoleLabelKey)
-			requeue, _ := consensusComponent.HandleProbeTimeoutWhenPodsReady(ctx, nil)
-			Expect(requeue).ShouldNot(BeTrue())
-			validateComponentStatus(cluster)
+			pod := &corev1.Pod{}
+			Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, pod)).Should(Succeed())
+			phase, _ := consensusComponent.GetPhaseWhenPodsReadyAndProbeTimeout([]*corev1.Pod{pod})
+			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
 
 			By("test component is running")
 			isRunning, _ = consensusComponent.IsRunning(ctx, sts)
 			Expect(isRunning == false).Should(BeTrue())
 
 			By("expect component phase is Failed when pod of component is failed")
-			phase, _ := consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName)
+			phase, _, _ = consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName)
 			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
 
 			By("not ready pod is not controlled by latest revision, should return empty string")
@@ -156,7 +151,7 @@ var _ = Describe("Consensus Component", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 				sts.Status.UpdateRevision = fmt.Sprintf("%s-%s-%s", clusterName, consensusCompName, "6fdd48d9cd1")
 			})).Should(Succeed())
-			phase, _ = consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName)
+			phase, _, _ = consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName)
 			Expect(len(phase) == 0).Should(BeTrue())
 		})
 	})

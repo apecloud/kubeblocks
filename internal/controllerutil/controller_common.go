@@ -134,11 +134,11 @@ func HandleCRDeletion(reqCtx RequestCtx,
 				cluster, ok := cr.(*v1alpha1.Cluster)
 				// throw warning event if terminationPolicy set to DoNotTerminate
 				if ok && cluster.Spec.TerminationPolicy == v1alpha1.DoNotTerminate {
-					reqCtx.Recorder.Eventf(cr, corev1.EventTypeWarning, constant.ReasonDeleteFailed,
+					reqCtx.Eventf(cr, corev1.EventTypeWarning, constant.ReasonDeleteFailed,
 						"Deleting %s: %s failed due to terminationPolicy set to DoNotTerminate",
 						strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
 				} else {
-					reqCtx.Recorder.Eventf(cr, corev1.EventTypeNormal, constant.ReasonDeletingCR, "Deleting %s: %s",
+					reqCtx.Eventf(cr, corev1.EventTypeNormal, constant.ReasonDeletingCR, "Deleting %s: %s",
 						strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
 				}
 			}
@@ -162,10 +162,8 @@ func HandleCRDeletion(reqCtx RequestCtx,
 					return ResultToP(CheckedRequeueWithError(err, reqCtx.Log, ""))
 				}
 				// record resources deleted event
-				if reqCtx.Recorder != nil {
-					reqCtx.Recorder.Eventf(cr, corev1.EventTypeNormal, constant.ReasonDeletedCR, "Deleted %s: %s",
-						strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
-				}
+				reqCtx.Eventf(cr, corev1.EventTypeNormal, constant.ReasonDeletedCR, "Deleted %s: %s",
+					strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
 			}
 		}
 
@@ -242,10 +240,17 @@ func BackgroundDeleteObject(cli client.Client, ctx context.Context, obj client.O
 	return nil
 }
 
-// SetOwnership set owner reference and add finalizer if not exists
-func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
-	if err := controllerutil.SetControllerReference(owner, obj, scheme); err != nil {
-		return err
+// SetOwnership provides helper function controllerutil.SetControllerReference/controllerutil.SetOwnerReference
+// and controllerutil.AddFinalizer if not exists.
+func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string, useOwnerReference ...bool) error {
+	if len(useOwnerReference) > 0 && useOwnerReference[0] {
+		if err := controllerutil.SetOwnerReference(owner, obj, scheme); err != nil {
+			return err
+		}
+	} else {
+		if err := controllerutil.SetControllerReference(owner, obj, scheme); err != nil {
+			return err
+		}
 	}
 	if !controllerutil.ContainsFinalizer(obj, finalizer) {
 		// pvc objects do not need to add finalizer

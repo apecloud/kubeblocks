@@ -21,6 +21,7 @@ package apps
 
 import (
 	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -57,6 +58,7 @@ func mockSystemAccountsSpec() *appsv1alpha1.SystemAccountSpec {
 		PasswordConfig:    pwdConfig,
 		Accounts:          []appsv1alpha1.SystemAccountConfig{},
 	}
+
 	var account appsv1alpha1.SystemAccountConfig
 	var scope appsv1alpha1.ProvisionScope
 	for _, name := range getAllSysAccounts() {
@@ -209,7 +211,7 @@ func TestRenderJob(t *testing.T) {
 			endpoint := "10.0.0.1"
 			job := renderJob(engine, compKey, creationStmt, endpoint)
 			assert.NotNil(t, job)
-			calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
+			_ = calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			assert.NotNil(t, job.Spec.TTLSecondsAfterFinished)
 			assert.Equal(t, (int32)(0), *job.Spec.TTLSecondsAfterFinished)
 			envList := job.Spec.Template.Spec.Containers[0].Env
@@ -220,7 +222,7 @@ func TestRenderJob(t *testing.T) {
 			assert.NotNil(t, job)
 			// set debug mode on
 			cluster.Annotations[debugClusterAnnotationKey] = "True"
-			calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
+			_ = calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			assert.Nil(t, job.Spec.TTLSecondsAfterFinished)
 			assert.NotNil(t, secrets)
 			// set debug mode off
@@ -231,7 +233,7 @@ func TestRenderJob(t *testing.T) {
 			cluster.Spec.Tolerations = toleration
 			job = renderJob(engine, compKey, creationStmt, endpoint)
 			assert.NotNil(t, job)
-			calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
+			_ = calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			jobToleration := job.Spec.Template.Spec.Tolerations
 			assert.Equal(t, 2, len(jobToleration))
 			// make sure the toleration is added to job and contains our built-in toleration
@@ -239,7 +241,7 @@ func TestRenderJob(t *testing.T) {
 			for _, t := range jobToleration {
 				tolerationKeys = append(tolerationKeys, t.Key)
 			}
-			assert.Contains(t, tolerationKeys, constant.KubeBlocksDataNodeTolerationKey)
+			assert.Contains(t, tolerationKeys, testDataPlaneTolerationKey)
 			assert.Contains(t, tolerationKeys, toleration[0].Key)
 		case appsv1alpha1.ReferToExisting:
 			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, constant.ConnCredentialPlaceHolder))
@@ -357,4 +359,90 @@ func TestRenderCreationStmt(t *testing.T) {
 			assert.NotNil(t, secret)
 		}
 	}
+}
+
+func TestMergeSystemAccountConfig(t *testing.T) {
+	systemAccount := mockSystemAccountsSpec()
+	// Make sure env is not empty
+	if systemAccount.CmdExecutorConfig.Env == nil {
+		systemAccount.CmdExecutorConfig.Env = []corev1.EnvVar{}
+	}
+
+	if len(systemAccount.CmdExecutorConfig.Env) == 0 {
+		systemAccount.CmdExecutorConfig.Env = append(systemAccount.CmdExecutorConfig.Env, corev1.EnvVar{
+			Name:  "cluster-def-env",
+			Value: "cluster-def-env-value",
+		})
+	}
+	// nil spec
+	componentVersion := &appsv1alpha1.ClusterComponentVersion{
+		SystemAccountSpec: nil,
+	}
+	accountConfig := systemAccount.CmdExecutorConfig.DeepCopy()
+	completeExecConfig(accountConfig, componentVersion)
+	assert.Equal(t, systemAccount.CmdExecutorConfig.Image, accountConfig.Image)
+	assert.Len(t, accountConfig.Env, len(systemAccount.CmdExecutorConfig.Env))
+	if len(systemAccount.CmdExecutorConfig.Env) > 0 {
+		assert.True(t, reflect.DeepEqual(accountConfig.Env, systemAccount.CmdExecutorConfig.Env))
+	}
+
+	// empty spec
+	accountConfig = systemAccount.CmdExecutorConfig.DeepCopy()
+	componentVersion.SystemAccountSpec = &appsv1alpha1.SystemAccountShortSpec{
+		CmdExecutorConfig: &appsv1alpha1.CommandExecutorEnvItem{},
+	}
+
+	completeExecConfig(accountConfig, componentVersion)
+	assert.Equal(t, systemAccount.CmdExecutorConfig.Image, accountConfig.Image)
+	assert.Len(t, accountConfig.Env, len(systemAccount.CmdExecutorConfig.Env))
+	if len(systemAccount.CmdExecutorConfig.Env) > 0 {
+		assert.True(t, reflect.DeepEqual(accountConfig.Env, systemAccount.CmdExecutorConfig.Env))
+	}
+
+	// spec with image
+	mockImageName := "test-image"
+	accountConfig = systemAccount.CmdExecutorConfig.DeepCopy()
+	componentVersion.SystemAccountSpec = &appsv1alpha1.SystemAccountShortSpec{
+		CmdExecutorConfig: &appsv1alpha1.CommandExecutorEnvItem{
+			Image: mockImageName,
+			Env:   nil,
+		},
+	}
+	completeExecConfig(accountConfig, componentVersion)
+	assert.NotEqual(t, systemAccount.CmdExecutorConfig.Image, accountConfig.Image)
+	assert.Equal(t, mockImageName, accountConfig.Image)
+	assert.Len(t, accountConfig.Env, len(systemAccount.CmdExecutorConfig.Env))
+	if len(systemAccount.CmdExecutorConfig.Env) > 0 {
+		assert.True(t, reflect.DeepEqual(accountConfig.Env, systemAccount.CmdExecutorConfig.Env))
+	}
+	// sepc with empty envs
+	accountConfig = systemAccount.CmdExecutorConfig.DeepCopy()
+	componentVersion.SystemAccountSpec = &appsv1alpha1.SystemAccountShortSpec{
+		CmdExecutorConfig: &appsv1alpha1.CommandExecutorEnvItem{
+			Image: mockImageName,
+			Env:   []corev1.EnvVar{},
+		},
+	}
+	completeExecConfig(accountConfig, componentVersion)
+	assert.NotEqual(t, systemAccount.CmdExecutorConfig.Image, accountConfig.Image)
+	assert.Equal(t, mockImageName, accountConfig.Image)
+	assert.Len(t, accountConfig.Env, 0)
+
+	// sepc with envs
+	testEnv := corev1.EnvVar{
+		Name:  "test-env",
+		Value: "test-value",
+	}
+	accountConfig = systemAccount.CmdExecutorConfig.DeepCopy()
+	componentVersion.SystemAccountSpec = &appsv1alpha1.SystemAccountShortSpec{
+		CmdExecutorConfig: &appsv1alpha1.CommandExecutorEnvItem{
+			Image: mockImageName,
+			Env:   []corev1.EnvVar{testEnv},
+		},
+	}
+	completeExecConfig(accountConfig, componentVersion)
+	assert.NotEqual(t, systemAccount.CmdExecutorConfig.Image, accountConfig.Image)
+	assert.Equal(t, mockImageName, accountConfig.Image)
+	assert.Len(t, accountConfig.Env, 1)
+	assert.Contains(t, accountConfig.Env, testEnv)
 }

@@ -407,7 +407,7 @@ func buildSlackConfigs(slacks []string) ([]*slackConfig, error) {
 		if len(m) == 0 {
 			return nil, fmt.Errorf("invalid slack: %s, slack config should be in the format of api_url=my-api-url,channel=my-channel,username=my-username", slackStr)
 		}
-		s := slackConfig{}
+		s := slackConfig{TitleLink: ""}
 		for k, v := range m {
 			// check slackConfig keys
 			switch slackKey(k) {

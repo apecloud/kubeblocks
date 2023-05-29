@@ -135,7 +135,6 @@ func (o *describeOptions) describeCluster(name string) error {
 			WithClusterDef:     true,
 			WithService:        true,
 			WithPod:            true,
-			WithEvent:          true,
 			WithPVC:            true,
 			WithDataProtection: true,
 		},
@@ -166,7 +165,7 @@ func (o *describeOptions) describeCluster(name string) error {
 	showDataProtection(o.BackupPolicies, o.Backups, o.Out)
 
 	// events
-	showEvents(o.Events, o.Cluster.Name, o.Cluster.Namespace, o.Out)
+	showEvents(o.Cluster.Name, o.Cluster.Namespace, o.Out)
 	fmt.Fprintln(o.Out)
 
 	return nil
@@ -206,27 +205,9 @@ func showImages(comps []*cluster.ComponentInfo, out io.Writer) {
 	tbl.Print()
 }
 
-func showEvents(events *corev1.EventList, name string, namespace string, out io.Writer) {
-	objs := util.SortEventsByLastTimestamp(events, corev1.EventTypeWarning)
-
-	// print last 5 events
-	title := fmt.Sprintf("\nEvents(last 5 warnings, see more:kbcli cluster list-events -n %s %s):", namespace, name)
-	tbl := newTbl(out, title, "TIME", "TYPE", "REASON", "OBJECT", "MESSAGE")
-	cnt := 0
-	for _, o := range *objs {
-		e := o.(*corev1.Event)
-		// do not output KubeBlocks probe events
-		if e.InvolvedObject.FieldPath == constant.ProbeCheckRolePath {
-			continue
-		}
-
-		tbl.AddRow(util.GetEventTimeStr(e), e.Type, e.Reason, util.GetEventObject(e), e.Message)
-		cnt++
-		if cnt == 5 {
-			break
-		}
-	}
-	tbl.Print()
+func showEvents(name string, namespace string, out io.Writer) {
+	// hint user how to get events
+	fmt.Fprintf(out, "\nShow cluster events: kbcli cluster list-events -n %s %s", namespace, name)
 }
 
 func showEndpoints(c *appsv1alpha1.Cluster, svcList *corev1.ServiceList, out io.Writer) {
@@ -252,6 +233,9 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 	}
 	tbl := newTbl(out, "\nData Protection:", "AUTO-BACKUP", "BACKUP-SCHEDULE", "TYPE", "BACKUP-TTL", "LAST-SCHEDULE", "RECOVERABLE-TIME")
 	for _, policy := range backupPolicies {
+		if policy.Annotations[constant.DefaultBackupPolicyAnnotationKey] != "true" {
+			continue
+		}
 		if policy.Status.Phase != dpv1alpha1.PolicyAvailable {
 			continue
 		}
@@ -259,22 +243,27 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 		backupSchedule := printer.NoneString
 		backupType := printer.NoneString
 		scheduleEnable := "Disabled"
-		if policy.Spec.Schedule.BaseBackup != nil {
-			if policy.Spec.Schedule.BaseBackup.Enable {
+		if policy.Spec.Schedule.Snapshot != nil {
+			if policy.Spec.Schedule.Snapshot.Enable {
 				scheduleEnable = "Enabled"
+				backupSchedule = policy.Spec.Schedule.Snapshot.CronExpression
+				backupType = string(dpv1alpha1.BackupTypeSnapshot)
 			}
-			backupSchedule = policy.Spec.Schedule.BaseBackup.CronExpression
-			backupType = string(policy.Spec.Schedule.BaseBackup.Type)
-
 		}
-		if policy.Spec.TTL != nil {
-			ttlString = *policy.Spec.TTL
+		if policy.Spec.Schedule.Datafile != nil {
+			if policy.Spec.Schedule.Datafile.Enable {
+				scheduleEnable = "Enabled"
+				backupSchedule = policy.Spec.Schedule.Datafile.CronExpression
+				backupType = string(dpv1alpha1.BackupTypeDataFile)
+			}
+		}
+		if policy.Spec.Retention != nil && policy.Spec.Retention.TTL != nil {
+			ttlString = *policy.Spec.Retention.TTL
 		}
 		lastScheduleTime := printer.NoneString
 		if policy.Status.LastScheduleTime != nil {
 			lastScheduleTime = util.TimeFormat(policy.Status.LastScheduleTime)
 		}
-
 		tbl.AddRow(scheduleEnable, backupSchedule, backupType, ttlString, lastScheduleTime, getBackupRecoverableTime(backups))
 	}
 	tbl.Print()

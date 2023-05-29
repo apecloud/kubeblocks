@@ -4,6 +4,7 @@ metadata:
   name: kb-resource-constraint-general
   labels:
     resourceconstraint.kubeblocks.io/provider: kubeblocks
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 spec:
   constraints:
   - cpu:
@@ -13,7 +14,7 @@ spec:
     memory:
       sizePerCPU: 1Gi
   - cpu:
-      min: 2
+      min: "0.5"
       max: 2
     memory:
       sizePerCPU: 2Gi
@@ -30,6 +31,7 @@ metadata:
   name: kb-resource-constraint-memory-optimized
   labels:
     resourceconstraint.kubeblocks.io/provider: kubeblocks
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 spec:
   constraints:
   - cpu:

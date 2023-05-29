@@ -21,18 +21,21 @@ package cluster
 
 import (
 	"bytes"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -56,6 +59,7 @@ var _ = Describe("operations", func() {
 		clusterWithOneComp.Spec.ComponentSpecs = []appsv1alpha1.ClusterComponentSpec{
 			clusterWithOneComp.Spec.ComponentSpecs[0],
 		}
+		clusterWithOneComp.Spec.ComponentSpecs[0].ClassDefRef = &appsv1alpha1.ClassDefRef{Class: testapps.Class1c1gName}
 		classDef := testapps.NewComponentClassDefinitionFactory("custom", clusterWithOneComp.Spec.ClusterDefRef, testing.ComponentDefName).
 			AddClasses(testapps.DefaultResourceConstraintName, []string{testapps.Class1c1gName}).
 			GetObject()
@@ -68,16 +72,17 @@ var _ = Describe("operations", func() {
 		tf.Cleanup()
 	})
 
-	initCommonOperationOps := func(opsType appsv1alpha1.OpsType, clusterName string, hasComponentNamesFlag bool) *OperationsOptions {
-		o := newBaseOperationsOptions(streams, opsType, hasComponentNamesFlag)
+	initCommonOperationOps := func(opsType appsv1alpha1.OpsType, clusterName string, hasComponentNamesFlag bool, objs ...runtime.Object) *OperationsOptions {
+		o := newBaseOperationsOptions(tf, streams, opsType, hasComponentNamesFlag)
 		o.Dynamic = tf.FakeDynamicClient
+		o.Client = testing.FakeClientSet(objs...)
 		o.Name = clusterName
 		o.Namespace = testing.Namespace
 		return o
 	}
 
 	It("Upgrade Ops", func() {
-		o := newBaseOperationsOptions(streams, appsv1alpha1.UpgradeType, false)
+		o := newBaseOperationsOptions(tf, streams, appsv1alpha1.UpgradeType, false)
 		o.Dynamic = tf.FakeDynamicClient
 
 		By("validate o.name is null")
@@ -96,18 +101,53 @@ var _ = Describe("operations", func() {
 	})
 
 	It("VolumeExpand Ops", func() {
-		o := initCommonOperationOps(appsv1alpha1.VolumeExpansionType, clusterName, true)
+		compName := "replicasets"
+		vctName := "data"
+		persistentVolumeClaim := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-%s-%s-%d", vctName, clusterName, compName, 0),
+				Namespace: testing.Namespace,
+				Labels: map[string]string{
+					constant.AppInstanceLabelKey:             clusterName,
+					constant.VolumeClaimTemplateNameLabelKey: vctName,
+					constant.KBAppComponentLabelKey:          compName,
+				},
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{
+					corev1.ReadWriteOnce,
+				},
+				Resources: corev1.ResourceRequirements{
+					Requests: corev1.ResourceList{
+						"storage": resource.MustParse("3Gi"),
+					},
+				},
+			},
+			Status: corev1.PersistentVolumeClaimStatus{
+				Capacity: map[corev1.ResourceName]resource.Quantity{
+					"storage": resource.MustParse("1Gi"),
+				},
+			},
+		}
+		o := initCommonOperationOps(appsv1alpha1.VolumeExpansionType, clusterName, true, persistentVolumeClaim)
 		By("validate volumeExpansion when components is null")
 		Expect(o.Validate()).To(MatchError(`missing components, please specify the "--components" flag for multi-components cluster`))
 
 		By("validate volumeExpansion when vct-names is null")
-		o.ComponentNames = []string{"replicasets"}
+		o.ComponentNames = []string{compName}
 		Expect(o.Validate()).To(MatchError("missing volume-claim-templates"))
 
 		By("validate volumeExpansion when storage is null")
-		o.VCTNames = []string{"data"}
+		o.VCTNames = []string{vctName}
 		Expect(o.Validate()).To(MatchError("missing storage"))
+
+		By("validate recovery from volume expansion failure")
 		o.Storage = "2Gi"
+		Expect(o.Validate()).Should(Succeed())
+		Expect(o.Out.(*bytes.Buffer).String()).To(ContainSubstring("Warning: this opsRequest is a recovery action for volume expansion failure and will re-create the PersistentVolumeClaims when RECOVER_VOLUME_EXPANSION_FAILURE=false"))
+
+		By("validate passed")
+		o.Storage = "4Gi"
 		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).Should(Succeed())
 	})
@@ -168,8 +208,8 @@ var _ = Describe("operations", func() {
 	It("Restart ops", func() {
 		o := initCommonOperationOps(appsv1alpha1.RestartType, clusterName, true)
 		By("expect for not found error")
-		inputs := buildOperationsInputs(tf, o)
-		Expect(o.Complete(inputs, []string{clusterName + "2"}))
+		o.Args = []string{clusterName + "2"}
+		Expect(o.Complete())
 		Expect(o.CompleteRestartOps().Error()).Should(ContainSubstring("not found"))
 
 		By("expect for complete success")
@@ -184,27 +224,4 @@ var _ = Describe("operations", func() {
 		capturedOutput, _ := done()
 		Expect(testing.ContainExpectStrings(capturedOutput, "kbcli cluster describe-ops")).Should(BeTrue())
 	})
-
-	It("list and delete operations", func() {
-		clusterName := "wesql"
-		args := []string{clusterName}
-		clusterLabel := util.BuildLabelSelectorByNames("", args)
-		testLabel := "kubeblocks.io/test=test"
-
-		By("test delete OpsRequest with cluster")
-		o := delete.NewDeleteOptions(tf, streams, types.OpsGVR())
-		Expect(completeForDeleteOps(o, args)).Should(Succeed())
-		Expect(o.LabelSelector == clusterLabel).Should(BeTrue())
-
-		By("test delete OpsRequest with cluster and custom label")
-		o.LabelSelector = testLabel
-		Expect(completeForDeleteOps(o, args)).Should(Succeed())
-		Expect(o.LabelSelector == testLabel+","+clusterLabel).Should(BeTrue())
-
-		By("test delete OpsRequest with name")
-		o.Names = []string{"test1"}
-		Expect(completeForDeleteOps(o, nil)).Should(Succeed())
-		Expect(len(o.ConfirmedNames)).Should(Equal(1))
-	})
-
 })

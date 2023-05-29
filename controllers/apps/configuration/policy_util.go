@@ -160,8 +160,8 @@ func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 		return nil, err
 	}
 
-	// sort pods
-	consensus.SortPods(pods, consensus.ComposeRolePriorityMap(*params.Component))
+	// TODO: should resolve the dependency on consensus module
+	util.SortPods(pods, consensus.ComposeRolePriorityMap(params.Component.ConsensusSpec), constant.RoleLabelKey)
 	r := make([]corev1.Pod, 0, len(pods))
 	for i := len(pods); i > 0; i-- {
 		r = append(r, pods[i-1:i]...)

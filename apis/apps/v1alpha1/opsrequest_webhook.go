@@ -38,6 +38,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 // log is for logging in this package.
@@ -305,7 +307,13 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 	if err := r.checkComponentExistence(cluster, componentNames); err != nil {
 		return err
 	}
-
+	runningOpsList, err := GetRunningOpsByOpsType(ctx, cli, r.Spec.ClusterRef, r.Namespace, string(VolumeExpansionType))
+	if err != nil {
+		return err
+	}
+	if len(runningOpsList) > 0 && runningOpsList[0].Name != r.Name {
+		return fmt.Errorf("existing other VolumeExpansion OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", runningOpsList[0].Name, cluster.Name)
+	}
 	return r.checkVolumesAllowExpansion(ctx, cli, cluster)
 }
 
@@ -335,6 +343,7 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 		existInSpec      bool
 		storageClassName *string
 		allowExpansion   bool
+		requestStorage   resource.Quantity
 	}
 
 	// component name -> vct name -> entity
@@ -344,38 +353,43 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 			if _, ok := vols[comp.ComponentName]; !ok {
 				vols[comp.ComponentName] = make(map[string]Entity)
 			}
-			vols[comp.ComponentName][vct.Name] = Entity{false, nil, false}
+			vols[comp.ComponentName][vct.Name] = Entity{false, nil, false, vct.Storage}
 		}
 	}
-
 	// traverse the spec to update volumes
 	for _, comp := range cluster.Spec.ComponentSpecs {
 		if _, ok := vols[comp.Name]; !ok {
 			continue // ignore not-exist component
 		}
 		for _, vct := range comp.VolumeClaimTemplates {
-			if _, ok := vols[comp.Name][vct.Name]; !ok {
+			e, ok := vols[comp.Name][vct.Name]
+			if !ok {
 				continue
 			}
-			vols[comp.Name][vct.Name] = Entity{true, vct.Spec.StorageClassName, false}
+			e.existInSpec = true
+			e.storageClassName = vct.Spec.StorageClassName
+			vols[comp.Name][vct.Name] = e
 		}
 	}
 
 	// check all used storage classes
+	var err error
 	for cname, compVols := range vols {
 		for vname := range compVols {
 			e := vols[cname][vname]
 			if !e.existInSpec {
 				continue
 			}
-			if e.storageClassName == nil {
-				e.storageClassName = r.getSCNameByPvc(ctx, cli, cname, vname)
+			e.storageClassName, err = r.getSCNameByPvcAndCheckStorageSize(ctx, cli, cname, vname, e.requestStorage)
+			if err != nil {
+				return err
 			}
 			allowExpansion, err := r.checkStorageClassAllowExpansion(ctx, cli, e.storageClassName)
 			if err != nil {
 				continue // ignore the error and take it as not-supported
 			}
-			vols[cname][vname] = Entity{e.existInSpec, e.storageClassName, allowExpansion}
+			e.allowExpansion = allowExpansion
+			vols[cname][vname] = e
 		}
 	}
 
@@ -430,23 +444,30 @@ func (r *OpsRequest) checkStorageClassAllowExpansion(ctx context.Context,
 	return *storageClass.AllowVolumeExpansion, nil
 }
 
-// getSCNameByPvc gets the storageClassName by pvc.
-func (r *OpsRequest) getSCNameByPvc(ctx context.Context,
+// getSCNameByPvcAndCheckStorageSize gets the storageClassName by pvc and checks if the storage size is valid.
+func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	cli client.Client,
 	compName,
-	vctName string) *string {
+	vctName string,
+	requestStorage resource.Quantity) (*string, error) {
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err := cli.List(ctx, pvcList, client.InNamespace(r.Namespace), client.MatchingLabels{
-		"app.kubernetes.io/instance":        r.Spec.ClusterRef,
-		"apps.kubeblocks.io/component-name": compName,
-		"vct.kubeblocks.io/name":            vctName,
+		constant.AppInstanceLabelKey:             r.Spec.ClusterRef,
+		constant.KBAppComponentLabelKey:          compName,
+		constant.VolumeClaimTemplateNameLabelKey: vctName,
 	}, client.Limit(1)); err != nil {
-		return nil
+		return nil, err
 	}
 	if len(pvcList.Items) == 0 {
-		return nil
+		return nil, nil
 	}
-	return pvcList.Items[0].Spec.StorageClassName
+	pvc := pvcList.Items[0]
+	previousValue := *pvc.Status.Capacity.Storage()
+	if requestStorage.Cmp(previousValue) < 0 {
+		return nil, fmt.Errorf(`requested storage size of volumeClaimTemplate "%s" can not less than status.capacity.storage "%s" `,
+			vctName, previousValue.String())
+	}
+	return pvc.Spec.StorageClassName, nil
 }
 
 // validateVerticalResourceList checks if k8s resourceList is legal
@@ -466,4 +487,27 @@ func notEmptyError(target string) error {
 
 func invalidValueError(target string, value string) error {
 	return fmt.Errorf(`invalid value for "%s": %s`, target, value)
+}
+
+// GetRunningOpsByOpsType gets the running opsRequests by type.
+func GetRunningOpsByOpsType(ctx context.Context, cli client.Client,
+	clusterName, namespace, opsType string) ([]OpsRequest, error) {
+	opsRequestList := &OpsRequestList{}
+	if err := cli.List(ctx, opsRequestList, client.MatchingLabels{
+		constant.AppInstanceLabelKey:    clusterName,
+		constant.OpsRequestTypeLabelKey: opsType,
+	}, client.InNamespace(namespace)); err != nil {
+		return nil, err
+	}
+	if len(opsRequestList.Items) == 0 {
+		return nil, nil
+	}
+	var runningOpsList []OpsRequest
+	for _, v := range opsRequestList.Items {
+		if v.Status.Phase == OpsRunningPhase {
+			runningOpsList = append(runningOpsList, v)
+			break
+		}
+	}
+	return runningOpsList, nil
 }

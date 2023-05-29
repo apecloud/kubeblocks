@@ -34,10 +34,9 @@ CHART_PATH = deploy/helm
 WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs
 
 
+
 # Go setup
 export GO111MODULE = auto
-# export GOPROXY = https://proxy.golang.org
-export GOPROXY = https://goproxy.cn
 export GOSUMDB = sum.golang.org
 export GONOPROXY = github.com/apecloud
 export GONOSUMDB = github.com/apecloud
@@ -52,6 +51,15 @@ GOBIN=$(shell $(GO) env GOPATH)/bin
 else
 GOBIN=$(shell $(GO) env GOBIN)
 endif
+GOPROXY := $(shell go env GOPROXY)
+ifeq ($(GOPROXY),)
+GOPROXY := https://proxy.golang.org
+## use following GOPROXY settings for Chinese mainland developers.
+#GOPROXY := https://goproxy.cn
+endif
+export GOPROXY
+
+
 LD_FLAGS="-s -w -X main.version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` -X main.gitCommit=`git rev-parse HEAD`"
 # Which architecture to build - see $(ALL_ARCH) for options.
 # if the 'local' rule is being run, detect the ARCH from 'go env'
@@ -59,10 +67,7 @@ LD_FLAGS="-s -w -X main.version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%
 local : ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
 ARCH ?= linux-amd64
 
-# docker build setup
-# BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
-BUILDX_PLATFORMS ?= linux/amd64,linux/arm64
-BUILDX_OUTPUT_TYPE ?= docker
+
 
 TAG_LATEST ?= false
 BUILDX_ENABLED ?= false

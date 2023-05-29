@@ -82,14 +82,22 @@ type ClusterComponentVersion struct {
 	// +listMapKey=name
 	ConfigSpecs []ComponentConfigSpec `json:"configSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// clientImage define image for the component to connect database or engines.
-	// This value has a higher proirity over ClusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.image.
+	// systemAccountSpec define image for the component to connect database or engines.
+	// It overrides `image` and `env` attributes defined in ClusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.
+	// To clean default envs settings, set `SystemAccountSpec.CmdExecutorConfig.Env` to empty list.
 	// +optional
-	ClientImage string `json:"clientImage,omitempty"`
+	SystemAccountSpec *SystemAccountShortSpec `json:"systemAccountSpec,omitempty"`
 
 	// versionContext defines containers images' context for component versions,
 	// this value replaces ClusterDefinition.spec.componentDefs.podSpec.[initContainers | containers]
 	VersionsCtx VersionsContext `json:"versionsContext"`
+}
+
+// SystemAccountShortSpec is a short version of SystemAccountSpec, with only CmdExecutorConfig field.
+type SystemAccountShortSpec struct {
+	// cmdExecutorConfig configs how to get client SDK and perform statements.
+	// +kubebuilder:validation:Required
+	CmdExecutorConfig *CommandExecutorEnvItem `json:"cmdExecutorConfig"`
 }
 
 type VersionsContext struct {

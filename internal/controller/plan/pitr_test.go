@@ -25,11 +25,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -66,6 +66,16 @@ var _ = Describe("PITR Functions", func() {
 		testapps.ClearClusterResources(&testCtx)
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
+
+		deletionPropagation := metav1.DeletePropagationBackground
+		deletionGracePeriodSeconds := int64(0)
+		opts := client.DeleteAllOfOptions{
+			DeleteOptions: client.DeleteOptions{
+				GracePeriodSeconds: &deletionGracePeriodSeconds,
+				PropagationPolicy:  &deletionPropagation,
+			},
+		}
+		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, &opts)
 		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.JobSignature, inNS, ml)
@@ -121,6 +131,18 @@ var _ = Describe("PITR Functions", func() {
 			pvc = testapps.NewPersistentVolumeClaimFactory(
 				testCtx.DefaultNamespace, "data-"+clusterName+"-"+mysqlCompName+"-0", clusterName, mysqlCompName, "data").
 				SetStorage("1Gi").
+				Create(&testCtx).GetObject()
+
+			By("By mocking a pod")
+			volume := corev1.Volume{Name: pvc.Name, VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: pvc.Name}}}
+			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, clusterName+"-"+mysqlCompName+"-0").
+				AddAppInstanceLabel(clusterName).
+				AddAppComponentLabel(mysqlCompName).
+				AddAppManangedByLabel().
+				AddVolume(volume).
+				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+				AddNodeName("fake-node-name").
 				Create(&testCtx).GetObject()
 
 			By("By creating backup tool: ")
@@ -195,14 +217,14 @@ var _ = Describe("PITR Functions", func() {
 			incrBackupLabels := map[string]string{
 				constant.AppInstanceLabelKey:    sourceCluster,
 				constant.KBAppComponentLabelKey: mysqlCompName,
-				constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeIncremental),
+				constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeLogFile),
 			}
 			incrStartTime := &startTime
 			incrStopTime := &stopTime
 			backupIncr := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				WithRandomName().SetLabels(incrBackupLabels).
 				SetBackupPolicyName("test-fake").
-				SetBackupType(dpv1alpha1.BackupTypeIncremental).
+				SetBackupType(dpv1alpha1.BackupTypeLogFile).
 				Create(&testCtx).GetObject()
 			backupStatus = dpv1alpha1.BackupStatus{
 				Phase:                     dpv1alpha1.BackupCompleted,

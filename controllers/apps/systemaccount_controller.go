@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/sqlchannel"
@@ -295,7 +296,9 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 		// render a job object
 		job := renderJob(engine, compKey, stmts, ep)
 		// before create job, we adjust job's attributes, such as labels, tolerations w.r.t cluster info.
-		calibrateJobMetaAndSpec(job, cluster, compKey, account.Name)
+		if err := calibrateJobMetaAndSpec(job, cluster, compKey, account.Name); err != nil {
+			return err
+		}
 		// update owner reference
 		if err := controllerutil.SetControllerReference(cluster, job, scheme); err != nil {
 			return err
@@ -533,4 +536,11 @@ func (r *SystemAccountReconciler) clusterDeletionHander() builder.Predicates {
 		},
 	}
 	return builder.WithPredicates(predicate)
+}
+
+// existsOperations checks if the cluster is doing operations
+func existsOperations(cluster *appsv1alpha1.Cluster) bool {
+	opsRequestMap, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
+	_, isRestoring := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	return len(opsRequestMap) > 0 || isRestoring
 }

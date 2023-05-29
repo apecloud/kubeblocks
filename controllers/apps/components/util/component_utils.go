@@ -23,26 +23,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"sort"
 	"strings"
 	"time"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	componentutil "github.com/apecloud/kubeblocks/internal/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
-)
-
-const (
-	ComponentStatusDefaultPodName = "Unknown"
 )
 
 var (
@@ -52,19 +53,93 @@ var (
 	ErrReqClusterComponentSpecObj = errors.New("required arg *appsv1alpha1.ClusterComponentSpec is nil")
 )
 
-func ComponentRuntimeReqArgsCheck(cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	component *appsv1alpha1.ClusterComponentSpec) error {
-	if cli == nil {
-		return ErrReqCtrlClient
+func ListObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
+	ctx context.Context, cli client.Client, _ func(T, L), namespace string, labels client.MatchingLabels) ([]PT, error) {
+	var objList L
+	if err := cli.List(ctx, PL(&objList), labels, client.InNamespace(namespace)); err != nil {
+		return nil, err
 	}
-	if cluster == nil {
-		return ErrReqCtrlClient
+
+	objs := make([]PT, 0)
+	items := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
+	for i := range items {
+		objs = append(objs, &items[i])
 	}
-	if component == nil {
-		return ErrReqClusterComponentSpecObj
+	return objs, nil
+}
+
+func ListStsOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.StatefulSet, error) {
+	return ListObjWithLabelsInNamespace(ctx, cli, generics.StatefulSetSignature, namespace, labels)
+}
+
+func ListDeployOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.Deployment, error) {
+	return ListObjWithLabelsInNamespace(ctx, cli, generics.DeploymentSignature, namespace, labels)
+}
+
+func ListPodOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*corev1.Pod, error) {
+	return ListObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels)
+}
+
+func PodIsAvailable(workloadType appsv1alpha1.WorkloadType, pod *corev1.Pod, minReadySeconds int32) bool {
+	if pod == nil {
+		return false
+	}
+	switch workloadType {
+	case appsv1alpha1.Consensus, appsv1alpha1.Replication:
+		return intctrlutil.PodIsReadyWithLabel(*pod)
+	case appsv1alpha1.Stateful, appsv1alpha1.Stateless:
+		return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
+	default:
+		panic("unknown workload type")
+	}
+}
+
+// RestartPod restarts a Pod through updating the pod's annotation
+func RestartPod(podTemplate *corev1.PodTemplateSpec) error {
+	if podTemplate.Annotations == nil {
+		podTemplate.Annotations = map[string]string{}
+	}
+
+	startTimestamp := time.Now() // TODO(impl): opsRes.OpsRequest.Status.StartTimestamp
+	restartTimestamp := podTemplate.Annotations[constant.RestartAnnotationKey]
+	// if res, _ := time.Parse(time.RFC3339, restartTimestamp); startTimestamp.After(res) {
+	if res, _ := time.Parse(time.RFC3339, restartTimestamp); startTimestamp.Before(res) {
+		podTemplate.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
 	}
 	return nil
+}
+
+// MergeAnnotations keeps the original annotations.
+// if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
+func MergeAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
+	if targetAnnotations == nil {
+		return
+	}
+	if *targetAnnotations == nil {
+		*targetAnnotations = map[string]string{}
+	}
+	for k, v := range originalAnnotations {
+		// if the annotation not exist in targetAnnotations, copy it from original.
+		if _, ok := (*targetAnnotations)[k]; !ok {
+			(*targetAnnotations)[k] = v
+		}
+	}
+}
+
+// MergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.
+// if annotations exist and are replaced, the Service will be updated.
+func MergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
+	if len(originalAnnotations) == 0 {
+		return targetAnnotations
+	}
+	tmpAnnotations := make(map[string]string, len(originalAnnotations)+len(targetAnnotations))
+	for k, v := range originalAnnotations {
+		if !strings.HasPrefix(k, "prometheus.io") {
+			tmpAnnotations[k] = v
+		}
+	}
+	maps.Copy(tmpAnnotations, targetAnnotations)
+	return tmpAnnotations
 }
 
 // GetClusterByObject gets cluster by related k8s workloads.
@@ -182,7 +257,7 @@ func GetClusterComponentSpecByName(cluster appsv1alpha1.Cluster, compSpecName st
 func InitClusterComponentStatusIfNeed(
 	cluster *appsv1alpha1.Cluster,
 	componentName string,
-	componentDef appsv1alpha1.ClusterComponentDefinition) error {
+	workloadType appsv1alpha1.WorkloadType) error {
 	if cluster == nil {
 		return ErrReqClusterObj
 	}
@@ -194,14 +269,14 @@ func InitClusterComponentStatusIfNeed(
 	// 	})
 	// }
 	componentStatus := cluster.Status.Components[componentName]
-	switch componentDef.WorkloadType {
+	switch workloadType {
 	case appsv1alpha1.Consensus:
 		if componentStatus.ConsensusSetStatus != nil {
 			break
 		}
 		componentStatus.ConsensusSetStatus = &appsv1alpha1.ConsensusSetStatus{
 			Leader: appsv1alpha1.ConsensusMemberStatus{
-				Pod:        ComponentStatusDefaultPodName,
+				Pod:        constant.ComponentStatusDefaultPodName,
 				AccessMode: appsv1alpha1.None,
 				Name:       "",
 			},
@@ -212,7 +287,7 @@ func InitClusterComponentStatusIfNeed(
 		}
 		componentStatus.ReplicationSetStatus = &appsv1alpha1.ReplicationSetStatus{
 			Primary: appsv1alpha1.ReplicationMemberStatus{
-				Pod: ComponentStatusDefaultPodName,
+				Pod: constant.ComponentStatusDefaultPodName,
 			},
 		}
 	}
@@ -399,8 +474,8 @@ func PatchGVRCustomLabels(ctx context.Context, cli client.Client, cluster *appsv
 	if err := GetObjectListByCustomLabels(ctx, cli, *cluster, objectList, client.MatchingLabels(matchLabels)); err != nil {
 		return err
 	}
-	labelKey = replaceKBEnvPlaceholderTokens(cluster.Name, componentName, labelKey)
-	labelValue = replaceKBEnvPlaceholderTokens(cluster.Name, componentName, labelValue)
+	labelKey = replaceKBEnvPlaceholderTokens(cluster, componentName, labelKey)
+	labelValue = replaceKBEnvPlaceholderTokens(cluster, componentName, labelValue)
 	switch gvk.Kind {
 	case constant.StatefulSetKind:
 		stsList := objectList.(*appsv1.StatefulSetList)
@@ -492,6 +567,22 @@ func GetCustomLabelWorkloadKind() []string {
 	}
 }
 
+// SortPods sorts pods by their role priority
+func SortPods(pods []corev1.Pod, priorityMap map[string]int, idLabelKey string) {
+	// make a Serial pod list,
+	// e.g.: unknown -> empty -> learner -> follower1 -> follower2 -> leader, with follower1.Name < follower2.Name
+	sort.SliceStable(pods, func(i, j int) bool {
+		roleI := pods[i].Labels[idLabelKey]
+		roleJ := pods[j].Labels[idLabelKey]
+		if priorityMap[roleI] == priorityMap[roleJ] {
+			_, ordinal1 := intctrlutil.GetParentNameAndOrdinal(&pods[i])
+			_, ordinal2 := intctrlutil.GetParentNameAndOrdinal(&pods[j])
+			return ordinal1 < ordinal2
+		}
+		return priorityMap[roleI] < priorityMap[roleJ]
+	})
+}
+
 // getObjectListMapOfResourceKind returns the mapping of resource kind and its object list.
 func getObjectListMapOfResourceKind() map[string]client.ObjectList {
 	return map[string]client.ObjectList{
@@ -506,7 +597,7 @@ func getObjectListMapOfResourceKind() map[string]client.ObjectList {
 }
 
 // replaceKBEnvPlaceholderTokens replaces the placeholder tokens in the string strToReplace with builtInEnvMap and return new string.
-func replaceKBEnvPlaceholderTokens(clusterName, componentName, strToReplace string) string {
-	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(clusterName, componentName)
+func replaceKBEnvPlaceholderTokens(cluster *appsv1alpha1.Cluster, componentName, strToReplace string) string {
+	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(cluster.Name, string(cluster.UID), componentName)
 	return componentutil.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
 }

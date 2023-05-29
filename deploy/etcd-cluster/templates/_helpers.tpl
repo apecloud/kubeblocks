@@ -50,13 +50,13 @@ app.kubernetes.io/name: {{ include "etcd-cluster.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{- define "clustername" -}}
+{{ include "etcd-cluster.fullname" .}}
+{{- end}}
+
 {{/*
 Create the name of the service account to use
 */}}
 {{- define "etcd-cluster.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "etcd-cluster.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
+{{- default (printf "kb-%s" (include "clustername" .)) .Values.serviceAccount.name }}
 {{- end }}

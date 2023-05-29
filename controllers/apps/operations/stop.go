@@ -142,8 +142,7 @@ func getCompMapFromLastConfiguration(opsRequest *appsv1alpha1.OpsRequest) realAf
 func deleteConfigMaps(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
 	inNS := client.InNamespace(cluster.Namespace)
 	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey:  cluster.GetName(),
-		constant.AppManagedByLabelKey: constant.AppName,
+		constant.AppInstanceLabelKey: cluster.GetName(),
 	}
 	return cli.DeleteAllOf(ctx, &corev1.ConfigMap{}, inNS, ml)
 }

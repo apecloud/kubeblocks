@@ -96,6 +96,10 @@ spec:
             - name: KUBEBLOCKS_ADDON_SA_NAME
               value: {{ include "kubeblocks.addonSAName" . }}
             {{- end }}
+            {{- if .Values.enabledAlphaFeatureGates.recoverVolumeExpansionFailure }}
+            - name: RECOVER_VOLUME_EXPANSION_FAILURE
+              value: "true"
+            {{- end }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

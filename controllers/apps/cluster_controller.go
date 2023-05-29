@@ -45,7 +45,7 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
-	"github.com/apecloud/kubeblocks/internal/controller/types"
+	controllertypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -131,7 +131,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	reqCtx.Log.V(1).Info("reconcile", "cluster", req.NamespacedName)
 
 	requeueError := func(err error) (ctrl.Result, error) {
-		if re, ok := err.(types.RequeueError); ok {
+		if re, ok := err.(controllertypes.RequeueError); ok {
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")

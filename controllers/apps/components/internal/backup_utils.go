@@ -72,7 +72,6 @@ func CheckBackupStatus(reqCtx intctrlutil.RequestCtx,
 }
 
 func Restore(restoreJobKey types.NamespacedName,
-	cluster *appsv1alpha1.Cluster,
 	sts *appsv1.StatefulSet,
 	component *component.SynthesizedComponent,
 	backup *dataprotectionv1alpha1.Backup,

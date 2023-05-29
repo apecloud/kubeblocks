@@ -167,6 +167,35 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 	backupKey types.NamespacedName,
 	stsProto *appsv1.StatefulSet,
 	stsObj *appsv1.StatefulSet) ([]client.Object, error) {
+
+	backupVCT := func() corev1.PersistentVolumeClaimTemplate {
+		vcts := component.VolumeClaimTemplates
+		vct := vcts[0]
+		for _, tmpVct := range vcts {
+			if tmpVct.Name == component.HorizontalScalePolicy.VolumeMountsName {
+				vct = tmpVct
+				break
+			}
+		}
+		return vct
+	}
+
+	toCreatePVCKeys := func() []types.NamespacedName {
+		var pvcKeys []types.NamespacedName
+		vct := backupVCT()
+		for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
+			pvcKey := types.NamespacedName{
+				Namespace: stsObj.Namespace,
+				Name: fmt.Sprintf("%s-%s-%d",
+					vct.Name,
+					stsObj.Name,
+					i),
+			}
+			pvcKeys = append(pvcKeys, pvcKey)
+		}
+		return pvcKeys
+	}
+
 	if component.HorizontalScalePolicy == nil {
 		return nil, nil
 	}
@@ -182,18 +211,75 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 			corev1.EventTypeWarning,
 			"HorizontalScaleFailed",
 			"scale with backup tool not support yet")
-		backupObjs, err := Backup(reqCtx,
-			cli,
-			backupKey,
-			stsObj,
-			cluster,
-			component.ComponentDef,
-			component.HorizontalScalePolicy.BackupPolicyTemplateName)
+		// check backup ready
+		backupStatus, err := CheckBackupStatus(reqCtx, cli, backupKey)
 		if err != nil {
 			return nil, err
 		}
-		objs = append(objs, backupObjs...)
-		controllertypes.NewRequeueError(controllertypes.RequeueDuration, "")
+		switch backupStatus {
+		case BackupStatusNotCreated:
+			backupObjs, err := Backup(reqCtx,
+				cli,
+				backupKey,
+				stsObj,
+				cluster,
+				component.ComponentDef,
+				component.HorizontalScalePolicy.BackupPolicyTemplateName)
+			if err != nil {
+				return nil, err
+			}
+			objs = append(objs, backupObjs...)
+			return objs, controllertypes.NewRequeueError(controllertypes.RequeueDuration, "")
+		case BackupStatusProcessing:
+			return objs, controllertypes.NewRequeueError(controllertypes.RequeueDuration, "")
+		case BackupStatusReadyToUse:
+			break
+		}
+		// backup's ready, then start to check restore
+		pvcKeys := toCreatePVCKeys()
+		needRequeue := false
+		for _, pvcKey := range pvcKeys {
+			restoreJobKey := types.NamespacedName{
+				Namespace: pvcKey.Namespace,
+				Name:      "restore-" + pvcKey.Name,
+			}
+			restoreStatus, err := CheckRestoreStatus(reqCtx, cli, restoreJobKey)
+			if err != nil {
+				return nil, err
+			}
+			switch restoreStatus {
+			case RestoreStatusNotCreated:
+				backup := dataprotectionv1alpha1.Backup{}
+				if err := cli.Get(reqCtx.Ctx, backupKey, &backup); err != nil {
+					return nil, err
+				}
+				ml := client.MatchingLabels{
+					constant.ClusterDefLabelKey: component.ClusterDefName,
+				}
+				backupToolList := dataprotectionv1alpha1.BackupToolList{}
+				if err := cli.List(reqCtx.Ctx, &backupToolList, ml); err != nil {
+					return nil, err
+				}
+				if len(backupToolList.Items) == 0 {
+					return nil, fmt.Errorf("backuptool not found for clusterdefinition: %s", component.ClusterDefName)
+				}
+				restoreObjs, err := Restore(restoreJobKey, stsObj, component, &backup, &backupToolList.Items[0], pvcKey)
+				if err != nil {
+					return nil, err
+				}
+				objs = append(objs, restoreObjs...)
+				needRequeue = true
+			case RestoreStatusProcessing:
+				needRequeue = true
+			case RestoreStatusReadyToUse:
+				break
+			}
+		}
+		if needRequeue {
+			return objs, controllertypes.NewRequeueError(controllertypes.RequeueDuration, "")
+		}
+		// restore to pvcs all ready
+		return objs, nil
 	// use volume snapshot
 	case appsv1alpha1.HScaleDataClonePolicyFromSnapshot:
 		if !isSnapshotAvailable(cli, reqCtx.Ctx) {
@@ -239,28 +325,9 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 		}
 		// if volumesnapshot ready,
 		// create pvc from snapshot for every new pod
-		for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
-			vct := vcts[0]
-			for _, tmpVct := range vcts {
-				if tmpVct.Name == component.HorizontalScalePolicy.VolumeMountsName {
-					vct = tmpVct
-					break
-				}
-			}
-			// sync vct.spec.resources from component
-			for _, tmpVct := range component.VolumeClaimTemplates {
-				if vct.Name == tmpVct.Name {
-					vct.Spec.Resources = tmpVct.Spec.Resources
-					break
-				}
-			}
-			pvcKey := types.NamespacedName{
-				Namespace: stsObj.Namespace,
-				Name: fmt.Sprintf("%s-%s-%d",
-					vct.Name,
-					stsObj.Name,
-					i),
-			}
+		pvcKeys := toCreatePVCKeys()
+		vct := backupVCT()
+		for _, pvcKey := range pvcKeys {
 			if pvc, err := checkedCreatePVCFromSnapshot(cli,
 				reqCtx.Ctx,
 				pvcKey,

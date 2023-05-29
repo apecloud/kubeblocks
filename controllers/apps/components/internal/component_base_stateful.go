@@ -728,6 +728,9 @@ func (c *StatefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet) bool 
 	// keep the original template annotations.
 	// if annotations exist and are replaced, the statefulSet will be updated.
 	util.MergeAnnotations(stsObjCopy.Spec.Template.Annotations, &stsProto.Spec.Template.Annotations)
+	if stsObjCopy.Annotations == nil {
+		stsObjCopy.Annotations = map[string]string{}
+	}
 	// record the cluster generation to check if the sts is latest
 	stsObjCopy.Annotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(c.Cluster.Generation, 10)
 	stsObjCopy.Spec.Template = stsProto.Spec.Template

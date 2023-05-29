@@ -53,7 +53,7 @@ func TestIsProbeTimeout(t *testing.T) {
 			RoleProbeTimeoutAfterPodsReady: appsv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady,
 		},
 	}
-	if !IsProbeTimeout(compDef, podsReadyTime) {
+	if !IsProbeTimeout(compDef.Probes, podsReadyTime) {
 		t.Error("probe timed out should be true")
 	}
 }

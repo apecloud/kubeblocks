@@ -1,20 +1,17 @@
-{{- $cc := .Files.Get "config/mysql8-config-effect-scope.yaml" | fromYaml }}
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ConfigConstraint
 metadata:
-  name: weaviate-config-constraints
+  name: weaviate-env-constraints
   labels:
     {{- include "weaviate.labels" . | nindent 4 }}
 spec:
-  # top level mysql configuration type
+  # top level weaviate configuration type
   cfgSchemaTopLevelName: WeaviateEnvs
 
   # ConfigurationSchema that impose restrictions on engine parameter's rule
   configurationSchema:
-    # schema: auto generate from mmmcue scripts
-    # example: ../../internal/configuration/testdata/mysql_openapi.json
     cue: |-
-      {{- .Files.Get "config/weavaite-config-constraint.cue" | nindent 6 }}
+      {{- .Files.Get "config/weaviate-env-constraint.cue" | nindent 6 }}
 
   ## define static parameter list
   staticParameters:
@@ -36,6 +33,12 @@ spec:
   - AZURE_STORAGE_ACCOUNT
   - AZURE_STORAGE_KEY
   - AZURE_STORAGE_CONNECTION_STRING
+  - AUTHENTICATION_APIKEY_ENABLED
+  - AUTHENTICATION_APIKEY_ALLOWED_KEYS
+  - AUTHENTICATION_APIKEY_USERS
+  - AUTHORIZATION_ADMINLIST_ENABLED
+  - AUTHORIZATION_ADMINLIST_USERS
+  - AUTHORIZATION_ADMINLIST_READONLY_USERS
 
   formatterConfig:
-    format: ini
+    format: dotenv

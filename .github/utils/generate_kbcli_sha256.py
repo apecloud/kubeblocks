@@ -34,8 +34,7 @@ def main(argv: list[str]) -> None:
     except FileNotFoundError as e:
         print(f"template {release_note_template_path} not found, IGNORED")
 
-
-    with open(release_note_path,'a') as f_dest:
+    with open(release_note_path,'a') as f_dest: # 没
         f_dest.write(Template(template).safe_substitute(
             kbcli_version = tag_name[1:],
             today = date.today().strftime("%Y-%m-%d"),

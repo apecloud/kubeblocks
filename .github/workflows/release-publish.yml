@@ -9,7 +9,7 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 #  TAG_NAME: ${{ github.ref_name }}
-  TAG_NAME: "v0.5.98"
+  TAG_NAME: "v0.5.99"
   GO_VERSION: "1.20"
   CLI_NAME: 'kbcli'
   CLI_REPO: 'apecloud/kbcli'
@@ -48,7 +48,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64]
+#        os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64]
+        os: [linux-amd64,windows-amd64]
     steps:
       - uses: actions/checkout@v3
       - name: install lib
@@ -176,15 +177,23 @@ jobs:
 
       - name: generate kbcli release-notes
         run: |
-          python ./.github/utils/generate_kbcli_sha256.py ${{ github.ref_name }} sha256
+          mkdir -p ./docs/release_notes/${{ env.TAG_NAME }}
+          python ./.github/utils/generate_kbcli_sha256.py ${{ env.TAG_NAME }} sha256
 
       - name: release kbcli with release notes
         uses: softprops/action-gh-release@v1
         with:
-          body_path: ./docs/release_notes/v${{ env.REL_VERSION }}/v${{ env.REL_VERSION }}.md
+          body_path: ./docs/release_notes/v${{ env.TAG_NAME }}/v${{ env.REL_VERSION }}.md
           token: ${{ env.GITLAB_ACCESS_TOKEN }}
           name: KBCLI ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
+
+      - name: remove artifact
+        uses: geekyeggo/delete-artifact@v2
+        with:
+          name: sha256
+
+
 
 #  send-message:
 #    runs-on: ubuntu-latest

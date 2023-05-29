@@ -128,7 +128,7 @@ storageClass:
       volumeType: gp3
       fsType: xfs
     gke:
-      volumeType: pd-standard
+      volumeType: pd-balanced
       fsType: xfs
     aliyun:
       volumeType: cloud_essd

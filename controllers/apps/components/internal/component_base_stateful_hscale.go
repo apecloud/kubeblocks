@@ -41,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	controllertypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -192,6 +193,7 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 			return nil, err
 		}
 		objs = append(objs, backupObjs...)
+		controllertypes.NewRequeueError(controllertypes.RequeueDuration, "")
 	// use volume snapshot
 	case appsv1alpha1.HScaleDataClonePolicyFromSnapshot:
 		if !isSnapshotAvailable(cli, reqCtx.Ctx) {

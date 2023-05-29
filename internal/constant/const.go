@@ -89,6 +89,7 @@ const (
 	WorkloadTypeLabelKey                   = "apps.kubeblocks.io/workload-type"
 	ClassProviderLabelKey                  = "class.kubeblocks.io/provider"
 	ClusterDefLabelKey                     = "clusterdefinition.kubeblocks.io/name"
+	ClusterVerLabelKey                     = "clusterversion.kubeblocks.io/name"
 	CMConfigurationSpecProviderLabelKey    = "config.kubeblocks.io/config-spec"    // CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
 	CMConfigurationCMKeysLabelKey          = "config.kubeblocks.io/configmap-keys" // CMConfigurationCMKeysLabelKey Specify keys
 	CMConfigurationTemplateNameLabelKey    = "config.kubeblocks.io/config-template-name"

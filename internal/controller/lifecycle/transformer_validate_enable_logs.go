@@ -21,6 +21,7 @@ package lifecycle
 
 import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 // ValidateEnableLogsTransformer validate config and send warning event log necessarily
@@ -37,7 +38,7 @@ func (e *ValidateEnableLogsTransformer) Transform(ctx graph.TransformContext, da
 	err := cluster.Spec.ValidateEnabledLogs(transCtx.ClusterDef)
 	setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
 	if err != nil {
-		return newRequeueError(requeueDuration, err.Error())
+		return types.NewRequeueError(types.RequeueDuration, err.Error())
 	}
 
 	return nil

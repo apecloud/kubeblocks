@@ -24,10 +24,13 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	graph "github.com/apecloud/kubeblocks/internal/controller/graph"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ConstraintsValidationTransformer validates explicitly specified constraints.
 type ConstraintsValidationTransformer struct{}
+
+var _ graph.Transformer = &ConstraintsValidationTransformer{}
 
 func (e *ConstraintsValidationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
@@ -39,12 +42,12 @@ func (e *ConstraintsValidationTransformer) Transform(ctx graph.TransformContext,
 		clusterComps := clusterDefMap[compDef.Name]
 		err := meetsNumOfOccConstraint(&compDef, clusterComps)
 		if err != nil {
-			return newValidationError(err.Error())
+			return intctrlutil.NewValidationError(err.Error())
 		}
 
 		err = meetsComponentRefConstraint(&compDef, clusterDef)
 		if err != nil {
-			return newValidationError(err.Error())
+			return intctrlutil.NewValidationError(err.Error())
 		}
 	}
 	return nil
@@ -118,5 +121,3 @@ func meetsComponentRefConstraint(compDef *appsv1alpha1.ClusterComponentDefinitio
 	}
 	return nil
 }
-
-var _ graph.Transformer = &ConstraintsValidationTransformer{}

@@ -84,7 +84,7 @@ func (r *requeueError) Reason() string {
 
 func (r *delayedRequeueError) Delayed() {}
 
-// newValidationError creates a new validation error.
+// NewValidationError creates a new validation error.
 // The reason is used to generate the error message.
 // When validation fails, cluster reconciler should prefer `RequeWithError` over `RequeueAfter`.
 func NewValidationError(reason string) error {
@@ -93,13 +93,13 @@ func NewValidationError(reason string) error {
 	}
 }
 
-// validationError implements error interface BUT-NOT  RequeueError.
+// ValidationError implements error interface BUT-NOT  RequeueError.
 type ValidationError struct {
 	reason string
 }
 
+var _ error = &ValidationError{}
+
 func (r *ValidationError) Error() string {
 	return r.reason
 }
-
-var _ error = &ValidationError{}

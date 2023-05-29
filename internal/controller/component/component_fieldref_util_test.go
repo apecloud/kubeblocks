@@ -55,7 +55,7 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 		BeforeEach(func() {
 			By("create cluster definition")
 			clusterDefBuilder = testapps.NewClusterDefFactory(clusterDefName)
-			// add one componet definition
+			// add one component definition
 			clusterDefBuilder = clusterDefBuilder.AddComponentDef(testapps.StatefulMySQLComponent, referredCompDefName)
 			// add one mysql component
 			clusterDefBuilder = clusterDefBuilder.AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName)
@@ -353,7 +353,7 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 		BeforeEach(func() {
 			By("create cluster definition")
 			clusterDefBuilder = testapps.NewClusterDefFactory(clusterDefName)
-			// add one componet definition
+			// add one component definition
 			clusterDefBuilder = clusterDefBuilder.AddComponentDef(testapps.StatefulMySQLComponent, referredCompDefName)
 			clusterDefBuilder = clusterDefBuilder.AddNamedServicePort("maxscale", 3306)
 			// add one mysql component definition

@@ -55,12 +55,12 @@ type MysqlOperations struct {
 var _ BaseInternalOps = &MysqlOperations{}
 
 const (
-	// configurations to connect to Mysql, either a data source name represent by URL.
+	// configurations to connect to MySQL, either a data source name represent by URL.
 	connectionURLKey = "url"
 
-	// To connect to MySQL running in Azure over SSL you have to download a
+	// To connect to MySQL running over SSL you have to download a
 	// SSL certificate. If this is provided the driver will connect using
-	// SSL. If you have disable SSL you can leave this empty.
+	// SSL. If you have disabled SSL you can leave this empty.
 	// When the user provides a pem path their connection string must end with
 	// &tls=custom
 	// The connection string should be in the following format
@@ -145,7 +145,7 @@ func (mysqlOps *MysqlOperations) initIfNeed() bool {
 			if err != nil {
 				mysqlOps.Logger.Errorf("MySQL connection init failed: %v", err)
 			} else {
-				mysqlOps.Logger.Info("MySQL connection init success.")
+				mysqlOps.Logger.Info("MySQL connection init succeeded.")
 			}
 		}()
 		return true
@@ -228,7 +228,7 @@ func (mysqlOps *MysqlOperations) GetRunningPort() int {
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	sql := "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
 
-	// sql exec timeout need to be less than httpget's timeout which default is 1s.
+	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
 	ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 	rows, err := mysqlOps.db.QueryContext(ctx1, sql)
@@ -362,7 +362,7 @@ func (mysqlOps *MysqlOperations) CheckStatusOps(ctx context.Context, req *bindin
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 		if mysqlOps.CheckStatusFailedCount%mysqlOps.FailedEventReportFrequency == 0 {
-			mysqlOps.Logger.Infof("status checks failed %v times continuously", mysqlOps.CheckStatusFailedCount)
+			mysqlOps.Logger.Infof("status check failed %v times continuously", mysqlOps.CheckStatusFailedCount)
 			resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
 		mysqlOps.CheckStatusFailedCount++
@@ -379,7 +379,7 @@ func propertyToInt(props map[string]string, key string, setter func(int)) error 
 		if i, err := strconv.Atoi(v); err == nil {
 			setter(i)
 		} else {
-			return errors.Wrapf(err, "error converitng %s:%s to int", key, v)
+			return errors.Wrapf(err, "error converting %s:%s to int", key, v)
 		}
 	}
 
@@ -391,7 +391,7 @@ func propertyToDuration(props map[string]string, key string, setter func(time.Du
 		if d, err := time.ParseDuration(v); err == nil {
 			setter(d)
 		} else {
-			return errors.Wrapf(err, "error converitng %s:%s to time duration", key, v)
+			return errors.Wrapf(err, "error converting %s:%s to time duration", key, v)
 		}
 	}
 
@@ -528,17 +528,17 @@ func (mysqlOps *MysqlOperations) convert(columnTypes []*sql.ColumnType, values [
 	return r
 }
 
-// InternalQuery is used for internal query, implement BaseInternalOps interface
+// InternalQuery is used for internal query, implements BaseInternalOps interface
 func (mysqlOps *MysqlOperations) InternalQuery(ctx context.Context, sql string) ([]byte, error) {
 	return mysqlOps.query(ctx, sql)
 }
 
-// InternalExec is used for internal execution, implement BaseInternalOps interface
+// InternalExec is used for internal execution, implements BaseInternalOps interface
 func (mysqlOps *MysqlOperations) InternalExec(ctx context.Context, sql string) (int64, error) {
 	return mysqlOps.exec(ctx, sql)
 }
 
-// GetLogger is used for getting logger, implement BaseInternalOps interface
+// GetLogger is used for getting logger, implements BaseInternalOps interface
 func (mysqlOps *MysqlOperations) GetLogger() logger.Logger {
 	return mysqlOps.Logger
 }

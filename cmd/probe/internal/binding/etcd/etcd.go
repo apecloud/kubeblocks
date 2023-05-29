@@ -67,7 +67,7 @@ func (e *Etcd) initIfNeed() bool {
 	if e.etcd == nil {
 		go func() {
 			err := e.InitDelay()
-			e.Logger.Errorf("MongoDB connection init failed: %v", err)
+			e.Logger.Errorf("Etcd connection init failed: %v", err)
 		}()
 		return true
 	}

@@ -118,7 +118,7 @@ func (r *Redis) initIfNeed() bool {
 			if err := r.initDelay(); err != nil {
 				r.Logger.Errorf("redis connection init failed: %v", err)
 			} else {
-				r.Logger.Info("redis connection init succeed.")
+				r.Logger.Info("redis connection init succeeded.")
 			}
 		}()
 		return true
@@ -160,12 +160,12 @@ func (r *Redis) GetLogger() logger.Logger {
 	return r.Logger
 }
 
-// InternalQuery is used for internal query, implement BaseInternalOps interface.
+// InternalQuery is used for internal query, implements BaseInternalOps interface.
 func (r *Redis) InternalQuery(ctx context.Context, cmd string) ([]byte, error) {
 	redisArgs := tokenizeCmd2Args(cmd)
 	// Be aware of the result type.
 	// type of result could be string, []string, []interface{}, map[interface]interface{}
-	// it is not solely determined by the command, but also the redis version.
+	// it is determined by the combination of command and redis version.
 	result, err := r.query(ctx, redisArgs...)
 	if err != nil {
 		return nil, err
@@ -173,7 +173,7 @@ func (r *Redis) InternalQuery(ctx context.Context, cmd string) ([]byte, error) {
 	return json.Marshal(result)
 }
 
-// InternalExec is used for internal execution, implement BaseInternalOps interface.
+// InternalExec is used for internal execution, implements BaseInternalOps interface.
 func (r *Redis) InternalExec(ctx context.Context, cmd string) (int64, error) {
 	// split command into array of args
 	redisArgs := tokenizeCmd2Args(cmd)
@@ -185,7 +185,7 @@ func (r *Redis) exec(ctx context.Context, args ...interface{}) error {
 }
 
 func (r *Redis) query(ctx context.Context, args ...interface{}) (interface{}, error) {
-	// parse result into an slice of string
+	// parse result into a slice of string
 	return r.client.Do(ctx, args...).Result()
 }
 
@@ -405,7 +405,7 @@ func parseCommandAndKeyFromMap(data interface{}) (map[string]string, error) {
 		return nil, err
 	}
 	for k, v := range results {
-		// each key is string, and each v is eigher a string or a list of string
+		// each key is string, and each v is string or list of string
 		if !slices.Contains(redisUserPrivContxt, k) {
 			continue
 		}
@@ -558,7 +558,7 @@ func (r *Redis) Close() error {
 }
 
 func (r *Redis) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
-	// sql exec timeout need to be less than httpget's timeout which default is 1s.
+	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
 	// ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	// defer cancel()
 	ctx1 := ctx

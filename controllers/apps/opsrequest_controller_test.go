@@ -55,7 +55,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	const defaultMinReadySeconds = 10
 
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.

@@ -248,7 +248,7 @@ func (c *ComponentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.
 
 	svcProtoList := ictrltypes.FindAll[*corev1.Service](c.Dag)
 
-	// create new services or update existed services
+	// create new services or update existing services
 	for _, vertex := range svcProtoList {
 		node, _ := vertex.(*ictrltypes.LifecycleVertex)
 		svcProto, _ := node.Obj.(*corev1.Service)
@@ -276,7 +276,7 @@ func (c *ComponentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.
 	return nil
 }
 
-// SetStatusPhase set the cluster component phase and messages to specified conditionally.
+// SetStatusPhase sets the cluster component phase and messages conditionally.
 func (c *ComponentBase) SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase,
 	statusMessage appsv1alpha1.ComponentMessageMap, phaseTransitionMsg string) {
 	updatefn := func(status *appsv1alpha1.ClusterComponentStatus) error {
@@ -383,7 +383,7 @@ func (c *ComponentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isR
 	if isRunning {
 		if c.Component.Replicas == 0 {
 			// if replicas number of component is zero, the component has stopped.
-			// 'Stopped' is a special 'Running' for workload(StatefulSet/Deployment).
+			// 'Stopped' is a special 'Running' status for workload(StatefulSet/Deployment).
 			phase = appsv1alpha1.StoppedClusterCompPhase
 		} else {
 			// change component phase to Running when workloads of component are running.
@@ -550,7 +550,7 @@ func (c *ComponentBase) updateStatus(phaseTransitionMsg string, updatefn func(st
 //	return nil
 // }
 
-// hasFailedAndTimedOutPod returns whether the pod of components is still failed after a PodFailedTimeout period.
+// hasFailedAndTimedOutPod returns whether the pods of components are still failed after a PodFailedTimeout period.
 // if return true, component phase will be set to Failed/Abnormal.
 func hasFailedAndTimedOutPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMessageMap) {
 	hasTimedoutPod := false

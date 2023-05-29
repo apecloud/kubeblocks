@@ -284,12 +284,6 @@ func (c *ComponentBase) SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase,
 		if status.Phase == phase {
 			return nil
 		}
-		/*
-			// TODO(impl): define the status phase transition diagram
-			if phase == appsv1alpha1.SpecReconcilingClusterCompPhase && status.Phase != appsv1alpha1.RunningClusterCompPhase {
-				return nil
-			}
-		*/
 		status.Phase = phase
 		if status.Message == nil {
 			status.Message = statusMessage
@@ -359,9 +353,11 @@ func (c *ComponentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client
 		status.SetMessage(statusMessage)
 		if !appsv1alpha1.ComponentPodsAreReady(podsReady) {
 			status.PodsReadyTime = nil
-		} else if *podsReady && !appsv1alpha1.ComponentPodsAreReady(status.PodsReady) {
-			// set podsReadyTime when pods of component are ready at the moment.
-			status.PodsReadyTime = &metav1.Time{Time: time.Now()}
+		} else {
+			if !appsv1alpha1.ComponentPodsAreReady(status.PodsReady) {
+				// set podsReadyTime when pods of component are ready at the moment.
+				status.PodsReadyTime = &metav1.Time{Time: time.Now()}
+			}
 		}
 		status.PodsReady = podsReady
 		return nil
@@ -373,6 +369,9 @@ func (c *ComponentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client
 				panic(fmt.Sprintf("unexpected error occurred while updating component status: %s", err.Error()))
 			}
 		})
+		if requeueAfter != 0 {
+			return intctrlutil.NewDelayedRequeueError(requeueAfter, "requeue for workload status to reconcile.")
+		}
 		return nil
 	}
 	// TODO(refactor): wait = true to requeue.

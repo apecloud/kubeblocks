@@ -6123,8 +6123,8 @@
     "type": "timepicker"
   },
   "timezone": "",
-  "title": "PostgreSQL",
-  "uid": "5UxloIJVk",
+  "title": "[Deprecated] PostgreSQL",
+  "uid": "5UxloIJVk_deprecated",
   "version": 1,
   "weekStart": ""
 }

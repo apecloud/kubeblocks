@@ -38,7 +38,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// PodIsAvailable checks whether a pod is available respect to the workload type.
+// PodIsAvailable checks whether a pod is available with respect to the workload type.
 // Deprecated: provide for ops request using, remove this interface later.
 func PodIsAvailable(workloadType appsv1alpha1.WorkloadType, pod *corev1.Pod, minReadySeconds int32) bool {
 	return util.PodIsAvailable(workloadType, pod, minReadySeconds)
@@ -57,7 +57,7 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 	if compSpec != nil {
 		compDef = definition.GetComponentDefByName(compSpec.ComponentDefRef)
 		if compDef == nil {
-			return nil, fmt.Errorf("referenced component definition is not exist, cluster: %s, component: %s, component definition ref:%s",
+			return nil, fmt.Errorf("referenced component definition does not exist, cluster: %s, component: %s, component definition ref:%s",
 				cluster.Name, compSpec.Name, compSpec.ComponentDefRef)
 		}
 		if version != nil {

@@ -115,6 +115,8 @@ spec:
                 value: {{ if .Values.cluster.customConfig }}{{ .Values.cluster.customConfig }}{{ end }}
               - name: MYSQL_DYNAMIC_CONFIG
                 value: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
+              - name: KB_EMBEDDED_WESQL
+                value: {{ .Values.cluster.kbWeSQLImage | default "1" | quote }}
             command: ["/scripts/setup.sh"]
             lifecycle:
               preStop:
@@ -221,7 +223,7 @@ spec:
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
-                update: ALTER USER (USERNAME) IDENTIFIED BY '$(PASSWD)';
+                update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
           - name: kbmonitoring
             provisionPolicy: *kbReadonlyAcctRef
           - name: kbreplicator

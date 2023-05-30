@@ -31,18 +31,18 @@ import (
 )
 
 type OpsHandler interface {
-	// Action The action running time should be short. if it fails, it will be reconciled by the OpsRequest controller.
-	// Do not patch OpsRequest status in this function with k8s client, just modify the status variable of ops.
-	// The opsRequest controller will unify the patch it to the k8s apiServer.
+	// Action The action duration should be short. if it fails, it will be reconciled by the OpsRequest controller.
+	// Do not patch OpsRequest status in this function with k8s client, just modify the status of ops.
+	// The opsRequest controller will patch it to the k8s apiServer.
 	Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error
 	// ReconcileAction loops till the operation is completed.
 	// return OpsRequest.status.phase and requeueAfter time.
 	ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error)
-	// ActionStartedCondition append to OpsRequest.status.conditions when start performing Action function
+	// ActionStartedCondition appends to OpsRequest.status.conditions when start performing Action function
 	ActionStartedCondition(opsRequest *appsv1alpha1.OpsRequest) *metav1.Condition
 
 	// SaveLastConfiguration saves last configuration to the OpsRequest.status.lastConfiguration,
-	// and this method will be executed together when opsRequest to running.
+	// and this method will be executed together when opsRequest in running.
 	SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error
 
 	// GetRealAffectedComponentMap returns a changed configuration componentName map by
@@ -50,7 +50,7 @@ type OpsHandler interface {
 	// we only changed the component status of cluster.status to the ToClusterPhase
 	// of OpsBehaviour, which component name is in the returned componentName map.
 	// Note: if the operation will not modify the Spec struct of the component workload,
-	// GetRealAffectedComponentMap function should return nil unless phase management of cluster and components
+	// GetRealAffectedComponentMap function should return nil unless phase management of cluster & components
 	// is implemented at ReconcileAction function.
 	GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap
 }
@@ -64,13 +64,13 @@ type OpsBehaviour struct {
 	ToClusterPhase appsv1alpha1.ClusterPhase
 
 	// MaintainClusterPhaseBySelf indicates whether the operation will maintain cluster/component phase by itself.
-	// Generally, the cluster/component phase will be maintained by cluster controller, but if your operation will not update
-	// StatefulSet/Deployment by Cluster controller and make pod to rebuilt, you need to maintain the cluster/component phase yourself.
+	// Generally, the cluster/component phase will be maintained by cluster controller, but if the operation will not update
+	// StatefulSet/Deployment by Cluster controller and make pod rebuilt, maintain the cluster/component phase by self.
 	MaintainClusterPhaseBySelf bool
 
 	// ProcessingReasonInClusterCondition indicates the reason of the condition that type is "OpsRequestProcessed" in Cluster.Status.Conditions and
 	// is only valid when ToClusterPhase is not empty. it will indicate what operation the cluster is doing and
-	// will be displayed of "kblic cluster list".
+	// will be displayed of "kbcli cluster list".
 	ProcessingReasonInClusterCondition string
 
 	OpsHandler OpsHandler

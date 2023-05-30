@@ -19,7 +19,7 @@ You can use KubeBlocks to create your own class types.
    *Example:*
 
    ```bash
-   kbcli class create custom-1c1g --cluster-definition apecloud-mysql --type mysql --constraint kb-resource-constraint-general --cpu 1 --memory 1Gi --storage name=data,size=10Gi
+   kbcli class create custom-1c1g --cluster-definition apecloud-mysql --type mysql --constraint kb-resource-constraint-general --cpu 1 --memory 1Gi
    ```
 
 2. Check whether the class is created with `kbcli class list` command.
@@ -41,13 +41,8 @@ For example, you can create the file named `/tmp/class.yaml`.
   template: |
     cpu: "{{ or .cpu 1 }}"
     memory: "{{ or .memory 4 }}Gi"
-    volumes:
-    - name: data
-      size: "{{ or .dataStorageSize 10 }}Gi"
-    - name: log
-      size: "{{ or .logStorageSize 1 }}Gi"
   # template variables used to define classes
-  vars: [cpu, memory, dataStorageSize, logStorageSize]
+  vars: [cpu, memory]
   series:
   - # class naming template, you can reference variables in class template
     # it's also ok to define static class name in the following class definitions

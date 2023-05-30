@@ -559,3 +559,14 @@ func GetVerboseLog() action.DebugLog {
 		klog.Infof(format+"\n", v...)
 	}
 }
+
+// GetValues gives an implementation of 'helm get values' for target release
+func GetValues(release string, cfg *Config) (map[string]interface{}, error) {
+	actionConfig, err := NewActionConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	client := action.NewGetValues(actionConfig)
+	client.AllValues = true
+	return client.Run(release)
+}

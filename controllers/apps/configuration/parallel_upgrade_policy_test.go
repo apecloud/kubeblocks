@@ -195,7 +195,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 		})
 	})
 
-	Context("parallel reconfigure policy test without not support component", func() {
+	Context("parallel reconfigure policy test for not supported component", func() {
 		It("Should failed", func() {
 			// not support type
 			mockParam := newMockReconfigureParams("parallelPolicy", nil,
@@ -210,7 +210,7 @@ var _ = Describe("Reconfigure ParallelPolicy", func() {
 					}}}))
 			status, err := parallelPolicy.Upgrade(mockParam)
 			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("not support component workload type"))
+			Expect(err.Error()).Should(ContainSubstring("not supported component workload type"))
 			Expect(status.Status).Should(BeEquivalentTo(ESNotSupport))
 		})
 	})

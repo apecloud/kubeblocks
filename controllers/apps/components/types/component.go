@@ -34,14 +34,14 @@ import (
 )
 
 const (
-	// ComponentPhaseTransition the event reason indicates that the component transits  to a new phase.
+	// ComponentPhaseTransition the event reason indicates that the component transits to a new phase.
 	ComponentPhaseTransition = "ComponentPhaseTransition"
-
-	// RoleProbeTimeoutReason the event reason when all pods of the component role probe timed out.
-	RoleProbeTimeoutReason = "RoleProbeTimeout"
 
 	// PodContainerFailedTimeout the timeout for container of pod failures, the component phase will be set to Failed/Abnormal after this time.
 	PodContainerFailedTimeout = time.Minute
+
+	// PodScheduledFailedTimeout timeout for scheduling failure.
+	PodScheduledFailedTimeout = 30 * time.Second
 )
 
 type Component interface {

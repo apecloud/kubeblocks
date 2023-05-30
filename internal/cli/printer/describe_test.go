@@ -91,3 +91,33 @@ func TestPrintConditions(t *testing.T) {
 		t.Fatalf(`Expect conditions output: "%s	%s	%s	%s"`, conditionType, reason, metav1.ConditionFalse, message)
 	}
 }
+
+func TestPrintHelmValues(t *testing.T) {
+	mockHelmConfig := map[string]interface{}{
+		"updateStrategy": map[string]interface{}{
+			"rollingUpdate": map[string]interface{}{
+				"maxSurge":       1,
+				"maxUnavailable": "40%",
+			},
+			"type": "RollingUpdate",
+		},
+		"podDisruptionBudget": map[string]interface{}{
+			"minAvailable": 1,
+		},
+		"loggerSettings": map[string]interface{}{
+			"developmentMode": false,
+			"encoder":         "console",
+			"timeEncoding":    "iso8601",
+		},
+		"priorityClassName": nil,
+		"nameOverride":      "",
+		"fullnameOverride±": "",
+		"dnsPolicy":         "ClusterFirst",
+		"replicaCount":      1,
+		"hostNetwork":       false,
+		"keepAddons":        false,
+	}
+	out := &bytes.Buffer{}
+
+	PrintHelmValues(mockHelmConfig, JSON, out)
+}

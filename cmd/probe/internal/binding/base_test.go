@@ -31,7 +31,7 @@ import (
 	"github.com/dapr/kit/logger"
 	"github.com/spf13/viper"
 
-	. "github.com/apecloud/kubeblocks/cmd/probe/util"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type fakeOperations struct {

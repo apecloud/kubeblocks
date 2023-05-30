@@ -306,17 +306,6 @@ func (o *CreateOptions) Validate() error {
 		return fmt.Errorf("does not support --set and --set-file being specified at the same time")
 	}
 
-	// if name is not specified, generate a random cluster name
-	if o.Name == "" {
-		name, err := generateClusterName(o.Dynamic, o.Namespace)
-		if err != nil {
-			return err
-		}
-		if name == "" {
-			return fmt.Errorf("failed to generate a random cluster name")
-		}
-		o.Name = name
-	}
 	if len(o.Name) > 16 {
 		return fmt.Errorf("cluster name should be less than 16 characters")
 	}
@@ -331,6 +320,7 @@ func (o *CreateOptions) Complete() error {
 		clusterCompSpecs []appsv1alpha1.ClusterComponentSpec
 		err              error
 	)
+
 	if len(o.SetFile) > 0 {
 		if compByte, err = MultipleSourceComponents(o.SetFile, o.IOStreams.In); err != nil {
 			return err
@@ -347,6 +337,18 @@ func (o *CreateOptions) Complete() error {
 		} else {
 			clusterCompSpecs = cls.Spec.ComponentSpecs
 		}
+	}
+
+	// if name is not specified, generate a random cluster name
+	if o.Name == "" {
+		name, err := generateClusterName(o.Dynamic, o.Namespace)
+		if err != nil {
+			return err
+		}
+		if name == "" {
+			return fmt.Errorf("failed to generate a random cluster name")
+		}
+		o.Name = name
 	}
 
 	// build annotation

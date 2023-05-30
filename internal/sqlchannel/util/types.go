@@ -17,9 +17,10 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package sqlchannel
+package util
 
 import (
+	"strings"
 	"time"
 
 	"github.com/dapr/components-contrib/bindings"
@@ -32,10 +33,14 @@ const (
 	RespEveSucc = "Success"
 	RespEveFail = "Failed"
 
-	SuperUserRole string = "superuser"
-	ReadWriteRole string = "readwrite"
-	ReadOnlyRole  string = "readonly"
-	InvalidRole   string = "invalid"
+	CheckRunningOperation bindings.OperationKind = "checkRunning"
+	CheckStatusOperation  bindings.OperationKind = "checkStatus"
+	CheckRoleOperation    bindings.OperationKind = "checkRole"
+	GetRoleOperation      bindings.OperationKind = "getRole"
+	GetLagOperation       bindings.OperationKind = "getLag"
+	ExecOperation         bindings.OperationKind = "exec"
+	QueryOperation        bindings.OperationKind = "query"
+	CloseOperation        bindings.OperationKind = "close"
 
 	// actions for cluster accounts management
 	ListUsersOp          bindings.OperationKind = "listUsers"
@@ -46,7 +51,42 @@ const (
 	RevokeUserRoleOp     bindings.OperationKind = "revokeUserRole"
 	ListSystemAccountsOp bindings.OperationKind = "listSystemAccounts"
 
+	OperationNotImplemented = "NotImplemented"
+	OperationInvalid        = "Invalid"
+	OperationSuccess        = "Success"
+	OperationFailed         = "Failed"
+
 	HTTPRequestPrefx string = "curl -X POST -H 'Content-Type: application/json' http://localhost:%d/v1.0/bindings/%s"
+)
+
+type RoleType string
+
+func (r RoleType) EqualTo(role string) bool {
+	return strings.EqualFold(string(r), role)
+}
+
+func (r RoleType) GetWeight() int32 {
+	switch r {
+	case SuperUserRole:
+		return 1 << 3
+	case ReadWriteRole:
+		return 1 << 2
+	case ReadOnlyRole:
+		return 1 << 1
+	case CustomizedRole:
+		return 1
+	default:
+		return 0
+	}
+}
+
+const (
+	SuperUserRole  RoleType = "superuser"
+	ReadWriteRole  RoleType = "readwrite"
+	ReadOnlyRole   RoleType = "readonly"
+	NoPrivileges   RoleType = ""
+	CustomizedRole RoleType = "customized"
+	InvalidRole    RoleType = "invalid"
 )
 
 // UserInfo is the user information for account management

@@ -103,7 +103,7 @@ bar    <unknown>
 test        foo    <unknown>
 test        bar    <unknown>
 `
-			_ = cmd.Flags().Set("all-namespace", "true")
+			_ = cmd.Flags().Set("all-namespaces", "true")
 			cmd.Run(cmd, []string{})
 			Expect(buf.String()).To(Equal(expected))
 		})

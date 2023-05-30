@@ -1,11 +1,11 @@
 ---
-title: kbcli cluster reconfigure
+title: kbcli cluster configure
 ---
 
-Reconfigure parameters with the specified components in the cluster.
+Configure parameters with the specified components in the cluster.
 
 ```
-kbcli cluster reconfigure NAME --set key=value[,key=value] [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file] [flags]
+kbcli cluster configure NAME --set key=value[,key=value] [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file] [flags]
 ```
 
 ### Examples
@@ -27,7 +27,7 @@ kbcli cluster reconfigure NAME --set key=value[,key=value] [--component=componen
       --config-file string             Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-config'.
       --config-spec string             Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-config'.
       --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
-  -h, --help                           help for reconfigure
+  -h, --help                           help for configure
       --name string                    OpsRequest name. if not specified, it will be randomly generated 
   -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --set strings                    Specify updated parameter list. For details about the parameters, refer to kbcli sub command: 'kbcli cluster describe-config'.

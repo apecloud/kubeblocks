@@ -206,20 +206,20 @@ func (r *ConsensusSet) HandleRestart(ctx context.Context, obj client.Object) ([]
 	}
 
 	// prepare to do pods Deletion, that's the only thing we should do,
-	// the statefulset reconciler will do the others.
-	// to simplify the process, we do pods Deletion after statefulset reconcile done,
-	// that is stsObj.Generation == stsObj.Status.ObservedGeneration
+	// the statefulset reconciler will do the rest.
+	// to simplify the process, we do pods Deletion after statefulset reconciliation done,
+	// it is when stsObj.Generation == stsObj.Status.ObservedGeneration
 	if stsObj.Generation != stsObj.Status.ObservedGeneration {
 		return nil, nil
 	}
 
-	// then we wait all pods' presence, that is len(pods) == stsObj.Spec.Replicas
-	// only then, we have enough info about the previous pods before delete the current one
+	// then we wait for all pods' presence when len(pods) == stsObj.Spec.Replicas
+	// at that point, we have enough info about the previous pods before deleting the current one
 	if len(pods) != int(*stsObj.Spec.Replicas) {
 		return nil, nil
 	}
 
-	// we don't check whether pod role label present: prefer stateful set's Update done than role probing ready
+	// we don't check whether pod role label is present: prefer stateful set's Update done than role probing ready
 
 	// generate the pods Deletion plan
 	podsToDelete := make([]*corev1.Pod, 0)
@@ -251,7 +251,7 @@ func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) 
 		return nil, err
 	}
 
-	// update cluster.status.component.consensusSetStatus based on all pods currently exist
+	// update cluster.status.component.consensusSetStatus based on the existences for all pods
 	componentName := r.getName()
 
 	// first, get the old status
@@ -267,7 +267,7 @@ func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) 
 			AccessMode: appsv1alpha1.None,
 		},
 	}
-	// then, calculate the new status
+	// then, set the new status
 	setConsensusSetStatusRoles(newConsensusSetStatus, r.getConsensusSpec(), pods)
 	// if status changed, do update
 	if !cmp.Equal(newConsensusSetStatus, oldConsensusSetStatus) {

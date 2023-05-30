@@ -41,12 +41,12 @@ const (
 	jobPrefix = "job-system-account-"
 )
 
-// SecretMapStore is a cache, recording all (key, secret) pair for accounts to be created.
+// SecretMapStore is a cache, recording all (key, secret) pairs for accounts to be created.
 type secretMapStore struct {
 	cache.Store
 }
 
-// SecretMapEntry records (key, secret) pair for account to be created.
+// SecretMapEntry records (key, secret) pairs for account to be created.
 type secretMapEntry struct {
 	key   string
 	value *corev1.Secret
@@ -160,7 +160,7 @@ func replaceEnvsValues(clusterName string, sysAccounts *appsv1alpha1.SystemAccou
 	}
 }
 
-// getLabelsForSecretsAndJobs construct matching labels for secrets and jobs.
+// getLabelsForSecretsAndJobs constructs matching labels for secrets and jobs.
 // This is consistent with that of secrets created during cluster initialization.
 func getLabelsForSecretsAndJobs(key componentUniqueKey) client.MatchingLabels {
 	return client.MatchingLabels{
@@ -237,7 +237,7 @@ func renderSecretByCopy(key componentUniqueKey, username string, fromSecret *cor
 }
 
 func renderSecret(key componentUniqueKey, username string, labels client.MatchingLabels, data map[string][]byte) *corev1.Secret {
-	// secret labels and secret fianlizers should be consistent with that of Cluster secret created by Cluster Controller.
+	// secret labels and secret finalizers should be consistent with that of Cluster secret created by Cluster Controller.
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:  key.namespace,
@@ -390,7 +390,7 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 	return nil
 }
 
-// completeExecConfig override the image of execConfig if version is not nil.
+// completeExecConfig overrides the image of execConfig if version is not nil.
 func completeExecConfig(execConfig *appsv1alpha1.CmdExecutorConfig, version *appsv1alpha1.ClusterComponentVersion) {
 	if version == nil || version.SystemAccountSpec == nil || version.SystemAccountSpec.CmdExecutorConfig == nil {
 		return

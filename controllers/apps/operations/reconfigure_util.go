@@ -40,7 +40,7 @@ type reconfiguringResult struct {
 	err                error
 }
 
-// updateCfgParams merge parameters of the config into the configmap, and verify final configuration file.
+// updateCfgParams merges parameters of the config into the configmap, and verifies final configuration file.
 func updateCfgParams(config appsv1alpha1.Configuration,
 	tpl appsv1alpha1.ComponentConfigSpec,
 	cmKey client.ObjectKey,

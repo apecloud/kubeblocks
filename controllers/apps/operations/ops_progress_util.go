@@ -36,12 +36,12 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// getProgressObjectKey gets progress object key from the object of client.Object.
+// getProgressObjectKey gets progress object key from the client.Object.
 func getProgressObjectKey(kind, name string) string {
 	return fmt.Sprintf("%s/%s", kind, name)
 }
 
-// isCompletedProgressStatus the progress detail is in final state, either Failed or Succeed.
+// isCompletedProgressStatus checks the progress detail with final state, either Failed or Succeed.
 func isCompletedProgressStatus(status appsv1alpha1.ProgressStatus) bool {
 	return slices.Contains([]appsv1alpha1.ProgressStatus{appsv1alpha1.SucceedProgressStatus,
 		appsv1alpha1.FailedProgressStatus}, status)
@@ -162,7 +162,7 @@ func removeStatelessExpiredPod(podList *corev1.PodList,
 }
 
 // handleComponentStatusProgress handles the component status progressDetails.
-// if all the pods of the component are affected, use this common function to reconcile the progressDetails.
+// if all the pods of the component are affected, use this function to reconcile the progressDetails.
 func handleComponentStatusProgress(
 	reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -310,7 +310,7 @@ func handleFailedOrProcessingProgressDetail(opsRes *OpsResource,
 	return completedCount
 }
 
-// podIsPendingDuringOperation checks if pod is pending during the component is doing operation.
+// podIsPendingDuringOperation checks if pod is pending during the component's operation.
 func podIsPendingDuringOperation(opsStartTime metav1.Time, pod *corev1.Pod) bool {
 	return pod.CreationTimestamp.Before(&opsStartTime) && pod.DeletionTimestamp.IsZero()
 }

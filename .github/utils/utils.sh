@@ -410,7 +410,7 @@ patch_release_notes() {
 
     gh_curl -X PATCH \
     $GITHUB_API/repos/$GITHUB_REPO/releases/$release_id \
-    -d '{body:"'$release_notes'"}'
+    -d '{body:"'$release_note'"}'
 }
 
 main "$@"

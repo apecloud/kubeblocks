@@ -142,8 +142,8 @@ func (h *Ha) clusterUpdateRecall(oldObj, newObj interface{}) {
 		return
 	}
 
-	oldLeaderName := oldCluster.GetAnnotations()[configuration_store.LeaderName]
-	newLeaderName := newCluster.GetAnnotations()[configuration_store.LeaderName]
+	oldLeaderName := oldCluster.GetAnnotations()[binding.LEADER]
+	newLeaderName := newCluster.GetAnnotations()[binding.LEADER]
 	if oldLeaderName == newLeaderName {
 
 		return

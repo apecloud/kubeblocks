@@ -337,13 +337,13 @@ func (pgOps *PostgresOperations) SwitchoverOps(ctx context.Context, req *binding
 		return result, nil
 	}
 
-	if err := pgOps.manualSwitchOver(candidate); err != nil {
+	if err := pgOps.manualSwitchOver(primary, candidate); err != nil {
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 		return result, nil
 	}
 
-	if ok, err := pgOps.getSwitchOverResult(candidate); err != nil {
+	if ok, err := pgOps.getSwitchOverResult(candidate, primary); err != nil {
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 		return result, nil
@@ -426,15 +426,12 @@ func (pgOps *PostgresOperations) isSwitchOverPossible(ctx context.Context, prima
 	return true, nil
 }
 
-func (pgOps *PostgresOperations) manualSwitchOver(candidate string) error {
-	clusterObj, err := pgOps.Cs.GetClusterObj()
-	if err != nil {
-		return err
+func (pgOps *PostgresOperations) manualSwitchOver(primary, candidate string) error {
+	annotations := map[string]string{
+		LEADER:    primary,
+		CANDIDATE: candidate,
 	}
-	annotations := clusterObj.GetAnnotations()
-	annotations[configuration_store.LeaderName] = candidate
-
-	_, err = pgOps.Cs.UpdateClusterObj(clusterObj)
+	_, err := pgOps.Cs.CreateConfigMap(configuration_store.ConfigSuffix, annotations)
 	if err != nil {
 		return err
 	}
@@ -443,28 +440,18 @@ func (pgOps *PostgresOperations) manualSwitchOver(candidate string) error {
 }
 
 // TODO: Check get result
-func (pgOps *PostgresOperations) getSwitchOverResult(candidate string) (bool, error) {
-	_ = pgOps.Cs.GetClusterFromKubernetes()
-	if pgOps.Cs.GetCluster().Leader.GetMember().GetName() != candidate {
-		return false, errors.New("switchover fail")
+func (pgOps *PostgresOperations) getSwitchOverResult(oldPrimary, candidate string) (bool, error) {
+	wait := int(pgOps.Cs.GetCluster().Config.GetData().GetTtl() / 2)
+	for i := 0; i < wait; i++ {
+		time.Sleep(time.Second)
+		_ = pgOps.Cs.GetClusterFromKubernetes()
+		newPrimary := pgOps.Cs.GetCluster().Leader.GetMember().GetName()
+		if newPrimary == candidate || (newPrimary != oldPrimary && candidate == "") {
+			return true, nil
+		}
 	}
 
-	pod, err := pgOps.Cs.GetPod(candidate)
-	if err != nil {
-		return false, err
-	}
-	client, err := sqlchannel.NewClientWithPod(pod, pgOps.DBType)
-	if err != nil {
-		return false, errors.Errorf("new client with pod err:%v", err)
-	}
-
-	time.Sleep(time.Second * 15)
-	role, err := client.GetRole()
-	if role != PRIMARY {
-		return false, errors.Errorf("failed switchover to candidate:%s", candidate)
-	}
-
-	return true, nil
+	return false, errors.New("switchover fail")
 }
 
 func (pgOps *PostgresOperations) FailoverOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

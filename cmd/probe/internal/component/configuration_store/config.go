@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -81,25 +82,25 @@ func (cs *ConfigurationStore) Init(sysID string, extra map[string]string) error 
 	renewTime := acquireTime
 	ttl := os.Getenv(util.KbTtl)
 	annotations := map[string]string{
-		LeaderName:  leaderName,
-		AcquireTime: strconv.FormatInt(acquireTime, 10),
-		RenewTime:   strconv.FormatInt(renewTime, 10),
-		TTL:         ttl,
+		binding.LEADER: leaderName,
+		AcquireTime:    strconv.FormatInt(acquireTime, 10),
+		RenewTime:      strconv.FormatInt(renewTime, 10),
+		TTL:            ttl,
 	}
 	clusterObj.SetAnnotations(annotations)
 	if _, err = cs.dynamicClient.Resource(types.ClusterGVR()).Namespace(cs.namespace).Update(cs.ctx, clusterObj, updateOpt); err != nil {
 		return err
 	}
 
-	maxLagOnFailover := os.Getenv(MaxLagOnFailover)
+	maxLagOnSwitchover := os.Getenv(MaxLagOnSwitchover)
 	if _, err = cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cs.clusterCompName + ConfigSuffix,
 			Namespace: cs.namespace,
 			Annotations: map[string]string{
-				SysID:            sysID,
-				TTL:              ttl,
-				MaxLagOnFailover: maxLagOnFailover,
+				SysID:              sysID,
+				TTL:                ttl,
+				MaxLagOnSwitchover: maxLagOnSwitchover,
 			},
 		},
 	}, createOpt); err != nil {
@@ -148,27 +149,27 @@ func (cs *ConfigurationStore) GetClusterFromKubernetes() error {
 		pods[i] = &pod
 	}
 
-	var config, failoverConfig *v1.ConfigMap
+	var config, switchoverConfig *v1.ConfigMap
 	for _, cf := range configMapList.Items {
 		switch cf.Name {
 		case cs.clusterCompName + ConfigSuffix:
 			config = &cf
-		case cs.clusterCompName + FailoverSuffix:
-			failoverConfig = &cf
+		case cs.clusterCompName + SwitchoverSuffix:
+			switchoverConfig = &cf
 		}
 	}
 
-	cs.cluster = cs.loadClusterFromKubernetes(config, failoverConfig, pods, clusterObj, map[string]string{})
+	cs.cluster = cs.loadClusterFromKubernetes(config, switchoverConfig, pods, clusterObj, map[string]string{})
 
 	return nil
 }
 
-func (cs *ConfigurationStore) loadClusterFromKubernetes(config, failoverConfig *v1.ConfigMap, pods []*v1.Pod, clusterObj *appsv1alpha1.Cluster, extra map[string]string) *Cluster {
+func (cs *ConfigurationStore) loadClusterFromKubernetes(config, switchoverConfig *v1.ConfigMap, pods []*v1.Pod, clusterObj *appsv1alpha1.Cluster, extra map[string]string) *Cluster {
 	var (
 		sysID         string
 		clusterConfig *ClusterConfig
 		leader        *Leader
-		failover      *Failover
+		switchover    *Switchover
 	)
 
 	if config != nil {
@@ -179,7 +180,7 @@ func (cs *ConfigurationStore) loadClusterFromKubernetes(config, failoverConfig *
 	if clusterObj != nil {
 		cs.leaderObservedRecord = newLeaderRecord(clusterObj.Annotations)
 		cs.LeaderObservedTime = time.Now().Unix()
-		leader = newLeader(clusterObj.ResourceVersion, newMember("-1", clusterObj.Annotations[LeaderName], map[string]string{}))
+		leader = newLeader(clusterObj.ResourceVersion, newMember("-1", clusterObj.Annotations[binding.LEADER], map[string]string{}))
 	}
 
 	members := make([]*Member, 0, len(pods))
@@ -187,21 +188,21 @@ func (cs *ConfigurationStore) loadClusterFromKubernetes(config, failoverConfig *
 		members[i] = getMemberFromPod(pod)
 	}
 
-	if failover != nil {
-		annotations := failoverConfig.Annotations
+	if switchover != nil {
+		annotations := switchoverConfig.Annotations
 		scheduledAt, err := strconv.Atoi(annotations[ScheduledAt])
 		if err == nil {
-			failover = newFailover(failoverConfig.ResourceVersion, annotations[LeaderName], annotations[Candidate], int64(scheduledAt))
+			switchover = newSwitchover(switchoverConfig.ResourceVersion, annotations[binding.LEADER], annotations[binding.CANDIDATE], int64(scheduledAt))
 		}
 	}
 
 	return &Cluster{
-		SysID:    sysID,
-		Config:   clusterConfig,
-		Leader:   leader,
-		Members:  members,
-		FailOver: failover,
-		Extra:    extra,
+		SysID:      sysID,
+		Config:     clusterConfig,
+		Leader:     leader,
+		Members:    members,
+		Switchover: switchover,
+		Extra:      extra,
 	}
 }
 
@@ -213,12 +214,27 @@ func (cs *ConfigurationStore) GetPod(name string) (*v1.Pod, error) {
 	return cs.clientSet.CoreV1().Pods(cs.namespace).Get(cs.ctx, name, metav1.GetOptions{})
 }
 
+func (cs *ConfigurationStore) ListPods() (*v1.PodList, error) {
+	return cs.clientSet.CoreV1().Pods(cs.namespace).List(cs.ctx, metav1.ListOptions{})
+}
+
 func (cs *ConfigurationStore) UpdateConfigMap(configMap *v1.ConfigMap) (*v1.ConfigMap, error) {
 	return cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Update(cs.ctx, configMap, metav1.UpdateOptions{})
 }
 
-func (cs *ConfigurationStore) ListPods() (*v1.PodList, error) {
-	return cs.clientSet.CoreV1().Pods(cs.namespace).List(cs.ctx, metav1.ListOptions{})
+func (cs *ConfigurationStore) CreateConfigMap(suffix string, annotations map[string]string) (*v1.ConfigMap, error) {
+	configMap, err := cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        cs.clusterCompName + suffix,
+			Namespace:   cs.namespace,
+			Annotations: annotations,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return configMap, nil
 }
 
 func (cs *ConfigurationStore) GetClusterObj() (*unstructured.Unstructured, error) {
@@ -291,7 +307,7 @@ func newLeaderRecord(data map[string]string) *LeaderRecord {
 
 	return &LeaderRecord{
 		acquireTime: int64(acquireTime),
-		leader:      data[LeaderName],
+		leader:      data[binding.LEADER],
 		renewTime:   int64(renewTime),
 		ttl:         int64(ttl),
 	}

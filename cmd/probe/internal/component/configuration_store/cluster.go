@@ -28,12 +28,12 @@ import (
 )
 
 type Cluster struct {
-	SysID    string
-	Config   *ClusterConfig
-	Leader   *Leader
-	Members  []*Member
-	FailOver *Failover
-	Extra    map[string]string
+	SysID      string
+	Config     *ClusterConfig
+	Leader     *Leader
+	Members    []*Member
+	Switchover *Switchover
+	Extra      map[string]string
 }
 
 func (c *Cluster) HasMember(memberName string) bool {
@@ -70,12 +70,12 @@ func getClusterConfigFromConfigMap(configmap *v1.ConfigMap) *ClusterConfig {
 	if err != nil {
 		ttl = 0
 	}
-	maxLagOnFailover, err := strconv.Atoi(annotations[MaxLagOnFailover])
+	maxLagOnSwitchover, err := strconv.Atoi(annotations[MaxLagOnSwitchover])
 	if err != nil {
-		maxLagOnFailover = 1048576
+		maxLagOnSwitchover = 1048576
 	}
 
-	data := newClusterData(int64(ttl), int64(maxLagOnFailover))
+	data := newClusterData(int64(ttl), int64(maxLagOnSwitchover))
 
 	return &ClusterConfig{
 		index:       configmap.ResourceVersion,
@@ -131,16 +131,15 @@ func (m *Member) GetName() string {
 	return m.name
 }
 
-// Failover 对象，记录即将发生的failover操作信息
-type Failover struct {
+type Switchover struct {
 	index       string
 	leader      string
 	candidate   string
 	scheduledAt int64
 }
 
-func newFailover(index string, leader string, candidate string, scheduledAt int64) *Failover {
-	return &Failover{
+func newSwitchover(index string, leader string, candidate string, scheduledAt int64) *Switchover {
+	return &Switchover{
 		index:       index,
 		leader:      leader,
 		candidate:   candidate,
@@ -179,14 +178,14 @@ type TimelineHistory struct {
 }
 
 type ClusterData struct {
-	ttl              int64
-	maxLagOnFailover int64
+	ttl                int64
+	maxLagOnSwitchover int64
 }
 
-func newClusterData(ttl int64, maxLagOnFailover int64) *ClusterData {
+func newClusterData(ttl int64, maxLagOnSwitchover int64) *ClusterData {
 	return &ClusterData{
-		ttl:              ttl,
-		maxLagOnFailover: maxLagOnFailover,
+		ttl:                ttl,
+		maxLagOnSwitchover: maxLagOnSwitchover,
 	}
 }
 
@@ -194,6 +193,6 @@ func (c *ClusterData) GetTtl() int64 {
 	return c.ttl
 }
 
-func (c *ClusterData) GetMaxLagOnFailover() int64 {
-	return c.maxLagOnFailover
+func (c *ClusterData) GetMaxLagOnSwitchover() int64 {
+	return c.maxLagOnSwitchover
 }

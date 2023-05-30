@@ -54,7 +54,7 @@ import (
 
 var (
 	listBackupPolicyExample = templates.Examples(`
-		# list all backup policy
+		# list all backup policies
 		kbcli cluster list-backup-policy 
         
 		# using short cmd to list backup policy of the specified cluster 
@@ -81,7 +81,7 @@ var (
 		kbcli cluster backup mycluster --backup-policy <backup-policy-name>
 	`)
 	listBackupExample = templates.Examples(`
-		# list all backup
+		# list all backups
 		kbcli cluster list-backups
 	`)
 	deleteBackupExample = templates.Examples(`
@@ -328,7 +328,7 @@ func NewDeleteBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	return cmd
 }
 
-// completeForDeleteBackup complete cmd for delete backup
+// completeForDeleteBackup completes cmd for delete backup
 func completeForDeleteBackup(o *delete.DeleteOptions, args []string) error {
 	if len(args) == 0 {
 		return errors.New("Missing cluster name")
@@ -340,8 +340,8 @@ func completeForDeleteBackup(o *delete.DeleteOptions, args []string) error {
 		return errors.New("Missing --name as backup name.")
 	}
 	if o.Force && len(o.Names) == 0 {
-		// do force action, if specified --force and not specified --name, all backups with the cluster will be deleted
-		// if no specify backup name and cluster name is specified. it will delete all backups with the cluster
+		// do force action, for --force and --name unset, delete all backups of the cluster
+		// if backup name unset and cluster name set, delete all backups of the cluster
 		o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
 		o.ConfirmedNames = args
 	}
@@ -368,7 +368,7 @@ func (o *CreateRestoreOptions) getClusterObject(backup *dataprotectionv1alpha1.B
 		return nil, err
 	}
 	if apierrors.IsNotFound(err) {
-		// if the source cluster does not exist, obtain it from the cluster snapshot of the backup.
+		// if the source cluster does not exist, get it from the cluster snapshot of the backup.
 		clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
 		if !ok {
 			return nil, fmt.Errorf("source cluster: %s not found", clusterName)
@@ -449,7 +449,7 @@ func (o *CreateRestoreOptions) runPITR() error {
 	}
 	backup := &dataprotectionv1alpha1.Backup{}
 
-	// no need check items len because it is validated by o.validateRestoreTime().
+	// no need to check items len because it is validated by o.validateRestoreTime().
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(objs.Items[0].Object, backup); err != nil {
 		return err
 	}

@@ -34,54 +34,54 @@ import (
 var (
 	createUserExamples = templates.Examples(`
 		# create account with password
-		kbcli cluster create-account NAME --component COMPNAME --name USERNAME --password PASSWD
+		kbcli cluster create-account CLUSTERNAME --component COMPNAME --name USERNAME --password PASSWD
 		# create account without password
-		kbcli cluster create-account NAME --component COMPNAME --name USERNAME
+		kbcli cluster create-account CLUSTERNAME --component COMPNAME --name USERNAME
 		# create account with default component
-		kbcli cluster create-account NAME --name USERNAME
+		kbcli cluster create-account CLUSTERNAME --name USERNAME
 		# create account for instance
-		kbcli cluster create-account --instance INSTANCE --name USERNAME
+		kbcli cluster create-account  --instance INSTANCE --name USERNAME
  `)
 
 	deleteUserExamples = templates.Examples(`
 		# delete account by name
-		kbcli cluster delete-account NAME --component COMPNAME --name USERNAME
+		kbcli cluster delete-account CLUSTERNAME --component COMPNAME --name USERNAME
 		# delete account with default component
-		kbcli cluster delete-account NAME --name USERNAME
+		kbcli cluster delete-account CLUSTERNAME --name USERNAME
 		# delete account for instance
 		kbcli cluster delete-account --instance INSTANCE --name USERNAME
  `)
 
 	descUserExamples = templates.Examples(`
 		# describe account and show role information
-		kbcli cluster describe-account NAME --component COMPNAME --name USERNAME
+		kbcli cluster describe-account CLUSTERNAME --component COMPNAME --name USERNAME
 		# describe account with default component
-		kbcli cluster delete-account NAME --name USERNAME
+		kbcli cluster describe-account CLUSTERNAME --name USERNAME
 		# describe account for instance
 		kbcli cluster describe-account --instance INSTANCE --name USERNAME
  `)
 
 	listUsersExample = templates.Examples(`
 		# list all users for component
-		kbcli cluster list-accounts NAME --component COMPNAME
+		kbcli cluster list-accounts CLUSTERNAME --component COMPNAME
 		# list all users with default component
-		kbcli cluster list-accounts NAME
+		kbcli cluster list-accounts CLUSTERNAME
 		# list all users from instance
 		kbcli cluster list-accounts --instance INSTANCE
 	`)
 	grantRoleExamples = templates.Examples(`
 		# grant role to user
-		kbcli cluster grant-role NAME --component COMPNAME --name USERNAME --role ROLENAME
+		kbcli cluster grant-role CLUSTERNAME --component COMPNAME --name USERNAME --role ROLENAME
 		# grant role to user with default component
-		kbcli cluster grant-role NAME --name USERNAME --role ROLENAME
+		kbcli cluster grant-role CLUSTERNAME --name USERNAME --role ROLENAME
 		# grant role to user for instance
 		kbcli cluster grant-role --instance INSTANCE --name USERNAME --role ROLENAME
 	`)
 	revokeRoleExamples = templates.Examples(`
 		# revoke role from user
-		kbcli cluster revoke-role NAME --component COMPNAME --name USERNAME --role ROLENAME
+		kbcli cluster revoke-role CLUSTERNAME --component COMPNAME --name USERNAME --role ROLENAME
 		# revoke role from user with default component
-		kbcli cluster revoke-role NAME --name USERNAME --role ROLENAME
+		kbcli cluster revoke-role CLUSTERNAME --name USERNAME --role ROLENAME
 		# revoke role from user for instance
 		kbcli cluster revoke-role --instance INSTANCE --name USERNAME --role ROLENAME
 	`)

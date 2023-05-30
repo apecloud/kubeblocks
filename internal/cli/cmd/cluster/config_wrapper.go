@@ -66,7 +66,7 @@ func (w *configWrapper) ConfigFile() string {
 	return w.configKey
 }
 
-// AutoFillRequiredParam auto fill required param.
+// AutoFillRequiredParam auto fills required param.
 func (w *configWrapper) AutoFillRequiredParam() error {
 	if err := w.fillComponent(); err != nil {
 		return err
@@ -77,14 +77,14 @@ func (w *configWrapper) AutoFillRequiredParam() error {
 	return w.fillConfigFile()
 }
 
-// ValidateRequiredParam validate required param.
+// ValidateRequiredParam validates required param.
 func (w *configWrapper) ValidateRequiredParam() error {
-	// step1: validate component exist.
+	// step1: check existence of component.
 	if w.clusterObj.Spec.GetComponentByName(w.componentName) == nil {
 		return makeComponentNotExistErr(w.clusterName, w.componentName)
 	}
 
-	// step2: validate configmap exist.
+	// step2: check existence of configmap
 	cmObj := corev1.ConfigMap{}
 	cmKey := client.ObjectKey{
 		Name:      cfgcore.GetComponentCfgName(w.clusterName, w.componentName, w.configSpecName),
@@ -94,7 +94,7 @@ func (w *configWrapper) ValidateRequiredParam() error {
 		return err
 	}
 
-	// step3: validate fileKey exist.
+	// step3: check existence of config file
 	if _, ok := cmObj.Data[w.configKey]; !ok {
 		return makeNotFoundConfigFileErr(w.configKey, w.configSpecName, cfgutil.ToSet(cmObj.Data).AsSlice())
 	}
@@ -193,7 +193,7 @@ func (w *configWrapper) fillConfigFile() error {
 		return err
 	}
 	if len(cmObj.Data) == 0 {
-		return cfgcore.MakeError("not support reconfiguring because there is no config file.")
+		return cfgcore.MakeError("not supported reconfiguring because there is no config file.")
 	}
 
 	keys := w.filterForReconfiguring(cmObj.Data)

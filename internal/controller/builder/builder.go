@@ -25,9 +25,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"strconv"
 	"strings"
+
+	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 
 	"github.com/google/uuid"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"

@@ -38,17 +38,17 @@ func (b *replicationComponentWorkloadBuilder) BuildWorkload() internal.Component
 }
 
 func (b *replicationComponentWorkloadBuilder) BuildService() internal.ComponentWorkloadBuilder {
-	buildfn := func() ([]client.Object, error) {
+	buildFn := func() ([]client.Object, error) {
 		svcList, err := builder.BuildSvcListLow(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {
 			return nil, err
 		}
 		objs := make([]client.Object, 0, len(svcList))
 		for _, svc := range svcList {
-			svc.Spec.Selector[constant.RoleLabelKey] = string(Primary)
+			svc.Spec.Selector[constant.RoleLabelKey] = constant.Primary
 			objs = append(objs, svc)
 		}
 		return objs, err
 	}
-	return b.BuildWrapper(buildfn)
+	return b.BuildWrapper(buildFn)
 }

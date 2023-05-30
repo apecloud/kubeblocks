@@ -60,7 +60,6 @@ type Component interface {
 	GetReplicas() int32
 
 	GetConsensusSpec() *appsv1alpha1.ConsensusSetSpec
-	GetPrimaryIndex() int32
 
 	GetPhase() appsv1alpha1.ClusterComponentPhase
 	// GetStatus() appsv1alpha1.ClusterComponentStatus

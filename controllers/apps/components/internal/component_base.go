@@ -106,13 +106,6 @@ func (c *ComponentBase) GetConsensusSpec() *appsv1alpha1.ConsensusSetSpec {
 	return c.Component.ConsensusSpec
 }
 
-func (c *ComponentBase) GetPrimaryIndex() int32 {
-	if c.Component.PrimaryIndex == nil {
-		return 0
-	}
-	return *c.Component.PrimaryIndex
-}
-
 func (c *ComponentBase) GetPhase() appsv1alpha1.ClusterComponentPhase {
 	if c.Cluster.Status.Components == nil {
 		return ""

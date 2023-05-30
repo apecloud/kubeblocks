@@ -223,7 +223,7 @@ func (r *ConsensusSet) HandleRestart(ctx context.Context, obj client.Object) ([]
 
 	// generate the pods Deletion plan
 	podsToDelete := make([]*corev1.Pod, 0)
-	plan := generateRestartPodPlan(ctx, r.Cli, stsObj, pods, r.getConsensusSpec(), podsToDelete)
+	plan := generateRestartPodPlan(ctx, r.Cli, stsObj, pods, r.getConsensusSpec(), &podsToDelete)
 	// execute plan
 	if _, err := plan.WalkOneStep(); err != nil {
 		return nil, err
@@ -253,7 +253,6 @@ func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) 
 
 	// update cluster.status.component.consensusSetStatus based on all pods currently exist
 	componentName := r.getName()
-	vertexes := make([]graph.Vertex, 0)
 
 	// first, get the old status
 	var oldConsensusSetStatus *appsv1alpha1.ConsensusSetStatus
@@ -282,11 +281,9 @@ func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) 
 		// TODO: does the update order between cluster and env configmap matter?
 
 		// add consensus role info to pod env
-		if err := updateConsensusRoleInfo(ctx, r.Cli, r.Cluster, r.getConsensusSpec(), r.getDefName(), componentName, pods, vertexes); err != nil {
-			return nil, err
-		}
+		return updateConsensusRoleInfo(ctx, r.Cli, r.Cluster, r.getConsensusSpec(), r.getDefName(), componentName, pods)
 	}
-	return vertexes, nil
+	return nil, nil
 }
 
 func (r *ConsensusSet) HandleHA(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {

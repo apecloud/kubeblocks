@@ -81,11 +81,12 @@ func isPVCExists(cli types2.ReadonlyClient, ctx context.Context,
 
 func isAllPVCBound(cli types2.ReadonlyClient,
 	ctx context.Context,
-	stsObj *appsv1.StatefulSet) (bool, error) {
+	stsObj *appsv1.StatefulSet,
+	targetReplicas int) (bool, error) {
 	if len(stsObj.Spec.VolumeClaimTemplates) == 0 {
 		return true, nil
 	}
-	for i := 0; i < int(*stsObj.Spec.Replicas); i++ {
+	for i := 0; i < targetReplicas; i++ {
 		pvcKey := types.NamespacedName{
 			Namespace: stsObj.Namespace,
 			Name:      fmt.Sprintf("%s-%s-%d", stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, i),

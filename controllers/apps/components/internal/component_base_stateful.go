@@ -597,7 +597,7 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 			!isSnapshotAvailable(cli, reqCtx.Ctx) {
 			return true, nil
 		}
-		return isAllPVCBound(cli, reqCtx.Ctx, stsObj)
+		return isAllPVCBound(cli, reqCtx.Ctx, stsObj, int(c.Component.Replicas))
 	}
 
 	cleanBackupResourcesIfNeeded := func() error {

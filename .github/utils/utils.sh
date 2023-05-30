@@ -406,7 +406,7 @@ patch_release_notes() {
       fi
     done < ${FILE}
     gh_curl -X PATCH \
-        $GITHUB_API/repos/$GITHUB_REPO/releases/tags/$TAG_NAME \
+            $GITHUB_API/repos/$GITHUB_REPO/releases/tags/$TAG_NAME \
         -d '{"body":"${release_note}"}'
 }
 

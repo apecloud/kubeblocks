@@ -185,7 +185,7 @@ jobs:
             --github-repo 'apecloud/kbcli' \
             --file "./docs/release_notes/${{ env.TAG_NAME }}/kbcli.md" \    
             --github-token ${{ env.GITHUB_TOKEN }} \
-            --tag-name ${{ env.TAG_NAME }}
+            --tag-name ${{ env.TAG_NAME }} \
 
       - name: remove artifact
         uses: geekyeggo/delete-artifact@v2

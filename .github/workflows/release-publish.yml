@@ -178,11 +178,9 @@ jobs:
         run: |
           mkdir -p ./docs/release_notes/${{ env.TAG_NAME }}
           python ./.github/utils/generate_kbcli_sha256.py ${{ env.TAG_NAME }} sha256
-          
 
       - name: release kbcli with release notes
         run: |
-#          release_note=$(sed -e ':a' -e 'N' -e '$!ba' ./docs/release_notes/${{ env.TAG_NAME }}/kbcli.md)
           bash .github/utils/utils.sh --type 13 \
             --github-repo 'apecloud/kbcli' \
             --file "./docs/release_notes/${{ env.TAG_NAME }}/kbcli.md" \    

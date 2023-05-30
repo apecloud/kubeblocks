@@ -188,7 +188,7 @@ jobs:
           -H "Authorization: Bearer ${{ env.GITLAB_ACCESS_TOKEN }}" \
           -H "X-GitHub-Api-Version: 2022-11-28" \
           -d '{"body":"'"$release_note"'"}'
-          https://api.github.com/repos/apecloud/kbcli/releases/tags/${{ env.TAG_NAME }} \`
+          https://api.github.com/repos/apecloud/kbcli/releases/tags/${{ env.TAG_NAME }} \ `
 
 
       - name: remove artifact

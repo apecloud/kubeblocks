@@ -20,9 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package printer
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 
+	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -95,4 +98,50 @@ func PrintComponentConfigMeta(tplInfos []types.ConfigTemplateInfo, clusterName, 
 		}
 	}
 	tbl.Print()
+}
+
+// PrintHelmValues print the helm values file of the release in specified format, support JSON、YAML and Table
+func PrintHelmValues(configs map[string]interface{}, format Format, out io.Writer) {
+	inTable := func() {
+		p := NewTablePrinter(out)
+		p.SetHeader("KEY", "VALUE")
+		p.SortBy(1)
+		for key, value := range configs {
+			addRows(key, value, p, true) // to table
+		}
+		p.Print()
+	}
+	if format.IsHumanReadable() {
+		inTable()
+		return
+	}
+
+	var data []byte
+	if format == YAML {
+		data, _ = yaml.Marshal(configs)
+	} else {
+		data, _ = json.MarshalIndent(configs, "", "  ")
+		data = append(data, '\n')
+	}
+	fmt.Fprint(out, string(data))
+}
+
+// addRows parse the interface value two depth at most and add it to the Table
+func addRows(key string, value interface{}, p *TablePrinter, ori bool) {
+	if value == nil {
+		p.AddRow(key, value)
+		return
+	}
+	if reflect.TypeOf(value).Kind() == reflect.Map && ori {
+		if len(value.(map[string]interface{})) == 0 {
+			data, _ := json.Marshal(value)
+			p.AddRow(key, string(data))
+		}
+		for k, v := range value.(map[string]interface{}) {
+			addRows(key+"."+k, v, p, false)
+		}
+	} else {
+		data, _ := json.Marshal(value)
+		p.AddRow(key, string(data))
+	}
 }

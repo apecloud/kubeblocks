@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: flink-scripts
-  labels:
-    {{- include "flink.labels" . | nindent 4 }}
-data:
-  setup.sh: |-
-    {{- .Files.Get "scripts/setup.sh.tpl" | nindent 4 }}

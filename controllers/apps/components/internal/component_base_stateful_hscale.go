@@ -127,13 +127,16 @@ func deleteSnapshot(cli types2.ReadonlyClient,
 		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", snapshotKey.Name)
 	}
 
-	vs := &snapshotv1.VolumeSnapshot{}
 	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: reqCtx.Ctx}
-	if err := compatClient.Get(snapshotKey, vs); err != nil && !apierrors.IsNotFound(err) {
+	vs := &snapshotv1.VolumeSnapshot{}
+	err = compatClient.Get(snapshotKey, vs)
+	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
-	objs = append(objs, vs)
-	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumeSnapshot/%s", snapshotKey.Name)
+	if err == nil {
+		objs = append(objs, vs)
+		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumeSnapshot/%s", snapshotKey.Name)
+	}
 
 	return objs, nil
 }

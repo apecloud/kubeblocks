@@ -412,7 +412,7 @@ patch_release_notes() {
           -H "Accept: application/vnd.github.v3.raw" \
            -X PATCH \
     $GITHUB_API/repos/$GITHUB_REPO/releases/$release_id \
-    -d '{"body":"'$release_note'"}'
+    -d '{"body":"'"$release_note"'"}'
 }
 
 main "$@"

@@ -39,7 +39,6 @@ jobs:
 #            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
 #            --tag-name ${{ env.TAG_NAME }} \
 #            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
-  
 
   upload-release-assert:
     needs: create-release-kbcli

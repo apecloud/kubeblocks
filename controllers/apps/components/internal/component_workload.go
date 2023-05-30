@@ -118,8 +118,8 @@ func (b *ComponentWorkloadBuilderBase) BuildWorkload4StatefulSet(workloadType st
 
 func (b *ComponentWorkloadBuilderBase) BuildPDB() ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		// if no these handle, the cluster controller will occur an error during reconciling.
-		// conditional build PodDisruptionBudget
+		// if without this handler, the cluster controller will occur error during reconciling.
+		// conditionally build PodDisruptionBudget
 		synthesizedComponent := b.Comp.GetSynthesizedComponent()
 		if synthesizedComponent.MinAvailable != nil {
 			pdb, err := builder.BuildPDBLow(b.Comp.GetCluster(), synthesizedComponent)
@@ -235,7 +235,7 @@ func (b *ComponentWorkloadBuilderBase) Complete() error {
 		return b.Error
 	}
 	if b.Workload == nil {
-		return fmt.Errorf("fail to create compoennt workloads, cluster: %s, component: %s",
+		return fmt.Errorf("fail to create component workloads, cluster: %s, component: %s",
 			b.Comp.GetClusterName(), b.Comp.GetName())
 	}
 	b.Comp.SetWorkload(b.Workload, b.DefaultAction, nil)

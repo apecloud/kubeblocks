@@ -137,7 +137,7 @@ func newStateless(cli client.Client,
 	}
 }
 
-// deploymentIsReady check deployment is ready
+// deploymentIsReady checks deployment is ready
 func deploymentIsReady(deploy *appsv1.Deployment, targetReplicas *int32) bool {
 	var (
 		componentIsRunning = true
@@ -167,7 +167,7 @@ func deploymentIsReady(deploy *appsv1.Deployment, targetReplicas *int32) bool {
 	return componentIsRunning
 }
 
-// hasProgressDeadline checks if the Deployment d is expected to surface the reason
+// hasProgressDeadline checks if the Deployment d is expected to suffice the reason
 // "ProgressDeadlineExceeded" when the Deployment progress takes longer than expected time.
 func hasProgressDeadline(d *appsv1.Deployment) bool {
 	return d.Spec.ProgressDeadlineSeconds != nil &&

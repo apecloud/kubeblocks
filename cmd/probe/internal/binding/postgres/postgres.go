@@ -139,7 +139,7 @@ func (pgOps *PostgresOperations) initIfNeed() bool {
 			if err != nil {
 				pgOps.Logger.Errorf("Postgres connection init failed: %v", err)
 			} else {
-				pgOps.Logger.Info("Postgres connection init success: %s", pgOps.db.Config().ConnConfig)
+				pgOps.Logger.Info("Postgres connection init succeeded: %s", pgOps.db.Config().ConnConfig)
 			}
 		}()
 		return true
@@ -172,7 +172,7 @@ func (pgOps *PostgresOperations) InitDelay() error {
 	}
 
 	// This context doesn't control the lifetime of the connection pool, and is
-	// only scoped to postgres creating resources at init.
+	// only creating resources at init.
 	pgOps.db, err = pgxpool.NewWithConfig(context.Background(), poolConfig)
 	if err != nil {
 		return fmt.Errorf("unable to ping the DB: %w", err)
@@ -201,7 +201,7 @@ func (pgOps *PostgresOperations) GetRunningPort() int {
 func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	sql := "select pg_is_in_recovery();"
 
-	// sql exec timeout need to be less than httpget's timeout which default is 1s.
+	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
 	ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 	rows, err := pgOps.db.Query(ctx1, sql)
@@ -354,17 +354,17 @@ func (pgOps *PostgresOperations) exec(ctx context.Context, sql string) (result i
 	return
 }
 
-// InternalQuery is used for internal query, implement BaseInternalOps interface
+// InternalQuery is used for internal query, implements BaseInternalOps interface
 func (pgOps *PostgresOperations) InternalQuery(ctx context.Context, sql string) (result []byte, err error) {
 	return pgOps.query(ctx, sql)
 }
 
-// InternalExec is used for internal execution, implement BaseInternalOps interface
+// InternalExec is used for internal execution, implements BaseInternalOps interface
 func (pgOps *PostgresOperations) InternalExec(ctx context.Context, sql string) (result int64, err error) {
 	return pgOps.exec(ctx, sql)
 }
 
-// GetLogger is used for getting logger, implement BaseInternalOps interface
+// GetLogger is used for getting logger, implements BaseInternalOps interface
 func (pgOps *PostgresOperations) GetLogger() logger.Logger {
 	return pgOps.Logger
 }

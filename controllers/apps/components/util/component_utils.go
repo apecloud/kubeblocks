@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -126,6 +127,17 @@ func MergeAnnotations(originalAnnotations map[string]string, targetAnnotations *
 	}
 }
 
+// BuildWorkLoadAnnotations builds the annotations for Deployment/StatefulSet
+func BuildWorkLoadAnnotations(obj client.Object, cluster *appsv1alpha1.Cluster) {
+	workloadAnnotations := obj.GetAnnotations()
+	if workloadAnnotations == nil {
+		workloadAnnotations = map[string]string{}
+	}
+	// record the cluster generation to check if the sts is latest
+	workloadAnnotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(cluster.Generation, 10)
+	obj.SetAnnotations(workloadAnnotations)
+}
+
 // MergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.
 // if annotations exist and are replaced, the Service will be updated.
 func MergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
@@ -188,11 +200,10 @@ func GetComponentStatusMessageKey(kind, name string) string {
 }
 
 // IsProbeTimeout checks if the application of the pod is probe timed out.
-func IsProbeTimeout(componentDef *appsv1alpha1.ClusterComponentDefinition, podsReadyTime *metav1.Time) bool {
+func IsProbeTimeout(probes *appsv1alpha1.ClusterDefinitionProbes, podsReadyTime *metav1.Time) bool {
 	if podsReadyTime == nil {
 		return false
 	}
-	probes := componentDef.Probes
 	if probes == nil || probes.RoleProbe == nil {
 		return false
 	}

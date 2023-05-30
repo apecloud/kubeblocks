@@ -185,7 +185,8 @@ jobs:
           release_note=$(sed -e ':a' -e 'N' -e '$!ba' ./docs/release_notes/${{ env.TAG_NAME }}/kbcli.md)
           bash .github/utils/utils.sh --type 13 \
             --notes $release_note\
-            --github-repo apecloud/kbcli \
+            --github-repo 'apecloud/kbcli' \
+            --github-token ${{ env.GITHUB_TOKEN }} \
             --tag-name ${{ env.TAG_NAME }}
 
       - name: remove artifact

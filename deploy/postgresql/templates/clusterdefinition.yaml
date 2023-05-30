@@ -86,13 +86,13 @@ spec:
             - /bin/bash
             - -c
           args:
-            - curl -s http://$(KB_REPLICATION_PRIMARY_POD_NAME):8008/switchover -XPOST -d '{"leader":"$(KB_REPLICATION_PRIMARY_POD_NAME)","candidate":"$(KB_SWITCHOVER_CANDIDATE_INSTANCE_NAME)"}'
+            - curl -s http://$(KB_REPLICATION_PRIMARY_POD_FQDN):8008/switchover -XPOST -d '{"leader":"$(KB_REPLICATION_PRIMARY_POD_NAME)","candidate":"$(KB_SWITCHOVER_CANDIDATE_INSTANCE_NAME)"}'
         withoutCandidateInstance:
           command:
             - /bin/bash
             - -c
           args:
-            - curl -s http://$(KB_REPLICATION_PRIMARY_POD_NAME):8008/switchover -XPOST -d '{"leader":"$(KB_REPLICATION_PRIMARY_POD_NAME)"}'
+            - curl -s http://$(KB_REPLICATION_PRIMARY_POD_FQDN):8008/switchover -XPOST -d '{"leader":"$(KB_REPLICATION_PRIMARY_POD_NAME)"}'
       podSpec:
         securityContext:
           runAsUser: 0

@@ -184,15 +184,37 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 	svcName := strings.Join([]string{cluster.Name, component.Name, "headless"}, "-")
 	switch component.WorkloadType {
 	case appsv1alpha1.Replication:
-		workloadEnvs = append(workloadEnvs, corev1.EnvVar{
-			Name:  constant.KBSwitchoverReplicationPrimaryPodName,
-			Value: fmt.Sprintf("%s.%s", pod.Name, svcName),
-		})
+		rsEnvs := []corev1.EnvVar{
+			{
+				Name:  constant.KBSwitchoverReplicationPrimaryPodIp,
+				Value: fmt.Sprintf("%s", pod.Status.PodIP),
+			},
+			{
+				Name:  constant.KBSwitchoverReplicationPrimaryPodName,
+				Value: fmt.Sprintf("%s", pod.Name),
+			},
+			{
+				Name:  constant.KBSwitchoverReplicationPrimaryPodFqdn,
+				Value: fmt.Sprintf("%s.%s", pod.Name, svcName),
+			},
+		}
+		workloadEnvs = append(workloadEnvs, rsEnvs...)
 	case appsv1alpha1.Consensus:
-		workloadEnvs = append(workloadEnvs, corev1.EnvVar{
-			Name:  constant.KBSwitchoverConsensusLeaderPodName,
-			Value: fmt.Sprintf("%s.%s", pod.Name, svcName),
-		})
+		csEnvs := []corev1.EnvVar{
+			{
+				Name:  constant.KBSwitchoverConsensusLeaderPodIp,
+				Value: fmt.Sprintf("%s", pod.Status.PodIP),
+			},
+			{
+				Name:  constant.KBSwitchoverConsensusLeaderPodName,
+				Value: fmt.Sprintf("%s", pod.Name),
+			},
+			{
+				Name:  constant.KBSwitchoverConsensusLeaderPodFqdn,
+				Value: fmt.Sprintf("%s.%s", pod.Name, svcName),
+			},
+		}
+		workloadEnvs = append(workloadEnvs, csEnvs...)
 	}
 	return workloadEnvs, nil
 }
@@ -200,12 +222,20 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 // buildSwitchoverCandidateInstanceEnv builds the candidate instance name environment variable for the switchover job.
 func buildSwitchoverCandidateInstanceEnv(
 	cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent) *corev1.EnvVar {
+	component *component.SynthesizedComponent) []corev1.EnvVar {
+	svcName := strings.Join([]string{cluster.Name, component.Name, "headless"}, "-")
 	if component.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual {
-		return &corev1.EnvVar{
-			Name:  constant.KBSwitchoverCandidateInstanceName,
-			Value: fmt.Sprintf("%s-%s-%d", cluster.Name, component.Name, component.CandidateInstance.Index),
+		cEnvs := []corev1.EnvVar{
+			{
+				Name:  constant.KBSwitchoverCandidateInstanceName,
+				Value: fmt.Sprintf("%s-%s-%d", cluster.Name, component.Name, component.CandidateInstance.Index),
+			},
+			{
+				Name:  constant.KBSwitchoverCandidateInstanceFqdn,
+				Value: fmt.Sprintf("%s-%s-%d.%s", cluster.Name, component.Name, component.CandidateInstance.Index, svcName),
+			},
 		}
+		return cEnvs
 	}
 	return nil
 }
@@ -231,10 +261,8 @@ func buildSwitchoverEnvs(ctx context.Context,
 	switchoverEnvs = append(switchoverEnvs, workloadEnvs...)
 
 	// inject the candidate instance name into the environment variable if specify the candidate instance
-	candidateInstanceEnv := buildSwitchoverCandidateInstanceEnv(cluster, component)
-	if candidateInstanceEnv != nil {
-		switchoverEnvs = append(switchoverEnvs, *candidateInstanceEnv)
-	}
+	candidateInstanceEnvs := buildSwitchoverCandidateInstanceEnv(cluster, component)
+	switchoverEnvs = append(switchoverEnvs, candidateInstanceEnvs...)
 	return switchoverEnvs, nil
 }
 

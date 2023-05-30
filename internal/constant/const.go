@@ -243,8 +243,13 @@ const (
 	KBSwitchoverJobContainerName = "kb-switchover-job-container"
 
 	KBSwitchoverCandidateInstanceName     = "KB_SWITCHOVER_CANDIDATE_INSTANCE_NAME"
+	KBSwitchoverCandidateInstanceFqdn     = "KB_SWITCHOVER_CANDIDATE_INSTANCE_FQDN"
+	KBSwitchoverReplicationPrimaryPodIp   = "KB_REPLICATION_PRIMARY_POD_IP"
 	KBSwitchoverReplicationPrimaryPodName = "KB_REPLICATION_PRIMARY_POD_NAME"
+	KBSwitchoverReplicationPrimaryPodFqdn = "KB_REPLICATION_PRIMARY_POD_FQDN"
+	KBSwitchoverConsensusLeaderPodIp      = "KB_CONSENSUS_LEADER_POD_IP"
 	KBSwitchoverConsensusLeaderPodName    = "KB_CONSENSUS_LEADER_POD_NAME"
+	KBSwitchoverConsensusLeaderPodFqdn    = "KB_CONSENSUS_LEADER_POD_FQDN"
 )
 
 // username and password are keys in created secrets for others to refer to.

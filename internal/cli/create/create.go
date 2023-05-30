@@ -170,7 +170,7 @@ func (o *CreateOptions) Run() error {
 	}
 
 	if o.EditBeforeCreate {
-		if err = o.RunEditOnCreate(resObj); err != nil {
+		if err = o.runEditOnCreate(resObj, false); err != nil {
 			return err
 		}
 	}
@@ -228,7 +228,7 @@ func (o *CreateOptions) Run() error {
 	return printer.PrintObj(resObj, o.Out)
 }
 
-func (o *CreateOptions) RunEditOnCreate(unstructuredObj *unstructured.Unstructured) error {
+func (o *CreateOptions) runEditOnCreate(unstructuredObj *unstructured.Unstructured, testEnv bool) error {
 	edit := editor.NewDefaultEditor([]string{
 		"KUBE_EDITOR",
 		"EDITOR",
@@ -259,29 +259,30 @@ func (o *CreateOptions) RunEditOnCreate(unstructuredObj *unstructured.Unstructur
 	}
 	original = buf.Bytes()
 
-	// launch the editor
-	edited, tmpFile, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(os.Args[0])), ".yaml", buf)
-	if err != nil {
-		return fmt.Errorf("error executing editor: %v", err)
+	if !testEnv {
+		// launch the editor
+		edited, tmpFile, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(os.Args[0])), ".yaml", buf)
+		if err != nil {
+			return fmt.Errorf("error executing editor: %v", err)
+		}
+	} else {
+		edited = original
 	}
 
 	// apply validation
 	fieldValidationVerifier := resource.NewQueryParamVerifier(o.Dynamic, o.Factory.OpenAPIGetter(), resource.QueryParamFieldValidation)
-	schema, err := o.Factory.Validator(metav1.FieldValidationStrict, fieldValidationVerifier)
+	schemaValidator, err := o.Factory.Validator(metav1.FieldValidationStrict, fieldValidationVerifier)
 	if err != nil {
 		return err
 	}
-	err = schema.ValidateBytes(cmdutil.StripComments(edited))
+	err = schemaValidator.ValidateBytes(cmdutil.StripComments(edited))
 	if err != nil {
 		return fmt.Errorf("the edited file failed validation: %v", err)
 	}
 
 	// Compare content without comments
 	if bytes.Equal(cmdutil.StripComments(original), cmdutil.StripComments(edited)) {
-		err := os.Remove(tmpFile)
-		if err != nil {
-			return fmt.Errorf("error removing file: %v", err)
-		}
+		os.Remove(tmpFile)
 		_, err = fmt.Fprintln(o.ErrOut, "Edit cancelled, no changes made.")
 		if err != nil {
 			return fmt.Errorf("error writing to stderr: %v", err)
@@ -295,10 +296,7 @@ func (o *CreateOptions) RunEditOnCreate(unstructuredObj *unstructured.Unstructur
 		return fmt.Errorf("error checking for comment: %v", err)
 	}
 	if !lines {
-		err := os.Remove(tmpFile)
-		if err != nil {
-			return err
-		}
+		os.Remove(tmpFile)
 		_, err = fmt.Fprintln(o.ErrOut, "Edit cancelled, saved file was empty.")
 		if err != nil {
 			return err

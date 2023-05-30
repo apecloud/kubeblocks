@@ -67,6 +67,9 @@ var clusterCreateExample = templates.Examples(`
 	# --cluster-definition is required, if --cluster-version is not specified, will use the most recently created version
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql
 
+	# --edit is used to edit the cluster resource before creating the cluster
+	# kbcli cluster create mycluster --cluster-definition apecloud-mysql --edit
+
 	# Output resource information in YAML format, but do not create resources.
 	kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run -o yaml
 
@@ -220,8 +223,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
-	cmd.Flags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
-	cmd.Flags().BoolVar(&o.AutoApprove, "auto-approve", false, "Skip interactive approval before create secret.")
+	cmd.Flags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the cluster resource before creating")
+	cmd.Flags().BoolVar(&o.AutoApprove, "auto-approve", false, "Skip interactive approval before create cluster.")
 
 	// add updatable flags
 	o.UpdatableFlags.addFlags(cmd)

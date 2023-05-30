@@ -32,13 +32,12 @@ Usage: $(basename "$0") <options>
     -bw, --bot-webhook        The bot webhook
     -tt, --trigger-type       The trigger type (e.g. release/package)
     -ru, --run-url            The run url
-    -nt, --notes              The release notes
+    -fl, --file               The release notes file
 EOF
 }
 
 GITHUB_API="https://api.github.com"
 LATEST_REPO=apecloud/kubeblocks
-KBCLI_REPO=apecloud/kbcli
 
 main() {
     local TYPE
@@ -53,7 +52,7 @@ main() {
     local TRIGGER_TYPE="release"
     local RELEASE_VERSION=""
     local RUN_URL=""
-    local Notes=""
+    local FILE=""
 
     parse_command_line "$@"
 

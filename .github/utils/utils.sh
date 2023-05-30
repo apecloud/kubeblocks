@@ -22,6 +22,7 @@ Usage: $(basename "$0") <options>
                                 10) trigger release
                                 11) release message
                                 12) send message
+                                13) patch release notes
     -tn, --tag-name           Release tag name
     -gr, --github-repo        Github Repo
     -gt, --github-token       Github token
@@ -31,11 +32,13 @@ Usage: $(basename "$0") <options>
     -bw, --bot-webhook        The bot webhook
     -tt, --trigger-type       The trigger type (e.g. release/package)
     -ru, --run-url            The run url
+    -nt, --notes              The release notes
 EOF
 }
 
 GITHUB_API="https://api.github.com"
 LATEST_REPO=apecloud/kubeblocks
+KBCLI_REPO=apecloud/kbcli
 
 main() {
     local TYPE
@@ -50,6 +53,7 @@ main() {
     local TRIGGER_TYPE="release"
     local RELEASE_VERSION=""
     local RUN_URL=""
+    local Notes=""
 
     parse_command_line "$@"
 
@@ -89,6 +93,9 @@ main() {
         ;;
         12)
             send_message
+        ;;
+        13)
+            patch_release_notes
         ;;
         *)
             show_help
@@ -161,6 +168,12 @@ parse_command_line() {
             -ru|--run-url)
                 if [[ -n "${2:-}" ]]; then
                     RUN_URL="$2"
+                    shift
+                fi
+                ;;
+            -nt|--notes)
+                if [[ -n "${2:-}" ]]; then
+                    Notes="$2"
                     shift
                 fi
                 ;;
@@ -378,5 +391,12 @@ check_package_version() {
     fi
     exit $exit_status
 }
+
+patch_release_notes() {
+    gh_curl -X PATCH \
+            $GITHUB_API/repos/$GITHUB_REPO/releases/tags/$TAG_NAME \
+            -d '{"body":"${Notes}"}'
+}
+
 
 main "$@"

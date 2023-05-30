@@ -11,7 +11,7 @@
 image:
   registry: registry.cn-hangzhou.aliyuncs.com
   repository: apecloud/spilo
-  tag: 14.7.1
+  tag: 14.7.2
   digest: ""
   ## Specify a imagePullPolicy
   ## Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
@@ -108,6 +108,16 @@ metrics:
     ##   - myRegistryKeySecretName
     ##
     pullSecrets: [ ]
+
+## @section pgbouncer Parameters
+pgbouncer:
+  image:
+    # refer: https://hub.docker.com/r/bitnami/pgbouncer
+    registry: hub.docker.com
+    repository: bitnami/pgbouncer
+    tag: 1.19.0
+    pullPolicy: IfNotPresent
+
 
 logConfigs:
   running: /home/postgres/pgdata/pgroot/data/log/postgresql-*

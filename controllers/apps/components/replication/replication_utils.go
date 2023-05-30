@@ -22,55 +22,36 @@ package replication
 import (
 	"context"
 	"fmt"
-
-	"golang.org/x/exp/slices"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
+	"golang.org/x/exp/slices"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// syncReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
-func syncReplicationSetClusterStatus(
-	cli client.Client,
-	ctx context.Context,
-	cluster *appsv1alpha1.Cluster,
-	sts *appsv1.StatefulSet) error {
-	podList, err := util.GetPodListByStatefulSet(ctx, cli, sts)
-	if err != nil {
-		return err
-	}
+// asyncReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
+func asyncReplicationSetClusterStatus(cluster *appsv1alpha1.Cluster,
+	workloadType appsv1alpha1.WorkloadType, compName string, podList []corev1.Pod) error {
 	if len(podList) == 0 {
 		return nil
 	}
-	// update cluster status
-	componentName, componentDef, err := util.GetComponentInfoByPod(ctx, cli, *cluster, &podList[0])
-	if err != nil {
-		return err
-	}
-	if componentDef == nil {
-		return nil
-	}
-	oldReplicationSetStatus := cluster.Status.Components[componentName].ReplicationSetStatus
-	if oldReplicationSetStatus == nil {
-		if err = util.InitClusterComponentStatusIfNeed(cluster, componentName, *componentDef); err != nil {
+	replicationStatus := cluster.Status.Components[compName].ReplicationSetStatus
+	if replicationStatus == nil {
+		if err := util.InitClusterComponentStatusIfNeed(cluster, compName, workloadType); err != nil {
 			return err
 		}
-		oldReplicationSetStatus = cluster.Status.Components[componentName].ReplicationSetStatus
+		replicationStatus = cluster.Status.Components[compName].ReplicationSetStatus
 	}
-	if err := syncReplicationSetStatus(oldReplicationSetStatus, podList); err != nil {
-		return err
-	}
-	return nil
+	return asyncReplicationSetStatus(replicationStatus, podList)
 }
 
-// syncReplicationSetStatus syncs the target pod info in cluster.status.components.
-func syncReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []corev1.Pod) error {
+// asyncReplicationSetStatus syncs the target pod info in cluster.status.components.
+func asyncReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []corev1.Pod) error {
 	for _, pod := range podList {
 		role := pod.Labels[constant.RoleLabelKey]
 		if role == "" {
@@ -106,9 +87,9 @@ func syncReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStat
 	return nil
 }
 
-// removeTargetPodsInfoInStatus remove the target pod info from cluster.status.components.
+// removeTargetPodsInfoInStatus removes the target pod info from cluster.status.components.
 func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus,
-	targetPodList []corev1.Pod,
+	targetPodList []*corev1.Pod,
 	componentReplicas int32) error {
 	if replicationStatus == nil {
 		return nil
@@ -122,7 +103,7 @@ func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSet
 			return fmt.Errorf("primary pod cannot be removed")
 		}
 		replicationStatus.Primary = appsv1alpha1.ReplicationMemberStatus{
-			Pod: util.ComponentStatusDefaultPodName,
+			Pod: constant.ComponentStatusDefaultPodName,
 		}
 	}
 	newSecondaries := make([]appsv1alpha1.ReplicationMemberStatus, 0)
@@ -137,7 +118,15 @@ func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSet
 	return nil
 }
 
-// checkObjRoleLabelIsPrimary checks whether it is the primary obj(statefulSet or pod) through the label tag on obj.
+func getRunningPods(ctx context.Context, cli client.Client, obj client.Object) ([]corev1.Pod, error) {
+	sts := util.ConvertToStatefulSet(obj)
+	if sts.Generation != sts.Status.ObservedGeneration {
+		return nil, nil
+	}
+	return util.GetPodListByStatefulSet(ctx, cli, sts)
+}
+
+// checkObjRoleLabelIsPrimary checks whether it is the primary obj(statefulSet or pod) by the label tag on obj.
 func checkObjRoleLabelIsPrimary[T generics.Object, PT generics.PObject[T]](obj PT) (bool, error) {
 	if obj == nil || obj.GetLabels() == nil {
 		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
@@ -176,17 +165,22 @@ func updateObjRoleLabel[T generics.Object, PT generics.PObject[T]](
 	return nil
 }
 
-// patchPodPrimaryAnnotation patches the primary annotation of the pod.
-func patchPodPrimaryAnnotation(ctx context.Context, cli client.Client, pod *corev1.Pod, primary string) error {
-	if pod.Annotations == nil {
-		pod.Annotations = map[string]string{}
+// patchPodsPrimaryAnnotation patches the primary annotation of the pod.
+func patchPodsPrimaryAnnotation(pods []corev1.Pod, primary string) ([]graph.Vertex, error) {
+	vertexes := make([]graph.Vertex, 0)
+	for _, pod := range pods {
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+		if v, ok := pod.Annotations[constant.PrimaryAnnotationKey]; !ok || v != primary {
+			pod.Annotations[constant.PrimaryAnnotationKey] = primary
+			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+				Obj:    &pod,
+				Action: ictrltypes.ActionUpdatePtr(),
+			})
+		}
 	}
-	if v, ok := pod.Annotations[constant.PrimaryAnnotationKey]; !ok || v != primary {
-		patch := client.MergeFrom(pod.DeepCopy())
-		pod.Annotations[constant.PrimaryAnnotationKey] = primary
-		return cli.Patch(ctx, pod, patch)
-	}
-	return nil
+	return vertexes, nil
 }
 
 // filterReplicationWorkload filters workload which workloadType is not Replication.
@@ -228,18 +222,21 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	// if switchPolicy is not Noop, return
 	clusterCompSpec := util.GetClusterComponentSpecByName(*cluster, compName)
 	if clusterCompSpec == nil || clusterCompSpec.SwitchPolicy == nil || clusterCompSpec.SwitchPolicy.Type != appsv1alpha1.Noop {
-		reqCtx.Log.Info("cluster switchPolicy is not Noop, does not support handle role change event", "cluster", cluster.Name)
+		reqCtx.Log.Info("cluster switchPolicy is not Noop, does not support handling role change event", "cluster", cluster.Name)
 		return nil
 	}
 
 	oldPrimaryPod, err := GetAndCheckReplicationSetPrimaryPod(reqCtx.Ctx, cli, *cluster, compName)
 	if err != nil {
-		reqCtx.Log.Info("handleReplicationSetRoleChangeEvent get old primary pod failed", "error", err)
+		reqCtx.Log.Info("handleReplicationSetRoleChangeEvent gets old primary pod failed", "error", err)
 		return err
 	}
+	if oldPrimaryPod == nil {
+		return nil
+	}
 	// pod is old primary and newRole is secondary, it means that the old primary needs to be changed to secondary,
-	// we do not deal with this situation because only change the old primary to secondary when the new primary
-	// changes from secondary to primary,
+	// we do not deal with this situation here, the demote labeling process of old primary to secondary is handled
+	// in another reconciliation triggered by role change event from secondary -> new primary,
 	// this is to avoid simultaneous occurrence of two primary or no primary at the same time
 	if oldPrimaryPod.Name == pod.Name {
 		reqCtx.Log.Info("pod is old primary and new role is secondary, do not deal with this situation",

@@ -297,7 +297,7 @@ func (pdm *ProbeDetectManager) roleDetect(pod *corev1.Pod) (*RoleDetectResult, e
 	return &res, nil
 }
 
-// lagDetect is the implementation of the SwitchDetectManager interface, which gets data delay detection information by actively calling the API provided by the probe
+// lagDetect is the implementation of the SwitchDetectManager interface, which gets replication lag detection information by actively calling the API provided by the probe
 // TODO(xingran) Wait for the probe interface to be ready before implementation
 func (pdm *ProbeDetectManager) lagDetect(pod *corev1.Pod) (*LagDetectResult, error) {
 	var res LagDetectResult = 0
@@ -425,7 +425,7 @@ func cleanSwitchCmdJobs(s *Switch) error {
 		s.SwitchResource.Cluster, getSwitchCmdJobLabel(s.SwitchResource.Cluster.Name, s.SwitchResource.CompSpec.Name))
 }
 
-// getSwitchCmdJobLabel gets the labels for job that execute the switch commands.
+// getSwitchCmdJobLabel gets the labels for job that executes the switch commands.
 func getSwitchCmdJobLabel(clusterName, componentName string) map[string]string {
 	return map[string]string{
 		constant.AppInstanceLabelKey:    clusterName,

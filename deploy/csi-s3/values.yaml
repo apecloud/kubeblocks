@@ -57,6 +57,9 @@ secret:
 tolerations:
   - operator: Exists
 
+daemonsetTolerations:
+  - operator: Exists
+
 affinity:
   nodeAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:
@@ -67,8 +70,3 @@ affinity:
               operator: In
               values:
                 - "true"
-            - key: kubernetes.io/arch
-              operator: In
-              values:
-                - "amd64"
-

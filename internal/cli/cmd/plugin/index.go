@@ -235,13 +235,16 @@ func ListIndexes(paths *Paths) ([]Index, error) {
 
 // AddIndex initializes a new index to install plugins from.
 func AddIndex(paths *Paths, name, url string) error {
+	if name == "" {
+		return errors.New("index name must be specified")
+	}
 	dir := paths.IndexPath(name)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return util.EnsureCloned(url, dir)
 	} else if err != nil {
 		return err
 	}
-	return errors.New("index already exists")
+	return fmt.Errorf("index %q already exists", name)
 }
 
 // DeleteIndex removes specified index name. If index does not exist, returns an error that can be tested by os.IsNotExist.

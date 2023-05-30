@@ -30,5 +30,41 @@ data:
       isDefault: true
       jsonData:
         timeInterval: {{ $scrapeInterval }}
+    - name: Prometheus-15s
+      type: prometheus
+      uid: {{ .Values.grafana.sidecar.datasources.uid }}-15
+      {{- if .Values.grafana.sidecar.datasources.url }}
+      url: {{ .Values.grafana.sidecar.datasources.url }}
+      {{- else }}
+      url: http://kb-addon-{{ include "addon.prometheus.name" . }}-server.{{ template "kubeblocks.prometheus.namespace" . }}:{{ .Values.prometheus.server.service.servicePort }}/{{ trimPrefix "/" .Values.prometheus.server.routePrefix }}
+      {{- end }}
+      access: proxy
+      isDefault: false
+      jsonData:
+        timeInterval: 15s
+    - name: Prometheus-5s
+      type: prometheus
+      uid: {{ .Values.grafana.sidecar.datasources.uid }}-5
+      {{- if .Values.grafana.sidecar.datasources.url }}
+      url: {{ .Values.grafana.sidecar.datasources.url }}
+      {{- else }}
+      url: http://kb-addon-{{ include "addon.prometheus.name" . }}-server.{{ template "kubeblocks.prometheus.namespace" . }}:{{ .Values.prometheus.server.service.servicePort }}/{{ trimPrefix "/" .Values.prometheus.server.routePrefix }}
+      {{- end }}
+      access: proxy
+      isDefault: false
+      jsonData:
+        timeInterval: 5s
+    - name: Prometheus-1s
+      type: prometheus
+      uid: {{ .Values.grafana.sidecar.datasources.uid }}-1
+      {{- if .Values.grafana.sidecar.datasources.url }}
+      url: {{ .Values.grafana.sidecar.datasources.url }}
+      {{- else }}
+      url: http://kb-addon-{{ include "addon.prometheus.name" . }}-server.{{ template "kubeblocks.prometheus.namespace" . }}:{{ .Values.prometheus.server.service.servicePort }}/{{ trimPrefix "/" .Values.prometheus.server.routePrefix }}
+      {{- end }}
+      access: proxy
+      isDefault: false
+      jsonData:
+        timeInterval: 1s
 {{- end }}
 {{- end }}

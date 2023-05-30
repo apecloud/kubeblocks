@@ -63,7 +63,7 @@ type SwitchInstance struct {
 	SecondariesRole []*SwitchRoleInfo
 }
 
-// SwitchRoleInfo is used to record the role information including health detection, role detection, data delay detection info, etc.
+// SwitchRoleInfo is used to record the role information including health detection, role detection, replication lag detection info, etc.
 type SwitchRoleInfo struct {
 	// k8s pod obj
 	Pod *corev1.Pod
@@ -93,13 +93,13 @@ type SwitchPhaseStatus string
 // SwitchPhase defines the phase of switching.
 type SwitchPhase string
 
-// SwitchDetectManager is an interface to implement various detections that high-availability depends on, including health detection, role detection, data delay detection, etc.
+// SwitchDetectManager is an interface to implement various detections that high-availability depends on, including health detection, role detection, replication lag detection, etc.
 type SwitchDetectManager interface {
 	// healthDetect is used to implement Pod health detection
 	healthDetect(pod *corev1.Pod) (*HealthDetectResult, error)
 	// roleDetect is used to detect the role of the Pod in the database kernel
 	roleDetect(pod *corev1.Pod) (*RoleDetectResult, error)
-	// lagDetect is used to detect the data delay between the secondary and the primary
+	// lagDetect is used to detect the replication lag between the secondary and the primary
 	lagDetect(pod *corev1.Pod) (*LagDetectResult, error)
 }
 
@@ -149,7 +149,7 @@ const (
 
 // detection implements the detection logic and saves the detection results to the SwitchRoleInfo of the corresponding role pod of the SwitchInstance,
 // if skipSecondary is true, the detection logic of the secondaries will be skipped, which is used in some scenarios where there is no need to detect the secondary,
-// currently supported detection types are health detection, role detection, and delay detection.
+// currently supported detection types are health detection, role detection, and lag detection.
 func (s *Switch) detection(skipSecondary bool) {
 	s.SwitchStatus.SwitchPhase = SwitchPhaseDetect
 	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusExecuting
@@ -239,7 +239,7 @@ func (s *Switch) election() *SwitchRoleInfo {
 	}
 
 	// do election priority
-	// TODO(xingran): the secondary with the smallest data delay is selected as the candidate primary currently, and more rules can be added in the future
+	// TODO(xingran): the secondary with the smallest replication lag is selected as the candidate primary currently, and more rules can be added in the future
 	sort.Sort(SwitchRoleInfoList(filterRoles))
 	s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusSucceed
 	return filterRoles[0]
@@ -285,7 +285,7 @@ func (s *Switch) decision() bool {
 	}
 
 	makeMaxAvailabilityDecision := func() bool {
-		// old primary is alive, check the data delay of candidate primary
+		// old primary is alive, check the replication lag of candidate primary
 		if *s.SwitchInstance.OldPrimaryRole.HealthDetectInfo {
 			// The LagDetectInfo is 0, which means that the primary and the secondary data are consistent and can be switched
 			if *s.SwitchInstance.CandidatePrimaryRole.LagDetectInfo == 0 {

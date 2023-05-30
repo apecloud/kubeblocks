@@ -64,7 +64,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 	)
 
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -363,7 +363,7 @@ var _ = Describe("ConfigWrapper util test", func() {
 			}, testutil.WithMaxTimes(len(tests))))
 
 			for _, tt := range tests {
-				got, _, err := GetReloadOptions(k8sMockClient.Client(), ctx, tt.tpls)
+				got, _, err := cfgcore.GetReloadOptions(k8sMockClient.Client(), ctx, tt.tpls)
 				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
 				Expect(reflect.DeepEqual(got, tt.want)).Should(BeTrue())
 			}

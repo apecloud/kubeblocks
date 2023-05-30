@@ -37,7 +37,7 @@ const (
 	bindingPath = "/v1.0/bindings"
 
 	// the key is used to bypass the dapr framework and set http status code.
-	// "status-code" is the key defined by probe, but this will changed like this
+	// "status-code" is the key defined by probe, but this will be changed
 	// by dapr framework and http framework in the end.
 	statusCodeHeader = "Metadata.status-Code"
 	bodyFmt          = `{"operation": "%s", "metadata": {"sql" : ""}}`
@@ -48,7 +48,7 @@ func NewProbeMiddleware(log logger.Logger) middleware.Middleware {
 	return &Middleware{logger: log}
 }
 
-// Middleware is an probe middleware.
+// Middleware is a probe middleware.
 type Middleware struct {
 	logger logger.Logger
 }

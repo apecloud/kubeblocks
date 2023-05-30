@@ -118,20 +118,12 @@ const (
 	SpecReconcilingClusterCompPhase ClusterComponentPhase = "Updating"
 	CreatingClusterCompPhase        ClusterComponentPhase = "Creating"
 	// DeletingClusterCompPhase        ClusterComponentPhase = "Deleting" // DO REVIEW: may merged with  Stopping
-
-	// REVIEW: following are variant of "Updating", why not have "Updating" phase with detail Status.Conditions
-	// VolumeExpandingClusterCompPhase   ClusterComponentPhase = "VolumeExpanding"
-	// HorizontalScalingClusterCompPhase ClusterComponentPhase = "HorizontalScaling"
-	// VerticalScalingClusterCompPhase   ClusterComponentPhase = "VerticalScaling"
-	// VersionUpgradingClusterCompPhase  ClusterComponentPhase = "Upgrading"
-	// ReconfiguringClusterCompPhase     ClusterComponentPhase = "Reconfiguring"
-	// ExposingClusterCompPhase          ClusterComponentPhase = "Exposing"
-	// RollingClusterCompPhase           ClusterComponentPhase = "Rolling" // REVIEW: original value is Rebooting, and why not having stopping -> stopped -> starting -> running
 )
 
 const (
 	// define the cluster condition type
 	ConditionTypeLatestOpsRequestProcessed = "LatestOpsRequestProcessed" // ConditionTypeLatestOpsRequestProcessed describes whether the latest OpsRequest that affect the cluster lifecycle has been processed.
+	ConditionTypeHaltRecovery              = "HaltRecovery"              // ConditionTypeHaltRecovery describe Halt recovery processing stage
 	ConditionTypeProvisioningStarted       = "ProvisioningStarted"       // ConditionTypeProvisioningStarted the operator starts resource provisioning to create or change the cluster
 	ConditionTypeApplyResources            = "ApplyResources"            // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
 	ConditionTypeReplicasReady             = "ReplicasReady"             // ConditionTypeReplicasReady all pods of components are ready

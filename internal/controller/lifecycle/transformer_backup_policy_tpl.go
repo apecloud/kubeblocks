@@ -33,6 +33,7 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -42,6 +43,12 @@ type BackupPolicyTPLTransformer struct {
 	tplIdentifier     string
 	isDefaultTemplate string
 }
+
+var _ graph.Transformer = &BackupPolicyTPLTransformer{}
+
+const (
+	trueVal = "true"
+)
 
 func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
@@ -54,7 +61,7 @@ func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *
 	if r.tplCount == 0 {
 		return nil
 	}
-	rootVertex, err := findRootVertex(dag)
+	rootVertex, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err
 	}
@@ -69,7 +76,7 @@ func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *
 				return intctrlutil.NewNotFound("componentDef %s not found in ClusterDefinition: %s ", v.ComponentDefRef, clusterDefName)
 			}
 			// build the backup policy from the template.
-			backupPolicy := r.transformBackupPolicy(transCtx, v, origCluster, compDef.WorkloadType, tpl.Name)
+			backupPolicy, action := r.transformBackupPolicy(transCtx, v, origCluster, compDef.WorkloadType, &tpl)
 			if backupPolicy == nil {
 				continue
 			}
@@ -78,7 +85,7 @@ func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *
 			if _, ok := backupPolicyNames[backupPolicy.Name]; ok {
 				continue
 			}
-			vertex := &lifecycleVertex{obj: backupPolicy}
+			vertex := &ictrltypes.LifecycleVertex{Obj: backupPolicy, Action: action}
 			dag.AddVertex(vertex)
 			dag.Connect(rootVertex, vertex)
 			backupPolicyNames[backupPolicy.Name] = struct{}{}
@@ -92,19 +99,19 @@ func (r *BackupPolicyTPLTransformer) transformBackupPolicy(transCtx *ClusterTran
 	policyTPL appsv1alpha1.BackupPolicy,
 	cluster *appsv1alpha1.Cluster,
 	workloadType appsv1alpha1.WorkloadType,
-	tplName string) *dataprotectionv1alpha1.BackupPolicy {
+	tpl *appsv1alpha1.BackupPolicyTemplate) (*dataprotectionv1alpha1.BackupPolicy, *ictrltypes.LifecycleAction) {
 	backupPolicyName := DeriveBackupPolicyName(cluster.Name, policyTPL.ComponentDefRef, r.tplIdentifier)
 	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
 	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKey{Namespace: cluster.Namespace, Name: backupPolicyName}, backupPolicy); err != nil && !apierrors.IsNotFound(err) {
-		return nil
+		return nil, nil
 	}
 	if len(backupPolicy.Name) == 0 {
 		// build a new backup policy from the backup policy template.
-		return r.buildBackupPolicy(policyTPL, cluster, workloadType, tplName, backupPolicyName)
+		return r.buildBackupPolicy(policyTPL, cluster, workloadType, tpl, backupPolicyName), ictrltypes.ActionCreatePtr()
 	}
 	// sync the existing backup policy with the cluster changes
-	r.syncBackupPolicy(backupPolicy, cluster, policyTPL, workloadType, tplName)
-	return backupPolicy
+	r.syncBackupPolicy(backupPolicy, cluster, policyTPL, workloadType, tpl)
+	return backupPolicy, ictrltypes.ActionUpdatePtr()
 }
 
 // syncBackupPolicy syncs labels and annotations of the backup policy with the cluster changes.
@@ -112,13 +119,16 @@ func (r *BackupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotecti
 	cluster *appsv1alpha1.Cluster,
 	policyTPL appsv1alpha1.BackupPolicy,
 	workloadType appsv1alpha1.WorkloadType,
-	tplName string) {
+	tpl *appsv1alpha1.BackupPolicyTemplate) {
 	// update labels and annotations of the backup policy.
 	if backupPolicy.Annotations == nil {
 		backupPolicy.Annotations = map[string]string{}
 	}
 	backupPolicy.Annotations[constant.DefaultBackupPolicyAnnotationKey] = r.defaultPolicyAnnotationValue()
-	backupPolicy.Annotations[constant.BackupPolicyTemplateAnnotationKey] = tplName
+	backupPolicy.Annotations[constant.BackupPolicyTemplateAnnotationKey] = tpl.Name
+	if tpl.Annotations[constant.ReconfigureRefAnnotationKey] != "" {
+		backupPolicy.Annotations[constant.ReconfigureRefAnnotationKey] = tpl.Annotations[constant.ReconfigureRefAnnotationKey]
+	}
 	if backupPolicy.Labels == nil {
 		backupPolicy.Labels = map[string]string{}
 	}
@@ -172,7 +182,7 @@ func (r *BackupPolicyTPLTransformer) syncBackupPolicy(backupPolicy *dataprotecti
 func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.BackupPolicy,
 	cluster *appsv1alpha1.Cluster,
 	workloadType appsv1alpha1.WorkloadType,
-	tplName,
+	tpl *appsv1alpha1.BackupPolicyTemplate,
 	backupPolicyName string) *dataprotectionv1alpha1.BackupPolicy {
 	component := r.getFirstComponent(cluster, policyTPL.ComponentDefRef)
 	if component == nil {
@@ -190,10 +200,13 @@ func (r *BackupPolicyTPLTransformer) buildBackupPolicy(policyTPL appsv1alpha1.Ba
 			},
 			Annotations: map[string]string{
 				constant.DefaultBackupPolicyAnnotationKey:  r.defaultPolicyAnnotationValue(),
-				constant.BackupPolicyTemplateAnnotationKey: tplName,
+				constant.BackupPolicyTemplateAnnotationKey: tpl.Name,
 				constant.BackupDataPathPrefixAnnotationKey: fmt.Sprintf("/%s-%s/%s", cluster.Name, cluster.UID, component.Name),
 			},
 		},
+	}
+	if tpl.Annotations[constant.ReconfigureRefAnnotationKey] != "" {
+		backupPolicy.Annotations[constant.ReconfigureRefAnnotationKey] = tpl.Annotations[constant.ReconfigureRefAnnotationKey]
 	}
 	bpSpec := backupPolicy.Spec
 	if policyTPL.Retention != nil {
@@ -361,10 +374,10 @@ func (r *BackupPolicyTPLTransformer) convertCommonPolicy(bp *appsv1alpha1.Common
 }
 
 func (r *BackupPolicyTPLTransformer) defaultPolicyAnnotationValue() string {
-	if r.tplCount > 1 && r.isDefaultTemplate != "true" {
+	if r.tplCount > 1 && r.isDefaultTemplate != trueVal {
 		return "false"
 	}
-	return "true"
+	return trueVal
 }
 
 // DeriveBackupPolicyName generates the backup policy name which is created from backup policy template.
@@ -374,5 +387,3 @@ func DeriveBackupPolicyName(clusterName, componentDef, identifier string) string
 	}
 	return fmt.Sprintf("%s-%s-backup-policy-%s", clusterName, componentDef, identifier)
 }
-
-var _ graph.Transformer = &BackupPolicyTPLTransformer{}

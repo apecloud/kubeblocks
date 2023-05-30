@@ -25,6 +25,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -52,7 +53,7 @@ var _ = Describe("ReplicationSet Util", func() {
 	)
 
 	cleanAll := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -148,14 +149,14 @@ var _ = Describe("ReplicationSet Util", func() {
 				Create(&testCtx).GetObject()
 			podList = append(podList, *pod)
 		}
-		err := syncReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus, podList)
+		err := asyncReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus, podList)
 		Expect(err).Should(Succeed())
 		Expect(len(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus.Secondaries)).Should(Equal(3))
 
 		By("testing sync cluster status with remove pod")
-		var podRemoveList []corev1.Pod
+		var podRemoveList []*corev1.Pod
 		*sts.Spec.Replicas -= 1
-		podRemoveList = append(podRemoveList, podList[len(podList)-1])
+		podRemoveList = append(podRemoveList, &podList[len(podList)-1])
 		Expect(removeTargetPodsInfoInStatus(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus,
 			podRemoveList, clusterObj.Spec.ComponentSpecs[0].Replicas)).Should(Succeed())
 		Expect(clusterObj.Status.Components[testapps.DefaultRedisCompName].ReplicationSetStatus.Secondaries).Should(HaveLen(2))

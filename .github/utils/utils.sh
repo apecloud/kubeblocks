@@ -236,7 +236,7 @@ check_numeric() {
 get_next_available_tag() {
     tag_type="$1"
     index=""
-    release_list=$( gh release list --repo $LATEST_REPO )
+    release_list=$( gh release list --repo $LATEST_REPO --limit 100 )
     for tag in $( echo "$release_list" | (grep "$tag_type" || true) ) ;do
         if [[ "$tag" != "$tag_type"* ]]; then
             continue
@@ -246,7 +246,7 @@ get_next_available_tag() {
         if [[ "$numeric" == "no" ]]; then
             continue
         fi
-        if [[ $numeric -gt $index ]]; then
+        if [[ $numeric -gt $index || -z "$index" ]]; then
             index=$numeric
         fi
     done
@@ -262,11 +262,13 @@ get_next_available_tag() {
 
 release_next_available_tag() {
     dispatches_url=$1
-    v_head="v$TAG_NAME"
-    alpha_type="$v_head.0-alpha."
-    beta_type="$v_head.0-beta."
-    rc_type="$v_head.0-rc."
-    stable_type="$v_head."
+    v_major_minor="v$TAG_NAME"
+    stable_type="$v_major_minor."
+    get_next_available_tag $stable_type
+    v_number=$RELEASE_VERSION
+    alpha_type="$v_number-alpha."
+    beta_type="$v_number-beta."
+    rc_type="$v_number-rc."
     case "$CONTENT" in
         *alpha*)
             get_next_available_tag "$alpha_type"
@@ -276,9 +278,6 @@ release_next_available_tag() {
         ;;
         *rc*)
             get_next_available_tag "$rc_type"
-        ;;
-        *stable*)
-            get_next_available_tag $stable_type
         ;;
     esac
 
@@ -309,6 +308,11 @@ release_message() {
 }
 
 send_message() {
+    if [[ "$TAG_NAME" != "v"*"."*"."* ]]; then
+        echo "invalid tag name"
+        return
+    fi
+
     if [[ "$CONTENT" == *"success" ]]; then
         curl -H "Content-Type: application/json" -X POST $BOT_WEBHOOK \
             -d '{"msg_type":"post","content":{"post":{"zh_cn":{"title":"Success:","content":[[{"tag":"text","text":"'$CONTENT'"}]]}}}}'

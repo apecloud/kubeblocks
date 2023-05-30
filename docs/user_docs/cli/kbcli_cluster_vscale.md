@@ -21,6 +21,7 @@ kbcli cluster vscale NAME [flags]
 ### Options
 
 ```
+      --auto-approve                   Skip interactive approval before vertically scaling the cluster
       --class string                   Component class
       --components strings             Component names to this operations
       --cpu string                     Requested and limited size of component cpu

@@ -45,6 +45,8 @@ const (
 	// ErrorTypeNotFound not found any resource.
 	ErrorTypeNotFound ErrorType = "NotFound"
 
+	ErrorTypeRequeue ErrorType = "Requeue" // requeue for reconcile.
+
 	// ErrorType for backup
 	ErrorTypeBackupNotSupported       ErrorType = "BackupNotSupported"       // this backup type not supported
 	ErrorTypeBackupPVTemplateNotFound ErrorType = "BackupPVTemplateNotFound" // this pv template not found
@@ -52,6 +54,7 @@ const (
 	ErrorTypeBackupPVCNameIsEmpty     ErrorType = "BackupPVCNameIsEmpty"     // pvc name for backup is empty
 	ErrorTypeBackupJobFailed          ErrorType = "BackupJobFailed"          // backup job failed
 	ErrorTypeStorageNotMatch          ErrorType = "ErrorTypeStorageNotMatch"
+	ErrorTypeReconfigureFailed        ErrorType = "ErrorTypeReconfigureFailed"
 
 	// ErrorType for cluster controller
 	ErrorTypeBackupFailed ErrorType = "BackupFailed"

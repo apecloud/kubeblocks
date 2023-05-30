@@ -42,13 +42,14 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type OperationsOptions struct {
 	create.CreateOptions  `json:"-"`
 	HasComponentNamesFlag bool `json:"-"`
-	// RequireConfirm if it is true, the second verification will be performed before creating ops.
-	RequireConfirm         bool     `json:"-"`
+	// autoApprove if it is true, will skip the double check.
+	autoApprove            bool     `json:"-"`
 	ComponentNames         []string `json:"componentNames,omitempty"`
 	OpsRequestName         string   `json:"opsRequestName"`
 	TTLSecondsAfterSucceed int      `json:"ttlSecondsAfterSucceed"`
@@ -100,7 +101,7 @@ func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStr
 		KeyValues:             map[string]string{},
 		OpsType:               opsType,
 		HasComponentNamesFlag: hasComponentNamesFlag,
-		RequireConfirm:        true,
+		autoApprove:           false,
 		CreateOptions: create.CreateOptions{
 			Factory:         f,
 			IOStreams:       streams,
@@ -182,6 +183,34 @@ func (o *OperationsOptions) validateVolumeExpansion() error {
 	if len(o.Storage) == 0 {
 		return fmt.Errorf("missing storage")
 	}
+	for _, cName := range o.ComponentNames {
+		for _, vctName := range o.VCTNames {
+			labels := fmt.Sprintf("%s=%s,%s=%s,%s=%s",
+				constant.AppInstanceLabelKey, o.Name,
+				constant.KBAppComponentLabelKey, cName,
+				constant.VolumeClaimTemplateNameLabelKey, vctName,
+			)
+			pvcs, err := o.Client.CoreV1().PersistentVolumeClaims(o.Namespace).List(context.Background(),
+				metav1.ListOptions{LabelSelector: labels, Limit: 1})
+			if err != nil {
+				return err
+			}
+			if len(pvcs.Items) == 0 {
+				continue
+			}
+			pvc := pvcs.Items[0]
+			specStorage := pvc.Spec.Resources.Requests.Storage()
+			statusStorage := pvc.Status.Capacity.Storage()
+			targetStorage := resource.MustParse(o.Storage)
+			// determine whether the opsRequest is a recovery action for volume expansion failure
+			if specStorage.Cmp(targetStorage) > 0 &&
+				statusStorage.Cmp(targetStorage) <= 0 {
+				o.autoApprove = false
+				fmt.Fprintln(o.Out, printer.BoldYellow("Warning: this opsRequest is a recovery action for volume expansion failure and will re-create the PersistentVolumeClaims when RECOVER_VOLUME_EXPANSION_FAILURE=false"))
+				break
+			}
+		}
+	}
 	return nil
 }
 
@@ -252,23 +281,23 @@ func (o *OperationsOptions) Validate() error {
 
 	switch o.OpsType {
 	case appsv1alpha1.VolumeExpansionType:
-		if err := o.validateVolumeExpansion(); err != nil {
+		if err = o.validateVolumeExpansion(); err != nil {
 			return err
 		}
 	case appsv1alpha1.UpgradeType:
-		if err := o.validateUpgrade(); err != nil {
+		if err = o.validateUpgrade(); err != nil {
 			return err
 		}
 	case appsv1alpha1.VerticalScalingType:
-		if err := o.validateVScale(&cluster); err != nil {
+		if err = o.validateVScale(&cluster); err != nil {
 			return err
 		}
 	case appsv1alpha1.ExposeType:
-		if err := o.validateExpose(); err != nil {
+		if err = o.validateExpose(); err != nil {
 			return err
 		}
 	}
-	if o.RequireConfirm && o.DryRun == "none" {
+	if !o.autoApprove && o.DryRun == "none" {
 		return delete.Confirm([]string{o.Name}, o.In)
 	}
 	return nil
@@ -378,6 +407,7 @@ func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.CompleteRestartOps())
 			cmdutil.CheckErr(o.Validate())
@@ -385,6 +415,7 @@ func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 	o.addCommonFlags(cmd)
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before restarting the cluster")
 	return cmd
 }
 
@@ -403,6 +434,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
@@ -410,6 +442,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 	o.addCommonFlags(cmd)
 	cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Reference cluster version (required)")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before upgrading the cluster")
 	return cmd
 }
 
@@ -431,6 +464,7 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.CompleteComponentsFlag())
 			cmdutil.CheckErr(o.Validate())
@@ -441,6 +475,7 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	cmd.Flags().StringVar(&o.CPU, "cpu", "", "Requested and limited size of component cpu")
 	cmd.Flags().StringVar(&o.Memory, "memory", "", "Requested and limited size of component memory")
 	cmd.Flags().StringVar(&o.Class, "class", "", "Component class")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before vertically scaling the cluster")
 	return cmd
 }
 
@@ -459,6 +494,7 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.CompleteComponentsFlag())
 			cmdutil.CheckErr(o.Validate())
@@ -468,6 +504,7 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 
 	o.addCommonFlags(cmd)
 	cmd.Flags().IntVar(&o.Replicas, "replicas", o.Replicas, "Replicas with the specified components")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before horizontally scaling the cluster")
 	_ = cmd.MarkFlagRequired("replicas")
 	return cmd
 }
@@ -477,7 +514,7 @@ var volumeExpansionExample = templates.Examples(`
 		kbcli cluster volume-expand mycluster --components=mysql --volume-claim-templates=data --storage=10Gi
 `)
 
-// NewVolumeExpansionCmd creates a vertical scaling command
+// NewVolumeExpansionCmd creates a volume expanding command
 func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.VolumeExpansionType, true)
 	cmd := &cobra.Command{
@@ -487,6 +524,7 @@ func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.CompleteComponentsFlag())
 			cmdutil.CheckErr(o.Validate())
@@ -496,6 +534,7 @@ func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 	o.addCommonFlags(cmd)
 	cmd.Flags().StringSliceVarP(&o.VCTNames, "volume-claim-templates", "t", nil, "VolumeClaimTemplate names in components (required)")
 	cmd.Flags().StringVar(&o.Storage, "storage", "", "Volume storage size (required)")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before expanding the cluster volume")
 	return cmd
 }
 
@@ -522,6 +561,7 @@ func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.fillExpose())
 			cmdutil.CheckErr(o.Validate())
@@ -531,6 +571,7 @@ func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o.addCommonFlags(cmd)
 	cmd.Flags().StringVar(&o.ExposeType, "type", "", "Expose type, currently supported types are 'vpc', 'internet'")
 	cmd.Flags().StringVar(&o.ExposeEnabled, "enable", "", "Enable or disable the expose, values can be true or false")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before exposing the cluster")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc("type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{string(util.ExposeToVPC), string(util.ExposeToInternet)}, cobra.ShellCompDirectiveNoFileComp
@@ -558,12 +599,14 @@ func NewStopCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
 		},
 	}
 	o.addCommonFlags(cmd)
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before stopping the cluster")
 	return cmd
 }
 
@@ -575,7 +618,7 @@ var startExample = templates.Examples(`
 // NewStartCmd creates a start command
 func NewStartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.StartType, false)
-	o.RequireConfirm = false
+	o.autoApprove = true
 	cmd := &cobra.Command{
 		Use:               "start NAME",
 		Short:             "Start the cluster if cluster is stopped.",
@@ -583,6 +626,7 @@ func NewStartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())

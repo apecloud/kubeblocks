@@ -83,7 +83,7 @@ func GetDeploymentRollingUpgradeFuncs() RollingUpgradeFuncs {
 }
 
 func getDeploymentRollingPods(params reconfigureParams) ([]corev1.Pod, error) {
-	// util.GetComponentPodList support deployment
+	// util.GetComponentPodList supports deployment
 	return getReplicationSetPods(params)
 }
 
@@ -97,7 +97,7 @@ func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 	return podList.Items, nil
 }
 
-// GetComponentPods get all pods of the component.
+// GetComponentPods gets all pods of the component.
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
 	for i := range params.ComponentUnits {
@@ -128,7 +128,7 @@ func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string
 
 func getStatefulSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 	if len(params.ComponentUnits) != 1 {
-		return nil, cfgcore.MakeError("statefulSet component require only one statefulset, actual %d component", len(params.ComponentUnits))
+		return nil, cfgcore.MakeError("statefulSet component require only one statefulset, actual %d components", len(params.ComponentUnits))
 	}
 
 	stsObj := &params.ComponentUnits[0]
@@ -147,7 +147,7 @@ func getStatefulSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 
 func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 	if len(params.ComponentUnits) > 1 {
-		return nil, cfgcore.MakeError("consensus component require only one statefulset, actual %d component", len(params.ComponentUnits))
+		return nil, cfgcore.MakeError("consensus component require only one statefulset, actual %d components", len(params.ComponentUnits))
 	}
 
 	if len(params.ComponentUnits) == 0 {
@@ -160,8 +160,8 @@ func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 		return nil, err
 	}
 
-	// sort pods
-	util.SortPods(pods, consensus.ComposeRolePriorityMap(params.Component), constant.RoleLabelKey)
+	// TODO: should resolve the dependency on consensus module
+	util.SortPods(pods, consensus.ComposeRolePriorityMap(params.Component.ConsensusSpec), constant.RoleLabelKey)
 	r := make([]corev1.Pod, 0, len(pods))
 	for i := len(pods); i > 0; i-- {
 		r = append(r, pods[i-1:i]...)

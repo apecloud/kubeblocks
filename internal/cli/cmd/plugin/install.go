@@ -45,7 +45,7 @@ var (
 	`)
 )
 
-type pluginInstallOption struct {
+type PluginInstallOption struct {
 	plugins []pluginEntry
 
 	genericclioptions.IOStreams
@@ -57,7 +57,7 @@ type pluginEntry struct {
 }
 
 func NewPluginInstallCmd(streams genericclioptions.IOStreams) *cobra.Command {
-	o := &pluginInstallOption{
+	o := &PluginInstallOption{
 		IOStreams: streams,
 	}
 	cmd := &cobra.Command{
@@ -65,14 +65,14 @@ func NewPluginInstallCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Short:   "Install kbcli or kubectl plugins",
 		Example: pluginInstallExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.complete(args))
-			cmdutil.CheckErr(o.install())
+			cmdutil.CheckErr(o.Complete(args))
+			cmdutil.CheckErr(o.Install())
 		},
 	}
 	return cmd
 }
 
-func (o *pluginInstallOption) complete(names []string) error {
+func (o *PluginInstallOption) Complete(names []string) error {
 	for _, name := range names {
 		indexName, pluginName := CanonicalPluginName(name)
 		plugin, err := LoadPluginByName(paths.IndexPluginsPath(indexName), pluginName)
@@ -90,7 +90,7 @@ func (o *pluginInstallOption) complete(names []string) error {
 	return nil
 }
 
-func (o *pluginInstallOption) install() error {
+func (o *PluginInstallOption) Install() error {
 	var failed []string
 	var returnErr error
 	for _, entry := range o.plugins {
@@ -98,7 +98,6 @@ func (o *pluginInstallOption) install() error {
 		fmt.Fprintf(o.Out, "Installing plugin: %s\n", plugin.Name)
 		err := Install(paths, plugin, entry.index, InstallOpts{})
 		if err == ErrIsAlreadyInstalled {
-			klog.Warningf("Skipping plugin %q, it is already installed", plugin.Name)
 			continue
 		}
 		if err != nil {

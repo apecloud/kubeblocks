@@ -75,11 +75,11 @@ func (r *reconfigureProxy) initContainerKiller() error {
 
 func (r *reconfigureProxy) StopContainer(ctx context.Context, request *cfgproto.StopContainerRequest) (*cfgproto.StopContainerResponse, error) {
 	if r.killer == nil {
-		return nil, cfgcore.MakeError("container killer is not initialized.")
+		return nil, cfgcore.MakeError("container killing process is not initialized.")
 	}
 	ds := request.GetContainerIDs()
 	if len(ds) == 0 {
-		return &cfgproto.StopContainerResponse{ErrMessage: "not any containerId."}, nil
+		return &cfgproto.StopContainerResponse{ErrMessage: "no match for any container with containerId."}, nil
 	}
 	if err := r.killer.Kill(ctx, ds, stopContainerSignal, nil); err != nil {
 		return nil, err
@@ -89,11 +89,11 @@ func (r *reconfigureProxy) StopContainer(ctx context.Context, request *cfgproto.
 
 func (r *reconfigureProxy) OnlineUpgradeParams(ctx context.Context, request *cfgproto.OnlineUpgradeParamsRequest) (*cfgproto.OnlineUpgradeParamsResponse, error) {
 	if r.updater == nil {
-		return nil, cfgcore.MakeError("online updater is not initialized.")
+		return nil, cfgcore.MakeError("online updating process is not initialized.")
 	}
 	params := request.GetParams()
 	if len(params) == 0 {
-		return nil, cfgcore.MakeError("update params not empty.")
+		return nil, cfgcore.MakeError("update params is empty.")
 	}
 	if err := r.updater(ctx, params); err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func (r *reconfigureProxy) initOnlineUpdater(opt *VolumeWatcherOpts) error {
 
 	updater, err := cfgcm.OnlineUpdateParamsHandle(opt.TPLScriptPath, opt.FormatterConfig, opt.DataType, opt.DSN)
 	if err != nil {
-		return cfgcore.WrapError(err, "failed to create online updater")
+		return cfgcore.WrapError(err, "failed to create online updating process")
 	}
 	r.updater = updater
 	return nil

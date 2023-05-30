@@ -37,7 +37,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	. "github.com/apecloud/kubeblocks/cmd/probe/util"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 // MongoDBOperations is a binding implementation for MongoDB.
@@ -152,7 +152,7 @@ func (mongoOps *MongoDBOperations) Init(metadata bindings.Metadata) error {
 
 func (mongoOps *MongoDBOperations) Ping() error {
 	if err := mongoOps.client.Ping(context.Background(), nil); err != nil {
-		return fmt.Errorf("mongoDB binding: error connecting to mongoDB at %s: %s", mongoOps.mongoDBMetadata.host, err)
+		return fmt.Errorf("MongoDB binding: error connecting to MongoDB at %s: %s", mongoOps.mongoDBMetadata.host, err)
 	}
 	return nil
 }
@@ -178,13 +178,13 @@ func (mongoOps *MongoDBOperations) InitDelay() error {
 
 	client, err := getMongoDBClient(&mongoOps.mongoDBMetadata)
 	if err != nil {
-		mongoOps.Logger.Errorf("error in creating mongodb client: %s", err)
+		mongoOps.Logger.Errorf("error in creating MongoDB client: %s", err)
 		return err
 	}
 
 	if err = client.Ping(context.Background(), nil); err != nil {
 		_ = client.Disconnect(context.Background())
-		mongoOps.Logger.Errorf("error in connecting to mongodb, host: %s error: %s", mongoOps.mongoDBMetadata.host, err)
+		mongoOps.Logger.Errorf("error in connecting to MongoDB, host: %s error: %s", mongoOps.mongoDBMetadata.host, err)
 		return err
 	}
 

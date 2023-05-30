@@ -10,8 +10,8 @@ version: 0.5.1-beta.0
 # and this value should be consistent with an existing clusterVersion.
 # All supported clusterVersion versions can be viewed through `kubectl get clusterVersion`.
 # The current default value is the highest version of the PostgreSQL (with Patroni HA) supported in KubeBlocks.
-appVersion: "14.7.1"
+appVersion: "14.7.2"
 
 annotations:
-  kubeblocks.io/clusterVersions: "14.7.1,12.14.0"
+  kubeblocks.io/clusterVersions: "14.7.2,12.14.0"
   kubeblocks.io/multiCV: "true"

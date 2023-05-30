@@ -55,7 +55,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	const defaultMinReadySeconds = 10
 
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -483,9 +483,10 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(cluster.Status.ObservedGeneration == 2).Should(BeTrue())
 				// component phase should be running during snapshot backup
 				// g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+				// TODO(REVIEW): component phase is Updating after refactor, does it meet expectations?
 				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
 				// the expected cluster phase is Updating during Hscale.
-				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
+				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
 			})).Should(Succeed())
 
 			By("mock VolumeSnapshot status is ready, component phase should change to Updating when component is horizontally scaling.")
@@ -498,8 +499,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Expect(k8sClient.Status().Update(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase))
-				// g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
-				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
+				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
 			})).Should(Succeed())
 
 			By("wait the underlying workload been updated")

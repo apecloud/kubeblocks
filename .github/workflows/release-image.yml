@@ -73,6 +73,7 @@ jobs:
           fi
           
           bash .github/utils/utils.sh --type 12 \
+            --tag-name ${{ env.RELEASE_VERSION }} \
             --content "${CONTENT}"\
             --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

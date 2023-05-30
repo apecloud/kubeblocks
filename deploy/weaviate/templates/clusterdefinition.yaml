@@ -27,8 +27,12 @@ spec:
       configSpecs:
         - name: weaviate-config-template
           templateRef: weaviate-config-template
-          constraintRef: weaviate-config-constraints
           volumeName: weaviate-config
+          namespace: {{ .Release.Namespace }}
+        - name: weaviate-env-template
+          templateRef: weaviate-env-template
+          constraintRef: weaviate-env-constraints
+          volumeName: weaviate-env
           namespace: {{ .Release.Namespace }}
       service:
         ports:
@@ -48,7 +52,7 @@ spec:
             - /bin/sh
             - -c
             - |
-              export $(cat /weaviate-config/envs | xargs)
+              export $(cat /weaviate-env/envs | xargs)
               /bin/weaviate --host 0.0.0.0 --port "8080" --scheme http --config-file /weaviate-config/conf.yaml --read-timeout=60s --write-timeout=60s
             securityContext:
               runAsUser: 0
@@ -86,6 +90,8 @@ spec:
             volumeMounts:
               - mountPath: /weaviate-config
                 name: weaviate-config
+              - mountPath: /weaviate-env
+                name: weaviate-env
               - mountPath: /var/lib/weaviate
                 name: data
             dnsPolicy: ClusterFirst
@@ -95,6 +101,10 @@ spec:
                 containerPort: 8080
               - name: tcp-metrics
                 containerPort: 2112
+              - name: tcp-gossip-bind
+                containerPort: 7000
+              - name: tcp-data-bind
+                containerPort: 7001
             env:
               - name: CLUSTER_DATA_BIND_PORT
                 value: "7001"
@@ -112,14 +122,11 @@ spec:
                 value: "false"
               - name: TRACK_VECTOR_DIMENSIONS
                 value: "false"
-              - name: STANDALONE_MODE
-                value: 'true'
               - name: PERSISTENCE_DATA_PATH
                 value: '/var/lib/weaviate'
               - name: DEFAULT_VECTORIZER_MODULE
                 value: none
-              - name: CLUSTER_GOSSIP_BIND_PORT
-                value: "7000"
-              - name: CLUSTER_DATA_BIND_PORT
-                value: "7001"
-
+              - name: CLUSTER_HOSTNAME
+                value: "$(KB_POD_NAME)"
+              - name: CLUSTER_JOIN
+                value: "$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc.cluster.local"

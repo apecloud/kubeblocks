@@ -72,7 +72,7 @@ func handleVolumeExpansionWithPVC(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	return nil
 }
 
-// Handle the warning events on pvcs. if the events are resize failed events, update the OpsRequest.status.
+// Handle the warning events of PVCs. if the events are resize-failed events, update the OpsRequest.status.
 func (pvcEventHandler PersistentVolumeClaimEventHandler) Handle(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
 	recorder record.EventRecorder,
@@ -100,18 +100,18 @@ func (pvcEventHandler PersistentVolumeClaimEventHandler) Handle(cli client.Clien
 		return nil
 	}
 
-	// here, if the volume expansion ops is running. we will change the pvc status to Failed on the OpsRequest.
+	// here, if the volume expansion ops is running, change the pvc status to Failed on the OpsRequest.
 	return pvcEventHandler.handlePVCFailedStatusOnRunningOpsRequests(cli, reqCtx, recorder, event, pvc)
 }
 
-// isTargetResizeFailedEvents checks the event is the resize failed events.
+// isTargetResizeFailedEvents checks the event is the resize-failed events.
 func (pvcEventHandler PersistentVolumeClaimEventHandler) isTargetResizeFailedEvents(event *corev1.Event) bool {
-	// ignores ExternalExpanding event, this event is always exists when using csi driver.
+	// ignores ExternalExpanding event, this event always exists when using csi driver.
 	return event.Type == corev1.EventTypeWarning && event.InvolvedObject.Kind == constant.PersistentVolumeClaimKind &&
 		slices.Index([]string{VolumeResizeFailed, FileSystemResizeFailed}, event.Reason) != -1
 }
 
-// handlePVCFailedStatusOnOpsRequest if the volume expansion ops is running. we will change the pvc status to Failed on the OpsRequest,
+// handlePVCFailedStatusOnOpsRequest if the volume expansion ops is running, changes the pvc status to Failed on the OpsRequest,
 func (pvcEventHandler PersistentVolumeClaimEventHandler) handlePVCFailedStatusOnRunningOpsRequests(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
 	recorder record.EventRecorder,

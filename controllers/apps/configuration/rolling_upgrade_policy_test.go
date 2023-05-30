@@ -230,15 +230,15 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 		})
 	})
 
-	Context("rolling reconfigure policy test without not support component", func() {
+	Context("rolling reconfigure policy test for not supported component", func() {
 		It("Should failed", func() {
-			// not support type
+			// not supported type
 			_ = mockParam
 			k8sMockClient.MockListMethod(testutil.WithSucceed(testutil.WithTimes(0)))
 
 			status, err := rollingPolicy.Upgrade(createReconfigureParam(appsv1alpha1.Stateless, defaultReplica))
 			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("not support component workload type"))
+			Expect(err.Error()).Should(ContainSubstring("not supported component workload type"))
 			Expect(status.Status).Should(BeEquivalentTo(ESNotSupport))
 		})
 	})

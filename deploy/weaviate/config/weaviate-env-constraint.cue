@@ -26,8 +26,6 @@
 	// The endpoint where to reach the clip module if enabled
 	CLIP_INFERENCE_API?: string
 
-	QNA_INFERENCE_API?: string
-
 	// The endpoint where to reach the img2vec-neural module if enabled
 	IMAGE_INFERENCE_API?: string
 
@@ -49,14 +47,34 @@
 	// A string that includes the authorization information required.
 	AZURE_STORAGE_CONNECTION_STRING?: string
 
-	SPELLCHECK_INFERENCE_API?: string
-	NER_INFERENCE_API?:        string
-	SUM_INFERENCE_API?:        string
-	OPENAI_APIKEY?:            string
-	HUGGINGFACE_APIKEY?:       string
-	COHERE_APIKEY?:            string
-	PALM_APIKEY?:              string
-}
+	QNA_INFERENCE_API?: string
 
-// SectionName is section name
-[SectionName=_]: #WeaviateEnvs
+	SPELLCHECK_INFERENCE_API?: string
+
+	NER_INFERENCE_API?: string
+
+	SUM_INFERENCE_API?: string
+
+	OPENAI_APIKEY?: string
+
+	HUGGINGFACE_APIKEY?: string
+
+	COHERE_APIKEY?: string
+
+	PALM_APIKEY?: string
+
+	// Enables API key authentication.
+	AUTHENTICATION_APIKEY_ENABLED?: string
+
+	// List one or more keys, separated by commas. Each key corresponds to a specific user identity below.
+	AUTHENTICATION_APIKEY_ALLOWED_KEYS?: string
+
+	// List one or more user identities, separated by commas. Each identity corresponds to a specific key above.
+	AUTHENTICATION_APIKEY_USERS?: string
+
+	AUTHORIZATION_ADMINLIST_ENABLED?: string
+
+	AUTHORIZATION_ADMINLIST_USERS?: string
+
+	AUTHORIZATION_ADMINLIST_READONLY_USERS?: string
+}

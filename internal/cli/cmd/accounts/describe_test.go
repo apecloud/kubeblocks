@@ -34,7 +34,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/sqlchannel"
+	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 var _ = Describe("Describe Account Options", func() {
@@ -84,7 +84,7 @@ var _ = Describe("Describe Account Options", func() {
 			o := NewDescribeUserOptions(tf, streams)
 			Expect(o).ShouldNot(BeNil())
 			Expect(o.AccountBaseOptions).ShouldNot(BeNil())
-			Expect(o.AccountBaseOptions.AccountOp).Should(Equal(sqlchannel.DescribeUserOp))
+			Expect(o.AccountBaseOptions.AccountOp).Should(Equal(channelutil.DescribeUserOp))
 		})
 
 		It("validate user name and password", func() {

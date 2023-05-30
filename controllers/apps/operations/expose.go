@@ -40,7 +40,7 @@ type ExposeOpsHandler struct {
 var _ OpsHandler = ExposeOpsHandler{}
 
 func init() {
-	// ToClusterPhase is not defined, because expose not affect the cluster status.
+	// ToClusterPhase is not defined, because 'expose' does not affect the cluster status.
 	exposeBehavior := OpsBehaviour{
 		// REVIEW: can do opsrequest if not running?
 		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),

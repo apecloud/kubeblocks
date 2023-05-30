@@ -118,26 +118,5 @@ pgbouncer:
     tag: 1.19.0
     pullPolicy: IfNotPresent
 
-## @section storageClass Parameters
-storageClass:
-  mountOptions:
-    - noatime
-    - nobarrier
-  provider:
-    eks:
-      volumeType: gp3
-      fsType: xfs
-    gke:
-      volumeType: pd-balanced
-      fsType: xfs
-    aliyun:
-      volumeType: cloud_essd
-      fsType: xfs
-    aks:
-      volumeType: managed
-      fsType: xfs
-    tke:
-      volumeType: CLOUD_SSD
-
 logConfigs:
   running: /home/postgres/pgdata/pgroot/data/log/postgresql-*

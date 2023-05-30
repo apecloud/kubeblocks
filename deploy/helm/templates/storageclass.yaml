@@ -3,9 +3,9 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: kb-postgres-default-sc-data
+  name: kb-default-data
   labels:
-    {{- include "postgresql.labels" . | nindent 4 }}
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 allowVolumeExpansion: true
 parameters:
   ## parameters references: https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/parameters.md
@@ -20,9 +20,9 @@ volumeBindingMode: WaitForFirstConsumer
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: kb-postgres-default-sc-data
+  name: kb-default-data
   labels:
-    {{- include "postgresql.labels" . | nindent 4 }}
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 allowVolumeExpansion: true
 parameters:
   ## refer: https://github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/issues/617
@@ -37,9 +37,9 @@ volumeBindingMode: WaitForFirstConsumer
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: kb-postgres-default-sc-data
+  name: kb-default-data
   labels:
-    {{- include "postgresql.labels" . | nindent 4 }}
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 allowVolumeExpansion: true
 parameters:
   ## parameters references: https://github.com/kubernetes-sigs/alibaba-cloud-csi-driver/blob/master/docs/disk.md
@@ -54,9 +54,9 @@ volumeBindingMode: WaitForFirstConsumer
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: kb-postgres-default-sc-data
+  name: kb-default-data
   labels:
-    {{- include "postgresql.labels" . | nindent 4 }}
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 parameters:
   ## parameters references: https://cloud.tencent.com/document/product/457/44239, the fsType is not supported by tke.
   type: {{ .Values.storageClass.provider.tke.volumeType }}
@@ -71,9 +71,9 @@ volumeBindingMode: WaitForFirstConsumer
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: kb-postgres-default-sc-data
+  name: kb-default-data
   labels:
-    {{- include "postgresql.labels" . | nindent 4 }}
+    {{- include "kubeblocks.labels" . | nindent 4 }}
 parameters:
   # parameters references: https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/driver-parameters.md
   fsType: {{ .Values.storageClass.provider.aks.fsType | default "xfs" }}

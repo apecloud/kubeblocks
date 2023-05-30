@@ -134,7 +134,7 @@ func (w *templateRenderWorkflow) getRenderedConfigSpec() ([]componentedConfigSpe
 	}
 
 	if !w.renderedOpts.AllConfigSpecs {
-		return nil, cfgcore.MakeError("config spec[%s] is not found", w.renderedOpts.ConfigSpec)
+		return nil, cfgcore.MakeError("AllConfigSpecs should be set while config spec is unset")
 	}
 	configSpecs := make([]componentedConfigSpec, 0)
 	for _, com := range w.clusterDefComponents {
@@ -191,8 +191,7 @@ func NewWorkflowTemplateRender(helmTemplateDir string, opts RenderedOptions) (*t
 }
 
 func checkAndFillPortProtocol(clusterDefComponents []appsv1alpha1.ClusterComponentDefinition) {
-	// fix failed to BuildHeadlessSvc
-	// failed to render workflow: cue: marshal error: service.spec.ports.0.protocol: undefined field: protocol
+	// set a default protocol with 'TCP' to avoid failure in BuildHeadlessSvc
 	for i := range clusterDefComponents {
 		for j := range clusterDefComponents[i].PodSpec.Containers {
 			container := &clusterDefComponents[i].PodSpec.Containers[j]

@@ -146,7 +146,7 @@ var _ = Describe("Consensus Component", func() {
 			phase, _, _ = consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName)
 			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
 
-			By("not ready pod is not controlled by latest revision, should return empty string")
+			By("unready pod is not controlled by latest revision, should return empty string")
 			// mock pod is not controlled by latest revision
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 				sts.Status.UpdateRevision = fmt.Sprintf("%s-%s-%s", clusterName, consensusCompName, "6fdd48d9cd1")

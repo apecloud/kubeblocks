@@ -72,7 +72,7 @@ func PatchOpsRequestReconcileAnnotation(ctx context.Context, cli client.Client, 
 	if opsRequest.Annotations == nil {
 		opsRequest.Annotations = map[string]string{}
 	}
-	// because many changes may be triggered within one second, if the accuracy is only seconds, the event may be lost.
+	// because many changes may be triggered within one second, if the accuracy is only in seconds, the event may be lost.
 	// so use nanoseconds to record the time.
 	opsRequest.Annotations[intctrlutil.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
 	return cli.Patch(ctx, opsRequest, patch)

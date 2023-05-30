@@ -95,7 +95,7 @@ func (r *ReplicationSet) IsRunning(ctx context.Context, obj client.Object) (bool
 }
 
 // PodsReady is the implementation of the type Component interface method,
-// which is used to check whether all the pods of replicationSet component is ready.
+// which is used to check whether all the pods of replicationSet component are ready.
 func (r *ReplicationSet) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	return r.Stateful.PodsReady(ctx, obj)
 }
@@ -239,7 +239,7 @@ func (r *ReplicationSet) HandleHA(ctx context.Context, obj client.Object) ([]gra
 	if len(pods) == 0 {
 		return nil, nil
 	}
-	// If the Pods already exists, check whether there is an HA switching and the HA process is prioritized to handle.
+	// If the Pods already exists, check whether there is a HA switching and the HA process is prioritized to handle.
 	// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
 	primaryIndexChanged, _, err := CheckPrimaryIndexChanged(ctx, r.Cli, r.Cluster, r.getName(), r.getPrimaryIndex())
 	if err != nil {

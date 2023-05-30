@@ -25,7 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// IsOvertimeEvent check whether the duration of warning event reaches the threshold.
+// IsOvertimeEvent checks whether the duration of warning event reaches the threshold.
 func IsOvertimeEvent(event *corev1.Event, timeout time.Duration) bool {
 	if event.Series != nil {
 		return event.Series.LastObservedTime.After(event.EventTime.Add(timeout))

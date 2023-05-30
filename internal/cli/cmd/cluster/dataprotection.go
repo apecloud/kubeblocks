@@ -292,7 +292,7 @@ func printBackupList(o ListBackupOptions) error {
 }
 
 func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &ListBackupOptions{ListOptions: list.NewListOptions(f, streams, types.OpsGVR())}
+	o := &ListBackupOptions{ListOptions: list.NewListOptions(f, streams, types.BackupGVR())}
 	cmd := &cobra.Command{
 		Use:               "list-backups",
 		Short:             "List backups.",
@@ -561,7 +561,7 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 }
 
 func NewListBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := list.NewListOptions(f, streams, types.OpsGVR())
+	o := list.NewListOptions(f, streams, types.BackupPolicyGVR())
 	cmd := &cobra.Command{
 		Use:               "list-backup-policy",
 		Short:             "List backups policies.",

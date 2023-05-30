@@ -171,9 +171,9 @@ parse_command_line() {
                     shift
                 fi
                 ;;
-            -nt|--notes)
+            -fl|--file)
                 if [[ -n "${2:-}" ]]; then
-                    Notes="$2"
+                    FILE="$2"
                     shift
                 fi
                 ;;
@@ -321,6 +321,11 @@ release_message() {
 }
 
 send_message() {
+    if [[ "$TAG_NAME" != "v"*"."*"."* ]]; then
+        echo "invalid tag name"
+        return
+    fi
+
     if [[ "$CONTENT" == *"success" ]]; then
         curl -H "Content-Type: application/json" -X POST $BOT_WEBHOOK \
             -d '{"msg_type":"post","content":{"post":{"zh_cn":{"title":"Success:","content":[[{"tag":"text","text":"'$CONTENT'"}]]}}}}'
@@ -393,9 +398,17 @@ check_package_version() {
 }
 
 patch_release_notes() {
+    release_note=""
+    while read line; do
+      if [[ -z "${release_note}" ]]; then
+        release_note="$line"
+      else
+        release_note="$release_note\n$line"
+      fi
+    done < ${FILE}
     gh_curl -X PATCH \
-            $GITHUB_API/repos/$GITHUB_REPO/releases/tags/$TAG_NAME \
-            -d '{"body":"${Notes}"}'
+        $GITHUB_API/repos/$GITHUB_REPO/releases/tags/$TAG_NAME \
+        -d '{"body":"${release_note}"}'
 }
 
 

@@ -46,7 +46,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64]
-
     steps:
       - uses: actions/checkout@v3
       - name: install lib
@@ -166,26 +165,21 @@ jobs:
     needs: upload-release-assert
     steps:
       - uses: actions/checkout@v3
-
       - uses: actions/download-artifact@v3
         with:
           name: sha256
           path: sha256
-
       - name: generate kbcli release-notes
         run: |
           mkdir -p ./docs/release_notes/${{ env.TAG_NAME }}
           python ./.github/utils/generate_kbcli_sha256.py ${{ env.TAG_NAME }} sha256
-
       - name: release kbcli with release notes
         run: |
           bash .github/utils/utils.sh --type 13 \
             --github-repo 'apecloud/kbcli' \
             --tag-name ${{ env.TAG_NAME }} \
             --file "./docs/release_notes/${{ env.TAG_NAME }}/kbcli.md" \
-            --github-token ${{ env.GITHUB_TOKEN }} 
-           
-
+            --github-token ${{ env.GITHUB_TOKEN }}
       - name: remove artifact
         uses: geekyeggo/delete-artifact@v2
         with:
@@ -203,7 +197,6 @@ jobs:
           if [[ "${{ needs.upload-release-assert.result }}" == "success" ]]; then
               CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0success"
           fi
-
           bash .github/utils/utils.sh --type 12 \
             --content "${CONTENT}"\
             --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \

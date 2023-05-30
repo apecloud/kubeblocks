@@ -11,23 +11,18 @@ import sys
 from datetime import date
 from string import Template
 
-
-
 release_note_template_path = "docs/release_notes/template.md"
-
 
 def main(argv: list[str]) -> None:
     """
-    :param1: the kbcli version
-    :param2: the sha256 files direct
-    :param3: github TOKENS
+    :param: the kbcli version
+    :param: the sha256 files direct
     :return None
     """
     kbcli_version = argv[1]
     sha256_direct = argv[2]
     release_note_template_path = "docs/release_notes/kbcli_template.md"
     release_note_path = f"docs/release_notes/{kbcli_version}/kbcli.md"
-
 
     template = ""
     try:
@@ -36,7 +31,7 @@ def main(argv: list[str]) -> None:
     except FileNotFoundError as e:
         print(f"template {release_note_template_path} not found, IGNORED")
 
-    with open(release_note_path,'a') as f_dest: # 没
+    with open(release_note_path,'a') as f_dest:
         f_dest.write(Template(template).safe_substitute(
             kbcli_version = kbcli_version[1:],
             today = date.today().strftime("%Y-%m-%d"),
@@ -46,9 +41,6 @@ def main(argv: list[str]) -> None:
                 f_dest.write(f.read())
                 f_dest.write('\n')
     print("Done")
-    with open(release_note_path, 'r') as f:
-        release_note = f.read()
-
 
 if __name__ == "__main__":
     main(sys.argv)

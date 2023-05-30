@@ -647,6 +647,38 @@ var _ = Describe("Cluster Controller", func() {
 			}
 		}
 
+		By("Checking pod env config updated")
+		for _, comp := range clusterObj.Spec.ComponentSpecs {
+			cmKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      fmt.Sprintf("%s-%s-env", clusterKey.Name, comp.Name),
+			}
+			Eventually(testapps.CheckObj(&testCtx, cmKey, func(g Gomega, cm *corev1.ConfigMap) {
+				match := func(key, prefix, suffix string) bool {
+					return strings.HasPrefix(key, prefix) && strings.HasSuffix(key, suffix)
+				}
+				foundN := ""
+				for k, v := range cm.Data {
+					if match(k, constant.KBPrefix, "_N") {
+						foundN = v
+						break
+					}
+				}
+				g.Expect(foundN).Should(Equal(strconv.Itoa(updatedReplicas)))
+				for i := 0; i < updatedReplicas; i++ {
+					foundPodHostname := ""
+					suffix := fmt.Sprintf("_%d_HOSTNAME", i)
+					for k, v := range cm.Data {
+						if match(k, constant.KBPrefix, suffix) {
+							foundPodHostname = v
+							break
+						}
+					}
+					g.Expect(foundPodHostname != "").Should(BeTrue())
+				}
+			})).Should(Succeed())
+		}
+
 		By("Checking cluster status and the number of replicas changed")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).
 			Should(BeEquivalentTo(initialGeneration + len(clusterObj.Spec.ComponentSpecs)))

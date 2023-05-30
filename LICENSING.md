@@ -13,7 +13,6 @@ apis/**
 deploy/**
 docker/**
 externalapis/**
-internal/cli/cmd/plugin/download/**
 hack/**
 pkg/**
 test/**
@@ -24,5 +23,6 @@ The following directories and their subdirectories are licensed under their orig
 
 ```
 cmd/probe/internal/component/
+internal/cli/cmd/plugin/download/**
 vendor/
 ```

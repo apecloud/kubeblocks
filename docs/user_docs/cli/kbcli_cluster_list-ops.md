@@ -21,7 +21,7 @@ kbcli cluster list-ops [flags]
 ### Options
 
 ```
-  -A, --all-namespace     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
+  -A, --all-namespaces    If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
   -h, --help              help for list-ops
       --name string       The OpsRequest name to get the details.
   -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)

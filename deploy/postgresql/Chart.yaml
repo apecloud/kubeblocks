@@ -12,7 +12,7 @@ version: 0.5.1-beta.0
 appVersion: "14.7.2"
 
 annotations:
-  kubeblocks.io/clusterVersions: "14.7.2,12.14.0"
+  kubeblocks.io/clusterVersions: "14.7.2,12.14.1"
   kubeblocks.io/multiCV: "true"
 
 home: https://kubeblocks.io/

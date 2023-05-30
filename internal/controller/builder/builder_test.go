@@ -514,6 +514,9 @@ var _ = Describe("builder", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "backup",
 					Namespace: "default",
+					Labels: map[string]string{
+						constant.ClusterDefLabelKey: "test-cluster-def",
+					},
 				},
 				Status: dataprotectionv1alpha1.BackupStatus{
 					PersistentVolumeClaimName: "data-pvc",

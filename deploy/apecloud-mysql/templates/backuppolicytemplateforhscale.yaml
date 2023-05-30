@@ -19,3 +19,5 @@ spec:
         - "rm -f /data/mysql/data/.restore; sync"
       target:
         role: leader
+    datafile:
+      backupToolName: xtrabackup-for-apecloud-mysql

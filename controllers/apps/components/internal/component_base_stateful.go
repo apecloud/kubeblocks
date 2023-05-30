@@ -557,26 +557,6 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 		return nil
 	}
 
-	checkAllPVCsExist := func() (bool, error) {
-		for i := *stsObj.Spec.Replicas; i < c.Component.Replicas; i++ {
-			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
-				pvcKey := types.NamespacedName{
-					Namespace: key.Namespace,
-					Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-				}
-				// check pvc existence
-				pvcExists, err := isPVCExists(cli, reqCtx.Ctx, pvcKey)
-				if err != nil {
-					return true, err
-				}
-				if !pvcExists {
-					return false, nil
-				}
-			}
-		}
-		return true, nil
-	}
-
 	checkAllPVCBoundIfNeeded := func() (bool, error) {
 		if horizontalScalePolicy == nil ||
 			horizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
@@ -613,28 +593,16 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 		return err
 	}
 
-	allPVCsExist, err := checkAllPVCsExist()
-	if err != nil {
+	stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
+	objs, err := cloneData(reqCtx, cli, c.Cluster, c.Component, backupKey, stsProto, stsObj)
+	if err != nil && !intctrlutil.IsDelayedRequeueError(err) {
 		return err
 	}
-	if !allPVCsExist {
-		if horizontalScalePolicy == nil {
-			c.WorkloadVertex.Immutable = false
-			return nil
-		}
-		// do backup according to component's horizontal scale policy
-		c.WorkloadVertex.Immutable = true
-		stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
-		objs, err := doBackup(reqCtx, cli, c.Cluster, c.Component, backupKey, stsProto, stsObj)
-		if err != nil {
-			// if it's requeue error, create object before return error
-			if !intctrlutil.IsDelayedRequeueError(err) {
-				return err
-			}
-		}
+	if intctrlutil.IsDelayedRequeueError(err) {
 		createObjs(objs)
 		return err
 	}
+
 	// pvcs are ready, stateful_set.replicas should be updated
 	c.WorkloadVertex.Immutable = false
 

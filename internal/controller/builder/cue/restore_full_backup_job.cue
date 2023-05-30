@@ -10,6 +10,7 @@ backup: {
 	metadata: {
 		name:      string
 		namespace: string
+		labels: [string]: string
 	}
 	status: {
 		persistentVolumeClaimName: string
@@ -36,6 +37,7 @@ job: {
 	metadata: {
 		name:      restoreJobName
 		namespace: backup.metadata.namespace
+		labels: backup.metadata.labels
 	}
 	spec: {
 		template: {
@@ -67,9 +69,15 @@ job: {
 						]
 						resources: component.podSpec.containers[0].resources
 						volumeMounts: [
+							if component.volumeTypes != _|_
 							for _, vt in component.volumeTypes
 							for _, vm in component.podSpec.containers[0].volumeMounts
 							if vt.type == "data" && vm.name == vt.name {
+								vm
+							},
+							if component.volumeTypes == _|_
+							for _, vm in component.podSpec.containers[0].volumeMounts
+							if vm.name == "data" {
 								vm
 							},
 							{
@@ -84,9 +92,18 @@ job: {
 					},
 				]
 				volumes: [
+					if component.volumeTypes != _|_
 					for _, vt in component.volumeTypes
 					for _, vct in component.volumeClaimTemplates
 					if vt.type == "data" && vct.metadata.name == vt.name {
+						name: vct.metadata.name
+						persistentVolumeClaim: {
+							claimName: pvcName
+						}
+					},
+					if component.volumeTypes != _|_
+					for _, vct in component.volumeClaimTemplates
+					if vct.metadata.name == "data" {
 						name: vct.metadata.name
 						persistentVolumeClaim: {
 							claimName: pvcName

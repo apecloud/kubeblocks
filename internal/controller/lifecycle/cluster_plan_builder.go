@@ -284,7 +284,7 @@ func (c *clusterPlanBuilder) reconcileObject(node *ictrltypes.LifecycleVertex) e
 		if newCluster, ok := node.Obj.(*appsv1alpha1.Cluster); ok {
 			oldCluster, _ := node.ObjCopy.(*appsv1alpha1.Cluster)
 			c.emitConditionUpdatingEvent(oldCluster.Status.Conditions, newCluster.Status.Conditions)
-			c.emitPhaseUpdatingEvent(oldCluster.Status.Phase, newCluster.Status.Phase)
+			c.emitStatusUpdatingEvent(oldCluster.Status, newCluster.Status)
 		}
 	case ictrltypes.NOOP:
 		// nothing
@@ -339,12 +339,15 @@ func (c *clusterPlanBuilder) emitConditionUpdatingEvent(oldConditions, newCondit
 	}
 }
 
-func (c *clusterPlanBuilder) emitPhaseUpdatingEvent(oldPhase, newPhase appsv1alpha1.ClusterPhase) {
-	if oldPhase == newPhase {
+func (c *clusterPlanBuilder) emitStatusUpdatingEvent(oldStatus, newStatus appsv1alpha1.ClusterStatus) {
+	cluster := c.transCtx.Cluster
+	if !reflect.DeepEqual(oldStatus, newStatus) {
+		_ = opsutil.MarkRunningOpsRequestAnnotation(c.transCtx.Context, c.cli, cluster)
+	}
+	newPhase := newStatus.Phase
+	if newPhase == oldStatus.Phase {
 		return
 	}
-
-	cluster := c.transCtx.Cluster
 	eType := corev1.EventTypeNormal
 	message := ""
 	switch newPhase {
@@ -358,6 +361,5 @@ func (c *clusterPlanBuilder) emitPhaseUpdatingEvent(oldPhase, newPhase appsv1alp
 	}
 	if len(message) > 0 {
 		c.transCtx.EventRecorder.Event(cluster, eType, string(newPhase), message)
-		_ = opsutil.MarkRunningOpsRequestAnnotation(c.transCtx.Context, c.cli, cluster)
 	}
 }

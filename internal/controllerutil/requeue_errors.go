@@ -17,43 +17,69 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package types
+package controllerutil
 
 import (
 	"fmt"
 	"time"
 )
 
-// default reconcile requeue after duration
-var RequeueDuration = time.Millisecond * 100
-
 type RequeueError interface {
 	RequeueAfter() time.Duration
 	Reason() string
 }
 
-type realRequeueError struct {
-	reason       string
-	requeueAfter time.Duration
+type DelayedRequeueError interface {
+	RequeueError
+	Delayed()
 }
-
-func (r *realRequeueError) Error() string {
-	return fmt.Sprintf("requeue after: %v as: %s", r.requeueAfter, r.reason)
-}
-
-func (r *realRequeueError) RequeueAfter() time.Duration {
-	return r.requeueAfter
-}
-
-func (r *realRequeueError) Reason() string {
-	return r.reason
-}
-
-var _ RequeueError = &realRequeueError{}
 
 func NewRequeueError(after time.Duration, reason string) error {
-	return &realRequeueError{
+	return &requeueError{
 		reason:       reason,
 		requeueAfter: after,
 	}
 }
+
+// NewDelayedRequeueError creates a delayed requeue error which only returns in the last step of the DAG.
+func NewDelayedRequeueError(after time.Duration, reason string) error {
+	return &delayedRequeueError{
+		requeueError{
+			reason:       reason,
+			requeueAfter: after,
+		},
+	}
+}
+
+func IsDelayedRequeueError(err error) bool {
+	if _, ok := err.(DelayedRequeueError); ok {
+		return true
+	}
+	return false
+}
+
+type requeueError struct {
+	reason       string
+	requeueAfter time.Duration
+}
+
+type delayedRequeueError struct {
+	requeueError
+}
+
+var _ RequeueError = &requeueError{}
+var _ DelayedRequeueError = &delayedRequeueError{}
+
+func (r *requeueError) Error() string {
+	return fmt.Sprintf("requeue after: %v as: %s", r.requeueAfter, r.reason)
+}
+
+func (r *requeueError) RequeueAfter() time.Duration {
+	return r.requeueAfter
+}
+
+func (r *requeueError) Reason() string {
+	return r.reason
+}
+
+func (r *delayedRequeueError) Delayed() {}

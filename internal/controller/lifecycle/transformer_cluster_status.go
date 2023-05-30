@@ -166,10 +166,10 @@ func (t *ClusterStatusTransformer) doAnalysisAndUpdateSynchronizer(dag *graph.DA
 		switch v.Phase {
 		case appsv1alpha1.AbnormalClusterCompPhase, appsv1alpha1.FailedClusterCompPhase:
 			t.existsAbnormalOrFailed, t.notReadyCompNames[k] = true, struct{}{}
-		case appsv1alpha1.RunningClusterCompPhase, appsv1alpha1.SpecReconcilingClusterCompPhase:
+		case appsv1alpha1.RunningClusterCompPhase:
 			// if !isComponentInHorizontalScaling(dag, k) {
 			runningCompCount += 1
-			// }
+			//  }
 		case appsv1alpha1.StoppedClusterCompPhase:
 			stoppedCompCount += 1
 		}

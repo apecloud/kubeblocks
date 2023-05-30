@@ -91,7 +91,7 @@ const (
 )
 
 var (
-	// systemAccountLog is a logger for use during runtime
+	// systemAccountLog is a logger during runtime
 	systemAccountLog logr.Logger
 )
 
@@ -158,7 +158,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	componentVersions := clusterVersion.Spec.GetDefNameMappingComponents()
 
-	// process accounts per component
+	// process accounts for each component
 	processAccountsForComponent := func(compDef *appsv1alpha1.ClusterComponentDefinition, compDecl *appsv1alpha1.ClusterComponentSpec,
 		svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints) error {
 		var (
@@ -295,7 +295,7 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 	for _, ep := range retrieveEndpoints(policy.Scope, svcEP, headlessEP) {
 		// render a job object
 		job := renderJob(engine, compKey, stmts, ep)
-		// before create job, we adjust job's attributes, such as labels, tolerations w.r.t cluster info.
+		// before creating job, we adjust job's attributes, such as labels, tolerations w.r.t cluster info.
 		if err := calibrateJobMetaAndSpec(job, cluster, compKey, account.Name); err != nil {
 			return err
 		}
@@ -352,7 +352,7 @@ func (r *SystemAccountReconciler) isComponentReady(reqCtx intctrlutil.RequestCtx
 	if headlessSvcErr != nil {
 		return false, nil, nil, headlessSvcErr
 	}
-	// either service or endpoints is not ready.
+	// Neither service nor endpoints is ready.
 	if len(svcEP.Subsets) == 0 || len(headlessEP.Subsets) == 0 {
 		return false, nil, nil, nil
 	}
@@ -365,7 +365,7 @@ func (r *SystemAccountReconciler) isComponentReady(reqCtx intctrlutil.RequestCtx
 	return true, svcEP, headlessEP, nil
 }
 
-// getAccountFacts parse secrets for given cluster as facts, i.e., accounts created
+// getAccountFacts parses secrets for given cluster as facts, i.e., accounts created
 // TODO: @shanshan, should verify accounts on database cluster as well.
 func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx, key componentUniqueKey) (appsv1alpha1.KBAccountType, error) {
 	// get account facts, i.e., secrets created

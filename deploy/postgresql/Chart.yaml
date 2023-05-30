@@ -9,10 +9,10 @@ version: 0.5.1-beta.0
 # The helm chart contains multiple kernel versions of PostgreSQL (with Patroni HA),
 # and each PostgreSQL (with Patroni HA) version corresponds to a clusterVersion object.
 # appVersion should be consistent with the highest PostgreSQL (with Patroni HA) kernel version in clusterVersion.
-appVersion: "14.7.1"
+appVersion: "14.7.2"
 
 annotations:
-  kubeblocks.io/clusterVersions: "14.7.1,12.14.0"
+  kubeblocks.io/clusterVersions: "14.7.2,12.14.0"
   kubeblocks.io/multiCV: "true"
 
 home: https://kubeblocks.io/

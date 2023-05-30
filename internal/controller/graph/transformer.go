@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/tools/record"
 
 	"github.com/apecloud/kubeblocks/internal/controller/client"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // TransformContext is used by Transformer.Transform
@@ -51,12 +52,19 @@ var ErrPrematureStop = errors.New("Premature-Stop")
 
 // ApplyTo applies TransformerChain t to dag
 func (r TransformerChain) ApplyTo(ctx TransformContext, dag *DAG) error {
+	var delayedError error
 	for _, transformer := range r {
 		if err := transformer.Transform(ctx, dag); err != nil {
+			if intctrlutil.IsDelayedRequeueError(err) {
+				if delayedError == nil {
+					delayedError = err
+				}
+				continue
+			}
 			return ignoredIfPrematureStop(err)
 		}
 	}
-	return nil
+	return delayedError
 }
 
 func ignoredIfPrematureStop(err error) error {

@@ -54,7 +54,7 @@ func (r *reconfigureAction) ActionStartedCondition(opsRequest *appsv1alpha1.OpsR
 	return appsv1alpha1.NewReconfigureCondition(opsRequest)
 }
 
-// SaveLastConfiguration this operation can not change in Cluster.spec.
+// SaveLastConfiguration this operation does not change Cluster.spec.
 func (r *reconfigureAction) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return nil
 }
@@ -294,7 +294,7 @@ func (r *reconfigureAction) doMergeAndPersist(reqCtx intctrlutil.RequestCtx,
 		configSpec := foundConfigSpec(config.Name)
 		if configSpec == nil {
 			return processMergedFailed(resource, true,
-				cfgcore.MakeError("failed to reconfigure, not exist config[%s], all configs: %v", config.Name, getConfigSpecName(configSpecs)))
+				cfgcore.MakeError("failed to reconfigure, not existed config[%s], all configs: %v", config.Name, getConfigSpecName(configSpecs)))
 		}
 		if len(configSpec.ConfigConstraintRef) == 0 {
 			return processMergedFailed(resource, true,

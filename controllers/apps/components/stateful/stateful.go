@@ -117,7 +117,7 @@ func (r *Stateful) HandleHA(ctx context.Context, obj client.Object) ([]graph.Ver
 	return nil, nil
 }
 
-// HandleUpdateWithProcessors extended HandleUpdate() with custom processors
+// HandleUpdateWithProcessors extends HandleUpdate() with custom processors
 // REVIEW/TODO: (nashtsai)
 //  1. too many args
 func (r *Stateful) HandleUpdateWithProcessors(ctx context.Context, obj client.Object,
@@ -146,7 +146,7 @@ func (r *Stateful) HandleUpdateWithProcessors(ctx context.Context, obj client.Ob
 		return err
 	}
 
-	// update cluster.status.component.consensusSetStatus based on all pods currently exist
+	// update cluster.status.component.consensusSetStatus when all pods currently exist
 	if compStatusProcessor != nil {
 		componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
 		if err = compStatusProcessor(componentDef, pods, componentName); err != nil {
@@ -155,15 +155,15 @@ func (r *Stateful) HandleUpdateWithProcessors(ctx context.Context, obj client.Ob
 	}
 
 	// prepare to do pods Deletion, that's the only thing we should do,
-	// the statefulset reconciler will do the others.
-	// to simplify the process, we do pods Deletion after statefulset reconcile done,
+	// the statefulset reconciler will do the rest.
+	// to simplify the process, we do pods Deletion after statefulset reconciliation done,
 	// that is stsObj.Generation == stsObj.Status.ObservedGeneration
 	if stsObj.Generation != stsObj.Status.ObservedGeneration {
 		return nil
 	}
 
-	// then we wait all pods' presence, that is len(pods) == stsObj.Spec.Replicas
-	// only then, we have enough info about the previous pods before delete the current one
+	// then we wait for all pods' presence, that is len(pods) == stsObj.Spec.Replicas
+	// at that point, we have enough info about the previous pods before delete the current one
 	if len(pods) != int(*stsObj.Spec.Replicas) {
 		return nil
 	}

@@ -97,8 +97,8 @@ var ValueTypeParserMap = map[ValueType]ValueParser{
 }
 
 func main() {
-	// The source file format is per line per parameter, the fields are separated by tabs, and the fields are as follows:
-	// parameter name | default value | value restrict |  is immutable(true/false) | value type(boolean/integer/string) | change type(static/dynamic) | description
+	// The source file format is one line per parameter, the fields are separated by tabs, and the fields are as follows:
+	// parameter name | default value | value restriction |  is immutable(true/false) | value type(boolean/integer/string) | change type(static/dynamic) | description
 	// file format example:
 	// default_authentication_plugin\tmysql_native_password\tmysql_native_password, sha256_password, caching_sha2_password\tfalse\string\tstatic\tThe default authentication plugin
 

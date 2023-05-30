@@ -33,8 +33,8 @@ backup_job: {
 	apiVersion: "dataprotection.kubeblocks.io/v1alpha1"
 	kind:       "Backup"
 	metadata: {
-		name: backup_job_key.Name
-		namespace:    backup_job_key.Namespace
+		name:      backup_job_key.Name
+		namespace: backup_job_key.Namespace
 		labels: {
 			"dataprotection.kubeblocks.io/backup-type":         backup_type
 			"apps.kubeblocks.io/managed-by":                    "cluster"

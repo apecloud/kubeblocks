@@ -46,14 +46,14 @@ spec:
         checkName: Check-K8S-Access
         outcomes:
           - fail:
-              message: k8s cluster access fail
+              message: K8s cluster access fail
           - pass:
-              message: k8s cluster access ok
+              message: K8s cluster access ok
     - taint:
         checkName: Required-Taint-Match
         outcomes:
           - fail:
-              message: all nodes had taints that the pod didn't tolerate
+              message: All nodes had taints that the pod didn't tolerate
           - pass:
               message: The taint matching succeeded
     - storageClass:
@@ -62,4 +62,4 @@ spec:
           - warn:
               message: The default storage class was not found. To learn more details, please check https://docs.aws.amazon.com/zh_cn/eks/latest/userguide/storage-classes.html; Alternatively use option --set storageClass=<storageClassName> when creating cluster
           - pass:
-              message: default storage class is the presence, and all good on storage classes
+              message: Default storage class is the presence, and all good on storage classes

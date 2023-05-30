@@ -62,8 +62,7 @@ func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.
 		// create new components or update existed components
 		err = c.transform4SpecUpdate(reqCtx, clusterDef, clusterVer, cluster, &dags4Component)
 	}
-	_, isRequeueError := err.(ictrltypes.RequeueError)
-	if err != nil && !isRequeueError {
+	if err != nil && !ictrlutil.IsDelayedRequeueError(err) {
 		return err
 	}
 
@@ -129,7 +128,7 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 			return err
 		}
 		if err := comp.Update(reqCtx, c.Client); err != nil {
-			if _, ok := err.(ictrltypes.RequeueError); ok {
+			if ictrlutil.IsDelayedRequeueError(err) {
 				*dags = append(*dags, dag)
 			}
 			return err
@@ -142,6 +141,7 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 
 func (c *ComponentTransformer) transform4StatusUpdate(reqCtx ictrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
+	var delayedError error
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		dag := graph.NewDAG()
 		comp, err := components.NewComponent(reqCtx, c.Client, clusterDef, clusterVer, cluster, compSpec.Name, dag)
@@ -149,9 +149,14 @@ func (c *ComponentTransformer) transform4StatusUpdate(reqCtx ictrlutil.RequestCt
 			return err
 		}
 		if err := comp.Status(reqCtx, c.Client); err != nil {
-			return err
+			if !ictrlutil.IsDelayedRequeueError(err) {
+				return err
+			}
+			if delayedError == nil {
+				delayedError = err
+			}
 		}
 		*dags = append(*dags, dag)
 	}
-	return nil
+	return delayedError
 }

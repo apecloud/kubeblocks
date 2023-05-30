@@ -28,7 +28,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 // ValidateAndLoadRefResourcesTransformer handles referenced resources'(cd & cv) validation and load them into context
@@ -49,7 +48,7 @@ func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformCo
 	validateExistence := func(key client.ObjectKey, object client.Object) error {
 		err = transCtx.Client.Get(transCtx.Context, key, object)
 		if err != nil {
-			return types2.NewRequeueError(types2.RequeueDuration, err.Error())
+			return newRequeueError(requeueDuration, err.Error())
 		}
 		return nil
 	}
@@ -76,7 +75,7 @@ func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformCo
 			message = fmt.Sprintf("%s, cv: %s", message, cv.Name)
 		}
 		err = errors.New(message)
-		return types2.NewRequeueError(types2.RequeueDuration, message)
+		return newRequeueError(requeueDuration, message)
 	}
 
 	// inject cd & cv into the shared ctx

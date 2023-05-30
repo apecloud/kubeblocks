@@ -338,7 +338,7 @@ func TestRenderCreationStmt(t *testing.T) {
 	}
 
 	for _, account := range accountsSetting.Accounts {
-		// for each accounts, we randomly remove deletion stmt
+		// for each account, we randomly remove deletion stmt
 		if account.ProvisionPolicy.Type == appsv1alpha1.CreateByStmt {
 			toss := rand.Intn(10) % 2
 			if toss == 1 {
@@ -415,7 +415,7 @@ func TestMergeSystemAccountConfig(t *testing.T) {
 	if len(systemAccount.CmdExecutorConfig.Env) > 0 {
 		assert.True(t, reflect.DeepEqual(accountConfig.Env, systemAccount.CmdExecutorConfig.Env))
 	}
-	// sepc with empty envs
+	// spec with empty envs
 	accountConfig = systemAccount.CmdExecutorConfig.DeepCopy()
 	componentVersion.SystemAccountSpec = &appsv1alpha1.SystemAccountShortSpec{
 		CmdExecutorConfig: &appsv1alpha1.CommandExecutorEnvItem{
@@ -428,7 +428,7 @@ func TestMergeSystemAccountConfig(t *testing.T) {
 	assert.Equal(t, mockImageName, accountConfig.Image)
 	assert.Len(t, accountConfig.Env, 0)
 
-	// sepc with envs
+	// spec with envs
 	testEnv := corev1.EnvVar{
 		Name:  "test-env",
 		Value: "test-value",

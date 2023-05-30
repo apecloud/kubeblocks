@@ -628,13 +628,12 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 		objs, err := doBackup(reqCtx, cli, c.Cluster, c.Component, backupKey, stsProto, stsObj)
 		if err != nil {
 			// if it's requeue error, create object before return error
-			if _, ok := err.(ictrltypes.RequeueError); ok {
-				createObjs(objs)
+			if !intctrlutil.IsDelayedRequeueError(err) {
+				return err
 			}
-			return err
 		}
 		createObjs(objs)
-		return nil
+		return err
 	}
 	// pvcs are ready, stateful_set.replicas should be updated
 	c.WorkloadVertex.Immutable = false
@@ -736,10 +735,12 @@ func (c *StatefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet) bool 
 	// keep the original template annotations.
 	// if annotations exist and are replaced, the statefulSet will be updated.
 	util.MergeAnnotations(stsObjCopy.Spec.Template.Annotations, &stsProto.Spec.Template.Annotations)
+	util.BuildWorkLoadAnnotations(stsObjCopy, c.Cluster)
 	stsObjCopy.Spec.Template = stsProto.Spec.Template
 	stsObjCopy.Spec.Replicas = stsProto.Spec.Replicas
 	stsObjCopy.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
+		// TODO(REVIEW): always return true and update component phase to Updating. stsObj.Spec contains default values which set by Kubernetes
 		c.WorkloadVertex.Obj = stsObjCopy
 		c.WorkloadVertex.Action = ictrltypes.ActionPtr(ictrltypes.UPDATE)
 		return true

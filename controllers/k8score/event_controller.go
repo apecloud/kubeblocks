@@ -149,7 +149,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 		return "", nil
 	}
 
-	// if probe event operation is not impl, check role failed or role invalid, ignore it
+	// if probe event operation is not implemented, check role failed or invalid, ignore it
 	if message.Event == ProbeEventOperationNotImpl || message.Event == ProbeEventCheckRoleFailed || message.Event == ProbeEventRoleInvalid {
 		reqCtx.Log.Info("probe event failed", "message", message.Message)
 		return "", nil
@@ -178,7 +178,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	}, cluster); err != nil {
 		return role, err
 	}
-	reqCtx.Log.V(1).Info("handle role change event", "cluster", cluster.Name, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
+	reqCtx.Log.V(1).Info("handle role changed event", "cluster", cluster.Name, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
 	compName, componentDef, err := componentutil.GetComponentInfoByPod(reqCtx.Ctx, cli, *cluster, pod)
 	if err != nil {
 		return role, err

@@ -32,7 +32,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 type HaltRecoveryTransformer struct{}
@@ -55,7 +54,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err := transCtx.Client.List(transCtx.Context, pvcList, listOptions...); err != nil {
-		return types.NewRequeueError(types.RequeueDuration, err.Error())
+		return newRequeueError(requeueDuration, err.Error())
 	}
 
 	if len(pvcList.Items) == 0 {
@@ -90,7 +89,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 
 	lc := &appsv1alpha1.Cluster{}
 	if err := json.Unmarshal([]byte(l), lc); err != nil {
-		return types.NewRequeueError(types.RequeueDuration, err.Error())
+		return newRequeueError(requeueDuration, err.Error())
 	}
 
 	// skip if same cluster UID

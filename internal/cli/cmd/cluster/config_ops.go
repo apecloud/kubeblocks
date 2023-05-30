@@ -96,7 +96,7 @@ func (o *configOpsOptions) Validate() error {
 	if o.editMode {
 		return nil
 	}
-	if err := o.validateConfigParams(o.wrapper.ConfigSpec()); err != nil {
+	if err := o.validateConfigParams(o.wrapper.ConfigTemplateSpec()); err != nil {
 		return err
 	}
 	o.printConfigureTips()

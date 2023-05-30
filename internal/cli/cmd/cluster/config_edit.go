@@ -89,7 +89,7 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		o.CfgFile: cfgEditContext.getEdited(),
 	}
 
-	configSpec := wrapper.ConfigSpec()
+	configSpec := wrapper.ConfigTemplateSpec()
 	configConstraintKey := client.ObjectKey{
 		Namespace: "",
 		Name:      configSpec.ConfigConstraintRef,
@@ -133,7 +133,7 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 	validatedData := map[string]string{
 		o.CfgFile: cfgEditContext.getEdited(),
 	}
-	options := cfgcore.WithKeySelector(wrapper.ConfigSpec().Keys)
+	options := cfgcore.WithKeySelector(wrapper.ConfigTemplateSpec().Keys)
 	if err = cfgcore.NewConfigValidator(&configConstraint.Spec, options).Validate(validatedData); err != nil {
 		return cfgcore.WrapError(err, "failed to validate edited config")
 	}

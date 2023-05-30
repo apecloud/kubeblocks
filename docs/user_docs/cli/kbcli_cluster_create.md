@@ -17,6 +17,9 @@ kbcli cluster create [NAME] [flags]
   # --cluster-definition is required, if --cluster-version is not specified, will use the most recently created version
   kbcli cluster create mycluster --cluster-definition apecloud-mysql
   
+  # --edit is used to edit the cluster resource before creating the cluster
+  # kbcli cluster create mycluster --cluster-definition apecloud-mysql --edit
+  
   # Output resource information in YAML format, but do not create resources.
   kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run -o yaml
   
@@ -84,10 +87,12 @@ kbcli cluster create [NAME] [flags]
 ### Options
 
 ```
+      --auto-approve                   Skip interactive approval before create cluster.
       --backup string                  Set a source backup to restore data
       --cluster-definition string      Specify cluster definition, run "kbcli cd list" to show all available cluster definitions
       --cluster-version string         Specify cluster version, run "kbcli cv list" to show all available cluster versions, use the latest version if not specified
       --dry-run string[="unchanged"]   Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --edit                           Edit the cluster resource before creating
       --enable-all-logs                Enable advanced application all log extraction, and true will ignore enabledLogs of component level, default is false
   -h, --help                           help for create
       --monitor                        Set monitor enabled and inject metrics exporter (default true)

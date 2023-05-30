@@ -18,7 +18,9 @@ release_note_template_path = "docs/release_notes/template.md"
 
 def main(argv: list[str]) -> None:
     """
-    :param: the kbcli version and the sha256 files direct
+    :param1: the kbcli version
+    :param2: the sha256 files direct
+    :param3: github TOKENS
     :return None
     """
     kbcli_version = argv[1]
@@ -42,7 +44,11 @@ def main(argv: list[str]) -> None:
         for file in os.listdir(sha256_direct):
             with open(os.path.join(sha256_direct, file),"r") as f:
                 f_dest.write(f.read())
+                f_dest.write('\n')
     print("Done")
+    with open(release_note_path, 'r') as f:
+        release_note = f.read()
+
 
 if __name__ == "__main__":
     main(sys.argv)

@@ -92,9 +92,9 @@ jobs:
           cp ${{ matrix.os }}/${{ env.CLI_NAME }}.exe bin/
           zip -r -o ${{ env.CLI_FILENAME }}.zip  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.zip  # for debug 
-          mv ${{ env.CLI_FILENAME }}.zip bin/
           mkdir -p sha256
-          shasum -a 256 bin/${{ env.CLI_FILENAME }}.zip > sha256/${{ env.CLI_FILENAME }}.zip.sha256.txt
+          shasum -a 256 ${{ env.CLI_FILENAME }}.zip > sha256/${{ env.CLI_FILENAME }}.zip.sha256.txt
+          mv ${{ env.CLI_FILENAME }}.zip bin/
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.zip" >> $GITHUB_ENV
           echo "ASSET_CONTENT_TYPE=application/zip" >> $GITHUB_ENV
           echo "CheckSum=${{ env.CLI_FILENAME }}.zip.sha256.txt" >> $GITHUB_ENV
@@ -105,9 +105,9 @@ jobs:
           mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }} 
           tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.tar.gz  # for debug 
-          mv ${{ env.CLI_FILENAME }}.tar.gz bin/
           mkdir -p sha256
-          shasum -a 256 bin/${{ env.CLI_FILENAME }}.tar.gz > sha256/${{ env.CLI_FILENAME }}.tar.gz.sha256.txt
+          shasum -a 256 ${{ env.CLI_FILENAME }}.tar.gz > sha256/${{ env.CLI_FILENAME }}.tar.gz.sha256.txt
+          mv ${{ env.CLI_FILENAME }}.tar.gz bin/
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.tar.gz" >> $GITHUB_ENV
           echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
           echo "CheckSum=${{ env.CLI_FILENAME }}.tar.gz.sha256.txt" >> $GITHUB_ENV
@@ -181,12 +181,19 @@ jobs:
           python ./.github/utils/generate_kbcli_sha256.py ${{ env.TAG_NAME }} sha256
 
       - name: release kbcli with release notes
-        uses: softprops/action-gh-release@v1
-        with:
-          body_path: ./docs/release_notes/${{ env.TAG_NAME }}/kbcli.md
-          token: ${{ env.GITLAB_ACCESS_TOKEN }}
-          name: KBCLI ${{ github.ref_name }}
-          tag_name: ${{ github.ref_name }}
+        run: |
+          release_note=$(sed -e ':a' -e 'N' -e '$!ba' ./docs/release_notes/${{ env.TAG_NAME }}/kbcli.md)
+#          sed -e ':a' -e 'N' -e '$!ba' ./docs/release_notes/${{ env.TAG_NAME }}/kbcli.md > release_note\
+#          sed -e ':a' -e 'N' -e '$!ba' ./docs/release_notes/v0.5.0/kbcli.md > release_note
+#          tr '\n' '\r\n' < release_note
+#          echo ${release_note}
+          curl -L \
+          -X PATCH \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer ${{ env.GITLAB_ACCESS_TOKEN }}"\
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          https://api.github.com/repos/apecloud/kbcli/releases/tags/${{ env.TAG_NAME }} \
+          -d '{"body":"'"$release_note"'"}'
 
       - name: remove artifact
         uses: geekyeggo/delete-artifact@v2

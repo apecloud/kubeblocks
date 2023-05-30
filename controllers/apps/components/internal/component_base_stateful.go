@@ -477,6 +477,9 @@ func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, c
 		return err
 	}
 
+	// update KB_<component-type>_<pod-idx>_<hostname> env needed by pod to obtain hostname.
+	c.updatePodEnvConfig()
+
 	reqCtx.Recorder.Eventf(c.Cluster,
 		corev1.EventTypeNormal,
 		"HorizontalScale",
@@ -489,6 +492,17 @@ func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, c
 // < 0 for scale in, > 0 for scale out, and == 0 for nothing
 func (c *StatefulComponentBase) horizontalScaling(stsObj *appsv1.StatefulSet) int {
 	return int(c.Component.Replicas - *stsObj.Spec.Replicas)
+}
+
+func (c *StatefulComponentBase) updatePodEnvConfig() {
+	for _, v := range ictrltypes.FindAll[*corev1.ConfigMap](c.Dag) {
+		node := v.(*ictrltypes.LifecycleVertex)
+		// TODO: need a way to reference the env config.
+		envConfigName := fmt.Sprintf("%s-%s-env", c.GetClusterName(), c.GetName())
+		if node.Obj.GetName() == envConfigName {
+			node.Action = ictrltypes.ActionUpdatePtr()
+		}
+	}
 }
 
 func (c *StatefulComponentBase) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.RequestCtx, cli client.Client, replicas int32) error {

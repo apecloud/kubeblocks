@@ -40,7 +40,6 @@ To address these challenges, and solve the problem of complexity, KubeBlocks int
 
 - Enhance stateful workloads on Kubernetes, being open-source and cloud-neutral.
 - Manage data infrastructure without a high cognitive load of cloud computing, Kubernetes, and database knowledge.
-- Be community-driven, embracing extensibility, and providing domain functions without vendor lock-in.
 - Reduce costs by only paying for the infrastructure and increasing the utilization of resources with flexible scheduling.
 - Support the most popular RDBMS, NoSQL, streaming and analytical systems, and their bundled tools.
 - Provide the most advanced user experience based on the concepts of IaC and GitOps.

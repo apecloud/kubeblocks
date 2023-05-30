@@ -408,9 +408,11 @@ patch_release_notes() {
 
     release_id=`gh_curl -s $GITHUB_API/repos/$GITHUB_REPO/releases/tags/$TAG_NAME | jq -r '.id'`
 
-    gh_curl -X PATCH \
+    curl -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3.raw" \
+           -X PATCH \
     $GITHUB_API/repos/$GITHUB_REPO/releases/$release_id \
-    -d '{body:"'$release_note'"}'
+    -d '{"body":"'$release_note'"}'
 }
 
 main "$@"

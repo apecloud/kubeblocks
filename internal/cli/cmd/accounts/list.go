@@ -23,7 +23,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/internal/sqlchannel"
+	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type ListUserOptions struct {
@@ -32,7 +32,7 @@ type ListUserOptions struct {
 
 func NewListUserOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *ListUserOptions {
 	return &ListUserOptions{
-		AccountBaseOptions: NewAccountBaseOptions(f, streams, sqlchannel.ListUsersOp),
+		AccountBaseOptions: NewAccountBaseOptions(f, streams, channelutil.ListUsersOp),
 	}
 }
 func (o ListUserOptions) Validate(args []string) error {

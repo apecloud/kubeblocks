@@ -11,7 +11,7 @@ kbcli cluster volume-expand NAME [flags]
 ### Examples
 
 ```
-  # restart specifies the component, separate with commas when <component-name> more than one
+  # restart specifies the component, separate with commas for multiple components
   kbcli cluster volume-expand mycluster --components=mysql --volume-claim-templates=data --storage=10Gi
 ```
 

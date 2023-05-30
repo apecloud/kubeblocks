@@ -9,7 +9,7 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 #  TAG_NAME: ${{ github.ref_name }}
-  TAG_NAME: "v0.5.99"
+  TAG_NAME: "v0.5.98"
   GO_VERSION: "1.20"
   CLI_NAME: 'kbcli'
   CLI_REPO: 'apecloud/kbcli'

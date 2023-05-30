@@ -3,7 +3,7 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: kb-default-data
+  name: kb-default-sc
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 allowVolumeExpansion: true
@@ -20,7 +20,7 @@ volumeBindingMode: WaitForFirstConsumer
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: kb-default-data
+  name: kb-default-sc
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 allowVolumeExpansion: true
@@ -37,7 +37,7 @@ volumeBindingMode: WaitForFirstConsumer
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: kb-default-data
+  name: kb-default-sc
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 allowVolumeExpansion: true
@@ -54,7 +54,7 @@ volumeBindingMode: WaitForFirstConsumer
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: kb-default-data
+  name: kb-default-sc
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 parameters:
@@ -71,7 +71,7 @@ volumeBindingMode: WaitForFirstConsumer
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: kb-default-data
+  name: kb-default-sc
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 parameters:

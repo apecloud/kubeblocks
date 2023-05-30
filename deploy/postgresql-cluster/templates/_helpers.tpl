@@ -66,9 +66,9 @@ Create the name of the storageClass to use
 lookup function refer: https://helm.sh/docs/chart_template_guide/functions_and_pipelines/#using-the-lookup-function
 */}}
 {{- define "postgresqlcluster.storageClassName" -}}
-{{- $sc := (lookup "v1" "StorageClass" "" "kb-default-data") }}
+{{- $sc := (lookup "v1" "StorageClass" "" "kb-default-sc") }}
 {{- if $sc }}
-  {{- printf "kb-default-data" -}}
+  {{- printf "kb-default-sc" -}}
 {{- else }}
   {{- printf "%s" $.Values.persistence.data.storageClassName -}}
 {{- end -}}

@@ -1,10 +1,13 @@
 package configuration_store
 
 import (
+	"bytes"
 	"context"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/remotecommand"
 	"os"
 	"strconv"
 	"strings"
@@ -122,6 +125,10 @@ func (cs *ConfigurationStore) GetCluster() *Cluster {
 	return cs.cluster
 }
 
+func (cs *ConfigurationStore) GetClusterName() string {
+	return cs.clusterName
+}
+
 func (cs *ConfigurationStore) GetClusterFromKubernetes() error {
 	podList, err := cs.clientSet.CoreV1().Pods(cs.namespace).List(cs.ctx, metav1.ListOptions{})
 	if err != nil || podList == nil {
@@ -220,6 +227,43 @@ func (cs *ConfigurationStore) GetClusterObj() (*unstructured.Unstructured, error
 
 func (cs *ConfigurationStore) UpdateClusterObj(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	return cs.dynamicClient.Resource(types.ClusterGVR()).Namespace(cs.namespace).Update(cs.ctx, obj, metav1.UpdateOptions{})
+}
+
+func (cs *ConfigurationStore) ExecCmdWithPod(ctx context.Context, podName, cmd, container string) (map[string]string, error) {
+	req := cs.clientSet.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(podName).
+		Namespace(cs.namespace).
+		SubResource("exec").
+		VersionedParams(&v1.PodExecOptions{
+			Container: container,
+			Command:   []string{"sh", "-c", cmd},
+			Stdin:     true,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       false,
+		}, scheme.ParameterCodec)
+
+	exec, err := remotecommand.NewSPDYExecutor(cs.config, "POST", req.URL())
+	if err != nil {
+		return nil, err
+	}
+
+	var stdout, stderr bytes.Buffer
+	if err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
+		Stdin:  strings.NewReader(""),
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}); err != nil {
+		return nil, err
+	}
+
+	res := map[string]string{
+		"stdout": stdout.String(),
+		"stderr": stderr.String(),
+	}
+
+	return res, nil
 }
 
 type LeaderRecord struct {

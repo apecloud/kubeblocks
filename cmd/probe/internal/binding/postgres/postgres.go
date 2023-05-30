@@ -23,9 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/ha"
-	"github.com/apecloud/kubeblocks/internal/sqlchannel"
 	"strconv"
 	"strings"
 	"sync"
@@ -39,7 +36,10 @@ import (
 	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/ha"
 	. "github.com/apecloud/kubeblocks/cmd/probe/util"
+	"github.com/apecloud/kubeblocks/internal/sqlchannel"
 )
 
 // List of operations.
@@ -802,11 +802,12 @@ func (pgOps *PostgresOperations) GetExtra(ctx context.Context) map[string]string
 	return nil
 }
 
-func (pgOps *PostgresOperations) Promote() error {
+func (pgOps *PostgresOperations) Promote(podName string) error {
+
 	return nil
 }
 
-func (pgOps *PostgresOperations) Demote() error {
+func (pgOps *PostgresOperations) Demote(podName string) error {
 	return nil
 }
 

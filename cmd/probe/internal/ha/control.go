@@ -1,13 +1,16 @@
 package ha
 
 import (
-	"github.com/apecloud/kubeblocks/cmd/probe/util"
 	"os"
 	"time"
 
 	"github.com/dapr/kit/logger"
 	"golang.org/x/net/context"
-	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -17,15 +20,18 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
+	"github.com/apecloud/kubeblocks/cmd/probe/util"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 type Ha struct {
-	ctx      context.Context
-	podName  string
-	dbType   string
-	log      logger.Logger
-	Informer cache.SharedIndexInformer
-	cs       *configuration_store.ConfigurationStore
+	ctx               context.Context
+	podName           string
+	dbType            string
+	log               logger.Logger
+	configMapInformer cache.SharedIndexInformer
+	clusterInformer   cache.SharedInformer
+	cs                *configuration_store.ConfigurationStore
 	DB
 }
 
@@ -39,19 +45,37 @@ func NewHa() *Ha {
 	if err != nil {
 		panic(err)
 	}
+	dynamicClient, err := dynamic.NewForConfig(configs)
+	if err != nil {
+		panic(err)
+	}
 
 	sharedInformers := informers.NewSharedInformerFactory(clientSet, 10*time.Second)
-	informer := sharedInformers.Core().V1().ConfigMaps().Informer()
+	configMapInformer := sharedInformers.Core().V1().ConfigMaps().Informer()
+
+	resourceInterface := dynamicClient.Resource(types.ClusterGVR())
+	listWatch := cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			return resourceInterface.List(context.Background(), options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return resourceInterface.Watch(context.Background(), options)
+		},
+		DisableChunking: false,
+	}
+	obj := unstructured.Unstructured{}
+	clusterInformer := cache.NewSharedInformer(&listWatch, &obj, 10*time.Second)
 
 	cs := configuration_store.NewConfigurationStore()
 
 	ha := &Ha{
-		ctx:      context.Background(),
-		podName:  os.Getenv(util.HostName),
-		dbType:   os.Getenv(util.KbServiceCharacterType),
-		log:      logger.NewLogger("ha"),
-		Informer: informer,
-		cs:       cs,
+		ctx:               context.Background(),
+		podName:           os.Getenv(util.HostName),
+		dbType:            os.Getenv(util.KbServiceCharacterType),
+		log:               logger.NewLogger("ha"),
+		configMapInformer: configMapInformer,
+		clusterInformer:   clusterInformer,
+		cs:                cs,
 	}
 
 	ha.DB = ha.newDbInterface(ha.log)
@@ -99,33 +123,49 @@ func (h *Ha) newDbExtra() map[string]string {
 }
 
 func (h *Ha) HaControl(stopCh chan struct{}) {
-	h.Informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	h.configMapInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: h.UpdateRecall,
 	})
 
-	h.Informer.Run(stopCh)
+	h.clusterInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: h.clusterUpdateRecall,
+	})
+
+	h.configMapInformer.Run(stopCh)
+	h.clusterInformer.Run(stopCh)
+}
+
+func (h *Ha) clusterUpdateRecall(oldObj, newObj interface{}) {
+	oldCluster := oldObj.(*unstructured.Unstructured)
+	newCluster := newObj.(*unstructured.Unstructured)
+	if oldCluster.GetName() != h.cs.GetClusterName() {
+		return
+	}
+
+	oldLeaderName := oldCluster.GetAnnotations()[configuration_store.LeaderName]
+	newLeaderName := newCluster.GetAnnotations()[configuration_store.LeaderName]
+	if oldLeaderName == newLeaderName {
+
+		return
+	}
+
+	if oldLeaderName == h.podName && newLeaderName != h.podName {
+		err := h.DB.Demote(h.podName)
+		if err != nil {
+			h.log.Errorf("demote failed, err:%v", err)
+		}
+	}
+	if oldLeaderName != h.podName && newLeaderName == h.podName {
+		err := h.DB.Promote(h.podName)
+		if err != nil {
+			h.log.Errorf("promote failed, err:%v", err)
+		}
+	}
+
 }
 
 func (h *Ha) UpdateRecall(oldObj, newObj interface{}) {
-	newConfigMap := newObj.(*corev1.ConfigMap)
-	oldConfigMap := oldObj.(*corev1.ConfigMap)
-	if oldConfigMap.Name != "test" {
-		return
-	}
-
-	oldPrimary := oldConfigMap.Data["primary"]
-	newPrimary := newConfigMap.Data["primary"]
-	if oldPrimary == newPrimary {
-		return
-	}
-
-	if h.podName == oldPrimary && h.podName != newPrimary {
-		_ = h.DB.Demote()
-	}
-
-	if h.podName != oldPrimary && h.podName == newPrimary {
-		_ = h.DB.Promote()
-	}
+	return
 }
 
 /*

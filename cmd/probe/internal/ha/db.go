@@ -5,8 +5,8 @@ import (
 )
 
 type DB interface {
-	Promote() error
-	Demote() error
+	Promote(podName string) error
+	Demote(podName string) error
 
 	GetStatus(ctx context.Context) (string, error)
 	GetExtra(ctx context.Context) map[string]string
@@ -21,7 +21,7 @@ type DbConn interface {
 }
 
 type DbTool interface {
-	ExecCmd(ctx context.Context, podName, namespace, cmd string) (map[string]string, error)
+	ExecCmd(ctx context.Context, podName, cmd string) (map[string]string, error)
 }
 
 type ProcessControl interface {

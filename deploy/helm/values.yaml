@@ -1515,6 +1515,11 @@ loki:
   test:
     enabled: false
   loki:
+    auth_enabled: false
+    commonConfig:
+      replication_factor: 1
+    storage:
+      type: filesystem
     podSecurityContext:
       runAsNonRoot: false
       runAsUser: 0

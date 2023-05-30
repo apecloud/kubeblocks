@@ -223,7 +223,7 @@ spec:
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
-                update: ALTER USER (USERNAME) IDENTIFIED BY '$(PASSWD)';
+                update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
           - name: kbmonitoring
             provisionPolicy: *kbReadonlyAcctRef
           - name: kbreplicator

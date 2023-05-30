@@ -46,13 +46,13 @@ In the actual environment, it is normal to install kbcli and KubeBlocks on the e
 Use the following command.
 
 ```bash
-curl -fsSL [https://www.kubeblocks.io/installer/install_cli.sh] | bash
+curl -fsSL https://www.kubeblocks.io/installer/install_cli.sh | bash
 ```
 
 To customize the version of kbcli, use the following command.
 
 ```bash
-curl -fsSL [https://kubeblocks.io/installer/install_cli.sh] |bash -s versionnumber
+curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s versionnumber
 ```
 
 **Step 2. Install KubeBlocks with kbcli kubeblocks install command**

@@ -43,13 +43,13 @@ You can install the kbcli and KubeBlocks on your local host, and now MacOS and W
 1. Install kbcli.
 
    ```bash
-   curl -fsSL [https://www.kubeblocks.io/installer/install_cli.sh] | bash
+   curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
    ```
 
    To customize the version of kbcli, use the following command.
 
    ```bash
-   curl -fsSL [https://kubeblocks.io/installer/install_cli.sh] |bash -s versionnumber
+   curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s versionnumber
    ```
 
 2. Run `kbcli version` to check the version of kbcli and ensure that it is successfully installed.

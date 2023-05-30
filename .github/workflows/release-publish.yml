@@ -178,6 +178,7 @@ jobs:
         run: |
           mkdir -p ./docs/release_notes/${{ env.TAG_NAME }}
           python ./.github/utils/generate_kbcli_sha256.py ${{ env.TAG_NAME }} sha256
+          
 
       - name: release kbcli with release notes
         run: |

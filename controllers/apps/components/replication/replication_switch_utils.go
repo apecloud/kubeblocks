@@ -102,7 +102,7 @@ func HandleReplicationSetHASwitch(ctx context.Context,
 		return nil
 	}
 
-	candidateInstanceChanged, currentPrimaryInstanceName, err := componentutil.CheckCandidateInstanceChanged(ctx, cli, cluster, clusterCompSpec)
+	candidateInstanceChanged, currentPrimaryInstanceName, err := componentutil.CheckCandidateInstanceChanged(ctx, cli, cluster, clusterCompSpec.Name)
 	if err != nil {
 		return err
 	}

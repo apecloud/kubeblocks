@@ -122,6 +122,10 @@ func (stateless *Stateless) HandleSwitchover(ctx context.Context, obj client.Obj
 	return nil, nil
 }
 
+func (stateless *Stateless) HandleFailover(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
+	return nil, nil
+}
+
 func newStateless(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	spec *appsv1alpha1.ClusterComponentSpec,

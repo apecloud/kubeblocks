@@ -21,6 +21,8 @@ spec:
     systemAccountSpec:
       cmdExecutorConfig:
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+    switchoverSpec:
+      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1
 
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -62,3 +64,5 @@ spec:
       systemAccountSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1
+      switchoverSpec:
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1

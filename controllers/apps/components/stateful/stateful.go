@@ -117,6 +117,10 @@ func (r *Stateful) HandleSwitchover(ctx context.Context, obj client.Object) ([]g
 	return nil, nil
 }
 
+func (r *Stateful) HandleFailover(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
+	return nil, nil
+}
+
 // HandleUpdateWithProcessors extends HandleUpdate() with custom processors
 // REVIEW/TODO: (nashtsai)
 //  1. too many args

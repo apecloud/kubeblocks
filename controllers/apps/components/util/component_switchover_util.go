@@ -34,23 +34,23 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlcomputil "github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// doSwitchover is used to perform switchover operations.
-func doSwitchover(ctx context.Context,
+// DoSwitchover is used to perform switchover operations.
+func DoSwitchover(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
-	componentDef *appsv1alpha1.ClusterComponentDefinition) error {
-	switchoverJob, err := renderSwitchoverCmdJob(ctx, cli, cluster, clusterCompSpec, componentDef)
+	component *component.SynthesizedComponent) error {
+	switchoverJob, err := renderSwitchoverCmdJob(ctx, cli, cluster, component)
 	if err != nil {
 		return err
 	}
 	// check the current generation switchoverJob whether exist
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: switchoverJob.Name}
-	ml := getSwitchoverCmdJobLabel(cluster.Name, clusterCompSpec.Name)
+	ml := getSwitchoverCmdJobLabel(cluster.Name, component.Name)
 	exists, _ := intctrlutil.CheckResourceExists(ctx, cli, key, &batchv1.Job{})
 	if !exists {
 		// check the previous generation switchoverJob whether exist
@@ -72,12 +72,12 @@ func doSwitchover(ctx context.Context,
 	}
 
 	// check pod role label consistency
-	ok, err := checkPodRoleLabelConsistencyAfterSwitchover(ctx, cli, cluster, clusterCompSpec)
+	ok, err := checkPodRoleLabelConsistencyAfterSwitchover(ctx, cli, cluster, component)
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return errors.New("pod role label consistency check failed")
+		return errors.New("pod role label consistency check failed after switchover")
 	}
 
 	// delete the successful job
@@ -91,43 +91,47 @@ func doSwitchover(ctx context.Context,
 func CheckCandidateInstanceChanged(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (bool, string, error) {
-	if clusterCompSpec == nil || clusterCompSpec.CandidateInstance == nil {
+	componentName string) (bool, string, error) {
+	compSpec := GetClusterComponentSpecByName(*cluster, componentName)
+	if compSpec.CandidateInstance == nil {
 		return false, "", nil
 	}
 	// get the Pod object whose current role label is primary or leader
-	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, *clusterCompSpec)
+	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, compSpec.Name)
 	if err != nil {
 		return false, "", err
 	}
 	if pod == nil {
 		return false, "", nil
 	}
-	candidateInstanceName := fmt.Sprintf("%s-%s-%d", cluster.Name, clusterCompSpec.Name, clusterCompSpec.CandidateInstance.Index)
-	if clusterCompSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual {
+	candidateInstanceName := fmt.Sprintf("%s-%s-%d", cluster.Name, componentName, compSpec.CandidateInstance.Index)
+	if compSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual {
 		return pod.Name != candidateInstanceName, pod.Name, nil
 	}
-	if clusterCompSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpNotEqual {
+	if compSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpNotEqual {
 		return pod.Name == candidateInstanceName, pod.Name, nil
 	}
 	return false, pod.Name, nil
 }
 
 // getPrimaryOrLeaderPod returns the leader or primary pod of the component.
-func getPrimaryOrLeaderPod(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compSpec appsv1alpha1.ClusterComponentSpec) (*corev1.Pod, error) {
-	compDef, err := GetComponentDefByCluster(ctx, cli, cluster, compSpec.ComponentDefRef)
+func getPrimaryOrLeaderPod(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, componentName string) (*corev1.Pod, error) {
+	var (
+		err     error
+		podList *corev1.PodList
+	)
+	compDef, err := GetComponentDefByCluster(ctx, cli, cluster, componentName)
 	if err != nil {
 		return nil, err
 	}
 	if !slices.Contains(getSupportSwitchoverWorkload(), compDef.WorkloadType) {
 		return nil, errors.New("component does not support switchover")
 	}
-	var podList *corev1.PodList
 	switch compDef.WorkloadType {
 	case appsv1alpha1.Replication:
-		podList, err = GetComponentPodListWithRole(ctx, cli, cluster, compSpec.Name, constant.Primary)
+		podList, err = GetComponentPodListWithRole(ctx, cli, cluster, componentName, constant.Primary)
 	case appsv1alpha1.Consensus:
-		podList, err = GetComponentPodListWithRole(ctx, cli, cluster, compSpec.Name, constant.Leader)
+		podList, err = GetComponentPodListWithRole(ctx, cli, cluster, componentName, constant.Leader)
 	}
 	if err != nil {
 		return nil, err
@@ -136,19 +140,6 @@ func getPrimaryOrLeaderPod(ctx context.Context, cli client.Client, cluster appsv
 		return nil, errors.New("component pod list is empty or has more than one pod")
 	}
 	return &podList.Items[0], nil
-}
-
-// getPrimaryOrLeaderPodOrdinal returns the leader or primary pod ordinal of the component
-func getPrimaryOrLeaderPodOrdinal(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compSpec appsv1alpha1.ClusterComponentSpec) (int, error) {
-	pod, err := getPrimaryOrLeaderPod(ctx, cli, cluster, compSpec)
-	if err != nil {
-		return -1, err
-	}
-	if pod == nil {
-		return -1, nil
-	}
-	_, ordinal := intctrlutil.GetParentNameAndOrdinal(pod)
-	return ordinal, nil
 }
 
 // getSupportSwitchoverWorkload returns the kinds that support switchover.
@@ -181,18 +172,17 @@ func replaceSwitchoverConnCredentialEnv(clusterName string, switchoverSpec *apps
 func buildSwitchoverWorkloadEnvs(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
-	componentDef *appsv1alpha1.ClusterComponentDefinition) ([]corev1.EnvVar, error) {
+	component *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
 	var workloadEnvs []corev1.EnvVar
-	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, *clusterCompSpec)
+	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, component.Name)
 	if err != nil {
 		return nil, err
 	}
 	if pod == nil {
-		return nil, errors.New("primary/leader pod not found")
+		return nil, errors.New("primary or leader pod not found")
 	}
-	svcName := strings.Join([]string{cluster.Name, clusterCompSpec.Name, "headless"}, "-")
-	switch componentDef.WorkloadType {
+	svcName := strings.Join([]string{cluster.Name, component.Name, "headless"}, "-")
+	switch component.WorkloadType {
 	case appsv1alpha1.Replication:
 		workloadEnvs = append(workloadEnvs, corev1.EnvVar{
 			Name:  constant.KBSwitchoverReplicationPrimaryPodName,
@@ -210,11 +200,11 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 // buildSwitchoverCandidateInstanceEnv builds the candidate instance name environment variable for the switchover job.
 func buildSwitchoverCandidateInstanceEnv(
 	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) *corev1.EnvVar {
-	if clusterCompSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual {
+	component *component.SynthesizedComponent) *corev1.EnvVar {
+	if component.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual {
 		return &corev1.EnvVar{
 			Name:  constant.KBSwitchoverCandidateInstanceName,
-			Value: fmt.Sprintf("%s-%s-%d", cluster.Name, clusterCompSpec.Name, clusterCompSpec.CandidateInstance.Index),
+			Value: fmt.Sprintf("%s-%s-%d", cluster.Name, component.Name, component.CandidateInstance.Index),
 		}
 	}
 	return nil
@@ -224,25 +214,24 @@ func buildSwitchoverCandidateInstanceEnv(
 func buildSwitchoverEnvs(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
-	componentDef *appsv1alpha1.ClusterComponentDefinition) ([]corev1.EnvVar, error) {
-	if clusterCompSpec == nil || componentDef.SwitchoverSpec == nil {
+	component *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
+	if component.SwitchoverSpec == nil {
 		return nil, errors.New("switchover spec not found")
 	}
 	var switchoverEnvs []corev1.EnvVar
 	// replace secret env and merge envs defined in SwitchoverSpec
-	replaceSwitchoverConnCredentialEnv(cluster.Name, componentDef.SwitchoverSpec)
-	switchoverEnvs = append(switchoverEnvs, componentDef.SwitchoverSpec.Env...)
+	replaceSwitchoverConnCredentialEnv(cluster.Name, component.SwitchoverSpec)
+	switchoverEnvs = append(switchoverEnvs, component.SwitchoverSpec.Env...)
 
 	// inject the old primary or leader info into the environment variable
-	workloadEnvs, err := buildSwitchoverWorkloadEnvs(ctx, cli, cluster, clusterCompSpec, componentDef)
+	workloadEnvs, err := buildSwitchoverWorkloadEnvs(ctx, cli, cluster, component)
 	if err != nil {
 		return nil, err
 	}
 	switchoverEnvs = append(switchoverEnvs, workloadEnvs...)
 
 	// inject the candidate instance name into the environment variable if specify the candidate instance
-	candidateInstanceEnv := buildSwitchoverCandidateInstanceEnv(cluster, clusterCompSpec)
+	candidateInstanceEnv := buildSwitchoverCandidateInstanceEnv(cluster, component)
 	if candidateInstanceEnv != nil {
 		switchoverEnvs = append(switchoverEnvs, *candidateInstanceEnv)
 	}
@@ -253,28 +242,27 @@ func buildSwitchoverEnvs(ctx context.Context,
 func renderSwitchoverCmdJob(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
-	componentDef *appsv1alpha1.ClusterComponentDefinition) (*batchv1.Job, error) {
-	if clusterCompSpec == nil || componentDef.SwitchoverSpec == nil {
+	component *component.SynthesizedComponent) (*batchv1.Job, error) {
+	if component.SwitchoverSpec == nil {
 		return nil, errors.New("switchover spec not found")
 	}
 
 	renderJob := func(switchoverSpec *appsv1alpha1.SwitchoverSpec, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
 		var switchoverAction *appsv1alpha1.SwitchoverAction
-		if clusterCompSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual && switchoverSpec.WithCandidateInstance != nil {
+		if component.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual && switchoverSpec.WithCandidateInstance != nil {
 			switchoverAction = switchoverSpec.WithCandidateInstance
-		} else if clusterCompSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpNotEqual && switchoverSpec.WithoutCandidateInstance != nil {
+		} else if component.CandidateInstance.Operator == appsv1alpha1.CandidateOpNotEqual && switchoverSpec.WithoutCandidateInstance != nil {
 			switchoverAction = switchoverSpec.WithoutCandidateInstance
 		} else {
 			return nil, errors.New("switchover action not found")
 		}
 		// jobName named with generation to distinguish different switchover jobs.
-		jobName := fmt.Sprintf("%s-%s-%d", constant.KBSwitchoverJobNamePrefix, clusterCompSpec.Name, cluster.Generation)
+		jobName := fmt.Sprintf("%s-%s-%d", constant.KBSwitchoverJobNamePrefix, component.Name, cluster.Generation)
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cluster.Namespace,
 				Name:      jobName,
-				Labels:    getSwitchoverCmdJobLabel(cluster.Name, clusterCompSpec.Name),
+				Labels:    getSwitchoverCmdJobLabel(cluster.Name, component.Name),
 			},
 			Spec: batchv1.JobSpec{
 				Template: corev1.PodTemplateSpec{
@@ -304,11 +292,11 @@ func renderSwitchoverCmdJob(ctx context.Context,
 		return job, nil
 	}
 
-	switchoverEnvs, err := buildSwitchoverEnvs(ctx, cli, cluster, clusterCompSpec, componentDef)
+	switchoverEnvs, err := buildSwitchoverEnvs(ctx, cli, cluster, component)
 	if err != nil {
 		return nil, err
 	}
-	job, err := renderJob(componentDef.SwitchoverSpec, switchoverEnvs)
+	job, err := renderJob(component.SwitchoverSpec, switchoverEnvs)
 	if err != nil {
 		return nil, err
 	}
@@ -380,6 +368,6 @@ func CheckJobSucceed(ctx context.Context,
 func checkPodRoleLabelConsistencyAfterSwitchover(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec) (bool, error) {
+	component *component.SynthesizedComponent) (bool, error) {
 	return true, nil
 }

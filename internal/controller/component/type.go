@@ -60,6 +60,7 @@ type SynthesizedComponent struct {
 	Issuer                *v1alpha1.Issuer                       `json:"issuer,omitempty"`
 	VolumeTypes           []v1alpha1.VolumeTypeSpec              `json:"VolumeTypes,omitempty"`
 	CustomLabelSpecs      []v1alpha1.CustomLabelSpec             `json:"customLabelSpecs,omitempty"`
+	SwitchoverSpec        *v1alpha1.SwitchoverSpec               `json:"switchoverSpec,omitempty"`
 	ComponentDef          string                                 `json:"componentDef,omitempty"`
 	ServiceAccountName    string                                 `json:"serviceAccountName,omitempty"`
 	CandidateInstance     *v1alpha1.CandidateInstance            `json:"candidateInstance,omitempty"`

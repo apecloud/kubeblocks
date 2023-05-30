@@ -111,11 +111,17 @@ type ComponentSet interface {
 	// if return an empty phase, means the pods of component are ready and skips it.
 	GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error)
 
+	// HandleRestart defines the process of handling restart operations of component.
 	HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
 
+	// HandleRoleChange handles the role change of component.
 	HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
 
+	// HandleSwitchover handles the switchover of component.
 	HandleSwitchover(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
+
+	// HandleFailover handles the failover of component.
+	HandleFailover(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
 }
 
 // ComponentSetBase is a common component set base struct.

@@ -92,6 +92,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		ScriptTemplates:       clusterCompDefObj.ScriptSpecs,
 		VolumeTypes:           clusterCompDefObj.VolumeTypes,
 		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
+		SwitchoverSpec:        clusterCompDefObj.SwitchoverSpec,
 		StatefulSetWorkload:   clusterCompDefObj.GetStatefulSetWorkload(),
 		MinAvailable:          clusterCompSpec.GetMinAvailable(clusterCompDefObj.GetMinAvailable()),
 		Replicas:              clusterCompSpec.Replicas,
@@ -114,6 +115,8 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		for _, c := range clusterCompVer.VersionsCtx.Containers {
 			component.PodSpec.Containers = appendOrOverrideContainerAttr(component.PodSpec.Containers, c)
 		}
+		// override component.SwitchoverSpec
+		overrideSwitchoverSpecAttr(component.SwitchoverSpec, clusterCompVer.SwitchoverSpec)
 	}
 
 	// handle component.PodSpec extra settings
@@ -309,22 +312,19 @@ func ReplaceSecretEnvVars(namedValuesMap map[string]string, envs []corev1.EnvVar
 	return newEnvs
 }
 
-func GetClusterDefCompByName(clusterDef appsv1alpha1.ClusterDefinition,
-	cluster appsv1alpha1.Cluster,
-	compName string) *appsv1alpha1.ClusterComponentDefinition {
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		if comp.Name != compName {
-			continue
-		}
-		for _, compDef := range clusterDef.Spec.ComponentDefs {
-			if compDef.Name == comp.ComponentDefRef {
-				return &compDef
-			}
-		}
-	}
-	return nil
-}
-
 func GenerateConnCredential(clusterName string) string {
 	return fmt.Sprintf("%s-conn-credential", clusterName)
+}
+
+// overrideSwitchoverSpecAttr overrides the attributes in switchoverSpec with the attributes of SwitchoverShortSpec in clusterVersion.
+func overrideSwitchoverSpecAttr(switchoverSpec *appsv1alpha1.SwitchoverSpec, cvSwitchoverSpec *appsv1alpha1.SwitchoverShortSpec) {
+	if cvSwitchoverSpec == nil {
+		return
+	}
+	if len(cvSwitchoverSpec.Image) > 0 {
+		switchoverSpec.Image = cvSwitchoverSpec.Image
+	}
+	if len(cvSwitchoverSpec.Env) > 0 {
+		switchoverSpec.Env = cvSwitchoverSpec.Env
+	}
 }

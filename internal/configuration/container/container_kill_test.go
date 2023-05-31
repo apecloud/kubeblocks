@@ -243,7 +243,7 @@ func TestAutoCheckCRIType(t *testing.T) {
 				t.Errorf("failed to writing settings. Err: %v", err)
 				return
 			}
-			<-dialDone // wait close conn only after dial returns.
+			<-dialDone // wait for dialDone before closing connection
 			conn.Close()
 		}()
 

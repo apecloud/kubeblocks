@@ -187,7 +187,7 @@ max_standby_streaming_delay = '300000ms'
 max_sync_workers_per_subscription = '2'
 max_wal_senders = '64'
 # {LEAST(GREATEST(DBInstanceClassMemory/2097152, 2048), 16384)}
-max_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 2097152 ) 2048 ) 32768 ) }}'
+max_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 2097152 ) 4096 ) 32768 ) }}'
 max_worker_processes = '{{ max $phy_cpu 8 }}'
 # min_parallel_index_scan_size unit is 8KB, 64 = 512KB
 min_parallel_index_scan_size = '512kB'

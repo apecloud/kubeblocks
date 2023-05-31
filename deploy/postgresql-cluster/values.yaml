@@ -43,7 +43,7 @@ persistence:
   enabled: true
   data:
     storageClassName: ""
-    size: 2Gi
+    size: 4Gi
 
 enabledLogs:
   - running

@@ -88,7 +88,7 @@ max_sync_workers_per_subscription = '6'
 max_wal_senders = '24'
 max_worker_processes = '8'
 # max_wal_size = '100GB'
-max_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 2097152 ) 2048 ) 32768 ) }}'
+max_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 2097152 ) 4096 ) 32768 ) }}'
 {{- if gt $phy_memory 0 }}
 # min_wal_size = '20GB'
 min_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 8388608 ) 2048 ) 8192 ) }}'

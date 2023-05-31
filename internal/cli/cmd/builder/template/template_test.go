@@ -28,9 +28,10 @@ import (
 
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/test/testdata"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
 var _ = Describe("template", func() {

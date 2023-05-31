@@ -40,7 +40,7 @@ In actual scenarios, you are recommendend to create a cluster on nodes with tain
 
    :::note
 
-   If you have already some tainted node, you can skip this step. :::
+   If you have already some tainted node, you can skip this step.
 
    :::
 
@@ -60,7 +60,7 @@ In actual scenarios, you are recommendend to create a cluster on nodes with tain
 
    The cluster creation command is simply `kbcli cluster create`. Use tolerances to deploy it on the tainted node. Further, you are recommended to create a cluster with specified class and customize your cluster settings as demanded.
 
-   Create a cluster with specified class,you can use `--set` flag and specify your requirement.
+   Create a cluster with specified class and you can use `--set` flag and specify your requirement.
 
    1. View and select a class for this cluster.
 

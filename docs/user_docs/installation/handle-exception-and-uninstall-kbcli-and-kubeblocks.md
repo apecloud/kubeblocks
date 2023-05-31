@@ -3,7 +3,7 @@ title: Handle exception and uninstall kbcli and KubeBlocks
 description: Handle exception and uninstall kbcli and KubeBlocks
 keywords: [kbcli, kubeblocks, exception, uninstall]
 sidebar_position: 4
-sidebar_label: kbcli and KubeBlocks
+sidebar_label: Handle Exception and Uninstall
 ---
 
 import Tabs from '@theme/Tabs';
@@ -69,26 +69,22 @@ helm uninstall kubeblocks -n kb-system
 
 ## Uninstall kbcli
 
-Uninstall `kbcli` if you want to delete `kbcli` after your trial.
+Uninstall `kbcli` if you want to delete `kbcli` after your trial. Use the same option as the way you install `kbcli`.
 
 <Tabs>
 <TabItem value="macOS" label="macOS" default>
 
-<TabItem value="cURL" label="cURL" default>
+For cURL, run
 
 ```bash
 sudo rm /usr/local/bin/kbcli
 ```
 
-</TabItem>
-
-<TabItem value="Homebrew" label="Homebrew">
+For Homebrew, run
 
 ```bash
 brew uninstall kbcli
 ```
-
-</TabItem>
 
 </TabItem>
 

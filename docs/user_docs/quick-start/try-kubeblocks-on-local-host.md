@@ -183,7 +183,13 @@ In this example, delete the leader pod to simulate a failure.
 
 ***Steps:***
 
-1. View the ApeCloud MySQL Raft group information. View the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-1.
+1. Make sure the newly created cluster is `Running`.
+
+   ```bash
+   kbcli cluster list
+   ```
+
+2. View the ApeCloud MySQL Raft group information. View the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-1.
 
    ```bash
    kbcli cluster describe maple05
@@ -214,7 +220,7 @@ In this example, delete the leader pod to simulate a failure.
    TIME        TYPE        REASON        OBJECT        MESSAGE
    ```
 
-2. Delete the leader pod.
+3. Delete the leader pod.
 
    ```bash
    kubectl delete pod maple05-mysql-1
@@ -222,7 +228,7 @@ In this example, delete the leader pod to simulate a failure.
    pod "maple05-mysql-1" deleted
    ```
 
-3. Connect to the ApeCloud MySQL Raft group to test its availability. You can find this group can still be accessed within seconds due to our HA strategy.
+4. Connect to the ApeCloud MySQL Raft group to test its availability. You can find this group can still be accessed within seconds due to our HA strategy.
 
    ```bash
    kbcli cluster connect maple05

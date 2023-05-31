@@ -1,14 +1,14 @@
 ---
 title: Install kbcli and KubeBlocks on the existed Kubernetes clusters
 description: Install kbcli and KubeBlocks on the existed Kubernetes clusters
-keywords: [taints, affinity, tolerance, install]
+keywords: [taints, affinity, tolerance, install, kbcli, KubeBlocks]
 sidebar_position: 3
-sidebar_label: Install kbcli and KubeBlocks on the existed Kubernetes clusters
+sidebar_label: On the existed Kubernetes clusters
 ---
 
 # Install kbcli and KubeBlocks on the existed Kubernetes clusters
 
-In the actual environment, it is normal to install kbcli and KubeBlocks on the existed Kubernetes clusters.
+In the actual environment, it is normal to install `kbcli` and KubeBlocks on the existed Kubernetes clusters.
 
 ## Environment preparation
 
@@ -22,11 +22,11 @@ In the actual environment, it is normal to install kbcli and KubeBlocks on the e
 	</tr >
 	<tr >
 	    <td rowspan="4">Data Plane</td>
-	    <td>For Mysql database </td>
+	    <td>For MySQL database </td>
 	    <td>It is recommended to create at least 3 nodes with 2c4Gi and 50Gi storage. </td>
 	</tr>
 	<tr>
-	    <td>For Postgresql database </td>
+	    <td>For PostgreSQL database </td>
         <td>It is recommended to create at least 2 nodes with 2c4Gi and 50Gi storage.  </td>
 	</tr>
 	<tr>
@@ -34,7 +34,7 @@ In the actual environment, it is normal to install kbcli and KubeBlocks on the e
         <td>It is recommended to create at least 2 nodes with 2c4Gi and 50Gi storage. </td>
 	</tr>
 	<tr>
-	    <td>For Mongodb database</td>
+	    <td>For MongoDB database</td>
 	    <td>It is recommended to create at least 3 nodes with 2c4Gi and 50Gi storage. </td>
 	</tr>
 </table>
@@ -55,10 +55,11 @@ To customize the version of kbcli, use the following command.
 curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s versionnumber
 ```
 
-**Step 2. Install KubeBlocks with kbcli kubeblocks install command**
+**Step 2. Install KubeBlocks with kbcli kubeblocks install command.**
 
-The installation command is `kbcli kubeblocks install`, simply running this command will install KubeBlocks on nodes without taints with default namespace `kb-system` .
-But in actual scenario, you are recommendend to install KubeBlocks on nodes with taints and customized namespace.
+The installation command is `kbcli kubeblocks install`, simply running this command will install KubeBlocks on nodes without taints with default namespace `kb-system`.
+
+But in actual scenarios, you are recommendend to install KubeBlocks on nodes with taints and customized namespace.
 
 1. Get Kubernetes nodes.
 

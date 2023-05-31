@@ -521,7 +521,7 @@ func BuildEnvConfigLow(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster
 	envData[prefix+"CLUSTER_UID"] = string(cluster.UID)
 	suffixes = append(suffixes, "CLUSTER_UID")
 
-	// have backward compatible handle for CM key with 'compDefName' being part of the key name
+	// have backward compatible handling for CM key with 'compDefName' being part of the key name
 	// TODO: need to deprecate 'compDefName' being part of variable name, as it's redundant
 	// and introduce env/cm key naming reference complexity
 	prefixWithCompDefName := prefix + strings.ToUpper(component.CompDefName) + "_"

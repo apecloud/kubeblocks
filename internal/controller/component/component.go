@@ -267,9 +267,7 @@ func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedVal
 
 // GetReplacementMapForBuiltInEnv gets the replacement map for KubeBlocks built-in environment variables.
 func GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
-
 	cc := fmt.Sprintf("%s-%s", clusterName, componentName)
-
 	replacementMap := map[string]string{
 		constant.KBClusterNamePlaceHolder:     clusterName,
 		constant.KBCompNamePlaceHolder:        componentName,

@@ -22,7 +22,6 @@ package builder
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -332,7 +331,7 @@ var _ = Describe("builder", func() {
 			cfg, err := BuildEnvConfig(*params, reqCtx, k8sClient)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
-			Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_CLUSTER_UID"]).Should(Equal(uuid))
+			Expect(cfg.Data["KB_CLUSTER_UID"]).Should(Equal(uuid))
 		})
 
 		It("builds Env Config with ConsensusSet status correctly", func() {
@@ -370,7 +369,7 @@ var _ = Describe("builder", func() {
 				Expect(err).Should(BeNil())
 				Expect(cfg).ShouldNot(BeNil())
 				Expect(len(cfg.Data) == int(3+params.Component.Replicas)).Should(BeTrue())
-				Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_N"]).
+				Expect(cfg.Data["KB_N"]).
 					Should(Equal(strconv.Itoa(int(params.Component.Replicas))))
 				stsName := fmt.Sprintf("%s-%s", params.Cluster.Name, params.Component.Name)
 				svcName := fmt.Sprintf("%s-headless", stsName)
@@ -380,10 +379,10 @@ var _ = Describe("builder", func() {
 				for i := 0; i < int(params.Component.Replicas); i++ {
 					if i == 0 {
 						By("Checking the 1st replica's hostname should not have suffix '-0'")
-						Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_"+strconv.Itoa(i)+"_HOSTNAME"]).
+						Expect(cfg.Data["KB_"+strconv.Itoa(i)+"_HOSTNAME"]).
 							Should(Equal(stsName + "-" + strconv.Itoa(0) + "." + svcName))
 					} else {
-						Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_"+strconv.Itoa(i)+"_HOSTNAME"]).
+						Expect(cfg.Data["KB_"+strconv.Itoa(i)+"_HOSTNAME"]).
 							Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "." + svcName))
 					}
 				}

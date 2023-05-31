@@ -23,6 +23,7 @@ cluster: {
 }
 component: {
 	clusterDefName: string
+	compDefName:    string
 	name:           string
 	monitor: {
 		enable:     bool
@@ -42,6 +43,7 @@ service: {
 			"app.kubernetes.io/name":       "\(component.clusterDefName)"
 			"app.kubernetes.io/instance":   cluster.metadata.name
 			"app.kubernetes.io/managed-by": "kubeblocks"
+			"app.kubernetes.io/component":  "\(component.compDefName)"
 
 			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}

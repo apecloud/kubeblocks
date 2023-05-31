@@ -473,13 +473,12 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 
 func BuildEnvConfigLow(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent) (*corev1.ConfigMap, error) {
-
 	const tplFile = "env_config_template.cue"
-
-	prefix := constant.KBPrefix + "_" + strings.ToUpper(component.Type) + "_"
+	prefix := constant.KBPrefix + "_"
 	svcName := strings.Join([]string{cluster.Name, component.Name, "headless"}, "-")
-	envData := map[string]string{}
-	envData[prefix+"N"] = strconv.Itoa(int(component.Replicas))
+	envData := map[string]string{
+		prefix + "N": strconv.Itoa(int(component.Replicas)),
+	}
 	for j := 0; j < int(component.Replicas); j++ {
 		hostNameTplKey := prefix + strconv.Itoa(j) + "_HOSTNAME"
 		hostNameTplValue := cluster.Name + "-" + component.Name + "-" + strconv.Itoa(j)
@@ -610,7 +609,7 @@ func BuildConfigMapWithTemplateLow(cluster *appsv1alpha1.Cluster,
 		},
 		"component": {
 			"name":                  component.Name,
-			"type":                  component.Type,
+			"type":                  component.CompDefName,
 			"characterType":         component.CharacterType,
 			"configName":            cmName,
 			"templateName":          tplCfg.TemplateRef,

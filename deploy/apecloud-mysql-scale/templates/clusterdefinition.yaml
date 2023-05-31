@@ -221,7 +221,7 @@ spec:
                 vtctld_web_port=${VTCTLD_WEB_PORT:-'15000'}
                 printf -v alias '%s-%010d' $cell $uid
                 printf -v tablet_dir 'vt_%010d' $uid
-                tablet_hostname=$(eval echo \$KB_MYSQL_"$uid"_HOSTNAME)
+                tablet_hostname=$(eval echo \$KB_"$uid"_HOSTNAME)
                 printf -v tablet_logfile 'vttablet_%010d_querylog.txt' $uid
 
                 tablet_type=replica

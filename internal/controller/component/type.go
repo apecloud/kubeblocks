@@ -37,7 +37,7 @@ type SynthesizedComponent struct {
 	ClusterName           string                                 `json:"clusterName,omitempty"`
 	ClusterUID            string                                 `json:"clusterUID,omitempty"`
 	Name                  string                                 `json:"name,omitempty"`
-	Type                  string                                 `json:"type,omitempty"`
+	CompDefName           string                                 `json:"compDefName,omitempty"`
 	CharacterType         string                                 `json:"characterType,omitempty"`
 	MinAvailable          *intstr.IntOrString                    `json:"minAvailable,omitempty"`
 	Replicas              int32                                  `json:"replicas"`

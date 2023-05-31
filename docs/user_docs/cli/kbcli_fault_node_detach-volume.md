@@ -39,7 +39,7 @@ kbcli fault node detach-volume [flags]
       --auto-approve                   Skip interactive approval before create secret.
   -c, --cloud-provider string          Cloud provider type, one of [aws gcp]
       --device-name strings            The device name of the volume.
-      --dry-run string[="unchanged"]   Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
       --duration string                Supported formats of the duration are: ms / s / m / h. (default "30s")
   -h, --help                           help for detach-volume
   -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)

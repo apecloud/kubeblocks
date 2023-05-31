@@ -52,7 +52,7 @@ kbcli fault network loss [flags]
       --annotation stringToString      Select the pod to inject the fault according to Annotation. (default [])
   -c, --correlation string             Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100].
       --direction string               You can select "to"" or "from"" or "both"". (default "to")
-      --dry-run string[="unchanged"]   Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
       --duration string                Supported formats of the duration are: ms / s / m / h. (default "10s")
   -e, --external-target stringArray    a network target outside of Kubernetes, which can be an IPv4 address or a domain name,
                                        	 such as "www.baidu.com". Only works with direction: to.

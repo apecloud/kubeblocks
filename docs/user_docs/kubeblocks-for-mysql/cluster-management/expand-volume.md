@@ -17,7 +17,7 @@ Volume expansion triggers pod restart, all pods restart in the order of learner 
 
 ## Before you start
 
-Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
+Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
 kbcli cluster list mysql-cluster
@@ -105,3 +105,9 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
    * STATUS=VolumeExpanding: it means the volume expansion is in progress.
    * STATUS=Running: it means the volume expansion operation has been applied.
+
+3. Check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mysql-cluster
+    ```

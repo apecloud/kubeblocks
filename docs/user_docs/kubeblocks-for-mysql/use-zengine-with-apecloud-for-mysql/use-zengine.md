@@ -1,3 +1,11 @@
+---
+title: Use SmartEngine with MySQL
+description: Use SmartEngine with MySQL
+keywords: [zengine, use zengine]
+sidebar_position: 2
+sidebar_label: Use SmartEngine with MySQL
+---
+
 # Use SmartEngine with MySQL
 
 SmartEngine coexists with other storage engines when enabled. However, please note that enabling SmartEngine will reduce the bufferpool of InnoDB to 128 MB, which significantly affects the performance of InnoDB tables.
@@ -8,19 +16,19 @@ SmartEngine coexists with other storage engines when enabled. However, please no
 
 1. Use the ```kbcli cluster configure``` command to enable SmartEngine.
 
-```bash
-kbcli cluster configure {cluster-name} --set smartengine_enabled=ON 
-```
+   ```bash
+   kbcli cluster configure {cluster-name} --set smartengine_enabled=ON 
+   ```
 
 2. Check the SmartEngine status.
 
-```
-kbcli cluster describe-config {cluster-name} --show-detail | grep ZEngine_enabled
-```
+   ```
+   kbcli cluster describe-config {cluster-name} --show-detail | grep ZEngine_enabled
+   ```
 
-After the SmartEngine is enabled, the default storage engine is SmartEngine, that is to say, the newly created table is stored with SmartEngine. If you want to change the default storage engine you can specify it in ```CREATE`` command line. See the command line below.
+After the SmartEngine is enabled, the default storage engine is SmartEngine, that is to say, the newly created table is stored with SmartEngine. If you want to change the default storage engine you can specify it in `CREATE` command line. See the command line below.
 
-```
+```bash
 CREATE TABLE t1 (
 c1 int primary key,
 c2 varchar(64)
@@ -38,9 +46,9 @@ c2 varchar(64)
 +-------+-------------------------------------------------------------
 ```
 
-For the tables created before enabling SmartEngine, the storage engine will not change. To change the engine to SmartEngine, you can use the ```ALTER``` command.
+For the tables created before enabling SmartEngine, the storage engine will not change. To change the engine to SmartEngine, you can use the `ALTER` command.
 
-```
+```bash
 ALTER TABLE {table_name} engine=ZEngine;
 ```
 
@@ -52,9 +60,10 @@ Use the ```kbcli cluster configure``` command to disable SmartEngine.
 kbcli cluster configure {cluster-name} --set smartengine_enabled=OFF 
 ```
 
-... note
+:::note
 
 - Disabling SmartEngine restarts the cluster.
 
 - Once SmartEngine is disabled, the configuration of the cluster changes to default. And  tables using SmartEngine as storage backend is not accessible. To access these tables, you need to enable SmartEngine again, or change the storage backend of these tables to other storage backend, such as InnoDB.
-...
+
+:::

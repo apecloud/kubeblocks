@@ -60,7 +60,7 @@ In actual scenarios, you are recommendend to create a cluster on nodes with tain
 
    The cluster creation command is simply `kbcli cluster create`. Use tolerances to deploy it on the tainted node. Further, you are recommended to create a cluster with specified class and customize your cluster settings as demanded.
 
-   Create a cluster with specified class and you can use `--set` flag and specify your requirement.
+   To create a cluster with specified class, you can use `--set` flag and specify your requirement.
 
    1. View and select a class for this cluster.
 
@@ -103,13 +103,13 @@ In actual scenarios, you are recommendend to create a cluster on nodes with tain
    EOF
    ```
 
-See the table below for the detailed description for customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended turn on the monitor and enable all logs.
+See the table below for the detailed description for customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.
 
 📎 Table 1. kbcli cluster create flags description
 
 | Option                 | Description             |
 |:-----------------------|:------------------------|
-| `--cluster-definition` | It specifies the cluster definition, choose the database type. Run `kbcli cd list` to show all available cluster definitions.   |
+| `--cluster-definition` | It specifies the cluster definition. You can choose a database type. Run `kbcli cd list` to show all available cluster definitions.   |
 | `--cluster-version`    | It specifies the cluster version. Run `kbcli cv list` to show all available cluster versions. If you do not specify a cluster version when creating a cluster, the latest version is applied by default.  |
 | `--enable-all-logs`    | It enables you to view all application logs. When this function is enabled, enabledLogs of component level will be ignored. For logs settings, refer to [Access Logs](./../../observability/access-logs.md).  |
 | `--help`               | It shows the help guide for `kbcli cluster create`. You can also use the abbreviated `-h`. |
@@ -129,7 +129,7 @@ kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --tolerat
 
 The cluster creation command is simply `kbcli cluster create`. Further, you are recommended to create a cluster with specified class and customize your cluster settings as demanded.
 
-Create a cluster with specified class,you can use `--set` flag and specify your requirement.
+To create a cluster with specified class, you can use `--set` flag and specify your requirement.
 
 1. View and select a class for this cluster.
 
@@ -141,7 +141,7 @@ Create a cluster with specified class,you can use `--set` flag and specify your 
 
    If there is no suitable class listed, you can [customize your own class](./../cluster-type/customize-class-type.md) template and apply the class here.
 
-   Creating clusters that does not meet the constraints is invalid and system creates the cluster with the minimum CPU value specified.
+   Creating clusters that does not meet the constraints is invalid and the system creates a cluster with the minimum CPU value specified.
 
    :::
 
@@ -175,13 +175,13 @@ kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --set sto
 EOF
 ```
 
-See the table below for the detailed description for customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended turn on the monitor and enable all logs.
+See the table below for the detailed description for customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.
 
 📎 Table 1. kbcli cluster create flags description
 
 | Option                 | Description             |
 |:-----------------------|:------------------------|
-| `--cluster-definition` | It specifies the cluster definition, choose the database type. Run `kbcli cd list` to show all available cluster definitions.   |
+| `--cluster-definition` | It specifies the cluster definition and you can choose the database type. Run `kbcli cd list` to show all available cluster definitions.   |
 | `--cluster-version`    | It specifies the cluster version. Run `kbcli cv list` to show all available cluster versions. If you do not specify a cluster version when creating a cluster, the latest version is applied by default.  |
 | `--enable-all-logs`    | It enables you to view all application logs. When this function is enabled, enabledLogs of component level will be ignored. For logs settings, refer to [Access Logs](./../../observability/access-logs.md).  |
 | `--help`               | It shows the help guide for `kbcli cluster create`. You can also use the abbreviated `-h`. |

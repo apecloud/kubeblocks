@@ -121,27 +121,18 @@ kbcli kubeblocks config --set dataProtection.backupPVCName=kubeblocks-backup-dat
 
    ```bash
    kbcli cluster list mysql-cluster
-   > 
-   NAME            NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME                 
-   mysql-cluster   default     apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Apr 18,2023 11:40 UTC+0800  
    ```
 
 2. Create a backup for this cluster.
 
    ```bash
    kbcli cluster backup mysql-cluster --type=datafile
-   > 
-   Backup backup-default-mysql-cluster-20230418124113 created successfully, you can view the progress:
-           kbcli cluster list-backup --name=backup-default-mysql-cluster-20230418124113 -n default
    ```
 
 3. View the backup set.
 
    ```bash
    kbcli cluster list-backups mysql-cluster 
-   > 
-   NAME                                          CLUSTER         TYPE       STATUS      TOTAL-SIZE   DURATION   CREATE-TIME                  COMPLETION-TIME              
-   backup-default-mysql-cluster-20230418124113   mysql-cluster   datafile   Completed                21s        Apr 18,2023 12:41 UTC+0800   Apr 18,2023 12:41 UTC+0800
    ```
 
 **Option 2. Enable scheduled backup**
@@ -168,15 +159,10 @@ spec:
 
    ```bash
    kbcli cluster restore new-mysql-cluster --backup backup-default-mysql-cluster-20230418124113
-   >
-   Cluster new-mysql-cluster created
    ```
 
 2. View this new cluster.
 
    ```bash
    kbcli cluster list new-mysql-cluster
-   >
-   NAME                NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME                 
-   new-mysql-cluster   default     apecloud-mysql       ac-mysql-8.0.30   Delete               Running    Apr 18,2023 12:42 UTC+0800
    ```

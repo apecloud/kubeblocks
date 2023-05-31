@@ -1,8 +1,9 @@
 ---
 title: ZEngine introduction
 description: What is ZEngine
+keywords: [zengine]
 sidebar_position: 1
-sidebar_label: Create and connect
+sidebar_label: Introduction
 ---
 
 # ZEngine introduction

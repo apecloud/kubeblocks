@@ -14,7 +14,7 @@ kbcli cluster restart NAME [flags]
   # restart all components
   kbcli cluster restart mycluster
   
-  # restart specifies the component, separate with commas when component more than one
+  # specified component to restart, separate with commas for multiple components
   kbcli cluster restart mycluster --components=mysql
 ```
 

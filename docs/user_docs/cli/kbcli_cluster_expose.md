@@ -14,7 +14,7 @@ kbcli cluster expose NAME --enable=[true|false] --type=[vpc|internet] [flags]
   # Expose a cluster to vpc
   kbcli cluster expose mycluster --type vpc --enable=true
   
-  # Expose a cluster to internet
+  # Expose a cluster to public internet
   kbcli cluster expose mycluster --type internet --enable=true
   
   # Stop exposing a cluster

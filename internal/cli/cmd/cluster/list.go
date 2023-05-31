@@ -41,7 +41,7 @@ var (
 		# list all clusters
 		kbcli cluster list
 
-		# list a single cluster with specified NAME
+		# list a single cluster with specified name
 		kbcli cluster list mycluster
 
 		# list a single cluster in YAML output format

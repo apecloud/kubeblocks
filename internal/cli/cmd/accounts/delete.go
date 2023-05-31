@@ -42,7 +42,7 @@ func NewDeleteUserOptions(f cmdutil.Factory, streams genericclioptions.IOStreams
 
 func (o *DeleteUserOptions) AddFlags(cmd *cobra.Command) {
 	o.AccountBaseOptions.AddFlags(cmd)
-	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required. Specify the name of user")
+	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required user name, please specify it")
 }
 
 func (o *DeleteUserOptions) Validate(args []string) error {

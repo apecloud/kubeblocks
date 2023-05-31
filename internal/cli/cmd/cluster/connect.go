@@ -44,7 +44,7 @@ import (
 )
 
 var connectExample = templates.Examples(`
-		# connect to a specified cluster, default connect to the leader or primary instance
+		# connect to a specified cluster, default connect to the leader/primary instance
 		kbcli cluster connect mycluster
 
 		# connect to cluster as user
@@ -81,14 +81,13 @@ type ConnectOptions struct {
 	targetCluster    *appsv1alpha1.Cluster
 	targetClusterDef *appsv1alpha1.ClusterDefinition
 
-	// assume user , who has access to the cluster
 	userName   string
 	userPasswd string
 
 	*exec.ExecOptions
 }
 
-// NewConnectCmd return the cmd of connecting a cluster
+// NewConnectCmd returns the cmd of connecting to a cluster
 func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &ConnectOptions{ExecOptions: exec.NewExecOptions(f, streams)}
 	cmd := &cobra.Command{
@@ -107,8 +106,8 @@ func NewConnectCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "The instance name to connect.")
-	cmd.Flags().StringVar(&o.componentName, "component", "", "The component to connect. If not specified, the first component will be used.")
-	cmd.Flags().BoolVar(&o.showExample, "show-example", false, "Show how to connect to cluster or instance from different client.")
+	cmd.Flags().StringVar(&o.componentName, "component", "", "The component to connect. If not specified, pick up the first one.")
+	cmd.Flags().BoolVar(&o.showExample, "show-example", false, "Show how to connect to cluster/instance from different clients.")
 	cmd.Flags().StringVar(&o.clientType, "client", "", "Which client connection example should be output, only valid if --show-example is true.")
 
 	cmd.Flags().StringVar(&o.userName, "as-user", "", "Connect to cluster as user")
@@ -136,10 +135,10 @@ func (o *ConnectOptions) runShowExample() error {
 		return fmt.Errorf("engine is not initialized yet")
 	}
 
-	// if cluster does not have public endpoints, tell user to use port-forward command and
-	// connect cluster from local host
+	// if cluster does not have public endpoints, prompts to use port-forward command and
+	// connect cluster from localhost
 	if o.privateEndPoint {
-		fmt.Fprintf(o.Out, "# cluster %s does not have public endpoints, you can run following command and connect cluster from local host\n"+
+		fmt.Fprintf(o.Out, "# cluster %s does not have public endpoints, you can run following command and connect cluster from localhost\n"+
 			"kubectl port-forward service/%s %s:%s\n\n", o.clusterName, o.svc.Name, info.Port, info.Port)
 		info.Host = "127.0.0.1"
 	}
@@ -156,7 +155,7 @@ func (o *ConnectOptions) validate(args []string) error {
 	// cluster name and pod instance are mutual exclusive
 	if len(o.PodName) > 0 {
 		if len(args) > 0 {
-			return fmt.Errorf("specify either cluster name or instance name, not both")
+			return fmt.Errorf("specify either cluster name or instance name, they are exclusive")
 		}
 		if len(o.componentName) > 0 {
 			return fmt.Errorf("component name is valid only when cluster name is specified")
@@ -238,7 +237,7 @@ func (o *ConnectOptions) complete() error {
 	return nil
 }
 
-// connect create parameters for connecting cluster and connect
+// connect creates connection string and connects to cluster
 func (o *ConnectOptions) connect() error {
 	if o.componentDef == nil {
 		return fmt.Errorf("component def is not initialized")
@@ -268,7 +267,7 @@ func (o *ConnectOptions) connect() error {
 }
 
 func (o *ConnectOptions) getAuthInfo() (*engine.AuthInfo, error) {
-	// select secrets by labels, prefer admin account
+	// select secrets by labels, admin account is preferred
 	labels := fmt.Sprintf("%s=%s,%s=%s,%s=%s",
 		constant.AppInstanceLabelKey, o.clusterName,
 		constant.KBAppComponentLabelKey, o.componentName,
@@ -289,7 +288,7 @@ func (o *ConnectOptions) getAuthInfo() (*engine.AuthInfo, error) {
 }
 
 func (o *ConnectOptions) getTargetPod() error {
-	// guarantee cluster name and component name are set
+	// make sure cluster name and component name are set
 	if len(o.clusterName) == 0 {
 		return fmt.Errorf("cluster name is not set yet")
 	}
@@ -364,18 +363,18 @@ func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 	internalSvcs, externalSvcs := cluster.GetComponentServices(objs.Services, o.component)
 	switch {
 	case len(externalSvcs) > 0:
-		// cluster has public endpoint
+		// cluster has public endpoints
 		o.svc = externalSvcs[0]
 		info.Host = cluster.GetExternalAddr(o.svc)
 		info.Port = fmt.Sprintf("%d", o.svc.Spec.Ports[0].Port)
 	case len(internalSvcs) > 0:
-		// cluster does not have public endpoint
+		// cluster does not have public endpoints
 		o.svc = internalSvcs[0]
 		info.Host = o.svc.Spec.ClusterIP
 		info.Port = fmt.Sprintf("%d", o.svc.Spec.Ports[0].Port)
 		o.privateEndPoint = true
 	default:
-		// does not find any endpoints
+		// find no endpoints
 		return nil, fmt.Errorf("failed to find any cluster endpoints")
 	}
 
@@ -386,7 +385,7 @@ func (o *ConnectOptions) getConnectionInfo() (*engine.ConnectionInfo, error) {
 	return info, nil
 }
 
-// get cluster user and password from secrets
+// getUserAndPassword gets cluster user and password from secrets
 func getUserAndPassword(clusterDef *appsv1alpha1.ClusterDefinition, secrets *corev1.SecretList) (string, string, error) {
 	var (
 		user, password = "", ""
@@ -432,7 +431,7 @@ func getUserAndPassword(clusterDef *appsv1alpha1.ClusterDefinition, secrets *cor
 	return user, password, err
 }
 
-// get cluster headlessEndpoint from secrets
+// getOneHeadlessEndpoint gets cluster headlessEndpoint from secrets
 func getOneHeadlessEndpoint(clusterDef *appsv1alpha1.ClusterDefinition, secrets *corev1.SecretList) string {
 	if len(secrets.Items) == 0 {
 		return ""

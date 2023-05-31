@@ -55,7 +55,7 @@ var _ = Describe("alter", func() {
 		}
 	})
 
-	It("remove duplicate string from slice", func() {
+	It("remove duplicated string from slice", func() {
 		slice := []string{"a", "b", "a", "c"}
 		res := removeDuplicateStr(slice)
 		Expect(res).ShouldNot(BeNil())

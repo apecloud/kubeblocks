@@ -65,7 +65,7 @@ var _ = Describe("test cluster Failed/Abnormal phase", func() {
 			ml := client.HasLabels{testCtx.TestObjLabelKey}
 			// testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
 			// testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
-			testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
+			testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PodSignature, true, inNS, ml)
 		}
 
 		// reset all resource names

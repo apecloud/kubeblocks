@@ -39,7 +39,7 @@ func openDB() error {
 		ds  = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", user, password, host, port, dbName)
 	)
 
-	// allow multiple statements in one query to allow q15 on the TPC-H
+	// allow multiple statements in one query to allow Q15 on the TPC-H
 	fullDsn := fmt.Sprintf("%s?multiStatements=true", ds)
 	globalDB, err = sql.Open(mysqlDriver, fullDsn)
 	if err != nil {

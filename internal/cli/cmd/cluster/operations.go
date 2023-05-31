@@ -48,7 +48,7 @@ import (
 type OperationsOptions struct {
 	create.CreateOptions  `json:"-"`
 	HasComponentNamesFlag bool `json:"-"`
-	// autoApprove if it is true, will skip the double check.
+	// autoApprove when set true, skip the double check.
 	autoApprove            bool     `json:"-"`
 	ComponentNames         []string `json:"componentNames,omitempty"`
 	OpsRequestName         string   `json:"opsRequestName"`
@@ -116,7 +116,7 @@ func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStr
 	return o
 }
 
-// addCommonFlags add common flags for operations command
+// addCommonFlags adds common flags for operations command
 func (o *OperationsOptions) addCommonFlags(cmd *cobra.Command) {
 	// add print flags
 	printer.AddOutputFlagForCreate(cmd, &o.Format)
@@ -130,7 +130,7 @@ func (o *OperationsOptions) addCommonFlags(cmd *cobra.Command) {
 	}
 }
 
-// CompleteRestartOps when restart a cluster and components is null, it means restarting all components of the cluster.
+// CompleteRestartOps restarts all components of the cluster
 // we should set all component names to ComponentNames flag.
 func (o *OperationsOptions) CompleteRestartOps() error {
 	if o.Name == "" {
@@ -151,7 +151,7 @@ func (o *OperationsOptions) CompleteRestartOps() error {
 	return nil
 }
 
-// CompleteComponentsFlag when components flag is null and the cluster only has one component, should auto complete it.
+// CompleteComponentsFlag when components flag is null and the cluster only has one component, auto complete it.
 func (o *OperationsOptions) CompleteComponentsFlag() error {
 	if o.Name == "" {
 		return makeMissingClusterNameErr()
@@ -393,7 +393,7 @@ var restartExample = templates.Examples(`
 		# restart all components
 		kbcli cluster restart mycluster
 
-		# restart specifies the component, separate with commas when component more than one
+		# specified component to restart, separate with commas for multiple components
 		kbcli cluster restart mycluster --components=mysql
 `)
 
@@ -420,11 +420,11 @@ func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 }
 
 var upgradeExample = templates.Examples(`
-		# upgrade the cluster to the specified version 
+		# upgrade the cluster to the target version 
 		kbcli cluster upgrade mycluster --cluster-version=ac-mysql-8.0.30
 `)
 
-// NewUpgradeCmd creates a upgrade command
+// NewUpgradeCmd creates an upgrade command
 func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.UpgradeType, false)
 	cmd := &cobra.Command{
@@ -447,7 +447,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 }
 
 var verticalScalingExample = templates.Examples(`
-		# scale the computing resources of specified components, separate with commas when component more than one
+		# scale the computing resources of specified components, separate with commas for multiple components
 		kbcli cluster vscale mycluster --components=mysql --cpu=500m --memory=500Mi 
 
 		# scale the computing resources of specified components by class, run command 'kbcli class list --cluster-definition cluster-definition-name' to get available classes
@@ -472,15 +472,15 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		},
 	}
 	o.addCommonFlags(cmd)
-	cmd.Flags().StringVar(&o.CPU, "cpu", "", "Requested and limited size of component cpu")
-	cmd.Flags().StringVar(&o.Memory, "memory", "", "Requested and limited size of component memory")
+	cmd.Flags().StringVar(&o.CPU, "cpu", "", "Request and limit size of component cpu")
+	cmd.Flags().StringVar(&o.Memory, "memory", "", "Request and limit size of component memory")
 	cmd.Flags().StringVar(&o.Class, "class", "", "Component class")
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before vertically scaling the cluster")
 	return cmd
 }
 
 var horizontalScalingExample = templates.Examples(`
-		# expand storage resources of specified components, separate with commas when component name more than one
+		# expand storage resources of specified components, separate with commas for multiple components
 		kbcli cluster hscale mycluster --components=mysql --replicas=3
 `)
 
@@ -510,7 +510,7 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 }
 
 var volumeExpansionExample = templates.Examples(`
-		# restart specifies the component, separate with commas when <component-name> more than one
+		# restart specifies the component, separate with commas for multiple components
 		kbcli cluster volume-expand mycluster --components=mysql --volume-claim-templates=data --storage=10Gi
 `)
 
@@ -543,7 +543,7 @@ var (
 		# Expose a cluster to vpc
 		kbcli cluster expose mycluster --type vpc --enable=true
 
-		# Expose a cluster to internet
+		# Expose a cluster to public internet
 		kbcli cluster expose mycluster --type internet --enable=true
 		
 		# Stop exposing a cluster

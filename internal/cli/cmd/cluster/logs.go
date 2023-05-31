@@ -112,7 +112,7 @@ func (o *LogsOptions) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "Instance name.")
 	cmd.Flags().StringVarP(&o.logOptions.Container, "container", "c", "", "Container name.")
 	cmd.Flags().BoolVarP(&o.logOptions.Follow, "follow", "f", false, "Specify if the logs should be streamed.")
-	cmd.Flags().Int64Var(&o.logOptions.Tail, "tail", -1, "Lines of recent log file to display. Defaults to -1 with showing all log lines.")
+	cmd.Flags().Int64Var(&o.logOptions.Tail, "tail", -1, "Lines of recent log file to display. Defaults to -1 for showing all log lines.")
 	cmd.Flags().Int64Var(&o.logOptions.LimitBytes, "limit-bytes", 0, "Maximum bytes of logs to return.")
 	cmd.Flags().BoolVar(&o.logOptions.Prefix, "prefix", false, "Prefix each log line with the log source (pod name and container name). Only take effect for stdout&stderr.")
 	cmd.Flags().BoolVar(&o.logOptions.IgnoreLogErrors, "ignore-errors", false, "If watching / following pod logs, allow for any errors that occur to be non-fatal. Only take effect for stdout&stderr.")
@@ -121,8 +121,8 @@ func (o *LogsOptions) addFlags(cmd *cobra.Command) {
 	cmd.Flags().DurationVar(&o.logOptions.SinceSeconds, "since", o.logOptions.SinceSeconds, "Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used. Only take effect for stdout&stderr.")
 	cmd.Flags().BoolVarP(&o.logOptions.Previous, "previous", "p", o.logOptions.Previous, "If true, print the logs for the previous instance of the container in a pod if it exists. Only take effect for stdout&stderr.")
 
-	cmd.Flags().StringVar(&o.fileType, "file-type", "", "Log-file type. Can see the output info of list-logs cmd. No set file-path and file-type will output stdout/stderr of target container.")
-	cmd.Flags().StringVar(&o.filePath, "file-path", "", "Log-file path. Specify target file path and have a premium priority. No set file-path and file-type will output stdout/stderr of target container.")
+	cmd.Flags().StringVar(&o.fileType, "file-type", "", "Log-file type. List them with list-logs cmd. When file-path and file-type are unset, output stdout/stderr of target container.")
+	cmd.Flags().StringVar(&o.filePath, "file-path", "", "Log-file path. File path has a priority over file-type. When file-path and file-type are unset, output stdout/stderr of target container.")
 
 	cmd.MarkFlagsMutuallyExclusive("file-path", "file-type")
 	cmd.MarkFlagsMutuallyExclusive("since", "since-time")
@@ -144,7 +144,7 @@ func (o *LogsOptions) complete(args []string) error {
 	if len(args) > 0 {
 		o.clusterName = args[0]
 	}
-	// no set podName and find the default pod of cluster
+	// podName not set, find the default pod of cluster
 	if len(o.PodName) == 0 {
 		infos := cluster.GetSimpleInstanceInfos(o.Dynamic, o.clusterName, o.Namespace)
 		if len(infos) == 0 || infos[0].Name == constant.ComponentStatusDefaultPodName {
@@ -171,7 +171,7 @@ func (o *LogsOptions) complete(args []string) error {
 		command = assembleTail(o.logOptions.Follow, o.logOptions.Tail, o.logOptions.LimitBytes) + " " + o.filePath
 	case o.isStdoutForContainer():
 		{
-			// no set file-path and file-type, and will output container's stdout & stderr, like kubectl logs
+			// file-path and file-type are unset, output container's stdout & stderr, like kubectl logs
 			o.logOptions.RESTClientGetter = o.Factory
 			o.logOptions.LogsForObject = polymorphichelpers.LogsForObjectFn
 			o.logOptions.Object = pod

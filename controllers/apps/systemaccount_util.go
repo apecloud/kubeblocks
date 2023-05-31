@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -81,6 +82,7 @@ func (r *secretMapStore) addSecret(key string, value *corev1.Secret) error {
 	}
 	entry := &secretMapEntry{key: key, value: value}
 	if exists {
+		klog.V(1).Infof("secrets %s already cached, update key", key)
 		return r.Update(entry)
 	}
 	return r.Add(entry)
@@ -103,6 +105,7 @@ func (r *secretMapStore) deleteSecret(key string) error {
 		return err
 	}
 	if exist {
+		klog.V(1).Infof("deleted cached secret %s", key)
 		return r.Delete(exp)
 	}
 	return nil

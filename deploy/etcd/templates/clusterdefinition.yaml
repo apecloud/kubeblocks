@@ -47,7 +47,7 @@ spec:
                 PEERS=""
                 DOMAIN=$KB_NAMESPACE".svc.cluster.local"
                 i=0
-                while [ $i -lt $KB_N ]; do
+                while [ $i -lt $KB_REPLICA_COUNT ]; do
                 	if [ $i -ne 0 ]; then
                 		PEERS="$PEERS,";
                 	fi;

@@ -71,14 +71,13 @@ bootstrap:
 					Namespace: "default",
 				},
 				Data: map[string]string{
-					"KB_MYSQL_0_HOSTNAME": "my-mysql-0.my-mysql-headless",
-					"KB_MYSQL_FOLLOWERS":  "",
-					"KB_MYSQL_LEADER":     "my-mysql-0",
-					"KB_MYSQL_N":          "1",
-					"KB_MYSQL_RECREATE":   "false",
-					"LOOP_REFERENCE_A":    "$(LOOP_REFERENCE_B)",
-					"LOOP_REFERENCE_B":    "$(LOOP_REFERENCE_C)",
-					"LOOP_REFERENCE_C":    "$(LOOP_REFERENCE_A)",
+					"KB_0_HOSTNAME":    "my-mysql-0.my-mysql-headless",
+					"KB_FOLLOWERS":     "",
+					"KB_LEADER":        "my-mysql-0",
+					"KB_REPLICA_COUNT": "1",
+					"LOOP_REFERENCE_A": "$(LOOP_REFERENCE_B)",
+					"LOOP_REFERENCE_B": "$(LOOP_REFERENCE_C)",
+					"LOOP_REFERENCE_C": "$(LOOP_REFERENCE_A)",
 				}},
 			&corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{

@@ -173,11 +173,13 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+                    optional: false
               - name: PGPASSWORD_SUPERUSER
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
               - name: PGUSER_ADMIN
                 value: superadmin
               - name: PGPASSWORD_ADMIN
@@ -185,6 +187,7 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
               - name: PGUSER_STANDBY
                 value: standby
               - name: PGPASSWORD_STANDBY
@@ -192,16 +195,19 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
               - name: PGUSER
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+                    optional: false
               - name: PGPASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
           - name: pgbouncer
             imagePullPolicy: {{ .Values.pgbouncer.image.pullPolicy | quote }}
             securityContext:
@@ -240,11 +246,13 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+                    optional: false
               - name: POSTGRESQL_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
               - name: POSTGRESQL_PORT
                 value: "5432"
               - name: POSTGRESQL_HOST
@@ -271,11 +279,13 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
               - name: DATA_SOURCE_USER
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+                    optional: false
             command:
               - "/opt/bitnami/postgres-exporter/bin/postgres_exporter"
               - "--auto-discover-databases"
@@ -328,11 +338,13 @@ spec:
               secretKeyRef:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: username
+                optional: false
           - name: PGPASSWORD
             valueFrom:
               secretKeyRef:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: password
+                optional: false
         passwordConfig:
           length: 10
           numDigits: 5

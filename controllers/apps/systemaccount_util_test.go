@@ -244,7 +244,7 @@ func TestRenderJob(t *testing.T) {
 			assert.Contains(t, tolerationKeys, testDataPlaneTolerationKey)
 			assert.Contains(t, tolerationKeys, toleration[0].Key)
 		case appsv1alpha1.ReferToExisting:
-			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, constant.ConnCredentialPlaceHolder))
+			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, constant.KBConnCredentialPlaceHolder))
 		}
 	}
 }

@@ -152,7 +152,7 @@ var (
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: constant.ConnCredentialPlaceHolder,
+						Name: constant.KBConnCredentialPlaceHolder,
 					},
 					Key: "password",
 				},

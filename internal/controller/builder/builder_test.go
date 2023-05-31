@@ -369,7 +369,7 @@ var _ = Describe("builder", func() {
 				Expect(err).Should(BeNil())
 				Expect(cfg).ShouldNot(BeNil())
 				Expect(len(cfg.Data) == int(3+params.Component.Replicas)).Should(BeTrue())
-				Expect(cfg.Data["KB_N"]).
+				Expect(cfg.Data["KB_REPLICA_COUNT"]).
 					Should(Equal(strconv.Itoa(int(params.Component.Replicas))))
 				stsName := fmt.Sprintf("%s-%s", params.Cluster.Name, params.Component.Name)
 				svcName := fmt.Sprintf("%s-headless", stsName)

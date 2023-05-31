@@ -30,7 +30,6 @@ import (
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/module"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/etcd"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/filesystem"
-	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/images"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/kubernetes"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/plugins"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/plugins/dns"
@@ -53,7 +52,6 @@ func NewCreateK8sClusterForKubeblocks(o *clusterOptions) []module.Module {
 		// &customscripts.CustomScriptsModule{Phase: "PreInstall", Scripts: runtime.Cluster.System.PreInstall},
 		&kubernetes.StatusModule{},
 		&container.InstallContainerModule{},
-		&images.PullModule{Skip: !o.enablePullImage},
 		&etcd.PreCheckModule{},
 		&etcd.CertsModule{},
 		&etcd.InstallETCDBinaryModule{},

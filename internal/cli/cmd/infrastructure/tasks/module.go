@@ -40,7 +40,13 @@ func (i *InstallDependenciesModule) isNotReadyHosts() []connector.Host {
 		var result confirm.PreCheckResults
 		if v, ok := host.GetCache().Get(common.NodePreCheck); ok {
 			_ = mapstructure.Decode(v, &result)
-			if result.Socat == "" || result.Conntrack == "" || result.Ipset == "" || result.Chronyd == "" || result.Ebtables == "" {
+			if result.Socat == "" ||
+				result.Conntrack == "" ||
+				result.Curl == "" ||
+				result.Ipset == "" ||
+				result.Chronyd == "" ||
+				result.Ipvsadm == "" ||
+				result.Ebtables == "" {
 				hosts = append(hosts, host)
 			}
 		}

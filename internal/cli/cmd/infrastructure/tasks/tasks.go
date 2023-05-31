@@ -37,7 +37,7 @@ type InstallDependenciesTask struct {
 	pkg []string
 }
 
-var dependenciesPkg = []string{"socat", "conntrack", "ipset", "ebtables", "chrony", "iptables"}
+var dependenciesPkg = []string{"socat", "conntrack", "ipset", "ebtables", "chrony", "iptables", "curl", "ipvsadm"}
 
 func (i *InstallDependenciesTask) Execute(runtime connector.Runtime) (err error) {
 	host := runtime.RemoteHost()

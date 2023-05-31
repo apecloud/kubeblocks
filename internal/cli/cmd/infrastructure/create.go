@@ -56,7 +56,6 @@ type clusterOptions struct {
 	cluster     Cluster
 	debug       bool
 
-	enablePullImage     bool
 	autoRenewCerts      bool
 	securityEnhancement bool
 }

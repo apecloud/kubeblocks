@@ -131,12 +131,12 @@ func GetClusterVersionResource(cvName string, cv *appsv1alpha1.ClusterVersion, c
 	return nil
 }
 
-func CheckConfigTemplateReconfigureKey(configSpec appsv1alpha1.ComponentConfigSpec, key string) bool {
-	if len(configSpec.Keys) == 0 {
+func IsSupportConfigFileReconfigure(configTemplateSpec appsv1alpha1.ComponentConfigSpec, configFileKey string) bool {
+	if len(configTemplateSpec.Keys) == 0 {
 		return true
 	}
-	for _, keySelector := range configSpec.Keys {
-		if keySelector == key {
+	for _, keySelector := range configTemplateSpec.Keys {
+		if keySelector == configFileKey {
 			return true
 		}
 	}

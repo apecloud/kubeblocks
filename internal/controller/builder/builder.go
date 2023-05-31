@@ -619,7 +619,7 @@ func BuildConfigMapWithTemplateLow(cluster *appsv1alpha1.Cluster,
 		},
 		"component": {
 			"name":                  component.Name,
-			"type":                  component.CompDefName,
+			"compDefName":           component.CompDefName,
 			"characterType":         component.CharacterType,
 			"configName":            cmName,
 			"templateName":          tplCfg.TemplateRef,

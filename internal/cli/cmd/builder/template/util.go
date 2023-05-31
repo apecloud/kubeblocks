@@ -17,17 +17,21 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package app
+package template
 
 import (
 	"reflect"
 
 	"github.com/sethvargo/go-password/password"
+	"helm.sh/helm/v3/pkg/cli/values"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	"github.com/apecloud/kubeblocks/version"
 )
 
 type RenderedOptions struct {
@@ -94,4 +98,19 @@ func kindFromResource[T any](resource T) string {
 func RandomString(n int) string {
 	s, _ := password.Generate(n, 0, 0, false, false)
 	return s
+}
+
+func helmTemplate(helmPath string, helmOutput string) error {
+	o := helm.InstallOpts{
+		Name:      testing.KubeBlocksChartName,
+		Chart:     helmPath,
+		Namespace: "default",
+		Version:   version.DefaultKubeBlocksVersion,
+
+		DryRun:    func() *bool { r := true; return &r }(),
+		OutputDir: helmOutput,
+		ValueOpts: &values.Options{Values: []string{}},
+	}
+	_, err := o.Install(helm.NewFakeConfig("default"))
+	return err
 }

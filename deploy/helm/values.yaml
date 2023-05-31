@@ -1809,3 +1809,24 @@ enabledAlphaFeatureGates:
   ## @param enabledAlphaFeatureGates.recoverVolumeExpansionFailure -- Specifies whether feature gates RecoverVolumeExpansionFailure is enabled in k8s cluster.
   ##
   recoverVolumeExpansionFailure: false
+
+## @section KubeBlocks default storageClass Parameters for cloud provider.
+storageClass:
+  mountOptions:
+    - noatime
+    - nobarrier
+  provider:
+    eks:
+      volumeType: gp3
+      fsType: xfs
+    gke:
+      volumeType: pd-balanced
+      fsType: xfs
+    aliyun:
+      volumeType: cloud_essd
+      fsType: xfs
+    aks:
+      volumeType: managed
+      fsType: xfs
+    tke:
+      volumeType: CLOUD_SSD

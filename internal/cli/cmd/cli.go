@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/addon"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/alert"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/bench"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterdefinition"
@@ -153,6 +154,7 @@ A Command Line Interface for KubeBlocks`,
 		migration.NewMigrationCmd(f, ioStreams),
 		plugin.NewPluginCmd(ioStreams),
 		fault.NewFaultCmd(f, ioStreams),
+		builder.NewBuilderCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

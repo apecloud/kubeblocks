@@ -48,3 +48,20 @@ jobs:
       VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
     secrets: inherit
 
+  release-winget-kbcli:
+    needs: update-release-kbcli
+    uses: apecloud/apecd/.github/workflows/trigger-workflow.yml@v0.5.1
+    with:
+      GITHUB_REPO: "apecloud/apecd"
+      WORKFLOW_ID: "publish-kbcli-winget.yml"
+      VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
+    secrets: inherit
+
+  release-scoop-kbcli:
+    needs: update-release-kbcli
+    uses: apecloud/apecd/.github/workflows/trigger-workflow.yml@v0.5.1
+    with:
+      GITHUB_REPO: "apecloud/apecd"
+      WORKFLOW_ID: "publish-kbcli-scoop.yml"
+      VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
+    secrets: inherit

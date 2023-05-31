@@ -77,19 +77,19 @@ func PrintComponentConfigMeta(tplInfos []types.ConfigTemplateInfo, clusterName, 
 	}
 	tbl := NewTablePrinter(out)
 	PrintTitle("ConfigSpecs Meta")
-	enableReconfiguring := func(tpl appsv1alpha1.ComponentConfigSpec, key string) string {
-		if len(tpl.ConfigConstraintRef) > 0 && cfgcore.CheckConfigTemplateReconfigureKey(tpl, key) {
+	enableReconfiguring := func(tpl appsv1alpha1.ComponentConfigSpec, configFileKey string) string {
+		if len(tpl.ConfigConstraintRef) > 0 && cfgcore.IsSupportConfigFileReconfigure(tpl, configFileKey) {
 			return "true"
 		}
 		return "false"
 	}
 	tbl.SetHeader("CONFIG-SPEC-NAME", "FILE", "ENABLED", "TEMPLATE", "CONSTRAINT", "RENDERED", "COMPONENT", "CLUSTER")
 	for _, info := range tplInfos {
-		for key := range info.CMObj.Data {
+		for configFileKey := range info.CMObj.Data {
 			tbl.AddRow(
 				BoldYellow(info.Name),
-				key,
-				BoldYellow(enableReconfiguring(info.TPL, key)),
+				configFileKey,
+				BoldYellow(enableReconfiguring(info.TPL, configFileKey)),
 				info.TPL.TemplateRef,
 				info.TPL.ConfigConstraintRef,
 				info.CMObj.Name,

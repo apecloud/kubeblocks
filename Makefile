@@ -285,9 +285,7 @@ clean-kbcli: ## Clean bin/kbcli*.
 
 .PHONY: kbcli-doc
 kbcli-doc: generate test-go-generate ## generate CLI command reference manual.
-	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
-
-
+	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 .PHONY: api-doc
 api-doc:  ## generate API reference manual.

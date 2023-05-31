@@ -136,6 +136,13 @@ Inject faults to pod.
 * [kbcli fault time](kbcli_fault_time.md)	 - Clock skew failure.
 
 
+## [infra](kbcli_infra.md)
+
+infra command
+
+* [kbcli infra create](kbcli_infra_create.md)	 - create kubernetes cluster.
+
+
 ## [kubeblocks](kbcli_kubeblocks.md)
 
 KubeBlocks operation commands.

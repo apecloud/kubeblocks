@@ -284,7 +284,6 @@ track_functions = 'pl'
 track_io_timing = 'True'
 transform_null_equals = 'False'
 
-
 vacuum_cleanup_index_scale_factor = '0.1'
 # patroni 20ms
 vacuum_cost_delay = '0'
@@ -303,7 +302,7 @@ vacuum_multixact_freeze_table_age = '200000000'
 # unit 8KB
 wal_buffers = '{{ printf "%dMB" ( div ( min ( max ( div $phy_memory 2097152 ) 2048) 16384 ) 128 ) }}'
 wal_compression = 'True'
-wal_keep_segments = '128'
+wal_keep_segments = '4'
 # patroni minimal for Extreme Performance
 wal_level = 'replica'
 # patroni on , off for Extreme Performance

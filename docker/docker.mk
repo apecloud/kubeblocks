@@ -99,7 +99,7 @@ endif
 
 .PHONY: build-tools-image
 build-tools-image: DOCKER_BUILD_ARGS += --cache-to type=gha,scope=${GITHUB_REF_NAME}-tools-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-tools-image
-build-tools-image: generate ## Build tools container image.
+build-tools-image: generate test-go-generate ## Build tools container image.
 ifneq ($(BUILDX_ENABLED), true)
 	$(DOCKER) build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/Dockerfile-tools -t ${TOOL_IMG}:${VERSION} -t ${TOOL_IMG}:latest
 else
@@ -112,7 +112,7 @@ endif
 
 .PHONY: push-tools-image
 push-tools-image: DOCKER_BUILD_ARGS += --cache-to type=gha,scope=${GITHUB_REF_NAME}-tools-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-tools-image
-push-tools-image: generate ## Push tools container image.
+push-tools-image: generate test-go-generate ## Push tools container image.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)
 	$(DOCKER) push ${TOOL_IMG}:latest

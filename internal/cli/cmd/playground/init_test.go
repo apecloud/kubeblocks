@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package playground
 
 import (
+	"os"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -27,15 +29,20 @@ import (
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
 var _ = Describe("playground", func() {
+	const (
+		testKubeConfigPath = "./testdata/kubeconfig.yaml"
+	)
+
 	var streams genericclioptions.IOStreams
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		Expect(os.Setenv(types.CliHomeEnv, "./testdata")).Should(Succeed())
 	})
 
 	It("init at local host", func() {
@@ -47,7 +54,7 @@ var _ = Describe("playground", func() {
 			clusterVersion: clitesting.ClusterVersionName,
 			IOStreams:      streams,
 			cloudProvider:  defaultCloudProvider,
-			helmCfg:        helm.NewConfig("", util.ConfigPath("config_kb_test"), "", false),
+			helmCfg:        helm.NewConfig("", testKubeConfigPath, "", false),
 		}
 		Expect(o.validate()).Should(Succeed())
 		Expect(o.run()).Should(HaveOccurred())

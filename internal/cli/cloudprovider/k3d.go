@@ -53,9 +53,6 @@ var (
 	// K3sImage is k3s image repo
 	K3sImage = "rancher/k3s:" + version.K3sImageTag
 
-	// K3dToolsImage is k3d tools image repo
-	K3dToolsImage = "docker.io/apecloud/k3d-tools:" + version.K3dVersion
-
 	// K3dProxyImage is k3d proxy image repo
 	K3dProxyImage = "docker.io/apecloud/k3d-proxy:" + version.K3dVersion
 )

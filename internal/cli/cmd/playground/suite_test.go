@@ -38,7 +38,6 @@ func TestPlayground(t *testing.T) {
 var _ = BeforeSuite(func() {
 	// set fake image info
 	cp.K3sImage = "fake-k3s-image"
-	cp.K3dToolsImage = "fake-k3s-tools-image"
 	cp.K3dProxyImage = "fake-k3d-proxy-image"
 
 	// set default cluster name to test

@@ -11,7 +11,7 @@ kbcli cluster list-backups [flags]
 ### Examples
 
 ```
-  # list all backup
+  # list all backups
   kbcli cluster list-backups
 ```
 

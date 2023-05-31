@@ -146,7 +146,7 @@ func (o *editConfigOptions) confirmReconfigure(promptStr string) (bool, error) {
 
 	confirmStr := []string{yesStr, noStr}
 	printer.Warning(o.Out, promptStr)
-	input, err := prompt.NewPrompt("Please type [yes/No] to confirm:",
+	input, err := prompt.NewPrompt("Please type [Yes/No] to confirm:",
 		func(input string) error {
 			if !slices.Contains(confirmStr, strings.ToLower(input)) {
 				return fmt.Errorf("typed \"%s\" does not match \"%s\"", input, confirmStr)
@@ -187,6 +187,6 @@ func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		},
 	}
 	o.buildReconfigureCommonFlags(cmd)
-	cmd.Flags().BoolVar(&o.replaceFile, "replace", false, "Specify whether to replace the config file. Default to false.")
+	cmd.Flags().BoolVar(&o.replaceFile, "replace", false, "Boolean flag to enable replacing config file. Default with false.")
 	return cmd
 }

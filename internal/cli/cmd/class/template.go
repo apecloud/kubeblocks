@@ -43,8 +43,8 @@ const ComponentClassTemplate = `
     namingTemplate: "custom-{{ .cpu }}c{{ .memory }}g"
 
     # class definitions, we support two kinds of class definitions:
-    # 1. define values for template variables and the full class definition will be dynamically rendered
-    # 2. statically define the complete class
+    # 1. dynamically classes rendered with defined values & template variables 
+    # 2. statically defined classes
     classes:
     - args: [1, 1]
 `

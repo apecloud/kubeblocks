@@ -43,8 +43,8 @@ Manage classes
 
 Cluster command.
 
+* [kbcli cluster Configure](kbcli_cluster_Configure.md)	 - Configure parameters with the specified components in the cluster.
 * [kbcli cluster backup](kbcli_cluster_backup.md)	 - Create a backup for the cluster.
-* [kbcli cluster configure](kbcli_cluster_configure.md)	 - Configure parameters with the specified components in the cluster.
 * [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a cluster or instance.
 * [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster.
 * [kbcli cluster create-account](kbcli_cluster_create-account.md)	 - Create account for a cluster

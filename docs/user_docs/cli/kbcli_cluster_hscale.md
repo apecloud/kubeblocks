@@ -11,7 +11,7 @@ kbcli cluster hscale NAME [flags]
 ### Examples
 
 ```
-  # expand storage resources of specified components, separate with commas when component name more than one
+  # expand storage resources of specified components, separate with commas for multiple components
   kbcli cluster hscale mycluster --components=mysql --replicas=3
 ```
 

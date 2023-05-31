@@ -42,31 +42,31 @@ const (
 	ComponentNameEmpty = ""
 )
 
-// GetSimpleInstanceInfos return simple instance info that only contains instance name and role, the default
+// GetSimpleInstanceInfos returns simple instance info that only contains instance name and role, the default
 // instance should be the first element in the returned array.
 func GetSimpleInstanceInfos(dynamic dynamic.Interface, name, namespace string) []*InstanceInfo {
 	return GetSimpleInstanceInfosForComponent(dynamic, name, ComponentNameEmpty, namespace)
 }
 
-// GetSimpleInstanceInfosForComponent return simple instance info that only contains instance name and role,
+// GetSimpleInstanceInfosForComponent returns simple instance info that only contains instance name and role for a component
 func GetSimpleInstanceInfosForComponent(dynamic dynamic.Interface, name, componentName, namespace string) []*InstanceInfo {
-	// if cluster status contains what we need, return directly
+	// first get instance info from status, using the status as a cache
 	if infos := getInstanceInfoFromStatus(dynamic, name, componentName, namespace); len(infos) > 0 {
 		return infos
 	}
 
-	// if cluster status does not contain what we need, try to list all pods and build instance info
+	// missed in the status, try to list all pods and build instance info
 	return getInstanceInfoByList(dynamic, name, componentName, namespace)
 }
 
-// getInstancesInfoFromCluster get instances info from cluster status
+// getInstancesInfoFromCluster gets instances info from cluster status
 func getInstanceInfoFromStatus(dynamic dynamic.Interface, name, componentName, namespace string) []*InstanceInfo {
 	var infos []*InstanceInfo
 	cluster, err := GetClusterByName(dynamic, name, namespace)
 	if err != nil {
 		return nil
 	}
-	// travel all components, check type
+	// traverse all components, check the workload type
 	for compName, c := range cluster.Status.Components {
 		// filter by component name
 		if len(componentName) > 0 && compName != componentName {
@@ -117,7 +117,7 @@ func getInstanceInfoFromStatus(dynamic dynamic.Interface, name, componentName, n
 	return infos
 }
 
-// getInstanceInfoByList get instances info by list all pods
+// getInstanceInfoByList gets instances info by listing all pods
 func getInstanceInfoByList(dynamic dynamic.Interface, name, componentName, namespace string) []*InstanceInfo {
 	var infos []*InstanceInfo
 	// filter by cluster name
@@ -203,7 +203,7 @@ func GetComponentServices(svcList *corev1.ServiceList, c *appsv1alpha1.ClusterCo
 	return internalSvcs, externalSvcs
 }
 
-// GetExternalAddr get external IP from service annotation
+// GetExternalAddr gets external IP from service annotation
 func GetExternalAddr(svc *corev1.Service) string {
 	for _, ingress := range svc.Status.LoadBalancer.Ingress {
 		if ingress.Hostname != "" {
@@ -302,7 +302,7 @@ func BuildStorageClass(storages []StorageInfo) string {
 	return util.CheckEmpty(strings.Join(scs, "\n"))
 }
 
-// GetLatestVersion get the latest cluster versions that reference the cluster definition
+// GetLatestVersion gets the latest cluster versions that referencing the cluster definition
 func GetLatestVersion(dynamic dynamic.Interface, clusterDef string) (string, error) {
 	versionList, err := GetVersionByClusterDef(dynamic, clusterDef)
 	if err != nil {
@@ -357,7 +357,7 @@ func (info *CompInfo) InferPodName() (string, error) {
 	if info.ComponentStatus.ReplicationSetStatus != nil {
 		return info.ComponentStatus.ReplicationSetStatus.Primary.Pod, nil
 	}
-	return "", fmt.Errorf("cannot infer the pod to connect, please specify the pod name explicitly by `--instance` flag")
+	return "", fmt.Errorf("cannot pick a pod to connect, please specify the pod name explicitly by `--instance` flag")
 }
 
 func FillCompInfoByName(ctx context.Context, dynamic dynamic.Interface, namespace, clusterName, componentName string) (*CompInfo, error) {
@@ -366,7 +366,7 @@ func FillCompInfoByName(ctx context.Context, dynamic dynamic.Interface, namespac
 		return nil, err
 	}
 	if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
-		return nil, fmt.Errorf("cluster %s is not running, please try later", clusterName)
+		return nil, fmt.Errorf("cluster %s is not running, please try again later", clusterName)
 	}
 
 	compInfo := &CompInfo{}

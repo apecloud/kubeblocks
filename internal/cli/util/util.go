@@ -41,8 +41,10 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"github.com/pmezard/go-difflib/difflib"
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -767,4 +769,31 @@ func BuildClusterDefinitionRefLable(prefix string, clusterDef []string) string {
 // IsWindows return true if the kbcli runtime situation is windows
 func IsWindows() bool {
 	return runtime.GOOS == types.GoosWindows
+}
+
+func GetUnifiedDiffString(original, edited string) (string, error) {
+	diff := difflib.UnifiedDiff{
+		A:        difflib.SplitLines(original),
+		B:        difflib.SplitLines(edited),
+		FromFile: "Original",
+		ToFile:   "Current",
+		Context:  3,
+	}
+	return difflib.GetUnifiedDiffString(diff)
+}
+
+func DisplayDiffWithColor(out io.Writer, diffText string) {
+	for _, line := range difflib.SplitLines(diffText) {
+		switch {
+		case strings.HasPrefix(line, "---"), strings.HasPrefix(line, "+++"):
+			line = color.HiYellowString(line)
+		case strings.HasPrefix(line, "@@"):
+			line = color.HiBlueString(line)
+		case strings.HasPrefix(line, "-"):
+			line = color.RedString(line)
+		case strings.HasPrefix(line, "+"):
+			line = color.GreenString(line)
+		}
+		fmt.Fprint(out, line)
+	}
 }

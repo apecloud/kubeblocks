@@ -29,6 +29,7 @@ import (
 	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"github.com/apecloud/kubeblocks/internal/cli/edit"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -69,6 +71,8 @@ type Options struct {
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	fieldManager                 string
 
+	EditBeforeUpdate bool
+
 	genericclioptions.IOStreams
 }
 
@@ -84,6 +88,7 @@ func NewOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, gvr sche
 
 func (o *Options) AddFlags(cmd *cobra.Command) {
 	o.PrintFlags.AddFlags(cmd)
+	cmd.Flags().BoolVar(&o.EditBeforeUpdate, "edit", o.EditBeforeUpdate, "Edit the cluster resource before updating")
 	cmdutil.AddDryRunFlag(cmd)
 }
 
@@ -170,13 +175,37 @@ func (o *Options) Run(cmd *cobra.Command) error {
 				NewHelper(client, mapping).
 				DryRun(o.dryRunStrategy == cmdutil.DryRunServer).
 				WithFieldManager(o.fieldManager).
-				WithSubresource(o.Subresource)
+				WithSubresource(o.Subresource).
+				WithFieldValidation(metav1.FieldValidationStrict)
 			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes, nil)
 			if err != nil {
 				if apierrors.IsUnsupportedMediaType(err) {
 					return errors.Wrap(err, fmt.Sprintf("%s is not supported by %s", patchType, mapping.GroupVersionKind))
 				}
-				return err
+				return fmt.Errorf("unable to update %s %s/%s: %v", info.Mapping.GroupVersionKind.Kind, info.Namespace, info.Name, err)
+			}
+
+			if o.EditBeforeUpdate {
+				customEdit := edit.NewCustomEditOptions(o.Factory, o.IOStreams, "update")
+				if err = customEdit.Run(patchedObj, false); err != nil {
+					return fmt.Errorf("unable to edit %s %s/%s: %v", info.Mapping.GroupVersionKind.Kind, info.Namespace, info.Name, err)
+				}
+				patchedObj = &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"spec": patchedObj.(*unstructured.Unstructured).Object["spec"],
+					},
+				}
+				patchBytes, err = patchedObj.(*unstructured.Unstructured).MarshalJSON()
+				if err != nil {
+					return fmt.Errorf("unable to marshal %s %s/%s: %v", info.Mapping.GroupVersionKind.Kind, info.Namespace, info.Name, err)
+				}
+				patchedObj, err = helper.Patch(namespace, name, patchType, patchBytes, nil)
+				if err != nil {
+					if apierrors.IsUnsupportedMediaType(err) {
+						return errors.Wrap(err, fmt.Sprintf("%s is not supported by %s", patchType, mapping.GroupVersionKind))
+					}
+					return fmt.Errorf("unable to update %s %s/%s: %v", info.Mapping.GroupVersionKind.Kind, info.Namespace, info.Name, err)
+				}
 			}
 
 			didPatch := !reflect.DeepEqual(info.Object, patchedObj)

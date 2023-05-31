@@ -77,14 +77,6 @@ var _ = Describe("Create", func() {
 			Expect(options.Complete()).Should(Succeed())
 		})
 
-		It("test edit the cluster resource before creating", func() {
-			options.Format = printer.YAML
-			Expect(options.Complete()).Should(Succeed())
-			resObj, err := options.buildResourceObj()
-			Expect(err).Should(Succeed())
-			Expect(options.runEditOnCreate(resObj, true)).Should(Succeed())
-		})
-
 		It("test create with dry-run", func() {
 			options.Format = printer.YAML
 			testCases := []struct {

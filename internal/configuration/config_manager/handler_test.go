@@ -64,7 +64,7 @@ func TestCreateSignalHandler(t *testing.T) {
 	_, err := CreateSignalHandler(appsv1alpha1.SIGALRM, "test")
 	require.Nil(t, err)
 	_, err = CreateSignalHandler("NOSIGNAL", "test")
-	require.ErrorContains(t, err, "not support unix signal")
+	require.ErrorContains(t, err, "not supported unix signal")
 }
 
 func TestCreateExecHandler(t *testing.T) {

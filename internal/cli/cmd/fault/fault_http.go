@@ -187,10 +187,10 @@ func (o *HTTPChaosOptions) NewCobraCommand(use, short string) *cobra.Command {
 func (o *HTTPChaosOptions) AddCommonFlag(cmd *cobra.Command) {
 	o.FaultBaseOptions.AddCommonFlag(cmd)
 
-	cmd.Flags().StringVar(&o.Target, "target", "Request", `Specifies whether the target of fault injuection is Request or Response. The target-related fields should be configured at the same time.`)
+	cmd.Flags().StringVar(&o.Target, "target", "Request", `Specifies whether the target of fault injection is Request or Response. The target-related fields should be configured at the same time.`)
 	cmd.Flags().Int32Var(&o.Port, "port", 80, `The TCP port that the target service listens on.`)
 	cmd.Flags().StringVar(&o.Path, "path", "*", `The URI path of the target request. Supports Matching wildcards.`)
-	cmd.Flags().StringVar(&o.Method, "method", "GET", `The HTTP method of the target request method.For example: GET, POST, PUT, DELETE, HEAD, OPTIONS, PATCH.`)
+	cmd.Flags().StringVar(&o.Method, "method", "GET", `The HTTP method of the target request method. For example: GET, POST, PUT, DELETE, HEAD, OPTIONS, PATCH.`)
 	cmd.Flags().Int32Var(&o.Code, "code", 0, `The status code responded by target.`)
 
 	// register flag completion func

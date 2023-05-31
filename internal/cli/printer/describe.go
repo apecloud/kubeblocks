@@ -100,7 +100,7 @@ func PrintComponentConfigMeta(tplInfos []types.ConfigTemplateInfo, clusterName, 
 	tbl.Print()
 }
 
-// PrintHelmValues print the helm values file of the release in specified format, support JSON、YAML and Table
+// PrintHelmValues prints the helm values file of the release in specified format, supports JSON、YAML and Table
 func PrintHelmValues(configs map[string]interface{}, format Format, out io.Writer) {
 	inTable := func() {
 		p := NewTablePrinter(out)
@@ -126,7 +126,7 @@ func PrintHelmValues(configs map[string]interface{}, format Format, out io.Write
 	fmt.Fprint(out, string(data))
 }
 
-// addRows parse the interface value two depth at most and add it to the Table
+// addRows parses the interface value and add it to the Table
 func addRows(key string, value interface{}, p *TablePrinter, ori bool) {
 	if value == nil {
 		p.AddRow(key, value)

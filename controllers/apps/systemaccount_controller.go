@@ -135,7 +135,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 	// cluster is under deletion, do nothing
 	if !cluster.GetDeletionTimestamp().IsZero() {
-		reqCtx.Log.Info("Cluster is under deletion.", "cluster", req.NamespacedName)
+		reqCtx.Log.V(1).Info("Cluster is under deletion.", "cluster", req.NamespacedName)
 		return intctrlutil.Reconciled()
 	}
 
@@ -181,7 +181,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		// facts: accounts have been created, in form of k8s secrets.
 		if detectedK8SFacts, err = r.getAccountFacts(reqCtx, compKey); err != nil {
-			reqCtx.Log.Error(err, "failed to get secrets")
+			reqCtx.Log.V(1).Error(err, "failed to get secrets")
 			return err
 		}
 		reqCtx.Log.V(1).Info("detected k8s facts", "cluster", req.NamespacedName, "accounts", detectedK8SFacts)
@@ -388,6 +388,7 @@ func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx,
 	}
 
 	detectedFacts := getAccountFacts(secrets, jobs)
+	reqCtx.Log.V(1).Info("Detected account facts", "facts", detectedFacts)
 
 	for _, accName := range getAllSysAccounts() {
 		key := concatSecretName(key, string(accName))
@@ -396,6 +397,7 @@ func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx,
 			detectedFacts |= accName.GetAccountID()
 		}
 	}
+	reqCtx.Log.V(1).Info("Detected account facts with those from cache", "facts", detectedFacts)
 	return detectedFacts, nil
 }
 
@@ -486,7 +488,7 @@ func (r *SystemAccountReconciler) jobCompletionHander() *handler.Funcs {
 				return
 			}
 
-			logger.Info("job succeeded", "job", job.Name, "account", accountName, "cluster", clusterName, "secret", key)
+			logger.V(1).Info("job succeeded", "job", job.Name, "account", accountName, "cluster", clusterName, "secret", key)
 
 			if err = r.Client.Create(context.TODO(), entry.value); err != nil {
 				logger.Error(err, "failed to create secret, will try later", "secret key", key)
@@ -546,7 +548,7 @@ func (r *SystemAccountReconciler) clusterDeletionHander() builder.Predicates {
 					}
 				}
 			}
-			logger.Info("cluster deleted", "cluster", cluster.Name, "namespace", cluster.Namespace, "secretMapStore", r.SecretMapStore.ListKeys())
+			logger.V(1).Info("cluster deleted", "cluster", cluster.Name, "namespace", cluster.Namespace, "secretMapStore", r.SecretMapStore.ListKeys())
 			return false
 		},
 	}

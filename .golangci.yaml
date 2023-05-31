@@ -11,6 +11,9 @@ run:
   skip-files:
     - "^zz_generated.*"
 
+  build-tags:
+    - containers_image_openpgp
+
 output:
   # colored-line-number|line-number|json|tab|checkstyle|code-climate, default is "colored-line-number"
   format: colored-line-number

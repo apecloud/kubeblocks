@@ -24,19 +24,16 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 var _ = Describe("kubeblock infra", func() {
 	var streams genericclioptions.IOStreams
-	var tf *cmdtesting.TestFactory
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 	})
 
 	AfterEach(func() {
-		tf.Cleanup()
 	})
 
 	It("command should succeed", func() {

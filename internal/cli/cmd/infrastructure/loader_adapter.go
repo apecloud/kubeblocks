@@ -72,11 +72,11 @@ func createClusterWithOptions(values *gotemplate.TplValues) (*kubekeyapiv1alpha2
 		return nil, cfgcore.WrapError(err, "failed to unmarshal the cluster yaml")
 	}
 
-	contentToJson, err := yaml.ToJSON(content)
+	contentToJSON, err := yaml.ToJSON(content)
 	if err != nil {
 		return nil, cfgcore.WrapError(err, "Unable to convert configuration to json")
 	}
-	if err := json.Unmarshal(contentToJson, &cluster); err != nil {
+	if err := json.Unmarshal(contentToJSON, &cluster); err != nil {
 		return nil, cfgcore.WrapError(err, "failed to unmarshal the cluster")
 	}
 	return &cluster.Spec, nil

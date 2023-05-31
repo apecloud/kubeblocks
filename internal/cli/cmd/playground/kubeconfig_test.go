@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	testConfigPath = "./testdata/kubeconfig.yaml"
+	testConfigPath = "./testdata/kubeconfig"
 	testCluster    = "test-cluster"
 	testUser       = "test-user"
 	testContext    = "test-context"

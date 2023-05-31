@@ -35,7 +35,7 @@ import (
 
 var _ = Describe("playground", func() {
 	const (
-		testKubeConfigPath = "./testdata/kubeconfig.yaml"
+		testKubeConfigPath = "./testdata/kubeconfig"
 	)
 
 	var streams genericclioptions.IOStreams

@@ -71,7 +71,7 @@ func NewDefaultCliCmd() *cobra.Command {
 		cmdPathPieces := os.Args[1:]
 
 		// only look for suitable extension executables if
-		// the specified command does not already exist
+		// the specified command does not exist
 		if _, _, err := cmd.Find(cmdPathPieces); err != nil {
 			var cmdName string
 			for _, arg := range cmdPathPieces {
@@ -120,7 +120,7 @@ A Command Line Interface for KubeBlocks`,
 		},
 	}
 
-	// From this point and forward we get warnings on flags that contain "_" separators
+	// Start from this point we get warnings on flags that contain "_" separators
 	// when adding them with hyphen instead of the original name.
 	cmd.SetGlobalNormalizationFunc(cliflag.WarnWordSepNormalizeFunc)
 
@@ -163,7 +163,7 @@ A Command Line Interface for KubeBlocks`,
 	helpFunc := cmd.HelpFunc()
 	usageFunc := cmd.UsageFunc()
 
-	// clusterCmd set its own usage and help function and its subcommand will inherit it,
+	// clusterCmd sets its own usage and help function and its subcommand will inherit it,
 	// so we need to set its subcommand's usage and help function back to the root command
 	clusterCmd := cluster.NewClusterCmd(f, ioStreams)
 	registerUsageAndHelpFuncForSubCommand(clusterCmd, helpFunc, usageFunc)

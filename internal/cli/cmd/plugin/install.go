@@ -124,8 +124,8 @@ func (o *PluginInstallOption) Install() error {
 	return nil
 }
 
-// Install will download and install a plugin. The operation tries
-// to not get the plugin dir in a bad state if it fails during the process.
+// Install downloads and installs a plugin. The operation tries
+// to keep the plugin dir in a healthy state if it fails during the process.
 func Install(p *Paths, plugin Plugin, indexName string, opts InstallOpts) error {
 	klog.V(2).Infof("Looking for installed versions")
 	_, err := ReadReceiptFromFile(p.PluginInstallReceiptPath(plugin.Name))

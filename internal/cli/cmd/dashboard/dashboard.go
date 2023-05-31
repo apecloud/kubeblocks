@@ -215,7 +215,7 @@ func newOpenCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 
 	cmd.Flags().StringVar(&o.localPort, "port", "", "dashboard local port")
 	cmd.Flags().Duration(podRunningTimeoutFlag, defaultPodExecTimeout,
-		"The length of time (like 5s, 2m, or 3h, higher than zero) to wait until at least one pod is running")
+		"The time (like 5s, 2m, or 3h, higher than zero) to wait for at least one pod is running")
 
 	return cmd
 }

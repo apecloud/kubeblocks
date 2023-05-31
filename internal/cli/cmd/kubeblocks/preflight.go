@@ -112,7 +112,7 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd.Flags().StringVar(p.Format, flagFormat, "yaml", "output format, one of json, yaml. only used when interactive is set to false, default format is yaml")
 	cmd.Flags().StringVar(p.CollectorImage, flagCollectorImage, *p.CollectorImage, "the full name of the collector image to use")
 	cmd.Flags().StringVar(p.CollectorPullPolicy, flagCollectorPullPolicy, *p.CollectorPullPolicy, "the pull policy of the collector image")
-	cmd.Flags().BoolVar(p.CollectWithoutPermissions, flagCollectWithoutPermissions, *p.CollectWithoutPermissions, "always run preflight checks even if some require permissions that preflight does not have")
+	cmd.Flags().BoolVar(p.CollectWithoutPermissions, flagCollectWithoutPermissions, *p.CollectWithoutPermissions, "always run preflight checks even if some required permissions that preflight does not have")
 	cmd.Flags().StringVar(p.Selector, flagSelector, *p.Selector, "selector (label query) to filter remote collection nodes on.")
 	cmd.Flags().StringVar(p.SinceTime, flagSinceTime, *p.SinceTime, "force pod logs collectors to return logs after a specific date (RFC3339)")
 	cmd.Flags().StringVar(p.Since, flagSince, *p.Since, "force pod logs collectors to return logs newer than a relative duration like 5s, 2m, or 3h.")
@@ -132,7 +132,7 @@ func LoadVendorCheckYaml(vendorName util.K8sProvider) ([][]byte, error) {
 		yamlDataList = append(yamlDataList, data)
 	}
 	if len(yamlDataList) == 0 {
-		return yamlDataList, errors.New("unsupported k8s provider, and the validation of provider will coming soon")
+		return yamlDataList, errors.New("unsupported k8s provider")
 	}
 	return yamlDataList, nil
 }
@@ -163,15 +163,15 @@ func (p *PreflightOptions) complete(f cmdutil.Factory, args []string) error {
 	if len(args) == 0 {
 		clientSet, err := f.KubernetesClientSet()
 		if err != nil {
-			return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, "init k8s client failed, and please check kubeconfig")
+			return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, "init k8s client failed, please check the kubeconfig")
 		}
 		versionInfo, err := util.GetVersionInfo(clientSet)
 		if err != nil {
-			return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, "get k8s version of server failed, and please check your k8s accessibility")
+			return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, "get k8s version of server failed, please check accessibility to k8s")
 		}
 		vendorName, err := util.GetK8sProvider(versionInfo.Kubernetes, clientSet)
 		if err != nil {
-			return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, "get k8s cloud provider failed, and please check your k8s accessibility")
+			return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, "get k8s cloud provider failed, please check accessibility to k8s")
 		}
 		p.checkYamlData, err = LoadVendorCheckYaml(vendorName)
 		if err != nil {

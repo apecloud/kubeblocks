@@ -482,7 +482,6 @@ func BuildEnvConfigLow(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster
 	envData := map[string]string{
 		prefix + "REPLICA_COUNT": cnt,
 	}
-	suffixes = append(suffixes, "REPLICA_COUNT")
 
 	for j := 0; j < int(component.Replicas); j++ {
 		toA := strconv.Itoa(j)
@@ -528,6 +527,7 @@ func BuildEnvConfigLow(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster
 	for _, s := range suffixes {
 		envData[prefixWithCompDefName+s] = envData[prefix+s]
 	}
+	envData[prefixWithCompDefName+"N"] = envData[prefix+"REPLICA_COUNT"]
 
 	config := corev1.ConfigMap{}
 	if err := buildFromCUE(tplFile, map[string]any{

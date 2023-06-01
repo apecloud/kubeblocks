@@ -22,25 +22,34 @@ package configuration
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
-	"github.com/StudioSol/set"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/StudioSol/set"
+	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 var _ = Describe("config_util", func() {
 
+	var k8sMockClient *testutil.K8sClientMockHelper
+
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
+		k8sMockClient = testutil.NewK8sMockClient()
 	})
 
 	AfterEach(func() {
 		// Add any teardown steps that needs to be executed after each test
+		k8sMockClient.Finish()
 	})
 
 	Context("MergeAndValidateConfigs", func() {
@@ -141,6 +150,90 @@ var _ = Describe("config_util", func() {
 			}
 		})
 	})
+
+	Context("common funcs test", func() {
+		It("GetReloadOptions Should success without error", func() {
+			mockTpl := appsv1alpha1.ConfigConstraint{
+				Spec: appsv1alpha1.ConfigConstraintSpec{
+					ReloadOptions: &appsv1alpha1.ReloadOptions{
+						UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+							Signal:      "HUB",
+							ProcessName: "for_test",
+						},
+					},
+				},
+			}
+			tests := []struct {
+				name    string
+				tpls    []appsv1alpha1.ComponentConfigSpec
+				want    *appsv1alpha1.ReloadOptions
+				wantErr bool
+			}{{
+				// empty config templates
+				name:    "test",
+				tpls:    nil,
+				want:    nil,
+				wantErr: false,
+			}, {
+				// empty config templates
+				name:    "test",
+				tpls:    []appsv1alpha1.ComponentConfigSpec{},
+				want:    nil,
+				wantErr: false,
+			}, {
+				// config templates without configConstraintObj
+				name: "test",
+				tpls: []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name: "for_test",
+					},
+				}, {
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name: "for_test2",
+					},
+				}},
+				want:    nil,
+				wantErr: false,
+			}, {
+				// normal
+				name: "test",
+				tpls: []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name: "for_test",
+					},
+					ConfigConstraintRef: "eg_v1",
+				}},
+				want:    mockTpl.Spec.ReloadOptions,
+				wantErr: false,
+			}, {
+				// not exist config constraint
+				name: "test",
+				tpls: []appsv1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name: "for_test",
+					},
+					ConfigConstraintRef: "not_exist",
+				}},
+				want:    nil,
+				wantErr: true,
+			}}
+
+			k8sMockClient.MockGetMethod(testutil.WithGetReturned(func(key client.ObjectKey, obj client.Object) error {
+				if strings.Contains(key.Name, "not_exist") {
+					return MakeError("not exist config!")
+				}
+				testutil.SetGetReturnedObject(obj, &mockTpl)
+				return nil
+			}, testutil.WithMaxTimes(len(tests))))
+
+			for _, tt := range tests {
+				got, _, err := GetReloadOptions(k8sMockClient.Client(), ctx, tt.tpls)
+				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
+				Expect(reflect.DeepEqual(got, tt.want)).Should(BeTrue())
+			}
+		})
+	})
+
 })
 
 func TestFromUpdatedConfig(t *testing.T) {

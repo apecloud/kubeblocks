@@ -147,7 +147,7 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec,
 			return nil, cfgutil.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
 		}
 		reloadOptions := cc.Spec.ReloadOptions
-		if !IsSupportReload(reloadOptions) || cc.Spec.ReloadOptions == nil {
+		if !IsSupportReload(reloadOptions) {
 			continue
 		}
 		reloadConfigSpecMeta = append(reloadConfigSpecMeta, ConfigSpecMeta{

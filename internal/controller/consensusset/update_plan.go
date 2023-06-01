@@ -176,7 +176,8 @@ func (p *realUpdatePlan) buildSerialUpdatePlan() {
 }
 
 func (p *realUpdatePlan) execute() ([]*corev1.Pod, error) {
-	if err := p.dag.WalkBFS(p.planWalkFunc); err != nil && err != ErrWait && err != ErrStop {
+	p.build()
+	if err := p.dag.WalkBFS(p.planWalkFunc); err != ErrContinue && err != ErrWait && err != ErrStop {
 		return nil, err
 	}
 
@@ -184,13 +185,11 @@ func (p *realUpdatePlan) execute() ([]*corev1.Pod, error) {
 }
 
 func newUpdatePlan(csSet workloads.ConsensusSet, pods []corev1.Pod) updatePlan {
-	plan := &realUpdatePlan{
+	return &realUpdatePlan{
 		csSet: csSet,
 		pods:  pods,
 		dag:   graph.NewDAG(),
 	}
-	plan.build()
-	return plan
 }
 
 var _ updatePlan = &realUpdatePlan{}

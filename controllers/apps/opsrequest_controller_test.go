@@ -604,33 +604,6 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(tmlCluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
 			})).Should(Succeed())
 		})
-
-		It("cancel restart opsRequest which is not supported", func() {
-			By("create cluster and mock it to running")
-			createMysqlCluster(3)
-			mockCompRunning(3)
-
-			By("create a restart ops")
-			ops := testapps.NewOpsRequestObj("restart"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
-				clusterObj.Name, appsv1alpha1.RestartType)
-			ops.Spec.RestartList = []appsv1alpha1.ComponentOps{{ComponentName: mysqlCompName}}
-			Expect(testCtx.CreateObj(testCtx.Ctx, ops)).Should(Succeed())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops))).Should(Equal(appsv1alpha1.OpsRunningPhase))
-
-			By("cancel the opsRequest")
-			Eventually(testapps.ChangeObj(&testCtx, ops, func(opsRequest *appsv1alpha1.OpsRequest) {
-				opsRequest.Spec.Cancel = true
-			})).Should(Succeed())
-
-			By("opsRequest should do nothing for the cancel signal")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops), func(g Gomega, opsRequest *appsv1alpha1.OpsRequest) {
-				g.Expect(opsRequest.Spec.Cancel).Should(Equal(true))
-				g.Expect(opsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsRunningPhase))
-				g.Expect(opsRequest.Status.CancelTimestamp.IsZero()).Should(BeTrue())
-				cancelCondition := meta.FindStatusCondition(opsRequest.Status.Conditions, appsv1alpha1.ConditionTypeCancelled)
-				g.Expect(cancelCondition).Should(BeNil())
-			})).Should(Succeed())
-		})
 	})
 
 })

@@ -70,12 +70,12 @@ ARCH ?= linux-amd64
 
 
 TAG_LATEST ?= false
-BUILDX_ENABLED ?= false
-ifneq ($(BUILDX_ENABLED), false)
+BUILDX_ENABLED ?= ""
+ifeq ($(BUILDX_ENABLED), "")
 	ifeq ($(shell docker buildx inspect 2>/dev/null | awk '/Status/ { print $$2 }'), running)
-		BUILDX_ENABLED ?= true
+		BUILDX_ENABLED = true
 	else
-		BUILDX_ENABLED ?= false
+		BUILDX_ENABLED = false
 	endif
 endif
 

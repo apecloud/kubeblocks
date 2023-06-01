@@ -248,14 +248,14 @@ bootstrap:
 				// KB_CLUSTER_NAME, KB_COMP_NAME from env
 				// MYSQL_USER,MYSQL_PASSWORD from valueFrom secret key
 				// SPILO_CONFIGURATION from valueFrom configmap key
-				// KB_MYSQL_LEADER from envFrom configmap
+				// KB_LEADER from envFrom configmap
 				// MEMORY_SIZE, CPU from resourceFieldRef
 				"my":            "{{ getEnvByName ( index $.podSpec.containers 0 ) \"KB_CLUSTER_NAME\" }}",
 				"mysql":         "{{ getEnvByName ( index $.podSpec.containers 0 ) \"KB_COMP_NAME\" }}",
 				"root":          "{{ getEnvByName ( index $.podSpec.containers 0 ) \"MYSQL_USER\" }}",
 				"4zrqfl2r":      "{{ getEnvByName ( index $.podSpec.containers 0 ) \"MYSQL_PASSWORD\" }}",
 				patroniTemplate: "{{ getEnvByName ( index $.podSpec.containers 0 ) \"SPILO_CONFIGURATION\" }}",
-				"my-mysql-0":    "{{ getEnvByName ( index $.podSpec.containers 0 ) \"KB_MYSQL_LEADER\" }}",
+				"my-mysql-0":    "{{ getEnvByName ( index $.podSpec.containers 0 ) \"KB_LEADER\" }}",
 
 				strconv.Itoa(4):                      "{{ getEnvByName ( index $.podSpec.containers 0 ) \"CPU\" }}",
 				strconv.Itoa(8 * 1024 * 1024 * 1024): "{{ getEnvByName ( index $.podSpec.containers 0 ) \"MEMORY_SIZE\" }}",

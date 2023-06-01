@@ -13,22 +13,3 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
-package e2e
-
-import (
-	"context"
-
-	"github.com/go-logr/logr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-var K8sClient client.Client
-var Ctx context.Context
-var Cancel context.CancelFunc
-var Logger logr.Logger
-var Version string
-var Provider string
-var Region string
-var SecretID string
-var SecretKey string

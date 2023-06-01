@@ -20,7 +20,7 @@ kbcli cluster hscale NAME [flags]
 ```
       --auto-approve                   Skip interactive approval before horizontally scaling the cluster
       --components strings             Component names to this operations
-      --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
   -h, --help                           help for hscale
       --name string                    OpsRequest name. if not specified, it will be randomly generated 
   -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)

@@ -27,7 +27,7 @@ kbcli kubeblocks install [flags]
 ### Options
 
 ```
-      --check                    Check kubernetes environment before install (default true)
+      --check                    Check kubernetes environment before installation (default true)
       --create-namespace         Create the namespace if not present
       --force                    If present, just print fail item and continue with the following steps
   -h, --help                     help for install
@@ -39,7 +39,7 @@ kbcli kubeblocks install [flags]
       --timeout duration         Time to wait for installing KubeBlocks, such as --timeout=10m (default 5m0s)
   -f, --values strings           Specify values in a YAML file or a URL (can specify multiple)
       --version string           KubeBlocks version
-      --wait                     Wait for KubeBlocks to be ready, including all the auto installed add-ons. It will wait for as long as --timeout (default true)
+      --wait                     Wait for KubeBlocks to be ready, including all the auto installed add-ons. It will wait for a --timeout period (default true)
 ```
 
 ### Options inherited from parent commands

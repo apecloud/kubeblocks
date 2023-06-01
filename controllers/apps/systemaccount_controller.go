@@ -135,7 +135,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 	// cluster is under deletion, do nothing
 	if !cluster.GetDeletionTimestamp().IsZero() {
-		reqCtx.Log.Info("Cluster is under deletion.", "cluster", req.NamespacedName)
+		reqCtx.Log.V(1).Info("Cluster is under deletion.", "cluster", req.NamespacedName)
 		return intctrlutil.Reconciled()
 	}
 
@@ -177,11 +177,15 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		// expectations: collect accounts from default setting, cluster and cluster definition.
 		toCreate = getDefaultAccounts()
+		reqCtx.Log.V(1).Info("accounts to create", "cluster", req.NamespacedName, "accounts", toCreate)
+
 		// facts: accounts have been created, in form of k8s secrets.
 		if detectedK8SFacts, err = r.getAccountFacts(reqCtx, compKey); err != nil {
-			reqCtx.Log.Error(err, "failed to get secrets")
+			reqCtx.Log.V(1).Error(err, "failed to get secrets")
 			return err
 		}
+		reqCtx.Log.V(1).Info("detected k8s facts", "cluster", req.NamespacedName, "accounts", detectedK8SFacts)
+
 		// toCreate = account to create - account exists
 		// (toCreate \intersect detectedEngineFacts) means the set of account exists in engine but not in k8s, and should be updated or altered, not re-created.
 		toCreate &= toCreate ^ detectedK8SFacts
@@ -194,6 +198,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			reqCtx.Log.Error(err, "failed to get accounts", "cluster", cluster.Name, "component", compDecl.Name)
 			// we don't return error here, because we can still create accounts in k8s and will give it a try.
 		}
+		reqCtx.Log.V(1).Info("detected database facts", "cluster", req.NamespacedName, "accounts", detectedEngineFacts)
 
 		// replace KubeBlocks ENVs.
 		replaceEnvsValues(cluster.Name, compDef.SystemAccounts)
@@ -383,6 +388,16 @@ func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx,
 	}
 
 	detectedFacts := getAccountFacts(secrets, jobs)
+	reqCtx.Log.V(1).Info("Detected account facts", "facts", detectedFacts)
+
+	for _, accName := range getAllSysAccounts() {
+		key := concatSecretName(key, string(accName))
+		_, exists, _ := r.SecretMapStore.getSecret(key)
+		if exists {
+			detectedFacts |= accName.GetAccountID()
+		}
+	}
+	reqCtx.Log.V(1).Info("Detected account facts with those from cache", "facts", detectedFacts)
 	return detectedFacts, nil
 }
 
@@ -473,8 +488,9 @@ func (r *SystemAccountReconciler) jobCompletionHander() *handler.Funcs {
 				return
 			}
 
-			err = r.Client.Create(context.TODO(), entry.value)
-			if err != nil {
+			logger.V(1).Info("job succeeded", "job", job.Name, "account", accountName, "cluster", clusterName, "secret", key)
+
+			if err = r.Client.Create(context.TODO(), entry.value); err != nil {
 				logger.Error(err, "failed to create secret, will try later", "secret key", key)
 				return
 			}
@@ -532,6 +548,7 @@ func (r *SystemAccountReconciler) clusterDeletionHander() builder.Predicates {
 					}
 				}
 			}
+			logger.V(1).Info("cluster deleted", "cluster", cluster.Name, "namespace", cluster.Namespace, "secretMapStore", r.SecretMapStore.ListKeys())
 			return false
 		},
 	}

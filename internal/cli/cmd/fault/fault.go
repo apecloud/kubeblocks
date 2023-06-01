@@ -108,8 +108,7 @@ func (o *FaultBaseOptions) AddCommonFlag(cmd *cobra.Command) {
 	cmd.Flags().StringToStringVar(&o.NodeLabelSelectors, "node-label", map[string]string{}, `label for node, such as '"kubernetes.io/arch=arm64,kubernetes.io/hostname=minikube-m03,kubernetes.io/os=linux.`)
 	cmd.Flags().StringArrayVar(&o.NodeNameSelectors, "node", []string{}, `Inject faults into pods in the specified node.`)
 	cmd.Flags().StringToStringVar(&o.AnnotationSelectors, "annotation", map[string]string{}, `Select the pod to inject the fault according to Annotation.`)
-
-	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = Unchanged
 
 	printer.AddOutputFlagForCreate(cmd, &o.Format)

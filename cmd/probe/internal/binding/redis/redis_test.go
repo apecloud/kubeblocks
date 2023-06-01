@@ -31,7 +31,7 @@ import (
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 
-	redismock "github.com/go-redis/redismock/v9"
+	"github.com/go-redis/redismock/v9"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"

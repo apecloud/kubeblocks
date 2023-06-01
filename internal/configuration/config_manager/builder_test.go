@@ -137,10 +137,12 @@ var _ = Describe("ConfigManager Test", func() {
 						},
 						ConfigSpecsBuildParams: []ConfigSpecMeta{
 							{
-								ConfigSpec: appsv1alpha1.ComponentConfigSpec{
-									ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-										Name:       "pg_config",
-										VolumeName: "pg_config",
+								ConfigSpecInfo: ConfigSpecInfo{
+									ConfigSpec: appsv1alpha1.ComponentConfigSpec{
+										ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+											Name:       "pg_config",
+											VolumeName: "pg_config",
+										},
 									},
 								},
 								ScriptConfig: []appsv1alpha1.ScriptConfig{

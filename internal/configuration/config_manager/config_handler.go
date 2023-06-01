@@ -169,7 +169,7 @@ type shellCommandHandler struct {
 	downwardAPIHandler    map[string]ConfigHandler
 
 	backupPath string
-	configMeta *ConfigSpecMeta
+	configMeta *ConfigSpecInfo
 	filter     regexFilter
 }
 
@@ -265,7 +265,7 @@ func createConfigVolumeMeta(configSpecName string, reloadType appsv1alpha1.CfgRe
 	}
 }
 
-func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSpecMeta, backupPath string) (ConfigHandler, error) {
+func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSpecInfo, backupPath string) (ConfigHandler, error) {
 	if len(command) == 0 {
 		return nil, cfgcore.MakeError("invalid command: %s", command)
 	}
@@ -299,7 +299,7 @@ func CreateExecHandler(command []string, mountPoint string, configMeta *ConfigSp
 	return shellTrigger, nil
 }
 
-func fromConfigSpecMeta(meta *ConfigSpecMeta) string {
+func fromConfigSpecMeta(meta *ConfigSpecInfo) string {
 	if meta == nil || len(meta.ConfigSpec.Keys) == 0 {
 		return ""
 	}
@@ -309,7 +309,7 @@ func fromConfigSpecMeta(meta *ConfigSpecMeta) string {
 	return "( " + strings.Join(meta.ConfigSpec.Keys, " | ") + " )"
 }
 
-func createDownwardHandler(meta *ConfigSpecMeta) (map[string]ConfigHandler, error) {
+func createDownwardHandler(meta *ConfigSpecInfo) (map[string]ConfigHandler, error) {
 	if meta == nil || len(meta.DownwardAPIOptions) == 0 {
 		return nil, nil
 	}
@@ -394,7 +394,7 @@ func CreateTPLScriptHandler(name, configPath string, dirs []string, backupPath s
 }
 
 func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, error) {
-	shellHandler := func(configMeta ConfigSpecMeta, backupPath string) (ConfigHandler, error) {
+	shellHandler := func(configMeta ConfigSpecInfo, backupPath string) (ConfigHandler, error) {
 		if configMeta.ShellTrigger == nil {
 			return nil, cfgcore.MakeError("shell trigger is nil")
 		}
@@ -407,7 +407,7 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 		}
 		return CreateSignalHandler(signalTrigger.Signal, signalTrigger.ProcessName, mountPoint)
 	}
-	tplHandler := func(tplTrigger *appsv1alpha1.TPLScriptTrigger, configMeta ConfigSpecMeta, backupPath string) (ConfigHandler, error) {
+	tplHandler := func(tplTrigger *appsv1alpha1.TPLScriptTrigger, configMeta ConfigSpecInfo, backupPath string) (ConfigHandler, error) {
 		if tplTrigger == nil {
 			return nil, cfgcore.MakeError("tpl trigger is nil")
 		}
@@ -419,14 +419,14 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 		)
 	}
 
-	var handlerMetas []ConfigSpecMeta
+	var handlerMetas []ConfigSpecInfo
 	err := json.Unmarshal([]byte(config), &handlerMetas)
 	if err != nil {
 		return nil, err
 	}
 
 	var h ConfigHandler
-	mhandler := &multiHandler{
+	mHandler := &multiHandler{
 		handlers: make(map[string]ConfigHandler, len(handlerMetas)),
 	}
 
@@ -445,7 +445,7 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 		if err != nil {
 			return nil, err
 		}
-		mhandler.handlers[configMeta.ConfigSpec.Name] = h
+		mHandler.handlers[configMeta.ConfigSpec.Name] = h
 	}
-	return mhandler, nil
+	return mHandler, nil
 }

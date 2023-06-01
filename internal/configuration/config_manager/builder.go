@@ -152,13 +152,21 @@ func buildConfigManagerArgs(params *CfgManagerBuildParams, volumeDirs []corev1.V
 	args = append(args, "--tcp", viper.GetString(constant.ConfigManagerGPRCPortEnv))
 	// args = append(args, "--notify-type", string(appsv1alpha1.MultiType))
 
-	b, err := json.Marshal(params.ConfigSpecsBuildParams)
+	b, err := json.Marshal(frmConfigSpecMeta(params.ConfigSpecsBuildParams))
 	if err != nil {
 		return err
 	}
 	args = append(args, "--config", string(b))
 	params.Args = args
 	return nil
+}
+
+func frmConfigSpecMeta(metas []ConfigSpecMeta) []ConfigSpecInfo {
+	configSpecs := make([]ConfigSpecInfo, 0, len(metas))
+	for _, meta := range metas {
+		configSpecs = append(configSpecs, meta.ConfigSpecInfo)
+	}
+	return configSpecs
 }
 
 func FindVolumeMount(volumeDirs []corev1.VolumeMount, volumeName string) *corev1.VolumeMount {

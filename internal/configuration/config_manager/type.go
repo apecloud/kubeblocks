@@ -30,23 +30,25 @@ type ConfigHandler interface {
 	MountPoint() []string
 }
 
-type ConfigSpecMeta struct {
+type ConfigSpecInfo struct {
 	*appsv1alpha1.ReloadOptions `json:",inline"`
 
-	ReloadType appsv1alpha1.CfgReloadType       `json:"reloadType"`
-	ConfigSpec appsv1alpha1.ComponentConfigSpec `json:"configSpec"`
+	ReloadType      appsv1alpha1.CfgReloadType       `json:"reloadType"`
+	ConfigSpec      appsv1alpha1.ComponentConfigSpec `json:"configSpec"`
+	FormatterConfig appsv1alpha1.FormatterConfig     `json:"formatterConfig"`
 
-	ScriptConfig       []appsv1alpha1.ScriptConfig
-	ToolImageSpec      *appsv1alpha1.ToolImageSpec
 	DownwardAPIOptions []appsv1alpha1.DownwardAPIOption `json:"downwardAPIOptions"`
 
 	// config volume mount path
-	TPLConfig  string `json:"tplConfig"`
 	MountPoint string `json:"mountPoint"`
-	// EngineType string `json:"engineType"`
-	// DSN        string `json:"dsn"`
+	TPLConfig  string `json:"tplConfig"`
+}
 
-	FormatterConfig appsv1alpha1.FormatterConfig `json:"formatterConfig"`
+type ConfigSpecMeta struct {
+	ConfigSpecInfo `json:",inline"`
+
+	ScriptConfig  []appsv1alpha1.ScriptConfig
+	ToolImageSpec *appsv1alpha1.ToolImageSpec
 }
 
 type TPLScriptConfig struct {

@@ -9,7 +9,9 @@ type DB interface {
 	Demote(podName string) error
 
 	GetStatus(ctx context.Context) (string, error)
-	GetExtra(ctx context.Context) map[string]string
+	GetExtra(ctx context.Context) (map[string]string, error)
+	IsLeader(ctx context.Context) bool
+	IsHealthiest(ctx context.Context, podName string) bool
 
 	DbConn
 	DbTool

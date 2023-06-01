@@ -6,6 +6,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
@@ -130,6 +131,10 @@ func (cs *ConfigurationStore) GetClusterName() string {
 	return cs.clusterName
 }
 
+func (cs *ConfigurationStore) GetClusterCompName() string {
+	return cs.clusterCompName
+}
+
 func (cs *ConfigurationStore) GetClusterFromKubernetes() error {
 	podList, err := cs.clientSet.CoreV1().Pods(cs.namespace).List(cs.ctx, metav1.ListOptions{})
 	if err != nil || podList == nil {
@@ -150,12 +155,12 @@ func (cs *ConfigurationStore) GetClusterFromKubernetes() error {
 	}
 
 	var config, switchoverConfig *v1.ConfigMap
-	for _, cf := range configMapList.Items {
-		switch cf.Name {
+	for _, cm := range configMapList.Items {
+		switch cm.Name {
 		case cs.clusterCompName + ConfigSuffix:
-			config = &cf
+			config = &cm
 		case cs.clusterCompName + SwitchoverSuffix:
-			switchoverConfig = &cf
+			switchoverConfig = &cm
 		}
 	}
 
@@ -178,9 +183,17 @@ func (cs *ConfigurationStore) loadClusterFromKubernetes(config, switchoverConfig
 	}
 
 	if clusterObj != nil {
-		cs.leaderObservedRecord = newLeaderRecord(clusterObj.Annotations)
-		cs.LeaderObservedTime = time.Now().Unix()
-		leader = newLeader(clusterObj.ResourceVersion, newMember("-1", clusterObj.Annotations[binding.LEADER], map[string]string{}))
+		leaderRecord := newLeaderRecord(clusterObj.Annotations)
+		if cs.leaderObservedRecord == nil || cs.leaderObservedRecord.renewTime != leaderRecord.renewTime {
+			cs.leaderObservedRecord = leaderRecord
+			cs.LeaderObservedTime = time.Now().Unix()
+		}
+
+		if cs.LeaderObservedTime+leaderRecord.ttl < time.Now().Unix() {
+			leader = nil
+		} else {
+			leader = newLeader(clusterObj.ResourceVersion, newMember("-1", clusterObj.Annotations[binding.LEADER], map[string]string{}))
+		}
 	}
 
 	members := make([]*Member, 0, len(pods))
@@ -222,10 +235,10 @@ func (cs *ConfigurationStore) UpdateConfigMap(configMap *v1.ConfigMap) (*v1.Conf
 	return cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Update(cs.ctx, configMap, metav1.UpdateOptions{})
 }
 
-func (cs *ConfigurationStore) CreateConfigMap(suffix string, annotations map[string]string) (*v1.ConfigMap, error) {
+func (cs *ConfigurationStore) CreateConfigMap(name string, annotations map[string]string) (*v1.ConfigMap, error) {
 	configMap, err := cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        cs.clusterCompName + suffix,
+			Name:        name,
 			Namespace:   cs.namespace,
 			Annotations: annotations,
 		},
@@ -235,6 +248,10 @@ func (cs *ConfigurationStore) CreateConfigMap(suffix string, annotations map[str
 	}
 
 	return configMap, nil
+}
+
+func (cs *ConfigurationStore) DeleteConfigMap(name string) error {
+	return cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Delete(cs.ctx, name, metav1.DeleteOptions{})
 }
 
 func (cs *ConfigurationStore) GetClusterObj() (*unstructured.Unstructured, error) {
@@ -280,6 +297,23 @@ func (cs *ConfigurationStore) ExecCmdWithPod(ctx context.Context, podName, cmd, 
 	}
 
 	return res, nil
+}
+
+func (cs *ConfigurationStore) UpdateLeader(podName string) error {
+	clusterObj, err := cs.GetClusterObj()
+	if err != nil {
+		return err
+	}
+
+	leaderRecord := clusterObj.GetAnnotations()
+	if leaderRecord[binding.LEADER] != podName {
+		return errors.Errorf("lost lock")
+	}
+	leaderRecord[RenewTime] = strconv.FormatInt(time.Now().Unix(), 10)
+	clusterObj.SetAnnotations(leaderRecord)
+
+	_, err = cs.UpdateClusterObj(clusterObj)
+	return err
 }
 
 type LeaderRecord struct {

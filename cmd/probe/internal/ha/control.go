@@ -2,10 +2,12 @@ package ha
 
 import (
 	"os"
+	"reflect"
 	"time"
 
 	"github.com/dapr/kit/logger"
 	"golang.org/x/net/context"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,8 +27,10 @@ import (
 )
 
 type Ha struct {
-	ctx               context.Context
-	podName           string
+	ctx      context.Context
+	podName  string
+	isLeader int64
+	//TODO:可重入锁
 	dbType            string
 	log               logger.Logger
 	configMapInformer cache.SharedIndexInformer
@@ -71,6 +75,7 @@ func NewHa() *Ha {
 	ha := &Ha{
 		ctx:               context.Background(),
 		podName:           os.Getenv(util.HostName),
+		isLeader:          int64(0),
 		dbType:            os.Getenv(util.KbServiceCharacterType),
 		log:               logger.NewLogger("ha"),
 		configMapInformer: configMapInformer,
@@ -87,13 +92,23 @@ func NewHa() *Ha {
 }
 
 func (h *Ha) Init() {
+	if !h.DB.IsLeader(h.ctx) {
+		return
+	}
+
 	sysid, err := h.DB.GetSysID(h.ctx)
 	if err != nil {
 		h.log.Errorf("can not get sysID, err:%v", err)
 		panic(err)
 	}
 
-	err = h.cs.Init(sysid, h.newDbExtra())
+	extra, err := h.DB.GetExtra(h.ctx)
+	if err != nil {
+		h.log.Errorf("can not get extra, err:%v", err)
+		panic(err)
+	}
+
+	err = h.cs.Init(sysid, extra)
 	if err != nil {
 		h.log.Errorf("configuration store init err:%v", err)
 		panic(err)
@@ -112,60 +127,156 @@ func (h *Ha) newDbInterface(logger logger.Logger) DB {
 	}
 }
 
-func (h *Ha) newDbExtra() map[string]string {
-	switch h.dbType {
-	case binding.Postgresql:
-		return h.DB.GetExtra(h.ctx)
-	default:
-		h.log.Fatalf("unknown db type:%s", h.dbType)
-		return nil
-	}
-}
-
 func (h *Ha) HaControl(stopCh chan struct{}) {
 	h.configMapInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		UpdateFunc: h.UpdateRecall,
+		AddFunc: h.processSwitchover,
 	})
 
 	h.clusterInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		UpdateFunc: h.clusterUpdateRecall,
+		UpdateFunc: h.clusterControl,
 	})
 
 	h.configMapInformer.Run(stopCh)
 	h.clusterInformer.Run(stopCh)
 }
 
-func (h *Ha) clusterUpdateRecall(oldObj, newObj interface{}) {
+// clusterControl 只处理升主
+func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 	oldCluster := oldObj.(*unstructured.Unstructured)
 	newCluster := newObj.(*unstructured.Unstructured)
 	if oldCluster.GetName() != h.cs.GetClusterName() {
 		return
 	}
-
-	oldLeaderName := oldCluster.GetAnnotations()[binding.LEADER]
-	newLeaderName := newCluster.GetAnnotations()[binding.LEADER]
-	if oldLeaderName == newLeaderName {
-
+	if reflect.DeepEqual(oldCluster.GetAnnotations(), newCluster.GetAnnotations()) {
 		return
 	}
 
-	if oldLeaderName == h.podName && newLeaderName != h.podName {
+	err := h.cs.GetClusterFromKubernetes()
+	if err != nil {
+		h.log.Errorf("cluster control get cluster from k8s err:%v", err)
+		return
+	}
+
+	if !h.cs.GetCluster().HasMember(h.podName) {
+		h.touchMember()
+	}
+
+	if h.cs.GetCluster().IsLocked() {
+		if !h.hasLock() {
+			//h.setLeader(false)
+			return
+		}
+		err = h.updateLockWithRetry(3)
+		if err != nil {
+			h.log.Errorf("update lock err,")
+		}
+		return
+	}
+
+	// Process no leader cluster
+	if h.isHealthiest() {
+
+	}
+}
+
+// Only in processSwitchover, leader can unlock actively， 处理降主，不处理升
+func (h *Ha) processSwitchover(obj interface{}) {
+	configMap := obj.(*v1.ConfigMap)
+
+	if configMap.Name != h.cs.GetClusterCompName()+configuration_store.SwitchoverSuffix {
+		return
+	}
+
+	err := h.cs.GetClusterFromKubernetes()
+	if err != nil {
+		h.log.Errorf("process switchover get cluster from k8s err:%v", err)
+		return
+	}
+	if !h.hasLock() {
+		h.log.Infof("db:%s does not have lock", h.podName)
+		return
+	}
+
+	err = h.updateLockWithRetry(3)
+	if err != nil {
+		h.log.Errorf("failed to update leader lock")
+		if h.DB.IsLeader(h.ctx) {
+			_ = h.DB.Demote(h.podName)
+		}
+	}
+
+	leader := configMap.Annotations[binding.LEADER]
+	candidate := configMap.Annotations[binding.CANDIDATE]
+
+	if leader == h.podName && candidate != h.podName {
 		err := h.DB.Demote(h.podName)
 		if err != nil {
 			h.log.Errorf("demote failed, err:%v", err)
 		}
 	}
-	if oldLeaderName != h.podName && newLeaderName == h.podName {
+	if leader != h.podName && candidate == h.podName {
 		err := h.DB.Promote(h.podName)
 		if err != nil {
 			h.log.Errorf("promote failed, err:%v", err)
 		}
 	}
-
 }
 
-func (h *Ha) UpdateRecall(oldObj, newObj interface{}) {
-	return
+func (h *Ha) hasLock() bool {
+	return h.podName == h.cs.GetCluster().Leader.GetMember().GetName()
+}
+
+func (h *Ha) updateLockWithRetry(retryTimes int) error {
+	var err error
+	for i := 0; i < retryTimes; i++ {
+		err = h.cs.UpdateLeader(h.podName)
+		if err == nil {
+			return nil
+		}
+		time.Sleep(time.Second * 10)
+	}
+
+	return err
+}
+
+func (h *Ha) setLeader(shouldSet bool) {
+	if shouldSet {
+		h.isLeader = time.Now().Unix() + h.cs.GetCluster().Config.GetData().GetTtl()
+	} else {
+		h.isLeader = 0
+	}
+}
+
+// TODO:finish touchMember
+func (h *Ha) touchMember() {}
+
+func (h *Ha) isHealthiest() bool {
+	if !h.isDBRunning() {
+		return false
+	}
+
+	if h.DB.IsLeader(h.ctx) {
+		dbSysId, err := h.DB.GetSysID(h.ctx)
+		if err != nil {
+			h.log.Errorf("get db sysid err:%v", err)
+			return false
+		}
+		if dbSysId != h.cs.GetCluster().SysID {
+			return false
+		}
+	}
+
+	return h.DB.IsHealthiest(h.ctx, h.podName)
+}
+
+func (h *Ha) isDBRunning() bool {
+	status, err := h.DB.GetStatus(h.ctx)
+	if err != nil {
+		h.log.Errorf("get db status failed, err:%v", err)
+		return false
+	}
+
+	return status == util.Running
 }
 
 /*

@@ -21,6 +21,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -331,19 +332,19 @@ func (pgOps *PostgresOperations) SwitchoverOps(ctx context.Context, req *binding
 		return result, nil
 	}
 
-	if can, err := pgOps.isSwitchOverPossible(ctx, primary, candidate, operation); !can || err != nil {
+	if can, err := pgOps.isSwitchoverPossible(ctx, primary, candidate, operation); !can || err != nil {
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 		return result, nil
 	}
 
-	if err := pgOps.manualSwitchOver(primary, candidate); err != nil {
+	if err := pgOps.manualSwitchover(primary, candidate); err != nil {
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 		return result, nil
 	}
 
-	if ok, err := pgOps.getSwitchOverResult(candidate, primary); err != nil {
+	if ok, err := pgOps.getSwitchoverResult(candidate, primary); err != nil {
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 		return result, nil
@@ -359,7 +360,7 @@ func (pgOps *PostgresOperations) SwitchoverOps(ctx context.Context, req *binding
 }
 
 // Checks whether there are nodes that could take it over after demoting the primary
-func (pgOps *PostgresOperations) isSwitchOverPossible(ctx context.Context, primary string, candidate string, operation bindings.OperationKind) (bool, error) {
+func (pgOps *PostgresOperations) isSwitchoverPossible(ctx context.Context, primary string, candidate string, operation bindings.OperationKind) (bool, error) {
 	if operation == FailoverOperation && candidate == "" {
 		return false, errors.Errorf("failover need a candidate")
 	} else if operation == SwitchoverOperation && primary == "" {
@@ -426,12 +427,12 @@ func (pgOps *PostgresOperations) isSwitchOverPossible(ctx context.Context, prima
 	return true, nil
 }
 
-func (pgOps *PostgresOperations) manualSwitchOver(primary, candidate string) error {
+func (pgOps *PostgresOperations) manualSwitchover(primary, candidate string) error {
 	annotations := map[string]string{
 		LEADER:    primary,
 		CANDIDATE: candidate,
 	}
-	_, err := pgOps.Cs.CreateConfigMap(configuration_store.ConfigSuffix, annotations)
+	_, err := pgOps.Cs.CreateConfigMap(pgOps.Cs.GetClusterCompName()+configuration_store.SwitchoverSuffix, annotations)
 	if err != nil {
 		return err
 	}
@@ -439,8 +440,7 @@ func (pgOps *PostgresOperations) manualSwitchOver(primary, candidate string) err
 	return nil
 }
 
-// TODO: Check get result
-func (pgOps *PostgresOperations) getSwitchOverResult(oldPrimary, candidate string) (bool, error) {
+func (pgOps *PostgresOperations) getSwitchoverResult(oldPrimary, candidate string) (bool, error) {
 	wait := int(pgOps.Cs.GetCluster().Config.GetData().GetTtl() / 2)
 	for i := 0; i < wait; i++ {
 		time.Sleep(time.Second)
@@ -509,7 +509,7 @@ func (pgOps *PostgresOperations) exec(ctx context.Context, sql string) (result i
 }
 
 func (pgOps *PostgresOperations) getReplicationMode(ctx context.Context) (string, error) {
-	sql := "show synchronous_commit;"
+	sql := "select pg_catalog.current_setting('synchronous_commit');"
 	mode, err := pgOps.query(ctx, sql)
 	if err != nil {
 		return "", err
@@ -532,7 +532,7 @@ func (pgOps *PostgresOperations) getReplicationMode(ctx context.Context) (string
 }
 
 func (pgOps *PostgresOperations) checkStandbySynchronizedToLeader(ctx context.Context, member string) bool {
-	sql := "show synchronous_standby_names;"
+	sql := "select pg_catalog.current_setting('synchronous_standby_names');"
 	resp, err := pgOps.query(ctx, sql)
 	if err != nil {
 		pgOps.Logger.Errorf("query sql:%s, err:%v", sql, err)
@@ -546,6 +546,39 @@ func (pgOps *PostgresOperations) checkStandbySynchronizedToLeader(ctx context.Co
 	}
 
 	return false
+}
+
+func (pgOps *PostgresOperations) getWalPosition(ctx context.Context) int64 {
+	var lsn int64
+	if pgOps.IsLeader(ctx) {
+		lsn = pgOps.getLsn(ctx, "current")
+	} else {
+		replayLsn := pgOps.getLsn(ctx, "replay")
+		receiveLsn := pgOps.getLsn(ctx, "receive")
+		lsn = MaxInt64(replayLsn, receiveLsn)
+	}
+
+	return lsn
+}
+
+func (pgOps *PostgresOperations) getLsn(ctx context.Context, types string) int64 {
+	var sql string
+	switch types {
+	case "current":
+		sql = "select pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), '0/0')::bigint;"
+	case "replay":
+		sql = "select pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_last_wal_replay_lsn(), '0/0')::bigint;"
+	case "receive":
+		sql = "select pg_catalog.pg_wal_lsn_diff(COALESCE(pg_catalog.pg_last_wal_receive_lsn(), '0/0'), '0/0')::bigint;"
+	}
+
+	resp, err := pgOps.query(ctx, sql)
+	if err != nil {
+		pgOps.Logger.Errorf("get wal position err:%v", err)
+		return 0
+	}
+
+	return int64(binary.BigEndian.Uint64(resp))
 }
 
 // InternalQuery is used for internal query, implement BaseInternalOps interface
@@ -785,8 +818,8 @@ func (pgOps *PostgresOperations) GetSysID(ctx context.Context) (string, error) {
 	return string(res), nil
 }
 
-func (pgOps *PostgresOperations) GetExtra(ctx context.Context) map[string]string {
-	return nil
+func (pgOps *PostgresOperations) GetExtra(ctx context.Context) (map[string]string, error) {
+	return nil, nil
 }
 
 func (pgOps *PostgresOperations) Promote(podName string) error {
@@ -806,5 +839,35 @@ func (pgOps *PostgresOperations) GetStatus(ctx context.Context) (string, error) 
 		return "", errors.Errorf("get status failed:%s", resp["message"])
 	}
 
-	return "is_running", nil
+	return "running", nil
+}
+
+func (pgOps *PostgresOperations) IsLeader(ctx context.Context) bool {
+	role, err := pgOps.GetRole(ctx, &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
+	if err != nil {
+		pgOps.Logger.Errorf("get role failed, err:%v", err)
+	}
+
+	return role == PRIMARY
+}
+
+func (pgOps *PostgresOperations) IsHealthiest(ctx context.Context, podName string) bool {
+	replicationMode, err := pgOps.getReplicationMode(ctx)
+	if err != nil {
+		pgOps.Logger.Errorf("get db replication mode err:%v", err)
+		return false
+	}
+	if replicationMode == SynchronousMode && !pgOps.checkStandbySynchronizedToLeader(ctx, podName) {
+		return false
+	}
+
+	walPosition := pgOps.getWalPosition(ctx)
+	if pgOps.isLagging(ctx, walPosition) {
+
+	}
+	return true
+}
+
+func (pgOps *PostgresOperations) isLagging(ctx context.Context, walPosition int64) bool {
+	return true
 }

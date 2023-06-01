@@ -126,6 +126,7 @@ func main() {
 	defer close(stopCh)
 	Ha := ha.NewHa()
 	Ha.HaControl(stopCh)
+	Ha.Init()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)

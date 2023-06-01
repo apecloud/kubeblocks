@@ -2,11 +2,8 @@ package configuration_store
 
 const (
 	SysID              = "sys_id"
-	State              = "state"
-	ProbeUrl           = "probe_url"
 	TTL                = "ttl"
 	MaxLagOnSwitchover = "max_lag_on_switchover"
-	ReplicationMode    = "replication_mode"
 	AcquireTime        = "acquire_time"
 	RenewTime          = "renew_time"
 	ScheduledAt        = "scheduled_at"
@@ -16,7 +13,7 @@ const (
 
 const (
 	ConfigSuffix     = "-config"
-	SwitchoverSuffix = "-Switchover"
+	SwitchoverSuffix = "-switchover"
 	ExtraSuffix      = "-extra"
 )
 

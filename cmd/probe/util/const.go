@@ -59,3 +59,7 @@ const (
 	KbTtl                  = "KB_TTL"
 	KbPodIP                = "KB_PODIP"
 )
+
+const (
+	Running = "running"
+)

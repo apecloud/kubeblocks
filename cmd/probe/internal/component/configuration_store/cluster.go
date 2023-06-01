@@ -54,6 +54,10 @@ func (c *Cluster) GetMemberName() []string {
 	return memberList
 }
 
+func (c *Cluster) IsLocked() bool {
+	return c.Leader != nil && c.Leader.member != nil && c.Leader.member.name != ""
+}
+
 type ClusterConfig struct {
 	index       string
 	modifyIndex int64

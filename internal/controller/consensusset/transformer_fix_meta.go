@@ -46,7 +46,7 @@ func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		return err
 	}
 
-	return graph.ErrNoops
+	return graph.ErrPrematureStop
 }
 
 var _ graph.Transformer = &FixMetaTransformer{}

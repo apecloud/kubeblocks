@@ -1,3 +1,10 @@
+---
+title: KubeBlocks backup API Reference
+description: KubeBlocks backup API Reference
+keywords: [backup, api]
+sidebar_position: 2
+---
+
 <p>Packages:</p>
 <ul>
 <li>

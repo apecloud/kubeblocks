@@ -1,3 +1,10 @@
+---
+title: KubeBlocks cluster API Reference
+description: KubeBlocks cluster API Reference
+keywords: [cluster, api]
+sidebar_position: 2
+---
+
 <p>Packages:</p>
 <ul>
 <li>

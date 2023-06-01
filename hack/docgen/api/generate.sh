@@ -26,3 +26,23 @@ PROJECT_DIR=${SCRIPT_DIR%/*/*/*}
 
 echo "> Generate API docs from $PROJECT_DIR"
 go generate "$PROJECT_DIR/apis/..."
+
+
+API_DOCS_DIR="$PROJECT_DIR/docs/user_docs/api-reference"
+for file in "$API_DOCS_DIR"/*
+do
+  if [ -f "$file" ] && [[ "$file" == *.md ]]
+  then
+    filename=$(basename "$file" .md)
+
+    sed -i '' '1i\
+---\
+title: KubeBlocks '"$filename"' API Reference\
+description: KubeBlocks '"$filename"' API Reference\
+keywords: ['"$filename"', api]\
+sidebar_position: 2\
+---\
+\
+' "$file"
+  fi
+done

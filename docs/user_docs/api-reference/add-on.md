@@ -1,3 +1,10 @@
+---
+title: KubeBlocks add-on API Reference
+description: KubeBlocks add-on API Reference
+keywords: [add-on, api]
+sidebar_position: 2
+---
+
 <p>Packages:</p>
 <ul>
 <li>

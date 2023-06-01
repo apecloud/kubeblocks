@@ -139,7 +139,7 @@ BackupPolicyTemplateStatus
 <h3 id="apps.kubeblocks.io/v1alpha1.Cluster">Cluster
 </h3>
 <div>
-<p>Cluster is the Schema for the clusters API</p>
+<p>Cluster is the Schema for the clusters API.</p>
 </div>
 <table>
 <thead>
@@ -199,7 +199,7 @@ string
 </em>
 </td>
 <td>
-<p>Cluster referenced ClusterDefinition name, this is an immutable attribute.</p>
+<p>Cluster referencing ClusterDefinition name. This is an immutable attribute.</p>
 </td>
 </tr>
 <tr>
@@ -211,7 +211,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Cluster referenced ClusterVersion name.</p>
+<p>Cluster referencing ClusterVersion name.</p>
 </td>
 </tr>
 <tr>
@@ -224,7 +224,7 @@ TerminationPolicyType
 </em>
 </td>
 <td>
-<p>Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
+<p>Cluster termination policy. Valid values are DoNotTerminate, Halt, Delete, WipeOut.
 DoNotTerminate will block delete operation.
 Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.
 Delete is based on Halt and deletes PVCs.
@@ -1773,7 +1773,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>name refers to the name of the ComponentClassDefinition.</p>
+<p>Name refers to the name of the ComponentClassDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -1784,7 +1784,7 @@ string
 </em>
 </td>
 <td>
-<p>class refers to the name of the class that is defined in the ComponentClassDefinition.</p>
+<p>Class refers to the name of the class that is defined in the ComponentClassDefinition.</p>
 </td>
 </tr>
 </tbody>
@@ -2156,7 +2156,7 @@ Kubernetes core/v1.ServiceType
 options are ClusterIP, NodePort, and LoadBalancer.
 &ldquo;ClusterIP&rdquo; allocates a cluster-internal IP address for load-balancing
 to endpoints. Endpoints are determined by the selector or if that is not
-specified, by manual construction of an Endpoints object or
+specified, they are determined by manual construction of an Endpoints object or
 EndpointSlice objects. If clusterIP is &ldquo;None&rdquo;, no virtual IP is
 allocated and the endpoints are published as a set of endpoints rather
 than a virtual IP.
@@ -2165,7 +2165,7 @@ routes to the same endpoints as the clusterIP.
 &ldquo;LoadBalancer&rdquo; builds on NodePort and creates an external load-balancer
 (if supported in the current cloud) which routes to the same endpoints
 as the clusterIP.
-More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types">https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types</a></p>
+More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types">https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types</a>.</p>
 </td>
 </tr>
 <tr>
@@ -2178,7 +2178,7 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>If ServiceType is LoadBalancer, cloud provider related parameters can be put here
-More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer">https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer</a></p>
+More info: <a href="https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer">https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer</a>.</p>
 </td>
 </tr>
 </tbody>
@@ -2217,7 +2217,7 @@ string
 </em>
 </td>
 <td>
-<p>componentDefRef reference componentDef defined in ClusterDefinition spec.</p>
+<p>componentDefRef referes to the componentDef defined in ClusterDefinition spec.</p>
 </td>
 </tr>
 <tr>
@@ -2231,7 +2231,7 @@ ClassDefRef
 </td>
 <td>
 <em>(Optional)</em>
-<p>classDefRef reference class defined in ComponentClassDefinition.</p>
+<p>classDefRef references the class defined in ComponentClassDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -2243,7 +2243,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>monitor which is a switch to enable monitoring, default is false
+<p>monitor is a switch to enable monitoring and is set as false by deafult.
 KubeBlocks provides an extension mechanism to support component level monitoring,
 which will scrape metrics auto or manually from servers in component and export
 metrics to Time Series Database.</p>
@@ -2258,8 +2258,8 @@ metrics to Time Series Database.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>enabledLogs indicate which log file takes effect in database cluster
-element is the log type which defined in cluster definition logConfig.name,
+<p>enabledLogs indicates which log file takes effect in the database cluster.
+element is the log type which is defined in cluster definition logConfig.name,
 and will set relative variables about this log type in database kernel.</p>
 </td>
 </tr>
@@ -2271,7 +2271,7 @@ int32
 </em>
 </td>
 <td>
-<p>Component replicas, use default value in ClusterDefinition spec. if not specified.</p>
+<p>Component replicas. The default value is used in ClusterDefinition spec if not specified.</p>
 </td>
 </tr>
 <tr>
@@ -2285,7 +2285,7 @@ Affinity
 </td>
 <td>
 <em>(Optional)</em>
-<p>affinity describes affinities which specific by users.</p>
+<p>affinity describes affinities specified by users.</p>
 </td>
 </tr>
 <tr>
@@ -2313,7 +2313,7 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>resources requests and limits of workload.</p>
+<p>Resources requests and limits of workload.</p>
 </td>
 </tr>
 <tr>
@@ -2341,7 +2341,7 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>services expose endpoints can be accessed by clients</p>
+<p>Services expose endpoints that can be accessed by clients.</p>
 </td>
 </tr>
 <tr>
@@ -2353,7 +2353,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>primaryIndex determines which index is primary when workloadType is Replication, index number starts from zero.</p>
+<p>primaryIndex determines which index is primary when workloadType is Replication. Index number starts from zero.</p>
 </td>
 </tr>
 <tr>
@@ -2379,7 +2379,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Enable or disable TLS certs.</p>
+<p>Enables or disables TLS certs.</p>
 </td>
 </tr>
 <tr>
@@ -2406,7 +2406,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>serviceAccountName is the name of the ServiceAccount that component runs depend on.</p>
+<p>serviceAccountName is the name of the ServiceAccount that running component depends on.</p>
 </td>
 </tr>
 <tr>
@@ -2418,8 +2418,8 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>noCreatePDB defines PodDistruptionBudget creation behavior, set to true if creation of PodDistruptionBudget
-for this component is not needed. Defaults to false.</p>
+<p>noCreatePDB defines the PodDistruptionBudget creation behavior and is set to true if creation of PodDistruptionBudget
+for this component is not needed. It defaults to false.</p>
 </td>
 </tr>
 </tbody>
@@ -2430,7 +2430,7 @@ for this component is not needed. Defaults to false.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterStatus">ClusterStatus</a>)
 </p>
 <div>
-<p>ClusterComponentStatus record components status information</p>
+<p>ClusterComponentStatus records components status.</p>
 </div>
 <table>
 <thead>
@@ -2450,15 +2450,15 @@ ClusterComponentPhase
 </em>
 </td>
 <td>
-<p>phase describes the phase of the component, the detail information of the phases are as following:
-Running: component is running. [terminal state]
-Stopped: component is stopped, as no running pod. [terminal state]
-Failed: component is unavailable. i.e, all pods are not ready for Stateless/Stateful component,
+<p>phase describes the phase of the component and the detail information of the phases are as following:
+Running: the component is running. [terminal state]
+Stopped: the component is stopped, as no running pod. [terminal state]
+Failed: the component is unavailable, i.e. all pods are not ready for Stateless/Stateful component and
 Leader/Primary pod is not ready for Consensus/Replication component. [terminal state]
-Abnormal: component is running but part of its pods are not ready.
+Abnormal: the component is running but part of its pods are not ready.
 Leader/Primary pod is ready for Consensus/Replication component. [terminal state]
-Creating: component has entered creating process.
-Updating: component has entered updating process, triggered by Spec. updated.</p>
+Creating: the component has entered creating process.
+Updating: the component has entered updating process, triggered by Spec. updated.</p>
 </td>
 </tr>
 <tr>
@@ -2473,7 +2473,7 @@ ComponentMessageMap
 <td>
 <em>(Optional)</em>
 <p>message records the component details message in current phase.
-keys are podName or deployName or statefulSetName, the format is <code>&lt;ObjectKind&gt;/&lt;Name&gt;</code>.</p>
+Keys are podName or deployName or statefulSetName. The format is <code>&lt;ObjectKind&gt;/&lt;Name&gt;</code>.</p>
 </td>
 </tr>
 <tr>
@@ -2514,7 +2514,7 @@ ConsensusSetStatus
 </td>
 <td>
 <em>(Optional)</em>
-<p>consensusSetStatus role and pod name mapping.</p>
+<p>consensusSetStatus specifies the mapping of role and pod name.</p>
 </td>
 </tr>
 <tr>
@@ -2528,7 +2528,7 @@ ReplicationSetStatus
 </td>
 <td>
 <em>(Optional)</em>
-<p>replicationSetStatus role and pod name mapping.</p>
+<p>replicationSetStatus specifies the mapping of role and pod name.</p>
 </td>
 </tr>
 </tbody>
@@ -2661,7 +2661,7 @@ PersistentVolumeClaimSpec
 <td>
 <em>(Optional)</em>
 <p>accessModes contains the desired access modes the volume should have.
-More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1">https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1</a></p>
+More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1">https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1</a>.</p>
 </td>
 </tr>
 <tr>
@@ -2679,7 +2679,7 @@ Kubernetes core/v1.ResourceRequirements
 If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements
 that are lower than previous value but must still be higher than capacity recorded in the
 status field of the claim.
-More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources">https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources</a></p>
+More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources">https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources</a>.</p>
 </td>
 </tr>
 <tr>
@@ -2692,7 +2692,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>storageClassName is the name of the StorageClass required by the claim.
-More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1">https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1</a></p>
+More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1">https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1</a>.</p>
 </td>
 </tr>
 </table>
@@ -3044,7 +3044,7 @@ updated on mutation by the API Server.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Cluster">Cluster</a>)
 </p>
 <div>
-<p>ClusterSpec defines the desired state of Cluster</p>
+<p>ClusterSpec defines the desired state of Cluster.</p>
 </div>
 <table>
 <thead>
@@ -3062,7 +3062,7 @@ string
 </em>
 </td>
 <td>
-<p>Cluster referenced ClusterDefinition name, this is an immutable attribute.</p>
+<p>Cluster referencing ClusterDefinition name. This is an immutable attribute.</p>
 </td>
 </tr>
 <tr>
@@ -3074,7 +3074,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Cluster referenced ClusterVersion name.</p>
+<p>Cluster referencing ClusterVersion name.</p>
 </td>
 </tr>
 <tr>
@@ -3087,7 +3087,7 @@ TerminationPolicyType
 </em>
 </td>
 <td>
-<p>Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
+<p>Cluster termination policy. Valid values are DoNotTerminate, Halt, Delete, WipeOut.
 DoNotTerminate will block delete operation.
 Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.
 Delete is based on Halt and deletes PVCs.
@@ -3143,7 +3143,7 @@ Affinity
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.Cluster">Cluster</a>)
 </p>
 <div>
-<p>ClusterStatus defines the observed state of Cluster</p>
+<p>ClusterStatus defines the observed state of Cluster.</p>
 </div>
 <table>
 <thead>
@@ -4611,7 +4611,7 @@ string
 </em>
 </td>
 <td>
-<p>name role name.</p>
+<p>Defines the role name.</p>
 </td>
 </tr>
 <tr>
@@ -4624,7 +4624,7 @@ AccessMode
 </em>
 </td>
 <td>
-<p>accessMode, what service this pod provides.</p>
+<p>accessMode defines what service this pod provides.</p>
 </td>
 </tr>
 <tr>
@@ -4635,7 +4635,7 @@ string
 </em>
 </td>
 <td>
-<p>pod name.</p>
+<p>Pod name.</p>
 </td>
 </tr>
 </tbody>
@@ -4738,7 +4738,7 @@ ConsensusMemberStatus
 </em>
 </td>
 <td>
-<p>leader status.</p>
+<p>Leader status.</p>
 </td>
 </tr>
 <tr>
@@ -4752,7 +4752,7 @@ ConsensusMemberStatus
 </td>
 <td>
 <em>(Optional)</em>
-<p>followers status.</p>
+<p>Followers status.</p>
 </td>
 </tr>
 <tr>
@@ -4766,7 +4766,7 @@ ConsensusMemberStatus
 </td>
 <td>
 <em>(Optional)</em>
-<p>learner status.</p>
+<p>Learner status.</p>
 </td>
 </tr>
 </tbody>
@@ -5269,8 +5269,8 @@ IssuerName
 </em>
 </td>
 <td>
-<p>name of issuer
-options supported:
+<p>Name of issuer.
+Options supported:
 - KubeBlocks - Certificates signed by KubeBlocks Operator.
 - UserProvided - User provided own CA-signed certificates.</p>
 </td>
@@ -5286,7 +5286,7 @@ TLSSecretRef
 </td>
 <td>
 <em>(Optional)</em>
-<p>secretRef, TLS certs Secret reference
+<p>secretRef. TLS certs Secret reference
 required when from is UserProvided</p>
 </td>
 </tr>
@@ -6379,7 +6379,7 @@ LetterCase
 <td>
 <em>(Optional)</em>
 <p>accessModes contains the desired access modes the volume should have.
-More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1">https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1</a></p>
+More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1">https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1</a>.</p>
 </td>
 </tr>
 <tr>
@@ -6397,7 +6397,7 @@ Kubernetes core/v1.ResourceRequirements
 If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements
 that are lower than previous value but must still be higher than capacity recorded in the
 status field of the claim.
-More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources">https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources</a></p>
+More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources">https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources</a>.</p>
 </td>
 </tr>
 <tr>
@@ -6410,7 +6410,7 @@ string
 <td>
 <em>(Optional)</em>
 <p>storageClassName is the name of the StorageClass required by the claim.
-More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1">https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1</a></p>
+More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1">https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1</a>.</p>
 </td>
 </tr>
 </tbody>
@@ -7073,7 +7073,7 @@ string
 </em>
 </td>
 <td>
-<p>pod name.</p>
+<p>Pod name.</p>
 </td>
 </tr>
 </tbody>
@@ -7161,7 +7161,7 @@ ReplicationMemberStatus
 </em>
 </td>
 <td>
-<p>primary status.</p>
+<p>Primary status.</p>
 </td>
 </tr>
 <tr>
@@ -7175,7 +7175,7 @@ ReplicationMemberStatus
 </td>
 <td>
 <em>(Optional)</em>
-<p>secondaries status.</p>
+<p>Secondaries status.</p>
 </td>
 </tr>
 </tbody>
@@ -8209,7 +8209,7 @@ string
 </em>
 </td>
 <td>
-<p>name of the Secret</p>
+<p>Name of the Secret</p>
 </td>
 </tr>
 <tr>
@@ -8220,7 +8220,7 @@ string
 </em>
 </td>
 <td>
-<p>ca cert key in Secret</p>
+<p>CA cert key in Secret</p>
 </td>
 </tr>
 <tr>
@@ -8231,7 +8231,7 @@ string
 </em>
 </td>
 <td>
-<p>cert key in Secret</p>
+<p>Cert key in Secret</p>
 </td>
 </tr>
 <tr>
@@ -8242,7 +8242,7 @@ string
 </em>
 </td>
 <td>
-<p>key of TLS private key in Secret</p>
+<p>Key of TLS private key in Secret</p>
 </td>
 </tr>
 </tbody>

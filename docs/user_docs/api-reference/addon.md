@@ -14,7 +14,7 @@ Resource Types:
 <h3 id="extensions.kubeblocks.io/v1alpha1.Addon">Addon
 </h3>
 <div>
-<p>Addon is the Schema for the addons API</p>
+<p>Addon is the Schema for the add-ons API.</p>
 </div>
 <table>
 <thead>
@@ -88,7 +88,7 @@ AddonType
 </em>
 </td>
 <td>
-<p>Addon type, valid value is helm.</p>
+<p>Add-on type. The valid value is helm.</p>
 </td>
 </tr>
 <tr>
@@ -102,7 +102,7 @@ HelmTypeInstallSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Helm installation spec., it&rsquo;s only being processed if type=helm.</p>
+<p>Helm installation spec. It&rsquo;s processed only when type=helm.</p>
 </td>
 </tr>
 <tr>
@@ -143,7 +143,7 @@ InstallableSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Addon installable spec., provide selector and auto-install settings.</p>
+<p>Addon installable spec. It provides selector and auto-install settings.</p>
 </td>
 </tr>
 <tr>
@@ -218,8 +218,8 @@ AddonInstallSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Addon default install parameters selectors. If multiple selectors are provided
-that all selectors must evaluate to true.</p>
+<p>Addon installs parameters selectors by default. If multiple selectors are provided,
+all selectors must evaluate to true.</p>
 </td>
 </tr>
 </tbody>
@@ -320,7 +320,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Install spec. for extra items.</p>
+<p>Installs spec. for extra items.</p>
 </td>
 </tr>
 </tbody>
@@ -458,7 +458,7 @@ ResourceRequirements
 (<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.Addon">Addon</a>)
 </p>
 <div>
-<p>AddonSpec defines the desired state of Addon</p>
+<p>AddonSpec defines the desired state of an add-on.</p>
 </div>
 <table>
 <thead>
@@ -490,7 +490,7 @@ AddonType
 </em>
 </td>
 <td>
-<p>Addon type, valid value is helm.</p>
+<p>Add-on type. The valid value is helm.</p>
 </td>
 </tr>
 <tr>
@@ -504,7 +504,7 @@ HelmTypeInstallSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Helm installation spec., it&rsquo;s only being processed if type=helm.</p>
+<p>Helm installation spec. It&rsquo;s processed only when type=helm.</p>
 </td>
 </tr>
 <tr>
@@ -545,7 +545,7 @@ InstallableSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>Addon installable spec., provide selector and auto-install settings.</p>
+<p>Addon installable spec. It provides selector and auto-install settings.</p>
 </td>
 </tr>
 <tr>
@@ -570,7 +570,7 @@ InstallableSpec
 (<em>Appears on:</em><a href="#extensions.kubeblocks.io/v1alpha1.Addon">Addon</a>)
 </p>
 <div>
-<p>AddonStatus defines the observed state of Addon</p>
+<p>AddonStatus defines the observed state of an add-on.</p>
 </div>
 <table>
 <thead>
@@ -590,7 +590,7 @@ AddonPhase
 </em>
 </td>
 <td>
-<p>Addon installation phases. Valid values are Disabled, Enabled, Failed, Enabling, Disabling.</p>
+<p>Add-on installation phases. Valid values are Disabled, Enabled, Failed, Enabling, Disabling.</p>
 </td>
 </tr>
 <tr>
@@ -604,7 +604,7 @@ AddonPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>Describe current state of Addon API installation conditions.</p>
+<p>Describes the current state of add-on API installation conditions.</p>
 </td>
 </tr>
 <tr>
@@ -617,7 +617,7 @@ int64
 <td>
 <em>(Optional)</em>
 <p>observedGeneration is the most recent generation observed for this
-Addon. It corresponds to the Addon&rsquo;s generation, which is
+add-on. It corresponds to the add-on&rsquo;s generation, which is
 updated on mutation by the API Server.</p>
 </td>
 </tr>
@@ -776,9 +776,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Selects a key of a ConfigMap item list, the value of ConfigMap can be
-a JSON or YAML string content, use key name with &ldquo;.json&rdquo; or &ldquo;.yaml&rdquo; or &ldquo;.yml&rdquo;
-extension name to specify content type.</p>
+<p>Selects a key of a ConfigMap item list. The value of ConfigMap can be
+a JSON or YAML string content. Use a key name with &ldquo;.json&rdquo; or &ldquo;.yaml&rdquo; or &ldquo;.yml&rdquo;
+extension name to specify a content type.</p>
 </td>
 </tr>
 <tr>
@@ -792,9 +792,9 @@ extension name to specify content type.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Selects a key of a Secrets item list, the value of Secrets can be
-a JSON or YAML string content, use key name with &ldquo;.json&rdquo; or &ldquo;.yaml&rdquo; or &ldquo;.yml&rdquo;
-extension name to specify content type.</p>
+<p>Selects a key of a Secrets item list. The value of Secrets can be
+a JSON or YAML string content. Use a key name with &ldquo;.json&rdquo; or &ldquo;.yaml&rdquo; or &ldquo;.yml&rdquo;
+extension name to specify a content type.</p>
 </td>
 </tr>
 <tr>
@@ -806,7 +806,7 @@ extension name to specify content type.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Helm install set values, can specify multiple or separate values with commas(key1=val1,key2=val2).</p>
+<p>Helm install set values. It can specify multiple or separate values with commas(key1=val1,key2=val2).</p>
 </td>
 </tr>
 <tr>
@@ -818,7 +818,7 @@ extension name to specify content type.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Helm install set JSON values, can specify multiple or separate values with commas(key1=jsonval1,key2=jsonval2).</p>
+<p>Helm install set JSON values. It can specify multiple or separate values with commas(key1=jsonval1,key2=jsonval2).</p>
 </td>
 </tr>
 </tbody>
@@ -847,7 +847,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>tolerations sets toleration mapping key.</p>
+<p>tolerations sets the toleration mapping key.</p>
 </td>
 </tr>
 </tbody>
@@ -889,7 +889,7 @@ HelmInstallOptions
 </td>
 <td>
 <em>(Optional)</em>
-<p>installOptions defines Helm release install options.</p>
+<p>installOptions defines Helm release installation options.</p>
 </td>
 </tr>
 <tr>
@@ -903,7 +903,7 @@ HelmInstallValues
 </td>
 <td>
 <em>(Optional)</em>
-<p>HelmInstallValues defines Helm release install set values.</p>
+<p>HelmInstallValues defines Helm release installation set values.</p>
 </td>
 </tr>
 <tr>
@@ -917,7 +917,7 @@ HelmValuesMapping
 </td>
 <td>
 <em>(Optional)</em>
-<p>valuesMapping defines addon normalized resources parameters mapped to Helm values&rsquo; keys.</p>
+<p>valuesMapping defines add-on normalized resources parameters mapped to Helm values&rsquo; keys.</p>
 </td>
 </tr>
 </tbody>
@@ -946,7 +946,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>replicaCount sets replicaCount value mapping key.</p>
+<p>replicaCount sets the replicaCount value mapping key.</p>
 </td>
 </tr>
 <tr>
@@ -958,7 +958,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>persistentVolumeEnabled persistent volume enabled mapping key.</p>
+<p>persistentVolumeEnabled sets the persistent volume enabled mapping key.</p>
 </td>
 </tr>
 <tr>
@@ -970,7 +970,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>storageClass sets storageClass mapping key.</p>
+<p>storageClass sets the storageClass mapping key.</p>
 </td>
 </tr>
 </tbody>
@@ -1090,11 +1090,11 @@ HelmValueMapType
 </td>
 <td>
 <em>(Optional)</em>
-<p>valueMap define the &ldquo;key&rdquo; mapping values, valid keys are replicaCount,
+<p>valueMap define the &ldquo;key&rdquo; mapping values. Valid keys are replicaCount,
 persistentVolumeEnabled, and storageClass. Enum values explained:
-<code>&quot;replicaCount&quot;</code> sets replicaCount value mapping key
-<code>&quot;persistentVolumeEnabled&quot;</code> sets persistent volume enabled mapping key
-<code>&quot;storageClass&quot;</code> sets storageClass mapping key</p>
+<code>&quot;replicaCount&quot;</code> sets the replicaCount value mapping key.
+<code>&quot;persistentVolumeEnabled&quot;</code> sets the persistent volume enabled mapping key.
+<code>&quot;storageClass&quot;</code> sets the storageClass mapping key.</p>
 </td>
 </tr>
 <tr>
@@ -1108,9 +1108,9 @@ HelmJSONValueMapType
 </td>
 <td>
 <em>(Optional)</em>
-<p>jsonMap define the &ldquo;key&rdquo; mapping values, valid keys are tolerations.
+<p>jsonMap defines the &ldquo;key&rdquo; mapping values. The valid key is tolerations.
 Enum values explained:
-<code>&quot;tolerations&quot;</code> sets toleration mapping key</p>
+<code>&quot;tolerations&quot;</code> sets the toleration mapping key.</p>
 </td>
 </tr>
 <tr>
@@ -1155,8 +1155,8 @@ ResourceMappingItem
 </td>
 <td>
 <em>(Optional)</em>
-<p>Addon installable selectors. If multiple selectors are provided
-that all selectors must evaluate to true.</p>
+<p>Add-on installable selectors. If multiple selectors are provided,
+all selectors must evaluate to true.</p>
 </td>
 </tr>
 <tr>
@@ -1167,7 +1167,7 @@ bool
 </em>
 </td>
 <td>
-<p>autoInstall defines an addon should auto installed</p>
+<p>autoInstall defines an add-on should be installed automatically.</p>
 </td>
 </tr>
 </tbody>
@@ -1221,7 +1221,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>storage sets storage size value mapping key.</p>
+<p>storage sets the storage size value mapping key.</p>
 </td>
 </tr>
 <tr>
@@ -1322,7 +1322,7 @@ Kubernetes core/v1.ResourceList
 <td>
 <em>(Optional)</em>
 <p>Limits describes the maximum amount of compute resources allowed.
-More info: <a href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</a></p>
+More info: <a href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</a>.</p>
 </td>
 </tr>
 <tr>
@@ -1337,9 +1337,9 @@ Kubernetes core/v1.ResourceList
 <td>
 <em>(Optional)</em>
 <p>Requests describes the minimum amount of compute resources required.
-If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
-otherwise to an implementation-defined value.
-More info: <a href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</a></p>
+If Requests is omitted for a container, it defaults to Limits if that is explicitly specified;
+otherwise, it defaults to an implementation-defined value.
+More info: <a href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/</a>.</p>
 </td>
 </tr>
 </tbody>
@@ -1369,7 +1369,7 @@ AddonSelectorKey
 </em>
 </td>
 <td>
-<p>The selector key, valid values are KubeVersion, KubeGitVersion.
+<p>The selector key. Valid values are KubeVersion, KubeGitVersion.
 &ldquo;KubeVersion&rdquo; the semver expression of Kubernetes versions, i.e., v1.24.
 &ldquo;KubeGitVersion&rdquo; may contain distro. info., i.e., v1.24.4+eks.</p>
 </td>
@@ -1387,10 +1387,10 @@ LineSelectorOperator
 <p>Represents a key&rsquo;s relationship to a set of values.
 Valid operators are Contains, NotIn, DoesNotContain, MatchRegex, and DoesNoteMatchRegex.</p>
 <p>Possible enum values:
-<code>&quot;Contains&quot;</code> line contains string
-<code>&quot;DoesNotContain&quot;</code> line does not contain string
-<code>&quot;MatchRegex&quot;</code> line contains a match to the regular expression
-<code>&quot;DoesNotMatchRegex&quot;</code> line does not contain a match to the regular expression</p>
+<code>&quot;Contains&quot;</code> line contains a string.
+<code>&quot;DoesNotContain&quot;</code> line does not contain a string.
+<code>&quot;MatchRegex&quot;</code> line contains a match to the regular expression.
+<code>&quot;DoesNotMatchRegex&quot;</code> line does not contain a match to the regular expression.</p>
 </td>
 </tr>
 <tr>
@@ -1402,7 +1402,7 @@ Valid operators are Contains, NotIn, DoesNotContain, MatchRegex, and DoesNoteMat
 </td>
 <td>
 <em>(Optional)</em>
-<p>An array of string values. Server as &ldquo;OR&rdquo; expression to the operator.</p>
+<p>An array of string values. It serves as an &ldquo;OR&rdquo; expression to the operator.</p>
 </td>
 </tr>
 </tbody>

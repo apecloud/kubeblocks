@@ -42,7 +42,7 @@ func filter[T ComponentsType](components []T, f filterFn[T]) *T {
 	return nil
 }
 
-// GetConfigTemplatesFromComponent returns ConfigTemplate list used by the component.
+// GetConfigTemplatesFromComponent returns ConfigTemplate list used by the component
 func GetConfigTemplatesFromComponent(
 	cComponents []appsv1alpha1.ClusterComponentSpec,
 	dComponents []appsv1alpha1.ClusterComponentDefinition,
@@ -80,7 +80,7 @@ func GetConfigTemplatesFromComponent(
 	return MergeConfigTemplates(cvConfigSpecs, cdConfigSpecs), nil
 }
 
-// MergeConfigTemplates merge ClusterVersion.ComponentDefs[*].ConfigTemplateRefs and ClusterDefinition.ComponentDefs[*].ConfigTemplateRefs
+// MergeConfigTemplates merges ClusterVersion.ComponentDefs[*].ConfigTemplateRefs and ClusterDefinition.ComponentDefs[*].ConfigTemplateRefs
 func MergeConfigTemplates(cvConfigSpecs []appsv1alpha1.ComponentConfigSpec,
 	cdConfigSpecs []appsv1alpha1.ComponentConfigSpec) []appsv1alpha1.ComponentConfigSpec {
 	if len(cvConfigSpecs) == 0 {
@@ -105,7 +105,7 @@ func MergeConfigTemplates(cvConfigSpecs []appsv1alpha1.ComponentConfigSpec,
 	}
 
 	for _, configSpec := range cdConfigSpecs {
-		// ClusterVersion replace clusterDefinition
+		// ClusterVersion replaces clusterDefinition
 		tplName := configSpec.Name
 		if _, ok := (mergedTplMap)[tplName]; ok {
 			continue

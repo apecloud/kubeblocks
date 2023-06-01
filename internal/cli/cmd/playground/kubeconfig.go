@@ -30,7 +30,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// writeKubeConfigOptions provide a set of options for writing a KubeConfig file
+// writeKubeConfigOptions provides a set of options for writing a KubeConfig file
 type writeKubeConfigOptions struct {
 	UpdateExisting       bool
 	UpdateCurrentContext bool
@@ -93,12 +93,12 @@ func kubeConfigWrite(kubeConfigStr string, output string, options writeKubeConfi
 	return kubeConfigMerge(kubeConfig, existingKubeConfig, output, options)
 }
 
-// kubeConfigGetDefaultPath returns the path of the default kubeconfig, but errors
+// kubeConfigGetDefaultPath returns the path of the default kubeconfig, print errors
 // if the KUBECONFIG env var specifies more than one file
 func kubeConfigGetDefaultPath() (string, error) {
 	defaultKubeConfigLoadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	if len(defaultKubeConfigLoadingRules.GetLoadingPrecedence()) > 1 {
-		return "", fmt.Errorf("multiple kubeconfigs specified via KUBECONFIG env var: Please reduce to one entry, unset KUBECONFIG or explicitly choose an output")
+		return "", fmt.Errorf("multiple kubeconfigs specified via KUBECONFIG env var: Please reduce to one entry, unset KUBECONFIG or explicitly choose one")
 	}
 	return defaultKubeConfigLoadingRules.GetDefaultFilename(), nil
 }

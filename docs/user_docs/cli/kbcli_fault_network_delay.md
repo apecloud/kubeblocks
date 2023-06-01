@@ -50,14 +50,14 @@ kbcli fault network delay [flags]
 
 ```
       --annotation stringToString      Select the pod to inject the fault according to Annotation. (default [])
-  -c, --correlation string             Indicates the probability of a packet error occurring. Value range: [0, 100]. (default "0")
+  -c, --correlation string             Indicates the probability of a packet error occurring. Value range: [0, 100].
       --direction string               You can select "to"" or "from"" or "both"". (default "to")
-      --dry-run string[="unchanged"]   Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
       --duration string                Supported formats of the duration are: ms / s / m / h. (default "10s")
   -e, --external-target stringArray    a network target outside of Kubernetes, which can be an IPv4 address or a domain name,
                                        	 such as "www.baidu.com". Only works with direction: to.
   -h, --help                           help for delay
-      --jitter string                  the variation range of the delay time. (default "0ms")
+      --jitter string                  the variation range of the delay time.
       --label stringToString           label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0. (default [])
       --latency string                 the length of time to delay.
       --mode string                    You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with. (default "all")
@@ -68,7 +68,7 @@ kbcli fault network delay [flags]
       --phase stringArray              Specify the pod that injects the fault by the state of the pod.
       --target-label stringToString    label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"' (default [])
       --target-mode string             You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.
-      --target-ns-fault stringArray    Specifies the namespace into which you want to inject faults. (default [default])
+      --target-ns-fault stringArray    Specifies the namespace into which you want to inject faults.
       --target-value string            If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
       --value string                   If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
 ```

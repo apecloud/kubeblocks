@@ -213,7 +213,7 @@ mathAvg = [8-9][0-9]\.?\d*`
 			engine.importFuncs["duplicate_fun2"] = functional{}
 			_, err = engine.Render(`{{ import "xxx.yyy" }}`)
 			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("failed to import function: duplicate_fun2, from xxx/yyy, function is ready import"))
+			Expect(err.Error()).Should(ContainSubstring("failed to import function: duplicate_fun2, from xxx/yyy, function is already imported"))
 
 			By("Error for not exist cm")
 			mockCM = nil

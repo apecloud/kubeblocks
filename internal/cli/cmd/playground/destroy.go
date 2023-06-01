@@ -60,7 +60,7 @@ type destroyOptions struct {
 	genericclioptions.IOStreams
 	baseOptions
 
-	// purge resources, before destroy kubernetes cluster we should delete cluster and
+	// purge resources, before destroying kubernetes cluster we should delete cluster and
 	// uninstall KubeBlocks
 	autoApprove bool
 	purge       bool
@@ -73,7 +73,7 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:     "destroy",
-		Short:   "Destroy the playground kubernetes cluster.",
+		Short:   "Destroy the playground KubeBlocks and kubernetes cluster.",
 		Example: destroyExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.validate())
@@ -81,20 +81,9 @@ func newDestroyCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&o.purge, "purge", true, "Purge all resources before destroy kubernetes cluster, delete all clusters created by KubeBlocks and uninstall KubeBlocks.")
-	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for installing KubeBlocks, such as --timeout=10m")
+	cmd.Flags().BoolVar(&o.purge, "purge", true, "Purge all resources before destroying kubernetes cluster, delete all clusters created by KubeBlocks and uninstall KubeBlocks.")
+	cmd.Flags().DurationVar(&o.timeout, "timeout", 300*time.Second, "Time to wait for installing KubeBlocks, such as --timeout=10m")
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before destroying the playground")
-	return cmd
-}
-
-func newGuideCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "guide",
-		Short: "Display playground cluster user guide.",
-		Run: func(cmd *cobra.Command, args []string) {
-			printGuide()
-		},
-	}
 	return cmd
 }
 
@@ -128,10 +117,9 @@ func (o *destroyOptions) destroyLocal() error {
 	return o.removeStateFile()
 }
 
-// destroyCloud destroy cloud kubernetes cluster, before destroy, we should delete
+// destroyCloud destroys cloud kubernetes cluster, before destroying, we should delete
 // all clusters created by KubeBlocks, uninstall KubeBlocks and remove the KubeBlocks
-// namespace that will destroy all resources created by KubeBlocks, avoid to leave
-// some resources
+// namespace that will destroy all resources created by KubeBlocks, avoid to leave resources behind
 func (o *destroyOptions) destroyCloud() error {
 	var err error
 
@@ -140,7 +128,7 @@ func (o *destroyOptions) destroyCloud() error {
 
 `)
 
-	fmt.Fprintf(o.Out, "Do you really want to destroy the kubernetes cluster %s?\n%s\n\n  This is no undo. Only 'yes' will be accepted to confirm.\n\n",
+	fmt.Fprintf(o.Out, "Do you really want to destroy the kubernetes cluster %s?\n%s\n\n  The operation cannot be rollbacked. Only 'yes' will be accepted to confirm.\n\n",
 		o.prevCluster.ClusterName, o.prevCluster.String())
 
 	// confirm to destroy
@@ -156,7 +144,7 @@ func (o *destroyOptions) destroyCloud() error {
 
 	// for cloud provider, we should delete all clusters created by KubeBlocks first,
 	// uninstall KubeBlocks and remove the KubeBlocks namespace, then destroy the
-	// playground cluster, avoid to leave some resources.
+	// playground cluster, avoid to leave resources behind.
 	// delete all clusters created by KubeBlocks, MUST BE VERY CAUTIOUS, use the right
 	// kubeconfig and context, otherwise, it will delete the wrong cluster.
 	if err = o.deleteClustersAndUninstallKB(); err != nil {
@@ -309,7 +297,7 @@ func (o *destroyOptions) deleteClusters(dynamic dynamic.Interface) error {
 
 	// check all clusters termination policy is WipeOut
 	if checkWipeOut {
-		if err = wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
+		if err = wait.PollImmediate(5*time.Second, o.timeout, func() (bool, error) {
 			return checkClusters(func(cluster *appsv1alpha1.Cluster) bool {
 				if cluster.Spec.TerminationPolicy != appsv1alpha1.WipeOut {
 					klog.V(1).Infof("Cluster %s termination policy is %s", cluster.Name, cluster.Spec.TerminationPolicy)
@@ -327,7 +315,7 @@ func (o *destroyOptions) deleteClusters(dynamic dynamic.Interface) error {
 	}
 
 	// check and wait all clusters are deleted
-	if err = wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
+	if err = wait.PollImmediate(5*time.Second, o.timeout, func() (bool, error) {
 		return checkClusters(func(cluster *appsv1alpha1.Cluster) bool {
 			// always return false if any cluster is not deleted
 			klog.V(1).Infof("Cluster %s is not deleted", cluster.Name)
@@ -389,7 +377,7 @@ func (o *destroyOptions) removeKubeConfig() error {
 		return err
 	}
 
-	// current context is deleted, notify user to set current context like kubectl
+	// current context is deleted, notify user to set current context with kubectl
 	if currentContext == clusterContext {
 		printer.Warning(o.Out, "this removed your active context, use \"kubectl config use-context\" to select a different one\n")
 	}

@@ -53,11 +53,11 @@ type configOpsOptions struct {
 var (
 	createReconfigureExample = templates.Examples(`
 		# update component params 
-		kbcli cluster reconfigure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=1000,general_log=OFF
+		kbcli cluster configure mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf --set max_connections=1000,general_log=OFF
 
-		# if only one component, and one config spec, and one config file, simplify the use of configure. e.g:
+		# if only one component, and one config spec, and one config file, simplify the searching process of configure. e.g:
 		# update mysql max_connections, cluster name is mycluster
-		kbcli cluster reconfigure mycluster --set max_connections=2000
+		kbcli cluster configure mycluster --set max_connections=2000
 	`)
 )
 
@@ -96,7 +96,7 @@ func (o *configOpsOptions) Validate() error {
 	if o.editMode {
 		return nil
 	}
-	if err := o.validateConfigParams(o.wrapper.ConfigSpec()); err != nil {
+	if err := o.validateConfigParams(o.wrapper.ConfigTemplateSpec()); err != nil {
 		return err
 	}
 	o.printConfigureTips()
@@ -160,7 +160,7 @@ func (o *configOpsOptions) confirmReconfigureWithRestart() error {
 	_, err := prompt.NewPrompt(fmt.Sprintf("Please type \"%s\" to confirm:", confirmStr),
 		func(input string) error {
 			if input != confirmStr {
-				return fmt.Errorf("typed \"%s\" does not match \"%s\"", input, confirmStr)
+				return fmt.Errorf("typed \"%s\" not match \"%s\"", input, confirmStr)
 			}
 			return nil
 		}, o.In).Run()
@@ -198,10 +198,12 @@ func (o *configOpsOptions) printConfigureTips() {
 // buildReconfigureCommonFlags build common flags for reconfigure command
 func (o *configOpsOptions) buildReconfigureCommonFlags(cmd *cobra.Command) {
 	o.addCommonFlags(cmd)
-	cmd.Flags().StringSliceVar(&o.Parameters, "set", nil, "Specify updated parameter list. For details about the parameters, refer to kbcli sub command: 'kbcli cluster describe-config'.")
+	cmd.Flags().StringSliceVar(&o.Parameters, "set", nil, "Specify parameters list to be updated. For more details, refer to 'kbcli cluster describe-config'.")
 	cmd.Flags().StringVar(&o.ComponentName, "component", "", "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
-	cmd.Flags().StringVar(&o.CfgTemplateName, "config-spec", "", "Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-config'.")
-	cmd.Flags().StringVar(&o.CfgFile, "config-file", "", "Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-config'.")
+	cmd.Flags().StringVar(&o.CfgTemplateName, "config-spec", "", "Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). "+
+		"For available templates and configs, refer to: 'kbcli cluster describe-config'.")
+	cmd.Flags().StringVar(&o.CfgFile, "config-file", "", "Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). "+
+		"For available templates and configs, refer to: 'kbcli cluster describe-config'.")
 }
 
 // NewReconfigureCmd creates a Reconfiguring command
@@ -211,12 +213,13 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		OperationsOptions: newBaseOperationsOptions(f, streams, appsv1alpha1.ReconfiguringType, false),
 	}
 	cmd := &cobra.Command{
-		Use:               "reconfigure NAME --set key=value[,key=value] [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file]",
-		Short:             "Reconfigure parameters with the specified components in the cluster.",
+		Use:               "configure NAME --set key=value[,key=value] [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file]",
+		Short:             "Configure parameters with the specified components in the cluster.",
 		Example:           createReconfigureExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.CreateOptions.Complete())
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.Validate())
@@ -224,6 +227,6 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		},
 	}
 	o.buildReconfigureCommonFlags(cmd)
-	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before reconfigure the cluster")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before reconfiguring the cluster")
 	return cmd
 }

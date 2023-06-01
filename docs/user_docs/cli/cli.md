@@ -30,6 +30,13 @@ Run a benchmark.
 * [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark.
 
 
+## [builder](kbcli_builder.md)
+
+builder command.
+
+* [kbcli builder template](kbcli_builder_template.md)	 - tpl - a developer tool integrated with Kubeblocks that can help developers quickly generate rendered configurations or scripts based on Helm templates, and discover errors in the template before creating the database cluster.
+
+
 ## [class](kbcli_class.md)
 
 Manage classes
@@ -44,6 +51,7 @@ Manage classes
 Cluster command.
 
 * [kbcli cluster backup](kbcli_cluster_backup.md)	 - Create a backup for the cluster.
+* [kbcli cluster configure](kbcli_cluster_configure.md)	 - Configure parameters with the specified components in the cluster.
 * [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a cluster or instance.
 * [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster.
 * [kbcli cluster create-account](kbcli_cluster_create-account.md)	 - Create account for a cluster
@@ -73,7 +81,6 @@ Cluster command.
 * [kbcli cluster list-logs](kbcli_cluster_list-logs.md)	 - List supported log files in cluster.
 * [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - List all opsRequests.
 * [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file.
-* [kbcli cluster reconfigure](kbcli_cluster_reconfigure.md)	 - Reconfigure parameters with the specified components in the cluster.
 * [kbcli cluster restart](kbcli_cluster_restart.md)	 - Restart the specified components in the cluster.
 * [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup.
 * [kbcli cluster revoke-role](kbcli_cluster_revoke-role.md)	 - Revoke role from account
@@ -98,6 +105,8 @@ ClusterDefinition command.
 ClusterVersion command.
 
 * [kbcli clusterversion list](kbcli_clusterversion_list.md)	 - List ClusterVersions.
+* [kbcli clusterversion set-default](kbcli_clusterversion_set-default.md)	 - Set the clusterversion to the default clusterversion for its clusterdefinition.
+* [kbcli clusterversion unset-default](kbcli_clusterversion_unset-default.md)	 - Unset the clusterversion if it's default.
 
 
 ## [dashboard](kbcli_dashboard.md)
@@ -154,10 +163,9 @@ Print the list of flags inherited by all commands.
 
 ## [playground](kbcli_playground.md)
 
-Bootstrap a playground KubeBlocks in local host or cloud.
+Bootstrap or destroy a playground KubeBlocks in local host or cloud.
 
-* [kbcli playground destroy](kbcli_playground_destroy.md)	 - Destroy the playground kubernetes cluster.
-* [kbcli playground guide](kbcli_playground_guide.md)	 - Display playground cluster user guide.
+* [kbcli playground destroy](kbcli_playground_destroy.md)	 - Destroy the playground KubeBlocks and kubernetes cluster.
 * [kbcli playground init](kbcli_playground_init.md)	 - Bootstrap a kubernetes cluster and install KubeBlocks for playground.
 
 

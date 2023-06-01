@@ -98,7 +98,7 @@ var _ = Describe("builder", func() {
 		clusterVersionObj *appsv1alpha1.ClusterVersion,
 		needCreate bool,
 	) (*appsv1alpha1.Cluster, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, types.NamespacedName) {
-		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
+		// setup Cluster obj requires default ClusterDefinition and ClusterVersion objects
 		if clusterDefObj == nil {
 			clusterDefObj = allFieldsClusterDefObj(needCreate)
 		}
@@ -204,7 +204,7 @@ var _ = Describe("builder", func() {
 
 		It("builds Service correctly", func() {
 			params := newParams()
-			svcList, err := BuildSvcListWithCustomAttributes(*params, nil)
+			svcList, err := BuildSvcListWithCustomAttributes(params.Cluster, params.Component, nil)
 			Expect(err).Should(BeNil())
 			Expect(svcList).ShouldNot(BeEmpty())
 		})

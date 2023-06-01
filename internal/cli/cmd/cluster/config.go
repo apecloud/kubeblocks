@@ -103,16 +103,16 @@ var (
 		# describe a content of configuration file.
 		kbcli cluster describe-config mycluster --component=mysql --config-file=my.cnf --show-detail`)
 	explainReconfigureExample = templates.Examples(`
-		# describe a cluster, e.g. cluster name is mycluster
+		# explain a cluster, e.g. cluster name is mycluster
 		kbcli cluster explain-config mycluster
 
-		# describe a specified configure template, e.g. cluster name is mycluster
+		# explain a specified configure template, e.g. cluster name is mycluster
 		kbcli cluster explain-config mycluster --component=mysql --config-specs=mysql-3node-tpl
 
-		# describe a specified configure template, e.g. cluster name is mycluster
+		# explain a specified configure template, e.g. cluster name is mycluster
 		kbcli cluster explain-config mycluster --component=mysql --config-specs=mysql-3node-tpl --trunc-document=false --trunc-enum=false
 
-		# describe a specified parameters, e.g. cluster name is mycluster
+		# explain a specified parameters, e.g. cluster name is mycluster
 		kbcli cluster explain-config mycluster --param=sql_mode`)
 	diffConfigureExample = templates.Examples(`
 		# compare config files
@@ -120,8 +120,8 @@ var (
 )
 
 func (r *reconfigureOptions) addCommonFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&r.componentName, "component", "", "Specify the name of Component to be describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter.\"")
-	cmd.Flags().StringSliceVar(&r.configSpecs, "config-specs", nil, "Specify the name of the configuration template to be describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)")
+	cmd.Flags().StringVar(&r.componentName, "component", "", "Specify the name of Component to describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter.\"")
+	cmd.Flags().StringSliceVar(&r.configSpecs, "config-specs", nil, "Specify the name of the configuration template to describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)")
 }
 
 func (r *reconfigureOptions) validate() error {
@@ -136,7 +136,7 @@ func (r *reconfigureOptions) validate() error {
 	}
 
 	if r.isExplain && len(r.configSpecs) != 1 {
-		return cfgcore.MakeError("explain require one template")
+		return cfgcore.MakeError("explain command requires one template")
 	}
 
 	for _, tplName := range r.configSpecs {
@@ -145,7 +145,7 @@ func (r *reconfigureOptions) validate() error {
 			return err
 		}
 		if r.isExplain && len(tpl.ConfigConstraintRef) == 0 {
-			return cfgcore.MakeError("explain command require template has config constraint options")
+			return cfgcore.MakeError("explain command requires template with config constraint options")
 		}
 	}
 	return nil
@@ -181,7 +181,7 @@ func (r *reconfigureOptions) complete2(args []string) error {
 		return err
 	}
 	if len(r.tpls) == 0 {
-		return cfgcore.MakeError("not any config template, not support describe")
+		return cfgcore.MakeError("config template is not set")
 	}
 
 	templateNames := make([]string, 0, len(r.tpls))
@@ -228,7 +228,7 @@ func (r *reconfigureOptions) syncClusterComponent() error {
 		return makeClusterNotExistErr(r.clusterName)
 	}
 	if len(componentNames) != 1 {
-		return cfgcore.MakeError("when multi component exist, must specify which component to use.")
+		return cfgcore.MakeError("please specify a component as there are more than one component in cluster.")
 	}
 	r.componentName = componentNames[0]
 	return nil
@@ -310,7 +310,7 @@ func (r *reconfigureOptions) getReconfigureMeta() ([]types.ConfigTemplateInfo, e
 			Name:      cmName,
 			Namespace: r.namespace,
 		}, r.dynamic, cmObj); err != nil {
-			return nil, cfgcore.WrapError(err, "template config instance is not exist, template name: %s, cfg name: %s", tplName, cmName)
+			return nil, cfgcore.WrapError(err, "config not found, template name: %s, cfg name: %s", tplName, cmName)
 		}
 		configs = append(configs, types.ConfigTemplateInfo{
 			Name:  tplName,

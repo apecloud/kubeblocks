@@ -34,6 +34,8 @@ type MonitorConfig struct {
 
 type SynthesizedComponent struct {
 	ClusterDefName        string                                 `json:"clusterDefName,omitempty"`
+	ClusterName           string                                 `json:"clusterName,omitempty"`
+	ClusterUID            string                                 `json:"clusterUID,omitempty"`
 	Name                  string                                 `json:"name,omitempty"`
 	Type                  string                                 `json:"type,omitempty"`
 	CharacterType         string                                 `json:"characterType,omitempty"`
@@ -65,7 +67,7 @@ type SynthesizedComponent struct {
 }
 
 // GetPrimaryIndex provides PrimaryIndex value getter, if PrimaryIndex is
-// a nil pointer it's treated at 0, return -1 if function receiver is nil.
+// a nil pointer it's treated as 0, return -1 if function receiver is nil.
 func (r *SynthesizedComponent) GetPrimaryIndex() int32 {
 	if r == nil {
 		return -1

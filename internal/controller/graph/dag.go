@@ -54,7 +54,7 @@ func (r *realEdge) To() Vertex {
 	return r.T
 }
 
-// AddVertex put 'v' into 'd'
+// AddVertex puts 'v' into 'd'
 func (d *DAG) AddVertex(v Vertex) bool {
 	if v == nil {
 		return false
@@ -63,7 +63,7 @@ func (d *DAG) AddVertex(v Vertex) bool {
 	return true
 }
 
-// RemoveVertex delete 'v' from 'd'
+// RemoveVertex deletes 'v' from 'd'
 // the in&out edges are also deleted
 func (d *DAG) RemoveVertex(v Vertex) bool {
 	if v == nil {
@@ -78,7 +78,7 @@ func (d *DAG) RemoveVertex(v Vertex) bool {
 	return true
 }
 
-// Vertices return all vertices in 'd'
+// Vertices returns all vertices in 'd'
 func (d *DAG) Vertices() []Vertex {
 	vertices := make([]Vertex, 0)
 	for v := range d.vertices {
@@ -87,7 +87,7 @@ func (d *DAG) Vertices() []Vertex {
 	return vertices
 }
 
-// AddEdge put edge 'e' into 'd'
+// AddEdge puts edge 'e' into 'd'
 func (d *DAG) AddEdge(e Edge) bool {
 	if e.From() == nil || e.To() == nil {
 		return false
@@ -101,7 +101,7 @@ func (d *DAG) AddEdge(e Edge) bool {
 	return true
 }
 
-// RemoveEdge delete edge 'e'
+// RemoveEdge deletes edge 'e'
 func (d *DAG) RemoveEdge(e Edge) bool {
 	for k := range d.edges {
 		if k.From() == e.From() && k.To() == e.To() {
@@ -143,7 +143,7 @@ func (d *DAG) AddConnectRoot(v Vertex) bool {
 	return d.AddConnect(root, v)
 }
 
-// WalkTopoOrder walk the DAG 'd' in topology order
+// WalkTopoOrder walks the DAG 'd' in topology order
 func (d *DAG) WalkTopoOrder(walkFunc WalkFunc) error {
 	if err := d.validate(); err != nil {
 		return err
@@ -157,7 +157,7 @@ func (d *DAG) WalkTopoOrder(walkFunc WalkFunc) error {
 	return nil
 }
 
-// WalkReverseTopoOrder walk the DAG 'd' in reverse topology order
+// WalkReverseTopoOrder walks the DAG 'd' in reverse topology order
 func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc) error {
 	if err := d.validate(); err != nil {
 		return err
@@ -208,7 +208,7 @@ func (d *DAG) WalkBFS(walkFunc WalkFunc) error {
 	return nil
 }
 
-// Root return root vertex that has no in adjacent.
+// Root returns root vertex that has no in adjacent.
 // our DAG should have one and only one root vertex
 func (d *DAG) Root() Vertex {
 	roots := make([]Vertex, 0)
@@ -223,7 +223,17 @@ func (d *DAG) Root() Vertex {
 	return roots[0]
 }
 
-// String return a string representation of the DAG in topology order
+func (d *DAG) Merge(subDag *DAG) {
+	root := d.Root()
+	for v := range subDag.vertices {
+		if len(d.inAdj(v)) == 0 {
+			d.AddVertex(v)
+			d.Connect(root, v)
+		}
+	}
+}
+
+// String returns a string representation of the DAG in topology order
 func (d *DAG) String() string {
 	str := "|"
 	walkFunc := func(v Vertex) error {
@@ -283,7 +293,7 @@ func (d *DAG) validate() error {
 	return nil
 }
 
-// topologicalOrder return a vertex list that is in topology order
+// topologicalOrder returns a vertex list that is in topology order
 // 'd' MUST be a legal DAG
 func (d *DAG) topologicalOrder(reverse bool) []Vertex {
 	// orders is what we want, a (reverse) topological order of this DAG
@@ -338,7 +348,7 @@ func (d *DAG) inAdj(v Vertex) []Vertex {
 	return vertices
 }
 
-// NewDAG new an empty DAG
+// NewDAG news an empty DAG
 func NewDAG() *DAG {
 	dag := &DAG{
 		vertices: make(map[Vertex]Vertex),

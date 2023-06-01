@@ -1,13 +1,14 @@
 ---
 title: Connect database in testing environment
 description: How to connect to a database in testing environment
+keywords: [connect to a database, testing environment, test environment]
 sidebar_position: 2
 sidebar_label: Testing environment
 ---
 
 # Connect database in testing environment
 
-## Procedure 1. Use kbcli cluster connect command 
+## Procedure 1. Use kbcli cluster connect command
 
 You can use the `kbcli cluster connect` command and specify the cluster name to be connected.
 
@@ -26,10 +27,11 @@ kbcli cluster connect --show-example ${cluster-name}
 ```
 
 Information printed includes database addresses, port No., username, password. The figure below is an example of MySQL database network information.
+
 - Address: -h specifies the server address. In the example below it is 127.0.0.1
 - Port: -P specifies port No. , In the example below it is 3306.
 - User: -u is the user name.
-- Password: -p shows the password. In the example below, it is hQBCKZLI. 
+- Password: -p shows the password. In the example below, it is hQBCKZLI.
 
 :::note
 

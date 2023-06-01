@@ -36,7 +36,7 @@ var _ OpsHandler = horizontalScalingOpsHandler{}
 
 func init() {
 	horizontalScalingBehaviour := OpsBehaviour{
-		// if cluster is Abnormal or Failed, new opsRequest may can repair it.
+		// if cluster is Abnormal or Failed, new opsRequest may repair it.
 		// TODO: we should add "force" flag for these opsRequest.
 		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
 		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,

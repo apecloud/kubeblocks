@@ -53,9 +53,8 @@ func Reconciled() (reconcile.Result, error) {
 	return reconcile.Result{}, nil
 }
 
-// CheckedRequeueWithError is a convenience wrapper around logging an error message
-// separate from the stacktrace and then passing the error through to the controller
-// manager, this will ignore not-found errors.
+// CheckedRequeueWithError passes the error through to the controller
+// manager, it ignores unknown errors.
 func CheckedRequeueWithError(err error, logger logr.Logger, msg string, keysAndValues ...interface{}) (reconcile.Result, error) {
 	if apierrors.IsNotFound(err) {
 		return Reconciled()
@@ -63,7 +62,7 @@ func CheckedRequeueWithError(err error, logger logr.Logger, msg string, keysAndV
 	return RequeueWithError(err, logger, msg, keysAndValues...)
 }
 
-// RequeueWithErrorAndRecordEvent requeue when an error occurs. if it is a not found error, send an event
+// RequeueWithErrorAndRecordEvent requeues when an error occurs. if it is an unknown error, triggers an event
 func RequeueWithErrorAndRecordEvent(obj client.Object, recorder record.EventRecorder, err error, logger logr.Logger) (reconcile.Result, error) {
 	if apierrors.IsNotFound(err) {
 		recorder.Eventf(obj, corev1.EventTypeWarning, constant.ReasonNotFoundCR, err.Error())
@@ -71,7 +70,7 @@ func RequeueWithErrorAndRecordEvent(obj client.Object, recorder record.EventReco
 	return RequeueWithError(err, logger, "")
 }
 
-// RequeueWithError requeue when an error occurs
+// RequeueWithError requeues when an error occurs
 func RequeueWithError(err error, logger logr.Logger, msg string, keysAndValues ...interface{}) (reconcile.Result, error) {
 	if msg == "" {
 		logger.Info(err.Error())
@@ -105,8 +104,8 @@ func Requeue(logger logr.Logger, msg string, keysAndValues ...interface{}) (reco
 	return reconcile.Result{Requeue: true}, nil
 }
 
-// HandleCRDeletion Handled CR deletion flow, will add finalizer if discovered a non-deleting object and remove finalizer during
-// deletion process. Pass optional 'deletionHandler' func for external dependency deletion. Return Result pointer
+// HandleCRDeletion handles CR deletion, adds finalizer if found a non-deleting object and removes finalizer during
+// deletion process. Passes optional 'deletionHandler' func for external dependency deletion. Returns Result pointer
 // if required to return out of outer 'Reconcile' reconciliation loop.
 func HandleCRDeletion(reqCtx RequestCtx,
 	r client.Writer,
@@ -116,7 +115,7 @@ func HandleCRDeletion(reqCtx RequestCtx,
 	// examine DeletionTimestamp to determine if object is under deletion
 	if cr.GetDeletionTimestamp().IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
-		// then lets add the finalizer and update the object. This is equivalent
+		// then add the finalizer and update the object. This is equivalent to
 		// registering our finalizer.
 		if !controllerutil.ContainsFinalizer(cr, finalizer) {
 			controllerutil.AddFinalizer(cr, finalizer)
@@ -128,8 +127,8 @@ func HandleCRDeletion(reqCtx RequestCtx,
 		// The object is being deleted
 		if controllerutil.ContainsFinalizer(cr, finalizer) {
 			// We need to record the deletion event first.
-			// Because if the resource has dependencies, it will not be automatically deleted.
-			// so it can prevent users from manually deleting it without event records
+			// If the resource has dependencies, it will not be automatically deleted.
+			// It can also prevent users from manually deleting it without event records
 			if reqCtx.Recorder != nil {
 				cluster, ok := cr.(*v1alpha1.Cluster)
 				// throw warning event if terminationPolicy set to DoNotTerminate
@@ -143,10 +142,10 @@ func HandleCRDeletion(reqCtx RequestCtx,
 				}
 			}
 
-			// our finalizer is present, so lets handle any external dependency
+			// our finalizer is present, so handle any external dependency
 			if deletionHandler != nil {
 				if res, err := deletionHandler(); err != nil {
-					// if fail to delete the external dependency here, return with error
+					// if failed to delete the external dependencies here, return with error
 					// so that it can be retried
 					if res == nil {
 						return ResultToP(CheckedRequeueWithError(err, reqCtx.Log, ""))
@@ -174,7 +173,7 @@ func HandleCRDeletion(reqCtx RequestCtx,
 	return nil, nil
 }
 
-// ValidateReferenceCR validate is exist referencing CRs. if exists, requeue reconcile after 30 seconds
+// ValidateReferenceCR validates existing referencing CRs, if exists, requeue reconcile after 30 seconds
 func ValidateReferenceCR(reqCtx RequestCtx, cli client.Client, obj client.Object,
 	labelKey string, recordEvent func(), objLists ...client.ObjectList) (*ctrl.Result, error) {
 	for _, objList := range objLists {
@@ -201,7 +200,7 @@ func ValidateReferenceCR(reqCtx RequestCtx, cli client.Client, obj client.Object
 	return nil, nil
 }
 
-// RecordCreatedEvent record an event when CR created successfully
+// RecordCreatedEvent records an event when a CR created successfully
 func RecordCreatedEvent(r record.EventRecorder, cr client.Object) {
 	if r != nil && cr.GetGeneration() == 1 {
 		r.Eventf(cr, corev1.EventTypeNormal, constant.ReasonCreatedCR, "Created %s: %s", strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())
@@ -219,7 +218,7 @@ func ManagedByKubeBlocksFilterPredicate(object client.Object) bool {
 	return object.GetLabels()[constant.AppManagedByLabelKey] == constant.AppName
 }
 
-// IgnoreIsAlreadyExists return errors that is not AlreadyExists
+// IgnoreIsAlreadyExists returns errors if 'err' is not type of AlreadyExists
 func IgnoreIsAlreadyExists(err error) error {
 	if !apierrors.IsAlreadyExists(err) {
 		return err
@@ -227,7 +226,7 @@ func IgnoreIsAlreadyExists(err error) error {
 	return nil
 }
 
-// BackgroundDeleteObject delete the object in the background, usually used in the Reconcile method
+// BackgroundDeleteObject deletes the object in the background, usually used in the Reconcile method
 func BackgroundDeleteObject(cli client.Client, ctx context.Context, obj client.Object) error {
 	deletePropagation := metav1.DeletePropagationBackground
 	deleteOptions := &client.DeleteOptions{
@@ -240,10 +239,17 @@ func BackgroundDeleteObject(cli client.Client, ctx context.Context, obj client.O
 	return nil
 }
 
-// SetOwnership set owner reference and add finalizer if not exists
-func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string) error {
-	if err := controllerutil.SetControllerReference(owner, obj, scheme); err != nil {
-		return err
+// SetOwnership provides helper function controllerutil.SetControllerReference/controllerutil.SetOwnerReference
+// and controllerutil.AddFinalizer if not exists.
+func SetOwnership(owner, obj client.Object, scheme *runtime.Scheme, finalizer string, useOwnerReference ...bool) error {
+	if len(useOwnerReference) > 0 && useOwnerReference[0] {
+		if err := controllerutil.SetOwnerReference(owner, obj, scheme); err != nil {
+			return err
+		}
+	} else {
+		if err := controllerutil.SetControllerReference(owner, obj, scheme); err != nil {
+			return err
+		}
 	}
 	if !controllerutil.ContainsFinalizer(obj, finalizer) {
 		// pvc objects do not need to add finalizer

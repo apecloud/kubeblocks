@@ -87,7 +87,7 @@ var _ = Describe("SystemAccount Controller", func() {
 	)
 
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -461,7 +461,7 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(k8sClient.List(ctx, secretsForAcct, ml)).To(Succeed())
 					for _, secret := range secretsForAcct.Items {
 						// each secret has finalizer
-						g.Expect(controllerutil.ContainsFinalizer(&secret, dbClusterFinalizerName)).To(BeTrue())
+						g.Expect(controllerutil.ContainsFinalizer(&secret, constant.DBClusterFinalizerName)).To(BeTrue())
 						g.Expect(len(secret.ObjectMeta.OwnerReferences)).To(BeEquivalentTo(1))
 						g.Expect(checkOwnerReferenceToObj(secret.OwnerReferences[0], cluster)).To(BeTrue())
 					}

@@ -92,9 +92,9 @@ func preDeleteOps(o *delete.DeleteOptions, obj runtime.Object) error {
 	return err
 }
 
-// completeForDeleteOps complete cmd for delete OpsRequest, if resource name
+// completeForDeleteOps completes cmd for delete OpsRequest, if resource name
 // is not specified, construct a label selector based on the cluster name to
-// delete all OpeRequest belonging to the cluster.
+// delete all OpeRequests belonging to the cluster.
 func completeForDeleteOps(o *delete.DeleteOptions, args []string) error {
 	// If resource name is not empty, delete these resources by name, do not need
 	// to construct the label selector.
@@ -112,7 +112,7 @@ func completeForDeleteOps(o *delete.DeleteOptions, args []string) error {
 	}
 
 	o.ConfirmedNames = args
-	// If no specify OpsRequest name and cluster name is specified, delete all OpsRequest belonging to the cluster
+	// If OpsRequest name is unset and cluster name is set, delete all OpsRequests belonging to the cluster
 	o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
 	return nil
 }

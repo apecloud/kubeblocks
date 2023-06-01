@@ -187,15 +187,14 @@ max_standby_streaming_delay = '300000ms'
 max_sync_workers_per_subscription = '2'
 max_wal_senders = '64'
 # {LEAST(GREATEST(DBInstanceClassMemory/2097152, 2048), 16384)}
-max_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 2097152 ) 2048 ) 32768 ) }}'
+max_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 2097152 ) 4096 ) 32768 ) }}'
 max_worker_processes = '{{ max $phy_cpu 8 }}'
 # min_parallel_index_scan_size unit is 8KB, 64 = 512KB
 min_parallel_index_scan_size = '512kB'
 # min_parallel_table_scan_size unit is 8KB, 1024 = 8MB
 min_parallel_table_scan_size = '8MB'
 {{- if gt $phy_memory 0 }}
-# min_wal_size={LEAST(GREATEST(DBInstanceClassMemory/8388608, 256), 8192)} # patroni 1/20 disk size
-min_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 8388608 ) 256 ) 8192 ) }}'
+min_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 8388608 ) 2048 ) 8192 ) }}'
 {{- end }}
 
 old_snapshot_threshold = '-1'
@@ -285,7 +284,6 @@ track_functions = 'pl'
 track_io_timing = 'True'
 transform_null_equals = 'False'
 
-
 vacuum_cleanup_index_scale_factor = '0.1'
 # patroni 20ms
 vacuum_cost_delay = '0'
@@ -304,7 +302,7 @@ vacuum_multixact_freeze_table_age = '200000000'
 # unit 8KB
 wal_buffers = '{{ printf "%dMB" ( div ( min ( max ( div $phy_memory 2097152 ) 2048) 16384 ) 128 ) }}'
 wal_compression = 'True'
-wal_keep_segments = '128'
+wal_keep_segments = '4'
 # patroni minimal for Extreme Performance
 wal_level = 'replica'
 # patroni on , off for Extreme Performance
@@ -320,3 +318,4 @@ wal_writer_flush_after = '1MB'
 work_mem = '{{ printf "%dkB" ( max ( div $phy_memory 4194304 ) 4096 ) }}'
 xmlbinary = 'base64'
 xmloption = 'content'
+wal_init_zero = off

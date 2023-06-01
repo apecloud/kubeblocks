@@ -115,6 +115,8 @@ spec:
                 value: {{ if .Values.cluster.customConfig }}{{ .Values.cluster.customConfig }}{{ end }}
               - name: MYSQL_DYNAMIC_CONFIG
                 value: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
+              - name: KB_EMBEDDED_WESQL
+                value: {{ .Values.cluster.kbWeSQLImage | default "1" | quote }}
             command: ["/scripts/setup.sh"]
             lifecycle:
               preStop:
@@ -216,19 +218,14 @@ spec:
                 creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO $(USERNAME); GRANT LOCK TABLES,RELOAD,PROCESS,REPLICATION CLIENT, SUPER,SELECT,EVENT,TRIGGER,SHOW VIEW ON *.* TO $(USERNAME);
                 update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
           - name: kbprobe
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AnyPods
-              statements:
-                creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
-                update: ALTER USER (USERNAME) IDENTIFIED BY '$(PASSWD)';
-          - name: kbmonitoring
-            provisionPolicy:
+            provisionPolicy: &kbReadonlyAcctRef
               type: CreateByStmt
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
                 update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
+          - name: kbmonitoring
+            provisionPolicy: *kbReadonlyAcctRef
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt

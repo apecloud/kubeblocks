@@ -47,7 +47,7 @@ func SetLogger(zapLogger *zap.Logger) {
 	logger = logger.WithName("configmap_volume_watcher")
 }
 
-// findPidFromProcessName get parent pid
+// findPidFromProcessName gets parent pid
 func findPidFromProcessName(processName string) (PID, error) {
 	allProcess, err := process.Processes()
 	if err != nil {
@@ -57,9 +57,8 @@ func findPidFromProcessName(processName string) (PID, error) {
 	psGraph := map[PID]int32{}
 	for _, proc := range allProcess {
 		name, err := proc.Name()
-		// OS X getting the name of the system process sometimes fails,
-		// because OS X Process.Name function depends on sysctl,
-		// the function requires elevated permissions.
+		// OS X getting the name of the system process may fail,
+		// because OS X Process.Name function depends on sysctl and elevated permissions
 		if err != nil {
 			logger.Error(err, fmt.Sprintf("failed to get process name from pid[%d], and pass", proc.Pid))
 			continue
@@ -80,13 +79,13 @@ func findPidFromProcessName(processName string) (PID, error) {
 		}
 	}
 
-	return InvalidPID, cfgutil.MakeError("not find pid of process name: [%s]", processName)
+	return InvalidPID, cfgutil.MakeError("cannot find pid of process name: [%s]", processName)
 }
 
 func CreateSignalHandler(sig appsv1alpha1.SignalType, processName string) (WatchEventHandler, error) {
 	signal, ok := allUnixSignals[sig]
 	if !ok {
-		err := cfgutil.MakeError("not support unix signal: %s", sig)
+		err := cfgutil.MakeError("not supported unix signal: %s", sig)
 		logger.Error(err, "failed to create signal handler")
 		return nil, err
 	}

@@ -39,7 +39,7 @@ var _ OpsHandler = restartOpsHandler{}
 
 func init() {
 	restartBehaviour := OpsBehaviour{
-		// if cluster is Abnormal or Failed, new opsRequest may can repair it.
+		// if cluster is Abnormal or Failed, new opsRequest may repair it.
 		// TODO: we should add "force" flag for these opsRequest.
 		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
 		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
@@ -70,7 +70,7 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
-// the Reconcile function for volume expansion opsRequest.
+// the Reconcile function for restart opsRequest.
 func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	return reconcileActionWithComponentOps(reqCtx, cli, opsRes, "restart", handleComponentStatusProgress)
 }
@@ -80,7 +80,7 @@ func (r restartOpsHandler) GetRealAffectedComponentMap(opsRequest *appsv1alpha1.
 	return realAffectedComponentMap(opsRequest.Spec.GetRestartComponentNameSet())
 }
 
-// SaveLastConfiguration this operation only restart the pods of the component, no changes in Cluster.spec.
+// SaveLastConfiguration this operation only restart the pods of the component, no changes for Cluster.spec.
 // empty implementation here.
 func (r restartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return nil

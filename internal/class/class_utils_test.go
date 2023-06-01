@@ -101,7 +101,7 @@ var _ = Describe("utils", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 
-		It("should succeed if component have class definition and with valid classDefRef", func() {
+		It("should succeed if component has class definition and with valid classDefRef", func() {
 			comp := &v1alpha1.ClusterComponentSpec{
 				ComponentDefRef: comp1Name,
 				ClassDefRef:     &v1alpha1.ClassDefRef{Class: specClassName},
@@ -111,7 +111,7 @@ var _ = Describe("utils", func() {
 			Expect(reflect.DeepEqual(cls.ComponentClass, testapps.Class1c1g)).Should(BeTrue())
 		})
 
-		It("should fail if component have class definition and with invalid classDefRef", func() {
+		It("should fail if component has class definition and with invalid classDefRef", func() {
 			comp := &v1alpha1.ClusterComponentSpec{
 				ComponentDefRef: comp1Name,
 				ClassDefRef:     &v1alpha1.ClassDefRef{Class: "class-not-exists"},
@@ -120,7 +120,7 @@ var _ = Describe("utils", func() {
 			Expect(err).Should(HaveOccurred())
 		})
 
-		It("should succeed if component have class definition and with valid resource", func() {
+		It("should succeed if component has class definition and with valid resource", func() {
 			comp := &v1alpha1.ClusterComponentSpec{
 				ComponentDefRef: comp1Name,
 				Resources: corev1.ResourceRequirements{
@@ -132,7 +132,7 @@ var _ = Describe("utils", func() {
 			Expect(reflect.DeepEqual(cls.ComponentClass, testapps.Class1c1g)).Should(BeTrue())
 		})
 
-		It("should fail if component have class definition and with invalid resource", func() {
+		It("should fail if component has class definition and with invalid resource", func() {
 			comp := &v1alpha1.ClusterComponentSpec{
 				ComponentDefRef: comp1Name,
 				Resources: corev1.ResourceRequirements{
@@ -143,7 +143,7 @@ var _ = Describe("utils", func() {
 			Expect(err).Should(HaveOccurred())
 		})
 
-		It("should succeed if component does not have class definition and without classDefRef", func() {
+		It("should succeed if component hasn't class definition and without classDefRef", func() {
 			comp := &v1alpha1.ClusterComponentSpec{
 				ComponentDefRef: comp2Name,
 			}
@@ -152,7 +152,7 @@ var _ = Describe("utils", func() {
 			Expect(cls).Should(BeNil())
 		})
 
-		It("should fail if component does not have class definition and with classDefRef", func() {
+		It("should fail if component hasn't class definition and with classDefRef", func() {
 			comp := &v1alpha1.ClusterComponentSpec{
 				ComponentDefRef: comp2Name,
 				ClassDefRef:     &v1alpha1.ClassDefRef{Class: specClassName},
@@ -161,7 +161,7 @@ var _ = Describe("utils", func() {
 			Expect(err).Should(HaveOccurred())
 		})
 
-		It("should succeed if component does not have class definition and without classDefRef", func() {
+		It("should succeed if component hasn't class definition and without classDefRef", func() {
 			comp := &v1alpha1.ClusterComponentSpec{
 				ComponentDefRef: comp2Name,
 				Resources: corev1.ResourceRequirements{
@@ -175,7 +175,7 @@ var _ = Describe("utils", func() {
 	})
 
 	Context("sort component classes", func() {
-		It("should match minial class if cpu and memory are empty", func() {
+		It("should match minimal class if cpu and memory are empty", func() {
 			class := ChooseComponentClasses(classes, buildResourceList("", ""))
 			Expect(class).ShouldNot(BeNil())
 			Expect(class.CPU.String()).Should(Equal("1"))
@@ -203,12 +203,12 @@ var _ = Describe("utils", func() {
 			Expect(class.Memory.String()).Should(Equal("16Gi"))
 		})
 
-		It("not match any classes by cpu", func() {
+		It("not match any class by cpu", func() {
 			class := ChooseComponentClasses(classes, buildResourceList(fmt.Sprintf("%d", cpuMax+1), ""))
 			Expect(class).Should(BeNil())
 		})
 
-		It("not match any classes by memory", func() {
+		It("not match any class by memory", func() {
 			class := ChooseComponentClasses(classes, buildResourceList("", "1Pi"))
 			Expect(class).Should(BeNil())
 		})

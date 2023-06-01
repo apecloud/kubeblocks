@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"encoding/json"
 	"fmt"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -28,10 +29,32 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
+
+func getClusterBackupSourceMap(cluster appsv1alpha1.Cluster) (map[string]string, error) {
+	compBackupMapString := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	if len(compBackupMapString) == 0 {
+		return nil, nil
+	}
+	compBackupMap := map[string]string{}
+	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
+	return compBackupMap, err
+}
+
+func getComponentBackupSource(cluster appsv1alpha1.Cluster, compName string) (string, error) {
+	backupSources, err := getClusterBackupSourceMap(cluster)
+	if err != nil {
+		return "", err
+	}
+	if source, ok := backupSources[compName]; ok {
+		return source, nil
+	}
+	return "", nil
+}
 
 func getBackupObjects(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -53,9 +76,8 @@ func getBackupObjects(reqCtx intctrlutil.RequestCtx,
 	return backup, backupTool, nil
 }
 
-// BuildRestoredInfo builds restore-related infos if it needs to restore from backup, such as init container/pvc dataSource.
-func BuildRestoredInfo(
-	reqCtx intctrlutil.RequestCtx,
+// BuildRestoredInfo builds restore infos when restore from backup, such as init-container, pvc dataSource.
+func BuildRestoredInfo(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	namespace string,
 	component *SynthesizedComponent,
@@ -64,12 +86,29 @@ func BuildRestoredInfo(
 	if err != nil {
 		return err
 	}
-	return BuildRestoredInfo2(component, backup, backupTool)
+	return buildRestoredInfo2(component, backup, backupTool)
 }
 
-// BuildRestoredInfo2 builds restore-related infos if it needs to restore from backup, such as init container/pvc dataSource.
-func BuildRestoredInfo2(
-	component *SynthesizedComponent,
+func buildRestoreInfoFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster appsv1alpha1.Cluster,
+	component *SynthesizedComponent) error {
+	// build info that needs to be restored from backup
+	backupSourceName, err := getComponentBackupSource(cluster, component.Name)
+	if err != nil {
+		return err
+	}
+	if len(backupSourceName) == 0 {
+		return nil
+	}
+
+	backup, backupTool, err := getBackupObjects(reqCtx, cli, cluster.Namespace, backupSourceName)
+	if err != nil {
+		return err
+	}
+	return buildRestoredInfo2(component, backup, backupTool)
+}
+
+// buildRestoredInfo2 builds restore infos when restore from backup, such as init-container, pvc dataSource.
+func buildRestoredInfo2(component *SynthesizedComponent,
 	backup *dataprotectionv1alpha1.Backup,
 	backupTool *dataprotectionv1alpha1.BackupTool) error {
 	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
@@ -84,12 +123,12 @@ func BuildRestoredInfo2(
 	return nil
 }
 
-// GetRestoredInitContainerName gets the init container name for restore.
+// GetRestoredInitContainerName gets the restore init container name.
 func GetRestoredInitContainerName(backupName string) string {
 	return fmt.Sprintf("restore-%s", backupName)
 }
 
-// buildInitContainerWithFullBackup builds the init container if it needs to restore from full backup
+// buildInitContainerWithFullBackup builds the init container when restore from full backup
 func buildInitContainerWithFullBackup(
 	component *SynthesizedComponent,
 	backup *dataprotectionv1alpha1.Backup,
@@ -98,7 +137,7 @@ func buildInitContainerWithFullBackup(
 		return nil
 	}
 	if len(backup.Status.PersistentVolumeClaimName) == 0 {
-		return fmt.Errorf("persistentVolumeClaimName can not be empty in Backup.status")
+		return fmt.Errorf("persistentVolumeClaimName cannot be empty in Backup.status")
 	}
 	container := corev1.Container{}
 	container.Name = GetRestoredInitContainerName(backup.Name)
@@ -152,7 +191,7 @@ func buildInitContainerWithFullBackup(
 	return nil
 }
 
-// buildVolumeClaimTemplatesWithSnapshot builds the volumeClaimTemplate if it needs to restore from volumeSnapshot
+// buildVolumeClaimTemplatesWithSnapshot builds the volumeClaimTemplate when restore from volumeSnapshot
 func buildVolumeClaimTemplatesWithSnapshot(component *SynthesizedComponent,
 	backup *dataprotectionv1alpha1.Backup) error {
 	if len(component.VolumeClaimTemplates) == 0 {

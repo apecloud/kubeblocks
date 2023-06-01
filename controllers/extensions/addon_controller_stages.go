@@ -587,12 +587,12 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 			}
 
 			// Job controller has yet handling Job or job controller is not running, i.e., testenv
-			// only handle this situation when addon is at terminating state.
+			// only handles this situation when addon is at terminating state.
 			if helmUninstallJob.Status.StartTime.IsZero() && !addon.GetDeletionTimestamp().IsZero() {
 				return
 			}
 
-			// requeue if uninstall job is active or deleting
+			// requeue if uninstall job is active or under deleting
 			if !helmUninstallJob.GetDeletionTimestamp().IsZero() || helmUninstallJob.Status.Active > 0 {
 				r.setRequeueAfter(time.Second, "")
 				return
@@ -743,7 +743,7 @@ func (r *terminalStateStage) Handle(ctx context.Context) {
 	r.next.Handle(ctx)
 }
 
-// attachVolumeMount attach a volumes to pod and added container.VolumeMounts to a ConfigMap
+// attachVolumeMount attaches a volumes to pod and added container.VolumeMounts to a ConfigMap
 // or Secret referenced key as file, and add --values={volumeMountPath}/{selector.Key} to
 // helm install/upgrade args
 func attachVolumeMount(
@@ -768,7 +768,7 @@ func attachVolumeMount(
 		fmt.Sprintf("%s/%s", mountPath, selector.Key))
 }
 
-// createHelmJobProto create a job.batch prototyped object
+// createHelmJobProto creates a job.batch prototyped object
 func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 	ttl := time.Minute * 5
 	if jobTTL := viper.GetString(constant.CfgKeyAddonJobTTL); jobTTL != "" {

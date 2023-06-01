@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/sqlchannel"
@@ -90,7 +91,7 @@ const (
 )
 
 var (
-	// systemAccountLog is a logger for use during runtime
+	// systemAccountLog is a logger during runtime
 	systemAccountLog logr.Logger
 )
 
@@ -134,7 +135,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 	// cluster is under deletion, do nothing
 	if !cluster.GetDeletionTimestamp().IsZero() {
-		reqCtx.Log.Info("Cluster is under deletion.", "cluster", req.NamespacedName)
+		reqCtx.Log.V(1).Info("Cluster is under deletion.", "cluster", req.NamespacedName)
 		return intctrlutil.Reconciled()
 	}
 
@@ -157,7 +158,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	componentVersions := clusterVersion.Spec.GetDefNameMappingComponents()
 
-	// process accounts per component
+	// process accounts for each component
 	processAccountsForComponent := func(compDef *appsv1alpha1.ClusterComponentDefinition, compDecl *appsv1alpha1.ClusterComponentSpec,
 		svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints) error {
 		var (
@@ -176,11 +177,15 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		// expectations: collect accounts from default setting, cluster and cluster definition.
 		toCreate = getDefaultAccounts()
+		reqCtx.Log.V(1).Info("accounts to create", "cluster", req.NamespacedName, "accounts", toCreate)
+
 		// facts: accounts have been created, in form of k8s secrets.
 		if detectedK8SFacts, err = r.getAccountFacts(reqCtx, compKey); err != nil {
-			reqCtx.Log.Error(err, "failed to get secrets")
+			reqCtx.Log.V(1).Error(err, "failed to get secrets")
 			return err
 		}
+		reqCtx.Log.V(1).Info("detected k8s facts", "cluster", req.NamespacedName, "accounts", detectedK8SFacts)
+
 		// toCreate = account to create - account exists
 		// (toCreate \intersect detectedEngineFacts) means the set of account exists in engine but not in k8s, and should be updated or altered, not re-created.
 		toCreate &= toCreate ^ detectedK8SFacts
@@ -193,6 +198,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			reqCtx.Log.Error(err, "failed to get accounts", "cluster", cluster.Name, "component", compDecl.Name)
 			// we don't return error here, because we can still create accounts in k8s and will give it a try.
 		}
+		reqCtx.Log.V(1).Info("detected database facts", "cluster", req.NamespacedName, "accounts", detectedEngineFacts)
 
 		// replace KubeBlocks ENVs.
 		replaceEnvsValues(cluster.Name, compDef.SystemAccounts)
@@ -294,7 +300,7 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 	for _, ep := range retrieveEndpoints(policy.Scope, svcEP, headlessEP) {
 		// render a job object
 		job := renderJob(engine, compKey, stmts, ep)
-		// before create job, we adjust job's attributes, such as labels, tolerations w.r.t cluster info.
+		// before creating job, we adjust job's attributes, such as labels, tolerations w.r.t cluster info.
 		if err := calibrateJobMetaAndSpec(job, cluster, compKey, account.Name); err != nil {
 			return err
 		}
@@ -351,7 +357,7 @@ func (r *SystemAccountReconciler) isComponentReady(reqCtx intctrlutil.RequestCtx
 	if headlessSvcErr != nil {
 		return false, nil, nil, headlessSvcErr
 	}
-	// either service or endpoints is not ready.
+	// Neither service nor endpoints is ready.
 	if len(svcEP.Subsets) == 0 || len(headlessEP.Subsets) == 0 {
 		return false, nil, nil, nil
 	}
@@ -364,7 +370,7 @@ func (r *SystemAccountReconciler) isComponentReady(reqCtx intctrlutil.RequestCtx
 	return true, svcEP, headlessEP, nil
 }
 
-// getAccountFacts parse secrets for given cluster as facts, i.e., accounts created
+// getAccountFacts parses secrets for given cluster as facts, i.e., accounts created
 // TODO: @shanshan, should verify accounts on database cluster as well.
 func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx, key componentUniqueKey) (appsv1alpha1.KBAccountType, error) {
 	// get account facts, i.e., secrets created
@@ -382,6 +388,16 @@ func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx,
 	}
 
 	detectedFacts := getAccountFacts(secrets, jobs)
+	reqCtx.Log.V(1).Info("Detected account facts", "facts", detectedFacts)
+
+	for _, accName := range getAllSysAccounts() {
+		key := concatSecretName(key, string(accName))
+		_, exists, _ := r.SecretMapStore.getSecret(key)
+		if exists {
+			detectedFacts |= accName.GetAccountID()
+		}
+	}
+	reqCtx.Log.V(1).Info("Detected account facts with those from cache", "facts", detectedFacts)
 	return detectedFacts, nil
 }
 
@@ -472,8 +488,9 @@ func (r *SystemAccountReconciler) jobCompletionHander() *handler.Funcs {
 				return
 			}
 
-			err = r.Client.Create(context.TODO(), entry.value)
-			if err != nil {
+			logger.V(1).Info("job succeeded", "job", job.Name, "account", accountName, "cluster", clusterName, "secret", key)
+
+			if err = r.Client.Create(context.TODO(), entry.value); err != nil {
 				logger.Error(err, "failed to create secret, will try later", "secret key", key)
 				return
 			}
@@ -531,8 +548,16 @@ func (r *SystemAccountReconciler) clusterDeletionHander() builder.Predicates {
 					}
 				}
 			}
+			logger.V(1).Info("cluster deleted", "cluster", cluster.Name, "namespace", cluster.Namespace, "secretMapStore", r.SecretMapStore.ListKeys())
 			return false
 		},
 	}
 	return builder.WithPredicates(predicate)
+}
+
+// existsOperations checks if the cluster is doing operations
+func existsOperations(cluster *appsv1alpha1.Cluster) bool {
+	opsRequestMap, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
+	_, isRestoring := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	return len(opsRequestMap) > 0 || isRestoring
 }

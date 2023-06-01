@@ -22,6 +22,7 @@ package kubeblocks
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -175,8 +176,8 @@ func (o *statusOptions) run() error {
 	defer cancel()
 
 	allErrs := make([]error, 0)
-	o.showK8SClusterInfos(ctx, &allErrs)
 	o.buildSelectorList(ctx, &allErrs)
+	o.showK8SClusterInfos(ctx, &allErrs)
 	o.showWorkloads(ctx, &allErrs)
 	o.showAddons()
 
@@ -420,42 +421,49 @@ func (o *statusOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
 }
 
 func (o *statusOptions) showK8SClusterInfos(ctx context.Context, allErrs *[]error) {
-	version, err := util.GetK8sVersion(o.client.Discovery())
+	version, err := util.GetVersionInfo(o.client)
 	if err != nil {
 		appendErrIgnoreNotFound(allErrs, err)
 	}
-	fmt.Fprintf(o.Out, "Kubernetes version: %s\n", version)
-	provider, err := util.GetK8sProvider(version, o.client)
+	fmt.Fprintf(o.Out, "Kubernetes version: %s\n", version.Kubernetes)
+	fmt.Fprintf(o.Out, "KubeBlocks version: %s\n", version.KubeBlocks)
+	provider, err := util.GetK8sProvider(version.Kubernetes, o.client)
 	if err != nil {
 		*allErrs = append(*allErrs, fmt.Errorf("failed to get kubernetes provider: %v", err))
 	}
-	if provider.IsCloud() {
-		fmt.Fprintf(o.Out, "Kubernetes provider %s\n", provider)
-		nodesList := listResourceByGVR(ctx, o.dynamic, o.ns, []schema.GroupVersionResource{types.NodeGVR()}, []metav1.ListOptions{}, allErrs)
-		var region string
-		var availableZones []string
-		for _, item := range nodesList {
-			for _, node := range item.Items {
-				labels := node.GetLabels()
-				if labels == nil {
-					continue
-				}
-				region = labels[constant.RegionLabelKey]
-				availableZones = append(availableZones, labels[constant.ZoneLabelKey])
-			}
-		}
-		if len(region) == 0 {
-			return
-		}
-		fmt.Fprintf(o.Out, "Kubernetes region: %s\n", region)
-		fmt.Fprintf(o.Out, "Kubernetes available zones:")
-		for i := range availableZones {
-			if len(availableZones[i]) != 0 {
-				fmt.Fprintf(o.Out, " %s", availableZones[i])
-			}
-		}
-		fmt.Fprintln(o.Out)
+	if !provider.IsCloud() {
+		return
 	}
+	fmt.Fprintf(o.Out, "Kubernetes provider %s\n", provider)
+	nodesList := listResourceByGVR(ctx, o.dynamic, "", []schema.GroupVersionResource{types.NodeGVR()}, []metav1.ListOptions{{}}, allErrs)
+	var region string
+	availableZones := make(map[string]struct{})
+	for _, item := range nodesList {
+		for _, node := range item.Items {
+			labels := node.GetLabels()
+			if labels == nil {
+				continue
+			}
+			region = labels[constant.RegionLabelKey]
+			availableZones[labels[constant.ZoneLabelKey]] = struct{}{}
+		}
+	}
+	if len(region) == 0 {
+		return
+	}
+	fmt.Fprintf(o.Out, "Kubernetes region: %s\n", region)
+	fmt.Fprintf(o.Out, "Kubernetes available zones:")
+	allZones := make([]string, 0)
+	for zone := range availableZones {
+		if len(zone) != 0 {
+			allZones = append(allZones, zone)
+		}
+	}
+	sort.Strings(allZones)
+	for i := range allZones {
+		fmt.Fprintf(o.Out, " %s", allZones[i])
+	}
+	printer.PrintBlankLine(o.Out)
 }
 
 func getNestedSelectorAsString(obj map[string]interface{}, fields ...string) (string, error) {

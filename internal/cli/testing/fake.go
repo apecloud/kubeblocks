@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/kubectl/pkg/util/storage"
 	"k8s.io/utils/pointer"
 
@@ -809,5 +810,11 @@ func FakeResourceNotFound(versionResource schema.GroupVersionResource, name stri
 		Reason:  "NotFound",
 		Details: nil,
 		Code:    404,
+	}
+}
+
+func FakeVersion() *version.Info {
+	return &version.Info{
+		GitVersion: "1.12.3",
 	}
 }

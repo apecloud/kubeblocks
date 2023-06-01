@@ -40,7 +40,7 @@ config: {
 			"app.kubernetes.io/instance":   cluster.metadata.name
 			"app.kubernetes.io/managed-by": "kubeblocks"
 			"app.kubernetes.io/component":  "\(component.compDefName)"
-			
+
 			// configmap selector for env update
 			"apps.kubeblocks.io/config-type":    "kubeblocks-env"
 			"apps.kubeblocks.io/component-name": "\(component.name)"

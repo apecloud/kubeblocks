@@ -2224,7 +2224,7 @@ string
 </em>
 </td>
 <td>
-<p>componentDefRef referes to the componentDef defined in ClusterDefinition spec.</p>
+<p>componentDefRef references the componentDef defined in ClusterDefinition spec.</p>
 </td>
 </tr>
 <tr>
@@ -2250,7 +2250,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>monitor is a switch to enable monitoring and is set as false by deafult.
+<p>monitor is a switch to enable monitoring and is set as false by default.
 KubeBlocks provides an extension mechanism to support component level monitoring,
 which will scrape metrics auto or manually from servers in component and export
 metrics to Time Series Database.</p>

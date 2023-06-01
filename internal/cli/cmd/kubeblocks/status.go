@@ -434,7 +434,7 @@ func (o *statusOptions) showK8SClusterInfos(ctx context.Context, allErrs *[]erro
 	if !provider.IsCloud() {
 		return
 	}
-	fmt.Fprintf(o.Out, "Kubernetes provider %s\n", provider)
+	fmt.Fprintf(o.Out, "Kubernetes provider: %s\n", provider)
 	nodesList := listResourceByGVR(ctx, o.dynamic, "", []schema.GroupVersionResource{types.NodeGVR()}, []metav1.ListOptions{{}}, allErrs)
 	var region string
 	availableZones := make(map[string]struct{})

@@ -205,7 +205,7 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 	})
 }
 
-// BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels on the sts to the pvc labels.
+// BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from sts to pvc.
 func BuildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.PersistentVolumeClaim,
 	component *component.SynthesizedComponent, pvcTplName string) {
 	// strict args checking.
@@ -465,7 +465,7 @@ func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
 	return &pvc, nil
 }
 
-// BuildEnvConfig build cluster component context ConfigMap object, which is to be used in workload container's
+// BuildEnvConfig builds cluster component context ConfigMap object, which is to be used in workload container's
 // envFrom.configMapRef with name of "$(cluster.metadata.name)-$(component.name)-env" pattern.
 func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli client.Client) (*corev1.ConfigMap, error) {
 	return BuildEnvConfigLow(reqCtx, cli, params.Cluster, params.Component)
@@ -623,7 +623,7 @@ func BuildConfigMapWithTemplateLow(cluster *appsv1alpha1.Cluster,
 		return nil, err
 	}
 
-	// Generate config files context by render cue template
+	// Generate config files context by rendering cue template
 	if err = cueValue.Fill("meta", configBytes); err != nil {
 		return nil, err
 	}

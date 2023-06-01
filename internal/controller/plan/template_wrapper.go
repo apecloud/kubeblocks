@@ -152,7 +152,7 @@ func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster
 }
 
 func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.ComponentTemplateSpec, cm *corev1.ConfigMap, scheme *runtime.Scheme) error {
-	// The owner of the configmap object is a cluster of users,
+	// The owner of the configmap object is a cluster,
 	// in order to manage the life cycle of configmap
 	if err := controllerutil.SetOwnerReference(wrapper.cluster, cm, scheme); err != nil {
 		return err
@@ -221,7 +221,7 @@ func updateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1alpha1.Comp
 	}
 }
 
-// generateConfigMapFromTpl render config file by config template provided by provider.
+// generateConfigMapFromTpl renders config file by config template provided by provider.
 func generateConfigMapFromTpl(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
 	tplBuilder *configTemplateBuilder,
@@ -247,7 +247,7 @@ func generateConfigMapFromTpl(cluster *appsv1alpha1.Cluster,
 	return builder.BuildConfigMapWithTemplateLow(cluster, component, configs, cmName, configConstraintName, templateSpec)
 }
 
-// renderConfigMapTemplate render config file using template engine
+// renderConfigMapTemplate renders config file using template engine
 func renderConfigMapTemplate(
 	templateBuilder *configTemplateBuilder,
 	templateSpec appsv1alpha1.ComponentTemplateSpec,
@@ -274,7 +274,7 @@ func renderConfigMapTemplate(
 	return renderedData, nil
 }
 
-// validateRenderedData validate config file against constraint
+// validateRenderedData validates config file against constraint
 func validateRenderedData(
 	renderedData map[string]string,
 	configSpec appsv1alpha1.ComponentConfigSpec,
@@ -291,7 +291,6 @@ func validateRenderedData(
 		return cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
 	}
 
-	// NOTE: not require checker configuration template status
 	configChecker := cfgcore.NewConfigValidator(&configConstraint.Spec, cfgcore.WithKeySelector(configSpec.Keys))
 
 	// NOTE: It is necessary to verify the correctness of the data

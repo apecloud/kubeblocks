@@ -93,7 +93,7 @@ func (y *yamlConfig) Unmarshal(str string) error {
 func checkAndCreateNestedPrefixMap(m map[string]any, path []string) map[string]any {
 	for _, k := range path {
 		m2, ok := m[k]
-		// if the key is not exist, create a new map
+		// if the key is not existed, create a new map
 		if !ok {
 			m3 := make(map[string]any)
 			m[k] = m3
@@ -101,7 +101,7 @@ func checkAndCreateNestedPrefixMap(m map[string]any, path []string) map[string]a
 			continue
 		}
 		m3, ok := m2.(map[string]any)
-		// if the type is not map, replace with a new map
+		// if the type is not map, replace it with a new map
 		if !ok {
 			m3 = make(map[string]any)
 			m[k] = m3

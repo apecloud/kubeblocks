@@ -32,7 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-// FillClassTransformer fill the class related info to cluster
+// FillClassTransformer fills the class related info to cluster
 type FillClassTransformer struct{}
 
 var _ graph.Transformer = &FillClassTransformer{}

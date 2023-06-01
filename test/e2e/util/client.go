@@ -38,7 +38,7 @@ func NewTestClient(kubecontext string) (TestClient, error) {
 	return InitTestClient(kubecontext)
 }
 
-// InitTestClient init different type clients
+// InitTestClient inits different type clients
 func InitTestClient(kubecontext string) (TestClient, error) {
 	config, err := client.LoadConfig()
 	if err != nil {

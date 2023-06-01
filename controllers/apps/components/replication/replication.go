@@ -27,8 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -41,38 +41,31 @@ type ReplicationSet struct {
 	stateful.Stateful
 }
 
-var _ types.ComponentSet = &ReplicationSet{}
+var _ internal.ComponentSet = &ReplicationSet{}
 
 func (r *ReplicationSet) getName() string {
-	if r.Component != nil {
-		return r.Component.GetName()
+	if r.SynthesizedComponent != nil {
+		return r.SynthesizedComponent.Name
 	}
 	return r.ComponentSpec.Name
 }
 
 func (r *ReplicationSet) getWorkloadType() appsv1alpha1.WorkloadType {
-	if r.Component != nil {
-		return r.Component.GetWorkloadType()
-	}
-	return r.ComponentDef.WorkloadType
+	return appsv1alpha1.Replication
 }
 
 func (r *ReplicationSet) getReplicas() int32 {
-	if r.Component != nil {
-		return r.Component.GetReplicas()
+	if r.SynthesizedComponent != nil {
+		return r.SynthesizedComponent.Replicas
 	}
 	return r.ComponentSpec.Replicas
 }
 
 func (r *ReplicationSet) getPrimaryIndex() int32 {
-	if r.Component != nil {
-		return r.Component.GetPrimaryIndex()
+	if r.SynthesizedComponent != nil {
+		return r.SynthesizedComponent.GetPrimaryIndex()
 	}
 	return r.ComponentSpec.GetPrimaryIndex()
-}
-
-func (r *ReplicationSet) SetComponent(comp types.Component) {
-	r.Component = comp
 }
 
 // IsRunning is the implementation of the type Component interface method,
@@ -268,12 +261,12 @@ func newReplicationSet(cli client.Client,
 	def appsv1alpha1.ClusterComponentDefinition) *ReplicationSet {
 	return &ReplicationSet{
 		Stateful: stateful.Stateful{
-			ComponentSetBase: types.ComponentSetBase{
-				Cli:           cli,
-				Cluster:       cluster,
-				ComponentSpec: spec,
-				ComponentDef:  &def,
-				Component:     nil,
+			ComponentSetBase: internal.ComponentSetBase{
+				Cli:                  cli,
+				Cluster:              cluster,
+				SynthesizedComponent: nil,
+				ComponentSpec:        spec,
+				ComponentDef:         &def,
 			},
 		},
 	}

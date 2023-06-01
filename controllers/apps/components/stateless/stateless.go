@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -46,20 +46,16 @@ import (
 const NewRSAvailableReason = "NewReplicaSetAvailable"
 
 type Stateless struct {
-	types.ComponentSetBase
+	internal.ComponentSetBase
 }
 
-var _ types.ComponentSet = &Stateless{}
+var _ internal.ComponentSet = &Stateless{}
 
 func (stateless *Stateless) getReplicas() int32 {
-	if stateless.Component != nil {
-		return stateless.Component.GetReplicas()
+	if stateless.SynthesizedComponent != nil {
+		return stateless.SynthesizedComponent.Replicas
 	}
 	return stateless.ComponentSpec.Replicas
-}
-
-func (stateless *Stateless) SetComponent(comp types.Component) {
-	stateless.Component = comp
 }
 
 func (stateless *Stateless) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
@@ -127,12 +123,12 @@ func newStateless(cli client.Client,
 	spec *appsv1alpha1.ClusterComponentSpec,
 	def appsv1alpha1.ClusterComponentDefinition) *Stateless {
 	return &Stateless{
-		ComponentSetBase: types.ComponentSetBase{
-			Cli:           cli,
-			Cluster:       cluster,
-			ComponentSpec: spec,
-			ComponentDef:  &def,
-			Component:     nil,
+		ComponentSetBase: internal.ComponentSetBase{
+			Cli:                  cli,
+			Cluster:              cluster,
+			SynthesizedComponent: nil,
+			ComponentSpec:        spec,
+			ComponentDef:         &def,
 		},
 	}
 }

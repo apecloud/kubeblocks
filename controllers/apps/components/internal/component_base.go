@@ -57,7 +57,7 @@ type ComponentBase struct {
 	Cluster        *appsv1alpha1.Cluster
 	ClusterVersion *appsv1alpha1.ClusterVersion    // building config needs the cluster version
 	Component      *component.SynthesizedComponent // built synthesized component, replace it with component workload proto
-	ComponentSet   types.ComponentSet
+	ComponentSet   ComponentSet
 	Dag            *graph.DAG
 	WorkloadVertex *ictrltypes.LifecycleVertex // DAG vertex of main workload object
 }
@@ -90,27 +90,16 @@ func (c *ComponentBase) GetSynthesizedComponent() *component.SynthesizedComponen
 	return c.Component
 }
 
+func (c *ComponentBase) GetConsensusSpec() *appsv1alpha1.ConsensusSetSpec {
+	return c.Component.ConsensusSpec
+}
+
 func (c *ComponentBase) GetMatchingLabels() client.MatchingLabels {
 	return client.MatchingLabels{
 		constant.AppManagedByLabelKey:   constant.AppName,
 		constant.AppInstanceLabelKey:    c.GetClusterName(),
 		constant.KBAppComponentLabelKey: c.GetName(),
 	}
-}
-
-func (c *ComponentBase) GetReplicas() int32 {
-	return c.Component.Replicas
-}
-
-func (c *ComponentBase) GetConsensusSpec() *appsv1alpha1.ConsensusSetSpec {
-	return c.Component.ConsensusSpec
-}
-
-func (c *ComponentBase) GetPrimaryIndex() int32 {
-	if c.Component.PrimaryIndex == nil {
-		return 0
-	}
-	return *c.Component.PrimaryIndex
 }
 
 func (c *ComponentBase) GetPhase() appsv1alpha1.ClusterComponentPhase {

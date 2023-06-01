@@ -47,12 +47,12 @@ func NewStatefulComponent(cli client.Client,
 				ClusterVersion: clusterVersion,
 				Component:      synthesizedComponent,
 				ComponentSet: &Stateful{
-					ComponentSetBase: types.ComponentSetBase{
-						Cli:           cli,
-						Cluster:       cluster,
-						ComponentSpec: nil,
-						ComponentDef:  nil,
-						Component:     nil,
+					ComponentSetBase: internal.ComponentSetBase{
+						Cli:                  cli,
+						Cluster:              cluster,
+						SynthesizedComponent: synthesizedComponent,
+						ComponentSpec:        nil,
+						ComponentDef:         nil,
 					},
 				},
 				Dag:            dag,
@@ -60,7 +60,6 @@ func NewStatefulComponent(cli client.Client,
 			},
 		},
 	}
-	comp.ComponentSet.SetComponent(comp)
 	return comp
 }
 

@@ -28,8 +28,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -41,52 +41,45 @@ type ConsensusSet struct {
 	stateful.Stateful
 }
 
-var _ types.ComponentSet = &ConsensusSet{}
+var _ internal.ComponentSet = &ConsensusSet{}
 
 func (r *ConsensusSet) getName() string {
-	if r.Component != nil {
-		return r.Component.GetName()
+	if r.SynthesizedComponent != nil {
+		return r.SynthesizedComponent.Name
 	}
 	return r.ComponentSpec.Name
 }
 
 func (r *ConsensusSet) getDefName() string {
-	if r.Component != nil {
-		return r.Component.GetDefinitionName()
+	if r.SynthesizedComponent != nil {
+		return r.SynthesizedComponent.ComponentDef
 	}
 	return r.ComponentDef.Name
 }
 
 func (r *ConsensusSet) getWorkloadType() appsv1alpha1.WorkloadType {
-	if r.Component != nil {
-		return r.Component.GetWorkloadType()
-	}
-	return r.ComponentDef.WorkloadType
+	return appsv1alpha1.Consensus
 }
 
 func (r *ConsensusSet) getReplicas() int32 {
-	if r.Component != nil {
-		return r.Component.GetReplicas()
+	if r.SynthesizedComponent != nil {
+		return r.SynthesizedComponent.Replicas
 	}
 	return r.ComponentSpec.Replicas
 }
 
 func (r *ConsensusSet) getConsensusSpec() *appsv1alpha1.ConsensusSetSpec {
-	if r.Component != nil {
-		return r.Component.GetConsensusSpec()
+	if r.SynthesizedComponent != nil {
+		return r.SynthesizedComponent.ConsensusSpec
 	}
 	return r.ComponentDef.ConsensusSpec
 }
 
 func (r *ConsensusSet) getProbes() *appsv1alpha1.ClusterDefinitionProbes {
-	if r.Component != nil {
-		return r.Component.GetSynthesizedComponent().Probes
+	if r.SynthesizedComponent != nil {
+		return r.SynthesizedComponent.Probes
 	}
 	return r.ComponentDef.Probes
-}
-
-func (r *ConsensusSet) SetComponent(comp types.Component) {
-	r.Component = comp
 }
 
 func (r *ConsensusSet) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
@@ -296,12 +289,12 @@ func newConsensusSet(cli client.Client,
 	def appsv1alpha1.ClusterComponentDefinition) *ConsensusSet {
 	return &ConsensusSet{
 		Stateful: stateful.Stateful{
-			ComponentSetBase: types.ComponentSetBase{
-				Cli:           cli,
-				Cluster:       cluster,
-				ComponentSpec: spec,
-				ComponentDef:  &def,
-				Component:     nil,
+			ComponentSetBase: internal.ComponentSetBase{
+				Cli:                  cli,
+				Cluster:              cluster,
+				SynthesizedComponent: nil,
+				ComponentSpec:        spec,
+				ComponentDef:         &def,
 			},
 		},
 	}

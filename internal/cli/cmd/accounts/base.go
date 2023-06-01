@@ -58,7 +58,7 @@ var (
 	errMissingRoleName       = fmt.Errorf("please specify at least ONE role name")
 	errInvalidRoleName       = fmt.Errorf("invalid role name, should be one of [SUPERUSER, READWRITE, READONLY] ")
 	errInvalidOp             = fmt.Errorf("invalid operation")
-	errCompNameOrInstName    = fmt.Errorf("please specify either --component or --instance, not both")
+	errCompNameOrInstName    = fmt.Errorf("please specify either --component or --instance, they are exclusive")
 	errClusterNameorInstName = fmt.Errorf("specify either cluster name or --instance")
 )
 
@@ -70,7 +70,7 @@ func NewAccountBaseOptions(f cmdutil.Factory, streams genericclioptions.IOStream
 }
 
 func (o *AccountBaseOptions) AddFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&o.ComponentName, "component", "", "Specify the name of component to be connected. If not specified, the first component will be used.")
+	cmd.Flags().StringVar(&o.ComponentName, "component", "", "Specify the name of component to be connected. If not specified, pick the first one.")
 	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "Specify the name of instance to be connected.")
 }
 

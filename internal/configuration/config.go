@@ -172,14 +172,14 @@ type dataConfig struct {
 	// Option is config for
 	Option CfgOption
 
-	// cfgWrapper reference configuration template or configmap
+	// cfgWrapper references configuration template or configmap
 	*cfgWrapper
 }
 
 func NewConfigLoader(option CfgOption) (*dataConfig, error) {
 	loader, ok := loaderProvider[option.Type]
 	if !ok {
-		return nil, MakeError("not support config type: %s", option.Type)
+		return nil, MakeError("not supported config type: %s", option.Type)
 	}
 
 	meta, err := loader(option)
@@ -416,7 +416,7 @@ func generateUpdateKeyParam(files map[string]interface{}, trimPrefix string, upd
 	return r
 }
 
-// isQuotesString check whether a string is quoted.
+// isQuotesString checks whether a string is quoted.
 func isQuotesString(str string) bool {
 	const (
 		singleQuotes = '\''

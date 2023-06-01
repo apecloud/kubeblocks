@@ -77,19 +77,19 @@ func PrintComponentConfigMeta(tplInfos []types.ConfigTemplateInfo, clusterName, 
 	}
 	tbl := NewTablePrinter(out)
 	PrintTitle("ConfigSpecs Meta")
-	enableReconfiguring := func(tpl appsv1alpha1.ComponentConfigSpec, key string) string {
-		if len(tpl.ConfigConstraintRef) > 0 && cfgcore.CheckConfigTemplateReconfigureKey(tpl, key) {
+	enableReconfiguring := func(tpl appsv1alpha1.ComponentConfigSpec, configFileKey string) string {
+		if len(tpl.ConfigConstraintRef) > 0 && cfgcore.IsSupportConfigFileReconfigure(tpl, configFileKey) {
 			return "true"
 		}
 		return "false"
 	}
 	tbl.SetHeader("CONFIG-SPEC-NAME", "FILE", "ENABLED", "TEMPLATE", "CONSTRAINT", "RENDERED", "COMPONENT", "CLUSTER")
 	for _, info := range tplInfos {
-		for key := range info.CMObj.Data {
+		for configFileKey := range info.CMObj.Data {
 			tbl.AddRow(
 				BoldYellow(info.Name),
-				key,
-				BoldYellow(enableReconfiguring(info.TPL, key)),
+				configFileKey,
+				BoldYellow(enableReconfiguring(info.TPL, configFileKey)),
 				info.TPL.TemplateRef,
 				info.TPL.ConfigConstraintRef,
 				info.CMObj.Name,
@@ -100,7 +100,7 @@ func PrintComponentConfigMeta(tplInfos []types.ConfigTemplateInfo, clusterName, 
 	tbl.Print()
 }
 
-// PrintHelmValues print the helm values file of the release in specified format, support JSON、YAML and Table
+// PrintHelmValues prints the helm values file of the release in specified format, supports JSON、YAML and Table
 func PrintHelmValues(configs map[string]interface{}, format Format, out io.Writer) {
 	inTable := func() {
 		p := NewTablePrinter(out)
@@ -126,7 +126,7 @@ func PrintHelmValues(configs map[string]interface{}, format Format, out io.Write
 	fmt.Fprint(out, string(data))
 }
 
-// addRows parse the interface value two depth at most and add it to the Table
+// addRows parses the interface value and add it to the Table
 func addRows(key string, value interface{}, p *TablePrinter, ori bool) {
 	if value == nil {
 		p.AddRow(key, value)

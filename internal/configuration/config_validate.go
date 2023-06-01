@@ -37,17 +37,17 @@ type ConfigValidator interface {
 }
 
 type cmKeySelector struct {
-	// A ConfigMap object may contain multiple configuration files and only some configuration files can recognize their format and verify their by kubeblocks,
-	// such as pg, there are two files, pg_hba.conf and postgresql.conf in the ConfigMap, we can only validate postgresql.conf,
-	// thus pg_hba.conf file needs to be ignored during the verification.
-	// keySelector is used to filter the keys in the configmap.
+	// A ConfigMap object may contain multiple configuration files and only some of them can be parsed and verified by kubeblocks,
+	// such as postgresql, there are two files pg_hba.conf & postgresql.conf in the ConfigMap, and we can only validate postgresql.conf,
+	// so pg_hba.conf file needs to be ignored during when doing verification.
+	// keySelector filters the keys in the configmap.
 	keySelector []ValidatorOptions
 }
 
 type configCueValidator struct {
 	cmKeySelector
 
-	// cue describe configuration template
+	// cue describes configuration template
 	cueScript string
 	cfgType   appsv1alpha1.CfgFileFormat
 }

@@ -27,7 +27,7 @@ kbcli kubeblocks preflight [flags]
 ### Options
 
 ```
-      --collect-without-permissions   always run preflight checks even if some require permissions that preflight does not have (default true)
+      --collect-without-permissions   always run preflight checks even if some required permissions that preflight does not have (default true)
       --collector-image string        the full name of the collector image to use
       --collector-pullpolicy string   the pull policy of the collector image
       --debug                         enable debug logging

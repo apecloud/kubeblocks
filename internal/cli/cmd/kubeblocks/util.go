@@ -159,13 +159,13 @@ func buildKubeBlocksSelectorLabels() string {
 }
 
 // buildConfig builds labelSelector that can be used to get all configmaps that are used to store config templates.
-// and it should be consistent with the labelSelectors defined used
+// and it should be consistent with the labelSelectors defined
 // in `configuration.updateConfigMapFinalizerImpl`.
 func buildConfigTypeSelectorLabels() string {
 	return fmt.Sprintf("%s=%s", constant.CMConfigurationTypeLabelKey, constant.ConfigTemplateType)
 }
 
-// printAddonMsg print addon message when has failed addon or timeout
+// printAddonMsg prints addon message when has failed addon or timeouts
 func printAddonMsg(out io.Writer, addons []*extensionsv1alpha1.Addon, install bool) {
 	var (
 		enablingAddons  []string

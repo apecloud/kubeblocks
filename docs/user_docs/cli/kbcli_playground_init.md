@@ -8,7 +8,7 @@ Bootstrap a kubernetes cluster and install KubeBlocks for playground.
 
 Bootstrap a kubernetes cluster and install KubeBlocks for playground.
 
- If no any cloud provider be specified, a k3d cluster named kb-playground will be created on local host, otherwise a kubernetes cluster will be created on the specified cloud. Then KubeBlocks will be installed on the created kubernetes cluster, and an apecloud-mysql cluster named mycluster will be created.
+ If no cloud provider is specified, a k3d cluster named kb-playground will be created on local host, otherwise a kubernetes cluster will be created on the specified cloud. Then KubeBlocks will be installed on the created kubernetes cluster, and an apecloud-mysql cluster named mycluster will be created.
 
 ```
 kbcli playground init [flags]
@@ -21,7 +21,7 @@ kbcli playground init [flags]
   kbcli playground init
   
   # create an AWS EKS cluster and install KubeBlocks, the region is required
-  kbcli playground init --cloud-provider aws --region cn-northwest-1
+  kbcli playground init --cloud-provider aws --region us-west-1
   
   # create an Alibaba cloud ACK cluster and install KubeBlocks, the region is required
   kbcli playground init --cloud-provider alicloud --region cn-hangzhou

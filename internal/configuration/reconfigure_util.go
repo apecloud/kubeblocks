@@ -77,7 +77,7 @@ func trimNestedField(updatedParams any, trimField string) (any, error) {
 	return updatedParams, nil
 }
 
-// IsUpdateDynamicParameters is used to check whether the changed parameters require a restart
+// IsUpdateDynamicParameters checks if the changed parameters require a restart
 func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *ConfigPatchInfo) (bool, error) {
 	if len(cfg.DeleteConfig) > 0 || len(cfg.AddConfig) > 0 {
 		return false, nil
@@ -102,19 +102,19 @@ func IsUpdateDynamicParameters(cc *appsv1alpha1.ConfigConstraintSpec, cfg *Confi
 		}
 	}
 
-	// if ConfigConstraint has DynamicParameter, all updated param in dynamic params
+	// if ConfigConstraint has DynamicParameter, and all updated params are dynamic
 	if len(cc.DynamicParameters) > 0 {
 		dynamicParams := set.NewLinkedHashSetString(cc.DynamicParameters...)
-		union := util.Difference(updateParams, dynamicParams)
-		return union.Length() == 0, nil
+		diff := util.Difference(updateParams, dynamicParams)
+		return diff.Length() == 0, nil
 	}
 
-	// if the updated parameter is not in list of DynamicParameter and in list of StaticParameter,
-	// restart is the default behavior.
+	// if the updated parameter is not in list of DynamicParameter,
+	// it is StaticParameter by default, and restart is the default behavior.
 	return false, nil
 }
 
-// IsParametersUpdateFromManager is used to check whether the parameters are updated from manager
+// IsParametersUpdateFromManager checks if the parameters are updated from manager
 func IsParametersUpdateFromManager(cm *corev1.ConfigMap) bool {
 	annotation := cm.ObjectMeta.Annotations
 	if annotation == nil {
@@ -124,7 +124,7 @@ func IsParametersUpdateFromManager(cm *corev1.ConfigMap) bool {
 	return v == constant.ReconfigureManagerSource
 }
 
-// IsNotUserReconfigureOperation is used to check whether the parameters are updated from operation
+// IsNotUserReconfigureOperation checks if the parameters are updated from operation
 func IsNotUserReconfigureOperation(cm *corev1.ConfigMap) bool {
 	labels := cm.GetLabels()
 	annotations := cm.GetAnnotations()
@@ -141,10 +141,10 @@ func IsNotUserReconfigureOperation(cm *corev1.ConfigMap) bool {
 	return lastReconfigurePhase == "" || ReconfigureCreatedPhase == lastReconfigurePhase
 }
 
-// SetParametersUpdateSource is used to set the parameters update source
+// SetParametersUpdateSource sets the parameters' update source
 // manager: parameter only updated from manager
 // external-template: parameter only updated from template
-// ops: parameter has updated from operation
+// ops: parameter updated from operation
 func SetParametersUpdateSource(cm *corev1.ConfigMap, source string) {
 	annotation := cm.GetAnnotations()
 	if annotation == nil {

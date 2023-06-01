@@ -61,7 +61,7 @@ var (
 	}
 )
 
-// getKBObjects returns all KubeBlocks objects include addons objects
+// getKBObjects returns all KubeBlocks objects including addons objects
 func getKBObjects(dynamic dynamic.Interface, namespace string, addons []*extensionsv1alpha1.Addon) (kbObjects, error) {
 	var (
 		err     error

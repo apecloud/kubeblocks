@@ -39,7 +39,7 @@ type Version struct {
 	Cli        string
 }
 
-// GetVersionInfo get version include KubeBlocks, CLI and kubernetes
+// GetVersionInfo gets version include KubeBlocks, CLI and kubernetes
 func GetVersionInfo(client kubernetes.Interface) (Version, error) {
 	var err error
 	version := Version{
@@ -61,7 +61,7 @@ func GetVersionInfo(client kubernetes.Interface) (Version, error) {
 	return version, nil
 }
 
-// getKubeBlocksVersion get KubeBlocks version
+// getKubeBlocksVersion gets KubeBlocks version
 func getKubeBlocksVersion(client kubernetes.Interface) (string, error) {
 	deploy, err := GetKubeBlocksDeploy(client)
 	if err != nil || deploy == nil {
@@ -80,7 +80,7 @@ func getKubeBlocksVersion(client kubernetes.Interface) (string, error) {
 	return v, nil
 }
 
-// GetK8sVersion get k8s server version
+// GetK8sVersion gets k8s server version
 func GetK8sVersion(discoveryClient discovery.DiscoveryInterface) (string, error) {
 	if discoveryClient == nil {
 		return "", nil

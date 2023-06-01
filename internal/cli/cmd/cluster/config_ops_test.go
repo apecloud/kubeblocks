@@ -109,7 +109,7 @@ var _ = Describe("reconfigure test", func() {
 		o.KeyValues = make(map[string]string)
 		defer ttf.Cleanup()
 
-		By("validate reconfiguring parameter")
+		By("validate reconfiguring parameters")
 		o.ComponentNames = []string{statefulCompName}
 		_, err := o.parseUpdatedParams()
 		Expect(err.Error()).To(ContainSubstring(missingUpdatedParametersErrMessage))

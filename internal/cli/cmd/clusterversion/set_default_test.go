@@ -165,7 +165,7 @@ var _ = Describe("set-default", func() {
 		validateSetOrUnsetResult([]string{cluterversion}, []string{annotationFalseValue})
 	})
 
-	It("the clusterDef already have a default cv when set-default", func() {
+	It("the clusterDef already has a default cv when set-default", func() {
 		cmd := newSetDefaultCMD(tf, streams)
 		cmd.Run(cmd, []string{cluterversion})
 		validateSetOrUnsetResult([]string{cluterversion, clusterversionInSameCD}, []string{annotationTrueValue, annotationFalseValue})
@@ -174,13 +174,13 @@ var _ = Describe("set-default", func() {
 		Expect(err).Should(HaveOccurred())
 	})
 
-	It("set-default args belong the same cd", func() {
+	It("set-default args belonging to the same cd", func() {
 		o := newSetOrUnsetDefaultOptions(tf, streams, true)
 		err := o.run([]string{cluterversion, cluterversion})
 		Expect(err).Should(HaveOccurred())
 	})
 
-	It("set-default and unset-default more than one args", func() {
+	It("set-default and unset-default multiple args", func() {
 		cmd := newSetDefaultCMD(tf, streams)
 		validateSetOrUnsetResult([]string{cluterversion, ClusterversionOtherCD}, []string{annotationFalseValue, annotationFalseValue})
 		// set-default

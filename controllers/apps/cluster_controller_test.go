@@ -591,6 +591,45 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, backupKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
 
 		checkUpdatedStsReplicas()
+
+		By("Checking updated sts replicas' PVC")
+		for i := 0; i < updatedReplicas; i++ {
+			pvcKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      getPVCName(comp.Name, i),
+			}
+			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+		}
+
+		By("Checking pod env config updated")
+		cmKey := types.NamespacedName{
+			Namespace: clusterKey.Namespace,
+			Name:      fmt.Sprintf("%s-%s-env", clusterKey.Name, comp.Name),
+		}
+		Eventually(testapps.CheckObj(&testCtx, cmKey, func(g Gomega, cm *corev1.ConfigMap) {
+			match := func(key, prefix, suffix string) bool {
+				return strings.HasPrefix(key, prefix) && strings.HasSuffix(key, suffix)
+			}
+			foundN := ""
+			for k, v := range cm.Data {
+				if match(k, constant.KBPrefix, "_N") {
+					foundN = v
+					break
+				}
+			}
+			g.Expect(foundN).Should(Equal(strconv.Itoa(updatedReplicas)))
+			for i := 0; i < updatedReplicas; i++ {
+				foundPodHostname := ""
+				suffix := fmt.Sprintf("_%d_HOSTNAME", i)
+				for k, v := range cm.Data {
+					if match(k, constant.KBPrefix, suffix) {
+						foundPodHostname = v
+						break
+					}
+				}
+				g.Expect(foundPodHostname != "").Should(BeTrue())
+			}
+		})).Should(Succeed())
 	}
 
 	// @argument componentDefsWithHScalePolicy assign ClusterDefinition.spec.componentDefs[].horizontalScalePolicy for
@@ -684,20 +723,6 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(clusterDefObj), clusterDefObj)).Should(Succeed())
 		for i, comp := range clusterObj.Spec.ComponentSpecs {
 			horizontalScaleComp(updatedReplicas, &clusterObj.Spec.ComponentSpecs[i], hscalePolicy(comp))
-		}
-
-		By("Checking updated sts replicas' PVC")
-		for _, comp := range clusterObj.Spec.ComponentSpecs {
-			if hscalePolicy(comp) == nil {
-				continue
-			}
-			for i := 0; i < updatedReplicas; i++ {
-				pvcKey := types.NamespacedName{
-					Namespace: clusterKey.Namespace,
-					Name:      getPVCName(comp.Name, i),
-				}
-				Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
-			}
 		}
 
 		By("Checking cluster status and the number of replicas changed")

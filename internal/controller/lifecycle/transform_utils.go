@@ -68,7 +68,7 @@ func getAppInstanceML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
 //	}
 // }
 
-// getClusterOwningObjects read objects owned by our cluster with kinds and label matching specifier.
+// getClusterOwningObjects reads objects owned by our cluster with kinds and label matching specifier.
 func getClusterOwningObjects(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster,
 	matchLabels client.MatchingLabels, kinds ...client.ObjectList) (clusterOwningObjects, error) {
 	// list what kinds of object cluster owns

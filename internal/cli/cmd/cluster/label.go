@@ -290,7 +290,7 @@ func parseLabels(spec []string) (map[string]string, []string, error) {
 	}
 	for _, removeLabel := range remove {
 		if _, found := labels[removeLabel]; found {
-			return nil, nil, fmt.Errorf("can not both modify and remove label in the same command")
+			return nil, nil, fmt.Errorf("cannot modify and remove label within the same command")
 		}
 	}
 	return labels, remove, nil

@@ -477,6 +477,9 @@ func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, c
 		return err
 	}
 
+	// update KB_<component-type>_<pod-idx>_<hostname> env needed by pod to obtain hostname.
+	c.updatePodEnvConfig()
+
 	reqCtx.Recorder.Eventf(c.Cluster,
 		corev1.EventTypeNormal,
 		"HorizontalScale",
@@ -489,6 +492,17 @@ func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, c
 // < 0 for scale in, > 0 for scale out, and == 0 for nothing
 func (c *StatefulComponentBase) horizontalScaling(stsObj *appsv1.StatefulSet) int {
 	return int(c.Component.Replicas - *stsObj.Spec.Replicas)
+}
+
+func (c *StatefulComponentBase) updatePodEnvConfig() {
+	for _, v := range ictrltypes.FindAll[*corev1.ConfigMap](c.Dag) {
+		node := v.(*ictrltypes.LifecycleVertex)
+		// TODO: need a way to reference the env config.
+		envConfigName := fmt.Sprintf("%s-%s-env", c.GetClusterName(), c.GetName())
+		if node.Obj.GetName() == envConfigName {
+			node.Action = ictrltypes.ActionUpdatePtr()
+		}
+	}
 }
 
 func (c *StatefulComponentBase) updatePodReplicaLabel4Scaling(reqCtx intctrlutil.RequestCtx, cli client.Client, replicas int32) error {
@@ -525,83 +539,89 @@ func (c *StatefulComponentBase) scaleIn(reqCtx intctrlutil.RequestCtx, cli clien
 	return nil
 }
 
+func (c *StatefulComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+	hasJobFailed := func(reqCtx intctrlutil.RequestCtx, cli client.Client) (*batchv1.Job, string, error) {
+		jobs, err := util.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.JobSignature, c.GetNamespace(), c.GetMatchingLabels())
+		if err != nil {
+			return nil, "", err
+		}
+		for _, job := range jobs {
+			// TODO: use a better way to check the delete PVC job.
+			if !strings.HasPrefix(job.Name, "delete-pvc-") {
+				continue
+			}
+			for _, cond := range job.Status.Conditions {
+				if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+					return job, fmt.Sprintf("%s-%s", cond.Reason, cond.Message), nil
+				}
+			}
+		}
+		return nil, "", nil
+	}
+	if job, msg, err := hasJobFailed(reqCtx, cli); err != nil {
+		return err
+	} else if job != nil {
+		msgKey := fmt.Sprintf("%s/%s", job.GetObjectKind().GroupVersionKind().Kind, job.GetName())
+		statusMessage := appsv1alpha1.ComponentMessageMap{msgKey: msg}
+		txn.propose(appsv1alpha1.AbnormalClusterCompPhase, func() {
+			c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, statusMessage, "PVC deletion job failed")
+		})
+	}
+	return nil
+}
+
 func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
-	key := client.ObjectKey{
-		Namespace: stsObj.Namespace,
-		Name:      stsObj.Name,
-	}
-	snapshotKey := types.NamespacedName{
-		Namespace: stsObj.Namespace,
-		Name:      stsObj.Name + "-scaling",
-	}
-
-	horizontalScalePolicy := c.Component.HorizontalScalePolicy
-
-	cleanCronJobs := func() error {
-		for i := *stsObj.Spec.Replicas; i < c.Component.Replicas; i++ {
-			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
-				pvcKey := types.NamespacedName{
-					Namespace: key.Namespace,
-					Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-				}
-				// delete deletion cronjob if exists
-				cronJobKey := pvcKey
-				cronJobKey.Name = "delete-pvc-" + pvcKey.Name
-				cronJob := &batchv1.CronJob{}
-				if err := cli.Get(reqCtx.Ctx, cronJobKey, cronJob); err != nil {
-					return client.IgnoreNotFound(err)
-				}
-				c.DeleteResource(cronJob, c.WorkloadVertex)
-			}
+	var (
+		key = client.ObjectKey{
+			Namespace: stsObj.Namespace,
+			Name:      stsObj.Name,
 		}
-		return nil
-	}
+		snapshotKey = types.NamespacedName{
+			Namespace: stsObj.Namespace,
+			Name:      stsObj.Name + "-scaling",
+		}
+		horizontalScalePolicy = c.Component.HorizontalScalePolicy
 
-	checkAllPVCsExist := func() (bool, error) {
-		for i := *stsObj.Spec.Replicas; i < c.Component.Replicas; i++ {
-			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
-				pvcKey := types.NamespacedName{
-					Namespace: key.Namespace,
-					Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-				}
-				// check pvc existence
-				pvcExists, err := isPVCExists(cli, reqCtx.Ctx, pvcKey)
-				if err != nil {
-					return true, err
-				}
-				if !pvcExists {
-					return false, nil
+		cleanCronJobs = func() error {
+			for i := *stsObj.Spec.Replicas; i < c.Component.Replicas; i++ {
+				for _, vct := range stsObj.Spec.VolumeClaimTemplates {
+					pvcKey := types.NamespacedName{
+						Namespace: key.Namespace,
+						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+					}
+					// delete deletion cronjob if exists
+					cronJobKey := pvcKey
+					cronJobKey.Name = "delete-pvc-" + pvcKey.Name
+					cronJob := &batchv1.CronJob{}
+					if err := cli.Get(reqCtx.Ctx, cronJobKey, cronJob); err != nil {
+						return client.IgnoreNotFound(err)
+					}
+					c.DeleteResource(cronJob, c.WorkloadVertex)
 				}
 			}
-		}
-		return true, nil
-	}
-
-	checkAllPVCBoundIfNeeded := func() (bool, error) {
-		if horizontalScalePolicy == nil ||
-			horizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-			!isSnapshotAvailable(cli, reqCtx.Ctx) {
-			return true, nil
-		}
-		return isAllPVCBound(cli, reqCtx.Ctx, stsObj)
-	}
-
-	cleanBackupResourcesIfNeeded := func() error {
-		if horizontalScalePolicy == nil ||
-			horizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-			!isSnapshotAvailable(cli, reqCtx.Ctx) {
 			return nil
 		}
-		// if all pvc bounded, clean backup resources
-		objs, err := deleteSnapshot(cli, reqCtx, snapshotKey, c.GetCluster(), c.GetName())
-		if err != nil {
-			return err
+
+		checkAllPVCsExist = func() (bool, error) {
+			for i := *stsObj.Spec.Replicas; i < c.Component.Replicas; i++ {
+				for _, vct := range stsObj.Spec.VolumeClaimTemplates {
+					pvcKey := types.NamespacedName{
+						Namespace: key.Namespace,
+						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+					}
+					// check pvc existence
+					pvcExists, err := isPVCExists(cli, reqCtx.Ctx, pvcKey)
+					if err != nil {
+						return true, err
+					}
+					if !pvcExists {
+						return false, nil
+					}
+				}
+			}
+			return true, nil
 		}
-		for _, obj := range objs {
-			c.DeleteResource(obj, nil)
-		}
-		return nil
-	}
+	)
 
 	if err := cleanCronJobs(); err != nil {
 		return err
@@ -631,6 +651,44 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 	// pvcs are ready, stateful_set.replicas should be updated
 	c.WorkloadVertex.Immutable = false
 
+	return c.postScaleOut(reqCtx, cli, stsObj)
+}
+
+func (c *StatefulComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
+	var (
+		snapshotKey = types.NamespacedName{
+			Namespace: stsObj.Namespace,
+			Name:      stsObj.Name + "-scaling",
+		}
+		horizontalScalePolicy = c.Component.HorizontalScalePolicy
+
+		checkAllPVCBoundIfNeeded = func() (bool, error) {
+			if horizontalScalePolicy == nil ||
+				horizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
+				!isSnapshotAvailable(cli, reqCtx.Ctx) {
+				return true, nil
+			}
+			return isAllPVCBound(cli, reqCtx.Ctx, stsObj, int(c.Component.Replicas))
+		}
+
+		cleanBackupResourcesIfNeeded = func() error {
+			if horizontalScalePolicy == nil ||
+				horizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
+				!isSnapshotAvailable(cli, reqCtx.Ctx) {
+				return nil
+			}
+			// if all pvc bounded, clean backup resources
+			objs, err := deleteSnapshot(cli, reqCtx, snapshotKey, c.GetCluster(), c.GetName())
+			if err != nil {
+				return err
+			}
+			for _, obj := range objs {
+				c.DeleteResource(obj, nil)
+			}
+			return nil
+		}
+	)
+
 	// check all pvc bound, wait next reconciliation if not all ready
 	allPVCBounded, err := checkAllPVCBoundIfNeeded()
 	if err != nil {
@@ -650,45 +708,20 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 
 func (c *StatefulComponentBase) statusHorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
 	ret := c.horizontalScaling(c.runningWorkload)
-	if ret == 0 {
-		return c.statusPVCDeletionJobFailed(reqCtx, cli, txn)
+	if ret < 0 {
+		return nil
 	}
 	if ret > 0 {
 		// forward the h-scaling progress.
-		if err := c.scaleOut(reqCtx, cli, c.runningWorkload); err != nil {
+		return c.scaleOut(reqCtx, cli, c.runningWorkload)
+	}
+	if ret == 0 { // sts has been updated
+		if err := c.postScaleIn(reqCtx, cli, txn); err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-func (c *StatefulComponentBase) statusPVCDeletionJobFailed(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
-	hasJobFailed := func(reqCtx intctrlutil.RequestCtx, cli client.Client) (*batchv1.Job, string, error) {
-		jobs, err := util.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.JobSignature, c.GetNamespace(), c.GetMatchingLabels())
-		if err != nil {
-			return nil, "", err
+		if err := c.postScaleOut(reqCtx, cli, c.runningWorkload); err != nil {
+			return err
 		}
-		for _, job := range jobs {
-			// TODO: use a better way to check the delete PVC job.
-			if !strings.HasPrefix(job.Name, "delete-pvc-") {
-				continue
-			}
-			for _, cond := range job.Status.Conditions {
-				if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
-					return job, fmt.Sprintf("%s-%s", cond.Reason, cond.Message), nil
-				}
-			}
-		}
-		return nil, "", nil
-	}
-	if job, msg, err := hasJobFailed(reqCtx, cli); err != nil {
-		return err
-	} else if job != nil {
-		msgKey := fmt.Sprintf("%s/%s", job.GetObjectKind().GroupVersionKind().Kind, job.GetName())
-		statusMessage := appsv1alpha1.ComponentMessageMap{msgKey: msg}
-		txn.propose(appsv1alpha1.AbnormalClusterCompPhase, func() {
-			c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, statusMessage, "PVC deletion job failed")
-		})
 	}
 	return nil
 }

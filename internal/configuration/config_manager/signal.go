@@ -36,7 +36,7 @@ func sendSignal(pid PID, sig os.Signal) error {
 		return err
 	}
 
-	logger.Info(fmt.Sprintf("send pid[%d] to signal: %s", pid, sig.String()))
+	logger.Info(fmt.Sprintf("send signal:%s to process[%d]", sig.String(), pid))
 	err = process.Signal(sig)
 	if err != nil {
 		return err

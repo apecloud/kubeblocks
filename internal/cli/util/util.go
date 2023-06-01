@@ -79,7 +79,7 @@ func CloseQuietly(d io.Closer) {
 	_ = d.Close()
 }
 
-// GetCliHomeDir return kbcli home dir
+// GetCliHomeDir returns kbcli home dir
 func GetCliHomeDir() (string, error) {
 	var cliHome string
 	if custom := os.Getenv(types.CliHomeEnv); custom != "" {
@@ -139,7 +139,7 @@ func GetPublicIP() (string, error) {
 	return string(body), nil
 }
 
-// MakeSSHKeyPair make a pair of public and private keys for SSH access.
+// MakeSSHKeyPair makes a pair of public and private keys for SSH access.
 // Public key is encoded in the format for inclusion in an OpenSSH authorized_keys file.
 // Private Key generated is PEM encoded
 func MakeSSHKeyPair(pubKeyPath, privateKeyPath string) error {
@@ -219,7 +219,7 @@ func PrintGoTemplate(wr io.Writer, tpl string, values interface{}) error {
 	return nil
 }
 
-// SetKubeConfig set KUBECONFIG environment
+// SetKubeConfig sets KUBECONFIG environment
 func SetKubeConfig(cfg string) error {
 	return os.Setenv("KUBECONFIG", cfg)
 }
@@ -252,7 +252,7 @@ func GVRToString(gvr schema.GroupVersionResource) string {
 	return strings.Join([]string{gvr.Resource, gvr.Version, gvr.Group}, ".")
 }
 
-// GetNodeByName choose node by name from a node array
+// GetNodeByName chooses node by name from a node array
 func GetNodeByName(nodes []*corev1.Node, name string) *corev1.Node {
 	for _, node := range nodes {
 		if node.Name == name {
@@ -262,7 +262,7 @@ func GetNodeByName(nodes []*corev1.Node, name string) *corev1.Node {
 	return nil
 }
 
-// ResourceIsEmpty check if resource is empty or not
+// ResourceIsEmpty checks if resource is empty or not
 func ResourceIsEmpty(res *resource.Quantity) bool {
 	resStr := res.String()
 	if resStr == "0" || resStr == "<nil>" {
@@ -287,7 +287,7 @@ func GetPodStatus(pods []*corev1.Pod) (running, waiting, succeeded, failed int) 
 	return
 }
 
-// OpenBrowser will open browser by url in different OS system
+// OpenBrowser opens browser with url in different OS system
 func OpenBrowser(url string) error {
 	var err error
 	switch runtime.GOOS {
@@ -307,7 +307,7 @@ func TimeFormat(t *metav1.Time) string {
 	return TimeFormatWithDuration(t, time.Minute)
 }
 
-// TimeFormatWithDuration format time with specified precision
+// TimeFormatWithDuration formats time with specified precision
 func TimeFormatWithDuration(t *metav1.Time, duration time.Duration) string {
 	if t == nil || t.IsZero() {
 		return ""
@@ -358,7 +358,7 @@ func GetHumanReadableDuration(startTime metav1.Time, endTime metav1.Time) string
 	return duration.HumanDuration(d)
 }
 
-// CheckEmpty check if string is empty, if yes, return <none> for displaying
+// CheckEmpty checks if string is empty, if yes, returns <none> for displaying
 func CheckEmpty(str string) string {
 	if len(str) == 0 {
 		return types.None
@@ -366,7 +366,7 @@ func CheckEmpty(str string) string {
 	return str
 }
 
-// BuildLabelSelectorByNames build the label selector by instance names, the label selector is
+// BuildLabelSelectorByNames builds the label selector by instance names, the label selector is
 // like "instance-key in (name1, name2)"
 func BuildLabelSelectorByNames(selector string, names []string) string {
 	if len(names) == 0 {
@@ -468,7 +468,7 @@ func GetConfigTemplateListWithResource(cComponents []appsv1alpha1.ClusterCompone
 	return validConfigSpecs, nil
 }
 
-// GetResourceObjectFromGVR query the resource object using GVR.
+// GetResourceObjectFromGVR queries the resource object using GVR.
 func GetResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.ObjectKey, client dynamic.Interface, k8sObj interface{}) error {
 	unstructuredObj, err := client.
 		Resource(gvr).
@@ -522,7 +522,7 @@ func enableReconfiguring(component *appsv1alpha1.ClusterComponentDefinition) boo
 	return false
 }
 
-// IsSupportReconfigureParams check whether all updated parameters belong to config template parameters.
+// IsSupportReconfigureParams checks whether all updated parameters belong to config template parameters.
 func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map[string]string, cli dynamic.Interface) (bool, error) {
 	var (
 		err              error
@@ -577,7 +577,7 @@ func getIPLocation() (string, error) {
 	return string(location[:len(location)-1]), nil
 }
 
-// GetHelmChartRepoURL get helm chart repo, we will choose one from GitHub and GitLab based on the IP location
+// GetHelmChartRepoURL gets helm chart repo, chooses one from GitHub and GitLab based on the IP location
 func GetHelmChartRepoURL() string {
 	if types.KubeBlocksChartURL == testing.KubeBlocksChartURL {
 		return testing.KubeBlocksChartURL
@@ -685,7 +685,7 @@ func BuildComponentNameLabels(prefix string, names []string) string {
 	return buildLabelSelectors(prefix, constant.KBAppComponentLabelKey, names)
 }
 
-// buildLabelSelectors build the label selector by given label key, the label selector is
+// buildLabelSelectors builds the label selector by given label key, the label selector is
 // like "label-key in (name1, name2)"
 func buildLabelSelectors(prefix string, key string, names []string) string {
 	if len(names) == 0 {
@@ -766,7 +766,7 @@ func BuildClusterDefinitionRefLable(prefix string, clusterDef []string) string {
 	return buildLabelSelectors(prefix, constant.AppNameLabelKey, clusterDef)
 }
 
-// IsWindows return true if the kbcli runtime situation is windows
+// IsWindows returns true if the kbcli runtime situation is windows
 func IsWindows() bool {
 	return runtime.GOOS == types.GoosWindows
 }

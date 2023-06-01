@@ -33,7 +33,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// CloneGitRepo clone git repo to local path
+// CloneGitRepo clones git repo to local path
 func CloneGitRepo(url, branch, path string) error {
 	pullFunc := func(repo *git.Repository) error {
 		// Get the working directory for the repository
@@ -82,7 +82,7 @@ func GitGetRemoteURL(dir string) (string, error) {
 	return ExecGitCommand(dir, "config", "--get", "remote.origin.url")
 }
 
-// EnsureCloned will clone into the destination path, otherwise will return no error.
+// EnsureCloned clones into the destination path, otherwise returns no error.
 func EnsureCloned(uri, destinationPath string) error {
 	if ok, err := IsGitCloned(destinationPath); err != nil {
 		return err
@@ -93,7 +93,7 @@ func EnsureCloned(uri, destinationPath string) error {
 	return nil
 }
 
-// IsGitCloned will test if the path is a git dir.
+// IsGitCloned tests if the path is a git dir.
 func IsGitCloned(gitPath string) (bool, error) {
 	f, err := os.Stat(filepath.Join(gitPath, ".git"))
 	if os.IsNotExist(err) {
@@ -102,7 +102,7 @@ func IsGitCloned(gitPath string) (bool, error) {
 	return err == nil && f.IsDir(), err
 }
 
-// EnsureUpdated will ensure the destination path exists and is up to date.
+// EnsureUpdated ensures the destination path exists and is up to date.
 func EnsureUpdated(uri, destinationPath string) error {
 	if err := EnsureCloned(uri, destinationPath); err != nil {
 		return err
@@ -110,8 +110,8 @@ func EnsureUpdated(uri, destinationPath string) error {
 	return UpdateAndCleanUntracked(destinationPath)
 }
 
-// UpdateAndCleanUntracked  will fetch origin and set HEAD to origin/HEAD
-// and also will create a pristine working directory by removing
+// UpdateAndCleanUntracked fetches origin and sets HEAD to origin/HEAD
+// and also creates a pristine working directory by removing
 // untracked files and directories.
 func UpdateAndCleanUntracked(destinationPath string) error {
 	if _, err := ExecGitCommand(destinationPath, "fetch", "-v"); err != nil {

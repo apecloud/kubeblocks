@@ -1,20 +1,17 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package v1beta2
@@ -31,101 +28,101 @@ type ExtendCollect struct {
 
 // ClusterAccessAnalyze analyzes the accessibility of target
 type ClusterAccessAnalyze struct {
-	// analyzeMeta is defined in troubleshoot.sh
+	// AnalyzeMeta is defined in troubleshoot.sh
 	troubleshoot.AnalyzeMeta `json:",inline"`
-	// outcomes are expected user defined results.
+	// Outcomes are expected user defined results.
 	// +kubebuilder:validation:Required
 	Outcomes []*troubleshoot.Outcome `json:"outcomes"`
 }
 
 type ExtendAnalyze struct {
-	// clusterAccess is to determine the accessibility of target k8s cluster
+	// ClusterAccess is to determine the accessibility of target k8s cluster
 	// +optional
 	ClusterAccess *ClusterAccessAnalyze `json:"clusterAccess,omitempty"`
 	// StorageClass is to determine the correctness of target storage class
 	// +optional
 	StorageClass *KBStorageClassAnalyze `json:"storageClass,omitempty"`
-	// Taint is to Determine the matching between the taint and tolerance
+	// Taint is to Determine the matching between the taint and toleration
 	// +optional
 	Taint *KBTaintAnalyze `json:"taint,omitempty"`
 }
 
 type HostUtility struct {
-	// hostCollectorMeta is defined in troubleshoot.sh
+	// HostCollectorMeta is defined in troubleshoot.sh
 	troubleshoot.HostCollectorMeta `json:",inline"`
-	// utilityName indicates the utility which will be checked in local host
+	// UtilityName indicates the utility which will be checked in local host
 	// +kubebuilder:validation:Required
 	UtilityName string `json:"utilityName"`
 }
 
 type ClusterRegion struct {
-	// hostCollectorMeta is defined in troubleshoot.sh
+	// HostCollectorMeta is defined in troubleshoot.sh
 	troubleshoot.HostCollectorMeta `json:",inline"`
-	// providerName denotes which cloud provider target k8s located on
+	// ProviderName denotes the cloud provider target k8s located on
 	// +kubebuilder:validation:Required
 	ProviderName string `json:"providerName"`
 }
 
 type ExtendHostCollect struct {
-	// hostUtility is to collect the data of target utility.
+	// HostUtility is to collect the data of target utility.
 	// +optional
 	HostUtility *HostUtility `json:"hostUtility,omitempty"`
-	// ClusterRegion is to collect the data of target k8s
+	// ClusterRegion is region of target k8s
 	// +optional
 	ClusterRegion *ClusterRegion `json:"clusterRegion,omitempty"`
 }
 
 type HostUtilityAnalyze struct {
-	// hostCollectorMeta is defined in troubleshoot.sh
+	// HostCollectorMeta is defined in troubleshoot.sh
 	troubleshoot.AnalyzeMeta `json:",inline"`
-	// collectorName indicates which collect data will be analyzed
+	// CollectorName indicates the collected data to be analyzed
 	// +optional
 	CollectorName string `json:"collectorName,omitempty"`
-	// outcomes are expected user defined results
+	// Outcomes are expected user defined results
 	// +kubebuilder:validation:Required
 	Outcomes []*troubleshoot.Outcome `json:"outcomes"`
 }
 
 type ClusterRegionAnalyze struct {
-	// analyzeMeta is defined in troubleshoot.sh
+	// AnalyzeMeta is defined in troubleshoot.sh
 	troubleshoot.AnalyzeMeta `json:",inline"`
-	// outcomes are expected user defined results.
+	// Outcomes are expected user defined results.
 	// +kubebuilder:validation:Required
 	Outcomes []*troubleshoot.Outcome `json:"outcomes"`
-	// regionNames is a set of expected region names
+	// RegionNames is a set of expected region names
 	// +kubebuilder:validation:Required
 	RegionNames []string `json:"regionNames"`
 }
 
 // KBStorageClassAnalyze replaces default storageClassAnalyze in preflight
 type KBStorageClassAnalyze struct {
-	// analyzeMeta is defined in troubleshoot.sh
+	// AnalyzeMeta is defined in troubleshoot.sh
 	troubleshoot.AnalyzeMeta `json:",inline"`
-	// outcomes are expected user defined results.
+	// Outcomes are expected user defined results.
 	// +kubebuilder:validation:Required
 	Outcomes []*troubleshoot.Outcome `json:"outcomes"`
-	// Parameters is a set of parameters including type and fsType...
+	// StorageClassType is StorageClass type
 	// +kubebuilder:validation:Required
 	StorageClassType string `json:"storageClassType"`
-	// provisioner is the provisioner of storageClass
+	// Provisioner is the provisioner of StorageClass
 	// +optional
 	Provisioner string `json:"provisioner,omitempty"`
 }
 
 // KBTaintAnalyze matches the analysis of taints with TolerationsMap
 type KBTaintAnalyze struct {
-	// analyzeMeta is defined in troubleshoot.sh
+	// AnalyzeMeta is defined in troubleshoot.sh
 	troubleshoot.AnalyzeMeta `json:",inline"`
-	// outcomes are expected user defined results.
+	// Outcomes are expected user defined results.
 	// +kubebuilder:validation:Required
 	Outcomes []*troubleshoot.Outcome `json:"outcomes"`
-	// tolerations are tolerance configuration passed by kbcli
+	// Tolerations are toleration configuration passed by kbcli
 	// +optional
 	TolerationsMap map[string][]v1.Toleration `json:"tolerations"`
 }
 
 type ExtendHostAnalyze struct {
-	// hostUtility is to analyze the presence of target utility.
+	// HostUtility is to analyze the presence of target utility
 	// +optional
 	HostUtility *HostUtilityAnalyze `json:"hostUtility,omitempty"`
 	// ClusterRegion is to validate the regionName of target k8s cluster

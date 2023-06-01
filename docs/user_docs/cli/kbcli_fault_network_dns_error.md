@@ -11,18 +11,18 @@ kbcli fault network dns error [flags]
 ### Examples
 
 ```
-  // Inject DNS faults into all pods under the default namespace, so that any IP is returned when accessing the baidu.com domain name.
-  kbcli fault dns random --patterns=baidu.com --duration=1m
+  // Inject DNS faults into all pods under the default namespace, so that any IP is returned when accessing the bing.com domain name.
+  kbcli fault dns random --patterns=bing.com --duration=1m
   
-  // Inject DNS faults into all pods under the default namespace, so that error is returned when accessing the baidu.com domain name.
-  kbcli fault dns error --patterns=baidu.com --duration=1m
+  // Inject DNS faults into all pods under the default namespace, so that error is returned when accessing the bing.com domain name.
+  kbcli fault dns error --patterns=bing.com --duration=1m
 ```
 
 ### Options
 
 ```
       --annotation stringToString      Select the pod to inject the fault according to Annotation. (default [])
-      --dry-run string[="unchanged"]   Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
       --duration string                Supported formats of the duration are: ms / s / m / h. (default "10s")
   -h, --help                           help for error
       --label stringToString           label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0. (default [])
@@ -31,7 +31,7 @@ kbcli fault network dns error [flags]
       --node-label stringToString      label for node, such as '"kubernetes.io/arch=arm64,kubernetes.io/hostname=minikube-m03,kubernetes.io/os=linux. (default [])
       --ns-fault stringArray           Specifies the namespace into which you want to inject faults. (default [default])
   -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
-      --patterns stringArray           Select the domain name template that matches the failure behavior, and support placeholders ? and wildcards *.
+      --patterns stringArray           Select the domain name template that matching the failure behavior & supporting placeholders ? and wildcards *.
       --phase stringArray              Specify the pod that injects the fault by the state of the pod.
       --value string                   If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
 ```

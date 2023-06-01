@@ -37,7 +37,7 @@ import (
 )
 
 var listExample = templates.Examples(`
-		# list all ClusterVersion
+		# list all ClusterVersions
 		kbcli clusterversion list`)
 
 type ListClusterVersionOptions struct {

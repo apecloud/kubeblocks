@@ -86,9 +86,13 @@ max_standby_archive_delay = '10min'
 max_standby_streaming_delay = '3min'
 max_sync_workers_per_subscription = '6'
 max_wal_senders = '24'
-max_wal_size = '100GB'
 max_worker_processes = '8'
-min_wal_size = '20GB'
+# max_wal_size = '100GB'
+max_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 2097152 ) 4096 ) 32768 ) }}'
+{{- if gt $phy_memory 0 }}
+# min_wal_size = '20GB'
+min_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 8388608 ) 2048 ) 8192 ) }}'
+{{- end }}
 password_encryption = 'md5'
 pg_stat_statements.max = '5000'
 pg_stat_statements.track = 'top'
@@ -110,7 +114,7 @@ vacuum_cost_delay = '2ms'
 vacuum_cost_limit = '10000'
 vacuum_defer_cleanup_age = '50000'
 wal_buffers = '16MB'
-wal_keep_size = '20GB'
+wal_keep_size = '4GB'
 wal_level = 'replica'
 wal_log_hints = 'on'
 wal_receiver_status_interval = '1s'
@@ -118,6 +122,7 @@ wal_receiver_timeout = '60s'
 wal_writer_delay = '20ms'
 wal_writer_flush_after = '1MB'
 work_mem = '32MB'
+wal_init_zero = off
 
 {{- if $.component.tls }}
 {{- $ca_file := getCAFile }}

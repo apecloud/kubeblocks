@@ -24,23 +24,23 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	sqlchannel "github.com/apecloud/kubeblocks/internal/sqlchannel"
+	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type DescribeUserOptions struct {
 	*AccountBaseOptions
-	info sqlchannel.UserInfo
+	info channelutil.UserInfo
 }
 
 func NewDescribeUserOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *DescribeUserOptions {
 	return &DescribeUserOptions{
-		AccountBaseOptions: NewAccountBaseOptions(f, streams, sqlchannel.DescribeUserOp),
+		AccountBaseOptions: NewAccountBaseOptions(f, streams, channelutil.DescribeUserOp),
 	}
 }
 
 func (o *DescribeUserOptions) AddFlags(cmd *cobra.Command) {
 	o.AccountBaseOptions.AddFlags(cmd)
-	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required. Specify the name of user")
+	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required user name, please specify it")
 }
 
 func (o DescribeUserOptions) Validate(args []string) error {

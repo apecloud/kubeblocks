@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package app
+package template
 
 import (
 	"context"
@@ -31,6 +31,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -94,7 +95,7 @@ func (w *templateRenderWorkflow) Do(outputDir string) error {
 			cache[configSpec.component] = objs
 			objects = objs
 		}
-		if err := renderTemplates(configSpec.configSpec, outputDir, cluster.Name, compName, objects); err != nil {
+		if err := renderTemplates(configSpec.configSpec, outputDir, cluster.Name, compName, objects, configSpec.component); err != nil {
 			return err
 		}
 	}
@@ -205,10 +206,11 @@ func checkAndFillPortProtocol(clusterDefComponents []appsv1alpha1.ClusterCompone
 	}
 }
 
-func renderTemplates(configSpec appsv1alpha1.ComponentTemplateSpec, outputDir string, clusterName, compName string, objects []client.Object) error {
+func renderTemplates(configSpec appsv1alpha1.ComponentTemplateSpec, outputDir, clusterName, compName string, objects []client.Object, componentDefName string) error {
 	cfgName := cfgcore.GetComponentCfgName(clusterName, compName, configSpec.Name)
 	output := filepath.Join(outputDir, cfgName)
-	log.Log.Info(fmt.Sprintf("dump rendering template spec: %s, output directory: %s", configSpec.Name, output))
+	fmt.Printf("dump rendering template spec: %s, output directory: %s\n",
+		printer.BoldYellow(fmt.Sprintf("%s.%s", componentDefName, configSpec.Name)), output)
 
 	if err := os.MkdirAll(output, 0755); err != nil {
 		return err

@@ -350,7 +350,7 @@ func (o *statusOptions) showHelmResources(ctx context.Context, allErrs *[]error)
 	}
 	// init helm release list with 'kubeblocks'
 	helmReleaseList := []string{types.KubeBlocksChartName}
-	// add add one names name = $kubeblocks-addons$
+	// add one release with name = $kubeblocks-addons$
 	for _, addon := range o.addons {
 		helmReleaseList = append(helmReleaseList, util.BuildAddonReleaseName(addon.Name))
 	}

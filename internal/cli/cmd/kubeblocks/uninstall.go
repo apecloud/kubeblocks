@@ -95,7 +95,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd.Flags().BoolVar(&o.removePVCs, "remove-pvcs", false, "Remove PersistentVolumeClaim or not")
 	cmd.Flags().BoolVar(&o.RemoveNamespace, "remove-namespace", false, "Remove default created \"kb-system\" namespace or not")
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for uninstalling KubeBlocks, such as --timeout=5m")
-	cmd.Flags().BoolVar(&o.Wait, "wait", true, "Wait for KubeBlocks to be uninstalled, including all the add-ons. It will wait for as long as --timeout")
+	cmd.Flags().BoolVar(&o.Wait, "wait", true, "Wait for KubeBlocks to be uninstalled, including all the add-ons. It will wait for a --timeout period")
 	return cmd
 }
 
@@ -216,7 +216,7 @@ func (o *UninstallOptions) Uninstall() error {
 	return nil
 }
 
-// uninstallAddons uninstall all KubeBlocks addons
+// uninstallAddons uninstalls all KubeBlocks addons
 func (o *UninstallOptions) uninstallAddons() error {
 	var (
 		allErrs []error
@@ -301,7 +301,7 @@ func (o *UninstallOptions) uninstallAddons() error {
 	// check if all addons are disabled, if so, then we will stop checking addons
 	// status otherwise, we will wait for a while and check again
 	if err = wait.PollImmediate(5*time.Second, o.Timeout, func() (bool, error) {
-		// we will only check addons status, do not try to uninstall addons again
+		// we only check addons status, do not try to uninstall addons again
 		if err = processAddons(false); err != nil {
 			return false, err
 		}
@@ -312,7 +312,7 @@ func (o *UninstallOptions) uninstallAddons() error {
 			spinnerDone()
 			return true, nil
 		} else if status.hasFailed {
-			return false, errors.New("there are some addons failed to disabled")
+			return false, errors.New("some addons are failed to disabled")
 		}
 		return false, nil
 	}); err != nil {

@@ -56,7 +56,7 @@ type Options struct {
 	GVR             schema.GroupVersionResource
 	OutputOperation OutputOperation
 
-	// follow fields are similar to kubectl patch
+	// following fields are similar to kubectl patch
 	PrintFlags  *genericclioptions.PrintFlags
 	ToPrinter   func(string) (printers.ResourcePrinter, error)
 	Patch       string

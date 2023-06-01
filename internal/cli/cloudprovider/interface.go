@@ -27,7 +27,7 @@ import (
 )
 
 type Interface interface {
-	// Name return the cloud provider name
+	// Name returns the cloud provider name
 	Name() string
 
 	// CreateK8sCluster creates a kubernetes cluster
@@ -36,7 +36,7 @@ type Interface interface {
 	// DeleteK8sCluster deletes the created kubernetes cluster
 	DeleteK8sCluster(clusterInfo *K8sClusterInfo) error
 
-	// GetClusterInfo get cluster info
+	// GetClusterInfo gets cluster info
 	GetClusterInfo() (*K8sClusterInfo, error)
 }
 

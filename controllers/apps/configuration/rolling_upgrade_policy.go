@@ -21,6 +21,7 @@ package configuration
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/spf13/viper"
@@ -78,11 +79,11 @@ func canPerformUpgrade(pods []corev1.Pod, params reconfigureParams) bool {
 		return true
 	}
 	if params.WorkloadType() == appsv1alpha1.Consensus {
-		params.Ctx.Log.Info("wait for consensus component is ready.")
+		params.Ctx.Log.Info(fmt.Sprintf("wait for consensus component is ready, %d pods are ready, and the expected replicas is %d.", len(pods), target))
 		return false
 	}
 	if len(pods) < target {
-		params.Ctx.Log.Info("component pods are not all ready.")
+		params.Ctx.Log.Info(fmt.Sprintf("component pods are not all ready, %d pods are ready, which is less than the expected replicas(%d).", len(pods), target))
 		return false
 	}
 	return true

@@ -20,10 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package kubeblocks
 
 import (
-	"fmt"
+	"bytes"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	"helm.sh/helm/v3/pkg/cli/values"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +32,7 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
@@ -40,6 +42,8 @@ import (
 var _ = Describe("backupconfig", func() {
 	var streams genericclioptions.IOStreams
 	var tf *cmdtesting.TestFactory
+	var o *InstallOptions
+	var out *bytes.Buffer
 
 	mockDeploy := func() *appsv1.Deployment {
 		deploy := &appsv1.Deployment{}
@@ -65,34 +69,41 @@ var _ = Describe("backupconfig", func() {
 		return deploy
 	}
 
-	mockConfigMap := func() *corev1.ConfigMap {
-		configmap := &corev1.ConfigMap{}
-		configmap.Name = fmt.Sprintf("%s-manager-config", types.KubeBlocksChartName)
-		configmap.SetLabels(map[string]string{
-			"app.kubernetes.io/name": types.KubeBlocksChartName,
-		})
-		configmap.Data = map[string]string{
-			"config.yaml": `BACKUP_PVC_NAME: "test-pvc"`,
-		}
-		return configmap
+	mockHelmConfig := func(release string, opt *Options) (map[string]interface{}, error) {
+		return map[string]interface{}{
+			"updateStrategy": map[string]interface{}{
+				"rollingUpdate": map[string]interface{}{
+					"maxSurge":       1,
+					"maxUnavailable": "40%",
+				},
+				"type": "RollingUpdate",
+			},
+			"podDisruptionBudget": map[string]interface{}{
+				"minAvailable": 1,
+			},
+			"loggerSettings": map[string]interface{}{
+				"developmentMode": false,
+				"encoder":         "console",
+				"timeEncoding":    "iso8601",
+			},
+			"priorityClassName": nil,
+			"nameOverride":      "",
+			"fullnameOverride":  "",
+			"dnsPolicy":         "ClusterFirst",
+			"replicaCount":      1,
+			"hostNetwork":       false,
+			"keepAddons":        false,
+		}, nil
 	}
 
 	BeforeEach(func() {
-		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		streams, _, out, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
 		tf.Client = &clientfake.RESTClient{}
-
 		// use a fake URL to test
 		types.KubeBlocksChartName = testing.KubeBlocksChartName
 		types.KubeBlocksChartURL = testing.KubeBlocksChartURL
-	})
-
-	AfterEach(func() {
-		tf.Cleanup()
-	})
-
-	It("run config cmd", func() {
-		o := &InstallOptions{
+		o = &InstallOptions{
 			Options: Options{
 				IOStreams: streams,
 				HelmCfg:   helm.NewFakeConfig(testing.Namespace),
@@ -104,27 +115,99 @@ var _ = Describe("backupconfig", func() {
 			Monitor:   true,
 			ValueOpts: values.Options{Values: []string{"snapshot-controller.enabled=true"}},
 		}
+	})
+
+	AfterEach(func() {
+		tf.Cleanup()
+	})
+
+	It("run config cmd", func() {
 		cmd := NewConfigCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(o.PreCheck()).Should(HaveOccurred())
 	})
 
-	It("run describe config cmd", func() {
-		o := &InstallOptions{
-			Options: Options{
-				IOStreams: streams,
-				HelmCfg:   helm.NewFakeConfig(testing.Namespace),
-				Namespace: "default",
-				Client:    testing.FakeClientSet(mockDeploy(), mockConfigMap()),
-			},
-		}
-		cmd := NewDescribeConfigCmd(tf, streams)
-		Expect(cmd).ShouldNot(BeNil())
-		done := testing.Capture()
-		Expect(describeConfig(o)).Should(Succeed())
-		capturedOutput, err := done()
-		Expect(err).Should(Succeed())
-		Expect(capturedOutput).Should(ContainSubstring("VOLUMESNAPSHOT=true"))
-		Expect(capturedOutput).Should(ContainSubstring("BACKUP_PVC_NAME=test-pvc"))
+	Context("run describe config cmd", func() {
+		var output printer.Format
+
+		It("describe-config --output table/wide", func() {
+			output = printer.Table
+			err := describeConfig(o, output, mockHelmConfig)
+			Expect(err).Should(Succeed())
+			expect := `KEY                                VALUE                                   
+dnsPolicy                          "ClusterFirst"                          
+fullnameOverride                   ""                                      
+hostNetwork                        false                                   
+keepAddons                         false                                   
+loggerSettings.developmentMode     false                                   
+loggerSettings.encoder             "console"                               
+loggerSettings.timeEncoding        "iso8601"                               
+nameOverride                       ""                                      
+podDisruptionBudget.minAvailable   1                                       
+priorityClassName                  <nil>                                   
+replicaCount                       1                                       
+updateStrategy.rollingUpdate       {"maxSurge":1,"maxUnavailable":"40%"}   
+updateStrategy.type                "RollingUpdate"                         
+`
+			Expect(out.String()).Should(Equal(expect))
+		})
+
+		It("describe-config --output json", func() {
+			output = printer.JSON
+			expect := `{
+  "dnsPolicy": "ClusterFirst",
+  "fullnameOverride": "",
+  "hostNetwork": false,
+  "keepAddons": false,
+  "loggerSettings": {
+    "developmentMode": false,
+    "encoder": "console",
+    "timeEncoding": "iso8601"
+  },
+  "nameOverride": "",
+  "podDisruptionBudget": {
+    "minAvailable": 1
+  },
+  "priorityClassName": null,
+  "replicaCount": 1,
+  "updateStrategy": {
+    "rollingUpdate": {
+      "maxSurge": 1,
+      "maxUnavailable": "40%"
+    },
+    "type": "RollingUpdate"
+  }
+}
+`
+			err := describeConfig(o, output, mockHelmConfig)
+			Expect(err).Should(Succeed())
+			Expect(out.String()).Should(Equal(expect))
+		})
+
+		It("describe-config --output yaml", func() {
+			output = printer.YAML
+			expect := `dnsPolicy: ClusterFirst
+fullnameOverride: ""
+hostNetwork: false
+keepAddons: false
+loggerSettings:
+  developmentMode: false
+  encoder: console
+  timeEncoding: iso8601
+nameOverride: ""
+podDisruptionBudget:
+  minAvailable: 1
+priorityClassName: null
+replicaCount: 1
+updateStrategy:
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 40%
+  type: RollingUpdate
+`
+			err := describeConfig(o, output, mockHelmConfig)
+			Expect(err).Should(Succeed())
+			Expect(out.String()).Should(Equal(expect))
+		})
 	})
 })

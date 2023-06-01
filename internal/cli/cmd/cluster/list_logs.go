@@ -167,7 +167,7 @@ type logFileInfo struct {
 	component   string
 }
 
-// gatherLogFilesData gathers all log files data from every instance of the cluster.
+// gatherLogFilesData gathers all log files data from each instance of the cluster.
 func (o *ListLogsOptions) gatherLogFilesData(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinition, pods *corev1.PodList) []logFileInfo {
 	logFileInfoList := make([]logFileInfo, 0, len(pods.Items))
 	for _, p := range pods.Items {

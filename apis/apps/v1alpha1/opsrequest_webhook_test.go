@@ -429,21 +429,20 @@ var _ = Describe("OpsRequest webhook", func() {
 		It("Should webhook validate passed", func() {
 			By("By create a clusterDefinition")
 
-			clusterDef := &ClusterDefinition{}
 			// wait until ClusterDefinition and ClusterVersion created
-			clusterDef, _ = createTestClusterDefinitionObj(clusterDefinitionName)
+			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
 			By("By creating a clusterVersion")
 			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
 			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 
 			opsRequest := createTestOpsRequest(clusterName, opsRequestName, UpgradeType)
-			cluster := &Cluster{}
-			// wait until Cluster created
+
+			// create Cluster
 			By("By testing spec.clusterDef is legal")
 			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(HaveOccurred())
 			By("By create a new cluster ")
-			cluster, _ = createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
+			cluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
 			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
 
 			testUpgrade(cluster)

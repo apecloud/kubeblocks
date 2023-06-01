@@ -548,20 +548,27 @@ func (pgOps *PostgresOperations) checkStandbySynchronizedToLeader(ctx context.Co
 	return false
 }
 
-func (pgOps *PostgresOperations) getWalPosition(ctx context.Context) int64 {
+func (pgOps *PostgresOperations) getWalPosition(ctx context.Context) (int64, error) {
 	var lsn int64
+	var err error
 	if pgOps.IsLeader(ctx) {
-		lsn = pgOps.getLsn(ctx, "current")
+		lsn, err = pgOps.getLsn(ctx, "current")
+		if err != nil {
+			return 0, err
+		}
 	} else {
-		replayLsn := pgOps.getLsn(ctx, "replay")
-		receiveLsn := pgOps.getLsn(ctx, "receive")
+		replayLsn, errReplay := pgOps.getLsn(ctx, "replay")
+		receiveLsn, errReceive := pgOps.getLsn(ctx, "receive")
+		if errReplay != nil && errReceive != nil {
+			return 0, errors.Errorf("get replayLsn or receiveLsn failed, replayLsn err:%v, receiveLsn err:%v", errReplay, errReceive)
+		}
 		lsn = MaxInt64(replayLsn, receiveLsn)
 	}
 
-	return lsn
+	return lsn, nil
 }
 
-func (pgOps *PostgresOperations) getLsn(ctx context.Context, types string) int64 {
+func (pgOps *PostgresOperations) getLsn(ctx context.Context, types string) (int64, error) {
 	var sql string
 	switch types {
 	case "current":
@@ -575,10 +582,10 @@ func (pgOps *PostgresOperations) getLsn(ctx context.Context, types string) int64
 	resp, err := pgOps.query(ctx, sql)
 	if err != nil {
 		pgOps.Logger.Errorf("get wal position err:%v", err)
-		return 0
+		return 0, err
 	}
 
-	return int64(binary.BigEndian.Uint64(resp))
+	return int64(binary.BigEndian.Uint64(resp)), nil
 }
 
 // InternalQuery is used for internal query, implement BaseInternalOps interface
@@ -842,6 +849,10 @@ func (pgOps *PostgresOperations) GetStatus(ctx context.Context) (string, error) 
 	return "running", nil
 }
 
+func (pgOps *PostgresOperations) GetOpTime(ctx context.Context) (int64, error) {
+	return pgOps.getWalPosition(ctx)
+}
+
 func (pgOps *PostgresOperations) IsLeader(ctx context.Context) bool {
 	role, err := pgOps.GetRole(ctx, &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
 	if err != nil {
@@ -861,7 +872,7 @@ func (pgOps *PostgresOperations) IsHealthiest(ctx context.Context, podName strin
 		return false
 	}
 
-	walPosition := pgOps.getWalPosition(ctx)
+	walPosition, err := pgOps.getWalPosition(ctx)
 	if pgOps.isLagging(ctx, walPosition) {
 
 	}

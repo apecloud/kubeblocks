@@ -10,6 +10,7 @@ type DB interface {
 
 	GetStatus(ctx context.Context) (string, error)
 	GetExtra(ctx context.Context) (map[string]string, error)
+	GetOpTime(ctx context.Context) (int64, error)
 	IsLeader(ctx context.Context) bool
 	IsHealthiest(ctx context.Context, podName string) bool
 

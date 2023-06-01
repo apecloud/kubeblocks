@@ -20,17 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration_store
 
 import (
-	"strconv"
-	"strings"
-
-	"golang.org/x/exp/slices"
 	v1 "k8s.io/api/core/v1"
+	"strconv"
 )
 
 type Cluster struct {
 	SysID      string
 	Config     *ClusterConfig
 	Leader     *Leader
+	OpTime     int64
 	Members    []*Member
 	Switchover *Switchover
 	Extra      map[string]string
@@ -59,9 +57,8 @@ func (c *Cluster) IsLocked() bool {
 }
 
 type ClusterConfig struct {
-	index       string
-	modifyIndex int64
-	data        *ClusterData
+	index string
+	data  *ClusterData
 }
 
 func (c *ClusterConfig) GetData() *ClusterData {
@@ -82,9 +79,8 @@ func getClusterConfigFromConfigMap(configmap *v1.ConfigMap) *ClusterConfig {
 	data := newClusterData(int64(ttl), int64(maxLagOnSwitchover))
 
 	return &ClusterConfig{
-		index:       configmap.ResourceVersion,
-		modifyIndex: 0, // TODO: is modifyIndex need?
-		data:        data,
+		index: configmap.ResourceVersion,
+		data:  data,
 	}
 }
 
@@ -151,34 +147,8 @@ func newSwitchover(index string, leader string, candidate string, scheduledAt in
 	}
 }
 
-// SyncState 最后观察到的同步复制状态。
-type SyncState struct {
-	index       string
-	leader      string
-	syncStandby []string // synchronous standby list which are last synchronized to leader
-}
-
-func newSyncState(index string, leader string, syncStandby string) *SyncState {
-	standby := strings.Split(syncStandby, ",")
-	return &SyncState{
-		index:       index,
-		leader:      leader,
-		syncStandby: standby,
-	}
-}
-
-func (s *SyncState) SynchronizedToLeader(candidate string) bool {
-	return slices.Contains(s.syncStandby, candidate)
-}
-
 type MemberData struct {
 	role string
-}
-
-type TimelineHistory struct {
-	index int64
-	value int64
-	lines []string
 }
 
 type ClusterData struct {

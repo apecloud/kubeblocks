@@ -108,7 +108,13 @@ func (h *Ha) Init() {
 		panic(err)
 	}
 
-	err = h.cs.Init(sysid, extra)
+	opTime, err := h.DB.GetOpTime(h.ctx)
+	if err != nil {
+		h.log.Errorf("can not get op time, err:%v", err)
+		panic(err)
+	}
+
+	err = h.cs.Init(sysid, extra, opTime)
 	if err != nil {
 		h.log.Errorf("configuration store init err:%v", err)
 		panic(err)
@@ -227,9 +233,12 @@ func (h *Ha) hasLock() bool {
 }
 
 func (h *Ha) updateLockWithRetry(retryTimes int) error {
-	var err error
+	opTime, err := h.DB.GetOpTime(h.ctx)
+	if err != nil {
+		opTime = 0
+	}
 	for i := 0; i < retryTimes; i++ {
-		err = h.cs.UpdateLeader(h.podName)
+		err = h.cs.UpdateLeader(h.podName, opTime)
 		if err == nil {
 			return nil
 		}

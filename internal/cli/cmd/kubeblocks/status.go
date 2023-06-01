@@ -175,6 +175,7 @@ func (o *statusOptions) run() error {
 	defer cancel()
 
 	allErrs := make([]error, 0)
+	o.showK8SClusterInfos(ctx, &allErrs)
 	o.buildSelectorList(ctx, &allErrs)
 	o.showWorkloads(ctx, &allErrs)
 	o.showAddons()
@@ -416,6 +417,45 @@ func (o *statusOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
 		}
 	}
 	tblPrinter.Print()
+}
+
+func (o *statusOptions) showK8SClusterInfos(ctx context.Context, allErrs *[]error) {
+	version, err := util.GetK8sVersion(o.client.Discovery())
+	if err != nil {
+		appendErrIgnoreNotFound(allErrs, err)
+	}
+	fmt.Fprintf(o.Out, "Kubernetes version: %s\n", version)
+	provider, err := util.GetK8sProvider(version, o.client)
+	if err != nil {
+		*allErrs = append(*allErrs, fmt.Errorf("failed to get kubernetes provider: %v", err))
+	}
+	if provider.IsCloud() {
+		fmt.Fprintf(o.Out, "Kubernetes provider %s\n", provider)
+		nodesList := listResourceByGVR(ctx, o.dynamic, o.ns, []schema.GroupVersionResource{types.NodeGVR()}, []metav1.ListOptions{}, allErrs)
+		var region string
+		var availableZones []string
+		for _, item := range nodesList {
+			for _, node := range item.Items {
+				labels := node.GetLabels()
+				if labels == nil {
+					continue
+				}
+				region = labels[constant.RegionLabelKey]
+				availableZones = append(availableZones, labels[constant.ZoneLabelKey])
+			}
+		}
+		if len(region) == 0 {
+			return
+		}
+		fmt.Fprintf(o.Out, "Kubernetes region: %s\n", region)
+		fmt.Fprintf(o.Out, "Kubernetes available zones:")
+		for i := range availableZones {
+			if len(availableZones[i]) != 0 {
+				fmt.Fprintf(o.Out, " %s", availableZones[i])
+			}
+		}
+		fmt.Fprintln(o.Out)
+	}
 }
 
 func getNestedSelectorAsString(obj map[string]interface{}, fields ...string) (string, error) {

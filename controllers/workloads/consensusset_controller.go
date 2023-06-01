@@ -108,8 +108,8 @@ func (r *ConsensusSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			&consensusset.CSSetStatusTransformer{},
 			// handle UpdateStrategy
 			&consensusset.UpdateStrategyTransformer{},
-			// handle horizontal scaling
-			&consensusset.HorizontalScalingTransformer{},
+			// handle member reconfiguration
+			&consensusset.MemberReconfigurationTransformer{},
 			// always safe to put your transformer below
 		).
 		Build()

@@ -33,8 +33,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
-// HorizontalScalingTransformer Pod level horizontal scaling handling
-type HorizontalScalingTransformer struct{}
+// MemberReconfigurationTransformer handles member reconfiguration
+type MemberReconfigurationTransformer struct{}
 
 type actionInfo struct {
 	shortActionName string
@@ -46,7 +46,7 @@ type conditionChecker = func() bool
 
 var actionNameRegex = regexp.MustCompile(`(.*)-([0-9]+)-([0-9]+)-([a-zA-Z\-]+)$`)
 
-func (t *HorizontalScalingTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*CSSetTransformContext)
 	if model.IsObjectDeleting(transCtx.CSSet) {
 		return nil
@@ -435,4 +435,4 @@ func generateActionInfos(csSet *workloads.ConsensusSet, ordinal int, actionTypeL
 	return actionInfos
 }
 
-var _ graph.Transformer = &HorizontalScalingTransformer{}
+var _ graph.Transformer = &MemberReconfigurationTransformer{}

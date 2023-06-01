@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
@@ -153,10 +152,10 @@ var _ = Describe("config_util", func() {
 
 	Context("common funcs test", func() {
 		It("GetReloadOptions Should success without error", func() {
-			mockTpl := appsv1alpha1.ConfigConstraint{
-				Spec: appsv1alpha1.ConfigConstraintSpec{
-					ReloadOptions: &appsv1alpha1.ReloadOptions{
-						UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+			mockTpl := v1alpha1.ConfigConstraint{
+				Spec: v1alpha1.ConfigConstraintSpec{
+					ReloadOptions: &v1alpha1.ReloadOptions{
+						UnixSignalTrigger: &v1alpha1.UnixSignalTrigger{
 							Signal:      "HUB",
 							ProcessName: "for_test",
 						},
@@ -165,8 +164,8 @@ var _ = Describe("config_util", func() {
 			}
 			tests := []struct {
 				name    string
-				tpls    []appsv1alpha1.ComponentConfigSpec
-				want    *appsv1alpha1.ReloadOptions
+				tpls    []v1alpha1.ComponentConfigSpec
+				want    *v1alpha1.ReloadOptions
 				wantErr bool
 			}{{
 				// empty config templates
@@ -177,18 +176,18 @@ var _ = Describe("config_util", func() {
 			}, {
 				// empty config templates
 				name:    "test",
-				tpls:    []appsv1alpha1.ComponentConfigSpec{},
+				tpls:    []v1alpha1.ComponentConfigSpec{},
 				want:    nil,
 				wantErr: false,
 			}, {
 				// config templates without configConstraintObj
 				name: "test",
-				tpls: []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+				tpls: []v1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
 						Name: "for_test",
 					},
 				}, {
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
 						Name: "for_test2",
 					},
 				}},
@@ -197,8 +196,8 @@ var _ = Describe("config_util", func() {
 			}, {
 				// normal
 				name: "test",
-				tpls: []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+				tpls: []v1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
 						Name: "for_test",
 					},
 					ConfigConstraintRef: "eg_v1",
@@ -208,8 +207,8 @@ var _ = Describe("config_util", func() {
 			}, {
 				// not exist config constraint
 				name: "test",
-				tpls: []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+				tpls: []v1alpha1.ComponentConfigSpec{{
+					ComponentTemplateSpec: v1alpha1.ComponentTemplateSpec{
 						Name: "for_test",
 					},
 					ConfigConstraintRef: "not_exist",

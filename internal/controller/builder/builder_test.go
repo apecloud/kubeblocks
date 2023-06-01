@@ -476,6 +476,7 @@ var _ = Describe("builder", func() {
 				Args:          []string{},
 				Envs:          []corev1.EnvVar{},
 				Volumes:       []corev1.VolumeMount{},
+				Cluster:       params.Cluster,
 			}
 			Expect(err).Should(BeNil())
 			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, params.Component)

@@ -56,7 +56,6 @@ type CreateDependency func(dryRun []string) error
 type DryRunStrategy int
 
 const (
-	// DryRunNone indicates the client will make all mutating calls
 	DryRunNone DryRunStrategy = iota
 	DryRunClient
 	DryRunServer

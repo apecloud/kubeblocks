@@ -23,6 +23,7 @@ container: {
 	args: [...]
 	volumeMounts: [...]
 	env: [...]
+	resources: {}
 }
 
 job: {

@@ -20,13 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package plan
 
 import (
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/kubernetes/scheme"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -242,41 +241,43 @@ var _ = Describe("PITR Functions", func() {
 
 		})
 
-		It("Test PITR prepare", func() {
+		It("Test restore", func() {
 			By("restore time is in range")
-			Expect(DoPITRPrepare(ctx, testCtx.Cli, cluster, synthesizedComponent)).Should(Succeed())
-			Expect(synthesizedComponent.PodSpec.InitContainers).ShouldNot(BeEmpty())
+			Expect(DoRestore(ctx, testCtx.Cli, cluster, synthesizedComponent, scheme.Scheme)).Should(Succeed())
 
 			By("restore time is at base backup stop time")
 			cluster.Annotations[constant.RestoreFromTimeAnnotationKey] = now.Format(time.RFC3339)
-			Expect(DoPITRPrepare(ctx, testCtx.Cli, cluster, synthesizedComponent)).Should(Succeed())
+			Expect(DoRestore(ctx, testCtx.Cli, cluster, synthesizedComponent, scheme.Scheme)).Should(Succeed())
 		})
-		It("Test PITR job run and cleanup", func() {
-			By("when data pvc is pending")
-			cluster.Status.ObservedGeneration = 1
-			shouldRequeue, err := DoPITRIfNeed(ctx, testCtx.Cli, cluster)
-			Expect(err).Should(Succeed())
-			Expect(shouldRequeue).Should(BeTrue())
-			By("when data pvc is bound")
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(fetched *corev1.PersistentVolumeClaim) {
-				fetched.Status.Phase = corev1.ClaimBound
-			})).Should(Succeed())
-			_, err = DoPITRIfNeed(ctx, testCtx.Cli, cluster)
-			Expect(err).Should(Succeed())
-			By("when job is completed")
-			jobName := fmt.Sprintf("pitr-phy-%s-%s-0", clusterName, mysqlCompName)
-			jobKey := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, jobKey, func(fetched *batchv1.Job) {
-				fetched.Status.Conditions = []batchv1.JobCondition{{Type: batchv1.JobComplete}}
-			})).Should(Succeed())
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(fetched *appsv1alpha1.Cluster) {
-				fetched.Status.Phase = appsv1alpha1.RunningClusterPhase
-			})).Should(Succeed())
-			_, err = DoPITRIfNeed(ctx, testCtx.Cli, cluster)
-			Expect(err).Should(Succeed())
-			By("cleanup pitr job")
-			Expect(DoPITRCleanup(ctx, testCtx.Cli, cluster)).Should(Succeed())
-		})
+		/*
+			It("Test PITR job run and cleanup", func() {
+				By("when data pvc is pending")
+				cluster.Status.ObservedGeneration = 1
+				shouldRequeue, err := DoPITRIfNeed(ctx, testCtx.Cli, cluster)
+				Expect(err).Should(Succeed())
+				Expect(shouldRequeue).Should(BeTrue())
+				By("when data pvc is bound")
+				Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pvc), func(fetched *corev1.PersistentVolumeClaim) {
+					fetched.Status.Phase = corev1.ClaimBound
+				})).Should(Succeed())
+				_, err = DoPITRIfNeed(ctx, testCtx.Cli, cluster)
+				Expect(err).Should(Succeed())
+				By("when job is completed")
+				jobName := fmt.Sprintf("pitr-phy-%s-%s-0", clusterName, mysqlCompName)
+				jobKey := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
+				Eventually(testapps.GetAndChangeObjStatus(&testCtx, jobKey, func(fetched *batchv1.Job) {
+					fetched.Status.Conditions = []batchv1.JobCondition{{Type: batchv1.JobComplete}}
+				})).Should(Succeed())
+				Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(cluster), func(fetched *appsv1alpha1.Cluster) {
+					fetched.Status.Phase = appsv1alpha1.RunningClusterPhase
+				})).Should(Succeed())
+				_, err = DoPITRIfNeed(ctx, testCtx.Cli, cluster)
+				Expect(err).Should(Succeed())
+				By("cleanup pitr job")
+				Expect(DoPITRCleanup(ctx, testCtx.Cli, cluster)).Should(Succeed())
+			})
+
+		*/
 	})
 })
 

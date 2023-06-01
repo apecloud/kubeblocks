@@ -77,6 +77,7 @@ func getBackupObjects(reqCtx intctrlutil.RequestCtx,
 }
 
 // BuildRestoredInfo builds restore infos when restore from backup, such as init-container, pvc dataSource.
+// Deprecated: using DoRestore function instead.
 func BuildRestoredInfo(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	namespace string,
@@ -89,7 +90,9 @@ func BuildRestoredInfo(reqCtx intctrlutil.RequestCtx,
 	return buildRestoredInfo2(component, backup, backupTool)
 }
 
-func buildRestoreInfoFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster appsv1alpha1.Cluster,
+// BuildRestoreInfoFromBackup restore from snapshot or datafile
+// Deprecated: using DoRestore function instead.
+func BuildRestoreInfoFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster appsv1alpha1.Cluster,
 	component *SynthesizedComponent) error {
 	// build info that needs to be restored from backup
 	backupSourceName, err := getComponentBackupSource(cluster, component.Name)
@@ -124,6 +127,7 @@ func buildRestoredInfo2(component *SynthesizedComponent,
 }
 
 // GetRestoredInitContainerName gets the restore init container name.
+// Deprecated: using DoRestore function instead.
 func GetRestoredInitContainerName(backupName string) string {
 	return fmt.Sprintf("restore-%s", backupName)
 }

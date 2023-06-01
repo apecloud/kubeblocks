@@ -217,7 +217,7 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 			continue
 		}
 		if b.Spec.BackupType == BackupTypeLogFile {
-			incrementalBackup = &b
+			incrementalBackup = b.DeepCopy()
 		} else if b.Spec.BackupType != BackupTypeLogFile && b.Status.Phase == BackupCompleted {
 			baseBackups = append(baseBackups, b)
 		}

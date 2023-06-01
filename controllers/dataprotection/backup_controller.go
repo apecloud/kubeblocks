@@ -207,7 +207,10 @@ func (r *BackupReconciler) doNewPhaseAction(
 			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 	}
-
+	// clean cached annotations if in NEW phase
+	if backup.Annotations[dataProtectionBackupTargetPodKey] != "" {
+		delete(backup.Annotations, dataProtectionBackupTargetPodKey)
+	}
 	target, err := r.getTargetPod(reqCtx, backup, targetCluster.LabelsSelector.MatchLabels)
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
@@ -358,7 +361,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 		if !isOK {
-			return intctrlutil.Reconciled()
+			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
 		}
 		if err = r.createUpdatesJobs(reqCtx, backup, &backupPolicy.Spec.Snapshot.BasePolicy, dataprotectionv1alpha1.PRE); err != nil {
 			r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPreUpdatesJob", err.Error())
@@ -383,7 +386,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 		if !isOK {
-			return intctrlutil.Reconciled()
+			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
 		}
 
 		// Failure MetadataCollectionJob does not affect the backup status.
@@ -944,8 +947,10 @@ func (r *BackupReconciler) createBatchV1Job(
 		},
 	}
 	controllerutil.AddFinalizer(job, dataProtectionFinalizerName)
-	if err := controllerutil.SetControllerReference(backup, job, r.Scheme); err != nil {
-		return err
+	if backup.Namespace == job.Namespace {
+		if err := controllerutil.SetControllerReference(backup, job, r.Scheme); err != nil {
+			return err
+		}
 	}
 
 	reqCtx.Log.V(1).Info("create a built-in job from backup", "job", job)

@@ -25,6 +25,7 @@ import (
 // TODO: @wangyelei could refactor to ops group
 
 // OpsRequestSpec defines the desired state of OpsRequest
+// +kubebuilder:validation:XValidation:rule="has(self.cancel) && self.cancel ? (self.type in ['VerticalScaling', 'HorizontalScaling']) : true",message="forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']"
 type OpsRequestSpec struct {
 	// clusterRef references clusterDefinition.
 	// +kubebuilder:validation:Required

@@ -48,7 +48,7 @@ var _ = Describe("Custom edit", func() {
 	})
 
 	It("test edit the cluster resource before updating", func() {
-		options := NewCustomEditOptions(tf, streams, "update")
+		options := NewCustomEditOptions(tf, streams, "patched")
 		resObj := &unstructured.Unstructured{
 			Object: map[string]interface{}{
 				"apiVersion": "v1",

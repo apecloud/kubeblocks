@@ -87,7 +87,6 @@ kbcli cluster create [NAME] [flags]
 ### Options
 
 ```
-      --auto-approve                   Skip interactive approval before create cluster.
       --backup string                  Set a source backup to restore data
       --cluster-definition string      Specify cluster definition, run "kbcli cd list" to show all available cluster definitions
       --cluster-version string         Specify cluster version, run "kbcli cv list" to show all available cluster versions, use the latest version if not specified

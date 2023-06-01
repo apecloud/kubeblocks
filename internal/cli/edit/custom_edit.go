@@ -108,7 +108,7 @@ func (o *CustomEditOptions) Run(originalObj runtime.Object, testEnv bool) error 
 		return fmt.Errorf("failed to decode edited object: %v", err)
 	}
 
-	if o.Method == "update" {
+	if o.Method == "patched" {
 		diff, err := util.GetUnifiedDiffString(string(original), string(edited))
 		if err != nil {
 			return fmt.Errorf("failed to get diff: %v", err)
@@ -169,7 +169,7 @@ func addHeader(w io.Writer) error {
 }
 
 func confirmToContinue(stream genericclioptions.IOStreams) error {
-	printer.Warning(stream.Out, "Above resource will be created, do you want to continue to create this resource?\n  Only 'yes' will be accepted to confirm.\n\n")
+	printer.Warning(stream.Out, "Above resource will be created or changed, do you want to continue to create or change this resource?\n  Only 'yes' will be accepted to confirm.\n\n")
 	entered, _ := prompt.NewPrompt("Enter a value:", nil, stream.In).Run()
 	if entered != "yes" {
 		_, err := fmt.Fprintf(stream.Out, "\nCancel resource creation.\n")

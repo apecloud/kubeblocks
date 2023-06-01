@@ -88,8 +88,8 @@ func NewOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, gvr sche
 
 func (o *Options) AddFlags(cmd *cobra.Command) {
 	o.PrintFlags.AddFlags(cmd)
-	cmd.Flags().BoolVar(&o.EditBeforeUpdate, "edit", o.EditBeforeUpdate, "Edit the cluster resource before updating")
 	cmdutil.AddDryRunFlag(cmd)
+	cmd.Flags().BoolVar(&o.EditBeforeUpdate, "edit", o.EditBeforeUpdate, "Edit the API resource")
 }
 
 func (o *Options) complete(cmd *cobra.Command) error {
@@ -186,13 +186,14 @@ func (o *Options) Run(cmd *cobra.Command) error {
 			}
 
 			if o.EditBeforeUpdate {
-				customEdit := edit.NewCustomEditOptions(o.Factory, o.IOStreams, "update")
+				customEdit := edit.NewCustomEditOptions(o.Factory, o.IOStreams, "patched")
 				if err = customEdit.Run(patchedObj, false); err != nil {
 					return fmt.Errorf("unable to edit %s %s/%s: %v", info.Mapping.GroupVersionKind.Kind, info.Namespace, info.Name, err)
 				}
 				patchedObj = &unstructured.Unstructured{
 					Object: map[string]interface{}{
-						"spec": patchedObj.(*unstructured.Unstructured).Object["spec"],
+						"metadata": patchedObj.(*unstructured.Unstructured).Object["metadata"],
+						"spec":     patchedObj.(*unstructured.Unstructured).Object["spec"],
 					},
 				}
 				patchBytes, err = patchedObj.(*unstructured.Unstructured).MarshalJSON()

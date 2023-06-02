@@ -43,7 +43,7 @@ In the actual environment, it is normal to install `kbcli` and KubeBlocks on the
 
 **Before you start**
 
-Make sure you have kbcli installed, for detailed information, check [Install kbcli](#install-kbcli).
+Make sure you have kbcli installed, for detailed information, check [Install kbcli](./install-kbcli.md).
 
 **Install KubeBlocks with `kbcli kubeblocks install` command.**
 

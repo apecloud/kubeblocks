@@ -7,7 +7,7 @@ sidebar_position: 2
 
 # Configure IM alert
 
-Alerts are mainly used for daily error response to improve system availability. Kubeblocks has a built-in set of common alert rules and integrates multiple notification channels. The alert capability of Kubeblocks can meet the operation and maintenance requirements of production-level online clusters.
+Alerts are mainly used for daily error response to improve system availability. KubeBlocks has a built-in set of common alert rules and integrates multiple notification channels. The alert capability of KubeBlocks can meet the operation and maintenance requirements of production-level online clusters.
 
 :::
 The alert function is the same for all 
@@ -46,9 +46,9 @@ kbcli dashboard open kubeblocks-prometheus-server # Here is an example and fill 
 
 ## Configure IM alert
 
-The alert message notification of Kubeblocks mainly adopts the AlertManager native capability. After receiving the Prometheus alert, KubeBlocks performs steps including deduplication, grouping, silence, suppression, and routing, and finally sends it to the corresponding notification channel.
+The alert message notification of KubeBlocks mainly adopts the AlertManager native capability. After receiving the Prometheus alert, KubeBlocks performs steps including deduplication, grouping, silence, suppression, and routing, and finally sends it to the corresponding notification channel.
 
-AlertManager integrates a set of notification channels, such as Email and Slack. Kubeblocks extends new IM class notification channels with AlertManger Webhook.
+AlertManager integrates a set of notification channels, such as Email and Slack. KubeBlocks extends new IM class notification channels with AlertManger Webhook.
 
 This tutorial takes configuring Feishu as the notification channel as an example.
 
@@ -58,9 +58,9 @@ To receive alerts, you need to deploy monitoring components and enable cluster m
 
 ### Configure alert channels
 
-The alert message notification of Kubeblocks mainly adopts the AlertManager native capability. After receiving the Prometheus alert, KubeBlocks performs steps including deduplication, grouping, silence, suppression, and routing, and finally sends it to the corresponding notification channel.
+The alert message notification of KubeBlocks mainly adopts the AlertManager native capability. After receiving the Prometheus alert, KubeBlocks performs steps including deduplication, grouping, silence, suppression, and routing, and finally sends it to the corresponding notification channel.
 
-AlertManager integrates a set of notification channels, such as Email and Slack. Kubeblocks extends new IM class notification channels with AlertManger Webhook.
+AlertManager integrates a set of notification channels, such as Email and Slack. KubeBlocks extends new IM class notification channels with AlertManger Webhook.
 
 This tutorial takes configuring Feishu as the notification channel as an example.
 

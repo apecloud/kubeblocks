@@ -98,6 +98,9 @@ type BackupToolStatus struct {
 	// TODO(dsj): define backup tool status.
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster

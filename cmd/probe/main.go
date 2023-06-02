@@ -20,27 +20,75 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
-	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/observation"
+	// Register all components
+	bindingsLoader "github.com/dapr/dapr/pkg/components/bindings"
+	configurationLoader "github.com/dapr/dapr/pkg/components/configuration"
+	lockLoader "github.com/dapr/dapr/pkg/components/lock"
+	httpMiddlewareLoader "github.com/dapr/dapr/pkg/components/middleware/http"
+	nrLoader "github.com/dapr/dapr/pkg/components/nameresolution"
+	pubsubLoader "github.com/dapr/dapr/pkg/components/pubsub"
+	secretstoresLoader "github.com/dapr/dapr/pkg/components/secretstores"
+	stateLoader "github.com/dapr/dapr/pkg/components/state"
+	httpMiddleware "github.com/dapr/dapr/pkg/middleware/http"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
+	"github.com/dapr/dapr/pkg/runtime"
+	"github.com/dapr/kit/logger"
+
+	dhttp "github.com/dapr/components-contrib/bindings/http"
+	"github.com/dapr/components-contrib/bindings/localstorage"
+	"github.com/dapr/components-contrib/middleware"
+	"github.com/dapr/components-contrib/nameresolution/mdns"
+
 	"go.uber.org/automaxprocs/maxprocs"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/custom"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/etcd"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/kafka"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mongodb"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/redis"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
 )
+
+var (
+	log        = logger.NewLogger("dapr.runtime")
+	logContrib = logger.NewLogger("dapr.contrib")
+)
+
+func init() {
+	viper.AutomaticEnv()
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mysql.NewMysql, "mysql")
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(etcd.NewEtcd, "etcd")
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mongodb.NewMongoDB, "mongodb")
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(redis.NewRedis, "redis")
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(postgres.NewPostgres, "postgres")
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(custom.NewHTTPCustom, "custom")
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(dhttp.NewHTTP, "http")
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(localstorage.NewLocalStorage, "localstorage")
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(kafka.NewKafka, "kafka")
+	nrLoader.DefaultRegistry.RegisterComponent(mdns.NewResolver, "mdns")
+	httpMiddlewareLoader.DefaultRegistry.RegisterComponent(func(log logger.Logger) httpMiddlewareLoader.FactoryMethod {
+		return func(metadata middleware.Metadata) (httpMiddleware.Middleware, error) {
+			return probe.NewProbeMiddleware(log).GetHandler(metadata)
+		}
+	}, "probe")
+
+}
 
 func main() {
 	// set GOMAXPROCS
 	_, _ = maxprocs.Set()
 
-	var err error
+	rt, err := runtime.FromFlags()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -56,45 +104,31 @@ func main() {
 		panic(fmt.Errorf("fatal error config file: %v", err))
 	}
 
-	custom := observation.NewController()
-	err = custom.Init()
+	secretstoresLoader.DefaultRegistry.Logger = logContrib
+	stateLoader.DefaultRegistry.Logger = logContrib
+	configurationLoader.DefaultRegistry.Logger = logContrib
+	lockLoader.DefaultRegistry.Logger = logContrib
+	pubsubLoader.DefaultRegistry.Logger = logContrib
+	nrLoader.DefaultRegistry.Logger = logContrib
+	bindingsLoader.DefaultRegistry.Logger = logContrib
+	httpMiddlewareLoader.DefaultRegistry.Logger = logContrib
+
+	err = rt.Run(
+		runtime.WithSecretStores(secretstoresLoader.DefaultRegistry),
+		runtime.WithStates(stateLoader.DefaultRegistry),
+		runtime.WithConfigurations(configurationLoader.DefaultRegistry),
+		runtime.WithLocks(lockLoader.DefaultRegistry),
+		runtime.WithPubSubs(pubsubLoader.DefaultRegistry),
+		runtime.WithNameResolutions(nrLoader.DefaultRegistry),
+		runtime.WithBindings(bindingsLoader.DefaultRegistry),
+		runtime.WithHTTPMiddlewares(httpMiddlewareLoader.DefaultRegistry),
+	)
 	if err != nil {
-		panic(fmt.Errorf("fatal error custom init: %v", err))
+		log.Fatalf("fatal error from runtime: %s", err)
 	}
-
-	err = http.ListenAndServe("localhost:3501", nil)
-	if err != nil {
-		panic(fmt.Errorf("fatal error http listen: %v", err))
-	}
-	url := "/role"
-
-	http.HandleFunc(url, func(writer http.ResponseWriter, request *http.Request) {
-		opsRes, shouldNotify := custom.CheckRoleOps(request.Context())
-		buf, err := json.Marshal(opsRes)
-		if err != nil {
-			panic(fmt.Errorf("fatal error json parse: %v", err))
-		}
-
-		if _, exist := opsRes["event"]; !exist || len(opsRes) == 0 {
-			code, _ := strconv.Atoi(observation.RealReadinessFail)
-			writer.WriteHeader(code)
-			return
-		}
-
-		if shouldNotify {
-			code, _ := strconv.Atoi(observation.OperationFailedHTTPCode)
-			writer.WriteHeader(code)
-			_, err = writer.Write(buf)
-			if err != nil {
-				panic(fmt.Errorf("fatal error response write: %v", err))
-			}
-		} else {
-			writer.WriteHeader(http.StatusNoContent)
-		}
-	})
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
 	<-stop
-	custom.ShutDownClient()
+	rt.ShutdownWithWait()
 }

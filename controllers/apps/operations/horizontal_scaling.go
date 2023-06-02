@@ -163,9 +163,10 @@ func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli 
 		if err != nil {
 			return err
 		}
-		lastConfig.TargetResources = map[appsv1alpha1.ComponentResourceKey][]string{
-			appsv1alpha1.PodsCompResourceKey: podNames,
+		if lastConfig.TargetResources == nil {
+			lastConfig.TargetResources = map[appsv1alpha1.ComponentResourceKey][]string{}
 		}
+		lastConfig.TargetResources[appsv1alpha1.PodsCompResourceKey] = podNames
 		comp.Replicas = *lastConfig.Replicas
 		return nil
 	})

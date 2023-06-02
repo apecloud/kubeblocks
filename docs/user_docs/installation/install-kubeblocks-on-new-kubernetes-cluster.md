@@ -2,7 +2,7 @@
 title: Install kbcli and KubeBlocks on a new Kubernetes cluster
 description: Install kbcli and KubeBlocks on a new Kubernetes cluster and the environment is clean
 keywords: [install, KubeBlocks, kbcli, on a new Kubernetes cluster, clean enivronment]
-sidebar_position: 2
+sidebar_position: 3
 sidebar_label: On a new Kubernetes cluster
 ---
 

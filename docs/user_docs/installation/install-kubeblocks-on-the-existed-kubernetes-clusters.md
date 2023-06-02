@@ -71,7 +71,7 @@ But in actual scenarios, you are recommendend to install KubeBlocks on nodes wit
 
 :::note
 
-When executing of the `kbcli kubeblocks install` command, the `preflight` checks are automatically performed to check the environment. If the current cluster meets the installation requirements, the installation continues. If it does not, the current process is terminated, and an error message is displayed. To force skip the preflight checks, you can add the `--force` flag after the "kbcli kubeblocks install" command.
+When executing the `kbcli kubeblocks install` command, the `preflight` checks run automatically to check the environment. If the current cluster meets the installation requirements, the installation continues. If it does not, the current process is terminated, and an error message is displayed. To skip the `preflight` checks, you can add the `--force` flag after the `kbcli kubeblocks install` command.
 
 :::
 

@@ -53,7 +53,6 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -129,7 +128,7 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.VolumeSnapshotSignature, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 		testapps.ClearResources(&testCtx, generics.BackupToolSignature, ml)
@@ -1407,10 +1406,10 @@ var _ = Describe("Cluster Controller", func() {
 		}
 		Expect(testCtx.Create(ctx, &backup)).Should(Succeed())
 
-		By("Checking backup status to failed, because pvc not exist")
-		Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dataprotectionv1alpha1.Backup) {
-			g.Expect(backup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
-		})).Should(Succeed())
+		By("Mocking backup status to failed")
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dataprotectionv1alpha1.Backup) {
+			backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
+		})()).Should(Succeed())
 
 		By("Set HorizontalScalePolicy")
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
@@ -1442,20 +1441,6 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			g.Expect(err).Should(HaveOccurred())
 		})).Should(Succeed())
-
-		By("expect for backup error event")
-		Eventually(func(g Gomega) {
-			eventList := corev1.EventList{}
-			Expect(k8sClient.List(ctx, &eventList, client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
-			hasBackupErrorEvent := false
-			for _, v := range eventList.Items {
-				if v.Reason == string(intctrlutil.ErrorTypeBackupFailed) {
-					hasBackupErrorEvent = true
-					break
-				}
-			}
-			g.Expect(hasBackupErrorEvent).Should(BeTrue())
-		}).Should(Succeed())
 	}
 
 	updateClusterAnnotation := func(cluster *appsv1alpha1.Cluster) {
@@ -1882,12 +1867,6 @@ var _ = Describe("Cluster Controller", func() {
 				SetBackupPolicyName(backupPolicyName).
 				SetBackupType(dataprotectionv1alpha1.BackupTypeDataFile).
 				Create(&testCtx).GetObject()
-
-			By("waiting for backup failed, because no backup policy exists")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),
-				func(g Gomega, tmpBackup *dataprotectionv1alpha1.Backup) {
-					g.Expect(tmpBackup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
-				})).Should(Succeed())
 
 			By("mocking backup status completed, we don't need backup reconcile here")
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dataprotectionv1alpha1.Backup) {

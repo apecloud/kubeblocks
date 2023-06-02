@@ -64,7 +64,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.OpsRequestSignature, true, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.VolumeSnapshotSignature, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.VolumeSnapshotSignature, true, inNS)
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
 		testapps.ClearClusterResources(&testCtx)
@@ -499,6 +499,13 @@ var _ = Describe("OpsRequest Controller", func() {
 				func(g Gomega, sts *appsv1.StatefulSet) {
 					g.Expect(*sts.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
+
+			By("Checking pvc created")
+			Eventually(testapps.List(&testCtx, intctrlutil.PersistentVolumeClaimSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: mysqlCompName,
+				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(int(replicas)))
 
 			By("mock all new PVCs scaled bounded")
 			for i := 0; i < int(replicas); i++ {

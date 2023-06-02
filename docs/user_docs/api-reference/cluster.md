@@ -276,7 +276,7 @@ Affinity
 </td>
 <td>
 <em>(Optional)</em>
-<p>tolerations are attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.</p>
+<p>tolerations are attached to tolerate any taint that matches the triple <code>key,value,effect</code> using the matching operator <code>operator</code>.</p>
 </td>
 </tr>
 </table>
@@ -396,7 +396,7 @@ secret for cluster.apps.kubeblocks.io object. Built-in objects are:
 where 1ST_COMP_NAME is the 1st component that provide</code>ClusterDefinition.spec.componentDefs[].service<code>attribute;
 </code>$(SVC_FQDN)<code>- service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
 where 1ST_COMP_NAME is the 1st component that provide</code>ClusterDefinition.spec.componentDefs[].service<code>attribute;
-</code>$(SVC<em>PORT</em><PORT-NAME>)` - a ServicePort&rsquo;s port value with specified port name, i.e, a servicePort JSON struct:
+</code>$(SVC<em>PORT</em>{PORT-NAME})` - a ServicePort&rsquo;s port value with specified port name, i.e, a servicePort JSON struct:
 { &ldquo;name&rdquo;: &ldquo;mysql&rdquo;, &ldquo;targetPort&rdquo;: &ldquo;mysqlContainerPort&rdquo;, &ldquo;port&rdquo;: 3306 }, and &ldquo;$(SVC_PORT_mysql)&rdquo; in the
 connection credential value is 3306.</p>
 </td>
@@ -2922,7 +2922,7 @@ secret for cluster.apps.kubeblocks.io object. Built-in objects are:
 where 1ST_COMP_NAME is the 1st component that provide</code>ClusterDefinition.spec.componentDefs[].service<code>attribute;
 </code>$(SVC_FQDN)<code>- service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
 where 1ST_COMP_NAME is the 1st component that provide</code>ClusterDefinition.spec.componentDefs[].service<code>attribute;
-</code>$(SVC<em>PORT</em><PORT-NAME>)` - a ServicePort&rsquo;s port value with specified port name, i.e, a servicePort JSON struct:
+</code>$(SVC<em>PORT</em>{PORT-NAME})` - a ServicePort&rsquo;s port value with specified port name, i.e, a servicePort JSON struct:
 { &ldquo;name&rdquo;: &ldquo;mysql&rdquo;, &ldquo;targetPort&rdquo;: &ldquo;mysqlContainerPort&rdquo;, &ldquo;port&rdquo;: 3306 }, and &ldquo;$(SVC_PORT_mysql)&rdquo; in the
 connection credential value is 3306.</p>
 </td>
@@ -2955,7 +2955,7 @@ Phase
 </em>
 </td>
 <td>
-<p>ClusterDefinition phase, valid values are <empty>, Available.
+<p>ClusterDefinition phase, valid values are <code>empty</code>, <code>Available</code>, &lsquo;Unavailable`.
 Available is ClusterDefinition become available, and can be referenced for co-related objects.</p>
 </td>
 </tr>
@@ -3112,7 +3112,7 @@ Affinity
 </td>
 <td>
 <em>(Optional)</em>
-<p>tolerations are attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.</p>
+<p>tolerations are attached to tolerate any taint that matches the triple <code>key,value,effect</code> using the matching operator <code>operator</code>.</p>
 </td>
 </tr>
 </tbody>

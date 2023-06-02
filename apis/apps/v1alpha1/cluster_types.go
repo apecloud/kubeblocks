@@ -61,7 +61,7 @@ type ClusterSpec struct {
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
-	// tolerations are attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.
+	// tolerations are attached to tolerate any taint that matches the triple `key,value,effect` using the matching operator `operator`.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`

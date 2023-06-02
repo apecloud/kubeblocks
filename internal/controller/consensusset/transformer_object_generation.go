@@ -153,8 +153,8 @@ func buildHeadlessSvc(csSet workloads.ConsensusSet) *corev1.Service {
 	for _, container := range csSet.Spec.Template.Spec.Containers {
 		for _, port := range container.Ports {
 			servicePort := corev1.ServicePort{
-				Protocol:   port.Protocol,
-				Port:       port.ContainerPort,
+				Protocol: port.Protocol,
+				Port:     port.ContainerPort,
 			}
 			switch {
 			case len(port.Name) > 0:

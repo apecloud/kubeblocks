@@ -31,7 +31,7 @@ Make sure you have all the followings prepared.
 * [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
 * Make sure the following tools are installed.
   * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): It is used to interact with Kubernetes clusters.
-  * [Install kbcli](./../installation/introduction.md): Choose one guide that fits your actual environments. `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
+  * [Install `kbcli`](./../../installation/install-kbcli.md). `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
 
 ### Configure access key
 
@@ -114,7 +114,7 @@ Make sure you have all the followings prepared.
 
 * Google Cloud account.
 * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): It is used to interact with Kubernetes clusters.
-* [Install kbcli](./../installation/introduction.md): Choose one guide that fits your actual environments. `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
+* [Install `kbcli`](./../installation/install-kbcli.md): `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
   
 ### Configure GCP environment
 
@@ -192,7 +192,8 @@ Make sure you have all the followings prepared.
 
 * Tencent Cloud account.
 * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): It is used to interact with Kubernetes clusters.
-* [Install kbcli](./../installation/introduction.md): Choose one guide that fits your actual environments. `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
+* [Install `kbcli`](./../../installation/install-kbcli.md). `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
+
   
 ### Configure TKE environment
 
@@ -253,7 +254,7 @@ Make sure you have all the followings prepared.
 
 * Alibaba Cloud account.
 * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): It is used to interact with Kubernetes clusters.
-* [Install kbcli](./../installation/introduction.md): Choose one guide that fits your actual environments. `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
+* [Install `kbcli`](./../installation/install-kbcli.md): Choose one guide that fits your actual environments. `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
   
 ### Configure ACK environment
 

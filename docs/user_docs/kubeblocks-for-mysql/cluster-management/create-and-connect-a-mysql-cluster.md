@@ -14,7 +14,8 @@ This document shows how to create and connect to a MySQL cluster.
 
 ### Before you start
 
-* [Install `kbcli` and KubeBlocks](./../../installation/introduction.md): Choose one guide that fits your actual environments.
+* [Install `kbcli`](./../../installation/install-kbcli.md).
+* [Install KubeBlocks](./../../installation/introduction.md): Choose one guide that fits your actual environments.
 * Make sure the ApeCloud MySQL addon is installed with `kbcli addon list`.
   
   ```bash

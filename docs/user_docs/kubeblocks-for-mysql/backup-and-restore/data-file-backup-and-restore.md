@@ -1,6 +1,6 @@
 ---
-title: Data file backup and restore for PostgreSQL
-description: How to back up and restore PostgreSQL by data files
+title: Data file backup and restore for MySQL
+description: How to back up and restore MySQL by data files
 keywords: [backup and restore, postgresql, data file]
 sidebar_position: 2
 sidebar_label: Data file
@@ -17,8 +17,7 @@ For KubeBlocks, configuring backup and restoring data is simple with 3 steps. Co
 
 Currently, KubeBlocks backs up and restores data on the storage path predefined.
 
-Choose one of the following options to configure the tartget storage path.
-
+<Tabs>
 <TabItem value="S3" label="AWS S3" default>
 
 Enable CSI-S3 and fill in the values based on your actual environment.
@@ -58,7 +57,6 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
 --set secret.secretKey=<your_access_secret> \
 --set storageClass.singleBucket=<bucket_name>  \
 --set secret.endpoint=https://oss-<region>.aliyuncs.com \
---set storageClass.mounter=s3fs,storageClass.mountOptions="" \
  -n kb-system
 
 # CSI-S3 installs a daemonSet pod on all nodes and you can set tolerations to install daemonSet pods on the specified nodes
@@ -92,6 +90,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
    ```
 
 </TabItem>
+</Tabs>
 
 You can configure a global backup storage to make this storage the default backup destination path of all new clusters. But currently, the global backup storage cannot be synchronized as the backup destination path of created clusters.
 

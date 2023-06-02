@@ -8,7 +8,7 @@ sidebar_label: Introduction
 
 # Introduction
 
-The installation section contains guides for installing `kbcli` and Kubeblocks under different scenarios to build a basic environment for managing clusters on Kubernetes. It also includes enable addons and install ChatGPT Retrieval Plugin.
+The installation section contains guides for installing `kbcli` and KubeBlocks under different scenarios to build a basic environment for managing clusters on Kubernetes. It also includes enable addons and install ChatGPT Retrieval Plugin.
 
 [Install kbcli and KubeBlocks on new Kubernetes cluster](./install-kbcli-and-kubeblocks-on-new-kubernetes-cluster.md)
 [Install kbcli and KubeBlocks on the existed Kubernetes clusters](./install-kbcli-and-kubeblocks-on-the-existed-kubernetes-clusters.md)

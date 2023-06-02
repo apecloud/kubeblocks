@@ -65,10 +65,10 @@ dnsPolicy: ClusterFirst
 ## @param podDisruptionBudget.minAvailable
 ## @param podDisruptionBudget.maxUnavailable
 podDisruptionBudget:
-  # Configures the minimum available pods for Kubeblocks disruptions.
+  # Configures the minimum available pods for KubeBlocks disruptions.
   # Cannot be used if `maxUnavailable` is set.
   minAvailable: 1
-  # Configures the maximum unavailable pods for Kubeblocks disruptions.
+  # Configures the maximum unavailable pods for KubeBlocks disruptions.
   # Cannot be used if `minAvailable` is set.
   maxUnavailable:
 

@@ -237,8 +237,12 @@ func (h *Ha) updateLockWithRetry(retryTimes int) error {
 	if err != nil {
 		opTime = 0
 	}
+	extra, err := h.DB.GetExtra(h.ctx)
+	if err != nil {
+		extra = map[string]string{}
+	}
 	for i := 0; i < retryTimes; i++ {
-		err = h.cs.UpdateLeader(h.podName, opTime)
+		err = h.cs.UpdateLeader(h.podName, opTime, extra)
 		if err == nil {
 			return nil
 		}

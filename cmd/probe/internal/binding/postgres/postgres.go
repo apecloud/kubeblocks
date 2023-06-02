@@ -824,7 +824,26 @@ func (pgOps *PostgresOperations) GetSysID(ctx context.Context) (string, error) {
 }
 
 func (pgOps *PostgresOperations) GetExtra(ctx context.Context) (map[string]string, error) {
-	return nil, nil
+	timeLineID, err := pgOps.getTimeline(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]string{
+		"timeline_id": timeLineID,
+	}, nil
+}
+
+func (pgOps *PostgresOperations) getTimeline(ctx context.Context) (string, error) {
+	sql := "SELECT CASE WHEN pg_catalog.pg_is_in_recovery() THEN 0 " +
+		"ELSE ('x' || pg_catalog.substr(pg_catalog.pg_walfile_name(pg_catalog.pg_current_wal_lsn()), 1, 8))::bit(32)::int END"
+
+	res, err := pgOps.query(ctx, sql)
+	if err != nil {
+		return "", err
+	}
+
+	return string(res), nil
 }
 
 func (pgOps *PostgresOperations) Promote(podName string) error {
@@ -878,13 +897,15 @@ func (pgOps *PostgresOperations) IsHealthiest(ctx context.Context, podName strin
 			return false
 		}
 		for _, m := range pgOps.Cs.GetCluster().Members {
-			if pgOps.checkStandbySynchronizedToLeader(ctx, m.GetName(), true) {
+			if pgOps.checkStandbySynchronizedToLeader(ctx, m.GetName(), true) && m.GetName() != podName {
 				members = append(members, m.GetName())
 			}
 		}
 	} else {
 		for _, m := range pgOps.Cs.GetCluster().Members {
-			members = append(members, m.GetName())
+			if m.GetName() != podName {
+				members = append(members, m.GetName())
+			}
 		}
 	}
 
@@ -892,6 +913,37 @@ func (pgOps *PostgresOperations) IsHealthiest(ctx context.Context, podName strin
 	if pgOps.isLagging(walPosition) {
 		pgOps.Logger.Infof("my wal position exceeds max lag")
 		return false
+	}
+
+	timeline, err := pgOps.getTimeline(ctx)
+	if err != nil {
+		pgOps.Logger.Errorf("get timelineID  err:%v", err)
+		return false
+	}
+	clusterTimeLine := pgOps.Cs.LeaderObservedRecord.GetExtra()["timeline_id"]
+	timelineID, _ := strconv.Atoi(timeline)
+	clusterTimeLineID, _ := strconv.Atoi(clusterTimeLine)
+	if timelineID < clusterTimeLineID {
+		pgOps.Logger.Infof("My timeline %s is behind last known cluster timeline %s", timeline, clusterTimeLine)
+		return false
+	}
+
+	pods, err := pgOps.Cs.ListPods()
+	for _, pod := range pods.Items {
+		client, err := sqlchannel.NewClientWithPod(&pod, pgOps.DBType)
+		if err != nil {
+			pgOps.Logger.Errorf("new client with pod err:%v", err)
+		}
+		role, err := client.GetRole()
+		if err != nil {
+			pgOps.Logger.Errorf("client check status err:%v", err)
+			return false
+		}
+		if role == PRIMARY {
+			pgOps.Logger.Errorf("Primary %s is still alive", pod.Name)
+			return false
+		}
+		// TODO: getLag
 	}
 
 	return true

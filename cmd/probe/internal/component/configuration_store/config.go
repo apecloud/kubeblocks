@@ -3,6 +3,7 @@ package configuration_store
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"strconv"
 	"strings"
@@ -58,11 +59,20 @@ func NewConfigurationStore() *ConfigurationStore {
 
 func (cs *ConfigurationStore) Init(sysID string, extra map[string]string, opTime int64) error {
 	var createOpt metav1.CreateOptions
+	var extraJsonStr string
 
 	leaderName := strings.Split(os.Getenv(util.KbPrimaryPodName), ".")[0]
 	acquireTime := time.Now().Unix()
 	renewTime := acquireTime
 	ttl := os.Getenv(util.KbTtl)
+
+	if extra != nil {
+		jsonByte, err := json.Marshal(extra)
+		if err != nil {
+			jsonByte = []byte{}
+		}
+		extraJsonStr = string(jsonByte)
+	}
 	_, err := cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cs.clusterCompName + LeaderSuffix,
@@ -73,6 +83,7 @@ func (cs *ConfigurationStore) Init(sysID string, extra map[string]string, opTime
 				RenewTime:      strconv.FormatInt(renewTime, 10),
 				TTL:            ttl,
 				OpTime:         strconv.FormatInt(opTime, 10),
+				Extra:          extraJsonStr,
 			},
 		},
 	}, createOpt)
@@ -283,10 +294,19 @@ func (cs *ConfigurationStore) ExecCmdWithPod(ctx context.Context, podName, cmd, 
 	return res, nil
 }
 
-func (cs *ConfigurationStore) UpdateLeader(podName string, opTime int64) error {
+func (cs *ConfigurationStore) UpdateLeader(podName string, opTime int64, extra map[string]string) error {
 	leaderConfigMap, err := cs.GetConfigMap(cs.clusterCompName + LeaderSuffix)
 	if err != nil {
 		return err
+	}
+
+	var extraJsonStr string
+	if extra != nil {
+		jsonByte, err := json.Marshal(extra)
+		if err != nil {
+			jsonByte = []byte{}
+		}
+		extraJsonStr = string(jsonByte)
 	}
 
 	leaderRecord := leaderConfigMap.GetAnnotations()
@@ -297,6 +317,7 @@ func (cs *ConfigurationStore) UpdateLeader(podName string, opTime int64) error {
 	if opTime != 0 {
 		leaderRecord[OpTime] = strconv.FormatInt(opTime, 10)
 	}
+	leaderRecord[Extra] = extraJsonStr
 
 	leaderConfigMap.SetAnnotations(leaderRecord)
 
@@ -310,10 +331,15 @@ type LeaderRecord struct {
 	renewTime   int64
 	ttl         int64
 	opTime      int64
+	extra       map[string]string
 }
 
 func (l *LeaderRecord) GetLeader() string {
 	return l.leader
+}
+
+func (l *LeaderRecord) GetExtra() map[string]string {
+	return l.extra
 }
 
 func newLeaderRecord(data map[string]string) *LeaderRecord {
@@ -337,11 +363,15 @@ func newLeaderRecord(data map[string]string) *LeaderRecord {
 		opTime = 0
 	}
 
+	extra := map[string]string{}
+	_ = json.Unmarshal([]byte(data[Extra]), &extra)
+
 	return &LeaderRecord{
 		acquireTime: int64(acquireTime),
 		leader:      data[binding.LEADER],
 		renewTime:   int64(renewTime),
 		ttl:         int64(ttl),
 		opTime:      int64(opTime),
+		extra:       extra,
 	}
 }

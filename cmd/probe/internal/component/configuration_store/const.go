@@ -8,6 +8,7 @@ const (
 	RenewTime          = "renew_time"
 	OpTime             = "op_time"
 	ScheduledAt        = "scheduled_at"
+	Extra              = "extra"
 )
 
 const (

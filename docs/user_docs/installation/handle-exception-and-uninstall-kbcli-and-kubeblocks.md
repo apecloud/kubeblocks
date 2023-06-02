@@ -1,35 +1,14 @@
 ---
-title: Handle exception and uninstall kbcli and KubeBlocks
+title: Uninstall kbcli and KubeBlocks
 description: Handle exception and uninstall kbcli and KubeBlocks
 keywords: [kbcli, kubeblocks, exception, uninstall]
 sidebar_position: 4
-sidebar_label: Handle Exception and Uninstall
+sidebar_label: Uninstall KubeBlocks and kbcli
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Handle an exception
-
-If installing KubeBlocks by `kbcli` fails, run preflight checks to find whether your environment meets the requirements of running KubeBlocks and clusters.
-
-```bash
-kbcli kubeblocks preflight
-```
-
-Add the `--verbose` sub-command to output the details of the preflight checks.
-
-```bash
-kbcli kubeblocks preflight --verbose
-```
-
-***Result***
-
-There are three types of results:
-
-* `fail`: The environment requirements for installing KubeBlocks are not met, and KubeBlocks can only be installed after these requirements are met. It is required to check these items again and re-run the preflight checks.
-* `warn`: The target environment affects the stability and performance of KubeBlocks and clusters, but running KubeBlocks and clusters is not affected, and you can continue the following installation.
-* `congratulation`: All checks pass and you can continue the following installation.
 
 # Uninstall KubeBlocks and kbcli
 

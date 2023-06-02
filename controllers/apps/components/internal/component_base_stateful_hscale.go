@@ -163,6 +163,38 @@ func getBackupMatchingLabels(clusterName string, componentName string) client.Ma
 	}
 }
 
+func dataCloneSucceed(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	component *component.SynthesizedComponent,
+	stsObj *appsv1.StatefulSet) (bool, error) {
+
+	checkAllPVCsExist := func() (bool, error) {
+		for i := *stsObj.Spec.Replicas; i < component.Replicas; i++ {
+			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
+				pvcKey := types.NamespacedName{
+					Namespace: stsObj.Namespace,
+					Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
+				}
+				// check pvc existence
+				pvcExists, err := isPVCExists(cli, reqCtx.Ctx, pvcKey)
+				if err != nil {
+					return true, err
+				}
+				if !pvcExists {
+					return false, nil
+				}
+			}
+		}
+		return true, nil
+	}
+
+	if component.HorizontalScalePolicy == nil {
+		return true, nil
+	}
+
+	return checkAllPVCsExist()
+}
+
 func cloneData(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
@@ -199,26 +231,6 @@ func cloneData(reqCtx intctrlutil.RequestCtx,
 		return pvcKeys
 	}
 
-	checkAllPVCsExist := func() (bool, error) {
-		for i := *stsObj.Spec.Replicas; i < component.Replicas; i++ {
-			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
-				pvcKey := types.NamespacedName{
-					Namespace: stsObj.Namespace,
-					Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-				}
-				// check pvc existence
-				pvcExists, err := isPVCExists(cli, reqCtx.Ctx, pvcKey)
-				if err != nil {
-					return true, err
-				}
-				if !pvcExists {
-					return false, nil
-				}
-			}
-		}
-		return true, nil
-	}
-
 	if component.HorizontalScalePolicy == nil {
 		return nil, nil
 	}
@@ -234,10 +246,6 @@ func cloneData(reqCtx intctrlutil.RequestCtx,
 			corev1.EventTypeWarning,
 			"HorizontalScaleFailed",
 			"scale with backup tool not support yet")
-		allPVCsExist, err := checkAllPVCsExist()
-		if err != nil {
-			return nil, err
-		}
 		// check backup ready
 		backupStatus, err := CheckBackupStatus(reqCtx, cli, backupKey)
 		if err != nil {
@@ -245,10 +253,6 @@ func cloneData(reqCtx intctrlutil.RequestCtx,
 		}
 		switch backupStatus {
 		case BackupStatusNotCreated:
-			// if pvc exists before backup created, then no need to clone data
-			if allPVCsExist {
-				return objs, nil
-			}
 			// create backup
 			backupObjs, err := Backup(reqCtx,
 				cli,
@@ -315,13 +319,6 @@ func cloneData(reqCtx intctrlutil.RequestCtx,
 		return objs, nil
 	// use volume snapshot
 	case appsv1alpha1.HScaleDataClonePolicyFromSnapshot:
-		allPVCsExist, err := checkAllPVCsExist()
-		if err != nil {
-			return nil, err
-		}
-		if allPVCsExist {
-			return objs, nil
-		}
 		if !isSnapshotAvailable(cli, reqCtx.Ctx) {
 			// TODO: add ut
 			return nil, fmt.Errorf("HorizontalScaleFailed: volume snapshot not supported")
@@ -351,7 +348,6 @@ func cloneData(reqCtx intctrlutil.RequestCtx,
 				return nil, err
 			} else {
 				objs = append(objs, snapshots...)
-				return objs, intctrlutil.NewDelayedRequeueError(time.Second, "")
 			}
 		}
 		// volumesnapshot exists, check if it is ready for use.
@@ -379,7 +375,6 @@ func cloneData(reqCtx intctrlutil.RequestCtx,
 				return nil, err
 			} else if pvc != nil {
 				objs = append(objs, pvc)
-				return objs, intctrlutil.NewDelayedRequeueError(time.Second, "")
 			}
 		}
 	// do nothing

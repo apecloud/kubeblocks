@@ -92,14 +92,14 @@ type VisualizedParam struct {
 }
 
 type ConfigOperator interface {
-	// MergeFrom update parameter by keyvalue
+	// MergeFrom updates parameter in key-value
 	MergeFrom(params map[string]interface{}, option CfgOpOption) error
 
 	// MergeFromConfig(fileContent []byte, option CfgOpOption) error
 	// MergePatch(jsonPatch []byte, option CfgOpOption) error
 	// Diff(target *ConfigOperator) (*ConfigPatchInfo, error)
 
-	// Query get parameter
+	// Query gets parameter
 	Query(jsonpath string, option CfgOpOption) ([]byte, error)
 
 	// ToCfgContent to configuration file content
@@ -139,18 +139,18 @@ func FromConfigData(data map[string]string, cmKeys *set.LinkedHashSetString) *Co
 	}
 }
 
-// GenerateTPLUniqLabelKeyWithConfig generate uniq key for configuration template
+// GenerateTPLUniqLabelKeyWithConfig generates uniq key for configuration template
 // reference: docs/img/reconfigure-cr-relationship.drawio.png
 func GenerateTPLUniqLabelKeyWithConfig(configKey string) string {
 	return GenerateUniqKeyWithConfig(constant.ConfigurationTplLabelPrefixKey, configKey)
 }
 
-// GenerateUniqKeyWithConfig is similar to getInstanceCfgCMName, generate uniq label or annotations for configuration template
+// GenerateUniqKeyWithConfig is similar to getInstanceCfgCMName, generates uniq label/annotations for configuration template
 func GenerateUniqKeyWithConfig(label string, configKey string) string {
 	return fmt.Sprintf("%s-%s", label, configKey)
 }
 
-// GenerateConstraintsUniqLabelKeyWithConfig generate uniq key for configure template
+// GenerateConstraintsUniqLabelKeyWithConfig generates uniq key for configure template
 // reference: docs/img/reconfigure-cr-relationship.drawio.png
 func GenerateConstraintsUniqLabelKeyWithConfig(configKey string) string {
 	return GenerateUniqKeyWithConfig(constant.ConfigurationConstraintsLabelPrefixKey, configKey)
@@ -168,7 +168,7 @@ func getInstanceCfgCMName(objName, tplName string) string {
 	return fmt.Sprintf("%s-%s", objName, tplName)
 }
 
-// GetComponentCfgName is similar to getInstanceCfgCMName, without statefulSet object.
+// GetComponentCfgName is similar to getInstanceCfgCMName, while without statefulSet object.
 func GetComponentCfgName(clusterName, componentName, tplName string) string {
 	return getInstanceCfgCMName(fmt.Sprintf("%s-%s", clusterName, componentName), tplName)
 }

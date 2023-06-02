@@ -22,6 +22,7 @@ Usage: $(basename "$0") <options>
                                 10) trigger release
                                 11) release message
                                 12) send message
+                                13) patch release notes
     -tn, --tag-name           Release tag name
     -gr, --github-repo        Github Repo
     -gt, --github-token       Github token
@@ -31,6 +32,7 @@ Usage: $(basename "$0") <options>
     -bw, --bot-webhook        The bot webhook
     -tt, --trigger-type       The trigger type (e.g. release/package)
     -ru, --run-url            The run url
+    -fl, --file               The release notes file
 EOF
 }
 
@@ -50,6 +52,7 @@ main() {
     local TRIGGER_TYPE="release"
     local RELEASE_VERSION=""
     local RUN_URL=""
+    local FILE=""
 
     parse_command_line "$@"
 
@@ -89,6 +92,9 @@ main() {
         ;;
         12)
             send_message
+        ;;
+        13)
+            patch_release_notes
         ;;
         *)
             show_help
@@ -161,6 +167,12 @@ parse_command_line() {
             -ru|--run-url)
                 if [[ -n "${2:-}" ]]; then
                     RUN_URL="$2"
+                    shift
+                fi
+                ;;
+            -fl|--file)
+                if [[ -n "${2:-}" ]]; then
+                    FILE="$2"
                     shift
                 fi
                 ;;
@@ -308,6 +320,11 @@ release_message() {
 }
 
 send_message() {
+    if [[ "$TAG_NAME" != "v"*"."*"."* ]]; then
+        echo "invalid tag name"
+        return
+    fi
+
     if [[ "$CONTENT" == *"success" ]]; then
         curl -H "Content-Type: application/json" -X POST $BOT_WEBHOOK \
             -d '{"msg_type":"post","content":{"post":{"zh_cn":{"title":"Success:","content":[[{"tag":"text","text":"'$CONTENT'"}]]}}}}'
@@ -377,6 +394,25 @@ check_package_version() {
         echo "$(tput -T xterm setaf 2)Version allows packaging$(tput -T xterm sgr0)"
     fi
     exit $exit_status
+}
+
+patch_release_notes() {
+    release_note=""
+    while read line; do
+      if [[ -z "${release_note}" ]]; then
+        release_note="$line"
+      else
+        release_note="$release_note\n$line"
+      fi
+    done < ${FILE}
+
+    release_id=`gh_curl -s $GITHUB_API/repos/$GITHUB_REPO/releases/tags/$TAG_NAME | jq -r '.id'`
+
+    curl -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3.raw" \
+           -X PATCH \
+    $GITHUB_API/repos/$GITHUB_REPO/releases/$release_id \
+    -d '{"body":"'"$release_note"'"}'
 }
 
 main "$@"

@@ -41,7 +41,7 @@ spec:
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: {{ .Values.persistence.data.storageClassName }}
+            storageClassName: {{ include "postgresqlcluster.storageClassName" . }}
             accessModes:
               - ReadWriteOnce
             resources:

@@ -52,7 +52,7 @@ kbcli fault network bandwidth [flags]
       --annotation stringToString      Select the pod to inject the fault according to Annotation. (default [])
       --buffer uint32                  the maximum number of bytes that can be sent instantaneously. (default 1)
       --direction string               You can select "to"" or "from"" or "both"". (default "to")
-      --dry-run string[="unchanged"]   Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
       --duration string                Supported formats of the duration are: ms / s / m / h. (default "10s")
   -e, --external-target stringArray    a network target outside of Kubernetes, which can be an IPv4 address or a domain name,
                                        	 such as "www.baidu.com". Only works with direction: to.
@@ -70,7 +70,7 @@ kbcli fault network bandwidth [flags]
       --rate string                    the rate at which the bandwidth is limited. For example : 10 bps/kbps/mbps/gbps.
       --target-label stringToString    label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0"' (default [])
       --target-mode string             You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with.
-      --target-ns-fault stringArray    Specifies the namespace into which you want to inject faults. (default [default])
+      --target-ns-fault stringArray    Specifies the namespace into which you want to inject faults.
       --target-value string            If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
       --value string                   If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
 ```

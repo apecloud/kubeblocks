@@ -42,6 +42,7 @@ var _ = Describe("Cluster", func() {
 		testComponentWithInvalidClassPath    = "../../testing/testdata/component_with_invalid_class.yaml"
 		testComponentWithResourcePath        = "../../testing/testdata/component_with_resource_1c1g.yaml"
 		testComponentWithInvalidResourcePath = "../../testing/testdata/component_with_invalid_resource.yaml"
+		testClusterPath                      = "../../testing/testdata/cluster.yaml"
 	)
 
 	const (
@@ -81,6 +82,7 @@ var _ = Describe("Cluster", func() {
 			}
 			o.Options = o
 			Expect(o.Complete()).To(Succeed())
+			Expect(o.Validate()).To(Succeed())
 			Expect(o.Name).ShouldNot(BeEmpty())
 			Expect(o.Run()).Should(HaveOccurred())
 		})
@@ -167,7 +169,7 @@ var _ = Describe("Cluster", func() {
 			Run()
 		})
 
-		It("should fail if component with resource not matching to any class", func() {
+		It("should fail if component with resource not matching any class", func() {
 			o.Values = []string{fmt.Sprintf("type=%s,cpu=1,memory=2Gi", testing.ComponentDefName)}
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
@@ -179,7 +181,7 @@ var _ = Describe("Cluster", func() {
 			Run()
 		})
 
-		It("should fail if component with cpu not matching to any class", func() {
+		It("should fail if component with cpu not matching any class", func() {
 			o.Values = []string{fmt.Sprintf("type=%s,cpu=3", testing.ComponentDefName)}
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
@@ -196,14 +198,14 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
 
-		It("should succeed if component don't have class definition", func() {
+		It("should succeed if component hasn't class definition", func() {
 			o.Values = []string{fmt.Sprintf("type=%s,cpu=3,memory=7Gi", testing.ExtraComponentDefName)}
 			Expect(o.Complete()).Should(Succeed())
 			Expect(o.Validate()).Should(Succeed())
 			Run()
 		})
 
-		It("should fail if create cluster by file not existing", func() {
+		It("should fail if create cluster by non-existed file", func() {
 			o.SetFile = "test.yaml"
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
@@ -236,14 +238,20 @@ var _ = Describe("Cluster", func() {
 			Run()
 		})
 
-		It("should fail if create cluster by file with class not exists", func() {
+		It("should fail if create cluster by file with non-existed class", func() {
 			o.SetFile = testComponentWithInvalidClassPath
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
 
-		It("should fail if create cluster by file with resource not matching to any class", func() {
+		It("should fail if create cluster by file with resource not matching any class", func() {
 			o.SetFile = testComponentWithInvalidResourcePath
 			Expect(o.Complete()).Should(HaveOccurred())
+		})
+
+		It("should succeed if create cluster with a complete config file", func() {
+			o.SetFile = testClusterPath
+			Expect(o.Complete()).Should(Succeed())
+			Expect(o.Validate()).Should(Succeed())
 		})
 	})
 

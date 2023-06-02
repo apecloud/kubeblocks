@@ -58,7 +58,7 @@ func TestInit(t *testing.T) {
 		err       string
 	}{
 		"get": {
-			input:     "{\"event\":\"Success\",\"originalRole\":\"\",\"role\":\"leader\"}",
+			input:     `{"event":"Success","operation":"checkRole","originalRole":"","role":"leader"}`,
 			operation: "checkRole",
 			metadata:  nil,
 			path:      "/",

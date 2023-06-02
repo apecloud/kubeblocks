@@ -63,7 +63,7 @@ var (
 //go:embed assets/k3d-entrypoint-mount.sh
 var k3dMountEntrypoint []byte
 
-// localCloudProvider will handle the k3d playground cluster creation and management
+// localCloudProvider handles the k3d playground cluster creation and management
 type localCloudProvider struct {
 	cfg    config.ClusterConfig
 	stdout io.Writer
@@ -75,7 +75,7 @@ var _ Interface = &localCloudProvider{}
 
 func init() {
 	if !klog.V(1).Enabled() {
-		// set k3d log level to warning to avoid so much info log
+		// set k3d log level to 'warning' to avoid too much info logs
 		l.Log().SetLevel(logrus.WarnLevel)
 	}
 }
@@ -91,7 +91,7 @@ func (p *localCloudProvider) Name() string {
 	return Local
 }
 
-// CreateK8sCluster create a local kubernetes cluster using k3d
+// CreateK8sCluster creates a local kubernetes cluster using k3d
 func (p *localCloudProvider) CreateK8sCluster(clusterInfo *K8sClusterInfo) error {
 	var err error
 
@@ -106,7 +106,7 @@ func (p *localCloudProvider) CreateK8sCluster(clusterInfo *K8sClusterInfo) error
 	return nil
 }
 
-// DeleteK8sCluster remove the k3d cluster
+// DeleteK8sCluster removes the k3d cluster
 func (p *localCloudProvider) DeleteK8sCluster(clusterInfo *K8sClusterInfo) error {
 	var err error
 	if clusterInfo == nil {
@@ -135,7 +135,7 @@ func (p *localCloudProvider) DeleteK8sCluster(clusterInfo *K8sClusterInfo) error
 		}
 	}
 
-	//	extra handling to clean up tools nodes
+	// extra handling to clean up tools nodes
 	defer func() {
 		if nl, err := k3dClient.NodeList(ctx, runtimes.SelectedRuntime); err == nil {
 			toolNode := fmt.Sprintf("k3d-%s-tools", clusterName)
@@ -188,7 +188,7 @@ func (p *localCloudProvider) GetKubeConfig() (string, error) {
 		return "", errors.Wrap(err, "unrecognized k3d kubeconfig format")
 	}
 
-	// Replace host config with loop back address
+	// replace host config with loop back address
 	return strings.ReplaceAll(cfgStr, hostToReplace, "127.0.0.1"), nil
 }
 
@@ -368,7 +368,7 @@ func setUpK3d(ctx context.Context, cluster *config.ClusterConfig) error {
 	for _, c := range l {
 		if c.Name == cluster.Name {
 			if c, err := k3dClient.ClusterGet(ctx, runtimes.SelectedRuntime, c); err == nil {
-				fmt.Printf("Detected an existing cluster: %s\n", c.Name)
+				klog.V(1).Info("Detected an existing cluster: %s\n", c.Name)
 				return nil
 			}
 			break

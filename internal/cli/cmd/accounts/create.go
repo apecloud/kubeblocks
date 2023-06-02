@@ -25,17 +25,17 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/internal/sqlchannel"
+	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type CreateUserOptions struct {
 	*AccountBaseOptions
-	info sqlchannel.UserInfo
+	info channelutil.UserInfo
 }
 
 func NewCreateUserOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *CreateUserOptions {
 	return &CreateUserOptions{
-		AccountBaseOptions: NewAccountBaseOptions(f, streams, sqlchannel.CreateUserOp),
+		AccountBaseOptions: NewAccountBaseOptions(f, streams, channelutil.CreateUserOp),
 	}
 }
 
@@ -44,7 +44,7 @@ func (o *CreateUserOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required. Specify the name of user, which must be unique.")
 	cmd.Flags().StringVarP(&o.info.Password, "password", "p", "", "Optional. Specify the password of user. The default value is empty, which means a random password will be generated.")
 	// TODO:@shanshan add expire flag if needed
-	// cmd.Flags().DurationVar(&o.info.ExpireAt, "expire", 0, "Optional. Specify the expire time of password. The default value is 0, which means the user will never expire.")
+	// cmd.Flags().DurationVar(&o.info.ExpireAt, "expire", 0, "Optional. Specify the expired time of password. The default value is 0, which means the user will never expire.")
 }
 
 func (o CreateUserOptions) Validate(args []string) error {

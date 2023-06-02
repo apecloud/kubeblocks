@@ -21,8 +21,7 @@ package util
 
 import "github.com/StudioSol/set"
 
-// Set type Reference c++ set interface to implemented stl set.
-// With generics, it may be more generic.
+// Set type Reference c++ set interface to implement stl set.
 
 func Difference(left, right *set.LinkedHashSetString) *set.LinkedHashSetString {
 	diff := set.NewLinkedHashSetString()

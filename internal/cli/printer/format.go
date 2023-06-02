@@ -21,9 +21,11 @@ package printer
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/util"
 )
 
@@ -117,4 +119,19 @@ func (o *outputValue) Set(s string) error {
 	}
 	*o = outputValue(outfmt)
 	return nil
+}
+
+// FatalWithRedColor when an error occurs, sets the red color to print it.
+func FatalWithRedColor(msg string, code int) {
+	if klog.V(99).Enabled() {
+		klog.FatalDepth(2, msg)
+	}
+	if len(msg) > 0 {
+		// add newline if needed
+		if !strings.HasSuffix(msg, "\n") {
+			msg += "\n"
+		}
+		fmt.Fprint(os.Stderr, BoldRed(msg))
+	}
+	os.Exit(code)
 }

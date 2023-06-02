@@ -66,7 +66,7 @@ var _ = Describe("monitor_utils", func() {
 			Expect(monitorConfig.ScrapePath).To(Equal("/metrics"))
 		})
 
-		It("should disable monitor if ClusterComponentDefinition.Monitor.BuiltIn is false and lacks ExporterConfig", func() {
+		It("should disable monitor if ClusterComponentDefinition.Monitor.BuiltIn is false and lack of ExporterConfig", func() {
 			clusterCompSpec.Monitor = true
 			clusterCompDef.Monitor.BuiltIn = false
 			clusterCompDef.Monitor.Exporter = nil

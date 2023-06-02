@@ -11,24 +11,24 @@ kbcli cluster explain-config [flags]
 ### Examples
 
 ```
-  # describe a cluster, e.g. cluster name is mycluster
+  # explain a cluster, e.g. cluster name is mycluster
   kbcli cluster explain-config mycluster
   
-  # describe a specified configure template, e.g. cluster name is mycluster
+  # explain a specified configure template, e.g. cluster name is mycluster
   kbcli cluster explain-config mycluster --component=mysql --config-specs=mysql-3node-tpl
   
-  # describe a specified configure template, e.g. cluster name is mycluster
+  # explain a specified configure template, e.g. cluster name is mycluster
   kbcli cluster explain-config mycluster --component=mysql --config-specs=mysql-3node-tpl --trunc-document=false --trunc-enum=false
   
-  # describe a specified parameters, e.g. cluster name is mycluster
+  # explain a specified parameters, e.g. cluster name is mycluster
   kbcli cluster explain-config mycluster --param=sql_mode
 ```
 
 ### Options
 
 ```
-      --component string       Specify the name of Component to be describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter."
-      --config-specs strings   Specify the name of the configuration template to be describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)
+      --component string       Specify the name of Component to describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter."
+      --config-specs strings   Specify the name of the configuration template to describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)
   -h, --help                   help for explain-config
       --param string           Specify the name of parameter to be query. It clearly display the details of the parameter.
       --trunc-document         If the document length of the parameter is greater than 100, it will be truncated.

@@ -8584,7 +8584,7 @@ spec:
                 type: string
               initReplicas:
                 description: InitReplicas is the number of pods(members) when cluster
-                  first initialized it's set to Replicas when at object creation time
+                  first initialized it's set to spec.Replicas at object creation time
                   and never changes
                 format: int32
                 type: integer

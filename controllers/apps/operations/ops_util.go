@@ -123,8 +123,8 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		// wait for the cluster to finish processing ops.
 		return opsRequestPhase, 0, nil
 	}
-	// TODO: judge whether ops is Failed according to whether progressDetail has failed pods.
-	// now we check the ops is Failed by the component phase, it may be not accurate during h-scale replicas.
+	// TODO: judge whether ops is Failed according to if progressDetail has failed pods.
+	// now we check the ops is Failed by the component phase, it may be inaccurate during h-scale replicas.
 	if isFailed && opsRes.Cluster.Status.ObservedGeneration >= opsRes.OpsRequest.Status.ClusterGeneration {
 		return appsv1alpha1.OpsFailedPhase, 0, nil
 	}
@@ -134,7 +134,7 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 	return appsv1alpha1.OpsSucceedPhase, 0, nil
 }
 
-// opsRequestHasProcessed checks if the opsRequest has processed.
+// opsRequestHasProcessed checks if the opsRequest has been processed.
 func opsRequestHasProcessed(opsRes OpsResource) bool {
 	return opsRes.ToClusterPhase != opsRes.Cluster.Status.Phase &&
 		opsRes.Cluster.Status.ObservedGeneration >= opsRes.OpsRequest.Status.ClusterGeneration
@@ -168,7 +168,7 @@ func patchOpsStatusWithOpsDeepCopy(ctx context.Context,
 			continue
 		}
 		opsRequest.SetStatusCondition(*v)
-		// provide an event
+		// emit an event
 		eventType := corev1.EventTypeNormal
 		if phase == appsv1alpha1.OpsFailedPhase {
 			eventType = corev1.EventTypeWarning
@@ -177,7 +177,7 @@ func patchOpsStatusWithOpsDeepCopy(ctx context.Context,
 	}
 	if opsRequestIsCompleted(phase) {
 		opsRequest.Status.CompletionTimestamp = metav1.Time{Time: time.Now()}
-		// when OpsRequest is completed, do it
+		// when OpsRequest is completed, remove it from annotation
 		if err := DeleteOpsRequestAnnotationInCluster(ctx, cli, opsRes); err != nil {
 			return err
 		}
@@ -216,17 +216,6 @@ func patchOpsHandlerNotSupported(ctx context.Context, cli client.Client, opsRes 
 func patchValidateErrorCondition(ctx context.Context, cli client.Client, opsRes *OpsResource, errMessage string) error {
 	condition := appsv1alpha1.NewValidateFailedCondition(appsv1alpha1.ReasonValidateFailed, errMessage)
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
-}
-
-// getOpsRequestNameFromAnnotation gets OpsRequest.name from cluster.annotations
-func getOpsRequestNameFromAnnotation(cluster *appsv1alpha1.Cluster, opsType appsv1alpha1.OpsType) *string {
-	opsRequestSlice, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
-	for _, v := range opsRequestSlice {
-		if v.Type == opsType {
-			return &v.Name
-		}
-	}
-	return nil
 }
 
 // GetOpsRecorderFromSlice gets OpsRequest recorder from slice by target cluster phase
@@ -285,8 +274,8 @@ func patchClusterStatusAndRecordEvent(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-// DeleteOpsRequestAnnotationInCluster when OpsRequest.status.phase is Succeed or Failed
-// we should delete the OpsRequest Annotation in cluster, unlock cluster
+// DeleteOpsRequestAnnotationInCluster when OpsRequest.status.phase is Succeeded or Failed
+// we should remove the OpsRequest Annotation of cluster, then unlock cluster
 func DeleteOpsRequestAnnotationInCluster(ctx context.Context, cli client.Client, opsRes *OpsResource) error {
 	var (
 		opsRequestSlice []appsv1alpha1.OpsRecorder
@@ -360,9 +349,9 @@ func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.Reconfiguring
 //
 // NOTES:
 // opsStatus describes status of OpsRequest.
-// reconfiguringStatus describes status of reconfiguring operation, which contains multi configuration templates.
-// cmStatus describes status of configmap, it is uniquely associated with a configuration template, which contains multi key, each key represents name of a configuration file.
-// execStatus describes the result of the execution of the state machine, which is designed to solve how to do the reconfiguring operation, such as whether to restart, how to send a signal to the process.
+// reconfiguringStatus describes status of reconfiguring operation, which contains multiple configuration templates.
+// cmStatus describes status of configmap, it is uniquely associated with a configuration template, which contains multiple keys, each key is name of a configuration file.
+// execStatus describes the result of the execution of the state machine, which is designed to solve how to conduct the reconfiguring operation, such as whether to restart, how to send a signal to the process.
 func patchReconfigureOpsStatus(
 	opsRes *OpsResource,
 	tplName string,
@@ -378,7 +367,7 @@ func patchReconfigureOpsStatus(
 	return updateReconfigureStatusByCM(reconfiguringStatus, tplName, handleReconfigureStatus)
 }
 
-// getSlowestReconfiguringProgress calculate the progress of the reconfiguring operations.
+// getSlowestReconfiguringProgress gets the progress of the reconfiguring operations.
 func getSlowestReconfiguringProgress(status []appsv1alpha1.ConfigurationStatus) string {
 	slowest := appsv1alpha1.ConfigurationStatus{
 		SucceedCount:  math.MaxInt32,

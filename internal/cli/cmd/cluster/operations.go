@@ -42,12 +42,13 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type OperationsOptions struct {
 	create.CreateOptions  `json:"-"`
 	HasComponentNamesFlag bool `json:"-"`
-	// autoApprove if it is true, will skip the double check.
+	// autoApprove when set true, skip the double check.
 	autoApprove            bool     `json:"-"`
 	ComponentNames         []string `json:"componentNames,omitempty"`
 	OpsRequestName         string   `json:"opsRequestName"`
@@ -115,21 +116,21 @@ func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStr
 	return o
 }
 
-// addCommonFlags add common flags for operations command
+// addCommonFlags adds common flags for operations command
 func (o *OperationsOptions) addCommonFlags(cmd *cobra.Command) {
 	// add print flags
 	printer.AddOutputFlagForCreate(cmd, &o.Format)
 
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
-	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 	if o.HasComponentNamesFlag {
 		cmd.Flags().StringSliceVar(&o.ComponentNames, "components", nil, "Component names to this operations")
 	}
 }
 
-// CompleteRestartOps when restart a cluster and components is null, it means restarting all components of the cluster.
+// CompleteRestartOps restarts all components of the cluster
 // we should set all component names to ComponentNames flag.
 func (o *OperationsOptions) CompleteRestartOps() error {
 	if o.Name == "" {
@@ -150,7 +151,7 @@ func (o *OperationsOptions) CompleteRestartOps() error {
 	return nil
 }
 
-// CompleteComponentsFlag when components flag is null and the cluster only has one component, should auto complete it.
+// CompleteComponentsFlag when components flag is null and the cluster only has one component, auto complete it.
 func (o *OperationsOptions) CompleteComponentsFlag() error {
 	if o.Name == "" {
 		return makeMissingClusterNameErr()
@@ -181,6 +182,34 @@ func (o *OperationsOptions) validateVolumeExpansion() error {
 	}
 	if len(o.Storage) == 0 {
 		return fmt.Errorf("missing storage")
+	}
+	for _, cName := range o.ComponentNames {
+		for _, vctName := range o.VCTNames {
+			labels := fmt.Sprintf("%s=%s,%s=%s,%s=%s",
+				constant.AppInstanceLabelKey, o.Name,
+				constant.KBAppComponentLabelKey, cName,
+				constant.VolumeClaimTemplateNameLabelKey, vctName,
+			)
+			pvcs, err := o.Client.CoreV1().PersistentVolumeClaims(o.Namespace).List(context.Background(),
+				metav1.ListOptions{LabelSelector: labels, Limit: 1})
+			if err != nil {
+				return err
+			}
+			if len(pvcs.Items) == 0 {
+				continue
+			}
+			pvc := pvcs.Items[0]
+			specStorage := pvc.Spec.Resources.Requests.Storage()
+			statusStorage := pvc.Status.Capacity.Storage()
+			targetStorage := resource.MustParse(o.Storage)
+			// determine whether the opsRequest is a recovery action for volume expansion failure
+			if specStorage.Cmp(targetStorage) > 0 &&
+				statusStorage.Cmp(targetStorage) <= 0 {
+				o.autoApprove = false
+				fmt.Fprintln(o.Out, printer.BoldYellow("Warning: this opsRequest is a recovery action for volume expansion failure and will re-create the PersistentVolumeClaims when RECOVER_VOLUME_EXPANSION_FAILURE=false"))
+				break
+			}
+		}
 	}
 	return nil
 }
@@ -252,19 +281,19 @@ func (o *OperationsOptions) Validate() error {
 
 	switch o.OpsType {
 	case appsv1alpha1.VolumeExpansionType:
-		if err := o.validateVolumeExpansion(); err != nil {
+		if err = o.validateVolumeExpansion(); err != nil {
 			return err
 		}
 	case appsv1alpha1.UpgradeType:
-		if err := o.validateUpgrade(); err != nil {
+		if err = o.validateUpgrade(); err != nil {
 			return err
 		}
 	case appsv1alpha1.VerticalScalingType:
-		if err := o.validateVScale(&cluster); err != nil {
+		if err = o.validateVScale(&cluster); err != nil {
 			return err
 		}
 	case appsv1alpha1.ExposeType:
-		if err := o.validateExpose(); err != nil {
+		if err = o.validateExpose(); err != nil {
 			return err
 		}
 	}
@@ -364,7 +393,7 @@ var restartExample = templates.Examples(`
 		# restart all components
 		kbcli cluster restart mycluster
 
-		# restart specifies the component, separate with commas when component more than one
+		# specified component to restart, separate with commas for multiple components
 		kbcli cluster restart mycluster --components=mysql
 `)
 
@@ -378,6 +407,7 @@ func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.CompleteRestartOps())
 			cmdutil.CheckErr(o.Validate())
@@ -390,11 +420,11 @@ func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 }
 
 var upgradeExample = templates.Examples(`
-		# upgrade the cluster to the specified version 
+		# upgrade the cluster to the target version 
 		kbcli cluster upgrade mycluster --cluster-version=ac-mysql-8.0.30
 `)
 
-// NewUpgradeCmd creates a upgrade command
+// NewUpgradeCmd creates an upgrade command
 func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.UpgradeType, false)
 	cmd := &cobra.Command{
@@ -404,6 +434,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
@@ -416,7 +447,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 }
 
 var verticalScalingExample = templates.Examples(`
-		# scale the computing resources of specified components, separate with commas when component more than one
+		# scale the computing resources of specified components, separate with commas for multiple components
 		kbcli cluster vscale mycluster --components=mysql --cpu=500m --memory=500Mi 
 
 		# scale the computing resources of specified components by class, run command 'kbcli class list --cluster-definition cluster-definition-name' to get available classes
@@ -433,6 +464,7 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.CompleteComponentsFlag())
 			cmdutil.CheckErr(o.Validate())
@@ -440,15 +472,15 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		},
 	}
 	o.addCommonFlags(cmd)
-	cmd.Flags().StringVar(&o.CPU, "cpu", "", "Requested and limited size of component cpu")
-	cmd.Flags().StringVar(&o.Memory, "memory", "", "Requested and limited size of component memory")
+	cmd.Flags().StringVar(&o.CPU, "cpu", "", "Request and limit size of component cpu")
+	cmd.Flags().StringVar(&o.Memory, "memory", "", "Request and limit size of component memory")
 	cmd.Flags().StringVar(&o.Class, "class", "", "Component class")
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before vertically scaling the cluster")
 	return cmd
 }
 
 var horizontalScalingExample = templates.Examples(`
-		# expand storage resources of specified components, separate with commas when component name more than one
+		# expand storage resources of specified components, separate with commas for multiple components
 		kbcli cluster hscale mycluster --components=mysql --replicas=3
 `)
 
@@ -462,6 +494,7 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.CompleteComponentsFlag())
 			cmdutil.CheckErr(o.Validate())
@@ -477,7 +510,7 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 }
 
 var volumeExpansionExample = templates.Examples(`
-		# restart specifies the component, separate with commas when <component-name> more than one
+		# restart specifies the component, separate with commas for multiple components
 		kbcli cluster volume-expand mycluster --components=mysql --volume-claim-templates=data --storage=10Gi
 `)
 
@@ -491,6 +524,7 @@ func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.CompleteComponentsFlag())
 			cmdutil.CheckErr(o.Validate())
@@ -509,7 +543,7 @@ var (
 		# Expose a cluster to vpc
 		kbcli cluster expose mycluster --type vpc --enable=true
 
-		# Expose a cluster to internet
+		# Expose a cluster to public internet
 		kbcli cluster expose mycluster --type internet --enable=true
 		
 		# Stop exposing a cluster
@@ -527,6 +561,7 @@ func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.fillExpose())
 			cmdutil.CheckErr(o.Validate())
@@ -564,6 +599,7 @@ func NewStopCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
@@ -590,6 +626,7 @@ func NewStartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete())
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())

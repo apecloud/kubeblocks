@@ -63,10 +63,10 @@ func newPrepareCmd() *cobra.Command {
 
 	cmd.Flags().BoolVar(&tpccConfig.NoCheck, "no-check", false, "TPCC prepare check, default false")
 	cmd.Flags().StringVar(&tpccConfig.OutputType, "output-type", "", "Output file type."+
-		" If empty, then load data to db. Current only support csv")
+		" If not set, database generates the data itself. Current only support csv")
 	cmd.Flags().StringVar(&tpccConfig.OutputDir, "output-dir", "", "Output directory for generating file if specified")
 	cmd.Flags().StringVar(&tpccConfig.SpecifiedTables, "tables", "", "Specified tables for "+
-		"generating file, separated by ','. Valid only if output is set. If this flag is not set, generate all tables by default")
+		"generating file, separated by ','. Valid only if output is set. If not set, generate all tables by default")
 	cmd.Flags().IntVar(&tpccConfig.PrepareRetryCount, "retry-count", 50, "Retry count when errors occur")
 	cmd.Flags().DurationVar(&tpccConfig.PrepareRetryInterval, "retry-interval", 5*time.Second, "The interval for each retry")
 	return cmd
@@ -82,7 +82,7 @@ func newRunCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&tpccConfig.Wait, "wait", false, "including keying & thinking time described on TPC-C Standard Specification")
-	cmd.Flags().DurationVar(&tpccConfig.MaxMeasureLatency, "max-measure-latency", measurement.DefaultMaxLatency, "max measure latency in millisecond")
+	cmd.Flags().DurationVar(&tpccConfig.MaxMeasureLatency, "max-measure-latency", measurement.DefaultMaxLatency, "max measure latency in milliseconds")
 	cmd.Flags().IntSliceVar(&tpccConfig.Weight, "weight", []int{45, 43, 4, 4, 4}, "Weight for NewOrder, Payment, OrderStatus, Delivery, StockLevel")
 
 	return cmd
@@ -168,7 +168,7 @@ func executeWorkload(ctx context.Context, w workload.Workloader, threads int, ac
 			defer wg.Done()
 			if err := execute(ctx, w, action, threads, index); err != nil {
 				if action == "prepare" {
-					panic(fmt.Sprintf("a fatal occurred when preparing data: %v", err))
+					panic(fmt.Sprintf("a fatal error occurred when preparing data: %v", err))
 				}
 				fmt.Printf("execute %s failed, err %v\n", action, err)
 				return

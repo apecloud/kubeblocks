@@ -55,7 +55,7 @@ var _ = Describe("Backup Controller test", func() {
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -166,7 +166,7 @@ var _ = Describe("Backup Controller test", func() {
 			It("should succeed after job completes", func() {
 				By("Check backup job's nodeName equals pod's nodeName")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *batchv1.Job) {
-					g.Expect(fetched.Spec.Template.Spec.NodeName).To(Equal(nodeName))
+					g.Expect(fetched.Spec.Template.Spec.NodeSelector[hostNameLabelKey]).To(Equal(nodeName))
 				})).Should(Succeed())
 
 				patchK8sJobStatus(backupKey, batchv1.JobComplete)

@@ -38,7 +38,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	computil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -74,7 +74,7 @@ func DoPITRPrepare(ctx context.Context, cli client.Client, cluster *appsv1alpha1
 		return nil
 	}
 
-	// build pitr init container to wait prepare data
+	// build pitr init container to wait for prepare data
 	// prepare data if PITR needed
 	pitrMgr := PointInTimeRecoveryManager{
 		Cluster: cluster,
@@ -84,7 +84,7 @@ func DoPITRPrepare(ctx context.Context, cli client.Client, cluster *appsv1alpha1
 	return pitrMgr.doPrepare(component)
 }
 
-// DoPITRIfNeed checks if run restore job and copy data for point in time recovery
+// DoPITRIfNeed if needs to run restore job and copy data for pitr
 func DoPITRIfNeed(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) (shouldRequeue bool, err error) {
 	if cluster.Status.ObservedGeneration != 1 {
 		return false, nil
@@ -97,7 +97,7 @@ func DoPITRIfNeed(ctx context.Context, cli client.Client, cluster *appsv1alpha1.
 	return pitrMgr.doRecoveryJob()
 }
 
-// DoPITRCleanup cleanup the resources and annotations after point in time recovery
+// DoPITRCleanup cleanups the resources and annotations after recovery
 func DoPITRCleanup(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) error {
 	if cluster.Status.ObservedGeneration < 1 {
 		return nil
@@ -123,7 +123,7 @@ func DoPITRCleanup(ctx context.Context, cli client.Client, cluster *appsv1alpha1
 	return nil
 }
 
-// doRecoveryJob runs a physical recovery job before cluster service start
+// doRecoveryJob runs a physical recovery job before cluster service starts
 func (p *PointInTimeRecoveryManager) doRecoveryJob() (shouldRequeue bool, err error) {
 	if need, err := p.checkAndInit(); err != nil {
 		return false, err
@@ -155,7 +155,7 @@ func (p *PointInTimeRecoveryManager) doRecoveryJob() (shouldRequeue bool, err er
 
 }
 
-// doPrepare prepares init container and pvc before point in time recovery
+// doPrepare prepares init container and pvc before recovery
 func (p *PointInTimeRecoveryManager) doPrepare(component *component.SynthesizedComponent) error {
 	if need, err := p.checkAndInit(); err != nil {
 		return err
@@ -275,7 +275,7 @@ func (p *PointInTimeRecoveryManager) getLatestBaseBackup() (*dpv1alpha1.Backup, 
 	return latestBackup, nil
 }
 
-// checkAndInit checks if cluster need to be restored, return value: true: need, false: no need
+// checkAndInit checks if cluster need to be restored
 func (p *PointInTimeRecoveryManager) checkAndInit() (need bool, err error) {
 	// check args if pitr supported
 	cluster := p.Cluster
@@ -597,7 +597,7 @@ func (p *PointInTimeRecoveryManager) removeStsInitContainer(
 	componentName string) error {
 	// get the sts list of component
 	stsList := &appsv1.StatefulSetList{}
-	if err := util.GetObjectListByComponentName(p.Ctx, p.Client, *cluster, stsList, componentName); err != nil {
+	if err := computil.GetObjectListByComponentName(p.Ctx, p.Client, *cluster, stsList, componentName); err != nil {
 		return err
 	}
 	for _, sts := range stsList.Items {

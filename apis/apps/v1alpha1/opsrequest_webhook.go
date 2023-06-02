@@ -1,20 +1,17 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package v1alpha1
@@ -27,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -308,7 +304,13 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 	if err := r.checkComponentExistence(cluster, componentNames); err != nil {
 		return err
 	}
-
+	runningOpsList, err := GetRunningOpsByOpsType(ctx, cli, r.Spec.ClusterRef, r.Namespace, string(VolumeExpansionType))
+	if err != nil {
+		return err
+	}
+	if len(runningOpsList) > 0 && runningOpsList[0].Name != r.Name {
+		return fmt.Errorf("existing other VolumeExpansion OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", runningOpsList[0].Name, cluster.Name)
+	}
 	return r.checkVolumesAllowExpansion(ctx, cli, cluster)
 }
 
@@ -351,8 +353,6 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 			vols[comp.ComponentName][vct.Name] = Entity{false, nil, false, vct.Storage}
 		}
 	}
-	// TODO: remove it after supporting to recover volume expansion when it fails.
-	recoverVolumeExpansionFailure := viper.GetBool(constant.CfgRecoverVolumeExpansionFailure)
 	// traverse the spec to update volumes
 	for _, comp := range cluster.Spec.ComponentSpecs {
 		if _, ok := vols[comp.Name]; !ok {
@@ -363,14 +363,6 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 			if !ok {
 				continue
 			}
-			// TODO:
-			// compare the requested storage size with the pvc.status.capacity when KubeBlocks supports to manage the pvc by self
-			// and supports to recover volume expansion when it is fails.
-			previousValue := *vct.Spec.Resources.Requests.Storage()
-			if e.requestStorage.Cmp(previousValue) < 0 && !recoverVolumeExpansionFailure {
-				return fmt.Errorf(`requested storage size of volumeClaimTemplate "%s" can not less than previous values "%s" unless both Kubernetes and KubeBlocks support RECOVER_VOLUME_EXPANSION_FAILURE`,
-					vct.Name, previousValue.String())
-			}
 			e.existInSpec = true
 			e.storageClassName = vct.Spec.StorageClassName
 			vols[comp.Name][vct.Name] = e
@@ -378,14 +370,16 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 	}
 
 	// check all used storage classes
+	var err error
 	for cname, compVols := range vols {
 		for vname := range compVols {
 			e := vols[cname][vname]
 			if !e.existInSpec {
 				continue
 			}
-			if e.storageClassName == nil {
-				e.storageClassName = r.getSCNameByPvc(ctx, cli, cname, vname)
+			e.storageClassName, err = r.getSCNameByPvcAndCheckStorageSize(ctx, cli, cname, vname, e.requestStorage)
+			if err != nil {
+				return err
 			}
 			allowExpansion, err := r.checkStorageClassAllowExpansion(ctx, cli, e.storageClassName)
 			if err != nil {
@@ -447,23 +441,30 @@ func (r *OpsRequest) checkStorageClassAllowExpansion(ctx context.Context,
 	return *storageClass.AllowVolumeExpansion, nil
 }
 
-// getSCNameByPvc gets the storageClassName by pvc.
-func (r *OpsRequest) getSCNameByPvc(ctx context.Context,
+// getSCNameByPvcAndCheckStorageSize gets the storageClassName by pvc and checks if the storage size is valid.
+func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	cli client.Client,
 	compName,
-	vctName string) *string {
+	vctName string,
+	requestStorage resource.Quantity) (*string, error) {
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err := cli.List(ctx, pvcList, client.InNamespace(r.Namespace), client.MatchingLabels{
-		constant.AppInstanceLabelKey:    r.Spec.ClusterRef,
-		constant.KBAppComponentLabelKey: compName,
-		constant.PVCNameLabelKey:        vctName,
+		constant.AppInstanceLabelKey:             r.Spec.ClusterRef,
+		constant.KBAppComponentLabelKey:          compName,
+		constant.VolumeClaimTemplateNameLabelKey: vctName,
 	}, client.Limit(1)); err != nil {
-		return nil
+		return nil, err
 	}
 	if len(pvcList.Items) == 0 {
-		return nil
+		return nil, nil
 	}
-	return pvcList.Items[0].Spec.StorageClassName
+	pvc := pvcList.Items[0]
+	previousValue := *pvc.Status.Capacity.Storage()
+	if requestStorage.Cmp(previousValue) < 0 {
+		return nil, fmt.Errorf(`requested storage size of volumeClaimTemplate "%s" can not less than status.capacity.storage "%s" `,
+			vctName, previousValue.String())
+	}
+	return pvc.Spec.StorageClassName, nil
 }
 
 // validateVerticalResourceList checks if k8s resourceList is legal
@@ -483,4 +484,27 @@ func notEmptyError(target string) error {
 
 func invalidValueError(target string, value string) error {
 	return fmt.Errorf(`invalid value for "%s": %s`, target, value)
+}
+
+// GetRunningOpsByOpsType gets the running opsRequests by type.
+func GetRunningOpsByOpsType(ctx context.Context, cli client.Client,
+	clusterName, namespace, opsType string) ([]OpsRequest, error) {
+	opsRequestList := &OpsRequestList{}
+	if err := cli.List(ctx, opsRequestList, client.MatchingLabels{
+		constant.AppInstanceLabelKey:    clusterName,
+		constant.OpsRequestTypeLabelKey: opsType,
+	}, client.InNamespace(namespace)); err != nil {
+		return nil, err
+	}
+	if len(opsRequestList.Items) == 0 {
+		return nil, nil
+	}
+	var runningOpsList []OpsRequest
+	for _, v := range opsRequestList.Items {
+		if v.Status.Phase == OpsRunningPhase {
+			runningOpsList = append(runningOpsList, v)
+			break
+		}
+	}
+	return runningOpsList, nil
 }

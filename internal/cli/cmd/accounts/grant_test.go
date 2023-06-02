@@ -35,7 +35,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/sqlchannel"
+	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 var _ = Describe("Grant Account Options", func() {
@@ -82,18 +82,18 @@ var _ = Describe("Grant Account Options", func() {
 
 	Context("new options", func() {
 		It("new option", func() {
-			for _, op := range []bindings.OperationKind{sqlchannel.GrantUserRoleOp, sqlchannel.RevokeUserRoleOp} {
+			for _, op := range []bindings.OperationKind{channelutil.GrantUserRoleOp, channelutil.RevokeUserRoleOp} {
 				o := NewGrantOptions(tf, streams, op)
 				Expect(o).ShouldNot(BeNil())
 			}
-			for _, op := range []bindings.OperationKind{sqlchannel.CreateUserOp, sqlchannel.DeleteUserOp, sqlchannel.DescribeUserOp, sqlchannel.ListUsersOp} {
+			for _, op := range []bindings.OperationKind{channelutil.CreateUserOp, channelutil.DeleteUserOp, channelutil.DescribeUserOp, channelutil.ListUsersOp} {
 				o := NewGrantOptions(tf, streams, op)
 				Expect(o).Should(BeNil())
 			}
 		})
 
 		It("validate options", func() {
-			for _, op := range []bindings.OperationKind{sqlchannel.GrantUserRoleOp, sqlchannel.RevokeUserRoleOp} {
+			for _, op := range []bindings.OperationKind{channelutil.GrantUserRoleOp, channelutil.RevokeUserRoleOp} {
 				o := NewGrantOptions(tf, streams, op)
 				Expect(o).ShouldNot(BeNil())
 				args := []string{}
@@ -117,7 +117,7 @@ var _ = Describe("Grant Account Options", func() {
 		})
 
 		It("complete option", func() {
-			o := NewGrantOptions(tf, streams, sqlchannel.GrantUserRoleOp)
+			o := NewGrantOptions(tf, streams, channelutil.GrantUserRoleOp)
 			Expect(o).ShouldNot(BeNil())
 			o.PodName = pods.Items[0].Name
 			o.ClusterName = clusterName

@@ -34,7 +34,7 @@ import (
 	"github.com/spf13/viper"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	. "github.com/apecloud/kubeblocks/cmd/probe/util"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 // HTTPCustom is a binding for an http url endpoint invocation

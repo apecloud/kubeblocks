@@ -102,7 +102,7 @@ func NewBenchCmd() *cobra.Command {
 			fmt.Printf("\nGot signal [%v] again to exit.\n", sig)
 			os.Exit(1)
 		case <-time.After(10 * time.Second):
-			fmt.Print("\nWait 10s for closed, force exit\n")
+			fmt.Print("\nWaited 10s to close, force exit\n")
 			os.Exit(1)
 		case <-closeDone:
 			return

@@ -85,7 +85,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	config := &corev1.ConfigMap{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, config); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "not find configmap")
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "cannot find configmap")
 	}
 
 	if !checkConfigurationObject(config) {
@@ -107,7 +107,7 @@ func (r *ReconfigureRequestReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	if cfgConstraintsName, ok := config.Labels[constant.CMConfigurationConstraintsNameLabelKey]; !ok || len(cfgConstraintsName) == 0 {
-		reqCtx.Log.V(1).Info("configuration not set ConfigConstraints, not support reconfigure.")
+		reqCtx.Log.V(1).Info("configuration without ConfigConstraints, does not support reconfigure.")
 		return intctrlutil.Reconciled()
 	}
 
@@ -166,7 +166,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder, err, reqCtx.Log)
 	}
 
-	// Not any parameters updated
+	// No parameters updated
 	if !configPatch.IsModify {
 		return r.updateConfigCMStatus(reqCtx, config, cfgcore.ReconfigureNoChangeType)
 	}
@@ -297,7 +297,7 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 	)
 
 	if len(cm.Annotations) != 0 {
-		lastOpsRequest = cm.Annotations[constant.LastAppliedOpsCRAnnotation]
+		lastOpsRequest = cm.Annotations[constant.LastAppliedOpsCRAnnotationKey]
 	}
 
 	eventContext := cfgcore.ConfigEventContext{

@@ -17,47 +17,47 @@
 
 // required, command line input options for parameters and flags
 options: {
-	kind: 						string
-	namespace: 				string
-	action: 					string
-	secretName: 			string
-	region: 					string
-	instance: 				string
-	volumeID: 				string
-	deviceName?: 			string
-	duration: 				string
+	kind:        string
+	namespace:   string
+	action:      string
+	secretName:  string
+	region:      string
+	instance:    string
+	volumeID:    string
+	deviceName?: string
+	duration:    string
 
-	project: 					string
+	project: string
 }
 
 // required, k8s api resource content
 content: {
-  kind: options.kind
-  apiVersion: "chaos-mesh.org/v1alpha1"
-  metadata:{
-  	generateName: "node-chaos-"
-    namespace: options.namespace
-  }
-  spec:{
-  	action: options.action
+	kind:       options.kind
+	apiVersion: "chaos-mesh.org/v1alpha1"
+	metadata: {
+		generateName: "node-chaos-"
+		namespace:    options.namespace
+	}
+	spec: {
+		action:     options.action
 		secretName: options.secretName
-		duration: options.duration
+		duration:   options.duration
 
-		if options.kind == "AWSChaos"  {
-			awsRegion: options.region
+		if options.kind == "AWSChaos" {
+			awsRegion:   options.region
 			ec2Instance: options.instance
 			if options.deviceName != _|_ {
-				volumeID: options.volumeID
+				volumeID:   options.volumeID
 				deviceName: options.deviceName
 			}
 		}
 
-		if options.kind == "GCPChaos"  {
-			project: options.project
-			zone: options.region
+		if options.kind == "GCPChaos" {
+			project:  options.project
+			zone:     options.region
 			instance: options.instance
 			if options.deviceName != _|_ {
-				deviceNames:[options.deviceName]
+				deviceNames: [options.deviceName]
 			}
 
 		}

@@ -25,6 +25,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -32,10 +33,37 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// BuildComponent generates a new Component object, which is a mixture of
+func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster appsv1alpha1.Cluster,
+	clusterDef appsv1alpha1.ClusterDefinition,
+	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
+	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
+) (*SynthesizedComponent, error) {
+	synthesizedComp, err := buildComponent(reqCtx, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+	if err != nil {
+		return nil, err
+	}
+	if err := buildRestoreInfoFromBackup(reqCtx, cli, cluster, synthesizedComp); err != nil {
+		return nil, err
+	}
+	return synthesizedComp, nil
+}
+
+func BuildComponent(reqCtx intctrlutil.RequestCtx,
+	cluster appsv1alpha1.Cluster,
+	clusterDef appsv1alpha1.ClusterDefinition,
+	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
+	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
+) (*SynthesizedComponent, error) {
+	return buildComponent(reqCtx, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+}
+
+// buildComponent generates a new Component object, which is a mixture of
 // component-related configs from input Cluster, ClusterDef and ClusterVersion.
-func BuildComponent(
-	reqCtx intctrlutil.RequestCtx,
+func buildComponent(reqCtx intctrlutil.RequestCtx,
 	cluster appsv1alpha1.Cluster,
 	clusterDef appsv1alpha1.ClusterDefinition,
 	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
@@ -46,6 +74,8 @@ func BuildComponent(
 	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
 		ClusterDefName:        clusterDef.Name,
+		ClusterName:           cluster.Name,
+		ClusterUID:            string(cluster.UID),
 		Name:                  clusterCompSpec.Name,
 		Type:                  clusterCompDefObj.Name,
 		CharacterType:         clusterCompDefObj.CharacterType,
@@ -146,7 +176,7 @@ func BuildComponent(
 	return component, nil
 }
 
-// appendOrOverrideContainerAttr is used to append targetContainer to compContainers or override the attributes of compContainers with a given targetContainer,
+// appendOrOverrideContainerAttr appends targetContainer to compContainers or overrides the attributes of compContainers with a given targetContainer,
 // if targetContainer does not exist in compContainers, it will be appended. otherwise it will be updated with the attributes of the target container.
 func appendOrOverrideContainerAttr(compContainers []corev1.Container, targetContainer corev1.Container) []corev1.Container {
 	index, compContainer := intctrlutil.GetContainerByName(compContainers, targetContainer.Name)
@@ -236,16 +266,16 @@ func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedVal
 }
 
 // GetReplacementMapForBuiltInEnv gets the replacement map for KubeBlocks built-in environment variables.
-func GetReplacementMapForBuiltInEnv(cluster *appsv1alpha1.Cluster, componentName string) map[string]string {
+func GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
 	replacementMap := map[string]string{
-		constant.KBClusterNamePlaceHolder:     cluster.Name,
+		constant.KBClusterNamePlaceHolder:     clusterName,
 		constant.KBCompNamePlaceHolder:        componentName,
-		constant.KBClusterCompNamePlaceHolder: fmt.Sprintf("%s-%s", cluster.Name, componentName),
+		constant.KBClusterCompNamePlaceHolder: fmt.Sprintf("%s-%s", clusterName, componentName),
 	}
-	if len(cluster.UID) > 8 {
-		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = string(cluster.UID)[len(cluster.UID)-8:]
+	if len(clusterUID) > 8 {
+		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = clusterUID[len(clusterUID)-8:]
 	} else {
-		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = string(cluster.UID)
+		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = clusterUID
 	}
 	return replacementMap
 }

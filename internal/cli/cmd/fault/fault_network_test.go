@@ -84,7 +84,7 @@ var _ = Describe("Fault Network", func() {
 			cmd := o.NewCobraCommand(Loss, LossShort)
 			o.AddCommonFlag(cmd)
 			cmd.Flags().StringVar(&o.Loss, "loss", "", `Indicates the probability of a packet error occurring. Value range: [0, 100].`)
-			cmd.Flags().StringVarP(&o.Correlation, "correlation", "c", "0", `Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100].`)
+			cmd.Flags().StringVarP(&o.NetworkLoss.Correlation, "correlation", "c", "0", `Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100].`)
 
 			for _, input := range inputs {
 				Expect(cmd.Flags().Parse(input)).Should(Succeed())
@@ -107,7 +107,7 @@ var _ = Describe("Fault Network", func() {
 			o.AddCommonFlag(cmd)
 			cmd.Flags().StringVar(&o.Latency, "latency", "", `the length of time to delay.`)
 			cmd.Flags().StringVar(&o.Jitter, "jitter", "0ms", `the variation range of the delay time.`)
-			cmd.Flags().StringVarP(&o.Correlation, "correlation", "c", "0", `Indicates the probability of a packet error occurring. Value range: [0, 100].`)
+			cmd.Flags().StringVarP(&o.NetworkDelay.Correlation, "correlation", "c", "0", `Indicates the probability of a packet error occurring. Value range: [0, 100].`)
 
 			for _, input := range inputs {
 				Expect(cmd.Flags().Parse(input)).Should(Succeed())
@@ -127,7 +127,7 @@ var _ = Describe("Fault Network", func() {
 			cmd := o.NewCobraCommand(Duplicate, DuplicateShort)
 			o.AddCommonFlag(cmd)
 			cmd.Flags().StringVar(&o.Duplicate, "duplicate", "", `the probability of a packet being repeated. Value range: [0, 100].`)
-			cmd.Flags().StringVarP(&o.Correlation, "correlation", "c", "0", `Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100].`)
+			cmd.Flags().StringVarP(&o.NetworkDuplicate.Correlation, "correlation", "c", "0", `Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100].`)
 
 			for _, input := range inputs {
 				Expect(cmd.Flags().Parse(input)).Should(Succeed())
@@ -147,7 +147,7 @@ var _ = Describe("Fault Network", func() {
 			cmd := o.NewCobraCommand(Corrupt, CorruptShort)
 			o.AddCommonFlag(cmd)
 			cmd.Flags().StringVar(&o.Corrupt, "corrupt", "", `Indicates the probability of a packet error occurring. Value range: [0, 100].`)
-			cmd.Flags().StringVarP(&o.Correlation, "correlation", "c", "0", `Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100].`)
+			cmd.Flags().StringVarP(&o.NetworkCorrupt.Correlation, "correlation", "c", "0", `Indicates the correlation between the probability of a packet error occurring and whether it occurred the previous time. Value range: [0, 100].`)
 
 			for _, input := range inputs {
 				Expect(cmd.Flags().Parse(input)).Should(Succeed())

@@ -85,7 +85,7 @@ spec:
             - name: ENABLE_WEBHOOKS
               value: "true"
             {{- end }}
-            {{- if not ( include "kubeblocks.addonControllerEnabled" . ) }}
+            {{- if ( include "kubeblocks.addonControllerEnabled" . ) | deepEqual "false" }}
             - name: DISABLE_ADDON_CTRLER
               value: "true"
             {{- else }}

@@ -36,10 +36,6 @@ import (
 	"go.uber.org/automaxprocs/maxprocs"
 )
 
-var (
-	logger = log.Logger{}
-)
-
 func main() {
 	// set GOMAXPROCS
 	_, _ = maxprocs.Set()
@@ -60,13 +56,16 @@ func main() {
 		panic(fmt.Errorf("fatal error config file: %v", err))
 	}
 
-	custom := observation.NewController(logger)
+	custom := observation.NewController()
 	err = custom.Init()
 	if err != nil {
 		panic(fmt.Errorf("fatal error custom init: %v", err))
 	}
 
-	http.ListenAndServe("localhost:3501", nil)
+	err = http.ListenAndServe("localhost:3501", nil)
+	if err != nil {
+		panic(fmt.Errorf("fatal error http listen: %v", err))
+	}
 	url := "/role"
 
 	http.HandleFunc(url, func(writer http.ResponseWriter, request *http.Request) {
@@ -85,7 +84,10 @@ func main() {
 		if shouldNotify {
 			code, _ := strconv.Atoi(observation.OperationFailedHTTPCode)
 			writer.WriteHeader(code)
-			writer.Write(buf)
+			_, err = writer.Write(buf)
+			if err != nil {
+				panic(fmt.Errorf("fatal error response write: %v", err))
+			}
 		} else {
 			writer.WriteHeader(http.StatusNoContent)
 		}

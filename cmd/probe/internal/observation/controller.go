@@ -30,7 +30,7 @@ type Controller struct {
 	// 1 rolechanged event lost;
 	// 2 pod role label deleted or updated incorrectly.
 	RoleDetectionThreshold int
-	OriRole                string // 原先的row
+	OriRole                string
 	Logger                 log.Logger
 	DBRoles                map[string]AccessMode
 	actionSvcPorts         *[]int
@@ -42,9 +42,9 @@ func init() {
 	viper.SetDefault("KB_ROLE_DETECTION_THRESHOLD", defaultRoleDetectionThreshold)
 }
 
-func NewController(logger log.Logger) *Controller {
+func NewController() *Controller {
 	return &Controller{
-		Logger:         logger,
+		Logger:         log.Logger{},
 		actionSvcPorts: &[]int{},
 	}
 }

@@ -189,7 +189,7 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 
-	if err := c.statusHorizontalScale(reqCtx, cli, statusTxn); err != nil {
+	if err := c.HorizontalScale(reqCtx, cli); err != nil {
 		if intctrlutil.IsDelayedRequeueError(err) {
 			delayedErr = err
 		} else {
@@ -480,6 +480,12 @@ func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, c
 	var delayedErr error
 	ret := c.horizontalScaling(c.runningWorkload)
 	if ret == 0 {
+		if err := c.postScaleIn(reqCtx, cli); err != nil {
+			return err
+		}
+		if err := c.postScaleOut(reqCtx, cli, c.runningWorkload); err != nil {
+			return err
+		}
 		return nil
 	}
 	if ret < 0 {
@@ -566,7 +572,7 @@ func (c *StatefulComponentBase) scaleIn(reqCtx intctrlutil.RequestCtx, cli clien
 	return nil
 }
 
-func (c *StatefulComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+func (c *StatefulComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	hasJobFailed := func(reqCtx intctrlutil.RequestCtx, cli client.Client) (*batchv1.Job, string, error) {
 		jobs, err := util.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.JobSignature, c.GetNamespace(), c.GetMatchingLabels())
 		if err != nil {
@@ -590,9 +596,10 @@ func (c *StatefulComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli c
 	} else if job != nil {
 		msgKey := fmt.Sprintf("%s/%s", job.GetObjectKind().GroupVersionKind().Kind, job.GetName())
 		statusMessage := appsv1alpha1.ComponentMessageMap{msgKey: msg}
-		txn.propose(appsv1alpha1.AbnormalClusterCompPhase, func() {
-			c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, statusMessage, "PVC deletion job failed")
-		})
+		// TODO: CT - remove this cronjob later
+		//txn.propose(appsv1alpha1.AbnormalClusterCompPhase, func() {
+		c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, statusMessage, "PVC deletion job failed")
+		//})
 	}
 	return nil
 }
@@ -710,25 +717,25 @@ func (c *StatefulComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli 
 	return nil
 }
 
-func (c *StatefulComponentBase) statusHorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
-	ret := c.horizontalScaling(c.runningWorkload)
-	if ret < 0 {
-		return nil
-	}
-	if ret > 0 {
-		// forward the h-scaling progress.
-		return c.scaleOut(reqCtx, cli, c.runningWorkload)
-	}
-	if ret == 0 { // sts has been updated
-		if err := c.postScaleIn(reqCtx, cli, txn); err != nil {
-			return err
-		}
-		if err := c.postScaleOut(reqCtx, cli, c.runningWorkload); err != nil {
-			return err
-		}
-	}
-	return nil
-}
+//func (c *StatefulComponentBase) statusHorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+//	ret := c.horizontalScaling(c.runningWorkload)
+//	if ret < 0 {
+//		return nil
+//	}
+//	if ret > 0 {
+//		// forward the h-scaling progress.
+//		return c.scaleOut(reqCtx, cli, c.runningWorkload)
+//	}
+//	if ret == 0 { // sts has been updated
+//		if err := c.postScaleIn(reqCtx, cli, txn); err != nil {
+//			return err
+//		}
+//		if err := c.postScaleOut(reqCtx, cli, c.runningWorkload); err != nil {
+//			return err
+//		}
+//	}
+//	return nil
+//}
 
 func (c *StatefulComponentBase) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	if stsObj == nil {

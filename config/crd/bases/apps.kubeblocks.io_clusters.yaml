@@ -519,7 +519,7 @@ spec:
                 type: string
               tolerations:
                 description: tolerations are attached to tolerate any taint that matches
-                  the triple <key,value,effect> using the matching operator <operator>.
+                  the triple `key,value,effect` using the matching operator `operator`.
                 items:
                   description: The pod this Toleration is attached to tolerates any
                     taint that matches the triple <key,value,effect> using the matching

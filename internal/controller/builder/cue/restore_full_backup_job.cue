@@ -101,7 +101,7 @@ job: {
 							claimName: pvcName
 						}
 					},
-					if component.volumeTypes != _|_
+					if component.volumeTypes == _|_
 					for _, vct in component.volumeClaimTemplates
 					if vct.metadata.name == "data" {
 						name: vct.metadata.name

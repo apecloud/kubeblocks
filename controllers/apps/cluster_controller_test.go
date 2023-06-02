@@ -29,6 +29,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	batchv1 "k8s.io/api/batch/v1"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
@@ -503,7 +504,7 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(func() int32 {
 				stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, comp.Name)
 				return *stsList.Items[0].Spec.Replicas
-			}).Should(BeEquivalentTo(updatedReplicas))
+			}, "200s").Should(BeEquivalentTo(updatedReplicas))
 		}
 
 		if policy == nil {
@@ -511,7 +512,7 @@ var _ = Describe("Cluster Controller", func() {
 			return
 		}
 
-		By("Checking Backup created")
+		By(fmt.Sprintf("Checking backup of component %s created", comp.Name))
 		Eventually(testapps.List(&testCtx, generics.BackupSignature,
 			client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
@@ -521,7 +522,7 @@ var _ = Describe("Cluster Controller", func() {
 		backupKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
 			clusterKey.Name, comp.Name),
 			Namespace: testCtx.DefaultNamespace}
-		By("mocking backup status to completed")
+		By("Mocking backup status to completed")
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dataprotectionv1alpha1.Backup) {
 			backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 			backup.Status.PersistentVolumeClaimName = "backup-data"
@@ -554,13 +555,14 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(k8sClient.Status().Update(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
 		}
 
+		By("Checking pvc created")
+		Eventually(testapps.List(&testCtx, generics.PersistentVolumeClaimSignature,
+			client.MatchingLabels{
+				constant.AppInstanceLabelKey:    clusterKey.Name,
+				constant.KBAppComponentLabelKey: comp.Name,
+			}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(updatedReplicas))
+
 		if policy.Type == appsv1alpha1.HScaleDataClonePolicyFromBackup {
-			By("Checking pvc created")
-			Eventually(testapps.List(&testCtx, generics.PersistentVolumeClaimSignature,
-				client.MatchingLabels{
-					constant.AppInstanceLabelKey:    clusterKey.Name,
-					constant.KBAppComponentLabelKey: comp.Name,
-				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(updatedReplicas))
 			By("Checking restore job created")
 			Eventually(testapps.List(&testCtx, generics.JobSignature,
 				client.MatchingLabels{
@@ -568,6 +570,20 @@ var _ = Describe("Cluster Controller", func() {
 					constant.KBAppComponentLabelKey: comp.Name,
 					constant.KBManagedByKey:         "cluster",
 				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(updatedReplicas - int(comp.Replicas)))
+			By("Mocking job status to succeeded")
+			ml := client.MatchingLabels{
+				constant.AppInstanceLabelKey:    clusterKey.Name,
+				constant.KBAppComponentLabelKey: comp.Name,
+				constant.KBManagedByKey:         "cluster",
+			}
+			jobList := batchv1.JobList{}
+			testCtx.Cli.List(testCtx.Ctx, &jobList, ml)
+			for _, job := range jobList.Items {
+				key := client.ObjectKeyFromObject(&job)
+				Expect(testapps.GetAndChangeObjStatus(&testCtx, key, func(job *batchv1.Job) {
+					job.Status.Succeeded = 1
+				})()).Should(Succeed())
+			}
 		}
 
 		By("Mock PVCs status to bound")
@@ -582,13 +598,15 @@ var _ = Describe("Cluster Controller", func() {
 			})()).ShouldNot(HaveOccurred())
 		}
 
-		By("Check backup job cleanup")
-		Eventually(testapps.List(&testCtx, generics.BackupSignature,
-			client.MatchingLabels{
-				constant.AppInstanceLabelKey:    clusterKey.Name,
-				constant.KBAppComponentLabelKey: comp.Name,
-			}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
-		Eventually(testapps.CheckObjExists(&testCtx, backupKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
+		if policy.Type == appsv1alpha1.HScaleDataClonePolicyFromSnapshot {
+			By("Check backup job cleanup")
+			Eventually(testapps.List(&testCtx, generics.BackupSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: comp.Name,
+				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
+			Eventually(testapps.CheckObjExists(&testCtx, backupKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
+		}
 
 		checkUpdatedStsReplicas()
 
@@ -629,7 +647,7 @@ var _ = Describe("Cluster Controller", func() {
 				}
 				g.Expect(foundPodHostname != "").Should(BeTrue())
 			}
-		})).Should(Succeed())
+		}), "200s").Should(Succeed())
 	}
 
 	// @argument componentDefsWithHScalePolicy assign ClusterDefinition.spec.componentDefs[].horizontalScalePolicy for
@@ -640,7 +658,7 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
 		initialGeneration := int(cluster.Status.ObservedGeneration)
 
-		By("Set HorizontalScalePolicy")
+		By(fmt.Sprintf("Set HorizontalScalePolicy, policyType is %s", policyType))
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 			func(clusterDef *appsv1alpha1.ClusterDefinition) {
 				// assign 1st component
@@ -722,6 +740,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Get the latest cluster def")
 		Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(clusterDefObj), clusterDefObj)).Should(Succeed())
 		for i, comp := range clusterObj.Spec.ComponentSpecs {
+			By(fmt.Sprintf("H-scale component %s with policy %s", comp.Name, hscalePolicy(comp)))
 			horizontalScaleComp(updatedReplicas, &clusterObj.Spec.ComponentSpecs[i], hscalePolicy(comp))
 		}
 

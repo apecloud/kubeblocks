@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -221,9 +222,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 		return fmt.Errorf("wrong vertex type %v", vertex)
 	}
 	if node.Action == nil {
-		return nil
-		// TODO: CT - hack to make reconcile work
-		//return errors.New("node action can't be nil")
+		return errors.New("node action can't be nil")
 	}
 
 	// cluster object has more business to do, handle them here

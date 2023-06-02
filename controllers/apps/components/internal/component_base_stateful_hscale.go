@@ -351,8 +351,8 @@ func cloneData(reqCtx intctrlutil.RequestCtx,
 				return nil, err
 			} else {
 				objs = append(objs, snapshots...)
+				return objs, intctrlutil.NewDelayedRequeueError(time.Second, "")
 			}
-			break
 		}
 		// volumesnapshot exists, check if it is ready for use.
 		ready, err := isVolumeSnapshotReadyToUse(cli, reqCtx.Ctx, cluster, component)
@@ -379,6 +379,7 @@ func cloneData(reqCtx intctrlutil.RequestCtx,
 				return nil, err
 			} else if pvc != nil {
 				objs = append(objs, pvc)
+				return objs, intctrlutil.NewDelayedRequeueError(time.Second, "")
 			}
 		}
 	// do nothing

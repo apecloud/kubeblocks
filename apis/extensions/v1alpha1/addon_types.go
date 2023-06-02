@@ -205,8 +205,8 @@ type HelmJSONValueMapType struct {
 type HelmValuesMappingItem struct {
 	// valueMap define the "key" mapping values. Valid keys are replicaCount,
 	// persistentVolumeEnabled, and storageClass. Enum values explained:
-	// `"replicaCount"` sets the replicaCount value mapping key. 
-	// `"persistentVolumeEnabled"` sets the persistent volume enabled mapping key. 
+	// `"replicaCount"` sets the replicaCount value mapping key.
+	// `"persistentVolumeEnabled"` sets the persistent volume enabled mapping key.
 	// `"storageClass"` sets the storageClass mapping key.
 	// +optional
 	HelmValueMap HelmValueMapType `json:"valueMap,omitempty"`
@@ -294,7 +294,7 @@ type DataObjectKeySelector struct {
 type AddonDefaultInstallSpecItem struct {
 	AddonInstallSpec `json:",inline"`
 
-	// Addon installs parameters selectors by default. If multiple selectors are provided, 
+	// Addon installs parameters selectors by default. If multiple selectors are provided,
 	// all selectors must evaluate to true.
 	// +optional
 	Selectors []SelectorRequirement `json:"selectors,omitempty"`

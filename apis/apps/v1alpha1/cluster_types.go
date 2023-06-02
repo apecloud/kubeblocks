@@ -212,12 +212,12 @@ func (r *ClusterComponentSpec) GetMinAvailable(prefer *intstr.IntOrString) *ints
 
 type ComponentMessageMap map[string]string
 
-// ClusterComponentStatus records components status. 
+// ClusterComponentStatus records components status.
 type ClusterComponentStatus struct {
 	// phase describes the phase of the component and the detail information of the phases are as following:
 	// Running: the component is running. [terminal state]
 	// Stopped: the component is stopped, as no running pod. [terminal state]
-	// Failed: the component is unavailable, i.e. all pods are not ready for Stateless/Stateful component and 
+	// Failed: the component is unavailable, i.e. all pods are not ready for Stateless/Stateful component and
 	// Leader/Primary pod is not ready for Consensus/Replication component. [terminal state]
 	// Abnormal: the component is running but part of its pods are not ready.
 	// Leader/Primary pod is ready for Consensus/Replication component. [terminal state]
@@ -357,7 +357,7 @@ func (r PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.Persis
 	}
 }
 
-// GetStorageClassName returns PersistentVolumeClaimSpec.StorageClassName if a value is assigned; otherwise, 
+// GetStorageClassName returns PersistentVolumeClaimSpec.StorageClassName if a value is assigned; otherwise,
 // it returns preferSC argument.
 func (r PersistentVolumeClaimSpec) GetStorageClassName(preferSC string) *string {
 	if r.StorageClassName != nil && *r.StorageClassName != "" {
@@ -397,7 +397,7 @@ type Affinity struct {
 
 // Issuer defines Tls certs issuer
 type Issuer struct {
-	// Name of issuer. 
+	// Name of issuer.
 	// Options supported:
 	// - KubeBlocks - Certificates signed by KubeBlocks Operator.
 	// - UserProvided - User provided own CA-signed certificates.

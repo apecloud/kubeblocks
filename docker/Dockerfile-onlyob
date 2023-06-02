@@ -1,0 +1,41 @@
+# Build the kubeblocks tools binaries
+# includes kbcli, kubectl, and manager tools.
+
+## docker buildx build injected build-args:
+#BUILDPLATFORM — matches the current machine. (e.g. linux/amd64)
+#BUILDOS — os component of BUILDPLATFORM, e.g. linux
+#BUILDARCH — e.g. amd64, arm64, riscv64
+#BUILDVARIANT — used to set build ARM variant, e.g. v7
+#TARGETPLATFORM — The value set with --platform flag on build
+#TARGETOS - OS component from --platform, e.g. linux
+#TARGETARCH - Architecture from --platform, e.g. arm64
+#TARGETVARIANT - used to set target ARM variant, e.g. v7
+
+ARG GO_VERSION=1.20
+
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as builder
+ARG TARGETOS
+ARG TARGETARCH
+ARG GOPROXY
+##ARG GOPROXY=https://goproxy.cn
+ARG LD_FLAGS="-s -w"
+
+ENV GONOPROXY=github.com/apecloud
+ENV GONOSUMDB=github.com/apecloud
+ENV GOPRIVATE=github.com/apecloud
+ENV GOPROXY=${GOPROXY}
+
+WORKDIR /src
+
+
+# Build
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/probe cmd/probe/main.go
+
+
+# Use alpine
+FROM docker.io/alpine:3.17 as dist
+# copy kubeblocks tools
+COPY --from=builder /out/probe  /bin/probe

@@ -14,11 +14,13 @@ require (
 	github.com/chaos-mesh/chaos-mesh/api v0.0.0-20230423031423-0b31a519b502
 	github.com/clbanning/mxj/v2 v2.5.7
 	github.com/containerd/stargz-snapshotter/estargz v0.13.0
-	github.com/containers/common v0.49.1
+	github.com/containers/common v0.48.1
 	github.com/dapr/components-contrib v1.9.6
 	github.com/dapr/dapr v1.9.5
 	github.com/dapr/go-sdk v1.7.0
 	github.com/dapr/kit v0.0.3
+	github.com/deckarep/golang-set v1.8.0
+	github.com/dlclark/regexp2 v1.10.0
 	github.com/docker/cli v20.10.24+incompatible
 	github.com/docker/docker v20.10.24+incompatible
 	github.com/docker/go-connections v0.4.0

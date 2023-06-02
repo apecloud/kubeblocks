@@ -56,6 +56,10 @@ func (c *Cluster) IsLocked() bool {
 	return c.Leader != nil && c.Leader.member != nil && c.Leader.member.name != ""
 }
 
+func (c *Cluster) GetOpTime() int64 {
+	return c.OpTime
+}
+
 type ClusterConfig struct {
 	index string
 	data  *ClusterData

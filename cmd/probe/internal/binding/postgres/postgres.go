@@ -25,7 +25,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -376,7 +375,7 @@ func (pgOps *PostgresOperations) isSwitchoverPossible(ctx context.Context, prima
 			return false, errors.Errorf("leader name does not match ,leader name: %s, primary: %s", pgOps.Cs.GetCluster().Leader.GetMember().GetName(), primary)
 		}
 		// candidate存在时，即使candidate并未同步也可以进行failover
-		if operation == SwitchoverOperation && replicationMode == SynchronousMode && !pgOps.checkStandbySynchronizedToLeader(ctx, candidate) {
+		if operation == SwitchoverOperation && replicationMode == SynchronousMode && !pgOps.checkStandbySynchronizedToLeader(ctx, candidate, false) {
 			return false, errors.Errorf("candidate name does not match with sync_standby")
 		}
 
@@ -386,7 +385,7 @@ func (pgOps *PostgresOperations) isSwitchoverPossible(ctx context.Context, prima
 	} else if replicationMode == SynchronousMode {
 		syncToLeader := 0
 		for _, member := range pgOps.Cs.GetCluster().GetMemberName() {
-			if pgOps.checkStandbySynchronizedToLeader(ctx, member) {
+			if pgOps.checkStandbySynchronizedToLeader(ctx, member, false) {
 				syncToLeader++
 			}
 		}
@@ -531,21 +530,20 @@ func (pgOps *PostgresOperations) getReplicationMode(ctx context.Context) (string
 	}
 }
 
-func (pgOps *PostgresOperations) checkStandbySynchronizedToLeader(ctx context.Context, member string) bool {
+func (pgOps *PostgresOperations) checkStandbySynchronizedToLeader(ctx context.Context, member string, checkLeader bool) bool {
 	sql := "select pg_catalog.current_setting('synchronous_standby_names');"
 	resp, err := pgOps.query(ctx, sql)
 	if err != nil {
 		pgOps.Logger.Errorf("query sql:%s, err:%v", sql, err)
 		return false
 	}
-	syncStandbys := strings.Split(string(resp), ",")
-	for _, standby := range syncStandbys {
-		if member == standby {
-			return true
-		}
+	syncStandbys, err := ParsePGSyncStandby(string(resp))
+	if err != nil {
+		pgOps.Logger.Errorf("parse pg sync standby failed, err:%v", err)
+		return false
 	}
 
-	return false
+	return (checkLeader && member == pgOps.Cs.LeaderObservedRecord.GetLeader()) || syncStandbys.Members.Contains(member)
 }
 
 func (pgOps *PostgresOperations) getWalPosition(ctx context.Context) (int64, error) {
@@ -863,22 +861,43 @@ func (pgOps *PostgresOperations) IsLeader(ctx context.Context) bool {
 }
 
 func (pgOps *PostgresOperations) IsHealthiest(ctx context.Context, podName string) bool {
+	err := pgOps.Cs.GetClusterFromKubernetes()
+	if err != nil {
+		pgOps.Logger.Errorf("get cluster from k8s failed, err:%v", err)
+	}
+
 	replicationMode, err := pgOps.getReplicationMode(ctx)
 	if err != nil {
 		pgOps.Logger.Errorf("get db replication mode err:%v", err)
 		return false
 	}
-	if replicationMode == SynchronousMode && !pgOps.checkStandbySynchronizedToLeader(ctx, podName) {
+
+	var members []string
+	if replicationMode == SynchronousMode {
+		if !pgOps.checkStandbySynchronizedToLeader(ctx, podName, true) {
+			return false
+		}
+		for _, m := range pgOps.Cs.GetCluster().Members {
+			if pgOps.checkStandbySynchronizedToLeader(ctx, m.GetName(), true) {
+				members = append(members, m.GetName())
+			}
+		}
+	} else {
+		for _, m := range pgOps.Cs.GetCluster().Members {
+			members = append(members, m.GetName())
+		}
+	}
+
+	walPosition, _ := pgOps.getWalPosition(ctx)
+	if pgOps.isLagging(walPosition) {
+		pgOps.Logger.Infof("my wal position exceeds max lag")
 		return false
 	}
 
-	walPosition, err := pgOps.getWalPosition(ctx)
-	if pgOps.isLagging(ctx, walPosition) {
-
-	}
 	return true
 }
 
-func (pgOps *PostgresOperations) isLagging(ctx context.Context, walPosition int64) bool {
-	return true
+func (pgOps *PostgresOperations) isLagging(walPosition int64) bool {
+	lag := pgOps.Cs.GetCluster().GetOpTime() - walPosition
+	return lag > pgOps.Cs.GetCluster().Config.GetData().GetMaxLagOnSwitchover()
 }

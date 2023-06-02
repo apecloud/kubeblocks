@@ -29,7 +29,7 @@ type ConfigurationStore struct {
 	cluster              *Cluster
 	config               *rest.Config
 	clientSet            *kubernetes.Clientset
-	leaderObservedRecord *LeaderRecord
+	LeaderObservedRecord *LeaderRecord
 	LeaderObservedTime   int64
 }
 
@@ -170,8 +170,8 @@ func (cs *ConfigurationStore) loadClusterFromKubernetes(config, switchoverConfig
 
 	if leaderConfig != nil {
 		leaderRecord := newLeaderRecord(leaderConfig.Annotations)
-		if cs.leaderObservedRecord == nil || cs.leaderObservedRecord.renewTime != leaderRecord.renewTime {
-			cs.leaderObservedRecord = leaderRecord
+		if cs.LeaderObservedRecord == nil || cs.LeaderObservedRecord.renewTime != leaderRecord.renewTime {
+			cs.LeaderObservedRecord = leaderRecord
 			cs.LeaderObservedTime = time.Now().Unix()
 		}
 		opTime = leaderRecord.opTime
@@ -310,6 +310,10 @@ type LeaderRecord struct {
 	renewTime   int64
 	ttl         int64
 	opTime      int64
+}
+
+func (l *LeaderRecord) GetLeader() string {
+	return l.leader
 }
 
 func newLeaderRecord(data map[string]string) *LeaderRecord {

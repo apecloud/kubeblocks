@@ -208,10 +208,11 @@ func (r *BackupReconciler) doNewPhaseAction(
 		}
 	}
 	// clean cached annotations if in NEW phase
-	if backup.Annotations[dataProtectionBackupTargetPodKey] != "" {
-		delete(backup.Annotations, dataProtectionBackupTargetPodKey)
+	backupCopy := backup.DeepCopy()
+	if backupCopy.Annotations[dataProtectionBackupTargetPodKey] != "" {
+		delete(backupCopy.Annotations, dataProtectionBackupTargetPodKey)
 	}
-	target, err := r.getTargetPod(reqCtx, backup, targetCluster.LabelsSelector.MatchLabels)
+	target, err := r.getTargetPod(reqCtx, backupCopy, targetCluster.LabelsSelector.MatchLabels)
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}

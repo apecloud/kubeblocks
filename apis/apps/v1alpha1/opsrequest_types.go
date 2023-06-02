@@ -448,6 +448,8 @@ type UpdatedParameters struct {
 	UpdatedKeys map[string]string `json:"updatedKeys,omitempty"`
 }
 
+// +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks,all},shortName=ops

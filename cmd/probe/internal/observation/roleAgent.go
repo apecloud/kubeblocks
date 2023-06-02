@@ -19,7 +19,7 @@ import (
 type OpsResult map[string]interface{}
 type AccessMode string
 
-type Controller struct {
+type RoleAgent struct {
 	CheckRoleFailedCount       int
 	RoleUnchangedCount         int
 	FailedEventReportFrequency int
@@ -42,38 +42,38 @@ func init() {
 	viper.SetDefault("KB_ROLE_DETECTION_THRESHOLD", defaultRoleDetectionThreshold)
 }
 
-func NewController() *Controller {
-	return &Controller{
-		Logger:         log.Logger{},
+func NewRoleAgent(writer io.Writer, prefix string) *RoleAgent {
+	return &RoleAgent{
+		Logger:         *log.New(writer, prefix, log.LstdFlags),
 		actionSvcPorts: &[]int{},
 	}
 }
 
-func (controller *Controller) Init() error {
-	controller.FailedEventReportFrequency = viper.GetInt("KB_FAILED_EVENT_REPORT_FREQUENCY")
-	if controller.FailedEventReportFrequency < 300 {
-		controller.FailedEventReportFrequency = 300
-	} else if controller.FailedEventReportFrequency > 3600 {
-		controller.FailedEventReportFrequency = 3600
+func (roleAgent *RoleAgent) Init() error {
+	roleAgent.FailedEventReportFrequency = viper.GetInt("KB_FAILED_EVENT_REPORT_FREQUENCY")
+	if roleAgent.FailedEventReportFrequency < 300 {
+		roleAgent.FailedEventReportFrequency = 300
+	} else if roleAgent.FailedEventReportFrequency > 3600 {
+		roleAgent.FailedEventReportFrequency = 3600
 	}
 
-	controller.RoleDetectionThreshold = viper.GetInt("KB_ROLE_DETECTION_THRESHOLD")
-	if controller.RoleDetectionThreshold < 60 {
-		controller.RoleDetectionThreshold = 60
-	} else if controller.RoleDetectionThreshold > 300 {
-		controller.RoleDetectionThreshold = 300
+	roleAgent.RoleDetectionThreshold = viper.GetInt("KB_ROLE_DETECTION_THRESHOLD")
+	if roleAgent.RoleDetectionThreshold < 60 {
+		roleAgent.RoleDetectionThreshold = 60
+	} else if roleAgent.RoleDetectionThreshold > 300 {
+		roleAgent.RoleDetectionThreshold = 300
 	}
 
 	val := viper.GetString("KB_SERVICE_ROLES")
 	if val != "" {
-		if err := json.Unmarshal([]byte(val), &controller.DBRoles); err != nil {
+		if err := json.Unmarshal([]byte(val), &roleAgent.DBRoles); err != nil {
 			fmt.Println(errors.Wrap(err, "KB_DB_ROLES env format error").Error())
 		}
 	}
 
 	actionSvcList := viper.GetString("KB_CONSENSUS_SET_ACTION_SVC_LIST")
 	if len(actionSvcList) > 0 {
-		err := json.Unmarshal([]byte(actionSvcList), controller.actionSvcPorts)
+		err := json.Unmarshal([]byte(actionSvcList), roleAgent.actionSvcPorts)
 		if err != nil {
 			return err
 		}
@@ -86,21 +86,21 @@ func (controller *Controller) Init() error {
 		Dial:                dialer.Dial,
 		TLSHandshakeTimeout: 5 * time.Second,
 	}
-	controller.client = &http.Client{
+	roleAgent.client = &http.Client{
 		Timeout:   time.Second * 30,
 		Transport: netTransport,
 	}
 	return nil
 }
 
-func (controller *Controller) ShutDownClient() {
-	controller.client.CloseIdleConnections()
+func (roleAgent *RoleAgent) ShutDownClient() {
+	roleAgent.client.CloseIdleConnections()
 }
 
-func (controller *Controller) CheckRoleOps(ctx context.Context) (OpsResult, bool) {
+func (roleAgent *RoleAgent) CheckRoleOps(ctx context.Context) (OpsResult, bool) {
 	opsRes := OpsResult{}
 	needNotify := false
-	role, err := controller.getRole(ctx)
+	role, err := roleAgent.getRole(ctx)
 
 	// OpsResult organized like below:
 	// Success: event originalRole role
@@ -108,32 +108,32 @@ func (controller *Controller) CheckRoleOps(ctx context.Context) (OpsResult, bool
 	// Failure: event message
 
 	if err != nil {
-		controller.Logger.Printf("error executing checkRole: %v", err)
+		roleAgent.Logger.Printf("error executing checkRole: %v", err)
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = err.Error()
-		if controller.CheckRoleFailedCount%controller.FailedEventReportFrequency == 0 {
-			controller.Logger.Printf("role checks failed %v times continuously", controller.CheckRoleFailedCount)
+		if roleAgent.CheckRoleFailedCount%roleAgent.FailedEventReportFrequency == 0 {
+			roleAgent.Logger.Printf("role checks failed %v times continuously", roleAgent.CheckRoleFailedCount)
 		}
-		controller.CheckRoleFailedCount++
+		roleAgent.CheckRoleFailedCount++
 		return opsRes, true
 	}
 
-	controller.CheckRoleFailedCount = 0
-	if isValid, message := controller.roleValidate(role); !isValid {
+	roleAgent.CheckRoleFailedCount = 0
+	if isValid, message := roleAgent.roleValidate(role); !isValid {
 		opsRes["event"] = OperationInvalid
 		opsRes["message"] = message
 		return opsRes, true
 	}
 
 	opsRes["event"] = OperationSuccess
-	opsRes["originalRole"] = controller.OriRole
+	opsRes["originalRole"] = roleAgent.OriRole
 	opsRes["role"] = role
 
-	if controller.OriRole != role {
-		controller.OriRole = role
+	if roleAgent.OriRole != role {
+		roleAgent.OriRole = role
 		needNotify = true
 	} else {
-		controller.RoleUnchangedCount++
+		roleAgent.RoleUnchangedCount++
 	}
 
 	// RoleUnchangedCount is the count of consecutive role unchanged checks.
@@ -141,29 +141,29 @@ func (controller *Controller) CheckRoleOps(ctx context.Context) (OpsResult, bool
 	// then the roleCheck event will be reported at roleEventReportFrequency so that the event controller
 	// can always get relevant roleCheck events in order to maintain the pod label accurately, even in cases
 	// of roleChanged events being lost or the pod role label being deleted or updated incorrectly.
-	if controller.RoleUnchangedCount < controller.RoleDetectionThreshold && controller.RoleUnchangedCount%roleEventReportFrequency == 0 {
+	if roleAgent.RoleUnchangedCount < roleAgent.RoleDetectionThreshold && roleAgent.RoleUnchangedCount%roleEventReportFrequency == 0 {
 		needNotify = true
-		controller.RoleUnchangedCount = 0
+		roleAgent.RoleUnchangedCount = 0
 	}
 	return opsRes, needNotify
 }
 
-func (controller *Controller) GetRoleOps(ctx context.Context) OpsResult {
+func (roleAgent *RoleAgent) GetRoleOps(ctx context.Context) OpsResult {
 	opsRes := OpsResult{}
 
-	role, err := controller.getRole(ctx)
+	role, err := roleAgent.getRole(ctx)
 	if err != nil {
-		controller.Logger.Printf("error executing getRole: %v", err)
+		roleAgent.Logger.Printf("error executing getRole: %v", err)
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = err.Error()
-		if controller.CheckRoleFailedCount%controller.FailedEventReportFrequency == 0 {
-			controller.Logger.Printf("getRole failed %v times continuously", controller.CheckRoleFailedCount)
+		if roleAgent.CheckRoleFailedCount%roleAgent.FailedEventReportFrequency == 0 {
+			roleAgent.Logger.Printf("getRole failed %v times continuously", roleAgent.CheckRoleFailedCount)
 		}
-		controller.CheckRoleFailedCount++
+		roleAgent.CheckRoleFailedCount++
 		return opsRes
 	}
 
-	controller.CheckRoleFailedCount = 0
+	roleAgent.CheckRoleFailedCount = 0
 
 	opsRes["event"] = OperationSuccess
 	opsRes["role"] = role
@@ -174,29 +174,29 @@ func (controller *Controller) GetRoleOps(ctx context.Context) OpsResult {
 // and not configured in cluster definition, e.g. ETCD's Candidate.
 // roleValidate is used to filter the internal roles and decrease the number
 // of report events to reduce the possibility of event conflicts.
-func (controller *Controller) roleValidate(role string) (bool, string) {
+func (roleAgent *RoleAgent) roleValidate(role string) (bool, string) {
 
 	// do not validate when db roles setting is missing
-	if len(controller.DBRoles) == 0 {
+	if len(roleAgent.DBRoles) == 0 {
 		return true, ""
 	}
 
 	var msg string
 	isValid := false
-	for r := range controller.DBRoles {
+	for r := range roleAgent.DBRoles {
 		if strings.EqualFold(r, role) {
 			isValid = true
 			break
 		}
 	}
 	if !isValid {
-		msg = fmt.Sprintf("role %s is not configured in cluster definition %v", role, controller.DBRoles)
+		msg = fmt.Sprintf("role %s is not configured in cluster definition %v", role, roleAgent.DBRoles)
 	}
 	return isValid, msg
 }
 
-func (controller *Controller) getRole(ctx context.Context) (string, error) {
-	if controller.actionSvcPorts == nil {
+func (roleAgent *RoleAgent) getRole(ctx context.Context) (string, error) {
+	if roleAgent.actionSvcPorts == nil {
 		return "", nil
 	}
 
@@ -205,9 +205,9 @@ func (controller *Controller) getRole(ctx context.Context) (string, error) {
 		err        error
 	)
 
-	for _, port := range *controller.actionSvcPorts {
+	for _, port := range *roleAgent.actionSvcPorts {
 		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_CONSENSUS_SET_LAST_STDOUT=%s", port, url.QueryEscape(lastOutput))
-		lastOutput, err = controller.callAction(ctx, u)
+		lastOutput, err = roleAgent.callAction(ctx, u)
 		if err != nil {
 			return "", err
 		}
@@ -216,7 +216,7 @@ func (controller *Controller) getRole(ctx context.Context) (string, error) {
 	return lastOutput, nil
 }
 
-func (controller *Controller) callAction(ctx context.Context, url string) (string, error) {
+func (roleAgent *RoleAgent) callAction(ctx context.Context, url string) (string, error) {
 	// compose http request
 	request, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -224,7 +224,7 @@ func (controller *Controller) callAction(ctx context.Context, url string) (strin
 	}
 
 	// send http request
-	resp, err := controller.client.Do(request)
+	resp, err := roleAgent.client.Do(request)
 	if err != nil {
 		return "", err
 	}

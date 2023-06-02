@@ -2,7 +2,7 @@
 title: kbcli builder template
 ---
 
-tpl - a developer tool integrated with Kubeblocks that can help developers quickly generate rendered configurations or scripts based on Helm templates, and discover errors in the template before creating the database cluster.
+tpl - a developer tool integrated with KubeBlocks that can help developers quickly generate rendered configurations or scripts based on Helm templates, and discover errors in the template before creating the database cluster.
 
 ```
 kbcli builder template [flags]

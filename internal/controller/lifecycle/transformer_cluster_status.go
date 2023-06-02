@@ -151,7 +151,7 @@ func (t *ClusterStatusTransformer) removeInvalidCompStatus(cluster *appsv1alpha1
 	cluster.Status.Components = tmpCompsStatus
 }
 
-// doAnalysisAndUpdateSynchronizer analyses the Cluster.Status.Components and updates the results to the synchronizer.
+// doAnalysisAndUpdateSynchronizer analyzes the Cluster.Status.Components and updates the results to the synchronizer.
 func (t *ClusterStatusTransformer) doAnalysisAndUpdateSynchronizer(dag *graph.DAG, cluster *appsv1alpha1.Cluster) {
 	var (
 		runningCompCount int
@@ -281,8 +281,8 @@ func handleClusterPhaseWhenCompsNotReady(cluster *appsv1alpha1.Cluster,
 	}
 }
 
-// getClusterAvailabilityEffect whether the component will affect the cluster availability.
-// if the component can affect and be Failed, the cluster will be Failed too.
+// getClusterAvailabilityEffect checks whether the component affect the cluster availability.
+// if the component affects the availability and being Failed, the cluster is also Failed.
 func getClusterAvailabilityEffect(componentDef *appsv1alpha1.ClusterComponentDefinition) bool {
 	switch componentDef.WorkloadType {
 	case appsv1alpha1.Consensus, appsv1alpha1.Replication:

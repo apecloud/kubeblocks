@@ -51,7 +51,7 @@ func (c *ConfigObjectRegistry) RegisterConfigCreator(format appsv1alpha1.CfgFile
 func (c *ConfigObjectRegistry) GetConfigObject(name string, format appsv1alpha1.CfgFileFormat) (ConfigObject, error) {
 	creator, ok := c.objectCreator[format]
 	if !ok {
-		return nil, fmt.Errorf("not support type[%s]", format)
+		return nil, fmt.Errorf("not supported type[%s]", format)
 	}
 	return creator(name), nil
 }

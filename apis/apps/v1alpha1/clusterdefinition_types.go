@@ -814,10 +814,14 @@ func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolic
 	if r == nil {
 		r = &ReplicationSetSpec{}
 	}
-	return r.StatefulSetSpec.finalStsUpdateStrategy()
-	// _, s := r.StatefulSetSpec.finalStsUpdateStrategy()
-	// s.Type = appsv1.OnDeleteStatefulSetStrategyType
-	// return appsv1.ParallelPodManagement, s
+	if r.LLUpdateStrategy != nil {
+		return r.LLPodManagementPolicy, *r.LLUpdateStrategy
+	}
+	_, s := r.StatefulSetSpec.finalStsUpdateStrategy()
+	// TODO(xingran): The update of the replicationSet needs to generate a plan according to the role
+	s.Type = appsv1.OnDeleteStatefulSetStrategyType
+	s.RollingUpdate = nil
+	return appsv1.ParallelPodManagement, s
 }
 
 type SwitchPolicy struct {

@@ -259,7 +259,7 @@ func (m *mysql) ConnectCommand(connectInfo *AuthInfo) []string {
 		userPass = connectInfo.UserPasswd
 	}
 
-	// avoid use env variables
+	// avoid using env variables
 	// MYSQL_PWD is deprecated as of MySQL 8.0; expect it to be removed in a future version of MySQL.
 	// ref to mysql manual for more details.
 	// https://dev.mysql.com/doc/refman/8.0/en/environment-variables.html

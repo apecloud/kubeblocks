@@ -76,7 +76,7 @@ func getBackupObjects(reqCtx intctrlutil.RequestCtx,
 	return backup, backupTool, nil
 }
 
-// BuildRestoredInfo builds restore-related infos if it needs to restore from backup, such as init container/pvc dataSource.
+// BuildRestoredInfo builds restore infos when restore from backup, such as init-container, pvc dataSource.
 func BuildRestoredInfo(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	namespace string,
@@ -107,7 +107,7 @@ func buildRestoreInfoFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client
 	return buildRestoredInfo2(component, backup, backupTool)
 }
 
-// buildRestoredInfo2 builds restore-related infos if it needs to restore from backup, such as init container/pvc dataSource.
+// buildRestoredInfo2 builds restore infos when restore from backup, such as init-container, pvc dataSource.
 func buildRestoredInfo2(component *SynthesizedComponent,
 	backup *dataprotectionv1alpha1.Backup,
 	backupTool *dataprotectionv1alpha1.BackupTool) error {
@@ -123,12 +123,12 @@ func buildRestoredInfo2(component *SynthesizedComponent,
 	return nil
 }
 
-// GetRestoredInitContainerName gets the init container name for restore.
+// GetRestoredInitContainerName gets the restore init container name.
 func GetRestoredInitContainerName(backupName string) string {
 	return fmt.Sprintf("restore-%s", backupName)
 }
 
-// buildInitContainerWithFullBackup builds the init container if it needs to restore from full backup
+// buildInitContainerWithFullBackup builds the init container when restore from full backup
 func buildInitContainerWithFullBackup(
 	component *SynthesizedComponent,
 	backup *dataprotectionv1alpha1.Backup,
@@ -137,7 +137,7 @@ func buildInitContainerWithFullBackup(
 		return nil
 	}
 	if len(backup.Status.PersistentVolumeClaimName) == 0 {
-		return fmt.Errorf("persistentVolumeClaimName can not be empty in Backup.status")
+		return fmt.Errorf("persistentVolumeClaimName cannot be empty in Backup.status")
 	}
 	container := corev1.Container{}
 	container.Name = GetRestoredInitContainerName(backup.Name)
@@ -191,7 +191,7 @@ func buildInitContainerWithFullBackup(
 	return nil
 }
 
-// buildVolumeClaimTemplatesWithSnapshot builds the volumeClaimTemplate if it needs to restore from volumeSnapshot
+// buildVolumeClaimTemplatesWithSnapshot builds the volumeClaimTemplate when restore from volumeSnapshot
 func buildVolumeClaimTemplatesWithSnapshot(component *SynthesizedComponent,
 	backup *dataprotectionv1alpha1.Backup) error {
 	if len(component.VolumeClaimTemplates) == 0 {

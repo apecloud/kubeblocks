@@ -35,7 +35,7 @@ func InVolumeSnapshotV1Beta1() bool {
 	return viper.GetBool("VOLUMESNAPSHOT_API_BETA")
 }
 
-// VolumeSnapshotCompatClient client is compatible both VolumeSnapshot v1 and v1beta1
+// VolumeSnapshotCompatClient client is compatible with VolumeSnapshot v1 and v1beta1
 type VolumeSnapshotCompatClient struct {
 	client.Client
 	roclient.ReadonlyClient

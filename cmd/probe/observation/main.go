@@ -41,9 +41,6 @@ func main() {
 	_, _ = maxprocs.Set()
 
 	var err error
-	if err != nil {
-		log.Fatal(err)
-	}
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 	err = viper.BindPFlags(pflag.CommandLine)

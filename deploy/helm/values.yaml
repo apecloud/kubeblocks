@@ -1833,3 +1833,11 @@ enabledAlphaFeatureGates:
   ## @param enabledAlphaFeatureGates.recoverVolumeExpansionFailure -- Specifies whether feature gates RecoverVolumeExpansionFailure is enabled in k8s cluster.
   ##
   recoverVolumeExpansionFailure: false
+
+agamotto:
+  enabled: false
+  image:
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/agamotto
+    pullPolicy: IfNotPresent
+    tag: 0.1.0-beta.2

@@ -269,3 +269,10 @@ Define addon loki name
 {{- define "addon.loki.name" -}}
 {{- print "loki" }}
 {{- end }}
+
+{{/*
+Define addon agamotto name
+*/}}
+{{- define "addon.agamotto.name" -}}
+{{- print "agamotto" }}
+{{- end }}

@@ -133,7 +133,7 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	// check if the opsRequest can be executed in the current cluster phase unless this opsRequest is reentrant.
 	if !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) &&
 		!slices.Contains(opsNamesInQueue, r.Name) {
-		return fmt.Errorf("opsRequest Type: %s is forbidden when Cluster.status.Phase is %s", r.Spec.Type, cluster.Status.Phase)
+		return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
 	}
 	return nil
 }

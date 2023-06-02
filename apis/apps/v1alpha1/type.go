@@ -158,10 +158,10 @@ const (
 	OpsPendingPhase    OpsPhase = "Pending"
 	OpsCreatingPhase   OpsPhase = "Creating"
 	OpsRunningPhase    OpsPhase = "Running"
-	OpsFailedPhase     OpsPhase = "Failed"
-	OpsSucceedPhase    OpsPhase = "Succeed"
 	OpsCancellingPhase OpsPhase = "Cancelling"
+	OpsSucceedPhase    OpsPhase = "Succeed"
 	OpsCancelledPhase  OpsPhase = "Cancelled"
+	OpsFailedPhase     OpsPhase = "Failed"
 )
 
 // OpsType defines operation types.

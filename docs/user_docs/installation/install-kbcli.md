@@ -11,8 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # Install kbcli
 
- You can install kbcli to an new Kubernetes cluster on both local and cloud environment.
-
+ You can install kbcli on both local and cloud environment.
 
 ## Environment preparation
 
@@ -20,7 +19,8 @@ import TabItem from '@theme/TabItem';
   - MacOS:
     - CPU: 4 cores
     - Memory: 4 GB
-    Check CPU with the following command: `sysctl hw.physicalcpu; Check memory with the following command: top -d`.
+    Check CPU with the following command: `sysctl hw.physicalcpu`; 
+    Check memory with the following command: `top -d`.
   - Windows:
     - 64-bit
 - Ensure the following tools are installed on your local host:
@@ -32,13 +32,12 @@ import TabItem from '@theme/TabItem';
 
 You can install the kbcli and KubeBlocks on your local host, and now MacOS and Windows are supported.
 
-
 <Tabs>
 <TabItem value="MacOS" label="MacOS" default>
 
 You can install kbcli with `curl` or `homebrew`.
 
-- Option 1: Install kbcli using the `cURL` command.
+- Option 1: Install kbcli using the `curl` command.
 
 1. Install kbcli.
 
@@ -114,3 +113,34 @@ If you need to customize the installation path, use the zip file.
 
 </TabItem>
 </Tabs>
+
+## (Optional) Enable kbcli automatic command line completion
+
+`kbcli` supports automatic command line completion. You can run the command below to view the user guide and enable this function.
+
+```bash
+# Configure SHELL-TYPE as one type from bash, fish, PowerShell, and zsh
+kbcli completion SHELL-TYPE -h
+```
+
+For example, enable command line completion for zsh.
+
+***Steps:***
+
+1. Check the user guide.
+
+    ```bash
+    kbcli completion zsh -h
+    ```
+
+2. Enable the completion function of your terminal first.
+
+    ```bash
+    echo "autoload -U compinit; compinit" >> ~/.zshrc
+    ```
+
+3. Enable the `kbcli` automatic completion function.
+
+    ```bash
+    echo "source <(kbcli completion zsh); compdef _kbcli kbcli" >> ~/.zshrc
+    ```

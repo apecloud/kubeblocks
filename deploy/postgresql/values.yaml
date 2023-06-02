@@ -118,6 +118,5 @@ pgbouncer:
     tag: 1.19.0
     pullPolicy: IfNotPresent
 
-
 logConfigs:
   running: /home/postgres/pgdata/pgroot/data/log/postgresql-*

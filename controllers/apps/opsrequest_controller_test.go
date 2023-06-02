@@ -55,7 +55,7 @@ var _ = Describe("OpsRequest Controller", func() {
 	const defaultMinReadySeconds = 10
 
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -431,14 +431,6 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("expect component is Running if don't support volume snapshot during doing h-scale ops")
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(appsv1alpha1.OpsRunningPhase))
-			// Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, lcluster *appsv1alpha1.Cluster) {
-			//	// the cluster spec has been updated by ops-controller to scale out.
-			//	g.Expect(lcluster.Generation == initGeneration+1).Should(BeTrue())
-			//	// but the new spec can't be reconciled successfully because of volume snapshot is disabled.
-			//	g.Expect(lcluster.Generation > lcluster.Status.ObservedGeneration).Should(BeTrue())
-			//	g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
-			//	g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
-			// })).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *appsv1alpha1.Cluster) {
 				// the cluster spec has been updated by ops-controller to scale out.
 				g.Expect(fetched.Generation == initGeneration+1).Should(BeTrue())
@@ -502,11 +494,25 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
 			})).Should(Succeed())
 
-			By("wait the underlying workload been updated")
+			By("check the underlying workload been updated")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
 				func(g Gomega, sts *appsv1.StatefulSet) {
 					g.Expect(*sts.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
+
+			By("mock all new PVCs scaled bounded")
+			for i := 0; i < int(replicas); i++ {
+				pvcKey := types.NamespacedName{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterKey.Name, mysqlCompName, i),
+				}
+				Expect(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
+					pvc.Status.Phase = corev1.ClaimBound
+				})()).Should(Succeed())
+			}
+
+			By("check the volumesnapshot created for scaling has been deleted")
+			Eventually(testapps.CheckObjExists(&testCtx, snapshotKey, volumeSnapshot, false)).Should(Succeed())
 
 			By("mock component workload is running and expect cluster and component are running")
 			mockCompRunning(replicas)

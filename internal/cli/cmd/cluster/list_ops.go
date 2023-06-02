@@ -103,7 +103,7 @@ func (o *opsListOptions) printOpsList() error {
 	// sort the unstructured objects with the creationTimestamp in positive order
 	sort.Sort(unstructuredList(opsList.Items))
 
-	// check if specific the "all" keyword for status.
+	// check if specified with "all" keyword for status.
 	isAllStatus := o.isAllStatus()
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAME", "TYPE", "CLUSTER", "COMPONENT", "STATUS", "PROGRESS", "CREATED-TIME")
@@ -120,7 +120,7 @@ func (o *opsListOptions) printOpsList() error {
 			}
 			continue
 		}
-		// if the OpsRequest phase is not in the expected phases, continue
+		// if the OpsRequest phase is not expected, continue
 		if !isAllStatus && !o.containsIgnoreCase(o.status, phase) {
 			continue
 		}
@@ -136,7 +136,6 @@ func (o *opsListOptions) printOpsList() error {
 	}
 	message := "No opsRequests found"
 	if len(o.opsRequestName) == 0 && !o.isAllStatus() {
-		// if do not view the ops in all status and do not specify the opsName, add this prompt command.
 		message += ", you can try as follows:\n\tkbcli cluster list-ops --status all"
 	}
 	printer.PrintLine(message)

@@ -32,10 +32,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	probeutil "github.com/apecloud/kubeblocks/cmd/probe/util"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 // EventTimeOut timeout of the event
@@ -50,7 +50,7 @@ func init() {
 	k8score.EventHandlerMap["cluster-status-handler"] = &ClusterStatusEventHandler{}
 }
 
-// Handle is the event handler for the cluster status event.
+// Handle handles the cluster status events.
 func (r *ClusterStatusEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
 	if event.Reason != string(probeutil.CheckRoleOperation) {
 		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
@@ -101,7 +101,7 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 		},
 		{
 			pred: func() bool {
-				// the error repeated several times, so we can sure it's a real error to the cluster.
+				// the error repeated several times, so we can be sure it's a real error to the cluster.
 				return !k8score.IsOvertimeEvent(event, EventTimeOut)
 			},
 			processor: nilReturnHandler,
@@ -135,7 +135,7 @@ func handleDeletePVCCronJobEvent(ctx context.Context, cli client.Client, recorde
 	matches := re.FindStringSubmatch(event.Message)
 	if len(matches) == 0 {
 		// TODO(impl): introduce a one-shot delayed job to delete the pvc object.
-		// delete pvc success, then delete cronjob
+		// delete pvc succeeded, then delete cronjob
 		return checkedDeleteDeletePVCCronJob(ctx, cli, event.InvolvedObject.Name, event.InvolvedObject.Namespace)
 	}
 	// cronjob failed
@@ -205,7 +205,7 @@ func getEventInvolvedObject(ctx context.Context, cli client.Client, event *corev
 	return nil, err
 }
 
-// isTargetKindForEvent checks the event involve object is the target resources
+// isTargetKindForEvent checks the event involved object is one of the target resources
 func isTargetKindForEvent(event *corev1.Event) bool {
 	return slices.Index([]string{constant.PodKind, constant.DeploymentKind, constant.StatefulSetKind}, event.InvolvedObject.Kind) != -1
 }

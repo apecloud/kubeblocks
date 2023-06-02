@@ -249,7 +249,7 @@ func (c *ComponentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.
 
 	svcProtoList := ictrltypes.FindAll[*corev1.Service](c.Dag)
 
-	// create new services or update existed services
+	// create new services or update existing services
 	for _, vertex := range svcProtoList {
 		node, _ := vertex.(*ictrltypes.LifecycleVertex)
 		svcProto, _ := node.Obj.(*corev1.Service)
@@ -277,7 +277,7 @@ func (c *ComponentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.
 	return nil
 }
 
-// SetStatusPhase set the cluster component phase and messages to specified conditionally.
+// SetStatusPhase sets the cluster component phase and messages conditionally.
 func (c *ComponentBase) SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase,
 	statusMessage appsv1alpha1.ComponentMessageMap, phaseTransitionMsg string) {
 	updatefn := func(status *appsv1alpha1.ClusterComponentStatus) error {
@@ -392,7 +392,7 @@ func (c *ComponentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isR
 	if isRunning {
 		if c.Component.Replicas == 0 {
 			// if replicas number of component is zero, the component has stopped.
-			// 'Stopped' is a special 'Running' for workload(StatefulSet/Deployment).
+			// 'Stopped' is a special 'Running' status for workload(StatefulSet/Deployment).
 			phase = appsv1alpha1.StoppedClusterCompPhase
 		} else {
 			// change component phase to Running when workloads of component are running.
@@ -459,104 +459,7 @@ func (c *ComponentBase) updateStatus(phaseTransitionMsg string, updatefn func(st
 	return nil
 }
 
-// func (c *ComponentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object) error {
-//	// if reflect.ValueOf(obj).Kind() == reflect.Ptr && reflect.ValueOf(obj).IsNil() {
-//	//	return nil
-//	// }
-//
-//	pods, err := util.ListPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
-//	if err != nil {
-//		return err
-//	}
-//
-//	isRunning, err := c.ComponentSet.IsRunning(reqCtx.Ctx, obj)
-//	if err != nil {
-//		return err
-//	}
-//
-//	var podsReady *bool
-//	if c.Component.Replicas > 0 {
-//		podsReadyForComponent, err := c.ComponentSet.PodsReady(reqCtx.Ctx, obj)
-//		if err != nil {
-//			return err
-//		}
-//		podsReady = &podsReadyForComponent
-//	}
-//
-//	hasFailedPodTimedOut := false
-//	timedOutPodStatusMessage := appsv1alpha1.ComponentMessageMap{}
-//	if !isRunning && (podsReady == nil || !*podsReady) {
-//		hasFailedPodTimedOut, timedOutPodStatusMessage = hasFailedAndTimedOutPod(pods)
-//	}
-//
-//	phaseTransitionCondMsg := ""
-//	if podsReady == nil {
-//		phaseTransitionCondMsg = fmt.Sprintf("Running: %v, PodsReady: nil, PodsTimedout: %v", isRunning, hasFailedPodTimedOut)
-//	} else {
-//		phaseTransitionCondMsg = fmt.Sprintf("Running: %v, PodsReady: %v, PodsTimedout: %v", isRunning, *podsReady, hasFailedPodTimedOut)
-//	}
-//
-//	// TODO(refactor): wait = true to requeue.
-//	return c.updateStatus(phaseTransitionCondMsg, func(status *appsv1alpha1.ClusterComponentStatus) error {
-//		return c.buildStatus(reqCtx.Ctx, pods, isRunning, podsReady, hasFailedPodTimedOut, timedOutPodStatusMessage, status)
-//	})
-// }
-//
-// func (c *ComponentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isRunning bool, podsReady *bool,
-//	hasFailedPodTimedOut bool, timedOutPodStatusMessage appsv1alpha1.ComponentMessageMap, status *appsv1alpha1.ClusterComponentStatus) error {
-//	if isRunning {
-//		if c.Component.Replicas == 0 {
-//			// if replicas number of component is zero, the component has stopped.
-//			// 'Stopped' is a special 'Running' for workload(StatefulSet/Deployment).
-//			status.Phase = appsv1alpha1.StoppedClusterCompPhase
-//		} else {
-//			// change component phase to Running when workloads of component are running.
-//			status.Phase = appsv1alpha1.RunningClusterCompPhase
-//		}
-//		status.SetMessage(nil)
-//	} else {
-//		var (
-//			err           error
-//			phase         appsv1alpha1.ClusterComponentPhase
-//			statusMessage appsv1alpha1.ComponentMessageMap
-//		)
-//		if podsReady != nil && *podsReady {
-//			// check if the role probe timed out when component phase is not Running but all pods of component are ready.
-//			phase, statusMessage = c.ComponentSet.GetPhaseWhenPodsReadyAndProbeTimeout(pods)
-//		} else {
-//			// if there is no running operation in cluster or failed pod timed-out, that means the component is Failed or Abnormal.
-//			status.Message = timedOutPodStatusMessage
-//			// TODO(refactor): should review and check this condition carefully.
-//			//// clusterUpRunning checks if the cluster is up running, includes the partially running.
-//			// clusterUpRunning := func(cluster *appsv1alpha1.Cluster) bool {
-//			//	return cluster.Status.ObservedGeneration != cluster.Generation &&
-//			//		slices.Contains(appsv1alpha1.GetClusterUpRunningPhases(), cluster.Status.Phase)
-//			// }
-//			// if clusterUpRunning(c.Cluster) || hasFailedPodTimedOut {
-//			if hasFailedPodTimedOut {
-//				phase, statusMessage, err = c.ComponentSet.GetPhaseWhenPodsNotReady(ctx, c.GetName())
-//				if err != nil {
-//					return err
-//				}
-//			}
-//		}
-//		if phase != "" {
-//			status.Phase = phase
-//		}
-//		for k, v := range statusMessage {
-//			status.Message[k] = v
-//		}
-//	}
-//	status.PodsReady = podsReady
-//	if podsReady != nil && *podsReady {
-//		status.PodsReadyTime = &metav1.Time{Time: time.Now()}
-//	} else {
-//		status.PodsReadyTime = nil
-//	}
-//	return nil
-// }
-
-// hasFailedAndTimedOutPod returns whether the pod of components is still failed after a PodFailedTimeout period.
+// hasFailedAndTimedOutPod returns whether the pods of components are still failed after a PodFailedTimeout period.
 // if return true, component phase will be set to Failed/Abnormal.
 func hasFailedAndTimedOutPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMessageMap, time.Duration) {
 	var (
@@ -566,7 +469,7 @@ func hasFailedAndTimedOutPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMe
 		requeueAfter   time.Duration
 	)
 	for _, pod := range pods {
-		isFailed, isTimedOut, messageStr := isPodFailedAndTimedOut(pod)
+		isFailed, isTimedOut, messageStr := IsPodFailedAndTimedOut(pod)
 		if !isFailed {
 			continue
 		}
@@ -597,8 +500,8 @@ func isPodScheduledFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
 	return false, false, ""
 }
 
-// isPodFailedAndTimedOut checks if the pod is failed and timed out.
-func isPodFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
+// IsPodFailedAndTimedOut checks if the pod is failed and timed out.
+func IsPodFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
 	if isFailed, isTimedOut, message := isPodScheduledFailedAndTimedOut(pod); isFailed {
 		return isFailed, isTimedOut, message
 	}

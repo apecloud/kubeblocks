@@ -41,7 +41,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Cluster is the Schema for the clusters API
+        description: Cluster is the Schema for the clusters API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -56,7 +56,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ClusterSpec defines the desired state of Cluster
+            description: ClusterSpec defines the desired state of Cluster.
             properties:
               affinity:
                 description: affinity is a group of affinity scheduling rules.
@@ -99,12 +99,12 @@ spec:
                     x-kubernetes-list-type: set
                 type: object
               clusterDefinitionRef:
-                description: Cluster referenced ClusterDefinition name, this is an
+                description: Cluster referencing ClusterDefinition name. This is an
                   immutable attribute.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               clusterVersionRef:
-                description: Cluster referenced ClusterVersion name.
+                description: Cluster referencing ClusterVersion name.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               componentSpecs:
@@ -114,8 +114,7 @@ spec:
                 items:
                   properties:
                     affinity:
-                      description: affinity describes affinities which specific by
-                        users.
+                      description: affinity describes affinities specified by users.
                       properties:
                         nodeLabels:
                           additionalProperties:
@@ -157,29 +156,29 @@ spec:
                           x-kubernetes-list-type: set
                       type: object
                     classDefRef:
-                      description: classDefRef reference class defined in ComponentClassDefinition.
+                      description: classDefRef references the class defined in ComponentClassDefinition.
                       properties:
                         class:
-                          description: class refers to the name of the class that
+                          description: Class refers to the name of the class that
                             is defined in the ComponentClassDefinition.
                           type: string
                         name:
-                          description: name refers to the name of the ComponentClassDefinition.
+                          description: Name refers to the name of the ComponentClassDefinition.
                           type: string
                       required:
                       - class
                       type: object
                     componentDefRef:
-                      description: componentDefRef reference componentDef defined
+                      description: componentDefRef references the componentDef defined
                         in ClusterDefinition spec.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     enabledLogs:
-                      description: enabledLogs indicate which log file takes effect
-                        in database cluster element is the log type which defined
-                        in cluster definition logConfig.name, and will set relative
-                        variables about this log type in database kernel.
+                      description: enabledLogs indicates which log file takes effect
+                        in the database cluster. element is the log type which is
+                        defined in cluster definition logConfig.name, and will set
+                        relative variables about this log type in database kernel.
                       items:
                         type: string
                       type: array
@@ -190,7 +189,7 @@ spec:
                       properties:
                         name:
                           default: KubeBlocks
-                          description: 'name of issuer options supported: - KubeBlocks
+                          description: 'Name of issuer. Options supported: - KubeBlocks
                             - Certificates signed by KubeBlocks Operator. - UserProvided
                             - User provided own CA-signed certificates.'
                           enum:
@@ -198,20 +197,20 @@ spec:
                           - UserProvided
                           type: string
                         secretRef:
-                          description: secretRef, TLS certs Secret reference required
+                          description: secretRef. TLS certs Secret reference required
                             when from is UserProvided
                           properties:
                             ca:
-                              description: ca cert key in Secret
+                              description: CA cert key in Secret
                               type: string
                             cert:
-                              description: cert key in Secret
+                              description: Cert key in Secret
                               type: string
                             key:
-                              description: key of TLS private key in Secret
+                              description: Key of TLS private key in Secret
                               type: string
                             name:
-                              description: name of the Secret
+                              description: Name of the Secret
                               type: string
                           required:
                           - ca
@@ -224,11 +223,11 @@ spec:
                       type: object
                     monitor:
                       default: false
-                      description: monitor which is a switch to enable monitoring,
-                        default is false KubeBlocks provides an extension mechanism
-                        to support component level monitoring, which will scrape metrics
-                        auto or manually from servers in component and export metrics
-                        to Time Series Database.
+                      description: monitor is a switch to enable monitoring and is
+                        set as false by default. KubeBlocks provides an extension
+                        mechanism to support component level monitoring, which will
+                        scrape metrics auto or manually from servers in component
+                        and export metrics to Time Series Database.
                       type: boolean
                     name:
                       description: name defines cluster's component name.
@@ -237,26 +236,26 @@ spec:
                       type: string
                     noCreatePDB:
                       default: false
-                      description: noCreatePDB defines PodDistruptionBudget creation
-                        behavior, set to true if creation of PodDistruptionBudget
-                        for this component is not needed. Defaults to false.
+                      description: noCreatePDB defines the PodDistruptionBudget creation
+                        behavior and is set to true if creation of PodDistruptionBudget
+                        for this component is not needed. It defaults to false.
                       type: boolean
                     primaryIndex:
                       description: primaryIndex determines which index is primary
-                        when workloadType is Replication, index number starts from
+                        when workloadType is Replication. Index number starts from
                         zero.
                       format: int32
                       minimum: 0
                       type: integer
                     replicas:
                       default: 1
-                      description: Component replicas, use default value in ClusterDefinition
-                        spec. if not specified.
+                      description: Component replicas. The default value is used in
+                        ClusterDefinition spec if not specified.
                       format: int32
                       minimum: 0
                       type: integer
                     resources:
-                      description: resources requests and limits of workload.
+                      description: Resources requests and limits of workload.
                       properties:
                         claims:
                           description: "Claims lists the names of resources, defined
@@ -306,17 +305,18 @@ spec:
                       x-kubernetes-preserve-unknown-fields: true
                     serviceAccountName:
                       description: serviceAccountName is the name of the ServiceAccount
-                        that component runs depend on.
+                        that running component depends on.
                       type: string
                     services:
-                      description: services expose endpoints can be accessed by clients
+                      description: Services expose endpoints that can be accessed
+                        by clients.
                       items:
                         properties:
                           annotations:
                             additionalProperties:
                               type: string
                             description: 'If ServiceType is LoadBalancer, cloud provider
-                              related parameters can be put here More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer'
+                              related parameters can be put here More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
                             type: object
                           name:
                             description: Service name
@@ -329,15 +329,16 @@ spec:
                               LoadBalancer. "ClusterIP" allocates a cluster-internal
                               IP address for load-balancing to endpoints. Endpoints
                               are determined by the selector or if that is not specified,
-                              by manual construction of an Endpoints object or EndpointSlice
-                              objects. If clusterIP is "None", no virtual IP is allocated
-                              and the endpoints are published as a set of endpoints
-                              rather than a virtual IP. "NodePort" builds on ClusterIP
-                              and allocates a port on every node which routes to the
-                              same endpoints as the clusterIP. "LoadBalancer" builds
-                              on NodePort and creates an external load-balancer (if
-                              supported in the current cloud) which routes to the
-                              same endpoints as the clusterIP. More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
+                              they are determined by manual construction of an Endpoints
+                              object or EndpointSlice objects. If clusterIP is "None",
+                              no virtual IP is allocated and the endpoints are published
+                              as a set of endpoints rather than a virtual IP. "NodePort"
+                              builds on ClusterIP and allocates a port on every node
+                              which routes to the same endpoints as the clusterIP.
+                              "LoadBalancer" builds on NodePort and creates an external
+                              load-balancer (if supported in the current cloud) which
+                              routes to the same endpoints as the clusterIP. More
+                              info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.'
                             enum:
                             - ClusterIP
                             - NodePort
@@ -363,7 +364,7 @@ spec:
                           type: string
                       type: object
                     tls:
-                      description: Enable or disable TLS certs.
+                      description: Enables or disables TLS certs.
                       type: boolean
                     tolerations:
                       description: Component tolerations will override ClusterSpec.Tolerations
@@ -422,7 +423,7 @@ spec:
                             properties:
                               accessModes:
                                 description: 'accessModes contains the desired access
-                                  modes the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1'
+                                  modes the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1.'
                                 items:
                                   type: string
                                 type: array
@@ -433,7 +434,7 @@ spec:
                                   feature is enabled users are allowed to specify
                                   resource requirements that are lower than previous
                                   value but must still be higher than capacity recorded
-                                  in the status field of the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources'
+                                  in the status field of the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources.'
                                 properties:
                                   claims:
                                     description: "Claims lists the names of resources,
@@ -486,7 +487,7 @@ spec:
                                 x-kubernetes-preserve-unknown-fields: true
                               storageClassName:
                                 description: 'storageClassName is the name of the
-                                  StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1'
+                                  StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.'
                                 type: string
                             type: object
                         required:
@@ -504,12 +505,12 @@ spec:
                 - name
                 x-kubernetes-list-type: map
               terminationPolicy:
-                description: Cluster termination policy. One of DoNotTerminate, Halt,
-                  Delete, WipeOut. DoNotTerminate will block delete operation. Halt
-                  will delete workload resources such as statefulset, deployment workloads
-                  but keep PVCs. Delete is based on Halt and deletes PVCs. WipeOut
-                  is based on Delete and wipe out all volume snapshots and snapshot
-                  data from backup storage location.
+                description: Cluster termination policy. Valid values are DoNotTerminate,
+                  Halt, Delete, WipeOut. DoNotTerminate will block delete operation.
+                  Halt will delete workload resources such as statefulset, deployment
+                  workloads but keep PVCs. Delete is based on Halt and deletes PVCs.
+                  WipeOut is based on Delete and wipe out all volume snapshots and
+                  snapshot data from backup storage location.
                 enum:
                 - DoNotTerminate
                 - Halt
@@ -563,7 +564,7 @@ spec:
             - terminationPolicy
             type: object
           status:
-            description: ClusterStatus defines the observed state of Cluster
+            description: ClusterStatus defines the observed state of Cluster.
             properties:
               clusterDefGeneration:
                 description: clusterDefGeneration represents the generation number
@@ -572,18 +573,20 @@ spec:
                 type: integer
               components:
                 additionalProperties:
-                  description: ClusterComponentStatus record components status information
+                  description: ClusterComponentStatus records components status.
                   properties:
                     consensusSetStatus:
-                      description: consensusSetStatus role and pod name mapping.
+                      description: consensusSetStatus specifies the mapping of role
+                        and pod name.
                       properties:
                         followers:
-                          description: followers status.
+                          description: Followers status.
                           items:
                             properties:
                               accessMode:
                                 default: ReadWrite
-                                description: accessMode, what service this pod provides.
+                                description: accessMode defines what service this
+                                  pod provides.
                                 enum:
                                 - None
                                 - Readonly
@@ -591,11 +594,11 @@ spec:
                                 type: string
                               name:
                                 default: leader
-                                description: name role name.
+                                description: Defines the role name.
                                 type: string
                               pod:
                                 default: Unknown
-                                description: pod name.
+                                description: Pod name.
                                 type: string
                             required:
                             - accessMode
@@ -604,11 +607,12 @@ spec:
                             type: object
                           type: array
                         leader:
-                          description: leader status.
+                          description: Leader status.
                           properties:
                             accessMode:
                               default: ReadWrite
-                              description: accessMode, what service this pod provides.
+                              description: accessMode defines what service this pod
+                                provides.
                               enum:
                               - None
                               - Readonly
@@ -616,11 +620,11 @@ spec:
                               type: string
                             name:
                               default: leader
-                              description: name role name.
+                              description: Defines the role name.
                               type: string
                             pod:
                               default: Unknown
-                              description: pod name.
+                              description: Pod name.
                               type: string
                           required:
                           - accessMode
@@ -628,11 +632,12 @@ spec:
                           - pod
                           type: object
                         learner:
-                          description: learner status.
+                          description: Learner status.
                           properties:
                             accessMode:
                               default: ReadWrite
-                              description: accessMode, what service this pod provides.
+                              description: accessMode defines what service this pod
+                                provides.
                               enum:
                               - None
                               - Readonly
@@ -640,11 +645,11 @@ spec:
                               type: string
                             name:
                               default: leader
-                              description: name role name.
+                              description: Defines the role name.
                               type: string
                             pod:
                               default: Unknown
-                              description: pod name.
+                              description: Pod name.
                               type: string
                           required:
                           - accessMode
@@ -658,22 +663,22 @@ spec:
                       additionalProperties:
                         type: string
                       description: message records the component details message in
-                        current phase. keys are podName or deployName or statefulSetName,
-                        the format is `<ObjectKind>/<Name>`.
+                        current phase. Keys are podName or deployName or statefulSetName.
+                        The format is `<ObjectKind>/<Name>`.
                       type: object
                     phase:
-                      description: 'phase describes the phase of the component, the
-                        detail information of the phases are as following: Running:
-                        component is running. [terminal state] Stopped: component
-                        is stopped, as no running pod. [terminal state] Failed: component
-                        is unavailable. i.e, all pods are not ready for Stateless/Stateful
-                        component, Leader/Primary pod is not ready for Consensus/Replication
-                        component. [terminal state] Abnormal: component is running
-                        but part of its pods are not ready. Leader/Primary pod is
+                      description: 'phase describes the phase of the component and
+                        the detail information of the phases are as following: Running:
+                        the component is running. [terminal state] Stopped: the component
+                        is stopped, as no running pod. [terminal state] Failed: the
+                        component is unavailable, i.e. all pods are not ready for
+                        Stateless/Stateful component and Leader/Primary pod is not
                         ready for Consensus/Replication component. [terminal state]
-                        Creating: component has entered creating process. Updating:
-                        component has entered updating process, triggered by Spec.
-                        updated.'
+                        Abnormal: the component is running but part of its pods are
+                        not ready. Leader/Primary pod is ready for Consensus/Replication
+                        component. [terminal state] Creating: the component has entered
+                        creating process. Updating: the component has entered updating
+                        process, triggered by Spec. updated.'
                       enum:
                       - Running
                       - Stopped
@@ -693,25 +698,26 @@ spec:
                       format: date-time
                       type: string
                     replicationSetStatus:
-                      description: replicationSetStatus role and pod name mapping.
+                      description: replicationSetStatus specifies the mapping of role
+                        and pod name.
                       properties:
                         primary:
-                          description: primary status.
+                          description: Primary status.
                           properties:
                             pod:
                               default: Unknown
-                              description: pod name.
+                              description: Pod name.
                               type: string
                           required:
                           - pod
                           type: object
                         secondaries:
-                          description: secondaries status.
+                          description: Secondaries status.
                           items:
                             properties:
                               pod:
                                 default: Unknown
-                                description: pod name.
+                                description: Pod name.
                                 type: string
                             required:
                             - pod

@@ -81,7 +81,7 @@ func CreateOrUpdatePodVolumes(podSpec *corev1.PodSpec, volumes map[string]appsv1
 		}, func(volume *corev1.Volume) error {
 			configMap := volume.ConfigMap
 			if configMap == nil {
-				return fmt.Errorf("mount volume[%s] type require ConfigMap: [%+v]", volume.Name, volume)
+				return fmt.Errorf("mount volume[%s] requires a ConfigMap: [%+v]", volume.Name, volume)
 			}
 			configMap.Name = cmName
 			return nil

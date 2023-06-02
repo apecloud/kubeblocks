@@ -240,7 +240,7 @@ func (r *OpsRequestReconciler) handleOpsReqDeletedDuringRunning(reqCtx intctrlut
 		if index == -1 {
 			continue
 		}
-		// if the OpsRequest is abnormal end, we should clear the OpsRequest annotation in reference cluster.
+		// if the OpsRequest is abnormal, we should clear the OpsRequest annotation in referencing cluster.
 		opsRequestSlice = slices.Delete(opsRequestSlice, index, index+1)
 		return opsutil.PatchClusterOpsAnnotations(reqCtx.Ctx, r.Client, &cluster, opsRequestSlice)
 	}

@@ -96,7 +96,7 @@ func syncReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStat
 	return nil
 }
 
-// removeTargetPodsInfoInStatus remove the target pod info from cluster.status.components.
+// removeTargetPodsInfoInStatus removes the target pod info from cluster.status.components.
 func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus,
 	targetPodList []*corev1.Pod,
 	componentReplicas int32) error {
@@ -127,7 +127,7 @@ func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSet
 	return nil
 }
 
-// checkObjRoleLabelIsPrimary checks whether it is the primary obj(statefulSet or pod) through the label tag on obj.
+// checkObjRoleLabelIsPrimary checks whether it is the primary obj(statefulSet or pod) by the label tag on obj.
 func checkObjRoleLabelIsPrimary[T generics.Object, PT generics.PObject[T]](obj PT) (bool, error) {
 	if obj == nil || obj.GetLabels() == nil {
 		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
@@ -218,21 +218,21 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	// if switchPolicy is not Noop, return
 	clusterCompSpec := util.GetClusterComponentSpecByName(*cluster, compName)
 	if clusterCompSpec == nil || clusterCompSpec.SwitchPolicy == nil || clusterCompSpec.SwitchPolicy.Type != appsv1alpha1.Noop {
-		reqCtx.Log.Info("cluster switchPolicy is not Noop, does not support handle role change event", "cluster", cluster.Name)
+		reqCtx.Log.Info("cluster switchPolicy is not Noop, does not support handling role change event", "cluster", cluster.Name)
 		return nil
 	}
 
 	oldPrimaryPod, err := getReplicationSetPrimaryObj(reqCtx.Ctx, cli, cluster, generics.PodSignature, compName)
 	if err != nil {
-		reqCtx.Log.Info("handleReplicationSetRoleChangeEvent get old primary pod failed", "error", err)
+		reqCtx.Log.Info("handleReplicationSetRoleChangeEvent gets old primary pod failed", "error", err)
 		return err
 	}
 	if oldPrimaryPod == nil {
 		return nil
 	}
 	// pod is old primary and newRole is secondary, it means that the old primary needs to be changed to secondary,
-	// we do not deal with this situation because only change the old primary to secondary when the new primary
-	// changes from secondary to primary,
+	// we do not deal with this situation here, the demote labeling process of old primary to secondary is handled
+	// in another reconciliation triggered by role change event from secondary -> new primary,
 	// this is to avoid simultaneous occurrence of two primary or no primary at the same time
 	if oldPrimaryPod.Name == pod.Name {
 		reqCtx.Log.Info("pod is old primary and new role is secondary, do not deal with this situation",

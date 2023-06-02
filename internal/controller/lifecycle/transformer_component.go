@@ -62,7 +62,7 @@ func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.
 		// create new components or update existed components
 		err = c.transform4SpecUpdate(reqCtx, clusterDef, clusterVer, cluster, &dags4Component)
 	}
-	if err != nil {
+	if err != nil && !ictrlutil.IsDelayedRequeueError(err) {
 		return err
 	}
 
@@ -78,7 +78,7 @@ func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.
 		}
 		dag.Merge(subDag)
 	}
-	return nil
+	return err
 }
 
 func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition,

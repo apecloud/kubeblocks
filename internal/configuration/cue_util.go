@@ -28,7 +28,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-// CueType define cue type
+// CueType defines cue type
 // +enum
 type CueType string
 
@@ -45,7 +45,7 @@ const (
 	ClassicTimeDurationType CueType = "timeDuration"
 )
 
-// CueValidate cue validate
+// CueValidate validates cue file
 func CueValidate(cueTpl string) error {
 	if len(cueTpl) == 0 {
 		return nil
@@ -59,7 +59,7 @@ func CueValidate(cueTpl string) error {
 func ValidateConfigurationWithCue(cueTpl string, cfgType appsv1alpha1.CfgFileFormat, rawData string) error {
 	cfg, err := loadConfigObjectFromContent(cfgType, rawData)
 	if err != nil {
-		return WrapError(err, "failed to load configuration. [%s]", rawData)
+		return WrapError(err, "failed to load configuration [%s]", rawData)
 	}
 
 	return unstructuredDataValidateByCue(cueTpl, cfg, cfgType == appsv1alpha1.Properties)
@@ -94,7 +94,7 @@ func unstructuredDataValidateByCue(cueTpl string, data interface{}, trimString b
 
 	tpl = tpl.Fill(data, paths...)
 	if err := tpl.Err(); err != nil {
-		return WrapError(err, "failed to cue template render configure")
+		return WrapError(err, "failed to render cue template configure")
 	}
 
 	return tpl.Validate()

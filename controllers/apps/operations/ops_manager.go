@@ -35,7 +35,7 @@ var (
 	opsManager     *OpsManager
 )
 
-// RegisterOps register operation with OpsType and OpsBehaviour
+// RegisterOps registers operation with OpsType and OpsBehaviour
 func (opsMgr *OpsManager) RegisterOps(opsType appsv1alpha1.OpsType, opsBehaviour OpsBehaviour) {
 	opsManager.OpsMap[opsType] = opsBehaviour
 	appsv1alpha1.OpsRequestBehaviourMapper[opsType] = appsv1alpha1.OpsRequestBehaviour{
@@ -45,7 +45,7 @@ func (opsMgr *OpsManager) RegisterOps(opsType appsv1alpha1.OpsType, opsBehaviour
 	}
 }
 
-// Do the common entry function for handling OpsRequest
+// Do the entry function for handling OpsRequest
 func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*ctrl.Result, error) {
 	var (
 		opsBehaviour OpsBehaviour
@@ -66,7 +66,7 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 	}
 	if opsRequest.Status.Phase != appsv1alpha1.OpsCreatingPhase {
 		// If the operation causes the cluster phase to change, the cluster needs to be locked.
-		// At the same time, only one operation is running if these operations are mutex(exist opsBehaviour.ToClusterPhase).
+		// At the same time, only one operation is running if these operations are mutually exclusive(exist opsBehaviour.ToClusterPhase).
 		if err = addOpsRequestAnnotationToCluster(reqCtx.Ctx, cli, opsRes, opsBehaviour); err != nil {
 			return nil, err
 		}

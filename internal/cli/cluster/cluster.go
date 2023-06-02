@@ -41,7 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
-// ConditionsError cluster will display this status on list cmd when the status of ApplyResources or ProvisioningStarted condition is not "True".
+// ConditionsError cluster displays this status on list cmd when the status of ApplyResources or ProvisioningStarted condition is "False".
 const ConditionsError = "ConditionsError"
 
 type GetOptions struct {
@@ -211,12 +211,12 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 
 	// get events
 	if o.WithEvent {
-		// get all events about cluster
+		// get all events of cluster
 		if objs.Events, err = corev1.Events(o.Namespace).Search(scheme.Scheme, objs.Cluster); err != nil {
 			return nil, err
 		}
 
-		// get all events about pods
+		// get all events of pods
 		for _, pod := range objs.Pods.Items {
 			events, err := corev1.Events(o.Namespace).Search(scheme.Scheme, &pod)
 			if err != nil {
@@ -286,7 +286,7 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 			}
 		}
 
-		// current component has no pod corresponding to it
+		// current component has no derived pods
 		if len(pods) == 0 {
 			continue
 		}

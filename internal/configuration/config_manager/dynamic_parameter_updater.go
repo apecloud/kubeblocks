@@ -73,7 +73,7 @@ func NewCommandChannel(ctx context.Context, dataType, dsn string) (DynamicParamU
 	default:
 		// TODO mock db begin support dapper
 	}
-	return nil, cfgcore.MakeError("not support type[%s]", dataType)
+	return nil, cfgcore.MakeError("not supported type[%s]", dataType)
 }
 
 func NewMysqlConnection(ctx context.Context, dsn string) (DynamicParamUpdater, error) {
@@ -96,10 +96,10 @@ func NewMysqlConnection(ctx context.Context, dsn string) (DynamicParamUpdater, e
 	ctx, cancel := context.WithTimeout(ctx, connectTimeout)
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
-		logger.Error(err, "failed to  pinging mysqld.")
+		logger.Error(err, "failed to ping mysqld.")
 		return nil, err
 	}
-	logger.V(1).Info("succeed to connect mysql.")
+	logger.V(1).Info("succeed to connect to mysql.")
 	return &mysqlCommandChannel{db: db}, nil
 }
 
@@ -135,7 +135,7 @@ func (p *pgPatroniCommandChannel) ExecCommand(ctx context.Context, command strin
 	)
 
 	if len(args) == 0 {
-		return "", cfgcore.MakeError("require patroni functional.")
+		return "", cfgcore.MakeError("patroni is required.")
 	}
 
 	functional := args[0]
@@ -147,7 +147,7 @@ func (p *pgPatroniCommandChannel) ExecCommand(ctx context.Context, command strin
 	case Restart, Reload:
 		return sendRestRequest(ctx, command, restPath, "POST")
 	}
-	return "", cfgcore.MakeError("not support patroni functional[%s]", args[0])
+	return "", cfgcore.MakeError("not supported patroni function: [%s]", args[0])
 }
 
 func (p *pgPatroniCommandChannel) Close() {

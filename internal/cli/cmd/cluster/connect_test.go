@@ -106,7 +106,7 @@ var _ = Describe("connection", func() {
 		// unset pod name
 		o.PodName = ""
 		Expect(o.validate([]string{clusterName})).Should(Succeed())
-		// unset component name as well
+		// unset component name
 		o.componentName = ""
 		Expect(o.validate([]string{clusterName})).Should(Succeed())
 	})

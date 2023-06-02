@@ -174,13 +174,13 @@ func ValidatePlugin(name string, p Plugin) error {
 
 func validatePlatform(p Platform) error {
 	if p.URI == "" {
-		return errors.New("`uri` has to be set")
+		return errors.New("`uri` is unset")
 	}
 	if p.Sha256 == "" {
-		return errors.New("`sha256` sum has to be set")
+		return errors.New("`sha256` sum is unset")
 	}
 	if p.Bin == "" {
-		return errors.New("`bin` has to be set")
+		return errors.New("`bin` is unset")
 	}
 	if err := validateFiles(p.Files); err != nil {
 		return errors.Wrap(err, "`files` is invalid")
@@ -196,13 +196,13 @@ func validateFiles(fops []FileOperation) error {
 		return nil
 	}
 	if len(fops) == 0 {
-		return errors.New("`files` has to be unspecified or non-empty")
+		return errors.New("`files` is empty, set it")
 	}
 	for _, op := range fops {
 		if op.From == "" {
-			return errors.New("`from` field has to be set")
+			return errors.New("`from` field is unset")
 		} else if op.To == "" {
-			return errors.New("`to` field has to be set")
+			return errors.New("`to` field is unset")
 		}
 	}
 	return nil

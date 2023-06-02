@@ -32,7 +32,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Addon is the Schema for the addons API
+        description: Addon is the Schema for the add-ons API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -47,7 +47,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: AddonSpec defines the desired state of Addon
+            description: AddonSpec defines the desired state of an add-on.
             properties:
               cliPlugins:
                 description: Plugin installation spec.
@@ -76,7 +76,7 @@ spec:
                         attributes to be set.
                       type: boolean
                     extras:
-                      description: Install spec. for extra items.
+                      description: Installs spec. for extra items.
                       items:
                         properties:
                           name:
@@ -100,7 +100,7 @@ spec:
                                   pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                   x-kubernetes-int-or-string: true
                                 description: 'Limits describes the maximum amount
-                                  of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                  of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/.'
                                 type: object
                               requests:
                                 additionalProperties:
@@ -112,8 +112,8 @@ spec:
                                 description: 'Requests describes the minimum amount
                                   of compute resources required. If Requests is omitted
                                   for a container, it defaults to Limits if that is
-                                  explicitly specified, otherwise to an implementation-defined
-                                  value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                  explicitly specified; otherwise, it defaults to
+                                  an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/.'
                                 type: object
                             type: object
                           storageClass:
@@ -147,7 +147,7 @@ spec:
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
                           description: 'Limits describes the maximum amount of compute
-                            resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/.'
                           type: object
                         requests:
                           additionalProperties:
@@ -158,19 +158,19 @@ spec:
                             x-kubernetes-int-or-string: true
                           description: 'Requests describes the minimum amount of compute
                             resources required. If Requests is omitted for a container,
-                            it defaults to Limits if that is explicitly specified,
-                            otherwise to an implementation-defined value. More info:
-                            https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                            it defaults to Limits if that is explicitly specified;
+                            otherwise, it defaults to an implementation-defined value.
+                            More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/.'
                           type: object
                       type: object
                     selectors:
-                      description: Addon default install parameters selectors. If
-                        multiple selectors are provided that all selectors must evaluate
+                      description: Addon installs parameters selectors by default.
+                        If multiple selectors are provided, all selectors must evaluate
                         to true.
                       items:
                         properties:
                           key:
-                            description: The selector key, valid values are KubeVersion,
+                            description: The selector key. Valid values are KubeVersion,
                               KubeGitVersion. "KubeVersion" the semver expression
                               of Kubernetes versions, i.e., v1.24. "KubeGitVersion"
                               may contain distro. info., i.e., v1.24.4+eks.
@@ -182,10 +182,10 @@ spec:
                             description: "Represents a key's relationship to a set
                               of values. Valid operators are Contains, NotIn, DoesNotContain,
                               MatchRegex, and DoesNoteMatchRegex. \n Possible enum
-                              values: `\"Contains\"` line contains string `\"DoesNotContain\"`
-                              line does not contain string `\"MatchRegex\"` line contains
-                              a match to the regular expression `\"DoesNotMatchRegex\"`
-                              line does not contain a match to the regular expression"
+                              values: `\"Contains\"` line contains a string. `\"DoesNotContain\"`
+                              line does not contain a string. `\"MatchRegex\"` line
+                              contains a match to the regular expression. `\"DoesNotMatchRegex\"`
+                              line does not contain a match to the regular expression."
                             enum:
                             - Contains
                             - DoesNotContain
@@ -193,8 +193,8 @@ spec:
                             - DoesNotMatchRegex
                             type: string
                           values:
-                            description: An array of string values. Server as "OR"
-                              expression to the operator.
+                            description: An array of string values. It serves as an
+                              "OR" expression to the operator.
                             items:
                               type: string
                             type: array
@@ -216,8 +216,7 @@ spec:
                 description: Addon description.
                 type: string
               helm:
-                description: Helm installation spec., it's only being processed if
-                  type=helm.
+                description: Helm installation spec. It's processed only when type=helm.
                 properties:
                   chartLocationURL:
                     description: A Helm Chart location URL.
@@ -225,17 +224,18 @@ spec:
                   installOptions:
                     additionalProperties:
                       type: string
-                    description: installOptions defines Helm release install options.
+                    description: installOptions defines Helm release installation
+                      options.
                     type: object
                   installValues:
-                    description: HelmInstallValues defines Helm release install set
-                      values.
+                    description: HelmInstallValues defines Helm release installation
+                      set values.
                     properties:
                       configMapRefs:
-                        description: Selects a key of a ConfigMap item list, the value
-                          of ConfigMap can be a JSON or YAML string content, use key
-                          name with ".json" or ".yaml" or ".yml" extension name to
-                          specify content type.
+                        description: Selects a key of a ConfigMap item list. The value
+                          of ConfigMap can be a JSON or YAML string content. Use a
+                          key name with ".json" or ".yaml" or ".yml" extension name
+                          to specify a content type.
                         items:
                           properties:
                             key:
@@ -250,10 +250,10 @@ spec:
                           type: object
                         type: array
                       secretRefs:
-                        description: Selects a key of a Secrets item list, the value
-                          of Secrets can be a JSON or YAML string content, use key
+                        description: Selects a key of a Secrets item list. The value
+                          of Secrets can be a JSON or YAML string content. Use a key
                           name with ".json" or ".yaml" or ".yml" extension name to
-                          specify content type.
+                          specify a content type.
                         items:
                           properties:
                             key:
@@ -268,13 +268,13 @@ spec:
                           type: object
                         type: array
                       setJSONValues:
-                        description: Helm install set JSON values, can specify multiple
-                          or separate values with commas(key1=jsonval1,key2=jsonval2).
+                        description: Helm install set JSON values. It can specify
+                          multiple or separate values with commas(key1=jsonval1,key2=jsonval2).
                         items:
                           type: string
                         type: array
                       setValues:
-                        description: Helm install set values, can specify multiple
+                        description: Helm install set values. It can specify multiple
                           or separate values with commas(key1=val1,key2=val2).
                         items:
                           type: string
@@ -285,7 +285,7 @@ spec:
                         type: array
                     type: object
                   valuesMapping:
-                    description: valuesMapping defines addon normalized resources
+                    description: valuesMapping defines add-on normalized resources
                       parameters mapped to Helm values' keys.
                     properties:
                       extras:
@@ -293,12 +293,12 @@ spec:
                         items:
                           properties:
                             jsonMap:
-                              description: 'jsonMap define the "key" mapping values,
-                                valid keys are tolerations. Enum values explained:
-                                `"tolerations"` sets toleration mapping key'
+                              description: 'jsonMap defines the "key" mapping values.
+                                The valid key is tolerations. Enum values explained:
+                                `"tolerations"` sets the toleration mapping key.'
                               properties:
                                 tolerations:
-                                  description: tolerations sets toleration mapping
+                                  description: tolerations sets the toleration mapping
                                     key.
                                   type: string
                               type: object
@@ -332,29 +332,29 @@ spec:
                                       type: string
                                   type: object
                                 storage:
-                                  description: storage sets storage size value mapping
-                                    key.
+                                  description: storage sets the storage size value
+                                    mapping key.
                                   type: string
                               type: object
                             valueMap:
-                              description: 'valueMap define the "key" mapping values,
-                                valid keys are replicaCount, persistentVolumeEnabled,
+                              description: 'valueMap define the "key" mapping values.
+                                Valid keys are replicaCount, persistentVolumeEnabled,
                                 and storageClass. Enum values explained: `"replicaCount"`
-                                sets replicaCount value mapping key `"persistentVolumeEnabled"`
-                                sets persistent volume enabled mapping key `"storageClass"`
-                                sets storageClass mapping key'
+                                sets the replicaCount value mapping key. `"persistentVolumeEnabled"`
+                                sets the persistent volume enabled mapping key. `"storageClass"`
+                                sets the storageClass mapping key.'
                               properties:
                                 persistentVolumeEnabled:
-                                  description: persistentVolumeEnabled persistent
+                                  description: persistentVolumeEnabled sets the persistent
                                     volume enabled mapping key.
                                   type: string
                                 replicaCount:
-                                  description: replicaCount sets replicaCount value
-                                    mapping key.
+                                  description: replicaCount sets the replicaCount
+                                    value mapping key.
                                   type: string
                                 storageClass:
-                                  description: storageClass sets storageClass mapping
-                                    key.
+                                  description: storageClass sets the storageClass
+                                    mapping key.
                                   type: string
                               type: object
                           required:
@@ -365,12 +365,12 @@ spec:
                         - name
                         x-kubernetes-list-type: map
                       jsonMap:
-                        description: 'jsonMap define the "key" mapping values, valid
-                          keys are tolerations. Enum values explained: `"tolerations"`
-                          sets toleration mapping key'
+                        description: 'jsonMap defines the "key" mapping values. The
+                          valid key is tolerations. Enum values explained: `"tolerations"`
+                          sets the toleration mapping key.'
                         properties:
                           tolerations:
-                            description: tolerations sets toleration mapping key.
+                            description: tolerations sets the toleration mapping key.
                             type: string
                         type: object
                       resources:
@@ -399,27 +399,29 @@ spec:
                                 type: string
                             type: object
                           storage:
-                            description: storage sets storage size value mapping key.
+                            description: storage sets the storage size value mapping
+                              key.
                             type: string
                         type: object
                       valueMap:
-                        description: 'valueMap define the "key" mapping values, valid
+                        description: 'valueMap define the "key" mapping values. Valid
                           keys are replicaCount, persistentVolumeEnabled, and storageClass.
-                          Enum values explained: `"replicaCount"` sets replicaCount
-                          value mapping key `"persistentVolumeEnabled"` sets persistent
-                          volume enabled mapping key `"storageClass"` sets storageClass
-                          mapping key'
+                          Enum values explained: `"replicaCount"` sets the replicaCount
+                          value mapping key. `"persistentVolumeEnabled"` sets the
+                          persistent volume enabled mapping key. `"storageClass"`
+                          sets the storageClass mapping key.'
                         properties:
                           persistentVolumeEnabled:
-                            description: persistentVolumeEnabled persistent volume
-                              enabled mapping key.
+                            description: persistentVolumeEnabled sets the persistent
+                              volume enabled mapping key.
                             type: string
                           replicaCount:
-                            description: replicaCount sets replicaCount value mapping
-                              key.
+                            description: replicaCount sets the replicaCount value
+                              mapping key.
                             type: string
                           storageClass:
-                            description: storageClass sets storageClass mapping key.
+                            description: storageClass sets the storageClass mapping
+                              key.
                             type: string
                         type: object
                     type: object
@@ -434,7 +436,7 @@ spec:
                       attributes to be set.
                     type: boolean
                   extras:
-                    description: Install spec. for extra items.
+                    description: Installs spec. for extra items.
                     items:
                       properties:
                         name:
@@ -458,7 +460,7 @@ spec:
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
                               description: 'Limits describes the maximum amount of
-                                compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/.'
                               type: object
                             requests:
                               additionalProperties:
@@ -470,8 +472,8 @@ spec:
                               description: 'Requests describes the minimum amount
                                 of compute resources required. If Requests is omitted
                                 for a container, it defaults to Limits if that is
-                                explicitly specified, otherwise to an implementation-defined
-                                value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                explicitly specified; otherwise, it defaults to an
+                                implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/.'
                               type: object
                           type: object
                         storageClass:
@@ -505,7 +507,7 @@ spec:
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
                         description: 'Limits describes the maximum amount of compute
-                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                          resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/.'
                         type: object
                       requests:
                         additionalProperties:
@@ -516,8 +518,9 @@ spec:
                           x-kubernetes-int-or-string: true
                         description: 'Requests describes the minimum amount of compute
                           resources required. If Requests is omitted for a container,
-                          it defaults to Limits if that is explicitly specified, otherwise
-                          to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                          it defaults to Limits if that is explicitly specified; otherwise,
+                          it defaults to an implementation-defined value. More info:
+                          https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/.'
                         type: object
                     type: object
                   storageClass:
@@ -528,20 +531,21 @@ spec:
                     type: string
                 type: object
               installable:
-                description: Addon installable spec., provide selector and auto-install
+                description: Addon installable spec. It provides selector and auto-install
                   settings.
                 properties:
                   autoInstall:
                     default: false
-                    description: autoInstall defines an addon should auto installed
+                    description: autoInstall defines an add-on should be installed
+                      automatically.
                     type: boolean
                   selectors:
-                    description: Addon installable selectors. If multiple selectors
-                      are provided that all selectors must evaluate to true.
+                    description: Add-on installable selectors. If multiple selectors
+                      are provided, all selectors must evaluate to true.
                     items:
                       properties:
                         key:
-                          description: The selector key, valid values are KubeVersion,
+                          description: The selector key. Valid values are KubeVersion,
                             KubeGitVersion. "KubeVersion" the semver expression of
                             Kubernetes versions, i.e., v1.24. "KubeGitVersion" may
                             contain distro. info., i.e., v1.24.4+eks.
@@ -553,10 +557,10 @@ spec:
                           description: "Represents a key's relationship to a set of
                             values. Valid operators are Contains, NotIn, DoesNotContain,
                             MatchRegex, and DoesNoteMatchRegex. \n Possible enum values:
-                            `\"Contains\"` line contains string `\"DoesNotContain\"`
-                            line does not contain string `\"MatchRegex\"` line contains
-                            a match to the regular expression `\"DoesNotMatchRegex\"`
-                            line does not contain a match to the regular expression"
+                            `\"Contains\"` line contains a string. `\"DoesNotContain\"`
+                            line does not contain a string. `\"MatchRegex\"` line
+                            contains a match to the regular expression. `\"DoesNotMatchRegex\"`
+                            line does not contain a match to the regular expression."
                           enum:
                           - Contains
                           - DoesNotContain
@@ -564,8 +568,8 @@ spec:
                           - DoesNotMatchRegex
                           type: string
                         values:
-                          description: An array of string values. Server as "OR" expression
-                            to the operator.
+                          description: An array of string values. It serves as an
+                            "OR" expression to the operator.
                           items:
                             type: string
                           type: array
@@ -578,7 +582,7 @@ spec:
                 - autoInstall
                 type: object
               type:
-                description: Addon type, valid value is helm.
+                description: Add-on type. The valid value is helm.
                 enum:
                 - Helm
                 type: string
@@ -591,10 +595,11 @@ spec:
                 otherwise
               rule: 'has(self.type) && self.type == ''Helm'' ?  has(self.helm) : !has(self.helm)'
           status:
-            description: AddonStatus defines the observed state of Addon
+            description: AddonStatus defines the observed state of an add-on.
             properties:
               conditions:
-                description: Describe current state of Addon API installation conditions.
+                description: Describes the current state of add-on API installation
+                  conditions.
                 items:
                   description: "Condition contains details for one aspect of the current
                     state of this API Resource. --- This struct is intended for direct
@@ -664,12 +669,12 @@ spec:
                 type: array
               observedGeneration:
                 description: observedGeneration is the most recent generation observed
-                  for this Addon. It corresponds to the Addon's generation, which
+                  for this add-on. It corresponds to the add-on's generation, which
                   is updated on mutation by the API Server.
                 format: int64
                 type: integer
               phase:
-                description: Addon installation phases. Valid values are Disabled,
+                description: Add-on installation phases. Valid values are Disabled,
                   Enabled, Failed, Enabling, Disabling.
                 enum:
                 - Disabled

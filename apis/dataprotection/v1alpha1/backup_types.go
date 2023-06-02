@@ -1,20 +1,17 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package v1alpha1
@@ -26,14 +23,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// BackupSpec defines the desired state of Backup
+// BackupSpec defines the desired state of Backup.
 type BackupSpec struct {
-	// which backupPolicy to perform this backup
+	// Which backupPolicy is applied to perform this backup
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	BackupPolicyName string `json:"backupPolicyName"`
 
-	// Backup Type. datafile or logfile or snapshot. if unset, default is datafile.
+	// Backup Type. datafile or logfile or snapshot. If not set, datafile is the default type.
 	// +kubebuilder:default=datafile
 	BackupType BackupType `json:"backupType"`
 
@@ -42,12 +39,12 @@ type BackupSpec struct {
 	ParentBackupName string `json:"parentBackupName,omitempty"`
 }
 
-// BackupStatus defines the observed state of Backup
+// BackupStatus defines the observed state of Backup.
 type BackupStatus struct {
 	// +optional
 	Phase BackupPhase `json:"phase,omitempty"`
 
-	// record parentBackupName if backupType is incremental.
+	// Records parentBackupName if backupType is incremental.
 	// +optional
 	ParentBackupName string `json:"parentBackupName,omitempty"`
 
@@ -69,12 +66,12 @@ type BackupStatus struct {
 	// +optional
 	Duration *metav1.Duration `json:"duration,omitempty"`
 
-	// backup total size
-	// string with capacity units in the form of "1Gi", "1Mi", "1Ki".
+	// Backup total size.
+	// A string with capacity units in the form of "1Gi", "1Mi", "1Ki".
 	// +optional
 	TotalSize string `json:"totalSize,omitempty"`
 
-	// the reason if backup failed.
+	// The reason for a backup failure.
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
 
@@ -82,25 +79,25 @@ type BackupStatus struct {
 	// +optional
 	PersistentVolumeClaimName string `json:"persistentVolumeClaimName,omitempty"`
 
-	// backupToolName referenced backup tool name.
+	// backupToolName references the backup tool name.
 	// +optional
 	BackupToolName string `json:"backupToolName,omitempty"`
 
-	// manifests determines the backup metadata info
+	// manifests determines the backup metadata info.
 	// +optional
 	Manifests *ManifestsStatus `json:"manifests,omitempty"`
 }
 
 type ManifestsStatus struct {
-	// backupLog records startTime and stopTime of data logging
+	// backupLog records startTime and stopTime of data logging.
 	// +optional
 	BackupLog *BackupLogStatus `json:"backupLog,omitempty"`
 
-	// target records the target cluster metadata string, which are in JSON format.
+	// target records the target cluster metadata string, which is in JSON format.
 	// +optional
 	Target string `json:"target,omitempty"`
 
-	// snapshot records the volume snapshot metadata
+	// snapshot records the volume snapshot metadata.
 	// +optional
 	Snapshot *BackupSnapshotStatus `json:"backupSnapshot,omitempty"`
 
@@ -114,17 +111,17 @@ type ManifestsStatus struct {
 }
 
 type BackupLogStatus struct {
-	// startTime record start time of data logging
+	// startTime records the start time of data logging.
 	// +optional
 	StartTime *metav1.Time `json:"startTime,omitempty"`
 
-	// stopTime record start time of data logging
+	// stopTime records the stop time of data logging.
 	// +optional
 	StopTime *metav1.Time `json:"stopTime,omitempty"`
 }
 
 type BackupSnapshotStatus struct {
-	// volumeSnapshotName record the volumeSnapshot name
+	// volumeSnapshotName records the volumeSnapshot name.
 	// +optional
 	VolumeSnapshotName string `json:"volumeSnapshotName,omitempty"`
 
@@ -141,12 +138,12 @@ type BackupToolManifestsStatus struct {
 	// +optional
 	FilePath string `json:"filePath,omitempty"`
 
-	// backup upload total size
-	// string with capacity units in the form of "1Gi", "1Mi", "1Ki".
+	// Backup upload total size.
+	// A string with capacity units in the form of "1Gi", "1Mi", "1Ki".
 	// +optional
 	UploadTotalSize string `json:"uploadTotalSize,omitempty"`
 
-	// checksum of backup file, generated by md5 or sha1 or sha256
+	// Checksum of backup file, generated by md5 or sha1 or sha256.
 	// +optional
 	CheckSum string `json:"checkSum,omitempty"`
 
@@ -155,6 +152,8 @@ type BackupToolManifestsStatus struct {
 	CheckPoint string `json:"CheckPoint,omitempty"`
 }
 
+// +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
@@ -165,7 +164,7 @@ type BackupToolManifestsStatus struct {
 // +kubebuilder:printcolumn:name="CREATE-TIME",type=string,JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="COMPLETION-TIME",type=string,JSONPath=`.status.completionTimestamp`
 
-// Backup is the Schema for the backups API (defined by User)
+// Backup is the Schema for the backups API (defined by User).
 type Backup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -176,7 +175,7 @@ type Backup struct {
 
 // +kubebuilder:object:root=true
 
-// BackupList contains a list of Backup
+// BackupList contains a list of Backup.
 type BackupList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
@@ -207,7 +206,7 @@ func (r *BackupSpec) Validate(backupPolicy *BackupPolicy) error {
 	return nil
 }
 
-// GetRecoverableTimeRange return the recoverable time range array
+// GetRecoverableTimeRange returns the recoverable time range array.
 func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 	// filter backups with backupLog
 	baseBackups := make([]Backup, 0)

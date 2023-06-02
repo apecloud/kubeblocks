@@ -51,7 +51,7 @@ var _ = Describe("Stateful Component", func() {
 		statefulCompName       = "stateful"
 	)
 	cleanAll := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -105,22 +105,20 @@ var _ = Describe("Stateful Component", func() {
 				sts.Status.UpdateRevision = updateRevision
 			})).Should(Succeed())
 			podsReady, _ := stateful.PodsReady(ctx, sts)
-			Expect(podsReady == false).Should(BeTrue())
+			Expect(podsReady).Should(BeFalse())
 
 			By("create pods of sts")
 			podList := testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, statefulCompName)
 
 			By("test stateful component is abnormal")
-			// mock pod is not ready
+			// mock pod scheduled failure
 			pod := podList[0]
-			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
-				pod.Status.Conditions = nil
-			})).Should(Succeed())
+			testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, pod.Name, pod.Namespace)
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sts), func(g Gomega, tmpSts *appsv1.StatefulSet) {
 				g.Expect(tmpSts.Status.AvailableReplicas == *sts.Spec.Replicas-1).Should(BeTrue())
 			})).Should(Succeed())
 			phase, _, _ = stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName)
-			Expect(phase == appsv1alpha1.AbnormalClusterCompPhase).Should(BeTrue())
+			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			By("not ready pod is not controlled by latest revision, should return empty string")
 			// mock pod is not controlled by latest revision
@@ -128,7 +126,7 @@ var _ = Describe("Stateful Component", func() {
 				lpod.Labels[appsv1.ControllerRevisionHashLabelKey] = fmt.Sprintf("%s-%s-%s", clusterName, statefulCompName, "5wdsd8d9fs")
 			})).Should(Succeed())
 			phase, _, _ = stateful.GetPhaseWhenPodsNotReady(ctx, statefulCompName)
-			Expect(len(phase) == 0).Should(BeTrue())
+			Expect(string(phase)).Should(Equal(""))
 			// reset updateRevision
 			Expect(testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
 				lpod.Labels[appsv1.ControllerRevisionHashLabelKey] = updateRevision
@@ -143,20 +141,20 @@ var _ = Describe("Stateful Component", func() {
 			// mock sts is ready
 			testk8s.MockStatefulSetReady(sts)
 			podsReady, _ = stateful.PodsReady(ctx, sts)
-			Expect(podsReady == true).Should(BeTrue())
+			Expect(podsReady).Should(BeTrue())
 
 			By("test component.replicas is inconsistent with sts.spec.replicas")
 			oldReplicas := clusterComponent.Replicas
 			replicas := int32(4)
 			clusterComponent.Replicas = replicas
 			isRunning, _ := stateful.IsRunning(ctx, sts)
-			Expect(isRunning == false).Should(BeTrue())
+			Expect(isRunning).Should(BeFalse())
 			// reset replicas
 			clusterComponent.Replicas = oldReplicas
 
 			By("test component is running")
 			isRunning, _ = stateful.IsRunning(ctx, sts)
-			Expect(isRunning == true).Should(BeTrue())
+			Expect(isRunning).Should(BeTrue())
 
 			// TODO(refactor): probe timed-out pod
 			// By("test handle probe timed out")

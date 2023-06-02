@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	// ComponentPhaseTransition the event reason indicates that the component transits  to a new phase.
+	// ComponentPhaseTransition the event reason indicates that the component transits to a new phase.
 	ComponentPhaseTransition = "ComponentPhaseTransition"
 
 	// PodContainerFailedTimeout the timeout for container of pod failures, the component phase will be set to Failed/Abnormal after this time.

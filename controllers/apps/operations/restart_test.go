@@ -105,7 +105,7 @@ var _ = Describe("Restart OpsRequest", func() {
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("opsRequest Type: Restart is forbidden when Cluster.status.Phase is Stopped"))
+			Expect(err.Error()).Should(ContainSubstring("OpsRequest.spec.type=Restart is forbidden when Cluster.status.phase=Stopped"))
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest),
 				func(g Gomega, fetched *appsv1alpha1.OpsRequest) {
 					g.Expect(fetched.Status.Phase).To(Equal(appsv1alpha1.OpsFailedPhase))

@@ -504,7 +504,7 @@ var _ = Describe("Cluster Controller", func() {
 			Eventually(func() int32 {
 				stsList = testk8s.ListAndCheckStatefulSetWithComponent(&testCtx, clusterKey, comp.Name)
 				return *stsList.Items[0].Spec.Replicas
-			}, "200s").Should(BeEquivalentTo(updatedReplicas))
+			}).Should(BeEquivalentTo(updatedReplicas))
 		}
 
 		if policy == nil {
@@ -647,7 +647,7 @@ var _ = Describe("Cluster Controller", func() {
 				}
 				g.Expect(foundPodHostname != "").Should(BeTrue())
 			}
-		}), "200s").Should(Succeed())
+		})).Should(Succeed())
 	}
 
 	// @argument componentDefsWithHScalePolicy assign ClusterDefinition.spec.componentDefs[].horizontalScalePolicy for

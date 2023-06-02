@@ -39,15 +39,15 @@ pg-cluster        default          postgresql            postgresql-14.7.0      
 
   **Option 1.** (**Recommended**) Use kbcli
 
-  Configure the values of `--components`, `--volume-claim-template-names`, and `--storage`, and run the command below to expand the volume.
+  Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
 
   ```bash
   kbcli cluster volume-expand pg-cluster --components="pg-replication" \
-  --volume-claim-template-names="data" --storage="2Gi"
+  --volume-claim-templates="data" --storage="2Gi"
   ```
 
   - `--components` describes the component name for volume expansion.
-  - `--volume-claim-template-names` describes the VolumeClaimTemplate names in components.
+  - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
   - `--storage` describes the volume storage size.
 
   **Option 2.** Create an OpsRequest
@@ -99,7 +99,7 @@ pg-cluster        default          postgresql            postgresql-14.7.0      
     terminationPolicy: Halt
   ```
 
-2. Validate the volume expansion.
+1. Validate the volume expansion.
 
    ```bash
    kbcli cluster list <name>

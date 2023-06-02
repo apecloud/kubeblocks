@@ -113,6 +113,10 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		for _, c := range clusterCompVer.VersionsCtx.Containers {
 			component.PodSpec.Containers = appendOrOverrideContainerAttr(component.PodSpec.Containers, c)
 		}
+		component.ToolsImage = clusterCompVer.ToolsImage
+		if component.ToolsImage == "" {
+			component.ToolsImage = component.PodSpec.Containers[0].Image
+		}
 	}
 
 	// handle component.PodSpec extra settings

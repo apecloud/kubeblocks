@@ -275,6 +275,9 @@ spec:
                       required:
                       - cmdExecutorConfig
                       type: object
+                    toolsImage:
+                      description: Provide Database manage tools image for sqlchannel
+                      type: string
                     versionsContext:
                       description: versionContext defines containers images' context
                         for component versions, this value replaces ClusterDefinition.spec.componentDefs.podSpec.[initContainers

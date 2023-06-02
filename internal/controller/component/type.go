@@ -63,6 +63,7 @@ type SynthesizedComponent struct {
 	CustomLabelSpecs      []v1alpha1.CustomLabelSpec             `json:"customLabelSpecs,omitempty"`
 	ComponentDef          string                                 `json:"componentDef,omitempty"`
 	ServiceAccountName    string                                 `json:"serviceAccountName,omitempty"`
+	ToolsImage            string                                 `json:"toolsImage,omitempty"`
 	StatefulSetWorkload   v1alpha1.StatefulSetWorkload
 }
 

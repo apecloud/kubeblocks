@@ -38,7 +38,7 @@ import (
 
 const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
-	checkRoleURIFormat    = "http://localhost:%s/v1.0/bindings/%s"
+	checkRoleURIFormat    = "/v1.0/bindings/%s?operation=checkRole"
 	checkRunningURIFormat = "/v1.0/bindings/%s?operation=checkRunning"
 	checkStatusURIFormat  = "/v1.0/bindings/%s?operation=checkStatus"
 )
@@ -89,6 +89,9 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		probeContainers = append(probeContainers, *runningProbeContainer)
 	}
 
+	initContainer := container.DeepCopy()
+	buildProbeInitContainer(component, initContainer)
+	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, *initContainer)
 	if len(probeContainers) >= 1 {
 		container := &probeContainers[0]
 		buildProbeServiceContainer(component, container, int(probeSvcHTTPPort), int(probeSvcGRPCPort))
@@ -96,6 +99,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 
 	reqCtx.Log.V(1).Info("probe", "containers", probeContainers)
 	component.PodSpec.Containers = append(component.PodSpec.Containers, probeContainers...)
+	component.PodSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
 	return nil
 }
 
@@ -118,16 +122,27 @@ func buildProbeContainer() (*corev1.Container, error) {
 	return container, nil
 }
 
-func buildProbeServiceContainer(component *SynthesizedComponent, container *corev1.Container, probeSvcHTTPPort int, probeSvcGRPCPort int) {
+func buildProbeInitContainer(component *SynthesizedComponent, container *corev1.Container) {
 	container.Image = viper.GetString(constant.KBToolsImage)
+	container.Name = constant.ProbeInitContainerName
+	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
+	container.Command = []string{"cp", "-r", "/bin/probe", "/config", "/kubeblocks/"}
+	container.StartupProbe = nil
+	container.ReadinessProbe = nil
+	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
+	container.VolumeMounts = []corev1.VolumeMount{volumeMount}
+}
+
+func buildProbeServiceContainer(component *SynthesizedComponent, container *corev1.Container, probeSvcHTTPPort int, probeSvcGRPCPort int) {
+	container.Image = component.ToolsImage
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
-	container.Command = []string{"probe", "--app-id", "batch-sdk",
+	container.Command = []string{"/kubeblocks/probe", "--app-id", "batch-sdk",
 		"--dapr-http-port", strconv.Itoa(probeSvcHTTPPort),
 		"--dapr-grpc-port", strconv.Itoa(probeSvcGRPCPort),
 		"--log-level", logLevel,
-		"--config", "/config/probe/config.yaml",
-		"--components-path", "/config/probe/components"}
+		"--config", "/kubeblocks/config/probe/config.yaml",
+		"--components-path", "/kubeblocks/config/probe/components"}
 
 	if len(component.PodSpec.Containers) > 0 && len(component.PodSpec.Containers[0].Ports) > 0 {
 		mainContainer := component.PodSpec.Containers[0]
@@ -140,6 +155,8 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 		})
 	}
 
+	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
+	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 	roles := getComponentRoles(component)
 	rolesJSON, _ := json.Marshal(roles)
 	container.Env = append(container.Env, corev1.EnvVar{
@@ -188,16 +205,11 @@ func buildRoleProbeContainer(characterType string, roleChangedContainer *corev1.
 	roleChangedContainer.Name = constant.RoleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
 	bindingType := strings.ToLower(characterType)
-	svcPort := strconv.Itoa(probeSvcHTTPPort)
-	roleObserveURI := fmt.Sprintf(checkRoleURIFormat, svcPort, bindingType)
-	probe.Exec.Command = []string{
-		"curl", "-X", "POST",
-		"--max-time", strconv.Itoa(int(probeSetting.TimeoutSeconds)),
-		"--fail-with-body", "--silent",
-		"-H", "Content-ComponentDefRef: application/json",
-		roleObserveURI,
-		"-d", "{\"operation\": \"checkRole\", \"metadata\":{\"sql\":\"\"}}",
-	}
+	httpGet := &corev1.HTTPGetAction{}
+	httpGet.Path = fmt.Sprintf(checkRoleURIFormat, bindingType)
+	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
+	probe.Exec = nil
+	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
 	probe.FailureThreshold = probeSetting.FailureThreshold

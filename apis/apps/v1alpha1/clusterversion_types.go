@@ -88,6 +88,10 @@ type ClusterComponentVersion struct {
 	// versionContext defines containers images' context for component versions,
 	// this value replaces ClusterDefinition.spec.componentDefs.podSpec.[initContainers | containers]
 	VersionsCtx VersionsContext `json:"versionsContext"`
+
+	// Provide Database manage tools image for sqlchannel
+	// +optional
+	ToolsImage string `json:"toolsImage,omitempty"`
 }
 
 // SystemAccountShortSpec is a short version of SystemAccountSpec, with only CmdExecutorConfig field.

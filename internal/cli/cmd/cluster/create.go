@@ -681,8 +681,6 @@ func setEnableAllLogs(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinitio
 	}
 }
 
-// buildClusterComp use cd,setsMap and componentClasses to build Cluster Component. cd is the clusterDefinition we input
-// setsMap is our set input, componentClasses is the class input
 func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map[setKey]string,
 	componentClasses map[string]map[string]*appsv1alpha1.ComponentClassInstance) ([]*appsv1alpha1.ClusterComponentSpec, error) {
 	// get value from set values and environment variables, the second return value is
@@ -814,6 +812,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		}}
 		storageClass := getVal(&c, keyStorageClass, sets)
 		if len(storageClass) != 0 {
+			// now the clusterdefinition components mostly have only one VolumeClaimTemplates in default
 			compObj.VolumeClaimTemplates[0].Spec.StorageClassName = &storageClass
 		}
 		if err = buildSwitchPolicy(&c, compObj, sets); err != nil {

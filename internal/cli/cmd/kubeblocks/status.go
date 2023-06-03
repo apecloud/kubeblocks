@@ -160,8 +160,6 @@ func (o *statusOptions) complete(f cmdutil.Factory) error {
 	if o.ns == "" {
 		printer.Warning(o.Out, "Failed to find deployed KubeBlocks in any namespace\n")
 		printer.Warning(o.Out, "Will check all namespaces for KubeBlocks resources left behind\n")
-	} else {
-		fmt.Fprintf(o.Out, "Kuberblocks is deployed in namespace: %s\n", o.ns)
 	}
 
 	o.selectorList = []metav1.ListOptions{
@@ -425,8 +423,10 @@ func (o *statusOptions) showK8SClusterInfos(ctx context.Context, allErrs *[]erro
 	if err != nil {
 		appendErrIgnoreNotFound(allErrs, err)
 	}
-	fmt.Fprintf(o.Out, "Kubernetes version: %s\n", version.Kubernetes)
-	fmt.Fprintf(o.Out, "KubeBlocks version: %s\n", version.KubeBlocks)
+	if o.ns != "" {
+		fmt.Fprintf(o.Out, "Kuberblocks is deployed in namespace: %s version: %s\n", o.ns, version.KubeBlocks)
+	}
+
 	provider, err := util.GetK8sProvider(version.Kubernetes, o.client)
 	if err != nil {
 		*allErrs = append(*allErrs, fmt.Errorf("failed to get kubernetes provider: %v", err))
@@ -434,7 +434,10 @@ func (o *statusOptions) showK8SClusterInfos(ctx context.Context, allErrs *[]erro
 	if !provider.IsCloud() {
 		return
 	}
-	fmt.Fprintf(o.Out, "Kubernetes provider: %s\n", provider)
+	fmt.Fprintf(o.Out, "\nKubernetes Cluster:")
+	printer.PrintBlankLine(o.Out)
+	tblPrinter := printer.NewTablePrinter(o.Out)
+	tblPrinter.SetHeader("VERSON", "PROVIDER", "REGION", "AVAILABLE ZONES")
 	nodesList := listResourceByGVR(ctx, o.dynamic, "", []schema.GroupVersionResource{types.NodeGVR()}, []metav1.ListOptions{{}}, allErrs)
 	var region string
 	availableZones := make(map[string]struct{})
@@ -451,8 +454,6 @@ func (o *statusOptions) showK8SClusterInfos(ctx context.Context, allErrs *[]erro
 	if len(region) == 0 {
 		return
 	}
-	fmt.Fprintf(o.Out, "Kubernetes region: %s\n", region)
-	fmt.Fprintf(o.Out, "Kubernetes available zones:")
 	allZones := make([]string, 0)
 	for zone := range availableZones {
 		if len(zone) != 0 {
@@ -460,10 +461,8 @@ func (o *statusOptions) showK8SClusterInfos(ctx context.Context, allErrs *[]erro
 		}
 	}
 	sort.Strings(allZones)
-	for i := range allZones {
-		fmt.Fprintf(o.Out, " %s", allZones[i])
-	}
-	printer.PrintBlankLine(o.Out)
+	tblPrinter.AddRow(version.Kubernetes, provider, region, allZones)
+	tblPrinter.Print()
 }
 
 func getNestedSelectorAsString(obj map[string]interface{}, fields ...string) (string, error) {

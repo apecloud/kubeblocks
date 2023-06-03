@@ -903,19 +903,6 @@ func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[
 	return allSets, nil
 }
 
-func buildTolerations(raw []string) []interface{} {
-	tolerations := make([]interface{}, 0)
-	for _, tolerationRaw := range raw {
-		toleration := map[string]interface{}{}
-		for _, entries := range strings.Split(tolerationRaw, ",") {
-			parts := strings.SplitN(entries, "=", 2)
-			toleration[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
-		}
-		tolerations = append(tolerations, toleration)
-	}
-	return tolerations
-}
-
 // generateClusterName generates a random cluster name that does not exist
 func generateClusterName(dynamic dynamic.Interface, namespace string) (string, error) {
 	var name string

@@ -22,10 +22,11 @@ package kubeblocks
 import (
 	"context"
 	"fmt"
-	"golang.org/x/exp/maps"
 	"sort"
 	"strconv"
 	"strings"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/containerd/stargz-snapshotter/estargz/errorutil"
 	"github.com/spf13/cobra"
@@ -439,18 +440,19 @@ func (o *statusOptions) showK8sClusterInfos(ctx context.Context, allErrs *[]erro
 	printer.PrintBlankLine(o.Out)
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("VERSION", "PROVIDER", "REGION", "AVAILABLE ZONES")
-	nodesList := listResourceByGVR(ctx, o.dynamic, "", []schema.GroupVersionResource{types.NodeGVR()}, []metav1.ListOptions{{}}, allErrs)
+	nodesList, err := o.dynamic.Resource(types.NodeGVR()).Namespace("").List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		appendErrIgnoreNotFound(allErrs, err)
+	}
 	var region string
 	availableZones := make(map[string]struct{})
-	for _, item := range nodesList {
-		for _, node := range item.Items {
-			labels := node.GetLabels()
-			if labels == nil {
-				continue
-			}
-			region = labels[constant.RegionLabelKey]
-			availableZones[labels[constant.ZoneLabelKey]] = struct{}{}
+	for _, node := range nodesList.Items {
+		labels := node.GetLabels()
+		if labels == nil {
+			continue
 		}
+		region = labels[constant.RegionLabelKey]
+		availableZones[labels[constant.ZoneLabelKey]] = struct{}{}
 	}
 	if len(region) == 0 {
 		tblPrinter.AddRow(version.Kubernetes, provider, "unknown", "unknown")
@@ -465,7 +467,6 @@ func (o *statusOptions) showK8sClusterInfos(ctx context.Context, allErrs *[]erro
 			allZonesInfo += ","
 		}
 		allZonesInfo += allZones[i]
-
 	}
 	tblPrinter.AddRow(version.Kubernetes, provider, region, allZonesInfo)
 	tblPrinter.Print()

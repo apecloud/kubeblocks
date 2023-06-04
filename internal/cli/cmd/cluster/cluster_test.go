@@ -56,7 +56,7 @@ var _ = Describe("Cluster", func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		cd := testing.FakeClusterDef()
-		fakeDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName, testing.IsDefautl)
+		fakeDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName, testing.IsDefault)
 		tf.FakeDynamicClient = testing.FakeDynamicClient(cd, fakeDefaultStorageClass, testing.FakeClusterVersion())
 		tf.Client = &clientfake.RESTClient{}
 	})
@@ -95,7 +95,7 @@ var _ = Describe("Cluster", func() {
 			clusterDef := testing.FakeClusterDef()
 			tf.FakeDynamicClient = testing.FakeDynamicClient(
 				clusterDef,
-				testing.FakeStorageClass(testing.StorageClassName, testing.IsDefautl),
+				testing.FakeStorageClass(testing.StorageClassName, testing.IsDefault),
 				testing.FakeClusterVersion(),
 				testing.FakeComponentClassDef(fmt.Sprintf("custom-%s", testing.ComponentDefName), clusterDef.Name, testing.ComponentDefName),
 				testing.FakeComponentClassDef("custom-mysql", clusterDef.Name, "mysql"),
@@ -336,7 +336,7 @@ var _ = Describe("Cluster", func() {
 		})
 
 		Context("validate storageClass", func() {
-			It("can get all StorageClasses in K8S and check out if the cluster have a defalut StorageClasses by GetStorageClasses()", func() {
+			It("can get all StorageClasses in K8S and check out if the cluster have a default StorageClasses by GetStorageClasses()", func() {
 				storageClasses, existedDefault, err := getStorageClasses(o.Dynamic)
 				Expect(err).Should(Succeed())
 				Expect(storageClasses).Should(HaveKey(testing.StorageClassName))

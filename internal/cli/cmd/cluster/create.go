@@ -644,7 +644,7 @@ func (o *CreateOptions) isPostgresqlCluster() (bool, error) {
 
 	// get cluster component definition
 	if len(o.ComponentSpecs) == 0 {
-		return false, fmt.Errorf("find no cluster componnet")
+		return false, fmt.Errorf("find no cluster component")
 	}
 	compSpec := o.ComponentSpecs[0]
 	for i, def := range cd.Spec.ComponentDefs {
@@ -655,7 +655,7 @@ func (o *CreateOptions) isPostgresqlCluster() (bool, error) {
 	}
 
 	if compDef == nil {
-		return false, fmt.Errorf("failed to find component definition for componnet %v", compSpec["Name"])
+		return false, fmt.Errorf("failed to find component definition for component %v", compSpec["Name"])
 	}
 
 	// for postgresql, we need to create a service account, a role and a rolebinding

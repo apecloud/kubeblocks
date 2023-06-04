@@ -218,7 +218,7 @@ func (v *CommandOverrideVerifier) Verify(path string) []error {
 	if isExec, err := isExecutable(path); err == nil && !isExec {
 		errors = append(errors, fmt.Errorf("warning: %q identified as a kbcli or kubectl plugin, but it is not executable", path))
 	} else if err != nil {
-		errors = append(errors, fmt.Errorf("error: unable to indentify %s as an executable file: %v", path, err))
+		errors = append(errors, fmt.Errorf("error: unable to identify %s as an executable file: %v", path, err))
 	}
 
 	if existingPath, ok := v.seenPlugins[binName]; ok {

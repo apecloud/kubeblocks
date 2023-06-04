@@ -760,7 +760,7 @@ func CreateResourceIfAbsent(
 	return nil
 }
 
-func BuildClusterDefinitionRefLable(prefix string, clusterDef []string) string {
+func BuildClusterDefinitionRefLabel(prefix string, clusterDef []string) string {
 	return buildLabelSelectors(prefix, constant.AppNameLabelKey, clusterDef)
 }
 

@@ -226,7 +226,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 					return err
 				}
 			case appsv1alpha1.ReferToExisting:
-				if err := r.createByReferingToExisting(reqCtx, cluster, compKey, account); err != nil {
+				if err := r.createByReferToExisting(reqCtx, cluster, compKey, account); err != nil {
 					return err
 				}
 			}
@@ -273,9 +273,9 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 func (r *SystemAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.SecretMapStore = newSecretMapStore()
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1alpha1.Cluster{}, r.clusterDeletionHander()).
+		For(&appsv1alpha1.Cluster{}, r.clusterDeletionHandler()).
 		Owns(&corev1.Secret{}).
-		Watches(&source.Kind{Type: &batchv1.Job{}}, r.jobCompletionHander()).
+		Watches(&source.Kind{Type: &batchv1.Job{}}, r.jobCompletionHandler()).
 		Complete(r)
 }
 
@@ -318,7 +318,7 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 	return r.SecretMapStore.addSecret(key, secret)
 }
 
-func (r *SystemAccountReconciler) createByReferingToExisting(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, key componentUniqueKey, account appsv1alpha1.SystemAccountConfig) error {
+func (r *SystemAccountReconciler) createByReferToExisting(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, key componentUniqueKey, account appsv1alpha1.SystemAccountConfig) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 
 	// get secret
@@ -402,7 +402,7 @@ func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx,
 }
 
 func (r *SystemAccountReconciler) getEngineFacts(reqCtx intctrlutil.RequestCtx, key componentUniqueKey) (appsv1alpha1.KBAccountType, error) {
-	// get pods for this cluster-component, by lable
+	// get pods for this cluster-component, by label
 	ml := getLabelsForSecretsAndJobs(key)
 	pods := &corev1.PodList{}
 	if err := r.Client.List(reqCtx.Ctx, pods, client.InNamespace(key.namespace), ml); err != nil {
@@ -437,7 +437,7 @@ func (r *SystemAccountReconciler) getEngineFacts(reqCtx intctrlutil.RequestCtx, 
 	return accountsID, nil
 }
 
-func (r *SystemAccountReconciler) jobCompletionHander() *handler.Funcs {
+func (r *SystemAccountReconciler) jobCompletionHandler() *handler.Funcs {
 	logger := systemAccountLog.WithName("jobCompletionHandler")
 
 	containsJobCondition := func(job batchv1.Job, jobConditions []batchv1.JobCondition,
@@ -512,7 +512,7 @@ func (r *SystemAccountReconciler) jobCompletionHander() *handler.Funcs {
 }
 
 // Delete removes cached entries from SystemAccountReconciler.SecretMapStore
-func (r *SystemAccountReconciler) clusterDeletionHander() builder.Predicates {
+func (r *SystemAccountReconciler) clusterDeletionHandler() builder.Predicates {
 	logger := systemAccountLog.WithName("clusterDeletionHandler")
 	predicate := predicate.Funcs{
 		DeleteFunc: func(e event.DeleteEvent) bool {

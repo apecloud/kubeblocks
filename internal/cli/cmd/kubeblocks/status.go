@@ -22,6 +22,7 @@ package kubeblocks
 import (
 	"context"
 	"fmt"
+	"golang.org/x/exp/maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -452,16 +453,21 @@ func (o *statusOptions) showK8sClusterInfos(ctx context.Context, allErrs *[]erro
 		}
 	}
 	if len(region) == 0 {
+		tblPrinter.AddRow(version.Kubernetes, provider, "unknown", "unknown")
+		tblPrinter.Print()
 		return
 	}
-	allZones := make([]string, 0)
-	for zone := range availableZones {
-		if len(zone) != 0 {
-			allZones = append(allZones, zone)
-		}
-	}
+	allZones := maps.Keys(availableZones)
 	sort.Strings(allZones)
-	tblPrinter.AddRow(version.Kubernetes, provider, region, allZones)
+	var allZonesInfo string
+	for i := range allZones {
+		if i != 0 {
+			allZonesInfo += ","
+		}
+		allZonesInfo += allZones[i]
+
+	}
+	tblPrinter.AddRow(version.Kubernetes, provider, region, allZonesInfo)
 	tblPrinter.Print()
 }
 

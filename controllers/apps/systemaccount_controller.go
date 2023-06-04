@@ -348,9 +348,9 @@ func (r *SystemAccountReconciler) isComponentReady(reqCtx intctrlutil.RequestCtx
 	headlessEP := &corev1.Endpoints{}
 	headlessSvcName := serviceName + "-headless"
 
-	svcerr := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: serviceName}, svcEP)
-	if svcerr != nil {
-		return false, nil, nil, svcerr
+	svcErr := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: serviceName}, svcEP)
+	if svcErr != nil {
+		return false, nil, nil, svcErr
 	}
 
 	headlessSvcErr := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: headlessSvcName}, headlessEP)
@@ -432,7 +432,7 @@ func (r *SystemAccountReconciler) getEngineFacts(reqCtx intctrlutil.RequestCtx, 
 	}
 	accountsID := appsv1alpha1.KBAccountInvalid
 	for _, acc := range accounts {
-		updateFacts((appsv1alpha1.AccountName(acc)), &accountsID)
+		updateFacts(appsv1alpha1.AccountName(acc), &accountsID)
 	}
 	return accountsID, nil
 }
@@ -511,7 +511,7 @@ func (r *SystemAccountReconciler) jobCompletionHandler() *handler.Funcs {
 	}
 }
 
-// Delete removes cached entries from SystemAccountReconciler.SecretMapStore
+// clusterDeletionHandler removes cached entries from SystemAccountReconciler.SecretMapStore
 func (r *SystemAccountReconciler) clusterDeletionHandler() builder.Predicates {
 	logger := systemAccountLog.WithName("clusterDeletionHandler")
 	predicate := predicate.Funcs{

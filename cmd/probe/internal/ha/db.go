@@ -13,6 +13,7 @@ type DB interface {
 	GetOpTime(ctx context.Context) (int64, error)
 	IsLeader(ctx context.Context) bool
 	IsHealthiest(ctx context.Context, podName string) bool
+	HandleFollow(ctx context.Context, leader string) error
 
 	DbConn
 	DbTool

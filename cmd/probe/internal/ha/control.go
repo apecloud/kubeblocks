@@ -281,7 +281,21 @@ func (h *Ha) isDBRunning() bool {
 }
 
 func (h *Ha) follow() {
+	// refresh cluster
+	err := h.cs.GetClusterFromKubernetes()
+	if err != nil {
+		h.log.Errorf("get cluster from k8s failed, err:%v")
+		return
+	}
 
+	leader := h.cs.GetCluster().Leader.GetMember().GetName()
+
+	if h.DB.IsLeader(h.ctx) {
+		h.log.Infof("demoted %s after trying and failing to obtain lock", h.podName)
+		err = h.DB.Demote(h.podName)
+	}
+
+	err = h.DB.HandleFollow(h.ctx, leader)
 }
 
 func (h *Ha) enforcePrimaryRole() {

@@ -953,3 +953,7 @@ func (pgOps *PostgresOperations) isLagging(walPosition int64) bool {
 	lag := pgOps.Cs.GetCluster().GetOpTime() - walPosition
 	return lag > pgOps.Cs.GetCluster().Config.GetData().GetMaxLagOnSwitchover()
 }
+
+func (pgOps *PostgresOperations) HandleFollow(ctx context.Context, leader string) error {
+	return nil
+}

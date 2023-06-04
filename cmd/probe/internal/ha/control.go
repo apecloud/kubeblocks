@@ -8,11 +8,6 @@ import (
 	"github.com/dapr/kit/logger"
 	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -23,7 +18,6 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
 	"github.com/apecloud/kubeblocks/cmd/probe/util"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 type Ha struct {
@@ -31,11 +25,10 @@ type Ha struct {
 	podName  string
 	isLeader int64
 	//TODO:可重入锁
-	dbType            string
-	log               logger.Logger
-	configMapInformer cache.SharedIndexInformer
-	clusterInformer   cache.SharedInformer
-	cs                *configuration_store.ConfigurationStore
+	dbType   string
+	log      logger.Logger
+	informer cache.SharedIndexInformer
+	cs       *configuration_store.ConfigurationStore
 	DB
 }
 
@@ -49,38 +42,20 @@ func NewHa() *Ha {
 	if err != nil {
 		panic(err)
 	}
-	dynamicClient, err := dynamic.NewForConfig(configs)
-	if err != nil {
-		panic(err)
-	}
 
 	sharedInformers := informers.NewSharedInformerFactory(clientSet, 10*time.Second)
 	configMapInformer := sharedInformers.Core().V1().ConfigMaps().Informer()
 
-	resourceInterface := dynamicClient.Resource(types.ClusterGVR())
-	listWatch := cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return resourceInterface.List(context.Background(), options)
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return resourceInterface.Watch(context.Background(), options)
-		},
-		DisableChunking: false,
-	}
-	obj := unstructured.Unstructured{}
-	clusterInformer := cache.NewSharedInformer(&listWatch, &obj, 10*time.Second)
-
 	cs := configuration_store.NewConfigurationStore()
 
 	ha := &Ha{
-		ctx:               context.Background(),
-		podName:           os.Getenv(util.HostName),
-		isLeader:          int64(0),
-		dbType:            os.Getenv(util.KbServiceCharacterType),
-		log:               logger.NewLogger("ha"),
-		configMapInformer: configMapInformer,
-		clusterInformer:   clusterInformer,
-		cs:                cs,
+		ctx:      context.Background(),
+		podName:  os.Getenv(util.HostName),
+		isLeader: int64(0),
+		dbType:   os.Getenv(util.KbServiceCharacterType),
+		log:      logger.NewLogger("ha"),
+		informer: configMapInformer,
+		cs:       cs,
 	}
 
 	ha.DB = ha.newDbInterface(ha.log)
@@ -134,26 +109,22 @@ func (h *Ha) newDbInterface(logger logger.Logger) DB {
 }
 
 func (h *Ha) HaControl(stopCh chan struct{}) {
-	h.configMapInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: h.processSwitchover,
-	})
-
-	h.clusterInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	h.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    h.processSwitchover,
 		UpdateFunc: h.clusterControl,
 	})
 
-	h.configMapInformer.Run(stopCh)
-	h.clusterInformer.Run(stopCh)
+	h.informer.Run(stopCh)
 }
 
 // clusterControl 只处理升主
 func (h *Ha) clusterControl(oldObj, newObj interface{}) {
-	oldCluster := oldObj.(*unstructured.Unstructured)
-	newCluster := newObj.(*unstructured.Unstructured)
-	if oldCluster.GetName() != h.cs.GetClusterName() {
+	oldConfigMap := oldObj.(*v1.ConfigMap)
+	newConfigMap := newObj.(*v1.ConfigMap)
+	if oldConfigMap.GetName() != h.cs.GetClusterCompName()+configuration_store.LeaderSuffix {
 		return
 	}
-	if reflect.DeepEqual(oldCluster.GetAnnotations(), newCluster.GetAnnotations()) {
+	if reflect.DeepEqual(oldConfigMap.Annotations, newConfigMap.Annotations) {
 		return
 	}
 
@@ -169,7 +140,7 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 
 	if h.cs.GetCluster().IsLocked() {
 		if !h.hasLock() {
-			//h.setLeader(false)
+			h.setLeader(false)
 			return
 		}
 		err = h.updateLockWithRetry(3)
@@ -181,7 +152,16 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 
 	// Process no leader cluster
 	if h.isHealthiest() {
+		err = h.acquireLeaderLock()
+		if err != nil {
+			h.log.Errorf("acquire leader lock err:%v", err)
+			h.follow()
+		}
 
+	} else {
+		// Give a time to somebody to take the leader lock
+		time.Sleep(time.Second * 2)
+		h.follow()
 	}
 }
 
@@ -282,6 +262,14 @@ func (h *Ha) isHealthiest() bool {
 	return h.DB.IsHealthiest(h.ctx, h.podName)
 }
 
+func (h *Ha) acquireLeaderLock() error {
+	err := h.cs.AttemptToAcquireLeaderLock(h.podName)
+	if err == nil {
+		h.setLeader(true)
+	}
+	return err
+}
+
 func (h *Ha) isDBRunning() bool {
 	status, err := h.DB.GetStatus(h.ctx)
 	if err != nil {
@@ -290,6 +278,14 @@ func (h *Ha) isDBRunning() bool {
 	}
 
 	return status == util.Running
+}
+
+func (h *Ha) follow() {
+
+}
+
+func (h *Ha) enforcePrimaryRole() {
+
 }
 
 /*

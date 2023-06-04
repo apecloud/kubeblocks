@@ -325,6 +325,33 @@ func (cs *ConfigurationStore) UpdateLeader(podName string, opTime int64, extra m
 	return err
 }
 
+func (cs *ConfigurationStore) AttemptToAcquireLeaderLock(podName string) error {
+	now := time.Now().Unix()
+	//TODO:only 4 para
+	annotation := map[string]string{
+		binding.LEADER: podName,
+		TTL:            strconv.FormatInt(cs.cluster.Config.data.ttl, 10),
+		RenewTime:      strconv.FormatInt(now, 10),
+		AcquireTime:    strconv.FormatInt(now, 10),
+	}
+
+	configMap, err := cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Get(cs.ctx, cs.clusterCompName+LeaderSuffix, metav1.GetOptions{})
+	if err != nil || configMap == nil {
+		_, err = cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        cs.clusterCompName + LeaderSuffix,
+				Namespace:   cs.namespace,
+				Annotations: annotation,
+			},
+		}, metav1.CreateOptions{})
+	} else {
+		configMap.SetAnnotations(annotation)
+		_, err = cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Update(cs.ctx, configMap, metav1.UpdateOptions{})
+	}
+
+	return err
+}
+
 type LeaderRecord struct {
 	acquireTime int64
 	leader      string

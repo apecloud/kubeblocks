@@ -175,7 +175,7 @@ func (o *statusOptions) run() error {
 
 	allErrs := make([]error, 0)
 	o.buildSelectorList(ctx, &allErrs)
-	o.showK8SClusterInfos(ctx, &allErrs)
+	o.showK8sClusterInfos(ctx, &allErrs)
 	o.showWorkloads(ctx, &allErrs)
 	o.showAddons()
 
@@ -418,13 +418,13 @@ func (o *statusOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
 	tblPrinter.Print()
 }
 
-func (o *statusOptions) showK8SClusterInfos(ctx context.Context, allErrs *[]error) {
+func (o *statusOptions) showK8sClusterInfos(ctx context.Context, allErrs *[]error) {
 	version, err := util.GetVersionInfo(o.client)
 	if err != nil {
 		appendErrIgnoreNotFound(allErrs, err)
 	}
 	if o.ns != "" {
-		fmt.Fprintf(o.Out, "Kuberblocks is deployed in namespace: %s version: %s\n", o.ns, version.KubeBlocks)
+		fmt.Fprintf(o.Out, "KubeBlocks is deployed in namespace: %s version: %s\n", o.ns, version.KubeBlocks)
 	}
 
 	provider, err := util.GetK8sProvider(version.Kubernetes, o.client)
@@ -437,7 +437,7 @@ func (o *statusOptions) showK8SClusterInfos(ctx context.Context, allErrs *[]erro
 	fmt.Fprintf(o.Out, "\nKubernetes Cluster:")
 	printer.PrintBlankLine(o.Out)
 	tblPrinter := printer.NewTablePrinter(o.Out)
-	tblPrinter.SetHeader("VERSON", "PROVIDER", "REGION", "AVAILABLE ZONES")
+	tblPrinter.SetHeader("VERSION", "PROVIDER", "REGION", "AVAILABLE ZONES")
 	nodesList := listResourceByGVR(ctx, o.dynamic, "", []schema.GroupVersionResource{types.NodeGVR()}, []metav1.ListOptions{{}}, allErrs)
 	var region string
 	availableZones := make(map[string]struct{})

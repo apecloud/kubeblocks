@@ -84,7 +84,7 @@ Wait until the status of this cluster is `Running`, then run `kbcli cluster conn
 kbcli cluster connect mycluster
 ```
 
-**Option 2.** Connect database outside Kubernetes cluster.
+**Option 2.** Connect database from host network.
 
 Get the MySQL client connection example.
 
@@ -94,7 +94,7 @@ kbcli cluster connect --show-example --client=cli mycluster
 
 **Example**
 
-1. Run `port-forward` to connect the cluster from the localhost.
+1. Run `port-forward` to connect the cluster from host network.
 
    ```bash
    kubectl port-forward service/mycluster-mysql 3306:3306

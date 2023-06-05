@@ -1500,6 +1500,41 @@ prometheus:
     ##
     enabled: false
 
+## loki settings for kubeblocks
+loki:
+  enabled: false
+  singleBinary:
+    replicas: 1
+    tolerations:
+      - key: kb-controller
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+  monitoring:
+    lokiCanary:
+      enabled: false
+    selfMonitoring:
+      enabled: false
+      grafanaAgent:
+        installOperator: false
+    dashboards:
+      enabled: false
+    rules:
+      enabled: false
+    serviceMonitor:
+      enabled: false
+  test:
+    enabled: false
+  loki:
+    auth_enabled: false
+    commonConfig:
+      replication_factor: 1
+    storage:
+      type: filesystem
+    podSecurityContext:
+      runAsNonRoot: false
+      runAsUser: 0
+
 grafana:
   ## If false, grafana sub-chart will not be installed
   ##
@@ -1809,6 +1844,15 @@ enabledAlphaFeatureGates:
   ## @param enabledAlphaFeatureGates.recoverVolumeExpansionFailure -- Specifies whether feature gates RecoverVolumeExpansionFailure is enabled in k8s cluster.
   ##
   recoverVolumeExpansionFailure: false
+
+
+agamotto:
+  enabled: false
+  image:
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/agamotto
+    pullPolicy: IfNotPresent
+    tag: 0.1.0-beta.2
 
 ## @section KubeBlocks default storageClass Parameters for cloud provider.
 storageClass:

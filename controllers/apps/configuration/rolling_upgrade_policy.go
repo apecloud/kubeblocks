@@ -21,6 +21,7 @@ package configuration
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/spf13/viper"
@@ -63,7 +64,7 @@ func (r *rollingUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus
 	case appsv1alpha1.Stateful:
 		funcs = GetStatefulSetRollingUpgradeFuncs()
 	default:
-		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not support component workload type[%s]", cType)
+		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not supported component workload type[%s]", cType)
 	}
 	return performRollingUpgrade(params, funcs)
 }
@@ -78,11 +79,11 @@ func canPerformUpgrade(pods []corev1.Pod, params reconfigureParams) bool {
 		return true
 	}
 	if params.WorkloadType() == appsv1alpha1.Consensus {
-		params.Ctx.Log.Info("wait to consensus component ready.")
+		params.Ctx.Log.Info(fmt.Sprintf("wait for consensus component is ready, %d pods are ready, and the expected replicas is %d.", len(pods), target))
 		return false
 	}
 	if len(pods) < target {
-		params.Ctx.Log.Info("component pod not all ready.")
+		params.Ctx.Log.Info(fmt.Sprintf("component pods are not all ready, %d pods are ready, which is less than the expected replicas(%d).", len(pods), target))
 		return false
 	}
 	return true
@@ -107,7 +108,7 @@ func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) 
 	podStats := staticPodStats(pods, params.getTargetReplicas(), params.podMinReadySeconds())
 	podWins := markDynamicCursor(pods, podStats, configKey, configVersion, rollingReplicas)
 	if !validPodState(podWins) {
-		params.Ctx.Log.Info("wait pod stat ready.")
+		params.Ctx.Log.Info("wait for pod stat ready.")
 		return makeReturnedStatus(ESRetry), nil
 	}
 
@@ -118,7 +119,7 @@ func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) 
 
 	for _, pod := range waitRollingPods {
 		if podStats.isUpdating(&pod) {
-			params.Ctx.Log.Info("pod is rolling updating.", "pod name", pod.Name)
+			params.Ctx.Log.Info("pod is in rolling update.", "pod name", pod.Name)
 			continue
 		}
 		if err := funcs.RestartContainerFunc(&pod, params.Ctx.Ctx, params.ContainerNames, params.ReconfigureClientFactory); err != nil {

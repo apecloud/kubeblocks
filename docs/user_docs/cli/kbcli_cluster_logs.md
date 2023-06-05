@@ -45,8 +45,8 @@ kbcli cluster logs NAME [flags]
 
 ```
   -c, --container string    Container name.
-      --file-path string    Log-file path. Specify target file path and have a premium priority. No set file-path and file-type will output stdout/stderr of target container.
-      --file-type string    Log-file type. Can see the output info of list-logs cmd. No set file-path and file-type will output stdout/stderr of target container.
+      --file-path string    Log-file path. File path has a priority over file-type. When file-path and file-type are unset, output stdout/stderr of target container.
+      --file-type string    Log-file type. List them with list-logs cmd. When file-path and file-type are unset, output stdout/stderr of target container.
   -f, --follow              Specify if the logs should be streamed.
   -h, --help                help for logs
       --ignore-errors       If watching / following pod logs, allow for any errors that occur to be non-fatal. Only take effect for stdout&stderr.
@@ -56,7 +56,7 @@ kbcli cluster logs NAME [flags]
   -p, --previous            If true, print the logs for the previous instance of the container in a pod if it exists. Only take effect for stdout&stderr.
       --since duration      Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used. Only take effect for stdout&stderr.
       --since-time string   Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used. Only take effect for stdout&stderr.
-      --tail int            Lines of recent log file to display. Defaults to -1 with showing all log lines. (default -1)
+      --tail int            Lines of recent log file to display. Defaults to -1 for showing all log lines. (default -1)
       --timestamps          Include timestamps on each line in the log output. Only take effect for stdout&stderr.
 ```
 

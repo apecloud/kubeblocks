@@ -88,6 +88,7 @@ jobs:
       - name: send message
         run: |
           bash .github/utils/utils.sh --type 12 \
+            --tag-name ${{ inputs.release_version }} \
             --content "release\u00a0${{ inputs.release_version }}\u00a0error"\
             --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

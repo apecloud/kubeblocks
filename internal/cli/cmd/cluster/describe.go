@@ -269,7 +269,7 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 	tbl.Print()
 }
 
-// getBackupRecoverableTime return the recoverable time range string
+// getBackupRecoverableTime returns the recoverable time range string
 func getBackupRecoverableTime(backups []dpv1alpha1.Backup) string {
 	recoverabelTime := dpv1alpha1.GetRecoverableTimeRange(backups)
 	var result string

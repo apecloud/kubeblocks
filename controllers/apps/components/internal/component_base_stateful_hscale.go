@@ -81,11 +81,12 @@ func isPVCExists(cli types2.ReadonlyClient, ctx context.Context,
 
 func isAllPVCBound(cli types2.ReadonlyClient,
 	ctx context.Context,
-	stsObj *appsv1.StatefulSet) (bool, error) {
+	stsObj *appsv1.StatefulSet,
+	targetReplicas int) (bool, error) {
 	if len(stsObj.Spec.VolumeClaimTemplates) == 0 {
 		return true, nil
 	}
-	for i := 0; i < int(*stsObj.Spec.Replicas); i++ {
+	for i := 0; i < targetReplicas; i++ {
 		pvcKey := types.NamespacedName{
 			Namespace: stsObj.Namespace,
 			Name:      fmt.Sprintf("%s-%s-%d", stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, i),
@@ -126,18 +127,21 @@ func deleteSnapshot(cli types2.ReadonlyClient,
 		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", snapshotKey.Name)
 	}
 
-	vs := &snapshotv1.VolumeSnapshot{}
 	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: reqCtx.Ctx}
-	if err := compatClient.Get(snapshotKey, vs); err != nil && !apierrors.IsNotFound(err) {
+	vs := &snapshotv1.VolumeSnapshot{}
+	err = compatClient.Get(snapshotKey, vs)
+	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
-	objs = append(objs, vs)
-	reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumeSnapshot/%s", snapshotKey.Name)
+	if err == nil {
+		objs = append(objs, vs)
+		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumeSnapshot/%s", snapshotKey.Name)
+	}
 
 	return objs, nil
 }
 
-// deleteBackup will delete all backup related resources created during horizontal scaling,
+// deleteBackup will delete all backup related resources created during horizontal scaling
 func deleteBackup(ctx context.Context, cli types2.ReadonlyClient, clusterName string, componentName string) ([]client.Object, error) {
 	ml := getBackupMatchingLabels(clusterName, componentName)
 	backupList := dataprotectionv1alpha1.BackupList{}
@@ -180,12 +184,12 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 		reqCtx.Recorder.Eventf(cluster,
 			corev1.EventTypeWarning,
 			"HorizontalScaleFailed",
-			"scale with backup tool not support yet")
+			"scale with backup tool not supported yet")
 	// use volume snapshot
 	case appsv1alpha1.HScaleDataClonePolicyFromSnapshot:
 		if !isSnapshotAvailable(cli, reqCtx.Ctx) {
 			// TODO: add ut
-			return nil, fmt.Errorf("HorizontalScaleFailed: volume snapshot not support")
+			return nil, fmt.Errorf("HorizontalScaleFailed: volume snapshot not supported")
 		}
 		vcts := component.VolumeClaimTemplates
 		if len(vcts) == 0 {
@@ -215,12 +219,12 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 			}
 			break
 		}
-		// volumesnapshot exists, then check if it is ready to use.
+		// volumesnapshot exists, check if it is ready for use.
 		ready, err := isVolumeSnapshotReadyToUse(cli, reqCtx.Ctx, cluster, component)
 		if err != nil {
 			return nil, err
 		}
-		// volumesnapshot not ready, wait for it to be ready by reconciling.
+		// volumesnapshot not ready, wait till it is ready after reconciling.
 		if !ready {
 			break
 		}
@@ -379,7 +383,7 @@ func checkedCreatePVCFromSnapshot(cli types2.ReadonlyClient,
 	return nil, nil
 }
 
-// createBackup create backup resources required to do backup,
+// createBackup creates backup resources required to do backup,
 func createBackup(reqCtx intctrlutil.RequestCtx,
 	cli types2.ReadonlyClient,
 	sts *appsv1.StatefulSet,
@@ -422,7 +426,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 		return nil, err
 	}
 	if backupPolicy == nil {
-		return nil, intctrlutil.NewNotFound("not found any backup policy created by %s", backupPolicyTemplateName)
+		return nil, intctrlutil.NewNotFound("cannot find any backup policy created by %s", backupPolicyTemplateName)
 	}
 	if err = createBackup(backupPolicy.Name); err != nil {
 		return nil, err

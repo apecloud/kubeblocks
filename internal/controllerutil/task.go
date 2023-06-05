@@ -45,7 +45,7 @@ func NewTask() Task {
 	return t
 }
 
-// TaskFunction REVIEW (cx): using interface{} is rather error-prone
+// TaskFunction REVIEW (cx): using interface{} is error-prone
 type TaskFunction func(RequestCtx, client.Client, interface{}) error
 
 func (t *Task) Exec(ctx RequestCtx, cli client.Client) error {

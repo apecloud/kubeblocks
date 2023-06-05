@@ -121,7 +121,7 @@ func (o *outputValue) Set(s string) error {
 	return nil
 }
 
-// FatalWithRedColor when an error occurs, set the red color to print it.
+// FatalWithRedColor when an error occurs, sets the red color to print it.
 func FatalWithRedColor(msg string, code int) {
 	if klog.V(99).Enabled() {
 		klog.FatalDepth(2, msg)

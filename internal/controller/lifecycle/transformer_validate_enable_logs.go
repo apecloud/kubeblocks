@@ -23,7 +23,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-// ValidateEnableLogsTransformer validate config and send warning event log necessarily
+// ValidateEnableLogsTransformer validates config and sends warning event log if necessary
 type ValidateEnableLogsTransformer struct{}
 
 func (e *ValidateEnableLogsTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
@@ -33,7 +33,7 @@ func (e *ValidateEnableLogsTransformer) Transform(ctx graph.TransformContext, da
 		return nil
 	}
 
-	// validate config and send warning event log necessarily
+	// validate config and send warning event log if necessary
 	err := cluster.Spec.ValidateEnabledLogs(transCtx.ClusterDef)
 	setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
 	if err != nil {

@@ -27,7 +27,14 @@ Manage alert receiver, include add, list and delete receiver.
 
 Run a benchmark.
 
-* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark.
+* [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
+
+
+## [builder](kbcli_builder.md)
+
+builder command.
+
+* [kbcli builder template](kbcli_builder_template.md)	 - tpl - a developer tool integrated with KubeBlocks that can help developers quickly generate rendered configurations or scripts based on Helm templates, and discover errors in the template before creating the database cluster.
 
 
 ## [class](kbcli_class.md)

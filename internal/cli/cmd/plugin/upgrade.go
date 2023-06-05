@@ -117,8 +117,8 @@ func (o *UpgradeOptions) Run() error {
 	return nil
 }
 
-// Upgrade will reinstall and delete the old plugin. The operation tries
-// to not get the plugin dir in a bad state if it fails during the process.
+// Upgrade reinstalls and deletes the old plugin. The operation tries
+// to keep dir in a healthy state if it fails during the process.
 func Upgrade(p *Paths, plugin Plugin, indexName string) error {
 	installReceipt, err := ReadReceiptFromFile(p.PluginInstallReceiptPath(plugin.Name))
 	if err != nil {
@@ -177,7 +177,7 @@ func Upgrade(p *Paths, plugin Plugin, indexName string) error {
 	return cleanupInstallation(p, plugin, curVersion)
 }
 
-// cleanupInstallation will remove a plugin directly
+// cleanupInstallation removes a plugin directly
 func cleanupInstallation(p *Paths, plugin Plugin, oldVersion string) error {
 	klog.V(1).Infof("Remove old plugin installation under %q", p.PluginVersionInstallPath(plugin.Name, oldVersion))
 	return os.RemoveAll(p.PluginVersionInstallPath(plugin.Name, oldVersion))

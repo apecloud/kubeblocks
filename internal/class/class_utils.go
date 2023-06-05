@@ -37,7 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
-// ValidateComponentClass check if component classDefRef or resource is invalid
+// ValidateComponentClass checks if component classDefRef or resource is valid
 func ValidateComponentClass(comp *v1alpha1.ClusterComponentSpec, compClasses map[string]map[string]*v1alpha1.ComponentClassInstance) (*v1alpha1.ComponentClassInstance, error) {
 	classes := compClasses[comp.ComponentDefRef]
 	var cls *v1alpha1.ComponentClassInstance
@@ -59,12 +59,12 @@ func ValidateComponentClass(comp *v1alpha1.ClusterComponentSpec, compClasses map
 	return cls, nil
 }
 
-// GetCustomClassObjectName Returns the name of the ComponentClassDefinition object containing the custom classes
+// GetCustomClassObjectName returns the name of the ComponentClassDefinition object containing the custom classes
 func GetCustomClassObjectName(cdName string, componentName string) string {
 	return fmt.Sprintf("kb.classes.custom.%s.%s", cdName, componentName)
 }
 
-// ChooseComponentClasses Choose the classes to be used for a given component with some constraints
+// ChooseComponentClasses chooses the classes to be used for a given component with constraints
 func ChooseComponentClasses(classes map[string]*v1alpha1.ComponentClassInstance, resources corev1.ResourceList) *v1alpha1.ComponentClassInstance {
 	var candidates []*v1alpha1.ComponentClassInstance
 	for _, cls := range classes {
@@ -114,7 +114,7 @@ func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[
 		} else {
 			for k, v := range classes {
 				if _, exists := componentClasses[componentType][k]; exists {
-					return nil, fmt.Errorf("duplicate component class %s", k)
+					return nil, fmt.Errorf("duplicated component class %s", k)
 				}
 				componentClasses[componentType][k] = v
 			}
@@ -124,7 +124,7 @@ func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[
 	return componentClasses, nil
 }
 
-// GetResourceConstraints get all resource constraints
+// GetResourceConstraints gets all resource constraints
 func GetResourceConstraints(dynamic dynamic.Interface) (map[string]*v1alpha1.ComponentResourceConstraint, error) {
 	objs, err := dynamic.Resource(types.ComponentResourceConstraintGVR()).List(context.TODO(), metav1.ListOptions{
 		//LabelSelector: types.ResourceConstraintProviderLabelKey,
@@ -148,7 +148,7 @@ func GetResourceConstraints(dynamic dynamic.Interface) (map[string]*v1alpha1.Com
 	return result, nil
 }
 
-// ListClassesByClusterDefinition get all classes, including kubeblocks default classes and user custom classes
+// ListClassesByClusterDefinition gets all classes, including kubeblocks default classes and user custom classes
 func ListClassesByClusterDefinition(client dynamic.Interface, cdName string) (map[string]map[string]*v1alpha1.ComponentClassInstance, error) {
 	selector := fmt.Sprintf("%s=%s,%s", constant.ClusterDefLabelKey, cdName, types.ClassProviderLabelKey)
 	objs, err := client.Resource(types.ComponentClassDefinitionGVR()).Namespace("").List(context.TODO(), metav1.ListOptions{
@@ -164,7 +164,7 @@ func ListClassesByClusterDefinition(client dynamic.Interface, cdName string) (ma
 	return GetClasses(classDefinitionList)
 }
 
-// ParseComponentClasses parse ComponentClassDefinition to component classes
+// ParseComponentClasses parses ComponentClassDefinition to component classes
 func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (map[string]*v1alpha1.ComponentClassInstance, error) {
 	genClass := func(nameTpl string, bodyTpl string, vars []string, args []string) (v1alpha1.ComponentClass, error) {
 		var result v1alpha1.ComponentClass
@@ -202,7 +202,6 @@ func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (m
 			}
 			class.CPU = cls.CPU
 			class.Memory = cls.Memory
-			class.Volumes = cls.Volumes
 		}
 		result := &v1alpha1.ComponentClassInstance{
 			ComponentClass: v1alpha1.ComponentClass{
@@ -211,13 +210,6 @@ func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (m
 				Memory: class.Memory,
 			},
 			ResourceConstraintRef: group.ResourceConstraintRef,
-		}
-		for _, volume := range class.Volumes {
-			result.Volumes = append(result.Volumes, v1alpha1.Volume{
-				Name:             volume.Name,
-				StorageClassName: volume.StorageClassName,
-				Size:             volume.Size,
-			})
 		}
 		return result, nil
 	}
@@ -231,7 +223,7 @@ func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (m
 					return nil, err
 				}
 				if _, exists := result[out.Name]; exists {
-					return nil, fmt.Errorf("duplicate component class name: %s", out.Name)
+					return nil, fmt.Errorf("duplicated component class name: %s", out.Name)
 				}
 				result[out.Name] = out
 			}

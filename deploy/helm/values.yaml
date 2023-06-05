@@ -65,10 +65,10 @@ dnsPolicy: ClusterFirst
 ## @param podDisruptionBudget.minAvailable
 ## @param podDisruptionBudget.maxUnavailable
 podDisruptionBudget:
-  # Configures the minimum available pods for Kubeblocks disruptions.
+  # Configures the minimum available pods for KubeBlocks disruptions.
   # Cannot be used if `maxUnavailable` is set.
   minAvailable: 1
-  # Configures the maximum unavailable pods for Kubeblocks disruptions.
+  # Configures the maximum unavailable pods for KubeBlocks disruptions.
   # Cannot be used if `minAvailable` is set.
   maxUnavailable:
 
@@ -522,6 +522,17 @@ prometheus:
       ## How frequently to evaluate rules
       ##
       evaluation_interval: 15s
+
+    ## Additional Prometheus server container flags
+    ##
+    extraFlags:
+      - web.enable-lifecycle
+      - web.enable-remote-write-receiver
+
+    ## Additional Prometheus server container arguments
+    ##
+    extraArgs:
+      log.level: info
 
     ## https://prometheus.io/docs/prometheus/latest/configuration/configuration/#remote_write
     ##
@@ -1834,6 +1845,7 @@ enabledAlphaFeatureGates:
   ##
   recoverVolumeExpansionFailure: false
 
+
 agamotto:
   enabled: false
   image:
@@ -1841,3 +1853,24 @@ agamotto:
     repository: apecloud/agamotto
     pullPolicy: IfNotPresent
     tag: 0.1.0-beta.2
+
+## @section KubeBlocks default storageClass Parameters for cloud provider.
+storageClass:
+  mountOptions:
+    - noatime
+    - nobarrier
+  provider:
+    eks:
+      volumeType: gp3
+      fsType: xfs
+    gke:
+      volumeType: pd-balanced
+      fsType: xfs
+    aliyun:
+      volumeType: cloud_essd
+      fsType: xfs
+    aks:
+      volumeType: managed
+      fsType: xfs
+    tke:
+      volumeType: CLOUD_SSD

@@ -1093,6 +1093,9 @@
 	// (8Kb) Amount of WAL written out by WAL writer triggering a flush.
 	wal_writer_flush_after?: int & >=0 & <=2147483647 @storeResource(8KB)
 
+	// If set to on (the default), this option causes new WAL files to be filled with zeroes. On some file systems, this ensures that space is allocated before we need to write WAL records. However, Copy-On-Write (COW) file systems may not benefit from this technique, so the option is given to skip the unnecessary work. If set to off, only the final byte is written when the file is created so that it has the expected size.
+	wal_init_zero?: string & "on" | "off"
+
 	// (kB) Sets the maximum memory to be used for query workspaces.
 	work_mem?: int & >=64 & <=2147483647 @storeResource(1KB)
 

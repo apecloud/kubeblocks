@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
@@ -95,7 +96,7 @@ func (r *ReplicationSet) IsRunning(ctx context.Context, obj client.Object) (bool
 }
 
 // PodsReady is the implementation of the type Component interface method,
-// which is used to check whether all the pods of replicationSet component is ready.
+// which is used to check whether all the pods of replicationSet component are ready.
 func (r *ReplicationSet) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	return r.Stateful.PodsReady(ctx, obj)
 }
@@ -134,7 +135,7 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 	var (
 		existLatestRevisionFailedPod bool
 		primaryIsReady               bool
-		statusMessages               appsv1alpha1.ComponentMessageMap
+		statusMessages               = appsv1alpha1.ComponentMessageMap{}
 	)
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
@@ -147,15 +148,12 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 			continue
 		}
 		if labelValue == "" {
-			// REVIEW: this isn't a get function, where r.Cluster.Status.Components is being updated.
-			// patch abnormal reason to cluster.status.ComponentDefs.
-			if statusMessages == nil {
-				statusMessages = appsv1alpha1.ComponentMessageMap{}
-			}
 			statusMessages.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
 		}
-		if !intctrlutil.PodIsReady(&v) && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
+		isFailed, _, message := internal.IsPodFailedAndTimedOut(&v)
+		if isFailed && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
 			existLatestRevisionFailedPod = true
+			statusMessages.SetObjectMessage(v.Kind, v.Name, message)
 		}
 	}
 	return util.GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryIsReady,
@@ -239,7 +237,7 @@ func (r *ReplicationSet) HandleHA(ctx context.Context, obj client.Object) ([]gra
 	if len(pods) == 0 {
 		return nil, nil
 	}
-	// If the Pods already exists, check whether there is an HA switching and the HA process is prioritized to handle.
+	// If the Pods already exists, check whether there is a HA switching and the HA process is prioritized to handle.
 	// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
 	primaryIndexChanged, _, err := CheckPrimaryIndexChanged(ctx, r.Cli, r.Cluster, r.getName(), r.getPrimaryIndex())
 	if err != nil {

@@ -44,7 +44,7 @@ func (t *PITRTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	if shouldRequeue, err := plan.DoPITRIfNeed(transCtx.Context, t.Client, cluster); err != nil {
 		return err
 	} else if shouldRequeue {
-		return &realRequeueError{reason: "waiting pitr job", requeueAfter: requeueDuration}
+		return newRequeueError(requeueDuration, "waiting pitr job")
 	}
 	if err := plan.DoPITRCleanup(transCtx.Context, t.Client, cluster); err != nil {
 		return err

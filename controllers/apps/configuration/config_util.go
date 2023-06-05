@@ -319,7 +319,7 @@ func updateLabelsByConfigSpec[T generics.Object, PT generics.PObject[T]](cli cli
 }
 
 func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, configSpecs []appsv1alpha1.ComponentConfigSpec) (bool, error) {
-	// check ConfigTemplate Validate
+	// validate ConfigTemplate
 	foundAndCheckConfigSpec := func(configSpec appsv1alpha1.ComponentConfigSpec, logger logr.Logger) (*appsv1alpha1.ConfigConstraint, error) {
 		if _, err := getConfigMapByTemplateName(cli, ctx, configSpec.TemplateRef, configSpec.Namespace); err != nil {
 			logger.Error(err, "failed to get config template cm object!")
@@ -424,7 +424,7 @@ func updateConfigSchema(cc *appsv1alpha1.ConfigConstraint, cli client.Client, ct
 		return nil
 	}
 
-	// Because the conversion of cue to openAPISchema is constraint, and the definition of some cue may not be converted into openAPISchema, and won't return error.
+	// Because the conversion of cue to openAPISchema is restricted, and the definition of some cue may not be converted into openAPISchema, and won't return error.
 	openAPISchema, err := cfgcore.GenerateOpenAPISchema(schema.CUE, cc.Spec.CfgSchemaTopLevelName)
 	if err != nil {
 		return err

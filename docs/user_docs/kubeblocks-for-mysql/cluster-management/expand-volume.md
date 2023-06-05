@@ -17,7 +17,7 @@ Volume expansion triggers pod restart, all pods restart in the order of learner 
 
 ## Before you start
 
-Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
+Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
 kbcli cluster list mysql-cluster
@@ -32,15 +32,15 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
     **Option 1.** (**Recommended**) Use kbcli
 
-    Configure the values of `--components`, `--volume-claim-template-names`, and `--storage`, and run the command below to expand the volume.
+    Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
 
     ```bash
     kbcli cluster volume-expand mysql-cluster --components="mysql" \
-    --volume-claim-template-names="data" --storage="2Gi"
+    --volume-claim-templates="data" --storage="2Gi"
     ```
 
     - `--components` describes the component name for volume expansion.
-    - `--volume-claim-template-names` describes the VolumeClaimTemplate names in components.
+    - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
     - `--storage` describes the volume storage size.
 
     **Option 2.** Create an OpsRequest
@@ -105,3 +105,9 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
    * STATUS=VolumeExpanding: it means the volume expansion is in progress.
    * STATUS=Running: it means the volume expansion operation has been applied.
+
+3. Check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mysql-cluster
+    ```

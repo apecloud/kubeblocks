@@ -38,7 +38,7 @@ Meet the following requirements for a smooth user experience:
    2. Deploys KubeBlocks in the K3d cluster.
    3. Creates a standalone MySQL cluster.
 
-2. View the created cluster and when the status is `Running`, this cluster is created successfully.
+2. Check the MySQL cluster repeatedly until the status becomes `Running`. 
 
    ```bash
    kbcli cluster list

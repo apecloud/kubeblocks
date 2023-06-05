@@ -473,17 +473,22 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 
 func BuildEnvConfigLow(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent) (*corev1.ConfigMap, error) {
-
 	const tplFile = "env_config_template.cue"
+	prefix := constant.KBPrefix + "_"
 
-	prefix := constant.KBPrefix + "_" + strings.ToUpper(component.Type) + "_"
 	svcName := strings.Join([]string{cluster.Name, component.Name, "headless"}, "-")
-	envData := map[string]string{}
-	envData[prefix+"N"] = strconv.Itoa(int(component.Replicas))
+	cnt := strconv.Itoa(int(component.Replicas))
+	suffixes := make([]string, 0, 4+component.Replicas)
+	envData := map[string]string{
+		prefix + "REPLICA_COUNT": cnt,
+	}
+
 	for j := 0; j < int(component.Replicas); j++ {
-		hostNameTplKey := prefix + strconv.Itoa(j) + "_HOSTNAME"
-		hostNameTplValue := cluster.Name + "-" + component.Name + "-" + strconv.Itoa(j)
-		envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
+		toA := strconv.Itoa(j)
+		suffix := toA + "_HOSTNAME"
+		value := fmt.Sprintf("%s.%s", cluster.Name+"-"+component.Name+"-"+toA, svcName)
+		envData[prefix+suffix] = value
+		suffixes = append(suffixes, suffix)
 
 		// build env for replication workload
 		if component.WorkloadType == appsv1alpha1.Replication {
@@ -494,31 +499,35 @@ func BuildEnvConfigLow(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster
 
 	// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
 	// build consensus env from cluster.status
-	if cluster.Status.Components != nil {
-		if v, ok := cluster.Status.Components[component.Name]; ok {
-			consensusSetStatus := v.ConsensusSetStatus
-			if consensusSetStatus != nil {
-				if consensusSetStatus.Leader.Pod != constant.ComponentStatusDefaultPodName {
-					envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
-				}
-
-				followers := ""
-				for _, follower := range consensusSetStatus.Followers {
-					if follower.Pod == constant.ComponentStatusDefaultPodName {
-						continue
-					}
-					if len(followers) > 0 {
-						followers += ","
-					}
-					followers += follower.Pod
-				}
-				envData[prefix+"FOLLOWERS"] = followers
-			}
+	if v, ok := cluster.Status.Components[component.Name]; ok && v.ConsensusSetStatus != nil {
+		consensusSetStatus := v.ConsensusSetStatus
+		if consensusSetStatus.Leader.Pod != constant.ComponentStatusDefaultPodName {
+			envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
+			suffixes = append(suffixes, "LEADER")
 		}
+		followers := make([]string, 0, len(consensusSetStatus.Followers))
+		for _, follower := range consensusSetStatus.Followers {
+			if follower.Pod == constant.ComponentStatusDefaultPodName {
+				continue
+			}
+			followers = append(followers, follower.Pod)
+		}
+		envData[prefix+"FOLLOWERS"] = strings.Join(followers, ",")
+		suffixes = append(suffixes, "FOLLOWERS")
 	}
 
 	// set cluster uid to let pod know if the cluster is recreated
 	envData[prefix+"CLUSTER_UID"] = string(cluster.UID)
+	suffixes = append(suffixes, "CLUSTER_UID")
+
+	// have backward compatible handling for CM key with 'compDefName' being part of the key name
+	// TODO: need to deprecate 'compDefName' being part of variable name, as it's redundant
+	// and introduce env/cm key naming reference complexity
+	prefixWithCompDefName := prefix + strings.ToUpper(component.CompDefName) + "_"
+	for _, s := range suffixes {
+		envData[prefixWithCompDefName+s] = envData[prefix+s]
+	}
+	envData[prefixWithCompDefName+"N"] = envData[prefix+"REPLICA_COUNT"]
 
 	config := corev1.ConfigMap{}
 	if err := buildFromCUE(tplFile, map[string]any{
@@ -610,7 +619,7 @@ func BuildConfigMapWithTemplateLow(cluster *appsv1alpha1.Cluster,
 		},
 		"component": {
 			"name":                  component.Name,
-			"type":                  component.Type,
+			"compDefName":           component.CompDefName,
 			"characterType":         component.CharacterType,
 			"configName":            cmName,
 			"templateName":          tplCfg.TemplateRef,

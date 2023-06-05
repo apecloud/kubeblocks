@@ -138,7 +138,7 @@ var _ = Describe("component module", func() {
 						SecretKeyRef: &corev1.SecretKeySelector{
 							Key: "username",
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: constant.ConnCredentialPlaceHolder,
+								Name: constant.KBConnCredentialPlaceHolder,
 							},
 						},
 					},
@@ -149,7 +149,7 @@ var _ = Describe("component module", func() {
 						SecretKeyRef: &corev1.SecretKeySelector{
 							Key: "password",
 							LocalObjectReference: corev1.LocalObjectReference{
-								Name: constant.ConnCredentialPlaceHolder,
+								Name: constant.KBConnCredentialPlaceHolder,
 							},
 						},
 					},

@@ -68,7 +68,7 @@ Playground does not support volume expansion, backup, and restore functions.
     kbcli cluster list
     ```
 
-2. View the details of a specified database cluster and get information like `STATUS`, `Endpoints`, `Topology`, `Images`, and `Events`.
+2. View the details of a specified database cluster, such as `STATUS`, `Endpoints`, `Topology`, `Images`, and `Events`.
 
     ```bash
     kbcli cluster describe mycluster

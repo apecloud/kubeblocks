@@ -148,7 +148,7 @@ jobs:
           cp ${{ env.CLI_FILENAME }}.tar.gz rpmbuild/SOURCES/
           cp ${{ github.workspace }}/utils/kbcli.spec rpmbuild/SPECS/
           sed -i 's/^Source0:.*/Source0: ${{ env.CLI_FILENAME }}.tar.gz/' rpmbuild/SPECS/kbcli.spec
-          sed -i 's/^Version:.*/Version: ${{ env.env.TAG_NAME }}.tar.gz/' rpmbuild/SPECS/kbcli.spec
+          sed -i 's/^Version:.*/Version: ${{ env.env.TAG_NAME }}/' rpmbuild/SPECS/kbcli.spec
           sudo apt-get update
           sudo apt-get install -y rpm build-essential
           rpmbuild --target ${{ matrix.os }} -ba rpmbuild/SPECS/kbcli.spec

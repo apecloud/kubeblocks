@@ -1,14 +1,14 @@
 ---
-title: Install kbcli and KubeBlocks on the existed Kubernetes clusters
-description: Install kbcli and KubeBlocks on the existed Kubernetes clusters
-keywords: [taints, affinity, tolerance, install]
-sidebar_position: 3
-sidebar_label: Install kbcli and KubeBlocks on the existed Kubernetes clusters
+title: Install KubeBlocks on the existed Kubernetes clusters
+description: Install KubeBlocks on the existed Kubernetes clusters
+keywords: [taints, affinity, tolerance, install, kbcli, KubeBlocks]
+sidebar_position: 4
+sidebar_label: On the existed Kubernetes clusters
 ---
 
-# Install kbcli and KubeBlocks on the existed Kubernetes clusters
+# Install KubeBlocks on the existed Kubernetes clusters
 
-In the actual environment, it is normal to install kbcli and KubeBlocks on the existed Kubernetes clusters.
+In the actual environment, it is normal to install `kbcli` and KubeBlocks on the existed Kubernetes clusters.
 
 ## Environment preparation
 
@@ -22,11 +22,11 @@ In the actual environment, it is normal to install kbcli and KubeBlocks on the e
 	</tr >
 	<tr >
 	    <td rowspan="4">Data Plane</td>
-	    <td>For Mysql database </td>
+	    <td>For MySQL database </td>
 	    <td>It is recommended to create at least 3 nodes with 2c4Gi and 50Gi storage. </td>
 	</tr>
 	<tr>
-	    <td>For Postgresql database </td>
+	    <td>For PostgreSQL database </td>
         <td>It is recommended to create at least 2 nodes with 2c4Gi and 50Gi storage.  </td>
 	</tr>
 	<tr>
@@ -34,31 +34,22 @@ In the actual environment, it is normal to install kbcli and KubeBlocks on the e
         <td>It is recommended to create at least 2 nodes with 2c4Gi and 50Gi storage. </td>
 	</tr>
 	<tr>
-	    <td>For Mongodb database</td>
+	    <td>For MongoDB database</td>
 	    <td>It is recommended to create at least 3 nodes with 2c4Gi and 50Gi storage. </td>
 	</tr>
 </table>
 
 ## Installation steps
 
-**Step 1. Install kbcli.**
+**Before you start**
 
-Use the following command.
+Make sure you have kbcli installed, for detailed information, check [Install kbcli](./install-kbcli.md).
 
-```bash
-curl -fsSL [https://www.kubeblocks.io/installer/install_cli.sh] | bash
-```
+**Install KubeBlocks with `kbcli kubeblocks install` command.**
 
-To customize the version of kbcli, use the following command.
+The installation command is `kbcli kubeblocks install`, simply running this command installs KubeBlocks on nodes without taints with default namespace `kb-system`.
 
-```bash
-curl -fsSL [https://kubeblocks.io/installer/install_cli.sh] |bash -s versionnumber
-```
-
-**Step 2. Install KubeBlocks with kbcli kubeblocks install command**
-
-The installation command is `kbcli kubeblocks install`, simply running this command will install KubeBlocks on nodes without taints with default namespace `kb-system` .
-But in actual scenario, you are recommendend to install KubeBlocks on nodes with taints and customized namespace.
+But in actual scenarios, you are recommendend to install KubeBlocks on nodes with taints and customized namespace.
 
 1. Get Kubernetes nodes.
 
@@ -80,7 +71,7 @@ But in actual scenario, you are recommendend to install KubeBlocks on nodes with
 
 :::note
 
-When executing of the `kbcli kubeblocks install` command, the `preflight` checks are automatically performed to check the environment. If the current cluster meets the installation requirements, the installation continues. If it does not, the current process is terminated, and an error message is displayed. To force skip the preflight checks, you can add the `--force` flag after the "kbcli kubeblocks install" command.
+When executing the `kbcli kubeblocks install` command, the `preflight` checks run automatically to check the environment. If the current cluster meets the installation requirements, the installation continues. If it does not, the current process is terminated, and an error message is displayed. To skip the `preflight` checks, you can add the `--force` flag after the `kbcli kubeblocks install` command.
 
 :::
 

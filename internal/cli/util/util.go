@@ -768,3 +768,91 @@ func BuildClusterDefinitionRefLable(prefix string, clusterDef []string) string {
 func IsWindows() bool {
 	return runtime.GOOS == types.GoosWindows
 }
+
+// BuildTolerations toleration format: key=value:effect or key:effect,
+func BuildTolerations(raw []string) ([]interface{}, error) {
+	tolerations := make([]interface{}, 0)
+	for _, tolerationRaw := range raw {
+		for _, entries := range strings.Split(tolerationRaw, ",") {
+			toleration := make(map[string]interface{})
+			parts := strings.Split(entries, ":")
+			if len(parts) != 2 {
+				return tolerations, fmt.Errorf("invalid toleration %s", entries)
+			}
+			toleration["effect"] = parts[1]
+
+			partsKV := strings.Split(parts[0], "=")
+			switch len(partsKV) {
+			case 1:
+				toleration["operator"] = "Exists"
+				toleration["key"] = partsKV[0]
+			case 2:
+				toleration["operator"] = "Equal"
+				toleration["key"] = partsKV[0]
+				toleration["value"] = partsKV[1]
+			default:
+				return tolerations, fmt.Errorf("invalid toleration %s", entries)
+			}
+			tolerations = append(tolerations, toleration)
+		}
+	}
+	return tolerations, nil
+}
+
+// BuildNodeAffinity build node affinity from node labels
+func BuildNodeAffinity(nodeLabels map[string]string) *corev1.NodeAffinity {
+	var nodeAffinity *corev1.NodeAffinity
+
+	var matchExpressions []corev1.NodeSelectorRequirement
+	for key, value := range nodeLabels {
+		values := strings.Split(value, ",")
+		matchExpressions = append(matchExpressions, corev1.NodeSelectorRequirement{
+			Key:      key,
+			Operator: corev1.NodeSelectorOpIn,
+			Values:   values,
+		})
+	}
+	if len(matchExpressions) > 0 {
+		nodeSelectorTerm := corev1.NodeSelectorTerm{
+			MatchExpressions: matchExpressions,
+		}
+		nodeAffinity = &corev1.NodeAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+				{
+					Preference: nodeSelectorTerm,
+				},
+			},
+		}
+	}
+
+	return nodeAffinity
+}
+
+// BuildPodAntiAffinity build pod anti affinity from topology keys
+func BuildPodAntiAffinity(podAntiAffinityStrategy string, topologyKeys []string) *corev1.PodAntiAffinity {
+	var podAntiAffinity *corev1.PodAntiAffinity
+	var podAffinityTerms []corev1.PodAffinityTerm
+	for _, topologyKey := range topologyKeys {
+		podAffinityTerms = append(podAffinityTerms, corev1.PodAffinityTerm{
+			TopologyKey: topologyKey,
+		})
+	}
+	if podAntiAffinityStrategy == string(appsv1alpha1.Required) {
+		podAntiAffinity = &corev1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: podAffinityTerms,
+		}
+	} else {
+		var weightedPodAffinityTerms []corev1.WeightedPodAffinityTerm
+		for _, podAffinityTerm := range podAffinityTerms {
+			weightedPodAffinityTerms = append(weightedPodAffinityTerms, corev1.WeightedPodAffinityTerm{
+				Weight:          100,
+				PodAffinityTerm: podAffinityTerm,
+			})
+		}
+		podAntiAffinity = &corev1.PodAntiAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: weightedPodAffinityTerms,
+		}
+	}
+
+	return podAntiAffinity
+}

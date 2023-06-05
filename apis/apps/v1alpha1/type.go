@@ -151,15 +151,17 @@ const (
 
 // OpsPhase defines opsRequest phase.
 // +enum
-// +kubebuilder:validation:Enum={Pending,Creating,Running,Failed,Succeed}
+// +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Failed,Succeed}
 type OpsPhase string
 
 const (
-	OpsPendingPhase  OpsPhase = "Pending"
-	OpsCreatingPhase OpsPhase = "Creating"
-	OpsRunningPhase  OpsPhase = "Running"
-	OpsFailedPhase   OpsPhase = "Failed"
-	OpsSucceedPhase  OpsPhase = "Succeed"
+	OpsPendingPhase    OpsPhase = "Pending"
+	OpsCreatingPhase   OpsPhase = "Creating"
+	OpsRunningPhase    OpsPhase = "Running"
+	OpsCancellingPhase OpsPhase = "Cancelling"
+	OpsSucceedPhase    OpsPhase = "Succeed"
+	OpsCancelledPhase  OpsPhase = "Cancelled"
+	OpsFailedPhase     OpsPhase = "Failed"
 )
 
 // OpsType defines operation types.

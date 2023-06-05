@@ -37,7 +37,7 @@ builder command.
 ### SEE ALSO
 
 
-* [kbcli builder template](kbcli_builder_template.md)	 - tpl - a developer tool integrated with Kubeblocks that can help developers quickly generate rendered configurations or scripts based on Helm templates, and discover errors in the template before creating the database cluster.
+* [kbcli builder template](kbcli_builder_template.md)	 - tpl - a developer tool integrated with KubeBlocks that can help developers quickly generate rendered configurations or scripts based on Helm templates, and discover errors in the template before creating the database cluster.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

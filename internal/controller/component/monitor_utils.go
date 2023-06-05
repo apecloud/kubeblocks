@@ -47,6 +47,7 @@ func buildMonitorConfig(
 		}
 		component.Monitor = &MonitorConfig{
 			Enable:     true,
+			BuiltIn:    false,
 			ScrapePath: monitorConfig.Exporter.ScrapePath,
 			ScrapePort: monitorConfig.Exporter.ScrapePort.IntVal,
 		}
@@ -65,12 +66,15 @@ func buildMonitorConfig(
 		return
 	}
 
-	// TODO: builtin will support by an independent agent soon
-	disableMonitor(component)
+	component.Monitor = &MonitorConfig{
+		Enable:  true,
+		BuiltIn: true,
+	}
 }
 
 func disableMonitor(component *SynthesizedComponent) {
 	component.Monitor = &MonitorConfig{
-		Enable: false,
+		Enable:  false,
+		BuiltIn: false,
 	}
 }

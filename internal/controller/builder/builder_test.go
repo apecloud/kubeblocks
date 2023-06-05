@@ -22,7 +22,6 @@ package builder
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -65,6 +64,11 @@ var _ = Describe("builder", func() {
 	const mysqlCompDefName = "replicasets"
 	const mysqlCompName = "mysql"
 	const proxyCompDefName = "proxy"
+	var requiredKeys = []string{
+		"KB_REPLICA_COUNT",
+		"KB_0_HOSTNAME",
+		"KB_CLUSTER_UID",
+	}
 
 	allFieldsClusterDefObj := func(needCreate bool) *appsv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
@@ -105,7 +109,6 @@ var _ = Describe("builder", func() {
 		if clusterVersionObj == nil {
 			clusterVersionObj = allFieldsClusterVersionObj(needCreate)
 		}
-
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
@@ -118,7 +121,6 @@ var _ = Describe("builder", func() {
 		if needCreate {
 			Expect(testCtx.CreateObj(testCtx.Ctx, clusterObj)).Should(Succeed())
 		}
-
 		return clusterObj, clusterDefObj, clusterVersionObj, key
 	}
 
@@ -272,7 +274,6 @@ var _ = Describe("builder", func() {
 			params := newParams()
 			envConfigName := "test-env-config-name"
 			newParams := params
-
 			sts, err := BuildSts(reqCtx, *params, envConfigName)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
@@ -318,21 +319,22 @@ var _ = Describe("builder", func() {
 			cfg, err := BuildEnvConfig(*params, reqCtx, k8sClient)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
-			Expect(len(cfg.Data) == 3).Should(BeTrue())
+			for _, k := range requiredKeys {
+				_, ok := cfg.Data[k]
+				Expect(ok).Should(BeTrue())
+			}
 		})
 
 		It("builds env config with resources recreate", func() {
 			reqCtx := newReqCtx()
 			params := newParams()
-
 			uuid := "12345"
 			By("mock a cluster uuid")
 			params.Cluster.UID = types.UID(uuid)
-
 			cfg, err := BuildEnvConfig(*params, reqCtx, k8sClient)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
-			Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_CLUSTER_UID"]).Should(Equal(uuid))
+			Expect(cfg.Data["KB_CLUSTER_UID"]).Should(Equal(uuid))
 		})
 
 		It("builds Env Config with ConsensusSet status correctly", func() {
@@ -354,23 +356,36 @@ var _ = Describe("builder", func() {
 			cfg, err := BuildEnvConfig(*params, reqCtx, k8sClient)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
-			Expect(len(cfg.Data) == 5).Should(BeTrue())
+			toCheckKeys := append(requiredKeys, []string{
+				"KB_LEADER",
+				"KB_FOLLOWERS",
+			}...)
+			for _, k := range toCheckKeys {
+				_, ok := cfg.Data[k]
+				Expect(ok).Should(BeTrue())
+			}
 		})
 
 		It("builds Env Config with Replication component correctly", func() {
+			var cfg *corev1.ConfigMap
+			var err error
+
 			reqCtx := newReqCtx()
 			params := newParams()
 			params.Component.WorkloadType = appsv1alpha1.Replication
-
-			var cfg *corev1.ConfigMap
-			var err error
 
 			checkEnvValues := func() {
 				cfg, err = BuildEnvConfig(*params, reqCtx, k8sClient)
 				Expect(err).Should(BeNil())
 				Expect(cfg).ShouldNot(BeNil())
-				Expect(len(cfg.Data) == int(3+params.Component.Replicas)).Should(BeTrue())
-				Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_N"]).
+				toCheckKeys := append(requiredKeys, []string{
+					"KB_PRIMARY_POD_NAME",
+				}...)
+				for _, k := range toCheckKeys {
+					_, ok := cfg.Data[k]
+					Expect(ok).Should(BeTrue())
+				}
+				Expect(cfg.Data["KB_REPLICA_COUNT"]).
 					Should(Equal(strconv.Itoa(int(params.Component.Replicas))))
 				stsName := fmt.Sprintf("%s-%s", params.Cluster.Name, params.Component.Name)
 				svcName := fmt.Sprintf("%s-headless", stsName)
@@ -380,10 +395,10 @@ var _ = Describe("builder", func() {
 				for i := 0; i < int(params.Component.Replicas); i++ {
 					if i == 0 {
 						By("Checking the 1st replica's hostname should not have suffix '-0'")
-						Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_"+strconv.Itoa(i)+"_HOSTNAME"]).
+						Expect(cfg.Data["KB_"+strconv.Itoa(i)+"_HOSTNAME"]).
 							Should(Equal(stsName + "-" + strconv.Itoa(0) + "." + svcName))
 					} else {
-						Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_"+strconv.Itoa(i)+"_HOSTNAME"]).
+						Expect(cfg.Data["KB_"+strconv.Itoa(i)+"_HOSTNAME"]).
 							Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "." + svcName))
 					}
 				}

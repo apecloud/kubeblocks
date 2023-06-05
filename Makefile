@@ -277,6 +277,12 @@ kbcli-doc: generate test-go-generate ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 
+
+.PHONY: api-doc
+api-doc:  ## generate API reference manual.
+	@./hack/docgen/api/generate.sh
+
+
 ##@ Operator Controller Manager
 
 .PHONY: manager

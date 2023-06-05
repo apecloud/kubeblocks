@@ -16,13 +16,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 container: {
-	name:            "pitr"
+	name:            "restore"
 	image:           string
 	imagePullPolicy: "IfNotPresent"
 	command: [...]
 	args: [...]
 	volumeMounts: [...]
 	env: [...]
+	resources: {}
 }
 
 job: {

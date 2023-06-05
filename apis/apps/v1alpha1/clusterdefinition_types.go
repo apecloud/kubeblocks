@@ -54,7 +54,7 @@ type ClusterDefinitionSpec struct {
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
 	// `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// `$(SVC_PORT_<PORT-NAME>)` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
+	// `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
 	//    { "name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306 }, and "$(SVC_PORT_mysql)" in the
 	//    connection credential value is 3306.
 	// +optional
@@ -164,7 +164,7 @@ type ProvisionStatements struct {
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
 type ClusterDefinitionStatus struct {
-	// ClusterDefinition phase, valid values are <empty>, Available.
+	// ClusterDefinition phase, valid values are `empty`, `Available`, 'Unavailable`.
 	// Available is ClusterDefinition become available, and can be referenced for co-related objects.
 	Phase Phase `json:"phase,omitempty"`
 
@@ -198,8 +198,8 @@ type ExporterConfig struct {
 
 type MonitorConfig struct {
 	// builtIn is a switch to enable KubeBlocks builtIn monitoring.
+	// If BuiltIn is set to true, monitor metrics will be scraped automatically.
 	// If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.
-	// BuiltIn set to true is not currently supported but will be soon.
 	// +kubebuilder:default=false
 	// +optional
 	BuiltIn bool `json:"builtIn,omitempty"`
@@ -922,6 +922,9 @@ type GVKResource struct {
 	Selector map[string]string `json:"selector,omitempty"`
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cd

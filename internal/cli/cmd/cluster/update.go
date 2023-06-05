@@ -165,7 +165,10 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 	}
 
 	buildTolObj := func(obj map[string]interface{}, v pflag.Value, field string) error {
-		tolerations := buildTolerations(o.TolerationsRaw)
+		tolerations, err := util.BuildTolerations(o.TolerationsRaw)
+		if err != nil {
+			return err
+		}
 		return unstructured.SetNestedField(obj, tolerations, field)
 	}
 

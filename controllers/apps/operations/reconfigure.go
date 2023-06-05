@@ -54,7 +54,6 @@ func (r *reconfigureAction) ActionStartedCondition(opsRequest *appsv1alpha1.OpsR
 	return appsv1alpha1.NewReconfigureCondition(opsRequest)
 }
 
-// SaveLastConfiguration this operation does not change Cluster.spec.
 func (r *reconfigureAction) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return nil
 }
@@ -97,21 +96,21 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 	switch phase {
 	case appsv1alpha1.OpsSucceedPhase:
 		// only update the condition of the opsRequest.
-		return patchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
+		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureSucceed,
 				eventContext.ConfigSpecName,
 				formatConfigPatchToMessage(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
 			appsv1alpha1.NewSucceedCondition(opsRequest))
 	case appsv1alpha1.OpsFailedPhase:
-		return patchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
+		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureFailed,
 				eventContext.ConfigSpecName,
 				formatConfigPatchToMessage(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
 			appsv1alpha1.NewReconfigureFailedCondition(opsRequest, cfgError))
 	default:
-		return patchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
+		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureRunning,
 				eventContext.ConfigSpecName))

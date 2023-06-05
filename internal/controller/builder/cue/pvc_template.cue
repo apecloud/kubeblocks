@@ -50,10 +50,12 @@ pvc: {
 	spec: {
 		accessModes: volumeClaimTemplate.spec.accessModes
 		resources:   volumeClaimTemplate.spec.resources
-		dataSource: {
-			"name":     snapshot_name
-			"kind":     "VolumeSnapshot"
-			"apiGroup": "snapshot.storage.k8s.io"
+		if len(snapshot_name) > 0 {
+			dataSource: {
+				"name":     snapshot_name
+				"kind":     "VolumeSnapshot"
+				"apiGroup": "snapshot.storage.k8s.io"
+			}
 		}
 	}
 }

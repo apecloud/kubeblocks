@@ -98,11 +98,13 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+                    optional: false
               - name: MYSQL_ROOT_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
               - name: MYSQL_DATABASE
                 value: {{- if .Values.auth.createDatabase }} {{ .Values.auth.database | quote }}  {{- else }} "" {{- end }}
               - name: MYSQL_USER
@@ -138,11 +140,13 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+                    optional: false
               - name: MYSQL_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
               - name: DATA_SOURCE_NAME
                 value: "$(MYSQL_USER):$(MYSQL_PASSWORD)@(localhost:3306)/"
             command:
@@ -201,11 +205,13 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+                    optional: false
               - name: MYSQL_ROOT_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password   
+                    key: password
+                    optional: false
             command:
               - /bin/bash
               - -c
@@ -221,7 +227,7 @@ spec:
                 vtctld_web_port=${VTCTLD_WEB_PORT:-'15000'}
                 printf -v alias '%s-%010d' $cell $uid
                 printf -v tablet_dir 'vt_%010d' $uid
-                tablet_hostname=$(eval echo \$KB_MYSQL_"$uid"_HOSTNAME)
+                tablet_hostname=$(eval echo \$KB_"$uid"_HOSTNAME)
                 printf -v tablet_logfile 'vttablet_%010d_querylog.txt' $uid
 
                 tablet_type=replica
@@ -279,11 +285,13 @@ spec:
               secretKeyRef:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: username
+                optional: false
           - name: MYSQL_ROOT_PASSWORD
             valueFrom:
               secretKeyRef:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: password
+                optional: false
         passwordConfig:
           length: 10
           numDigits: 5
@@ -485,11 +493,13 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+                    optional: false
               - name: MYSQL_ROOT_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
               - name: VTCONSENSUS_PORT
                 value: "16000" 
               - name: ETCD_SERVER
@@ -554,11 +564,13 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+                    optional: false
               - name: MYSQL_ROOT_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password            
+                    key: password
+                    optional: false
               - name: CELL
                 value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
               - name: VTGATE_MYSQL_PORT

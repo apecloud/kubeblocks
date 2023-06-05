@@ -1,7 +1,7 @@
 ---
 title: Try out KubeBlocks in 5 minutes on your laptop
 description: A quick tour of KubeBlocks Playground
-keywords: [Playground, try out, laptop, localhost]
+keywords: [Playground, try out, laptop,]
 sidebar_position: 1
 sidebar_label: Try out KubeBlocks on your laptop
 ---

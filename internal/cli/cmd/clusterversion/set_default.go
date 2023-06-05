@@ -59,7 +59,7 @@ const (
 type SetOrUnsetDefaultOption struct {
 	Factory   cmdutil.Factory
 	IOStreams genericclioptions.IOStreams
-	// `set-default` cmd will set the setDefault to be true, while `unset-default` cmd set it false
+	// `set-default` sets the setDefault to true, `unset-default` sets to false
 	setDefault bool
 }
 
@@ -121,7 +121,7 @@ func (o *SetOrUnsetDefaultOption) run(args []string) error {
 	if err != nil {
 		return err
 	}
-	// alreadySet is to marks if two input args have the same clusterdefintion
+	// alreadySet is to mark if two input args have the same clusterdefintion
 	alreadySet := make(map[string]string)
 	for _, cv := range args {
 		cd, ok := cv2Cd[cv]
@@ -153,7 +153,7 @@ func (o *SetOrUnsetDefaultOption) validate(args []string) error {
 	return nil
 }
 
-// patchDefaultClusterVersionAnnotations will patch the Annotations for the clusterversion in K8S
+// patchDefaultClusterVersionAnnotations patches the Annotations for the clusterversion in K8S
 func patchDefaultClusterVersionAnnotations(client dynamic.Interface, cvName string, value string) error {
 	patchData := map[string]interface{}{
 		"metadata": map[string]interface{}{

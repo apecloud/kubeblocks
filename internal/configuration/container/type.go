@@ -45,7 +45,7 @@ var defaultContainerdEndpoints = []string{
 	"unix:///var/run/cri-dockerd.sock",
 }
 
-// ContainerKiller kill container interface
+// ContainerKiller kills container interface
 type ContainerKiller interface {
 
 	// Kill containers in the pod by cri

@@ -27,6 +27,7 @@ component: {
 	name:           string
 	monitor: {
 		enable:     bool
+		builtIn:    bool
 		scrapePort: int
 		scrapePath: string
 	}
@@ -48,11 +49,20 @@ service: {
 			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 		annotations: {
-			"prometheus.io/scrape": "\(component.monitor.enable)"
-			if component.monitor.enable == true {
-				"prometheus.io/path":   component.monitor.scrapePath
-				"prometheus.io/port":   "\(component.monitor.scrapePort)"
-				"prometheus.io/scheme": "http"
+			if component.monitor.enable == false {
+				"prometheus.io/scrape":       "false"
+				"apps.kubeblocks.io/monitor": "false"
+			}
+			if component.monitor.enable == true && component.monitor.builtIn == false {
+				"prometheus.io/scrape":       "true"
+				"prometheus.io/path":         component.monitor.scrapePath
+				"prometheus.io/port":         "\(component.monitor.scrapePort)"
+				"prometheus.io/scheme":       "http"
+				"apps.kubeblocks.io/monitor": "false"
+			}
+			if component.monitor.enable == true && component.monitor.builtIn == true {
+				"prometheus.io/scrape":       "false"
+				"apps.kubeblocks.io/monitor": "true"
 			}
 		}
 	}

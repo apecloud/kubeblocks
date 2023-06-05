@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
@@ -134,7 +135,7 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 	var (
 		existLatestRevisionFailedPod bool
 		primaryIsReady               bool
-		statusMessages               appsv1alpha1.ComponentMessageMap
+		statusMessages               = appsv1alpha1.ComponentMessageMap{}
 	)
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
@@ -147,15 +148,12 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 			continue
 		}
 		if labelValue == "" {
-			// REVIEW: this isn't a get function, where r.Cluster.Status.Components is being updated.
-			// patch abnormal reason to cluster.status.ComponentDefs.
-			if statusMessages == nil {
-				statusMessages = appsv1alpha1.ComponentMessageMap{}
-			}
 			statusMessages.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
 		}
-		if !intctrlutil.PodIsReady(&v) && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
+		isFailed, _, message := internal.IsPodFailedAndTimedOut(&v)
+		if isFailed && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
 			existLatestRevisionFailedPod = true
+			statusMessages.SetObjectMessage(v.Kind, v.Name, message)
 		}
 	}
 	return util.GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryIsReady,

@@ -75,12 +75,19 @@ func NewPluginInstallCmd(streams genericclioptions.IOStreams) *cobra.Command {
 func (o *PluginInstallOption) Complete(names []string) error {
 	for _, name := range names {
 		indexName, pluginName := CanonicalPluginName(name)
+
+		// check whether the plugin exists
+		if _, err := os.Stat(paths.PluginInstallReceiptPath(pluginName)); err == nil {
+			fmt.Fprintf(o.Out, "plugin %q is already installed\n", name)
+			continue
+		}
+
 		plugin, err := LoadPluginByName(paths.IndexPluginsPath(indexName), pluginName)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return errors.Errorf("plugin %q does not exist in the plugin index", name)
+				return errors.Errorf("plugin %q does not exist in the %s plugin index", name, indexName)
 			}
-			return errors.Wrapf(err, "failed to load plugin %q from the index", name)
+			return errors.Wrapf(err, "failed to load plugin %q from the %s plugin index", name, indexName)
 		}
 		o.plugins = append(o.plugins, pluginEntry{
 			index:  indexName,
@@ -124,8 +131,8 @@ func (o *PluginInstallOption) Install() error {
 	return nil
 }
 
-// Install will download and install a plugin. The operation tries
-// to not get the plugin dir in a bad state if it fails during the process.
+// Install downloads and installs a plugin. The operation tries
+// to keep the plugin dir in a healthy state if it fails during the process.
 func Install(p *Paths, plugin Plugin, indexName string, opts InstallOpts) error {
 	klog.V(2).Infof("Looking for installed versions")
 	_, err := ReadReceiptFromFile(p.PluginInstallReceiptPath(plugin.Name))

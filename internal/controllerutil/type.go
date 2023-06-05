@@ -52,7 +52,7 @@ func (r *RequestCtx) Eventf(object runtime.Object, eventtype, reason, messageFmt
 	r.Recorder.Eventf(object, eventtype, reason, messageFmt, args...)
 }
 
-// UpdateCtxValue update Context value, return parent Context.
+// UpdateCtxValue updates Context value, returns parent Context.
 func (r *RequestCtx) UpdateCtxValue(key, val any) context.Context {
 	p := r.Ctx
 	r.Ctx = context.WithValue(r.Ctx, key, val)

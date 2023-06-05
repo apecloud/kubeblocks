@@ -35,10 +35,10 @@ import (
 	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 )
 
-// ComposeTLSSecret compose a TSL secret object.
+// ComposeTLSSecret composes a TSL secret object.
 // REVIEW/TODO:
 //  1. missing public function doc
-//  2. should avoid using Go template to call a function, this is too hack & costly,
+//  2. should avoid using Go template to call a function, this is too hacky & costly,
 //     should just call underlying registered Go template function.
 func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret, error) {
 	secret, err := builder.BuildTLSSecret(namespace, clusterName, componentName)

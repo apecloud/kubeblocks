@@ -276,7 +276,7 @@ bootstrap:
 				"error_loop_reference": "{{ getEnvByName ( index $.podSpec.containers 0 ) \"LOOP_REFERENCE_A\" }}",
 			})
 			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("too many reference count, maybe there is a loop reference"))
+			Expect(err.Error()).Should(ContainSubstring("too many reference count, maybe there is a cycled reference"))
 		})
 	})
 })

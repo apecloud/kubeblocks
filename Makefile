@@ -70,12 +70,12 @@ ARCH ?= linux-amd64
 
 
 TAG_LATEST ?= false
-BUILDX_ENABLED ?= false
-ifneq ($(BUILDX_ENABLED), false)
+BUILDX_ENABLED ?= ""
+ifeq ($(BUILDX_ENABLED), "")
 	ifeq ($(shell docker buildx inspect 2>/dev/null | awk '/Status/ { print $$2 }'), running)
-		BUILDX_ENABLED ?= true
+		BUILDX_ENABLED = true
 	else
-		BUILDX_ENABLED ?= false
+		BUILDX_ENABLED = false
 	endif
 endif
 
@@ -275,6 +275,12 @@ clean-kbcli: ## Clean bin/kbcli*.
 .PHONY: kbcli-doc
 kbcli-doc: generate test-go-generate ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
+
+
+
+.PHONY: api-doc
+api-doc:  ## generate API reference manual.
+	@./hack/docgen/api/generate.sh
 
 
 ##@ Operator Controller Manager

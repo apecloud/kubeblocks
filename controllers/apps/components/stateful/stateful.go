@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -95,10 +96,16 @@ func (r *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componentName s
 	if err != nil || len(stsList.Items) == 0 {
 		return "", nil, err
 	}
+	statusMessages := appsv1alpha1.ComponentMessageMap{}
 	// if the failed pod is not controlled by the latest revision
 	checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
 		sts := workload.(*appsv1.StatefulSet)
-		return !intctrlutil.PodIsReady(pod) && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
+		isFailed, _, message := internal.IsPodFailedAndTimedOut(pod)
+		existLatestRevisionFailedPod := isFailed && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
+		if existLatestRevisionFailedPod {
+			statusMessages.SetObjectMessage(pod.Kind, pod.Name, message)
+		}
+		return isFailed && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
 	}
 	stsObj := stsList.Items[0]
 	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, r.getReplicas(),

@@ -27,7 +27,7 @@ Meet the following requirements for the smooth operation of Playground and other
 * Make sure the following tools are installed on your local host.
   * Docker: v20.10.5 (runc ≥ v1.0.0-rc93) or above. For installation details, refer to [Get Docker](https://docs.docker.com/get-docker/).
   * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): It is used to interact with Kubernetes clusters.
-  * [Install kbcli](./../installation/introduction.md):Choose one guide that fits your actual environments. `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
+  * [Install `kbcli`](./../../installation/install-kbcli.md). `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
 
 ## Initialize Playground
 
@@ -183,7 +183,13 @@ In this example, delete the leader pod to simulate a failure.
 
 ***Steps:***
 
-1. View the ApeCloud MySQL Raft group information. View the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-1.
+1. Make sure the newly created cluster is `Running`.
+
+   ```bash
+   kbcli cluster list
+   ```
+
+2. View the ApeCloud MySQL Raft group information. View the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-1.
 
    ```bash
    kbcli cluster describe maple05
@@ -214,7 +220,7 @@ In this example, delete the leader pod to simulate a failure.
    TIME        TYPE        REASON        OBJECT        MESSAGE
    ```
 
-2. Delete the leader pod.
+3. Delete the leader pod.
 
    ```bash
    kubectl delete pod maple05-mysql-1
@@ -222,7 +228,7 @@ In this example, delete the leader pod to simulate a failure.
    pod "maple05-mysql-1" deleted
    ```
 
-3. Connect to the ApeCloud MySQL Raft group to test its availability. You can find this group can still be accessed within seconds due to our HA strategy.
+4. Connect to the ApeCloud MySQL Raft group to test its availability. You can find this group can still be accessed within seconds due to our HA strategy.
 
    ```bash
    kbcli cluster connect maple05

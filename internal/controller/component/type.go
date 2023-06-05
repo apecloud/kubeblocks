@@ -28,6 +28,7 @@ import (
 
 type MonitorConfig struct {
 	Enable     bool   `json:"enable"`
+	BuiltIn    bool   `json:"builtIn"`
 	ScrapePort int32  `json:"scrapePort,omitempty"`
 	ScrapePath string `json:"scrapePath,omitempty"`
 }
@@ -67,7 +68,7 @@ type SynthesizedComponent struct {
 }
 
 // GetPrimaryIndex provides PrimaryIndex value getter, if PrimaryIndex is
-// a nil pointer it's treated at 0, return -1 if function receiver is nil.
+// a nil pointer it's treated as 0, return -1 if function receiver is nil.
 func (r *SynthesizedComponent) GetPrimaryIndex() int32 {
 	if r == nil {
 		return -1

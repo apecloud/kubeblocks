@@ -154,6 +154,7 @@ spec:
                     initdb:
                       - auth-host: md5
                       - auth-local: trust
+                      - wal-segsize: "1024"
               - name: ALLOW_NOSSL
                 value: "true"
               - name: PGROOT

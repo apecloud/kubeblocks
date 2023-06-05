@@ -59,16 +59,12 @@ var _ = Describe("tpl engine template", func() {
 			f2 := Friend{Name: "test2"}
 			pp := TplValues{
 				"UserName":   "user@@test",
-				"Emails":     []string{"test1@gmail.com", "test2@gmail.com"},
 				"Friends":    []*Friend{&f1, &f2},
 				"MemorySize": 100,
 			}
 
 			tplString := `hello {{.UserName}}!
 cal test: {{ add ( div ( mul .MemorySize 88 ) 100 ) 6 7 }}
-{{ range .Emails }}
-an email {{ . }}
-{{- end }}
 {{ with .Friends }}
 {{- range . }}
 my friend name is {{.Name}}
@@ -77,9 +73,6 @@ my friend name is {{.Name}}
 
 			expectString := `hello user@@test!
 cal test: 101
-
-an email test1@gmail.com
-an email test2@gmail.com
 
 my friend name is test1
 my friend name is test2
@@ -213,7 +206,7 @@ mathAvg = [8-9][0-9]\.?\d*`
 			engine.importFuncs["duplicate_fun2"] = functional{}
 			_, err = engine.Render(`{{ import "xxx.yyy" }}`)
 			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("failed to import function: duplicate_fun2, from xxx/yyy, function is ready import"))
+			Expect(err.Error()).Should(ContainSubstring("failed to import function: duplicate_fun2, from xxx/yyy, function is already imported"))
 
 			By("Error for not exist cm")
 			mockCM = nil

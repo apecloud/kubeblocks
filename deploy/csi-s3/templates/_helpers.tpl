@@ -8,7 +8,7 @@ Expand the endpoint of the secret.
   {{- else }}
     {{- printf "https://s3.%s.amazonaws.com" .Values.secret.region }}
   {{- end }}
-{{- else if eq .Values.secret.cloudProvider "alibaba" }}
+{{- else if eq .Values.secret.cloudProvider "aliyun" }}
   {{- printf "https://oss-%s.aliyuncs.com" .Values.secret.region }}
 {{- else if .Values.secret.cloudProvider }}
     fail "cloudProvider {{ .Values.secret.cloudProvider }} not supported"

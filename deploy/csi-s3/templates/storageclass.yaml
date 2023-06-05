@@ -2,7 +2,7 @@
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
-  name: {{ .Values.storageClass.name }}
+  name: {{ .Release.Name}}
 {{- if .Values.storageClass.annotations }}
   annotations:
 {{ toYaml .Values.storageClass.annotations | indent 4 }}
@@ -11,16 +11,16 @@ provisioner: ru.yandex.s3.csi
 parameters:
   mounter: "{{ .Values.storageClass.mounter }}"
   options: "{{ include "storageClass.mountOptions" . }}"
-{{- if .Values.storageClass.singleBucket }}
-  bucket: "{{ .Values.storageClass.singleBucket }}"
+{{- if .Values.storageClass.bucket }}
+  bucket: "{{ .Values.storageClass.bucket }}"
 {{- end }}
-  csi.storage.k8s.io/provisioner-secret-name: {{ .Values.secret.name }}
+  csi.storage.k8s.io/provisioner-secret-name: {{ .Release.Name}}-secret
   csi.storage.k8s.io/provisioner-secret-namespace: {{ .Release.Namespace }}
-  csi.storage.k8s.io/controller-publish-secret-name: {{ .Values.secret.name }}
+  csi.storage.k8s.io/controller-publish-secret-name: {{ .Release.Name}}-secret
   csi.storage.k8s.io/controller-publish-secret-namespace: {{ .Release.Namespace }}
-  csi.storage.k8s.io/node-stage-secret-name: {{ .Values.secret.name }}
+  csi.storage.k8s.io/node-stage-secret-name: {{ .Release.Name}}-secret
   csi.storage.k8s.io/node-stage-secret-namespace: {{ .Release.Namespace }}
-  csi.storage.k8s.io/node-publish-secret-name: {{ .Values.secret.name }}
+  csi.storage.k8s.io/node-publish-secret-name: {{ .Release.Name}}-secret
   csi.storage.k8s.io/node-publish-secret-namespace: {{ .Release.Namespace }}
 reclaimPolicy: {{ .Values.storageClass.reclaimPolicy }}
 {{- end -}}

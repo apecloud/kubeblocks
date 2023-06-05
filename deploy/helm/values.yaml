@@ -1727,30 +1727,27 @@ snapshot-controller:
 kubeblocks-csi-driver:
   enabled: false
 
+
+cloudProvider:
+  ## cloudProvider secret settings
+  ## @param cloudProvider.accessKey -- S3 Access Key.
+  ## @param cloudProvider.secretKey -- S3 Secret Key.
+  ## @param cloudProvider.region -- S3 region.
+  ## @param cloudProvider.cloud -- cloud name: [aws,aliyun].
+  ## @param cloudProvider.bucket -- S3 Bucket.
+  accessKey: ""
+  secretKey: ""
+  region: ""
+  name: ""
+  bucket: ""
+
 ## csi-s3 settings
 ## ref: https://artifacthub.io/packages/helm/cloudve/csi-s3#configuration
 ##
 csi-s3:
-  ## @param csi-s3.enabled -- Enable csi-s3 chart.
+  ## @param backupRepo.enabled -- Enable csi-s3 chart.
   ##
   enabled: false
-  ## csi-s3 secret settings
-  ## @param csi-s3.secret.accessKey -- S3 Access Key.
-  ## @param csi-s3.secret.secretKey -- S3 Secret Key.
-  ## @param csi-s3.secret.endpoint -- S3 Endpoint.
-  ##
-  secret:
-    accessKey: ""
-    secretKey: ""
-  ## csi-s3 storageClass setting
-  ## @param csi-s3.storageClass.create -- Specifies whether the storage class should be created.
-  ## @param csi-s3.storageClass.singleBucket -- Use a single bucket for all dynamically provisioned persistent volumes.
-  ## @param csi-s3.storageClass.mountOptions -- mount options.
-  ##
-  storageClass:
-    create: true
-    singleBucket: ""
-    mountOptions: ""
 
 alertmanager-webhook-adaptor:
   ## Linkage with prometheus.enabled

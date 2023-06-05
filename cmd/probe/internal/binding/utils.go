@@ -459,3 +459,10 @@ func getMatchLastGroupNumber(rs []*regexp2.Regexp, str string, substr string, st
 
 	return -1
 }
+
+func ParsePgLsn(str string) int64 {
+	list := strings.Split(str, "/")
+	prefix, _ := strconv.ParseInt(list[0], 16, 64)
+	suffix, _ := strconv.ParseInt(list[1], 16, 64)
+	return prefix*0x100000000 + suffix
+}

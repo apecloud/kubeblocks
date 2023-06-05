@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -855,6 +856,7 @@ func (pgOps *PostgresOperations) Demote(podName string) error {
 	return nil
 }
 
+// GetStatus TODO：GetStatus后期考虑用postmaster替代
 func (pgOps *PostgresOperations) GetStatus(ctx context.Context) (string, error) {
 	resp, err := pgOps.CheckStatusOps(ctx, &bindings.InvokeRequest{}, &bindings.InvokeResponse{
 		Metadata: map[string]string{},
@@ -949,11 +951,191 @@ func (pgOps *PostgresOperations) IsHealthiest(ctx context.Context, podName strin
 	return true
 }
 
+func (pgOps *PostgresOperations) IsRunning(ctx context.Context) bool {
+	return true
+}
+
 func (pgOps *PostgresOperations) isLagging(walPosition int64) bool {
 	lag := pgOps.Cs.GetCluster().GetOpTime() - walPosition
 	return lag > pgOps.Cs.GetCluster().Config.GetData().GetMaxLagOnSwitchover()
 }
 
-func (pgOps *PostgresOperations) HandleFollow(ctx context.Context, leader string) error {
+func (pgOps *PostgresOperations) HandleFollow(ctx context.Context, leader *configuration_store.Leader, podName string) error {
+	need, _ := pgOps.isRewindOrReinitializePossible(ctx, leader, podName)
+	if !need {
+		return nil
+	}
+	pgOps.executeRewind()
 	return nil
+}
+
+func (pgOps *PostgresOperations) executeRewind() {
+
+}
+
+func (pgOps *PostgresOperations) isRewindOrReinitializePossible(ctx context.Context, leader *configuration_store.Leader, podName string) (bool, error) {
+	return pgOps.checkTimelineAndLsn(ctx, leader, podName), nil
+}
+
+func (pgOps *PostgresOperations) checkTimelineAndLsn(ctx context.Context, leader *configuration_store.Leader, podName string) bool {
+	var needRewind bool
+	var historys []*history
+
+	isRecovery, localTimeLine, localLsn := pgOps.getLocalTimeLineAndLsn(ctx, podName)
+	if localTimeLine == 0 || localLsn == 0 {
+		return false
+	}
+
+	if leader.GetMember().GetName() != MASTER {
+		return false
+	}
+
+	leaderPod, err := pgOps.Cs.GetPod(leader.GetMember().GetName())
+	if err != nil {
+		pgOps.Logger.Errorf("get leader pod failed, err:%v", err)
+	}
+	client, err := sqlchannel.NewClientWithPod(leaderPod, pgOps.DBType)
+	// check leader is in recovery
+	role, err := client.GetRole()
+	if role != PRIMARY {
+		pgOps.Logger.Infof("Leader is still in_recovery and therefore can't be used for rewind")
+		return false
+	}
+
+	primaryTimeLine, err := pgOps.getPrimaryTimeLine(ctx, podName)
+	if err != nil {
+		pgOps.Logger.Errorf("get primary timeLine failed, err:%v", err)
+		return false
+	}
+
+	if localTimeLine > primaryTimeLine {
+		needRewind = true
+	} else if localTimeLine == primaryTimeLine {
+		needRewind = false
+	} else if primaryTimeLine > 1 {
+		historys = pgOps.getHistory()
+	}
+
+	if historys != nil {
+		for _, h := range historys {
+			if h.parentTimeline == localTimeLine {
+				if isRecovery {
+					needRewind = localLsn > h.switchPoint
+				} else if localLsn >= h.switchPoint {
+					needRewind = true
+				} else {
+					// TODO:get checkpoint end
+				}
+				break
+			} else if h.parentTimeline > localTimeLine {
+				needRewind = true
+				break
+			}
+		}
+	}
+
+	return needRewind
+}
+
+type history struct {
+	parentTimeline int64
+	switchPoint    int64
+}
+
+// TODO
+func (pgOps *PostgresOperations) getHistory() []*history {
+	return nil
+}
+
+func (pgOps *PostgresOperations) getPrimaryTimeLine(ctx context.Context, podName string) (int64, error) {
+	cmd := `psql "replication=database" -c "IDENTIFY_SYSTEM";`
+	resp, err := pgOps.ExecCmd(ctx, podName, cmd)
+	if err != nil {
+		return 0, err
+	}
+
+	stdout := resp["stdout"]
+	stdoutList := strings.Split(stdout, "\n")
+	value := stdoutList[2]
+	values := strings.Split(value, "|")
+
+	primaryTimeLine := strings.TrimSpace(values[1])
+
+	return strconv.ParseInt(primaryTimeLine, 10, 64)
+}
+
+func (pgOps *PostgresOperations) getLocalTimeLineAndLsn(ctx context.Context, podName string) (bool, int64, int64) {
+	var isRecovery bool
+
+	status, err := pgOps.GetStatus(ctx)
+	if err != nil || status != "running" {
+		return pgOps.getLocalTimeLineAndLsnFromControlData(ctx, podName)
+	}
+
+	isRecovery = true
+	timeLine := pgOps.getReceivedTimeLine(ctx)
+	lsn, _ := pgOps.getLsn(ctx, "replay")
+
+	return isRecovery, timeLine, lsn
+}
+
+func (pgOps *PostgresOperations) getLocalTimeLineAndLsnFromControlData(ctx context.Context, podName string) (bool, int64, int64) {
+	var isRecovery bool
+	var timeLineStr, lsnStr string
+	var timeLine, lsn int64
+
+	pgControlData := pgOps.getPgControlData(ctx, podName)
+	if slices.Contains([]string{"shut down in recovery", "in archive recovery"}, (*pgControlData)["Database cluster state"]) {
+		isRecovery = true
+		lsnStr = (*pgControlData)["Minimum recovery ending location"]
+		timeLineStr = (*pgControlData)["Min recovery ending loc's timeline"]
+	} else if (*pgControlData)["Database cluster state"] == "shut down" {
+		isRecovery = false
+		lsnStr = (*pgControlData)["Latest checkpoint location"]
+		timeLineStr = (*pgControlData)["Latest checkpoint's TimeLineID"]
+	}
+
+	if lsnStr != "" {
+		lsn = ParsePgLsn(lsnStr)
+	}
+	if timeLineStr != "" {
+		timeLine, _ = strconv.ParseInt(timeLineStr, 10, 64)
+	}
+
+	return isRecovery, timeLine, lsn
+}
+
+func (pgOps *PostgresOperations) getReceivedTimeLine(ctx context.Context) int64 {
+	sql := "select case when latest_end_lsn is null then null " +
+		"else received_tli end as received_tli from pg_catalog.pg_stat_get_wal_receiver();"
+
+	resp, err := pgOps.query(ctx, sql)
+	if err != nil || resp == nil {
+		pgOps.Logger.Errorf("get received time line failed, err%v", err)
+		return 0
+	}
+
+	return int64(binary.BigEndian.Uint64(resp))
+}
+
+func (pgOps *PostgresOperations) getPgControlData(ctx context.Context, podName string) *map[string]string {
+	cmd := "pg_controldata"
+	result := map[string]string{}
+
+	// 后期直接用脚本替代
+	resp, err := pgOps.ExecCmd(ctx, podName, cmd)
+	if err != nil {
+		pgOps.Logger.Errorf("get pg control data failed, err:%v", err)
+		return &result
+	}
+
+	stdoutList := strings.Split(resp["stdout"], "\n")
+	for _, s := range stdoutList {
+		stdout := strings.Split(s, ":")
+		if len(stdout) == 2 {
+			result[stdout[0]] = strings.TrimSpace(stdout[1])
+		}
+	}
+
+	return &result
 }

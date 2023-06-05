@@ -2,6 +2,7 @@ package ha
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
 )
 
 type DB interface {
@@ -13,7 +14,7 @@ type DB interface {
 	GetOpTime(ctx context.Context) (int64, error)
 	IsLeader(ctx context.Context) bool
 	IsHealthiest(ctx context.Context, podName string) bool
-	HandleFollow(ctx context.Context, leader string) error
+	HandleFollow(ctx context.Context, leader *configuration_store.Leader, podName string) error
 
 	DbConn
 	DbTool
@@ -30,4 +31,5 @@ type DbTool interface {
 
 type ProcessControl interface {
 	Stop(ctx context.Context) error
+	IsRunning(ctx context.Context) bool
 }

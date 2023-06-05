@@ -157,7 +157,7 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 			h.log.Errorf("acquire leader lock err:%v", err)
 			h.follow()
 		}
-
+		h.enforcePrimaryRole()
 	} else {
 		// Give a time to somebody to take the leader lock
 		time.Sleep(time.Second * 2)
@@ -288,14 +288,12 @@ func (h *Ha) follow() {
 		return
 	}
 
-	leader := h.cs.GetCluster().Leader.GetMember().GetName()
-
 	if h.DB.IsLeader(h.ctx) {
 		h.log.Infof("demoted %s after trying and failing to obtain lock", h.podName)
 		err = h.DB.Demote(h.podName)
 	}
 
-	err = h.DB.HandleFollow(h.ctx, leader)
+	err = h.DB.HandleFollow(h.ctx, h.cs.GetCluster().Leader, h.podName)
 }
 
 func (h *Ha) enforcePrimaryRole() {

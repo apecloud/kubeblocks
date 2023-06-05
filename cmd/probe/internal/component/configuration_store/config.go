@@ -174,6 +174,11 @@ func (cs *ConfigurationStore) loadClusterFromKubernetes(config, switchoverConfig
 		extra         map[string]string
 	)
 
+	members := make([]*Member, 0, len(pods))
+	for i, pod := range pods {
+		members[i] = getMemberFromPod(pod)
+	}
+
 	if config != nil {
 		sysID = config.Annotations[SysID]
 		clusterConfig = getClusterConfigFromConfigMap(config)
@@ -190,13 +195,15 @@ func (cs *ConfigurationStore) loadClusterFromKubernetes(config, switchoverConfig
 		if cs.LeaderObservedTime+leaderRecord.ttl < time.Now().Unix() {
 			leader = nil
 		} else {
-			leader = newLeader(leaderConfig.ResourceVersion, newMember("-1", leaderConfig.Annotations[binding.LEADER], map[string]string{}))
+			member := newMember("-1", leaderConfig.Annotations[binding.LEADER], map[string]string{})
+			for _, m := range members {
+				if m.name == member.name {
+					member = m
+					break
+				}
+			}
+			leader = newLeader(leaderConfig.ResourceVersion, member)
 		}
-	}
-
-	members := make([]*Member, 0, len(pods))
-	for i, pod := range pods {
-		members[i] = getMemberFromPod(pod)
 	}
 
 	if switchoverConfig != nil {

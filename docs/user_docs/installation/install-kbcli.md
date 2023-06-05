@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # Install kbcli
 
-You can install kbcli on your laptop or virtual machines in the cloud.
+You can install kbcli on your laptop or virtual machines on the cloud.
 
 ## Environment preparation
 

@@ -100,7 +100,7 @@ kbcli cluster connect mycluster
    Forwarding from 127.0.0.1:3306 -> 3306
    Forwarding from [::1]:3306 -> 3306
 
-3. Open another terminal tab to connect the MySQL Client.
+3. Open another terminal tab to connect the database cluster.
 
    ```bash
    mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt

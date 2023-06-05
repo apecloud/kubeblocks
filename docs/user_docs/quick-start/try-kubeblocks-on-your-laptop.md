@@ -8,7 +8,7 @@ sidebar_label: Try out KubeBlocks on your laptop
 
 # Try out KubeBlocks in 5 minutes on your laptop
 
-This guide walks you through the quickest way to get started with KubeBlocks, demonstrating how to create a KubeBlocks demo environment (Playground) with one command.
+This guide walks you through the quickest way to get started with KubeBlocks, demonstrating how to create a demo environment (Playground) with one command.
 
 ## Before you start
 
@@ -76,7 +76,7 @@ Playground does not support volume expansion, backup, and restore functions.
 
 ### Access a MySQL cluster
 
-**Option 1.** Connect database inside Kubernetes cluster.
+**Option 1.** Connect database from container network.
 
 Wait until the status of this cluster is `Running`, then run `kbcli cluster connect` to access a specified database cluster. For example,
 

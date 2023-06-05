@@ -86,15 +86,13 @@ kbcli cluster connect mycluster
 
 **Option 2.** Connect database from host network.
 
-Get the MySQL client connection example.
+***Steps:***
 
-```bash
-kbcli cluster connect --show-example --client=cli mycluster
-```
-
-**Example**
-
-1. Run `port-forward` to connect the cluster from host network.
+1. Get Credentials.
+   ```bash
+   kbcli cluster connect --show-example --client=cli mycluster
+   ```
+3. Run `port-forward` to connect the cluster from host network.
 
    ```bash
    kubectl port-forward service/mycluster-mysql 3306:3306
@@ -102,7 +100,7 @@ kbcli cluster connect --show-example --client=cli mycluster
    Forwarding from 127.0.0.1:3306 -> 3306
    Forwarding from [::1]:3306 -> 3306
 
-2. Open another terminal tab to connect the MySQL Client.
+3. Open another terminal tab to connect the MySQL Client.
 
    ```bash
    mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
@@ -149,7 +147,7 @@ KubeBlocks supports complete observability capabilities. This section demonstrat
 
 This guide shows a simple failure simulation to show you the failure recovery capability of MySQL.
 
-#### Delete the MySQL cluster
+#### Delete the Standalone MySQL cluster
 
 Delete the Standalone MySQL cluster before trying out high availability.
 
@@ -159,7 +157,7 @@ kbcli cluster delete mycluster
 
 #### Create a Raft MySQL cluster
 
-Playground creates a Standalone MySQL cluster by default. You can also use `kbcli` to create a Raft MySQL cluster. The following is an example of creating a Raft MySQL cluster with default configurations.
+You can use `kbcli` to create a Raft MySQL cluster. The following is an example of creating a Raft MySQL cluster with default configurations.
 
 ```bash
 kbcli cluster create --cluster-definition='apecloud-mysql' --set replicas=3

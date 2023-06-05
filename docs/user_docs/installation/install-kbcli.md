@@ -38,7 +38,7 @@ You can install kbcli with `curl` or `homebrew`.
 
 :::note
 
-- If a timeout exception occurs during installation, please retry and check your network settings.
+- If a timeout exception occurs during installation, please check your network settings and retry.
 
 :::
 

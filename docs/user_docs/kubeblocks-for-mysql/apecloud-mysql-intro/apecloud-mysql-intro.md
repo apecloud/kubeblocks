@@ -13,12 +13,6 @@ KubeBlocks adopts the MySQL distribution provided by ApeCloud, which includes da
 - When there are 2 replicas, a Primary-Secondary replication cluster is created, in which the primary instance provides read/write capacity, and the secondary instance keeps in sync with the primary instance with asynchronous replication, providing read-only and fault tolerance capabilities.
 - When there is only 1 replica, a standalone cluster is created to provide read/write capacity. Automatic fault recovery capability is still provided, and RPO=0 remains ensured if the cloud disk is not damaged.
 
-:::note
-
-In this guide, we use KubeBlocks to manage ApeCloud MySQL.
-
-:::
-
 ## Instance Roles
 
 ApeCloud MySQL supports four roles, **Leader**, **Follower**, **Candidate**, and **Learner**. The Leader and a Follower form a high-availability cluster and ensure RPO=0.

@@ -21,6 +21,7 @@ package plugin
 
 import (
 	"io"
+	"os"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -98,7 +99,8 @@ func (o *pluginSearchOptions) run() error {
 	for _, p := range plugins {
 		// fuzzy search
 		if fuzzySearchByNameAndDesc(o.keyword, p.plugin.Name, p.plugin.Spec.ShortDescription) {
-			addPluginSearchRow(p.index, p.plugin.Name, limitString(p.plugin.Spec.ShortDescription, o.limit), false, searchPrinter)
+			_, err := os.Stat(paths.PluginInstallReceiptPath(p.plugin.Name))
+			addPluginSearchRow(p.index, p.plugin.Name, limitString(p.plugin.Spec.ShortDescription, o.limit), !os.IsNotExist(err), searchPrinter)
 		}
 	}
 	searchPrinter.Print()

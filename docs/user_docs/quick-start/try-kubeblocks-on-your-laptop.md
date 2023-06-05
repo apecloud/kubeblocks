@@ -92,7 +92,7 @@ kbcli cluster connect mycluster
    ```bash
    kbcli cluster connect --show-example --client=cli mycluster
    ```
-3. Run `port-forward` to connect the cluster from host network.
+3. Run `port-forward`.
 
    ```bash
    kubectl port-forward service/mycluster-mysql 3306:3306

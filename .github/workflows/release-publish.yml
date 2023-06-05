@@ -151,15 +151,14 @@ jobs:
           cp ${{ github.workspace }}/.github/utils/kbcli.spec rpmbuild/SPECS/
           sed -i 's/^Source0:.*/Source0: ${{ env.CLI_FILENAME }}.tar.gz/' rpmbuild/SPECS/kbcli.spec
           sed -i 's/^Version:.*/Version: ${{ env.TAG_NAME }}/' rpmbuild/SPECS/kbcli.spec
-          ls -l
-          ls -l /home/runner/
-          pwd
           sudo apt-get update
           sudo apt-get install -y rpm build-essential
+          pwd
+          mv rpmbuild /home/runner/
           if [ "${{ matrix.os }}" = "linux-amd64" ]; then
-            rpmbuild --target x86_64 -ba ${{ github.workspace }}/rpmbuild/SPECS/kbcli.spec
+            rpmbuild --target x86_64 -ba /home/runner/rpmbuild/SPECS/kbcli.spec
           elif [ "${{ matrix.os }}" = "linux-arm64" ]; then
-            rpmbuild --target aarch64 -ba ${{ github.workspace }}/rpmbuild/SPECS/kbcli.spec
+            rpmbuild --target aarch64 -ba /home/runner/rpmbuild/SPECS/kbcli.spec
           fi
 
       - name: upload RPM package

@@ -71,7 +71,7 @@ func init() {
 	viper.SetDefault("ClearResourcePollingInterval", time.Millisecond)
 }
 
-// NewDefaultTestContext create default test context, if provided namespace optional arg, a namespace
+// NewDefaultTestContext creates default test context, if provided namespace optional arg, a namespace
 // will be created if not exist
 func NewDefaultTestContext(ctx context.Context, cli client.Client, testEnv *envtest.Environment, namespace ...string) TestContext {
 	if cli == nil {
@@ -185,7 +185,7 @@ func (testCtx TestContext) UseDefaultNamespace() func(client.Object) {
 	}
 }
 
-// SetKubeServerVersionWithDistro provide "_KUBE_SERVER_INFO" viper settings helper function.
+// SetKubeServerVersionWithDistro provides "_KUBE_SERVER_INFO" viper settings helper function.
 func SetKubeServerVersionWithDistro(major, minor, patch, distro string) {
 	ver := version.Info{
 		Major:      major,
@@ -195,7 +195,7 @@ func SetKubeServerVersionWithDistro(major, minor, patch, distro string) {
 	viper.Set(constant.CfgKeyServerInfo, ver)
 }
 
-// SetKubeServerVersion provide "_KUBE_SERVER_INFO" viper settings helper function.
+// SetKubeServerVersion provides "_KUBE_SERVER_INFO" viper settings helper function.
 func SetKubeServerVersion(major, minor, patch string) {
 	ver := version.Info{
 		Major:      major,

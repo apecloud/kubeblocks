@@ -179,7 +179,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 	return component, nil
 }
 
-// appendOrOverrideContainerAttr is used to append targetContainer to compContainers or override the attributes of compContainers with a given targetContainer,
+// appendOrOverrideContainerAttr appends targetContainer to compContainers or overrides the attributes of compContainers with a given targetContainer,
 // if targetContainer does not exist in compContainers, it will be appended. otherwise it will be updated with the attributes of the target container.
 func appendOrOverrideContainerAttr(compContainers []corev1.Container, targetContainer corev1.Container) []corev1.Container {
 	index, compContainer := intctrlutil.GetContainerByName(compContainers, targetContainer.Name)

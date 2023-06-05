@@ -40,7 +40,7 @@ type AnalyzeStorageClassByKb struct {
 }
 
 func (a *AnalyzeStorageClassByKb) Title() string {
-	return util.TitleOrDefault(a.analyzer.AnalyzeMeta, "Kubeblocks Storage Class")
+	return util.TitleOrDefault(a.analyzer.AnalyzeMeta, "KubeBlocks Storage Class")
 }
 
 func (a *AnalyzeStorageClassByKb) GetAnalyzer() *preflightv1beta2.KBStorageClassAnalyze {

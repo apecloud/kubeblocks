@@ -12,10 +12,8 @@ images:
 storageClass:
   # Specifies whether the storage class should be created
   create: true
-  # Name
-  name: csi-s3
   # Use a single bucket for all dynamically provisioned persistent volumes
-  singleBucket: ""
+  bucket: ""
   # mounter to use - either geesefs, s3fs or rclone (default geesefs)
   mounter: geesefs
   # GeeseFS mount options
@@ -42,8 +40,6 @@ storageClass:
 secret:
   # Specifies whether the secret should be created
   create: true
-  # Name of the secret
-  name: csi-s3-secret
   # S3 Access Key
   accessKey: ""
   # S3 Secret Key
@@ -53,6 +49,8 @@ secret:
   # In China set it to "https://s3.<region>.amazonaws.com.cn", for example https://s3.cn-north-1.amazonaws.com.cn
   endpoint: https://storage.yandexcloud.net
   region: ""
+   # cloud name: [aws, aliyun]
+  cloudProvider: ""
 
 tolerations:
   - operator: Exists
@@ -70,3 +68,9 @@ affinity:
               operator: In
               values:
                 - "true"
+
+# csi name
+csiName: s3
+
+# Check if this CSI has been installed multiple times. if true, only install storageClass and secret.
+multiCSI: false

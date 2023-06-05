@@ -7,21 +7,7 @@ Run a benchmark.
 ### Options
 
 ```
-      --count int           Total execution count, 0 means infinite
-  -D, --db string           Database name (default "kb_test")
-  -d, --driver string       Database driver: mysql (default "mysql")
-      --dropdata            Cleanup data before prepare
-  -h, --help                help for bench
-  -H, --host string         Database host (default "127.0.0.1")
-      --ignore-error        Ignore error when running workload
-      --interval duration   Output interval time (default 5s)
-      --max-procs int       runtime.GOMAXPROCS
-  -p, --password string     Database password (default "sakila")
-  -P, --port int            Database port (default 3306)
-      --silence             Don't print error when running workload
-  -T, --threads int         Thread concurrency (default 1)
-      --time duration       Total execution time (default 2562047h47m16.854775807s)
-  -U, --user string         Database user (default "root")
+  -h, --help   help for bench
 ```
 
 ### Options inherited from parent commands
@@ -45,12 +31,13 @@ Run a benchmark.
   -s, --server string                  The address and port of the Kubernetes API server
       --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
       --token string                   Bearer token for authentication to the API server
+      --user string                    The name of the kubeconfig user to use
 ```
 
 ### SEE ALSO
 
 
-* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark.
+* [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

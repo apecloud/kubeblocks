@@ -19,7 +19,7 @@ We would like to extend our appreciation to all contributors who helped make thi
 
 **Highlights**
   * Automatic pod container environment variables updates:
-    * [NEW] KB_POD_FQDN - KubeBlock Cluster component workload associated headless service name, N/A if workloadType=Stateless.
+    * [NEW] KB_POD_FQDN - KubeBlocks Cluster component workload associated headless service name, N/A if workloadType=Stateless.
     * [NEW] KB_POD_IP -  Pod IP address
     * [NEW] KB_POD_IPS - Pod IP addresses
     * [NEW] KB_HOST_IP - Host IP address
@@ -30,16 +30,16 @@ We would like to extend our appreciation to all contributors who helped make thi
     * KB_NAMESPACE - Namespace
     * KB_SA_NAME - Service Account Name
     * KB_NODENAME - Node Name
-    * KB_CLUSTER_NAME - KubeBlock Cluster API object name
-    * KB_COMP_NAME - Running pod's KubeBlock Cluster API object's `.spec.components.name`
-    * KB_CLUSTER_COMP_NAME - Running pod's KubeBlock Cluster API object's `<.metadata.name>-<.spec.components.name>`, same name is used for Deployment or StatefulSet workload name, and Service object name
+    * KB_CLUSTER_NAME - KubeBlocks Cluster API object name
+    * KB_COMP_NAME - Running pod's KubeBlocks Cluster API object's `.spec.components.name`
+    * KB_CLUSTER_COMP_NAME - Running pod's KubeBlocks Cluster API object's `<.metadata.name>-<.spec.components.name>`, same name is used for Deployment or StatefulSet workload name, and Service object name
   * New KubeBlocks addon extensions management (an addon components are part of KubeBlocks control plane extensions). Highlights include: 
     * New addons.extensions.kubeblocks.io API that provide running cluster installable check and auto-installation settings.
     * Following addons are provided:
       * Prometheus and Alertmanager
       * AlertManager Webhook Adaptor
       * Grafana
-      * Kubeblocks CSI driver
+      * KubeBlocks CSI driver
       * S3 CSI driver
       * Snapshot Controller
       * KubeBlocks private network Load Balancer

@@ -28,6 +28,7 @@ import (
 
 type MonitorConfig struct {
 	Enable     bool   `json:"enable"`
+	BuiltIn    bool   `json:"builtIn"`
 	ScrapePort int32  `json:"scrapePort,omitempty"`
 	ScrapePath string `json:"scrapePath,omitempty"`
 }

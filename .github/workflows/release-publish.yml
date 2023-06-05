@@ -157,7 +157,7 @@ jobs:
           pwd
           sudo apt-get update
           sudo apt-get install -y rpm build-essential
-          rpmbuild --target ${{ matrix.os }} -ba rpmbuild/SPECS/kbcli.spec
+          rpmbuild --target ${{ matrix.os }} -ba ${{ github.workspace }}/rpmbuild/SPECS/kbcli.spec
 
       - name: upload RPM package
         if: matrix.os == 'linux-amd64' || matrix.os == 'linux-arm64'

@@ -46,13 +46,11 @@ Meet the following requirements for a smooth user experience:
 
    **Result:**
 
-   You just created a cluster named `mycluster` in the default namespace.
-
-   You can find the Playground user guide under the installation success tip. View this guide again by running `kbcli playground init -h`.
+   You just created a cluster named `mycluster` in the default namespace. You can find the user guide under the installation success tip. View this guide again by running `kbcli playground init -h`.
 
 ## Try KubeBlocks with Playground
 
-You can explore KubeBlocks, by [Viewing a MySQL cluster](#describe-a-mysql-cluster), [Accessing a MySQL cluster](#access-a-mysql-cluster), [Observability](#observability), and [High availability](#high-availability-of-mysql). Refer to [Overview](./../introduction/introduction.md) to explore detailed KubeBlocks features and you can try all the features of KubeBlocks in a standard Kubernetes cluster.
+You can explore KubeBlocks, by [Describe a MySQL cluster](#describe-a-mysql-cluster), [Access a MySQL cluster](#access-a-mysql-cluster), [Observability](#observe-a-mysql-cluster), and [High availability](#high-availability-of-mysql). Refer to [Overview](./../introduction/introduction.md) to explore detailed KubeBlocks features and you can try all the features of KubeBlocks in a standard Kubernetes cluster.
 
 KubeBlocks supports the complete life cycle management of a database cluster. Go through the following instructions to try basic features of KubeBlocks.
 
@@ -128,7 +126,7 @@ kbcli cluster connect --show-example --client=cli mycluster
    5 rows in set (0.02 sec)
    ```
 
-### Observability
+### Observe a MySQL cluster
 
 KubeBlocks supports complete observability capabilities. This section demonstrates the monitoring function of KubeBlocks.
 

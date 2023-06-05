@@ -271,7 +271,7 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
    kbcli dashboard open kubeblocks-nyancat
    ```
 
-4. Open another terminal tab and delete the leader pod. Then view the influences on the ApeCloud MySQL cluster through the NYAN CAT page.
+4. Open another terminal tab and delete the leader pod. Then view the influences on the Raft MySQL cluster through the NYAN CAT page.
 
    ```bash
    kubectl delete pod maple05-mysql-1

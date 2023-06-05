@@ -22,6 +22,7 @@ package tasks
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/logger"
@@ -59,21 +60,28 @@ func downloadKubernetesBinaryWithArch(downloadPath string, arch string, binaryVe
 		if err := binary.CreateBaseDir(); err != nil {
 			return nil, cfgcore.WrapError(err, "failed to create file %s base dir.", binary.FileName)
 		}
-		logger.Log.Messagef(common.LocalHost, "downloading %s %s %s ...", arch, binary.ID, binary.Version)
 
+		logger.Log.Messagef(common.LocalHost, "downloading %s %s %s ...", arch, binary.ID, binary.Version)
 		binariesMap[binary.ID] = binary
 		if util.IsExist(binary.Path()) {
-			if err := binary.SHA256Check(); err != nil {
+			if err := checkSha256sum(binary); err != nil {
+				logger.Log.Messagef(common.LocalHost, "failed to check %s sha256, error: %v", binary.ID, err)
 				_ = os.Remove(binary.Path())
 			} else {
 				logger.Log.Messagef(common.LocalHost, "%s is existed", binary.ID)
 				continue
 			}
 		}
-		if err := binary.Download(); err != nil {
+		if err := download(binary); err != nil {
 			return nil, cfgcore.WrapError(err, "failed to download %s binary: %s", binary.ID, binary.GetCmd())
 		}
 	}
-
 	return binariesMap, nil
+}
+
+func download(binary *files.KubeBinary) error {
+	if err := runCommand(exec.Command("/bin/sh", "-c", binary.GetCmd())); err != nil {
+		return err
+	}
+	return writeSha256sum(binary)
 }

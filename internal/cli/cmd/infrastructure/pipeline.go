@@ -22,7 +22,6 @@ package infrastructure
 import (
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/bootstrap/precheck"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/certs"
-	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/container"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/module"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/etcd"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/filesystem"
@@ -51,7 +50,7 @@ func NewCreateK8sClusterForKubeblocks(o *clusterOptions) []module.Module {
 		// &os.ConfigureOSModule{},
 		// &customscripts.CustomScriptsModule{Phase: "PreInstall", Scripts: runtime.Cluster.System.PreInstall},
 		&kubernetes.StatusModule{},
-		&container.InstallContainerModule{},
+		// &container.InstallContainerModule{},
 		&tasks.InstallCRIModule{},
 		&etcd.PreCheckModule{},
 		&etcd.CertsModule{},

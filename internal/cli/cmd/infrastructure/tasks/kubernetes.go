@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 
 	"github.com/StudioSol/set"
-	"github.com/apecloud/kubeblocks/internal/gotemplate"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/bootstrap/os"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/bootstrap/os/templates"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
@@ -32,6 +31,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
+	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
 type PrepareK8sBinariesModule struct {
@@ -51,7 +51,7 @@ func (p *PrepareK8sBinariesModule) Init() {
 
 	p.Tasks = []task.Interface{
 		&task.LocalTask{
-			Name:   "DownloadBinaries",
+			Name:   "PrepareK8sBinaries",
 			Desc:   "Download installation binaries",
 			Action: &DownloadKubernetesBinary{BinaryVersion: p.BinaryVersion},
 		}}
@@ -69,7 +69,7 @@ func (c *ConfigureOSModule) Init() {
 			Parallel: true,
 		},
 		&task.RemoteTask{
-			Name:     "InitOS",
+			Name:     "SetHostName",
 			Desc:     "Prepare to init OS",
 			Hosts:    c.Runtime.GetAllHosts(),
 			Action:   new(os.NodeConfigureOS),

@@ -27,8 +27,6 @@ import (
 	"strings"
 
 	"github.com/StudioSol/set"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/tasks"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
 	kubekeyapiv1alpha2 "github.com/kubesphere/kubekey/v3/cmd/kk/apis/kubekey/v1alpha2"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/connector"
@@ -37,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/tasks"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/configuration/container"

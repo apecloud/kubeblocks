@@ -22,8 +22,9 @@ package infrastructure
 import (
 	"testing"
 
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
 	kubekeyapiv1alpha2 "github.com/kubesphere/kubekey/v3/cmd/kk/apis/kubekey/v1alpha2"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
 
 	"github.com/apecloud/kubeblocks/internal/configuration/container"
 )

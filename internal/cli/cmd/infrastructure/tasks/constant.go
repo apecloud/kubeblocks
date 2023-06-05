@@ -33,7 +33,7 @@ const (
 	DefaultEtcdVersion       = "v3.4.26" // https://github.com/etcd-io/etcd/releases/tag/v3.4.26
 	DefaultCRICtlVersion     = "v1.26.0" // https://github.com/kubernetes-sigs/cri-tools/releases/tag/v1.26.0
 	DefaultHelmVersion       = "v3.12.0" // https://github.com/helm/helm/releases
-	DefaultContainerdVersion = "v1.7.2"  // https://github.com/containerd/containerd/releases
 	DefaultRuncVersion       = "v1.1.7"  // https://github.com/opencontainers/runc/releases
 	DefaultCniVersion        = "v1.3.0"  // https://github.com/containernetworking/plugins/releases
+	DefaultContainerdVersion = "1.7.2"   // https://github.com/containerd/containerd/releases
 )

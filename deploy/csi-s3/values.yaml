@@ -12,6 +12,8 @@ images:
 storageClass:
   # Specifies whether the storage class should be created
   create: true
+  # storage class name
+  name: "csi-s3"
   # Use a single bucket for all dynamically provisioned persistent volumes
   bucket: ""
   # mounter to use - either geesefs, s3fs or rclone (default geesefs)

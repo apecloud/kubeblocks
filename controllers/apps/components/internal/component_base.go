@@ -469,7 +469,7 @@ func hasFailedAndTimedOutPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMe
 		requeueAfter   time.Duration
 	)
 	for _, pod := range pods {
-		isFailed, isTimedOut, messageStr := IsPodFailedAndTimedOut(pod)
+		isFailed, isTimedOut, messageStr := isPodFailedAndTimedOut(pod)
 		if !isFailed {
 			continue
 		}
@@ -500,8 +500,8 @@ func isPodScheduledFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
 	return false, false, ""
 }
 
-// IsPodFailedAndTimedOut checks if the pod is failed and timed out.
-func IsPodFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
+// isPodFailedAndTimedOut checks if the pod is failed and timed out.
+func isPodFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
 	if isFailed, isTimedOut, message := isPodScheduledFailedAndTimedOut(pod); isFailed {
 		return isFailed, isTimedOut, message
 	}

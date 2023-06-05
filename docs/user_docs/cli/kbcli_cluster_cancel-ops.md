@@ -1,34 +1,25 @@
 ---
-title: kbcli cluster list-ops
+title: kbcli cluster cancel-ops
 ---
 
-List all opsRequests.
+cancel the pending/creating/running OpsRequest which type is vscale or hscale.
 
 ```
-kbcli cluster list-ops [flags]
+kbcli cluster cancel-ops NAME [flags]
 ```
 
 ### Examples
 
 ```
-  # list all opsRequests
-  kbcli cluster list-ops
-  
-  # list all opsRequests of specified cluster
-  kbcli cluster list-ops mycluster
+  # cancel the opsRequest which is not completed.
+  kbcli cluster cancel-ops <opsRequestName>
 ```
 
 ### Options
 
 ```
-  -A, --all-namespaces    If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
-  -h, --help              help for list-ops
-      --name string       The OpsRequest name to get the details.
-  -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
-  -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
-      --show-labels       When printing, show all labels as the last column (default hide labels column)
-      --status strings    Options include all, pending, creating, running, canceling, failed. by default, outputs the pending/creating/running/canceling/failed OpsRequest. (default [pending,creating,running,canceling,failed])
-      --type strings      The OpsRequest type
+      --auto-approve   Skip interactive approval before cancel the opsRequest
+  -h, --help           help for cancel-ops
 ```
 
 ### Options inherited from parent commands

@@ -32,10 +32,10 @@ WORKDIR /src
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
-     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/probe cmd/probe/observation/main.go
+     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/role-agent cmd/probe/role/main.go
 
 
 # Use alpine
 FROM docker.io/alpine:3.17 as dist
-# copy kubeblocks tools
-COPY --from=builder /out/probe  /bin/probe
+# copy role observation
+COPY --from=builder /out/role-agent  /bin/probe

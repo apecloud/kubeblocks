@@ -327,7 +327,7 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-func (r *SystemAccountReconciler) createByReferingToExisting(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, key componentUniqueKey, account appsv1alpha1.SystemAccountConfig) error {
+func (r *SystemAccountReconciler) createByReferringToExisting(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, key componentUniqueKey, account appsv1alpha1.SystemAccountConfig) error {
 	// get secret
 	secret := &corev1.Secret{}
 	secretRef := account.ProvisionPolicy.SecretRef

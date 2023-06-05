@@ -40,6 +40,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -50,6 +52,7 @@ var k8sClient client.Client
 var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
+var testCtx testutil.TestContext
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -104,6 +107,8 @@ var _ = BeforeSuite(func() {
 
 	err = (&ConsensusSet{}).SetupWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
+
+	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 
 	//+kubebuilder:scaffold:webhook
 

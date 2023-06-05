@@ -51,3 +51,8 @@ func (builder *ConsensusSetBuilder) SetReplicas(replicas int32) *ConsensusSetBui
 	builder.get().Spec.Replicas = replicas
 	return builder
 }
+
+func (builder *ConsensusSetBuilder) SetRoles(roles []workloads.ConsensusRole) *ConsensusSetBuilder {
+	builder.get().Spec.Roles = roles
+	return builder
+}

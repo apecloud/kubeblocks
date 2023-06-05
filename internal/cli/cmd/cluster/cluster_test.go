@@ -116,7 +116,7 @@ var _ = Describe("Cluster", func() {
 					PodAntiAffinity: "Preferred",
 					TopologyKeys:    []string{"kubernetes.io/hostname"},
 					NodeLabels:      map[string]string{"testLabelKey": "testLabelValue"},
-					TolerationsRaw:  []string{"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"},
+					TolerationsRaw:  []string{"engineType=mongo:NoSchedule"},
 					Tenancy:         string(appsv1alpha1.SharedNode),
 				},
 			}

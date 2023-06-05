@@ -142,7 +142,7 @@ var _ = Describe("Backup Controller test", func() {
 				SetTargetSecretName(clusterName).
 				AddHookPreCommand("touch /data/mysql/.restore;sync").
 				AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-				AddFullPolicy().
+				AddDataFilePolicy().
 				SetBackupToolName(backupTool.Name).
 				AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 				AddMatchLabels(constant.RoleLabelKey, "leader").
@@ -425,7 +425,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("By creating a backupPolicy from backupTool: " + backupTool.Name)
 				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 					AddAnnotations(constant.BackupDataPathPrefixAnnotationKey, pathPrefix).
-					AddFullPolicy().
+					AddDataFilePolicy().
 					SetBackupToolName(backupTool.Name).
 					SetSchedule(defaultSchedule, true).
 					SetTTL(defaultTTL).

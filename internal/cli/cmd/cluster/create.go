@@ -507,6 +507,16 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 			Resources: []string{"events"},
 			Verbs:     []string{"create"},
 		},
+		{
+			APIGroups: []string{"dataprotection.kubeblocks.io"},
+			Resources: []string{"backups/status"},
+			Verbs:     []string{"get", "update", "patch"},
+		},
+		{
+			APIGroups: []string{"dataprotection.kubeblocks.io"},
+			Resources: []string{"backups"},
+			Verbs:     []string{"create", "get", "list", "update", "patch"},
+		},
 	}...).WithLabels(labels)
 
 	// postgresql need more rules for patroni

@@ -58,7 +58,7 @@ func TestNewErrors(t *testing.T) {
 	if !IsTargetError(pvTemplateNotFound, ErrorTypeBackupPVTemplateNotFound) {
 		t.Error("should be error of BackupPVTemplateNotFound")
 	}
-	pvsIsEmpty := NewBackupPVCNameIsEmpty("policy-test1")
+	pvsIsEmpty := NewBackupPVCNameIsEmpty("datafile", "policy-test1")
 	if !IsTargetError(pvsIsEmpty, ErrorTypeBackupPVCNameIsEmpty) {
 		t.Error("should be error of BackupPVCNameIsEmpty")
 	}

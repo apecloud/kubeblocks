@@ -144,7 +144,7 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 			return "", nil, nil
 		}
 		labelValue := v.Labels[constant.RoleLabelKey]
-		if labelValue == string(Primary) && intctrlutil.PodIsReady(&v) {
+		if labelValue == string(appsv1alpha1.ReplicationRolePrimary) && intctrlutil.PodIsReady(&v) {
 			primaryIsReady = true
 			continue
 		}
@@ -203,9 +203,9 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 		// if there is no role label on the Pod, it needs to be updated with statefulSet's role label.
 		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
 			_, o := util.ParseParentNameAndOrdinal(pod.Name)
-			role := string(Secondary)
+			role := string(appsv1alpha1.ReplicationRoleSecondary)
 			if o == r.getPrimaryIndex() {
-				role = string(Primary)
+				role = string(appsv1alpha1.ReplicationRolePrimary)
 			}
 			pod.GetLabels()[constant.RoleLabelKey] = role
 			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
@@ -286,9 +286,9 @@ func newReplicationSet(cli client.Client,
 }
 
 func DefaultRole(i int32) string {
-	role := string(Secondary)
+	role := string(appsv1alpha1.ReplicationRoleSecondary)
 	if i == 0 {
-		role = string(Primary)
+		role = string(appsv1alpha1.ReplicationRolePrimary)
 	}
 	return role
 }

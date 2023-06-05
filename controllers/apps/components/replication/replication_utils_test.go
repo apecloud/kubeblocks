@@ -203,7 +203,7 @@ var _ = Describe("ReplicationSet Util", func() {
 				AddLabelsInMap(sts.Labels).
 				AddRoleLabel(DefaultRole(i)).
 				Create(&testCtx).GetObject()
-			if pod.Labels[constant.RoleLabelKey] == string(Primary) {
+			if pod.Labels[constant.RoleLabelKey] == string(appsv1alpha1.ReplicationRolePrimary) {
 				primaryPod = pod
 			} else {
 				secondaryPods = append(secondaryPods, pod)
@@ -218,11 +218,11 @@ var _ = Describe("ReplicationSet Util", func() {
 			Log: log.FromContext(ctx).WithValues("event", testCtx.DefaultNamespace),
 		}
 		Expect(HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, clusterObj, testapps.DefaultRedisCompName,
-			secondaryPods[0], string(Primary))).ShouldNot(HaveOccurred())
+			secondaryPods[0], string(appsv1alpha1.ReplicationRolePrimary))).ShouldNot(HaveOccurred())
 
 		By("Test when secondary change to primary, the old primary label has been updated at the same time, so return nil directly.")
 		Expect(HandleReplicationSetRoleChangeEvent(k8sClient, reqCtx, clusterObj, testapps.DefaultRedisCompName,
-			primaryPod, string(Secondary))).ShouldNot(HaveOccurred())
+			primaryPod, string(appsv1alpha1.ReplicationRoleSecondary))).ShouldNot(HaveOccurred())
 	}
 
 	// Scenarios

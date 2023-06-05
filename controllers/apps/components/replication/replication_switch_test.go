@@ -131,9 +131,9 @@ var _ = Describe("ReplicationSet Switch", func() {
 				AddContainer(container).
 				AddLabelsInMap(replicationSetSts.Labels)
 			if i == 0 {
-				podBuilder.AddRoleLabel(string(Primary))
+				podBuilder.AddRoleLabel(string(appsv1alpha1.ReplicationRolePrimary))
 			} else {
-				podBuilder.AddRoleLabel(string(Secondary))
+				podBuilder.AddRoleLabel(string(appsv1alpha1.ReplicationRoleSecondary))
 			}
 			_ = podBuilder.Create(&testCtx).GetObject()
 		}

@@ -22,6 +22,7 @@ package replication
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
@@ -45,7 +46,7 @@ func (b *replicationComponentWorkloadBuilder) BuildService() internal.ComponentW
 		}
 		objs := make([]client.Object, 0, len(svcList))
 		for _, svc := range svcList {
-			svc.Spec.Selector[constant.RoleLabelKey] = string(Primary)
+			svc.Spec.Selector[constant.RoleLabelKey] = string(appsv1alpha1.ReplicationRolePrimary)
 			objs = append(objs, svc)
 		}
 		return objs, err

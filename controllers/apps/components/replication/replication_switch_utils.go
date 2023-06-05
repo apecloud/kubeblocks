@@ -182,7 +182,7 @@ func (f *SwitchElectionRoleFilter) filter(roleInfoList []*SwitchRoleInfo) ([]*Sw
 		if err != nil {
 			return filterRoles, err
 		}
-		if string(*roleInfo.RoleDetectInfo) != string(Primary) && !isPrimaryPod {
+		if string(*roleInfo.RoleDetectInfo) != string(appsv1alpha1.ReplicationRolePrimary) && !isPrimaryPod {
 			filterRoles = append(filterRoles, roleInfo)
 		}
 	}
@@ -293,7 +293,7 @@ func (pdm *ProbeDetectManager) roleDetect(pod *corev1.Pod) (*RoleDetectResult, e
 	var res RoleDetectResult
 	role := pod.Labels[constant.RoleLabelKey]
 	res = DetectRoleSecondary
-	if role == string(Primary) {
+	if role == string(appsv1alpha1.ReplicationRolePrimary) {
 		res = DetectRolePrimary
 	}
 	return &res, nil

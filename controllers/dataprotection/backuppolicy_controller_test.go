@@ -133,7 +133,7 @@ var _ = Describe("Backup Policy Controller", func() {
 			BeforeEach(func() {
 				By("By creating a backupPolicy from backupTool: " + backupToolName)
 				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
-					AddFullPolicy().
+					AddDataFilePolicy().
 					SetBackupToolName(backupToolName).
 					SetBackupsHistoryLimit(1).
 					SetSchedule(defaultSchedule, true).
@@ -285,7 +285,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				By("By creating a backupPolicy with empty secret")
 				randomSecretName := testCtx.GetRandomStr()
 				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
-					AddFullPolicy().
+					AddDataFilePolicy().
 					SetBackupToolName(backupToolName).
 					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(randomSecretName).
@@ -309,7 +309,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				viper.SetDefault(constant.CfgKeyBackupPVCName, pvcName)
 				viper.SetDefault(constant.CfgKeyBackupPVCInitCapacity, pvcInitCapacity)
 				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
-					AddFullPolicy().
+					AddDataFilePolicy().
 					SetBackupToolName(backupToolName).
 					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
@@ -323,8 +323,8 @@ var _ = Describe("Backup Policy Controller", func() {
 				})).Should(Succeed())
 			})
 		})
-		Context("creating a logfile backupPolicy", func() {
-			It("with reconfigure config", func() {
+		Context("reconcile a logfile backupPolicy", func() {
+			It("with reconfigure config and job deployKind", func() {
 				By("creating a backupPolicy")
 				pvcName := "backup-data"
 				pvcInitCapacity := "10Gi"
@@ -342,14 +342,15 @@ var _ = Describe("Backup Policy Controller", func() {
 				  }`
 				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 					AddAnnotations(constant.ReconfigureRefAnnotationKey, reconfigureRef).
+					AddLogfilePolicy().
 					SetBackupToolName(backupToolName).
-					AddIncrementalPolicy().
 					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					AddSnapshotPolicy().
 					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					Create(&testCtx).GetObject()
 				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					fmt.Printf("backupPolicy: %v", fetched.Status)
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
 				})).Should(Succeed())
 				By("enable schedule for reconfigure")

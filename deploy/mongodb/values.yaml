@@ -7,7 +7,11 @@ image:
   repository: apecloud/mongo
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: 5.0.14
+  tag: 5.0.14 # 6.0.3-debian-11-r0
+
+walg:
+  repository: apecloud/wal-g
+  tag: mongo-latest
 
 clusterVersionOverride: ""
 nameOverride: ""

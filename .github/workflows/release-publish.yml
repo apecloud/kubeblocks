@@ -97,18 +97,18 @@ jobs:
 #          echo "ASSET_CONTENT_TYPE=application/zip" >> $GITHUB_ENV
 #          echo "CheckSum=${{ env.CLI_FILENAME }}.zip.sha256.txt" >> $GITHUB_ENV
 
-#      - name: make tar
-#        if: matrix.os != 'windows-amd64'
-#        run: |
-#          mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }}
-#          tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
-#          file ${{ env.CLI_FILENAME }}.tar.gz  # for debug
-#          mkdir -p sha256
-#          shasum -a 256 ${{ env.CLI_FILENAME }}.tar.gz > sha256/${{ env.CLI_FILENAME }}.tar.gz.sha256.txt
-#          mv ${{ env.CLI_FILENAME }}.tar.gz bin/
-#          echo "ASSET_NAME=${{ env.CLI_FILENAME }}.tar.gz" >> $GITHUB_ENV
-#          echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
-#          echo "CheckSum=${{ env.CLI_FILENAME }}.tar.gz.sha256.txt" >> $GITHUB_ENV
+      - name: make tar
+        if: matrix.os != 'windows-amd64'
+        run: |
+          mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }} 
+          tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
+          file ${{ env.CLI_FILENAME }}.tar.gz  # for debug 
+          mkdir -p sha256
+          shasum -a 256 ${{ env.CLI_FILENAME }}.tar.gz > sha256/${{ env.CLI_FILENAME }}.tar.gz.sha256.txt
+          mv ${{ env.CLI_FILENAME }}.tar.gz bin/
+          echo "ASSET_NAME=${{ env.CLI_FILENAME }}.tar.gz" >> $GITHUB_ENV
+          echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
+          echo "CheckSum=${{ env.CLI_FILENAME }}.tar.gz.sha256.txt" >> $GITHUB_ENV
 
 #      - name: upload gitlab kbcli asset ${{ matrix.os }}
 #        env:

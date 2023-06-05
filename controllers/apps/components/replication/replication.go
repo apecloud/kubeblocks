@@ -246,15 +246,11 @@ func (r *ReplicationSet) asyncReplicationPodRoleLabelAndAnnotations(podList []co
 // HandleSwitchover is the implementation of the type Component interface method, which is used to handle the switchover of the Replication workload.
 func (r *ReplicationSet) HandleSwitchover(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
 	// check if all Pods have role label
-	allPodRoleExist := true
 	podList, err := getRunningPods(ctx, r.Cli, obj)
 	for _, pod := range podList {
 		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
-			allPodRoleExist = false
+			return nil, nil
 		}
-	}
-	if !allPodRoleExist {
-		return nil, nil
 	}
 
 	// check if the switchover is needed

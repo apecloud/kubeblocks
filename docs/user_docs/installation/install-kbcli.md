@@ -44,23 +44,23 @@ You can install kbcli with `curl` or `homebrew`.
 
 - Option 2: Install kbcli using Homebrew.
 
-    1. Install ApeCloud tap, the Homebrew package of ApeCloud.
+1. Install ApeCloud tap, the Homebrew package of ApeCloud.
 
-        ```bash
-        brew tap apecloud/tap
-        ```
+   ```bash
+   brew tap apecloud/tap
+   ```
 
-    2. Install kbcli.
+2. Install kbcli.
 
-        ```bash
-        brew install kbcli
-        ```
+   ```bash
+   brew install kbcli
+   ```
 
-    3. Verify that kbcli is successfully installed.
+3. Verify that kbcli is successfully installed.
 
-        ```bash
-        kbcli -h
-        ```
+   ```bash
+   kbcli -h
+   ```
 
 </TabItem>
 

@@ -136,6 +136,32 @@ jobs:
           asset_name: ${{ env.ASSET_NAME }}
           asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
 
+      - name: make RPM package
+        if: matrix.os == 'linux-amd64' || matrix.os == 'linux-arm64'
+        run: |
+          mkdir -p rpmbuild
+          mkdir -p rpmbuild/SOURCES
+          mkdir -p rpmbuild/SPECS
+          mkdir -p rpmbuild/BUILD
+          mkdir -p rpmbuild/RPMS
+          mkdir -p rpmbuild/SRPMS
+          cp ${{ env.CLI_FILENAME }}.tar.gz rpmbuild/SOURCES/
+          cp ${{ github.workspace }}/utils/kbcli.spec rpmbuild/SPECS/
+          sed -i 's/^Source0:.*/Source0: ${{ env.CLI_FILENAME }}.tar.gz/' rpmbuild/SPECS/kbcli.spec
+          sed -i 's/^Version:.*/Version: ${{ env.env.TAG_NAME }}.tar.gz/' rpmbuild/SPECS/kbcli.spec
+          sudo apt-get update
+          sudo apt-get install -y rpm build-essential
+          rpmbuild --target ${{ matrix.os }} -ba rpmbuild/SPECS/kbcli.spec
+
+      - name: upload RPM package
+        if: matrix.os == 'linux-amd64' || matrix.os == 'linux-arm64'
+        uses: actions/upload-release-asset@main
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ./rpmbuild/RPMS/${{ matrix.os }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-${{ matrix.os }}.rpm
+          asset_name: ${{ env.CLI_FILENAME }}.rpm
+          asset_content_type: application/octet-stream
+
       - name: upload kbcli binary release for winget
         if: matrix.os == 'windows-amd64'
         uses: actions/upload-release-asset@main

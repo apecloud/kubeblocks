@@ -50,7 +50,7 @@ Meet the following requirements for a smooth user experience:
 
 ## Try KubeBlocks with Playground
 
-You can explore KubeBlocks, by [Describe a MySQL cluster](#describe-a-mysql-cluster), [Access a MySQL cluster](#access-a-mysql-cluster), [Observability](#observe-a-mysql-cluster), and [High availability](#high-availability-of-mysql). Refer to [Overview](./../introduction/introduction.md) to explore detailed KubeBlocks features and you can try all the features of KubeBlocks in a standard Kubernetes cluster.
+You can explore KubeBlocks, by [Describe a MySQL cluster](#describe-a-mysql-cluster), [Access a MySQL cluster](#access-a-mysql-cluster), [Observe a MySQL cluster](#observe-a-mysql-cluster), and [High availability](#high-availability-of-mysql). Refer to [Overview](./../introduction/introduction.md) to explore detailed KubeBlocks features and you can try all the features of KubeBlocks in a standard Kubernetes cluster.
 
 KubeBlocks supports the complete life cycle management of a database cluster. Go through the following instructions to try basic features of KubeBlocks.
 

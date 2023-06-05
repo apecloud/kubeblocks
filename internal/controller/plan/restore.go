@@ -27,7 +27,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -72,8 +71,6 @@ func DoRestore(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Clu
 		return nil
 	}
 
-	// builds pitr init container to wait prepare data
-	// prepares data if PITR needed
 	mgr := RestoreManager{
 		Cluster: cluster,
 		Client:  cli,
@@ -81,13 +78,12 @@ func DoRestore(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Clu
 		Scheme:  schema,
 	}
 
-	// check restore from backup or PITR
+	// check restore from backup
 	backupObj, err := mgr.getBackupObjectFromAnnotation(component)
 	if err != nil {
 		return err
 	}
 	if backupObj == nil {
-		// TODO: PITR action
 		return nil
 	}
 
@@ -96,11 +92,17 @@ func DoRestore(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Clu
 	}
 	jobs := make([]client.Object, 0)
 	if backupObj.Spec.BackupType == dpv1alpha1.BackupTypeDataFile {
-		dataFilejobs, err := mgr.buildDatafileRestoreJob(component, backupObj)
+		dataFileJobs, err := mgr.buildDatafileRestoreJob(component, backupObj)
 		if err != nil {
 			return err
 		}
-		jobs = append(jobs, dataFilejobs...)
+
+		logicJobs, err := mgr.buildLogicRestoreJob(component, backupObj)
+		if err != nil {
+			return err
+		}
+		jobs = append(jobs, dataFileJobs...)
+		jobs = append(jobs, logicJobs...)
 	}
 
 	// create and waiting job finished
@@ -125,8 +127,6 @@ func DoPITR(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluste
 		return nil
 	}
 
-	// builds pitr init container to wait prepare data
-	// prepares data if PITR needed
 	pitrMgr := RestoreManager{
 		Cluster: cluster,
 		Client:  cli,
@@ -134,13 +134,13 @@ func DoPITR(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluste
 		Scheme:  schema,
 	}
 
-	if need, err := pitrMgr.checkAndInit(); err != nil {
+	if need, err := pitrMgr.checkPITRAndInit(); err != nil {
 		return err
 	} else if !need {
 		return nil
 	}
 
-	// checks restore from backup or PITR
+	// get the latest backup  from point in time
 	backupObj, err := pitrMgr.getLatestBaseBackup(component.Name)
 	if err != nil {
 		return err
@@ -167,6 +167,16 @@ func DoPITR(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluste
 	if err != nil {
 		return err
 	}
+
+	logfileBackup, err := pitrMgr.getLogfileBackup(component.Name)
+	if err != nil {
+		return err
+	}
+	logicJobs, err := pitrMgr.buildLogicRestoreJob(component, logfileBackup)
+	if err != nil {
+		return err
+	}
+	pitrJobs = append(pitrJobs, logicJobs...)
 
 	// do create PITR job and check completed
 	if err = pitrMgr.createJobsAndWaiting(pitrJobs); err != nil {
@@ -253,8 +263,8 @@ func (p *RestoreManager) getLatestBaseBackup(componentName string) (*dpv1alpha1.
 	return latestBackup, nil
 }
 
-// checkAndInit checks if cluster need to be restored
-func (p *RestoreManager) checkAndInit() (need bool, err error) {
+// checkPITRAndInit checks if cluster need to be restored
+func (p *RestoreManager) checkPITRAndInit() (need bool, err error) {
 	// checks args if pitr supported
 	cluster := p.Cluster
 	if cluster.Annotations[constant.RestoreFromTimeAnnotationKey] == "" {
@@ -311,7 +321,7 @@ func (p *RestoreManager) getRecoveryInfo(componentName string) (*dpv1alpha1.Back
 	if len(toolList.Items) == 0 {
 		return nil, errors.New("not support recovery because of non-existed pitr backupTool")
 	}
-	incrementalBackup, err := p.getIncrementalBackup(componentName)
+	logfileBackup, err := p.getLogfileBackup(componentName)
 	if err != nil {
 		return nil, err
 	}
@@ -328,18 +338,18 @@ func (p *RestoreManager) getRecoveryInfo(componentName string) (*dpv1alpha1.Back
 	if envTimeEnvIdx != -1 {
 		spec.Env[envTimeEnvIdx].Value = p.restoreTime.Time.UTC().Format(timeFormat)
 	}
-	backupDIR := incrementalBackup.Name
-	if incrementalBackup.Status.Manifests != nil && incrementalBackup.Status.Manifests.BackupTool != nil {
-		backupDIR = incrementalBackup.Status.Manifests.BackupTool.FilePath
+	backupDIR := logfileBackup.Name
+	if logfileBackup.Status.Manifests != nil && logfileBackup.Status.Manifests.BackupTool != nil {
+		backupDIR = logfileBackup.Status.Manifests.BackupTool.FilePath
 	}
 	headEnv := []corev1.EnvVar{
 		{Name: "BACKUP_DIR", Value: backupVolumePATH + "/" + backupDIR},
-		{Name: "BACKUP_NAME", Value: incrementalBackup.Name}}
+		{Name: "BACKUP_NAME", Value: logfileBackup.Name}}
 	spec.Env = append(headEnv, spec.Env...)
 	return spec, nil
 }
 
-func (p *RestoreManager) getIncrementalBackup(componentName string) (*dpv1alpha1.Backup, error) {
+func (p *RestoreManager) getLogfileBackup(componentName string) (*dpv1alpha1.Backup, error) {
 	incrementalBackupList := dpv1alpha1.BackupList{}
 	if err := p.Client.List(p.Ctx, &incrementalBackupList,
 		client.MatchingLabels{
@@ -350,19 +360,19 @@ func (p *RestoreManager) getIncrementalBackup(componentName string) (*dpv1alpha1
 		return nil, err
 	}
 	if len(incrementalBackupList.Items) == 0 {
-		return nil, errors.New("not found incremental backups")
+		return nil, errors.New("not found logfile backups")
 	}
 	return &incrementalBackupList.Items[0], nil
 }
 
-func (p *RestoreManager) getIncrementalPVC(componentName string) (*corev1.PersistentVolumeClaim, error) {
-	incrementalBackup, err := p.getIncrementalBackup(componentName)
+func (p *RestoreManager) getLogfilePVC(componentName string) (*corev1.PersistentVolumeClaim, error) {
+	logfileBackup, err := p.getLogfileBackup(componentName)
 	if err != nil {
 		return nil, err
 	}
 	pvcKey := types.NamespacedName{
-		Name:      incrementalBackup.Status.PersistentVolumeClaimName,
-		Namespace: incrementalBackup.Namespace,
+		Name:      logfileBackup.Status.PersistentVolumeClaimName,
+		Namespace: logfileBackup.Namespace,
 	}
 	pvc := corev1.PersistentVolumeClaim{}
 	if err := p.Client.Get(p.Ctx, pvcKey, &pvc); err != nil {
@@ -386,6 +396,10 @@ func (p *RestoreManager) getDataPVCs(componentName string) ([]corev1.PersistentV
 	return dataPVCList.Items, nil
 }
 
+// When the pvc has been bound on the determined pod,
+// this is a little different from the getDataPVCs function,
+// we need to get the node name of the pvc according to the pod,
+// and the job must be the same as the node name of the pvc
 func (p *RestoreManager) getDataPVCsFromPods(componentName string) ([]corev1.PersistentVolumeClaim, error) {
 	podList := corev1.PodList{}
 	podLabels := map[string]string{
@@ -560,7 +574,7 @@ func (p *RestoreManager) buildDatafileRestoreJob(synthesizedComponent *component
 		}
 
 		jobName := fmt.Sprintf("%s-%d", jobNamePrefix, i)
-		job, err := builder.BuildPITRJob(jobName, p.Cluster.Namespace, backupTool.Spec.Image, []string{"sh", "-c"},
+		job, err := builder.BuildRestoreJob(jobName, p.Cluster.Namespace, backupTool.Spec.Image, []string{"sh", "-c"},
 			backupTool.Spec.Physical.RestoreCommands, volumes, volumeMounts, env, backupTool.Spec.Resources)
 		if err != nil {
 			return nil, err
@@ -594,9 +608,9 @@ func (p *RestoreManager) buildPITRRestoreJob(synthesizedComponent *component.Syn
 	// renders the pitrJob cue template
 	image := recoveryInfo.Image
 	if image == "" {
-		image = viper.GetString(constant.KBToolsImage)
+		image = synthesizedComponent.PodSpec.Containers[0].Image
 	}
-	incrementalPVC, err := p.getIncrementalPVC(synthesizedComponent.Name)
+	logfilePVC, err := p.getLogfilePVC(synthesizedComponent.Name)
 	if err != nil {
 		return objs, err
 	}
@@ -611,10 +625,10 @@ func (p *RestoreManager) buildPITRRestoreJob(synthesizedComponent *component.Syn
 			{Name: "data", VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: dataPVC.GetName()}}},
 			{Name: "log", VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: incrementalPVC.GetName()}}},
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: logfilePVC.GetName()}}},
 		}
 		pitrJobName := fmt.Sprintf("pitr-phy-%s", dataPVC.GetName())
-		pitrJob, err := builder.BuildPITRJob(pitrJobName, p.namespace, image, []string{"sh", "-c"},
+		pitrJob, err := builder.BuildRestoreJob(pitrJobName, p.namespace, image, []string{"sh", "-c"},
 			recoveryInfo.Physical.RestoreCommands, volumes, volumeMounts, recoveryInfo.Env, recoveryInfo.Resources)
 		if err != nil {
 			return objs, err
@@ -627,33 +641,62 @@ func (p *RestoreManager) buildPITRRestoreJob(synthesizedComponent *component.Syn
 		objs = append(objs, pitrJob)
 	}
 
+	return objs, nil
+}
+
+func (p *RestoreManager) buildLogicRestoreJob(synthesizedComponent *component.SynthesizedComponent, backup *dpv1alpha1.Backup) (objs []client.Object, err error) {
 	// creates logic restore job, usually imported after the cluster service is started
-	if p.Cluster.Status.Phase == appsv1alpha1.RunningClusterPhase && len(recoveryInfo.Logical.RestoreCommands) > 0 {
-		dataPVCsFromPods, err := p.getDataPVCsFromPods(synthesizedComponent.Name)
+	if p.Cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
+		return nil, nil
+	}
+	backupToolKey := client.ObjectKey{Name: backup.Status.BackupToolName}
+	backupTool := dpv1alpha1.BackupTool{}
+	if err = p.Client.Get(p.Ctx, backupToolKey, &backupTool); err != nil {
+		return nil, err
+	}
+	if len(backupTool.Spec.Logical.RestoreCommands) == 0 {
+		return nil, nil
+	}
+
+	image := backupTool.Spec.Image
+	if image == "" {
+		image = synthesizedComponent.PodSpec.Containers[0].Image
+	}
+	commonLabels := map[string]string{
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AppInstanceLabelKey:    p.Cluster.Name,
+		constant.KBAppComponentLabelKey: synthesizedComponent.Name,
+	}
+
+	dataVolumeMount := getVolumeMount(&backupTool.Spec)
+	volumeMounts := []corev1.VolumeMount{
+		{Name: "data", MountPath: dataVolumeMount},
+		{Name: "backup-data", MountPath: backupVolumePATH},
+	}
+	dataPVCsFromPods, err := p.getDataPVCsFromPods(synthesizedComponent.Name)
+	if err != nil {
+		return objs, err
+	}
+	for _, dataPVC := range dataPVCsFromPods {
+		volumes := []corev1.Volume{
+			{Name: "data", VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: dataPVC.GetName()}}},
+			{Name: "backup-data", VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: backup.Status.PersistentVolumeClaimName}}},
+		}
+		logicJobName := fmt.Sprintf("restore-logic-%s", dataPVC.GetName())
+		logicJob, err := builder.BuildRestoreJob(logicJobName, p.namespace, image, []string{"sh", "-c"},
+			backupTool.Spec.Logical.RestoreCommands, volumes, volumeMounts, backupTool.Spec.Env, backupTool.Spec.Resources)
 		if err != nil {
 			return objs, err
 		}
-		for _, dataPVC := range dataPVCsFromPods {
-			volumes := []corev1.Volume{
-				{Name: "data", VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: dataPVC.GetName()}}},
-				{Name: "log", VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: incrementalPVC.GetName()}}},
-			}
-			logicJobName := fmt.Sprintf("pitr-logic-%s", dataPVC.GetName())
-			logicJob, err := builder.BuildPITRJob(logicJobName, p.namespace, image, []string{"sh", "-c"},
-				recoveryInfo.Logical.RestoreCommands, volumes, volumeMounts, recoveryInfo.Env, recoveryInfo.Resources)
-			if err != nil {
-				return objs, err
-			}
-			if err = controllerutil.SetControllerReference(p.Cluster, logicJob, p.Scheme); err != nil {
-				return nil, err
-			}
-			logicJob.SetLabels(commonLabels)
-			// DO NOT use "volume.kubernetes.io/selected-node" annotation key in PVC, because it is unreliable.
-			logicJob.Spec.Template.Spec.NodeName = dataPVC.Annotations["node-name"]
-			objs = append(objs, logicJob)
+		if err = controllerutil.SetControllerReference(p.Cluster, logicJob, p.Scheme); err != nil {
+			return nil, err
 		}
+		logicJob.SetLabels(commonLabels)
+		// DO NOT use "volume.kubernetes.io/selected-node" annotation key in PVC, because it is unreliable.
+		logicJob.Spec.Template.Spec.NodeName = dataPVC.Annotations["node-name"]
+		objs = append(objs, logicJob)
 	}
 
 	return objs, nil

@@ -704,9 +704,9 @@ func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1a
 	return job, nil
 }
 
-func BuildPITRJob(name, namespace string, image string, command []string, args []string,
+func BuildRestoreJob(name, namespace string, image string, command []string, args []string,
 	volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, env []corev1.EnvVar, resources *corev1.ResourceRequirements) (*batchv1.Job, error) {
-	const tplFile = "pitr_job_template.cue"
+	const tplFile = "restore_job_template.cue"
 	job := &batchv1.Job{}
 	fillMaps := map[string]any{
 		"job.metadata.name":              name,

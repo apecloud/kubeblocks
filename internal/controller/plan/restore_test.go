@@ -298,7 +298,7 @@ var _ = Describe("PITR Functions", func() {
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
 
 			By("when logic PITR jobs are completed")
-			logicJobName := fmt.Sprintf("pitr-logic-data-%s-%s-0", clusterName, mysqlCompName)
+			logicJobName := fmt.Sprintf("restore-logic-data-%s-%s-0", clusterName, mysqlCompName)
 			logicJobKey := types.NamespacedName{Namespace: cluster.Namespace, Name: logicJobName}
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, logicJobKey, func(fetched *batchv1.Job) {
 				fetched.Status.Conditions = []batchv1.JobCondition{{Type: batchv1.JobComplete}}
@@ -309,7 +309,6 @@ var _ = Describe("PITR Functions", func() {
 			Eventually(testapps.CheckObjExists(&testCtx, logicJobKey, &batchv1.Job{}, false)).Should(Succeed())
 			Eventually(testapps.CheckObjExists(&testCtx, jobKey, &batchv1.Job{}, false)).Should(Succeed())
 			Eventually(testapps.CheckObjExists(&testCtx, baseBackupJobKey, &batchv1.Job{}, false)).Should(Succeed())
-
 		})
 	})
 })

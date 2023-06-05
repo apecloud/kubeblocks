@@ -21,12 +21,12 @@ package plugin
 
 import (
 	"io"
-	"os"
+	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/sahilm/fuzzy"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -35,26 +35,46 @@ import (
 
 var (
 	pluginSearchExample = templates.Examples(`
-	# search a kbcli or kubectl plugin by name
-	kbcli plugin search myplugin
+	# search a kbcli or kubectl plugin with keywords
+	kbcli plugin search keyword1 keyword2
 	`)
 )
 
+type pluginSearchOptions struct {
+	keyword string
+	limit   int
+
+	genericclioptions.IOStreams
+}
+
 func NewPluginSearchCmd(streams genericclioptions.IOStreams) *cobra.Command {
+	o := &pluginSearchOptions{
+		IOStreams: streams,
+	}
+
 	cmd := &cobra.Command{
 		Use:     "search",
 		Short:   "Search kbcli or kubectl plugins",
+		Long:    "Search kbcli or kubectl plugins by keywords",
 		Example: pluginSearchExample,
-		Args:    cobra.ExactArgs(1),
+		Args:    cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(searchPlugin(streams, args[0]))
+			cmdutil.CheckErr(o.complete(args))
+			cmdutil.CheckErr(o.run())
 		},
 	}
 
+	cmd.Flags().IntVar(&o.limit, "limit", 50, "Limit the number of plugin descriptions to output")
 	return cmd
 }
 
-func searchPlugin(streams genericclioptions.IOStreams, name string) error {
+func (o *pluginSearchOptions) complete(args []string) error {
+	o.keyword = strings.Join(args, "")
+
+	return nil
+}
+
+func (o *pluginSearchOptions) run() error {
 	indexes, err := ListIndexes(paths)
 	if err != nil {
 		return errors.Wrap(err, "failed to list indexes")
@@ -62,36 +82,66 @@ func searchPlugin(streams genericclioptions.IOStreams, name string) error {
 
 	var plugins []pluginEntry
 	for _, index := range indexes {
-		plugin, err := LoadPluginByName(paths.IndexPluginsPath(index.Name), name)
-		if err != nil && !os.IsNotExist(err) {
-			klog.V(1).Info("failed to load plugin %q from the index", name)
-		} else {
+		ps, err := LoadPluginListFromFS(paths.IndexPluginsPath(index.Name))
+		if err != nil {
+			return errors.Wrapf(err, "failed to load plugin list from the index %s", index.Name)
+		}
+		for _, p := range ps {
 			plugins = append(plugins, pluginEntry{
 				index:  index.Name,
-				plugin: plugin,
+				plugin: p,
 			})
 		}
 	}
 
-	p := NewPluginSearchPrinter(streams.Out)
-	for _, plugin := range plugins {
-		_, err := os.Stat(paths.PluginInstallReceiptPath(name))
-		addPluginSearchRow(plugin.index, plugin.plugin.Name, !os.IsNotExist(err), p)
+	searchPrinter := NewPluginSearchPrinter(o.Out)
+	for _, p := range plugins {
+		// fuzzy search
+		if fuzzySearchByNameAndDesc(o.keyword, p.plugin.Name, p.plugin.Spec.ShortDescription) {
+			addPluginSearchRow(p.index, p.plugin.Name, limitString(p.plugin.Spec.ShortDescription, o.limit), false, searchPrinter)
+		}
 	}
-	p.Print()
+	searchPrinter.Print()
 	return nil
 }
 
 func NewPluginSearchPrinter(out io.Writer) *printer.TablePrinter {
 	t := printer.NewTablePrinter(out)
-	t.SetHeader("INDEX", "NAME", "INSTALLED")
+	t.SetHeader("INDEX", "NAME", "DESCRIPTION", "INSTALLED")
 	return t
 }
 
-func addPluginSearchRow(index, plugin string, installed bool, p *printer.TablePrinter) {
+func addPluginSearchRow(index, plugin, description string, installed bool, p *printer.TablePrinter) {
 	if installed {
-		p.AddRow(index, plugin, "yes")
+		p.AddRow(index, plugin, description, "yes")
 	} else {
-		p.AddRow(index, plugin, "no")
+		p.AddRow(index, plugin, description, "no")
 	}
+}
+
+func fuzzySearchByNameAndDesc(keyword, name, description string) bool {
+	if keyword == "" {
+		return false
+	}
+
+	// find by name and description
+	matches := fuzzy.Find(keyword, []string{name})
+	if len(matches) > 0 {
+		return true
+	}
+
+	matches = fuzzy.Find(keyword, []string{description})
+	if len(matches) > 0 && matches[0].Score > 0 {
+		return true
+	}
+
+	return false
+
+}
+
+func limitString(s string, length int) string {
+	if len(s) > length && length > 3 {
+		s = s[:length-3] + "..."
+	}
+	return s
 }

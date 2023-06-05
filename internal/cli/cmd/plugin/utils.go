@@ -240,3 +240,45 @@ func validateSelector(sel *metav1.LabelSelector) error {
 
 	return nil
 }
+
+func findPluginManifestFiles(indexDir string) ([]string, error) {
+	var out []string
+	files, err := os.ReadDir(indexDir)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to open index dir")
+	}
+	for _, file := range files {
+		if file.Type().IsRegular() && filepath.Ext(file.Name()) == ManifestExtension {
+			out = append(out, file.Name())
+		}
+	}
+	return out, nil
+}
+
+// LoadPluginListFromFS will parse and retrieve all plugin files.
+func LoadPluginListFromFS(indexDir string) ([]Plugin, error) {
+	indexDir, err := filepath.EvalSymlinks(indexDir)
+	if err != nil {
+		return nil, err
+	}
+
+	files, err := findPluginManifestFiles(indexDir)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to scan plugins in index directory")
+	}
+	klog.V(4).Infof("found %d plugins in dir %s", len(files), indexDir)
+
+	list := make([]Plugin, 0, len(files))
+	for _, file := range files {
+		pluginName := strings.TrimSuffix(file, filepath.Ext(file))
+		p, err := LoadPluginByName(indexDir, pluginName)
+		if err != nil {
+			// Index loading shouldn't fail because of one plugin.
+			// Show error instead.
+			klog.Errorf("failed to read or parse plugin manifest %q: %v", pluginName, err)
+			continue
+		}
+		list = append(list, p)
+	}
+	return list, nil
+}

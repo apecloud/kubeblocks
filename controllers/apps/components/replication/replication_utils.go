@@ -250,10 +250,13 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *oldPrimaryPod, constant.Secondary); err != nil {
 		return err
 	}
+	reqCtx.Log.Info("update old primary pod to secondary success", "old primary podName", oldPrimaryPod.Name)
 
 	// update secondary pod to primary
 	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *pod, constant.Primary); err != nil {
 		return err
 	}
+	reqCtx.Log.Info("update secondary pod to primary success", "new primary podName", pod.Name)
+
 	return nil
 }

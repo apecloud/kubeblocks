@@ -21,7 +21,6 @@ package replication
 
 import (
 	"context"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -246,12 +245,31 @@ func (r *ReplicationSet) asyncReplicationPodRoleLabelAndAnnotations(podList []co
 
 // HandleSwitchover is the implementation of the type Component interface method, which is used to handle the switchover of the Replication workload.
 func (r *ReplicationSet) HandleSwitchover(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	doSwitchover, _, err := util.CheckCandidateInstanceChanged(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent().Name)
+	// check if all Pods have role label
+	allPodRoleExist := true
+	podList, err := getRunningPods(ctx, r.Cli, obj)
+	for _, pod := range podList {
+		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
+			allPodRoleExist = false
+		}
+	}
+	if !allPodRoleExist {
+		return nil, nil
+	}
+
+	// check if the switchover is needed
+	needSwitchover, err := util.NeedDeaWithSwitchover(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent())
 	if err != nil {
 		return nil, err
 	}
-	if doSwitchover {
+	if needSwitchover {
+		// create a job to do switchover and check the result
 		if err := util.DoSwitchover(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent()); err != nil {
+			return nil, err
+		}
+	} else {
+		// if the switchover is not needed, it means that the switchover has been completed, and the switchover job can be deleted.
+		if err := util.PostOpsSwitchover(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent()); err != nil {
 			return nil, err
 		}
 	}

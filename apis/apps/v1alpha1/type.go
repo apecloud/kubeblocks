@@ -125,7 +125,7 @@ const (
 	ConditionTypeApplyResources            = "ApplyResources"            // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
 	ConditionTypeReplicasReady             = "ReplicasReady"             // ConditionTypeReplicasReady all pods of components are ready
 	ConditionTypeReady                     = "Ready"                     // ConditionTypeReady all components are running
-
+	ConditionTypeSwitchoverPrefix          = "Switchover-"               // ConditionTypeSwitchoverPrefix component status condition of switchover
 )
 
 // Phase defines the ClusterDefinition and ClusterVersion  CR .status.phase

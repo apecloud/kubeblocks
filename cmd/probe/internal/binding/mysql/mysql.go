@@ -228,10 +228,7 @@ func (mysqlOps *MysqlOperations) GetRunningPort() int {
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	sql := "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
 
-	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
-	ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-	rows, err := mysqlOps.db.QueryContext(ctx1, sql)
+	rows, err := mysqlOps.db.QueryContext(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Infof("error executing %s: %v", sql, err)
 		return "", errors.Wrapf(err, "error executing %s", sql)

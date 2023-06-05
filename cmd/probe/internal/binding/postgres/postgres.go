@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
@@ -201,10 +200,7 @@ func (pgOps *PostgresOperations) GetRunningPort() int {
 func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	sql := "select pg_is_in_recovery();"
 
-	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
-	ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-	rows, err := pgOps.db.Query(ctx1, sql)
+	rows, err := pgOps.db.Query(ctx, sql)
 	if err != nil {
 		pgOps.Logger.Infof("error executing %s: %v", sql, err)
 		return "", errors.Wrapf(err, "error executing %s", sql)

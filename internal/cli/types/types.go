@@ -62,7 +62,6 @@ const (
 	ResourceStatefulSets = "statefulsets"
 	ResourceDaemonSets   = "daemonsets"
 	ResourceSecrets      = "secrets"
-	ResourceNode         = "nodes"
 )
 
 // K8s batch API group

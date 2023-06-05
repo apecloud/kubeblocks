@@ -426,7 +426,12 @@ func (o *statusOptions) showK8sClusterInfos(ctx context.Context, allErrs *[]erro
 		appendErrIgnoreNotFound(allErrs, err)
 	}
 	if o.ns != "" {
-		fmt.Fprintf(o.Out, "KubeBlocks is deployed in namespace: %s version: %s\n", o.ns, version.KubeBlocks)
+		fmt.Fprintf(o.Out, "KubeBlocks is deployed in namespace: %s", o.ns)
+	}
+	if version.KubeBlocks != "" {
+		fmt.Fprintf(o.Out, ",version: %s\n", version.KubeBlocks)
+	} else {
+		printer.PrintBlankLine(o.Out)
 	}
 
 	provider, err := util.GetK8sProvider(version.Kubernetes, o.client)
@@ -440,7 +445,7 @@ func (o *statusOptions) showK8sClusterInfos(ctx context.Context, allErrs *[]erro
 	printer.PrintBlankLine(o.Out)
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("VERSION", "PROVIDER", "REGION", "AVAILABLE ZONES")
-	nodesList, err := o.dynamic.Resource(types.NodeGVR()).Namespace("").List(context.Background(), metav1.ListOptions{})
+	nodesList, err := o.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		appendErrIgnoreNotFound(allErrs, err)
 	}
@@ -461,13 +466,7 @@ func (o *statusOptions) showK8sClusterInfos(ctx context.Context, allErrs *[]erro
 	}
 	allZones := maps.Keys(availableZones)
 	sort.Strings(allZones)
-	var allZonesInfo string
-	for i := range allZones {
-		if i != 0 {
-			allZonesInfo += ","
-		}
-		allZonesInfo += allZones[i]
-	}
+	allZonesInfo := strings.Join(allZones, ",")
 	tblPrinter.AddRow(version.Kubernetes, provider, region, allZonesInfo)
 	tblPrinter.Print()
 }

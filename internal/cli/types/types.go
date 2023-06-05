@@ -374,7 +374,3 @@ func JobGVR() schema.GroupVersionResource {
 func CronJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: K8SBatchAPIGroup, Version: K8sBatchAPIVersion, Resource: ResourceCronJobs}
 }
-
-func NodeGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: "", Version: K8sCoreAPIVersion, Resource: ResourceNode}
-}

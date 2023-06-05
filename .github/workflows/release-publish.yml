@@ -151,6 +151,11 @@ jobs:
           cp ${{ github.workspace }}/.github/utils/kbcli.spec rpmbuild/SPECS/
           sed -i 's/^Source0:.*/Source0: ${{ env.CLI_FILENAME }}.tar.gz/' rpmbuild/SPECS/kbcli.spec
           sed -i 's/^Version:.*/Version: ${{ env.TAG_NAME }}/' rpmbuild/SPECS/kbcli.spec
+          if [ "${{ matrix.os }}" = "linux-amd64" ]; then
+            sed -i 's/^%setup.*/%setup -q -n linux-amd64/' rpmbuild/SPECS/kbcli.spec
+          elif [ "${{ matrix.os }}" = "linux-arm64" ]; then
+            sed -i 's/^%setup.*/%setup -q -n linux-arm64/' rpmbuild/SPECS/kbcli.spec
+          fi
           sudo apt-get update
           sudo apt-get install -y rpm build-essential
           pwd

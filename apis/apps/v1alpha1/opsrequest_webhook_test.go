@@ -246,7 +246,7 @@ var _ = Describe("OpsRequest webhook", func() {
 			Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
 
 			patch = client.MergeFrom(opsRequest.DeepCopy())
-			opsRequest.Spec.ClusterRef = newClusterName
+			opsRequest.Spec.Cancel = true
 			Expect(k8sClient.Patch(ctx, opsRequest, patch).Error()).To(ContainSubstring(fmt.Sprintf("is forbidden when status.Phase is %s", phase)))
 		}
 		phaseList := []OpsPhase{OpsSucceedPhase, OpsFailedPhase, OpsCancelledPhase}
@@ -267,7 +267,7 @@ var _ = Describe("OpsRequest webhook", func() {
 
 			By(fmt.Sprintf("expect an error for updating spec.ClusterRef when ops phase is %s", phase))
 			opsRequest.Spec.ClusterRef = newClusterName
-			Expect(k8sClient.Patch(ctx, opsRequest, patch).Error()).To(ContainSubstring(fmt.Sprintf("is forbidden except for cancel when status.Phase is %s", phase)))
+			Expect(k8sClient.Patch(ctx, opsRequest, patch).Error()).To(ContainSubstring("forbidden to update spec.clusterRef"))
 		}
 
 		phaseList = []OpsPhase{OpsCreatingPhase, OpsRunningPhase, OpsCancellingPhase}

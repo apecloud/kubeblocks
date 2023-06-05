@@ -12,7 +12,7 @@ BuildRoot:    %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 %description
 kbcli is command line tool for kubeblocks.
 %prep
-%setup -q -n linux-arm64
+%setup
 %build
 %install
 sudo chmod +x kbcli

@@ -361,54 +361,6 @@ spec:
               roleObservation:
                 description: RoleObservation provides method to observe role.
                 properties:
-                  builtIn:
-                    description: BuiltIn specifies the built-in observation action
-                      if both BuiltIn and Custom are not configured, BuiltIn will
-                      be chosen
-                    properties:
-                      bindingType:
-                        default: apecloud-mysql
-                        description: binding type
-                        enum:
-                        - apecloud-mysql
-                        - etcd
-                        - zookeeper
-                        - mongodb
-                        type: string
-                    required:
-                    - bindingType
-                    type: object
-                  custom:
-                    description: Custom specifies customized observation action
-                    properties:
-                      actions:
-                        description: 'Actions to be taken in serial after all actions
-                          done, the final output should be a single string of the
-                          role name defined in spec.Roles latest [BusyBox](https://busybox.net/)
-                          image will be used if Image not configured Environment variables
-                          can be used in Command: - v_KB_CONSENSUS_SET_LAST_STDOUT
-                          stdout from last action, watch ''v_'' prefixed - KB_CONSENSUS_SET_USERNAME
-                          username part of credential - KB_CONSENSUS_SET_PASSWORD
-                          password part of credential'
-                        items:
-                          properties:
-                            command:
-                              description: Command will be executed in Container to
-                                retrieve or process role info
-                              items:
-                                type: string
-                              type: array
-                            image:
-                              description: utility image contains command that can
-                                be used to retrieve of process role info
-                              type: string
-                          required:
-                          - command
-                          type: object
-                        type: array
-                    required:
-                    - actions
-                    type: object
                   failureThreshold:
                     default: 3
                     description: Minimum consecutive failures for the observation
@@ -424,6 +376,31 @@ spec:
                     format: int32
                     minimum: 0
                     type: integer
+                  observationActions:
+                    description: 'ObservationActions define Actions to be taken in
+                      serial. after all actions done, the final output should be a
+                      single string of the role name defined in spec.Roles latest
+                      [BusyBox](https://busybox.net/) image will be used if Image
+                      not configured Environment variables can be used in Command:
+                      - v_KB_CONSENSUS_SET_LAST_STDOUT stdout from last action, watch
+                      ''v_'' prefixed - KB_CONSENSUS_SET_USERNAME username part of
+                      credential - KB_CONSENSUS_SET_PASSWORD password part of credential'
+                    items:
+                      properties:
+                        command:
+                          description: Command will be executed in Container to retrieve
+                            or process role info
+                          items:
+                            type: string
+                          type: array
+                        image:
+                          description: utility image contains command that can be
+                            used to retrieve of process role info
+                          type: string
+                      required:
+                      - command
+                      type: object
+                    type: array
                   periodSeconds:
                     default: 2
                     description: How often (in seconds) to perform the observation.
@@ -446,6 +423,8 @@ spec:
                     format: int32
                     minimum: 1
                     type: integer
+                required:
+                - observationActions
                 type: object
               roles:
                 description: Roles, a list of roles defined in this consensus system.

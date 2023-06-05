@@ -50,28 +50,26 @@ const (
 	jobScenarioMembership       = "membership-reconfiguration"
 	jobScenarioUpdate           = "pod-update"
 
-	roleObservationName                                    = "role-observe"
-	roleAgentVolumeName                                    = "role-agent"
-	roleAgentInstallerName                                 = "role-agent-installer"
-	roleAgentVolumeMountPath                               = "/role-observation"
-	roleAgentName                                          = "agent"
-	shell2httpImage                                        = "msoap/shell2http:1.16.0"
-	shell2httpBinaryPath                                   = "/app/shell2http"
-	shell2httpServePath                                    = "/role"
-	defaultRoleObservationImage                            = "registry.cn-hangzhou.aliyuncs.com/apecloud/kubeblocks-tools:latest"
-	defaultRoleObservationDaemonPort                       = 3501
-	roleObservationURIFormat                               = "http://localhost:%s/v1.0/bindings/%s" // http://localhost:<port>/v1.0/bindings/<binding_type>
-	defaultActionImage                                     = "busybox:latest"
-	usernameCredentialVarName                              = "KB_CONSENSUS_SET_USERNAME"
-	passwordCredentialVarName                              = "KB_CONSENSUS_SET_PASSWORD"
-	servicePortVarName                                     = "KB_CONSENSUS_SET_SERVICE_PORT"
-	actionSvcListVarName                                   = "KB_CONSENSUS_SET_ACTION_SVC_LIST"
-	leaderHostVarName                                      = "KB_CONSENSUS_SET_LEADER_HOST"
-	targetHostVarName                                      = "KB_CONSENSUS_SET_TARGET_HOST"
-	roleObservationEventFieldPath                          = "spec.containers{" + roleObservationName + "}"
-	mySQLBinding                     workloads.BindingType = "mysql"
-	customBinding                    workloads.BindingType = "custom"
-	actionSvcPortBase                                      = int32(36500)
+	roleObservationName              = "role-observe"
+	roleAgentVolumeName              = "role-agent"
+	roleAgentInstallerName           = "role-agent-installer"
+	roleAgentVolumeMountPath         = "/role-observation"
+	roleAgentName                    = "agent"
+	shell2httpImage                  = "msoap/shell2http:1.16.0"
+	shell2httpBinaryPath             = "/app/shell2http"
+	shell2httpServePath              = "/role"
+	defaultRoleObservationImage      = "apecloud/kubeblocks-role-observation:latest"
+	defaultRoleObservationDaemonPort = 3501
+	roleObservationURIFormat         = "http://localhost:%s/getRole"
+	defaultActionImage               = "busybox:latest"
+	usernameCredentialVarName        = "KB_CONSENSUS_SET_USERNAME"
+	passwordCredentialVarName        = "KB_CONSENSUS_SET_PASSWORD"
+	servicePortVarName               = "KB_CONSENSUS_SET_SERVICE_PORT"
+	actionSvcListVarName             = "KB_CONSENSUS_SET_ACTION_SVC_LIST"
+	leaderHostVarName                = "KB_CONSENSUS_SET_LEADER_HOST"
+	targetHostVarName                = "KB_CONSENSUS_SET_TARGET_HOST"
+	roleObservationEventFieldPath    = "spec.containers{" + roleObservationName + "}"
+	actionSvcPortBase                = int32(36500)
 )
 
 type CSSetTransformContext struct {

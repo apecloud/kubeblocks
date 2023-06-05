@@ -169,20 +169,17 @@ const (
 	ParallelUpdateStrategy           UpdateStrategy = "Parallel"
 )
 
-// BindingType defines built-in role observation type
-type BindingType string
-
-const (
-	ApeCloudMySQLBinding BindingType = "apecloud-mysql"
-	ETCDBinding          BindingType = "etcd"
-	ZooKeeperBinding     BindingType = "zookeeper"
-	MongoDBBinding       BindingType = "mongodb"
-)
-
 // RoleObservation defines how to observe role
 type RoleObservation struct {
-	// the action should be taken to determine the role of the pod
-	ObservationHandler `json:",inline"`
+	// ObservationActions define Actions to be taken in serial.
+	// after all actions done, the final output should be a single string of the role name defined in spec.Roles
+	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured
+	// Environment variables can be used in Command:
+	// - v_KB_CONSENSUS_SET_LAST_STDOUT stdout from last action, watch 'v_' prefixed
+	// - KB_CONSENSUS_SET_USERNAME username part of credential
+	// - KB_CONSENSUS_SET_PASSWORD password part of credential
+	// +kubebuilder:validation:Required
+	ObservationActions []Action `json:"observationActions"`
 
 	// Number of seconds after the container has started before role observation has started.
 	// +kubebuilder:default=0
@@ -217,37 +214,6 @@ type RoleObservation struct {
 	// +kubebuilder:validation:Minimum=1
 	// +optional
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
-}
-
-type ObservationHandler struct {
-	// BuiltIn specifies the built-in observation action
-	// if both BuiltIn and Custom are not configured, BuiltIn will be chosen
-	// +optional
-	BuiltIn *BuiltInAction `json:"builtIn,omitempty"`
-
-	// Custom specifies customized observation action
-	// +optional
-	Custom *CustomAction `json:"custom,omitempty"`
-}
-
-type BuiltInAction struct {
-	// binding type
-	// +kubebuilder:validation:Enum={apecloud-mysql, etcd, zookeeper, mongodb}
-	// +kubebuilder:default=apecloud-mysql
-	// +kubebuilder:validation:Required
-	BindingType BindingType `json:"bindingType"`
-}
-
-type CustomAction struct {
-	// Actions to be taken in serial
-	// after all actions done, the final output should be a single string of the role name defined in spec.Roles
-	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured
-	// Environment variables can be used in Command:
-	// - v_KB_CONSENSUS_SET_LAST_STDOUT stdout from last action, watch 'v_' prefixed
-	// - KB_CONSENSUS_SET_USERNAME username part of credential
-	// - KB_CONSENSUS_SET_PASSWORD password part of credential
-	// +kubebuilder:validation:Required
-	Actions []Action `json:"actions"`
 }
 
 type Credential struct {

@@ -224,13 +224,6 @@ func buildStsPodTemplate(csSet workloads.ConsensusSet, envConfig corev1.ConfigMa
 func injectRoleObservationContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec) {
 	roleObservation := csSet.Spec.RoleObservation
 	credential := csSet.Spec.Credential
-	bindingType := customBinding
-	if roleObservation.BuiltIn != nil {
-		bindingType = roleObservation.BuiltIn.BindingType
-		if roleObservation.BuiltIn.BindingType == workloads.ApeCloudMySQLBinding {
-			bindingType = mySQLBinding
-		}
-	}
 	credentialEnv := make([]corev1.EnvVar, 0)
 	if credential != nil {
 		credentialEnv = append(credentialEnv,
@@ -245,18 +238,16 @@ func injectRoleObservationContainer(csSet workloads.ConsensusSet, template *core
 				ValueFrom: credential.Password.ValueFrom,
 			})
 	}
-	actionSvcPorts := make([]int32, 0)
-	if bindingType == customBinding && roleObservation.Custom != nil {
-		allUsedPorts := findAllUsedPorts(template)
-		svcPort := actionSvcPortBase
-		for range roleObservation.Custom.Actions {
-			svcPort = findNextAvailablePort(svcPort, allUsedPorts)
-			actionSvcPorts = append(actionSvcPorts, svcPort)
-		}
-		injectCustomRoleObservationContainer(csSet, template, actionSvcPorts, credentialEnv)
+	allUsedPorts := findAllUsedPorts(template)
+	svcPort := actionSvcPortBase
+	var actionSvcPorts []int32
+	for range roleObservation.ObservationActions {
+		svcPort = findNextAvailablePort(svcPort, allUsedPorts)
+		actionSvcPorts = append(actionSvcPorts, svcPort)
 	}
+	injectObservationActionContainer(csSet, template, actionSvcPorts, credentialEnv)
 	actionSvcList, _ := json.Marshal(actionSvcPorts)
-	injectProbeContainer(csSet, template, bindingType, string(actionSvcList), credentialEnv)
+	injectRoleObserveContainer(csSet, template, string(actionSvcList), credentialEnv)
 }
 
 func findNextAvailablePort(base int32, allUsedPorts []int32) int32 {
@@ -286,7 +277,7 @@ func findAllUsedPorts(template *corev1.PodTemplateSpec) []int32 {
 	return allUsedPorts
 }
 
-func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, bindingType workloads.BindingType, actionSvcList string, credentialEnv []corev1.EnvVar) {
+func injectRoleObserveContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
 	// compute parameters for role observation container
 	roleObservation := csSet.Spec.RoleObservation
 	credential := csSet.Spec.Credential
@@ -298,7 +289,7 @@ func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemp
 	if observationDaemonPort == 0 {
 		observationDaemonPort = defaultRoleObservationDaemonPort
 	}
-	roleObserveURI := fmt.Sprintf(roleObservationURIFormat, strconv.Itoa(observationDaemonPort), bindingType)
+	roleObserveURI := fmt.Sprintf(roleObservationURIFormat, strconv.Itoa(observationDaemonPort))
 	env := credentialEnv
 	env = append(env,
 		corev1.EnvVar{
@@ -339,12 +330,10 @@ func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemp
 		Name:            roleObservationName,
 		Image:           image,
 		ImagePullPolicy: "IfNotPresent",
-		Command: []string{"probe", "--app-id", "batch-sdk",
-			"--dapr-http-port", strconv.Itoa(observationDaemonPort),
-			"--app-protocol", "http",
+		Command: []string{"role-agent",
+			"--port", strconv.Itoa(observationDaemonPort),
+			"--protocol", "http",
 			"--log-level", "info",
-			"--config", "/config/probe/config.yaml",
-			"--components-path", "/config/probe/components",
 		},
 		Ports: []corev1.ContainerPort{{
 			ContainerPort: int32(observationDaemonPort),
@@ -360,7 +349,6 @@ func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemp
 						"--fail-with-body", "--silent",
 						"-H", "Content-ComponentDefRef: application/json",
 						roleObserveURI,
-						"-d", "{\"operation\": \"checkRole\", \"metadata\":{\"sql\":\"\"}}",
 					},
 				},
 			},
@@ -377,7 +365,7 @@ func injectProbeContainer(csSet workloads.ConsensusSet, template *corev1.PodTemp
 	template.Spec.Containers = append(template.Spec.Containers, container)
 }
 
-func injectCustomRoleObservationContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
+func injectObservationActionContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
 	// inject shared volume
 	agentVolume := corev1.Volume{
 		Name: roleAgentVolumeName,
@@ -407,7 +395,7 @@ func injectCustomRoleObservationContainer(csSet workloads.ConsensusSet, template
 	template.Spec.InitContainers = append(template.Spec.InitContainers, initContainer)
 
 	// inject action containers based on utility images
-	for i, action := range csSet.Spec.RoleObservation.Custom.Actions {
+	for i, action := range csSet.Spec.RoleObservation.ObservationActions {
 		image := action.Image
 		if len(image) == 0 {
 			image = defaultActionImage

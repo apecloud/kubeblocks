@@ -15,9 +15,7 @@ This guide walks you through the quickest way to get started with KubeBlocks on 
 
 ## Preparation
 
-When deploying on the cloud, cloud resources are initialized with the help of the terraform script maintained by ApeCloud. Find this script at [Github repository](https://github.com/apecloud/cloud-provider).
-
-When deploying a Kubernetes cluster on the cloud, `kbcli` clones the above repository to the local host, calls the terraform commands to initialize the cluster, then deploys KubeBlocks on this cluster.
+When deploying KubeBlocks on the cloud, cloud resources are initialized with the help of [the terraform script](https://github.com/apecloud/cloud-provider). `kbcli` downloads the script and stores it locally, then calls the terraform commands to initialize a fully-managed Kubernetes cluster and deploy KubeBlocks on this cluster.
 
 <Tabs>
 <TabItem value="AWS" label="AWS" default>
@@ -26,20 +24,15 @@ When deploying a Kubernetes cluster on the cloud, `kbcli` clones the above repos
 
 Make sure you have all the followings prepared.
 
-* [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
-* Make sure the following tools are installed.
-  * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): It is used to interact with Kubernetes clusters.
-  * [Install `kbcli`](./../installation/install-kbcli.md). `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
+* [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+* [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
+* [Install `kbcli`](./../installation/install-kbcli.md)
 
 ### Configure access key
 
-Configure the Access Key of cloud resources.
-
-For AWS, there are two options.
-
 **Option 1.** Use `aws configure`.
 
-Fill in AWS Access Key ID and AWS Secret Access Key and run the command below to configure access permission.
+Fill in an access key and run the command below to authenticate the requests.
 
 ```bash
 aws configure
@@ -52,21 +45,19 @@ You can refer to [Quick configuration with aws configure](https://docs.aws.amazo
 **Option 2.** Use environment variables.
 
 ```bash
-export AWS_ACCESS_KEY_ID="anaccesskey"
-export AWS_SECRET_ACCESS_KEY="asecretkey"
+export AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
+export AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 ```
 
 ### Initialize Playground
 
-Initialize Playground.
-
 ```bash
-kbcli playground init --cloud-provider aws --region cn-northwest-1
+kbcli playground init --cloud-provider aws --region us-west-2
 ```
 
 * `cloud-provider` specifies the cloud provider.
 * `region` specifies the region to deploy a Kubernetes cluster.
-   Frequently used regions are as follows. You can find the full region list on [the official website](https://aws.amazon.com/about-aws/global-infrastructure/regional-product-services/?nc1=h_ls).
+   You can find the region list on [the official website](https://aws.amazon.com/about-aws/global-infrastructure/regional-product-services/?nc1=h_ls).
   * Americas
   
      | Region ID  | Region name         |
@@ -85,9 +76,8 @@ kbcli playground init --cloud-provider aws --region cn-northwest-1
      | cn-north-1        | Beijing     |
      | cn-northwest-1    | Ningxia     |
 
-During the initialization, `kbcli` clones [the GitHub repository](https://github.com/apecloud/cloud-provider) to the directory `~/.kbcli/playground` and calls the terraform script to create cloud resources. And then `kbcli` deploys KubeBlocks automatically and installs a MySQL cluster.
-
-After the `kbcli playground init` command is executed, `kbcli` automatically switches the context of the local kubeconfig to the current cluster. Run the command below to view the created cluster.
+During the initialization, `kbcli` clones [the GitHub repository](https://github.com/apecloud/cloud-provider) to the directory `~/.kbcli/playground`, installs KubeBlocks, and creates a MySQL cluster. After executing the `kbcli playground init` command, kbcli automatically switches the current context of kubeconfig to the new Kubernetes cluster.
+Run the command below to view the created cluster.
 
 ```bash
 # View kbcli version
@@ -99,7 +89,7 @@ kbcli cluster list
 
 :::note
 
-The initialization lasts about 20 minutes. If the installation fails after a long time, please check your network environment.
+The initialization lasts about 20 minutes. If the installation fails after a long time, please check your network.
 
 :::
 
@@ -110,9 +100,9 @@ The initialization lasts about 20 minutes. If the installation fails after a lon
 
 Make sure you have all the followings prepared.
 
-* Google Cloud account.
-* [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): It is used to interact with Kubernetes clusters.
-* [Install `kbcli`](./../installation/install-kbcli.md): `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
+* Google Cloud account
+* [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
+* [Install `kbcli`](./../installation/install-kbcli.md)
   
 ### Configure GCP environment
 
@@ -148,13 +138,7 @@ Make sure you have all the followings prepared.
 
 ### Initialize Playground
 
-:::note
-
-Execute `export GOOGLE_PROJECT=<project-name>` to specify the project name.
-
-:::
-
-The following command deploys a GKE service in the available region `us-central1` on Google Cloud, and installs KubeBlocks.
+The following command deploys a GKE service in the region `us-central1` on GCP, and installs KubeBlocks.
 
 ```bash
 kbcli playground init --cloud-provider gcp --region us-central1
@@ -163,9 +147,8 @@ kbcli playground init --cloud-provider gcp --region us-central1
 * `cloud-provider` specifies the cloud provider.
 * `region` specifies the region to deploy a Kubernetes cluster.
 
-During the initialization, `kbcli` clones [the GitHub repository](https://github.com/apecloud/cloud-provider) to the directory `~/.kbcli/playground` and calls the terraform script to create cloud resources. And then `kbcli` deploys KubeBlocks automatically and installs a MySQL cluster.
-
-After the `kbcli playground init` command is executed, `kbcli` automatically switches the context of the local kubeconfig to the current cluster. Run the command below to view the created cluster.
+During the initialization, `kbcli` clones [the GitHub repository](https://github.com/apecloud/cloud-provider) to the directory `~/.kbcli/playground`, installs KubeBlocks, and creates a MySQL cluster. After executing the `kbcli playground init` command, kbcli automatically switches the current context of kubeconfig to the new Kubernetes cluster.
+Run the command below to view the created cluster.
 
 ```bash
 # View kbcli version
@@ -177,7 +160,7 @@ kbcli cluster list
 
 :::note
 
-The initialization takes about 20 minutes. If the installation fails after a long time, please check your network environment.
+The initialization takes about 20 minutes. If the installation fails after a long time, please check your network.
 
 :::
 
@@ -188,10 +171,9 @@ The initialization takes about 20 minutes. If the installation fails after a lon
 
 Make sure you have all the followings prepared.
 
-* Tencent Cloud account.
-* [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): It is used to interact with Kubernetes clusters.
-* [Install `kbcli`](./../installation/install-kbcli.md). `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
-
+* Tencent Cloud account
+* [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
+* [Install `kbcli`](./../installation/install-kbcli.md)
   
 ### Configure TKE environment
 
@@ -200,13 +182,6 @@ Make sure you have all the followings prepared.
 1. Log in to Tencent Cloud.
 2. Go to [Tencent Kubernetes Engine (TKE)](https://console.cloud.tencent.com/tke2) to grant resource operation permission to your account before using the container service.
 3. Go to [API Console](https://console.cloud.tencent.com/cam/overview) -> **Access Key** -> **API Keys** and click **Create Key** to create a pair of Secret ID and Secret Key.
-
-   :::note
-
-   If you have an available security certificate, skip Step 3 and 4.
-
-   :::
-
 4. Add the Secret ID and Secret Key to the environment variables.
 
    ```bash
@@ -216,7 +191,7 @@ Make sure you have all the followings prepared.
 
 ### Initialize Playground
 
-The following command deploys a Kubernetes service in the available region `ap-chengdu` on Tencent Cloud and installs KubeBlocks.
+The following command deploys a Kubernetes service in the region `ap-chengdu` on Tencent Cloud and installs KubeBlocks.
 
 ```bash
 kbcli playground init --cloud-provider tencentcloud --region ap-chengdu
@@ -225,9 +200,8 @@ kbcli playground init --cloud-provider tencentcloud --region ap-chengdu
 * `cloud-provider` specifies the cloud provider.
 * `region` specifies the region to deploy a Kubernetes cluster.
 
-During the initialization, `kbcli` clones [the GitHub repository](https://github.com/apecloud/cloud-provider) to the directory `~/.kbcli/playground` and calls the terraform script to create cloud resources. And then `kbcli` deploys KubeBlocks automatically and installs a MySQL cluster.
-
-After the `kbcli playground init` command is executed, `kbcli` automatically switches the context of the local kubeconfig to the current cluster. Run the command below to view the created cluster.
+During the initialization, `kbcli` clones [the GitHub repository](https://github.com/apecloud/cloud-provider) to the directory `~/.kbcli/playground`, installs KubeBlocks, and creates a MySQL cluster. After executing the `kbcli playground init` command, kbcli automatically switches the current context of kubeconfig to the new Kubernetes cluster.
+Run the command below to view the created cluster.
 
 ```bash
 # View kbcli version
@@ -239,7 +213,7 @@ kbcli cluster list
 
 :::note
 
-The initialization takes about 20 minutes. If the installation fails after a long time, please check your network environment.
+The initialization takes about 20 minutes. If the installation fails after a long time, please check your network.
 
 :::
 
@@ -251,8 +225,8 @@ The initialization takes about 20 minutes. If the installation fails after a lon
 Make sure you have all the followings prepared.
 
 * Alibaba Cloud account.
-* [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): It is used to interact with Kubernetes clusters.
-* [Install `kbcli`](./../installation/install-kbcli.md): Choose one guide that fits your actual environments. `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
+* [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
+* [Install `kbcli`](./../installation/install-kbcli.md)
   
 ### Configure ACK environment
 
@@ -284,7 +258,7 @@ Make sure you have all the followings prepared.
 
 ### Initialize Playground
 
-The following command deploys an ACK cluster in the available region `cn-hangzhou` on Alibaba Cloud, and installs KubeBlocks.
+The following command deploys an ACK cluster in the region `cn-hangzhou` on Alibaba Cloud, and installs KubeBlocks.
 
 ```bash
 kbcli playground init --cloud-provider alicloud --region cn-hangzhou
@@ -293,9 +267,8 @@ kbcli playground init --cloud-provider alicloud --region cn-hangzhou
 * `cloud-provider` specifies the cloud provider.
 * `region` specifies the region to deploy a Kubernetes cluster.
 
-During the initialization, `kbcli` clones [the GitHub repository](https://github.com/apecloud/cloud-provider) to the directory `~/.kbcli/playground` and calls the terraform script to create cloud resources. And then `kbcli` deploys KubeBlocks automatically and installs a MySQL cluster.
-
-After the `kbcli playground init` command is executed, `kbcli` automatically switches the context of the local kubeconfig to the current cluster. Run the command below to view the created cluster.
+During the initialization, `kbcli` clones [the GitHub repository](https://github.com/apecloud/cloud-provider) to the directory `~/.kbcli/playground`, installs KubeBlocks, and creates a MySQL cluster. After executing the `kbcli playground init` command, kbcli automatically switches the current context of kubeconfig to the new Kubernetes cluster.
+Run the command below to view the created cluster.
 
 ```bash
 # View kbcli version
@@ -307,7 +280,7 @@ kbcli cluster list
 
 :::note
 
-The initialization takes about 20 minutes. If the installation fails after a long time, please check your network environment.
+The initialization takes about 20 minutes. If the installation fails after a long time, please check your network.
 
 :::
 

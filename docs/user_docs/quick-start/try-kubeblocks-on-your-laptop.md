@@ -134,7 +134,7 @@ KubeBlocks supports complete observability capabilities. This section demonstrat
    kbcli dashboard open kubeblocks-grafana
    ```
 
-   **Result**
+   **Result:**
 
    A monitoring page on Grafana website is loaded automatically after the command is executed.
 

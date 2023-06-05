@@ -373,7 +373,7 @@ KubeBlocks has complete observability capabilities. This section demonstrates th
 
 2. Click the Dashboard icon on the left bar and two monitoring panels show on the page.
    ![Dashboards](./../../img/quick_start_dashboards.png)
-3. Click **General** -> **MySQL** to monitor the status of the ApeCloud MySQL cluster created by Playground.
+3. Click **General** -> **MySQL** to monitor the status of the MySQL cluster created by Playground.
    ![MySQL_panel](./../../img/quick_start_mysql_panel.png)
 
 ### High availability of MySQL

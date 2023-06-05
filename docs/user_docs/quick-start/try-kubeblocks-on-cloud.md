@@ -11,9 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # Try out basic functions of KubeBlocks on Cloud
 
-This guide walks you through the quickest way to get started with KubeBlocks on any cloud, demonstrating how to easily create a demo environment (Playground) with simply one `kbcli` command.
-
-With Playground, you can try out KubeBlocks both on your local host (macOS) and on a cloud environment. And KubeBlocks supports multiple cloud platforms.
+This guide walks you through the quickest way to get started with KubeBlocks on cloud, demonstrating how to create a demo environment (Playground) with one command.
 
 ## Preparation
 

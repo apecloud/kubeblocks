@@ -19,9 +19,9 @@ Meet the following requirements for a smooth user experience:
   * RAM: 4 GB, use `top -d` command to check memory.
 
 * Make sure the following tools are installed on your laptop:
-  * Docker: v20.10.5 (runc ≥ v1.0.0-rc93) or above. For installation details, refer to [Get Docker](https://docs.docker.com/get-docker/);
+  * [Docker](https://docs.docker.com/get-docker/): v20.10.5 (runc ≥ v1.0.0-rc93) or above;
   * [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): it is used to interact with Kubernetes clusters;
-  * [kbcli](./../installation/introduction.md): it is used for the interaction between Playground and KubeBlocks.
+  * [kbcli](./../installation/install-kbcli.md): it is used for the interaction between Playground and KubeBlocks.
 
 ## Initialize Playground
 

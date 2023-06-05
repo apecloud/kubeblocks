@@ -30,7 +30,7 @@ kbcli infra create [flags]
       --private-key-path string    Specify the file PrimaryKeyPath of ssh to the remote machine. default ~/.ssh/id_rsa.
   -t, --timeout int                Specify the ssh timeout.[option] (default 30)
   -u, --user string                Specify the account to access the remote server. [require]
-      --version string             Specify install kubernetes version. default version is v1.26.1 (default "v1.26.1")
+      --version string             Specify install kubernetes version. default version is v1.26.5 (default "v1.26.5")
       --worker strings             Specify worker nodes
 ```
 

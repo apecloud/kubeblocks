@@ -27,6 +27,8 @@ import (
 	"strings"
 
 	"github.com/StudioSol/set"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/tasks"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
 	kubekeyapiv1alpha2 "github.com/kubesphere/kubekey/v3/cmd/kk/apis/kubekey/v1alpha2"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/connector"
@@ -42,6 +44,7 @@ import (
 
 type clusterOptions struct {
 	IOStreams genericclioptions.IOStreams
+	version   types.InfraVersionInfo
 
 	timeout        int64
 	userName       string
@@ -51,19 +54,13 @@ type clusterOptions struct {
 
 	clusterName string
 	nodes       []string
-	version     string
 	criType     string
-	cluster     Cluster
+	cluster     types.Cluster
 	debug       bool
 
 	autoRenewCerts      bool
 	securityEnhancement bool
 }
-
-const (
-	defaultVersion     = "v1.26.1"
-	defaultDownloadURL = "curl -L -o %s %s"
-)
 
 var createExamples = `
 `
@@ -96,13 +93,13 @@ func (o *clusterOptions) Complete() error {
 	if len(o.nodes) == 0 {
 		return cfgcore.MakeError("The list of machines where kubernetes is installed must be specified.")
 	}
-	o.cluster.Nodes = make([]ClusterNode, len(o.nodes))
+	o.cluster.Nodes = make([]types.ClusterNode, len(o.nodes))
 	for i, node := range o.nodes {
 		fields := strings.SplitN(node, ":", 3)
 		if len(fields) < 2 {
 			return cfgcore.MakeError("The node format is incorrect, require: [name:address:internalAddress].")
 		}
-		n := ClusterNode{
+		n := types.ClusterNode{
 			Name:            fields[0],
 			Address:         fields[1],
 			InternalAddress: fields[1],
@@ -190,14 +187,6 @@ func (o *clusterOptions) Run() error {
 		BaseRuntime: connector.NewBaseRuntime(o.clusterName, connector.NewDialer(), o.debug, false),
 		Cluster:     cluster,
 		ClusterName: o.clusterName,
-		Arg: common.Argument{
-			DownloadCommand: func(path, url string) string {
-				// this is an extension point for downloading tools, for example users can set the timeout, proxy or retry under
-				// some poor network environment. Or users even can choose another cli, it might be wget.
-				// perhaps we should have a build-in download function instead of totally rely on the external one
-				return fmt.Sprintf(defaultDownloadURL, path, url)
-			},
-		},
 	}
 	updateClusterHosts(cluster, runtime)
 
@@ -217,6 +206,7 @@ func NewCreateKubernetesCmd(streams genericclioptions.IOStreams) *cobra.Command 
 	o := &clusterOptions{
 		IOStreams: streams,
 	}
+	o.setDefaultVersion()
 	cmd := &cobra.Command{
 		Use:     "create",
 		Short:   "create kubernetes cluster.",
@@ -233,7 +223,7 @@ func NewCreateKubernetesCmd(streams genericclioptions.IOStreams) *cobra.Command 
 
 func (o *clusterOptions) buildCreateInfraFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&o.clusterName, "name", "", "", "Specify kubernetes cluster name")
-	cmd.Flags().StringVarP(&o.version, "version", "", defaultVersion, fmt.Sprintf("Specify install kubernetes version. default version is %s", defaultVersion))
+	cmd.Flags().StringVarP(&o.version.KubernetesVersion, "version", "", o.version.KubernetesVersion, fmt.Sprintf("Specify install kubernetes version. default version is %s", o.version.KubernetesVersion))
 	cmd.Flags().StringVarP(&o.criType, "container-runtime", "", string(container.ContainerdType), "Specify kubernetes container runtime. default is containerd")
 	cmd.Flags().StringSliceVarP(&o.nodes, "nodes", "", nil, "List of machines on which kubernetes is installed. [require]")
 	cmd.Flags().BoolVarP(&o.debug, "debug", "", false, "set debug mode")
@@ -248,4 +238,14 @@ func (o *clusterOptions) buildCreateInfraFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSliceVarP(&o.cluster.ETCD, "etcd", "", nil, "Specify etcd nodes")
 	cmd.Flags().StringSliceVarP(&o.cluster.Master, "master", "", nil, "Specify master nodes")
 	cmd.Flags().StringSliceVarP(&o.cluster.Worker, "worker", "", nil, "Specify worker nodes")
+}
+
+func (o *clusterOptions) setDefaultVersion() {
+	o.version.KubernetesVersion = tasks.DefaultK8sVersion
+	o.version.EtcdVersion = tasks.DefaultEtcdVersion
+	o.version.ContainerVersion = tasks.DefaultContainerdVersion
+	o.version.HelmVersion = tasks.DefaultHelmVersion
+	o.version.CRICtlVersion = tasks.DefaultCRICtlVersion
+	o.version.CniVersion = tasks.DefaultCniVersion
+	o.version.RuncVersion = tasks.DefaultRuncVersion
 }

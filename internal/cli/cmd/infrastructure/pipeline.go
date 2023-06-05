@@ -20,10 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package infrastructure
 
 import (
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/tasks"
-	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/binaries"
-	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/bootstrap/confirm"
-	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/bootstrap/os"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/bootstrap/precheck"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/certs"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/container"
@@ -34,6 +30,8 @@ import (
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/plugins"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/plugins/dns"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/plugins/network"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/tasks"
 )
 
 func NewCreateK8sClusterForKubeblocks(o *clusterOptions) []module.Module {
@@ -44,14 +42,17 @@ func NewCreateK8sClusterForKubeblocks(o *clusterOptions) []module.Module {
 		&precheck.NodePreCheckModule{},
 		// install kubekey required packages
 		&tasks.InstallDependenciesModule{},
-		&precheck.NodePreCheckModule{},
-		&confirm.InstallConfirmModule{},
+		// &precheck.NodePreCheckModule{},
+		// &confirm.InstallConfirmModule{},
 		// &os.RepositoryModule{Skip: !runtime.Arg.InstallPackages},
-		&binaries.NodeBinariesModule{},
-		&os.ConfigureOSModule{},
+		// &binaries.NodeBinariesModule{},
+		&tasks.PrepareK8sBinariesModule{BinaryVersion: o.version},
+		&tasks.ConfigureOSModule{},
+		// &os.ConfigureOSModule{},
 		// &customscripts.CustomScriptsModule{Phase: "PreInstall", Scripts: runtime.Cluster.System.PreInstall},
 		&kubernetes.StatusModule{},
 		&container.InstallContainerModule{},
+		&tasks.InstallCRIModule{},
 		&etcd.PreCheckModule{},
 		&etcd.CertsModule{},
 		&etcd.InstallETCDBinaryModule{},

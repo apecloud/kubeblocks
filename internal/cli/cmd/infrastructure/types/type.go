@@ -17,7 +17,17 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package infrastructure
+package types
+
+type InfraVersionInfo struct {
+	KubernetesVersion string
+	EtcdVersion       string
+	ContainerVersion  string
+	CRICtlVersion     string
+	RuncVersion       string
+	CniVersion        string
+	HelmVersion       string
+}
 
 type Cluster struct {
 	User  ClusterUser

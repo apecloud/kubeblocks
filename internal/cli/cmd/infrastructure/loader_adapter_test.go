@@ -22,6 +22,7 @@ package infrastructure
 import (
 	"testing"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
 	kubekeyapiv1alpha2 "github.com/kubesphere/kubekey/v3/cmd/kk/apis/kubekey/v1alpha2"
 
 	"github.com/apecloud/kubeblocks/internal/configuration/container"
@@ -37,12 +38,12 @@ func TestCreateClusterWithOptions(t *testing.T) {
 		name: "generateClusterTest",
 		args: &clusterOptions{
 			clusterName: "for_test",
-			version:     defaultVersion,
+			version:     types.InfraVersionInfo{},
 			criType:     string(container.ContainerdType),
 			userName:    "test",
 			password:    "test",
-			cluster: Cluster{
-				Nodes: []ClusterNode{
+			cluster: types.Cluster{
+				Nodes: []types.ClusterNode{
 					{
 						Name:            "node1",
 						Address:         "127.0.0.1",

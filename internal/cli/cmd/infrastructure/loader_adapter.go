@@ -20,64 +20,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package infrastructure
 
 import (
-	"bufio"
-	"embed"
-	"encoding/json"
-	"strings"
-
 	kubekeyapiv1alpha2 "github.com/kubesphere/kubekey/v3/cmd/kk/apis/kubekey/v1alpha2"
-	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
-	"github.com/leaanthony/debme"
-	"k8s.io/apimachinery/pkg/util/yaml"
 
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/builder"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
+	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
 )
 
-var (
-	//go:embed template/*
-	cueTemplate embed.FS
-)
-
-func newKubeKeyClusterTemplate(templateName string) (string, error) {
-	tmplFs, _ := debme.FS(cueTemplate, "template")
-	if tmlBytes, err := tmplFs.ReadFile(templateName); err != nil {
-		return "", err
-	} else {
-		return string(tmlBytes), nil
-	}
-}
+var ReplicaSetSignature = func(_ kubekeyapiv1alpha2.Cluster, _ any) {}
 
 func createClusterWithOptions(values *gotemplate.TplValues) (*kubekeyapiv1alpha2.ClusterSpec, error) {
-	const tplFile = "kubekey_cluster_template.tpl"
-	yamlTemplate, err := newKubeKeyClusterTemplate(tplFile)
+	const tplFile = "kubekey_cluster.tpl"
+	rendered, err := builder.BuildFromTemplate(values, tplFile)
 	if err != nil {
 		return nil, err
 	}
 
-	tpl := gotemplate.NewTplEngine(values, nil, "ClusterTemplate", nil, nil)
-	rendered, err := tpl.Render(yamlTemplate)
+	cluster, err := builder.BuildResourceFromYaml(kubekeyapiv1alpha2.Cluster{}, rendered)
 	if err != nil {
 		return nil, err
-	}
-
-	var ret map[string]interface{}
-	cluster := kubekeyapiv1alpha2.Cluster{}
-	content, err := yaml.NewYAMLReader(bufio.NewReader(strings.NewReader(rendered))).Read()
-	if err != nil {
-		return nil, cfgcore.WrapError(err, "failed to read the cluster yaml")
-	}
-	err = yaml.Unmarshal(content, &ret)
-	if err != nil {
-		return nil, cfgcore.WrapError(err, "failed to unmarshal the cluster yaml")
-	}
-
-	contentToJSON, err := yaml.ToJSON(content)
-	if err != nil {
-		return nil, cfgcore.WrapError(err, "Unable to convert configuration to json")
-	}
-	if err := json.Unmarshal(contentToJSON, &cluster); err != nil {
-		return nil, cfgcore.WrapError(err, "failed to unmarshal the cluster")
 	}
 	return &cluster.Spec, nil
 }
@@ -97,7 +58,7 @@ const (
 func buildTemplateParams(o *clusterOptions) *gotemplate.TplValues {
 	return &gotemplate.TplValues{
 		builtinClusterNameObject:    o.clusterName,
-		builtinClusterVersionObject: o.version,
+		builtinClusterVersionObject: o.version.KubernetesVersion,
 		builtinCRITypeObject:        o.criType,
 		builtinUserObject:           o.userName,
 		builtinPasswordObject:       o.password,

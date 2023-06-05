@@ -1,0 +1,17 @@
+name: RELEASE-DELETE
+
+on:
+  workflow_dispatch:
+    inputs:
+      release-version:
+        description: 'The version of KubeBlocks release'
+        required: true
+        default: ''
+
+jobs:
+  delete-release:
+    uses: apecloud/apecd/.github/workflows/release-delete.yml@v0.7.0
+    with:
+      VERSION: "${{ inputs.release-version }}"
+      APECD_REF: "v0.7.0"
+    secrets: inherit

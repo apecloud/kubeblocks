@@ -125,7 +125,7 @@ var clusterCreateExample = templates.Examples(`
 		--node-labels '"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
 
 	# Create a Cluster with two tolerations 
-	kbcli cluster create --cluster-definition apecloud-mysql --tolerations \ '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+	kbcli cluster create --cluster-definition apecloud-mysql --tolerations \ '"engineType=mongo:NoSchedule","diskType=ssd:NoSchedule"'
 
     # Create a cluster, with each pod runs on their own dedicated node
     kbcli cluster create --cluster-definition apecloud-mysql --tenancy=DedicatedNode
@@ -375,7 +375,10 @@ func (o *CreateOptions) Complete() error {
 	o.ComponentSpecs = components
 
 	// TolerationsRaw looks like `["key=engineType,value=mongo,operator=Equal,effect=NoSchedule"]` after parsing by cmd
-	tolerations := buildTolerations(o.TolerationsRaw)
+	tolerations, err := util.BuildTolerations(o.TolerationsRaw)
+	if err != nil {
+		return err
+	}
 	if len(tolerations) > 0 {
 		o.Tolerations = tolerations
 	}
@@ -900,19 +903,6 @@ func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[
 	return allSets, nil
 }
 
-func buildTolerations(raw []string) []interface{} {
-	tolerations := make([]interface{}, 0)
-	for _, tolerationRaw := range raw {
-		toleration := map[string]interface{}{}
-		for _, entries := range strings.Split(tolerationRaw, ",") {
-			parts := strings.SplitN(entries, "=", 2)
-			toleration[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
-		}
-		tolerations = append(tolerations, toleration)
-	}
-	return tolerations
-}
-
 // generateClusterName generates a random cluster name that does not exist
 func generateClusterName(dynamic dynamic.Interface, namespace string) (string, error) {
 	var name string
@@ -938,7 +928,7 @@ func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&f.TerminationPolicy, "termination-policy", "Delete", "Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut)")
 	cmd.Flags().StringArrayVar(&f.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
 	cmd.Flags().StringToStringVar(&f.NodeLabels, "node-labels", nil, "Node label selector")
-	cmd.Flags().StringSliceVar(&f.TolerationsRaw, "tolerations", nil, `Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'`)
+	cmd.Flags().StringSliceVar(&f.TolerationsRaw, "tolerations", nil, `Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'`)
 	cmd.Flags().StringVar(&f.Tenancy, "tenancy", "SharedNode", "Tenancy options, one of: (SharedNode, DedicatedNode)")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(

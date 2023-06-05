@@ -493,6 +493,6 @@ In this example, delete the leader pod to simulate a failure.
 
 :::caution
 
-`kbcli playground destroy` directly deletes the Kubernetes cluster on the cloud but there might be residual resources on the cloud, such as volumes. Please confirm whether there are residual resources after uninstallation and delete them in time to avoid unnecessary fees.
+`kbcli playground destroy` deletes the Kubernetes cluster on the cloud, but there might be residual resources on the cloud, such as volumes and snapshots. Please delete them in time to avoid unexpected costs.
 
 :::

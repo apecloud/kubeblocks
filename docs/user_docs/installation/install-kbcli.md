@@ -11,22 +11,11 @@ import TabItem from '@theme/TabItem';
 
 # Install kbcli
 
- You can install kbcli on both local and cloud environment.
+You can install kbcli on your laptop or virtual machines in the cloud.
 
 ## Environment preparation
 
-- Minimum system requirements:
-  - MacOS:
-    - CPU: 4 cores
-    - Memory: 4 GB
-    Check CPU with the following command: `sysctl hw.physicalcpu`; 
-    Check memory with the following command: `top -d`.
-  - Windows:
-    - 64-bit
-- Ensure the following tools are installed on your local host:
-  - Docker: v20.10.5 (runc ≥ v1.0.0-rc93) or higher. For installation details, see Get Docker.
-  - kubectl: used to interact with Kubernetes clusters.
-  - For Windows environment, PowerShell version 5.0 or higher is required.
+For Windows users, PowerShell version should be 5.0 or higher.
 
 ## Install kbcli
 

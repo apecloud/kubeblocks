@@ -147,7 +147,7 @@ jobs:
           mkdir -p rpmbuild/BUILD
           mkdir -p rpmbuild/RPMS
           mkdir -p rpmbuild/SRPMS
-          cp ${{ env.CLI_FILENAME }}.tar.gz rpmbuild/SOURCES/
+          cp bin/${{ env.CLI_FILENAME }}.tar.gz rpmbuild/SOURCES/
           cp ${{ github.workspace }}/utils/kbcli.spec rpmbuild/SPECS/
           sed -i 's/^Source0:.*/Source0: ${{ env.CLI_FILENAME }}.tar.gz/' rpmbuild/SPECS/kbcli.spec
           sed -i 's/^Version:.*/Version: ${{ env.env.TAG_NAME }}.tar.gz/' rpmbuild/SPECS/kbcli.spec

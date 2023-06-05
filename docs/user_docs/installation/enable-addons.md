@@ -2,7 +2,7 @@
 title: Enable add-ons when installing KubeBlocks
 description: Enable add-ons when installing KubeBlocks
 keywords: [addons, enable, KubeBlocks, prometheus, s3, alertmanager,]
-sidebar_position: 5
+sidebar_position: 4
 sidebar_label: Enable add-ons 
 ---
 
@@ -20,7 +20,7 @@ kbcli addon list
 
 :::note
 
-Some add-ons have an environment requirement. If a certain requirement is not met, the automatic installation is invalid.
+Some add-ons have environment requirements. If a certain requirement is not met, the automatic installation is invalid.
 
 :::
 

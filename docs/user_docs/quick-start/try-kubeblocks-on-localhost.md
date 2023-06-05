@@ -1,16 +1,14 @@
 ---
-title: Try out KubeBlocks in 5 minutes on Local Host
-description: A quick tour of KubeBlocks in 5 minutes on Local host on Playground
-keywords: [Playground, try out, local host]
+title: Try out KubeBlocks in 5 minutes on LocalHost
+description: A quick tour of KubeBlocks in 5 minutes on Localhost on Playground
+keywords: [Playground, try out, localhost]
 sidebar_position: 1
-sidebar_label: Try out KubeBlocks on local host
+sidebar_label: Try out KubeBlocks on localhost
 ---
 
-# Try out KubeBlocks in 5 minutes on Local Host
+# Try out KubeBlocks in 5 minutes on Localhost
 
-This guide walks you through the quickest way to get started with KubeBlocks on your local host, demonstrating how to easily create a KubeBlocks demo environment (Playground) with simply one `kbcli` command.
-
-With Playground, you can try out KubeBlocks on your local host (macOS) and on a cloud environment.
+This guide walks you through the quickest way to get started with KubeBlocks on your localhost, demonstrating how to easily create a KubeBlocks demo environment (Playground) with simply one `kbcli` command.
 
 ## Before you start
 
@@ -24,10 +22,10 @@ Meet the following requirements for the smooth operation of Playground and other
 
    To check memory, use `top -d` command.
 
-* Make sure the following tools are installed on your local host.
+* Make sure the following tools are installed on your localhost.
   * Docker: v20.10.5 (runc ≥ v1.0.0-rc93) or above. For installation details, refer to [Get Docker](https://docs.docker.com/get-docker/).
   * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): It is used to interact with Kubernetes clusters.
-  * [Install `kbcli`](./../../installation/install-kbcli.md). `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
+  * [Install kbcli](./../installation/introduction.md): Choose one guide that fits your actual environments. `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
 
 ## Initialize Playground
 
@@ -64,7 +62,7 @@ KubeBlocks supports the complete life cycle management of a database cluster. Go
 
 :::note
 
-The local host does not support volume expansion, backup, and restore functions.
+The localhost does not support volume expansion, backup, and restore functions.
 
 :::
 
@@ -104,7 +102,7 @@ kbcli cluster connect --show-example --client=cli mycluster
 
 **Example**
 
-1. Run `port-forward` to connect the cluster from the local host.
+1. Run `port-forward` to connect the cluster from the localhost.
 
    ```bash
    kubectl port-forward service/mycluster-mysql 3306:3306

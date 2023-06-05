@@ -288,12 +288,9 @@ The initialization takes about 20 minutes. If the installation fails after a lon
 </Tabs>
 
 ## Try KubeBlocks with Playground
+Go through the following instructions to try basic features of KubeBlocks.
 
-KubeBlocks supports the complete life cycle management of a database cluster. Go through the following instructions to try basic features of KubeBlocks.
-
-For the full feature set, refer to [KubeBlocks Documentation](./../introduction/introduction.md) for details.
-
-### View an ApeCloud MySQL cluster
+### Describe a MySQL cluster
 
 ***Steps:***
 
@@ -309,9 +306,9 @@ For the full feature set, refer to [KubeBlocks Documentation](./../introduction/
     kbcli cluster describe mycluster
     ```
 
-### Access an ApeCloud MySQL cluster
+### Access a MySQL cluster
 
-**Option 1.** Connect database inside Kubernetes cluster.
+**Option 1.** Connect database from container network.
 
 Wait until the status of this cluster is `Running`, then run `kbcli cluster connect` to access a specified database cluster. For example,
 
@@ -319,17 +316,15 @@ Wait until the status of this cluster is `Running`, then run `kbcli cluster conn
 kbcli cluster connect mycluster
 ```
 
-**Option 2.** Connect database outside Kubernetes cluster.
+**Option 2.** Connect database remotely.
 
-Get the MySQL Client connection example.
+***Steps:***
 
-```bash
-kbcli cluster connect --show-example --client=cli mycluster
-```
-
-**Example**
-
-1. Run `port-forward` to connect the cluster from the local host.
+1. Get Credentials.
+   ```bash
+   kbcli cluster connect --show-example --client=cli mycluster
+   ```
+2. Run `port-forward`.
 
    ```bash
    kubectl port-forward service/mycluster-mysql 3306:3306
@@ -338,7 +333,7 @@ kbcli cluster connect --show-example --client=cli mycluster
    Forwarding from [::1]:3306 -> 3306
    ```
 
-2. Open another terminal tab to connect the MySQL Client.
+3. Open another terminal tab to connect the database cluster.
 
    ```bash
    mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
@@ -360,13 +355,13 @@ kbcli cluster connect --show-example --client=cli mycluster
    5 rows in set (0.02 sec)
    ```
 
-### Observability
+### Observe a MySQL cluster
 
 KubeBlocks has complete observability capabilities. This section demonstrates the monitoring function of KubeBlocks.
 
 ***Steps:***
 
-1. View the monitoring page to observe the service running status.
+1. Open the grafana dashboard.
 
    ```bash
    kbcli dashboard open kubeblocks-grafana
@@ -381,23 +376,21 @@ KubeBlocks has complete observability capabilities. This section demonstrates th
 3. Click **General** -> **MySQL** to monitor the status of the ApeCloud MySQL cluster created by Playground.
    ![MySQL_panel](./../../img/quick_start_mysql_panel.png)
 
-### High availability of ApeCloud MySQL
+### High availability of MySQL
 
-ApeCloud MySQL Raft Group delivers high availability with RPO=0 and RTO in less than 30 seconds.
+This guide shows a simple failure simulation to show you the failure recovery capability of MySQL.
 
-This section uses a simple failure simulation to show you the failure recovery capability of ApeCloud MySQL.
+#### Delete the Standalone MySQL cluster
 
-#### Delete ApeCloud MySQL Standalone
-
-Delete the ApeCloud MySQL Standalone before trying out high availability.
+Delete the Standalone MySQL cluster before trying out high availability.
 
 ```bash
 kbcli cluster delete mycluster
 ```
 
-#### Create an ApeCloud MySQL Raft Group
+#### Create a Raft MySQL cluster
 
-Playground creates an ApeCloud MySQL Standalone by default. You can use `kbcli` to create a new Raft Group. The following is an example of creating an ApeCloud MySQL Raft Group with default configurations.
+You can use `kbcli` to create a Raft MySQL cluster. The following is an example of creating a Raft MySQL cluster with default configurations.
 
 ```bash
 kbcli cluster create --cluster-definition='apecloud-mysql' --set replicas=3
@@ -415,7 +408,7 @@ In this example, delete the leader pod to simulate a failure.
    kbcli cluster list
    ```
 
-2. View the ApeCloud MySQL Raft group information. View the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-1.
+2. Find the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-1.
 
    ```bash
    kbcli cluster describe maple05
@@ -454,7 +447,7 @@ In this example, delete the leader pod to simulate a failure.
    pod "maple05-mysql-1" deleted
    ```
 
-4. Connect to the ApeCloud MySQL Raft Group to test its availability. You can find this group can still be accessed within seconds due to our HA strategy.
+4. Connect to the Raft MySQL cluster. It can be accessed within seconds.
 
    ```bash
    kbcli cluster connect maple05
@@ -475,66 +468,20 @@ In this example, delete the leader pod to simulate a failure.
    mysql>
    ```
 
-#### Demonstrate availability failure by NON-STOP NYAN CAT (for fun)
-
-The above example uses `kbcli cluster connect` to test availability, in which the changes are not obvious to see.
-
-NON-STOP NYAN CAT is a demo application to observe how the database cluster exceptions affect actual businesses. Animations and real-time key information display provided by NON-STOP NYAN CAT can directly show the availability influences of database services.
-
-***Steps:***
-
-1. Install the NYAN CAT demo application.
-
-   ```bash
-   kbcli addon enable nyancat
-   ```
-
-   **Result:**
-
-   ```
-   addon.extensions.kubeblocks.io/nyancat patched
-   ```
-
-2. Check the NYAN CAT add-on status and when its status is `Enabled`, this application is ready.
-
-   ```bash
-   kbcli addon list | grep nyancat 
-   ```
-
-3. Open the web page.
-
-   ```bash
-   kbcli dashboard open kubeblocks-nyancat
-   ```
-
-4. Delete the leader pod and view the influences on the ApeCloud MySQL clusters through the NYAN CAT page.
-
-   ```bash
-   kubectl delete pod maple05-mysql-1
-   ```
-
-   ![NYAN CAT](./../../img/quick_start_nyan_cat.png)
-
-5. Uninstall the NYAN CAT demo application after your trial.
-
-   ```bash
-   kbcli addon disable nyancat
-   ```
-
 ## Destroy Playground
 
-1. Before destroying Playground, it is recommended to delete the clusters created by KubeBlocks.
+1. Before destroying Playground, it is recommended to delete the database clusters created by KubeBlocks.
 
    ```bash
    # View all clusters
    kbcli cluster list -A
 
    # Delete a cluster
-   # A double-check is required and you can add --auto-approve to check it automatically
+   # A double-check is required or you can add --auto-approve to skip it
    kbcli cluster delete <name>
 
    # Uninstall KubeBlocks
-   # A double-check is required and you can add --auto-approve to check it automatically
+   # A double-check is required or you can add --auto-approve to skip it
    kbcli kubeblocks uninstall --remove-pvcs --remove-pvs
    ```
 

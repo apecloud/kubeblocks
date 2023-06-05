@@ -98,10 +98,5 @@ func composeSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	/*
-		if err := plan.DoPITRPrepare(reqCtx.Ctx, cli, cluster, synthesizedComp); err != nil {
-			return nil, err
-		}
-	*/
 	return synthesizedComp, nil
 }

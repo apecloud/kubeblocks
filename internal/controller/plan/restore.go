@@ -399,9 +399,6 @@ func (p *RestoreManager) getDataPVCsFromPods(componentName string) ([]corev1.Per
 	}
 	dataPVCs := []corev1.PersistentVolumeClaim{}
 	for _, targetPod := range podList.Items {
-		if targetPod.Spec.NodeName == "" {
-			return nil, intctrlutil.NewError(intctrlutil.ErrorTypeNeedWaiting, "waiting Pod scheduled")
-		}
 		for _, volume := range targetPod.Spec.Volumes {
 			if volume.PersistentVolumeClaim == nil {
 				continue
@@ -413,9 +410,6 @@ func (p *RestoreManager) getDataPVCsFromPods(componentName string) ([]corev1.Per
 			}
 			if dataPVC.Labels[constant.VolumeTypeLabelKey] != string(appsv1alpha1.VolumeTypeData) {
 				continue
-			}
-			if dataPVC.Status.Phase != corev1.ClaimBound {
-				return nil, intctrlutil.NewError(intctrlutil.ErrorTypeNeedWaiting, "waiting PVC Bound")
 			}
 			if dataPVC.Annotations == nil {
 				dataPVC.Annotations = map[string]string{}

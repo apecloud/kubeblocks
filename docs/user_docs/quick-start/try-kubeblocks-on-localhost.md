@@ -147,11 +147,9 @@ KubeBlocks supports complete observability capabilities. This section demonstrat
 
 ### High availability of MySQL
 
-Raft group delivers high availability with RPO=0 and RTO in less than 30 seconds.
-
 This guide shows a simple failure simulation to show you the failure recovery capability of MySQL.
 
-#### Delete a MySQL cluster
+#### Delete the MySQL cluster
 
 Delete the Standalone MySQL cluster before trying out high availability.
 
@@ -159,9 +157,9 @@ Delete the Standalone MySQL cluster before trying out high availability.
 kbcli cluster delete mycluster
 ```
 
-#### Create a MySQL Raft group
+#### Create a Raft MySQL cluster
 
-Playground creates a Standalone MySQL cluster by default. You can also use `kbcli` to create a MySQL Raft group. The following is an example of creating a MySQL Raft group with default configurations.
+Playground creates a Standalone MySQL cluster by default. You can also use `kbcli` to create a Raft MySQL cluster. The following is an example of creating a Raft MySQL cluster with default configurations.
 
 ```bash
 kbcli cluster create --cluster-definition='apecloud-mysql' --set replicas=3
@@ -179,7 +177,7 @@ In this example, delete the leader pod to simulate a failure.
    kbcli cluster list
    ```
 
-2. View the MySQL Raft group information. View the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-1.
+2. Find the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-1.
 
    ```bash
    kbcli cluster describe maple05
@@ -218,7 +216,7 @@ In this example, delete the leader pod to simulate a failure.
    pod "maple05-mysql-1" deleted
    ```
 
-4. Connect to the MySQL Raft group to test its availability. You can find this group can still be accessed within seconds due to our HA strategy.
+4. Connect to the Raft MySQL cluster. It can be accessed within seconds.
 
    ```bash
    kbcli cluster connect maple05

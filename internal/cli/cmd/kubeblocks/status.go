@@ -22,11 +22,10 @@ package kubeblocks
 import (
 	"context"
 	"fmt"
+	"golang.org/x/exp/maps"
 	"sort"
 	"strconv"
 	"strings"
-
-	"golang.org/x/exp/maps"
 
 	"github.com/containerd/stargz-snapshotter/estargz/errorutil"
 	"github.com/spf13/cobra"

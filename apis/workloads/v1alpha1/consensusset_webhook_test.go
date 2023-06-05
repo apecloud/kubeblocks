@@ -29,7 +29,7 @@ import (
 )
 
 var _ = Describe("ConsensusSet Webhook", func() {
-	Context("spec.roles", func() {
+	Context("spec validation", func() {
 		const name = "test-consensus-set"
 		var csSet *ConsensusSet
 
@@ -76,12 +76,32 @@ var _ = Describe("ConsensusSet Webhook", func() {
 			Expect(err.Error()).Should(ContainSubstring("leader is required"))
 		})
 
-		It("should succeed if leader set", func() {
+		It("should return an error if servicePort not provided", func() {
 			csSet.Spec.Roles = []ConsensusRole{
 				{
 					Name:       "leader",
 					IsLeader:   true,
 					AccessMode: ReadWriteMode,
+				},
+			}
+			err := k8sClient.Create(ctx, csSet)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("servicePort must provide"))
+		})
+
+		It("should succeed if spec is well defined", func() {
+			csSet.Spec.Roles = []ConsensusRole{
+				{
+					Name:       "leader",
+					IsLeader:   true,
+					AccessMode: ReadWriteMode,
+				},
+			}
+			csSet.Spec.Service.Ports = []corev1.ServicePort{
+				{
+					Name:     "foo",
+					Protocol: "tcp",
+					Port:     12345,
 				},
 			}
 			Expect(k8sClient.Create(ctx, csSet)).Should(Succeed())

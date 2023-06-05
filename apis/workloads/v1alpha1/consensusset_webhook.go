@@ -93,6 +93,13 @@ func (r *ConsensusSet) validate() error {
 				"leader is required"))
 	}
 
+	// servicePort must provide
+	if len(r.Spec.Service.Ports) == 0 {
+		allErrs = append(allErrs,
+			field.Required(field.NewPath("spec.service.ports"),
+				"servicePort must provide"))
+	}
+
 	if len(allErrs) > 0 {
 		return apierrors.NewInvalid(
 			schema.GroupKind{

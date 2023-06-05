@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
+	corev1 "k8s.io/api/core/v1"
+
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
@@ -54,5 +56,27 @@ func (builder *ConsensusSetBuilder) SetReplicas(replicas int32) *ConsensusSetBui
 
 func (builder *ConsensusSetBuilder) SetRoles(roles []workloads.ConsensusRole) *ConsensusSetBuilder {
 	builder.get().Spec.Roles = roles
+	return builder
+}
+
+func (builder *ConsensusSetBuilder) SetTemplate(template corev1.PodTemplateSpec) *ConsensusSetBuilder {
+	builder.get().Spec.Template = template
+	return builder
+}
+
+func (builder *ConsensusSetBuilder) SetObservationActions(actions []workloads.Action) *ConsensusSetBuilder {
+	builder.get().Spec.RoleObservation.ObservationActions = actions
+	return builder
+}
+
+func (builder *ConsensusSetBuilder) AddObservationAction(action workloads.Action) *ConsensusSetBuilder {
+	actions := builder.get().Spec.RoleObservation.ObservationActions
+	actions = append(actions, action)
+	builder.get().Spec.RoleObservation.ObservationActions = actions
+	return builder
+}
+
+func (builder *ConsensusSetBuilder) SetService(service corev1.ServiceSpec) *ConsensusSetBuilder {
+	builder.get().Spec.Service = service
 	return builder
 }

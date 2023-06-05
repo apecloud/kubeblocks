@@ -31,7 +31,14 @@ func NewPodBuilder(namespace, name string) *PodBuilder {
 	return builder
 }
 
-func (builder *PodBuilder) SetSpec(spec corev1.PodSpec) *PodBuilder {
-	builder.get().Spec = spec
+func (builder *PodBuilder) SetContainers(containers []corev1.Container) *PodBuilder {
+	builder.get().Spec.Containers = containers
+	return builder
+}
+
+func (builder *PodBuilder) AddContainer(container corev1.Container) *PodBuilder {
+	containers := builder.get().Spec.Containers
+	containers = append(containers, container)
+	builder.get().Spec.Containers = containers
 	return builder
 }

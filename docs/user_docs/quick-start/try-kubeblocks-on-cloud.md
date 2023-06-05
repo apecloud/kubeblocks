@@ -9,7 +9,7 @@ sidebar_label: Try out KubeBlocks on cloud
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Try out basic functions of KubeBlocks on Cloud
+# Try out KubeBlocks on Cloud
 
 This guide walks you through the quickest way to get started with KubeBlocks on cloud, demonstrating how to create a demo environment (Playground) with one command.
 

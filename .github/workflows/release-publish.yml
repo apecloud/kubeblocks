@@ -48,6 +48,7 @@ jobs:
       matrix:
 #        os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64]
         os: [linux-amd64, linux-arm64]
+        arch: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v3
       - name: install lib
@@ -122,21 +123,21 @@ jobs:
 #            --asset-name ${{ env.ASSET_NAME }} \
 #            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
 
-#      - name: get release kbcli upload url
-#        run: |
-#          echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh \
-#            --tag-name ${{ env.TAG_NAME }} \
-#            --type 3 \
-#            --github-repo ${{ env.CLI_REPO }} \
-#            --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
+      - name: get release kbcli upload url
+        run: |
+          echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh \
+            --tag-name ${{ env.TAG_NAME }} \
+            --type 3 \
+            --github-repo ${{ env.CLI_REPO }} \
+            --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
 
-#      - name: upload release kbcli asset ${{ matrix.os }}
-#        uses: actions/upload-release-asset@main
-#        with:
-#          upload_url: ${{ env.UPLOAD_URL }}
-#          asset_path: ./bin/${{ env.ASSET_NAME }}
-#          asset_name: ${{ env.ASSET_NAME }}
-#          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
+      - name: upload release kbcli asset ${{ matrix.os }}
+        uses: actions/upload-release-asset@main
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ./bin/${{ env.ASSET_NAME }}
+          asset_name: ${{ env.ASSET_NAME }}
+          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
 
       - name: make RPM package
         if: matrix.os == 'linux-amd64' || matrix.os == 'linux-arm64'
@@ -171,7 +172,7 @@ jobs:
         uses: actions/upload-release-asset@main
         with:
           upload_url: ${{ env.UPLOAD_URL }}
-          asset_path: ./rpmbuild/RPMS/${{ matrix.os }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-${{ matrix.os }}.rpm
+          asset_path: /home/runner/rpmbuild/RPMS/${{ matrix.arch }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-${{ matrix.arch }}.rpm
           asset_name: ${{ env.CLI_FILENAME }}.rpm
           asset_content_type: application/octet-stream
 

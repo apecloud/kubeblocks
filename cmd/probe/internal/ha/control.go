@@ -117,7 +117,7 @@ func (h *Ha) HaControl(stopCh chan struct{}) {
 	h.informer.Run(stopCh)
 }
 
-// clusterControl 只处理升主
+// clusterControl 主循环
 func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 	oldConfigMap := oldObj.(*v1.ConfigMap)
 	newConfigMap := newObj.(*v1.ConfigMap)
@@ -157,7 +157,7 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 			h.log.Errorf("acquire leader lock err:%v", err)
 			h.follow()
 		}
-		h.enforcePrimaryRole()
+		err = h.DB.EnforcePrimaryRole(h.ctx, h.podName)
 	} else {
 		// Give a time to somebody to take the leader lock
 		time.Sleep(time.Second * 2)
@@ -187,23 +187,7 @@ func (h *Ha) processSwitchover(obj interface{}) {
 	if err != nil {
 		h.log.Errorf("failed to update leader lock")
 		if h.DB.IsLeader(h.ctx) {
-			_ = h.DB.Demote(h.podName)
-		}
-	}
-
-	leader := configMap.Annotations[binding.LEADER]
-	candidate := configMap.Annotations[binding.CANDIDATE]
-
-	if leader == h.podName && candidate != h.podName {
-		err := h.DB.Demote(h.podName)
-		if err != nil {
-			h.log.Errorf("demote failed, err:%v", err)
-		}
-	}
-	if leader != h.podName && candidate == h.podName {
-		err := h.DB.Promote(h.podName)
-		if err != nil {
-			h.log.Errorf("promote failed, err:%v", err)
+			_ = h.DB.Demote(h.ctx, h.podName)
 		}
 	}
 }
@@ -290,28 +274,13 @@ func (h *Ha) follow() {
 
 	if h.DB.IsLeader(h.ctx) {
 		h.log.Infof("demoted %s after trying and failing to obtain lock", h.podName)
-		err = h.DB.Demote(h.podName)
+		err = h.DB.Demote(h.ctx, h.podName)
 	}
 
-	err = h.DB.HandleFollow(h.ctx, h.cs.GetCluster().Leader, h.podName)
-}
-
-func (h *Ha) enforcePrimaryRole() {
-
+	_ = h.DB.HandleFollow(h.ctx, h.cs.GetCluster().Leader, h.podName)
 }
 
 /*
-func (h *Ha) promote() error {
-	time.Sleep(5 * time.Second)
-	resp, err := h.cs.ExecCommand(h.db.name, "default", "su -c 'pg_ctl promote' postgres")
-	if err != nil {
-		h.log.Errorf("promote err: %v", err)
-		return err
-	}
-	h.log.Infof("response: ", resp)
-	return nil
-}
-
 func (h *Ha) demote() error {
 	resp, err := h.cs.ExecCommand(h.db.name, "default", "su -c 'pg_ctl stop -m fast' postgres")
 	if err != nil {

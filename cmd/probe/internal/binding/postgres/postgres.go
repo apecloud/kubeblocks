@@ -847,12 +847,35 @@ func (pgOps *PostgresOperations) getTimeline(ctx context.Context) (string, error
 	return string(res), nil
 }
 
-func (pgOps *PostgresOperations) Promote(podName string) error {
+// Promote 考虑异步
+func (pgOps *PostgresOperations) Promote(ctx context.Context, podName string) error {
+	err := pgOps.prePromote(ctx)
+	if err != nil {
+		return err
+	}
 
+	cmd := "su -c 'pg_ctl promote' postgres"
+	resp, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, cmd, pgOps.DBType)
+	if err != nil {
+		pgOps.Logger.Errorf("promote err: %v", err)
+		return err
+	}
+	pgOps.Logger.Infof("response: ", resp)
+
+	err = pgOps.waitPromote(ctx)
 	return nil
 }
 
-func (pgOps *PostgresOperations) Demote(podName string) error {
+// 执行一个脚本
+func (pgOps *PostgresOperations) prePromote(ctx context.Context) error {
+	return nil
+}
+
+func (pgOps *PostgresOperations) waitPromote(ctx context.Context) error {
+	return nil
+}
+
+func (pgOps *PostgresOperations) Demote(ctx context.Context, podName string) error {
 	return nil
 }
 
@@ -1138,4 +1161,36 @@ func (pgOps *PostgresOperations) getPgControlData(ctx context.Context, podName s
 	}
 
 	return &result
+}
+
+func (pgOps *PostgresOperations) EnforcePrimaryRole(ctx context.Context, podName string) error {
+	if pgOps.IsLeader(ctx) {
+		err := pgOps.processSyncReplication()
+		return err
+	} else {
+		replicationMode, err := pgOps.getReplicationMode(ctx)
+		if err != nil {
+			return err
+		}
+
+		if replicationMode == SynchronousMode {
+			err = pgOps.setSynchronousStandbyNames()
+			if err != nil {
+				return err
+			}
+		}
+
+		err = pgOps.Promote(ctx, podName)
+	}
+
+	return nil
+}
+
+func (pgOps *PostgresOperations) processSyncReplication() error {
+	return nil
+}
+
+// set synchronous_standby_names and reload
+func (pgOps *PostgresOperations) setSynchronousStandbyNames() error {
+	return nil
 }

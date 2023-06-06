@@ -6,8 +6,8 @@ import (
 )
 
 type DB interface {
-	Promote(podName string) error
-	Demote(podName string) error
+	Promote(ctx context.Context, podName string) error
+	Demote(ctx context.Context, podName string) error
 
 	GetStatus(ctx context.Context) (string, error)
 	GetExtra(ctx context.Context) (map[string]string, error)
@@ -15,6 +15,7 @@ type DB interface {
 	IsLeader(ctx context.Context) bool
 	IsHealthiest(ctx context.Context, podName string) bool
 	HandleFollow(ctx context.Context, leader *configuration_store.Leader, podName string) error
+	EnforcePrimaryRole(ctx context.Context, podName string) error
 
 	DbConn
 	DbTool

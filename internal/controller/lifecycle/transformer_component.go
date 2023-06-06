@@ -128,9 +128,6 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 			return err
 		}
 		if err := comp.Update(reqCtx, c.Client); err != nil {
-			if ictrlutil.IsDelayedRequeueError(err) {
-				*dags = append(*dags, dag)
-			}
 			return err
 		}
 		*dags = append(*dags, dag)

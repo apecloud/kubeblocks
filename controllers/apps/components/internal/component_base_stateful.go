@@ -25,7 +25,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
@@ -136,8 +135,6 @@ func (c *StatefulComponentBase) Delete(reqCtx intctrlutil.RequestCtx, cli client
 
 func (c *StatefulComponentBase) Update(reqCtx intctrlutil.RequestCtx, cli client.Client, builder ComponentWorkloadBuilder) error {
 
-	var delayedErr error
-
 	if err := c.init(reqCtx, cli, builder, true); err != nil {
 		return err
 	}
@@ -154,12 +151,7 @@ func (c *StatefulComponentBase) Update(reqCtx intctrlutil.RequestCtx, cli client
 
 		// cluster.spec.componentSpecs[*].replicas
 		if err := c.HorizontalScale(reqCtx, cli); err != nil {
-			if intctrlutil.IsDelayedRequeueError(err) {
-				// TODO: CT - handle delayed error properly
-				delayedErr = err
-			} else {
-				return err
-			}
+			return err
 		}
 	}
 
@@ -171,11 +163,10 @@ func (c *StatefulComponentBase) Update(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 
-	return delayedErr
+	return nil
 }
 
 func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Client, builder ComponentWorkloadBuilder) error {
-	var delayedErr error
 	if err := c.init(reqCtx, cli, builder, true); err != nil {
 		return err
 	}
@@ -190,11 +181,7 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 	}
 
 	if err := c.HorizontalScale(reqCtx, cli); err != nil {
-		if intctrlutil.IsDelayedRequeueError(err) {
-			delayedErr = err
-		} else {
-			return err
-		}
+		return err
 	}
 
 	// TODO(impl): restart pod if needed, move it to @Update and restart pod directly.
@@ -234,7 +221,7 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 	c.updateWorkload(c.runningWorkload)
-	return delayedErr
+	return nil
 }
 
 func (c *StatefulComponentBase) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -477,7 +464,6 @@ func (c *StatefulComponentBase) hasVolumeExpansionRunning(reqCtx intctrlutil.Req
 }
 
 func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	var delayedErr error
 	ret := c.horizontalScaling(c.runningWorkload)
 	if ret == 0 {
 		if err := c.postScaleIn(reqCtx, cli); err != nil {
@@ -490,19 +476,11 @@ func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, c
 	}
 	if ret < 0 {
 		if err := c.scaleIn(reqCtx, cli, c.runningWorkload); err != nil {
-			if intctrlutil.IsDelayedRequeueError(err) {
-				delayedErr = intctrlutil.NewDelayedRequeueError(time.Second, err.Error())
-			} else {
-				return err
-			}
+			return err
 		}
 	} else {
 		if err := c.scaleOut(reqCtx, cli, c.runningWorkload); err != nil {
-			if intctrlutil.IsDelayedRequeueError(err) {
-				delayedErr = intctrlutil.NewDelayedRequeueError(time.Second, err.Error())
-			} else {
-				return err
-			}
+			return err
 		}
 	}
 
@@ -519,7 +497,7 @@ func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, c
 		"start horizontal scale component %s of cluster %s from %d to %d",
 		c.GetName(), c.GetClusterName(), int(c.Component.Replicas)-ret, c.Component.Replicas)
 
-	return delayedErr
+	return nil
 }
 
 // < 0 for scale in, > 0 for scale out, and == 0 for nothing
@@ -636,12 +614,6 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 		}
 	)
 
-	createObjs := func(objs []client.Object) {
-		for _, obj := range objs {
-			c.CreateResource(obj, nil)
-		}
-	}
-
 	if err := cleanCronJobs(); err != nil {
 		return err
 	}
@@ -662,14 +634,12 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 		c.WorkloadVertex.Immutable = true
 		// update objs will trigger cluster reconcile, no need to requeue error
 		objs, err := dataClone.CloneData()
-		if err != nil && !intctrlutil.IsDelayedRequeueError(err) {
+		if err != nil {
 			return err
 		}
-		if intctrlutil.IsDelayedRequeueError(err) {
-			createObjs(objs)
-			return err
+		for _, obj := range objs {
+			c.CreateResource(obj, nil)
 		}
-		createObjs(objs)
 	}
 
 	return c.postScaleOut(reqCtx, cli, stsObj)

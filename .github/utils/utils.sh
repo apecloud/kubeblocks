@@ -431,7 +431,7 @@ upload_rpm_repo() {
       -H "Content-Type: application/vnd.github.v3+json" \
       -d '{"ref":"main", "path":"", "branch":"main"}' \
       --data-binary "@." \
-      "https://$GITHUB_API/repos/$GITHUB_REPO/contents/$FOLDER"
+      $GITHUB_API/repos/$GITHUB_REPO/contents/$FOLDER
 }
 
 main "$@"

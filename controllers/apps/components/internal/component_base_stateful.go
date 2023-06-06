@@ -633,7 +633,7 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 	} else {
 		c.WorkloadVertex.Immutable = true
 		// update objs will trigger cluster reconcile, no need to requeue error
-		objs, err := dataClone.CloneData()
+		objs, err := dataClone.CloneData(dataClone)
 		if err != nil {
 			return err
 		}

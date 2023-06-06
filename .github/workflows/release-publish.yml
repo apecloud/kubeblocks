@@ -1,6 +1,7 @@
 name: RELEASE-PUBLISH
 
 on:
+  push:
   release:
     types:
       - published

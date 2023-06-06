@@ -54,6 +54,7 @@ You can use `kbcli addon describe [addon name]` command to check the installatio
     ```bash
     kbcli addon enable snapshot-controller
     ```
+
     To disable the add-on, use `kbcli addon disable`.
 2. List the add-ons again to check whether it is enabled.
 

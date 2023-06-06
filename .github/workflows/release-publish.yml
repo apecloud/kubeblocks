@@ -71,7 +71,7 @@ jobs:
 
       - name: make build
         run: |
-          echo "TAG_NAME=v1.0.0" >> $GITHUB_ENV
+          env.TAG_NAME = "v0.0.1"
           CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh \
             --tag-name ${{ matrix.os }} \
             --type 2`

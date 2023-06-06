@@ -35,7 +35,7 @@ jobs:
 
   release-test:
     needs: release-message
-    runs-on: [ self-hosted, eks-fargate-runner ]
+    runs-on: [ self-hosted, kubeblocks-runner ]
     outputs:
       runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
     steps:

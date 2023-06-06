@@ -169,10 +169,10 @@ jobs:
           cp /home/runner/rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-1.${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm rpm_repo/
           createrepo_c -pdo rpm_repo rpm_repo
           createrepo_c --update rpm_repo
-          bash .github/utils/utils.sh --type 13 \
+          bash ${{ github.workspace }}/.github/utils/utils.sh --type 13 \
           --github-repo 'apecloud/kbcli_rpm' \
           --tag-name ${{ env.TAG_NAME }} \
-          --file "rpm_rpo \
+          --file "rpm_rpo" \
           --github-token ${{ env.GITHUB_TOKEN }}
 
       - name: upload RPM package

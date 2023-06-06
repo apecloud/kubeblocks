@@ -171,6 +171,8 @@ jobs:
           createrepo_c -pdo rpm_repo/rpm_repo rpm_repo/rpm_repo
           createrepo_c --update rpm_repo/rpm_repo
           cd rpm_repo
+          ls -l cd rpm_repo
+          pwd
           bash ${{ github.workspace }}/.github/utils/utils.sh --type 14 \
           --github-repo 'apecloud/kbcli_rpm_test' \
           --tag-name ${{ env.TAG_NAME }} \

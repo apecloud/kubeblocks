@@ -273,8 +273,8 @@ func LoadPluginListFromFS(indexDir string) ([]Plugin, error) {
 		pluginName := strings.TrimSuffix(file, filepath.Ext(file))
 		p, err := LoadPluginByName(indexDir, pluginName)
 		if err != nil {
-			// Index loading shouldn't fail because of one plugin.
-			// Show error instead.
+			// loading the index repository shouldn't fail because of one plugin
+			// if loading the plugin fails, log the error and continue
 			klog.Errorf("failed to read or parse plugin manifest %q: %v", pluginName, err)
 			continue
 		}

@@ -25,8 +25,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 	"html/template"
 	"io"
 	"net/http"
@@ -40,6 +38,9 @@ import (
 	texttemplate "text/template"
 	"time"
 	"unicode"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"github.com/pkg/errors"
 	"github.com/russross/blackfriday/v2"
@@ -290,11 +291,6 @@ func combineAPIPackages(pkgs []*types.Package) ([]*apiPackage, error) {
 			return nil, errors.Wrapf(err, "could not get apiVersion for package %s", pkg.Path)
 		}
 
-		typeList := make([]*types.Type, 0, len(pkg.Types))
-		for _, t := range pkg.Types {
-			typeList = append(typeList, t)
-		}
-
 		id := fmt.Sprintf("%s/%s", apiGroup, apiVersion)
 		v, ok := pkgMap[id]
 		if !ok {
@@ -308,12 +304,12 @@ func combineAPIPackages(pkgs []*types.Package) ([]*apiPackage, error) {
 			pkgIds = append(pkgIds, id)
 		} else {
 			v.Types = append(v.Types, flattenTypes(pkg.Types)...)
-			v.Constants = append(v.Types, flattenTypes(pkg.Constants)...)
+			v.Constants = append(v.Constants, flattenTypes(pkg.Constants)...)
 			v.GoPackages = append(v.GoPackages, pkg)
 		}
 	}
 
-	sort.Sort(sort.StringSlice(pkgIds))
+	sort.Strings(pkgIds)
 
 	out := make([]*apiPackage, 0, len(pkgMap))
 	for _, id := range pkgIds {
@@ -372,9 +368,9 @@ func renderComments(s []string, markdown bool) string {
 
 	if markdown {
 		doc = string(blackfriday.Run([]byte(doc)))
-		doc = strings.Replace(doc, "\n", string(template.HTML("<br />")), -1)
-		doc = strings.Replace(doc, "{", string(template.HTML("&#123;")), -1)
-		doc = strings.Replace(doc, "}", string(template.HTML("&#125;")), -1)
+		doc = strings.ReplaceAll(doc, "\n", string(template.HTML("<br />")))
+		doc = strings.ReplaceAll(doc, "{", string(template.HTML("&#123;")))
+		doc = strings.ReplaceAll(doc, "}", string(template.HTML("&#125;")))
 		return doc
 	}
 	return nl2br(doc)
@@ -385,7 +381,7 @@ func safe(s string) template.HTML { return template.HTML(s) }
 func toTitle(s string) string { return cases.Title(language.English).String(s) }
 
 func nl2br(s string) string {
-	return strings.Replace(s, "\n\n", string(template.HTML("<br/><br/>")), -1)
+	return strings.ReplaceAll(s, "\n\n", string(template.HTML("<br/><br/>")))
 }
 
 func hiddenMember(m types.Member, c generatorConfig) bool {
@@ -668,14 +664,14 @@ func render(w io.Writer, pkgs []*apiPackage, config generatorConfig) error {
 		"isExportedType":     isExportedType,
 		"fieldName":          fieldName,
 		"fieldEmbedded":      fieldEmbedded,
-		"typeIdentifier":     func(t *types.Type) string { return typeIdentifier(t) },
+		"typeIdentifier":     typeIdentifier,
 		"typeDisplayName":    func(t *types.Type) string { return typeDisplayName(t, config, typePkgMap) },
 		"visibleTypes":       func(t []*types.Type) []*types.Type { return visibleTypes(t, config) },
 		"renderComments":     func(s []string) string { return renderComments(s, !config.MarkdownDisabled) },
 		"packageDisplayName": func(p *apiPackage) string { return p.identifier() },
 		"apiGroup":           func(t *types.Type) string { return apiGroupForType(t, typePkgMap) },
 		"packageAnchorID": func(p *apiPackage) string {
-			return strings.Replace(p.identifier(), " ", "", -1)
+			return strings.ReplaceAll(p.identifier(), " ", "")
 		},
 		"linkForType": func(t *types.Type) string {
 			v, err := linkForType(t, config, typePkgMap)

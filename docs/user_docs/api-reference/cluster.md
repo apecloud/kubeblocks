@@ -896,6 +896,18 @@ string
 </tr>
 <tr>
 <td>
+<code>cancel</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>cancel defines the action to cancel the Pending/Creating/Running opsRequest, supported types: [VerticalScaling, HorizontalScaling].<br />once cancel is set to true, this opsRequest will be canceled and modifying this property again will not take effect.</p><br />
+</td>
+</tr>
+<tr>
+<td>
 <code>type</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.OpsType">
@@ -5378,7 +5390,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>builtIn is a switch to enable KubeBlocks builtIn monitoring.<br />If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.<br />BuiltIn set to true is not currently supported but will be soon.</p><br />
+<p>builtIn is a switch to enable KubeBlocks builtIn monitoring.<br />If BuiltIn is set to true, monitor metrics will be scraped automatically.<br />If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.</p><br />
 </td>
 </tr>
 <tr>
@@ -5412,7 +5424,11 @@ ExporterConfig
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;Creating&#34;</p></td>
+<tbody><tr><td><p>&#34;Cancelled&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Cancelling&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Creating&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;Failed&#34;</p></td>
 <td></td>
@@ -5594,6 +5610,18 @@ string
 </td>
 <td>
 <p>clusterRef references clusterDefinition.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>cancel</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>cancel defines the action to cancel the Pending/Creating/Running opsRequest, supported types: [VerticalScaling, HorizontalScaling].<br />once cancel is set to true, this opsRequest will be canceled and modifying this property again will not take effect.</p><br />
 </td>
 </tr>
 <tr>
@@ -5840,6 +5868,20 @@ Kubernetes meta/v1.Time
 <td>
 <em>(Optional)</em>
 <p>completionTimestamp defines the OpsRequest completion time.</p><br />
+</td>
+</tr>
+<tr>
+<td>
+<code>cancelTimestamp</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>CancelTimestamp defines cancel time.</p><br />
 </td>
 </tr>
 <tr>

@@ -15,8 +15,8 @@ This guide walks you through the quickest way to get started with KubeBlocks, de
 Meet the following requirements for a smooth user experience:
 
 * Minimum system requirements:
-  * CPU: 4 cores, use `sysctl hw.physicalcpu` command to check CPU;
-  * RAM: 4 GB, use `top -d` command to check memory.
+  * CPU: 4C, use `sysctl hw.physicalcpu` command to check CPU;
+  * RAM: 4G, use `top -d` command to check memory.
 
 * Make sure the following tools are installed on your laptop:
   * [Docker](https://docs.docker.com/get-docker/): v20.10.5 (runc ≥ v1.0.0-rc93) or above;

@@ -3,13 +3,12 @@ title: Install KubeBlocks
 description: Install KubeBlocks on the existed Kubernetes clusters
 keywords: [taints, affinity, tolerance, install, kbcli, KubeBlocks]
 sidebar_position: 3
-sidebar_label: On the existed Kubernetes clusters
+sidebar_label: Install KubeBlocks
 ---
 
 # Install KubeBlocks
 
-In the actual environment, it is normal to install `kbcli` and KubeBlocks on the existing and running Kubernetes clusters.
-To install KubeBlocks on a brand new cluster, you can use Playground, the command is `kbcli playground init`.
+The quickest way to try KubeBlocks is to create a new Kubernetes cluster and install KubeBlocks using Playground. However, production environments are more complex, with applications running in different namespaces and with resource or permission limitations. This document explains how to deploy KubeBlocks on an existing Kubernetes cluster.
 
 ## Environment preparation
 
@@ -19,34 +18,34 @@ To install KubeBlocks on a brand new cluster, you can use Playground, the comman
 	</tr >
 	<tr>
 	    <td >Control Plane</td>
-	    <td colspan="2">It is recommended to create 1 node with at least 4c4g and 50Gi storage. </td>
+	    <td colspan="2">It is recommended to create 1 node with at least 4C4G and 50GB storage. </td>
 	</tr >
 	<tr >
 	    <td rowspan="4">Data Plane</td>
 	    <td>For MySQL database </td>
-	    <td>It is recommended to create at least 3 nodes with 2c4Gi and 50Gi storage. </td>
+	    <td>It is recommended to create at least 3 nodes with 2C4G and 50GB storage. </td>
 	</tr>
 	<tr>
 	    <td>For PostgreSQL database </td>
-        <td>It is recommended to create at least 2 nodes with 2c4Gi and 50Gi storage.  </td>
+        <td>It is recommended to create at least 2 nodes with 2C4G and 50GB storage.  </td>
 	</tr>
 	<tr>
 	    <td>For Redis database</td>
-        <td>It is recommended to create at least 2 nodes with 2c4Gi and 50Gi storage. </td>
+        <td>It is recommended to create at least 2 nodes with 2C4G and 50GB storage. </td>
 	</tr>
 	<tr>
 	    <td>For MongoDB database</td>
-	    <td>It is recommended to create at least 3 nodes with 2c4Gi and 50Gi storage. </td>
+	    <td>It is recommended to create at least 3 nodes with 2C4G and 50GB storage. </td>
 	</tr>
 </table>
 
-## Installation steps
+## Steps
 
 **Before you start**
 
 Make sure you have kbcli installed, for detailed information, check [Install kbcli](./install-kbcli.md).
 
-**Install KubeBlocks with `kbcli kubeblocks install` command.**
+**Install KubeBlocks with kbcli kubeblocks install command.**
 
 The installation command is `kbcli kubeblocks install`, simply running this command installs KubeBlocks on nodes without taints with default namespace `kb-system`.
 

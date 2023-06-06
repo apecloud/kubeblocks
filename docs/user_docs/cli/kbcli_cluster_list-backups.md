@@ -11,15 +11,16 @@ kbcli cluster list-backups [flags]
 ### Examples
 
 ```
-  # list all backup
+  # list all backups
   kbcli cluster list-backups
 ```
 
 ### Options
 
 ```
-  -A, --all-namespace     If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
+  -A, --all-namespaces    If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.
   -h, --help              help for list-backups
+      --name string       The backup name to get the details.
   -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
   -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
       --show-labels       When printing, show all labels as the last column (default hide labels column)

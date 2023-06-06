@@ -5,26 +5,29 @@ title: kbcli cluster restart
 Restart the specified components in the cluster.
 
 ```
-kbcli cluster restart [flags]
+kbcli cluster restart NAME [flags]
 ```
 
 ### Examples
 
 ```
   # restart all components
-  kbcli cluster restart <my-cluster>
+  kbcli cluster restart mycluster
   
-  # restart specifies the component, separate with commas when <component-name> more than one
-  kbcli cluster restart <my-cluster> --components=<component-name>
+  # specified component to restart, separate with commas for multiple components
+  kbcli cluster restart mycluster --components=mysql
 ```
 
 ### Options
 
 ```
-      --components strings            Component names to this operations
-  -h, --help                         help for restart
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
-      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
+      --auto-approve                   Skip interactive approval before restarting the cluster
+      --components strings             Component names to this operations
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+  -h, --help                           help for restart
+      --name string                    OpsRequest name. if not specified, it will be randomly generated 
+  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```
 
 ### Options inherited from parent commands

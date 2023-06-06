@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cloudprovider
@@ -22,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 
@@ -32,6 +36,7 @@ import (
 	l "github.com/k3d-io/k3d/v5/pkg/logger"
 	"github.com/k3d-io/k3d/v5/pkg/runtimes"
 	k3d "github.com/k3d-io/k3d/v5/pkg/types"
+	"github.com/k3d-io/k3d/v5/pkg/types/fixes"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/clientcmd"
@@ -50,17 +55,17 @@ var (
 	// K3sImage is k3s image repo
 	K3sImage = "rancher/k3s:" + version.K3sImageTag
 
-	// K3dToolsImage is k3d tools image repo
-	K3dToolsImage = "docker.io/apecloud/k3d-tools:" + version.K3dVersion
-
 	// K3dProxyImage is k3d proxy image repo
 	K3dProxyImage = "docker.io/apecloud/k3d-proxy:" + version.K3dVersion
+
+	// K3dFixEnv
+	KBEnvFix fixes.K3DFixEnv = "KB_FIX_MOUNTS"
 )
 
 //go:embed assets/k3d-entrypoint-mount.sh
 var k3dMountEntrypoint []byte
 
-// localCloudProvider will handle the k3d playground cluster creation and management
+// localCloudProvider handles the k3d playground cluster creation and management
 type localCloudProvider struct {
 	cfg    config.ClusterConfig
 	stdout io.Writer
@@ -72,12 +77,12 @@ var _ Interface = &localCloudProvider{}
 
 func init() {
 	if !klog.V(1).Enabled() {
-		// set k3d log level to warning to avoid so much info log
+		// set k3d log level to 'warning' to avoid too much info logs
 		l.Log().SetLevel(logrus.WarnLevel)
 	}
 }
 
-func NewLocalCloudProvider(stdout, stderr io.Writer) *localCloudProvider {
+func newLocalCloudProvider(stdout, stderr io.Writer) Interface {
 	return &localCloudProvider{
 		stdout: stdout,
 		stderr: stderr,
@@ -88,7 +93,7 @@ func (p *localCloudProvider) Name() string {
 	return Local
 }
 
-// CreateK8sCluster create a local kubernetes cluster using k3d
+// CreateK8sCluster creates a local kubernetes cluster using k3d
 func (p *localCloudProvider) CreateK8sCluster(clusterInfo *K8sClusterInfo) error {
 	var err error
 
@@ -103,7 +108,7 @@ func (p *localCloudProvider) CreateK8sCluster(clusterInfo *K8sClusterInfo) error
 	return nil
 }
 
-// DeleteK8sCluster remove the k3d cluster
+// DeleteK8sCluster removes the k3d cluster
 func (p *localCloudProvider) DeleteK8sCluster(clusterInfo *K8sClusterInfo) error {
 	var err error
 	if clusterInfo == nil {
@@ -132,7 +137,7 @@ func (p *localCloudProvider) DeleteK8sCluster(clusterInfo *K8sClusterInfo) error
 		}
 	}
 
-	//	extra handling to clean up tools nodes
+	// extra handling to clean up tools nodes
 	defer func() {
 		if nl, err := k3dClient.NodeList(ctx, runtimes.SelectedRuntime); err == nil {
 			toolNode := fmt.Sprintf("k3d-%s-tools", clusterName)
@@ -185,7 +190,7 @@ func (p *localCloudProvider) GetKubeConfig() (string, error) {
 		return "", errors.Wrap(err, "unrecognized k3d kubeconfig format")
 	}
 
-	// Replace host config with loop back address
+	// replace host config with loop back address
 	return strings.ReplaceAll(cfgStr, hostToReplace, "127.0.0.1"), nil
 }
 
@@ -353,6 +358,12 @@ func buildKubeconfigOptions() config.SimpleConfigOptionsKubeconfig {
 }
 
 func setUpK3d(ctx context.Context, cluster *config.ClusterConfig) error {
+	// add fix Envs
+	if err := os.Setenv(string(KBEnvFix), "1"); err != nil {
+		return err
+	}
+	fixes.FixEnvs = append(fixes.FixEnvs, KBEnvFix)
+
 	l, err := k3dClient.ClusterList(ctx, runtimes.SelectedRuntime)
 	if err != nil {
 		return err
@@ -365,7 +376,7 @@ func setUpK3d(ctx context.Context, cluster *config.ClusterConfig) error {
 	for _, c := range l {
 		if c.Name == cluster.Name {
 			if c, err := k3dClient.ClusterGet(ctx, runtimes.SelectedRuntime, c); err == nil {
-				fmt.Printf(" Detected an existing cluster: %s", c.Name)
+				klog.V(1).Info("Detected an existing cluster: %s\n", c.Name)
 				return nil
 			}
 			break

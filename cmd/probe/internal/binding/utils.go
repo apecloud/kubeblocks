@@ -1,38 +1,45 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package binding
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
+	"os"
+	"text/template"
 	"time"
 
 	"github.com/dapr/components-contrib/bindings"
-	"golang.org/x/exp/slices"
-)
+	"github.com/dapr/kit/logger"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 
-type UserInfo struct {
-	UserName string `json:"userName"`
-	Password string `json:"password,omitempty"`
-	Expired  string `json:"expired,omitempty"`
-	RoleName string `json:"roleName,omitempty"`
-}
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+)
 
 type RedisEntry struct {
 	Key  string `json:"key"`
@@ -163,11 +170,13 @@ func UserNameAndRoleValidator(user UserInfo) error {
 	if len(user.RoleName) == 0 {
 		return ErrNoRoleName
 	}
-	roles := []string{ReadOnlyRole, ReadWriteRole, SuperUserRole}
-	if !slices.Contains(roles, strings.ToLower(user.RoleName)) {
-		return ErrInvalidRoleName
+	roles := []RoleType{ReadOnlyRole, ReadWriteRole, SuperUserRole}
+	for _, role := range roles {
+		if role.EqualTo(user.RoleName) {
+			return nil
+		}
 	}
-	return nil
+	return ErrInvalidRoleName
 }
 
 func getAndFormatNow() string {
@@ -188,4 +197,109 @@ func opsTerminateOnErr(result OpsResult, metadata opsMetadata, err error) (OpsRe
 	result[RespTypMsg] = err.Error()
 	result[RespTypMeta] = metadata
 	return result, nil
+}
+
+func SortRoleByWeight(r1, r2 RoleType) bool {
+	return int(r1.GetWeight()) > int(r2.GetWeight())
+}
+
+func String2RoleType(roleName string) RoleType {
+	if SuperUserRole.EqualTo(roleName) {
+		return SuperUserRole
+	}
+	if ReadWriteRole.EqualTo(roleName) {
+		return ReadWriteRole
+	}
+	if ReadOnlyRole.EqualTo(roleName) {
+		return ReadOnlyRole
+	}
+	if NoPrivileges.EqualTo(roleName) {
+		return NoPrivileges
+	}
+	return CustomizedRole
+}
+
+func SentProbeEvent(ctx context.Context, opsResult OpsResult, log logger.Logger) {
+	log.Infof("send event: %v", opsResult)
+	event, err := createProbeEvent(opsResult)
+	if err != nil {
+		log.Infof("generate event failed: %v", err)
+		return
+	}
+
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Infof("get k8s client config failed: %v", err)
+		return
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Infof("k8s client create failed: %v", err)
+		return
+	}
+	namespace := os.Getenv("KB_NAMESPACE")
+	for i := 0; i < 3; i++ {
+		_, err = clientset.CoreV1().Events(namespace).Create(ctx, event, metav1.CreateOptions{})
+		if err == nil {
+			break
+		}
+		log.Infof("send event failed: %v", err)
+	}
+}
+
+func createProbeEvent(opsResult OpsResult) (*corev1.Event, error) {
+	eventTmpl := `
+apiVersion: v1
+kind: Event
+metadata:
+  name: {{ .PodName }}.{{ .EventSeq }}
+  namespace: {{ .Namespace }}
+involvedObject:
+  apiVersion: v1
+  fieldPath: spec.containers{sqlchannel}
+  kind: Pod
+  name: {{ .PodName }}
+  namespace: {{ .Namespace }}
+reason: RoleChanged
+type: Normal
+source:
+  component: sqlchannel
+`
+
+	// get pod object
+	podName := os.Getenv("KB_POD_NAME")
+	podUID := os.Getenv("KB_POD_UID")
+	nodeName := os.Getenv("KB_NODENAME")
+	namespace := os.Getenv("KB_NAMESPACE")
+	msg, _ := json.Marshal(opsResult)
+	seq := rand.String(16)
+	roleValue := map[string]string{
+		"PodName":   podName,
+		"Namespace": namespace,
+		"EventSeq":  seq,
+	}
+	tmpl, err := template.New("event-tmpl").Parse(eventTmpl)
+	if err != nil {
+		return nil, err
+	}
+	buf := new(bytes.Buffer)
+	err = tmpl.Execute(buf, roleValue)
+	if err != nil {
+		return nil, err
+	}
+
+	event := &corev1.Event{}
+	_, _, err = scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, event)
+	if err != nil {
+		return nil, err
+	}
+	event.Message = string(msg)
+	event.InvolvedObject.UID = types.UID(podUID)
+	event.Source.Host = nodeName
+	event.Reason = string(opsResult["operation"].(bindings.OperationKind))
+	event.FirstTimestamp = metav1.Now()
+	event.LastTimestamp = metav1.Now()
+
+	return event, nil
 }

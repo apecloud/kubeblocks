@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configuration
@@ -20,6 +23,7 @@ import (
 	"context"
 
 	"github.com/StudioSol/set"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -30,7 +34,7 @@ type ParamPairs struct {
 	UpdatedParams map[string]interface{}
 }
 
-// MergeAndValidateConfigs does merge configuration files and validate
+// MergeAndValidateConfigs merges and validates configuration files
 func MergeAndValidateConfigs(configConstraint appsv1alpha1.ConfigConstraintSpec, baseConfigs map[string]string, cmKey []string, updatedParams []ParamPairs) (map[string]string, error) {
 	var (
 		err error
@@ -64,9 +68,9 @@ func MergeAndValidateConfigs(configConstraint appsv1alpha1.ConfigConstraintSpec,
 		return nil, WrapError(err, "failed to generate config file")
 	}
 
-	// The ToCfgContent interface returns the file contents of all keys, and after the configuration file is encoded and decoded,
-	// the content may be inconsistent, such as comments, blank lines, etc,
-	// in order to minimize the impact on the original configuration file, only update the changed file content.
+	// The ToCfgContent interface returns the file contents of all keys, the configuration file is encoded and decoded into keys,
+	// the content may be different with the original file, such as comments, blank lines, etc,
+	// in order to minimize the impact on the original file, only update the changed part.
 	updatedCfg := fromUpdatedConfig(newCfg, updatedKeys)
 	if err = NewConfigValidator(&configConstraint, WithKeySelector(cmKey)).Validate(updatedCfg); err != nil {
 		return nil, WrapError(err, "failed to validate updated config")
@@ -88,7 +92,7 @@ func mergeUpdatedConfig(baseMap, updatedMap map[string]string) map[string]string
 	return r
 }
 
-// fromUpdatedConfig function is to filter out changed file contents.
+// fromUpdatedConfig filters out changed file contents.
 func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[string]string {
 	if sets.Length() == 0 {
 		return map[string]string{}
@@ -131,4 +135,29 @@ func ApplyConfigPatch(baseCfg []byte, updatedParameters map[string]string, forma
 	}
 	mergedConfig := configWrapper.getConfigObject(mergedOptions)
 	return mergedConfig.Marshal()
+}
+
+func NeedReloadVolume(config appsv1alpha1.ComponentConfigSpec) bool {
+	// TODO distinguish between scripts and configuration
+	return config.ConfigConstraintRef != ""
+}
+
+func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []appsv1alpha1.ComponentConfigSpec) (*appsv1alpha1.ReloadOptions, *appsv1alpha1.FormatterConfig, error) {
+	for _, configSpec := range configSpecs {
+		if !NeedReloadVolume(configSpec) {
+			continue
+		}
+		ccKey := client.ObjectKey{
+			Namespace: "",
+			Name:      configSpec.ConfigConstraintRef,
+		}
+		cfgConst := &appsv1alpha1.ConfigConstraint{}
+		if err := cli.Get(ctx, ccKey, cfgConst); err != nil {
+			return nil, nil, WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
+		}
+		if cfgConst.Spec.ReloadOptions != nil {
+			return cfgConst.Spec.ReloadOptions, cfgConst.Spec.FormatterConfig, nil
+		}
+	}
+	return nil, nil, nil
 }

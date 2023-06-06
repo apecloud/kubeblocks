@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package class
@@ -20,39 +23,55 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/ghodss/yaml"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
-// GetCustomClassConfigMapName Returns the name of the ConfigMap containing the custom classes
-func GetCustomClassConfigMapName(cdName string, componentName string) string {
+// ValidateComponentClass checks if component classDefRef or resource is valid
+func ValidateComponentClass(comp *v1alpha1.ClusterComponentSpec, compClasses map[string]map[string]*v1alpha1.ComponentClassInstance) (*v1alpha1.ComponentClassInstance, error) {
+	classes := compClasses[comp.ComponentDefRef]
+	var cls *v1alpha1.ComponentClassInstance
+	switch {
+	case comp.ClassDefRef != nil && comp.ClassDefRef.Class != "":
+		if classes == nil {
+			return nil, fmt.Errorf("can not find classes for component %s", comp.ComponentDefRef)
+		}
+		cls = classes[comp.ClassDefRef.Class]
+		if cls == nil {
+			return nil, fmt.Errorf("unknown component class %s", comp.ClassDefRef.Class)
+		}
+	case classes != nil:
+		cls = ChooseComponentClasses(classes, comp.Resources.Requests)
+		if cls == nil {
+			return nil, fmt.Errorf("can not find matching class for component %s", comp.Name)
+		}
+	}
+	return cls, nil
+}
+
+// GetCustomClassObjectName returns the name of the ComponentClassDefinition object containing the custom classes
+func GetCustomClassObjectName(cdName string, componentName string) string {
 	return fmt.Sprintf("kb.classes.custom.%s.%s", cdName, componentName)
 }
 
-// ChooseComponentClasses Choose the classes to be used for a given component with some constraints
-func ChooseComponentClasses(classes map[string]*ComponentClass, filters map[string]resource.Quantity) *ComponentClass {
-	var candidates []*ComponentClass
+// ChooseComponentClasses chooses the classes to be used for a given component with constraints
+func ChooseComponentClasses(classes map[string]*v1alpha1.ComponentClassInstance, resources corev1.ResourceList) *v1alpha1.ComponentClassInstance {
+	var candidates []*v1alpha1.ComponentClassInstance
 	for _, cls := range classes {
-		cpu, ok := filters[corev1.ResourceCPU.String()]
-		if ok && !cpu.Equal(cls.CPU) {
+		if !resources.Cpu().IsZero() && !resources.Cpu().Equal(cls.CPU) {
 			continue
 		}
-		memory, ok := filters[corev1.ResourceMemory.String()]
-		if ok && !memory.Equal(cls.Memory) {
+		if !resources.Memory().IsZero() && !resources.Memory().Equal(cls.Memory) {
 			continue
 		}
 		candidates = append(candidates, cls)
@@ -64,21 +83,64 @@ func ChooseComponentClasses(classes map[string]*ComponentClass, filters map[stri
 	return candidates[0]
 }
 
-func GetClassFamilies(dynamic dynamic.Interface) (map[string]*v1alpha1.ClassFamily, error) {
-	objs, err := dynamic.Resource(types.ClassFamilyGVR()).Namespace("").List(context.TODO(), metav1.ListOptions{
-		//LabelSelector: types.ClassFamilyProviderLabelKey,
+func GetClasses(classDefinitionList v1alpha1.ComponentClassDefinitionList) (map[string]map[string]*v1alpha1.ComponentClassInstance, error) {
+	var (
+		compTypeLabel    = "apps.kubeblocks.io/component-def-ref"
+		componentClasses = make(map[string]map[string]*v1alpha1.ComponentClassInstance)
+	)
+	for _, classDefinition := range classDefinitionList.Items {
+		componentType := classDefinition.GetLabels()[compTypeLabel]
+		if componentType == "" {
+			return nil, fmt.Errorf("can not find component type label %s", compTypeLabel)
+		}
+		var (
+			err     error
+			classes = make(map[string]*v1alpha1.ComponentClassInstance)
+		)
+		if classDefinition.GetGeneration() != 0 &&
+			classDefinition.Status.ObservedGeneration == classDefinition.GetGeneration() {
+			for idx := range classDefinition.Status.Classes {
+				cls := classDefinition.Status.Classes[idx]
+				classes[cls.Name] = &cls
+			}
+		} else {
+			classes, err = ParseComponentClasses(classDefinition)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if _, ok := componentClasses[componentType]; !ok {
+			componentClasses[componentType] = classes
+		} else {
+			for k, v := range classes {
+				if _, exists := componentClasses[componentType][k]; exists {
+					return nil, fmt.Errorf("duplicated component class %s", k)
+				}
+				componentClasses[componentType][k] = v
+			}
+		}
+	}
+
+	return componentClasses, nil
+}
+
+// GetResourceConstraints gets all resource constraints
+func GetResourceConstraints(dynamic dynamic.Interface) (map[string]*v1alpha1.ComponentResourceConstraint, error) {
+	objs, err := dynamic.Resource(types.ComponentResourceConstraintGVR()).List(context.TODO(), metav1.ListOptions{
+		//LabelSelector: types.ResourceConstraintProviderLabelKey,
 	})
 	if err != nil {
 		return nil, err
 	}
-	var classFamilyList v1alpha1.ClassFamilyList
-	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), &classFamilyList); err != nil {
+	var constraintsList v1alpha1.ComponentResourceConstraintList
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), &constraintsList); err != nil {
 		return nil, err
 	}
 
-	result := make(map[string]*v1alpha1.ClassFamily)
-	for _, cf := range classFamilyList.Items {
-		if _, ok := cf.GetLabels()[types.ClassFamilyProviderLabelKey]; !ok {
+	result := make(map[string]*v1alpha1.ComponentResourceConstraint)
+	for idx := range constraintsList.Items {
+		cf := constraintsList.Items[idx]
+		if _, ok := cf.GetLabels()[types.ResourceConstraintProviderLabelKey]; !ok {
 			continue
 		}
 		result[cf.GetName()] = &cf
@@ -86,83 +148,26 @@ func GetClassFamilies(dynamic dynamic.Interface) (map[string]*v1alpha1.ClassFami
 	return result, nil
 }
 
-// GetClasses Get all classes, including kubeblocks default classes and user custom classes
-func GetClasses(client kubernetes.Interface, cdName string) (map[string]map[string]*ComponentClass, error) {
+// ListClassesByClusterDefinition gets all classes, including kubeblocks default classes and user custom classes
+func ListClassesByClusterDefinition(client dynamic.Interface, cdName string) (map[string]map[string]*v1alpha1.ComponentClassInstance, error) {
 	selector := fmt.Sprintf("%s=%s,%s", constant.ClusterDefLabelKey, cdName, types.ClassProviderLabelKey)
-	cmList, err := client.CoreV1().ConfigMaps(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{
+	objs, err := client.Resource(types.ComponentClassDefinitionGVR()).Namespace("").List(context.TODO(), metav1.ListOptions{
 		LabelSelector: selector,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return ParseClasses(cmList)
+	var classDefinitionList v1alpha1.ComponentClassDefinitionList
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), &classDefinitionList); err != nil {
+		return nil, err
+	}
+	return GetClasses(classDefinitionList)
 }
 
-func ParseClasses(cmList *corev1.ConfigMapList) (map[string]map[string]*ComponentClass, error) {
-	var (
-		componentClasses = make(map[string]map[string]*ComponentClass)
-	)
-	for _, cm := range cmList.Items {
-		if _, ok := cm.GetLabels()[types.ClassProviderLabelKey]; !ok {
-			continue
-		}
-		level := cm.GetLabels()[types.ClassLevelLabelKey]
-		switch level {
-		case "component":
-			componentType := cm.GetLabels()[constant.KBAppComponentDefRefLabelKey]
-			if componentType == "" {
-				return nil, fmt.Errorf("failed to find component type")
-			}
-			classes, err := ParseComponentClasses(cm.Data)
-			if err != nil {
-				return nil, err
-			}
-			if _, ok := componentClasses[componentType]; !ok {
-				componentClasses[componentType] = classes
-			} else {
-				for k, v := range classes {
-					if _, exists := componentClasses[componentType][k]; exists {
-						return nil, fmt.Errorf("duplicate component class %s", k)
-					}
-					componentClasses[componentType][k] = v
-				}
-			}
-		case "cluster":
-			// TODO
-		default:
-			return nil, fmt.Errorf("invalid class level: %s", level)
-		}
-	}
-
-	return componentClasses, nil
-}
-
-type classVersion int64
-
-// ParseComponentClasses parse configmap.data to component classes
-func ParseComponentClasses(data map[string]string) (map[string]*ComponentClass, error) {
-	versions := make(map[classVersion][]*ComponentClassFamilyDef)
-
-	for k, v := range data {
-		// ConfigMap data key follows the format: families-[version]
-		// version is the timestamp in unix microseconds which class is created
-		parts := strings.SplitAfterN(k, "-", 2)
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("invalid key: %s", k)
-		}
-		version, err := strconv.ParseInt(parts[1], 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid key: %s", k)
-		}
-		var families []*ComponentClassFamilyDef
-		if err := yaml.Unmarshal([]byte(v), &families); err != nil {
-			return nil, err
-		}
-		versions[classVersion(version)] = families
-	}
-
-	genClassDef := func(nameTpl string, bodyTpl string, vars []string, args []string) (ComponentClassDef, error) {
-		var def ComponentClassDef
+// ParseComponentClasses parses ComponentClassDefinition to component classes
+func ParseComponentClasses(classDefinition v1alpha1.ComponentClassDefinition) (map[string]*v1alpha1.ComponentClassInstance, error) {
+	genClass := func(nameTpl string, bodyTpl string, vars []string, args []string) (v1alpha1.ComponentClass, error) {
+		var result v1alpha1.ComponentClass
 		values := make(map[string]interface{})
 		for index, key := range vars {
 			values[key] = args[index]
@@ -170,69 +175,57 @@ func ParseComponentClasses(data map[string]string) (map[string]*ComponentClass, 
 
 		classStr, err := renderTemplate(bodyTpl, values)
 		if err != nil {
-			return def, err
+			return result, err
 		}
 
-		if err = yaml.Unmarshal([]byte(classStr), &def); err != nil {
-			return def, err
+		if err = yaml.Unmarshal([]byte(classStr), &result); err != nil {
+			return result, err
 		}
 
-		def.Name, err = renderTemplate(nameTpl, values)
+		name, err := renderTemplate(nameTpl, values)
 		if err != nil {
-			return def, err
+			return result, err
 		}
-		return def, nil
+		result.Name = name
+		return result, nil
 	}
 
-	parser := func(family *ComponentClassFamilyDef, series ComponentClassSeriesDef, class ComponentClassDef) (*ComponentClass, error) {
-		var (
-			err error
-			def = class
-		)
-
+	parser := func(group v1alpha1.ComponentClassGroup, series v1alpha1.ComponentClassSeries, class v1alpha1.ComponentClass) (*v1alpha1.ComponentClassInstance, error) {
 		if len(class.Args) > 0 {
-			def, err = genClassDef(series.Name, family.Template, family.Vars, class.Args)
+			cls, err := genClass(series.NamingTemplate, group.Template, group.Vars, class.Args)
 			if err != nil {
 				return nil, err
 			}
 
-			if class.Name != "" {
-				def.Name = class.Name
+			if class.Name == "" && cls.Name != "" {
+				class.Name = cls.Name
 			}
+			class.CPU = cls.CPU
+			class.Memory = cls.Memory
 		}
-
-		result := &ComponentClass{
-			Name:   def.Name,
-			Family: family.Family,
-			CPU:    resource.MustParse(def.CPU),
-			Memory: resource.MustParse(def.Memory),
+		result := &v1alpha1.ComponentClassInstance{
+			ComponentClass: v1alpha1.ComponentClass{
+				Name:   class.Name,
+				CPU:    class.CPU,
+				Memory: class.Memory,
+			},
+			ResourceConstraintRef: group.ResourceConstraintRef,
 		}
-
-		for _, disk := range def.Storage {
-			result.Storage = append(result.Storage, &Disk{
-				Name:  disk.Name,
-				Class: disk.Class,
-				Size:  resource.MustParse(disk.Size),
-			})
-		}
-
 		return result, nil
 	}
 
-	result := make(map[string]*ComponentClass)
-	for _, families := range versions {
-		for _, family := range families {
-			for _, series := range family.Series {
-				for _, class := range series.Classes {
-					out, err := parser(family, series, class)
-					if err != nil {
-						return nil, err
-					}
-					if _, exists := result[out.Name]; exists {
-						return nil, fmt.Errorf("duplicate component class name: %s", out.Name)
-					}
-					result[out.Name] = out
+	result := make(map[string]*v1alpha1.ComponentClassInstance)
+	for _, group := range classDefinition.Spec.Groups {
+		for _, series := range group.Series {
+			for _, class := range series.Classes {
+				out, err := parser(group, series, class)
+				if err != nil {
+					return nil, err
 				}
+				if _, exists := result[out.Name]; exists {
+					return nil, fmt.Errorf("duplicated component class name: %s", out.Name)
+				}
+				result[out.Name] = out
 			}
 		}
 	}
@@ -249,9 +242,4 @@ func renderTemplate(tpl string, values map[string]interface{}) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
-}
-
-// BuildClassDefinitionVersion generate the key in the configmap data field
-func BuildClassDefinitionVersion() string {
-	return fmt.Sprintf("version-%s", time.Now().Format("20060102150405"))
 }

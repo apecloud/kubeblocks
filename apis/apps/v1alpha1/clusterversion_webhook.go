@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -157,7 +157,7 @@ func (r *ClusterVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefini
 }
 
 func getComponentDefNotFoundMsg(invalidComponentDefNames []string, clusterDefName string) string {
-	return fmt.Sprintf(" %v is not found in ClusterDefinition.spec.componentDefs[*].name %s",
+	return fmt.Sprintf(" %v is not found in ClusterDefinition.spec.componentDefs[*].name of %s",
 		invalidComponentDefNames, clusterDefName)
 }
 

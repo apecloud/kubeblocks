@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package k8score
@@ -19,7 +22,6 @@ package k8score
 import (
 	"context"
 	"encoding/json"
-	"regexp"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -32,11 +34,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/consensusset"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/consensusset"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type EventHandler interface {
@@ -72,6 +76,7 @@ var _ EventHandler = &RoleChangeEventHandler{}
 
 func init() {
 	EventHandlerMap["role-change-handler"] = &RoleChangeEventHandler{}
+	EventHandlerMap["consensus-set-event-handler"] = &consensusset.PodRoleEventHandler{}
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -112,7 +117,7 @@ func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // Handle handles role changed event.
 func (r *RoleChangeEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != constant.ProbeCheckRolePath {
+	if event.Reason != string(probeutil.CheckRoleOperation) {
 		return nil
 	}
 	var (
@@ -146,7 +151,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 		return "", nil
 	}
 
-	// if probe event operation is not impl, check role failed or role invalid, ignore it
+	// if probe event operation is not implemented, check role failed or invalid, ignore it
 	if message.Event == ProbeEventOperationNotImpl || message.Event == ProbeEventCheckRoleFailed || message.Event == ProbeEventRoleInvalid {
 		reqCtx.Log.Info("probe event failed", "message", message.Message)
 		return "", nil
@@ -175,16 +180,16 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	}, cluster); err != nil {
 		return role, err
 	}
-	reqCtx.Log.V(1).Info("handle role change event", "cluster", cluster.Name, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
+	reqCtx.Log.V(1).Info("handle role changed event", "cluster", cluster.Name, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
 	compName, componentDef, err := componentutil.GetComponentInfoByPod(reqCtx.Ctx, cli, *cluster, pod)
 	if err != nil {
 		return role, err
 	}
 	switch componentDef.WorkloadType {
 	case appsv1alpha1.Consensus:
-		return role, consensusset.UpdateConsensusSetRoleLabel(cli, reqCtx, componentDef, pod, role)
+		return role, consensus.UpdateConsensusSetRoleLabel(cli, reqCtx, componentDef, pod, role)
 	case appsv1alpha1.Replication:
-		return role, replicationset.HandleReplicationSetRoleChangeEvent(cli, reqCtx, cluster, compName, pod, role)
+		return role, replication.HandleReplicationSetRoleChangeEvent(cli, reqCtx, cluster, compName, pod, role)
 	}
 	return role, nil
 }
@@ -192,14 +197,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 // ParseProbeEventMessage parses probe event message.
 func ParseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) *ProbeMessage {
 	message := &ProbeMessage{}
-	re := regexp.MustCompile(`Readiness probe failed: ({.*})`)
-	matches := re.FindStringSubmatch(event.Message)
-	if len(matches) != 2 {
-		reqCtx.Log.Info("parser Readiness probe event message failed", "message", event.Message)
-		return nil
-	}
-	msg := matches[1]
-	err := json.Unmarshal([]byte(msg), message)
+	err := json.Unmarshal([]byte(event.Message), message)
 	if err != nil {
 		// not role related message, ignore it
 		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)

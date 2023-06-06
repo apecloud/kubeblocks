@@ -1,29 +1,39 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package util
 
 import (
+	"bytes"
+	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/pkg/errors"
+	"k8s.io/klog/v2"
 )
 
-// CloneGitRepo clone git repo to local path
+// CloneGitRepo clones git repo to local path
 func CloneGitRepo(url, branch, path string) error {
 	pullFunc := func(repo *git.Repository) error {
 		// Get the working directory for the repository
@@ -66,4 +76,69 @@ func CloneGitRepo(url, branch, path string) error {
 		SingleBranch:  true,
 	})
 	return err
+}
+
+func GitGetRemoteURL(dir string) (string, error) {
+	return ExecGitCommand(dir, "config", "--get", "remote.origin.url")
+}
+
+// EnsureCloned clones into the destination path, otherwise returns no error.
+func EnsureCloned(uri, destinationPath string) error {
+	if ok, err := IsGitCloned(destinationPath); err != nil {
+		return err
+	} else if !ok {
+		_, err = ExecGitCommand("", "clone", "-v", uri, destinationPath)
+		return err
+	}
+	return nil
+}
+
+// IsGitCloned tests if the path is a git dir.
+func IsGitCloned(gitPath string) (bool, error) {
+	f, err := os.Stat(filepath.Join(gitPath, ".git"))
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return err == nil && f.IsDir(), err
+}
+
+// EnsureUpdated ensures the destination path exists and is up to date.
+func EnsureUpdated(uri, destinationPath string) error {
+	if err := EnsureCloned(uri, destinationPath); err != nil {
+		return err
+	}
+	return UpdateAndCleanUntracked(destinationPath)
+}
+
+// UpdateAndCleanUntracked fetches origin and sets HEAD to origin/HEAD
+// and also creates a pristine working directory by removing
+// untracked files and directories.
+func UpdateAndCleanUntracked(destinationPath string) error {
+	if _, err := ExecGitCommand(destinationPath, "fetch", "-v"); err != nil {
+		return errors.Wrapf(err, "fetch index at %q failed", destinationPath)
+	}
+
+	if _, err := ExecGitCommand(destinationPath, "reset", "--hard", "@{upstream}"); err != nil {
+		return errors.Wrapf(err, "reset index at %q failed", destinationPath)
+	}
+
+	_, err := ExecGitCommand(destinationPath, "clean", "-xfd")
+	return errors.Wrapf(err, "clean index at %q failed", destinationPath)
+}
+
+// ExecGitCommand executes a git command in the given directory.
+func ExecGitCommand(pwd string, args ...string) (string, error) {
+	klog.V(4).Infof("Going to run git %s", strings.Join(args, " "))
+	cmd := exec.Command("git", args...)
+	cmd.Dir = pwd
+	buf := bytes.Buffer{}
+	var w io.Writer = &buf
+	if klog.V(2).Enabled() {
+		w = io.MultiWriter(w, os.Stderr)
+	}
+	cmd.Stdout, cmd.Stderr = w, w
+	if err := cmd.Run(); err != nil {
+		return "", errors.Wrapf(err, "command execution failure, output=%q", buf.String())
+	}
+	return strings.TrimSpace(buf.String()), nil
 }

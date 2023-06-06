@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,54 +17,139 @@ limitations under the License.
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	"strconv"
+	"strings"
+	"time"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // BackupPolicySpec defines the desired state of BackupPolicy
 type BackupPolicySpec struct {
-	// policy can inherit from backup config and override some fields.
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// retention describe how long the Backup should be retained. if not set, will be retained forever.
 	// +optional
-	BackupPolicyTemplateName string `json:"backupPolicyTemplateName,omitempty"`
+	Retention *RetentionSpec `json:"retention,omitempty"`
 
-	// The schedule in Cron format, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
+	// schedule policy for backup.
 	// +optional
-	Schedule string `json:"schedule,omitempty"`
+	Schedule Schedule `json:"schedule,omitempty"`
 
-	// Backup ComponentDefRef. full or incremental or snapshot. if unset, default is snapshot.
-	// +kubebuilder:validation:Enum={full,incremental,snapshot}
-	// +kubebuilder:default=snapshot
+	// the policy for snapshot backup.
 	// +optional
-	BackupType string `json:"backupType,omitempty"`
+	Snapshot *SnapshotPolicy `json:"snapshot,omitempty"`
 
-	// The number of automatic backups to retain. Value must be non-negative integer.
-	// 0 means NO limit on the number of backups.
-	// +kubebuilder:default=7
+	// the policy for datafile backup.
 	// +optional
-	BackupsHistoryLimit int32 `json:"backupsHistoryLimit,omitempty"`
+	Datafile *CommonBackupPolicy `json:"datafile,omitempty"`
 
-	// which backup tool to perform database backup, only support one tool.
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// the policy for logfile backup.
 	// +optional
-	BackupToolName string `json:"backupToolName,omitempty"`
+	Logfile *CommonBackupPolicy `json:"logfile,omitempty"`
+}
 
-	// TTL is a time.Duration-parseable string describing how long
-	// the Backup should be retained for.
+type RetentionSpec struct {
+	// ttl is a time string ending with the 'd'|'D'|'h'|'H' character to describe how long
+	// the Backup should be retained. if not set, will be retained forever.
+	// +kubebuilder:validation:Pattern:=`^\d+[d|D|h|H]$`
 	// +optional
-	TTL *metav1.Duration `json:"ttl,omitempty"`
+	TTL *string `json:"ttl,omitempty"`
+}
 
-	// database cluster service
+type Schedule struct {
+	// schedule policy for snapshot backup.
+	// +optional
+	Snapshot *SchedulePolicy `json:"snapshot,omitempty"`
+
+	// schedule policy for datafile backup.
+	// +optional
+	Datafile *SchedulePolicy `json:"datafile,omitempty"`
+
+	// schedule policy for logfile backup.
+	// +optional
+	Logfile *SchedulePolicy `json:"logfile,omitempty"`
+}
+
+type SchedulePolicy struct {
+	// the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
 	// +kubebuilder:validation:Required
-	Target TargetCluster `json:"target"`
+	CronExpression string `json:"cronExpression"`
+
+	// enable or disable the schedule.
+	// +kubebuilder:validation:Required
+	Enable bool `json:"enable"`
+}
+
+type SnapshotPolicy struct {
+	BasePolicy `json:",inline"`
 
 	// execute hook commands for backup.
 	// +optional
 	Hooks *BackupPolicyHook `json:"hooks,omitempty"`
+}
 
-	// array of remote volumes from CSI driver definition.
+type CommonBackupPolicy struct {
+	BasePolicy `json:",inline"`
+
+	// refer to PersistentVolumeClaim and the backup data will be stored in the corresponding persistent volume.
 	// +kubebuilder:validation:Required
-	RemoteVolume corev1.Volume `json:"remoteVolume"`
+	PersistentVolumeClaim PersistentVolumeClaim `json:"persistentVolumeClaim"`
+
+	// which backup tool to perform database backup, only support one tool.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	BackupToolName string `json:"backupToolName,omitempty"`
+}
+
+type PersistentVolumeClaim struct {
+	// the name of the PersistentVolumeClaim.
+	Name string `json:"name"`
+
+	// storageClassName is the name of the StorageClass required by the claim.
+	// +optional
+	StorageClassName *string `json:"storageClassName,omitempty"`
+
+	// initCapacity represents the init storage size of the PersistentVolumeClaim which should be created if not exist.
+	// and the default value is 100Gi if it is empty.
+	// +optional
+	InitCapacity resource.Quantity `json:"initCapacity,omitempty"`
+
+	// createPolicy defines the policy for creating the PersistentVolumeClaim, enum values:
+	// - Never: do nothing if the PersistentVolumeClaim not exists.
+	// - IfNotPresent: create the PersistentVolumeClaim if not present and the accessModes only contains 'ReadWriteMany'.
+	// +kubebuilder:default=IfNotPresent
+	// +optional
+	CreatePolicy CreatePVCPolicy `json:"createPolicy"`
+
+	// persistentVolumeConfigMap references the configmap which contains a persistentVolume template.
+	// key must be "persistentVolume" and value is the "PersistentVolume" struct.
+	// support the following built-in Objects:
+	// - $(GENERATE_NAME): generate a specific format "pvcName-pvcNamespace".
+	// if the PersistentVolumeClaim not exists and CreatePolicy is "IfNotPresent", the controller
+	// will create it by this template. this is a mutually exclusive setting with "storageClassName".
+	// +optional
+	PersistentVolumeConfigMap *PersistentVolumeConfigMap `json:"persistentVolumeConfigMap,omitempty"`
+}
+
+type PersistentVolumeConfigMap struct {
+	// the name of the persistentVolume ConfigMap.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// the namespace of the persistentVolume ConfigMap.
+	// +kubebuilder:validation:Required
+	Namespace string `json:"namespace"`
+}
+type BasePolicy struct {
+	// target database cluster for backup.
+	// +kubebuilder:validation:Required
+	Target TargetCluster `json:"target"`
+
+	// the number of automatic backups to retain. Value must be non-negative integer.
+	// 0 means NO limit on the number of backups.
+	// +kubebuilder:default=7
+	// +optional
+	BackupsHistoryLimit int32 `json:"backupsHistoryLimit,omitempty"`
 
 	// count of backup stop retries on fail.
 	// +optional
@@ -77,37 +162,39 @@ type BackupPolicySpec struct {
 
 // TargetCluster TODO (dsj): target cluster need redefined from Cluster API
 type TargetCluster struct {
-	// LabelSelector is used to find matching pods.
+	// labelsSelector is used to find matching pods.
 	// Pods that match this label selector are counted to determine the number of pods
 	// in their corresponding topology domain.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:pruning:PreserveUnknownFields
 	LabelsSelector *metav1.LabelSelector `json:"labelsSelector"`
 
-	// Secret is used to connect to the target database cluster.
+	// secret is used to connect to the target database cluster.
 	// If not set, secret will be inherited from backup policy template.
 	// if still not set, the controller will check if any system account for dataprotection has been created.
 	// +optional
 	Secret *BackupPolicySecret `json:"secret,omitempty"`
 }
 
-// BackupPolicySecret defined for the target database secret that backup tool can connect.
+// BackupPolicySecret defines for the target database secret that backup tool can connect.
 type BackupPolicySecret struct {
 	// the secret name
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// UserKeyword the map keyword of the user in the connection credential secret
-	// +optional
-	UserKeyword string `json:"userKeyword,omitempty"`
+	// usernameKey the map key of the user in the connection credential secret
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=username
+	UsernameKey string `json:"usernameKey,omitempty"`
 
-	// PasswordKeyword the map keyword of the password in the connection credential secret
-	// +optional
-	PasswordKeyword string `json:"passwordKeyword,omitempty"`
+	// passwordKey the map key of the password in the connection credential secret
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=password
+	PasswordKey string `json:"passwordKey,omitempty"`
 }
 
-// BackupPolicyHook defined for the database execute commands before and after backup.
+// BackupPolicyHook defines for the database execute commands before and after backup.
 type BackupPolicyHook struct {
 	// pre backup to perform commands
 	// +optional
@@ -159,28 +246,36 @@ type BackupStatusUpdate struct {
 
 // BackupPolicyStatus defines the observed state of BackupPolicy
 type BackupPolicyStatus struct {
-	// backup policy phase valid value: available, failed, new.
+
+	// observedGeneration is the most recent generation observed for this
+	// BackupPolicy. It corresponds to the Cluster's generation, which is
+	// updated on mutation by the API Server.
 	// +optional
-	Phase BackupPolicyTemplatePhase `json:"phase,omitempty"`
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// backup policy phase valid value: Available, Failed.
+	// +optional
+	Phase BackupPolicyPhase `json:"phase,omitempty"`
 
 	// the reason if backup policy check failed.
 	// +optional
 	FailureReason string `json:"failureReason,omitempty"`
 
-	// Information when was the last time the job was successfully scheduled.
+	// information when was the last time the job was successfully scheduled.
 	// +optional
 	LastScheduleTime *metav1.Time `json:"lastScheduleTime,omitempty"`
 
-	// Information when was the last time the job successfully completed.
+	// information when was the last time the job successfully completed.
 	// +optional
 	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
 }
 
+// +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
+// +kubebuilder:resource:categories={kubeblocks},scope=Namespaced,shortName=bp
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
-// +kubebuilder:printcolumn:name="SCHEDULE",type=string,JSONPath=`.spec.schedule`
 // +kubebuilder:printcolumn:name="LAST SCHEDULE",type=string,JSONPath=`.status.lastScheduleTime`
 // +kubebuilder:printcolumn:name="AGE",type=date,JSONPath=`.metadata.creationTimestamp`
 
@@ -204,4 +299,40 @@ type BackupPolicyList struct {
 
 func init() {
 	SchemeBuilder.Register(&BackupPolicy{}, &BackupPolicyList{})
+}
+
+func (r *BackupPolicySpec) GetCommonPolicy(backupType BackupType) *CommonBackupPolicy {
+	switch backupType {
+	case BackupTypeDataFile:
+		return r.Datafile
+	case BackupTypeLogFile:
+		return r.Logfile
+	}
+	return nil
+}
+
+func (r *BackupPolicySpec) GetCommonSchedulePolicy(backupType BackupType) *SchedulePolicy {
+	switch backupType {
+	case BackupTypeSnapshot:
+		return r.Schedule.Snapshot
+	case BackupTypeDataFile:
+		return r.Schedule.Datafile
+	case BackupTypeLogFile:
+		return r.Schedule.Logfile
+	}
+	return nil
+}
+
+// ToDuration converts the ttl string to time.Duration.
+func ToDuration(ttl *string) time.Duration {
+	if ttl == nil {
+		return time.Duration(0)
+	}
+	ttlLower := strings.ToLower(*ttl)
+	if strings.HasSuffix(ttlLower, "d") {
+		days, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "d", ""))
+		return time.Hour * 24 * time.Duration(days)
+	}
+	hours, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "h", ""))
+	return time.Hour * time.Duration(hours)
 }

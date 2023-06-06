@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configuration
@@ -34,17 +37,17 @@ type ConfigValidator interface {
 }
 
 type cmKeySelector struct {
-	// A ConfigMap object may contain multiple configuration files and only some configuration files can recognize their format and verify their by kubeblocks,
-	// such as pg, there are two files, pg_hba.conf and postgresql.conf in the ConfigMap, we can only validate postgresql.conf,
-	// thus pg_hba.conf file needs to be ignored during the verification.
-	// keySelector is used to filter the keys in the configmap.
+	// A ConfigMap object may contain multiple configuration files and only some of them can be parsed and verified by kubeblocks,
+	// such as postgresql, there are two files pg_hba.conf & postgresql.conf in the ConfigMap, and we can only validate postgresql.conf,
+	// so pg_hba.conf file needs to be ignored during when doing verification.
+	// keySelector filters the keys in the configmap.
 	keySelector []ValidatorOptions
 }
 
 type configCueValidator struct {
 	cmKeySelector
 
-	// cue describe configuration template
+	// cue describes configuration template
 	cueScript string
 	cfgType   appsv1alpha1.CfgFileFormat
 }

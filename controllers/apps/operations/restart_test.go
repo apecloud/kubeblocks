@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package operations
@@ -19,7 +22,6 @@ package operations
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -38,7 +40,7 @@ var _ = Describe("Restart OpsRequest", func() {
 	)
 
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -59,11 +61,18 @@ var _ = Describe("Restart OpsRequest", func() {
 	AfterEach(cleanEnv)
 
 	Context("Test OpsRequest", func() {
-		It("Test restart OpsRequest", func() {
+		var (
+			opsRes  *OpsResource
+			cluster *appsv1alpha1.Cluster
+			reqCtx  intctrlutil.RequestCtx
+		)
+		BeforeEach(func() {
 			By("init operations resources ")
-			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			opsRes, _, cluster = initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			reqCtx = intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+		})
 
+		It("Test restart OpsRequest", func() {
 			By("create Restart opsRequest")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase, consensusComp, statelessComp)
@@ -74,8 +83,8 @@ var _ = Describe("Restart OpsRequest", func() {
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 
 			By("test restart action and reconcile function")
-			testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusComp)
-			testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessComp)
+			testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusComp)
+			testapps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessComp)
 			rHandler := restartOpsHandler{}
 			_ = rHandler.Action(reqCtx, k8sClient, opsRes)
 
@@ -87,6 +96,21 @@ var _ = Describe("Restart OpsRequest", func() {
 			Expect(len(h.GetRealAffectedComponentMap(opsRes.OpsRequest))).Should(Equal(2))
 		})
 
+		It("expect failed when cluster is stopped", func() {
+			By("mock cluster is stopped")
+			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
+				cluster.Status.Phase = appsv1alpha1.StoppedClusterPhase
+			})).Should(Succeed())
+			By("create Restart opsRequest")
+			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("OpsRequest.spec.type=Restart is forbidden when Cluster.status.phase=Stopped"))
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest),
+				func(g Gomega, fetched *appsv1alpha1.OpsRequest) {
+					g.Expect(fetched.Status.Phase).To(Equal(appsv1alpha1.OpsFailedPhase))
+				})).Should(Succeed())
+		})
 	})
 })
 

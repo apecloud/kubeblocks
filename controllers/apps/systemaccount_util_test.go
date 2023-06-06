@@ -1,23 +1,27 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package apps
 
 import (
 	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -54,6 +58,7 @@ func mockSystemAccountsSpec() *appsv1alpha1.SystemAccountSpec {
 		PasswordConfig:    pwdConfig,
 		Accounts:          []appsv1alpha1.SystemAccountConfig{},
 	}
+
 	var account appsv1alpha1.SystemAccountConfig
 	var scope appsv1alpha1.ProvisionScope
 	for _, name := range getAllSysAccounts() {
@@ -81,6 +86,7 @@ func mockCreateByStmtSystemAccount(name appsv1alpha1.AccountName) appsv1alpha1.S
 			Type: appsv1alpha1.CreateByStmt,
 			Statements: &appsv1alpha1.ProvisionStatements{
 				CreationStatement: "CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY \"$(PASSWD)\";",
+				UpdateStatement:   "ALTER USER $(USERNAME) IDENTIFIED BY \"$(PASSWD)\";",
 				DeletionStatement: "DROP USER IF EXISTS $(USERNAME);",
 			},
 		},
@@ -146,20 +152,20 @@ func TestRenderJob(t *testing.T) {
 		clusterDefName     = "test-clusterdef"
 		clusterVersionName = "test-clusterversion"
 		clusterNamePrefix  = "test-cluster"
-		mysqlCompType      = "replicasets"
+		mysqlCompDefName   = "replicasets"
 		mysqlCompName      = "mysql"
 	)
 
 	systemAccount := mockSystemAccountsSpec()
 	clusterDef := testapps.NewClusterDefFactory(clusterDefName).
-		AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+		AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 		AddSystemAccountSpec(systemAccount).
 		GetObject()
 	assert.NotNil(t, clusterDef)
 	assert.NotNil(t, clusterDef.Spec.ComponentDefs[0].SystemAccounts)
 
 	cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, clusterDef.Name, clusterVersionName).
-		AddComponent(mysqlCompType, mysqlCompName).GetObject()
+		AddComponent(mysqlCompDefName, mysqlCompName).GetObject()
 	assert.NotNil(t, cluster)
 	if cluster.Annotations == nil {
 		cluster.Annotations = make(map[string]string, 0)
@@ -195,7 +201,7 @@ func TestRenderJob(t *testing.T) {
 	for _, acc := range accountsSetting.Accounts {
 		switch acc.ProvisionPolicy.Type {
 		case appsv1alpha1.CreateByStmt:
-			creationStmt, secrets := getCreationStmtForAccount(compKey, accountsSetting.PasswordConfig, acc)
+			creationStmt, secrets := getCreationStmtForAccount(compKey, accountsSetting.PasswordConfig, acc, reCreate)
 			// make sure all variables have been replaced
 			for _, stmt := range creationStmt {
 				assert.False(t, strings.Contains(stmt, "$(USERNAME)"))
@@ -203,20 +209,21 @@ func TestRenderJob(t *testing.T) {
 			}
 			// render job with debug mode off
 			endpoint := "10.0.0.1"
-			job := renderJob(engine, compKey, creationStmt, endpoint)
+			mockJobName := "mock-job" + testCtx.GetRandomStr()
+			job := renderJob(mockJobName, engine, compKey, creationStmt, endpoint)
 			assert.NotNil(t, job)
-			calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
+			_ = calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			assert.NotNil(t, job.Spec.TTLSecondsAfterFinished)
-			assert.Equal(t, (int32)(0), *job.Spec.TTLSecondsAfterFinished)
+			assert.Equal(t, (int32)(1), *job.Spec.TTLSecondsAfterFinished)
 			envList := job.Spec.Template.Spec.Containers[0].Env
 			assert.GreaterOrEqual(t, len(envList), 1)
 			assert.Equal(t, job.Spec.Template.Spec.Containers[0].Image, cmdExecutorConfig.Image)
 			// render job with debug mode on
-			job = renderJob(engine, compKey, creationStmt, endpoint)
+			job = renderJob(mockJobName, engine, compKey, creationStmt, endpoint)
 			assert.NotNil(t, job)
 			// set debug mode on
 			cluster.Annotations[debugClusterAnnotationKey] = "True"
-			calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
+			_ = calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			assert.Nil(t, job.Spec.TTLSecondsAfterFinished)
 			assert.NotNil(t, secrets)
 			// set debug mode off
@@ -225,9 +232,9 @@ func TestRenderJob(t *testing.T) {
 			toleration := make([]corev1.Toleration, 0)
 			toleration = append(toleration, generateToleration())
 			cluster.Spec.Tolerations = toleration
-			job = renderJob(engine, compKey, creationStmt, endpoint)
+			job = renderJob(mockJobName, engine, compKey, creationStmt, endpoint)
 			assert.NotNil(t, job)
-			calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
+			_ = calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			jobToleration := job.Spec.Template.Spec.Tolerations
 			assert.Equal(t, 2, len(jobToleration))
 			// make sure the toleration is added to job and contains our built-in toleration
@@ -235,10 +242,10 @@ func TestRenderJob(t *testing.T) {
 			for _, t := range jobToleration {
 				tolerationKeys = append(tolerationKeys, t.Key)
 			}
-			assert.Contains(t, tolerationKeys, constant.KubeBlocksDataNodeTolerationKey)
+			assert.Contains(t, tolerationKeys, testDataPlaneTolerationKey)
 			assert.Contains(t, tolerationKeys, toleration[0].Key)
 		case appsv1alpha1.ReferToExisting:
-			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, constant.ConnCredentialPlaceHolder))
+			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, constant.KBConnCredentialPlaceHolder))
 		}
 	}
 }
@@ -306,20 +313,20 @@ func TestAccountDebugMode(t *testing.T) {
 
 func TestRenderCreationStmt(t *testing.T) {
 	var (
-		clusterDefName = "test-clusterdef"
-		clusterName    = "test-cluster"
-		mysqlCompType  = "replicasets"
-		mysqlCompName  = "mysql"
+		clusterDefName   = "test-clusterdef"
+		clusterName      = "test-cluster"
+		mysqlCompDefName = "replicasets"
+		mysqlCompName    = "mysql"
 	)
 
 	systemAccount := mockSystemAccountsSpec()
 	clusterDef := testapps.NewClusterDefFactory(clusterDefName).
-		AddComponent(testapps.StatefulMySQLComponent, mysqlCompType).
+		AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
 		AddSystemAccountSpec(systemAccount).
 		GetObject()
 	assert.NotNil(t, clusterDef)
 
-	compDef := clusterDef.GetComponentDefByName(mysqlCompType)
+	compDef := clusterDef.GetComponentDefByName(mysqlCompDefName)
 	assert.NotNil(t, compDef.SystemAccounts)
 
 	accountsSetting := compDef.SystemAccounts
@@ -332,7 +339,7 @@ func TestRenderCreationStmt(t *testing.T) {
 	}
 
 	for _, account := range accountsSetting.Accounts {
-		// for each accounts, we randomly remove deletion stmt
+		// for each account, we randomly remove deletion stmt
 		if account.ProvisionPolicy.Type == appsv1alpha1.CreateByStmt {
 			toss := rand.Intn(10) % 2
 			if toss == 1 {
@@ -340,13 +347,103 @@ func TestRenderCreationStmt(t *testing.T) {
 				account.ProvisionPolicy.Statements.DeletionStatement = ""
 			}
 
-			stmts, secret := getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account)
+			stmts, secret := getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account, reCreate)
 			if toss == 1 {
 				assert.Equal(t, 1, len(stmts))
 			} else {
 				assert.Equal(t, 2, len(stmts))
 			}
 			assert.NotNil(t, secret)
+
+			stmts, secret = getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account, inPlaceUpdate)
+			assert.Equal(t, 1, len(stmts))
+			assert.NotNil(t, secret)
 		}
 	}
+}
+
+func TestMergeSystemAccountConfig(t *testing.T) {
+	systemAccount := mockSystemAccountsSpec()
+	// Make sure env is not empty
+	if systemAccount.CmdExecutorConfig.Env == nil {
+		systemAccount.CmdExecutorConfig.Env = []corev1.EnvVar{}
+	}
+
+	if len(systemAccount.CmdExecutorConfig.Env) == 0 {
+		systemAccount.CmdExecutorConfig.Env = append(systemAccount.CmdExecutorConfig.Env, corev1.EnvVar{
+			Name:  "cluster-def-env",
+			Value: "cluster-def-env-value",
+		})
+	}
+	// nil spec
+	componentVersion := &appsv1alpha1.ClusterComponentVersion{
+		SystemAccountSpec: nil,
+	}
+	accountConfig := systemAccount.CmdExecutorConfig.DeepCopy()
+	completeExecConfig(accountConfig, componentVersion)
+	assert.Equal(t, systemAccount.CmdExecutorConfig.Image, accountConfig.Image)
+	assert.Len(t, accountConfig.Env, len(systemAccount.CmdExecutorConfig.Env))
+	if len(systemAccount.CmdExecutorConfig.Env) > 0 {
+		assert.True(t, reflect.DeepEqual(accountConfig.Env, systemAccount.CmdExecutorConfig.Env))
+	}
+
+	// empty spec
+	accountConfig = systemAccount.CmdExecutorConfig.DeepCopy()
+	componentVersion.SystemAccountSpec = &appsv1alpha1.SystemAccountShortSpec{
+		CmdExecutorConfig: &appsv1alpha1.CommandExecutorEnvItem{},
+	}
+
+	completeExecConfig(accountConfig, componentVersion)
+	assert.Equal(t, systemAccount.CmdExecutorConfig.Image, accountConfig.Image)
+	assert.Len(t, accountConfig.Env, len(systemAccount.CmdExecutorConfig.Env))
+	if len(systemAccount.CmdExecutorConfig.Env) > 0 {
+		assert.True(t, reflect.DeepEqual(accountConfig.Env, systemAccount.CmdExecutorConfig.Env))
+	}
+
+	// spec with image
+	mockImageName := "test-image"
+	accountConfig = systemAccount.CmdExecutorConfig.DeepCopy()
+	componentVersion.SystemAccountSpec = &appsv1alpha1.SystemAccountShortSpec{
+		CmdExecutorConfig: &appsv1alpha1.CommandExecutorEnvItem{
+			Image: mockImageName,
+			Env:   nil,
+		},
+	}
+	completeExecConfig(accountConfig, componentVersion)
+	assert.NotEqual(t, systemAccount.CmdExecutorConfig.Image, accountConfig.Image)
+	assert.Equal(t, mockImageName, accountConfig.Image)
+	assert.Len(t, accountConfig.Env, len(systemAccount.CmdExecutorConfig.Env))
+	if len(systemAccount.CmdExecutorConfig.Env) > 0 {
+		assert.True(t, reflect.DeepEqual(accountConfig.Env, systemAccount.CmdExecutorConfig.Env))
+	}
+	// spec with empty envs
+	accountConfig = systemAccount.CmdExecutorConfig.DeepCopy()
+	componentVersion.SystemAccountSpec = &appsv1alpha1.SystemAccountShortSpec{
+		CmdExecutorConfig: &appsv1alpha1.CommandExecutorEnvItem{
+			Image: mockImageName,
+			Env:   []corev1.EnvVar{},
+		},
+	}
+	completeExecConfig(accountConfig, componentVersion)
+	assert.NotEqual(t, systemAccount.CmdExecutorConfig.Image, accountConfig.Image)
+	assert.Equal(t, mockImageName, accountConfig.Image)
+	assert.Len(t, accountConfig.Env, 0)
+
+	// spec with envs
+	testEnv := corev1.EnvVar{
+		Name:  "test-env",
+		Value: "test-value",
+	}
+	accountConfig = systemAccount.CmdExecutorConfig.DeepCopy()
+	componentVersion.SystemAccountSpec = &appsv1alpha1.SystemAccountShortSpec{
+		CmdExecutorConfig: &appsv1alpha1.CommandExecutorEnvItem{
+			Image: mockImageName,
+			Env:   []corev1.EnvVar{testEnv},
+		},
+	}
+	completeExecConfig(accountConfig, componentVersion)
+	assert.NotEqual(t, systemAccount.CmdExecutorConfig.Image, accountConfig.Image)
+	assert.Equal(t, mockImageName, accountConfig.Image)
+	assert.Len(t, accountConfig.Env, 1)
+	assert.Contains(t, accountConfig.Env, testEnv)
 }

@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package main
@@ -42,18 +45,18 @@ var logger logr.Logger
 func main() {
 	var containerRuntime cfgutil.CRIType
 	var runtimeEndpoint string
-	var contaienrID []string
+	var containerID []string
 
 	pflag.StringVar((*string)(&containerRuntime),
-		"container-runtime", "auto", "the config set cri runtime type.")
+		"container-runtime", "auto", "the config sets cri runtime type.")
 	pflag.StringVar(&runtimeEndpoint,
-		"runtime-endpoint", runtimeEndpoint, "the config set cri runtime endpoint.")
-	pflag.StringArrayVar(&contaienrID,
-		"container-id", contaienrID, "the container-id killed.")
+		"runtime-endpoint", runtimeEndpoint, "the config sets cri runtime endpoint.")
+	pflag.StringArrayVar(&containerID,
+		"container-id", containerID, "the container-id to be killed.")
 	pflag.Parse()
 
-	if len(contaienrID) == 0 {
-		fmt.Fprintf(os.Stderr, "require container-id!\n\n")
+	if len(containerID) == 0 {
+		fmt.Fprintf(os.Stderr, " container-id required!\n\n")
 		pflag.Usage()
 		os.Exit(-1)
 	}
@@ -68,7 +71,7 @@ func main() {
 
 	killer, err := cfgutil.NewContainerKiller(containerRuntime, runtimeEndpoint, zapLogger.Sugar())
 	if err != nil {
-		logger.Error(err, "failed to create container killer")
+		logger.Error(err, "failed to create container killing process")
 		os.Exit(-1)
 	}
 
@@ -76,7 +79,7 @@ func main() {
 		logger.Error(err, "failed to init killer")
 	}
 
-	if err := killer.Kill(context.Background(), contaienrID, viper.GetString(cfgutil.KillContainerSignalEnvName), nil); err != nil {
-		logger.Error(err, fmt.Sprintf("failed to kill container[%s]", contaienrID))
+	if err := killer.Kill(context.Background(), containerID, viper.GetString(cfgutil.KillContainerSignalEnvName), nil); err != nil {
+		logger.Error(err, fmt.Sprintf("failed to kill container[%s]", containerID))
 	}
 }

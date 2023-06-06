@@ -1,11 +1,11 @@
 apiVersion: v2
-name: milvus-standalone
+name: milvus
 description: .
 
 type: application
 
 # This is the chart version
-version: 0.5.0-alpha.3
+version: 0.5.1-beta.0
 
 # This is the version number of milvus
 appVersion: "2.2.4"

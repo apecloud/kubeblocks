@@ -1,18 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
-Copyright 2016 The Kubernetes Authors.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package util
@@ -130,7 +132,7 @@ var _ = Describe("StatefulSet utils test", func() {
 				Create(&testCtx).GetObject()
 
 			By("Creating pods by the StatefulSet")
-			testapps.MockReplicationComponentPods(testCtx, sts, clusterName, testapps.DefaultRedisCompName, role)
+			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterName, testapps.DefaultRedisCompName, nil)
 			Expect(IsStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
 
 			By("Updating the StatefulSet's UpdateRevision")
@@ -140,6 +142,11 @@ var _ = Describe("StatefulSet utils test", func() {
 			Expect(err).To(Succeed())
 			Expect(len(podList)).To(Equal(1))
 
+			By("Testing get the StatefulSet of the pod")
+			ownerSts, err := GetPodOwnerReferencesSts(ctx, k8sClient, &podList[0])
+			Expect(err).To(Succeed())
+			Expect(ownerSts).ShouldNot(BeNil())
+
 			By("Deleting the pods of StatefulSet")
 			Expect(DeleteStsPods(testCtx.Ctx, k8sClient, sts)).Should(Succeed())
 			podList, err = GetPodListByStatefulSet(ctx, k8sClient, sts)
@@ -147,7 +154,7 @@ var _ = Describe("StatefulSet utils test", func() {
 			Expect(len(podList)).To(Equal(0))
 
 			By("Creating new pods by StatefulSet with new UpdateRevision")
-			testapps.MockReplicationComponentPods(testCtx, sts, clusterName, testapps.DefaultRedisCompName, role)
+			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterName, testapps.DefaultRedisCompName, nil)
 			Expect(IsStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
 		})
 	})

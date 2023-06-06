@@ -27,13 +27,12 @@ kbcli kubeblocks preflight [flags]
 ### Options
 
 ```
-      --collect-without-permissions   always run preflight checks even if some require permissions that preflight does not have (default true)
+      --collect-without-permissions   always run preflight checks even if some required permissions that preflight does not have (default true)
       --collector-image string        the full name of the collector image to use
       --collector-pullpolicy string   the pull policy of the collector image
       --debug                         enable debug logging
-      --format string                 output format, one of human, json, yaml. only used when interactive is set to false, default format is yaml (default "yaml")
+      --format string                 output format, one of json, yaml. only used when interactive is set to false, default format is yaml (default "yaml")
   -h, --help                          help for preflight
-      --interactive                   interactive preflights, default value is false
   -n, --namespace string              If present, the namespace scope for this CLI request
   -o, --output string                 specify the output file path for the preflight checks
       --selector string               selector (label query) to filter remote collection nodes on.

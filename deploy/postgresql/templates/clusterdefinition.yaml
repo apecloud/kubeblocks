@@ -18,7 +18,7 @@ spec:
       characterType: postgresql
       customLabelSpecs:
         - key: apps.kubeblocks.postgres.patroni/scope
-          value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni"
+          value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni$(KB_CLUSTER_UID_POSTFIX_8)"
           resources:
             - gvk: "v1/Pod"
               selector:
@@ -27,7 +27,7 @@ spec:
               selector:
                 app.kubernetes.io/managed-by: kubeblocks
       probes:
-        roleChangedProbe:
+        roleProbe:
           failureThreshold: 2
           periodSeconds: 1
           timeoutSeconds: 1
@@ -50,8 +50,15 @@ spec:
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-config
           defaultMode: 0777
+        - name: pgbouncer-configuration
+          templateRef: pgbouncer-configuration
+          keys:
+            - pgbouncer.ini
+          namespace: {{ .Release.Namespace }}
+          volumeName: pgbouncer-config
+          defaultMode: 0777
         - name: postgresql-custom-metrics
-          templateRef: postgresql-custom-metrics
+          templateRef: postgresql14-custom-metrics
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-custom-metrics
           defaultMode: 0777
@@ -66,14 +73,13 @@ spec:
           - name: tcp-postgresql
             port: 5432
             targetPort: tcp-postgresql
-          - name: http-metrics-postgresql
-            port: 9187
-            targetPort: http-metrics
+          - name: tcp-pgbouncer
+            port: 6432
+            targetPort: tcp-pgbouncer
       volumeTypes:
         - name: data
           type: data
       podSpec:
-        serviceAccountName: operator
         securityContext:
           runAsUser: 0
           fsGroup: 103
@@ -86,13 +92,10 @@ spec:
             volumeMounts:
               - name: data
                 mountPath: /home/postgres/pgdata
-                mode: 0777
               - name: postgresql-config
                 mountPath: /home/postgres/conf
-                mode: 0777
               - name: scripts
                 mountPath: /kb-scripts
-                mode: 0777
         containers:
           - name: postgresql
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
@@ -101,9 +104,9 @@ spec:
             command:
               - /kb-scripts/setup.sh
             readinessProbe:
-              failureThreshold: 6
+              failureThreshold: 3
               initialDelaySeconds: 10
-              periodSeconds: 10
+              periodSeconds: 30
               successThreshold: 1
               timeoutSeconds: 5
               exec:
@@ -119,10 +122,8 @@ spec:
                 mountPath: /dev/shm
               - name: data
                 mountPath: /home/postgres/pgdata
-                mode: 0777
               - name: postgresql-config
                 mountPath: /home/postgres/conf
-                mode: 0777
               - name: scripts
                 mountPath: /kb-scripts
             ports:
@@ -136,21 +137,24 @@ spec:
               - name: KUBERNETES_USE_CONFIGMAPS
                 value: "true"
               - name: SCOPE
-                value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni"
+                value: "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)-patroni$(KB_CLUSTER_UID_POSTFIX_8)"
               - name: KUBERNETES_SCOPE_LABEL
                 value: "apps.kubeblocks.postgres.patroni/scope"
               - name: KUBERNETES_ROLE_LABEL
                 value: "apps.kubeblocks.postgres.patroni/role"
               - name: KUBERNETES_LABELS
-                value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)","app.kubernetes.io/managed-by":"kubeblocks"}'
+                value: '{"app.kubernetes.io/instance":"$(KB_CLUSTER_NAME)","apps.kubeblocks.io/component-name":"$(KB_COMP_NAME)"}'
               - name: RESTORE_DATA_DIR
                 value: /home/postgres/pgdata/kb_restore
+              - name: KB_PG_CONFIG_PATH
+                value: /home/postgres/conf/postgresql.conf
               - name: SPILO_CONFIGURATION
                 value: | ## https://github.com/zalando/patroni#yaml-configuration
                   bootstrap:
                     initdb:
                       - auth-host: md5
                       - auth-local: trust
+                      - wal-segsize: "1024"
               - name: ALLOW_NOSSL
                 value: "true"
               - name: PGROOT
@@ -170,11 +174,13 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+                    optional: false
               - name: PGPASSWORD_SUPERUSER
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
               - name: PGUSER_ADMIN
                 value: superadmin
               - name: PGPASSWORD_ADMIN
@@ -182,21 +188,83 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
+              - name: PGUSER_STANDBY
+                value: standby
               - name: PGPASSWORD_STANDBY
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
               - name: PGUSER
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+                    optional: false
               - name: PGPASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
+          - name: pgbouncer
+            imagePullPolicy: {{ .Values.pgbouncer.image.pullPolicy | quote }}
+            securityContext:
+              runAsUser: 0
+            ports:
+              - name: tcp-pgbouncer
+                containerPort: 6432
+            volumeMounts:
+              - name: pgbouncer-config
+                mountPath: /home/pgbouncer/conf
+              - name: scripts
+                mountPath: /kb-scripts
+            command:
+              - /kb-scripts/pgbouncer_setup.sh
+            livenessProbe:
+              failureThreshold: 3
+              initialDelaySeconds: 15
+              periodSeconds: 30
+              successThreshold: 1
+              timeoutSeconds: 5
+              tcpSocket:
+                port: tcp-pgbouncer
+            readinessProbe:
+              failureThreshold: 3
+              initialDelaySeconds: 15
+              periodSeconds: 30
+              successThreshold: 1
+              timeoutSeconds: 5
+              tcpSocket:
+                port: tcp-pgbouncer
+            env:
+              - name: PGBOUNCER_AUTH_TYPE
+                value: md5
+              - name: POSTGRESQL_USERNAME
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: POSTGRESQL_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: POSTGRESQL_PORT
+                value: "5432"
+              - name: POSTGRESQL_HOST
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+              - name: PGBOUNCER_PORT
+                value: "6432"
+              - name: PGBOUNCER_BIND_ADDRESS
+                value: "0.0.0.0"
           - name: metrics
             image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
@@ -212,11 +280,13 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
               - name: DATA_SOURCE_USER
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+                    optional: false
             command:
               - "/opt/bitnami/postgres-exporter/bin/postgres_exporter"
               - "--auto-discover-databases"
@@ -269,11 +339,13 @@ spec:
               secretKeyRef:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: username
+                optional: false
           - name: PGPASSWORD
             valueFrom:
               secretKeyRef:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: password
+                optional: false
         passwordConfig:
           length: 10
           numDigits: 5
@@ -281,37 +353,27 @@ spec:
           letterCase: MixedCases
         accounts:
           - name: kbadmin
-            provisionPolicy:
+            provisionPolicy: &kbAdminAcctRef
               type: CreateByStmt
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
-                deletion: DROP USER IF EXISTS $(USERNAME);
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
           - name: kbdataprotection
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AnyPods
-              statements:
-                creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
-                deletion: DROP USER IF EXISTS $(USERNAME);
+            provisionPolicy: *kbAdminAcctRef
           - name: kbprobe
-            provisionPolicy:
+            provisionPolicy: &kbReadonlyAcctRef
               type: CreateByStmt
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
-                deletion: DROP USER IF EXISTS $(USERNAME);
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
           - name: kbmonitoring
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AnyPods
-              statements:
-                creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)';  GRANT pg_monitor TO $(USERNAME);
-                deletion: DROP USER IF EXISTS $(USERNAME);
+            provisionPolicy: *kbReadonlyAcctRef
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
               statements:
                 creation: CREATE USER $(USERNAME) WITH REPLICATION PASSWORD '$(PASSWD)';
-                deletion: DROP USER IF EXISTS $(USERNAME);                     
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';

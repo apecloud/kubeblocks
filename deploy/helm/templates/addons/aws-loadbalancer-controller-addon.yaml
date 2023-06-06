@@ -1,7 +1,7 @@
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
-  name: aws-loadbalancer-controller
+  name: aws-load-balancer-controller
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
   {{- if .Values.keepAddons }}
@@ -18,11 +18,11 @@ spec:
 
     installValues:
       configMapRefs:
-      - name: aws-loadbalancer-controller-chart-kubeblocks-values
+      - name: aws-load-balancer-controller-chart-kubeblocks-values
         key: values-kubeblocks-override.yaml
 
       setValues:
-      - clusterName={{ index .Values "aws-loadbalancer-controller" "clusterName" }}
+      - clusterName={{ index .Values "aws-load-balancer-controller" "clusterName" }}
 
     valuesMapping:
       valueMap:
@@ -41,9 +41,12 @@ spec:
 
   defaultInstallValues:
   - replicas: 1
+    {{- with .Values.tolerations }}
+    tolerations: {{ toJson . | quote }}
+    {{- end }}
 
   installable:
-    autoInstall: {{ index .Values "aws-loadbalancer-controller" "enabled" }}
+    autoInstall: {{ index .Values "aws-load-balancer-controller" "enabled" }}
     selectors:
     - key: KubeGitVersion
       operator: Contains

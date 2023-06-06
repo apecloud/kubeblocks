@@ -1,22 +1,27 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package playground
 
 import (
+	"os"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -24,15 +29,20 @@ import (
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
 var _ = Describe("playground", func() {
+	const (
+		testKubeConfigPath = "./testdata/kubeconfig"
+	)
+
 	var streams genericclioptions.IOStreams
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		Expect(os.Setenv(types.CliHomeEnv, "./testdata")).Should(Succeed())
 	})
 
 	It("init at local host", func() {
@@ -44,7 +54,7 @@ var _ = Describe("playground", func() {
 			clusterVersion: clitesting.ClusterVersionName,
 			IOStreams:      streams,
 			cloudProvider:  defaultCloudProvider,
-			helmCfg:        helm.NewConfig("", util.ConfigPath("config_kb_test"), "", false),
+			helmCfg:        helm.NewConfig("", testKubeConfigPath, "", false),
 		}
 		Expect(o.validate()).Should(Succeed())
 		Expect(o.run()).Should(HaveOccurred())
@@ -60,10 +70,5 @@ var _ = Describe("playground", func() {
 			cloudProvider:  cp.AWS,
 		}
 		Expect(o.validate()).Should(HaveOccurred())
-	})
-
-	It("guide", func() {
-		cmd := newGuideCmd()
-		Expect(cmd).ShouldNot(BeNil())
 	})
 })

@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -19,12 +22,8 @@ package cluster
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"path/filepath"
-	"strings"
 
-	"github.com/fatih/color"
-	"github.com/pmezard/go-difflib/difflib"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,10 +32,11 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
 type configEditContext struct {
-	create.BaseOptions
+	create.CreateOptions
 
 	clusterName    string
 	componentName  string
@@ -67,7 +67,7 @@ func (c *configEditContext) prepare() error {
 
 	val, ok := cmObj.Data[c.configKey]
 	if !ok {
-		return makeNotFoundConfigFileErr(c.configKey, c.configSpecName, cfgcore.ToSet(cmObj.Data).AsSlice())
+		return makeNotFoundConfigFileErr(c.configKey, c.configSpecName, cfgutil.ToSet(cmObj.Data).AsSlice())
 	}
 
 	c.original = val
@@ -84,40 +84,13 @@ func (c *configEditContext) editConfig(editor editor.Editor) error {
 	return nil
 }
 
-func (c *configEditContext) getUnifiedDiffString() (string, error) {
-	diff := difflib.UnifiedDiff{
-		A:        difflib.SplitLines(c.original),
-		B:        difflib.SplitLines(c.edited),
-		FromFile: "Original",
-		ToFile:   "Current",
-		Context:  3,
-	}
-	return difflib.GetUnifiedDiffString(diff)
-}
-
-func newConfigContext(baseOptions create.BaseOptions, clusterName, componentName, configSpec, file string) *configEditContext {
+func newConfigContext(baseOptions create.CreateOptions, clusterName, componentName, configSpec, file string) *configEditContext {
 	return &configEditContext{
-		BaseOptions:    baseOptions,
+		CreateOptions:  baseOptions,
 		clusterName:    clusterName,
 		componentName:  componentName,
 		configSpecName: configSpec,
 		configKey:      file,
-	}
-}
-
-func displayDiffWithColor(out io.Writer, diffText string) {
-	for _, line := range difflib.SplitLines(diffText) {
-		switch {
-		case strings.HasPrefix(line, "---"), strings.HasPrefix(line, "+++"):
-			line = color.HiYellowString(line)
-		case strings.HasPrefix(line, "@@"):
-			line = color.HiBlueString(line)
-		case strings.HasPrefix(line, "-"):
-			line = color.RedString(line)
-		case strings.HasPrefix(line, "+"):
-			line = color.GreenString(line)
-		}
-		fmt.Fprint(out, line)
 	}
 }
 

@@ -1,29 +1,34 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package component
 
 import (
+	"encoding/json"
 	"strings"
 
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 func buildPodTopologySpreadConstraints(
@@ -50,8 +55,8 @@ func buildPodTopologySpreadConstraints(
 			TopologyKey:       topologyKey,
 			LabelSelector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					intctrlutil.AppInstanceLabelKey:    cluster.Name,
-					intctrlutil.KBAppComponentLabelKey: component.Name,
+					constant.AppInstanceLabelKey:    cluster.Name,
+					constant.KBAppComponentLabelKey: component.Name,
 				},
 			},
 		})
@@ -60,6 +65,23 @@ func buildPodTopologySpreadConstraints(
 }
 
 func buildPodAffinity(
+	cluster *appsv1alpha1.Cluster,
+	clusterOrCompAffinity *appsv1alpha1.Affinity,
+	component *SynthesizedComponent,
+) (*corev1.Affinity, error) {
+	affinity := buildNewAffinity(cluster, clusterOrCompAffinity, component)
+
+	// read data plane affinity from config and merge it
+	dpAffinity := new(corev1.Affinity)
+	if val := viper.GetString(constant.CfgKeyDataPlaneAffinity); val != "" {
+		if err := json.Unmarshal([]byte(val), &dpAffinity); err != nil {
+			return nil, err
+		}
+	}
+	return mergeAffinity(affinity, dpAffinity)
+}
+
+func buildNewAffinity(
 	cluster *appsv1alpha1.Cluster,
 	clusterOrCompAffinity *appsv1alpha1.Affinity,
 	component *SynthesizedComponent,
@@ -96,8 +118,8 @@ func buildPodAffinity(
 			TopologyKey: topologyKey,
 			LabelSelector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					intctrlutil.AppInstanceLabelKey:    cluster.Name,
-					intctrlutil.KBAppComponentLabelKey: component.Name,
+					constant.AppInstanceLabelKey:    cluster.Name,
+					constant.KBAppComponentLabelKey: component.Name,
 				},
 			},
 		})
@@ -122,7 +144,7 @@ func buildPodAffinity(
 	if clusterOrCompAffinity.Tenancy == appsv1alpha1.DedicatedNode {
 		var labelSelectorReqs []metav1.LabelSelectorRequirement
 		labelSelectorReqs = append(labelSelectorReqs, metav1.LabelSelectorRequirement{
-			Key:      intctrlutil.WorkloadTypeLabelKey,
+			Key:      constant.WorkloadTypeLabelKey,
 			Operator: metav1.LabelSelectorOpIn,
 			Values:   appsv1alpha1.WorkloadTypes,
 		})
@@ -138,42 +160,86 @@ func buildPodAffinity(
 	return affinity
 }
 
-// patchBuiltInAffinity patches built-in affinity configuration
-func patchBuiltInAffinity(affinity *corev1.Affinity) *corev1.Affinity {
-	var matchExpressions []corev1.NodeSelectorRequirement
-	matchExpressions = append(matchExpressions, corev1.NodeSelectorRequirement{
-		Key:      intctrlutil.KubeBlocksDataNodeLabelKey,
-		Operator: corev1.NodeSelectorOpIn,
-		Values:   []string{intctrlutil.KubeBlocksDataNodeLabelValue},
-	})
-	preferredSchedulingTerm := corev1.PreferredSchedulingTerm{
-		Preference: corev1.NodeSelectorTerm{
-			MatchExpressions: matchExpressions,
-		},
-		Weight: 100,
-	}
-	if affinity != nil && affinity.NodeAffinity != nil {
-		affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
-			affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution, preferredSchedulingTerm)
-	} else {
-		if affinity == nil {
-			affinity = new(corev1.Affinity)
-		}
-		affinity.NodeAffinity = &corev1.NodeAffinity{
-			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{preferredSchedulingTerm},
-		}
+// mergeAffinity merges affinity from src to dest
+func mergeAffinity(dest, src *corev1.Affinity) (*corev1.Affinity, error) {
+	if src == nil {
+		return dest, nil
 	}
 
-	return affinity
+	if dest == nil {
+		return src.DeepCopy(), nil
+	}
+
+	rst := dest.DeepCopy()
+	skipPodAffinity := src.PodAffinity == nil
+	skipPodAntiAffinity := src.PodAntiAffinity == nil
+	skipNodeAffinity := src.NodeAffinity == nil
+
+	if rst.PodAffinity == nil && !skipPodAffinity {
+		rst.PodAffinity = src.PodAffinity
+		skipPodAffinity = true
+	}
+	if rst.PodAntiAffinity == nil && !skipPodAntiAffinity {
+		rst.PodAntiAffinity = src.PodAntiAffinity
+		skipPodAntiAffinity = true
+	}
+	if rst.NodeAffinity == nil && !skipNodeAffinity {
+		rst.NodeAffinity = src.NodeAffinity
+		skipNodeAffinity = true
+	}
+
+	// if not skip, both are not nil
+	if !skipPodAffinity {
+		rst.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			rst.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			src.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution...)
+
+		rst.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			rst.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			src.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution...)
+	}
+	if !skipPodAntiAffinity {
+		rst.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			rst.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			src.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution...)
+
+		rst.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			rst.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			src.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution...)
+	}
+	if !skipNodeAffinity {
+		rst.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			rst.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			src.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution...)
+
+		skip := src.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil
+		if rst.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil && !skip {
+			rst.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = src.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+			skip = true
+		}
+		if !skip {
+			rst.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(
+				rst.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+				src.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms...)
+		}
+	}
+	return rst, nil
 }
 
-// PatchBuiltInToleration patches built-in tolerations configuration
-func PatchBuiltInToleration(tolerations []corev1.Toleration) []corev1.Toleration {
-	tolerations = append(tolerations, corev1.Toleration{
-		Key:      intctrlutil.KubeBlocksDataNodeTolerationKey,
-		Operator: corev1.TolerationOpEqual,
-		Value:    intctrlutil.KubeBlocksDataNodeTolerationValue,
-		Effect:   corev1.TaintEffectNoSchedule,
-	})
-	return tolerations
+// BuildTolerations builds tolerations from config
+func BuildTolerations(cluster *appsv1alpha1.Cluster, clusterCompSpec *appsv1alpha1.ClusterComponentSpec) ([]corev1.Toleration, error) {
+	tolerations := cluster.Spec.Tolerations
+	if clusterCompSpec != nil && len(clusterCompSpec.Tolerations) != 0 {
+		tolerations = clusterCompSpec.Tolerations
+	}
+
+	// build data plane tolerations from config
+	var dpTolerations []corev1.Toleration
+	if val := viper.GetString(constant.CfgKeyDataPlaneTolerations); val != "" {
+		if err := json.Unmarshal([]byte(val), &dpTolerations); err != nil {
+			return nil, err
+		}
+	}
+
+	return append(tolerations, dpTolerations...), nil
 }

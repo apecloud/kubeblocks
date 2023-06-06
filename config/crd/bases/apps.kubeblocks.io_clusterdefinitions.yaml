@@ -94,6 +94,7 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: set
                           name:
                             description: Specify the name of configuration template.
                             maxLength: 63
@@ -219,17 +220,72 @@ spec:
                           - accessMode
                           - name
                           type: object
+                        llPodManagementPolicy:
+                          description: llPodManagementPolicy is the low-level controls
+                            how pods are created during initial scale up, when replacing
+                            pods on nodes, or when scaling down. `OrderedReady` policy
+                            specify where pods are created in increasing order (pod-0,
+                            then pod-1, etc) and the controller will wait until each
+                            pod is ready before continuing. When scaling down, the
+                            pods are removed in the opposite order. `Parallel` policy
+                            specify create pods in parallel to match the desired scale
+                            without waiting, and on scale down will delete all pods
+                            at once.
+                          type: string
+                        llUpdateStrategy:
+                          description: llUpdateStrategy indicates the low-level StatefulSetUpdateStrategy
+                            that will be employed to update Pods in the StatefulSet
+                            when a revision is made to Template. Will ignore `updateStrategy`
+                            attribute if provided.
+                          properties:
+                            rollingUpdate:
+                              description: RollingUpdate is used to communicate parameters
+                                when Type is RollingUpdateStatefulSetStrategyType.
+                              properties:
+                                maxUnavailable:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: 'The maximum number of pods that can
+                                    be unavailable during the update. Value can be
+                                    an absolute number (ex: 5) or a percentage of
+                                    desired pods (ex: 10%). Absolute number is calculated
+                                    from percentage by rounding up. This can not be
+                                    0. Defaults to 1. This field is alpha-level and
+                                    is only honored by servers that enable the MaxUnavailableStatefulSet
+                                    feature. The field applies to all pods in the
+                                    range 0 to Replicas-1. That means if there is
+                                    any unavailable pod in the range 0 to Replicas-1,
+                                    it will be counted towards MaxUnavailable.'
+                                  x-kubernetes-int-or-string: true
+                                partition:
+                                  description: Partition indicates the ordinal at
+                                    which the StatefulSet should be partitioned for
+                                    updates. During a rolling update, all pods from
+                                    ordinal Replicas-1 to Partition are updated. All
+                                    pods from ordinal Partition-1 to 0 remain untouched.
+                                    This is helpful in being able to do a canary based
+                                    deployment. The default value is 0.
+                                  format: int32
+                                  type: integer
+                              type: object
+                            type:
+                              description: Type indicates the type of the StatefulSetUpdateStrategy.
+                                Default is RollingUpdate.
+                              type: string
+                          type: object
                         updateStrategy:
                           default: Serial
-                          description: 'updateStrategy, Pods update strategy. serial:
-                            update Pods one by one that guarantee minimum component
-                            unavailable time. Learner -> Follower(with AccessMode=none)
-                            -> Follower(with AccessMode=readonly) -> Follower(with
-                            AccessMode=readWrite) -> Leader bestEffortParallel: update
-                            Pods in parallel that guarantee minimum component un-writable
-                            time. Learner, Follower(minority) in parallel -> Follower(majority)
-                            -> Leader, keep majority online all the time. parallel:
-                            force parallel'
+                          description: "updateStrategy, Pods update strategy. In case
+                            of workloadType=Consensus the update strategy will be
+                            following: \n serial: update Pods one by one that guarantee
+                            minimum component unavailable time. Learner -> Follower(with
+                            AccessMode=none) -> Follower(with AccessMode=readonly)
+                            -> Follower(with AccessMode=readWrite) -> Leader bestEffortParallel:
+                            update Pods in parallel that guarantee minimum component
+                            un-writable time. Learner, Follower(minority) in parallel
+                            -> Follower(majority) -> Leader, keep majority online
+                            all the time. parallel: force parallel"
                           enum:
                           - Serial
                           - BestEffortParallel
@@ -286,12 +342,10 @@ spec:
                       description: horizontalScalePolicy controls the behavior of
                         horizontal scale.
                       properties:
-                        backupTemplateSelector:
-                          additionalProperties:
-                            type: string
-                          description: backupTemplateSelector defines the label selector
-                            for finding associated BackupTemplate API object.
-                          type: object
+                        backupPolicyTemplateName:
+                          description: BackupPolicyTemplateName reference the backup
+                            policy template.
+                          type: string
                         type:
                           default: None
                           description: 'type controls what kind of data synchronization
@@ -299,10 +353,10 @@ spec:
                             Snapshot}. The default policy is `None`. None: Default
                             policy, do nothing. Snapshot: Do native volume snapshot
                             before scaling and restore to newly scaled pods. Prefer
-                            backup job to create snapshot if `BackupTemplateSelector`
-                            can find a template. Notice that ''Snapshot'' policy will
-                            only take snapshot on one volumeMount, default is the
-                            first volumeMount of first container (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
+                            backup job to create snapshot if can find a backupPolicy
+                            from ''BackupPolicyTemplateName''. Notice that ''Snapshot''
+                            policy will only take snapshot on one volumeMount, default
+                            is the first volumeMount of first container (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
                             since take multiple snapshots at one time might cause
                             consistency problem.'
                           enum:
@@ -340,16 +394,6 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
-                    maxUnavailable:
-                      anyOf:
-                      - type: integer
-                      - type: string
-                      description: 'The maximum number of pods that can be unavailable
-                        during scaling. Value can be an absolute number (ex: 5) or
-                        a percentage of desired pods (ex: 10%). Absolute number is
-                        calculated from percentage by rounding down. This value is
-                        ignored if workloadType is Consensus.'
-                      x-kubernetes-int-or-string: true
                     monitor:
                       description: monitor is monitoring config which provided by
                         provider.
@@ -357,9 +401,10 @@ spec:
                         builtIn:
                           default: false
                           description: builtIn is a switch to enable KubeBlocks builtIn
-                            monitoring. If BuiltIn is set to false, the provider should
-                            set ExporterConfig and Sidecar container own. BuiltIn
-                            set to true is not currently supported but will be soon.
+                            monitoring. If BuiltIn is set to true, monitor metrics
+                            will be scraped automatically. If BuiltIn is set to false,
+                            the provider should set ExporterConfig and Sidecar container
+                            own.
                           type: boolean
                         exporterConfig:
                           description: exporterConfig provided by provider, which
@@ -373,12 +418,12 @@ spec:
                               maxLength: 128
                               type: string
                             scrapePort:
+                              anyOf:
+                              - type: integer
+                              - type: string
                               description: scrapePort is exporter port for Time Series
                                 Database to scrape metrics.
-                              format: int32
-                              maximum: 65535
-                              minimum: 0
-                              type: integer
+                              x-kubernetes-int-or-string: true
                           required:
                           - scrapePort
                           type: object
@@ -7916,7 +7961,7 @@ spec:
                     probes:
                       description: probes setting for healthy checks.
                       properties:
-                        roleChangedProbe:
+                        roleProbe:
                           description: Probe for DB role changed check.
                           properties:
                             commands:
@@ -7963,9 +8008,8 @@ spec:
                             exceed the InitializationTimeoutSeconds time without a
                             role label, this component will enter the Failed/Abnormal
                             phase. Note that this configuration will only take effect
-                            if the component supports RoleChangedProbe and will not
-                            affect the life cycle of the pod. default values are 60
-                            seconds.
+                            if the component supports RoleProbe and will not affect
+                            the life cycle of the pod. default values are 60 seconds.
                           format: int32
                           minimum: 30
                           type: integer
@@ -8052,9 +8096,62 @@ spec:
                       type: object
                     replicationSpec:
                       description: replicationSpec defines replication related spec
-                        if workloadType is Replication, required if workloadType is
-                        Replication.
+                        if workloadType is Replication.
                       properties:
+                        llPodManagementPolicy:
+                          description: llPodManagementPolicy is the low-level controls
+                            how pods are created during initial scale up, when replacing
+                            pods on nodes, or when scaling down. `OrderedReady` policy
+                            specify where pods are created in increasing order (pod-0,
+                            then pod-1, etc) and the controller will wait until each
+                            pod is ready before continuing. When scaling down, the
+                            pods are removed in the opposite order. `Parallel` policy
+                            specify create pods in parallel to match the desired scale
+                            without waiting, and on scale down will delete all pods
+                            at once.
+                          type: string
+                        llUpdateStrategy:
+                          description: llUpdateStrategy indicates the low-level StatefulSetUpdateStrategy
+                            that will be employed to update Pods in the StatefulSet
+                            when a revision is made to Template. Will ignore `updateStrategy`
+                            attribute if provided.
+                          properties:
+                            rollingUpdate:
+                              description: RollingUpdate is used to communicate parameters
+                                when Type is RollingUpdateStatefulSetStrategyType.
+                              properties:
+                                maxUnavailable:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: 'The maximum number of pods that can
+                                    be unavailable during the update. Value can be
+                                    an absolute number (ex: 5) or a percentage of
+                                    desired pods (ex: 10%). Absolute number is calculated
+                                    from percentage by rounding up. This can not be
+                                    0. Defaults to 1. This field is alpha-level and
+                                    is only honored by servers that enable the MaxUnavailableStatefulSet
+                                    feature. The field applies to all pods in the
+                                    range 0 to Replicas-1. That means if there is
+                                    any unavailable pod in the range 0 to Replicas-1,
+                                    it will be counted towards MaxUnavailable.'
+                                  x-kubernetes-int-or-string: true
+                                partition:
+                                  description: Partition indicates the ordinal at
+                                    which the StatefulSet should be partitioned for
+                                    updates. During a rolling update, all pods from
+                                    ordinal Replicas-1 to Partition are updated. All
+                                    pods from ordinal Partition-1 to 0 remain untouched.
+                                    This is helpful in being able to do a canary based
+                                    deployment. The default value is 0.
+                                  format: int32
+                                  type: integer
+                              type: object
+                            type:
+                              description: Type indicates the type of the StatefulSetUpdateStrategy.
+                                Default is RollingUpdate.
+                              type: string
+                          type: object
                         switchCmdExecutorConfig:
                           description: switchCmdExecutorConfig configs how to get
                             client SDK and perform switch statements.
@@ -8286,6 +8383,23 @@ spec:
                             type: object
                           minItems: 1
                           type: array
+                        updateStrategy:
+                          default: Serial
+                          description: "updateStrategy, Pods update strategy. In case
+                            of workloadType=Consensus the update strategy will be
+                            following: \n serial: update Pods one by one that guarantee
+                            minimum component unavailable time. Learner -> Follower(with
+                            AccessMode=none) -> Follower(with AccessMode=readonly)
+                            -> Follower(with AccessMode=readWrite) -> Leader bestEffortParallel:
+                            update Pods in parallel that guarantee minimum component
+                            un-writable time. Learner, Follower(minority) in parallel
+                            -> Follower(majority) -> Leader, keep majority online
+                            all the time. parallel: force parallel"
+                          enum:
+                          - Serial
+                          - BestEffortParallel
+                          - Parallel
+                          type: string
                       required:
                       - switchCmdExecutorConfig
                       type: object
@@ -8403,6 +8517,141 @@ spec:
                           - protocol
                           x-kubernetes-list-type: map
                       type: object
+                    statefulSpec:
+                      description: statefulSpec defines stateful related spec if workloadType
+                        is Stateful.
+                      properties:
+                        llPodManagementPolicy:
+                          description: llPodManagementPolicy is the low-level controls
+                            how pods are created during initial scale up, when replacing
+                            pods on nodes, or when scaling down. `OrderedReady` policy
+                            specify where pods are created in increasing order (pod-0,
+                            then pod-1, etc) and the controller will wait until each
+                            pod is ready before continuing. When scaling down, the
+                            pods are removed in the opposite order. `Parallel` policy
+                            specify create pods in parallel to match the desired scale
+                            without waiting, and on scale down will delete all pods
+                            at once.
+                          type: string
+                        llUpdateStrategy:
+                          description: llUpdateStrategy indicates the low-level StatefulSetUpdateStrategy
+                            that will be employed to update Pods in the StatefulSet
+                            when a revision is made to Template. Will ignore `updateStrategy`
+                            attribute if provided.
+                          properties:
+                            rollingUpdate:
+                              description: RollingUpdate is used to communicate parameters
+                                when Type is RollingUpdateStatefulSetStrategyType.
+                              properties:
+                                maxUnavailable:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: 'The maximum number of pods that can
+                                    be unavailable during the update. Value can be
+                                    an absolute number (ex: 5) or a percentage of
+                                    desired pods (ex: 10%). Absolute number is calculated
+                                    from percentage by rounding up. This can not be
+                                    0. Defaults to 1. This field is alpha-level and
+                                    is only honored by servers that enable the MaxUnavailableStatefulSet
+                                    feature. The field applies to all pods in the
+                                    range 0 to Replicas-1. That means if there is
+                                    any unavailable pod in the range 0 to Replicas-1,
+                                    it will be counted towards MaxUnavailable.'
+                                  x-kubernetes-int-or-string: true
+                                partition:
+                                  description: Partition indicates the ordinal at
+                                    which the StatefulSet should be partitioned for
+                                    updates. During a rolling update, all pods from
+                                    ordinal Replicas-1 to Partition are updated. All
+                                    pods from ordinal Partition-1 to 0 remain untouched.
+                                    This is helpful in being able to do a canary based
+                                    deployment. The default value is 0.
+                                  format: int32
+                                  type: integer
+                              type: object
+                            type:
+                              description: Type indicates the type of the StatefulSetUpdateStrategy.
+                                Default is RollingUpdate.
+                              type: string
+                          type: object
+                        updateStrategy:
+                          default: Serial
+                          description: "updateStrategy, Pods update strategy. In case
+                            of workloadType=Consensus the update strategy will be
+                            following: \n serial: update Pods one by one that guarantee
+                            minimum component unavailable time. Learner -> Follower(with
+                            AccessMode=none) -> Follower(with AccessMode=readonly)
+                            -> Follower(with AccessMode=readWrite) -> Leader bestEffortParallel:
+                            update Pods in parallel that guarantee minimum component
+                            un-writable time. Learner, Follower(minority) in parallel
+                            -> Follower(majority) -> Leader, keep majority online
+                            all the time. parallel: force parallel"
+                          enum:
+                          - Serial
+                          - BestEffortParallel
+                          - Parallel
+                          type: string
+                      type: object
+                    statelessSpec:
+                      description: statelessSpec defines stateless related spec if
+                        workloadType is Stateless.
+                      properties:
+                        updateStrategy:
+                          description: updateStrategy defines the underlying deployment
+                            strategy to use to replace existing pods with new ones.
+                          properties:
+                            rollingUpdate:
+                              description: 'Rolling update config params. Present
+                                only if DeploymentStrategyType = RollingUpdate. ---
+                                TODO: Update this to follow our convention for oneOf,
+                                whatever we decide it to be.'
+                              properties:
+                                maxSurge:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: 'The maximum number of pods that can
+                                    be scheduled above the desired number of pods.
+                                    Value can be an absolute number (ex: 5) or a percentage
+                                    of desired pods (ex: 10%). This can not be 0 if
+                                    MaxUnavailable is 0. Absolute number is calculated
+                                    from percentage by rounding up. Defaults to 25%.
+                                    Example: when this is set to 30%, the new ReplicaSet
+                                    can be scaled up immediately when the rolling
+                                    update starts, such that the total number of old
+                                    and new pods do not exceed 130% of desired pods.
+                                    Once old pods have been killed, new ReplicaSet
+                                    can be scaled up further, ensuring that total
+                                    number of pods running at any time during the
+                                    update is at most 130% of desired pods.'
+                                  x-kubernetes-int-or-string: true
+                                maxUnavailable:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: 'The maximum number of pods that can
+                                    be unavailable during the update. Value can be
+                                    an absolute number (ex: 5) or a percentage of
+                                    desired pods (ex: 10%). Absolute number is calculated
+                                    from percentage by rounding down. This can not
+                                    be 0 if MaxSurge is 0. Defaults to 25%. Example:
+                                    when this is set to 30%, the old ReplicaSet can
+                                    be scaled down to 70% of desired pods immediately
+                                    when the rolling update starts. Once new pods
+                                    are ready, old ReplicaSet can be scaled down further,
+                                    followed by scaling up the new ReplicaSet, ensuring
+                                    that the total number of pods available at all
+                                    times during the update is at least 70% of desired
+                                    pods.'
+                                  x-kubernetes-int-or-string: true
+                              type: object
+                            type:
+                              description: Type of deployment. Can be "Recreate" or
+                                "RollingUpdate". Default is RollingUpdate.
+                              type: string
+                          type: object
+                      type: object
                     systemAccounts:
                       description: Statement to create system account.
                       properties:
@@ -8457,7 +8706,16 @@ spec:
                                         type: string
                                       deletion:
                                         description: deletion specifies statement
-                                          how to delete this account.
+                                          how to delete this account. Used in combination
+                                          with `CreateionStatement` to delete the
+                                          account before create it. For instance,
+                                          one usually uses `drop user if exists` statement
+                                          followed by `create user` statement to create
+                                          an account.
+                                        type: string
+                                      update:
+                                        description: update specifies statement how
+                                          to update account's password.
                                         type: string
                                     required:
                                     - creation
@@ -8662,9 +8920,9 @@ spec:
                         the volumes mapping the name of the VolumeMounts in the PodSpec.Container
                         field, such as data volume, log volume, etc. When backing
                         up the volume, the volume can be correctly backed up according
-                        to the volumeType. \n For example: `{name: data, type: data}`
+                        to the volumeType. \n For example: `name: data, type: data`
                         means that the volume named `data` is used to store `data`.
-                        `{name: binlog, type: log}` means that the volume named `binlog`
+                        `name: binlog, type: log` means that the volume named `binlog`
                         is used to store `log`. \n NOTE: When volumeTypes is not defined,
                         the backup function will not be supported, even if a persistent
                         volume has been specified."
@@ -8685,8 +8943,13 @@ spec:
                             - data
                             - log
                             type: string
+                        required:
+                        - name
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     workloadType:
                       description: workloadType defines type of the workload. Stateless
                         is a stateless workload type used to describe stateless applications.
@@ -8706,6 +8969,11 @@ spec:
                   - name
                   - workloadType
                   type: object
+                  x-kubernetes-validations:
+                  - message: componentDefs.consensusSpec is required when componentDefs.workloadType
+                      is Consensus, and forbidden otherwise
+                    rule: 'has(self.workloadType) && self.workloadType == ''Consensus''
+                      ?  has(self.consensusSpec) : !has(self.consensusSpec)'
                 minItems: 1
                 type: array
                 x-kubernetes-list-map-keys:
@@ -8715,17 +8983,20 @@ spec:
                 additionalProperties:
                   type: string
                 description: 'Connection credential template used for creating a connection
-                  credential secret for cluster.apps.kubeblock.io object. Built-in
+                  credential secret for cluster.apps.kubeblocks.io object. Built-in
                   objects are: `$(RANDOM_PASSWD)` - random 8 characters. `$(UUID)`
                   - generate a random UUID v4 string. `$(UUID_B64)` - generate a random
-                  UUID v4 BASE64 encoded string``. `$(UUID_STR_B64)` - generate a
-                  random UUID v4 string then BASE64 encoded``. `$(UUID_HEX)` - generate
-                  a random UUID v4 wth HEX representation``. `$(SVC_FQDN)` - service
-                  FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
+                  UUID v4 BASE64 encoded string. `$(UUID_STR_B64)` - generate a random
+                  UUID v4 string then BASE64 encoded. `$(UUID_HEX)` - generate a random
+                  UUID v4 HEX representation. `$(HEADLESS_SVC_FQDN)` - headless service
+                  FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
                   where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
-                  attribute; `$(SVC_PORT_<PORT-NAME>)` - a ServicePort''s port value
-                  with specified port name, i.e, a servicePort JSON struct: { "name":
-                  "mysql", "targetPort": "mysqlContainerPort", "port": 3306 }, and
+                  attribute; `$(SVC_FQDN)` - service FQDN  placeholder, value pattern
+                  - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc, where 1ST_COMP_NAME
+                  is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
+                  attribute; `$(SVC_PORT_{PORT-NAME})` - a ServicePort''s port value
+                  with specified port name, i.e, a servicePort JSON struct: `"name":
+                  "mysql", "targetPort": "mysqlContainerPort", "port": 3306`, and
                   "$(SVC_PORT_mysql)" in the connection credential value is 3306.'
                 type: object
               type:
@@ -8750,9 +9021,9 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: ClusterDefinition phase, valid values are <empty>, Available.
-                  Available is ClusterDefinition become available, and can be referenced
-                  for co-related objects.
+                description: ClusterDefinition phase, valid values are `empty`, `Available`,
+                  'Unavailable`. Available is ClusterDefinition become available,
+                  and can be referenced for co-related objects.
                 enum:
                 - Available
                 - Unavailable

@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,21 +23,22 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-// ClusterSpec defines the desired state of Cluster
+// ClusterSpec defines the desired state of Cluster.
 type ClusterSpec struct {
-	// Cluster referenced ClusterDefinition name, this is an immutable attribute.
+	// Cluster referencing ClusterDefinition name. This is an immutable attribute.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
-	// Cluster referenced ClusterVersion name.
+	// Cluster referencing ClusterVersion name.
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
 
-	// Cluster termination policy. One of DoNotTerminate, Halt, Delete, WipeOut.
+	// Cluster termination policy. Valid values are DoNotTerminate, Halt, Delete, WipeOut.
 	// DoNotTerminate will block delete operation.
 	// Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.
 	// Delete is based on Halt and deletes PVCs.
@@ -58,13 +59,13 @@ type ClusterSpec struct {
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
-	// tolerations are attached to tolerate any taint that matches the triple <key,value,effect> using the matching operator <operator>.
+	// tolerations are attached to tolerate any taint that matches the triple `key,value,effect` using the matching operator `operator`.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
-// ClusterStatus defines the observed state of Cluster
+// ClusterStatus defines the observed state of Cluster.
 type ClusterStatus struct {
 	// observedGeneration is the most recent generation observed for this
 	// Cluster. It corresponds to the Cluster's generation, which is
@@ -106,13 +107,17 @@ type ClusterComponentSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// componentDefRef reference componentDef defined in ClusterDefinition spec.
+	// componentDefRef references the componentDef defined in ClusterDefinition spec.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
-	// monitor which is a switch to enable monitoring, default is false
+	// classDefRef references the class defined in ComponentClassDefinition.
+	// +optional
+	ClassDefRef *ClassDefRef `json:"classDefRef,omitempty"`
+
+	// monitor is a switch to enable monitoring and is set as false by default.
 	// KubeBlocks provides an extension mechanism to support component level monitoring,
 	// which will scrape metrics auto or manually from servers in component and export
 	// metrics to Time Series Database.
@@ -120,20 +125,20 @@ type ClusterComponentSpec struct {
 	// +optional
 	Monitor bool `json:"monitor,omitempty"`
 
-	// enabledLogs indicate which log file takes effect in database cluster
-	// element is the log type which defined in cluster definition logConfig.name,
+	// enabledLogs indicates which log file takes effect in the database cluster.
+	// element is the log type which is defined in cluster definition logConfig.name,
 	// and will set relative variables about this log type in database kernel.
 	// +listType=set
 	// +optional
 	EnabledLogs []string `json:"enabledLogs,omitempty"`
 
-	// Component replicas, use default value in ClusterDefinition spec. if not specified.
+	// Component replicas. The default value is used in ClusterDefinition spec if not specified.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=1
 	Replicas int32 `json:"replicas"`
 
-	// affinity describes affinities which specific by users.
+	// affinity describes affinities specified by users.
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
@@ -142,7 +147,7 @@ type ClusterComponentSpec struct {
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 
-	// resources requests and limits of workload.
+	// Resources requests and limits of workload.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
@@ -153,11 +158,11 @@ type ClusterComponentSpec struct {
 	// +patchStrategy=merge,retainKeys
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// services expose endpoints can be accessed by clients
+	// Services expose endpoints that can be accessed by clients.
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
 
-	// primaryIndex determines which index is primary when workloadType is Replication, index number starts from zero.
+	// primaryIndex determines which index is primary when workloadType is Replication. Index number starts from zero.
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	PrimaryIndex *int32 `json:"primaryIndex,omitempty"`
@@ -166,33 +171,59 @@ type ClusterComponentSpec struct {
 	// +optional
 	SwitchPolicy *ClusterSwitchPolicy `json:"switchPolicy,omitempty"`
 
-	// tls should be enabled or not
+	// Enables or disables TLS certs.
 	// +optional
 	TLS bool `json:"tls,omitempty"`
 
-	// issuer who provides tls certs
+	// issuer defines provider context for TLS certs.
 	// required when TLS enabled
 	// +optional
 	Issuer *Issuer `json:"issuer,omitempty"`
+
+	// serviceAccountName is the name of the ServiceAccount that running component depends on.
+	// +optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+
+	// noCreatePDB defines the PodDistruptionBudget creation behavior and is set to true if creation of PodDistruptionBudget
+	// for this component is not needed. It defaults to false.
+	// +kubebuilder:default=false
+	// +optional
+	NoCreatePDB bool `json:"noCreatePDB,omitempty"`
+}
+
+// GetMinAvailable wraps the 'prefer' value return. As for component replicaCount <= 1, it will return 0,
+// and as for replicaCount=2 it will return 1.
+func (r *ClusterComponentSpec) GetMinAvailable(prefer *intstr.IntOrString) *intstr.IntOrString {
+	if r == nil || r.NoCreatePDB || prefer == nil {
+		return nil
+	}
+	if r.Replicas <= 1 {
+		m := intstr.FromInt(0)
+		return &m
+	} else if r.Replicas == 2 {
+		m := intstr.FromInt(1)
+		return &m
+	}
+	return prefer
 }
 
 type ComponentMessageMap map[string]string
 
-// ClusterComponentStatus record components status information
+// ClusterComponentStatus records components status.
 type ClusterComponentStatus struct {
-	// phase describes the phase of the component, the detail information of the phases are as following:
-	// Running: component is running. [terminal state]
-	// Stopped: component is stopped, as no running pod. [terminal state]
-	// Failed: component is unavailable. i.e, all pods are not ready for Stateless/Stateful component,
+	// phase describes the phase of the component and the detail information of the phases are as following:
+	// Running: the component is running. [terminal state]
+	// Stopped: the component is stopped, as no running pod. [terminal state]
+	// Failed: the component is unavailable, i.e. all pods are not ready for Stateless/Stateful component and
 	// Leader/Primary pod is not ready for Consensus/Replication component. [terminal state]
-	// Abnormal: component is running but part of its pods are not ready.
+	// Abnormal: the component is running but part of its pods are not ready.
 	// Leader/Primary pod is ready for Consensus/Replication component. [terminal state]
-	// Creating: component has entered creating process.
-	// Updating: component has entered updating process, triggered by Spec. updated.
+	// Creating: the component has entered creating process.
+	// Updating: the component has entered updating process, triggered by Spec. updated.
 	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
 	// message records the component details message in current phase.
-	// keys are podName or deployName or statefulSetName, the format is `<ObjectKind>/<Name>`.
+	// Keys are podName or deployName or statefulSetName. The format is `ObjectKind/Name`.
 	// +optional
 	Message ComponentMessageMap `json:"message,omitempty"`
 
@@ -205,58 +236,58 @@ type ClusterComponentStatus struct {
 	// +optional
 	PodsReadyTime *metav1.Time `json:"podsReadyTime,omitempty"`
 
-	// consensusSetStatus role and pod name mapping.
+	// consensusSetStatus specifies the mapping of role and pod name.
 	// +optional
 	ConsensusSetStatus *ConsensusSetStatus `json:"consensusSetStatus,omitempty"`
 
-	// replicationSetStatus role and pod name mapping.
+	// replicationSetStatus specifies the mapping of role and pod name.
 	// +optional
 	ReplicationSetStatus *ReplicationSetStatus `json:"replicationSetStatus,omitempty"`
 }
 
 type ConsensusSetStatus struct {
-	// leader status.
+	// Leader status.
 	// +kubebuilder:validation:Required
 	Leader ConsensusMemberStatus `json:"leader"`
 
-	// followers status.
+	// Followers status.
 	// +optional
 	Followers []ConsensusMemberStatus `json:"followers,omitempty"`
 
-	// learner status.
+	// Learner status.
 	// +optional
 	Learner *ConsensusMemberStatus `json:"learner,omitempty"`
 }
 
 type ConsensusMemberStatus struct {
-	// name role name.
+	// Defines the role name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=leader
 	Name string `json:"name"`
 
-	// accessMode, what service this pod provides.
+	// accessMode defines what service this pod provides.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=ReadWrite
 	AccessMode AccessMode `json:"accessMode"`
 
-	// pod name.
+	// Pod name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Unknown
 	Pod string `json:"pod"`
 }
 
 type ReplicationSetStatus struct {
-	// primary status.
+	// Primary status.
 	// +kubebuilder:validation:Required
 	Primary ReplicationMemberStatus `json:"primary"`
 
-	// secondaries status.
+	// Secondaries status.
 	// +optional
 	Secondaries []ReplicationMemberStatus `json:"secondaries,omitempty"`
 }
 
 type ReplicationMemberStatus struct {
-	// pod name.
+	// Pod name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Unknown
 	Pod string `json:"pod"`
@@ -273,11 +304,10 @@ type ClusterSwitchPolicy struct {
 }
 
 type ClusterComponentVolumeClaimTemplate struct {
-	// Ref ClusterVersion.spec.components.containers.volumeMounts.name
+	// Reference `ClusterDefinition.spec.componentDefs.containers.volumeMounts.name`.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 	// spec defines the desired characteristics of a volume requested by a pod author.
-	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Spec PersistentVolumeClaimSpec `json:"spec,omitempty"`
 }
@@ -291,18 +321,20 @@ func (r *ClusterComponentVolumeClaimTemplate) toVolumeClaimTemplate() corev1.Per
 
 type PersistentVolumeClaimSpec struct {
 	// accessModes contains the desired access modes the volume should have.
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty" protobuf:"bytes,1,rep,name=accessModes,casttype=PersistentVolumeAccessMode"`
 	// resources represents the minimum resources the volume should have.
 	// If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements
 	// that are lower than previous value but must still be higher than capacity recorded in the
 	// status field of the claim.
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Resources corev1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,2,opt,name=resources"`
 	// storageClassName is the name of the StorageClass required by the claim.
-	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
 	// +optional
 	StorageClassName *string `json:"storageClassName,omitempty" protobuf:"bytes,5,opt,name=storageClassName"`
 	// TODO:
@@ -322,8 +354,8 @@ func (r PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.Persis
 	}
 }
 
-// GetStorageClassName return PersistentVolumeClaimSpec.StorageClassName if value is assigned, otherwise
-// return preferSC argument.
+// GetStorageClassName returns PersistentVolumeClaimSpec.StorageClassName if a value is assigned; otherwise,
+// it returns preferSC argument.
 func (r PersistentVolumeClaimSpec) GetStorageClassName(preferSC string) *string {
 	if r.StorageClassName != nil && *r.StorageClassName != "" {
 		return r.StorageClassName
@@ -362,8 +394,8 @@ type Affinity struct {
 
 // Issuer defines Tls certs issuer
 type Issuer struct {
-	// name of issuer
-	// options supported:
+	// Name of issuer.
+	// Options supported:
 	// - KubeBlocks - Certificates signed by KubeBlocks Operator.
 	// - UserProvided - User provided own CA-signed certificates.
 	// +kubebuilder:validation:Enum={KubeBlocks, UserProvided}
@@ -371,7 +403,7 @@ type Issuer struct {
 	// +kubebuilder:validation:Required
 	Name IssuerName `json:"name"`
 
-	// secretRef, Tls certs Secret reference
+	// secretRef. TLS certs Secret reference
 	// required when from is UserProvided
 	// +optional
 	SecretRef *TLSSecretRef `json:"secretRef,omitempty"`
@@ -379,19 +411,19 @@ type Issuer struct {
 
 // TLSSecretRef defines Secret contains Tls certs
 type TLSSecretRef struct {
-	// name of the Secret
+	// Name of the Secret
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// ca cert key in Secret
+	// CA cert key in Secret
 	// +kubebuilder:validation:Required
 	CA string `json:"ca"`
 
-	// cert key in Secret
+	// Cert key in Secret
 	// +kubebuilder:validation:Required
 	Cert string `json:"cert"`
 
-	// key of TLS private key in Secret
+	// Key of TLS private key in Secret
 	// +kubebuilder:validation:Required
 	Key string `json:"key"`
 }
@@ -399,13 +431,14 @@ type TLSSecretRef struct {
 type ClusterComponentService struct {
 	// Service name
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=15
 	Name string `json:"name"`
 
 	// serviceType determines how the Service is exposed. Valid
 	// options are ClusterIP, NodePort, and LoadBalancer.
 	// "ClusterIP" allocates a cluster-internal IP address for load-balancing
 	// to endpoints. Endpoints are determined by the selector or if that is not
-	// specified, by manual construction of an Endpoints object or
+	// specified, they are determined by manual construction of an Endpoints object or
 	// EndpointSlice objects. If clusterIP is "None", no virtual IP is
 	// allocated and the endpoints are published as a set of endpoints rather
 	// than a virtual IP.
@@ -414,7 +447,7 @@ type ClusterComponentService struct {
 	// "LoadBalancer" builds on NodePort and creates an external load-balancer
 	// (if supported in the current cloud) which routes to the same endpoints
 	// as the clusterIP.
-	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.
 	// +kubebuilder:default=ClusterIP
 	// +kubebuilder:validation:Enum={ClusterIP,NodePort,LoadBalancer}
 	// +kubebuilder:pruning:PreserveUnknownFields
@@ -422,11 +455,23 @@ type ClusterComponentService struct {
 	ServiceType corev1.ServiceType `json:"serviceType,omitempty"`
 
 	// If ServiceType is LoadBalancer, cloud provider related parameters can be put here
-	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
+type ClassDefRef struct {
+	// Name refers to the name of the ComponentClassDefinition.
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Class refers to the name of the class that is defined in the ComponentClassDefinition.
+	// +kubebuilder:validation:Required
+	Class string `json:"class"`
+}
+
+// +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks,all}
@@ -436,7 +481,7 @@ type ClusterComponentService struct {
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="Cluster Status."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// Cluster is the Schema for the clusters API
+// Cluster is the Schema for the clusters API.
 type Cluster struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -447,7 +492,7 @@ type Cluster struct {
 
 // +kubebuilder:object:root=true
 
-// ClusterList contains a list of Cluster
+// ClusterList contains a list of Cluster.
 type ClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
@@ -456,6 +501,70 @@ type ClusterList struct {
 
 func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
+}
+
+func (r Cluster) IsDeleting() bool {
+	return !r.GetDeletionTimestamp().IsZero()
+}
+
+func (r Cluster) IsUpdating() bool {
+	return r.Status.ObservedGeneration != r.Generation
+}
+
+func (r Cluster) IsStatusUpdating() bool {
+	return !r.IsDeleting() && !r.IsUpdating()
+}
+
+// GetVolumeClaimNames gets all PVC names of component compName.
+//
+// r.Spec.GetComponentByName(compName).VolumeClaimTemplates[*].Name will be used if no claimNames provided
+//
+// nil return if:
+// 1. component compName not found or
+// 2. len(VolumeClaimTemplates)==0 or
+// 3. any claimNames not found
+func (r *Cluster) GetVolumeClaimNames(compName string, claimNames ...string) []string {
+	if r == nil {
+		return nil
+	}
+	comp := r.Spec.GetComponentByName(compName)
+	if comp == nil {
+		return nil
+	}
+	if len(comp.VolumeClaimTemplates) == 0 {
+		return nil
+	}
+	if len(claimNames) == 0 {
+		for _, template := range comp.VolumeClaimTemplates {
+			claimNames = append(claimNames, template.Name)
+		}
+	}
+	allExist := true
+	for _, name := range claimNames {
+		found := false
+		for _, template := range comp.VolumeClaimTemplates {
+			if template.Name == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			allExist = false
+			break
+		}
+	}
+	if !allExist {
+		return nil
+	}
+
+	pvcNames := make([]string, 0)
+	for _, claimName := range claimNames {
+		for i := 0; i < int(comp.Replicas); i++ {
+			pvcName := fmt.Sprintf("%s-%s-%s-%d", claimName, r.Name, compName, i)
+			pvcNames = append(pvcNames, pvcName)
+		}
+	}
+	return pvcNames
 }
 
 // GetComponentByName gets component by name.
@@ -478,7 +587,7 @@ func (r ClusterSpec) GetComponentDefRefName(componentName string) string {
 	return ""
 }
 
-// ValidateEnabledLogs validates enabledLogs config in cluster.yaml, and returns metav1.Condition when detect invalid values.
+// ValidateEnabledLogs validates enabledLogs config in cluster.yaml, and returns metav1.Condition when detecting invalid values.
 func (r ClusterSpec) ValidateEnabledLogs(cd *ClusterDefinition) error {
 	message := make([]string, 0)
 	for _, comp := range r.ComponentSpecs {
@@ -505,7 +614,7 @@ func (r ClusterSpec) GetDefNameMappingComponents() map[string][]ClusterComponent
 	return m
 }
 
-// GetMessage gets message map deep copy object
+// GetMessage gets message map deep copy object.
 func (r ClusterComponentStatus) GetMessage() ComponentMessageMap {
 	messageMap := map[string]string{}
 	for k, v := range r.Message {
@@ -514,7 +623,7 @@ func (r ClusterComponentStatus) GetMessage() ComponentMessageMap {
 	return messageMap
 }
 
-// SetMessage override message map object
+// SetMessage overrides message map object.
 func (r *ClusterComponentStatus) SetMessage(messageMap ComponentMessageMap) {
 	if r == nil {
 		return
@@ -522,7 +631,7 @@ func (r *ClusterComponentStatus) SetMessage(messageMap ComponentMessageMap) {
 	r.Message = messageMap
 }
 
-// SetObjectMessage sets k8s workload message to component status message map
+// SetObjectMessage sets K8s workload message to component status message map.
 func (r *ClusterComponentStatus) SetObjectMessage(objectKind, objectName, message string) {
 	if r == nil {
 		return
@@ -573,7 +682,7 @@ func (r *ClusterComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolum
 	return ts
 }
 
-// GetPrimaryIndex provide safe operation get ClusterComponentSpec.PrimaryIndex, if value is nil, it's treated as 0.
+// GetPrimaryIndex provides safe operation get ClusterComponentSpec.PrimaryIndex, if value is nil, it's treated as 0.
 func (r *ClusterComponentSpec) GetPrimaryIndex() int32 {
 	if r == nil || r.PrimaryIndex == nil {
 		return 0
@@ -581,7 +690,7 @@ func (r *ClusterComponentSpec) GetPrimaryIndex() int32 {
 	return *r.PrimaryIndex
 }
 
-// GetClusterTerminalPhases return Cluster terminal phases.
+// GetClusterTerminalPhases returns Cluster terminal phases.
 func GetClusterTerminalPhases() []ClusterPhase {
 	return []ClusterPhase{
 		RunningClusterPhase,
@@ -591,7 +700,7 @@ func GetClusterTerminalPhases() []ClusterPhase {
 	}
 }
 
-// GetClusterUpRunningPhases return Cluster running or partially running phases.
+// GetClusterUpRunningPhases returns Cluster running or partially running phases.
 func GetClusterUpRunningPhases() []ClusterPhase {
 	return []ClusterPhase{
 		RunningClusterPhase,
@@ -616,4 +725,18 @@ func GetComponentTerminalPhases() []ClusterComponentPhase {
 		FailedClusterCompPhase,
 		AbnormalClusterCompPhase,
 	}
+}
+
+// GetComponentUpRunningPhase returns component running or partially running phases.
+func GetComponentUpRunningPhase() []ClusterComponentPhase {
+	return []ClusterComponentPhase{
+		RunningClusterCompPhase,
+		AbnormalClusterCompPhase,
+		FailedClusterCompPhase,
+	}
+}
+
+// ComponentPodsAreReady checks if the pods of component are ready.
+func ComponentPodsAreReady(podsAreReady *bool) bool {
+	return podsAreReady != nil && *podsAreReady
 }

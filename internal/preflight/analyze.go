@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package preflight
@@ -25,6 +28,7 @@ import (
 	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
 	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
+	"helm.sh/helm/v3/pkg/cli/values"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
 	kbanalyzer "github.com/apecloud/kubeblocks/internal/preflight/analyzer"
@@ -32,6 +36,7 @@ import (
 
 type KBClusterCollectResult struct {
 	preflight.ClusterCollectResult
+	HelmOptions     *values.Options
 	AnalyzerSpecs   []*troubleshoot.Analyze
 	KbAnalyzerSpecs []*preflightv1beta2.ExtendAnalyze
 }
@@ -43,19 +48,19 @@ type KBHostCollectResult struct {
 }
 
 func (c KBClusterCollectResult) Analyze() []*analyze.AnalyzeResult {
-	return doAnalyze(c.Context, c.AllCollectedData, c.AnalyzerSpecs, c.KbAnalyzerSpecs, nil, nil)
+	return doAnalyze(c.Context, c.AllCollectedData, c.AnalyzerSpecs, c.KbAnalyzerSpecs, nil, nil, c.HelmOptions)
 }
 
 func (c KBHostCollectResult) Analyze() []*analyze.AnalyzeResult {
-	return doAnalyze(c.Context, c.AllCollectedData, nil, nil, c.AnalyzerSpecs, c.KbAnalyzerSpecs)
+	return doAnalyze(c.Context, c.AllCollectedData, nil, nil, c.AnalyzerSpecs, c.KbAnalyzerSpecs, nil)
 }
 
-func doAnalyze(ctx context.Context,
-	allCollectedData map[string][]byte,
+func doAnalyze(ctx context.Context, allCollectedData map[string][]byte,
 	analyzers []*troubleshoot.Analyze,
 	kbAnalyzers []*preflightv1beta2.ExtendAnalyze,
 	hostAnalyzers []*troubleshoot.HostAnalyze,
 	kbhHostAnalyzers []*preflightv1beta2.ExtendHostAnalyze,
+	options *values.Options,
 ) []*analyze.AnalyzeResult {
 	getCollectedFileContents := func(fileName string) ([]byte, error) {
 		contents, ok := allCollectedData[fileName]
@@ -99,7 +104,7 @@ func doAnalyze(ctx context.Context,
 		}
 	}
 	for _, kbAnalyzer := range kbAnalyzers {
-		analyzeResult := kbanalyzer.KBAnalyze(ctx, kbAnalyzer, getCollectedFileContents, getChildCollectedFileContents)
+		analyzeResult := kbanalyzer.KBAnalyze(ctx, kbAnalyzer, getCollectedFileContents, getChildCollectedFileContents, options)
 		analyzeResults = append(analyzeResults, analyzeResult...)
 	}
 	for _, hostAnalyzer := range hostAnalyzers {

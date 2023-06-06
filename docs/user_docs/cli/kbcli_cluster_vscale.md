@@ -5,26 +5,32 @@ title: kbcli cluster vscale
 Vertically scale the specified components in the cluster.
 
 ```
-kbcli cluster vscale [flags]
+kbcli cluster vscale NAME [flags]
 ```
 
 ### Examples
 
 ```
-  # scale the computing resources of specified components, separate with commas when <component-name> more than one
-  kbcli cluster vscale <my-cluster> --components=<component-name> --cpu=500m --memory=500Mi
+  # scale the computing resources of specified components, separate with commas for multiple components
+  kbcli cluster vscale mycluster --components=mysql --cpu=500m --memory=500Mi
+  
+  # scale the computing resources of specified components by class, run command 'kbcli class list --cluster-definition cluster-definition-name' to get available classes
+  kbcli cluster vscale mycluster --components=mysql --class=general-2c4g
 ```
 
 ### Options
 
 ```
-      --class string                 Component class
-      --components strings            Component names to this operations
-      --cpu string                   Requested and limited size of component cpu
-  -h, --help                         help for vscale
-      --memory string                Requested and limited size of component memory
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
-      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
+      --auto-approve                   Skip interactive approval before vertically scaling the cluster
+      --class string                   Component class
+      --components strings             Component names to this operations
+      --cpu string                     Request and limit size of component cpu
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+  -h, --help                           help for vscale
+      --memory string                  Request and limit size of component memory
+      --name string                    OpsRequest name. if not specified, it will be randomly generated 
+  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```
 
 ### Options inherited from parent commands

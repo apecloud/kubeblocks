@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package stateless
@@ -25,7 +28,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -43,13 +46,21 @@ import (
 const NewRSAvailableReason = "NewReplicaSetAvailable"
 
 type Stateless struct {
-	Cli          client.Client
-	Cluster      *appsv1alpha1.Cluster
-	Component    *appsv1alpha1.ClusterComponentSpec
-	componentDef *appsv1alpha1.ClusterComponentDefinition
+	types.ComponentSetBase
 }
 
-var _ types.Component = &Stateless{}
+var _ types.ComponentSet = &Stateless{}
+
+func (stateless *Stateless) getReplicas() int32 {
+	if stateless.Component != nil {
+		return stateless.Component.GetReplicas()
+	}
+	return stateless.ComponentSpec.Replicas
+}
+
+func (stateless *Stateless) SetComponent(comp types.Component) {
+	stateless.Component = comp
+}
 
 func (stateless *Stateless) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if stateless == nil {
@@ -66,7 +77,8 @@ func (stateless *Stateless) PodsReady(ctx context.Context, obj client.Object) (b
 	if !ok {
 		return false, nil
 	}
-	return deploymentIsReady(deploy, &stateless.Component.Replicas), nil
+	targetReplicas := stateless.getReplicas()
+	return deploymentIsReady(deploy, &targetReplicas), nil
 }
 
 func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
@@ -76,19 +88,17 @@ func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int3
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 
-// HandleProbeTimeoutWhenPodsReady the stateless component has no role detection, empty implementation here.
-func (stateless *Stateless) HandleProbeTimeoutWhenPodsReady(ctx context.Context,
-	recorder record.EventRecorder) (bool, error) {
-	return false, nil
+func (stateless *Stateless) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap) {
+	return "", nil
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
 func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
-	componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
+	componentName string) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	deployList := &appsv1.DeploymentList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, stateless.Cli, *stateless.Cluster, componentName, deployList)
 	if err != nil || len(deployList.Items) == 0 {
-		return "", err
+		return "", nil, err
 	}
 	// if the failed pod is not controlled by the new ReplicaSetKind
 	checkExistFailedPodOfNewRS := func(pod *corev1.Pod, workload metav1.Object) bool {
@@ -96,31 +106,38 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
 		return !intctrlutil.PodIsReady(pod) && belongToNewReplicaSet(d, pod)
 	}
 	deploy := &deployList.Items[0]
-	return util.GetComponentPhaseWhenPodsNotReady(podList, deploy, stateless.Component.Replicas,
-		deploy.Status.AvailableReplicas, checkExistFailedPodOfNewRS), nil
+	return util.GetComponentPhaseWhenPodsNotReady(podList, deploy, stateless.getReplicas(),
+		deploy.Status.AvailableReplicas, checkExistFailedPodOfNewRS), nil, nil
 }
 
-func (stateless *Stateless) HandleUpdate(ctx context.Context, obj client.Object) error {
-	return nil
+func (stateless *Stateless) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {
+	return nil, nil
 }
 
-func NewStateless(
-	cli client.Client,
+func (stateless *Stateless) HandleRoleChange(context.Context, client.Object) ([]graph.Vertex, error) {
+	return nil, nil
+}
+
+func (stateless *Stateless) HandleHA(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
+	return nil, nil
+}
+
+func newStateless(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition) (*Stateless, error) {
-	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
-		return nil, err
-	}
+	spec *appsv1alpha1.ClusterComponentSpec,
+	def appsv1alpha1.ClusterComponentDefinition) *Stateless {
 	return &Stateless{
-		Cli:          cli,
-		Cluster:      cluster,
-		Component:    component,
-		componentDef: &componentDef,
-	}, nil
+		ComponentSetBase: types.ComponentSetBase{
+			Cli:           cli,
+			Cluster:       cluster,
+			ComponentSpec: spec,
+			ComponentDef:  &def,
+			Component:     nil,
+		},
+	}
 }
 
-// deploymentIsReady check deployment is ready
+// deploymentIsReady checks deployment is ready
 func deploymentIsReady(deploy *appsv1.Deployment, targetReplicas *int32) bool {
 	var (
 		componentIsRunning = true
@@ -150,7 +167,7 @@ func deploymentIsReady(deploy *appsv1.Deployment, targetReplicas *int32) bool {
 	return componentIsRunning
 }
 
-// hasProgressDeadline checks if the Deployment d is expected to surface the reason
+// hasProgressDeadline checks if the Deployment d is expected to suffice the reason
 // "ProgressDeadlineExceeded" when the Deployment progress takes longer than expected time.
 func hasProgressDeadline(d *appsv1.Deployment) bool {
 	return d.Spec.ProgressDeadlineSeconds != nil &&

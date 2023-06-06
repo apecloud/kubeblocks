@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package util
@@ -46,11 +49,11 @@ func TestIsProbeTimeout(t *testing.T) {
 	podsReadyTime := &metav1.Time{Time: time.Now().Add(-10 * time.Minute)}
 	compDef := &appsv1alpha1.ClusterComponentDefinition{
 		Probes: &appsv1alpha1.ClusterDefinitionProbes{
-			RoleChangedProbe:               &appsv1alpha1.ClusterDefinitionProbe{},
+			RoleProbe:                      &appsv1alpha1.ClusterDefinitionProbe{},
 			RoleProbeTimeoutAfterPodsReady: appsv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady,
 		},
 	}
-	if !IsProbeTimeout(compDef, podsReadyTime) {
+	if !IsProbeTimeout(compDef.Probes, podsReadyTime) {
 		t.Error("probe timed out should be true")
 	}
 }
@@ -159,11 +162,11 @@ var _ = Describe("Consensus Component", func() {
 	Context("Consensus Component test", func() {
 		It("Consensus Component test", func() {
 			By(" init cluster, statefulSet, pods")
-			_, _, cluster := testapps.InitClusterWithHybridComps(testCtx, clusterDefName,
+			_, _, cluster := testapps.InitClusterWithHybridComps(&testCtx, clusterDefName,
 				clusterVersionName, clusterName, statelessCompName, "stateful", consensusCompName)
-			sts := testapps.MockConsensusComponentStatefulSet(testCtx, clusterName, consensusCompName)
-			testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
-			_ = testapps.MockConsensusComponentPods(testCtx, sts, clusterName, consensusCompName)
+			sts := testapps.MockConsensusComponentStatefulSet(&testCtx, clusterName, consensusCompName)
+			testapps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessCompName)
+			_ = testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, consensusCompName)
 
 			By("test GetComponentDefByCluster function")
 			componentDef, _ := GetComponentDefByCluster(ctx, k8sClient, *cluster, consensusCompDefRef)
@@ -174,17 +177,17 @@ var _ = Describe("Consensus Component", func() {
 			Expect(newCluster != nil).Should(BeTrue())
 
 			By("test consensusSet InitClusterComponentStatusIfNeed function")
-			err := InitClusterComponentStatusIfNeed(cluster, consensusCompName, *componentDef)
+			err := InitClusterComponentStatusIfNeed(cluster, consensusCompName, componentDef.WorkloadType)
 			Expect(err).Should(Succeed())
 			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus).ShouldNot(BeNil())
-			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus.Leader.Pod).Should(Equal(ComponentStatusDefaultPodName))
+			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus.Leader.Pod).Should(Equal(constant.ComponentStatusDefaultPodName))
 
 			By("test ReplicationSet InitClusterComponentStatusIfNeed function")
 			componentDef.WorkloadType = appsv1alpha1.Replication
-			err = InitClusterComponentStatusIfNeed(cluster, consensusCompName, *componentDef)
+			err = InitClusterComponentStatusIfNeed(cluster, consensusCompName, componentDef.WorkloadType)
 			Expect(err).Should(Succeed())
 			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus).ShouldNot(BeNil())
-			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus.Primary.Pod).Should(Equal(ComponentStatusDefaultPodName))
+			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus.Primary.Pod).Should(Equal(constant.ComponentStatusDefaultPodName))
 
 			By("test GetObjectListByComponentName function")
 			stsList := &appsv1.StatefulSetList{}
@@ -200,16 +203,6 @@ var _ = Describe("Consensus Component", func() {
 			By("test GetClusterComponentSpecByName function")
 			clusterComp := GetClusterComponentSpecByName(*cluster, consensusCompName)
 			Expect(clusterComp).ShouldNot(BeNil())
-
-			By("test ComponentRuntimeReqArgsCheck function")
-			err = ComponentRuntimeReqArgsCheck(k8sClient, cluster, clusterComp)
-			Expect(err).Should(Succeed())
-			By("test ComponentRuntimeReqArgsCheck function when cluster nil")
-			err = ComponentRuntimeReqArgsCheck(k8sClient, nil, clusterComp)
-			Expect(err).ShouldNot(Succeed())
-			By("test ComponentRuntimeReqArgsCheck function when clusterComp nil")
-			err = ComponentRuntimeReqArgsCheck(k8sClient, cluster, nil)
-			Expect(err).ShouldNot(Succeed())
 
 			By("test UpdateObjLabel function")
 			stsObj := stsList.Items[0]
@@ -323,6 +316,56 @@ var _ = Describe("Consensus Component", func() {
 				sts.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision)
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
+		})
+	})
+})
+
+var _ = Describe("Component utils test", func() {
+	Context("test mergeServiceAnnotations", func() {
+		It("original and target annotations are nil", func() {
+			Expect(MergeServiceAnnotations(nil, nil)).Should(BeNil())
+		})
+		It("target annotations is nil", func() {
+			originalAnnotations := map[string]string{"k1": "v1"}
+			Expect(MergeServiceAnnotations(originalAnnotations, nil)).To(Equal(originalAnnotations))
+		})
+		It("original annotations is nil", func() {
+			targetAnnotations := map[string]string{"k1": "v1"}
+			Expect(MergeServiceAnnotations(nil, targetAnnotations)).To(Equal(targetAnnotations))
+		})
+		It("original annotations have prometheus annotations which should be removed", func() {
+			originalAnnotations := map[string]string{"k1": "v1", "prometheus.io/path": "/metrics"}
+			targetAnnotations := map[string]string{"k2": "v2"}
+			expectAnnotations := map[string]string{"k1": "v1", "k2": "v2"}
+			Expect(MergeServiceAnnotations(originalAnnotations, targetAnnotations)).To(Equal(expectAnnotations))
+		})
+		It("target annotations should override original annotations", func() {
+			originalAnnotations := map[string]string{"k1": "v1", "prometheus.io/path": "/metrics"}
+			targetAnnotations := map[string]string{"k1": "v11"}
+			expectAnnotations := map[string]string{"k1": "v11"}
+			Expect(MergeServiceAnnotations(originalAnnotations, targetAnnotations)).To(Equal(expectAnnotations))
+		})
+
+		It("should merge annotations from original that not exist in target to final result", func() {
+			originalKey := "only-existing-in-original"
+			targetKey := "only-existing-in-target"
+			updatedKey := "updated-in-target"
+			originalAnnotations := map[string]string{
+				originalKey: "true",
+				updatedKey:  "false",
+			}
+			targetAnnotations := map[string]string{
+				targetKey:  "true",
+				updatedKey: "true",
+			}
+			MergeAnnotations(originalAnnotations, &targetAnnotations)
+			Expect(targetAnnotations[targetKey]).ShouldNot(BeEmpty())
+			Expect(targetAnnotations[originalKey]).ShouldNot(BeEmpty())
+			Expect(targetAnnotations[updatedKey]).Should(Equal("true"))
+			By("merging with target being nil")
+			var nilAnnotations map[string]string
+			MergeAnnotations(originalAnnotations, &nilAnnotations)
+			Expect(nilAnnotations).ShouldNot(BeNil())
 		})
 	})
 })

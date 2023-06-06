@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configuration
@@ -25,12 +28,13 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func checkEnableCfgUpgrade(object client.Object) bool {
-	// check user disable upgrade
+	// check user's upgrade switch
 	// config.kubeblocks.io/disable-reconfigure = "false"
 	annotations := object.GetAnnotations()
 	value, ok := annotations[constant.DisableUpgradeInsConfigurationAnnotationKey]
@@ -69,7 +73,7 @@ func checkAndApplyConfigsChanged(client client.Client, ctx intctrlutil.RequestCt
 		return false, err
 	}
 
-	lastConfig, ok := annotations[constant.LastAppliedConfigAnnotation]
+	lastConfig, ok := annotations[constant.LastAppliedConfigAnnotationKey]
 	if !ok {
 		return updateAppliedConfigs(client, ctx, cm, configData, cfgcore.ReconfigureCreatedPhase)
 	}
@@ -77,7 +81,7 @@ func checkAndApplyConfigsChanged(client client.Client, ctx intctrlutil.RequestCt
 	return lastConfig == string(configData), nil
 }
 
-// updateAppliedConfigs update hash label and last applied config
+// updateAppliedConfigs updates hash label and last applied config
 func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte, reconfigurePhase string) (bool, error) {
 
 	patch := client.MergeFrom(config.DeepCopy())
@@ -85,8 +89,8 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
 
-	config.ObjectMeta.Annotations[constant.LastAppliedConfigAnnotation] = string(configData)
-	hash, err := cfgcore.ComputeHash(config.Data)
+	config.ObjectMeta.Annotations[constant.LastAppliedConfigAnnotationKey] = string(configData)
+	hash, err := util.ComputeHash(config.Data)
 	if err != nil {
 		return false, err
 	}
@@ -103,7 +107,6 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 
 	// delete reconfigure-policy
 	delete(config.ObjectMeta.Annotations, constant.UpgradePolicyAnnotationKey)
-	delete(config.ObjectMeta.Annotations, constant.KBParameterUpdateSourceAnnotationKey)
 	if err := cli.Patch(ctx.Ctx, config, patch); err != nil {
 		return false, err
 	}
@@ -113,7 +116,7 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 
 func getLastVersionConfig(cm *corev1.ConfigMap) (map[string]string, error) {
 	data := make(map[string]string, 0)
-	cfgContent, ok := cm.GetAnnotations()[constant.LastAppliedConfigAnnotation]
+	cfgContent, ok := cm.GetAnnotations()[constant.LastAppliedConfigAnnotationKey]
 	if !ok {
 		return data, nil
 	}

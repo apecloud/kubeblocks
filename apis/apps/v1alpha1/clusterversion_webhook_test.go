@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -57,16 +57,13 @@ var _ = Describe("clusterVersion webhook", func() {
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 
-			Eventually(func() bool {
-				By("By testing component name is not found in cluserDefinition")
-				clusterVersion.Spec.ComponentVersions[1].ComponentDefRef = "proxy1"
-				Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).ShouldNot(Succeed())
+			By("By testing component name is not found in clusterDefinition")
+			clusterVersion.Spec.ComponentVersions[1].ComponentDefRef = "proxy1"
+			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).ShouldNot(Succeed())
 
-				By("By creating an clusterVersion")
-				clusterVersion.Spec.ComponentVersions[1].ComponentDefRef = "proxy"
-				err := testCtx.CheckedCreateObj(ctx, clusterVersion)
-				return err == nil
-			}).Should(BeTrue())
+			By("By creating an clusterVersion")
+			clusterVersion.Spec.ComponentVersions[1].ComponentDefRef = "proxy"
+			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 
 			By("By testing create a new clusterVersion with invalid config template")
 			clusterVersionDup := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName+"-for-config")

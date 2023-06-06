@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package alert
@@ -53,13 +56,13 @@ var (
 		kbcli alert add-receiver --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=XXX'
 
 		# add email receiver
-        kbcli alter add-receiver --email='a@foo.com,b@foo.com'
+        kbcli alter add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io'
 
 		# add email receiver, and only receive alert from cluster mycluster
-		kbcli alter add-receiver --email='a@foo.com,b@foo.com' --cluster=mycluster
+		kbcli alter add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster
 
 		# add email receiver, and only receive alert from cluster mycluster and alert severity is warning
-		kbcli alter add-receiver --email='a@foo.com,b@foo.com' --cluster=mycluster --severity=warning
+		kbcli alter add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster --severity=warning
 
 		# add slack receiver
   		kbcli alert add-receiver --slack api_url=https://hooks.slackConfig.com/services/foo,channel=monitor,username=kubeblocks-alert-bot`)
@@ -100,11 +103,11 @@ func newAddReceiverCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		},
 	}
 
-	cmd.Flags().StringArrayVar(&o.emails, "email", []string{}, "Add email address, such as bar@foo.com, more than one emailConfig can be specified separated by comma")
+	cmd.Flags().StringArrayVar(&o.emails, "email", []string{}, "Add email address, such as user@kubeblocks.io, more than one emailConfig can be specified separated by comma")
 	cmd.Flags().StringArrayVar(&o.webhooks, "webhook", []string{}, "Add webhook receiver, such as url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=xxxxx")
 	cmd.Flags().StringArrayVar(&o.slacks, "slack", []string{}, "Add slack receiver, such as api_url=https://hooks.slackConfig.com/services/foo,channel=monitor,username=kubeblocks-alert-bot")
-	cmd.Flags().StringArrayVar(&o.clusters, "cluster", []string{}, "Cluster name, such as mycluster, more than one cluster can be specified, such as mycluster,mycluster2")
-	cmd.Flags().StringArrayVar(&o.severities, "severity", []string{}, "Alert severity, critical, warning or info, more than one severity can be specified, such as critical,warning")
+	cmd.Flags().StringArrayVar(&o.clusters, "cluster", []string{}, "Cluster name, such as mycluster, more than one cluster can be specified, such as mycluster1,mycluster2")
+	cmd.Flags().StringArrayVar(&o.severities, "severity", []string{}, "Alert severity level, critical, warning or info, more than one severity level can be specified, such as critical,warning")
 
 	// register completions
 	util.CheckErr(cmd.RegisterFlagCompletionFunc("severity",
@@ -145,7 +148,7 @@ func (o *addReceiverOptions) validate(args []string) error {
 		return fmt.Errorf("must specify at least one receiver, such as --email, --webhook or --slack")
 	}
 
-	// if name is not specified, generate a random name
+	// if name is not specified, generate a random one
 	if len(args) == 0 {
 		o.name = generateReceiverName()
 	} else {
@@ -162,7 +165,7 @@ func (o *addReceiverOptions) validate(args []string) error {
 	return nil
 }
 
-// checkSeverities check if severity is valid
+// checkSeverities checks if severity is valid
 func (o *addReceiverOptions) checkSeverities() error {
 	if len(o.severities) == 0 {
 		return nil
@@ -185,7 +188,7 @@ func (o *addReceiverOptions) checkSeverities() error {
 	return nil
 }
 
-// checkEmails check if email SMTP is configured, if not, do not allow to add email receiver
+// checkEmails checks if email SMTP is configured, if not, do not allow to add email receiver
 func (o *addReceiverOptions) checkEmails() error {
 	if len(o.emails) == 0 {
 		return nil
@@ -404,7 +407,7 @@ func buildSlackConfigs(slacks []string) ([]*slackConfig, error) {
 		if len(m) == 0 {
 			return nil, fmt.Errorf("invalid slack: %s, slack config should be in the format of api_url=my-api-url,channel=my-channel,username=my-username", slackStr)
 		}
-		s := slackConfig{}
+		s := slackConfig{TitleLink: ""}
 		for k, v := range m {
 			// check slackConfig keys
 			switch slackKey(k) {

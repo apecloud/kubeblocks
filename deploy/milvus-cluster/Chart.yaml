@@ -1,0 +1,9 @@
+apiVersion: v2
+name: milvus-cluster
+description: A Milvus cluster Helm chart for KubeBlocks.
+
+type: application
+
+version: 0.5.1-beta.0
+
+appVersion: "2.2.4"

@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -22,25 +25,25 @@ import (
 )
 
 var (
-	clusterNotExistErrMessage          = "cluster[name=%s] is not exist. Please check that <cluster name> is spelled correctly."
-	componentNotExistErrMessage        = "cluster[name=%s] does not has this component[name=%s]. Please check that --component-name is spelled correctly."
+	clusterNotExistErrMessage          = "cluster[name=%s] does not exist. Please check that <cluster name> is spelled correctly."
+	componentNotExistErrMessage        = "cluster[name=%s] does not have component[name=%s]. Please check that --component is spelled correctly."
 	missingClusterArgErrMassage        = "cluster name should be specified, using --help."
 	missingUpdatedParametersErrMessage = "missing updated parameters, using --help."
 
-	multiComponentsErrorMessage     = "when multi component exist, must specify which component to use. Please using --component-name"
-	multiConfigTemplateErrorMessage = "when multi config template exist, must specify which config template to use. Please using --config-spec"
-	multiConfigFileErrorMessage     = "when multi config files exist, must specify which config file to update. Please using --config-file"
+	multiComponentsErrorMessage     = "when multi components exist, specify a component, using --component"
+	multiConfigTemplateErrorMessage = "when multi config templates exist, specify a config template,  using --config-spec"
+	multiConfigFileErrorMessage     = "when multi config files exist, specify a config file, using --config-file"
 
-	notFoundValidConfigTemplateErrorMessage = "not find valid config template, component[name=%s] in the cluster[name=%s]"
+	notFoundValidConfigTemplateErrorMessage = "cannot find valid config templates for component[name=%s] in the cluster[name=%s]"
 
-	notFoundConfigSpecErrorMessage = "not find config spec[%s], component[name=%s] in the cluster[name=%s]"
+	notFoundConfigSpecErrorMessage = "cannot find config spec[%s] for component[name=%s] in the cluster[name=%s]"
 
-	notFoundConfigFileErrorMessage   = "not find config file, file[name=%s] in the configspec[name=%s], all configfiles: %v"
-	notSupportFileUpdateErrorMessage = "not support file[%s] update, current support files: %v"
+	notFoundConfigFileErrorMessage   = "cannot find config file[name=%s] in the configspec[name=%s], all configfiles: %v"
+	notSupportFileUpdateErrorMessage = "not supported file[%s] for updating, current supported files: %v"
 
-	notCueSchemaPrompt            = "The config template not define cue schema and parameter explain info cannot be generated."
-	cue2openAPISchemaFailedPrompt = "The cue schema may not satisfy the conversion constraints of openAPISchema and parameter explain info cannot be generated."
-	restartConfirmPrompt          = "The parameter change you modified needs to be restarted, which may cause the cluster to be unavailable for a period of time. Do you need to continue...\n, "
+	notCueSchemaPrompt            = "The config template is not defined in cue schema and parameter explanation info cannot be generated."
+	cue2openAPISchemaFailedPrompt = "The cue schema may not satisfy the conversion constraints of openAPISchema and parameter explanation info cannot be generated."
+	restartConfirmPrompt          = "The parameter change incurs a cluster restart, which brings the cluster down for a while. Enter to continue...\n, "
 	confirmApplyReconfigurePrompt = "Are you sure you want to apply these changes?\n"
 )
 

@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package accounts
@@ -23,19 +26,19 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	klog "k8s.io/klog/v2"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/internal/sqlchannel"
+	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type GrantOptions struct {
 	*AccountBaseOptions
-	info sqlchannel.UserInfo
+	info channelutil.UserInfo
 }
 
 func NewGrantOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, op bindings.OperationKind) *GrantOptions {
-	if (op != sqlchannel.GrantUserRoleOp) && (op != sqlchannel.RevokeUserRoleOp) {
+	if (op != channelutil.GrantUserRoleOp) && (op != channelutil.RevokeUserRoleOp) {
 		klog.V(1).Infof("invalid operation kind: %s", op)
 		return nil
 	}
@@ -46,11 +49,11 @@ func NewGrantOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, op 
 
 func (o *GrantOptions) AddFlags(cmd *cobra.Command) {
 	o.AccountBaseOptions.AddFlags(cmd)
-	cmd.Flags().StringVarP(&o.info.UserName, "username", "u", "", "Required. Specify the name of user.")
+	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required user name, please specify it.")
 	cmd.Flags().StringVarP(&o.info.RoleName, "role", "r", "", "Role name should be one of {SUPERUSER, READWRITE, READONLY}")
 }
 
-func (o GrantOptions) Validate(args []string) error {
+func (o *GrantOptions) Validate(args []string) error {
 	if err := o.AccountBaseOptions.Validate(args); err != nil {
 		return err
 	}
@@ -67,8 +70,8 @@ func (o GrantOptions) Validate(args []string) error {
 }
 
 func (o *GrantOptions) validRoleName() error {
-	candiates := []string{sqlchannel.SuperUserRole, sqlchannel.ReadWriteRole, sqlchannel.ReadOnlyRole}
-	if slices.Contains(candiates, strings.ToLower(o.info.RoleName)) {
+	candidates := []string{string(channelutil.SuperUserRole), string(channelutil.ReadWriteRole), string(channelutil.ReadOnlyRole)}
+	if slices.Contains(candidates, strings.ToLower(o.info.RoleName)) {
 		return nil
 	}
 	return errInvalidRoleName

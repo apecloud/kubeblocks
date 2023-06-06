@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "delphic.fullname" . }}-create-django-user
+  labels:
+    {{- include "delphic.labels" . | nindent 4 }}
+spec:
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      name: {{ include "delphic.fullname" . }}-create-django-user
+      labels:
+        {{- include "delphic.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "delphic.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      restartPolicy: OnFailure
+      containers:
+      - name: post-install-job
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          /entrypoint python manage.py createsuperuser --noinput
+        env:
+          - name: DJANGO_SUPERUSER_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "delphic.fullname" . }}-django-secret
+                key: username
+          - name: DJANGO_SUPERUSER_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "delphic.fullname" . }}-django-secret
+                key: password
+          - name: DJANGO_SUPERUSER_EMAIL
+            value: admin@kubeblocks.io
+        {{ include "delphic.common.envs" . | nindent 10}}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

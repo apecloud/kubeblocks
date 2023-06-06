@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configuration
@@ -26,7 +29,7 @@ import (
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/apecloud/kubeblocks/controllers/apps/components/consensusset"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
@@ -80,7 +83,7 @@ func GetDeploymentRollingUpgradeFuncs() RollingUpgradeFuncs {
 }
 
 func getDeploymentRollingPods(params reconfigureParams) ([]corev1.Pod, error) {
-	// util.GetComponentPodList support deployment
+	// util.GetComponentPodList supports deployment
 	return getReplicationSetPods(params)
 }
 
@@ -94,7 +97,7 @@ func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 	return podList.Items, nil
 }
 
-// GetComponentPods get all pods of the component.
+// GetComponentPods gets all pods of the component.
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
 	for i := range params.ComponentUnits {
@@ -125,7 +128,7 @@ func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string
 
 func getStatefulSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 	if len(params.ComponentUnits) != 1 {
-		return nil, cfgcore.MakeError("statefulSet component require only one statefulset, actual %d component", len(params.ComponentUnits))
+		return nil, cfgcore.MakeError("statefulSet component require only one statefulset, actual %d components", len(params.ComponentUnits))
 	}
 
 	stsObj := &params.ComponentUnits[0]
@@ -144,7 +147,7 @@ func getStatefulSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 
 func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 	if len(params.ComponentUnits) > 1 {
-		return nil, cfgcore.MakeError("consensus component require only one statefulset, actual %d component", len(params.ComponentUnits))
+		return nil, cfgcore.MakeError("consensus component require only one statefulset, actual %d components", len(params.ComponentUnits))
 	}
 
 	if len(params.ComponentUnits) == 0 {
@@ -157,8 +160,8 @@ func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 		return nil, err
 	}
 
-	// sort pods
-	consensusset.SortPods(pods, consensusset.ComposeRolePriorityMap(*params.Component))
+	// TODO: should resolve the dependency on consensus module
+	util.SortPods(pods, consensus.ComposeRolePriorityMap(params.Component.ConsensusSpec), constant.RoleLabelKey)
 	r := make([]corev1.Pod, 0, len(pods))
 	for i := len(pods); i > 0; i-- {
 		r = append(r, pods[i-1:i]...)

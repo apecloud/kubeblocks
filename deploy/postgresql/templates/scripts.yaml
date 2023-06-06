@@ -32,6 +32,19 @@ data:
             if line and not line.startswith('#'):
                 ret.append(line)
         return ret
+    def postgresql_conf_to_dict(file_path):
+        with open(file_path, 'r') as f:
+            content = f.read()
+        lines = content.splitlines()
+        result = {}
+        for line in lines:
+            if line.startswith('#'):
+                continue
+            if '=' not in line:
+                continue
+            key, value = line.split('=', 1)
+            result[key.strip()] = value.strip().strip("'")
+        return result
     def main(filename):
         restore_dir = os.environ.get('RESTORE_DATA_DIR', '')
         local_config = yaml.safe_load(
@@ -41,7 +54,6 @@ data:
         postgresql = local_config['postgresql']
         postgresql['config_dir'] = '/home/postgres/pgdata/conf'
         postgresql['custom_conf'] = '/home/postgres/conf/postgresql.conf'
-        # TODO add local postgresql.parameters
         # add pg_hba.conf
         with open('/home/postgres/conf/pg_hba.conf', 'r') as f:
             lines = read_file_lines(f)
@@ -52,6 +64,14 @@ data:
                 local_config['bootstrap'] = {}
             with open('/home/postgres/conf/kb_restore.conf', 'r') as f:
                 local_config['bootstrap'].update(yaml.safe_load(f))
+        # point in time recovery(PITR)
+        data_dir = os.environ.get('PGDATA', '')
+        if os.path.isfile("/home/postgres/pgdata/conf/recovery.conf"):
+            with open('/home/postgres/conf/kb_pitr.conf', 'r') as f:
+                pitr_config = yaml.safe_load(f)
+                re_config = postgresql_conf_to_dict("/home/postgres/pgdata/conf/recovery.conf")
+                pitr_config[pitr_config['method']]['recovery_conf'].update(re_config)
+                local_config['bootstrap'].update(pitr_config)
         write_file(yaml.dump(local_config, default_flow_style=False), filename, True)
     if __name__ == '__main__':
         main(sys.argv[1])
@@ -61,9 +81,67 @@ data:
     set -ex
     KB_PRIMARY_POD_NAME_PREFIX=${KB_PRIMARY_POD_NAME%%\.*}
     if [ "$KB_PRIMARY_POD_NAME_PREFIX" != "$KB_POD_NAME" ]; then
-        sleep 3
+        # waiting for primary pod to be ready
+        until pg_isready -U {{ default "postgres" | quote }} -h $KB_PRIMARY_POD_NAME -p 5432; do
+            sleep 5
+        done
+    fi
+    if [ -f ${RESTORE_DATA_DIR}/kb_restore.signal ]; then
+        chown -R postgres ${RESTORE_DATA_DIR}
     fi
     python3 /kb-scripts/generate_patroni_yaml.py tmp_patroni.yaml
     export SPILO_CONFIGURATION=$(cat tmp_patroni.yaml)
     # export SCOPE="$KB_CLUSTER_NAME-$KB_CLUSTER_NAME"
     exec /launch.sh init
+  pgbouncer_setup.sh: |
+    #!/bin/bash
+    set -o errexit
+    set -ex
+    mkdir -p /opt/bitnami/pgbouncer/conf/ /opt/bitnami/pgbouncer/logs/ /opt/bitnami/pgbouncer/tmp/
+    cp /home/pgbouncer/conf/pgbouncer.ini /opt/bitnami/pgbouncer/conf/
+    echo "\"$POSTGRESQL_USERNAME\" \"$POSTGRESQL_PASSWORD\"" > /opt/bitnami/pgbouncer/conf/userlist.txt
+    echo -e "\\n[databases]" >> /opt/bitnami/pgbouncer/conf/pgbouncer.ini
+    echo "postgres=host=$KB_POD_IP port=5432 dbname=postgres" >> /opt/bitnami/pgbouncer/conf/pgbouncer.ini
+    chmod +777 /opt/bitnami/pgbouncer/conf/pgbouncer.ini
+    chmod +777 /opt/bitnami/pgbouncer/conf/userlist.txt
+    useradd pgbouncer
+    chown -R pgbouncer:pgbouncer /opt/bitnami/pgbouncer/conf/ /opt/bitnami/pgbouncer/logs/ /opt/bitnami/pgbouncer/tmp/
+    /opt/bitnami/scripts/pgbouncer/run.sh
+  backup-log-collector.sh: |
+    #!/bin/bash
+    set -o errexit
+    set -o nounset
+    SHOW_START_TIME=$1
+    LOG_START_TIME=""
+    LOG_STOP_TIME=""
+    if [ "$SHOW_START_TIME" == "false" ]; then
+      latest_done_wal=$(ls -t ${PGDATA}/pg_wal/archive_status/|grep ".done"|head -n 1)
+      if [ "${latest_done_wal}" != "" ]; then
+        LOG_STOP_TIME=$(pg_waldump ${latest_done_wal%.*} --rmgr=Transaction 2>/dev/null |tail -n 1|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
+      fi
+      [[ "${LOG_STOP_TIME}" != "" ]] && printf "{\"stopTime\": \"$(date -d "$LOG_STOP_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')\"}" || printf "{}"
+    else
+      LOG_START_TIME=$(pg_waldump $(ls -Ftr $PGDATA/pg_wal/ | grep '[[:xdigit:]]$\|.partial$'|head -n 1) --rmgr=Transaction 2>/dev/null |head -n 1|awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
+      for i in $(ls -Ft $PGDATA/pg_wal/ | grep '[[:xdigit:]]$\|.partial$'); do LOG_STOP_TIME=$(pg_waldump $i --rmgr=Transaction 2>/dev/null|tail -n 1); [[ "$LOG_STOP_TIME" != "" ]] && break;  done
+      LOG_STOP_TIME=$(echo $LOG_STOP_TIME |awk -F ' COMMIT ' '{print $2}'|awk -F ';' '{print $1}')
+      if [ "${LOG_START_TIME}" == "" ]; then LOG_START_TIME=${LOG_STOP_TIME}; fi
+      LOG_START_TIME=$(date -d "$LOG_START_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')
+      LOG_STOP_TIME=$(date -d "$LOG_STOP_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')
+      printf "{\"startTime\": \"$LOG_START_TIME\" ,\"stopTime\": \"$LOG_STOP_TIME\"}"
+    fi
+  filesize-collector.sh: |
+    #!/bin/bash
+    set -e;
+    function getProperty() {
+       file=$1; key=$2;
+       echo $(grep "${key}: " ${file} | awk -F ': ' '{print $2}')
+    }
+    filename=$1
+    fileinfo=${PGDATA}/${filename}
+    if [ -f ${fileinfo} ]; then
+      TOTAL_SIZE=$(getProperty ${fileinfo} "TOTAL SIZE")
+      rm -f ${fileinfo}
+      printf "{\"totalSize\":\"${TOTAL_SIZE}\",\"manifests\":{\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}"
+    else
+      printf "{}"
+    fi

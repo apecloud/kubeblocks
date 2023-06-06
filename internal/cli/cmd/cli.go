@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cmd
@@ -19,27 +22,32 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
+	kccmd "k8s.io/kubectl/pkg/cmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/addon"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/alert"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/backupconfig"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/bench"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterdefinition"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterversion"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/dashboard"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/fault"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/migration"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/plugin"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -47,6 +55,46 @@ import (
 const (
 	cliName = "kbcli"
 )
+
+func init() {
+	if _, err := util.GetCliHomeDir(); err != nil {
+		fmt.Println("Failed to create kbcli home dir:", err)
+	}
+}
+
+func NewDefaultCliCmd() *cobra.Command {
+	cmd := NewCliCmd()
+
+	pluginHandler := kccmd.NewDefaultPluginHandler(plugin.ValidPluginFilenamePrefixes)
+
+	if len(os.Args) > 1 {
+		cmdPathPieces := os.Args[1:]
+
+		// only look for suitable extension executables if
+		// the specified command does not exist
+		if _, _, err := cmd.Find(cmdPathPieces); err != nil {
+			var cmdName string
+			for _, arg := range cmdPathPieces {
+				if !strings.HasPrefix(arg, "-") {
+					cmdName = arg
+					break
+				}
+			}
+
+			switch cmdName {
+			case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
+				// Don't search for a plugin
+			default:
+				if err := kccmd.HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
+					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+					os.Exit(1)
+				}
+			}
+		}
+	}
+
+	return cmd
+}
 
 func NewCliCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -72,7 +120,7 @@ A Command Line Interface for KubeBlocks`,
 		},
 	}
 
-	// From this point and forward we get warnings on flags that contain "_" separators
+	// Start from this point we get warnings on flags that contain "_" separators
 	// when adding them with hyphen instead of the original name.
 	cmd.SetGlobalNormalizationFunc(cliflag.WarnWordSepNormalizeFunc)
 
@@ -84,6 +132,9 @@ A Command Line Interface for KubeBlocks`,
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(flags)
 
+	// add klog flags
+	util.AddKlogFlags(flags)
+
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 	ioStreams := genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr}
 
@@ -91,21 +142,32 @@ A Command Line Interface for KubeBlocks`,
 	cmd.AddCommand(
 		playground.NewPlaygroundCmd(ioStreams),
 		kubeblocks.NewKubeBlocksCmd(f, ioStreams),
-		cluster.NewClusterCmd(f, ioStreams),
-		bench.NewBenchCmd(),
+		bench.NewBenchCmd(f, ioStreams),
 		options.NewCmdOptions(ioStreams.Out),
 		version.NewVersionCmd(f),
-		backupconfig.NewBackupConfigCmd(f, ioStreams),
 		dashboard.NewDashboardCmd(f, ioStreams),
 		clusterversion.NewClusterVersionCmd(f, ioStreams),
 		clusterdefinition.NewClusterDefinitionCmd(f, ioStreams),
 		class.NewClassCommand(f, ioStreams),
 		alert.NewAlertCmd(f, ioStreams),
 		addon.NewAddonCmd(f, ioStreams),
+		migration.NewMigrationCmd(f, ioStreams),
+		plugin.NewPluginCmd(ioStreams),
+		fault.NewFaultCmd(f, ioStreams),
+		builder.NewBuilderCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}
 	templates.ActsAsRootCommand(cmd, filters, []templates.CommandGroup{}...)
+
+	helpFunc := cmd.HelpFunc()
+	usageFunc := cmd.UsageFunc()
+
+	// clusterCmd sets its own usage and help function and its subcommand will inherit it,
+	// so we need to set its subcommand's usage and help function back to the root command
+	clusterCmd := cluster.NewClusterCmd(f, ioStreams)
+	registerUsageAndHelpFuncForSubCommand(clusterCmd, helpFunc, usageFunc)
+	cmd.AddCommand(clusterCmd)
 
 	utilcomp.SetFactoryForCompletion(f)
 	registerCompletionFuncForGlobalFlags(cmd, f)
@@ -158,4 +220,11 @@ func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory)
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return utilcomp.ListUsersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
+}
+
+func registerUsageAndHelpFuncForSubCommand(cmd *cobra.Command, helpFunc func(*cobra.Command, []string), usageFunc func(command *cobra.Command) error) {
+	for _, subCmd := range cmd.Commands() {
+		subCmd.SetHelpFunc(helpFunc)
+		subCmd.SetUsageFunc(usageFunc)
+	}
 }

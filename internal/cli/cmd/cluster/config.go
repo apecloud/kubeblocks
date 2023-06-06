@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -92,33 +95,33 @@ var (
 		kbcli cluster describe-config mycluster
 
 		# describe a component, e.g. cluster name is mycluster, component name is mysql
-		kbcli cluster describe-config mycluster --component-name=mysql
+		kbcli cluster describe-config mycluster --component=mysql
 
-		# describe all configuration files. 
-		kbcli cluster describe-config mycluster --component-name=mysql --show-detail
+		# describe all configuration files.
+		kbcli cluster describe-config mycluster --component=mysql --show-detail
 
-		# describe a content of configuration file. 
-		kbcli cluster describe-config mycluster --component-name=mysql --config-file=my.cnf --show-detail`)
+		# describe a content of configuration file.
+		kbcli cluster describe-config mycluster --component=mysql --config-file=my.cnf --show-detail`)
 	explainReconfigureExample = templates.Examples(`
-		# describe a cluster, e.g. cluster name is mycluster
+		# explain a cluster, e.g. cluster name is mycluster
 		kbcli cluster explain-config mycluster
 
-		# describe a specified configure template, e.g. cluster name is mycluster
-		kbcli cluster explain-config mycluster --component-name=mysql --config-specs=mysql-3node-tpl
+		# explain a specified configure template, e.g. cluster name is mycluster
+		kbcli cluster explain-config mycluster --component=mysql --config-specs=mysql-3node-tpl
 
-		# describe a specified configure template, e.g. cluster name is mycluster
-		kbcli cluster explain-config mycluster --component-name=mysql --config-specs=mysql-3node-tpl --trunc-document=false --trunc-enum=false
+		# explain a specified configure template, e.g. cluster name is mycluster
+		kbcli cluster explain-config mycluster --component=mysql --config-specs=mysql-3node-tpl --trunc-document=false --trunc-enum=false
 
-		# describe a specified parameters, e.g. cluster name is mycluster
-		kbcli cluster explain-config mycluster --component-name=mysql --config-specs=mysql-3node-tpl --param=sql_mode`)
+		# explain a specified parameters, e.g. cluster name is mycluster
+		kbcli cluster explain-config mycluster --param=sql_mode`)
 	diffConfigureExample = templates.Examples(`
-		# compare config files 
+		# compare config files
 		kbcli cluster diff-config opsrequest1 opsrequest2`)
 )
 
 func (r *reconfigureOptions) addCommonFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&r.componentName, "component-name", "", "Specify the name of Component to be describe (e.g. for apecloud-mysql: --component-name=mysql). If the cluster has only one component, unset the parameter.\"")
-	cmd.Flags().StringSliceVar(&r.configSpecs, "config-specs", nil, "Specify the name of the configuration template to be describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)")
+	cmd.Flags().StringVar(&r.componentName, "component", "", "Specify the name of Component to describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter.\"")
+	cmd.Flags().StringSliceVar(&r.configSpecs, "config-specs", nil, "Specify the name of the configuration template to describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)")
 }
 
 func (r *reconfigureOptions) validate() error {
@@ -133,7 +136,7 @@ func (r *reconfigureOptions) validate() error {
 	}
 
 	if r.isExplain && len(r.configSpecs) != 1 {
-		return cfgcore.MakeError("explain require one template")
+		return cfgcore.MakeError("explain command requires one template")
 	}
 
 	for _, tplName := range r.configSpecs {
@@ -142,7 +145,7 @@ func (r *reconfigureOptions) validate() error {
 			return err
 		}
 		if r.isExplain && len(tpl.ConfigConstraintRef) == 0 {
-			return cfgcore.MakeError("explain command require template has config constraint options")
+			return cfgcore.MakeError("explain command requires template with config constraint options")
 		}
 	}
 	return nil
@@ -178,7 +181,7 @@ func (r *reconfigureOptions) complete2(args []string) error {
 		return err
 	}
 	if len(r.tpls) == 0 {
-		return cfgcore.MakeError("not any config template, not support describe")
+		return cfgcore.MakeError("config template is not set")
 	}
 
 	templateNames := make([]string, 0, len(r.tpls))
@@ -225,7 +228,7 @@ func (r *reconfigureOptions) syncClusterComponent() error {
 		return makeClusterNotExistErr(r.clusterName)
 	}
 	if len(componentNames) != 1 {
-		return cfgcore.MakeError("when multi component exist, must specify which component to use.")
+		return cfgcore.MakeError("please specify a component as there are more than one component in cluster.")
 	}
 	r.componentName = componentNames[0]
 	return nil
@@ -307,7 +310,7 @@ func (r *reconfigureOptions) getReconfigureMeta() ([]types.ConfigTemplateInfo, e
 			Name:      cmName,
 			Namespace: r.namespace,
 		}, r.dynamic, cmObj); err != nil {
-			return nil, cfgcore.WrapError(err, "template config instance is not exist, template name: %s, cfg name: %s", tplName, cmName)
+			return nil, cfgcore.WrapError(err, "config not found, template name: %s, cfg name: %s", tplName, cmName)
 		}
 		configs = append(configs, types.ConfigTemplateInfo{
 			Name:  tplName,

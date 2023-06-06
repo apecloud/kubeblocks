@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -33,7 +36,6 @@ import (
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/util/templates"
 
-	computil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -49,7 +51,7 @@ var (
 		# Display only the most recent 20 lines from cluster mycluster with default primary instance (stdout)
 		kbcli cluster logs mycluster --tail=20
 
-		# Display stdout info of specific instance my-instance-0 (cluster name comes from annotation app.kubernetes.io/instance) 
+		# Display stdout info of specific instance my-instance-0 (cluster name comes from annotation app.kubernetes.io/instance)
 		kbcli cluster logs --instance my-instance-0
 
 		# Return snapshot logs from cluster mycluster with specific instance my-instance-0 (stdout)
@@ -110,7 +112,7 @@ func (o *LogsOptions) addFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&o.PodName, "instance", "i", "", "Instance name.")
 	cmd.Flags().StringVarP(&o.logOptions.Container, "container", "c", "", "Container name.")
 	cmd.Flags().BoolVarP(&o.logOptions.Follow, "follow", "f", false, "Specify if the logs should be streamed.")
-	cmd.Flags().Int64Var(&o.logOptions.Tail, "tail", -1, "Lines of recent log file to display. Defaults to -1 with showing all log lines.")
+	cmd.Flags().Int64Var(&o.logOptions.Tail, "tail", -1, "Lines of recent log file to display. Defaults to -1 for showing all log lines.")
 	cmd.Flags().Int64Var(&o.logOptions.LimitBytes, "limit-bytes", 0, "Maximum bytes of logs to return.")
 	cmd.Flags().BoolVar(&o.logOptions.Prefix, "prefix", false, "Prefix each log line with the log source (pod name and container name). Only take effect for stdout&stderr.")
 	cmd.Flags().BoolVar(&o.logOptions.IgnoreLogErrors, "ignore-errors", false, "If watching / following pod logs, allow for any errors that occur to be non-fatal. Only take effect for stdout&stderr.")
@@ -119,8 +121,8 @@ func (o *LogsOptions) addFlags(cmd *cobra.Command) {
 	cmd.Flags().DurationVar(&o.logOptions.SinceSeconds, "since", o.logOptions.SinceSeconds, "Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used. Only take effect for stdout&stderr.")
 	cmd.Flags().BoolVarP(&o.logOptions.Previous, "previous", "p", o.logOptions.Previous, "If true, print the logs for the previous instance of the container in a pod if it exists. Only take effect for stdout&stderr.")
 
-	cmd.Flags().StringVar(&o.fileType, "file-type", "", "Log-file type. Can see the output info of list-logs cmd. No set file-path and file-type will output stdout/stderr of target container.")
-	cmd.Flags().StringVar(&o.filePath, "file-path", "", "Log-file path. Specify target file path and have a premium priority. No set file-path and file-type will output stdout/stderr of target container.")
+	cmd.Flags().StringVar(&o.fileType, "file-type", "", "Log-file type. List them with list-logs cmd. When file-path and file-type are unset, output stdout/stderr of target container.")
+	cmd.Flags().StringVar(&o.filePath, "file-path", "", "Log-file path. File path has a priority over file-type. When file-path and file-type are unset, output stdout/stderr of target container.")
 
 	cmd.MarkFlagsMutuallyExclusive("file-path", "file-type")
 	cmd.MarkFlagsMutuallyExclusive("since", "since-time")
@@ -142,10 +144,10 @@ func (o *LogsOptions) complete(args []string) error {
 	if len(args) > 0 {
 		o.clusterName = args[0]
 	}
-	// no set podName and find the default pod of cluster
+	// podName not set, find the default pod of cluster
 	if len(o.PodName) == 0 {
 		infos := cluster.GetSimpleInstanceInfos(o.Dynamic, o.clusterName, o.Namespace)
-		if len(infos) == 0 || infos[0].Name == computil.ComponentStatusDefaultPodName {
+		if len(infos) == 0 || infos[0].Name == constant.ComponentStatusDefaultPodName {
 			return fmt.Errorf("failed to find the default instance, please check cluster status")
 		}
 		// first element is the default instance to connect
@@ -169,7 +171,7 @@ func (o *LogsOptions) complete(args []string) error {
 		command = assembleTail(o.logOptions.Follow, o.logOptions.Tail, o.logOptions.LimitBytes) + " " + o.filePath
 	case o.isStdoutForContainer():
 		{
-			// no set file-path and file-type, and will output container's stdout & stderr, like kubectl logs
+			// file-path and file-type are unset, output container's stdout & stderr, like kubectl logs
 			o.logOptions.RESTClientGetter = o.Factory
 			o.logOptions.LogsForObject = polymorphichelpers.LogsForObjectFn
 			o.logOptions.Object = pod

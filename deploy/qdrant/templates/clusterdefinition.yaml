@@ -2,7 +2,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: qdrant-standalone
+  name: qdrant
   labels:
     {{- include "qdrant.labels" . | nindent 4 }}
 spec:
@@ -25,8 +25,8 @@ spec:
           scrapePort: 9187
       logConfigs:
       configSpecs:
-        - name: qdrant-standalone-config-template
-          templateRef: qdrant-standalone-config-template
+        - name: qdrant-config-template
+          templateRef: qdrant-config-template
           volumeName: qdrant-config
           namespace: {{ .Release.Namespace }}
       service:

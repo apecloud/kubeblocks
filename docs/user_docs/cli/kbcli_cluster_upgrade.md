@@ -5,23 +5,26 @@ title: kbcli cluster upgrade
 Upgrade the cluster version.
 
 ```
-kbcli cluster upgrade [flags]
+kbcli cluster upgrade NAME [flags]
 ```
 
 ### Examples
 
 ```
-  # upgrade the cluster to the specified version
-  kbcli cluster upgrade <my-cluster> --cluster-version=<cluster-version>
+  # upgrade the cluster to the target version
+  kbcli cluster upgrade mycluster --cluster-version=ac-mysql-8.0.30
 ```
 
 ### Options
 
 ```
-      --cluster-version string       Reference cluster version (required)
-  -h, --help                         help for upgrade
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
-      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
+      --auto-approve                   Skip interactive approval before upgrading the cluster
+      --cluster-version string         Reference cluster version (required)
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+  -h, --help                           help for upgrade
+      --name string                    OpsRequest name. if not specified, it will be randomly generated 
+  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```
 
 ### Options inherited from parent commands

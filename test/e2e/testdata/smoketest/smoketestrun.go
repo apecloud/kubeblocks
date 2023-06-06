@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -90,6 +90,13 @@ func SmokeTest() {
 				}
 			}
 		})
+		It("check addon", func() {
+			enabledSc := " kbcli addon enable csi-hostpath-driver"
+			log.Println(enabledSc)
+			csi := e2eutil.ExecCommand(enabledSc)
+			log.Println(csi)
+		})
+
 		It("run test cases", func() {
 			dir, err := os.Getwd()
 			if err != nil {
@@ -122,9 +129,11 @@ func SmokeTest() {
 func runTestCases(files []string) {
 	for _, file := range files {
 		By("test " + file)
-		b := e2eutil.OpsYaml(file, "apply")
+
+		b := e2eutil.OpsYaml(file, "create")
 		Expect(b).Should(BeTrue())
 		Eventually(func(g Gomega) {
+			e2eutil.WaitTime(100000)
 			podStatusResult := e2eutil.CheckPodStatus()
 			for _, result := range podStatusResult {
 				g.Expect(result).Should(BeTrue())
@@ -133,7 +142,7 @@ func runTestCases(files []string) {
 		Eventually(func(g Gomega) {
 			clusterStatusResult := e2eutil.CheckClusterStatus()
 			g.Expect(clusterStatusResult).Should(BeTrue())
-		}, time.Second*180, time.Second*1).Should(Succeed())
+		}, time.Second*300, time.Second*1).Should(Succeed())
 
 	}
 	if len(files) > 0 {

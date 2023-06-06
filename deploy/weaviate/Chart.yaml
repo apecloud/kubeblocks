@@ -1,11 +1,11 @@
 apiVersion: v2
-name: weaviate-standalone
-description: .
+name: weaviate
+description: Weaviate is an open-source vector database. It allows you to store data objects and vector embeddings from your favorite ML-models, and scale seamlessly into billions of data objects.
 
 type: application
 
 # This is the chart version.
-version: 0.1.0
+version: 0.5.1-beta.0
 
 # This is the version number of weaviate.
 appVersion: "1.18.0"

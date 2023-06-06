@@ -1,23 +1,27 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package apps
 
 import (
 	"context"
+	"fmt"
 	"go/build"
 	"path/filepath"
 	"testing"
@@ -52,6 +56,11 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
+const (
+	testDataPlaneNodeAffinityKey = "testDataPlaneNodeAffinityKey"
+	testDataPlaneTolerationKey   = "testDataPlaneTolerationKey"
+)
+
 var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
@@ -81,6 +90,10 @@ var _ = BeforeSuite(func() {
 	}
 
 	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 10)
+	viper.Set(constant.CfgKeyDataPlaneTolerations,
+		fmt.Sprintf("[{\"key\":\"%s\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]", testDataPlaneTolerationKey))
+	viper.Set(constant.CfgKeyDataPlaneAffinity,
+		fmt.Sprintf("{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"%s\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}", testDataPlaneNodeAffinityKey))
 	ctx, cancel = context.WithCancel(context.TODO())
 	logger = logf.FromContext(ctx).WithValues()
 	logger.Info("logger start")
@@ -158,18 +171,10 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&components.StatefulSetReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("stateful-set-controller"),
-	}).SetupWithManager(k8sManager)
+	err = components.NewStatefulSetReconciler(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&components.DeploymentReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("deployment-controller"),
-	}).SetupWithManager(k8sManager)
+	err = components.NewDeploymentReconciler(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&k8score.EventReconciler{
@@ -210,7 +215,16 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	err = (&ComponentClassReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("class-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
+
+	appsv1alpha1.RegisterWebhookManager(k8sManager)
 
 	go func() {
 		defer GinkgoRecover()

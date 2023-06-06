@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package class
@@ -27,15 +30,14 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-const classFamilyBytes = `
+const resourceConstraintBytes = `
 # API scope: cluster
-# ClusterClassFamily
 apiVersion: "apps.kubeblocks.io/v1alpha1"
-kind:       "ClassFamily"
+kind:       "ComponentResourceConstraint"
 metadata:
-  name: kb-class-family-general
+  name: kb-resource-constraint-general
 spec:
-  models:
+  constraints:
   - cpu:
       min: 0.5
       max: 128
@@ -55,11 +57,16 @@ spec:
       maxPerCPU: 8Gi
 `
 
-func TestClassFamily_ByClassCPUAndMemory(t *testing.T) {
-	buildClass := func(cpu string, memory string) *ComponentClass {
-		return &ComponentClass{CPU: resource.MustParse(cpu), Memory: resource.MustParse(memory)}
+func TestResourceConstraint_ByClassCPUAndMemory(t *testing.T) {
+	buildClass := func(cpu string, memory string) *appsv1alpha1.ComponentClassInstance {
+		return &appsv1alpha1.ComponentClassInstance{
+			ComponentClass: appsv1alpha1.ComponentClass{
+				CPU:    resource.MustParse(cpu),
+				Memory: resource.MustParse(memory),
+			},
+		}
 	}
-	classes := []*ComponentClass{
+	classes := []*appsv1alpha1.ComponentClassInstance{
 		buildClass("1", "2Gi"),
 		buildClass("1", "1Gi"),
 		buildClass("2", "0.5Gi"),
@@ -68,24 +75,24 @@ func TestClassFamily_ByClassCPUAndMemory(t *testing.T) {
 	}
 	sort.Sort(ByClassCPUAndMemory(classes))
 	candidate := classes[0]
-	if candidate.CPU != resource.MustParse("0.5") || candidate.Memory != resource.MustParse("10Gi") {
+	if !candidate.CPU.Equal(resource.MustParse("0.5")) || !candidate.Memory.Equal(resource.MustParse("10Gi")) {
 		t.Errorf("case failed")
 	}
 }
 
-func TestClassFamily_ModelList(t *testing.T) {
-	var cf appsv1alpha1.ClassFamily
-	err := yaml.Unmarshal([]byte(classFamilyBytes), &cf)
+func TestResourceConstraint_ConstraintList(t *testing.T) {
+	var cf appsv1alpha1.ComponentResourceConstraint
+	err := yaml.Unmarshal([]byte(resourceConstraintBytes), &cf)
 	if err != nil {
-		panic("Failed to unmarshal class family: %v" + err.Error())
+		panic("Failed to unmarshal resource constraint: %v" + err.Error())
 	}
-	var models []ClassModelWithFamilyName
-	for _, model := range cf.Spec.Models {
-		models = append(models, ClassModelWithFamilyName{Family: cf.Name, Model: model})
+	var constraints []ConstraintWithName
+	for _, constraint := range cf.Spec.Constraints {
+		constraints = append(constraints, ConstraintWithName{Name: cf.Name, Constraint: constraint})
 	}
 	resource.MustParse("200Mi")
-	sort.Sort(ByModelList(models))
-	cpu, memory := GetMinCPUAndMemory(models[0].Model)
+	sort.Sort(ByConstraintList(constraints))
+	cpu, memory := GetMinCPUAndMemory(constraints[0].Constraint)
 	assert.Equal(t, cpu.Cmp(resource.MustParse("0.1")) == 0, true)
 	assert.Equal(t, memory.Cmp(resource.MustParse("20Mi")) == 0, true)
 }

@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configuration
@@ -29,6 +32,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -60,14 +64,14 @@ type reconfigurePolicy interface {
 	// Upgrade is to enable the configuration to take effect.
 	Upgrade(params reconfigureParams) (ReturnedStatus, error)
 
-	// GetPolicyName return name of policy.
+	// GetPolicyName returns name of policy.
 	GetPolicyName() string
 }
 
 type AutoReloadPolicy struct{}
 
 type reconfigureParams struct {
-	// Only support restart pod or container.
+	// Only supports restart pod or container.
 	Restart bool
 
 	// Name is a config template name.
@@ -85,7 +89,7 @@ type reconfigureParams struct {
 	// For grpc factory
 	ReconfigureClientFactory createReconfigureClient
 
-	// List of container, using this config volume.
+	// List of containers using this config volume.
 	ContainerNames []string
 
 	Client client.Client
@@ -98,12 +102,12 @@ type reconfigureParams struct {
 	// Associated component for clusterdefinition.
 	Component *appsv1alpha1.ClusterComponentDefinition
 
-	// List of StatefulSet, using this config template.
+	// List of StatefulSets using this config template.
 	ComponentUnits []appv1.StatefulSet
 }
 
 var (
-	// lazy create grpc connection
+	// lazy creation of grpc connection
 	// TODO support connection pool
 	newGRPCClient = func(addr string) (cfgproto.ReconfigureClient, error) {
 		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -134,9 +138,9 @@ func (param *reconfigureParams) getConfigKey() string {
 }
 
 func (param *reconfigureParams) getTargetVersionHash() string {
-	hash, err := cfgcore.ComputeHash(param.ConfigMap.Data)
+	hash, err := util.ComputeHash(param.ConfigMap.Data)
 	if err != nil {
-		param.Ctx.Log.Error(err, "failed to cal configuration version!")
+		param.Ctx.Log.Error(err, "failed to get configuration version!")
 		return ""
 	}
 
@@ -150,22 +154,22 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 		replicas       = param.getTargetReplicas()
 	)
 
-	if param.Component.MaxUnavailable == nil {
+	if param.Component.GetMaxUnavailable() == nil {
 		return defaultRolling
 	}
 
-	v, isPercent, err := intctrlutil.GetIntOrPercentValue(param.Component.MaxUnavailable)
+	v, isPercentage, err := intctrlutil.GetIntOrPercentValue(param.Component.GetMaxUnavailable())
 	if err != nil {
-		param.Ctx.Log.Error(err, "failed to get MaxUnavailable!")
+		param.Ctx.Log.Error(err, "failed to get maxUnavailable!")
 		return defaultRolling
 	}
 
-	if isPercent {
+	if isPercentage {
 		r = int32(math.Floor(float64(v) * float64(replicas) / 100))
 	} else {
-		r = int32(cfgcore.Min(v, param.getTargetReplicas()))
+		r = int32(util.Min(v, param.getTargetReplicas()))
 	}
-	return cfgcore.Max(r, defaultRolling)
+	return util.Max(r, defaultRolling)
 }
 
 func (param *reconfigureParams) getTargetReplicas() int {
@@ -174,7 +178,7 @@ func (param *reconfigureParams) getTargetReplicas() int {
 
 func (param *reconfigureParams) podMinReadySeconds() int32 {
 	minReadySeconds := param.ComponentUnits[0].Spec.MinReadySeconds
-	return cfgcore.Max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
+	return util.Max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
 }
 
 func RegisterPolicy(policy appsv1alpha1.UpgradePolicy, action reconfigurePolicy) {
@@ -212,7 +216,7 @@ func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *cfgco
 	if action, ok := upgradePolicyMap[policy]; ok {
 		return action, nil
 	}
-	return nil, cfgcore.MakeError("not support upgrade policy:[%s]", policy)
+	return nil, cfgcore.MakeError("not supported upgrade policy:[%s]", policy)
 }
 
 func enableAutoDecision(restart bool, policy appsv1alpha1.UpgradePolicy) bool {

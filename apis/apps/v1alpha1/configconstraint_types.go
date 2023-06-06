@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -66,10 +66,9 @@ type ConfigConstraintSpec struct {
 
 // ConfigConstraintStatus defines the observed state of ConfigConstraint.
 type ConfigConstraintStatus struct {
-	// phase is status of configuration template, when set to AvailablePhase, it can be referenced by ClusterDefinition or ClusterVersion.
-	// +kubebuilder:validation:Enum={Available,Unavailable,Deleting}
+	// phase is status of configuration template, when set to CCAvailablePhase, it can be referenced by ClusterDefinition or ClusterVersion.
 	// +optional
-	Phase Phase `json:"phase,omitempty"`
+	Phase ConfigConstraintPhase `json:"phase,omitempty"`
 
 	// message field describes the reasons of abnormal status.
 	// +optional
@@ -80,6 +79,10 @@ type ConfigConstraintStatus struct {
 	// updated by the API Server.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+}
+
+func (cs ConfigConstraintStatus) IsConfigConstraintTerminalPhases() bool {
+	return cs.Phase == CCAvailablePhase
 }
 
 type CustomParametersValidation struct {
@@ -195,6 +198,9 @@ type IniConfig struct {
 	SectionName string `json:"sectionName,omitempty"`
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cc

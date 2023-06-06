@@ -1,11 +1,11 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-	http://www.apache.org/licenses/LICENSE-2.0
+    http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
 package appstest
 
 import (
@@ -36,16 +37,11 @@ var _ = Describe("MySQL data protection function", func() {
 	const clusterVersionName = "test-clusterversion"
 	const clusterNamePrefix = "test-cluster"
 	const scriptConfigName = "test-cluster-mysql-scripts"
-
-	const mysqlCompType = "replicasets"
+	const mysqlCompDefName = "replicasets"
 	const mysqlCompName = "mysql"
-
 	const backupPolicyTemplateName = "test-backup-policy-template"
 	const backupPolicyName = "test-backup-policy"
-	const backupRemoteVolumeName = "backup-remote-volume"
 	const backupRemotePVCName = "backup-remote-pvc"
-	const defaultSchedule = "0 3 * * *"
-	const defaultTTL = "168h0m0s"
 	const backupName = "test-backup-job"
 
 	// Cleanups
@@ -66,7 +62,6 @@ var _ = Describe("MySQL data protection function", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicyTemplateSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.RestoreJobSignature, inNS, ml)
@@ -95,13 +90,13 @@ var _ = Describe("MySQL data protection function", func() {
 		By("Create a clusterDef obj")
 		mode := int32(0755)
 		clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-			AddComponent(testapps.ConsensusMySQLComponent, mysqlCompType).
+			AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompDefName).
 			AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
 			Create(&testCtx).GetObject()
 
 		By("Create a clusterVersion obj")
 		clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-			AddComponent(mysqlCompType).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
+			AddComponentVersion(mysqlCompDefName).AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
 			Create(&testCtx).GetObject()
 
 		By("Create a cluster obj")
@@ -109,7 +104,7 @@ var _ = Describe("MySQL data protection function", func() {
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(mysqlCompName, mysqlCompType).
+			AddComponent(mysqlCompName, mysqlCompDefName).
 			SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			Create(&testCtx).GetObject()
@@ -127,20 +122,14 @@ var _ = Describe("MySQL data protection function", func() {
 		backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
 			&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
 
-		By("By creating a backupPolicyTemplate from backupTool: " + backupTool.Name)
-		_ = testapps.NewBackupPolicyTemplateFactory(backupPolicyTemplateName).
-			SetBackupToolName(backupTool.Name).
-			SetSchedule(defaultSchedule).
-			SetTTL(defaultTTL).
-			Create(&testCtx).GetObject()
-
 		By("By creating a backupPolicy from backupPolicyTemplate: " + backupPolicyTemplateName)
 		backupPolicyObj := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 			WithRandomName().
-			SetBackupPolicyTplName(backupPolicyTemplateName).
+			AddFullPolicy().
+			SetBackupToolName(backupTool.Name).
 			AddMatchLabels(constant.AppInstanceLabelKey, clusterKey.Name).
 			SetTargetSecretName(component.GenerateConnCredential(clusterKey.Name)).
-			SetRemoteVolumePVC(backupRemoteVolumeName, backupRemotePVCName).
+			SetPVC(backupRemotePVCName).
 			Create(&testCtx).GetObject()
 		backupPolicyKey := client.ObjectKeyFromObject(backupPolicyObj)
 
@@ -153,15 +142,14 @@ var _ = Describe("MySQL data protection function", func() {
 
 		By("By check backupPolicy available")
 		Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, backupPolicy *dpv1alpha1.BackupPolicy) {
-			g.Expect(backupPolicy.Status.Phase).To(Equal(dpv1alpha1.ConfigAvailable))
+			g.Expect(backupPolicy.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
 		})).Should(Succeed())
 
 		By("By creating a backup from backupPolicy: " + backupPolicyKey.Name)
 		backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 			WithRandomName().
-			SetTTL(defaultTTL).
 			SetBackupPolicyName(backupPolicyKey.Name).
-			SetBackupType(dpv1alpha1.BackupTypeFull).
+			SetBackupType(dpv1alpha1.BackupTypeDataFile).
 			Create(&testCtx).GetObject()
 		backupKey = client.ObjectKeyFromObject(backup)
 	}

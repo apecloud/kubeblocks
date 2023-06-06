@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package app
@@ -39,7 +42,7 @@ import (
 
 var logger *zap.SugaredLogger
 
-// NewConfigManagerCommand This command is used to reload configuration
+// NewConfigManagerCommand is used to reload configuration
 func NewConfigManagerCommand(ctx context.Context, name string) *cobra.Command {
 	opt := NewVolumeWatcherOpts()
 	cmd := &cobra.Command{
@@ -156,7 +159,7 @@ func logUnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.
 
 func checkOptions(opt *VolumeWatcherOpts) error {
 	if len(opt.VolumeDirs) == 0 && opt.NotifyHandType != TPLScript {
-		return cfgutil.MakeError("require volume directory is null.")
+		return cfgutil.MakeError("required volume directory is null.")
 	}
 
 	if opt.NotifyHandType == TPLScript {
@@ -164,11 +167,11 @@ func checkOptions(opt *VolumeWatcherOpts) error {
 	}
 
 	if opt.NotifyHandType == ShellTool && opt.Command == "" {
-		return cfgutil.MakeError("require command is null.")
+		return cfgutil.MakeError("required command is null.")
 	}
 
 	if len(opt.ProcessName) == 0 {
-		return cfgutil.MakeError("require process name is null.")
+		return cfgutil.MakeError("required process name is null.")
 	}
 	return nil
 }
@@ -183,7 +186,7 @@ type TplScriptConfig struct {
 
 func checkTPLScriptOptions(opt *VolumeWatcherOpts) error {
 	if opt.TPLConfig == "" {
-		return cfgutil.MakeError("require tpl config is not null")
+		return cfgutil.MakeError("required tpl config is null")
 	}
 
 	if _, err := os.Stat(opt.TPLConfig); err != nil {
@@ -219,7 +222,7 @@ func initLog(level string) *zap.Logger {
 	}
 
 	if _, ok := levelStrings[level]; !ok {
-		fmt.Printf("not support log level[%s], set default info", level)
+		fmt.Printf("not supported log level[%s], set default info", level)
 		level = "info"
 	}
 
@@ -245,8 +248,8 @@ func createHandlerWithVolumeWatch(opt *VolumeWatcherOpts) (cfgcore.WatchEventHan
 	case TPLScript:
 		return cfgcore.CreateTPLScriptHandler(opt.TPLScriptPath, opt.VolumeDirs, opt.FileRegex, opt.BackupPath, opt.FormatterConfig, opt.DataType, opt.DSN)
 	case SQL, WebHook:
-		return nil, cfgutil.MakeError("event type[%s]: not yet, but in the future", opt.NotifyHandType.String())
+		return nil, cfgutil.MakeError("event type[%s]: not supported", opt.NotifyHandType.String())
 	default:
-		return nil, cfgutil.MakeError("not support event type.")
+		return nil, cfgutil.MakeError("not supported event type.")
 	}
 }

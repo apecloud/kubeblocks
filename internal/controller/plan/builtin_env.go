@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package plan
@@ -30,7 +33,6 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
@@ -42,18 +44,27 @@ type envWrapper struct {
 	*configTemplateBuilder
 
 	// configmap or secret not yet submitted.
-	localObjects *intctrltypes.ReconcileTask
+	localObjects  []coreclient.Object
+	clusterName   string
+	clusterUID    string
+	componentName string
 	// cache remoted configmap and secret.
 	cache map[schema.GroupVersionKind]map[coreclient.ObjectKey]coreclient.Object
 }
 
 const maxReferenceCount = 10
 
-func wrapGetEnvByName(templateBuilder *configTemplateBuilder, localObjects *intctrltypes.ReconcileTask) envBuildInFunc {
+func wrapGetEnvByName(templateBuilder *configTemplateBuilder, component *component.SynthesizedComponent, localObjs []coreclient.Object) envBuildInFunc {
 	wrapper := &envWrapper{
 		configTemplateBuilder: templateBuilder,
-		localObjects:          localObjects,
+		localObjects:          localObjs,
 		cache:                 make(map[schema.GroupVersionKind]map[coreclient.ObjectKey]coreclient.Object),
+	}
+	// hack for test cases of cli update cmd...
+	if component != nil {
+		wrapper.clusterName = component.ClusterName
+		wrapper.clusterUID = component.ClusterUID
+		wrapper.componentName = component.Name
 	}
 	return func(args interface{}, envName string) (string, error) {
 		container, err := fromJSONObject[corev1.Container](args)
@@ -161,7 +172,7 @@ func (w *envWrapper) secretValue(secretRef *corev1.SecretKeySelector, container 
 
 func (w *envWrapper) configMapValue(configmapRef *corev1.ConfigMapKeySelector, container *corev1.Container) (string, error) {
 	if w.cli == nil {
-		return "", cfgcore.MakeError("not support configmap[%s] value in local mode, cli is nil", configmapRef.Name)
+		return "", cfgcore.MakeError("not supported configmap[%s] value in local mode, cli is nil", configmapRef.Name)
 	}
 
 	cmName, err := w.checkAndReplaceEnv(configmapRef.Name, container)
@@ -186,10 +197,7 @@ func (w *envWrapper) getResourceFromLocal(key coreclient.ObjectKey, gvk schema.G
 	if v, ok := w.cache[gvk][key]; ok {
 		return v
 	}
-	if w.localObjects == nil {
-		return nil
-	}
-	return w.localObjects.GetLocalResourceWithObjectKey(key, gvk)
+	return findMatchedLocalObject(w.localObjects, key, gvk)
 }
 
 var envPlaceHolderRegexp = regexp.MustCompile(`\$\(\w+\)`)
@@ -224,18 +232,19 @@ func (w *envWrapper) checkAndReplaceEnv(value string, container *corev1.Containe
 
 func (w *envWrapper) doEnvReplace(replacedVars *set.LinkedHashSetString, oldValue string, container *corev1.Container) (string, error) {
 	var (
-		clusterName   = w.localObjects.Cluster.Name
-		componentName = w.localObjects.Component.Name
-		builtInEnvMap = component.GetReplacementMapForBuiltInEnv(clusterName, componentName)
+		clusterName   = w.clusterName
+		clusterUID    = w.clusterUID
+		componentName = w.componentName
+		builtInEnvMap = component.GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName)
 	)
 
-	builtInEnvMap[constant.ConnCredentialPlaceHolder] = component.GenerateConnCredential(w.localObjects.Cluster.Name)
+	builtInEnvMap[constant.KBConnCredentialPlaceHolder] = component.GenerateConnCredential(clusterName)
 	kbInnerEnvReplaceFn := func(envName string, strToReplace string) string {
 		return strings.ReplaceAll(strToReplace, envName, builtInEnvMap[envName])
 	}
 
 	if !w.incAndCheckReferenceCount() {
-		return "", cfgcore.MakeError("too many reference count, maybe there is a loop reference: [%s] more than %d times ", oldValue, w.referenceCount)
+		return "", cfgcore.MakeError("too many reference count, maybe there is a cycled reference: [%s] more than %d times ", oldValue, w.referenceCount)
 	}
 
 	replacedValue := oldValue
@@ -275,8 +284,10 @@ func (w *envWrapper) incAndCheckReferenceCount() bool {
 func getResourceObject[T generics.Object, PT generics.PObject[T]](w *envWrapper, obj PT, key coreclient.ObjectKey) (PT, error) {
 	gvk := generics.ToGVK(obj)
 	object := w.getResourceFromLocal(key, gvk)
-	if v, ok := object.(PT); ok {
-		return v, nil
+	if object != nil {
+		if v, ok := object.(PT); ok {
+			return v, nil
+		}
 	}
 	if err := w.cli.Get(w.ctx, key, obj); err != nil {
 		return nil, err

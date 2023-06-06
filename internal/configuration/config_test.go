@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configuration
@@ -63,70 +66,6 @@ secure-file-priv=/data/mysql
 socket=/data/mysql/tmp/mysqld.sock
 host=localhost
 `
-
-func TestRawConfig(t *testing.T) {
-
-	cfg, err := NewConfigLoader(CfgOption{
-		Type:    CfgRawType,
-		Log:     log.FromContext(context.Background()),
-		CfgType: appsv1alpha1.Ini,
-		RawData: []byte(iniConfig),
-	})
-
-	if err != nil {
-		t.Fatalf("new config loader failed [%v]", err)
-	}
-
-	ctx := NewCfgOptions("",
-		func(ctx *CfgOpOption) {
-			// filter mysqld
-			ctx.IniContext = &IniContext{
-				SectionName: "mysqld",
-			}
-		})
-
-	// ctx := NewCfgOptions("$..slow_query_log_file", "")
-
-	result, err := cfg.Query("$..slow_query_log_file", NewCfgOptions(""))
-	require.Nil(t, err)
-	require.NotNil(t, result)
-	require.Equal(t, "[\"/data/mysql/mysqld-slow.log\"]", string(result))
-
-	require.Nil(t,
-		cfg.MergeFrom(map[string]interface{}{
-			"slow_query_log": 1,
-			"server-id":      2,
-			"socket":         "xxxxxxxxxxxxxxx",
-		}, ctx))
-
-	content, err := cfg.ToCfgContent()
-	require.NotNil(t, content)
-	require.Nil(t, err)
-
-	newContent, exist := content[cfg.name]
-	require.True(t, exist)
-	patch, err := CreateMergePatch([]byte(iniConfig), []byte(newContent), cfg.Option)
-	require.Nil(t, err)
-	log.Log.Info("patch : %v", patch)
-	require.True(t, patch.IsModify)
-	require.Equal(t, string(patch.UpdateConfig["raw"]), `{"mysqld":{"server-id":"2","socket":"xxxxxxxxxxxxxxx"}}`)
-
-	{
-		require.Nil(t,
-			cfg.MergeFrom(map[string]interface{}{
-				"server-id": 1,
-				"socket":    "/data/mysql/tmp/mysqld.sock",
-			}, ctx))
-		content, err := cfg.ToCfgContent()
-		require.Nil(t, err)
-		newContent := content[cfg.name]
-		// CreateMergePatch([]byte(iniConfig), []byte(newContent), cfg.Option)
-		patch, err := CreateMergePatch([]byte(iniConfig), []byte(newContent), cfg.Option)
-		require.Nil(t, err)
-		log.Log.Info("patch : %v", patch)
-		require.False(t, patch.IsModify)
-	}
-}
 
 func TestConfigMapConfig(t *testing.T) {
 	cfg, err := NewConfigLoader(CfgOption{

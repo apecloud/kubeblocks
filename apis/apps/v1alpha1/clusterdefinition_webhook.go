@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -57,13 +57,13 @@ func (r *ClusterDefinition) Default() {
 		if probes == nil {
 			continue
 		}
-		if probes.RoleChangedProbe != nil {
+		if probes.RoleProbe != nil {
 			// set default values
 			if probes.RoleProbeTimeoutAfterPodsReady == 0 {
 				probes.RoleProbeTimeoutAfterPodsReady = DefaultRoleProbeTimeoutAfterPodsReady
 			}
 		} else {
-			// if component does not support RoleChangedProbe, reset RoleProbeTimeoutAtPodsReady to zero
+			// if component does not support RoleProbe, reset RoleProbeTimeoutAtPodsReady to zero
 			if probes.RoleProbeTimeoutAfterPodsReady != 0 {
 				probes.RoleProbeTimeoutAfterPodsReady = 0
 			}
@@ -234,7 +234,7 @@ func (r *SystemAccountSpec) validateSysAccounts(allErrs *field.ErrorList) {
 		if _, exists := accountName[sysAccount.Name]; exists {
 			*allErrs = append(*allErrs,
 				field.Invalid(field.NewPath("spec.components[*].systemAccounts.accounts"),
-					sysAccount.Name, "duplicated system account names are not allowd."))
+					sysAccount.Name, "duplicated system account names are not allowed."))
 			continue
 		} else {
 			accountName[sysAccount.Name] = true

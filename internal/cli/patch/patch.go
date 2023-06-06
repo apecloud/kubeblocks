@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package patch
@@ -26,6 +29,7 @@ import (
 	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -38,6 +42,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
+	"github.com/apecloud/kubeblocks/internal/cli/edit"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -51,7 +56,7 @@ type Options struct {
 	GVR             schema.GroupVersionResource
 	OutputOperation OutputOperation
 
-	// follow fields are similar to kubectl patch
+	// following fields are similar to kubectl patch
 	PrintFlags  *genericclioptions.PrintFlags
 	ToPrinter   func(string) (printers.ResourcePrinter, error)
 	Patch       string
@@ -65,6 +70,8 @@ type Options struct {
 	builder                      *resource.Builder
 	unstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	fieldManager                 string
+
+	EditBeforeUpdate bool
 
 	genericclioptions.IOStreams
 }
@@ -82,6 +89,7 @@ func NewOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, gvr sche
 func (o *Options) AddFlags(cmd *cobra.Command) {
 	o.PrintFlags.AddFlags(cmd)
 	cmdutil.AddDryRunFlag(cmd)
+	cmd.Flags().BoolVar(&o.EditBeforeUpdate, "edit", o.EditBeforeUpdate, "Edit the API resource")
 }
 
 func (o *Options) complete(cmd *cobra.Command) error {
@@ -167,13 +175,38 @@ func (o *Options) Run(cmd *cobra.Command) error {
 				NewHelper(client, mapping).
 				DryRun(o.dryRunStrategy == cmdutil.DryRunServer).
 				WithFieldManager(o.fieldManager).
-				WithSubresource(o.Subresource)
+				WithSubresource(o.Subresource).
+				WithFieldValidation(metav1.FieldValidationStrict)
 			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes, nil)
 			if err != nil {
 				if apierrors.IsUnsupportedMediaType(err) {
 					return errors.Wrap(err, fmt.Sprintf("%s is not supported by %s", patchType, mapping.GroupVersionKind))
 				}
-				return err
+				return fmt.Errorf("unable to update %s %s/%s: %v", info.Mapping.GroupVersionKind.Kind, info.Namespace, info.Name, err)
+			}
+
+			if o.EditBeforeUpdate {
+				customEdit := edit.NewCustomEditOptions(o.Factory, o.IOStreams, "patched")
+				if err = customEdit.Run(patchedObj); err != nil {
+					return fmt.Errorf("unable to edit %s %s/%s: %v", info.Mapping.GroupVersionKind.Kind, info.Namespace, info.Name, err)
+				}
+				patchedObj = &unstructured.Unstructured{
+					Object: map[string]interface{}{
+						"metadata": patchedObj.(*unstructured.Unstructured).Object["metadata"],
+						"spec":     patchedObj.(*unstructured.Unstructured).Object["spec"],
+					},
+				}
+				patchBytes, err = patchedObj.(*unstructured.Unstructured).MarshalJSON()
+				if err != nil {
+					return fmt.Errorf("unable to marshal %s %s/%s: %v", info.Mapping.GroupVersionKind.Kind, info.Namespace, info.Name, err)
+				}
+				patchedObj, err = helper.Patch(namespace, name, patchType, patchBytes, nil)
+				if err != nil {
+					if apierrors.IsUnsupportedMediaType(err) {
+						return errors.Wrap(err, fmt.Sprintf("%s is not supported by %s", patchType, mapping.GroupVersionKind))
+					}
+					return fmt.Errorf("unable to update %s %s/%s: %v", info.Mapping.GroupVersionKind.Kind, info.Namespace, info.Name, err)
+				}
 			}
 
 			didPatch := !reflect.DeepEqual(info.Object, patchedObj)

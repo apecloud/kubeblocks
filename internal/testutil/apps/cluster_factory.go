@@ -1,25 +1,32 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package apps
 
 import (
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 type MockClusterFactory struct {
@@ -55,10 +62,10 @@ func (factory *MockClusterFactory) AddClusterToleration(toleration corev1.Tolera
 	return factory
 }
 
-func (factory *MockClusterFactory) AddComponent(compName string, compType string) *MockClusterFactory {
+func (factory *MockClusterFactory) AddComponent(compName string, compDefName string) *MockClusterFactory {
 	comp := appsv1alpha1.ClusterComponentSpec{
 		Name:            compName,
-		ComponentDefRef: compType,
+		ComponentDefRef: compDefName,
 	}
 	factory.get().Spec.ComponentSpecs = append(factory.get().Spec.ComponentSpecs, comp)
 	return factory
@@ -70,6 +77,14 @@ func (factory *MockClusterFactory) SetReplicas(replicas int32) *MockClusterFacto
 		comps[len(comps)-1].Replicas = replicas
 	}
 	factory.get().Spec.ComponentSpecs = comps
+	return factory
+}
+
+func (factory *MockClusterFactory) SetServiceAccountName(serviceAccountName string) *MockClusterFactory {
+	comps := factory.get().Spec.ComponentSpecs
+	if len(comps) > 0 {
+		comps[len(comps)-1].ServiceAccountName = serviceAccountName
+	}
 	return factory
 }
 
@@ -95,6 +110,15 @@ func (factory *MockClusterFactory) SetEnabledLogs(logName ...string) *MockCluste
 	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {
 		comps[len(comps)-1].EnabledLogs = logName
+	}
+	factory.get().Spec.ComponentSpecs = comps
+	return factory
+}
+
+func (factory *MockClusterFactory) SetClassDefRef(classDefRef *appsv1alpha1.ClassDefRef) *MockClusterFactory {
+	comps := factory.get().Spec.ComponentSpecs
+	if len(comps) > 0 {
+		comps[len(comps)-1].ClassDefRef = classDefRef
 	}
 	factory.get().Spec.ComponentSpecs = comps
 	return factory
@@ -189,5 +213,17 @@ func (factory *MockClusterFactory) AddService(serviceName string, serviceType co
 		comps[len(comps)-1] = comp
 	}
 	factory.get().Spec.ComponentSpecs = comps
+	return factory
+}
+
+func (factory *MockClusterFactory) AddRestorePointInTime(restoreTime metav1.Time, sourceCluster string) *MockClusterFactory {
+	annotations := factory.get().Annotations
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	annotations[constant.RestoreFromTimeAnnotationKey] = restoreTime.Format(time.RFC3339)
+	annotations[constant.RestoreFromSrcClusterAnnotationKey] = sourceCluster
+
+	factory.get().Annotations = annotations
 	return factory
 }

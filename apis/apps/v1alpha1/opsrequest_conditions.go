@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 
 const (
 	// condition types
-
+	ConditionTypeCancelled         = "Cancelled"
 	ConditionTypeProgressing       = "Progressing"
 	ConditionTypeValidated         = "Validated"
 	ConditionTypeSucceed           = "Succeed"
@@ -48,11 +48,14 @@ const (
 	ReasonReconfigureNoChanged = "ReconfigureNoChanged"
 	ReasonReconfigureSucceed   = "ReconfigureSucceed"
 	ReasonReconfigureRunning   = "ReconfigureRunning"
-	ReasonClusterPhaseMisMatch = "ClusterPhaseMisMatch"
+	ReasonClusterPhaseMismatch = "ClusterPhaseMismatch"
 	ReasonOpsTypeNotSupported  = "OpsTypeNotSupported"
 	ReasonValidateFailed       = "ValidateFailed"
 	ReasonClusterNotFound      = "ClusterNotFound"
 	ReasonOpsRequestFailed     = "OpsRequestFailed"
+	ReasonOpsCanceling         = "Canceling"
+	ReasonOpsCancelFailed      = "CancelFailed"
+	ReasonOpsCancelSucceed     = "CancelSucceed"
 )
 
 func (r *OpsRequest) SetStatusCondition(condition metav1.Condition) {
@@ -71,7 +74,45 @@ func NewProgressingCondition(ops *OpsRequest) *metav1.Condition {
 	}
 }
 
-// NewValidatePassedCondition creates a condition that the operation validation.
+// NewCancelingCondition the controller is canceling the OpsRequest
+func NewCancelingCondition(ops *OpsRequest) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeCancelled,
+		Status:             metav1.ConditionFalse,
+		Reason:             ReasonOpsCanceling,
+		LastTransitionTime: metav1.Now(),
+		Message: fmt.Sprintf(`Start to cancel the OpsRequest "%s" in Cluster: "%s"`,
+			ops.Name, ops.Spec.ClusterRef),
+	}
+}
+
+// NewCancelFailedCondition creates a condition for canceling failed.
+func NewCancelFailedCondition(ops *OpsRequest, err error) *metav1.Condition {
+	msg := fmt.Sprintf(`Failed to cancel OpsRequest "%s"`, ops.Name)
+	if err != nil {
+		msg = err.Error()
+	}
+	return &metav1.Condition{
+		Type:               ConditionTypeCancelled,
+		Status:             metav1.ConditionTrue,
+		Reason:             ReasonOpsCancelFailed,
+		LastTransitionTime: metav1.Now(),
+		Message:            msg,
+	}
+}
+
+// NewCancelSucceedCondition creates a condition for canceling successfully.
+func NewCancelSucceedCondition(opsName string) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeCancelled,
+		Status:             metav1.ConditionTrue,
+		Reason:             ReasonOpsCancelSucceed,
+		LastTransitionTime: metav1.Now(),
+		Message:            fmt.Sprintf(`Cancel OpsRequest "%s" successfully`, opsName),
+	}
+}
+
+// NewValidatePassedCondition creates a condition for operation validation to pass.
 func NewValidatePassedCondition(opsRequestName string) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeValidated,
@@ -82,7 +123,7 @@ func NewValidatePassedCondition(opsRequestName string) *metav1.Condition {
 	}
 }
 
-// NewValidateFailedCondition creates a condition that the operation validation.
+// NewValidateFailedCondition creates a condition for operation validation failure.
 func NewValidateFailedCondition(reason, message string) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeValidated,

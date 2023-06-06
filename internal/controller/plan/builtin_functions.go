@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package plan
@@ -22,9 +25,12 @@ import (
 	"math"
 
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
 func toJSONObject[T corev1.VolumeSource | corev1.Container | corev1.ContainerPort](obj T) (interface{}, error) {
@@ -158,9 +164,7 @@ func calDBPoolSize(args interface{}) (string, error) {
 
 }
 
-// getPodContainerByName for general built-in
-// User overwrite podSpec of Cluster CR, the correctness of access via index cannot be guaranteed
-// if User modify name of container, pray users don't
+// getPodContainerByName gets pod container by name
 func getPodContainerByName(args []interface{}, containerName string) (interface{}, error) {
 	containers, err := fromJSONArray[corev1.Container](args)
 	if err != nil {
@@ -174,7 +178,7 @@ func getPodContainerByName(args []interface{}, containerName string) (interface{
 	return nil, nil
 }
 
-// getVolumeMountPathByName for general built-in
+// getVolumeMountPathByName gets volume mount path by name
 func getVolumeMountPathByName(args interface{}, volumeName string) (string, error) {
 	container, err := fromJSONObject[corev1.Container](args)
 	if err != nil {
@@ -188,7 +192,7 @@ func getVolumeMountPathByName(args interface{}, volumeName string) (string, erro
 	return "", nil
 }
 
-// getPVCByName for general built-in
+// getPVCByName gets pvc by name
 func getPVCByName(args []interface{}, volumeName string) (interface{}, error) {
 	volumes, err := fromJSONArray[corev1.Volume](args)
 	if err != nil {
@@ -202,7 +206,16 @@ func getPVCByName(args []interface{}, volumeName string) (interface{}, error) {
 	return nil, nil
 }
 
-// getContainerMemory for general built-in
+// getContainerCPU gets container cpu limit
+func getContainerCPU(args interface{}) (int64, error) {
+	container, err := fromJSONObject[corev1.Container](args)
+	if err != nil {
+		return 0, err
+	}
+	return intctrlutil.GetCoreNum(*container), nil
+}
+
+// getContainerMemory gets container memory limit
 func getContainerMemory(args interface{}) (int64, error) {
 	container, err := fromJSONObject[corev1.Container](args)
 	if err != nil {
@@ -211,13 +224,22 @@ func getContainerMemory(args interface{}) (int64, error) {
 	return intctrlutil.GetMemorySize(*container), nil
 }
 
-// getArgByName for general built-in
+// getContainerRequestMemory gets container memory request
+func getContainerRequestMemory(args interface{}) (int64, error) {
+	container, err := fromJSONObject[corev1.Container](args)
+	if err != nil {
+		return 0, err
+	}
+	return intctrlutil.GetRequestMemorySize(*container), nil
+}
+
+// getArgByName get arg by name
 func getArgByName(args interface{}, argName string) string {
 	// TODO Support parse command args
 	return emptyString
 }
 
-// getPortByName for general built-in
+// getPortByName get port by name
 func getPortByName(args interface{}, portName string) (interface{}, error) {
 	container, err := fromJSONObject[corev1.Container](args)
 	if err != nil {
@@ -232,17 +254,37 @@ func getPortByName(args interface{}, portName string) (interface{}, error) {
 	return nil, nil
 }
 
-// getCAFile for general builtIn
+// getCAFile gets CA file
 func getCAFile() string {
 	return builder.MountPath + "/" + builder.CAName
 }
 
-// getCertFile for general builtIn
+// getCertFile gets cert file
 func getCertFile() string {
 	return builder.MountPath + "/" + builder.CertName
 }
 
-// getKeyFile for general builtIn
+// getKeyFile gets key file
 func getKeyFile() string {
 	return builder.MountPath + "/" + builder.KeyName
+}
+
+// BuiltInCustomFunctions builds a map of customized functions for KubeBlocks
+func BuiltInCustomFunctions(c *configTemplateBuilder, component *component.SynthesizedComponent, localObjs []client.Object) *gotemplate.BuiltInObjectsFunc {
+	return &gotemplate.BuiltInObjectsFunc{
+		builtInMysqlCalBufferFunctionName:            calDBPoolSize,
+		builtInGetVolumeFunctionName:                 getVolumeMountPathByName,
+		builtInGetPvcFunctionName:                    getPVCByName,
+		builtInGetEnvFunctionName:                    wrapGetEnvByName(c, component, localObjs),
+		builtInGetPortFunctionName:                   getPortByName,
+		builtInGetArgFunctionName:                    getArgByName,
+		builtInGetContainerFunctionName:              getPodContainerByName,
+		builtInGetContainerCPUFunctionName:           getContainerCPU,
+		builtInGetContainerMemoryFunctionName:        getContainerMemory,
+		builtInGetContainerRequestMemoryFunctionName: getContainerRequestMemory,
+		builtInGetCAFile:                             getCAFile,
+		builtInGetCertFile:                           getCertFile,
+		builtInGetKeyFile:                            getKeyFile,
+	}
+
 }

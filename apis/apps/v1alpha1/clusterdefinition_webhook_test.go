@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -56,19 +56,13 @@ var _ = Describe("clusterDefinition webhook", func() {
 			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
 			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 			// wait until ClusterDefinition created
-			Eventually(func() bool {
-				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
-				return err == nil
-			}).Should(BeTrue())
+			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)).Should(Succeed())
 
 			By("By creating a new clusterDefinition")
 			clusterDef, _ = createTestClusterDefinitionObj3(clusterDefinitionName3)
 			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 			// wait until ClusterDefinition created
-			Eventually(func() bool {
-				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName3}, clusterDef)
-				return err == nil
-			}).Should(BeTrue())
+			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName3}, clusterDef)).Should(Succeed())
 
 			By("By creating a new clusterDefinition with workloadType==Consensus but consensusSpec not present")
 			clusterDef, _ = createTestClusterDefinitionObj2(clusterDefinitionName2)
@@ -164,10 +158,7 @@ var _ = Describe("clusterDefinition webhook", func() {
 			By("By creating a new clusterDefinition with valid accounts")
 			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 			// wait until ClusterDefinition created
-			Eventually(func() bool {
-				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName3}, clusterDef)
-				return err == nil
-			}).Should(BeTrue())
+			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName3}, clusterDef)).Should(Succeed())
 		})
 
 		It("Should webhook validate configSpec", func() {
@@ -281,25 +272,21 @@ var _ = Describe("clusterDefinition webhook", func() {
 
 	It("test mutating webhook", func() {
 		clusterDef, _ := createTestClusterDefinitionObj3(clusterDefinitionName + "-mutating")
-		By("test set the default value to RoleProbeTimeoutAfterPodsReady when roleChangedProbe is not nil")
+		By("test set the default value to RoleProbeTimeoutAfterPodsReady when roleProbe is not nil")
 		clusterDef.Spec.ComponentDefs[0].Probes = &ClusterDefinitionProbes{
-			RoleChangedProbe: &ClusterDefinitionProbe{},
+			RoleProbe: &ClusterDefinitionProbe{},
 		}
 		Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
-		Eventually(func(g Gomega) int32 {
-			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)).Should(Succeed())
-			return clusterDef.Spec.ComponentDefs[0].Probes.RoleProbeTimeoutAfterPodsReady
-		}).Should(Equal(DefaultRoleProbeTimeoutAfterPodsReady))
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)).Should(Succeed())
+		Expect(clusterDef.Spec.ComponentDefs[0].Probes.RoleProbeTimeoutAfterPodsReady).Should(Equal(DefaultRoleProbeTimeoutAfterPodsReady))
 
-		By("test set zero to RoleProbeTimeoutAfterPodsReady when roleChangedProbe is nil")
+		By("test set zero to RoleProbeTimeoutAfterPodsReady when roleProbe is nil")
 		clusterDef.Spec.ComponentDefs[0].Probes = &ClusterDefinitionProbes{
 			RoleProbeTimeoutAfterPodsReady: 60,
 		}
 		Expect(k8sClient.Update(ctx, clusterDef)).Should(Succeed())
-		Eventually(func(g Gomega) int32 {
-			g.Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)).Should(Succeed())
-			return clusterDef.Spec.ComponentDefs[0].Probes.RoleProbeTimeoutAfterPodsReady
-		}).Should(Equal(int32(0)))
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)).Should(Succeed())
+		Expect(clusterDef.Spec.ComponentDefs[0].Probes.RoleProbeTimeoutAfterPodsReady).Should(Equal(int32(0)))
 	})
 })
 

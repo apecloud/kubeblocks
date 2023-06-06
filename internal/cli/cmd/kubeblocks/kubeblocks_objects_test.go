@@ -1,37 +1,46 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package kubeblocks
 
 import (
+	"context"
+
+	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/dynamic"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var _ = Describe("kubeblocks objects", func() {
+
 	It("delete objects", func() {
 		dynamic := testing.FakeDynamicClient()
 		Expect(deleteObjects(dynamic, types.DeployGVR(), nil)).Should(Succeed())
@@ -92,20 +101,65 @@ var _ = Describe("kubeblocks objects", func() {
 		}
 
 		for _, c := range testCases {
-			client := mockDynamicClientWithCRD(c.clusterDef, c.clusterVersion, c.backupTool)
+			objects := mockCRD()
+			objects = append(objects, testing.FakeVolumeSnapshotClass())
+			objects = append(objects, c.clusterDef, c.clusterVersion, c.backupTool)
+			client := testing.FakeDynamicClient(objects...)
 			objs, _ := getKBObjects(client, "", nil)
 			Expect(removeCustomResources(client, objs)).Should(Succeed())
 		}
 	})
 
 	It("delete crd", func() {
-		dynamic := mockDynamicClientWithCRD()
+		objects := mockCRD()
+		objects = append(objects, testing.FakeVolumeSnapshotClass())
+		dynamic := testing.FakeDynamicClient(objects...)
 		objs, _ := getKBObjects(dynamic, "", nil)
 		Expect(deleteObjects(dynamic, types.CRDGVR(), objs[types.CRDGVR()])).Should(Succeed())
 	})
+
+	It("test getKBObjects", func() {
+		objects := mockCRD()
+		objects = append(objects, mockCRs()...)
+		objects = append(objects, testing.FakeVolumeSnapshotClass())
+		objects = append(objects, mockRBACResources()...)
+		objects = append(objects, mockConfigMaps()...)
+		dynamic := testing.FakeDynamicClient(objects...)
+		objs, _ := getKBObjects(dynamic, "", nil)
+
+		tmp, err := dynamic.Resource(types.ClusterRoleGVR()).Namespace(metav1.NamespaceAll).
+			List(context.TODO(), metav1.ListOptions{LabelSelector: buildKubeBlocksSelectorLabels()})
+		Expect(err).ShouldNot(HaveOccurred())
+		Expect(tmp.Items).Should(HaveLen(1))
+		// verify crds
+		Expect(objs[types.CRDGVR()].Items).Should(HaveLen(4))
+		// verify crs
+		for _, gvr := range []schema.GroupVersionResource{types.ClusterDefGVR(), types.ClusterVersionGVR()} {
+			objlist, ok := objs[gvr]
+			Expect(ok).Should(BeTrue())
+			Expect(objlist.Items).Should(HaveLen(1))
+		}
+
+		// verify rbac info
+		for _, gvr := range []schema.GroupVersionResource{types.RoleGVR(), types.ClusterRoleBindingGVR(), types.ServiceAccountGVR()} {
+			objlist, ok := objs[gvr]
+			Expect(ok).Should(BeTrue())
+			Expect(objlist.Items).Should(HaveLen(1), gvr.String())
+		}
+		// verify cofnig tpl
+		for _, gvr := range []schema.GroupVersionResource{types.ConfigmapGVR()} {
+			objlist, ok := objs[gvr]
+			Expect(ok).Should(BeTrue())
+			Expect(objlist.Items).Should(HaveLen(1), gvr.String())
+		}
+	})
 })
 
-func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
+func mockName() string {
+	return uuid.NewString()
+}
+
+func mockCRD() []runtime.Object {
 	clusterCRD := v1.CustomResourceDefinition{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "CustomResourceDefinition",
@@ -159,9 +213,34 @@ func mockDynamicClientWithCRD(objects ...runtime.Object) dynamic.Interface {
 		},
 		Status: v1.CustomResourceDefinitionStatus{},
 	}
+	return []runtime.Object{&clusterCRD, &clusterDefCRD, &clusterVersionCRD, &backupToolCRD}
+}
 
-	allObjs := []runtime.Object{&clusterCRD, &clusterDefCRD, &clusterVersionCRD, &backupToolCRD,
-		testing.FakeVolumeSnapshotClass()}
-	allObjs = append(allObjs, objects...)
-	return testing.FakeDynamicClient(allObjs...)
+func mockCRs() []runtime.Object {
+	allObjects := make([]runtime.Object, 0)
+	allObjects = append(allObjects, testing.FakeClusterDef())
+	allObjects = append(allObjects, testing.FakeClusterVersion())
+	return allObjects
+}
+
+func mockRBACResources() []runtime.Object {
+	sa := testing.FakeServiceAccount(mockName())
+
+	cluserRole := testing.FakeClusterRole(mockName())
+	cluserRoleBinding := testing.FakeClusterRoleBinding(mockName(), sa, cluserRole)
+
+	role := testing.FakeRole(mockName())
+	roleBinding := testing.FakeRoleBinding(mockName(), sa, role)
+
+	return []runtime.Object{sa, cluserRole, cluserRoleBinding, role, roleBinding}
+}
+
+func mockConfigMaps() []runtime.Object {
+	obj := testing.FakeConfigMap(mockName())
+	// add a config tpl label
+	if obj.ObjectMeta.Labels == nil {
+		obj.ObjectMeta.Labels = make(map[string]string)
+	}
+	obj.ObjectMeta.Labels[constant.CMConfigurationTypeLabelKey] = constant.ConfigTemplateType
+	return []runtime.Object{obj}
 }

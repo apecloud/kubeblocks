@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package plan
@@ -22,11 +25,11 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/client"
+	ictrlclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
@@ -42,13 +45,15 @@ const (
 
 // General Built-in functions
 const (
-	builtInGetVolumeFunctionName          = "getVolumePathByName"
-	builtInGetPvcFunctionName             = "getPVCByName"
-	builtInGetEnvFunctionName             = "getEnvByName"
-	builtInGetArgFunctionName             = "getArgByName"
-	builtInGetPortFunctionName            = "getPortByName"
-	builtInGetContainerFunctionName       = "getContainerByName"
-	builtInGetContainerMemoryFunctionName = "getContainerMemory"
+	builtInGetVolumeFunctionName                 = "getVolumePathByName"
+	builtInGetPvcFunctionName                    = "getPVCByName"
+	builtInGetEnvFunctionName                    = "getEnvByName"
+	builtInGetArgFunctionName                    = "getArgByName"
+	builtInGetPortFunctionName                   = "getPortByName"
+	builtInGetContainerFunctionName              = "getContainerByName"
+	builtInGetContainerCPUFunctionName           = "getContainerCPU"
+	builtInGetContainerMemoryFunctionName        = "getContainerMemory"
+	builtInGetContainerRequestMemoryFunctionName = "getContainerRequestMemory"
 
 	// BuiltinMysqlCalBufferFunctionName Mysql Built-in
 	// TODO: This function migrate to configuration template
@@ -91,7 +96,7 @@ type configTemplateBuilder struct {
 	podSpec        *corev1.PodSpec
 
 	ctx context.Context
-	cli client.ReadonlyClient
+	cli ictrlclient.ReadonlyClient
 }
 
 func newTemplateBuilder(
@@ -99,7 +104,7 @@ func newTemplateBuilder(
 	cluster *appsv1alpha1.Cluster,
 	version *appsv1alpha1.ClusterVersion,
 	ctx context.Context,
-	cli client.ReadonlyClient) *configTemplateBuilder {
+	cli ictrlclient.ReadonlyClient) *configTemplateBuilder {
 	return &configTemplateBuilder{
 		namespace:      namespace,
 		clusterName:    clusterName,
@@ -159,31 +164,20 @@ func (c *configTemplateBuilder) injectBuiltInObjectsAndFunctions(
 	podSpec *corev1.PodSpec,
 	configs []appsv1alpha1.ComponentConfigSpec,
 	component *component.SynthesizedComponent,
-	task *intctrltypes.ReconcileTask) error {
+	localObjs []client.Object) error {
 	if err := c.injectBuiltInObjects(podSpec, component, configs); err != nil {
 		return err
 	}
-	if err := c.injectBuiltInFunctions(component, task); err != nil {
+	if err := c.injectBuiltInFunctions(component, localObjs); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.SynthesizedComponent, task *intctrltypes.ReconcileTask) error {
+func (c *configTemplateBuilder) injectBuiltInFunctions(component *component.SynthesizedComponent, localObjs []client.Object) error {
 	// TODO add built-in function
-	c.builtInFunctions = &gotemplate.BuiltInObjectsFunc{
-		builtInMysqlCalBufferFunctionName:     calDBPoolSize,
-		builtInGetVolumeFunctionName:          getVolumeMountPathByName,
-		builtInGetPvcFunctionName:             getPVCByName,
-		builtInGetEnvFunctionName:             wrapGetEnvByName(c, task),
-		builtInGetPortFunctionName:            getPortByName,
-		builtInGetArgFunctionName:             getArgByName,
-		builtInGetContainerFunctionName:       getPodContainerByName,
-		builtInGetContainerMemoryFunctionName: getContainerMemory,
-		builtInGetCAFile:                      getCAFile,
-		builtInGetCertFile:                    getCertFile,
-		builtInGetKeyFile:                     getKeyFile,
-	}
+	c.builtInFunctions = BuiltInCustomFunctions(c, component, localObjs)
+	// other logic here
 	return nil
 }
 
@@ -197,7 +191,7 @@ func (c *configTemplateBuilder) injectBuiltInObjects(podSpec *corev1.PodSpec, co
 		}
 	}
 	c.componentValues = &componentTemplateValues{
-		TypeName:    component.Type,
+		TypeName:    component.CompDefName,
 		Replicas:    component.Replicas,
 		Resource:    resource,
 		ConfigSpecs: configSpecs,

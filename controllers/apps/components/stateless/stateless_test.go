@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package stateless
@@ -43,12 +46,12 @@ var _ = Describe("Stateful Component", func() {
 	)
 	const (
 		statelessCompName      = "stateless"
-		statelessCompDefRef    = "stateless"
+		statelessCompDefName   = "stateless"
 		defaultMinReadySeconds = 10
 	)
 
 	cleanAll := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -71,31 +74,28 @@ var _ = Describe("Stateful Component", func() {
 		It("Stateless Component test", func() {
 			By(" init cluster, deployment")
 			clusterDef := testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatelessNginxComponent, statelessCompDefRef).
+				AddComponentDef(testapps.StatelessNginxComponent, statelessCompDefName).
 				Create(&testCtx).GetObject()
 			cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(statelessCompName, statelessCompDefRef).SetReplicas(2).Create(&testCtx).GetObject()
-			deploy := testapps.MockStatelessComponentDeploy(testCtx, clusterName, statelessCompName)
+				AddComponent(statelessCompName, statelessCompDefName).SetReplicas(2).Create(&testCtx).GetObject()
+			deploy := testapps.MockStatelessComponentDeploy(&testCtx, clusterName, statelessCompName)
 			clusterComponent := cluster.Spec.GetComponentByName(statelessCompName)
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
-			statelessComponent, err := NewStateless(k8sClient, cluster, clusterComponent, *componentDef)
-			Expect(err).Should(Succeed())
+			statelessComponent := newStateless(k8sClient, cluster, clusterComponent, *componentDef)
 			By("test pods number of deploy is 0 ")
-			phase, _ := statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
+			phase, _, _ := statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
 			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
 
 			By("test pod is ready")
 			rsName := deploy.Name + "-5847cb795c"
-			pod := testapps.MockStatelessPod(testCtx, deploy, clusterName, statelessCompName, rsName+randomStr)
+			pod := testapps.MockStatelessPod(&testCtx, deploy, clusterName, statelessCompName, rsName+randomStr)
 			lastTransTime := metav1.NewTime(time.Now().Add(-1 * (defaultMinReadySeconds + 1) * time.Second))
 			testk8s.MockPodAvailable(pod, lastTransTime)
 			Expect(statelessComponent.PodIsAvailable(pod, defaultMinReadySeconds)).Should(BeTrue())
 
 			By("test a part pods of deploy are not ready")
 			// mock pod is not ready
-			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
-				pod.Status.Conditions = nil
-			})).Should(Succeed())
+			testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, pod.Name, pod.Namespace)
 			// mock deployment is processing rs
 			Expect(testapps.ChangeObjStatus(&testCtx, deploy, func() {
 				deploy.Status.Conditions = []appsv1.DeploymentCondition{
@@ -115,31 +115,32 @@ var _ = Describe("Stateful Component", func() {
 				deploy.Status.Replicas = availableReplicas
 			})).Should(Succeed())
 			podsReady, _ := statelessComponent.PodsReady(ctx, deploy)
-			Expect(podsReady == false).Should(BeTrue())
-			phase, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
-			Expect(phase == appsv1alpha1.AbnormalClusterCompPhase).Should(BeTrue())
+			Expect(podsReady).Should(BeFalse())
+			phase, _, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
+			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			By("test pods of deployment are ready")
 			testk8s.MockDeploymentReady(deploy, NewRSAvailableReason, rsName)
 			podsReady, _ = statelessComponent.PodsReady(ctx, deploy)
-			Expect(podsReady == true).Should(BeTrue())
+			Expect(podsReady).Should(BeTrue())
 
 			By("test component.replicas is inconsistent with deployment.spec.replicas")
 			oldReplicas := clusterComponent.Replicas
 			replicas := int32(4)
 			clusterComponent.Replicas = replicas
 			isRunning, _ := statelessComponent.IsRunning(ctx, deploy)
-			Expect(isRunning == false).Should(BeTrue())
+			Expect(isRunning).Should(BeFalse())
 			// reset replicas
 			clusterComponent.Replicas = oldReplicas
 
 			By("test component is running")
 			isRunning, _ = statelessComponent.IsRunning(ctx, deploy)
-			Expect(isRunning == true).Should(BeTrue())
+			Expect(isRunning).Should(BeTrue())
 
-			By("test handle probe timed out")
-			requeue, _ := statelessComponent.HandleProbeTimeoutWhenPodsReady(ctx, nil)
-			Expect(requeue == false).Should(BeTrue())
+			// TODO(refactor): probe timed-out pod
+			// By("test handle probe timed out")
+			// requeue, _ := statelessComponent.HandleProbeTimeoutWhenPodsReady(ctx, nil)
+			// Expect(requeue == false).Should(BeTrue())
 
 			By("test pod is not ready and not controlled by new ReplicaSet of deployment")
 			Expect(testapps.ChangeObjStatus(&testCtx, deploy, func() {
@@ -152,8 +153,8 @@ var _ = Describe("Stateful Component", func() {
 					},
 				}
 			})).Should(Succeed())
-			phase, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
-			Expect(len(phase) == 0).Should(BeTrue())
+			phase, _, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
+			Expect(string(phase)).Should(Equal(""))
 		})
 	})
 

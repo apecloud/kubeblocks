@@ -33,30 +33,6 @@ rules:
 - apiGroups:
   - apps
   resources:
-  - pods
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - pods/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps
-  resources:
-  - pods/status
-  verbs:
-  - get
-- apiGroups:
-  - apps
-  resources:
   - replicasets
   verbs:
   - create
@@ -106,11 +82,10 @@ rules:
 - apiGroups:
   - apps.kubeblocks.io
   resources:
-  - classfamilies
+  - backuppolicytemplates
   verbs:
   - get
   - list
-  - watch
 - apiGroups:
   - apps.kubeblocks.io
   resources:
@@ -189,6 +164,40 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - componentclassdefinitions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - componentclassdefinitions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - componentclassdefinitions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - componentresourceconstraints
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - apps.kubeblocks.io
   resources:
@@ -386,6 +395,16 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - persistentvolumes
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - pods
   verbs:
   - delete
@@ -401,6 +420,19 @@ rules:
   - pods/exec
   verbs:
   - create
+- apiGroups:
+  - ""
+  resources:
+  - pods/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - pods/log
+  verbs:
+  - get
+  - list
 - apiGroups:
   - ""
   resources:
@@ -492,32 +524,6 @@ rules:
   - dataprotection.kubeblocks.io
   resources:
   - backuppolicies/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backuppolicytemplates
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backuppolicytemplates/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - dataprotection.kubeblocks.io
-  resources:
-  - backuppolicytemplates/status
   verbs:
   - get
   - patch
@@ -673,3 +679,29 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - workloads.kubeblocks.io
+  resources:
+  - consensussets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - workloads.kubeblocks.io
+  resources:
+  - consensussets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - workloads.kubeblocks.io
+  resources:
+  - consensussets/status
+  verbs:
+  - get
+  - patch
+  - update

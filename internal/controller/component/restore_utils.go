@@ -1,33 +1,60 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package component
 
 import (
+	"encoding/json"
 	"fmt"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
+
+func getClusterBackupSourceMap(cluster appsv1alpha1.Cluster) (map[string]string, error) {
+	compBackupMapString := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	if len(compBackupMapString) == 0 {
+		return nil, nil
+	}
+	compBackupMap := map[string]string{}
+	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
+	return compBackupMap, err
+}
+
+func getComponentBackupSource(cluster appsv1alpha1.Cluster, compName string) (string, error) {
+	backupSources, err := getClusterBackupSourceMap(cluster)
+	if err != nil {
+		return "", err
+	}
+	if source, ok := backupSources[compName]; ok {
+		return source, nil
+	}
+	return "", nil
+}
 
 func getBackupObjects(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -49,9 +76,9 @@ func getBackupObjects(reqCtx intctrlutil.RequestCtx,
 	return backup, backupTool, nil
 }
 
-// BuildRestoredInfo builds restore-related infos if it needs to restore from backup, such as init container/pvc dataSource.
-func BuildRestoredInfo(
-	reqCtx intctrlutil.RequestCtx,
+// BuildRestoredInfo builds restore infos when restore from backup, such as init-container, pvc dataSource.
+// Deprecated: using DoRestore function instead.
+func BuildRestoredInfo(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	namespace string,
 	component *SynthesizedComponent,
@@ -60,32 +87,52 @@ func BuildRestoredInfo(
 	if err != nil {
 		return err
 	}
-	return BuildRestoredInfo2(component, backup, backupTool)
+	return buildRestoredInfo2(component, backup, backupTool)
 }
 
-// BuildRestoredInfo2 builds restore-related infos if it needs to restore from backup, such as init container/pvc dataSource.
-func BuildRestoredInfo2(
-	component *SynthesizedComponent,
+// BuildRestoreInfoFromBackup restore from snapshot or datafile
+// Deprecated: using DoRestore function instead.
+func BuildRestoreInfoFromBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster appsv1alpha1.Cluster,
+	component *SynthesizedComponent) error {
+	// build info that needs to be restored from backup
+	backupSourceName, err := getComponentBackupSource(cluster, component.Name)
+	if err != nil {
+		return err
+	}
+	if len(backupSourceName) == 0 {
+		return nil
+	}
+
+	backup, backupTool, err := getBackupObjects(reqCtx, cli, cluster.Namespace, backupSourceName)
+	if err != nil {
+		return err
+	}
+	return buildRestoredInfo2(component, backup, backupTool)
+}
+
+// buildRestoredInfo2 builds restore infos when restore from backup, such as init-container, pvc dataSource.
+func buildRestoredInfo2(component *SynthesizedComponent,
 	backup *dataprotectionv1alpha1.Backup,
 	backupTool *dataprotectionv1alpha1.BackupTool) error {
 	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeBackupNotCompleted, "backup %s is not completed", backup.Name)
 	}
 	switch backup.Spec.BackupType {
-	case dataprotectionv1alpha1.BackupTypeFull:
+	case dataprotectionv1alpha1.BackupTypeDataFile:
 		return buildInitContainerWithFullBackup(component, backup, backupTool)
 	case dataprotectionv1alpha1.BackupTypeSnapshot:
-		buildVolumeClaimTemplatesWithSnapshot(component, backup)
+		return buildVolumeClaimTemplatesWithSnapshot(component, backup)
 	}
 	return nil
 }
 
-// GetRestoredInitContainerName gets the init container name for restore.
+// GetRestoredInitContainerName gets the restore init container name.
+// Deprecated: using DoRestore function instead.
 func GetRestoredInitContainerName(backupName string) string {
 	return fmt.Sprintf("restore-%s", backupName)
 }
 
-// buildInitContainerWithFullBackup builds the init container if it needs to restore from full backup
+// buildInitContainerWithFullBackup builds the init container when restore from full backup
 func buildInitContainerWithFullBackup(
 	component *SynthesizedComponent,
 	backup *dataprotectionv1alpha1.Backup,
@@ -93,8 +140,8 @@ func buildInitContainerWithFullBackup(
 	if component.PodSpec == nil || len(component.PodSpec.Containers) == 0 {
 		return nil
 	}
-	if backup.Status.RemoteVolume == nil {
-		return fmt.Errorf("remote volume can not be empty in Backup.status.remoteVolume")
+	if len(backup.Status.PersistentVolumeClaimName) == 0 {
+		return fmt.Errorf("persistentVolumeClaimName cannot be empty in Backup.status")
 	}
 	container := corev1.Container{}
 	container.Name = GetRestoredInitContainerName(backup.Name)
@@ -106,10 +153,17 @@ func buildInitContainerWithFullBackup(
 	}
 	container.VolumeMounts = component.PodSpec.Containers[0].VolumeMounts
 	// add the volumeMounts with backup volume
-	randomVolumeName := fmt.Sprintf("%s-%s", component.Name, backup.Status.RemoteVolume.Name)
-	backup.Status.RemoteVolume.Name = randomVolumeName
+	backupVolumeName := fmt.Sprintf("%s-%s", component.Name, backup.Status.PersistentVolumeClaimName)
+	remoteVolume := corev1.Volume{
+		Name: backupVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: backup.Status.PersistentVolumeClaimName,
+			},
+		},
+	}
 	remoteVolumeMount := corev1.VolumeMount{}
-	remoteVolumeMount.Name = randomVolumeName
+	remoteVolumeMount.Name = backupVolumeName
 	remoteVolumeMount.MountPath = "/" + backup.Name
 	container.VolumeMounts = append(container.VolumeMounts, remoteVolumeMount)
 
@@ -119,6 +173,11 @@ func buildInitContainerWithFullBackup(
 		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 		RunAsUser:                &runAsUser}
 
+	backupDataPath := fmt.Sprintf("/%s/%s", backup.Name, backup.Namespace)
+	manifests := backup.Status.Manifests
+	if manifests != nil && manifests.BackupTool != nil {
+		backupDataPath = fmt.Sprintf("/%s%s", backup.Name, manifests.BackupTool.FilePath)
+	}
 	// build env for restore
 	container.Env = []corev1.EnvVar{
 		{
@@ -126,23 +185,33 @@ func buildInitContainerWithFullBackup(
 			Value: backup.Name,
 		}, {
 			Name:  "BACKUP_DIR",
-			Value: fmt.Sprintf("/%s/%s", backup.Name, backup.Namespace),
+			Value: backupDataPath,
 		}}
 	// merge env from backup tool.
 	container.Env = append(container.Env, backupTool.Spec.Env...)
 	// add volume of backup data
-	component.PodSpec.Volumes = append(component.PodSpec.Volumes, *backup.Status.RemoteVolume)
+	component.PodSpec.Volumes = append(component.PodSpec.Volumes, remoteVolume)
 	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, container)
 	return nil
 }
 
-// buildVolumeClaimTemplatesWithSnapshot builds the volumeClaimTemplate if it needs to restore from volumeSnapshot
+// buildVolumeClaimTemplatesWithSnapshot builds the volumeClaimTemplate when restore from volumeSnapshot
 func buildVolumeClaimTemplatesWithSnapshot(component *SynthesizedComponent,
-	backup *dataprotectionv1alpha1.Backup) {
+	backup *dataprotectionv1alpha1.Backup) error {
 	if len(component.VolumeClaimTemplates) == 0 {
-		return
+		return intctrlutil.NewError(intctrlutil.ErrorTypeBackupNotSupported,
+			"need specified volumeClaimTemplates to restore.")
 	}
 	vct := component.VolumeClaimTemplates[0]
+	backupTotalSize, err := resource.ParseQuantity(backup.Status.TotalSize)
+	if err != nil {
+		return err
+	}
+	if vct.Spec.Resources.Requests.Storage().Value() < backupTotalSize.Value() {
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeStorageNotMatch,
+			"requests storage %s is less than source backup storage %s.",
+			vct.Spec.Resources.Requests.Storage(), backupTotalSize.String())
+	}
 	snapshotAPIGroup := snapshotv1.GroupName
 	vct.Spec.DataSource = &corev1.TypedLocalObjectReference{
 		APIGroup: &snapshotAPIGroup,
@@ -150,4 +219,5 @@ func buildVolumeClaimTemplatesWithSnapshot(component *SynthesizedComponent,
 		Name:     backup.Name,
 	}
 	component.VolumeClaimTemplates[0] = vct
+	return nil
 }

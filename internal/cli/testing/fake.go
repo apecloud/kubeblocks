@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package testing
@@ -23,9 +26,14 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubectl/pkg/util/storage"
 	"k8s.io/utils/pointer"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -33,27 +41,32 @@ import (
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 const (
-	ClusterName                = "fake-cluster-name"
-	Namespace                  = "fake-namespace"
-	ClusterVersionName         = "fake-cluster-version"
-	ClusterDefName             = "fake-cluster-definition"
-	ComponentName              = "fake-component-name"
-	ComponentDefName           = "fake-component-type"
-	NodeName                   = "fake-node-name"
-	SecretName                 = "fake-secret-conn-credential"
-	StorageClassName           = "fake-storage-class"
-	PVCName                    = "fake-pvc"
-	GeneralClassFamily         = "kb-class-family-general"
-	MemoryOptimizedClassFamily = "kb-class-family-memory-optimized"
+	ClusterName        = "fake-cluster-name"
+	Namespace          = "fake-namespace"
+	ClusterVersionName = "fake-cluster-version"
+	ClusterDefName     = "fake-cluster-definition"
+	ComponentName      = "fake-component-name"
+	ComponentDefName   = "fake-component-type"
+	NodeName           = "fake-node-name"
+	SecretName         = "fake-secret-conn-credential"
+	StorageClassName   = "fake-storage-class"
+	PVCName            = "fake-pvc"
 
 	KubeBlocksRepoName  = "fake-kubeblocks-repo"
 	KubeBlocksChartName = "fake-kubeblocks"
 	KubeBlocksChartURL  = "fake-kubeblocks-chart-url"
 	BackupToolName      = "fake-backup-tool"
-	BackupTemplateName  = "fake-backup-policy-template"
+
+	IsDefautl    = true
+	IsNotDefault = false
+)
+
+var (
+	ExtraComponentDefName = fmt.Sprintf("%s-%d", ComponentDefName, 1)
 )
 
 func GetRandomStr() string {
@@ -246,32 +259,54 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 				PasswordConfig: appsv1alpha1.PasswordConfig{},
 				Accounts:       []appsv1alpha1.SystemAccountConfig{},
 			},
+			ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
+				{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:        "mysql-consensusset-config",
+						TemplateRef: "mysql8.0-config-template",
+						Namespace:   Namespace,
+						VolumeName:  "mysql-config",
+					},
+					ConfigConstraintRef: "mysql8.0-config-constraints",
+				},
+			},
 		},
 		{
-			Name:          fmt.Sprintf("%s-%d", ComponentDefName, 1),
+			Name:          ExtraComponentDefName,
 			CharacterType: "mysql",
+			ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
+				{
+					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						Name:        "mysql-consensusset-config",
+						TemplateRef: "mysql8.0-config-template",
+						Namespace:   Namespace,
+						VolumeName:  "mysql-config",
+					},
+					ConfigConstraintRef: "mysql8.0-config-constraints",
+				},
+			},
 		},
 	}
 	return clusterDef
 }
 
-func FakeComponentClassDef(clusterDef *appsv1alpha1.ClusterDefinition, def []byte) *corev1.ConfigMapList {
-	result := &corev1.ConfigMapList{}
-	cm := &corev1.ConfigMap{}
-	cm.Name = fmt.Sprintf("fake-kubeblocks-classes-%s", ComponentName)
-	cm.SetLabels(map[string]string{
-		types.ClassLevelLabelKey:              "component",
-		constant.KBAppComponentDefRefLabelKey: ComponentDefName,
-		types.ClassProviderLabelKey:           "kubeblocks",
-		constant.ClusterDefLabelKey:           clusterDef.Name,
-	})
-	cm.Data = map[string]string{"families-20230223162700": string(def)}
-	result.Items = append(result.Items, *cm)
-	return result
+func FakeComponentClassDef(name string, clusterDefRef string, componentDefRef string) *appsv1alpha1.ComponentClassDefinition {
+	constraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
+		AddConstraints(testapps.GeneralResourceConstraint).
+		GetObject()
+
+	componentClassDefinition := testapps.NewComponentClassDefinitionFactory(name, clusterDefRef, componentDefRef).
+		AddClasses(constraint.Name, []string{testapps.Class1c1gName, testapps.Class2c4gName}).
+		GetObject()
+
+	return componentClassDefinition
 }
 
 func FakeClusterVersion() *appsv1alpha1.ClusterVersion {
 	cv := &appsv1alpha1.ClusterVersion{}
+	gvr := types.ClusterVersionGVR()
+	cv.TypeMeta.APIVersion = gvr.GroupVersion().String()
+	cv.TypeMeta.Kind = types.KindClusterVersion
 	cv.Name = ClusterVersionName
 	cv.SetLabels(map[string]string{
 		constant.ClusterDefLabelKey:   ClusterDefName,
@@ -288,14 +323,24 @@ func FakeBackupTool() *dpv1alpha1.BackupTool {
 	return tool
 }
 
-func FakeBackupPolicyTemplate() *dpv1alpha1.BackupPolicyTemplate {
-	template := &dpv1alpha1.BackupPolicyTemplate{
+func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPolicy {
+	template := &dpv1alpha1.BackupPolicy{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
-			Kind:       types.KindBackupPolicyTemplate,
+			Kind:       types.KindBackupPolicy,
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: BackupTemplateName,
+			Name:      backupPolicyName,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: clusterName,
+			},
+			Annotations: map[string]string{
+				constant.DefaultBackupPolicyAnnotationKey: "true",
+			},
+		},
+		Status: dpv1alpha1.BackupPolicyStatus{
+			Phase: dpv1alpha1.PolicyAvailable,
 		},
 	}
 	return template
@@ -466,4 +511,303 @@ func FakeAddon(name string) *extensionsv1alpha1.Addon {
 	}
 	addon.SetCreationTimestamp(metav1.Now())
 	return addon
+}
+
+func FakeConfigMap(cmName string) *corev1.ConfigMap {
+	cm := &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "ConfigMap",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cmName,
+			Namespace: Namespace,
+		},
+		Data: map[string]string{
+			"fake": "fake",
+		},
+	}
+	return cm
+}
+
+func FakeConfigConstraint(ccName string) *appsv1alpha1.ConfigConstraint {
+	cm := &appsv1alpha1.ConfigConstraint{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: ccName,
+		},
+		Spec: appsv1alpha1.ConfigConstraintSpec{
+			FormatterConfig: &appsv1alpha1.FormatterConfig{},
+		},
+	}
+	return cm
+}
+
+func FakeStorageClass(name string, isDefault bool) *storagev1.StorageClass {
+	storageClassObj := &storagev1.StorageClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "StorageClass",
+			APIVersion: "storage.k8s.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	if isDefault {
+		storageClassObj.ObjectMeta.Annotations = make(map[string]string)
+		storageClassObj.ObjectMeta.Annotations[storage.IsDefaultStorageClassAnnotation] = "true"
+	}
+	return storageClassObj
+}
+
+func FakeServiceAccount(name string) *corev1.ServiceAccount {
+	return &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+				constant.AppNameLabelKey:     KubeBlocksChartName},
+		},
+	}
+}
+
+func FakeClusterRole(name string) *rbacv1.ClusterRole {
+	return &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+				constant.AppNameLabelKey:     KubeBlocksChartName},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"*"},
+				Resources: []string{"*"},
+				Verbs:     []string{"*"},
+			},
+		},
+	}
+}
+
+func FakeClusterRoleBinding(name string, sa *corev1.ServiceAccount, clusterRole *rbacv1.ClusterRole) *rbacv1.ClusterRoleBinding {
+	return &rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+				constant.AppNameLabelKey:     KubeBlocksChartName},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind: clusterRole.Kind,
+			Name: clusterRole.Name,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      sa.Name,
+				Namespace: sa.Namespace,
+			},
+		},
+	}
+}
+
+func FakeRole(name string) *rbacv1.Role {
+	return &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+				constant.AppNameLabelKey:     KubeBlocksChartName},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"*"},
+				Resources: []string{"*"},
+				Verbs:     []string{"*"},
+			},
+		},
+	}
+}
+
+func FakeRoleBinding(name string, sa *corev1.ServiceAccount, role *rbacv1.Role) *rbacv1.RoleBinding {
+	return &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+				constant.AppNameLabelKey:     KubeBlocksChartName},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind: role.Kind,
+			Name: role.Name,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      sa.Name,
+				Namespace: sa.Namespace,
+			},
+		},
+	}
+}
+
+func FakeDeploy(name string, namespace string, extraLabels map[string]string) *appsv1.Deployment {
+	labels := map[string]string{
+		constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+	}
+	// extraLabels will override the labels above if there is a conflict
+	for k, v := range extraLabels {
+		labels[k] = v
+	}
+	labels["app"] = name
+
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: pointer.Int32(1),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+			},
+		},
+	}
+}
+
+func FakeStatefulSet(name string, namespace string, extraLabels map[string]string) *appsv1.StatefulSet {
+	labels := map[string]string{
+		constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+	}
+	// extraLabels will override the labels above if there is a conflict
+	for k, v := range extraLabels {
+		labels[k] = v
+	}
+	labels["app"] = name
+	return &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Replicas: pointer.Int32(1),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+			},
+		},
+		Status: appsv1.StatefulSetStatus{
+			Replicas: 1,
+		},
+	}
+}
+
+func FakePodForSts(sts *appsv1.StatefulSet) *corev1.PodList {
+	pods := &corev1.PodList{}
+	for i := 0; i < int(*sts.Spec.Replicas); i++ {
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-%d", sts.Name, i),
+				Namespace: sts.Namespace,
+				Labels:    sts.Spec.Template.Labels,
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  sts.Name,
+						Image: "fake-image",
+					},
+				},
+			},
+			Status: corev1.PodStatus{
+				Phase: corev1.PodRunning,
+			},
+		}
+		pods.Items = append(pods.Items, *pod)
+	}
+	return pods
+}
+
+func FakeJob(name string, namespace string, extraLabels map[string]string) *batchv1.Job {
+	labels := map[string]string{
+		constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+	}
+	// extraLabels will override the labels above if there is a conflict
+	for k, v := range extraLabels {
+		labels[k] = v
+	}
+	labels["app"] = name
+
+	return &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		Spec: batchv1.JobSpec{
+			Completions: pointer.Int32(1),
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+			},
+		},
+		Status: batchv1.JobStatus{
+			Active: 1,
+			Ready:  pointer.Int32(1),
+		},
+	}
+}
+
+func FakeCronJob(name string, namespace string, extraLabels map[string]string) *batchv1.CronJob {
+	labels := map[string]string{
+		constant.AppInstanceLabelKey: types.KubeBlocksReleaseName,
+	}
+	// extraLabels will override the labels above if there is a conflict
+	for k, v := range extraLabels {
+		labels[k] = v
+	}
+	labels["app"] = name
+
+	return &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		Spec: batchv1.CronJobSpec{
+			Schedule: "*/1 * * * *",
+			JobTemplate: batchv1.JobTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+			},
+		},
+	}
+}
+
+func FakeResourceNotFound(versionResource schema.GroupVersionResource, name string) *metav1.Status {
+	return &metav1.Status{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Status",
+			APIVersion: "v1",
+		},
+		Status:  "Failure",
+		Message: fmt.Sprintf("%s.%s \"%s\" not found", versionResource.Resource, versionResource.Group, name),
+		Reason:  "NotFound",
+		Details: nil,
+		Code:    404,
+	}
 }

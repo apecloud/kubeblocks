@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package addon
@@ -20,10 +23,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/docker/cli/cli"
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -40,6 +46,7 @@ import (
 	"k8s.io/utils/strings/slices"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/plugin"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/patch"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -124,6 +131,7 @@ func newDescribeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 		Use:               "describe ADDON_NAME",
 		Short:             "Describe an addon specification.",
 		Args:              cli.ExactArgs(1),
+		Aliases:           []string{"desc"},
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.AddonGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.init(args))
@@ -173,11 +181,12 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
     
         # Enabled "prometheus" addon and its extra alertmanager component with custom resources settings 
     	kbcli addon enable prometheus --memory 512Mi/4Gi --storage 8Gi --replicas 2 \
-  			--memory alertmanager:16Mi/256Mi --storage: alertmanager:1Gi --replicas alertmanager:2 
+  			--memory alertmanager:16Mi/256Mi --storage alertmanager:1Gi --replicas alertmanager:2 
 
         # Enabled "prometheus" addon with tolerations 
-    	kbcli addon enable prometheus --tolerations '[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]' \
-			--tolerations 'alertmanager:[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]'
+    	kbcli addon enable prometheus \
+			--tolerations '[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]' \
+			--tolerations 'alertmanager:[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]'
 
 		# Enabled "prometheus" addon with helm like custom settings
 		kbcli addon enable prometheus --set prometheus.alertmanager.image.tag=v0.24.0
@@ -199,7 +208,9 @@ func newEnableCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		"Sets addon CPU resource values (--cpu [extraName:]<request>/<limit>) (can specify multiple if has extra items))")
 	cmd.Flags().StringArrayVar(&o.addonEnableFlags.StorageSets, "storage", []string{},
 		`Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items)). 
-Additional notes for Helm type Addon, that resizing storage will fail if modified value is a storage request size 
+Additional notes:
+1. Specify '0' value will remove storage values settings and explicitly disable 'persistentVolumeEnabled' attribute.
+2. For Helm type Addon, that resizing storage will fail if modified value is a storage request size 
 that belongs to StatefulSet's volume claim template, to resolve 'Failed' Addon status possible action is disable and 
 re-enable the addon (More info on how-to resize a PVC: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources).
 `)
@@ -298,6 +309,11 @@ func (o *addonCmdOpts) validate() error {
 			return fmt.Errorf("addon %s INSTALLABLE-SELECTOR has no matching requirement", o.Names)
 		}
 	}
+
+	if err := o.installAndUpgradePlugins(); err != nil {
+		fmt.Fprintf(o.Out, "failed to install/upgrade plugins: %v\n", err)
+	}
+
 	return nil
 }
 
@@ -352,7 +368,7 @@ func addonDescribeHandler(o *addonCmdOpts, cmd *cobra.Command, args []string) er
 		return nil
 	}
 
-	labels := []string{}
+	var labels []string
 	for k, v := range o.addon.Labels {
 		if strings.Contains(k, constant.APIGroup) {
 			labels = append(labels, fmt.Sprintf("%s=%s", k, v))
@@ -362,14 +378,18 @@ func addonDescribeHandler(o *addonCmdOpts, cmd *cobra.Command, args []string) er
 	printer.PrintPairStringToLine("Description", o.addon.Spec.Description, 0)
 	printer.PrintPairStringToLine("Labels", strings.Join(labels, ","), 0)
 	printer.PrintPairStringToLine("Type", string(o.addon.Spec.Type), 0)
-	printer.PrintPairStringToLine("Extras", strings.Join(o.addon.GetExtraNames(), ","), 0)
+	if len(o.addon.GetExtraNames()) > 0 {
+		printer.PrintPairStringToLine("Extras", strings.Join(o.addon.GetExtraNames(), ","), 0)
+	}
 	printer.PrintPairStringToLine("Status", string(o.addon.Status.Phase), 0)
 	var autoInstall bool
 	if o.addon.Spec.Installable != nil {
 		autoInstall = o.addon.Spec.Installable.AutoInstall
 	}
 	printer.PrintPairStringToLine("Auto-install", strconv.FormatBool(autoInstall), 0)
-	printer.PrintPairStringToLine("Auto-install selector", strings.Join(o.addon.Spec.Installable.GetSelectorsStrings(), ","), 0)
+	if len(o.addon.Spec.Installable.GetSelectorsStrings()) > 0 {
+		printer.PrintPairStringToLine("Auto-install selector", strings.Join(o.addon.Spec.Installable.GetSelectorsStrings(), ","), 0)
+	}
 
 	switch o.addon.Status.Phase {
 	case extensionsv1alpha1.AddonEnabled:
@@ -377,7 +397,7 @@ func addonDescribeHandler(o *addonCmdOpts, cmd *cobra.Command, args []string) er
 		printer.PrintLineWithTabSeparator()
 		if err := printer.PrintTable(o.Out, nil, printInstalled,
 			"NAME", "REPLICAS", "STORAGE", "CPU (REQ/LIMIT)", "MEMORY (REQ/LIMIT)", "STORAGE-CLASS",
-			"TOLERATIONS", "PV Enabled"); err != nil {
+			"TOLERATIONS", "PV-ENABLED"); err != nil {
 			return err
 		}
 	default:
@@ -402,12 +422,35 @@ func addonDescribeHandler(o *addonCmdOpts, cmd *cobra.Command, args []string) er
 			}
 			if err := printer.PrintTable(o.Out, nil, printInstallable,
 				"NAME", "REPLICAS", "STORAGE", "CPU (REQ/LIMIT)", "MEMORY (REQ/LIMIT)", "STORAGE-CLASS",
-				"TOLERATIONS", "PV Enabled"); err != nil {
+				"TOLERATIONS", "PV-ENABLED"); err != nil {
 				return err
 			}
 			printer.PrintLineWithTabSeparator()
 		}
 	}
+
+	// print failed message
+	if o.addon.Status.Phase == extensionsv1alpha1.AddonFailed {
+		var tbl *printer.TablePrinter
+		printHeader := true
+		for _, c := range o.addon.Status.Conditions {
+			if c.Status == metav1.ConditionTrue {
+				continue
+			}
+			if printHeader {
+				fmt.Fprintln(o.Out, "Failed Message")
+				tbl = printer.NewTablePrinter(o.Out)
+				tbl.Tbl.SetColumnConfigs([]table.ColumnConfig{
+					{Number: 3, WidthMax: 120},
+				})
+				tbl.SetHeader("TIME", "REASON", "MESSAGE")
+				printHeader = false
+			}
+			tbl.AddRow(util.TimeFormat(&c.LastTransitionTime), c.Reason, c.Message)
+		}
+		tbl.Print()
+	}
+
 	return nil
 }
 
@@ -423,6 +466,7 @@ func addonEnableDisableHandler(o *addonCmdOpts, cmd *cobra.Command, args []strin
 func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[string]interface{}) (err error) {
 	extraNames := o.addon.GetExtraNames()
 	installSpec := extensionsv1alpha1.AddonInstallSpec{
+		Enabled:              true,
 		AddonInstallSpecItem: extensionsv1alpha1.NewAddonInstallSpecItem(),
 	}
 	// only using named return value in defer function
@@ -441,31 +485,12 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 	}()
 
 	if o.addonEnableFlags.useDefault() {
-		if len(o.addon.Spec.DefaultInstallValues) == 0 {
-			installSpec.Enabled = true
-			return nil
-		}
-
-		for _, di := range o.addon.Spec.GetSortedDefaultInstallValues() {
-			if len(di.Selectors) == 0 {
-				installSpec = di.AddonInstallSpec
-				break
-			}
-			for _, s := range di.Selectors {
-				if !s.MatchesFromConfig() {
-					continue
-				}
-				installSpec = di.AddonInstallSpec
-				break
-			}
-		}
-		installSpec.Enabled = true
 		return nil
 	}
 
-	// extractInstallSpecExtraItem extract extensionsv1alpha1.AddonInstallExtraItem
-	// for the matching arg name, if not found it will append extensionsv1alpha1.AddonInstallExtraItem
-	// item to installSpec.ExtraItems and return its pointer.
+	// extractInstallSpecExtraItem extracts extensionsv1alpha1.AddonInstallExtraItem
+	// for the matching arg name, if not found, appends extensionsv1alpha1.AddonInstallExtraItem
+	// item to installSpec.ExtraItems and returns its pointer.
 	extractInstallSpecExtraItem := func(name string) (*extensionsv1alpha1.AddonInstallExtraItem, error) {
 		var pItem *extensionsv1alpha1.AddonInstallExtraItem
 		for i, eItem := range installSpec.ExtraItems {
@@ -487,15 +512,13 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 		return pItem, nil
 	}
 
-	twoTuplesProcessor := func(s, flag string,
+	_tuplesProcessor := func(t []string, s, flag string,
 		valueTransformer func(s, flag string) (interface{}, error),
 		valueAssigner func(*extensionsv1alpha1.AddonInstallSpecItem, interface{}),
 	) error {
-		t := strings.SplitN(s, ":", 2)
 		l := len(t)
 		var name string
 		var result interface{}
-		var err error
 		switch l {
 		case 2:
 			name = t[0]
@@ -523,6 +546,31 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			valueAssigner(&pItem.AddonInstallSpecItem, result)
 		}
 		return nil
+	}
+
+	twoTuplesProcessor := func(s, flag string,
+		valueTransformer func(s, flag string) (interface{}, error),
+		valueAssigner func(*extensionsv1alpha1.AddonInstallSpecItem, interface{}),
+	) error {
+		t := strings.SplitN(s, ":", 2)
+		return _tuplesProcessor(t, s, flag, valueTransformer, valueAssigner)
+	}
+
+	twoTuplesJSONProcessor := func(s, flag string,
+		valueTransformer func(s, flag string) (interface{}, error),
+		valueAssigner func(*extensionsv1alpha1.AddonInstallSpecItem, interface{}),
+	) error {
+		var jsonArray []map[string]interface{}
+		var t []string
+
+		err := json.Unmarshal([]byte(s), &jsonArray)
+		if err != nil {
+			// not a valid JSON array treat it a 2 tuples
+			t = strings.SplitN(s, ":", 2)
+		} else {
+			t = []string{s}
+		}
+		return _tuplesProcessor(t, s, flag, valueTransformer, valueAssigner)
 	}
 
 	reqLimitResTransformer := func(s, flag string) (interface{}, error) {
@@ -575,7 +623,7 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 	}
 
 	for _, v := range f.TolerationsSet {
-		if err := twoTuplesProcessor(v, "tolerations", nil, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
+		if err := twoTuplesJSONProcessor(v, "tolerations", nil, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
 			item.Tolerations = i.(string)
 		}); err != nil {
 			return err
@@ -590,7 +638,18 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			}
 			return q, nil
 		}, func(item *extensionsv1alpha1.AddonInstallSpecItem, i interface{}) {
-			item.Resources.Requests[corev1.ResourceStorage] = i.(resource.Quantity)
+			q := i.(resource.Quantity)
+			// for 0 storage size, remove storage request value and explicitly disable `persistentVolumeEnabled`
+			if v, _ := q.AsInt64(); v == 0 {
+				delete(item.Resources.Requests, corev1.ResourceStorage)
+				b := false
+				item.PVEnabled = &b
+				return
+			}
+			item.Resources.Requests[corev1.ResourceStorage] = q
+			// explicitly enable `persistentVolumeEnabled` if with provided storage size setting
+			b := true
+			item.PVEnabled = &b
 		}); err != nil {
 			return err
 		}
@@ -723,6 +782,28 @@ func addonListRun(o *list.ListOptions) error {
 	}
 
 	printRows := func(tbl *printer.TablePrinter) error {
+		// sort addons with .status.Phase then .metadata.name
+		sort.SliceStable(infos, func(i, j int) bool {
+			toAddon := func(idx int) *extensionsv1alpha1.Addon {
+				addon := &extensionsv1alpha1.Addon{}
+				if err := runtime.DefaultUnstructuredConverter.FromUnstructured(infos[idx].Object.(*unstructured.Unstructured).Object, addon); err != nil {
+					return nil
+				}
+				return addon
+			}
+			iAddon := toAddon(i)
+			jAddon := toAddon(j)
+			if iAddon == nil {
+				return true
+			}
+			if jAddon == nil {
+				return false
+			}
+			if iAddon.Status.Phase == jAddon.Status.Phase {
+				return iAddon.GetName() < jAddon.GetName()
+			}
+			return iAddon.Status.Phase < jAddon.Status.Phase
+		})
 		for _, info := range infos {
 			addon := &extensionsv1alpha1.Addon{}
 			obj := info.Object.(*unstructured.Unstructured)
@@ -751,5 +832,64 @@ func addonListRun(o *list.ListOptions) error {
 		"NAME", "TYPE", "STATUS", "EXTRAS", "AUTO-INSTALL", "AUTO-INSTALLABLE-SELECTOR"); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (o *addonCmdOpts) installAndUpgradePlugins() error {
+	if len(o.addon.Spec.CliPlugins) == 0 {
+		return nil
+	}
+
+	plugin.InitPlugin()
+
+	paths := plugin.GetKbcliPluginPath()
+	indexes, err := plugin.ListIndexes(paths)
+	if err != nil {
+		return err
+	}
+
+	indexRepositoryToNme := make(map[string]string)
+	for _, index := range indexes {
+		indexRepositoryToNme[index.URL] = index.Name
+	}
+
+	var plugins []string
+	var names []string
+	for _, p := range o.addon.Spec.CliPlugins {
+		names = append(names, p.Name)
+		indexName, ok := indexRepositoryToNme[p.IndexRepository]
+		if !ok {
+			// index not found, add it
+			_, indexName = path.Split(p.IndexRepository)
+			if err := plugin.AddIndex(paths, indexName, p.IndexRepository); err != nil {
+				return err
+			}
+		}
+		plugins = append(plugins, fmt.Sprintf("%s/%s", indexName, p.Name))
+	}
+
+	installOption := &plugin.PluginInstallOption{
+		IOStreams: o.IOStreams,
+	}
+	upgradeOption := &plugin.UpgradeOptions{
+		IOStreams: o.IOStreams,
+	}
+
+	// install plugins
+	if err := installOption.Complete(plugins); err != nil {
+		return err
+	}
+	if err := installOption.Install(); err != nil {
+		return err
+	}
+
+	// upgrade existed plugins
+	if err := upgradeOption.Complete(names); err != nil {
+		return err
+	}
+	if err := upgradeOption.Run(); err != nil {
+		return err
+	}
+
 	return nil
 }

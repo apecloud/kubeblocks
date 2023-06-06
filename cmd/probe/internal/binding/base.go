@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package binding
@@ -30,14 +33,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
-	. "github.com/apecloud/kubeblocks/cmd/probe/util"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type Operation func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error)
 
 type OpsResult map[string]interface{}
 
-// AccessMode define SVC access mode enums.
+// AccessMode defines SVC access mode enums.
 // +enum
 type AccessMode string
 
@@ -137,7 +140,6 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 		return nil, errors.Errorf("invoke request required")
 	}
 
-	ops.Logger.Debugf("request operation: %v", req.Operation)
 	startTime := time.Now()
 	resp := &bindings.InvokeResponse{
 		Metadata: map[string]string{
@@ -186,9 +188,10 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 
 func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
+	opsRes["operation"] = CheckRoleOperation
 	opsRes["originalRole"] = ops.OriRole
 	if ops.GetRole == nil {
-		message := fmt.Sprintf("roleCheck operation is not implemented for %v", ops.DBType)
+		message := fmt.Sprintf("checkRole operation is not implemented for %v", ops.DBType)
 		ops.Logger.Errorf(message)
 		opsRes["event"] = OperationNotImplemented
 		opsRes["message"] = message
@@ -198,12 +201,12 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 
 	role, err := ops.GetRole(ctx, req, resp)
 	if err != nil {
-		ops.Logger.Infof("error executing roleCheck: %v", err)
+		ops.Logger.Infof("error executing checkRole: %v", err)
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Infof("role checks failed %v times continuously", ops.CheckRoleFailedCount)
-			resp.Metadata[StatusCode] = OperationFailedHTTPCode
+			SentProbeEvent(ctx, opsRes, ops.Logger)
 		}
 		ops.CheckRoleFailedCount++
 		return opsRes, nil
@@ -220,9 +223,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 	opsRes["role"] = role
 	if ops.OriRole != role {
 		ops.OriRole = role
-		ops.RoleUnchangedCount = 0
-	} else {
-		ops.RoleUnchangedCount++
+		SentProbeEvent(ctx, opsRes, ops.Logger)
 	}
 
 	// RoleUnchangedCount is the count of consecutive role unchanged checks.
@@ -230,16 +231,16 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 	// then the roleCheck event will be reported at roleEventReportFrequency so that the event controller
 	// can always get relevant roleCheck events in order to maintain the pod label accurately, even in cases
 	// of roleChanged events being lost or the pod role label being deleted or updated incorrectly.
-	if ops.RoleUnchangedCount < ops.RoleDetectionThreshold && ops.RoleUnchangedCount%roleEventReportFrequency == 0 {
-		resp.Metadata[StatusCode] = OperationFailedHTTPCode
-	}
+	// if ops.RoleUnchangedCount < ops.RoleDetectionThreshold && ops.RoleUnchangedCount%roleEventReportFrequency == 0 {
+	// 	resp.Metadata[StatusCode] = OperationFailedHTTPCode
+	// }
 	return opsRes, nil
 }
 
 func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
 	if ops.GetRole == nil {
-		message := fmt.Sprintf("roleCheck operation is not implemented for %v", ops.DBType)
+		message := fmt.Sprintf("getRole operation is not implemented for %v", ops.DBType)
 		ops.Logger.Errorf(message)
 		opsRes["event"] = OperationNotImplemented
 		opsRes["message"] = message
@@ -249,12 +250,12 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 
 	role, err := ops.GetRole(ctx, req, resp)
 	if err != nil {
-		ops.Logger.Infof("error executing roleCheck: %v", err)
+		ops.Logger.Infof("error executing getRole: %v", err)
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
-			ops.Logger.Infof("role checks failed %v times continuously", ops.CheckRoleFailedCount)
-			resp.Metadata[StatusCode] = OperationFailedHTTPCode
+			ops.Logger.Infof("getRole failed %v times continuously", ops.CheckRoleFailedCount)
+			// resp.Metadata[StatusCode] = OperationFailedHTTPCode
 		}
 		ops.CheckRoleFailedCount++
 		return opsRes, nil
@@ -264,12 +265,12 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 	return opsRes, nil
 }
 
-// Component may have some internal roles that need not be exposed to end user,
+// Component may have some internal roles that needn't be exposed to end user,
 // and not configured in cluster definition, e.g. ETCD's Candidate.
 // roleValidate is used to filter the internal roles and decrease the number
 // of report events to reduce the possibility of event conflicts.
 func (ops *BaseOperations) roleValidate(role string) (bool, string) {
-	// do not validate when db roles setting is missing
+	// do not validate them when db roles setting is missing
 	if len(ops.DBRoles) == 0 {
 		return true, ""
 	}
@@ -293,9 +294,10 @@ func (ops *BaseOperations) roleValidate(role string) (bool, string) {
 func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	var message string
 	opsRes := OpsResult{}
+	opsRes["operation"] = CheckRunningOperation
 
 	host := net.JoinHostPort(ops.DBAddress, strconv.Itoa(ops.DBPort))
-	// sql exec timeout need to be less than httpget's timeout which default is 1s.
+	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
 	conn, err := net.DialTimeout("tcp", host, 500*time.Millisecond)
 	if err != nil {
 		message = fmt.Sprintf("running check %s error: %v", host, err)
@@ -304,7 +306,8 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 		opsRes["message"] = message
 		if ops.CheckRunningFailedCount%ops.FailedEventReportFrequency == 0 {
 			ops.Logger.Infof("running checks failed %v times continuously", ops.CheckRunningFailedCount)
-			resp.Metadata[StatusCode] = OperationFailedHTTPCode
+			// resp.Metadata[StatusCode] = OperationFailedHTTPCode
+			SentProbeEvent(ctx, opsRes, ops.Logger)
 		}
 		ops.CheckRunningFailedCount++
 		return opsRes, nil

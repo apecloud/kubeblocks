@@ -1,28 +1,34 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package plan
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -30,7 +36,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
@@ -46,15 +52,13 @@ type renderWrapper struct {
 	ctx     context.Context
 	cli     client.Client
 	cluster *appsv1alpha1.Cluster
-	params  builder.BuilderParams
 }
 
-func newTemplateRenderWrapper(templateBuilder *configTemplateBuilder, cluster *appsv1alpha1.Cluster, params builder.BuilderParams, ctx context.Context, cli client.Client) renderWrapper {
+func newTemplateRenderWrapper(templateBuilder *configTemplateBuilder, cluster *appsv1alpha1.Cluster, ctx context.Context, cli client.Client) renderWrapper {
 	return renderWrapper{
 		ctx:     ctx,
 		cli:     cli,
 		cluster: cluster,
-		params:  params,
 
 		templateBuilder:     templateBuilder,
 		templateAnnotations: make(map[string]string),
@@ -62,77 +66,81 @@ func newTemplateRenderWrapper(templateBuilder *configTemplateBuilder, cluster *a
 	}
 }
 
-func (wrapper *renderWrapper) enableRerenderTemplateSpec(cfgCMName string, task *intctrltypes.ReconcileTask) (bool, error) {
+func (wrapper *renderWrapper) checkRerenderTemplateSpec(cfgCMName string, localObjs []client.Object) (bool, *corev1.ConfigMap, error) {
 	cmKey := client.ObjectKey{
 		Name:      cfgCMName,
 		Namespace: wrapper.cluster.Namespace,
 	}
 
 	cmObj := &corev1.ConfigMap{}
-	localObject := task.GetLocalResourceWithObjectKey(cmKey, generics.ToGVK(cmObj))
+	localObject := findMatchedLocalObject(localObjs, cmKey, generics.ToGVK(cmObj))
 	if localObject != nil {
-		return false, nil
+		if cm, ok := localObject.(*corev1.ConfigMap); ok {
+			return false, cm, nil
+		}
 	}
 
 	cmErr := wrapper.cli.Get(wrapper.ctx, cmKey, cmObj)
 	if cmErr != nil && !apierrors.IsNotFound(cmErr) {
 		// An unexpected error occurs
-		return false, cmErr
+		return false, nil, cmErr
 	}
 	if cmErr != nil {
 		// Config is not exists
-		return true, nil
+		return true, nil, nil
 	}
 
 	// Config is exists
-	return cfgcore.IsNotUserReconfigureOperation(cmObj), nil
+	return cfgcore.IsNotUserReconfigureOperation(cmObj), cmObj, nil
 }
 
-func (wrapper *renderWrapper) renderConfigTemplate(task *intctrltypes.ReconcileTask) error {
-	var err error
-	var enableRerender bool
-
+func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent, localObjs []client.Object) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-	for _, configSpec := range task.Component.ConfigTemplates {
-		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, configSpec.Name)
-		if enableRerender, err = wrapper.enableRerenderTemplateSpec(cmName, task); err != nil {
+	for _, configSpec := range component.ConfigTemplates {
+		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
+		enableRerender, origCMObj, err := wrapper.checkRerenderTemplateSpec(cmName, localObjs)
+		if err != nil {
 			return err
 		}
 		if !enableRerender {
-			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, cmName)
+			wrapper.addVolumeMountMeta(configSpec.ComponentTemplateSpec, origCMObj, false)
 			continue
 		}
-
 		// Generate ConfigMap objects for config files
-		cm, err := generateConfigMapFromTpl(wrapper.templateBuilder, cmName, configSpec.ConfigConstraintRef, configSpec.ComponentTemplateSpec,
-			wrapper.params, wrapper.ctx, wrapper.cli, func(m map[string]string) error {
+		newCMObj, err := generateConfigMapFromTpl(cluster, component, wrapper.templateBuilder, cmName, configSpec.ConfigConstraintRef,
+			configSpec.ComponentTemplateSpec, wrapper.ctx, wrapper.cli, func(m map[string]string) error {
 				return validateRenderedData(m, configSpec, wrapper.ctx, wrapper.cli)
 			})
 		if err != nil {
 			return err
 		}
-		updateCMConfigSpecLabels(cm, configSpec)
-		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, cm, scheme); err != nil {
+		if err := wrapper.checkAndPatchConfigResource(origCMObj, newCMObj.Data); err != nil {
+			return err
+		}
+		updateCMConfigSpecLabels(newCMObj, configSpec)
+		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (wrapper *renderWrapper) renderScriptTemplate(task *intctrltypes.ReconcileTask) error {
+func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent,
+	localObjs []client.Object) error {
 	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-	for _, templateSpec := range task.Component.ScriptTemplates {
-		cmName := cfgcore.GetComponentCfgName(task.Cluster.Name, task.Component.Name, templateSpec.Name)
-		if task.GetLocalResourceWithObjectKey(client.ObjectKey{
+	for _, templateSpec := range component.ScriptTemplates {
+		cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, templateSpec.Name)
+		object := findMatchedLocalObject(localObjs, client.ObjectKey{
 			Name:      cmName,
-			Namespace: wrapper.cluster.Namespace,
-		}, generics.ToGVK(&corev1.ConfigMap{})) != nil {
-			wrapper.addVolumeMountMeta(templateSpec, cmName)
+			Namespace: wrapper.cluster.Namespace}, generics.ToGVK(&corev1.ConfigMap{}))
+		if object != nil {
+			wrapper.addVolumeMountMeta(templateSpec, object, false)
 			continue
 		}
 
 		// Generate ConfigMap objects for config files
-		cm, err := generateConfigMapFromTpl(wrapper.templateBuilder, cmName, "", templateSpec, wrapper.params, wrapper.ctx, wrapper.cli, nil)
+		cm, err := generateConfigMapFromTpl(cluster, component, wrapper.templateBuilder, cmName, "", templateSpec, wrapper.ctx, wrapper.cli, nil)
 		if err != nil {
 			return err
 		}
@@ -144,21 +152,57 @@ func (wrapper *renderWrapper) renderScriptTemplate(task *intctrltypes.ReconcileT
 }
 
 func (wrapper *renderWrapper) addRenderedObject(templateSpec appsv1alpha1.ComponentTemplateSpec, cm *corev1.ConfigMap, scheme *runtime.Scheme) error {
-	// The owner of the configmap object is a cluster of users,
+	// The owner of the configmap object is a cluster,
 	// in order to manage the life cycle of configmap
 	if err := controllerutil.SetOwnerReference(wrapper.cluster, cm, scheme); err != nil {
 		return err
 	}
 
 	cfgcore.SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
-	wrapper.renderedObjs = append(wrapper.renderedObjs, cm)
-	wrapper.addVolumeMountMeta(templateSpec, cm.Name)
+	wrapper.addVolumeMountMeta(templateSpec, cm, true)
 	return nil
 }
 
-func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1alpha1.ComponentTemplateSpec, cmName string) {
-	wrapper.volumes[cmName] = templateSpec
-	wrapper.templateAnnotations[cfgcore.GenerateTPLUniqLabelKeyWithConfig(templateSpec.Name)] = cmName
+func (wrapper *renderWrapper) addVolumeMountMeta(templateSpec appsv1alpha1.ComponentTemplateSpec, object client.Object, rendered bool) {
+	wrapper.volumes[object.GetName()] = templateSpec
+	if rendered {
+		wrapper.renderedObjs = append(wrapper.renderedObjs, object)
+	}
+	wrapper.templateAnnotations[cfgcore.GenerateTPLUniqLabelKeyWithConfig(templateSpec.Name)] = object.GetName()
+}
+
+func (wrapper *renderWrapper) checkAndPatchConfigResource(origCMObj *corev1.ConfigMap, newData map[string]string) error {
+	if origCMObj == nil {
+		return nil
+	}
+	if reflect.DeepEqual(origCMObj.Data, newData) {
+		return nil
+	}
+
+	patch := client.MergeFrom(origCMObj.DeepCopy())
+	origCMObj.Data = newData
+	if origCMObj.Annotations == nil {
+		origCMObj.Annotations = make(map[string]string)
+	}
+	cfgcore.SetParametersUpdateSource(origCMObj, constant.ReconfigureManagerSource)
+	rawData, err := json.Marshal(origCMObj.Data)
+	if err != nil {
+		return err
+	}
+
+	origCMObj.Annotations[corev1.LastAppliedConfigAnnotation] = string(rawData)
+	return wrapper.cli.Patch(wrapper.ctx, origCMObj, patch)
+}
+
+func findMatchedLocalObject(localObjs []client.Object, objKey client.ObjectKey, gvk schema.GroupVersionKind) client.Object {
+	for _, obj := range localObjs {
+		if obj.GetName() == objKey.Name && obj.GetNamespace() == objKey.Namespace {
+			if generics.ToGVK(obj) == gvk {
+				return obj
+			}
+		}
+	}
+	return nil
 }
 
 func updateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1alpha1.ComponentConfigSpec) {
@@ -177,12 +221,13 @@ func updateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1alpha1.Comp
 	}
 }
 
-// generateConfigMapFromTpl render config file by config template provided by provider.
-func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
+// generateConfigMapFromTpl renders config file by config template provided by provider.
+func generateConfigMapFromTpl(cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
+	tplBuilder *configTemplateBuilder,
 	cmName string,
 	configConstraintName string,
 	templateSpec appsv1alpha1.ComponentTemplateSpec,
-	params builder.BuilderParams,
 	ctx context.Context,
 	cli client.Client, dataValidator templateRenderValidator) (*corev1.ConfigMap, error) {
 	// Render config template by TplEngine
@@ -199,10 +244,10 @@ func generateConfigMapFromTpl(tplBuilder *configTemplateBuilder,
 	}
 
 	// Using ConfigMap cue template render to configmap of config
-	return builder.BuildConfigMapWithTemplate(configs, params, cmName, configConstraintName, templateSpec)
+	return builder.BuildConfigMapWithTemplateLow(cluster, component, configs, cmName, configConstraintName, templateSpec)
 }
 
-// renderConfigMapTemplate render config file using template engine
+// renderConfigMapTemplate renders config file using template engine
 func renderConfigMapTemplate(
 	templateBuilder *configTemplateBuilder,
 	templateSpec appsv1alpha1.ComponentTemplateSpec,
@@ -229,7 +274,7 @@ func renderConfigMapTemplate(
 	return renderedData, nil
 }
 
-// validateRenderedData validate config file against constraint
+// validateRenderedData validates config file against constraint
 func validateRenderedData(
 	renderedData map[string]string,
 	configSpec appsv1alpha1.ComponentConfigSpec,
@@ -246,7 +291,6 @@ func validateRenderedData(
 		return cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
 	}
 
-	// NOTE: not require checker configuration template status
 	configChecker := cfgcore.NewConfigValidator(&configConstraint.Spec, cfgcore.WithKeySelector(configSpec.Keys))
 
 	// NOTE: It is necessary to verify the correctness of the data

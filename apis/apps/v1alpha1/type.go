@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"errors"
+
+	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -29,6 +32,59 @@ const (
 	ClusterKind           = "Cluster"
 	OpsRequestKind        = "OpsRequestKind"
 )
+
+type ComponentTemplateSpec struct {
+	// Specify the name of configuration template.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// Specify the name of the referenced the configuration template ConfigMap object.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	TemplateRef string `json:"templateRef"`
+
+	// Specify the namespace of the referenced the configuration template ConfigMap object.
+	// An empty namespace is equivalent to the "default" namespace.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:default="default"
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
+	// The volume name must be defined in podSpec.containers[*].volumeMounts.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=32
+	VolumeName string `json:"volumeName"`
+
+	// defaultMode is optional: mode bits used to set permissions on created files by default.
+	// Must be an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+	// YAML accepts both octal and decimal values, JSON requires decimal values for mode bits.
+	// Defaults to 0644.
+	// Directories within the path are not affected by this setting.
+	// This might be in conflict with other options that affect the file
+	// mode, like fsGroup, and the result can be other mode bits set.
+	// +optional
+	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
+}
+
+type ComponentConfigSpec struct {
+	ComponentTemplateSpec `json:",inline"`
+
+	// Specify a list of keys.
+	// If empty, ConfigConstraint takes effect for all keys in configmap.
+	// +listType=set
+	// +optional
+	Keys []string `json:"keys,omitempty"`
+
+	// Specify the name of the referenced the configuration constraints object.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	ConfigConstraintRef string `json:"constraintRef,omitempty"`
+}
 
 // ClusterPhase defines the Cluster CR .status.phase
 // +enum
@@ -59,20 +115,12 @@ const (
 	SpecReconcilingClusterCompPhase ClusterComponentPhase = "Updating"
 	CreatingClusterCompPhase        ClusterComponentPhase = "Creating"
 	// DeletingClusterCompPhase        ClusterComponentPhase = "Deleting" // DO REVIEW: may merged with  Stopping
-
-	// REVIEW: following are variant of "Updating", why not have "Updating" phase with detail Status.Conditions
-	// VolumeExpandingClusterCompPhase   ClusterComponentPhase = "VolumeExpanding"
-	// HorizontalScalingClusterCompPhase ClusterComponentPhase = "HorizontalScaling"
-	// VerticalScalingClusterCompPhase   ClusterComponentPhase = "VerticalScaling"
-	// VersionUpgradingClusterCompPhase  ClusterComponentPhase = "Upgrading"
-	// ReconfiguringClusterCompPhase     ClusterComponentPhase = "Reconfiguring"
-	// ExposingClusterCompPhase          ClusterComponentPhase = "Exposing"
-	// RollingClusterCompPhase           ClusterComponentPhase = "Rolling" // REVIEW: original value is Rebooting, and why not having stopping -> stopped -> starting -> running
 )
 
 const (
 	// define the cluster condition type
 	ConditionTypeLatestOpsRequestProcessed = "LatestOpsRequestProcessed" // ConditionTypeLatestOpsRequestProcessed describes whether the latest OpsRequest that affect the cluster lifecycle has been processed.
+	ConditionTypeHaltRecovery              = "HaltRecovery"              // ConditionTypeHaltRecovery describe Halt recovery processing stage
 	ConditionTypeProvisioningStarted       = "ProvisioningStarted"       // ConditionTypeProvisioningStarted the operator starts resource provisioning to create or change the cluster
 	ConditionTypeApplyResources            = "ApplyResources"            // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
 	ConditionTypeReplicasReady             = "ReplicasReady"             // ConditionTypeReplicasReady all pods of components are ready
@@ -90,17 +138,30 @@ const (
 	UnavailablePhase Phase = "Unavailable"
 )
 
+// ConfigConstraintPhase defines the ConfigConstraint  CR .status.phase
+// +enum
+// +kubebuilder:validation:Enum={Available,Unavailable, Deleting}
+type ConfigConstraintPhase string
+
+const (
+	CCAvailablePhase   ConfigConstraintPhase = "Available"
+	CCUnavailablePhase ConfigConstraintPhase = "Unavailable"
+	CCDeletingPhase    ConfigConstraintPhase = "Deleting"
+)
+
 // OpsPhase defines opsRequest phase.
 // +enum
-// +kubebuilder:validation:Enum={Pending,Creating,Running,Failed,Succeed}
+// +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Failed,Succeed}
 type OpsPhase string
 
 const (
-	OpsPendingPhase  OpsPhase = "Pending"
-	OpsCreatingPhase OpsPhase = "Creating"
-	OpsRunningPhase  OpsPhase = "Running"
-	OpsFailedPhase   OpsPhase = "Failed"
-	OpsSucceedPhase  OpsPhase = "Succeed"
+	OpsPendingPhase    OpsPhase = "Pending"
+	OpsCreatingPhase   OpsPhase = "Creating"
+	OpsRunningPhase    OpsPhase = "Running"
+	OpsCancellingPhase OpsPhase = "Cancelling"
+	OpsSucceedPhase    OpsPhase = "Succeed"
+	OpsCancelledPhase  OpsPhase = "Cancelled"
+	OpsFailedPhase     OpsPhase = "Failed"
 )
 
 // OpsType defines operation types.
@@ -241,7 +302,7 @@ type OpsRecorder struct {
 type ProvisionPolicyType string
 
 const (
-	// CreateByStmt will create account w.r.t. deleteion and creation statement given by provider.
+	// CreateByStmt will create account w.r.t. deletion and creation statement given by provider.
 	CreateByStmt ProvisionPolicyType = "CreateByStmt"
 	// ReferToExisting will not create account, but create a secret by copying data from referred secret file.
 	ReferToExisting ProvisionPolicyType = "ReferToExisting"
@@ -442,8 +503,31 @@ const (
 	VolumeTypeLog  VolumeType = "log"
 )
 
+// BaseBackupType the base backup type, keep synchronized with the BaseBackupType of the data protection API.
+// +enum
+// +kubebuilder:validation:Enum={full,snapshot}
+type BaseBackupType string
+
+// BackupStatusUpdateStage defines the stage of backup status update.
+// +enum
+// +kubebuilder:validation:Enum={pre,post}
+type BackupStatusUpdateStage string
+
 func RegisterWebhookManager(mgr manager.Manager) {
 	webhookMgr = &webhookManager{mgr.GetClient()}
 }
 
 type ComponentNameSet map[string]struct{}
+
+var (
+	ErrWorkloadTypeIsUnknown   = errors.New("workloadType is unknown")
+	ErrWorkloadTypeIsStateless = errors.New("workloadType should not be stateless")
+	ErrNotMatchingCompDef      = errors.New("not matching componentDefRef")
+)
+
+// StatefulSetWorkload interface
+// +kubebuilder:object:generate=false
+type StatefulSetWorkload interface {
+	FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy)
+	GetUpdateStrategy() UpdateStrategy
+}

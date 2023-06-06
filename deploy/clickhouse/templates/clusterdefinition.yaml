@@ -87,6 +87,7 @@ spec:
                     # just keeping the same secret keys as bitnami Clickhouse chart
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: admin-password
+                    optional: false
               - name: BITNAMI_DEBUG
                 value: "false"
               - name: CLICKHOUSE_HTTP_PORT
@@ -193,6 +194,7 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: admin-password
+                    optional: false
               - name: BITNAMI_DEBUG
                 value: "false"
               - name: CLICKHOUSE_KEEPER_TCP_PORT
@@ -234,11 +236,11 @@ spec:
       workloadType: Stateful #Consensus
       characterType: zookeeper
       # probes:
-      #   roleChangedProbe:
+      #   roleProbe:
       #     cmd: "stat | grep 'Leader'"
-      #     failureThreshold: {{ .Values.zookeeper.roleChangedProbe.failureThreshold }}
-      #     periodSeconds: {{ .Values.zookeeper.roleChangedProbe.periodSeconds }}
-      #     successThreshold: {{ .Values.zookeeper.roleChangedProbe.successThreshold }}
+      #     failureThreshold: {{ .Values.zookeeper.roleProbe.failureThreshold }}
+      #     periodSeconds: {{ .Values.zookeeper.roleProbe.periodSeconds }}
+      #     successThreshold: {{ .Values.zookeeper.roleProbe.successThreshold }}
       monitor:
         builtIn: false
         exporterConfig:

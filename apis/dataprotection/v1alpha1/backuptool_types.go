@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,6 +31,11 @@ type BackupToolSpec struct {
 	// +kubebuilder:validation:Enum={job,daemon}
 	// +kubebuilder:default=job
 	DeployKind string `json:"deployKind,omitempty"`
+
+	// the type of backup tool, file or pitr
+	// +kubebuilder:validation:Enum={file,pitr}
+	// +kubebuilder:default=file
+	Type string `json:"type,omitempty"`
 
 	// Compute Resources required by this container.
 	// Cannot be updated.
@@ -90,6 +95,9 @@ type BackupToolStatus struct {
 	// TODO(dsj): define backup tool status.
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster

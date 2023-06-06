@@ -4,44 +4,44 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-REMOTE_URL=$(git config --get remote.origin.url)
-OWNER=$(dirname ${REMOTE_URL} | awk -F ":" '{print $2}')
-REPO=$(basename -s .git ${REMOTE_URL})
-MILESTONE_ID=${MILESTONE_ID:-5}
+# requires `git`, `gh`, and `jq` commands, ref. https://cli.github.com/manual/installation for installation guides.
 
-# GH list issues API ref: https://docs.github.com/en/rest/issues/issues?apiVersion=2022-11-28#list-repository-issues
-ISSUE_LIST=$(gh api \
-    --header 'Accept: application/vnd.github+json' \
-    --method GET \
-    /repos/${OWNER}/${REPO}/issues \
-    -F per_page=100 \
-    -f milestone=${MILESTONE_ID} \
-    -f labels=kind/feature \
-    -f state=all)
+workdir=$(dirname $0)
+. ${workdir}/gh_env
+. ${workdir}/functions.bash
 
-ROWS=$(echo ${ISSUE_LIST}| jq -r '. | sort_by(.state,.number)| .[].number')
+print_issue_rows() {
+    for ((i = 0; i < ${item_count}; i++))
+    do 
+        local issue_body=$(echo ${last_issue_list} | jq -r ".[${i}]")
+        local issue_id=$(echo ${issue_body} | jq -r ".number")
+        local url=$(echo ${issue_body} | jq -r '.html_url')
+        local title=$(echo ${issue_body} | jq -r '.title')
+        local assignees=$(echo ${issue_body} | jq -r '.assignees[]?.login')
+        local state=$(echo ${issue_body}| jq -r '.state')
+        local labels=$(echo ${issue_body} | jq -r '.labels[]?.name')
+        pr_url=$(echo ${issue_body} | jq -r '.pull_request?.url')
+        if [ "$pr_url" == "null" ]; then
+            pr_url="N/A"
+        fi
+        printf "[%s](%s) #%s | %s | %s | %s| | \n" "${title}" "${url}" "${issue_id}" "$(join_by , ${assignees})" "${state}"  "${pr_url}"
+    done
+}
 
-
+count_total=0
+item_count=100
+page=1
+echo ""
 printf "%s | %s | %s | %s | %s | %s\n" "Feature Title" "Assignees" "Issue State" "Code PR Merge Status" "Feature Doc. Status" "Extra Notes"
 echo "---|---|---|---|---|---"
-for ROW in $ROWS
-do 
-    ISSUE_ID=$(echo $ROW | awk -F "," '{print $1}')
-    # GH get issue API ref: https://docs.github.com/en/rest/issues/issues?apiVersion=2022-11-28#get-an-issue
-    ISSUE_BODY=$(gh api \
-        --header 'Accept: application/vnd.github+json' \
-        --method GET \
-        /repos/${OWNER}/${REPO}/issues/${ISSUE_ID})
-    URL=$(echo $ISSUE_BODY| jq -r '.url')
-    TITLE=$(echo $ISSUE_BODY| jq -r '.title')
-    ASSIGNEES=$(echo $ISSUE_BODY| jq -r '.assignees[]?.login')
-    ASSIGNEES_PRINTABLE=
-    for ASSIGNEE in $ASSIGNEES
-    do 
-        ASSIGNEES_PRINTABLE="${ASSIGNEES_PRINTABLE},${ASSIGNEE}"
-    done
-    ASSIGNEES_PRINTABLE=${ASSIGNEES_PRINTABLE#,}
-    STATE=$(echo $ISSUE_BODY| jq -r '.state')
-    PR=$(echo $ISSUE_BODY| jq -r '.pull_request?.url')
-    printf "[%s](%s) #%s | %s | %s | | | \n" "$TITLE" $URL $ISSUE_ID "$ASSIGNEES_PRINTABLE" "$STATE"
+while [ "${item_count}" == "100" ]
+do
+    gh_get_issues ${MILESTONE_ID} "kind/feature" "all" ${page}
+    item_count=$(echo ${last_issue_list} | jq -r '. | length')
+    print_issue_rows 
+    page=$((page+1))
+    count_total=$((count_total + item_count))
 done
+
+echo ""
+echo "total items: ${count_total}"

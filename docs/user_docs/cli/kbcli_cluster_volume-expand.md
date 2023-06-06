@@ -5,23 +5,25 @@ title: kbcli cluster volume-expand
 Expand volume with the specified components and volumeClaimTemplates in the cluster.
 
 ```
-kbcli cluster volume-expand [flags]
+kbcli cluster volume-expand NAME [flags]
 ```
 
 ### Examples
 
 ```
-  # restart specifies the component, separate with commas when <component-name> more than one
-  kbcli cluster volume-expand <my-cluster> --components=<component-name> \
-  --volume-claim-templates=data --storage=10Gi
+  # restart specifies the component, separate with commas for multiple components
+  kbcli cluster volume-expand mycluster --components=mysql --volume-claim-templates=data --storage=10Gi
 ```
 
 ### Options
 
 ```
-      --components strings                Component names to this operations
+      --auto-approve                     Skip interactive approval before expanding the cluster volume
+      --components strings               Component names to this operations
+      --dry-run string[="unchanged"]     Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
   -h, --help                             help for volume-expand
       --name string                      OpsRequest name. if not specified, it will be randomly generated 
+  -o, --output format                    prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --storage string                   Volume storage size (required)
       --ttlSecondsAfterSucceed int       Time to live after the OpsRequest succeed
   -t, --volume-claim-templates strings   VolumeClaimTemplate names in components (required)

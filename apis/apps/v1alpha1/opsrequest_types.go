@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,13 +25,21 @@ import (
 // TODO: @wangyelei could refactor to ops group
 
 // OpsRequestSpec defines the desired state of OpsRequest
+// +kubebuilder:validation:XValidation:rule="has(self.cancel) && self.cancel ? (self.type in ['VerticalScaling', 'HorizontalScaling']) : true",message="forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']"
 type OpsRequestSpec struct {
 	// clusterRef references clusterDefinition.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ClusterRef string `json:"clusterRef"`
+
+	// cancel defines the action to cancel the Pending/Creating/Running opsRequest, supported types: [VerticalScaling, HorizontalScaling].
+	// once cancel is set to true, this opsRequest will be canceled and modifying this property again will not take effect.
+	// +optional
+	Cancel bool `json:"cancel,omitempty"`
 
 	// type defines the operation type.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.type"
 	Type OpsType `json:"type"`
 
 	// ttlSecondsAfterSucceed OpsRequest will be deleted after TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.
@@ -40,6 +48,7 @@ type OpsRequestSpec struct {
 
 	// upgrade specifies the cluster version by specifying clusterVersionRef.
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.upgrade"
 	Upgrade *Upgrade `json:"upgrade,omitempty"`
 
 	// horizontalScaling defines what component need to horizontal scale the specified replicas.
@@ -48,6 +57,7 @@ type OpsRequestSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.horizontalScaling"
 	HorizontalScalingList []HorizontalScaling `json:"horizontalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// volumeExpansion defines what component and volumeClaimTemplate need to expand the specified storage.
@@ -56,6 +66,7 @@ type OpsRequestSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.volumeExpansion"
 	VolumeExpansionList []VolumeExpansion `json:"volumeExpansion,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// restart the specified component.
@@ -64,6 +75,7 @@ type OpsRequestSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restart"
 	RestartList []ComponentOps `json:"restart,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// verticalScaling defines what component need to vertical scale the specified compute resources.
@@ -72,10 +84,12 @@ type OpsRequestSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.verticalScaling"
 	VerticalScalingList []VerticalScaling `json:"verticalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// reconfigure defines the variables that need to input when updating configuration.
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.reconfigure"
 	Reconfigure *Reconfigure `json:"reconfigure,omitempty"`
 
 	// expose defines services the component needs to expose.
@@ -84,7 +98,13 @@ type OpsRequestSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.expose"
 	ExposeList []Expose `json:"expose,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
+	// cluster RestoreFrom backup or point in time
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restoreFrom"
+	RestoreFrom *RestoreFromSpec `json:"restoreFrom,omitempty"`
 }
 
 // ComponentOps defines the common variables of component scope operations.
@@ -106,9 +126,12 @@ type VerticalScaling struct {
 	ComponentOps `json:",inline"`
 
 	// resources specifies the computing resource size of verticalScaling.
-	// +kubebuilder:validation:Required
 	// +kubebuilder:pruning:PreserveUnknownFields
 	corev1.ResourceRequirements `json:",inline"`
+
+	// class specifies the class name of the component
+	// +optional
+	Class string `json:"class,omitempty"`
 }
 
 // VolumeExpansion defines the variables of volume expansion operation.
@@ -220,6 +243,42 @@ type Expose struct {
 	Services []ClusterComponentService `json:"services"`
 }
 
+type RestoreFromSpec struct {
+	// use the backup name and component name for restore, support for multiple components' recovery.
+	// +optional
+	Backup []BackupRefSpec `json:"backup,omitempty"`
+
+	// specified the point in time to recovery
+	// +optional
+	PointInTime *PointInTimeRefSpec `json:"pointInTime,omitempty"`
+}
+
+type RefNamespaceName struct {
+	// specified the name
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// specified the namespace
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+}
+
+type BackupRefSpec struct {
+	// specify a reference backup to restore
+	// +optional
+	Ref RefNamespaceName `json:"ref,omitempty"`
+}
+
+type PointInTimeRefSpec struct {
+	// specify the time point to restore, with UTC as the time zone.
+	// +optional
+	Time *metav1.Time `json:"time,omitempty"`
+
+	// specify a reference source cluster to restore
+	// +optional
+	Ref RefNamespaceName `json:"ref,omitempty"`
+}
+
 // OpsRequestStatus defines the observed state of OpsRequest
 type OpsRequestStatus struct {
 
@@ -249,6 +308,10 @@ type OpsRequestStatus struct {
 	// completionTimestamp defines the OpsRequest completion time.
 	// +optional
 	CompletionTimestamp metav1.Time `json:"completionTimestamp,omitempty"`
+
+	// CancelTimestamp defines cancel time.
+	// +optional
+	CancelTimestamp metav1.Time `json:"cancelTimestamp,omitempty"`
 
 	// reconfiguringStatus defines the status information of reconfiguring.
 	// +optional
@@ -299,6 +362,10 @@ type LastComponentConfiguration struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	corev1.ResourceRequirements `json:",inline,omitempty"`
+
+	// the last class name of the component.
+	// +optional
+	Class string `json:"class,omitempty"`
 
 	// volumeClaimTemplates records the last volumeClaimTemplates of the component.
 	// +optional
@@ -401,6 +468,8 @@ type UpdatedParameters struct {
 	UpdatedKeys map[string]string `json:"updatedKeys,omitempty"`
 }
 
+// +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks,all},shortName=ops

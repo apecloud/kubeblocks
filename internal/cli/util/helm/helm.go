@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package helm
@@ -48,6 +51,7 @@ import (
 	"helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -66,11 +70,16 @@ type InstallOpts struct {
 	ValueOpts       *values.Options
 	Timeout         time.Duration
 	Atomic          bool
+	DisableHooks    bool
+
+	// for helm template
+	DryRun    *bool
+	OutputDir string
 }
 
 type Option func(*cli.EnvSettings)
 
-// AddRepo will add a repo
+// AddRepo adds a repo
 func AddRepo(r *repo.Entry) error {
 	settings := cli.New()
 	repoFile := settings.RepositoryConfig
@@ -92,8 +101,7 @@ func AddRepo(r *repo.Entry) error {
 	if f.Has(r.Name) {
 		existing := f.Get(r.Name)
 		if *r != *existing && r.Name != types.KubeBlocksChartName {
-			// The input coming in for the Name is different from what is already
-			// configured. Return an error.
+			// The input Name is different from the existing one, return an error
 			return errors.Errorf("repository name (%s) already exists, please specify a different name", r.Name)
 		}
 	}
@@ -115,7 +123,7 @@ func AddRepo(r *repo.Entry) error {
 	return nil
 }
 
-// RemoveRepo will remove a repo
+// RemoveRepo removes a repo
 func RemoveRepo(r *repo.Entry) error {
 	settings := cli.New()
 	repoFile := settings.RepositoryConfig
@@ -138,7 +146,7 @@ func RemoveRepo(r *repo.Entry) error {
 	return nil
 }
 
-// GetInstalled get helm package release info if installed.
+// GetInstalled gets helm package release info if installed.
 func (i *InstallOpts) GetInstalled(cfg *action.Configuration) (*release.Release, error) {
 	res, err := action.NewGet(cfg).Run(i.Name)
 	if err != nil {
@@ -154,7 +162,7 @@ func (i *InstallOpts) GetInstalled(cfg *action.Configuration) (*release.Release,
 	return res, nil
 }
 
-// Install will install a Chart
+// Install installs a Chart
 func (i *InstallOpts) Install(cfg *Config) (string, error) {
 	ctx := context.Background()
 	opts := retry.Options{
@@ -208,6 +216,11 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	client.Timeout = i.Timeout
 	client.Version = i.Version
 	client.Atomic = i.Atomic
+	// for helm template
+	if i.DryRun != nil {
+		client.DryRun = *i.DryRun
+		client.OutputDir = i.OutputDir
+	}
 
 	if client.Timeout == 0 {
 		client.Timeout = defaultTimeout
@@ -234,7 +247,7 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	ctx := context.Background()
 	_, cancel := context.WithCancel(ctx)
 
-	// Set up channel on which to send signal notifications.
+	// Set up channel through which to send signal notifications.
 	// We must use a buffered channel or risk missing the signal
 	// if we're not ready to receive when the signal is sent.
 	cSignal := make(chan os.Signal, 2)
@@ -252,7 +265,7 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	return released.Info.Notes, nil
 }
 
-// Uninstall will uninstall a Chart
+// Uninstall uninstalls a Chart
 func (i *InstallOpts) Uninstall(cfg *Config) error {
 	ctx := context.Background()
 	opts := retry.Options{
@@ -282,12 +295,13 @@ func (i *InstallOpts) tryUninstall(cfg *action.Configuration) error {
 	client := action.NewUninstall(cfg)
 	client.Wait = i.Wait
 	client.Timeout = defaultTimeout
+	client.DisableHooks = i.DisableHooks
 
 	// Create context and prepare the handle of SIGTERM
 	ctx := context.Background()
 	_, cancel := context.WithCancel(ctx)
 
-	// Set up channel on which to send signal notifications.
+	// Set up channel through which to send signal notifications.
 	// We must use a buffered channel or risk missing the signal
 	// if we're not ready to receive when the signal is sent.
 	cSignal := make(chan os.Signal, 2)
@@ -442,7 +456,7 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 	ctx := context.Background()
 	_, cancel := context.WithCancel(ctx)
 
-	// Set up channel on which to send signal notifications.
+	// Set up channel through which to send signal notifications.
 	// We must use a buffered channel or risk missing the signal
 	// if we're not ready to receive when the signal is sent.
 	cSignal := make(chan os.Signal, 2)
@@ -548,8 +562,19 @@ func GetQuiteLog() action.DebugLog {
 	return func(format string, v ...interface{}) {}
 }
 
-func GetVerboseLog(out io.Writer) action.DebugLog {
+func GetVerboseLog() action.DebugLog {
 	return func(format string, v ...interface{}) {
-		fmt.Fprintf(out, format+"\n", v...)
+		klog.Infof(format+"\n", v...)
 	}
+}
+
+// GetValues gives an implementation of 'helm get values' for target release
+func GetValues(release string, cfg *Config) (map[string]interface{}, error) {
+	actionConfig, err := NewActionConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	client := action.NewGetValues(actionConfig)
+	client.AllValues = true
+	return client.Run(release)
 }

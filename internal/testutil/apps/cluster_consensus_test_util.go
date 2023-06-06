@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package apps
@@ -31,15 +34,16 @@ import (
 )
 
 const (
-	errorLogName = "error"
-	leader       = "leader"
-	follower     = "follower"
-	learner      = "learner"
+	errorLogName      = "error"
+	leader            = "leader"
+	follower          = "follower"
+	learner           = "learner"
+	ConsensusReplicas = 3
 )
 
 // InitConsensusMysql initializes a cluster environment which only contains a component of ConsensusSet type for testing,
 // includes ClusterDefinition/ClusterVersion/Cluster resources.
-func InitConsensusMysql(testCtx testutil.TestContext,
+func InitConsensusMysql(testCtx *testutil.TestContext,
 	clusterDefName,
 	clusterVersionName,
 	clusterName,
@@ -53,44 +57,48 @@ func InitConsensusMysql(testCtx testutil.TestContext,
 
 // CreateConsensusMysqlCluster creates a mysql cluster with a component of ConsensusSet type.
 func CreateConsensusMysqlCluster(
-	testCtx testutil.TestContext,
+	testCtx *testutil.TestContext,
 	clusterDefName,
 	clusterVersionName,
 	clusterName,
 	workloadType,
-	consensusCompName string) *appsv1alpha1.Cluster {
-	pvcSpec := NewPVCSpec("2Gi")
+	consensusCompName string, pvcSize ...string) *appsv1alpha1.Cluster {
+	size := "2Gi"
+	if len(pvcSize) > 0 {
+		size = pvcSize[0]
+	}
+	pvcSpec := NewPVCSpec(size)
 	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-		AddComponent(consensusCompName, workloadType).SetReplicas(3).SetEnabledLogs(errorLogName).
-		AddVolumeClaimTemplate("data", pvcSpec).Create(&testCtx).GetObject()
+		AddComponent(consensusCompName, workloadType).SetReplicas(ConsensusReplicas).SetEnabledLogs(errorLogName).
+		AddVolumeClaimTemplate("data", pvcSpec).Create(testCtx).GetObject()
 }
 
 // CreateConsensusMysqlClusterDef creates a mysql clusterDefinition with a component of ConsensusSet type.
-func CreateConsensusMysqlClusterDef(testCtx testutil.TestContext, clusterDefName, workloadType string) *appsv1alpha1.ClusterDefinition {
+func CreateConsensusMysqlClusterDef(testCtx *testutil.TestContext, clusterDefName, componentDefName string) *appsv1alpha1.ClusterDefinition {
 	filePathPattern := "/data/mysql/log/mysqld.err"
-	return NewClusterDefFactory(clusterDefName).AddComponent(ConsensusMySQLComponent, workloadType).
-		AddLogConfig(errorLogName, filePathPattern).Create(&testCtx).GetObject()
+	return NewClusterDefFactory(clusterDefName).AddComponentDef(ConsensusMySQLComponent, componentDefName).
+		AddLogConfig(errorLogName, filePathPattern).Create(testCtx).GetObject()
 }
 
 // CreateConsensusMysqlClusterVersion creates a mysql clusterVersion with a component of ConsensusSet type.
-func CreateConsensusMysqlClusterVersion(testCtx testutil.TestContext, clusterDefName, clusterVersionName, workloadType string) *appsv1alpha1.ClusterVersion {
-	return NewClusterVersionFactory(clusterVersionName, clusterDefName).AddComponent(workloadType).AddContainerShort("mysql", ApeCloudMySQLImage).
-		Create(&testCtx).GetObject()
+func CreateConsensusMysqlClusterVersion(testCtx *testutil.TestContext, clusterDefName, clusterVersionName, workloadType string) *appsv1alpha1.ClusterVersion {
+	return NewClusterVersionFactory(clusterVersionName, clusterDefName).AddComponentVersion(workloadType).AddContainerShort("mysql", ApeCloudMySQLImage).
+		Create(testCtx).GetObject()
 }
 
 // MockConsensusComponentStatefulSet mocks the component statefulSet, just using in envTest
 func MockConsensusComponentStatefulSet(
-	testCtx testutil.TestContext,
+	testCtx *testutil.TestContext,
 	clusterName,
 	consensusCompName string) *appsv1.StatefulSet {
 	stsName := clusterName + "-" + consensusCompName
-	return NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, consensusCompName).SetReplicas(int32(3)).
-		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(&testCtx).GetObject()
+	return NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, consensusCompName).SetReplicas(ConsensusReplicas).
+		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).Create(testCtx).GetObject()
 }
 
 // MockConsensusComponentStsPod mocks to create the pod of the consensus StatefulSet, just using in envTest
 func MockConsensusComponentStsPod(
-	testCtx testutil.TestContext,
+	testCtx *testutil.TestContext,
 	sts *appsv1.StatefulSet,
 	clusterName,
 	consensusCompName,
@@ -109,7 +117,7 @@ func MockConsensusComponentStsPod(
 		AddConsensusSetAccessModeLabel(accessMode).
 		AddControllerRevisionHashLabel(stsUpdateRevision).
 		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).
-		Create(&testCtx).GetObject()
+		CheckedCreate(testCtx).GetObject()
 	patch := client.MergeFrom(pod.DeepCopy())
 	pod.Status.Conditions = []corev1.PodCondition{
 		{
@@ -123,12 +131,12 @@ func MockConsensusComponentStsPod(
 
 // MockConsensusComponentPods mocks the component pods, just using in envTest
 func MockConsensusComponentPods(
-	testCtx testutil.TestContext,
+	testCtx *testutil.TestContext,
 	sts *appsv1.StatefulSet,
 	clusterName,
 	consensusCompName string) []*corev1.Pod {
-	podList := make([]*corev1.Pod, 3)
-	for i := 0; i < 3; i++ {
+	podList := make([]*corev1.Pod, ConsensusReplicas)
+	for i := 0; i < ConsensusReplicas; i++ {
 		podName := fmt.Sprintf("%s-%s-%d", clusterName, consensusCompName, i)
 		podRole := "follower"
 		accessMode := "Readonly"

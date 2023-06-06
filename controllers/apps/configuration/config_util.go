@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configuration
@@ -316,7 +319,7 @@ func updateLabelsByConfigSpec[T generics.Object, PT generics.PObject[T]](cli cli
 }
 
 func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, configSpecs []appsv1alpha1.ComponentConfigSpec) (bool, error) {
-	// check ConfigTemplate Validate
+	// validate ConfigTemplate
 	foundAndCheckConfigSpec := func(configSpec appsv1alpha1.ComponentConfigSpec, logger logr.Logger) (*appsv1alpha1.ConfigConstraint, error) {
 		if _, err := getConfigMapByTemplateName(cli, ctx, configSpec.TemplateRef, configSpec.Namespace); err != nil {
 			logger.Error(err, "failed to get config template cm object!")
@@ -361,11 +364,18 @@ func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, confi
 }
 
 func validateConfigConstraintStatus(ccStatus appsv1alpha1.ConfigConstraintStatus) bool {
-	return ccStatus.Phase == appsv1alpha1.AvailablePhase
+	return ccStatus.Phase == appsv1alpha1.CCAvailablePhase
 }
 
 func usingComponentConfigSpec(annotations map[string]string, key, value string) bool {
 	return len(annotations) != 0 && annotations[key] == value
+}
+
+func updateConfigConstraintStatus(cli client.Client, ctx intctrlutil.RequestCtx, configConstraint *appsv1alpha1.ConfigConstraint, phase appsv1alpha1.ConfigConstraintPhase) error {
+	patch := client.MergeFrom(configConstraint.DeepCopy())
+	configConstraint.Status.Phase = phase
+	configConstraint.Status.ObservedGeneration = configConstraint.Generation
+	return cli.Status().Patch(ctx.Ctx, configConstraint, patch)
 }
 
 func getAssociatedComponentsByConfigmap(stsList *appv1.StatefulSetList, cfg client.ObjectKey, configSpecName string) ([]appv1.StatefulSet, []string) {
@@ -414,7 +424,7 @@ func updateConfigSchema(cc *appsv1alpha1.ConfigConstraint, cli client.Client, ct
 		return nil
 	}
 
-	// Because the conversion of cue to openAPISchema is constraint, and the definition of some cue may not be converted into openAPISchema, and won't return error.
+	// Because the conversion of cue to openAPISchema is restricted, and the definition of some cue may not be converted into openAPISchema, and won't return error.
 	openAPISchema, err := cfgcore.GenerateOpenAPISchema(schema.CUE, cc.Spec.CfgSchemaTopLevelName)
 	if err != nil {
 		return err
@@ -426,31 +436,6 @@ func updateConfigSchema(cc *appsv1alpha1.ConfigConstraint, cli client.Client, ct
 	ccPatch := client.MergeFrom(cc.DeepCopy())
 	cc.Spec.ConfigurationSchema.Schema = openAPISchema
 	return cli.Patch(ctx, cc, ccPatch)
-}
-
-func NeedReloadVolume(config appsv1alpha1.ComponentConfigSpec) bool {
-	// TODO distinguish between scripts and configuration
-	return config.ConfigConstraintRef != ""
-}
-
-func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []appsv1alpha1.ComponentConfigSpec) (*appsv1alpha1.ReloadOptions, *appsv1alpha1.FormatterConfig, error) {
-	for _, configSpec := range configSpecs {
-		if !NeedReloadVolume(configSpec) {
-			continue
-		}
-		ccKey := client.ObjectKey{
-			Namespace: "",
-			Name:      configSpec.ConfigConstraintRef,
-		}
-		cfgConst := &appsv1alpha1.ConfigConstraint{}
-		if err := cli.Get(ctx, ccKey, cfgConst); err != nil {
-			return nil, nil, cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
-		}
-		if cfgConst.Spec.ReloadOptions != nil {
-			return cfgConst.Spec.ReloadOptions, cfgConst.Spec.FormatterConfig, nil
-		}
-	}
-	return nil, nil, nil
 }
 
 func getComponentFromClusterDefinition(

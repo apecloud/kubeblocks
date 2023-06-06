@@ -33,10 +33,10 @@ SKIP_GO_GEN ?= true
 CHART_PATH = deploy/helm
 WEBHOOK_CERT_DIR ?= /tmp/k8s-webhook-server/serving-certs
 
+
+
 # Go setup
 export GO111MODULE = auto
-# export GOPROXY = https://proxy.golang.org
-export GOPROXY = https://goproxy.cn
 export GOSUMDB = sum.golang.org
 export GONOPROXY = github.com/apecloud
 export GONOSUMDB = github.com/apecloud
@@ -51,6 +51,15 @@ GOBIN=$(shell $(GO) env GOPATH)/bin
 else
 GOBIN=$(shell $(GO) env GOBIN)
 endif
+GOPROXY := $(shell go env GOPROXY)
+ifeq ($(GOPROXY),)
+GOPROXY := https://proxy.golang.org
+## use following GOPROXY settings for Chinese mainland developers.
+#GOPROXY := https://goproxy.cn
+endif
+export GOPROXY
+
+
 LD_FLAGS="-s -w -X main.version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%dT%H:%M:%SZ'` -X main.gitCommit=`git rev-parse HEAD`"
 # Which architecture to build - see $(ALL_ARCH) for options.
 # if the 'local' rule is being run, detect the ARCH from 'go env'
@@ -58,18 +67,15 @@ LD_FLAGS="-s -w -X main.version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%
 local : ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
 ARCH ?= linux-amd64
 
-# docker build setup
-# BUILDX_PLATFORMS ?= $(subst -,/,$(ARCH))
-BUILDX_PLATFORMS ?= linux/amd64,linux/arm64
-BUILDX_OUTPUT_TYPE ?= docker
+
 
 TAG_LATEST ?= false
-BUILDX_ENABLED ?= false
-ifneq ($(BUILDX_ENABLED), false)
+BUILDX_ENABLED ?= ""
+ifeq ($(BUILDX_ENABLED), "")
 	ifeq ($(shell docker buildx inspect 2>/dev/null | awk '/Status/ { print $$2 }'), running)
-		BUILDX_ENABLED ?= true
+		BUILDX_ENABLED = true
 	else
-		BUILDX_ENABLED ?= false
+		BUILDX_ENABLED = false
 	endif
 endif
 
@@ -136,8 +142,6 @@ ifeq ($(SKIP_GO_GEN), false)
 	$(GO) generate -x ./internal/configuration/proto
 endif
 
-
-
 .PHONY: test-go-generate
 test-go-generate: ## Run go generate against test code.
 	$(GO) generate -x ./internal/testutil/k8s/mocks/...
@@ -182,7 +186,7 @@ mod-vendor: module ## Run go mod vendor against go modules.
 
 .PHONY: module
 module: ## Run go mod tidy->verify against go modules.
-	$(GO) mod tidy -compat=1.19
+	$(GO) mod tidy -compat=1.20
 	$(GO) mod verify
 
 TEST_PACKAGES ?= ./internal/... ./apis/... ./controllers/... ./cmd/...
@@ -206,6 +210,10 @@ test-fast: envtest
 
 .PHONY: test
 test: manifests generate test-go-generate fmt vet add-k8s-host test-fast ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+
+.PHONY: race
+race:
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -race $(TEST_PACKAGES)
 
 .PHONY: test-integration
 test-integration: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
@@ -247,7 +255,7 @@ CLI_LD_FLAGS ="-s -w \
 	-X github.com/apecloud/kubeblocks/version.K3dVersion=$(K3D_VERSION) \
 	-X github.com/apecloud/kubeblocks/version.DefaultKubeBlocksVersion=$(VERSION)"
 
-bin/kbcli.%: ## Cross build bin/kbcli.$(OS).$(ARCH).
+bin/kbcli.%: test-go-generate ## Cross build bin/kbcli.$(OS).$(ARCH).
 	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) CGO_ENABLED=0 $(GO) build -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
 
 .PHONY: kbcli-fast
@@ -264,9 +272,15 @@ kbcli: test-go-generate build-checks kbcli-fast ## Build bin/kbcli.
 clean-kbcli: ## Clean bin/kbcli*.
 	rm -f bin/kbcli*
 
-.PHONY: doc
-kbcli-doc: generate ## generate CLI command reference manual.
+.PHONY: kbcli-doc
+kbcli-doc: generate test-go-generate ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
+
+
+
+.PHONY: api-doc
+api-doc:  ## generate API reference manual.
+	@./hack/docgen/api/generate.sh
 
 
 ##@ Operator Controller Manager
@@ -333,7 +347,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 .PHONY: reviewable
 reviewable: generate build-checks test check-license-header ## Run code checks to proceed with PR reviews.
-	$(GO) mod tidy -compat=1.19
+	$(GO) mod tidy -compat=1.20
 
 .PHONY: check-diff
 check-diff: reviewable ## Run git code diff checker.
@@ -388,6 +402,7 @@ bump-chart-ver: \
 	bump-single-chart-ver.redis \
 	bump-single-chart-ver.redis-cluster \
 	bump-single-chart-ver.milvus \
+	bump-single-chart-ver.milvus-cluster \
 	bump-single-chart-ver.qdrant \
 	bump-single-chart-ver.qdrant-cluster \
 	bump-single-chart-ver.weaviate \
@@ -746,14 +761,14 @@ endif
 render-smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
 	$(HELM) template mycluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
-	$(HELM) template mycluster deploy/redis > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
-	$(HELM) template mycluster deploy/redis-cluster >> test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(HELM) template mycluster deploy/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(HELM) template mycluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
+
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) -C test/e2e run
 
 # NOTE: include must be placed at the end
 include docker/docker.mk
 include cmd/cmd.mk
-

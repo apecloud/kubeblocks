@@ -8,10 +8,12 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   TAG_NAME: ${{ github.ref_name }}
-  GO_VERSION: '1.19'
+  GO_VERSION: "1.20"
   CLI_NAME: 'kbcli'
   CLI_REPO: 'apecloud/kbcli'
   GITLAB_KBCLI_PROJECT_ID: 85948
+  GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
+  RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
 
 jobs:
   create-release-kbcli:
@@ -34,8 +36,7 @@ jobs:
             --type 1 \
             --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
             --tag-name ${{ env.TAG_NAME }} \
-            --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}
-            
+            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
 
   upload-release-assert:
     needs: create-release-kbcli
@@ -67,7 +68,7 @@ jobs:
         uses: bruceadams/get-release@v1.3.2
 
       - name: make build
-        run: |    
+        run: |
           CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh \
             --tag-name ${{ matrix.os }} \
             --type 2`
@@ -79,16 +80,20 @@ jobs:
           echo "CLI_OS_ARCH=${CLI_OS_ARCH}" >> $GITHUB_ENV
           echo "CLI_FILENAME=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}" >> $GITHUB_ENV
           echo "CLI_DIR=${{ matrix.os }}" >> $GITHUB_ENV
-  
+
       - name: make zip
         if: matrix.os == 'windows-amd64'
         run: |
           mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }}.exe 
+          cp ${{ matrix.os }}/${{ env.CLI_NAME }}.exe bin/
           zip -r -o ${{ env.CLI_FILENAME }}.zip  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.zip  # for debug 
+          mkdir -p sha256
+          shasum -a 256 ${{ env.CLI_FILENAME }}.zip > sha256/${{ env.CLI_FILENAME }}.zip.sha256.txt
           mv ${{ env.CLI_FILENAME }}.zip bin/
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.zip" >> $GITHUB_ENV
           echo "ASSET_CONTENT_TYPE=application/zip" >> $GITHUB_ENV
+          echo "CheckSum=${{ env.CLI_FILENAME }}.zip.sha256.txt" >> $GITHUB_ENV
 
       - name: make tar
         if: matrix.os != 'windows-amd64'
@@ -96,17 +101,24 @@ jobs:
           mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }} 
           tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.tar.gz  # for debug 
+          mkdir -p sha256
+          shasum -a 256 ${{ env.CLI_FILENAME }}.tar.gz > sha256/${{ env.CLI_FILENAME }}.tar.gz.sha256.txt
           mv ${{ env.CLI_FILENAME }}.tar.gz bin/
           echo "ASSET_NAME=${{ env.CLI_FILENAME }}.tar.gz" >> $GITHUB_ENV
           echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
+          echo "CheckSum=${{ env.CLI_FILENAME }}.tar.gz.sha256.txt" >> $GITHUB_ENV
 
-      - name: upload release asset ${{ matrix.os }}
-        uses: actions/upload-release-asset@main
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./bin/${{ env.ASSET_NAME }}
-          asset_name: ${{ env.ASSET_NAME }}
-          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
+      - name: upload gitlab kbcli asset ${{ matrix.os }}
+        env:
+          CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
+        run: |
+          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
+            --type 2 \
+            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
+            --tag-name ${{ env.TAG_NAME }} \
+            --asset-path ./bin/${{ env.ASSET_NAME }} \
+            --asset-name ${{ env.ASSET_NAME }} \
+            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
 
       - name: get release kbcli upload url
         run: |
@@ -124,14 +136,69 @@ jobs:
           asset_name: ${{ env.ASSET_NAME }}
           asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
 
-      - name: upload gitlab kbcli asset ${{ matrix.os }}
-        env:
-          CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
+      - name: upload kbcli binary release for winget
+        if: matrix.os == 'windows-amd64'
+        uses: actions/upload-release-asset@main
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ./bin/${{ env.CLI_NAME }}.exe
+          asset_name: ${{ env.CLI_NAME }}.exe
+          asset_content_type: application/octet-stream
+
+      - name: upload checksum for kbcli assets
+        uses: actions/upload-artifact@v3
+        with:
+          name: sha256
+          path: sha256/
+
+      - name: upload release asset ${{ matrix.os }}
+        continue-on-error: true
+        uses: actions/upload-release-asset@main
+        with:
+          upload_url: ${{ steps.get_release.outputs.upload_url }}
+          asset_path: ./bin/${{ env.ASSET_NAME }}
+          asset_name: ${{ env.ASSET_NAME }}
+          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
+
+  generate-kbcli-sha256:
+    runs-on: ubuntu-latest
+    needs: upload-release-assert
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: sha256
+          path: sha256
+      - name: generate kbcli release-notes
         run: |
-          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
-            --type 2 \
-            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
+          mkdir -p ./docs/release_notes/${{ env.TAG_NAME }}
+          python ./.github/utils/generate_kbcli_sha256.py ${{ env.TAG_NAME }} sha256
+      - name: release kbcli with release notes
+        run: |
+          bash .github/utils/utils.sh --type 13 \
+            --github-repo 'apecloud/kbcli' \
             --tag-name ${{ env.TAG_NAME }} \
-            --asset-path ./bin/${{ env.ASSET_NAME }} \
-            --asset-name ${{ env.ASSET_NAME }} \
-            --access-token ${{ secrets.GITLAB_ACCESS_TOKEN }}
+            --file "./docs/release_notes/${{ env.TAG_NAME }}/kbcli.md" \
+            --github-token ${{ env.GITHUB_TOKEN }}
+      - name: remove artifact
+        uses: geekyeggo/delete-artifact@v2
+        with:
+          name: sha256
+
+  send-message:
+    runs-on: ubuntu-latest
+    needs: upload-release-assert
+    if: ${{ always() }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: send message
+        run: |
+          CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0error"
+          if [[ "${{ needs.upload-release-assert.result }}" == "success" ]]; then
+              CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0success"
+          fi
+          bash .github/utils/utils.sh --type 12 \
+            --tag-name ${{ env.TAG_NAME }} \
+            --content "${CONTENT}"\
+            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

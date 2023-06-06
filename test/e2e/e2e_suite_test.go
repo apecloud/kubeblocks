@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -48,10 +48,18 @@ var cfg *rest.Config
 var testEnv *envtest.Environment
 var TC *TestClient
 var version string
+var provider string
+var region string
+var secretID string
+var secretKey string
 
 func init() {
 	viper.AutomaticEnv()
 	flag.StringVar(&version, "VERSION", "", "kubeblocks test version")
+	flag.StringVar(&provider, "PROVIDER", "", "kubeblocks test cloud-provider")
+	flag.StringVar(&region, "REGION", "", "kubeblocks test region")
+	flag.StringVar(&secretID, "SECRET_ID", "", "cloud-provider SECRET_ID")
+	flag.StringVar(&secretKey, "SECRET_KEY", "", "cloud-provider SECRET_KEY")
 }
 
 func TestE2e(t *testing.T) {
@@ -91,6 +99,12 @@ var _ = BeforeSuite(func() {
 	}
 	log.Println("kb version:" + version)
 	Version = version
+	if len(provider) > 0 && len(region) > 0 && len(secretID) > 0 && len(secretKey) > 0 {
+		Provider = provider
+		Region = region
+		SecretID = secretID
+		SecretKey = secretKey
+	}
 	if viper.GetBool("ENABLE_DEBUG_LOG") {
 		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
 			o.TimeEncoder = zapcore.ISO8601TimeEncoder

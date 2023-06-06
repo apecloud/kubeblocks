@@ -11,23 +11,22 @@ kbcli class create [NAME] [flags]
 ### Examples
 
 ```
-  # Create a class following class family kubeblocks-general-classes for component mysql in cluster definition apecloud-mysql, which have 1 cpu core, 2Gi memory and storage is 10Gi
-  kbcli class create custom-1c2g --cluster-definition apecloud-mysql --type mysql --class-family kubeblocks-general-classes --cpu 1 --memory 2Gi --storage name=data,size=10Gi
+  # Create a class with constraint kb-resource-constraint-general for component mysql in cluster definition apecloud-mysql, which has 1 CPU core and 1Gi memory
+  kbcli class create custom-1c1g --cluster-definition apecloud-mysql --type mysql --constraint kb-resource-constraint-general --cpu 1 --memory 1Gi
   
-  # Create classes for component mysql in cluster definition apecloud-mysql, where classes is defined in file
+  # Create classes for component mysql in cluster definition apecloud-mysql, with classes defined in file
   kbcli class create --cluster-definition apecloud-mysql --type mysql --file ./classes.yaml
 ```
 
 ### Options
 
 ```
-      --class-family string         Specify class family
-      --cluster-definition string   Specify cluster definition, run "kbcli clusterdefinition list" to show all available cluster definition
-      --cpu string                  Specify component cpu cores
-      --file string                 Specify file path which contains YAML definition of class
+      --cluster-definition string   Specify cluster definition, run "kbcli clusterdefinition list" to show all available cluster definitions
+      --constraint string           Specify resource constraint
+      --cpu string                  Specify component CPU cores
+      --file string                 Specify file path of class definition YAML
   -h, --help                        help for create
       --memory string               Specify component memory size
-      --storage stringArray         Specify component storage disks
       --type string                 Specify component type
 ```
 

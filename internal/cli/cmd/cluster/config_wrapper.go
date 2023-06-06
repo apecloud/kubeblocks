@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -26,28 +29,29 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
 type configWrapper struct {
-	create.BaseOptions
+	create.CreateOptions
 
 	clusterName   string
 	updatedParams map[string]string
 
-	// auto fill field
+	// autofill field
 	componentName  string
 	configSpecName string
-	configKey      string
+	configFileKey  string
 
-	configSpec appsv1alpha1.ComponentConfigSpec
+	configTemplateSpec appsv1alpha1.ComponentConfigSpec
 
 	clusterObj    *appsv1alpha1.Cluster
 	clusterDefObj *appsv1alpha1.ClusterDefinition
 	clusterVerObj *appsv1alpha1.ClusterVersion
 }
 
-func (w *configWrapper) ConfigSpec() *appsv1alpha1.ComponentConfigSpec {
-	return &w.configSpec
+func (w *configWrapper) ConfigTemplateSpec() *appsv1alpha1.ComponentConfigSpec {
+	return &w.configTemplateSpec
 }
 
 func (w *configWrapper) ConfigSpecName() string {
@@ -59,10 +63,10 @@ func (w *configWrapper) ComponentName() string {
 }
 
 func (w *configWrapper) ConfigFile() string {
-	return w.configKey
+	return w.configFileKey
 }
 
-// AutoFillRequiredParam auto fill required param.
+// AutoFillRequiredParam auto fills required param.
 func (w *configWrapper) AutoFillRequiredParam() error {
 	if err := w.fillComponent(); err != nil {
 		return err
@@ -73,14 +77,14 @@ func (w *configWrapper) AutoFillRequiredParam() error {
 	return w.fillConfigFile()
 }
 
-// ValidateRequiredParam validate required param.
+// ValidateRequiredParam validates required param.
 func (w *configWrapper) ValidateRequiredParam() error {
-	// step1: validate component exist.
+	// step1: check existence of component.
 	if w.clusterObj.Spec.GetComponentByName(w.componentName) == nil {
 		return makeComponentNotExistErr(w.clusterName, w.componentName)
 	}
 
-	// step2: validate configmap exist.
+	// step2: check existence of configmap
 	cmObj := corev1.ConfigMap{}
 	cmKey := client.ObjectKey{
 		Name:      cfgcore.GetComponentCfgName(w.clusterName, w.componentName, w.configSpecName),
@@ -90,14 +94,14 @@ func (w *configWrapper) ValidateRequiredParam() error {
 		return err
 	}
 
-	// step3: validate fileKey exist.
-	if _, ok := cmObj.Data[w.configKey]; !ok {
-		return makeNotFoundConfigFileErr(w.configKey, w.configSpecName, cfgcore.ToSet(cmObj.Data).AsSlice())
+	// step3: check existence of config file
+	if _, ok := cmObj.Data[w.configFileKey]; !ok {
+		return makeNotFoundConfigFileErr(w.configFileKey, w.configSpecName, cfgutil.ToSet(cmObj.Data).AsSlice())
 	}
 
 	// TODO support all config file update.
-	if !cfgcore.CheckConfigTemplateReconfigureKey(w.configSpec, w.configKey) {
-		return makeNotSupportConfigFileUpdateErr(w.configKey, w.configSpec)
+	if !cfgcore.IsSupportConfigFileReconfigure(w.configTemplateSpec, w.configFileKey) {
+		return makeNotSupportConfigFileUpdateErr(w.configFileKey, w.configTemplateSpec)
 	}
 	return nil
 }
@@ -121,7 +125,7 @@ func (w *configWrapper) fillConfigSpec() error {
 	foundConfigSpec := func(configSpecs []appsv1alpha1.ComponentConfigSpec, name string) *appsv1alpha1.ComponentConfigSpec {
 		for _, configSpec := range configSpecs {
 			if configSpec.Name == name {
-				w.configSpec = configSpec
+				w.configTemplateSpec = configSpec
 				return &configSpec
 			}
 		}
@@ -151,7 +155,7 @@ func (w *configWrapper) fillConfigSpec() error {
 		return nil
 	}
 
-	w.configSpec = configSpecs[0]
+	w.configTemplateSpec = configSpecs[0]
 	if len(configSpecs) == 1 {
 		w.configSpecName = configSpecs[0].Name
 		return nil
@@ -164,7 +168,7 @@ func (w *configWrapper) fillConfigSpec() error {
 		}
 	}
 	if len(supportUpdatedTpl) == 1 {
-		w.configSpec = configSpecs[0]
+		w.configTemplateSpec = configSpecs[0]
 		w.configSpecName = supportUpdatedTpl[0].Name
 		return nil
 	}
@@ -172,11 +176,11 @@ func (w *configWrapper) fillConfigSpec() error {
 }
 
 func (w *configWrapper) fillConfigFile() error {
-	if w.configKey != "" {
+	if w.configFileKey != "" {
 		return nil
 	}
 
-	if w.configSpec.TemplateRef == "" {
+	if w.configTemplateSpec.TemplateRef == "" {
 		return makeNotFoundTemplateErr(w.clusterName, w.componentName)
 	}
 
@@ -189,12 +193,12 @@ func (w *configWrapper) fillConfigFile() error {
 		return err
 	}
 	if len(cmObj.Data) == 0 {
-		return cfgcore.MakeError("not support reconfiguring because there is no config file.")
+		return cfgcore.MakeError("not supported reconfiguring because there is no config file.")
 	}
 
 	keys := w.filterForReconfiguring(cmObj.Data)
 	if len(keys) == 1 {
-		w.configKey = keys[0]
+		w.configFileKey = keys[0]
 		return nil
 	}
 	return cfgcore.MakeError(multiConfigFileErrorMessage)
@@ -202,15 +206,15 @@ func (w *configWrapper) fillConfigFile() error {
 
 func (w *configWrapper) filterForReconfiguring(data map[string]string) []string {
 	keys := make([]string, 0, len(data))
-	for k := range data {
-		if cfgcore.CheckConfigTemplateReconfigureKey(w.configSpec, k) {
-			keys = append(keys, k)
+	for configFileKey := range data {
+		if cfgcore.IsSupportConfigFileReconfigure(w.configTemplateSpec, configFileKey) {
+			keys = append(keys, configFileKey)
 		}
 	}
 	return keys
 }
 
-func newConfigWrapper(baseOptions create.BaseOptions, clusterName, componentName, configSpec, configKey string, params map[string]string) (*configWrapper, error) {
+func newConfigWrapper(baseOptions create.CreateOptions, clusterName, componentName, configSpec, configKey string, params map[string]string) (*configWrapper, error) {
 	var (
 		err           error
 		clusterObj    *appsv1alpha1.Cluster
@@ -225,14 +229,14 @@ func newConfigWrapper(baseOptions create.BaseOptions, clusterName, componentName
 	}
 
 	w := &configWrapper{
-		BaseOptions:   baseOptions,
+		CreateOptions: baseOptions,
 		clusterObj:    clusterObj,
 		clusterDefObj: clusterDefObj,
 		clusterName:   clusterName,
 
 		componentName:  componentName,
 		configSpecName: configSpec,
-		configKey:      configKey,
+		configFileKey:  configKey,
 		updatedParams:  params,
 	}
 

@@ -1,0 +1,12 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: ops-vexpand
+spec:
+  clusterRef: mycluster
+  type: VolumeExpansion
+  volumeExpansion:
+    - componentName: mongodb
+      volumeClaimTemplates:
+        - name: data
+          storage: "2Gi"

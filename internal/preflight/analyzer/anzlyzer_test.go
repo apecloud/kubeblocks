@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package analyzer
@@ -36,7 +39,7 @@ var _ = Describe("analyzer_test", func() {
 	Context("KBAnalyze test", func() {
 		It("KBAnalyze test, and ExtendAnalyze is nil", func() {
 			Eventually(func(g Gomega) {
-				res := KBAnalyze(context.TODO(), &preflightv1beta2.ExtendAnalyze{}, nil, nil)
+				res := KBAnalyze(context.TODO(), &preflightv1beta2.ExtendAnalyze{}, nil, nil, nil)
 				g.Expect(res[0].IsFail).Should(BeTrue())
 			}).Should(Succeed())
 		})
@@ -74,7 +77,7 @@ var _ = Describe("analyzer_test", func() {
 				getCollectedFileContents := func(string) ([]byte, error) {
 					return b, nil
 				}
-				res := KBAnalyze(context.TODO(), kbAnalyzer, getCollectedFileContents, nil)
+				res := KBAnalyze(context.TODO(), kbAnalyzer, getCollectedFileContents, nil, nil)
 				Expect(len(res)).Should(Equal(1))
 				g.Expect(res[0].IsPass).Should(BeTrue())
 			}).Should(Succeed())
@@ -122,10 +125,10 @@ var _ = Describe("analyzer_test", func() {
 
 	It("GetAnalyzer test, and expect success", func() {
 		Eventually(func(g Gomega) {
-			collector, ok := GetAnalyzer(&preflightv1beta2.ExtendAnalyze{ClusterAccess: &preflightv1beta2.ClusterAccessAnalyze{}})
+			collector, ok := GetAnalyzer(&preflightv1beta2.ExtendAnalyze{ClusterAccess: &preflightv1beta2.ClusterAccessAnalyze{}}, nil)
 			g.Expect(collector).ShouldNot(BeNil())
 			g.Expect(ok).Should(BeTrue())
-			collector, ok = GetAnalyzer(&preflightv1beta2.ExtendAnalyze{})
+			collector, ok = GetAnalyzer(&preflightv1beta2.ExtendAnalyze{}, nil)
 			g.Expect(collector).Should(BeNil())
 			g.Expect(ok).Should(BeFalse())
 		}).Should(Succeed())

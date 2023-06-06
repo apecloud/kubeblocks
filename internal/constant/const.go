@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package constant
@@ -23,18 +26,31 @@ const (
 	CfgKeyCtrlrMgrAffinity              = "CM_AFFINITY"
 	CfgKeyCtrlrMgrNodeSelector          = "CM_NODE_SELECTOR"
 	CfgKeyCtrlrMgrTolerations           = "CM_TOLERATIONS"
-	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS" // accept time
+	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS"       // accept time
+	CfgKeyBackupPVCName                 = "BACKUP_PVC_NAME"                  // the global persistent volume claim to store the backup data
+	CfgKeyBackupPVCInitCapacity         = "BACKUP_PVC_INIT_CAPACITY"         // the init capacity for creating the pvc, e.g. 10Gi.
+	CfgKeyBackupPVCStorageClass         = "BACKUP_PVC_STORAGE_CLASS"         // the pvc storage class name.
+	CfgKeyBackupPVCCreatePolicy         = "BACKUP_PVC_CREATE_POLICY"         // the pvc creation policy, choice is "IfNotPresent" or "Never"
+	CfgKeyBackupPVConfigmapName         = "BACKUP_PV_CONFIGMAP_NAME"         // the configmap containing the persistentVolume template.
+	CfgKeyBackupPVConfigmapNamespace    = "BACKUP_PV_CONFIGMAP_NAMESPACE"    // the configmap namespace containing the persistentVolume template.
+	CfgRecoverVolumeExpansionFailure    = "RECOVER_VOLUME_EXPANSION_FAILURE" // refer to feature gates RecoverVolumeExpansionFailure of k8s.
 
 	// addon config keys
 	CfgKeyAddonJobTTL        = "ADDON_JOB_TTL"
 	CfgAddonJobImgPullPolicy = "ADDON_JOB_IMAGE_PULL_POLICY"
+
+	// data plane config key
+	CfgKeyDataPlaneTolerations = "DATA_PLANE_TOLERATIONS"
+	CfgKeyDataPlaneAffinity    = "DATA_PLANE_AFFINITY"
 )
 
 const (
-	ConnCredentialPlaceHolder    = "$(CONN_CREDENTIAL_SECRET_NAME)"
-	KBCompNamePlaceHolder        = "$(KB_COMP_NAME)"
-	KBClusterNamePlaceHolder     = "$(KB_CLUSTER_NAME)"
-	KBClusterCompNamePlaceHolder = "$(KB_CLUSTER_COMP_NAME)"
+	KBConnCredentialPlaceHolder     = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	KBComponentEnvCMPlaceHolder     = "$(COMP_ENV_CM_NAME)"
+	KBCompNamePlaceHolder           = "$(KB_COMP_NAME)"
+	KBClusterNamePlaceHolder        = "$(KB_CLUSTER_NAME)"
+	KBClusterCompNamePlaceHolder    = "$(KB_CLUSTER_COMP_NAME)"
+	KBClusterUIDPostfix8PlaceHolder = "$(KB_CLUSTER_UID_POSTFIX_8)"
 )
 
 const (
@@ -51,7 +67,7 @@ const (
 
 	AppName = "kubeblocks"
 
-	// K8s recommonded and well-known label and annotation keys
+	// K8s recommonded well-known labels and annotation keys
 	AppInstanceLabelKey  = "app.kubernetes.io/instance"
 	AppNameLabelKey      = "app.kubernetes.io/name"
 	AppManagedByLabelKey = "app.kubernetes.io/managed-by"
@@ -59,61 +75,74 @@ const (
 	ZoneLabelKey         = "topology.kubernetes.io/zone"
 
 	// kubeblocks.io labels
-	ClusterDefLabelKey              = "clusterdefinition.kubeblocks.io/name"
-	KBAppComponentLabelKey          = "apps.kubeblocks.io/component-name"
-	KBAppComponentDefRefLabelKey    = "apps.kubeblocks.io/component-def-ref"
-	ConsensusSetAccessModeLabelKey  = "cs.apps.kubeblocks.io/access-mode"
-	AppConfigTypeLabelKey           = "apps.kubeblocks.io/config-type"
-	WorkloadTypeLabelKey            = "apps.kubeblocks.io/workload-type"
-	VolumeClaimTemplateNameLabelKey = "vct.kubeblocks.io/name"
-	RoleLabelKey                    = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
-	BackupProtectionLabelKey        = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
-	AddonNameLabelKey               = "extensions.kubeblocks.io/addon-name"
-	ClusterAccountLabelKey          = "account.kubeblocks.io/name"
-	VolumeTypeLabelKey              = "kubeblocks.io/volume-type"
-	KBManagedByKey                  = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created during operation
-	ClassProviderLabelKey           = "class.kubeblocks.io/provider"
+	BackupProtectionLabelKey               = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
+	BackupToolTypeLabelKey                 = "kubeblocks.io/backup-tool-type"
+	AddonProviderLableKey                  = "kubeblocks.io/provider" // AddonProviderLableKey marks the addon provider
+	RoleLabelKey                           = "kubeblocks.io/role"     // RoleLabelKey consensusSet and replicationSet role label key
+	VolumeTypeLabelKey                     = "kubeblocks.io/volume-type"
+	ClusterAccountLabelKey                 = "account.kubeblocks.io/name"
+	KBAppComponentLabelKey                 = "apps.kubeblocks.io/component-name"
+	KBAppComponentDefRefLabelKey           = "apps.kubeblocks.io/component-def-ref"
+	AppConfigTypeLabelKey                  = "apps.kubeblocks.io/config-type"
+	KBManagedByKey                         = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created
+	PVCNameLabelKey                        = "apps.kubeblocks.io/pvc-name"
+	VolumeClaimTemplateNameLabelKey        = "apps.kubeblocks.io/vct-name"
+	WorkloadTypeLabelKey                   = "apps.kubeblocks.io/workload-type"
+	ClassProviderLabelKey                  = "class.kubeblocks.io/provider"
+	ClusterDefLabelKey                     = "clusterdefinition.kubeblocks.io/name"
+	CMConfigurationSpecProviderLabelKey    = "config.kubeblocks.io/config-spec"    // CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
+	CMConfigurationCMKeysLabelKey          = "config.kubeblocks.io/configmap-keys" // CMConfigurationCMKeysLabelKey Specify configmap keys
+	CMConfigurationTemplateNameLabelKey    = "config.kubeblocks.io/config-template-name"
+	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
+	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
+	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
+	ConsensusSetAccessModeLabelKey         = "cs.apps.kubeblocks.io/access-mode"
+	BackupTypeLabelKeyKey                  = "dataprotection.kubeblocks.io/backup-type"
+	AddonNameLabelKey                      = "extensions.kubeblocks.io/addon-name"
+	OpsRequestTypeLabelKey                 = "ops.kubeblocks.io/ops-type"
 
 	// kubeblocks.io annotations
-	OpsRequestAnnotationKey        = "kubeblocks.io/ops-request" // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
-	ReconcileAnnotationKey         = "kubeblocks.io/reconcile"   // ReconcileAnnotationKey Notify k8s object to reconcile
-	RestartAnnotationKey           = "kubeblocks.io/restart"     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	SnapShotForStartAnnotationKey  = "kubeblocks.io/snapshot-for-start"
-	RestoreFromBackUpAnnotationKey = "kubeblocks.io/restore-from-backup" // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
-	ClusterSnapshotAnnotationKey   = "kubeblocks.io/cluster-snapshot"    // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
-	LeaderAnnotationKey            = "cs.apps.kubeblocks.io/leader"
+	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"            // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
+	DefaultClusterVersionAnnotationKey          = "kubeblocks.io/is-default-cluster-version"  // DefaultClusterVersionAnnotationKey specifies the default cluster version.
+	OpsRequestAnnotationKey                     = "kubeblocks.io/ops-request"                 // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	ReconcileAnnotationKey                      = "kubeblocks.io/reconcile"                   // ReconcileAnnotationKey Notify k8s object to reconcile
+	RestartAnnotationKey                        = "kubeblocks.io/restart"                     // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	RestoreFromTimeAnnotationKey                = "kubeblocks.io/restore-from-time"           // RestoreFromTimeAnnotationKey specifies the time to recover from the backup.
+	RestoreFromSrcClusterAnnotationKey          = "kubeblocks.io/restore-from-source-cluster" // RestoreFromSrcClusterAnnotationKey specifies the source cluster to recover from the backup.
+	RestoreFromBackUpAnnotationKey              = "kubeblocks.io/restore-from-backup"         // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
+	SnapShotForStartAnnotationKey               = "kubeblocks.io/snapshot-for-start"
+	ComponentReplicasAnnotationKey              = "apps.kubeblocks.io/component-replicas" // ComponentReplicasAnnotationKey specifies the number of pods in replicas
+	BackupPolicyTemplateAnnotationKey           = "apps.kubeblocks.io/backup-policy-template"
+	LastAppliedClusterAnnotationKey             = "apps.kubeblocks.io/last-applied-cluster"
+	PVLastClaimPolicyAnnotationKey              = "apps.kubeblocks.io/pv-last-claim-policy"
+	HaltRecoveryAllowInconsistentCVAnnotKey     = "clusters.apps.kubeblocks.io/allow-inconsistent-cv"
+	HaltRecoveryAllowInconsistentResAnnotKey    = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"
+	LeaderAnnotationKey                         = "cs.apps.kubeblocks.io/leader"
+	DefaultBackupPolicyAnnotationKey            = "dataprotection.kubeblocks.io/is-default-policy"          // DefaultBackupPolicyAnnotationKey specifies the default backup policy.
+	DefaultBackupPolicyTemplateAnnotationKey    = "dataprotection.kubeblocks.io/is-default-policy-template" // DefaultBackupPolicyTemplateAnnotationKey specifies the default backup policy template.
+	BackupDataPathPrefixAnnotationKey           = "dataprotection.kubeblocks.io/path-prefix"                // BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
+	ReconfigureRefAnnotationKey                 = "dataprotection.kubeblocks.io/reconfigure-ref"
+	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
+	LastAppliedConfigAnnotationKey              = "config.kubeblocks.io/last-applied-configuration"
+	LastAppliedOpsCRAnnotationKey               = "config.kubeblocks.io/last-applied-ops-name"
+	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
+	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
+	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
+	KubeBlocksGenerationKey                     = "kubeblocks.io/generation"
+
+	// kubeblocks.io well-known finalizers
+	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"
+	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
 
 	// ConfigurationTplLabelPrefixKey clusterVersion or clusterdefinition using tpl
 	ConfigurationTplLabelPrefixKey         = "config.kubeblocks.io/tpl"
 	ConfigurationConstraintsLabelPrefixKey = "config.kubeblocks.io/constraints"
 
-	LastAppliedOpsCRAnnotation                  = "config.kubeblocks.io/last-applied-ops-name"
-	LastAppliedConfigAnnotation                 = "config.kubeblocks.io/last-applied-configuration"
-	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
-	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
-	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
-	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
-
-	// CMConfigurationTypeLabelKey configmap is config template type, e.g: "tpl", "instance"
-	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
-	CMConfigurationTemplateNameLabelKey    = "config.kubeblocks.io/config-template-name"
-	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
-	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
-
-	// CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
-	CMConfigurationSpecProviderLabelKey = "config.kubeblocks.io/config-spec"
-
-	// CMConfigurationCMKeysLabelKey Specify keys
-	CMConfigurationCMKeysLabelKey = "config.kubeblocks.io/configmap-keys"
-
-	// CMInsConfigurationLabelKey configmap is configuration file for component
-	// CMInsConfigurationLabelKey = "config.kubeblocks.io/ins-configure"
-
 	// CMInsLastReconfigurePhaseKey defines the current phase
 	CMInsLastReconfigurePhaseKey = "config.kubeblocks.io/last-applied-reconfigure-phase"
 
-	// configuration finalizer
-	ConfigurationTemplateFinalizerName = "config.kubeblocks.io/finalizer"
+	// CMInsEnableRerenderTemplateKey is used to enable rerender template
+	CMInsEnableRerenderTemplateKey = "config.kubeblocks.io/enable-rerender"
 
 	// ClassAnnotationKey is used to specify the class of components
 	ClassAnnotationKey = "cluster.kubeblocks.io/component-class"
@@ -143,10 +172,11 @@ const (
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	CronJobKind               = "CronJob"
 	JobKind                   = "Job"
-	ReplicaSetKind            = "ReplicaSetKind"
+	ReplicaSetKind            = "ReplicaSet"
 	VolumeSnapshotKind        = "VolumeSnapshot"
 	ServiceKind               = "Service"
 	ConfigMapKind             = "ConfigMap"
+	DaemonSetKind             = "DaemonSet"
 )
 
 const (
@@ -166,21 +196,12 @@ const (
 	ProbeGRPCPortName         = "probe-grpc-port"
 	RoleProbeContainerName    = "kb-checkrole"
 	StatusProbeContainerName  = "kb-checkstatus"
-	RunningProbeContainerName = "kb-runningcheck"
+	RunningProbeContainerName = "kb-checkrunning"
 
 	// the filedpath name used in event.InvolvedObject.FieldPath
 	ProbeCheckRolePath    = "spec.containers{" + RoleProbeContainerName + "}"
 	ProbeCheckStatusPath  = "spec.containers{" + StatusProbeContainerName + "}"
 	ProbeCheckRunningPath = "spec.containers{" + RunningProbeContainerName + "}"
-
-	// KubeBlocksDataNodeLabelKey is the node label key of the built-in data node label
-	KubeBlocksDataNodeLabelKey = "kb-data"
-	// KubeBlocksDataNodeLabelValue is the node label value of the built-in data node label
-	KubeBlocksDataNodeLabelValue = "true"
-	// KubeBlocksDataNodeTolerationKey is the taint label key of the built-in data node taint
-	KubeBlocksDataNodeTolerationKey = "kb-data"
-	// KubeBlocksDataNodeTolerationValue is the taint label value of the built-in data node taint
-	KubeBlocksDataNodeTolerationValue = "true"
 )
 
 const (
@@ -199,4 +220,16 @@ const (
 
 const (
 	KBReplicationSetPrimaryPodName = "KB_PRIMARY_POD_NAME"
+)
+
+// username and password are keys in created secrets for others to refer to.
+const (
+	AccountNameForSecret   = "username"
+	AccountPasswdForSecret = "password"
+)
+
+const DefaultBackupPvcInitCapacity = "20Gi"
+
+const (
+	ComponentStatusDefaultPodName = "Unknown"
 )

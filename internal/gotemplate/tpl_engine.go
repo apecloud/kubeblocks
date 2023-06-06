@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package gotemplate
@@ -70,6 +73,10 @@ type TplEngine struct {
 	ctx context.Context
 }
 
+func (t *TplEngine) GetTplEngine() *template.Template {
+	return t.tpl
+}
+
 func (t *TplEngine) Render(context string) (string, error) {
 	var buf strings.Builder
 	tpl, err := t.tpl.Parse(context)
@@ -83,12 +90,10 @@ func (t *TplEngine) Render(context string) (string, error) {
 }
 
 func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
-	// Add the 'failed' function here.
 	// When an error occurs, go template engine can detect it and exit early.
 	funcs[buildInSystemFailedName] = failed
 
-	// Add the 'import' function here.
-	// Using it, you can make any function in a configmap object visible in this scope.
+	// With 'import', you can make a function in configmap visible in this scope.
 	funcs[buildInSystemImportName] = func(namespacedName string) (string, error) {
 		if t.importModules.InArray(namespacedName) {
 			return "", nil
@@ -111,7 +116,7 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 		}
 		for key, value := range cm.Data {
 			if fn, ok := t.importFuncs[key]; ok {
-				return "", cfgcore.MakeError("failed to import function: %s, from %v, function is ready import: %v",
+				return "", cfgcore.MakeError("failed to import function: %s, from %v, function is already imported: %v",
 					key, client.ObjectKey{
 						Namespace: fields[0],
 						Name:      fields[1],
@@ -126,14 +131,13 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 		return "", nil
 	}
 
-	// Add the 'call' function here.
-	// This function simulates a function call in a programming language.
+	// Function 'call' simulates a function call in a programming language.
 	// The parameter list of function is similar to function in bash language.
 	// The access parameter uses .arg or $.arg.
 	// e.g: $.arg0, $.arg1, ...
 	//
-	// Node: How to do handle the return type of go template functions?
-	// It is recommended that you serialize it to string and cast it to a specific type in the calling function.
+	// Note: How to handle the return type of go template functions?
+	// It is recommended that serialize it to string and cast it to a specific type in the calling function.
 	// e.g :
 	// The return type of the function is map, the return value is $sts,
 	// {{- $sts | toJson }}
@@ -142,7 +146,7 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 	funcs[buildInSystemCallName] = func(funcName string, args ...interface{}) (string, error) {
 		fn, ok := t.importFuncs[funcName]
 		if !ok {
-			return "", cfgcore.MakeError("not exist func: %s", funcName)
+			return "", cfgcore.MakeError("not existed func: %s", funcName)
 		}
 
 		values := ConstructFunctionArgList(args...)
@@ -174,11 +178,7 @@ func (t *TplEngine) importSelfModuleFuncs(funcs map[string]functional, fn func(t
 	}
 }
 
-// NewTplEngine create go template helper
-// To support this caller has a concept of import dependency which is recursive.
-//
-// As it recurses, it also sets the values to be appropriate for the parameters of the called function,
-// it looks like it's calling a local function.
+// NewTplEngine creates go template helper
 func NewTplEngine(values *TplValues, funcs *BuiltInObjectsFunc, tplName string, cli types2.ReadonlyClient, ctx context.Context) *TplEngine {
 	coreBuiltinFuncs := sprig.TxtFuncMap()
 

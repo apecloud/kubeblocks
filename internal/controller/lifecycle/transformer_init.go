@@ -1,24 +1,32 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package lifecycle
 
 import (
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
 
 type initTransformer struct {
@@ -26,9 +34,49 @@ type initTransformer struct {
 	originCluster *appsv1alpha1.Cluster
 }
 
-func (i *initTransformer) Transform(dag *graph.DAG) error {
+var _ graph.Transformer = &initTransformer{}
+
+func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	// put the cluster object first, it will be root vertex of DAG
-	rootVertex := &lifecycleVertex{obj: i.cluster, oriObj: i.originCluster}
+	rootVertex := &ictrltypes.LifecycleVertex{Obj: t.cluster, ObjCopy: t.originCluster, Action: ictrltypes.ActionStatusPtr()}
 	dag.AddVertex(rootVertex)
+
+	if !t.cluster.IsDeleting() {
+		t.handleLatestOpsRequestProcessingCondition()
+	}
+	if t.cluster.IsUpdating() {
+		t.handleClusterPhase()
+	}
 	return nil
+}
+
+func (t *initTransformer) handleClusterPhase() {
+	clusterPhase := t.cluster.Status.Phase
+	if clusterPhase == "" {
+		t.cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
+	} else if clusterPhase != appsv1alpha1.CreatingClusterPhase {
+		t.cluster.Status.Phase = appsv1alpha1.SpecReconcilingClusterPhase
+	}
+}
+
+// updateLatestOpsRequestProcessingCondition handles the latest opsRequest processing condition.
+func (t *initTransformer) handleLatestOpsRequestProcessingCondition() {
+	opsRecords, _ := opsutil.GetOpsRequestSliceFromCluster(t.cluster)
+	if len(opsRecords) == 0 {
+		return
+	}
+	ops := opsRecords[0]
+	opsBehaviour, ok := appsv1alpha1.OpsRequestBehaviourMapper[ops.Type]
+	if !ok {
+		return
+	}
+	opsCondition := newOpsRequestProcessingCondition(ops.Name, string(ops.Type), opsBehaviour.ProcessingReasonInClusterCondition)
+	oldCondition := meta.FindStatusCondition(t.cluster.Status.Conditions, opsCondition.Type)
+	if oldCondition == nil {
+		// if this condition not exists, insert it to the first position.
+		opsCondition.LastTransitionTime = metav1.Now()
+		t.cluster.Status.Conditions = append([]metav1.Condition{opsCondition}, t.cluster.Status.Conditions...)
+	} else {
+		meta.SetStatusCondition(&t.cluster.Status.Conditions, opsCondition)
+	}
 }

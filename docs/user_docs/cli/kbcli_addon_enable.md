@@ -19,11 +19,12 @@ kbcli addon enable ADDON_NAME [flags]
   
   # Enabled "prometheus" addon and its extra alertmanager component with custom resources settings
   kbcli addon enable prometheus --memory 512Mi/4Gi --storage 8Gi --replicas 2 \
-  --memory alertmanager:16Mi/256Mi --storage: alertmanager:1Gi --replicas alertmanager:2
+  --memory alertmanager:16Mi/256Mi --storage alertmanager:1Gi --replicas alertmanager:2
   
   # Enabled "prometheus" addon with tolerations
-  kbcli addon enable prometheus --tolerations '[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]' \
-  --tolerations 'alertmanager:[[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]]'
+  kbcli addon enable prometheus \
+  --tolerations '[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]' \
+  --tolerations 'alertmanager:[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"true"}]'
   
   # Enabled "prometheus" addon with helm like custom settings
   kbcli addon enable prometheus --set prometheus.alertmanager.image.tag=v0.24.0
@@ -38,6 +39,7 @@ kbcli addon enable ADDON_NAME [flags]
       --allow-missing-template-keys    If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
       --cpu stringArray                Sets addon CPU resource values (--cpu [extraName:]<request>/<limit>) (can specify multiple if has extra items))
       --dry-run string[="unchanged"]   Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --edit                           Edit the API resource
       --force                          ignoring the installable restrictions and forcefully enabling.
   -h, --help                           help for enable
       --memory stringArray             Sets addon memory resource values (--memory [extraName:]<request>/<limit>) (can specify multiple if has extra items))
@@ -46,7 +48,9 @@ kbcli addon enable ADDON_NAME [flags]
       --set stringArray                set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2), it's only being processed if addon's type is helm.
       --show-managed-fields            If true, keep the managedFields when printing objects in JSON or YAML format.
       --storage stringArray            Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items)). 
-                                       Additional notes for Helm type Addon, that resizing storage will fail if modified value is a storage request size 
+                                       Additional notes:
+                                       1. Specify '0' value will remove storage values settings and explicitly disable 'persistentVolumeEnabled' attribute.
+                                       2. For Helm type Addon, that resizing storage will fail if modified value is a storage request size 
                                        that belongs to StatefulSet's volume claim template, to resolve 'Failed' Addon status possible action is disable and 
                                        re-enable the addon (More info on how-to resize a PVC: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources).
                                        

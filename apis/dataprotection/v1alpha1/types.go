@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,27 +28,40 @@ const (
 	BackupFailed     BackupPhase = "Failed"
 )
 
-// BackupType the backup type, marked backup set is full or incremental or snapshot.
+// BackupType the backup type, marked backup set is datafile or logfile or snapshot.
 // +enum
-// +kubebuilder:validation:Enum={full,incremental,snapshot}
+// +kubebuilder:validation:Enum={datafile,logfile,snapshot}
 type BackupType string
 
 const (
-	BackupTypeFull        BackupType = "full"
-	BackupTypeIncremental BackupType = "incremental"
-	BackupTypeSnapshot    BackupType = "snapshot"
+	BackupTypeDataFile BackupType = "datafile"
+	BackupTypeLogFile  BackupType = "logfile"
+	BackupTypeSnapshot BackupType = "snapshot"
 )
 
-// BackupPolicyTemplatePhase defines phases for BackupPolicyTemplate CR.
+// BaseBackupType the base backup type.
 // +enum
-// +kubebuilder:validation:Enum={New,Available,InProgress,Failed}
-type BackupPolicyTemplatePhase string
+// +kubebuilder:validation:Enum={full,snapshot}
+type BaseBackupType string
+
+// CreatePVCPolicy the policy how to create the PersistentVolumeClaim for backup.
+// +enum
+// +kubebuilder:validation:Enum={IfNotPresent,Never}
+type CreatePVCPolicy string
 
 const (
-	ConfigNew        BackupPolicyTemplatePhase = "New"
-	ConfigAvailable  BackupPolicyTemplatePhase = "Available"
-	ConfigInProgress BackupPolicyTemplatePhase = "InProgress"
-	ConfigFailed     BackupPolicyTemplatePhase = "Failed"
+	CreatePVCPolicyNever        CreatePVCPolicy = "Never"
+	CreatePVCPolicyIfNotPresent CreatePVCPolicy = "IfNotPresent"
+)
+
+// BackupPolicyPhase defines phases for BackupPolicy CR.
+// +enum
+// +kubebuilder:validation:Enum={Available,Failed}
+type BackupPolicyPhase string
+
+const (
+	PolicyAvailable BackupPolicyPhase = "Available"
+	PolicyFailed    BackupPolicyPhase = "Failed"
 )
 
 // RestoreJobPhase The current phase. Valid values are New, InProgressPhy, InProgressLogic, Completed, Failed.

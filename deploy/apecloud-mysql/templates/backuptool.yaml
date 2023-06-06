@@ -1,20 +1,13 @@
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupTool
 metadata:
-  name: xtrabackup-mysql
+  name: xtrabackup-for-apecloud-mysql
   labels:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
   image: registry.cn-hangzhou.aliyuncs.com/apecloud/percona-xtrabackup
   deployKind: job
-  resources:
-    limits:
-      cpu: "1"
-      memory: 2Gi
-    requests:
-      cpu: "1"
-      memory: 128Mi
   env:
     - name: DATA_DIR
       value: /data/mysql/data
@@ -29,7 +22,7 @@ spec:
           exit 1
         fi
         mkdir -p /tmp/data/ && cd /tmp/data
-        xbstream -x < /${BACKUP_DIR}/${BACKUP_NAME}.xbstream
+        xbstream -x < ${BACKUP_DIR}/${BACKUP_NAME}.xbstream
         xtrabackup --decompress  --target-dir=/tmp/data/
         xtrabackup --prepare --target-dir=/tmp/data/
         find . -name "*.qp"|xargs rm -f
@@ -42,5 +35,8 @@ spec:
     restoreCommands: []
     incrementalRestoreCommands: []
   backupCommands:
-    - xtrabackup --compress --backup  --safe-slave-backup --slave-info --stream=xbstream --host=${DB_HOST} --user=${DB_USER} --password=${DB_PASSWORD} --datadir=${DATA_DIR} > /${BACKUP_DIR}/${BACKUP_NAME}.xbstream
+    - |
+      set -e
+      mkdir -p ${BACKUP_DIR}
+      xtrabackup --compress --backup  --safe-slave-backup --slave-info --stream=xbstream --host=${DB_HOST} --user=${DB_USER} --password=${DB_PASSWORD} --datadir=${DATA_DIR} > ${BACKUP_DIR}/${BACKUP_NAME}.xbstream
   incrementalBackupCommands: []

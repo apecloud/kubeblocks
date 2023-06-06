@@ -1,11 +1,11 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-	http://www.apache.org/licenses/LICENSE-2.0
+    http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -127,18 +127,14 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 	mysqlConfigConstraintPath,
 	mysqlScriptsPath string) (
 	*appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, *appsv1alpha1.Cluster) {
-
 	const mysqlCompName = "mysql"
-	const mysqlCompType = "mysql"
-
+	const mysqlCompDefName = "mysql"
 	const mysqlConfigName = "mysql-component-config"
 	const mysqlConfigConstraintName = "mysql8.0-config-constraints"
 	const mysqlScriptsConfigName = "apecloud-mysql-scripts"
-
 	const mysqlDataVolumeName = "data"
 	const mysqlConfigVolumeName = "mysql-config"
 	const mysqlScriptsVolumeName = "scripts"
-
 	const mysqlErrorFilePath = "/data/mysql/log/mysqld-error.log"
 	const mysqlGeneralFilePath = "/data/mysql/log/mysqld.log"
 	const mysqlSlowlogFilePath = "/data/mysql/log/mysqld-slowquery.log"
@@ -185,7 +181,7 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 	mode := int32(0755)
 	clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
 		SetConnectionCredential(map[string]string{"username": "root", "password": ""}, nil).
-		AddComponent(testapps.ConsensusMySQLComponent, mysqlCompType).
+		AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompDefName).
 		AddConfigTemplate(mysqlConfigName, configmap.Name, constraint.Name,
 			testCtx.DefaultNamespace, mysqlConfigVolumeName).
 		AddScriptTemplate(mysqlScriptsConfigName, mysqlScriptsConfigName,
@@ -203,7 +199,7 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 
 	By("Create a clusterVersion obj")
 	clusterVersionObj := testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.GetName()).
-		AddComponent(mysqlCompType).
+		AddComponentVersion(mysqlCompDefName).
 		AddContainerShort(testapps.DefaultMySQLContainerName, testapps.ApeCloudMySQLImage).
 		AddLabels(cfgcore.GenerateTPLUniqLabelKeyWithConfig(mysqlConfigName), configmap.Name,
 			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
@@ -220,7 +216,7 @@ func CreateSimpleConsensusMySQLClusterWithConfig(
 	}
 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 		clusterDefObj.Name, clusterVersionObj.Name).
-		AddComponent(mysqlCompName, mysqlCompType).
+		AddComponent(mysqlCompName, mysqlCompDefName).
 		SetReplicas(3).
 		SetEnabledLogs("error", "general", "slow").
 		AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
@@ -327,18 +323,10 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&components.StatefulSetReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("stateful-set-controller"),
-	}).SetupWithManager(k8sManager)
+	err = components.NewStatefulSetReconciler(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&components.DeploymentReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("deployment-controller"),
-	}).SetupWithManager(k8sManager)
+	err = components.NewDeploymentReconciler(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&k8score.EventReconciler{

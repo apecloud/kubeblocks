@@ -12,17 +12,21 @@ kbcli cluster revoke-role [flags]
 
 ```
   # revoke role from user
-  kbcli cluster revoke-role NAME --component-name COMPNAME --role ROLENAME
+  kbcli cluster revoke-role CLUSTERNAME --component COMPNAME --name USERNAME --role ROLENAME
+  # revoke role from user with default component
+  kbcli cluster revoke-role CLUSTERNAME --name USERNAME --role ROLENAME
+  # revoke role from user for instance
+  kbcli cluster revoke-role --instance INSTANCE --name USERNAME --role ROLENAME
 ```
 
 ### Options
 
 ```
-      --component-name string   Specify the name of component to be connected. If not specified, the first component will be used.
-  -h, --help                    help for revoke-role
-  -i, --instance string         Specify the name of instance to be connected.
-  -r, --role string             Role name should be one of {SUPERUSER, READWRITE, READONLY}
-  -u, --username string         Required. Specify the name of user.
+      --component string   Specify the name of component to be connected. If not specified, pick the first one.
+  -h, --help               help for revoke-role
+  -i, --instance string    Specify the name of instance to be connected.
+      --name string        Required user name, please specify it.
+  -r, --role string        Role name should be one of {SUPERUSER, READWRITE, READONLY}
 ```
 
 ### Options inherited from parent commands

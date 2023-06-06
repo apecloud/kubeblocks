@@ -1,23 +1,27 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package dataprotection
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/spf13/viper"
 	appv1 "k8s.io/api/apps/v1"
@@ -60,8 +64,6 @@ type RestoreJobReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.1/pkg/reconcile
 func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
-
 	// NOTES:
 	// setup common request context
 	reqCtx := intctrlutil.RequestCtx{
@@ -84,7 +86,6 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return *res, err
 	}
 
-	// restore job reconcile logic here
 	switch restoreJob.Status.Phase {
 	case "", dataprotectionv1alpha1.RestoreJobNew:
 		return r.doRestoreNewPhaseAction(reqCtx, restoreJob)
@@ -110,7 +111,7 @@ func (r *RestoreJobReconciler) doRestoreNewPhaseAction(
 	restoreJob *dataprotectionv1alpha1.RestoreJob) (ctrl.Result, error) {
 
 	// 1. get stateful service and
-	// 2. set stateful set replicate 0
+	// 2. set stateful replicas to 0
 	patch := []byte(`{"spec":{"replicas":0}}`)
 	if err := r.patchTargetCluster(reqCtx, restoreJob, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -170,11 +171,11 @@ func (r *RestoreJobReconciler) doRestoreInProgressPhyAction(
 
 	switch jobStatusConditions[0].Type {
 	case batchv1.JobComplete:
-		// update Phase to in Completed
+		// update Phase to Completed
 		restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobCompleted
 		restoreJob.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 		// get stateful service and
-		// set stateful set replicate to 1
+		// set stateful replicas to 1
 		patch := []byte(`{"spec":{"replicas":1}}`)
 		if err := r.patchTargetCluster(reqCtx, restoreJob, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -239,26 +240,19 @@ func (r *RestoreJobReconciler) buildPodSpec(reqCtx intctrlutil.RequestCtx, resto
 		return podSpec, err
 	}
 
-	// get backup policy
-	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
-	backupPolicyNameSpaceName := types.NamespacedName{
-		Namespace: reqCtx.Req.Namespace,
-		Name:      backup.Spec.BackupPolicyName,
-	}
-	if err := r.Client.Get(reqCtx.Ctx, backupPolicyNameSpaceName, backupPolicy); err != nil {
-		logger.Error(err, "Unable to get backupPolicy for backup.", "BackupPolicy", backupPolicyNameSpaceName)
-		return podSpec, err
-	}
-
 	// get backup tool
 	backupTool := &dataprotectionv1alpha1.BackupTool{}
 	backupToolNameSpaceName := types.NamespacedName{
 		Namespace: reqCtx.Req.Namespace,
-		Name:      backupPolicy.Spec.BackupToolName,
+		Name:      backup.Status.BackupToolName,
 	}
 	if err := r.Client.Get(reqCtx.Ctx, backupToolNameSpaceName, backupTool); err != nil {
 		logger.Error(err, "Unable to get backupTool for backup.", "BackupTool", backupToolNameSpaceName)
 		return podSpec, err
+	}
+
+	if len(backup.Status.PersistentVolumeClaimName) == 0 {
+		return podSpec, nil
 	}
 
 	container := corev1.Container{}
@@ -272,9 +266,19 @@ func (r *RestoreJobReconciler) buildPodSpec(reqCtx intctrlutil.RequestCtx, resto
 
 	container.VolumeMounts = restoreJob.Spec.TargetVolumeMounts
 
+	// add the volumeMounts with backup volume
+	restoreVolumeName := fmt.Sprintf("restore-%s", backup.Status.PersistentVolumeClaimName)
+	remoteVolume := corev1.Volume{
+		Name: restoreVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: backup.Status.PersistentVolumeClaimName,
+			},
+		},
+	}
 	// add remote volumeMounts
 	remoteVolumeMount := corev1.VolumeMount{}
-	remoteVolumeMount.Name = backupPolicy.Spec.RemoteVolume.Name
+	remoteVolumeMount.Name = restoreVolumeName
 	remoteVolumeMount.MountPath = "/data"
 	container.VolumeMounts = append(container.VolumeMounts, remoteVolumeMount)
 
@@ -299,7 +303,7 @@ func (r *RestoreJobReconciler) buildPodSpec(reqCtx intctrlutil.RequestCtx, resto
 	podSpec.Volumes = restoreJob.Spec.TargetVolumes
 
 	// add remote volumes
-	podSpec.Volumes = append(podSpec.Volumes, backupPolicy.Spec.RemoteVolume)
+	podSpec.Volumes = append(podSpec.Volumes, remoteVolume)
 
 	// TODO(dsj): mount readonly remote volumes for restore.
 	// podSpec.Volumes[0].PersistentVolumeClaim.ReadOnly = true
@@ -320,9 +324,9 @@ func (r *RestoreJobReconciler) patchTargetCluster(reqCtx intctrlutil.RequestCtx,
 	clusterItemsLen := len(clusterTarget.Items)
 	if clusterItemsLen != 1 {
 		if clusterItemsLen <= 0 {
-			restoreJob.Status.FailureReason = "Can not found any stateful sets by labelsSelector."
+			restoreJob.Status.FailureReason = "Can not find any statefulsets with labelsSelector."
 		} else {
-			restoreJob.Status.FailureReason = "Match labels result more than one, check labelsSelector."
+			restoreJob.Status.FailureReason = "Match more than one results, please check the labelsSelector."
 		}
 		restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobFailed
 		reqCtx.Log.Info(restoreJob.Status.FailureReason)

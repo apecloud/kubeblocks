@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package apps
@@ -25,11 +28,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
-// CreateRestartOpsRequest creates a OpsRequest of restart type for testing.
-func CreateRestartOpsRequest(testCtx testutil.TestContext, clusterName, opsRequestName string, componentNames []string) *appsv1alpha1.OpsRequest {
+// CreateRestartOpsRequest creates an OpsRequest of restart type for testing.
+func CreateRestartOpsRequest(testCtx *testutil.TestContext, clusterName, opsRequestName string, componentNames []string) *appsv1alpha1.OpsRequest {
 	opsRequest := NewOpsRequestObj(opsRequestName, testCtx.DefaultNamespace, clusterName, appsv1alpha1.RestartType)
 	componentList := make([]appsv1alpha1.ComponentOps, len(componentNames))
 	for i := range componentNames {
@@ -45,6 +49,10 @@ func NewOpsRequestObj(opsRequestName, namespace, clusterName string, opsType app
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      opsRequestName,
 			Namespace: namespace,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:    clusterName,
+				constant.OpsRequestTypeLabelKey: string(opsType),
+			},
 		},
 		Spec: appsv1alpha1.OpsRequestSpec{
 			ClusterRef: clusterName,
@@ -61,7 +69,7 @@ func CreateOpsRequest(ctx context.Context, testCtx testutil.TestContext, opsRequ
 	return opsRequest
 }
 
-// GetOpsRequestCompPhase gets the component phase of testing OpsRequest  for verification.
+// GetOpsRequestCompPhase gets the component phase of testing OpsRequest for verification.
 func GetOpsRequestCompPhase(ctx context.Context, testCtx testutil.TestContext, opsName, componentName string) func(g gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
 	return func(g gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
 		tmpOps := &appsv1alpha1.OpsRequest{}

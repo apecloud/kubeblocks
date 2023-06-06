@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package component
@@ -22,6 +25,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -29,44 +33,75 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// BuildComponent generates a new Component object, which is a mixture of
-// component-related configs from input Cluster, ClusterDef and ClusterVersion.
-func BuildComponent(
-	reqCtx intctrlutil.RequestCtx,
+func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
 	cluster appsv1alpha1.Cluster,
 	clusterDef appsv1alpha1.ClusterDefinition,
 	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
 	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
-) *SynthesizedComponent {
+) (*SynthesizedComponent, error) {
+	synthesizedComp, err := buildComponent(reqCtx, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+	if err != nil {
+		return nil, err
+	}
+	/*
+		if err := buildRestoreInfoFromBackup(reqCtx, cli, cluster, synthesizedComp); err != nil {
+			return nil, err
+		}
+	*/
+	return synthesizedComp, nil
+}
 
+func BuildComponent(reqCtx intctrlutil.RequestCtx,
+	cluster appsv1alpha1.Cluster,
+	clusterDef appsv1alpha1.ClusterDefinition,
+	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
+	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
+) (*SynthesizedComponent, error) {
+	return buildComponent(reqCtx, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+}
+
+// buildComponent generates a new Component object, which is a mixture of
+// component-related configs from input Cluster, ClusterDef and ClusterVersion.
+func buildComponent(reqCtx intctrlutil.RequestCtx,
+	cluster appsv1alpha1.Cluster,
+	clusterDef appsv1alpha1.ClusterDefinition,
+	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
+	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
+) (*SynthesizedComponent, error) {
+	var err error
 	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
 		ClusterDefName:        clusterDef.Name,
+		ClusterName:           cluster.Name,
+		ClusterUID:            string(cluster.UID),
 		Name:                  clusterCompSpec.Name,
-		Type:                  clusterCompDefObj.Name,
+		CompDefName:           clusterCompDefObj.Name,
 		CharacterType:         clusterCompDefObj.CharacterType,
-		MaxUnavailable:        clusterCompDefObj.MaxUnavailable,
 		WorkloadType:          clusterCompDefObj.WorkloadType,
+		StatelessSpec:         clusterCompDefObj.StatelessSpec,
+		StatefulSpec:          clusterCompDefObj.StatefulSpec,
 		ConsensusSpec:         clusterCompDefObj.ConsensusSpec,
+		ReplicationSpec:       clusterCompDefObj.ReplicationSpec,
 		PodSpec:               clusterCompDefObj.PodSpec,
 		Probes:                clusterCompDefObj.Probes,
 		LogConfigs:            clusterCompDefObj.LogConfigs,
 		HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
+		ConfigTemplates:       clusterCompDefObj.ConfigSpecs,
+		ScriptTemplates:       clusterCompDefObj.ScriptSpecs,
+		VolumeTypes:           clusterCompDefObj.VolumeTypes,
+		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
+		StatefulSetWorkload:   clusterCompDefObj.GetStatefulSetWorkload(),
+		MinAvailable:          clusterCompSpec.GetMinAvailable(clusterCompDefObj.GetMinAvailable()),
 		Replicas:              clusterCompSpec.Replicas,
 		EnabledLogs:           clusterCompSpec.EnabledLogs,
 		TLS:                   clusterCompSpec.TLS,
 		Issuer:                clusterCompSpec.Issuer,
-		VolumeTypes:           clusterCompDefObj.VolumeTypes,
-		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
-	}
-
-	// resolve component.ConfigTemplates
-	if clusterCompDefObj.ConfigSpecs != nil {
-		component.ConfigTemplates = clusterCompDefObj.ConfigSpecs
-	}
-	if clusterCompDefObj.ScriptSpecs != nil {
-		component.ScriptTemplates = clusterCompDefObj.ScriptSpecs
+		ComponentDef:          clusterCompSpec.ComponentDefRef,
+		ServiceAccountName:    clusterCompSpec.ServiceAccountName,
 	}
 
 	if len(clusterCompVers) > 0 && clusterCompVers[0] != nil {
@@ -82,34 +117,32 @@ func BuildComponent(
 		}
 	}
 
+	// handle component.PodSpec extra settings
 	// set affinity and tolerations
 	affinity := cluster.Spec.Affinity
 	if clusterCompSpec.Affinity != nil {
 		affinity = clusterCompSpec.Affinity
 	}
-	podAffinity := buildPodAffinity(&cluster, affinity, component)
-	component.PodSpec.Affinity = patchBuiltInAffinity(podAffinity)
-	component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(&cluster, affinity, component)
-
-	tolerations := cluster.Spec.Tolerations
-	if len(clusterCompSpec.Tolerations) != 0 {
-		tolerations = clusterCompSpec.Tolerations
+	if component.PodSpec.Affinity, err = buildPodAffinity(&cluster, affinity, component); err != nil {
+		reqCtx.Log.Error(err, "build pod affinity failed.")
+		return nil, err
 	}
-	component.PodSpec.Tolerations = PatchBuiltInToleration(tolerations)
+	component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(&cluster, affinity, component)
+	if component.PodSpec.Tolerations, err = BuildTolerations(&cluster, &clusterCompSpec); err != nil {
+		reqCtx.Log.Error(err, "build pod tolerations failed.")
+		return nil, err
+	}
 
 	if clusterCompSpec.VolumeClaimTemplates != nil {
 		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()
 	}
-
 	if clusterCompSpec.Resources.Requests != nil || clusterCompSpec.Resources.Limits != nil {
 		component.PodSpec.Containers[0].Resources = clusterCompSpec.Resources
 	}
-
 	if clusterCompDefObj.Service != nil {
 		service := corev1.Service{Spec: clusterCompDefObj.Service.ToSVCSpec()}
 		service.Spec.Type = corev1.ServiceTypeClusterIP
 		component.Services = append(component.Services, service)
-
 		for _, item := range clusterCompSpec.Services {
 			service = corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -122,11 +155,12 @@ func BuildComponent(
 			component.Services = append(component.Services, service)
 		}
 	}
-
 	component.PrimaryIndex = clusterCompSpec.PrimaryIndex
+	// set component.PodSpec.ServiceAccountName
+	component.PodSpec.ServiceAccountName = component.ServiceAccountName
 
-	// TODO(zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
-	// At present, it is possible to distinguish between ConfigMap volume and normal volume,
+	// TODO: (zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
+	// At present, it is not possible to distinguish between ConfigMap volume and normal volume,
 	// Compare the VolumeName of configTemplateRef and Name of VolumeMounts
 	//
 	// if component.VolumeClaimTemplates == nil {
@@ -136,18 +170,15 @@ func BuildComponent(
 	// }
 
 	buildMonitorConfig(&clusterCompDef, &clusterCompSpec, component)
-	err := buildProbeContainers(reqCtx, component)
-	if err != nil {
+	if err = buildProbeContainers(reqCtx, component); err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
-		return nil
+		return nil, err
 	}
-
 	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
-
-	return component
+	return component, nil
 }
 
-// appendOrOverrideContainerAttr is used to append targetContainer to compContainers or override the attributes of compContainers with a given targetContainer,
+// appendOrOverrideContainerAttr appends targetContainer to compContainers or overrides the attributes of compContainers with a given targetContainer,
 // if targetContainer does not exist in compContainers, it will be appended. otherwise it will be updated with the attributes of the target container.
 func appendOrOverrideContainerAttr(compContainers []corev1.Container, targetContainer corev1.Container) []corev1.Container {
 	index, compContainer := intctrlutil.GetContainerByName(compContainers, targetContainer.Name)
@@ -223,7 +254,7 @@ func doContainerAttrOverride(compContainer *corev1.Container, container corev1.C
 // GetEnvReplacementMapForConnCredential gets the replacement map for connect credential
 func GetEnvReplacementMapForConnCredential(clusterName string) map[string]string {
 	return map[string]string{
-		constant.ConnCredentialPlaceHolder: GenerateConnCredential(clusterName),
+		constant.KBConnCredentialPlaceHolder: GenerateConnCredential(clusterName),
 	}
 }
 
@@ -237,12 +268,20 @@ func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedVal
 }
 
 // GetReplacementMapForBuiltInEnv gets the replacement map for KubeBlocks built-in environment variables.
-func GetReplacementMapForBuiltInEnv(clusterName, componentName string) map[string]string {
-	return map[string]string{
+func GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
+	cc := fmt.Sprintf("%s-%s", clusterName, componentName)
+	replacementMap := map[string]string{
 		constant.KBClusterNamePlaceHolder:     clusterName,
 		constant.KBCompNamePlaceHolder:        componentName,
-		constant.KBClusterCompNamePlaceHolder: fmt.Sprintf("%s-%s", clusterName, componentName),
+		constant.KBClusterCompNamePlaceHolder: cc,
+		constant.KBComponentEnvCMPlaceHolder:  fmt.Sprintf("%s-env", cc),
 	}
+	if len(clusterUID) > 8 {
+		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = clusterUID[len(clusterUID)-8:]
+	} else {
+		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = clusterUID
+	}
+	return replacementMap
 }
 
 // ReplaceNamedVars replaces the placeholder in targetVar if it is match and returns the replaced result

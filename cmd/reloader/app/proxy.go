@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package app
@@ -72,11 +75,11 @@ func (r *reconfigureProxy) initContainerKiller() error {
 
 func (r *reconfigureProxy) StopContainer(ctx context.Context, request *cfgproto.StopContainerRequest) (*cfgproto.StopContainerResponse, error) {
 	if r.killer == nil {
-		return nil, cfgcore.MakeError("container killer is not initialized.")
+		return nil, cfgcore.MakeError("container killing process is not initialized.")
 	}
 	ds := request.GetContainerIDs()
 	if len(ds) == 0 {
-		return &cfgproto.StopContainerResponse{ErrMessage: "not any containerId."}, nil
+		return &cfgproto.StopContainerResponse{ErrMessage: "no match for any container with containerId."}, nil
 	}
 	if err := r.killer.Kill(ctx, ds, stopContainerSignal, nil); err != nil {
 		return nil, err
@@ -86,11 +89,11 @@ func (r *reconfigureProxy) StopContainer(ctx context.Context, request *cfgproto.
 
 func (r *reconfigureProxy) OnlineUpgradeParams(ctx context.Context, request *cfgproto.OnlineUpgradeParamsRequest) (*cfgproto.OnlineUpgradeParamsResponse, error) {
 	if r.updater == nil {
-		return nil, cfgcore.MakeError("online updater is not initialized.")
+		return nil, cfgcore.MakeError("online updating process is not initialized.")
 	}
 	params := request.GetParams()
 	if len(params) == 0 {
-		return nil, cfgcore.MakeError("update params not empty.")
+		return nil, cfgcore.MakeError("update params is empty.")
 	}
 	if err := r.updater(ctx, params); err != nil {
 		return nil, err
@@ -105,7 +108,7 @@ func (r *reconfigureProxy) initOnlineUpdater(opt *VolumeWatcherOpts) error {
 
 	updater, err := cfgcm.OnlineUpdateParamsHandle(opt.TPLScriptPath, opt.FormatterConfig, opt.DataType, opt.DSN)
 	if err != nil {
-		return cfgcore.WrapError(err, "failed to create online updater")
+		return cfgcore.WrapError(err, "failed to create online updating process")
 	}
 	r.updater = updater
 	return nil

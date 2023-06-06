@@ -5,15 +5,12 @@ title: kbcli cluster edit-config
 Edit the config file of the component.
 
 ```
-kbcli cluster edit-config [flags]
+kbcli cluster edit-config NAME [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file] [flags]
 ```
 
 ### Examples
 
 ```
-  # edit config for component
-  kbcli cluster edit-config <cluster-name> [--component=<component-name>] [--config-spec=<config-spec-name>] [--config-file=<config-file>]
-  
   # update mysql max_connections, cluster name is mycluster
   kbcli cluster edit-config mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf
 ```
@@ -21,14 +18,16 @@ kbcli cluster edit-config [flags]
 ### Options
 
 ```
-      --component string             Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.
-      --config-file string           Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-config'.
-      --config-spec string           Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). What templates or configure files are available for this cluster can refer to kbcli sub command: 'kbcli cluster describe-config'.
-  -h, --help                         help for edit-config
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
-      --replace                      Specify whether to replace the config file. Default to false.
-      --set strings                  Specify updated parameter list. For details about the parameters, refer to kbcli sub command: 'kbcli cluster describe-config'.
-      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
+      --component string               Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.
+      --config-file string             Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). For available templates and configs, refer to: 'kbcli cluster describe-config'.
+      --config-spec string             Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). For available templates and configs, refer to: 'kbcli cluster describe-config'.
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+  -h, --help                           help for edit-config
+      --name string                    OpsRequest name. if not specified, it will be randomly generated 
+  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --replace                        Boolean flag to enable replacing config file. Default with false.
+      --set strings                    Specify parameters list to be updated. For more details, refer to 'kbcli cluster describe-config'.
+      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```
 
 ### Options inherited from parent commands

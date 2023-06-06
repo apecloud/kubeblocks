@@ -60,9 +60,18 @@ spec:
           spec:
             description: OpsRequestSpec defines the desired state of OpsRequest
             properties:
+              cancel:
+                description: 'cancel defines the action to cancel the Pending/Creating/Running
+                  opsRequest, supported types: [VerticalScaling, HorizontalScaling].
+                  once cancel is set to true, this opsRequest will be canceled and
+                  modifying this property again will not take effect.'
+                type: boolean
               clusterRef:
                 description: clusterRef references clusterDefinition.
                 type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.clusterRef
+                  rule: self == oldSelf
               expose:
                 description: expose defines services the component needs to expose.
                 items:
@@ -78,10 +87,11 @@ spec:
                             additionalProperties:
                               type: string
                             description: 'If ServiceType is LoadBalancer, cloud provider
-                              related parameters can be put here More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer'
+                              related parameters can be put here More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
                             type: object
                           name:
                             description: Service name
+                            maxLength: 15
                             type: string
                           serviceType:
                             default: ClusterIP
@@ -90,15 +100,16 @@ spec:
                               LoadBalancer. "ClusterIP" allocates a cluster-internal
                               IP address for load-balancing to endpoints. Endpoints
                               are determined by the selector or if that is not specified,
-                              by manual construction of an Endpoints object or EndpointSlice
-                              objects. If clusterIP is "None", no virtual IP is allocated
-                              and the endpoints are published as a set of endpoints
-                              rather than a virtual IP. "NodePort" builds on ClusterIP
-                              and allocates a port on every node which routes to the
-                              same endpoints as the clusterIP. "LoadBalancer" builds
-                              on NodePort and creates an external load-balancer (if
-                              supported in the current cloud) which routes to the
-                              same endpoints as the clusterIP. More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
+                              they are determined by manual construction of an Endpoints
+                              object or EndpointSlice objects. If clusterIP is "None",
+                              no virtual IP is allocated and the endpoints are published
+                              as a set of endpoints rather than a virtual IP. "NodePort"
+                              builds on ClusterIP and allocates a port on every node
+                              which routes to the same endpoints as the clusterIP.
+                              "LoadBalancer" builds on NodePort and creates an external
+                              load-balancer (if supported in the current cloud) which
+                              routes to the same endpoints as the clusterIP. More
+                              info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.'
                             enum:
                             - ClusterIP
                             - NodePort
@@ -117,6 +128,9 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.expose
+                  rule: self == oldSelf
               horizontalScaling:
                 description: horizontalScaling defines what component need to horizontal
                   scale the specified replicas.
@@ -140,6 +154,9 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.horizontalScaling
+                  rule: self == oldSelf
               reconfigure:
                 description: reconfigure defines the variables that need to input
                   when updating configuration.
@@ -207,6 +224,9 @@ spec:
                 - componentName
                 - configurations
                 type: object
+                x-kubernetes-validations:
+                - message: forbidden to update spec.reconfigure
+                  rule: self == oldSelf
               restart:
                 description: restart the specified component.
                 items:
@@ -223,6 +243,52 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.restart
+                  rule: self == oldSelf
+              restoreFrom:
+                description: cluster RestoreFrom backup or point in time
+                properties:
+                  backup:
+                    description: use the backup name and component name for restore,
+                      support for multiple components' recovery.
+                    items:
+                      properties:
+                        ref:
+                          description: specify a reference backup to restore
+                          properties:
+                            name:
+                              description: specified the name
+                              type: string
+                            namespace:
+                              description: specified the namespace
+                              type: string
+                          type: object
+                      type: object
+                    type: array
+                  pointInTime:
+                    description: specified the point in time to recovery
+                    properties:
+                      ref:
+                        description: specify a reference source cluster to restore
+                        properties:
+                          name:
+                            description: specified the name
+                            type: string
+                          namespace:
+                            description: specified the namespace
+                            type: string
+                        type: object
+                      time:
+                        description: specify the time point to restore, with UTC as
+                          the time zone.
+                        format: date-time
+                        type: string
+                    type: object
+                type: object
+                x-kubernetes-validations:
+                - message: forbidden to update spec.restoreFrom
+                  rule: self == oldSelf
               ttlSecondsAfterSucceed:
                 description: ttlSecondsAfterSucceed OpsRequest will be deleted after
                   TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.
@@ -241,6 +307,9 @@ spec:
                 - Stop
                 - Expose
                 type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.type
+                  rule: self == oldSelf
               upgrade:
                 description: upgrade specifies the cluster version by specifying clusterVersionRef.
                 properties:
@@ -250,6 +319,9 @@ spec:
                 required:
                 - clusterVersionRef
                 type: object
+                x-kubernetes-validations:
+                - message: forbidden to update spec.upgrade
+                  rule: self == oldSelf
               verticalScaling:
                 description: verticalScaling defines what component need to vertical
                   scale the specified compute resources.
@@ -277,6 +349,9 @@ spec:
                       x-kubernetes-list-map-keys:
                       - name
                       x-kubernetes-list-type: map
+                    class:
+                      description: class specifies the class name of the component
+                      type: string
                     componentName:
                       description: componentName cluster component name.
                       type: string
@@ -310,6 +385,9 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.verticalScaling
+                  rule: self == oldSelf
               volumeExpansion:
                 description: volumeExpansion defines what component and volumeClaimTemplate
                   need to expand the specified storage.
@@ -352,13 +430,24 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.volumeExpansion
+                  rule: self == oldSelf
             required:
             - clusterRef
             - type
             type: object
+            x-kubernetes-validations:
+            - message: forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']
+              rule: 'has(self.cancel) && self.cancel ? (self.type in [''VerticalScaling'',
+                ''HorizontalScaling'']) : true'
           status:
             description: OpsRequestStatus defines the observed state of OpsRequest
             properties:
+              cancelTimestamp:
+                description: CancelTimestamp defines cancel time.
+                format: date-time
+                type: string
               clusterGeneration:
                 description: ClusterGeneration records the cluster generation after
                   handling the opsRequest action.
@@ -539,6 +628,9 @@ spec:
                           x-kubernetes-list-map-keys:
                           - name
                           x-kubernetes-list-type: map
+                        class:
+                          description: the last class name of the component.
+                          type: string
                         limits:
                           additionalProperties:
                             anyOf:
@@ -575,10 +667,11 @@ spec:
                                   type: string
                                 description: 'If ServiceType is LoadBalancer, cloud
                                   provider related parameters can be put here More
-                                  info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer'
+                                  info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
                                 type: object
                               name:
                                 description: Service name
+                                maxLength: 15
                                 type: string
                               serviceType:
                                 default: ClusterIP
@@ -587,17 +680,17 @@ spec:
                                   and LoadBalancer. "ClusterIP" allocates a cluster-internal
                                   IP address for load-balancing to endpoints. Endpoints
                                   are determined by the selector or if that is not
-                                  specified, by manual construction of an Endpoints
-                                  object or EndpointSlice objects. If clusterIP is
-                                  "None", no virtual IP is allocated and the endpoints
-                                  are published as a set of endpoints rather than
-                                  a virtual IP. "NodePort" builds on ClusterIP and
-                                  allocates a port on every node which routes to the
-                                  same endpoints as the clusterIP. "LoadBalancer"
+                                  specified, they are determined by manual construction
+                                  of an Endpoints object or EndpointSlice objects.
+                                  If clusterIP is "None", no virtual IP is allocated
+                                  and the endpoints are published as a set of endpoints
+                                  rather than a virtual IP. "NodePort" builds on ClusterIP
+                                  and allocates a port on every node which routes
+                                  to the same endpoints as the clusterIP. "LoadBalancer"
                                   builds on NodePort and creates an external load-balancer
                                   (if supported in the current cloud) which routes
                                   to the same endpoints as the clusterIP. More info:
-                                  https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types'
+                                  https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.'
                                 enum:
                                 - ClusterIP
                                 - NodePort
@@ -649,6 +742,8 @@ spec:
                 - Pending
                 - Creating
                 - Running
+                - Cancelling
+                - Cancelled
                 - Failed
                 - Succeed
                 type: string

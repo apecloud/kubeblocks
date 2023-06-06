@@ -7,27 +7,27 @@
 {{- if gt $phy_memory 0 }}
 {{- $shared_buffers = div $phy_memory 4 }}
 {{- $max_connections = min ( div $phy_memory 9531392 ) 5000 }}
-{{- end -}}
+{{- end }}
 
 {{- if ge $shared_buffers 1024 }}
 {{- $shared_buffers = div $shared_buffers 1024 }}
-{{- $buffer_unit = "KB" }}
-{{- end -}}
+{{- $buffer_unit = "kB" }}
+{{- end }}
 
 {{- if ge $shared_buffers 1024 }}
 {{- $shared_buffers = div $shared_buffers 1024 }}
 {{- $buffer_unit = "MB" }}
-{{- end -}}
+{{- end }}
 
 {{- if ge $shared_buffers 1024 }}
 {{- $shared_buffers = div $shared_buffers 1024 }}
 {{ $buffer_unit = "GB" }}
-{{- end -}}
+{{- end }}
 
 listen_addresses = '*'
 port = '5432'
-#archive_command = 'wal_dir=/pg/arcwal; [[ $(date +%H%M) == 1200 ]] && rm -rf ${wal_dir}/$(date -d"yesterday" +%Y%m%d); /bin/mkdir -p ${wal_dir}/$(date +%Y%m%d) && /usr/bin/lz4 -q -z %p > ${wal_dir}/$(date +%Y%m%d)/%f.lz4'
-#archive_mode = 'True'
+archive_command = '/bin/true'
+archive_mode = 'on'
 auto_explain.log_analyze = 'True'
 auto_explain.log_min_duration = '1s'
 auto_explain.log_nested_statements = 'True'
@@ -57,14 +57,22 @@ idle_in_transaction_session_timeout = '1h'
 listen_addresses = '0.0.0.0'
 log_autovacuum_min_duration = '1s'
 log_checkpoints = 'True'
+
+{{- block "logsBlock" . }}
+{{- if hasKey $.component "enabledLogs" }}
+{{- if mustHas "running" $.component.enabledLogs }}
+logging_collector = 'True'
 log_destination = 'csvlog'
 log_directory = 'log'
 log_filename = 'postgresql-%Y-%m-%d.log'
+{{ end -}}
+{{ end -}}
+{{ end }}
+
 log_lock_waits = 'True'
 log_min_duration_statement = '100'
 log_replication_commands = 'True'
 log_statement = 'ddl'
-logging_collector = 'True'
 #maintenance_work_mem = '3952MB'
 max_connections = '{{ $max_connections }}'
 max_locks_per_transaction = '128'
@@ -78,18 +86,22 @@ max_standby_archive_delay = '10min'
 max_standby_streaming_delay = '3min'
 max_sync_workers_per_subscription = '6'
 max_wal_senders = '24'
-max_wal_size = '100GB'
 max_worker_processes = '8'
-min_wal_size = '20GB'
+# max_wal_size = '100GB'
+max_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 2097152 ) 4096 ) 32768 ) }}'
+{{- if gt $phy_memory 0 }}
+# min_wal_size = '20GB'
+min_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 8388608 ) 2048 ) 8192 ) }}'
+{{- end }}
 password_encryption = 'md5'
 pg_stat_statements.max = '5000'
-pg_stat_statements.track = 'all'
+pg_stat_statements.track = 'top'
 pg_stat_statements.track_planning = 'False'
 pg_stat_statements.track_utility = 'False'
 random_page_cost = '1.1'
 #auto generated
 shared_buffers = '{{ printf "%d%s" $shared_buffers $buffer_unit }}'
-shared_preload_libraries = 'pg_stat_statements, auto_explain'
+# shared_preload_libraries = 'pg_stat_statements,auto_explain,bg_mon,pgextwlist,pg_auth_mon,set_user,pg_cron,pg_stat_kcache'
 superuser_reserved_connections = '10'
 temp_file_limit = '100GB'
 #timescaledb.max_background_workers = '6'
@@ -102,7 +114,7 @@ vacuum_cost_delay = '2ms'
 vacuum_cost_limit = '10000'
 vacuum_defer_cleanup_age = '50000'
 wal_buffers = '16MB'
-wal_keep_size = '20GB'
+wal_keep_size = '4GB'
 wal_level = 'replica'
 wal_log_hints = 'on'
 wal_receiver_status_interval = '1s'
@@ -110,13 +122,14 @@ wal_receiver_timeout = '60s'
 wal_writer_delay = '20ms'
 wal_writer_flush_after = '1MB'
 work_mem = '32MB'
+wal_init_zero = off
 
 {{- if $.component.tls }}
 {{- $ca_file := getCAFile }}
 {{- $cert_file := getCertFile }}
 {{- $key_file := getKeyFile }}
 # tls
-ssl=ON
+ssl= 'True'
 ssl_ca_file={{ $ca_file }}
 ssl_cert_file={{ $cert_file }}
 ssl_key_file={{ $key_file }}

@@ -128,7 +128,28 @@ resources:
     namespaced: true
   domain: kubeblocks.io
   group: apps
-  kind: ClassFamily
+  kind: ComponentResourceConstraint
   path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: kubeblocks.io
+  group: apps
+  kind: ComponentClassDefinition
+  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: workloads
+  kind: ConsensusSet
+  path: github.com/apecloud/kubeblocks/apis/workloads/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
 version: "3"

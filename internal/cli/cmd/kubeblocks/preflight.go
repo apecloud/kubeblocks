@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package kubeblocks
@@ -22,28 +25,27 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 
-	"github.com/ahmetalpbalkan/go-cursor"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	analyze "github.com/replicatedhq/troubleshoot/pkg/analyze"
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
+	"helm.sh/helm/v3/pkg/cli/values"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	preflightv1beta2 "github.com/apecloud/kubeblocks/externalapis/preflight/v1beta2"
+	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	kbpreflight "github.com/apecloud/kubeblocks/internal/preflight"
-	kbinteractive "github.com/apecloud/kubeblocks/internal/preflight/interactive"
 )
 
 const (
-	flagInteractive               = "interactive"
-	flagFormat                    = "format"
 	flagCollectorImage            = "collector-image"
 	flagCollectorPullPolicy       = "collector-pullpolicy"
 	flagCollectWithoutPermissions = "collect-without-permissions"
@@ -54,6 +56,12 @@ const (
 	flagDebug                     = "debug"
 	flagNamespace                 = "namespace"
 	flagVerbose                   = "verbose"
+	flagForce                     = "force"
+	flagFormat                    = "format"
+
+	PreflightPattern     = "data/%s_preflight.yaml"
+	HostPreflightPattern = "data/%s_hostpreflight.yaml"
+	PreflightMessage     = "Kubernetes cluster preflight"
 )
 
 var (
@@ -73,11 +81,6 @@ var (
 		kbcli kubeblocks preflight preflight-check.yaml --interactive=true`)
 )
 
-const (
-	EKSHostPreflight = "data/eks_hostpreflight.yaml"
-	EKSPreflight     = "data/eks_preflight.yaml"
-)
-
 // PreflightOptions declares the arguments accepted by the preflight command
 type PreflightOptions struct {
 	factory cmdutil.Factory
@@ -87,6 +90,8 @@ type PreflightOptions struct {
 	checkYamlData [][]byte
 	namespace     string
 	verbose       bool
+	force         bool
+	ValueOpts     values.Options
 }
 
 func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -100,17 +105,14 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Short:   "Run and retrieve preflight checks for KubeBlocks.",
 		Example: preflightExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(p.complete(f, args))
-			util.CheckErr(p.validate())
-			util.CheckErr(p.run())
+			util.CheckErr(p.Preflight(f, args, values.Options{}))
 		},
 	}
 	// add flags
-	cmd.Flags().BoolVar(p.Interactive, flagInteractive, false, "interactive preflights, default value is false")
-	cmd.Flags().StringVar(p.Format, flagFormat, "yaml", "output format, one of human, json, yaml. only used when interactive is set to false, default format is yaml")
+	cmd.Flags().StringVar(p.Format, flagFormat, "yaml", "output format, one of json, yaml. only used when interactive is set to false, default format is yaml")
 	cmd.Flags().StringVar(p.CollectorImage, flagCollectorImage, *p.CollectorImage, "the full name of the collector image to use")
 	cmd.Flags().StringVar(p.CollectorPullPolicy, flagCollectorPullPolicy, *p.CollectorPullPolicy, "the pull policy of the collector image")
-	cmd.Flags().BoolVar(p.CollectWithoutPermissions, flagCollectWithoutPermissions, *p.CollectWithoutPermissions, "always run preflight checks even if some require permissions that preflight does not have")
+	cmd.Flags().BoolVar(p.CollectWithoutPermissions, flagCollectWithoutPermissions, *p.CollectWithoutPermissions, "always run preflight checks even if some required permissions that preflight does not have")
 	cmd.Flags().StringVar(p.Selector, flagSelector, *p.Selector, "selector (label query) to filter remote collection nodes on.")
 	cmd.Flags().StringVar(p.SinceTime, flagSinceTime, *p.SinceTime, "force pod logs collectors to return logs after a specific date (RFC3339)")
 	cmd.Flags().StringVar(p.Since, flagSince, *p.Since, "force pod logs collectors to return logs newer than a relative duration like 5s, 2m, or 3h.")
@@ -123,47 +125,66 @@ func NewPreflightCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 
 func LoadVendorCheckYaml(vendorName util.K8sProvider) ([][]byte, error) {
 	var yamlDataList [][]byte
-	switch vendorName {
-	case util.EKSProvider:
-		if data, err := defaultVendorYamlData.ReadFile(EKSHostPreflight); err == nil {
-			yamlDataList = append(yamlDataList, data)
-		}
-		if data, err := defaultVendorYamlData.ReadFile(EKSPreflight); err == nil {
-			yamlDataList = append(yamlDataList, data)
-		}
-	case util.UnknownProvider:
-		fallthrough
-	default:
-		fmt.Println("unsupported k8s provider, and the validation of provider will coming soon")
-		return yamlDataList, errors.New("no supported provider")
+	if data, err := defaultVendorYamlData.ReadFile(newPreflightPath(vendorName)); err == nil {
+		yamlDataList = append(yamlDataList, data)
+	}
+	if data, err := defaultVendorYamlData.ReadFile(newHostPreflightPath(vendorName)); err == nil {
+		yamlDataList = append(yamlDataList, data)
+	}
+	if len(yamlDataList) == 0 {
+		return yamlDataList, errors.New("unsupported k8s provider")
 	}
 	return yamlDataList, nil
 }
 
-func (p *PreflightOptions) complete(factory cmdutil.Factory, args []string) error {
+func (p *PreflightOptions) Preflight(f cmdutil.Factory, args []string, opts values.Options) error {
+	// if force flag set, skip preflight
+
+	if p.force {
+		return nil
+	}
+	p.ValueOpts = opts
+
+	var err error
+	if err = p.complete(f, args); err != nil {
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeSkipPreflight) {
+			return nil
+		}
+		return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
+	}
+	if err = p.run(); err != nil {
+		return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
+	}
+	return nil
+}
+
+func (p *PreflightOptions) complete(f cmdutil.Factory, args []string) error {
 	// default no args, and run default validating vendor
 	if len(args) == 0 {
-		clientSet, err := factory.KubernetesClientSet()
+		clientSet, err := f.KubernetesClientSet()
 		if err != nil {
-			return errors.New("init k8s client failed, and please check kubeconfig")
+			return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, "init k8s client failed, please check the kubeconfig")
 		}
 		versionInfo, err := util.GetVersionInfo(clientSet)
 		if err != nil {
-			return errors.New("get k8s version of server failed, and please check your k8s accessibility")
+			return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, "get k8s version of server failed, please check accessibility to k8s")
 		}
-		vendorName, err := util.GetK8sProvider(versionInfo[util.KubernetesApp], clientSet)
+		vendorName, err := util.GetK8sProvider(versionInfo.Kubernetes, clientSet)
 		if err != nil {
-			return errors.New("get k8s cloud provider failed, and please check your k8s accessibility")
+			return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, "get k8s cloud provider failed, please check accessibility to k8s")
 		}
 		p.checkYamlData, err = LoadVendorCheckYaml(vendorName)
 		if err != nil {
-			return err
+			return intctrlutil.NewError(intctrlutil.ErrorTypeSkipPreflight, err.Error())
 		}
-		color.New(color.FgCyan).Printf("current provider %s. collecting and analyzing data will take 10-20 seconds...  \n", vendorName)
 	} else {
 		p.checkFileList = args
-		color.New(color.FgCyan).Println("collecting and analyzing data will take 10-20 seconds...")
 	}
+	if len(p.checkFileList) < 1 && len(p.checkYamlData) < 1 {
+		return intctrlutil.NewError(intctrlutil.ErrorTypeSkipPreflight, "must specify at least one checks yaml")
+	}
+
+	p.factory = f
 	// conceal warning logs
 	rest.SetDefaultWarningHandler(rest.NoWarnings{})
 	go func() {
@@ -172,13 +193,6 @@ func (p *PreflightOptions) complete(factory cmdutil.Factory, args []string) erro
 		<-signalChan
 		os.Exit(0)
 	}()
-	return nil
-}
-
-func (p *PreflightOptions) validate() error {
-	if len(p.checkFileList) < 1 && len(p.checkYamlData) < 1 {
-		return fmt.Errorf("must specify at least one checks yaml")
-	}
 	return nil
 }
 
@@ -191,10 +205,6 @@ func (p *PreflightOptions) run() error {
 		preflightName   string
 		err             error
 	)
-	if *p.Interactive {
-		fmt.Print(cursor.Hide())
-		defer fmt.Print(cursor.Show())
-	}
 	// set progress chan
 	progressCh := make(chan interface{})
 	defer close(progressCh)
@@ -205,30 +215,34 @@ func (p *PreflightOptions) run() error {
 	progressCollections.Go(CollectProgress(ctx, progressCh, p.verbose))
 	// 1. load yaml
 	if kbPreflight, kbHostPreflight, preflightName, err = kbpreflight.LoadPreflightSpec(p.checkFileList, p.checkYamlData); err != nil {
-		return err
+		return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
 	}
 	// 2. collect data
-	collectResults, err = kbpreflight.CollectPreflight(ctx, kbPreflight, kbHostPreflight, progressCh)
+	s := spinner.New(p.Out, spinner.WithMessage(fmt.Sprintf("%-50s", "Collecting data from cluster")))
+	collectResults, err = kbpreflight.CollectPreflight(p.factory, &p.ValueOpts, ctx, kbPreflight, kbHostPreflight, progressCh)
 	if err != nil {
-		return err
+		s.Fail()
+		return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
 	}
+	s.Success()
+
 	// 3. analyze data
 	for _, res := range collectResults {
 		analyzeResults = append(analyzeResults, res.Analyze()...)
 	}
 	cancelFunc()
 	if err := progressCollections.Wait(); err != nil {
-		return err
+		return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
 	}
 	// 4. display analyzed data
 	if len(analyzeResults) == 0 {
-		return errors.New("no data has been collected")
+		fmt.Fprintln(p.Out, "no data has been collected")
+		return nil
 	}
-	if *p.Interactive {
-		return kbinteractive.ShowInteractiveResults(preflightName, analyzeResults, *p.Output)
-	} else {
-		return kbpreflight.ShowTextResults(preflightName, analyzeResults, *p.Format, p.verbose)
+	if err = kbpreflight.ShowTextResults(preflightName, analyzeResults, *p.Format, p.verbose, p.Out); err != nil {
+		return intctrlutil.NewError(intctrlutil.ErrorTypePreflightCommon, err.Error())
 	}
+	return nil
 }
 
 func CollectProgress(ctx context.Context, progressCh <-chan interface{}, verbose bool) func() error {
@@ -251,4 +265,12 @@ func CollectProgress(ctx context.Context, progressCh <-chan interface{}, verbose
 			}
 		}
 	}
+}
+
+func newPreflightPath(vendorName util.K8sProvider) string {
+	return fmt.Sprintf(PreflightPattern, strings.ToLower(string(vendorName)))
+}
+
+func newHostPreflightPath(vendorName util.K8sProvider) string {
+	return fmt.Sprintf(HostPreflightPattern, strings.ToLower(string(vendorName)))
 }

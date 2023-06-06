@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configmanager
@@ -30,6 +33,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcontainer "github.com/apecloud/kubeblocks/internal/configuration/container"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
@@ -126,11 +130,11 @@ func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCf
 	}
 
 	logger.V(1).Info(fmt.Sprintf("new version files: %v, old version files: %v", newVersion, oldVersion))
-	oldData, err := fromConfigFiles(oldVersion)
+	oldData, err := util.FromConfigFiles(oldVersion)
 	if err != nil {
 		return nil, err
 	}
-	newData, err := fromConfigFiles(newVersion)
+	newData, err := util.FromConfigFiles(newVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -151,18 +155,6 @@ func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCf
 		}
 	}
 	return r, nil
-}
-
-func fromConfigFiles(files []string) (map[string]string, error) {
-	m := make(map[string]string)
-	for _, file := range files {
-		b, err := os.ReadFile(file)
-		if err != nil {
-			return nil, err
-		}
-		m[filepath.Base(file)] = string(b)
-	}
-	return m, nil
 }
 
 func resolveLink(path string) (string, error) {

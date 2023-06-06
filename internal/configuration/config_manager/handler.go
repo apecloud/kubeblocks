@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configmanager
@@ -44,7 +47,7 @@ func SetLogger(zapLogger *zap.Logger) {
 	logger = logger.WithName("configmap_volume_watcher")
 }
 
-// findPidFromProcessName get parent pid
+// findPidFromProcessName gets parent pid
 func findPidFromProcessName(processName string) (PID, error) {
 	allProcess, err := process.Processes()
 	if err != nil {
@@ -54,9 +57,8 @@ func findPidFromProcessName(processName string) (PID, error) {
 	psGraph := map[PID]int32{}
 	for _, proc := range allProcess {
 		name, err := proc.Name()
-		// OS X getting the name of the system process sometimes fails,
-		// because OS X Process.Name function depends on sysctl,
-		// the function requires elevated permissions.
+		// OS X getting the name of the system process may fail,
+		// because OS X Process.Name function depends on sysctl and elevated permissions
 		if err != nil {
 			logger.Error(err, fmt.Sprintf("failed to get process name from pid[%d], and pass", proc.Pid))
 			continue
@@ -77,13 +79,13 @@ func findPidFromProcessName(processName string) (PID, error) {
 		}
 	}
 
-	return InvalidPID, cfgutil.MakeError("not find pid of process name: [%s]", processName)
+	return InvalidPID, cfgutil.MakeError("cannot find pid of process name: [%s]", processName)
 }
 
 func CreateSignalHandler(sig appsv1alpha1.SignalType, processName string) (WatchEventHandler, error) {
 	signal, ok := allUnixSignals[sig]
 	if !ok {
-		err := cfgutil.MakeError("not support unix signal: %s", sig)
+		err := cfgutil.MakeError("not supported unix signal: %s", sig)
 		logger.Error(err, "failed to create signal handler")
 		return nil, err
 	}

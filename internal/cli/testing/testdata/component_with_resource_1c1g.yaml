@@ -1,0 +1,18 @@
+- name: test
+  componentDefRef: mysql
+  monitor: true
+  enabledLogs: [error, slow]
+  replicas: 1
+  resources:
+    requests:
+      cpu: 1
+      memory: 1Gi
+  volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+        volumeMode: Filesystem

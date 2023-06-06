@@ -1,23 +1,27 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package components
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -27,20 +31,23 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateless"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("ComponentStatusSynchronizer", func() {
 	const (
-		compName = "comp"
-		compType = "comp"
+		compName    = "comp"
+		compDefName = "comp"
 	)
 
 	var (
@@ -51,7 +58,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 	)
 
 	cleanAll := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -62,13 +69,13 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 
 		// non-namespaced resources
-		testapps.ClearResources(&testCtx, intctrlutil.ClusterDefinitionSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ClusterDefinitionSignature, inNS, ml)
 
 		// namespaced resources
-		testapps.ClearResources(&testCtx, intctrlutil.ClusterSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.DeploymentSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.StatefulSetSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.DeploymentSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanAll)
@@ -80,37 +87,33 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			clusterDef *appsv1alpha1.ClusterDefinition
 			cluster    *appsv1alpha1.Cluster
 			component  types.Component
+			reqCtx     *intctrlutil.RequestCtx
+			dag        *graph.DAG
 			err        error
 		)
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatelessNginxComponent, compType).
+				AddComponentDef(testapps.StatelessNginxComponent, compDefName).
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(1).
 				GetObject()
 
-			component, err = NewComponentByType(testCtx.Cli, cluster,
-				cluster.Spec.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName))
+			reqCtx = &intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: log.FromContext(ctx).WithValues("cluster", clusterDef.Name),
+			}
+			dag = graph.NewDAG()
+			component, err = NewComponent(*reqCtx, testCtx.Cli, clusterDef, nil, cluster, compName, dag)
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 		})
 
 		It("should not change component if no deployment or pod exists", func() {
-			synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-				cluster.Spec.GetComponentByName(compName), component)
-			Expect(err).Should(Succeed())
-			Expect(synchronizer).ShouldNot(BeNil())
-
-			hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
-			Expect(hasFailedAndTimeoutPod).Should(BeFalse())
-			Expect(hasFailedPod).Should(BeFalse())
-
-			podsAreReady := false
-			Expect(synchronizer.updateComponentsPhase(ctx, false, &podsAreReady, hasFailedAndTimeoutPod)).Should(Succeed())
+			Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 			Expect(cluster.Status.Components[compName].Phase).Should(BeEmpty())
 		})
 
@@ -123,6 +126,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			BeforeEach(func() {
 				deploymentName := clusterName + "-" + compName
 				deployment = testapps.NewDeploymentFactory(testCtx.DefaultNamespace, deploymentName, clusterName, compName).
+					AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 					SetMinReadySeconds(int32(10)).
 					SetReplicas(int32(1)).
 					AddContainer(corev1.Container{Name: testapps.DefaultNginxContainerName, Image: testapps.NginxImage}).
@@ -141,23 +145,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			It("should set component status to failed if container is not ready and have error message", func() {
 				Expect(mockContainerError(pod)).Should(Succeed())
 
-				synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-					cluster.Spec.GetComponentByName(compName), component)
-				Expect(err).Should(Succeed())
-				Expect(synchronizer).ShouldNot(BeNil())
-
-				hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
-				Expect(hasFailedAndTimeoutPod).Should(BeTrue())
-				Expect(hasFailedPod).Should(BeTrue())
-
-				isPodReady, err := component.PodsReady(ctx, deployment)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(isPodReady).Should(BeFalse())
-				isRunning, err := component.IsRunning(ctx, deployment)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(isRunning).Should(BeFalse())
-
-				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
+				Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 			})
 
@@ -166,23 +154,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					testk8s.MockDeploymentReady(deployment, stateless.NewRSAvailableReason, deployment.Name)
 				})).Should(Succeed())
 
-				synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-					cluster.Spec.GetComponentByName(compName), component)
-				Expect(err).Should(Succeed())
-				Expect(synchronizer).ShouldNot(BeNil())
-
-				hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
-				Expect(hasFailedAndTimeoutPod).Should(BeFalse())
-				Expect(hasFailedPod).Should(BeFalse())
-
-				isPodReady, err := component.PodsReady(ctx, deployment)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(isPodReady).Should(BeTrue())
-				isRunning, err := component.IsRunning(ctx, deployment)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(isRunning).Should(BeTrue())
-
-				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
+				Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 			})
 		})
@@ -193,37 +165,33 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			clusterDef *appsv1alpha1.ClusterDefinition
 			cluster    *appsv1alpha1.Cluster
 			component  types.Component
+			reqCtx     *intctrlutil.RequestCtx
+			dag        *graph.DAG
 			err        error
 		)
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.StatefulMySQLComponent, compType).
+				AddComponentDef(testapps.StatefulMySQLComponent, compDefName).
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(int32(3)).
 				GetObject()
 
-			component, err = NewComponentByType(testCtx.Cli, cluster,
-				cluster.Spec.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName))
+			reqCtx = &intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: log.FromContext(ctx).WithValues("cluster", clusterDef.Name),
+			}
+			dag = graph.NewDAG()
+			component, err = NewComponent(*reqCtx, testCtx.Cli, clusterDef, nil, cluster, compName, dag)
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 		})
 
 		It("should not change component if no statefulset or pod exists", func() {
-			synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-				cluster.Spec.GetComponentByName(compName), component)
-			Expect(err).Should(Succeed())
-			Expect(synchronizer).ShouldNot(BeNil())
-
-			hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
-			Expect(hasFailedAndTimeoutPod).Should(BeFalse())
-			Expect(hasFailedPod).Should(BeFalse())
-
-			podsAreReady := false
-			Expect(synchronizer.updateComponentsPhase(ctx, false, &podsAreReady, hasFailedAndTimeoutPod)).Should(Succeed())
+			Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 			Expect(cluster.Status.Components[compName].Phase).Should(BeEmpty())
 		})
 
@@ -236,6 +204,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			BeforeEach(func() {
 				stsName := clusterName + "-" + compName
 				statefulset = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
+					AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 					SetReplicas(int32(3)).
 					AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 					Create(&testCtx).GetObject()
@@ -265,25 +234,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(mockContainerError(pods[0])).Should(Succeed())
 				Expect(mockContainerError(pods[1])).Should(Succeed())
 
-				synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-					cluster.Spec.GetComponentByName(compName), component)
-				Expect(err).Should(Succeed())
-				Expect(synchronizer).ShouldNot(BeNil())
-
-				hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
-				Expect(hasFailedAndTimeoutPod).Should(BeTrue())
-				// two pod failed message
-				Expect(len(cluster.Status.Components[compName].Message)).Should(Equal(2))
-				Expect(hasFailedPod).Should(BeTrue())
-
-				isPodReady, err := component.PodsReady(ctx, statefulset)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(isPodReady).Should(BeFalse())
-				isRunning, err := component.IsRunning(ctx, statefulset)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(isRunning).Should(BeFalse())
-
-				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
+				Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 			})
 
@@ -292,23 +243,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					testk8s.MockStatefulSetReady(statefulset)
 				})).Should(Succeed())
 
-				synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-					cluster.Spec.GetComponentByName(compName), component)
-				Expect(err).Should(Succeed())
-				Expect(synchronizer).ShouldNot(BeNil())
-
-				hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
-				Expect(hasFailedAndTimeoutPod).Should(BeFalse())
-				Expect(hasFailedPod).Should(BeFalse())
-
-				isPodReady, err := component.PodsReady(ctx, statefulset)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(isPodReady).Should(BeTrue())
-				isRunning, err := component.IsRunning(ctx, statefulset)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(isRunning).Should(BeTrue())
-
-				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
+				Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 			})
 		})
@@ -319,37 +254,33 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			clusterDef *appsv1alpha1.ClusterDefinition
 			cluster    *appsv1alpha1.Cluster
 			component  types.Component
+			reqCtx     *intctrlutil.RequestCtx
+			dag        *graph.DAG
 			err        error
 		)
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ConsensusMySQLComponent, compType).
+				AddComponentDef(testapps.ConsensusMySQLComponent, compDefName).
 				Create(&testCtx).GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(int32(3)).
 				Create(&testCtx).GetObject()
 
-			component, err = NewComponentByType(testCtx.Cli, cluster,
-				cluster.Spec.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName))
+			reqCtx = &intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: log.FromContext(ctx).WithValues("cluster", clusterDef.Name),
+			}
+			dag = graph.NewDAG()
+			component, err = NewComponent(*reqCtx, testCtx.Cli, clusterDef, nil, cluster, compName, dag)
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 		})
 
 		It("should not change component if no statefulset or pod exists", func() {
-			synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-				cluster.Spec.GetComponentByName(compName), component)
-			Expect(err).Should(Succeed())
-			Expect(synchronizer).ShouldNot(BeNil())
-
-			hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
-			Expect(hasFailedAndTimeoutPod).Should(BeFalse())
-			Expect(hasFailedPod).Should(BeFalse())
-
-			podsAreReady := false
-			Expect(synchronizer.updateComponentsPhase(ctx, false, &podsAreReady, hasFailedAndTimeoutPod)).Should(Succeed())
+			Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 			Expect(cluster.Status.Components[compName].Phase).Should(BeEmpty())
 		})
 
@@ -362,6 +293,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			BeforeEach(func() {
 				stsName := clusterName + "-" + compName
 				statefulset = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
+					AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 					SetReplicas(int32(3)).
 					AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 					Create(&testCtx).GetObject()
@@ -389,23 +321,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			It("should set component status to failed if container is not ready and have error message", func() {
 				Expect(mockContainerError(pods[0])).Should(Succeed())
 
-				synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-					cluster.Spec.GetComponentByName(compName), component)
-				Expect(err).Should(Succeed())
-				Expect(synchronizer).ShouldNot(BeNil())
-
-				hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
-				Expect(hasFailedAndTimeoutPod).Should(BeTrue())
-				Expect(hasFailedPod).Should(BeTrue())
-
-				isPodReady, err := component.PodsReady(ctx, statefulset)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(isPodReady).Should(BeFalse())
-				isRunning, err := component.IsRunning(ctx, statefulset)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(isRunning).Should(BeFalse())
-
-				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
+				Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 			})
 
@@ -418,23 +334,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 				Expect(setPodRole(pods[1], "follower")).Should(Succeed())
 				Expect(setPodRole(pods[2], "follower")).Should(Succeed())
 
-				synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-					cluster.Spec.GetComponentByName(compName), component)
-				Expect(err).Should(Succeed())
-				Expect(synchronizer).ShouldNot(BeNil())
-
-				hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
-				Expect(hasFailedAndTimeoutPod).Should(BeFalse())
-				Expect(hasFailedPod).Should(BeFalse())
-
-				isPodReady, err := component.PodsReady(ctx, statefulset)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(isPodReady).Should(BeTrue())
-				isRunning, err := component.IsRunning(ctx, statefulset)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(isRunning).Should(BeTrue())
-
-				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
+				Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 			})
 		})
@@ -445,41 +345,40 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			clusterDef *appsv1alpha1.ClusterDefinition
 			cluster    *appsv1alpha1.Cluster
 			component  types.Component
+			reqCtx     *intctrlutil.RequestCtx
+			dag        *graph.DAG
 			err        error
 		)
 
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ReplicationRedisComponent, compType).
+				AddComponentDef(testapps.ReplicationRedisComponent, compDefName).
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(compName, compType).
+				AddComponent(compName, compDefName).
 				SetReplicas(2).
 				GetObject()
 
-			component, err = NewComponentByType(testCtx.Cli, cluster,
-				cluster.Spec.GetComponentByName(compName), *clusterDef.GetComponentDefByName(compName))
+			reqCtx = &intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: log.FromContext(ctx).WithValues("cluster", clusterDef.Name),
+			}
+			dag = graph.NewDAG()
+			component, err = NewComponent(*reqCtx, testCtx.Cli, clusterDef, nil, cluster, compName, dag)
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
 		})
 
 		It("should not change component if no deployment or pod exists", func() {
-			synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-				cluster.Spec.GetComponentByName(compName), component)
-			Expect(err).Should(Succeed())
-			Expect(synchronizer).ShouldNot(BeNil())
-
-			hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
-			Expect(hasFailedAndTimeoutPod).Should(BeFalse())
-			Expect(hasFailedPod).Should(BeFalse())
-
-			podsAreReady := false
-			Expect(synchronizer.updateComponentsPhase(ctx, false, &podsAreReady, hasFailedAndTimeoutPod)).Should(Succeed())
+			Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 			Expect(cluster.Status.Components[compName].Phase).Should(BeEmpty())
 		})
 
 		Context("and with mocked statefulset & pod", func() {
+			const (
+				replicas = 2
+			)
 			var (
 				statefulset *appsv1.StatefulSet
 				pods        []*corev1.Pod
@@ -488,18 +387,23 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			BeforeEach(func() {
 				stsName := clusterName + "-" + compName
 				statefulset = testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, compName).
-					SetReplicas(int32(2)).
+					AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
+					SetReplicas(int32(replicas)).
 					AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 					Create(&testCtx).GetObject()
 				testk8s.InitStatefulSetStatus(testCtx, statefulset, controllerRevision)
-				for i := 0; i < 2; i++ {
-					podName := fmt.Sprintf("%s-%s-%d", clusterName, compName, i)
+				for i := 0; i < replicas; i++ {
+					podName := fmt.Sprintf("%s-%d", stsName, i)
+					podRole := "primary"
+					if i > 0 {
+						podRole = "secondary"
+					}
 					pod := testapps.NewPodFactory(testCtx.DefaultNamespace, podName).
 						SetOwnerReferences("apps/v1", constant.StatefulSetKind, statefulset).
 						AddAppInstanceLabel(clusterName).
 						AddAppComponentLabel(compName).
 						AddAppManangedByLabel().
-						AddRoleLabel("leader").
+						AddRoleLabel(podRole).
 						AddControllerRevisionHashLabel(controllerRevision).
 						AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 						Create(&testCtx).GetObject()
@@ -518,23 +422,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 			It("should set component status to failed if container is not ready and have error message", func() {
 				Expect(mockContainerError(pods[0])).Should(Succeed())
 
-				synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-					cluster.Spec.GetComponentByName(compName), component)
-				Expect(err).Should(Succeed())
-				Expect(synchronizer).ShouldNot(BeNil())
-
-				hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
-				Expect(hasFailedAndTimeoutPod).Should(BeTrue())
-				Expect(hasFailedPod).Should(BeTrue())
-
-				isPodReady, err := component.PodsReady(ctx, statefulset)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(isPodReady).Should(BeFalse())
-				isRunning, err := component.IsRunning(ctx, statefulset)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(isRunning).Should(BeFalse())
-
-				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
+				Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 			})
 
@@ -543,23 +431,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 					testk8s.MockStatefulSetReady(statefulset)
 				})).Should(Succeed())
 
-				synchronizer, err := newClusterStatusSynchronizer(testCtx.Ctx, testCtx.Cli, cluster,
-					cluster.Spec.GetComponentByName(compName), component)
-				Expect(err).Should(Succeed())
-				Expect(synchronizer).ShouldNot(BeNil())
-
-				hasFailedAndTimeoutPod, hasFailedPod := synchronizer.hasFailedAndTimedOutPod()
-				Expect(hasFailedAndTimeoutPod).Should(BeFalse())
-				Expect(hasFailedPod).Should(BeFalse())
-
-				isPodReady, err := component.PodsReady(ctx, statefulset)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(isPodReady).Should(BeTrue())
-				isRunning, err := component.IsRunning(ctx, statefulset)
-				Expect(err).ShouldNot(HaveOccurred())
-				Expect(isRunning).Should(BeTrue())
-
-				Expect(synchronizer.updateComponentsPhase(ctx, isRunning, &isPodReady, hasFailedAndTimeoutPod)).Should(Succeed())
+				Expect(component.Status(*reqCtx, testCtx.Cli)).Should(Succeed())
 				Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 			})
 		})
@@ -589,7 +461,7 @@ func mockContainerError(pod *corev1.Pod) error {
 }
 
 func setPodRole(pod *corev1.Pod, role string) error {
-	return testapps.ChangeObj(&testCtx, pod, func() {
-		pod.Labels[constant.RoleLabelKey] = role
+	return testapps.ChangeObj(&testCtx, pod, func(lpod *corev1.Pod) {
+		lpod.Labels[constant.RoleLabelKey] = role
 	})
 }

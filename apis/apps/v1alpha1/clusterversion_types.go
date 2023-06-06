@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -79,9 +79,22 @@ type ClusterComponentVersion struct {
 	// +listMapKey=name
 	ConfigSpecs []ComponentConfigSpec `json:"configSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
+	// systemAccountSpec define image for the component to connect database or engines.
+	// It overrides `image` and `env` attributes defined in ClusterDefinition.spec.componentDefs.systemAccountSpec.cmdExecutorConfig.
+	// To clean default envs settings, set `SystemAccountSpec.CmdExecutorConfig.Env` to empty list.
+	// +optional
+	SystemAccountSpec *SystemAccountShortSpec `json:"systemAccountSpec,omitempty"`
+
 	// versionContext defines containers images' context for component versions,
 	// this value replaces ClusterDefinition.spec.componentDefs.podSpec.[initContainers | containers]
 	VersionsCtx VersionsContext `json:"versionsContext"`
+}
+
+// SystemAccountShortSpec is a short version of SystemAccountSpec, with only CmdExecutorConfig field.
+type SystemAccountShortSpec struct {
+	// cmdExecutorConfig configs how to get client SDK and perform statements.
+	// +kubebuilder:validation:Required
+	CmdExecutorConfig *CommandExecutorEnvItem `json:"cmdExecutorConfig"`
 }
 
 type VersionsContext struct {
@@ -106,6 +119,9 @@ type VersionsContext struct {
 	Containers []corev1.Container `json:"containers,omitempty"`
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cv

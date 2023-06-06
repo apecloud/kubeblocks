@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ func NewTestClient(kubecontext string) (TestClient, error) {
 	return InitTestClient(kubecontext)
 }
 
-// InitTestClient init different type clients
+// InitTestClient inits different type clients
 func InitTestClient(kubecontext string) (TestClient, error) {
 	config, err := client.LoadConfig()
 	if err != nil {

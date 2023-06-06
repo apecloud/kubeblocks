@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ func TestNewAllCondition(t *testing.T) {
 	NewSucceedCondition(opsRequest)
 	NewVerticalScalingCondition(opsRequest)
 	NewUpgradingCondition(opsRequest)
-	NewValidateFailedCondition(ReasonClusterPhaseMisMatch, "fail")
+	NewValidateFailedCondition(ReasonClusterPhaseMismatch, "fail")
 	NewFailedCondition(opsRequest, nil)
 	NewFailedCondition(opsRequest, errors.New("opsRequest run failed"))
 

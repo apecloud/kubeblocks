@@ -1,110 +1,99 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package bench
 
 import (
-	"context"
-	"database/sql"
+	"embed"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 var (
-	dbName         string
-	host           string
-	port           int
-	user           string
-	password       string
-	threads        int
-	driver         string
-	totalTime      time.Duration
-	totalCount     int
-	dropData       bool
-	ignoreError    bool
-	outputInterval time.Duration
-	isolationLevel int
-	silence        bool
-	maxProcs       int
-
-	globalDB  *sql.DB
-	globalCtx context.Context
+	//go:embed template/*
+	cueTemplate embed.FS
 )
 
+const (
+	CueSysBenchTemplateName = "bench_sysbench_template.cue"
+)
+
+type BenchBaseOptions struct {
+	Driver   string `json:"driver"`
+	Database string `json:"database"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	User     string `json:"user"`
+	Password string `json:"password"`
+}
+
+func (o *BenchBaseOptions) BaseValidate() error {
+	if o.Driver == "" {
+		return fmt.Errorf("driver is required")
+	}
+
+	if o.Database == "" {
+		return fmt.Errorf("database is required")
+	}
+
+	if o.Host == "" {
+		return fmt.Errorf("host is required")
+	}
+
+	if o.Port == 0 {
+		return fmt.Errorf("port is required")
+	}
+
+	if o.User == "" {
+		return fmt.Errorf("user is required")
+	}
+
+	if o.Password == "" {
+		return fmt.Errorf("password is required")
+	}
+
+	return nil
+}
+
+func (o *BenchBaseOptions) AddFlags(cmd *cobra.Command) {
+	cmd.PersistentFlags().StringVar(&o.Driver, "driver", "", "database driver")
+	cmd.PersistentFlags().StringVar(&o.Database, "database", "", "database name")
+	cmd.PersistentFlags().StringVar(&o.Host, "host", "", "the host of database")
+	cmd.PersistentFlags().StringVar(&o.User, "user", "", "the user of database")
+	cmd.PersistentFlags().StringVar(&o.Password, "password", "", "the password of database")
+	cmd.PersistentFlags().IntVar(&o.Port, "port", 0, "the port of database")
+}
+
 // NewBenchCmd creates the bench command
-func NewBenchCmd() *cobra.Command {
+func NewBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "bench",
 		Short: "Run a benchmark.",
 	}
 
-	cmd.PersistentFlags().IntVar(&maxProcs, "max-procs", 0, "runtime.GOMAXPROCS")
-	cmd.PersistentFlags().StringVarP(&dbName, "db", "D", "kb_test", "Database name")
-	cmd.PersistentFlags().StringVarP(&host, "host", "H", "127.0.0.1", "Database host")
-	cmd.PersistentFlags().StringVarP(&user, "user", "U", "root", "Database user")
-	cmd.PersistentFlags().StringVarP(&password, "password", "p", "sakila", "Database password")
-	cmd.PersistentFlags().IntVarP(&port, "port", "P", 3306, "Database port")
-	cmd.PersistentFlags().IntVarP(&threads, "threads", "T", 1, "Thread concurrency")
-	cmd.PersistentFlags().StringVarP(&driver, "driver", "d", mysqlDriver, "Database driver: mysql")
-	cmd.PersistentFlags().DurationVar(&totalTime, "time", 1<<63-1, "Total execution time")
-	cmd.PersistentFlags().IntVar(&totalCount, "count", 0, "Total execution count, 0 means infinite")
-	cmd.PersistentFlags().BoolVar(&dropData, "dropdata", false, "Cleanup data before prepare")
-	cmd.PersistentFlags().BoolVar(&ignoreError, "ignore-error", false, "Ignore error when running workload")
-	cmd.PersistentFlags().BoolVar(&silence, "silence", false, "Don't print error when running workload")
-	cmd.PersistentFlags().DurationVar(&outputInterval, "interval", 5*time.Second, "Output interval time")
-	cobra.EnablePrefixMatching = true
-
 	// add subcommands
 	cmd.AddCommand(
-		NewTpccCmd(),
+		NewSysBenchCmd(f, streams),
 	)
-
-	var cancel context.CancelFunc
-	globalCtx, cancel = context.WithCancel(context.Background())
-
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc,
-		syscall.SIGHUP,
-		syscall.SIGINT,
-		syscall.SIGTERM,
-		syscall.SIGQUIT)
-
-	closeDone := make(chan struct{}, 1)
-	go func() {
-		sig := <-sc
-		fmt.Printf("\nGot signal [%v] to exit.\n", sig)
-		cancel()
-
-		select {
-		case <-sc:
-			// send signal again, return directly
-			fmt.Printf("\nGot signal [%v] again to exit.\n", sig)
-			os.Exit(1)
-		case <-time.After(10 * time.Second):
-			fmt.Print("\nWait 10s for closed, force exit\n")
-			os.Exit(1)
-		case <-closeDone:
-			return
-		}
-	}()
 
 	return cmd
 }

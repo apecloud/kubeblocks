@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -22,6 +25,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,6 +41,9 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
+// ConditionsError cluster displays this status on list cmd when the status of ApplyResources or ProvisioningStarted condition is "False".
+const ConditionsError = "ConditionsError"
+
 type GetOptions struct {
 	WithClusterDef     bool
 	WithClusterVersion bool
@@ -46,6 +53,7 @@ type GetOptions struct {
 	WithSecret         bool
 	WithPod            bool
 	WithEvent          bool
+	WithDataProtection bool
 }
 
 type ObjectsGetter struct {
@@ -63,9 +71,28 @@ func NewClusterObjects() *ClusterObjects {
 	}
 }
 
+func listResources[T any](dynamic dynamic.Interface, gvr schema.GroupVersionResource, ns string, opts metav1.ListOptions, items *[]T) error {
+	if *items == nil {
+		*items = []T{}
+	}
+	obj, err := dynamic.Resource(gvr).Namespace(ns).List(context.TODO(), opts)
+	if err != nil {
+		return err
+	}
+	for _, i := range obj.Items {
+		var object T
+		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(i.Object, &object); err != nil {
+			return err
+		}
+		*items = append(*items, object)
+	}
+	return nil
+}
+
 // Get all kubernetes objects belonging to the database cluster
 func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 	var err error
+
 	objs := NewClusterObjects()
 	ctx := context.TODO()
 	corev1 := o.Client.CoreV1()
@@ -90,12 +117,22 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 		return nil, err
 	}
 
-	// wrap the cluster phase if the latest ops request is processing
-	latestOpsProcessedCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
-	if latestOpsProcessedCondition != nil && latestOpsProcessedCondition.Status == metav1.ConditionFalse {
-		objs.Cluster.Status.Phase = appsv1alpha1.ClusterPhase(latestOpsProcessedCondition.Reason)
+	if objs.Cluster.Status.Phase == appsv1alpha1.SpecReconcilingClusterPhase {
+		// wrap the cluster phase if the latest ops request is processing
+		latestOpsProcessedCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeLatestOpsRequestProcessed)
+		if latestOpsProcessedCondition != nil && latestOpsProcessedCondition.Status == metav1.ConditionFalse {
+			objs.Cluster.Status.Phase = appsv1alpha1.ClusterPhase(latestOpsProcessedCondition.Reason)
+		}
+	}
+	provisionCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
+	if provisionCondition != nil && provisionCondition.Status == metav1.ConditionFalse {
+		objs.Cluster.Status.Phase = ConditionsError
 	}
 
+	applyResourcesCondition := meta.FindStatusCondition(objs.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeApplyResources)
+	if applyResourcesCondition != nil && applyResourcesCondition.Status == metav1.ConditionFalse {
+		objs.Cluster.Status.Phase = ConditionsError
+	}
 	// get cluster definition
 	if o.WithClusterDef {
 		cd := &appsv1alpha1.ClusterDefinition{}
@@ -162,21 +199,24 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 			}
 
 			node, err := corev1.Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-			if err != nil {
+			if err != nil && !apierrors.IsNotFound(err) {
 				return nil, err
 			}
-			objs.Nodes = append(objs.Nodes, node)
+
+			if node != nil {
+				objs.Nodes = append(objs.Nodes, node)
+			}
 		}
 	}
 
 	// get events
 	if o.WithEvent {
-		// get all events about cluster
+		// get all events of cluster
 		if objs.Events, err = corev1.Events(o.Namespace).Search(scheme.Scheme, objs.Cluster); err != nil {
 			return nil, err
 		}
 
-		// get all events about pods
+		// get all events of pods
 		for _, pod := range objs.Pods.Items {
 			events, err := corev1.Events(o.Namespace).Search(scheme.Scheme, &pod)
 			if err != nil {
@@ -187,6 +227,19 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 			} else {
 				objs.Events.Items = append(objs.Events.Items, events.Items...)
 			}
+		}
+	}
+
+	if o.WithDataProtection {
+		dpListOpts := metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s",
+				constant.AppInstanceLabelKey, o.Name),
+		}
+		if err = listResources(o.Dynamic, types.BackupPolicyGVR(), o.Namespace, dpListOpts, &objs.BackupPolicies); err != nil {
+			return nil, err
+		}
+		if err = listResources(o.Dynamic, types.BackupGVR(), o.Namespace, dpListOpts, &objs.Backups); err != nil {
+			return nil, err
 		}
 	}
 	return objs, nil
@@ -233,7 +286,7 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 			}
 		}
 
-		// current component has no pod corresponding to it
+		// current component has no derived pods
 		if len(pods) == 0 {
 			continue
 		}
@@ -316,7 +369,11 @@ func (o *ClusterObjects) getStorageInfo(component *appsv1alpha1.ClusterComponent
 			if labels[constant.VolumeClaimTemplateNameLabelKey] != vcTpl.Name {
 				continue
 			}
-			return *pvc.Spec.StorageClassName
+			if pvc.Spec.StorageClassName != nil {
+				return *pvc.Spec.StorageClassName
+			} else {
+				return types.None
+			}
 		}
 
 		return types.None
@@ -358,6 +415,11 @@ func getResourceInfo(reqs, limits corev1.ResourceList) (string, string) {
 	for _, name := range names {
 		res := types.None
 		limit, req := limits[name], reqs[name]
+
+		// if request is empty and limit is not, set limit to request
+		if util.ResourceIsEmpty(&req) && !util.ResourceIsEmpty(&limit) {
+			req = limit
+		}
 
 		// if both limit and request are empty, only output none
 		if !util.ResourceIsEmpty(&limit) || !util.ResourceIsEmpty(&req) {

@@ -77,19 +77,15 @@ spec:
             - name: VOLUMESNAPSHOT
               value: "true"
             {{- end }}
-            {{- if .Values.dataProtection.backupSchedule }}
-            - name: DP_BACKUP_SCHEDULE
-              value: {{ .Values.dataProtection.backupSchedule }}
-            {{- end }}
-            {{- if .Values.dataProtection.backupTTL }}
-            - name: DP_BACKUP_TTL
-              value: {{ .Values.dataProtection.backupTTL }}
+            {{- if .Capabilities.APIVersions.Has "snapshot.storage.k8s.io/v1beta1" }}
+            - name: VOLUMESNAPSHOT_API_BETA
+              value: "true"
             {{- end }}
             {{- if .Values.admissionWebhooks.enabled }}
             - name: ENABLE_WEBHOOKS
               value: "true"
             {{- end }}
-            {{- if not ( include "kubeblocks.addonControllerEnabled" . ) }}
+            {{- if ( include "kubeblocks.addonControllerEnabled" . ) | deepEqual "false" }}
             - name: DISABLE_ADDON_CTRLER
               value: "true"
             {{- else }}
@@ -99,6 +95,10 @@ spec:
               value: {{ .jobImagePullPolicy | default "IfNotPresent" }}
             - name: KUBEBLOCKS_ADDON_SA_NAME
               value: {{ include "kubeblocks.addonSAName" . }}
+            {{- end }}
+            {{- if .Values.enabledAlphaFeatureGates.recoverVolumeExpansionFailure }}
+            - name: RECOVER_VOLUME_EXPANSION_FAILURE
+              value: "true"
             {{- end }}
           {{- with .Values.securityContext }}
           securityContext:
@@ -131,6 +131,8 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
+          - mountPath: /etc/kubeblocks
+            name: manager-config
           {{- if .Values.admissionWebhooks.enabled }}
             - mountPath: /tmp/k8s-webhook-server/serving-certs
               name: cert
@@ -162,7 +164,7 @@ spec:
       volumes:
         - name: manager-config
           configMap:
-            name: manager-config
+            name: {{ include "kubeblocks.fullname" . }}-manager-config
         {{- if .Values.admissionWebhooks.enabled }}
         - name: cert
           secret:

@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package main
@@ -26,6 +29,8 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+	"github.com/fsnotify/fsnotify"
+	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -42,15 +47,18 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	"github.com/apecloud/kubeblocks/internal/constant"
+
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 
 	// +kubebuilder:scaffold:imports
 
 	discoverycli "k8s.io/client-go/discovery"
 
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -75,19 +83,22 @@ func init() {
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(dataprotectionv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1.AddToScheme(scheme))
+	utilruntime.Must(snapshotv1beta1.AddToScheme(scheme))
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(workloadsv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
 	viper.SetConfigType("yaml")                            // REQUIRED if the config file does not have the extension in the name
 	viper.AddConfigPath(fmt.Sprintf("/etc/%s/", appName))  // path to look for the config file in
-	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s", appName)) // call multiple times to add many search paths
+	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s", appName)) // call multiple times to append search path
 	viper.AddConfigPath(".")                               // optionally look for config in the working directory
 	viper.AutomaticEnv()
 
 	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 100)
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 	viper.SetDefault("VOLUMESNAPSHOT", false)
+	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")
 	viper.SetDefault("PROBE_SERVICE_HTTP_PORT", 3501)
 	viper.SetDefault("PROBE_SERVICE_GRPC_PORT", 50001)
@@ -115,28 +126,44 @@ func (r flagName) viperName() string {
 }
 
 func validateRequiredToParseConfigs() error {
+	validateTolerations := func(val string) error {
+		if val == "" {
+			return nil
+		}
+		var tolerations []corev1.Toleration
+		return json.Unmarshal([]byte(val), &tolerations)
+	}
+
+	validateAffinity := func(val string) error {
+		if val == "" {
+			return nil
+		}
+		affinity := corev1.Affinity{}
+		return json.Unmarshal([]byte(val), &affinity)
+	}
+
 	if jobTTL := viper.GetString(constant.CfgKeyAddonJobTTL); jobTTL != "" {
 		if _, err := time.ParseDuration(jobTTL); err != nil {
 			return err
 		}
 	}
-	if cmTolerations := viper.GetString(constant.CfgKeyCtrlrMgrTolerations); cmTolerations != "" {
-		Tolerations := []corev1.Toleration{}
-		if err := json.Unmarshal([]byte(cmTolerations), &Tolerations); err != nil {
-			return err
-		}
+	if err := validateTolerations(viper.GetString(constant.CfgKeyCtrlrMgrTolerations)); err != nil {
+		return err
 	}
-	if cmAffinity := viper.GetString(constant.CfgKeyCtrlrMgrAffinity); cmAffinity != "" {
-		affinity := corev1.Affinity{}
-		if err := json.Unmarshal([]byte(cmAffinity), &affinity); err != nil {
-			return err
-		}
+	if err := validateAffinity(viper.GetString(constant.CfgKeyCtrlrMgrAffinity)); err != nil {
+		return err
 	}
 	if cmNodeSelector := viper.GetString(constant.CfgKeyCtrlrMgrNodeSelector); cmNodeSelector != "" {
 		nodeSelector := map[string]string{}
 		if err := json.Unmarshal([]byte(cmNodeSelector), &nodeSelector); err != nil {
 			return err
 		}
+	}
+	if err := validateTolerations(viper.GetString(constant.CfgKeyDataPlaneTolerations)); err != nil {
+		return err
+	}
+	if err := validateAffinity(viper.GetString(constant.CfgKeyDataPlaneAffinity)); err != nil {
+		return err
 	}
 	return nil
 }
@@ -167,7 +194,7 @@ func main() {
 	})
 
 	if err := viper.BindPFlags(pflag.CommandLine); err != nil {
-		setupLog.Error(err, "unable able to bind flags")
+		setupLog.Error(err, "unable to bind flags")
 		os.Exit(1)
 	}
 
@@ -178,9 +205,13 @@ func main() {
 
 	// Find and read the config file
 	if err := viper.ReadInConfig(); err != nil { // Handle errors reading the config file
-		setupLog.Info("unable read in config, errors ignored")
+		setupLog.Info("unable to read in config, errors ignored")
 	}
 	setupLog.Info(fmt.Sprintf("config file: %s", viper.GetViper().ConfigFileUsed()))
+	viper.OnConfigChange(func(e fsnotify.Event) {
+		setupLog.Info(fmt.Sprintf("config file changed: %s", e.Name))
+	})
+	viper.WatchConfig()
 
 	metricsAddr = viper.GetString(metricsAddrFlagKey.viperName())
 	probeAddr = viper.GetString(probeAddrFlagKey.viperName())
@@ -208,12 +239,12 @@ func main() {
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
-		// speeds up voluntary leader transitions as the new leader don't have to wait
+		// speeds up voluntary leader transitions as the new leader doesn't have to wait
 		// LeaseDuration time first.
 		//
 		// In the default scaffold provided, the program ends immediately after
 		// the manager stops, so would be fine to enable this option. However,
-		// if you are doing or is intended to do any operation such as perform cleanups
+		// if you are doing or intending to do any operation such as performing cleanups
 		// after the manager stops then its usage might be unsafe.
 		LeaderElectionReleaseOnCancel: true,
 
@@ -326,6 +357,14 @@ func main() {
 		}
 	}
 
+	if err = (&workloadscontrollers.ConsensusSetReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("consensus-set-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ConsensusSet")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if err = (&configuration.ReconfigureRequestReconciler{
@@ -364,30 +403,22 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&components.StatefulSetReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("stateful-set-controller"),
-	}).SetupWithManager(mgr); err != nil {
+	if err = components.NewStatefulSetReconciler(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "StatefulSet")
 		os.Exit(1)
 	}
 
-	if err = (&components.DeploymentReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("deployment-controller"),
-	}).SetupWithManager(mgr); err != nil {
+	if err = components.NewDeploymentReconciler(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Deployment")
 		os.Exit(1)
 	}
 
-	if err = (&components.PodReconciler{
+	if err = (&appscontrollers.ComponentClassReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("pod-controller"),
+		Recorder: mgr.GetEventRecorderFor("class-controller"),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Pod")
+		setupLog.Error(err, "unable to create controller", "controller", "Class")
 		os.Exit(1)
 	}
 
@@ -412,6 +443,11 @@ func main() {
 
 		if err = (&appsv1alpha1.OpsRequest{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "OpsRequest")
+			os.Exit(1)
+		}
+
+		if err = (&workloadsv1alpha1.ConsensusSet{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ConsensusSet")
 			os.Exit(1)
 		}
 

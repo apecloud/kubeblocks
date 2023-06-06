@@ -3,10 +3,10 @@ kind: OpsRequest
 metadata:
   name: ops-vscale
 spec:
-  clusterRef: mycluster
+  clusterRef: mycluster-redis-cluster
   type: VerticalScaling
   verticalScaling:
-    - componentName: redis-repl
+    - componentName: redis
       requests:
         memory: "500Mi"
         cpu: "500m"

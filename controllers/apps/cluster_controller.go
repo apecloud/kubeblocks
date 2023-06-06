@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package apps
@@ -20,24 +23,26 @@ import (
 	"context"
 	"time"
 
+	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -46,6 +51,8 @@ import (
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusters/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=backuppolicytemplates,verbs=get;list
 
 // owned K8s core API resources controller-gen RBAC marker
 // full access on core API resources
@@ -67,6 +74,8 @@ import (
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/status,verbs=get
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/finalizers,verbs=update
 
+// +kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;watch;update;patch
+
 // +kubebuilder:rbac:groups=apps,resources=replicasets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps,resources=replicasets/status,verbs=get
 // +kubebuilder:rbac:groups=apps,resources=replicasets/finalizers,verbs=update
@@ -85,32 +94,24 @@ import (
 // read + update access
 // +kubebuilder:rbac:groups=core,resources=endpoints,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=core,resources=pods/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=pods/exec,verbs=create
 
 // read only + watch access
 // +kubebuilder:rbac:groups=storage.k8s.io,resources=storageclasses,verbs=get;list;watch
 
 // dataprotection get list and delete
-// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;delete;deletecollection
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;delete;deletecollection
 
-// classfamily get list
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=classfamilies,verbs=get;list;watch
+// componentresourceconstraint get list
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentresourceconstraints,verbs=get;list;watch
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
-}
-
-// ClusterStatusEventHandler is the event handler for the cluster status event
-type ClusterStatusEventHandler struct{}
-
-var _ k8score.EventHandler = &ClusterStatusEventHandler{}
-
-func init() {
-	k8score.EventHandlerMap["cluster-status-handler"] = &ClusterStatusEventHandler{}
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -129,21 +130,78 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	reqCtx.Log.V(1).Info("reconcile", "cluster", req.NamespacedName)
 
 	requeueError := func(err error) (ctrl.Result, error) {
-		if re, ok := err.(lifecycle.RequeueError); ok {
+		if re, ok := err.(intctrlutil.RequeueError); ok {
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	}
+
+	// the cluster reconciliation loop is a 3-stage model: plan Init, plan Build and plan Execute
+	// Init stage
+	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req)
+	if err := planBuilder.Init(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req, r.Recorder)
-	if err := planBuilder.Init(); err != nil {
-		return requeueError(err)
-	} else if err := planBuilder.Validate(); err != nil {
-		return requeueError(err)
-	} else if plan, err := planBuilder.Build(); err != nil {
-		return requeueError(err)
-	} else if err = plan.Execute(); err != nil {
-		return requeueError(err)
+	// Build stage
+	// what you should do in most cases is writing your transformer.
+	//
+	// here are the how-to tips:
+	// 1. one transformer for one scenario
+	// 2. try not to modify the current transformers, make a new one
+	// 3. transformers are independent with each-other, with some exceptions.
+	//    Which means transformers' order is not important in most cases.
+	//    If you don't know where to put your transformer, append it to the end and that would be ok.
+	// 4. don't use client.Client for object write, use client.ReadonlyClient for object read.
+	//    If you do need to create/update/delete object, make your intent operation a lifecycleVertex and put it into the DAG.
+	//
+	// TODO: transformers are vertices, theirs' dependencies are edges, make plan Build stage a DAG.
+	plan, errBuild := planBuilder.
+		AddTransformer(
+			// handle deletion
+			// handle cluster deletion first
+			&lifecycle.ClusterDeletionTransformer{},
+			// check is recovering from halted cluster
+			&lifecycle.HaltRecoveryTransformer{},
+			// assure meta-data info
+			// update finalizer and cd&cv labels
+			&lifecycle.AssureMetaTransformer{},
+			// validate ref objects
+			// validate cd & cv's existence and availability
+			&lifecycle.ValidateAndLoadRefResourcesTransformer{},
+			// validate config
+			&lifecycle.ValidateEnableLogsTransformer{},
+			// fix spec
+			// fill class related info
+			&lifecycle.FillClassTransformer{},
+			// create cluster connection credential secret object
+			&lifecycle.ClusterCredentialTransformer{},
+			// handle restore
+			&lifecycle.RestoreTransformer{Client: r.Client},
+			// create all components objects
+			&lifecycle.ComponentTransformer{Client: r.Client},
+			// transform backupPolicy tpl to backuppolicy.dataprotection.kubeblocks.io
+			&lifecycle.BackupPolicyTPLTransformer{},
+			// add our finalizer to all objects
+			&lifecycle.OwnershipTransformer{},
+			// make all workload objects depending on credential secret
+			&lifecycle.SecretTransformer{},
+			// make config configmap immutable
+			&lifecycle.ConfigTransformer{},
+			// update cluster status
+			&lifecycle.ClusterStatusTransformer{},
+			// always safe to put your transformer below
+		).
+		Build()
+
+	// Execute stage
+	// errBuild not nil means build stage partial success or validation error
+	// execute the plan first, delay error handling
+	if errExec := plan.Execute(); errExec != nil {
+		return requeueError(errExec)
+	}
+	if errBuild != nil {
+		return requeueError(errBuild)
 	}
 	return intctrlutil.Reconciled()
 }
@@ -162,33 +220,33 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
 		Owns(&dataprotectionv1alpha1.BackupPolicy{}).
-		Owns(&dataprotectionv1alpha1.Backup{})
+		Owns(&dataprotectionv1alpha1.Backup{}).
+		Owns(&batchv1.Job{}).
+		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterPods))
 	if viper.GetBool("VOLUMESNAPSHOT") {
-		b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+		if intctrlutil.InVolumeSnapshotV1Beta1() {
+			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+		} else {
+			b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+		}
 	}
-	b.Watches(&source.Kind{Type: &appsv1alpha1.ClassFamily{}},
-		&handler.EnqueueRequestForObject{},
-		builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool { return true })),
-	)
 	return b.Complete(r)
 }
 
-// Handle is the event handler for the cluster status event.
-func (r *ClusterStatusEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != constant.ProbeCheckRolePath {
-		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
+func (r *ClusterReconciler) filterClusterPods(obj client.Object) []reconcile.Request {
+	labels := obj.GetLabels()
+	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
+		return []reconcile.Request{}
 	}
-
-	// parse probe event message when field path is probe-role-changed-check
-	message := k8score.ParseProbeEventMessage(reqCtx, event)
-	if message == nil {
-		reqCtx.Log.Info("parse probe event message failed", "message", event.Message)
-		return nil
+	if _, ok := labels[constant.AppInstanceLabelKey]; !ok {
+		return []reconcile.Request{}
 	}
-
-	// if probe message event is checkRoleFailed, it means the cluster is abnormal, need to handle the cluster status
-	if message.Event == k8score.ProbeEventCheckRoleFailed {
-		return handleEventForClusterStatus(reqCtx.Ctx, cli, recorder, event)
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: obj.GetNamespace(),
+				Name:      labels[constant.AppInstanceLabelKey],
+			},
+		},
 	}
-	return nil
 }

@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package controllerutil
@@ -37,10 +40,29 @@ func (v *Error) Error() string {
 type ErrorType string
 
 const (
-	// ErrorTypeBackupNotCompleted is used to report backup not completed.
-	ErrorTypeBackupNotCompleted ErrorType = "BackupNotCompleted"
 	// ErrorWaitCacheRefresh waits for synchronization of the corresponding object cache in client-go from ApiServer.
-	ErrorWaitCacheRefresh = "WaitCacheRefresh"
+	ErrorWaitCacheRefresh ErrorType = "WaitCacheRefresh"
+	// ErrorTypeNotFound not found any resource.
+	ErrorTypeNotFound ErrorType = "NotFound"
+
+	ErrorTypeRequeue ErrorType = "Requeue" // requeue for reconcile.
+
+	// ErrorType for backup
+	ErrorTypeBackupNotSupported       ErrorType = "BackupNotSupported"       // this backup type not supported
+	ErrorTypeBackupPVTemplateNotFound ErrorType = "BackupPVTemplateNotFound" // this pv template not found
+	ErrorTypeBackupNotCompleted       ErrorType = "BackupNotCompleted"       // report backup not completed.
+	ErrorTypeBackupPVCNameIsEmpty     ErrorType = "BackupPVCNameIsEmpty"     // pvc name for backup is empty
+	ErrorTypeBackupJobFailed          ErrorType = "BackupJobFailed"          // backup job failed
+	ErrorTypeStorageNotMatch          ErrorType = "ErrorTypeStorageNotMatch"
+	ErrorTypeReconfigureFailed        ErrorType = "ErrorTypeReconfigureFailed"
+
+	// ErrorType for cluster controller
+	ErrorTypeBackupFailed ErrorType = "BackupFailed"
+	ErrorTypeNeedWaiting  ErrorType = "NeedWaiting" // waiting for next reconcile
+
+	// ErrorType for preflight
+	ErrorTypePreflightCommon = "PreflightCommon"
+	ErrorTypeSkipPreflight   = "SkipPreflight"
 )
 
 var ErrFailedToAddFinalizer = errors.New("failed to add finalizer")
@@ -65,4 +87,45 @@ func IsTargetError(err error, errorType ErrorType) bool {
 		return tmpErr.Type == errorType
 	}
 	return false
+}
+
+// ToControllerError converts the error to the Controller error.
+func ToControllerError(err error) *Error {
+	if tmpErr, ok := err.(*Error); ok || errors.As(err, &tmpErr) {
+		return tmpErr
+	}
+	return nil
+}
+
+// NewNotFound returns a new Error with ErrorTypeNotFound.
+func NewNotFound(format string, a ...any) *Error {
+	return &Error{
+		Type:    ErrorTypeNotFound,
+		Message: fmt.Sprintf(format, a...),
+	}
+}
+
+// IsNotFound returns true if the specified error is the error type of ErrorTypeNotFound.
+func IsNotFound(err error) bool {
+	return IsTargetError(err, ErrorTypeNotFound)
+}
+
+// NewBackupNotSupported returns a new Error with ErrorTypeBackupNotSupported.
+func NewBackupNotSupported(backupType, backupPolicyName string) *Error {
+	return NewErrorf(ErrorTypeBackupNotSupported, `backup type "%s" not supported by backup policy "%s"`, backupType, backupPolicyName)
+}
+
+// NewBackupPVTemplateNotFound returns a new Error with ErrorTypeBackupPVTemplateNotFound.
+func NewBackupPVTemplateNotFound(cmName, cmNamespace string) *Error {
+	return NewErrorf(ErrorTypeBackupPVTemplateNotFound, `"the persistentVolume template is empty in the configMap %s/%s", pvConfig.Namespace, pvConfig.Name`, cmNamespace, cmName)
+}
+
+// NewBackupPVCNameIsEmpty returns a new Error with ErrorTypeBackupPVCNameIsEmpty.
+func NewBackupPVCNameIsEmpty(backupPolicyName string) *Error {
+	return NewErrorf(ErrorTypeBackupPVCNameIsEmpty, `the persistentVolumeClaim name of this policy "%s" is empty`, backupPolicyName)
+}
+
+// NewBackupJobFailed returns a new Error with ErrorTypeBackupJobFailed.
+func NewBackupJobFailed(jobName string) *Error {
+	return NewErrorf(ErrorTypeBackupJobFailed, `backup job "%s" failed`, jobName)
 }

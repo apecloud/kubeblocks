@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package util
@@ -21,6 +24,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -37,17 +41,20 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/go-logr/logr"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/pmezard/go-difflib/difflib"
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8sapitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
@@ -66,19 +73,13 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
-func init() {
-	if _, err := GetCliHomeDir(); err != nil {
-		fmt.Println("Failed to create kbcli home dir:", err)
-	}
-}
-
 // CloseQuietly closes `io.Closer` quietly. Very handy and helpful for code
 // quality too.
 func CloseQuietly(d io.Closer) {
 	_ = d.Close()
 }
 
-// GetCliHomeDir return kbcli home dir
+// GetCliHomeDir returns kbcli home dir
 func GetCliHomeDir() (string, error) {
 	var cliHome string
 	if custom := os.Getenv(types.CliHomeEnv); custom != "" {
@@ -138,7 +139,7 @@ func GetPublicIP() (string, error) {
 	return string(body), nil
 }
 
-// MakeSSHKeyPair make a pair of public and private keys for SSH access.
+// MakeSSHKeyPair makes a pair of public and private keys for SSH access.
 // Public key is encoded in the format for inclusion in an OpenSSH authorized_keys file.
 // Private Key generated is PEM encoded
 func MakeSSHKeyPair(pubKeyPath, privateKeyPath string) error {
@@ -205,10 +206,6 @@ func DoWithRetry(ctx context.Context, logger logr.Logger, operation func() error
 	return err
 }
 
-func GenRequestID() string {
-	return uuid.New().String()
-}
-
 func PrintGoTemplate(wr io.Writer, tpl string, values interface{}) error {
 	tmpl, err := template.New("output").Parse(tpl)
 	if err != nil {
@@ -222,7 +219,7 @@ func PrintGoTemplate(wr io.Writer, tpl string, values interface{}) error {
 	return nil
 }
 
-// SetKubeConfig set KUBECONFIG environment
+// SetKubeConfig sets KUBECONFIG environment
 func SetKubeConfig(cfg string) error {
 	return os.Setenv("KUBECONFIG", cfg)
 }
@@ -255,17 +252,17 @@ func GVRToString(gvr schema.GroupVersionResource) string {
 	return strings.Join([]string{gvr.Resource, gvr.Version, gvr.Group}, ".")
 }
 
-// GetNodeByName choose node by name from a node array
+// GetNodeByName chooses node by name from a node array
 func GetNodeByName(nodes []*corev1.Node, name string) *corev1.Node {
 	for _, node := range nodes {
 		if node.Name == name {
 			return node
 		}
 	}
-	return &corev1.Node{}
+	return nil
 }
 
-// ResourceIsEmpty check if resource is empty or not
+// ResourceIsEmpty checks if resource is empty or not
 func ResourceIsEmpty(res *resource.Quantity) bool {
 	resStr := res.String()
 	if resStr == "0" || resStr == "<nil>" {
@@ -290,7 +287,7 @@ func GetPodStatus(pods []*corev1.Pod) (running, waiting, succeeded, failed int) 
 	return
 }
 
-// OpenBrowser will open browser by url in different OS system
+// OpenBrowser opens browser with url in different OS system
 func OpenBrowser(url string) error {
 	var err error
 	switch runtime.GOOS {
@@ -307,15 +304,41 @@ func OpenBrowser(url string) error {
 }
 
 func TimeFormat(t *metav1.Time) string {
+	return TimeFormatWithDuration(t, time.Minute)
+}
+
+// TimeFormatWithDuration formats time with specified precision
+func TimeFormatWithDuration(t *metav1.Time, duration time.Duration) string {
 	if t == nil || t.IsZero() {
 		return ""
 	}
-	return TimeTimeFormat(t.Time)
+	return TimeTimeFormatWithDuration(t.Time, duration)
 }
 
 func TimeTimeFormat(t time.Time) string {
 	const layout = "Jan 02,2006 15:04 UTC-0700"
 	return t.Format(layout)
+}
+
+func timeLayout(precision time.Duration) string {
+	layout := "Jan 02,2006 15:04 UTC-0700"
+	switch precision {
+	case time.Second:
+		layout = "Jan 02,2006 15:04:05 UTC-0700"
+	case time.Millisecond:
+		layout = "Jan 02,2006 15:04:05.000 UTC-0700"
+	}
+	return layout
+}
+
+func TimeTimeFormatWithDuration(t time.Time, precision time.Duration) string {
+	layout := timeLayout(precision)
+	return t.Format(layout)
+}
+
+func TimeParse(t string, precision time.Duration) (time.Time, error) {
+	layout := timeLayout(precision)
+	return time.Parse(layout, t)
 }
 
 // GetHumanReadableDuration returns a succinct representation of the provided startTime and endTime
@@ -335,7 +358,7 @@ func GetHumanReadableDuration(startTime metav1.Time, endTime metav1.Time) string
 	return duration.HumanDuration(d)
 }
 
-// CheckEmpty check if string is empty, if yes, return <none> for displaying
+// CheckEmpty checks if string is empty, if yes, returns <none> for displaying
 func CheckEmpty(str string) string {
 	if len(str) == 0 {
 		return types.None
@@ -343,7 +366,7 @@ func CheckEmpty(str string) string {
 	return str
 }
 
-// BuildLabelSelectorByNames build the label selector by instance names, the label selector is
+// BuildLabelSelectorByNames builds the label selector by instance names, the label selector is
 // like "instance-key in (name1, name2)"
 func BuildLabelSelectorByNames(selector string, names []string) string {
 	if len(names) == 0 {
@@ -445,7 +468,7 @@ func GetConfigTemplateListWithResource(cComponents []appsv1alpha1.ClusterCompone
 	return validConfigSpecs, nil
 }
 
-// GetResourceObjectFromGVR query the resource object using GVR.
+// GetResourceObjectFromGVR queries the resource object using GVR.
 func GetResourceObjectFromGVR(gvr schema.GroupVersionResource, key client.ObjectKey, client dynamic.Interface, k8sObj interface{}) error {
 	unstructuredObj, err := client.
 		Resource(gvr).
@@ -499,7 +522,7 @@ func enableReconfiguring(component *appsv1alpha1.ClusterComponentDefinition) boo
 	return false
 }
 
-// IsSupportReconfigureParams check whether all updated parameters belong to config template parameters.
+// IsSupportReconfigureParams checks whether all updated parameters belong to config template parameters.
 func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map[string]string, cli dynamic.Interface) (bool, error) {
 	var (
 		err              error
@@ -554,7 +577,7 @@ func getIPLocation() (string, error) {
 	return string(location[:len(location)-1]), nil
 }
 
-// GetHelmChartRepoURL get helm chart repo, we will choose one from GitHub and GitLab based on the IP location
+// GetHelmChartRepoURL gets helm chart repo, chooses one from GitHub and GitLab based on the IP location
 func GetHelmChartRepoURL() string {
 	if types.KubeBlocksChartURL == testing.KubeBlocksChartURL {
 		return testing.KubeBlocksChartURL
@@ -640,20 +663,6 @@ func GetExposeAnnotations(provider K8sProvider, exposeType ExposeType) (map[stri
 	return annotations, nil
 }
 
-func GetK8SProvider(client kubernetes.Interface) (K8sProvider, error) {
-	versionInfo, err := GetVersionInfo(client)
-	if err != nil {
-		return "", err
-	}
-
-	versionErr := fmt.Errorf("failed to get kubernetes version")
-	k8sVersionStr, ok := versionInfo[KubernetesApp]
-	if !ok {
-		return "", versionErr
-	}
-	return GetK8sProvider(k8sVersionStr, client)
-}
-
 // BuildAddonReleaseName returns the release name of addon, its f
 func BuildAddonReleaseName(addon string) string {
 	return fmt.Sprintf("%s-%s", types.AddonReleasePrefix, addon)
@@ -661,9 +670,218 @@ func BuildAddonReleaseName(addon string) string {
 
 // CombineLabels combines labels into a string
 func CombineLabels(labels map[string]string) string {
-	var labelStr string
+	var labelStr []string
 	for k, v := range labels {
-		labelStr += fmt.Sprintf("%s=%s,", k, v)
+		labelStr = append(labelStr, fmt.Sprintf("%s=%s", k, v))
 	}
-	return strings.TrimSuffix(labelStr, ",")
+
+	// sort labelStr to make sure the order is stable
+	sort.Strings(labelStr)
+
+	return strings.Join(labelStr, ",")
+}
+
+func BuildComponentNameLabels(prefix string, names []string) string {
+	return buildLabelSelectors(prefix, constant.KBAppComponentLabelKey, names)
+}
+
+// buildLabelSelectors builds the label selector by given label key, the label selector is
+// like "label-key in (name1, name2)"
+func buildLabelSelectors(prefix string, key string, names []string) string {
+	if len(names) == 0 {
+		return prefix
+	}
+
+	label := fmt.Sprintf("%s in (%s)", key, strings.Join(names, ","))
+	if len(prefix) == 0 {
+		return label
+	} else {
+		return prefix + "," + label
+	}
+}
+
+// NewOpsRequestForReconfiguring returns a new common OpsRequest for Reconfiguring operation
+func NewOpsRequestForReconfiguring(opsName, namespace, clusterName string) *appsv1alpha1.OpsRequest {
+	return &appsv1alpha1.OpsRequest{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.AppsAPIGroup, types.AppsAPIVersion),
+			Kind:       types.KindOps,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opsName,
+			Namespace: namespace,
+		},
+		Spec: appsv1alpha1.OpsRequestSpec{
+			ClusterRef:  clusterName,
+			Type:        appsv1alpha1.ReconfiguringType,
+			Reconfigure: &appsv1alpha1.Reconfigure{},
+		},
+	}
+}
+func ConvertObjToUnstructured(obj any) (*unstructured.Unstructured, error) {
+	var (
+		contentBytes    []byte
+		err             error
+		unstructuredObj = &unstructured.Unstructured{}
+	)
+
+	if contentBytes, err = json.Marshal(obj); err != nil {
+		return nil, err
+	}
+	if err = json.Unmarshal(contentBytes, unstructuredObj); err != nil {
+		return nil, err
+	}
+	return unstructuredObj, nil
+}
+
+func CreateResourceIfAbsent(
+	dynamic dynamic.Interface,
+	gvr schema.GroupVersionResource,
+	namespace string,
+	unstructuredObj *unstructured.Unstructured) error {
+	objectName, isFound, err := unstructured.NestedString(unstructuredObj.Object, "metadata", "name")
+	if !isFound || err != nil {
+		return err
+	}
+	objectByte, err := json.Marshal(unstructuredObj)
+	if err != nil {
+		return err
+	}
+	if _, err = dynamic.Resource(gvr).Namespace(namespace).Patch(
+		context.TODO(), objectName, k8sapitypes.MergePatchType,
+		objectByte, metav1.PatchOptions{}); err != nil {
+		if apierrors.IsNotFound(err) {
+			if _, err = dynamic.Resource(gvr).Namespace(namespace).Create(
+				context.TODO(), unstructuredObj, metav1.CreateOptions{}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return nil
+}
+
+func BuildClusterDefinitionRefLable(prefix string, clusterDef []string) string {
+	return buildLabelSelectors(prefix, constant.AppNameLabelKey, clusterDef)
+}
+
+// IsWindows returns true if the kbcli runtime situation is windows
+func IsWindows() bool {
+	return runtime.GOOS == types.GoosWindows
+}
+
+func GetUnifiedDiffString(original, edited string) (string, error) {
+	diff := difflib.UnifiedDiff{
+		A:        difflib.SplitLines(original),
+		B:        difflib.SplitLines(edited),
+		FromFile: "Original",
+		ToFile:   "Current",
+		Context:  3,
+	}
+	return difflib.GetUnifiedDiffString(diff)
+}
+
+func DisplayDiffWithColor(out io.Writer, diffText string) {
+	for _, line := range difflib.SplitLines(diffText) {
+		switch {
+		case strings.HasPrefix(line, "---"), strings.HasPrefix(line, "+++"):
+			line = color.HiYellowString(line)
+		case strings.HasPrefix(line, "@@"):
+			line = color.HiBlueString(line)
+		case strings.HasPrefix(line, "-"):
+			line = color.RedString(line)
+		case strings.HasPrefix(line, "+"):
+			line = color.GreenString(line)
+		}
+		fmt.Fprint(out, line)
+	}
+}
+
+// BuildTolerations toleration format: key=value:effect or key:effect,
+func BuildTolerations(raw []string) ([]interface{}, error) {
+	tolerations := make([]interface{}, 0)
+	for _, tolerationRaw := range raw {
+		for _, entries := range strings.Split(tolerationRaw, ",") {
+			toleration := make(map[string]interface{})
+			parts := strings.Split(entries, ":")
+			if len(parts) != 2 {
+				return tolerations, fmt.Errorf("invalid toleration %s", entries)
+			}
+			toleration["effect"] = parts[1]
+
+			partsKV := strings.Split(parts[0], "=")
+			switch len(partsKV) {
+			case 1:
+				toleration["operator"] = "Exists"
+				toleration["key"] = partsKV[0]
+			case 2:
+				toleration["operator"] = "Equal"
+				toleration["key"] = partsKV[0]
+				toleration["value"] = partsKV[1]
+			default:
+				return tolerations, fmt.Errorf("invalid toleration %s", entries)
+			}
+			tolerations = append(tolerations, toleration)
+		}
+	}
+	return tolerations, nil
+}
+
+// BuildNodeAffinity build node affinity from node labels
+func BuildNodeAffinity(nodeLabels map[string]string) *corev1.NodeAffinity {
+	var nodeAffinity *corev1.NodeAffinity
+
+	var matchExpressions []corev1.NodeSelectorRequirement
+	for key, value := range nodeLabels {
+		values := strings.Split(value, ",")
+		matchExpressions = append(matchExpressions, corev1.NodeSelectorRequirement{
+			Key:      key,
+			Operator: corev1.NodeSelectorOpIn,
+			Values:   values,
+		})
+	}
+	if len(matchExpressions) > 0 {
+		nodeSelectorTerm := corev1.NodeSelectorTerm{
+			MatchExpressions: matchExpressions,
+		}
+		nodeAffinity = &corev1.NodeAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+				{
+					Preference: nodeSelectorTerm,
+				},
+			},
+		}
+	}
+
+	return nodeAffinity
+}
+
+// BuildPodAntiAffinity build pod anti affinity from topology keys
+func BuildPodAntiAffinity(podAntiAffinityStrategy string, topologyKeys []string) *corev1.PodAntiAffinity {
+	var podAntiAffinity *corev1.PodAntiAffinity
+	var podAffinityTerms []corev1.PodAffinityTerm
+	for _, topologyKey := range topologyKeys {
+		podAffinityTerms = append(podAffinityTerms, corev1.PodAffinityTerm{
+			TopologyKey: topologyKey,
+		})
+	}
+	if podAntiAffinityStrategy == string(appsv1alpha1.Required) {
+		podAntiAffinity = &corev1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: podAffinityTerms,
+		}
+	} else {
+		var weightedPodAffinityTerms []corev1.WeightedPodAffinityTerm
+		for _, podAffinityTerm := range podAffinityTerms {
+			weightedPodAffinityTerms = append(weightedPodAffinityTerms, corev1.WeightedPodAffinityTerm{
+				Weight:          100,
+				PodAffinityTerm: podAffinityTerm,
+			})
+		}
+		podAntiAffinity = &corev1.PodAntiAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: weightedPodAffinityTerms,
+		}
+	}
+
+	return podAntiAffinity
 }

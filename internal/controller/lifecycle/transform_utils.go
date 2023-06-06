@@ -1,163 +1,108 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package lifecycle
 
 import (
-	"fmt"
+	"reflect"
 	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func findAll[T interface{}](dag *graph.DAG) []graph.Vertex {
-	vertices := make([]graph.Vertex, 0)
-	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*lifecycleVertex)
-		if _, ok := v.obj.(T); ok {
-			vertices = append(vertices, vertex)
-		}
-	}
-	return vertices
+func newRequeueError(after time.Duration, reason string) error {
+	return intctrlutil.NewRequeueError(after, reason)
 }
 
-func findAllNot[T interface{}](dag *graph.DAG) []graph.Vertex {
-	vertices := make([]graph.Vertex, 0)
-	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*lifecycleVertex)
-		if _, ok := v.obj.(T); !ok {
-			vertices = append(vertices, vertex)
-		}
-	}
-	return vertices
-}
-
-func findRootVertex(dag *graph.DAG) (*lifecycleVertex, error) {
-	root := dag.Root()
-	if root == nil {
-		return nil, fmt.Errorf("root vertex not found: %v", dag)
-	}
-	rootVertex, _ := root.(*lifecycleVertex)
-	return rootVertex, nil
-}
-
-func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkName, error) {
+func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkNObjKey, error) {
 	gvk, err := apiutil.GVKForObject(object, scheme)
 	if err != nil {
 		return nil, err
 	}
-	return &gvkName{
-		gvk:  gvk,
-		ns:   object.GetNamespace(),
-		name: object.GetName(),
+	return &gvkNObjKey{
+		GroupVersionKind: gvk,
+		ObjectKey: client.ObjectKey{
+			Namespace: object.GetNamespace(),
+			Name:      object.GetName(),
+		},
 	}, nil
 }
 
-func isOwnerOf(owner, obj client.Object, scheme *runtime.Scheme) bool {
-	ro, ok := owner.(runtime.Object)
-	if !ok {
-		return false
+func getAppInstanceML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
+	return client.MatchingLabels{
+		constant.AppInstanceLabelKey: cluster.Name,
 	}
-	gvk, err := apiutil.GVKForObject(ro, scheme)
-	if err != nil {
-		return false
-	}
-	ref := metav1.OwnerReference{
-		APIVersion: gvk.GroupVersion().String(),
-		Kind:       gvk.Kind,
-		UID:        owner.GetUID(),
-		Name:       owner.GetName(),
-	}
-	owners := obj.GetOwnerReferences()
-	referSameObject := func(a, b metav1.OwnerReference) bool {
-		aGV, err := schema.ParseGroupVersion(a.APIVersion)
-		if err != nil {
-			return false
+}
+
+// func getAppInstanceAndManagedByML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
+//	return client.MatchingLabels{
+//		constant.AppInstanceLabelKey:  cluster.Name,
+//		constant.AppManagedByLabelKey: constant.AppName,
+//	}
+// }
+
+// getClusterOwningObjects reads objects owned by our cluster with kinds and label matching specifier.
+func getClusterOwningObjects(transCtx *ClusterTransformContext, cluster appsv1alpha1.Cluster,
+	matchLabels client.MatchingLabels, kinds ...client.ObjectList) (clusterOwningObjects, error) {
+	// list what kinds of object cluster owns
+	objs := make(clusterOwningObjects)
+	inNS := client.InNamespace(cluster.Namespace)
+	for _, list := range kinds {
+		if err := transCtx.Client.List(transCtx.Context, list, inNS, matchLabels); err != nil {
+			return nil, err
 		}
-
-		bGV, err := schema.ParseGroupVersion(b.APIVersion)
-		if err != nil {
-			return false
+		// reflect get list.Items
+		items := reflect.ValueOf(list).Elem().FieldByName("Items")
+		l := items.Len()
+		for i := 0; i < l; i++ {
+			// get the underlying object
+			object := items.Index(i).Addr().Interface().(client.Object)
+			name, err := getGVKName(object, scheme)
+			if err != nil {
+				return nil, err
+			}
+			objs[*name] = object
 		}
-
-		return aGV.Group == bGV.Group && a.Kind == b.Kind && a.Name == b.Name
 	}
-	for _, ownerRef := range owners {
-		if referSameObject(ownerRef, ref) {
-			return true
-		}
+	return objs, nil
+}
+
+// sendWaringEventForCluster sends a warning event when occurs error.
+func sendWaringEventWithError(
+	recorder record.EventRecorder,
+	cluster *appsv1alpha1.Cluster,
+	reason string,
+	err error) {
+	if err == nil {
+		return
 	}
-	return false
-}
-
-func actionPtr(action Action) *Action {
-	return &action
-}
-
-func newRequeueError(after time.Duration, reason string) error {
-	return &realRequeueError{
-		reason:       reason,
-		requeueAfter: after,
+	controllerErr := intctrlutil.ToControllerError(err)
+	if controllerErr != nil {
+		reason = string(controllerErr.Type)
 	}
-}
-
-func isClusterDeleting(cluster appsv1alpha1.Cluster) bool {
-	return !cluster.GetDeletionTimestamp().IsZero()
-}
-
-func isClusterUpdating(cluster appsv1alpha1.Cluster) bool {
-	return cluster.Status.ObservedGeneration != cluster.Generation
-}
-
-func isClusterStatusUpdating(cluster appsv1alpha1.Cluster) bool {
-	return !isClusterDeleting(cluster) && !isClusterUpdating(cluster)
-	// return cluster.Status.ObservedGeneration == cluster.Generation &&
-	//	slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase)
-}
-
-func getBackupObjects(reqCtx intctrlutil.RequestCtx,
-	cli types2.ReadonlyClient,
-	namespace string,
-	backupName string) (*dataprotectionv1alpha1.Backup, *dataprotectionv1alpha1.BackupTool, error) {
-	// get backup
-	backup := &dataprotectionv1alpha1.Backup{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backupName, Namespace: namespace}, backup); err != nil {
-		return nil, nil, err
-	}
-
-	// get backup tool
-	backupTool := &dataprotectionv1alpha1.BackupTool{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: backup.Status.BackupToolName}, backupTool); err != nil {
-		return nil, nil, err
-	}
-	return backup, backupTool, nil
-}
-
-func isTypeOf[T interface{}](obj client.Object) bool {
-	_, ok := obj.(T)
-	return ok
+	recorder.Event(cluster, corev1.EventTypeWarning, reason, err.Error())
 }

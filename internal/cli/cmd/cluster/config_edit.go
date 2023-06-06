@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cluster
@@ -34,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/prompt"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 )
 
 type editConfigOptions struct {
@@ -43,17 +47,18 @@ type editConfigOptions struct {
 	replaceFile bool
 }
 
-var editConfigExample = templates.Examples(`
-		# edit config for component 
-		kbcli cluster edit-config <cluster-name> [--component=<component-name>] [--config-spec=<config-spec-name>] [--config-file=<config-file>] 
+var (
+	editConfigUse = "edit-config NAME [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file]"
 
+	editConfigExample = templates.Examples(`
 		# update mysql max_connections, cluster name is mycluster
 		kbcli cluster edit-config mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf 
 	`)
+)
 
 func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) error) error {
 	wrapper := o.wrapper
-	cfgEditContext := newConfigContext(o.BaseOptions, o.Name, wrapper.ComponentName(), wrapper.ConfigSpecName(), wrapper.ConfigFile())
+	cfgEditContext := newConfigContext(o.CreateOptions, o.Name, wrapper.ComponentName(), wrapper.ConfigSpecName(), wrapper.ConfigFile())
 	if err := cfgEditContext.prepare(); err != nil {
 		return err
 	}
@@ -66,7 +71,7 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		return err
 	}
 
-	diff, err := cfgEditContext.getUnifiedDiffString()
+	diff, err := util.GetUnifiedDiffString(cfgEditContext.original, cfgEditContext.edited)
 	if err != nil {
 		return err
 	}
@@ -75,7 +80,7 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		return nil
 	}
 
-	displayDiffWithColor(o.IOStreams.Out, diff)
+	util.DisplayDiffWithColor(o.IOStreams.Out, diff)
 
 	oldVersion := map[string]string{
 		o.CfgFile: cfgEditContext.getOriginal(),
@@ -84,7 +89,7 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		o.CfgFile: cfgEditContext.getEdited(),
 	}
 
-	configSpec := wrapper.ConfigSpec()
+	configSpec := wrapper.ConfigTemplateSpec()
 	configConstraintKey := client.ObjectKey{
 		Namespace: "",
 		Name:      configSpec.ConfigConstraintRef,
@@ -114,7 +119,7 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 	}
 
 	confirmPrompt := confirmApplyReconfigurePrompt
-	if !dynamicUpdated {
+	if !dynamicUpdated || !cfgcm.IsSupportReload(configConstraint.Spec.ReloadOptions) {
 		confirmPrompt = restartConfirmPrompt
 	}
 	yes, err := o.confirmReconfigure(confirmPrompt)
@@ -123,6 +128,14 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 	}
 	if !yes {
 		return nil
+	}
+
+	validatedData := map[string]string{
+		o.CfgFile: cfgEditContext.getEdited(),
+	}
+	options := cfgcore.WithKeySelector(wrapper.ConfigTemplateSpec().Keys)
+	if err = cfgcore.NewConfigValidator(&configConstraint.Spec, options).Validate(validatedData); err != nil {
+		return cfgcore.WrapError(err, "failed to validate edited config")
 	}
 	return fn(configPatch, &configConstraint.Spec)
 }
@@ -133,7 +146,7 @@ func (o *editConfigOptions) confirmReconfigure(promptStr string) (bool, error) {
 
 	confirmStr := []string{yesStr, noStr}
 	printer.Warning(o.Out, promptStr)
-	input, err := prompt.NewPrompt("Please type [yes/No] to confirm:",
+	input, err := prompt.NewPrompt("Please type [Yes/No] to confirm:",
 		func(input string) error {
 			if !slices.Contains(confirmStr, strings.ToLower(input)) {
 				return fmt.Errorf("typed \"%s\" does not match \"%s\"", input, confirmStr)
@@ -148,40 +161,32 @@ func (o *editConfigOptions) confirmReconfigure(promptStr string) (bool, error) {
 
 // NewEditConfigureCmd shows the difference between two configuration version.
 func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	editOptions := &editConfigOptions{
+	o := &editConfigOptions{
 		configOpsOptions: configOpsOptions{
 			editMode:          true,
-			OperationsOptions: newBaseOperationsOptions(streams, appsv1alpha1.ReconfiguringType, false),
+			OperationsOptions: newBaseOperationsOptions(f, streams, appsv1alpha1.ReconfiguringType, false),
 		}}
-	inputs := buildOperationsInputs(f, editOptions.OperationsOptions)
-	inputs.Use = "edit-config"
-	inputs.Short = "Edit the config file of the component."
-	inputs.Example = editConfigExample
-	inputs.BuildFlags = func(cmd *cobra.Command) {
-		editOptions.buildReconfigureCommonFlags(cmd)
-		cmd.Flags().BoolVar(&editOptions.replaceFile, "replace", false, "Specify whether to replace the config file. Default to false.")
-	}
-	inputs.Complete = editOptions.Complete
-	inputs.Validate = editOptions.Validate
 
 	cmd := &cobra.Command{
-		Use:     inputs.Use,
-		Short:   inputs.Short,
-		Example: inputs.Example,
+		Use:               editConfigUse,
+		Short:             "Edit the config file of the component.",
+		Example:           editConfigExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			util.CheckErr(inputs.BaseOptionsObj.Complete(inputs, args))
-			util.CheckErr(inputs.BaseOptionsObj.Validate(inputs))
-			util.CheckErr(editOptions.Run(func(info *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) error {
+			o.Args = args
+			cmdutil.CheckErr(o.CreateOptions.Complete())
+			util.CheckErr(o.Complete())
+			util.CheckErr(o.Validate())
+			util.CheckErr(o.Run(func(info *cfgcore.ConfigPatchInfo, cc *appsv1alpha1.ConfigConstraintSpec) error {
 				// generate patch for config
 				formatterConfig := cc.FormatterConfig
 				params := cfgcore.GenerateVisualizedParamsList(info, formatterConfig, nil)
-				editOptions.KeyValues = fromKeyValuesToMap(params, editOptions.CfgFile)
-				return inputs.BaseOptionsObj.Run(inputs)
+				o.KeyValues = fromKeyValuesToMap(params, o.CfgFile)
+				return o.CreateOptions.Run()
 			}))
 		},
 	}
-	if inputs.BuildFlags != nil {
-		inputs.BuildFlags(cmd)
-	}
+	o.buildReconfigureCommonFlags(cmd)
+	cmd.Flags().BoolVar(&o.replaceFile, "replace", false, "Boolean flag to enable replacing config file. Default with false.")
 	return cmd
 }

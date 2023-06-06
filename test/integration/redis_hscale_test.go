@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replicationset"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
@@ -91,7 +91,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompType).
+			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
 			SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
 			SetReplicas(replicas).AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			Create(&testCtx).GetObject()
@@ -110,9 +110,9 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		By("Checking statefulSet role label")
 		for _, sts := range stsList.Items {
 			if strings.HasSuffix(sts.Name, strconv.Itoa(testapps.DefaultReplicationPrimaryIndex)) {
-				Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
+				Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replication.Primary))
 			} else {
-				Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
+				Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replication.Secondary))
 			}
 		}
 
@@ -122,9 +122,9 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 			Expect(err).To(Succeed())
 			Expect(len(podList)).Should(BeEquivalentTo(1))
 			if strings.HasSuffix(sts.Name, strconv.Itoa(testapps.DefaultReplicationPrimaryIndex)) {
-				Expect(podList[0].Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Primary))
+				Expect(podList[0].Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replication.Primary))
 			} else {
-				Expect(podList[0].Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replicationset.Secondary))
+				Expect(podList[0].Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replication.Secondary))
 			}
 		}
 
@@ -145,8 +145,8 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 		for _, newReplicas := range []int32{4, 2, 7, 1} {
 			By(fmt.Sprintf("horizontal scale out to %d", newReplicas))
-			Expect(testapps.ChangeObj(&testCtx, clusterObj, func() {
-				clusterObj.Spec.ComponentSpecs[0].Replicas = newReplicas
+			Expect(testapps.ChangeObj(&testCtx, clusterObj, func(lcluster *appsv1alpha1.Cluster) {
+				lcluster.Spec.ComponentSpecs[0].Replicas = newReplicas
 			})).Should(Succeed())
 
 			By("Wait for the cluster to be running")
@@ -179,11 +179,11 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 			replicationRedisConfigVolumeMounts := []corev1.VolumeMount{
 				{
-					Name:      string(replicationset.Primary),
+					Name:      string(replication.Primary),
 					MountPath: "/etc/conf/primary",
 				},
 				{
-					Name:      string(replicationset.Secondary),
+					Name:      string(replication.Secondary),
 					MountPath: "/etc/conf/secondary",
 				},
 			}
@@ -191,17 +191,17 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 			By("Create a clusterDefinition obj with replication workloadType.")
 			mode := int32(0755)
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponent(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompType).
+				AddComponentDef(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompDefName).
 				AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
-				AddConfigTemplate(primaryConfigName, primaryConfigName, "", testCtx.DefaultNamespace, string(replicationset.Primary)).
-				AddConfigTemplate(secondaryConfigName, secondaryConfigName, "", testCtx.DefaultNamespace, string(replicationset.Secondary)).
+				AddConfigTemplate(primaryConfigName, primaryConfigName, "", testCtx.DefaultNamespace, string(replication.Primary)).
+				AddConfigTemplate(secondaryConfigName, secondaryConfigName, "", testCtx.DefaultNamespace, string(replication.Secondary)).
 				AddInitContainerVolumeMounts(testapps.DefaultRedisInitContainerName, replicationRedisConfigVolumeMounts).
 				AddContainerVolumeMounts(testapps.DefaultRedisContainerName, replicationRedisConfigVolumeMounts).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj with replication workloadType.")
 			clusterVersionObj = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefObj.Name).
-				AddComponent(testapps.DefaultRedisCompType).
+				AddComponentVersion(testapps.DefaultRedisCompDefName).
 				AddInitContainerShort(testapps.DefaultRedisInitContainerName, testapps.DefaultRedisImageName).
 				AddContainerShort(testapps.DefaultRedisContainerName, testapps.DefaultRedisImageName).
 				Create(&testCtx).GetObject()

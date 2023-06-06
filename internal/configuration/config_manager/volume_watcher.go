@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package configmanager
@@ -37,7 +40,7 @@ const (
 type ConfigMapVolumeWatcher struct {
 	retryCount int
 
-	// volumeDirectory watch directory witch volumeCount
+	// volumeDirectory watches directory witch volumeCount
 	volumeDirectory []string
 
 	// regexSelector string
@@ -86,7 +89,7 @@ func (w *ConfigMapVolumeWatcher) Close() error {
 
 func (w *ConfigMapVolumeWatcher) Run() error {
 	if w.handler == nil {
-		return cfgcore.MakeError("require process event handler.")
+		return cfgcore.MakeError("required process event handler.")
 	}
 
 	watcher, err := fsnotify.NewWatcher()
@@ -99,7 +102,7 @@ func (w *ConfigMapVolumeWatcher) Run() error {
 		w.log.Infof("add watched fs directory: %s", d)
 		err = watcher.Add(d)
 		if err != nil {
-			return cfgcore.WrapError(err, "failed to add watch directory[%s] failed", d)
+			return cfgcore.WrapError(err, "failed to add watch directory[%s]", d)
 		}
 	}
 
@@ -129,7 +132,7 @@ func (w *ConfigMapVolumeWatcher) loopNotifyEvent(watcher *fsnotify.Watcher, ctx 
 		case err := <-watcher.Errors:
 			w.log.Error(err)
 		case <-ctx.Done():
-			w.log.Info("The process has received the end signal.")
+			w.log.Info("The process has received the exit signal.")
 			return
 		}
 	}
@@ -145,7 +148,7 @@ func runWithRetry(ctx context.Context, handler WatchEventHandler, event fsnotify
 		if retryCount <= 0 {
 			return
 		}
-		logger.Errorf("event handler failed, will retry after [%d]s : %s", DefaultSleepRetryTime, err)
+		logger.Errorf("failed event handler, please retry after [%d]s : %s", DefaultSleepRetryTime, err)
 		time.Sleep(time.Second * DefaultRetryCount)
 	}
 }

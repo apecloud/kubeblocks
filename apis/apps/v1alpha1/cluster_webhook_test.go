@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -84,19 +84,13 @@ var _ = Describe("cluster webhook", func() {
 			Expect(testCtx.CreateObj(ctx, clusterDefSecond)).Should(Succeed())
 
 			// wait until ClusterDefinition created
-			Eventually(func() bool {
-				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
-				return err == nil
-			}).Should(BeTrue())
+			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)).Should(Succeed())
 
 			By("By creating a new clusterVersion")
 			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
 			Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(Succeed())
 			// wait until ClusterVersion created
-			Eventually(func() bool {
-				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterVersionName}, clusterVersion)
-				return err == nil
-			}).Should(BeTrue())
+			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterVersionName}, clusterVersion)).Should(Succeed())
 
 			By("By creating a new Cluster")
 			cluster, _ = createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
@@ -204,19 +198,13 @@ var _ = Describe("cluster webhook", func() {
 			Expect(testCtx.CreateObj(ctx, clusterDef)).Should(Succeed())
 
 			// wait until ClusterDefinition created
-			Eventually(func() bool {
-				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)
-				return err == nil
-			}).Should(BeTrue())
+			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDefinitionName}, clusterDef)).Should(Succeed())
 
 			By("By creating a new clusterVersion")
 			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
 			Expect(testCtx.CreateObj(ctx, clusterVersion)).Should(Succeed())
 			// wait until ClusterVersion created
-			Eventually(func() bool {
-				err := k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterVersionName}, clusterVersion)
-				return err == nil
-			}).Should(BeTrue())
+			Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterVersionName}, clusterVersion)).Should(Succeed())
 		})
 		It("should assure tls fields setting properly", func() {
 			By("creating cluster with nil issuer")
@@ -234,10 +222,8 @@ var _ = Describe("cluster webhook", func() {
 
 			By("creating cluster with UserProvided issuer and secret ref provided")
 			Expect(k8sClient.Delete(ctx, cluster)).Should(Succeed())
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), &Cluster{})
-				return apierrors.IsNotFound(err)
-			}).Should(BeTrue())
+			err := k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), &Cluster{})
+			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 			cluster, _ = createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
 			cluster.Spec.ComponentSpecs[0].TLS = true
 			cluster.Spec.ComponentSpecs[0].Issuer = &Issuer{
@@ -267,10 +253,8 @@ var _ = Describe("cluster webhook", func() {
 			cluster, _ := createTestReplicationSetCluster(rsClusterDefinitionName, rsClusterVersionName, rsClusterName)
 			cluster.Spec.ComponentSpecs[0].PrimaryIndex = nil
 			Expect(testCtx.CreateObj(ctx, cluster)).Should(Succeed())
-			Eventually(func(g Gomega) int32 {
-				g.Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
-				return *cluster.Spec.ComponentSpecs[0].PrimaryIndex
-			}).Should(Equal(int32(0)))
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
+			Expect(*cluster.Spec.ComponentSpecs[0].PrimaryIndex).Should(Equal(int32(0)))
 
 			By("By update Replication component replicas to 0, expect succeed")
 			cluster.Spec.ComponentSpecs[0].Replicas = int32(0)
@@ -296,6 +280,7 @@ spec:
     volumeClaimTemplates:
     - name: data
       spec:
+        storageClassName: standard
         resources:
           requests:
             storage: 1Gi
@@ -309,7 +294,7 @@ spec:
 	return cluster, err
 }
 
-func createTestReplicationSetCluster(clusterDefinitionName, clusterVerisonName, clusterName string) (*Cluster, error) {
+func createTestReplicationSetCluster(clusterDefinitionName, clusterVersionName, clusterName string) (*Cluster, error) {
 	clusterYaml := fmt.Sprintf(`
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
@@ -333,7 +318,7 @@ spec:
         resources:
           requests:
             storage: 1Gi
-`, clusterName, clusterDefinitionName, clusterVerisonName)
+`, clusterName, clusterDefinitionName, clusterVersionName)
 	cluster := &Cluster{}
 	err := yaml.Unmarshal([]byte(clusterYaml), cluster)
 	cluster.Spec.TerminationPolicy = WipeOut

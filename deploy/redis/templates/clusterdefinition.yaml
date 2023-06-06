@@ -16,6 +16,11 @@ spec:
     - name: redis
       workloadType: Replication
       characterType: redis
+      probes:
+        roleProbe:
+          failureThreshold: 2
+          periodSeconds: 2
+          timeoutSeconds: 1
       replicationSpec:
         switchPolicies:
           - type: MaximumAvailability
@@ -60,9 +65,6 @@ spec:
           - name: redis
             port: 6379
             targetPort: redis
-          - name: metrics
-            port: 9121
-            targetPort: metrics
       configSpecs:
         - name: redis-replication-config
           templateRef: redis7-config-template
@@ -131,12 +133,12 @@ spec:
 # to pass $(KB_ACCOUNT_STATEMENT) to redis-cli without causing parsing error.
 # Instead, using a shell script to wrap redis-cli and pass $(KB_ACCOUNT_STATEMENT) to it will do.
         cmdExecutorConfig:
-          image: docker.io/redis:7.0.5
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
           command:
           - sh
           - -c
           args:
-          - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT)"
+          - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT) | redis-cli -h $(KB_ACCOUNT_ENDPOINT) acl save "
         passwordConfig:
           length: 10
           numDigits: 5
@@ -144,35 +146,30 @@ spec:
           letterCase: MixedCases
         accounts:
           - name: kbadmin
-            provisionPolicy:
+            provisionPolicy: &kbadminAcctRef
               type: CreateByStmt
-              scope: AnyPods
+              scope: AllPods
               statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allcommands allkeys
+                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allcommands allkeys
+                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbdataprotection
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AnyPods
-              statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allcommands allkeys
+            provisionPolicy: *kbadminAcctRef
           - name: kbmonitoring
-            provisionPolicy:
+            provisionPolicy: &kbReadOnlyAcctRef
               type: CreateByStmt
-              scope: AnyPods
+              scope: AllPods
               statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allkeys +get
+                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allkeys +get
+                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbprobe
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AnyPods
-              statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) allkeys +get
+            provisionPolicy: *kbReadOnlyAcctRef
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt
-              scope: AnyPods
+              scope: AllPods
               statements:
-                creation: ACL SETUSER $(USERNAME) ON >$(PASSWD) +psync +replconf +ping
+                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) +psync +replconf +ping
+                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
     - name: redis-sentinel
       workloadType: Stateful
       characterType: redis

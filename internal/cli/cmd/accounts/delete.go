@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package accounts
@@ -22,23 +25,24 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
-	"github.com/apecloud/kubeblocks/internal/sqlchannel"
+	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type DeleteUserOptions struct {
 	*AccountBaseOptions
-	info sqlchannel.UserInfo
+	AutoApprove bool
+	info        channelutil.UserInfo
 }
 
 func NewDeleteUserOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *DeleteUserOptions {
 	return &DeleteUserOptions{
-		AccountBaseOptions: NewAccountBaseOptions(f, streams, sqlchannel.DeleteUserOp),
+		AccountBaseOptions: NewAccountBaseOptions(f, streams, channelutil.DeleteUserOp),
 	}
 }
 
 func (o *DeleteUserOptions) AddFlags(cmd *cobra.Command) {
 	o.AccountBaseOptions.AddFlags(cmd)
-	cmd.Flags().StringVarP(&o.info.UserName, "username", "u", "", "Required. Specify the name of user")
+	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required user name, please specify it")
 }
 
 func (o *DeleteUserOptions) Validate(args []string) error {
@@ -47,6 +51,9 @@ func (o *DeleteUserOptions) Validate(args []string) error {
 	}
 	if len(o.info.UserName) == 0 {
 		return errMissingUserName
+	}
+	if o.AutoApprove {
+		return nil
 	}
 	if err := delete.Confirm([]string{o.info.UserName}, o.In); err != nil {
 		return err

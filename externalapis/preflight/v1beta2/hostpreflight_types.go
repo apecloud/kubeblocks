@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,9 +39,9 @@ type HostPreflightStatus struct {
 	troubleshoot.HostPreflightStatus `json:",inline"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:storageversion
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:storageversion
 
 // HostPreflight is the Schema for the hostpreflights API
 type HostPreflight struct {
@@ -52,7 +52,7 @@ type HostPreflight struct {
 	Status HostPreflightStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // HostPreflightList contains a list of HostPreflight
 type HostPreflightList struct {

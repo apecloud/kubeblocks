@@ -1,5 +1,5 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,9 +18,11 @@ package util
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 	"log"
 	"os"
+	executil "os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -187,7 +189,7 @@ func ExecCommand(strCommand string) string {
 	cmd := exec.New().Command("/bin/bash", "-c", strCommand)
 	stdout, _ := cmd.StdoutPipe()
 	if err := cmd.Start(); err != nil {
-		log.Printf("Execute failed when Start:%s\n", err.Error())
+		log.Printf("failed to Start:%s\n", err.Error())
 		return ""
 	}
 	outBytes, _ := io.ReadAll(stdout)
@@ -196,7 +198,7 @@ func ExecCommand(strCommand string) string {
 		return ""
 	}
 	if err := cmd.Wait(); err != nil {
-		log.Printf("Execute failed when Wait:%s\n", err.Error())
+		log.Printf("failed to Wait:%s\n", err.Error())
 		return ""
 	}
 	return string(outBytes)
@@ -250,10 +252,10 @@ func ReplaceClusterVersionRef(fileName string, clusterVersionRef string) {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
-				log.Println("File read ok!")
+				log.Println("file read ok!")
 				break
 			} else {
-				log.Println("Read file error!", err)
+				log.Println("file read error ", err)
 				return
 			}
 		}
@@ -262,14 +264,14 @@ func ReplaceClusterVersionRef(fileName string, clusterVersionRef string) {
 			bytes := []byte("    app.kubernetes.io/version: \"" + version + "\"\n")
 			_, err := file.WriteAt(bytes, pos)
 			if err != nil {
-				log.Println("open file filed.", err)
+				log.Println("file open failed ", err)
 			}
 		}
 		if strings.Contains(line, "clusterVersionRef") {
 			bytes := []byte("  clusterVersionRef: " + clusterVersionRef + "\n")
 			_, err := file.WriteAt(bytes, pos)
 			if err != nil {
-				log.Println("open file filed.", err)
+				log.Println("file open failed ", err)
 			}
 		}
 		pos += int64(len(line))
@@ -285,4 +287,33 @@ func StringStrip(str string) string {
 func CheckKbcliExists() error {
 	_, err := exec.New().LookPath("kbcli")
 	return err
+}
+
+func Check(command string, input string) (string, error) {
+	cmd := executil.Command("bash", "-c", command)
+
+	var output bytes.Buffer
+	cmd.Stdout = &output
+
+	inPipe, err := cmd.StdinPipe()
+	if err != nil {
+		return "", err
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		return "", err
+	}
+
+	_, e := io.WriteString(inPipe, input)
+	if e != nil {
+		return "", e
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		return "", err
+	}
+
+	return output.String(), nil
 }

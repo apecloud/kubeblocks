@@ -27,9 +27,10 @@ kbcli kubeblocks upgrade [flags]
       --set-file stringArray     Set values from respective files specified via the command line (can specify multiple or separate values with commas: key1=path1,key2=path2)
       --set-json stringArray     Set JSON values on the command line (can specify multiple or separate values with commas: key1=jsonval1,key2=jsonval2)
       --set-string stringArray   Set STRING values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
-      --timeout duration         Time to wait for upgrading KubeBlocks (default 30m0s)
+      --timeout duration         Time to wait for upgrading KubeBlocks, such as --timeout=10m (default 5m0s)
   -f, --values strings           Specify values in a YAML file or a URL (can specify multiple)
       --version string           Set KubeBlocks version
+      --wait                     Wait for KubeBlocks to be ready. It will wait for a --timeout period (default true)
 ```
 
 ### Options inherited from parent commands

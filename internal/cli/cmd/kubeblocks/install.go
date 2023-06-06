@@ -1,17 +1,20 @@
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+This file is part of KubeBlocks project
 
-    http://www.apache.org/licenses/LICENSE-2.0
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package kubeblocks
@@ -19,21 +22,23 @@ package kubeblocks
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/briandowns/spinner"
+	"github.com/pkg/errors"
+	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
-	"golang.org/x/exp/slices"
+	"golang.org/x/exp/maps"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/repo"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -42,8 +47,8 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
@@ -51,7 +56,10 @@ import (
 )
 
 const (
-	kMonitorParam = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t"
+	kMonitorParam    = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t"
+	kNodeAffinity    = "affinity.nodeAffinity=%s"
+	kPodAntiAffinity = "affinity.podAntiAffinity=%s"
+	kTolerations     = "tolerations=%s"
 )
 
 type Options struct {
@@ -59,10 +67,12 @@ type Options struct {
 
 	HelmCfg *helm.Config
 
-	// Namespace is the current namespace that the command is running
+	// Namespace is the current namespace the command running in
 	Namespace string
 	Client    kubernetes.Interface
 	Dynamic   dynamic.Interface
+	Timeout   time.Duration
+	Wait      bool
 }
 
 type InstallOptions struct {
@@ -73,14 +83,26 @@ type InstallOptions struct {
 	CreateNamespace bool
 	Check           bool
 	ValueOpts       values.Options
-	timeout         time.Duration
+
+	// ConfiguredOptions is the options that kubeblocks
+	PodAntiAffinity string
+	TopologyKeys    []string
+	NodeLabels      map[string]string
+	TolerationsRaw  []string
+}
+
+type addonStatus struct {
+	allEnabled  bool
+	allDisabled bool
+	hasFailed   bool
+	outputMsg   string
 }
 
 var (
 	installExample = templates.Examples(`
-	# Install KubeBlocks, the default version is same with the kbcli version, the default namespace is kb-system 
+	# Install KubeBlocks, the default version is same with the kbcli version, the default namespace is kb-system
 	kbcli kubeblocks install
-	
+
 	# Install KubeBlocks with specified version
 	kbcli kubeblocks install --version=0.4.0
 
@@ -89,6 +111,10 @@ var (
 
 	# Install KubeBlocks with other settings, for example, set replicaCount to 3
 	kbcli kubeblocks install --set replicaCount=3`)
+
+	spinnerMsg = func(format string, a ...any) spinner.Option {
+		return spinner.WithMessage(fmt.Sprintf("%-50s", fmt.Sprintf(format, a...)))
+	}
 )
 
 func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -98,6 +124,13 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 
+	p := &PreflightOptions{
+		PreflightFlags: preflight.NewPreflightFlags(),
+		IOStreams:      streams,
+	}
+	*p.Interactive = false
+	*p.Format = "kbcli"
+
 	cmd := &cobra.Command{
 		Use:     "install",
 		Short:   "Install KubeBlocks.",
@@ -105,6 +138,8 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f, cmd))
+			util.CheckErr(o.PreCheck())
+			util.CheckErr(p.Preflight(f, args, o.ValueOpts))
 			util.CheckErr(o.Install())
 		},
 	}
@@ -112,8 +147,14 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Auto install monitoring add-ons including prometheus, grafana and alertmanager-webhook-adaptor")
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "Create the namespace if not present")
-	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before install")
-	cmd.Flags().DurationVar(&o.timeout, "timeout", 1800*time.Second, "Time to wait for installing KubeBlocks")
+	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before installation")
+	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for installing KubeBlocks, such as --timeout=10m")
+	cmd.Flags().BoolVar(&o.Wait, "wait", true, "Wait for KubeBlocks to be ready, including all the auto installed add-ons. It will wait for a --timeout period")
+	cmd.Flags().BoolVar(&p.force, flagForce, p.force, "If present, just print fail item and continue with the following steps")
+	cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "", "Pod anti-affinity type, one of: (Preferred, Required)")
+	cmd.Flags().StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
+	cmd.Flags().StringToStringVar(&o.NodeLabels, "node-labels", nil, "Node label selector")
+	cmd.Flags().StringSliceVar(&o.TolerationsRaw, "tolerations", nil, `Tolerations for Kubeblocks, such as '"dev=true:NoSchedule,large=true:NoSchedule"'`)
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
@@ -121,6 +162,12 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 
 func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	var err error
+
+	// default write log to file
+	if err = util.EnableLogToFile(cmd.Flags()); err != nil {
+		fmt.Fprintf(o.Out, "Failed to enable the log file %s", err.Error())
+	}
+
 	if o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace(); err != nil {
 		return err
 	}
@@ -153,17 +200,20 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	return err
 }
 
-func (o *InstallOptions) Install() error {
+func (o *InstallOptions) PreCheck() error {
 	// check if KubeBlocks has been installed
-	versionInfo, err := util.GetVersionInfo(o.Client)
+	v, err := util.GetVersionInfo(o.Client)
 	if err != nil {
 		return err
 	}
 
-	if v := versionInfo[util.KubeBlocksApp]; len(v) > 0 {
-		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", v)
+	// Todo: KubeBlocks maybe already installed but it's status could be Failed.
+	// For example: 'kbcli playground init' in windows will fail and try 'kbcli playground init' again immediately,
+	// kbcli will output SUCCESSFULLY, however the addon csi is still failed and KubeBlocks is not installed SUCCESSFULLY
+	if v.KubeBlocks != "" {
+		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", v.KubeBlocks)
 		fmt.Fprintln(o.Out, "If you want to upgrade it, please use \"kbcli kubeblocks upgrade\".")
-		return nil
+		return cmdutil.ErrExit
 	}
 
 	// check whether the namespace exists
@@ -177,43 +227,80 @@ func (o *InstallOptions) Install() error {
 		return err
 	}
 
-	if err = o.preCheck(versionInfo); err != nil {
+	if err = o.checkVersion(v); err != nil {
 		return err
 	}
+	return nil
+}
 
+func (o *InstallOptions) Install() error {
+	var err error
 	// add monitor parameters
 	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 
+	// add pod anti-affinity
+	if o.PodAntiAffinity != "" || len(o.TopologyKeys) > 0 {
+		podAntiAffinityJSON, err := json.Marshal(util.BuildPodAntiAffinity(o.PodAntiAffinity, o.TopologyKeys))
+		if err != nil {
+			return err
+		}
+		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kPodAntiAffinity, podAntiAffinityJSON))
+	}
+
+	// add node affinity
+	if len(o.NodeLabels) > 0 {
+		nodeLabelsJSON, err := json.Marshal(util.BuildNodeAffinity(o.NodeLabels))
+		if err != nil {
+			return err
+		}
+		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kNodeAffinity, string(nodeLabelsJSON)))
+	}
+
+	// parse tolerations and add to values
+	if len(o.TolerationsRaw) > 0 {
+		tolerations, err := util.BuildTolerations(o.TolerationsRaw)
+		if err != nil {
+			return err
+		}
+		tolerationsJSON, err := json.Marshal(tolerations)
+		if err != nil {
+			return err
+		}
+		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kTolerations, string(tolerationsJSON)))
+	}
+
 	// add helm repo
-	spinner := printer.Spinner(o.Out, "%-50s", "Add and update repo "+types.KubeBlocksRepoName)
-	defer spinner(false)
+	s := spinner.New(o.Out, spinnerMsg("Add and update repo "+types.KubeBlocksRepoName))
+	defer s.Fail()
 	// Add repo, if exists, will update it
 	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksRepoName, URL: util.GetHelmChartRepoURL()}); err != nil {
 		return err
 	}
-	spinner(true)
+	s.Success()
 
-	// install KubeBlocks chart
-	spinner = printer.Spinner(o.Out, "%-50s", "Install KubeBlocks "+o.Version)
-	defer spinner(false)
+	// install KubeBlocks
+	s = spinner.New(o.Out, spinnerMsg("Install KubeBlocks "+o.Version))
+	defer s.Fail()
 	if err = o.installChart(); err != nil {
 		return err
 	}
-	spinner(true)
+	s.Success()
 
 	// wait for auto-install addons to be ready
 	if err = o.waitAddonsEnabled(); err != nil {
-		return err
-	}
-
-	// create VolumeSnapshotClass
-	if err = o.createVolumeSnapshotClass(); err != nil {
+		fmt.Fprintf(o.Out, "Failed to wait for auto-install addons to be enabled, run \"kbcli kubeblocks status\" to check the status\n")
 		return err
 	}
 
 	if !o.Quiet {
-		fmt.Fprintf(o.Out, "\nKubeBlocks %s installed to namespace %s SUCCESSFULLY!\n",
-			o.Version, o.HelmCfg.Namespace())
+		msg := fmt.Sprintf("\nKubeBlocks %s installed to namespace %s SUCCESSFULLY!\n", o.Version, o.HelmCfg.Namespace())
+		if !o.Wait {
+			msg = fmt.Sprintf(`
+KubeBlocks %s is installing to namespace %s.
+You can check the KubeBlocks status by running "kbcli kubeblocks status"
+`, o.Version, o.HelmCfg.Namespace())
+		}
+		fmt.Fprint(o.Out, msg)
 		o.printNotes()
 	}
 	return nil
@@ -221,127 +308,93 @@ func (o *InstallOptions) Install() error {
 
 // waitAddonsEnabled waits for auto-install addons status to be enabled
 func (o *InstallOptions) waitAddonsEnabled() error {
-	addons := make(map[string]bool)
-	checkAddons := func() (bool, error) {
-		allEnabled := true
-		objects, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: buildAddonLabelSelector(),
+	if !o.Wait {
+		return nil
+	}
+
+	addons := make(map[string]*extensionsv1alpha1.Addon)
+	fetchAddons := func() error {
+		objs, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: buildKubeBlocksSelectorLabels(),
 		})
 		if err != nil && !apierrors.IsNotFound(err) {
-			return false, err
+			return err
 		}
-		if objects == nil || len(objects.Items) == 0 {
+		if objs == nil || len(objs.Items) == 0 {
 			klog.V(1).Info("No Addons found")
-			return true, nil
+			return nil
 		}
 
-		for _, obj := range objects.Items {
-			addon := extensionsv1alpha1.Addon{}
-			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &addon); err != nil {
-				return false, err
+		for _, obj := range objs.Items {
+			addon := &extensionsv1alpha1.Addon{}
+			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, addon); err != nil {
+				return err
 			}
 
 			if addon.Status.ObservedGeneration == 0 {
 				klog.V(1).Infof("Addon %s is not observed yet", addon.Name)
-				allEnabled = false
 				continue
 			}
 
-			installable := false
-			if addon.Spec.InstallSpec != nil {
-				installable = addon.Spec.Installable.AutoInstall
-			}
-
-			klog.V(1).Infof("Addon: %s, enabled: %v, status: %s, auto-install: %v",
-				addon.Name, addon.Spec.InstallSpec.GetEnabled(), addon.Status.Phase, installable)
-			// addon is enabled, then check its status
+			// addon should be auto installed, check its status
 			if addon.Spec.InstallSpec.GetEnabled() {
-				addons[addon.Name] = true
+				addons[addon.Name] = addon
 				if addon.Status.Phase != extensionsv1alpha1.AddonEnabled {
-					klog.V(1).Infof("Addon %s is not enabled yet", addon.Name)
-					addons[addon.Name] = false
-					allEnabled = false
+					klog.V(1).Infof("Addon %s is not enabled yet, status %s", addon.Name, addon.Status.Phase)
+				}
+				if addon.Status.Phase == extensionsv1alpha1.AddonFailed {
+					klog.V(1).Infof("Addon %s failed:", addon.Name)
+					for _, c := range addon.Status.Conditions {
+						klog.V(1).Infof("  %s: %s", c.Reason, c.Message)
+					}
 				}
 			}
 		}
-		return allEnabled, nil
+		return nil
 	}
 
-	okMsg := func(msg string) string {
-		return fmt.Sprintf("%-50s %s\n", msg, printer.BoldGreen("OK"))
-	}
-	failMsg := func(msg string) string {
-		return fmt.Sprintf("%-50s %s\n", msg, printer.BoldRed("FAIL"))
-	}
 	suffixMsg := func(msg string) string {
-		return fmt.Sprintf(" %-50s", msg)
+		return fmt.Sprintf("%-50s", msg)
 	}
 
 	// create spinner
-	msg := "Wait for addons to be ready"
-	s := spinner.New(spinner.CharSets[11], 100*time.Millisecond)
-	s.Writer = o.Out
-	_ = s.Color("cyan")
-	s.Suffix = suffixMsg(msg)
-	s.Start()
-
-	var prevUnready []string
-	// check addon installing progress
-	checkProgress := func() {
-		if len(addons) == 0 {
-			return
-		}
-		unready := make([]string, 0)
-		ready := make([]string, 0)
-		for k, v := range addons {
-			if v {
-				ready = append(ready, k)
-			} else {
-				unready = append(unready, k)
-			}
-		}
-		sort.Strings(unready)
-		s.Suffix = suffixMsg(fmt.Sprintf("%s\n  %s", msg, strings.Join(unready, "\n  ")))
-		for _, r := range ready {
-			if !slices.Contains(prevUnready, r) {
-				continue
-			}
-			s.FinalMSG = okMsg("Addon " + r)
-			s.Stop()
-			s.Suffix = suffixMsg(fmt.Sprintf("%s\n  %s", msg, strings.Join(unready, "\n  ")))
-			s.Start()
-		}
-		prevUnready = unready
-	}
-
+	msg := ""
+	header := "Wait for addons to be enabled"
+	failedErr := errors.New("some addons are failed to be enabled")
+	s := spinner.New(o.Out, spinnerMsg(header))
 	var (
-		allEnabled bool
-		err        error
+		err         error
+		spinnerDone = func() {
+			s.SetFinalMsg(msg)
+			s.Done("")
+			fmt.Fprintln(o.Out)
+		}
 	)
-	// wait for all auto-install addons to be enabled
-	for i := 0; i < viper.GetInt("KB_WAIT_ADDON_TIMES"); i++ {
-		allEnabled, err = checkAddons()
-		if err != nil {
-			s.FinalMSG = failMsg(msg)
-			s.Stop()
-			return err
+	// wait all addons to be enabled, or timeout
+	if err = wait.PollImmediate(5*time.Second, o.Timeout, func() (bool, error) {
+		if err = fetchAddons(); err != nil || len(addons) == 0 {
+			return false, err
 		}
-		checkProgress()
-		if allEnabled {
-			s.FinalMSG = okMsg(msg)
-			s.Stop()
-			return nil
+		status := checkAddons(maps.Values(addons), true)
+		msg = suffixMsg(fmt.Sprintf("%s\n  %s", header, status.outputMsg))
+		s.SetMessage(msg)
+		if status.allEnabled {
+			spinnerDone()
+			return true, nil
+		} else if status.hasFailed {
+			return false, failedErr
 		}
-		time.Sleep(5 * time.Second)
+		return false, nil
+	}); err != nil {
+		spinnerDone()
+		printAddonMsg(o.Out, maps.Values(addons), true)
+		return err
 	}
 
-	// timeout to wait for all auto-install addons to be enabled
-	s.FinalMSG = fmt.Sprintf("%-50s %s\n", msg, printer.BoldRed("TIMEOUT"))
-	s.Stop()
 	return nil
 }
 
-func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
+func (o *InstallOptions) checkVersion(v util.Version) error {
 	if !o.Check {
 		return nil
 	}
@@ -355,21 +408,21 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 	}
 
 	versionErr := fmt.Errorf("failed to get kubernetes version")
-	k8sVersionStr, ok := versionInfo[util.KubernetesApp]
-	if !ok {
+	k8sVersionStr := v.Kubernetes
+	if k8sVersionStr == "" {
 		return versionErr
 	}
 
-	version := util.GetK8sVersion(k8sVersionStr)
-	if len(version) == 0 {
+	semVer := util.GetK8sSemVer(k8sVersionStr)
+	if len(semVer) == 0 {
 		return versionErr
 	}
 
 	// output kubernetes version
-	fmt.Fprintf(o.Out, "Kubernetes version %s\n", ""+version)
+	fmt.Fprintf(o.Out, "Kubernetes version %s\n", ""+semVer)
 
 	// disable or enable some features according to the kubernetes environment
-	provider, err := util.GetK8sProvider(version, o.Client)
+	provider, err := util.GetK8sProvider(k8sVersionStr, o.Client)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes provider: %v", err)
 	}
@@ -378,7 +431,7 @@ func (o *InstallOptions) preCheck(versionInfo map[util.AppName]string) error {
 	}
 
 	// check kbcli version, now do nothing
-	fmt.Fprintf(o.Out, "kbcli version %s\n", versionInfo[util.KBCLIApp])
+	fmt.Fprintf(o.Out, "kbcli version %s\n", v.Cli)
 
 	return nil
 }
@@ -413,7 +466,7 @@ func (o *InstallOptions) checkRemainedResource() error {
 	// the addon resources.
 	objs, err := getKBObjects(o.Dynamic, ns, nil)
 	if err != nil {
-		fmt.Fprintf(o.ErrOut, "Check whether there are resources left by KubeBlocks before: %s\n", err.Error())
+		fmt.Fprintf(o.ErrOut, "Failed to get resources left by KubeBlocks before: %s\n", err.Error())
 	}
 
 	res := getRemainedResource(objs)
@@ -463,57 +516,17 @@ Note: Monitoring add-ons are not installed.
 	}
 }
 
-func (o *InstallOptions) createVolumeSnapshotClass() error {
-	createFunc := func() error {
-		options := cluster.CreateVolumeSnapshotClassOptions{}
-		options.BaseOptions.Dynamic = o.Dynamic
-		options.BaseOptions.IOStreams = o.IOStreams
-		options.BaseOptions.Quiet = true
-
-		spinner := printer.Spinner(o.Out, "%-50s", "Configure VolumeSnapshotClass")
-		defer spinner(false)
-
-		if err := options.Complete(); err != nil {
-			return err
-		}
-		if err := options.Create(); err != nil {
-			return err
-		}
-		spinner(true)
-		return nil
-	}
-
-	var sets []string
-	for _, set := range o.ValueOpts.Values {
-		splitSet := strings.Split(set, ",")
-		sets = append(sets, splitSet...)
-	}
-	for _, set := range sets {
-		if set != "snapshot-controller.enabled=true" {
-			continue
-		}
-
-		if err := createFunc(); err != nil {
-			return err
-		} else {
-			// only need to create once
-			return nil
-		}
-	}
-	return nil
-}
-
 func (o *InstallOptions) buildChart() *helm.InstallOpts {
 	return &helm.InstallOpts{
 		Name:            types.KubeBlocksChartName,
 		Chart:           types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
-		Wait:            true,
+		Wait:            o.Wait,
 		Version:         o.Version,
 		Namespace:       o.HelmCfg.Namespace(),
 		ValueOpts:       &o.ValueOpts,
 		TryTimes:        2,
 		CreateNamespace: o.CreateNamespace,
-		Timeout:         o.timeout,
+		Timeout:         o.Timeout,
 		Atomic:          true,
 	}
 }

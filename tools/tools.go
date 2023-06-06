@@ -2,7 +2,7 @@
 // +build tools
 
 /*
-Copyright ApeCloud, Inc.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,4 +20,6 @@ limitations under the License.
 // This package imports things required by build scripts, to force `go mod` to see them as dependencies
 package tools
 
-import _ "github.com/golang/mock/mockgen"
+import (
+	_ "github.com/golang/mock/mockgen"
+)

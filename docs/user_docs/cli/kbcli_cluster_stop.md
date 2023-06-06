@@ -5,22 +5,25 @@ title: kbcli cluster stop
 Stop the cluster and release all the pods of the cluster.
 
 ```
-kbcli cluster stop [flags]
+kbcli cluster stop NAME [flags]
 ```
 
 ### Examples
 
 ```
   # stop the cluster and release all the pods of the cluster
-  kbcli cluster stop <my-cluster>
+  kbcli cluster stop mycluster
 ```
 
 ### Options
 
 ```
-  -h, --help                         help for stop
-      --name string                  OpsRequest name. if not specified, it will be randomly generated 
-      --ttlSecondsAfterSucceed int   Time to live after the OpsRequest succeed
+      --auto-approve                   Skip interactive approval before stopping the cluster
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+  -h, --help                           help for stop
+      --name string                    OpsRequest name. if not specified, it will be randomly generated 
+  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```
 
 ### Options inherited from parent commands

@@ -1,0 +1,54 @@
+name: PACKAGE-VERSION
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'The tag name of release'
+        required: true
+        default: ''
+
+run-name: ref_name:${{ github.ref_name }} release_version:${{ inputs.release_version }}
+
+env:
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  PACKAGE_BOT_WEBHOOK: ${{ secrets.PACKAGE_BOT_WEBHOOK }}
+
+
+jobs:
+  package-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout branch ${{ github.ref_name }}
+        uses: actions/checkout@v3
+
+      - name: package message
+        run: |
+          bash .github/utils/utils.sh --type 11 \
+            --tag-name "${{ inputs.release_version }}" \
+            --bot-webhook ${{ env.PACKAGE_BOT_WEBHOOK }}
+
+      - name: package check
+        run: |
+          bash .github/utils/utils.sh --type 7 --tag-name "${{ inputs.release_version }}"
+
+      - name: push tag
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          custom_tag: ${{ inputs.release_version }}
+          github_token: ${{ env.GITHUB_TOKEN }}
+          tag_prefix: ""
+
+  send-message:
+    runs-on: ubuntu-latest
+    needs: package-version
+    if: ${{ failure() || cancelled() }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: send message
+        run: |
+          bash .github/utils/utils.sh --type 12 \
+            --tag-name ${{ inputs.release_version }} \
+            --content "package\u00a0${{ inputs.release_version }}\u00a0error" \
+            --bot-webhook ${{ env.PACKAGE_BOT_WEBHOOK }} \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

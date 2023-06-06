@@ -33,7 +33,8 @@ These improvements achieve a better experience for running your own Plugin.
 
 - Make sure you have the Plugin authorities from OpenAI. If don't, you can join the [waiting list here](https://openai.com/waitlist/plugins).
 - An OPENAI_API_KEY for the Plugin to call OpenAI embedding APIs.
-- [Install kbcli and KubeBlocks](./../installation/introduction.md): Choose one guide that fits your actual environments.
+- [Install kbcli](./../installation/install-kbcli.md).
+- [Install KubeBlocks](./../installation/install-kubeblocks.md).
 
 ***Steps:***
 

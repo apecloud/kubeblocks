@@ -15,7 +15,7 @@ This document shows how to create and connect to a PostgreSQL cluster.
 ### Before you start
 
 * [Install kbcli](./../../installation/install-kbcli.md).
-* [Install KubeBlocks](./../../installation/introduction.md): Choose one guide that fits your actual environments.
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 * Make sure the PostgreSQL add-on is installed and enabled with `kbcli addon list`.
   
   ```bash

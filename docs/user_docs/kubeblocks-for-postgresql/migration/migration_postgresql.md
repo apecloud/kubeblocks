@@ -20,7 +20,7 @@ sidebar_label: Migration
 
 ### Enable kbcli migration
 
-1. [Install KubeBlocks](./../../installation/introduction.md): Choose one guide that fits your actual environments.
+1. [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 2. [Enable the migration add-on](./../../installation/enable-addons.md).
 
    ```bash

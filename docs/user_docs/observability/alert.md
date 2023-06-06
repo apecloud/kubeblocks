@@ -57,7 +57,7 @@ This tutorial takes configuring Feishu as the notification channel as an example
 
 ### Before you start
 
-To receive alerts, you need to deploy monitoring components and enable cluster monitoring first. Refer to [Monitor database](monitor-database.md) for details.
+To receive alerts, you need to deploy monitoring add-ons and enable cluster monitoring first. Refer to [Monitor database](monitor-database.md) for details.
 
 ### Configure alert channels
 

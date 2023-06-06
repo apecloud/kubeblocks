@@ -14,103 +14,103 @@ env:
 
 
 jobs:
-  trigger-mode:
-    runs-on: ubuntu-latest
-    outputs:
-      trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: Get trigger mode
-        id: get_trigger_mode
-        run: |
-          TRIGGER_MODE=`bash .github/utils/utils.sh --type 6`
-          echo $TRIGGER_MODE
-          echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
-
-      - name: merge releasing to release
-        if: ${{ startsWith(github.ref_name, 'releasing-') }}
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-          bash .github/utils/merge_releasing_branch.sh
-
-  pre-push:
-    needs: trigger-mode
-    runs-on: ubuntu-latest
-    if: ${{ github.ref_name != 'main' }}
-    name: Push Pre-Check
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 2
-      - name: install pcregrep
-        run: |
-          sudo apt-get update
-          sudo apt-get install pcregrep
-
-      - name: gen pcregrep
-        run: |
-          pcregrep --exclude-dir=mtr -r -n -I '[^\x00-\x7f]' . > pcregrep.out
-
-      - name: pcregrep Chinese
-        run: |
-          FILE_PATH=`git diff --name-only HEAD HEAD^`
-
-          python ${{ github.workspace }}/.github/utils/pcregrep.py \
-            --source="${{ github.workspace }}/pcregrep.out" \
-            --filter="$FILE_PATH"
-
-      - name: Spell Check with Typos
-        if: contains(needs.trigger-mode.outputs.trigger-mode, '[docs]')
-        uses: crate-ci/typos@v1.13.14
-        with:
-          files: docs/
-          config: .github/utils/typos.toml
-
-  cli-doc:
-    needs: trigger-mode
-    runs-on: ubuntu-latest
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[cli]') && github.ref_name != 'main' }}
-    steps:
-      - uses: actions/checkout@v3
-      - name: install lib
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libbtrfs-dev \
-            libdevmapper-dev
-
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: "1.20"
-
-      - name: Check cli doc
-        id: check-cli-doc
-        run: |
-          make kbcli-doc
-          FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
-          if [[ ! -z "$FILE_CHANGES" ]]; then
-            echo $FILE_CHANGES
-            git config --local user.name "$GITHUB_ACTOR"
-            git config --local user.email "$GITHUB_ACTOR@users.noreply.github.com"
-            git commit -a -m "chore: auto update cli doc changes"
-          fi
-          echo file_changes=$FILE_CHANGES >> $GITHUB_OUTPUT
-
-      - name: Push cli doc changes
-        uses: ad-m/github-push-action@master
-        if: ${{ steps.check-cli-doc.outputs.file_changes }}
-        with:
-          github_token: ${{ env.GITHUB_TOKEN }}
-          branch: ${{ github.ref }}
-
+#  trigger-mode:
+#    runs-on: ubuntu-latest
+#    outputs:
+#      trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
+#    steps:
+#      - uses: actions/checkout@v3
+#        with:
+#          fetch-depth: 0
+#      - name: Get trigger mode
+#        id: get_trigger_mode
+#        run: |
+#          TRIGGER_MODE=`bash .github/utils/utils.sh --type 6`
+#          echo $TRIGGER_MODE
+#          echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
+#
+#      - name: merge releasing to release
+#        if: ${{ startsWith(github.ref_name, 'releasing-') }}
+#        run: |
+#          git config user.name "$GITHUB_ACTOR"
+#          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+#          bash .github/utils/merge_releasing_branch.sh
+#
+#  pre-push:
+#    needs: trigger-mode
+#    runs-on: ubuntu-latest
+#    if: ${{ github.ref_name != 'main' }}
+#    name: Push Pre-Check
+#    steps:
+#      - uses: actions/checkout@v3
+#        with:
+#          fetch-depth: 2
+#      - name: install pcregrep
+#        run: |
+#          sudo apt-get update
+#          sudo apt-get install pcregrep
+#
+#      - name: gen pcregrep
+#        run: |
+#          pcregrep --exclude-dir=mtr -r -n -I '[^\x00-\x7f]' . > pcregrep.out
+#
+#      - name: pcregrep Chinese
+#        run: |
+#          FILE_PATH=`git diff --name-only HEAD HEAD^`
+#
+#          python ${{ github.workspace }}/.github/utils/pcregrep.py \
+#            --source="${{ github.workspace }}/pcregrep.out" \
+#            --filter="$FILE_PATH"
+#
+#      - name: Spell Check with Typos
+#        if: contains(needs.trigger-mode.outputs.trigger-mode, '[docs]')
+#        uses: crate-ci/typos@v1.13.14
+#        with:
+#          files: docs/
+#          config: .github/utils/typos.toml
+#
+#  cli-doc:
+#    needs: trigger-mode
+#    runs-on: ubuntu-latest
+#    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[cli]') && github.ref_name != 'main' }}
+#    steps:
+#      - uses: actions/checkout@v3
+#      - name: install lib
+#        run: |
+#          sudo apt-get update
+#          sudo apt-get install -y --no-install-recommends \
+#            libbtrfs-dev \
+#            libdevmapper-dev
+#
+#      - name: Setup Go
+#        uses: actions/setup-go@v3
+#        with:
+#          go-version: "1.20"
+#
+#      - name: Check cli doc
+#        id: check-cli-doc
+#        run: |
+#          make kbcli-doc
+#          FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
+#          if [[ ! -z "$FILE_CHANGES" ]]; then
+#            echo $FILE_CHANGES
+#            git config --local user.name "$GITHUB_ACTOR"
+#            git config --local user.email "$GITHUB_ACTOR@users.noreply.github.com"
+#            git commit -a -m "chore: auto update cli doc changes"
+#          fi
+#          echo file_changes=$FILE_CHANGES >> $GITHUB_OUTPUT
+#
+#      - name: Push cli doc changes
+#        uses: ad-m/github-push-action@master
+#        if: ${{ steps.check-cli-doc.outputs.file_changes }}
+#        with:
+#          github_token: ${{ env.GITHUB_TOKEN }}
+#          branch: ${{ github.ref }}
+#
   make-test:
-    needs: trigger-mode
-    runs-on: [self-hosted, eks-fargate-runner ]
-    if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
+#    needs: trigger-mode
+    runs-on: [self-hosted, kubeblocks-runner ]
+#    if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
     outputs:
       runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
     steps:
@@ -136,15 +136,15 @@ jobs:
         run: |
           make test
 
-      - name: upload coverage report
-        uses: codecov/codecov-action@v3
-        continue-on-error: true
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./cover.out
-          flags: unittests
-          name: codecov-report
-          verbose: true
+#      - name: upload coverage report
+#        uses: codecov/codecov-action@v3
+#        continue-on-error: true
+#        with:
+#          token: ${{ secrets.CODECOV_TOKEN }}
+#          files: ./cover.out
+#          flags: unittests
+#          name: codecov-report
+#          verbose: true
 
       - name: kill kube-apiserver and etcd
         id: get_runner_name
@@ -164,86 +164,86 @@ jobs:
           bash .github/utils/utils.sh --type 9 \
             --github-token ${{ env.GITHUB_TOKEN }} \
             --runner-name ${{ needs.make-test.outputs.runner-name }}
-
-  check-image:
-    needs: trigger-mode
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') && github.ref_name != 'main' }}
-    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.6.1
-    with:
-      MAKE_OPS_PRE: "generate"
-      MAKE_OPS: "build-manager-image"
-      IMG: "apecloud/kubeblocks"
-      VERSION: "check"
-      GO_VERSION: "1.20"
-      BUILDX_PLATFORMS: "linux/amd64"
-      SYNC_ENABLE: false
-    secrets: inherit
-
-  check-tools-image:
-    needs: trigger-mode
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') && github.ref_name != 'main' }}
-    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.6.1
-    with:
-      MAKE_OPS_PRE: "generate"
-      MAKE_OPS: "build-tools-image"
-      IMG: "apecloud/kubeblocks-tools"
-      VERSION: "check"
-      GO_VERSION: "1.20"
-      BUILDX_PLATFORMS: "linux/amd64"
-      SYNC_ENABLE: false
-    secrets: inherit
-
-  check-helm:
-    needs: trigger-mode
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]') && github.ref_name != 'main' }}
-    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.6.1
-    with:
-      MAKE_OPS: "bump-chart-ver"
-      VERSION: "v0.4.0-check"
-      CHART_NAME: "kubeblocks"
-      CHART_DIR: "deploy/helm"
-      PUSH_ENABLE: false
-      DEP_REPO: "helm dep update deploy/delphic"
-    secrets: inherit
-
-  deploy-kubeblocks-io:
-    needs: trigger-mode
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docs]') && (github.ref_name == 'main' || startsWith(github.ref_name, 'release')) }}
-    uses: apecloud/apecd/.github/workflows/trigger-workflow.yml@v0.5.0
-    with:
-      GITHUB_REPO: "apecloud/kubeblocks.io"
-      BRANCH_NAME: "master"
-      WORKFLOW_ID: "deploy.yml"
-    secrets: inherit
-
-  build-kbcli:
-    needs: trigger-mode
-    runs-on: ubuntu-latest
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[cli]') && github.ref_name != 'main' }}
-    strategy:
-      matrix:
-        os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64]
-    steps:
-      - uses: actions/checkout@v3
-      - name: install lib
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libbtrfs-dev \
-            libdevmapper-dev
-
-      - name: Setup Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: "1.20"
-
-      - name: make generate
-        run: make generate
-
-      - name: build cli
-        run: |
-          CLI_OS_ARCH=`bash .github/utils/utils.sh \
-            --tag-name ${{ matrix.os }} \
-            --type 2`
-
-          make bin/kbcli.$CLI_OS_ARCH
+#
+#  check-image:
+#    needs: trigger-mode
+#    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') && github.ref_name != 'main' }}
+#    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.6.1
+#    with:
+#      MAKE_OPS_PRE: "generate"
+#      MAKE_OPS: "build-manager-image"
+#      IMG: "apecloud/kubeblocks"
+#      VERSION: "check"
+#      GO_VERSION: "1.20"
+#      BUILDX_PLATFORMS: "linux/amd64"
+#      SYNC_ENABLE: false
+#    secrets: inherit
+#
+#  check-tools-image:
+#    needs: trigger-mode
+#    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') && github.ref_name != 'main' }}
+#    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.6.1
+#    with:
+#      MAKE_OPS_PRE: "generate"
+#      MAKE_OPS: "build-tools-image"
+#      IMG: "apecloud/kubeblocks-tools"
+#      VERSION: "check"
+#      GO_VERSION: "1.20"
+#      BUILDX_PLATFORMS: "linux/amd64"
+#      SYNC_ENABLE: false
+#    secrets: inherit
+#
+#  check-helm:
+#    needs: trigger-mode
+#    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]') && github.ref_name != 'main' }}
+#    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.6.1
+#    with:
+#      MAKE_OPS: "bump-chart-ver"
+#      VERSION: "v0.4.0-check"
+#      CHART_NAME: "kubeblocks"
+#      CHART_DIR: "deploy/helm"
+#      PUSH_ENABLE: false
+#      DEP_REPO: "helm dep update deploy/delphic"
+#    secrets: inherit
+#
+#  deploy-kubeblocks-io:
+#    needs: trigger-mode
+#    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docs]') && (github.ref_name == 'main' || startsWith(github.ref_name, 'release')) }}
+#    uses: apecloud/apecd/.github/workflows/trigger-workflow.yml@v0.5.0
+#    with:
+#      GITHUB_REPO: "apecloud/kubeblocks.io"
+#      BRANCH_NAME: "master"
+#      WORKFLOW_ID: "deploy.yml"
+#    secrets: inherit
+#
+#  build-kbcli:
+#    needs: trigger-mode
+#    runs-on: ubuntu-latest
+#    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[cli]') && github.ref_name != 'main' }}
+#    strategy:
+#      matrix:
+#        os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64]
+#    steps:
+#      - uses: actions/checkout@v3
+#      - name: install lib
+#        run: |
+#          sudo apt-get update
+#          sudo apt-get install -y --no-install-recommends \
+#            libbtrfs-dev \
+#            libdevmapper-dev
+#
+#      - name: Setup Go
+#        uses: actions/setup-go@v3
+#        with:
+#          go-version: "1.20"
+#
+#      - name: make generate
+#        run: make generate
+#
+#      - name: build cli
+#        run: |
+#          CLI_OS_ARCH=`bash .github/utils/utils.sh \
+#            --tag-name ${{ matrix.os }} \
+#            --type 2`
+#
+#          make bin/kbcli.$CLI_OS_ARCH

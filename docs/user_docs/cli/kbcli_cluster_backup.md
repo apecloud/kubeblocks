@@ -19,7 +19,7 @@ kbcli cluster backup NAME [flags]
   kbcli cluster backup mycluster --type snapshot
   
   # create a datafile backup
-  # backup all data directory files and save them to the specified storage, only full backup is supported now.
+  # backup all files under the data directory and save them to the specified storage, only full backup is supported now.
   kbcli cluster backup mycluster --type datafile
   
   # create a backup with specified backup policy

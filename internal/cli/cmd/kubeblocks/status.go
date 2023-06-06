@@ -448,7 +448,7 @@ func (o *statusOptions) showK8sClusterInfos(ctx context.Context, allErrs *[]erro
 		appendErrIgnoreNotFound(allErrs, err)
 	}
 	if nodesList == nil {
-		tblPrinter.AddRow(version.Kubernetes, provider, "unknown", "unknown")
+		tblPrinter.AddRow(version.Kubernetes, provider, "", "")
 		tblPrinter.Print()
 		return
 	}
@@ -461,11 +461,6 @@ func (o *statusOptions) showK8sClusterInfos(ctx context.Context, allErrs *[]erro
 		}
 		region = labels[constant.RegionLabelKey]
 		availableZones[labels[constant.ZoneLabelKey]] = struct{}{}
-	}
-	if region == "" {
-		tblPrinter.AddRow(version.Kubernetes, provider, "", "")
-		tblPrinter.Print()
-		return
 	}
 	allZones := maps.Keys(availableZones)
 	sort.Strings(allZones)

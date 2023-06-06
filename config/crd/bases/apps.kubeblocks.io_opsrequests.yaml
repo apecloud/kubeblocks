@@ -60,9 +60,18 @@ spec:
           spec:
             description: OpsRequestSpec defines the desired state of OpsRequest
             properties:
+              cancel:
+                description: 'cancel defines the action to cancel the Pending/Creating/Running
+                  opsRequest, supported types: [VerticalScaling, HorizontalScaling].
+                  once cancel is set to true, this opsRequest will be canceled and
+                  modifying this property again will not take effect.'
+                type: boolean
               clusterRef:
                 description: clusterRef references clusterDefinition.
                 type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.clusterRef
+                  rule: self == oldSelf
               expose:
                 description: expose defines services the component needs to expose.
                 items:
@@ -119,6 +128,9 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.expose
+                  rule: self == oldSelf
               horizontalScaling:
                 description: horizontalScaling defines what component need to horizontal
                   scale the specified replicas.
@@ -142,6 +154,9 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.horizontalScaling
+                  rule: self == oldSelf
               reconfigure:
                 description: reconfigure defines the variables that need to input
                   when updating configuration.
@@ -209,6 +224,9 @@ spec:
                 - componentName
                 - configurations
                 type: object
+                x-kubernetes-validations:
+                - message: forbidden to update spec.reconfigure
+                  rule: self == oldSelf
               restart:
                 description: restart the specified component.
                 items:
@@ -225,6 +243,9 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.restart
+                  rule: self == oldSelf
               restoreFrom:
                 description: cluster RestoreFrom backup or point in time
                 properties:
@@ -265,6 +286,9 @@ spec:
                         type: string
                     type: object
                 type: object
+                x-kubernetes-validations:
+                - message: forbidden to update spec.restoreFrom
+                  rule: self == oldSelf
               ttlSecondsAfterSucceed:
                 description: ttlSecondsAfterSucceed OpsRequest will be deleted after
                   TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.
@@ -283,6 +307,9 @@ spec:
                 - Stop
                 - Expose
                 type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.type
+                  rule: self == oldSelf
               upgrade:
                 description: upgrade specifies the cluster version by specifying clusterVersionRef.
                 properties:
@@ -292,6 +319,9 @@ spec:
                 required:
                 - clusterVersionRef
                 type: object
+                x-kubernetes-validations:
+                - message: forbidden to update spec.upgrade
+                  rule: self == oldSelf
               verticalScaling:
                 description: verticalScaling defines what component need to vertical
                   scale the specified compute resources.
@@ -355,6 +385,9 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.verticalScaling
+                  rule: self == oldSelf
               volumeExpansion:
                 description: volumeExpansion defines what component and volumeClaimTemplate
                   need to expand the specified storage.
@@ -397,13 +430,24 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.volumeExpansion
+                  rule: self == oldSelf
             required:
             - clusterRef
             - type
             type: object
+            x-kubernetes-validations:
+            - message: forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']
+              rule: 'has(self.cancel) && self.cancel ? (self.type in [''VerticalScaling'',
+                ''HorizontalScaling'']) : true'
           status:
             description: OpsRequestStatus defines the observed state of OpsRequest
             properties:
+              cancelTimestamp:
+                description: CancelTimestamp defines cancel time.
+                format: date-time
+                type: string
               clusterGeneration:
                 description: ClusterGeneration records the cluster generation after
                   handling the opsRequest action.
@@ -698,6 +742,8 @@ spec:
                 - Pending
                 - Creating
                 - Running
+                - Cancelling
+                - Cancelled
                 - Failed
                 - Succeed
                 type: string

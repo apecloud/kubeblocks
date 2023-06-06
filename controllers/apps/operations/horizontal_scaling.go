@@ -35,12 +35,14 @@ type horizontalScalingOpsHandler struct{}
 var _ OpsHandler = horizontalScalingOpsHandler{}
 
 func init() {
+	hsHandler := horizontalScalingOpsHandler{}
 	horizontalScalingBehaviour := OpsBehaviour{
 		// if cluster is Abnormal or Failed, new opsRequest may repair it.
 		// TODO: we should add "force" flag for these opsRequest.
 		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
 		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
-		OpsHandler:                         horizontalScalingOpsHandler{},
+		OpsHandler:                         hsHandler,
+		CancelFunc:                         hsHandler.Cancel,
 		ProcessingReasonInClusterCondition: ProcessingReasonHorizontalScaling,
 	}
 	opsMgr := GetOpsManager()
@@ -63,10 +65,8 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		if horizontalScaling, ok = horizontalScalingMap[component.Name]; !ok {
 			continue
 		}
-		if horizontalScaling.Replicas != 0 {
-			r := horizontalScaling.Replicas
-			opsRes.Cluster.Spec.ComponentSpecs[index].Replicas = r
-		}
+		r := horizontalScaling.Replicas
+		opsRes.Cluster.Spec.ComponentSpecs[index].Replicas = r
 	}
 	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
@@ -151,4 +151,23 @@ func getCompPodNamesBeforeScaleDownReplicas(reqCtx intctrlutil.RequestCtx,
 		podNames = append(podNames, v.Name)
 	}
 	return podNames, nil
+}
+
+// Cancel this function defines the cancel horizontalScaling action.
+func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	return cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec) error {
+		if lastConfig.Replicas == nil {
+			return nil
+		}
+		podNames, err := getCompPodNamesBeforeScaleDownReplicas(reqCtx, cli, *opsRes.Cluster, comp.Name)
+		if err != nil {
+			return err
+		}
+		if lastConfig.TargetResources == nil {
+			lastConfig.TargetResources = map[appsv1alpha1.ComponentResourceKey][]string{}
+		}
+		lastConfig.TargetResources[appsv1alpha1.PodsCompResourceKey] = podNames
+		comp.Replicas = *lastConfig.Replicas
+		return nil
+	})
 }

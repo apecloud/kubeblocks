@@ -71,7 +71,7 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		return err
 	}
 
-	diff, err := cfgEditContext.getUnifiedDiffString()
+	diff, err := util.GetUnifiedDiffString(cfgEditContext.original, cfgEditContext.edited)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		return nil
 	}
 
-	displayDiffWithColor(o.IOStreams.Out, diff)
+	util.DisplayDiffWithColor(o.IOStreams.Out, diff)
 
 	oldVersion := map[string]string{
 		o.CfgFile: cfgEditContext.getOriginal(),

@@ -223,7 +223,7 @@ type ClusterComponentStatus struct {
 	Phase ClusterComponentPhase `json:"phase,omitempty"`
 
 	// message records the component details message in current phase.
-	// Keys are podName or deployName or statefulSetName. The format is `<ObjectKind>/<Name>`.
+	// Keys are podName or deployName or statefulSetName. The format is `ObjectKind/Name`.
 	// +optional
 	Message ComponentMessageMap `json:"message,omitempty"`
 

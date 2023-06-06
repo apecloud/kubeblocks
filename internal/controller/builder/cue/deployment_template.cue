@@ -27,7 +27,7 @@ cluster: {
 component: {
 	clusterDefName: string
 	name:           string
-	type:           string
+	compDefName:    string
 	workloadType:   string
 	replicas:       int
 	podSpec: containers: [...]
@@ -44,6 +44,7 @@ deployment: {
 			"app.kubernetes.io/name":       "\(component.clusterDefName)"
 			"app.kubernetes.io/instance":   cluster.metadata.name
 			"app.kubernetes.io/managed-by": "kubeblocks"
+			"app.kubernetes.io/component":  "\(component.compDefName)"
 
 			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
@@ -66,7 +67,7 @@ deployment: {
 					"app.kubernetes.io/name":       "\(component.clusterDefName)"
 					"app.kubernetes.io/instance":   "\(cluster.metadata.name)"
 					"app.kubernetes.io/managed-by": "kubeblocks"
-					"app.kubernetes.io/component":  "\(component.type)"
+					"app.kubernetes.io/component":  "\(component.compDefName)"
 					if cluster.spec.clusterVersionRef != _|_ {
 						"app.kubernetes.io/version": "\(cluster.spec.clusterVersionRef)"
 					}

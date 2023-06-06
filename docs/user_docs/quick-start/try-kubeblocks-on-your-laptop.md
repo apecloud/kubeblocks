@@ -1,12 +1,12 @@
 ---
-title: Try out KubeBlocks in 5 minutes on your laptop
+title: Try out KubeBlocks in 5 minutes on laptop
 description: A quick tour of KubeBlocks Playground
 keywords: [Playground, try out, laptop,]
 sidebar_position: 1
-sidebar_label: Try out KubeBlocks on your laptop
+sidebar_label: Try out KubeBlocks on laptop
 ---
 
-# Try out KubeBlocks in 5 minutes on your laptop
+# Try out KubeBlocks in 5 minutes on laptop
 
 This guide walks you through the quickest way to get started with KubeBlocks, demonstrating how to create a demo environment (Playground) with one command.
 

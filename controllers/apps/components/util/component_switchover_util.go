@@ -366,11 +366,13 @@ func renderSwitchoverCmdJob(ctx context.Context,
 
 	renderJob := func(switchoverSpec *appsv1alpha1.SwitchoverSpec, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
 		var switchoverAction *appsv1alpha1.SwitchoverAction
-		if component.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual && switchoverSpec.WithCandidateInstance != nil {
+		switch component.CandidateInstance.Operator {
+		case appsv1alpha1.CandidateOpEqual:
 			switchoverAction = switchoverSpec.WithCandidateInstance
-		} else if component.CandidateInstance.Operator == appsv1alpha1.CandidateOpNotEqual && switchoverSpec.WithoutCandidateInstance != nil {
+		case appsv1alpha1.CandidateOpNotEqual:
 			switchoverAction = switchoverSpec.WithoutCandidateInstance
-		} else {
+		}
+		if switchoverAction == nil {
 			return nil, errors.New("switchover action not found")
 		}
 		// jobName named with generation to distinguish different switchover jobs.

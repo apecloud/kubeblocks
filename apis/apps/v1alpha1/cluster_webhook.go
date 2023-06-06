@@ -181,6 +181,8 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		r.validateComponentResources(allErrs, v.Resources, i)
 	}
 
+	r.validateCandidateInstance(allErrs)
+
 	r.validateComponentTLSSettings(allErrs)
 
 	if len(invalidComponentDefs) > 0 {
@@ -213,6 +215,20 @@ func (r *Cluster) validateComponentTLSSettings(allErrs *field.ErrorList) {
 		}
 		if component.Issuer.Name == IssuerUserProvided && component.Issuer.SecretRef == nil {
 			*allErrs = append(*allErrs, field.Required(field.NewPath(fmt.Sprintf("spec.components[%d].issuer.secretRef", index)), "Secret must provide when issuer name is UserProvided"))
+		}
+	}
+}
+
+// validateCandidateInstance checks candidateInstance.index value cannot be larger than replicas.
+func (r *Cluster) validateCandidateInstance(allErrs *field.ErrorList) {
+	for index, component := range r.Spec.ComponentSpecs {
+		if component.CandidateInstance == nil || component.Replicas == 0 {
+			continue
+		}
+		if component.CandidateInstance.Index > component.Replicas-1 {
+			path := fmt.Sprintf("spec.components[%d].CandidateInstance.Index", index)
+			*allErrs = append(*allErrs, field.Invalid(field.NewPath(path),
+				component.CandidateInstance.Index, "CandidateInstance.Index cannot be larger than Replicas."))
 		}
 	}
 }

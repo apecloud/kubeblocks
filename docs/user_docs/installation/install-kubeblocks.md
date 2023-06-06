@@ -41,7 +41,8 @@ The quickest way to try out KubeBlocks is to create a new Kubernetes cluster and
 
 ## Installation steps
 
-The command `kbcli kubeblocks install` installs KubeBlocks in the `kb-system` namespace, or you can use the `--namespace` flag to specify one. 
+The command `kbcli kubeblocks install` installs KubeBlocks in the `kb-system` namespace, or you can use the `--namespace` flag to specify one.
+
 You can also isolate the KubeBlocks control plane and data plane resources by setting taints and tolerations. Choose from the following options.
 
 ### Install KubeBlocks with default tolerations

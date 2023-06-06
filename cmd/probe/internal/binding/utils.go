@@ -245,6 +245,7 @@ func SentProbeEvent(ctx context.Context, opsResult OpsResult, log logger.Logger)
 			break
 		}
 		log.Errorf("send event failed: %v", err)
+		time.Sleep(10 * time.Second)
 	}
 }
 

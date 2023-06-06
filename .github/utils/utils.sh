@@ -53,6 +53,7 @@ main() {
     local RELEASE_VERSION=""
     local RUN_URL=""
     local FILE=""
+    local FOLDER=""
 
     parse_command_line "$@"
 
@@ -95,6 +96,9 @@ main() {
         ;;
         13)
             patch_release_notes
+        ;;
+        14)
+            upload_rpm_repo
         ;;
         *)
             show_help
@@ -413,6 +417,15 @@ patch_release_notes() {
            -X PATCH \
     $GITHUB_API/repos/$GITHUB_REPO/releases/$release_id \
     -d '{"body":"'"$release_note"'"}'
+}
+
+upload_rpm_repo() {
+    curl -X POST \
+      -H "Authorization: token $GITHUB_TOKEN" \
+      -H "Content-Type: application/vnd.github.v3+json" \
+      -d '{"ref":"main", "path":"", "branch":"main"}' \
+      --data-binary "@." \
+      "https://$GITHUB_API/repos/$GITHUB_REPO/contents/$FOLDER"
 }
 
 main "$@"

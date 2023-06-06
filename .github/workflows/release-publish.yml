@@ -165,26 +165,26 @@ jobs:
         if: matrix.os == 'linux-amd64' || matrix.os == 'linux-arm64'
         run: |
           sudo apt-get install -y createrepo-c
-          mkdir -p rpm_repo
+          mkdir -p rpm_repo/rpm_repo
           pwd
-          cp /home/runner/rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-1.${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm rpm_repo/
-          createrepo_c -pdo rpm_repo rpm_repo
-          createrepo_c --update rpm_repo
+          cp /home/runner/rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-1.${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm rpm_repo/rpm_repo/
+          createrepo_c -pdo rpm_repo/rpm_repo rpm_repo/rpm_repo
+          createrepo_c --update rpm_repo/rpm_repo
           ls -l rpm_repo
-          bash ${{ github.workspace }}/.github/utils/utils.sh --type 13 \
+          bash ${{ github.workspace }}/.github/utils/utils.sh --type 14 \
           --github-repo 'apecloud/kbcli_rpm' \
           --tag-name ${{ env.TAG_NAME }} \
-          --file "${{ github.workspace }}/rpm_repo" \
+          --folder "${{ github.workspace }}/rpm_repo" \
           --github-token ${{ env.GITHUB_TOKEN }}
-
-      - name: upload RPM package
-        if: matrix.os == 'linux-amd64' || matrix.os == 'linux-arm64'
-        uses: actions/upload-release-asset@main
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-1.${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm
-          asset_name: ${{ env.CLI_FILENAME }}.rpm
-          asset_content_type: application/octet-stream
+#
+#      - name: upload RPM package
+#        if: matrix.os == 'linux-amd64' || matrix.os == 'linux-arm64'
+#        uses: actions/upload-release-asset@main
+#        with:
+#          upload_url: ${{ steps.get_release.outputs.upload_url }}
+#          asset_path: ./rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-1.${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm
+#          asset_name: ${{ env.CLI_FILENAME }}.rpm
+#          asset_content_type: application/octet-stream
 
 #      - name: upload kbcli binary release for winget
 #        if: matrix.os == 'windows-amd64'

@@ -174,7 +174,7 @@ jobs:
           bash ${{ github.workspace }}/.github/utils/utils.sh --type 13 \
           --github-repo 'apecloud/kbcli_rpm' \
           --tag-name ${{ env.TAG_NAME }} \
-          --file "${{ github.workspace }}/rpm_rpo/*" \
+          --file "${{ github.workspace }}/rpm_repo" \
           --github-token ${{ env.GITHUB_TOKEN }}
 
       - name: upload RPM package

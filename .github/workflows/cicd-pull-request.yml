@@ -72,7 +72,7 @@ jobs:
     name: check image
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
-    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.6.1
+    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-manager-image"
@@ -81,13 +81,14 @@ jobs:
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
       SYNC_ENABLE: false
+      APECD_REF: "v0.1.0"
     secrets: inherit
 
   check-tools-image:
     name: check image
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
-    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.6.1
+    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-tools-image"
@@ -96,13 +97,14 @@ jobs:
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
       SYNC_ENABLE: false
+      APECD_REF: "v0.1.0"
     secrets: inherit
 
   check-helm:
     name: check helm
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]')
-    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.6.1
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.0
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "v0.4.0-check"
@@ -110,4 +112,5 @@ jobs:
       CHART_DIR: "deploy/helm"
       PUSH_ENABLE: false
       DEP_REPO: "helm dep update deploy/delphic"
+      APECD_REF: "v0.1.0"
     secrets: inherit

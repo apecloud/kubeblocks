@@ -23,7 +23,7 @@ spec:
     {{- end }}
   {{- end }}
   controlPlaneEndpoint:
-    domain: lb.api-service.local
+    domain: lb.apiservice.local
     {{- $address := ""}}
     {{- if hasKey $.RoleGroups "master" }}
         {{- $mName := index (get $.RoleGroups "master") 0 }}
@@ -64,6 +64,6 @@ spec:
     type: kubeadm
     {{- end }}
   network:
-    plugin: calico
+    plugin: cilium
     kubePodsCIDR: 10.233.64.0/18
     kubeServiceCIDR: 10.233.0.0/18

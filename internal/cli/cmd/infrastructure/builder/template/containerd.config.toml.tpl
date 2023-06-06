@@ -13,6 +13,9 @@ state = "/run/containerd"
   max_recv_message_size = 16777216
   max_send_message_size = 16777216
 
+[debug]
+  level = "info"
+
 [metrics]
   address = ""
   grpc_histogram = false
@@ -27,6 +30,8 @@ state = "/run/containerd"
 default_runtime_name = "runc"
 
 [plugins."io.containerd.grpc.v1.cri"]
+stream_server_address = "127.0.0.1"
+max_container_log_line_size = 262144
 sandbox_image = "{{ .SandBoxImage }}"
 
 [plugins."io.containerd.grpc.v1.cri".registry]

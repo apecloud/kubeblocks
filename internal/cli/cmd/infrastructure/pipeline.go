@@ -26,7 +26,6 @@ import (
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/etcd"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/filesystem"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/kubernetes"
-	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/plugins"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/plugins/dns"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/plugins/network"
 
@@ -51,7 +50,7 @@ func NewCreateK8sClusterForKubeblocks(o *clusterOptions) []module.Module {
 		// &customscripts.CustomScriptsModule{Phase: "PreInstall", Scripts: runtime.Cluster.System.PreInstall},
 		&kubernetes.StatusModule{},
 		// &container.InstallContainerModule{},
-		&tasks.InstallCRIModule{},
+		&tasks.InstallCRIModule{SandBoxImage: o.sandBoxImage},
 		&etcd.PreCheckModule{},
 		&etcd.CertsModule{},
 		&etcd.InstallETCDBinaryModule{},
@@ -72,8 +71,8 @@ func NewCreateK8sClusterForKubeblocks(o *clusterOptions) []module.Module {
 		&filesystem.ChownModule{},
 		&certs.AutoRenewCertsModule{Skip: !o.autoRenewCerts},
 		&kubernetes.SecurityEnhancementModule{Skip: !o.securityEnhancement},
-		&kubernetes.SaveKubeConfigModule{},
-		&plugins.DeployPluginsModule{},
+		// &kubernetes.SaveKubeConfigModule{},
+		// &plugins.DeployPluginsModule{},
 		// &customscripts.CustomScriptsModule{Phase: "PostInstall", Scripts: runtime.Cluster.System.PostInstall},
 	}
 }

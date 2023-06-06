@@ -29,6 +29,8 @@ const (
 	ContainerdConfigInstallPath  = "/etc/containerd/config.toml"
 	CRICtlConfigInstallPath      = "/etc/crictl.yaml"
 
+	DefaultSandBoxImage = "k8s.gcr.io/pause:3.8"
+
 	DefaultK8sVersion        = "v1.26.5" // https://github.com/kubernetes/kubernetes/releases/tag/v1.26.5
 	DefaultEtcdVersion       = "v3.4.26" // https://github.com/etcd-io/etcd/releases/tag/v3.4.26
 	DefaultCRICtlVersion     = "v1.26.0" // https://github.com/kubernetes-sigs/cri-tools/releases/tag/v1.26.0

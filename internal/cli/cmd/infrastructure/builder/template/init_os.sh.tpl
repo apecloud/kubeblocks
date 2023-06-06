@@ -127,8 +127,8 @@ EOF
   fi
 }
 
-# install_netfilter
-# install_ipvs
+install_netfilter
+install_ipvs
 install_hosts
 common_os_setting
 
@@ -139,10 +139,10 @@ sysctl_set_keyvalue "kernel.pid_max" "65535"
 sysctl -p
 
 # Make sure the iptables utility doesn't use the nftables backend.
-# update-alternatives --set iptables /usr/sbin/iptables-legacy >/dev/null 2>&1 || true
-# update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy >/dev/null 2>&1 || true
-# update-alternatives --set arptables /usr/sbin/arptables-legacy >/dev/null 2>&1 || true
-# update-alternatives --set ebtables /usr/sbin/ebtables-legacy >/dev/null 2>&1 || true
+update-alternatives --set iptables /usr/sbin/iptables-legacy >/dev/null 2>&1 || true
+update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy >/dev/null 2>&1 || true
+update-alternatives --set arptables /usr/sbin/arptables-legacy >/dev/null 2>&1 || true
+update-alternatives --set ebtables /usr/sbin/ebtables-legacy >/dev/null 2>&1 || true
 
 ulimit -u 65535
 ulimit -n 65535

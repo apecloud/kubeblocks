@@ -29,9 +29,7 @@ import (
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/logger"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/prepare"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/task"
-	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/images"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/kubernetes"
-	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/registry"
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/builder"
@@ -112,6 +110,7 @@ func (i *CheckNodeArchitectureModule) Init() {
 
 type InstallCRIModule struct {
 	common.KubeModule
+	SandBoxImage string
 }
 
 func (i *InstallCRIModule) Init() {
@@ -171,11 +170,8 @@ func (i *InstallCRIModule) Init() {
 			Template: ContainerdConfig,
 			Dst:      ContainerdConfigInstallPath,
 			Values: gotemplate.TplValues{
-				"Mirrors":            templates.Mirrors(i.KubeConf),
-				"InsecureRegistries": i.KubeConf.Cluster.Registry.InsecureRegistries,
-				"SandBoxImage":       images.GetImage(i.Runtime, i.KubeConf, "pause").ImageName(),
-				"Auths":              registry.DockerRegistryAuthEntries(i.KubeConf.Cluster.Registry.Auths),
-				"DataRoot":           templates.DataRoot(i.KubeConf),
+				"SandBoxImage": i.SandBoxImage,
+				"DataRoot":     templates.DataRoot(i.KubeConf),
 			}},
 		Parallel: true,
 	}

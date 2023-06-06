@@ -172,7 +172,7 @@ jobs:
           createrepo_c --update rpm_repo/rpm_repo
           ls -l rpm_repo
           bash ${{ github.workspace }}/.github/utils/utils.sh --type 14 \
-          --github-repo 'apecloud/kbcli_rpm' \
+          --github-repo 'apecloud/kbcli_rpm_test' \
           --tag-name ${{ env.TAG_NAME }} \
           --folder "${{ github.workspace }}/rpm_repo" \
           --github-token ${{ env.GITHUB_TOKEN }}

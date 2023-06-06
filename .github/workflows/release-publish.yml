@@ -1,7 +1,6 @@
 name: RELEASE-PUBLISH
 
 on:
-  push:
   release:
     types:
       - published
@@ -130,13 +129,13 @@ jobs:
             --github-repo ${{ env.CLI_REPO }} \
             --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
 
-#      - name: upload release kbcli asset ${{ matrix.os }}
-#        uses: actions/upload-release-asset@main
-#        with:
-#          upload_url: ${{ env.UPLOAD_URL }}
-#          asset_path: ./bin/${{ env.ASSET_NAME }}
-#          asset_name: ${{ env.ASSET_NAME }}
-#          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
+      - name: upload release kbcli asset ${{ matrix.os }}
+        uses: actions/upload-release-asset@main
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ./bin/${{ env.ASSET_NAME }}
+          asset_name: ${{ env.ASSET_NAME }}
+          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
 
       - name: make RPM package
         if: matrix.os == 'linux-amd64' || matrix.os == 'linux-arm64'
@@ -175,14 +174,14 @@ jobs:
           asset_name: ${{ env.CLI_FILENAME }}.rpm
           asset_content_type: application/octet-stream
 
-#      - name: upload kbcli binary release for winget
-#        if: matrix.os == 'windows-amd64'
-#        uses: actions/upload-release-asset@main
-#        with:
-#          upload_url: ${{ env.UPLOAD_URL }}
-#          asset_path: ./bin/${{ env.CLI_NAME }}.exe
-#          asset_name: ${{ env.CLI_NAME }}.exe
-#          asset_content_type: application/octet-stream
+      - name: upload kbcli binary release for winget
+        if: matrix.os == 'windows-amd64'
+        uses: actions/upload-release-asset@main
+        with:
+          upload_url: ${{ env.UPLOAD_URL }}
+          asset_path: ./bin/${{ env.CLI_NAME }}.exe
+          asset_name: ${{ env.CLI_NAME }}.exe
+          asset_content_type: application/octet-stream
 
       - name: upload checksum for kbcli assets
         uses: actions/upload-artifact@v3

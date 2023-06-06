@@ -20,7 +20,7 @@ The termination policy determines how a cluster is deleted.
 |:--                     | :--                                       |
 | `DoNotTerminate`       | `DoNotTerminate` blocks delete operation. |
 | `Halt`                 | `Halt` deletes workload resources such as statefulset, deployment workloads but keep PVCs. |
-| `Delete`               | `Delete` delete workload resources and PVCs but keep backups. |
+| `Delete`               | `Delete` deletes workload resources and PVCs but keep backups. |
 | `WipeOut`              | `WipeOut` deletes workload resources, PVCs and all relevant resources included backups. |
 
 To check the termination policy, execute the following command.
@@ -40,7 +40,7 @@ redis-cluster	default  	redis    	        redis-7.0.6	    Delete            	Run
 
 ## Step
 
-Configure the cluster name and run the command below to delete the specified cluster.
+Configure the cluster name and run the command below to delete a specified cluster.
 
 ```bash
 kbcli cluster delete <name>

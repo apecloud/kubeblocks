@@ -9,8 +9,11 @@ sidebar_position: 2
 
 Alerts are mainly used for daily error response to improve system availability. Kubeblocks has a built-in set of common alert rules and integrates multiple notification channels. The alert capability of Kubeblocks can meet the operation and maintenance requirements of production-level online clusters.
 
+:::note
+
+The alert function is the same for all.
+
 :::
-The alert function is the same for all 
 
 ## Alert rules
 
@@ -58,11 +61,7 @@ To receive alerts, you need to deploy monitoring components and enable cluster m
 
 ### Configure alert channels
 
-The alert message notification of Kubeblocks mainly adopts the AlertManager native capability. After receiving the Prometheus alert, KubeBlocks performs steps including deduplication, grouping, silence, suppression, and routing, and finally sends it to the corresponding notification channel.
-
-AlertManager integrates a set of notification channels, such as Email and Slack. Kubeblocks extends new IM class notification channels with AlertManger Webhook.
-
-This tutorial takes configuring Feishu as the notification channel as an example.
+Refer to the following guides to configure your alert channels.
 
 * [Feishu custom bot](https://open.feishu.cn/document/ukTMukTMukTM/ucTM5YjL3ETO24yNxkjN)
 * [DingTalk custom bot](https://open.dingtalk.com/document/orgapp/custom-robot-access)
@@ -71,7 +70,7 @@ This tutorial takes configuring Feishu as the notification channel as an example
 
 :::note
 
-* Each notification channel has its interface call amount and frequency limits and when the limits are reached, the channel will limit traffic and you cannot receive alerts. 
+* Each notification channel has its interface call amount and frequency limits and when the limits are reached, the channel will limit traffic and you cannot receive alerts.
 * The SLA of the service provided by a single channel cannot guarantee the alerts are sent successfully. Therefore, it is recommended to configure multiple notification channels to ensure availability.
 
 :::

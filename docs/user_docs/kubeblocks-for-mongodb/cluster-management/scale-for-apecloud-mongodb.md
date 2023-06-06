@@ -22,7 +22,7 @@ During the vertical scaling process, a restart is triggered and the primary pod 
 
 ### Before you start
 
-Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
+Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
 kbcli cluster list mongodb-cluster
@@ -36,14 +36,14 @@ kbcli cluster list mongodb-cluster
 
    1. Use `kbcli cluster vscale` and configure the resources required.
 
-   ***Example***
+      ***Example***
 
-   ```bash
-   kbcli cluster vscale mongodb-cluster --component-names=mongodb --cpu=500m --memory=500Mi
-   >
-   OpsRequest mongodb-cluster-verticalscaling-thglk created successfully, you can view the progress:
-          kbcli cluster describe-ops mongodb-cluster-verticalscaling-thglk -n default
-   ```
+      ```bash
+      kbcli cluster vscale mongodb-cluster --component-names=mongodb --cpu=500m --memory=500Mi
+      >
+      OpsRequest mongodb-cluster-verticalscaling-thglk created successfully, you can view the progress:
+             kbcli cluster describe-ops mongodb-cluster-verticalscaling-thglk -n default
+      ```
 
    - `--component-names` describes the component name ready for vertical scaling.
    - `--memory` describes the requested and limited size of the component memory.

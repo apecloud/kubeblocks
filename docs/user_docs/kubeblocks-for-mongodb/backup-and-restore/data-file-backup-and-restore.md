@@ -18,7 +18,7 @@ For KubeBlocks, configuring backup and restoring data is simple with 3 steps. Co
 Currently, KubeBlocks backups and restores data on storage path predefined.
 
 <Tabs>
-<TabItem value="S3" label="Use S3 as the backup storage" default>
+<TabItem value="S3" label="S3" default>
 
 Enable CSI-S3 and fill in the values based on your actual environment.
 
@@ -47,7 +47,7 @@ Endpoint format:
 
 </TabItem>
 
-<TabItem value="OSS" label="Use OSS as the backup storage">
+<TabItem value="OSS" label="OSS">
 
 ```bash
 helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
@@ -65,7 +65,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
 
 </TabItem>
 
-<TabItem value="minIO" label="Use minIO as the backup storage">
+<TabItem value="minIO" label="MinIO">
 
 1. Install minIO.
 
@@ -112,7 +112,7 @@ kbcli kubeblocks config --set dataProtection.backupPVCName=kubeblocks-backup-dat
 
 :::
 
-## Step 2. Create backup
+## Create backup
 
 **Option 1. Manually Backup**
 
@@ -152,7 +152,7 @@ spec:
       type: datafile
 ```
 
-## Step 3. Restore data from backup
+## Restore data from backup
 
 1. Restore data from the backup.
 

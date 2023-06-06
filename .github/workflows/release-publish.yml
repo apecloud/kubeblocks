@@ -65,9 +65,9 @@ jobs:
       - name: make generate
         run: make generate
 
-      - name: Get release
-        id: get_release
-        uses: bruceadams/get-release@v1.3.2
+#      - name: Get release
+#        id: get_release
+#        uses: bruceadams/get-release@v1.3.2
 
       - name: make build
         run: |
@@ -121,14 +121,14 @@ jobs:
 #            --asset-path ./bin/${{ env.ASSET_NAME }} \
 #            --asset-name ${{ env.ASSET_NAME }} \
 #            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
-
-      - name: get release kbcli upload url
-        run: |
-          echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh \
-            --tag-name ${{ env.TAG_NAME }} \
-            --type 3 \
-            --github-repo ${{ env.CLI_REPO }} \
-            --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
+#
+#      - name: get release kbcli upload url
+#        run: |
+#          echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh \
+#            --tag-name ${{ env.TAG_NAME }} \
+#            --type 3 \
+#            --github-repo ${{ env.CLI_REPO }} \
+#            --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
 #
 #      - name: upload release kbcli asset ${{ matrix.os }}
 #        uses: actions/upload-release-asset@main
@@ -169,6 +169,11 @@ jobs:
           cp rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-1-${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm rpm_repo/
           createrepo -pdo rpm_repo rpm_repo
           createrepo --update rpm_repo
+          bash .github/utils/utils.sh --type 13 \
+          --github-repo 'apecloud/kbcli_rpm' \
+          --tag-name ${{ env.TAG_NAME }} \
+          --file "rpm_rpo/ \
+          --github-token ${{ env.GITHUB_TOKEN }}
 
       - name: upload RPM package
         if: matrix.os == 'linux-amd64' || matrix.os == 'linux-arm64'
@@ -203,45 +208,45 @@ jobs:
 #          asset_name: ${{ env.ASSET_NAME }}
 #          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
 #
-#  generate-kbcli-sha256:
-#    runs-on: ubuntu-latest
-#    needs: upload-release-assert
-#    steps:
-#      - uses: actions/checkout@v3
-#      - uses: actions/download-artifact@v3
-#        with:
-#          name: sha256
-#          path: sha256
-#      - name: generate kbcli release-notes
-#        run: |
-#          mkdir -p ./docs/release_notes/${{ env.TAG_NAME }}
-#          python ./.github/utils/generate_kbcli_sha256.py ${{ env.TAG_NAME }} sha256
-#      - name: release kbcli with release notes
-#        run: |
-#          bash .github/utils/utils.sh --type 13 \
-#            --github-repo 'apecloud/kbcli' \
-#            --tag-name ${{ env.TAG_NAME }} \
-#            --file "./docs/release_notes/${{ env.TAG_NAME }}/kbcli.md" \
-#            --github-token ${{ env.GITHUB_TOKEN }}
-#      - name: remove artifact
-#        uses: geekyeggo/delete-artifact@v2
-#        with:
-#          name: sha256
-#
-#  send-message:
-#    runs-on: ubuntu-latest
-#    needs: upload-release-assert
-#    if: ${{ always() }}
-#    steps:
-#      - uses: actions/checkout@v3
-#      - name: send message
-#        run: |
-#          CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0error"
-#          if [[ "${{ needs.upload-release-assert.result }}" == "success" ]]; then
-#              CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0success"
-#          fi
-#          bash .github/utils/utils.sh --type 12 \
-#            --tag-name ${{ env.TAG_NAME }} \
-#            --content "${CONTENT}"\
-#            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
-#            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+  generate-kbcli-sha256:
+    runs-on: ubuntu-latest
+    needs: upload-release-assert
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: sha256
+          path: sha256
+      - name: generate kbcli release-notes
+        run: |
+          mkdir -p ./docs/release_notes/${{ env.TAG_NAME }}
+          python ./.github/utils/generate_kbcli_sha256.py ${{ env.TAG_NAME }} sha256
+      - name: release kbcli with release notes
+        run: |
+          bash .github/utils/utils.sh --type 13 \
+            --github-repo 'apecloud/kbcli' \
+            --tag-name ${{ env.TAG_NAME }} \
+            --file "./docs/release_notes/${{ env.TAG_NAME }}/kbcli.md" \
+            --github-token ${{ env.GITHUB_TOKEN }}
+      - name: remove artifact
+        uses: geekyeggo/delete-artifact@v2
+        with:
+          name: sha256
+
+  send-message:
+    runs-on: ubuntu-latest
+    needs: upload-release-assert
+    if: ${{ always() }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: send message
+        run: |
+          CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0error"
+          if [[ "${{ needs.upload-release-assert.result }}" == "success" ]]; then
+              CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0success"
+          fi
+          bash .github/utils/utils.sh --type 12 \
+            --tag-name ${{ env.TAG_NAME }} \
+            --content "${CONTENT}"\
+            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

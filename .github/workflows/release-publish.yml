@@ -175,8 +175,9 @@ jobs:
           cd kbcli_rpm_test
           git config --global credential.helper store
           git config --global user.name ${{ env.GITHUB_TOKEN }}
-          git remote add kbcli_rpm_test https://github.com/apecloud/kbcli_rpm_test.git
-          git push -f kbcli_rpm_test main:main
+          git add .
+          git commit -m "update"
+          git push origin main
 
 #
 #      - name: upload RPM package

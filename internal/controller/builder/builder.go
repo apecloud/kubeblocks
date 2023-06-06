@@ -510,17 +510,34 @@ func BuildEnvConfigLow(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster
 
 // buildWorkloadCommonEnv build common env for all workload types.
 func buildWorkloadCommonEnv(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) map[string]string {
-	env := map[string]string{}
-	prefix := constant.KBPrefix + "_" + strings.ToUpper(component.Type) + "_"
+	prefix := constant.KBPrefix + "_"
+	cnt := strconv.Itoa(int(component.Replicas))
 	svcName := strings.Join([]string{cluster.Name, component.Name, "headless"}, "-")
-	env[prefix+"N"] = strconv.Itoa(int(component.Replicas))
-	for j := 0; j < int(component.Replicas); j++ {
-		hostNameTplKey := prefix + strconv.Itoa(j) + "_HOSTNAME"
-		hostNameTplValue := cluster.Name + "-" + component.Name + "-" + strconv.Itoa(j)
-		env[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
+	suffixes := make([]string, 0, 4+component.Replicas)
+	env := map[string]string{
+		prefix + "REPLICA_COUNT": cnt,
 	}
+
+	for j := 0; j < int(component.Replicas); j++ {
+		toA := strconv.Itoa(j)
+		suffix := toA + "_HOSTNAME"
+		value := fmt.Sprintf("%s.%s", cluster.Name+"-"+component.Name+"-"+toA, svcName)
+		env[prefix+suffix] = value
+		suffixes = append(suffixes, suffix)
+	}
+
 	// set cluster uid to let pod know if the cluster is recreated
 	env[prefix+"CLUSTER_UID"] = string(cluster.UID)
+	suffixes = append(suffixes, "CLUSTER_UID")
+
+	// have backward compatible handling for CM key with 'compDefName' being part of the key name
+	// TODO: need to deprecate 'compDefName' being part of variable name, as it's redundant
+	// and introduce env/cm key naming reference complexity
+	prefixWithCompDefName := prefix + strings.ToUpper(component.CompDefName) + "_"
+	for _, s := range suffixes {
+		env[prefixWithCompDefName+s] = env[prefix+s]
+	}
+	env[prefixWithCompDefName+"N"] = env[prefix+"REPLICA_COUNT"]
 	return env
 }
 
@@ -551,27 +568,23 @@ func buildReplicationSetEnv(reqCtx intctrlutil.RequestCtx,
 // buildConsensusSetEnv build env for consensus workload.
 func buildConsensusSetEnv(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) map[string]string {
 	env := map[string]string{}
-	if cluster.Status.Components != nil {
-		if v, ok := cluster.Status.Components[component.Name]; ok {
-			consensusSetStatus := v.ConsensusSetStatus
-			prefix := constant.KBPrefix + "_" + strings.ToUpper(component.Type) + "_"
-			if consensusSetStatus != nil {
-				if consensusSetStatus.Leader.Pod != constant.ComponentStatusDefaultPodName {
-					env[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
-				}
-				followers := ""
-				for _, follower := range consensusSetStatus.Followers {
-					if follower.Pod == constant.ComponentStatusDefaultPodName {
-						continue
-					}
-					if len(followers) > 0 {
-						followers += ","
-					}
-					followers += follower.Pod
-				}
-				env[prefix+"FOLLOWERS"] = followers
-			}
+	prefix := constant.KBPrefix + "_"
+	prefixWithCompDefName := prefix + strings.ToUpper(component.CompDefName) + "_"
+	if v, ok := cluster.Status.Components[component.Name]; ok && v.ConsensusSetStatus != nil {
+		consensusSetStatus := v.ConsensusSetStatus
+		if consensusSetStatus.Leader.Pod != constant.ComponentStatusDefaultPodName {
+			env[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
+			env[prefixWithCompDefName+"LEADER"] = env[prefix+"LEADER"]
 		}
+		followers := make([]string, 0, len(consensusSetStatus.Followers))
+		for _, follower := range consensusSetStatus.Followers {
+			if follower.Pod == constant.ComponentStatusDefaultPodName {
+				continue
+			}
+			followers = append(followers, follower.Pod)
+		}
+		env[prefix+"FOLLOWERS"] = strings.Join(followers, ",")
+		env[prefixWithCompDefName+"FOLLOWERS"] = env[prefix+"FOLLOWERS"]
 	}
 	return env
 }
@@ -655,7 +668,7 @@ func BuildConfigMapWithTemplateLow(cluster *appsv1alpha1.Cluster,
 		},
 		"component": {
 			"name":                  component.Name,
-			"type":                  component.Type,
+			"compDefName":           component.CompDefName,
 			"characterType":         component.CharacterType,
 			"configName":            cmName,
 			"templateName":          tplCfg.TemplateRef,
@@ -749,20 +762,25 @@ func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1a
 	return job, nil
 }
 
-func BuildPITRJob(name string, cluster *appsv1alpha1.Cluster, image string, command []string, args []string,
-	volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, env []corev1.EnvVar) (*batchv1.Job, error) {
-	const tplFile = "pitr_job_template.cue"
+func BuildRestoreJob(name, namespace string, image string, command []string, args []string,
+	volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, env []corev1.EnvVar, resources *corev1.ResourceRequirements) (*batchv1.Job, error) {
+	const tplFile = "restore_job_template.cue"
 	job := &batchv1.Job{}
-	if err := buildFromCUE(tplFile, map[string]any{
+	fillMaps := map[string]any{
 		"job.metadata.name":              name,
-		"job.metadata.namespace":         cluster.Namespace,
+		"job.metadata.namespace":         namespace,
 		"job.spec.template.spec.volumes": volumes,
 		"container.image":                image,
 		"container.command":              command,
 		"container.args":                 args,
 		"container.volumeMounts":         volumeMounts,
 		"container.env":                  env,
-	}, "job", job); err != nil {
+	}
+	if resources != nil {
+		fillMaps["container.resources"] = *resources
+	}
+
+	if err := buildFromCUE(tplFile, fillMaps, "job", job); err != nil {
 		return nil, err
 	}
 	return job, nil

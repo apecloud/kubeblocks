@@ -33,9 +33,9 @@ sidebar_label: Migration
 
 Modify the configuration of the source to support CDC.
 
-* (1) Set 'wal_level' configuration to 'logical'.
-* (2) Make sure that the number of 'max_replication_slots' configured is sufficient.
-* (3) Make sure that the number of 'max_wal_senders' configured is sufficient.
+1. Set 'wal_level' configuration to 'logical'.
+2. Make sure that the number of 'max_replication_slots' configured is sufficient.
+3. Make sure that the number of 'max_wal_senders' configured is sufficient.
 
 :::note
 
@@ -90,8 +90,8 @@ Make sure both the source and sink account meet the following permissions.
 
   For the migration function in KubeBlocks version 5.0, there are limits for the structure initialization.
 
-  1. User-defined types are not supported.
-  2. A field filled with an Array data type (such as text[], text[3][3], and integer[]) is not supported for migration.
+   1. User-defined types are not supported.
+   2. A field filled with an Array data type (such as text[], text[3][3], and integer[]) is not supported for migration.
 
   :::
 
@@ -117,10 +117,10 @@ It is recommended to prepare data sampling for verification after the migration 
    | Option     | Descriprion |
    | :--------- | :---------- |
    | mystask    | The name of the migration task. You can customize it. |
-   | --template | It specifies the migration template. `--template apecloud-pg2pg` stands for this migration task uses the template of migrating from PostgreSQL to PostgreSQL created by ApeCloud. Run `kbcli migration templates` to view all available templates and the supported database information.   |
-   | --source   | It specifies the source. `user:123456@127.0.0.1:5432/db_test` in the above example stands for `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connect URL uses the public network address. |
-   | --sink     | It specifies the destination. `user:123456@127.0.0.2:5432/db_test` in the above example stands for `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connection URL uses the service address inside the Kubernetes cluster. |
-   | --migration-object  | It specifies the migration object. The above example describes data in "public.table_test_1" and "public.table_test_2", including structure data, stock data, and incremental data generated during running migration task, will be migrated to the sink.    |
+   | `--template` | It specifies the migration template. `--template apecloud-pg2pg` stands for this migration task uses the template of migrating from PostgreSQL to PostgreSQL created by KubeBlocks. Run `kbcli migration templates` to view all available templates and the supported database information.   |
+   | `--source`  | It specifies the source. `user:123456@127.0.0.1:5432/db_test` in the above example stands for `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connect URL uses the public network address. |
+   | `--sink`     | It specifies the destination. `user:123456@127.0.0.2:5432/db_test` in the above example stands for `${user_name}:${password}@${database connection url}/${database}`. For this guide, the connection URL uses the service address inside the Kubernetes cluster. |
+   | `--migration-object`  | It specifies the migration object. The above example describes data in "public.table_test_1" and "public.table_test_2", including structure data, stock data, and incremental data generated during running migration task, will be migrated to the sink.    |
 
    :::note
 
@@ -157,16 +157,11 @@ It is recommended to prepare data sampling for verification after the migration 
    Pay attention to Initialization, CDC, and CDC Metrics.
 
    * Initialization
-     * Precheck
-       If the status shows `Failed`, it means the initialization precheck does not pass. Troubleshoot the initialization by [the following examples in troubleshooting](#troubleshooting).
-     * Init-struct
-       Structure initialization. Idempotent processing logic is adopted. A failure occurs only when a severe problem occurs, such as failing to connect a database.
-     * Init-data
-       Data initialization. If there are a large amount of stock data, it takes a long time to perform this step and you should pay attention to Status.
-   * CDC
-     Incremental migration. Based on the timestamp recorded by the system before the init-data step, the system starts data migration following eventual consistency and performs capturing the source library WAL (Write Ahead Log) changes -> writing to the sink. Under normal circumstances, the CDC phase continues if the migration link is not actively terminated.
-   * CDC Metrics
-     Incremental migration indicators. Currently, the indicators mainly provide the WAL LSN (Log Sequencer Number) of the source library and the corresponding timestamp (note that the timestamp shows the local time zone of the Pod Container runtime) when the CDC process has completed "capturing -> writing" process.
+     * Precheck: If the status shows `Failed`, it means the initialization precheck does not pass. Troubleshoot the initialization by [the following examples in troubleshooting](#troubleshooting).
+     * Init-struct: Structure initialization. Idempotent processing logic is adopted. A failure occurs only when a severe problem occurs, such as failing to connect a database.
+     * Init-data: Data initialization. If there are a large amount of stock data, it takes a long time to perform this step and you should pay attention to Status.
+   * CDC: Incremental migration. Based on the timestamp recorded by the system before the init-data step, the system starts data migration following eventual consistency and performs capturing the source library WAL (Write Ahead Log) changes -> writing to the sink. Under normal circumstances, the CDC phase continues if the migration link is not actively terminated.
+   * CDC Metrics: Incremental migration indicators. Currently, the indicators mainly provide the WAL LSN (Log Sequencer Number) of the source library and the corresponding timestamp (note that the timestamp shows the local time zone of the Pod Container runtime) when the CDC process has completed "capturing -> writing" process.
 
      :::note
 

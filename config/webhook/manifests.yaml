@@ -25,6 +25,26 @@ webhooks:
     resources:
     - clusterdefinitions
   sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-workloads-kubeblocks-io-v1alpha1-consensusset
+  failurePolicy: Fail
+  name: mconsensusset.kb.io
+  rules:
+  - apiGroups:
+    - workloads.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - consensussets
+  sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -111,4 +131,24 @@ webhooks:
     - UPDATE
     resources:
     - opsrequests
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-workloads-kubeblocks-io-v1alpha1-consensusset
+  failurePolicy: Fail
+  name: vconsensusset.kb.io
+  rules:
+  - apiGroups:
+    - workloads.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - consensussets
   sideEffects: None

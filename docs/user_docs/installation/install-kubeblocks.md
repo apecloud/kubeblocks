@@ -1,14 +1,15 @@
 ---
-title: Install KubeBlocks on the existed Kubernetes clusters
+title: Install KubeBlocks
 description: Install KubeBlocks on the existed Kubernetes clusters
 keywords: [taints, affinity, tolerance, install, kbcli, KubeBlocks]
-sidebar_position: 4
+sidebar_position: 3
 sidebar_label: On the existed Kubernetes clusters
 ---
 
-# Install KubeBlocks on the existed Kubernetes clusters
+# Install KubeBlocks
 
-In the actual environment, it is normal to install `kbcli` and KubeBlocks on the existed Kubernetes clusters.
+In the actual environment, it is normal to install `kbcli` and KubeBlocks on the existing and running Kubernetes clusters.
+To install KubeBlocks on a brand new cluster, you can use Playground, the command is `kbcli playground init`.
 
 ## Environment preparation
 
@@ -49,7 +50,7 @@ Make sure you have kbcli installed, for detailed information, check [Install kbc
 
 The installation command is `kbcli kubeblocks install`, simply running this command installs KubeBlocks on nodes without taints with default namespace `kb-system`.
 
-But in actual scenarios, you are recommendend to install KubeBlocks on nodes with taints and customized namespace.
+But in actual scenarios, you are recommended to install KubeBlocks on nodes with taints and customized namespace.
 
 1. Get Kubernetes nodes.
 

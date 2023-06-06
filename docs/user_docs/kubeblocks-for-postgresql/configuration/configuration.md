@@ -98,7 +98,7 @@ The example below reconfigures `max_connections`.
 
    ```bash
    kbcli cluster configure pg-cluster  --set=max_connections=5
-   error: failed to validate updated config: [failed to cue template render configure: [pg.acllog-max-len: invalid value 5 (out of bound 6-8388607):  #TODO: Confirm the error prompt
+   error: failed to validate updated config: [failed to cue template render configure: [pg.acllog-max-len: invalid value 5 (out of bound 6-8388607):
     343:34
    ]
    ]

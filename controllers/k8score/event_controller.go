@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/consensusset"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
@@ -75,6 +76,7 @@ var _ EventHandler = &RoleChangeEventHandler{}
 
 func init() {
 	EventHandlerMap["role-change-handler"] = &RoleChangeEventHandler{}
+	EventHandlerMap["consensus-set-event-handler"] = &consensusset.PodRoleEventHandler{}
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to

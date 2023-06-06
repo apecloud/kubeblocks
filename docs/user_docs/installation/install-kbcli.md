@@ -11,26 +11,15 @@ import TabItem from '@theme/TabItem';
 
 # Install kbcli
 
- You can install kbcli on both local and cloud environment.
+You can install kbcli on your laptop or virtual machines on the cloud.
 
 ## Environment preparation
 
-- Minimum system requirements:
-  - MacOS:
-    - CPU: 4 cores
-    - Memory: 4 GB
-    Check CPU with the following command: `sysctl hw.physicalcpu`; 
-    Check memory with the following command: `top -d`.
-  - Windows:
-    - 64-bit
-- Ensure the following tools are installed on your local host:
-  - Docker: v20.10.5 (runc ≥ v1.0.0-rc93) or higher. For installation details, see Get Docker.
-  - kubectl: used to interact with Kubernetes clusters.
-  - For Windows environment, PowerShell version 5.0 or higher is required.
+For Windows users, PowerShell version should be 5.0 or higher.
 
 ## Install kbcli
 
-You can install the kbcli and KubeBlocks on your local host, and now MacOS and Windows are supported.
+kbcli now supports MacOS and Windows.
 
 <Tabs>
 <TabItem value="MacOS" label="MacOS" default>
@@ -49,29 +38,29 @@ You can install kbcli with `curl` or `homebrew`.
 
 :::note
 
-- If a timeout exception occurs during installation, please retry and check your network settings.
+- If a timeout exception occurs during installation, please check your network settings and retry.
 
 :::
 
 - Option 2: Install kbcli using Homebrew.
 
-    1. Install ApeCloud tap, the Homebrew package of ApeCloud.
+1. Install ApeCloud tap, the Homebrew package of ApeCloud.
 
-        ```bash
-        brew tap apecloud/tap
-        ```
+   ```bash
+   brew tap apecloud/tap
+   ```
 
-    2. Install kbcli.
+2. Install kbcli.
 
-        ```bash
-        brew install kbcli
-        ```
+   ```bash
+   brew install kbcli
+   ```
 
-    3. Verify that kbcli is successfully installed.
+3. Verify that kbcli is successfully installed.
 
-        ```bash
-        kbcli -h
-        ```
+   ```bash
+   kbcli -h
+   ```
 
 </TabItem>
 
@@ -114,16 +103,16 @@ If you need to customize the installation path, use the zip file.
 </TabItem>
 </Tabs>
 
-## (Optional) Enable kbcli automatic command line completion
+## (Optional) Enable auto-completion for kbcli
 
-`kbcli` supports automatic command line completion. You can run the command below to view the user guide and enable this function.
+`kbcli` supports command line auto-completion.
 
 ```bash
 # Configure SHELL-TYPE as one type from bash, fish, PowerShell, and zsh
 kbcli completion SHELL-TYPE -h
 ```
 
-For example, enable command line completion for zsh.
+For example, enable kbcli auto-completion for zsh.
 
 ***Steps:***
 

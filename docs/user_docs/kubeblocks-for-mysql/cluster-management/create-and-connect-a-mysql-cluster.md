@@ -14,7 +14,7 @@ This document shows how to create and connect to a MySQL cluster.
 
 ### Before you start
 
-* [Install `kbcli`](./../../installation/install-kbcli.md).
+* [Install kbcli](./../../installation/install-kbcli.md).
 * [Install KubeBlocks](./../../installation/introduction.md): Choose one guide that fits your actual environments.
 * Make sure the ApeCloud MySQL addon is installed with `kbcli addon list`.
   
@@ -35,13 +35,13 @@ This document shows how to create and connect to a MySQL cluster.
 
 ### (Recommended) Create a cluster on a tainted node
 
-In actual scenarios, you are recommendend to create a cluster on nodes with taints and customized specification.
+In actual scenarios, you are recommended to create a cluster on nodes with taints and customized specifications.
 
 1. Taint your node.
 
    :::note
 
-   If you have already some tainted node, you can skip this step.
+   If you have already some tainted nodes, you can skip this step.
 
    :::
 
@@ -59,9 +59,9 @@ In actual scenarios, you are recommendend to create a cluster on nodes with tain
 
 2. Create a MySQL cluster.
 
-   The cluster creation command is simply `kbcli cluster create`. Use tolerances to deploy it on the tainted node. Further, you are recommended to create a cluster with specified class and customize your cluster settings as demanded.
+   The cluster creation command is simply `kbcli cluster create`. Use tolerances to deploy it on the tainted node. Further, you are recommended to create a cluster with a specified class and customize your cluster settings as demanded.
 
-   To create a cluster with specified class, you can use `--set` flag and specify your requirement.
+   To create a cluster with a specified class, you can use `--set` flag and specify your requirement.
 
    1. View and select a class for this cluster.
 
@@ -73,11 +73,11 @@ In actual scenarios, you are recommendend to create a cluster on nodes with tain
 
    If there is no suitable class listed, you can [customize your own class](./../cluster-type/customize-class-type.md) template and apply the class here.
 
-   Creating clusters that does not meet the constraints is invalid and system creates the cluster with the minimum CPU value specified.
+   Creating clusters that do not meet the constraints is invalid and the system creates the cluster with the minimum CPU value specified.
 
    :::
 
-   2. Create a cluster with specified class and add all taints on the current node in the `--toleration` flag to tolerate them.
+   2. Create a cluster with a specified class and add all taints on the current node in the `--toleration` flag to tolerate them.
 
       ```bash
       kbcli cluster create mysql-cluster --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"' --cluster-definition=apecloud-mysql --set class=general-2c2g,storageClass=<storageclassname> --namespace <name>
@@ -104,7 +104,7 @@ In actual scenarios, you are recommendend to create a cluster on nodes with tain
    EOF
    ```
 
-See the table below for the detailed description for customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.
+See the table below for detailed descriptions of customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.
 
 📎 Table 1. kbcli cluster create flags description
 
@@ -115,12 +115,12 @@ See the table below for the detailed description for customizable parameters, se
 | `--enable-all-logs`    | It enables you to view all application logs. When this function is enabled, enabledLogs of component level will be ignored. For logs settings, refer to [Access Logs](./../../observability/access-logs.md).  |
 | `--help`               | It shows the help guide for `kbcli cluster create`. You can also use the abbreviated `-h`. |
 | `--monitor`            | It is used to enable the monitor function and inject metrics exporter. It is set as true by default. |
-| `--node-labels`        | It is a node label selector. Its default value is [] and means empty value. If you want set node labels, you can follow the example format: <br />`kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'`  |
-| `--set`                | It sets the cluster resource including CPU, memory, replicas, and storage, each set corresponds to a component. For example, `--set cpu=1000m,memory=1Gi,replicas=1,storage=10Gi`.  |
+| `--node-labels`        | It is a node label selector. Its default value is [] and means empty value. If you want to set node labels, you can follow the example format: <br />`kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'`  |
+| `--set`                | It sets the cluster resource including CPU, memory, replicas, and storage, and each set corresponds to a component. For example, `--set cpu=1000m,memory=1Gi,replicas=1,storage=10Gi`.  |
 | `--set-file`           | It uses a yaml file, URL, or stdin to set the cluster resource. |
 | `--termination-policy` | It specifies how a cluster is deleted. Set the policy when creating a cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
 
-If no flags are used and no information specified, you create a MySQL cluster with default settings.
+If no flags are used and no information is specified, you create a MySQL cluster with default settings.
 
 ```bash
 kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"' 
@@ -142,11 +142,11 @@ To create a cluster with specified class, you can use `--set` flag and specify y
 
    If there is no suitable class listed, you can [customize your own class](./../cluster-type/customize-class-type.md) template and apply the class here.
 
-   Creating clusters that does not meet the constraints is invalid and the system creates a cluster with the minimum CPU value specified.
+   Creating clusters that do not meet the constraints is invalid and the system creates a cluster with the minimum CPU value specified.
 
    :::
 
-2. Create a cluster with specified class and add all taints on the current node in the `--toleration` flag to tolerate them.
+2. Create a cluster with a specified class and add all taints on the current node in the `--toleration` flag to tolerate them.
 
    ```bash
    kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --set class=general-2c2g,storageClass=<storageclassname> --namespace <name>
@@ -176,7 +176,7 @@ kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --set sto
 EOF
 ```
 
-See the table below for the detailed description for customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.
+See the table below for detailed descriptions of customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.
 
 📎 Table 1. kbcli cluster create flags description
 
@@ -192,7 +192,7 @@ See the table below for the detailed description for customizable parameters, se
 | `--set-file`           | It uses a yaml file, URL, or stdin to set the cluster resource. |
 | `--termination-policy` | It specifies how a cluster is deleted. Set the policy when creating a cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
 
-If no flags are used and no information specified, you create a MySQL cluster with default settings.
+If no flags are used and no information is specified, you create a MySQL cluster with default settings.
 
 ```bash
 kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql

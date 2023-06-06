@@ -45,9 +45,11 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	if err := buildRestoreInfoFromBackup(reqCtx, cli, cluster, synthesizedComp); err != nil {
-		return nil, err
-	}
+	/*
+		if err := buildRestoreInfoFromBackup(reqCtx, cli, cluster, synthesizedComp); err != nil {
+			return nil, err
+		}
+	*/
 	return synthesizedComp, nil
 }
 
@@ -77,7 +79,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		ClusterName:           cluster.Name,
 		ClusterUID:            string(cluster.UID),
 		Name:                  clusterCompSpec.Name,
-		Type:                  clusterCompDefObj.Name,
+		CompDefName:           clusterCompDefObj.Name,
 		CharacterType:         clusterCompDefObj.CharacterType,
 		WorkloadType:          clusterCompDefObj.WorkloadType,
 		StatelessSpec:         clusterCompDefObj.StatelessSpec,
@@ -255,7 +257,7 @@ func doContainerAttrOverride(compContainer *corev1.Container, container corev1.C
 // GetEnvReplacementMapForConnCredential gets the replacement map for connect credential
 func GetEnvReplacementMapForConnCredential(clusterName string) map[string]string {
 	return map[string]string{
-		constant.ConnCredentialPlaceHolder: GenerateConnCredential(clusterName),
+		constant.KBConnCredentialPlaceHolder: GenerateConnCredential(clusterName),
 	}
 }
 
@@ -270,10 +272,12 @@ func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedVal
 
 // GetReplacementMapForBuiltInEnv gets the replacement map for KubeBlocks built-in environment variables.
 func GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
+	cc := fmt.Sprintf("%s-%s", clusterName, componentName)
 	replacementMap := map[string]string{
 		constant.KBClusterNamePlaceHolder:     clusterName,
 		constant.KBCompNamePlaceHolder:        componentName,
-		constant.KBClusterCompNamePlaceHolder: fmt.Sprintf("%s-%s", clusterName, componentName),
+		constant.KBClusterCompNamePlaceHolder: cc,
+		constant.KBComponentEnvCMPlaceHolder:  fmt.Sprintf("%s-env", cc),
 	}
 	if len(clusterUID) > 8 {
 		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = clusterUID[len(clusterUID)-8:]

@@ -107,7 +107,7 @@ var _ = Describe("ReplicationSet Switch", func() {
 		By("Creating a cluster with replication workloadType.")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
+			AddComponent(testapps.DefaultRedisCompSpecName, testapps.DefaultRedisCompDefName).
 			SetReplicas(testapps.DefaultReplicationReplicas).
 			SetCandidateInstance(candidateInstance).
 			SetSwitchPolicy(clusterSwitchPolicy).
@@ -121,10 +121,10 @@ var _ = Describe("ReplicationSet Switch", func() {
 		}
 
 		replicationSetSts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
-			clusterObj.Name+"-"+testapps.DefaultRedisCompName, clusterObj.Name, testapps.DefaultRedisCompName).
+			clusterObj.Name+"-"+testapps.DefaultRedisCompSpecName, clusterObj.Name, testapps.DefaultRedisCompSpecName).
 			AddContainer(container).
 			AddAppInstanceLabel(clusterObj.Name).
-			AddAppComponentLabel(testapps.DefaultRedisCompName).
+			AddAppComponentLabel(testapps.DefaultRedisCompSpecName).
 			AddAppManangedByLabel().
 			SetReplicas(4).
 			Create(&testCtx).GetObject()
@@ -163,7 +163,7 @@ var _ = Describe("ReplicationSet Switch", func() {
 		Expect(s.SwitchStatus.SwitchPhaseStatus).Should(Equal(SwitchPhaseStatusSucceed))
 
 		By("Test switch election with multi secondaries should be successful, and the candidate primary should be the priorityPod.")
-		priorityPod := clusterObj.Name + "-" + testapps.DefaultRedisCompName + "-3"
+		priorityPod := clusterObj.Name + "-" + testapps.DefaultRedisCompSpecName + "-3"
 		for _, sri := range s.SwitchInstance.SecondariesRole {
 			if sri.Pod.Name != priorityPod {
 				sri.LagDetectInfo = &lagNotZero

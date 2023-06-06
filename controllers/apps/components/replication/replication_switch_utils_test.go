@@ -84,7 +84,7 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 		By("Creating a cluster with replication workloadType.")
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-			AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
+			AddComponent(testapps.DefaultRedisCompSpecName, testapps.DefaultRedisCompDefName).
 			SetReplicas(testapps.DefaultReplicationReplicas).
 			SetCandidateInstance(candidateInstance).
 			SetSwitchPolicy(clusterSwitchPolicy).
@@ -97,12 +97,12 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 			ImagePullPolicy: corev1.PullIfNotPresent,
 		}
 		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
-			clusterObj.Name+"-"+testapps.DefaultRedisCompName,
+			clusterObj.Name+"-"+testapps.DefaultRedisCompSpecName,
 			clusterObj.Name,
-			testapps.DefaultRedisCompName).
+			testapps.DefaultRedisCompSpecName).
 			AddContainer(container).
 			AddAppInstanceLabel(clusterObj.Name).
-			AddAppComponentLabel(testapps.DefaultRedisCompName).
+			AddAppComponentLabel(testapps.DefaultRedisCompSpecName).
 			AddAppManangedByLabel().
 			SetReplicas(2).
 			Create(&testCtx).GetObject()
@@ -119,7 +119,7 @@ var _ = Describe("ReplicationSet Switch Util", func() {
 		clusterComponentSpec := &clusterObj.Spec.ComponentSpecs[0]
 
 		By("Test candidateInstance has not changed.")
-		changed, currentPrimaryInstanceName, err := componentutil.CheckCandidateInstanceChanged(testCtx.Ctx, k8sClient, clusterObj, clusterComponentSpec)
+		changed, currentPrimaryInstanceName, err := componentutil.CheckCandidateInstanceChanged(testCtx.Ctx, k8sClient, clusterObj, clusterComponentSpec.Name)
 		Expect(err).Should(Succeed())
 		Expect(changed).Should(BeFalse())
 

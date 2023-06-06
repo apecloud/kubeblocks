@@ -51,7 +51,7 @@ const (
 	DefaultNginxContainerName = "nginx"
 
 	DefaultRedisCompDefName       = "redis"
-	DefaultRedisCompName          = "redis-rsts"
+	DefaultRedisCompSpecName      = "redis-rsts"
 	DefaultRedisImageName         = "redis:7.0.5"
 	DefaultRedisContainerName     = "redis"
 	DefaultRedisInitContainerName = "redis-init-container"

@@ -89,14 +89,14 @@ var _ = Describe("Replication Component", func() {
 			By("Creating a cluster with replication workloadType.")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
-				AddComponent(testapps.DefaultRedisCompName, testapps.DefaultRedisCompDefName).
+				AddComponent(testapps.DefaultRedisCompSpecName, testapps.DefaultRedisCompDefName).
 				SetReplicas(testapps.DefaultReplicationReplicas).
 				Create(&testCtx).GetObject()
 
 			// mock cluster is Running
 			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
 				clusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-					testapps.DefaultRedisCompName: {
+					testapps.DefaultRedisCompSpecName: {
 						Phase: appsv1alpha1.RunningClusterCompPhase,
 					},
 				}
@@ -115,10 +115,10 @@ var _ = Describe("Replication Component", func() {
 			}
 
 			replicationSetSts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
-				clusterObj.Name+"-"+testapps.DefaultRedisCompName, clusterObj.Name, testapps.DefaultRedisCompName).
+				clusterObj.Name+"-"+testapps.DefaultRedisCompSpecName, clusterObj.Name, testapps.DefaultRedisCompSpecName).
 				AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 				AddAppInstanceLabel(clusterObj.Name).
-				AddAppComponentLabel(testapps.DefaultRedisCompName).
+				AddAppComponentLabel(testapps.DefaultRedisCompSpecName).
 				AddAppManangedByLabel().
 				SetReplicas(replicas).
 				Create(&testCtx).GetObject()
@@ -126,9 +126,9 @@ var _ = Describe("Replication Component", func() {
 
 			Expect(replicationSetSts.Spec.VolumeClaimTemplates).Should(BeEmpty())
 
-			compDefName := clusterObj.Spec.GetComponentDefRefName(testapps.DefaultRedisCompName)
+			compDefName := clusterObj.Spec.GetComponentDefRefName(testapps.DefaultRedisCompSpecName)
 			componentDef := clusterDefObj.GetComponentDefByName(compDefName)
-			component := clusterObj.Spec.GetComponentByName(testapps.DefaultRedisCompName)
+			component := clusterObj.Spec.GetComponentByName(testapps.DefaultRedisCompSpecName)
 			replicationComponent := newReplicationSet(k8sClient, clusterObj, component, *componentDef)
 			var podList []*corev1.Pod
 
@@ -140,7 +140,7 @@ var _ = Describe("Replication Component", func() {
 				if availableReplica > 0 {
 					// Create pods of the statefulset
 					stsPods := testapps.MockReplicationComponentPods(nil, testCtx, replicationSetSts, clusterObj.Name,
-						testapps.DefaultRedisCompName, map[int32]string{
+						testapps.DefaultRedisCompSpecName, map[int32]string{
 							0: constant.Primary,
 							1: constant.Secondary,
 						})
@@ -175,16 +175,16 @@ var _ = Describe("Replication Component", func() {
 			testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, podList[1].Name, podList[1].Namespace)
 			status.AvailableReplicas -= 1
 			testk8s.PatchStatefulSetStatus(&testCtx, replicationSetSts.Name, status)
-			phase, _, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
+			phase, _, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompSpecName)
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			// mock primary pod label is empty
 			Expect(testapps.ChangeObj(&testCtx, primaryPod, func(lpod *corev1.Pod) {
 				lpod.Labels[constant.RoleLabelKey] = ""
 			})).Should(Succeed())
-			phase, _, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
+			phase, _, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompSpecName)
 			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
-			_, statusMessages, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
+			_, statusMessages, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompSpecName)
 			Expect(statusMessages[fmt.Sprintf("%s/%s", primaryPod.Kind, primaryPod.Name)]).
 				Should(ContainSubstring("empty label for pod, please check"))
 

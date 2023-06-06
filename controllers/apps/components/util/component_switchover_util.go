@@ -186,7 +186,7 @@ func CheckCandidateInstanceChanged(ctx context.Context,
 		return false, "", nil
 	}
 	// get the Pod object whose current role label is primary or leader
-	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, compSpec.Name)
+	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, compSpec.Name, compSpec.ComponentDefRef)
 	if err != nil {
 		return false, "", err
 	}
@@ -204,12 +204,12 @@ func CheckCandidateInstanceChanged(ctx context.Context,
 }
 
 // getPrimaryOrLeaderPod returns the leader or primary pod of the component.
-func getPrimaryOrLeaderPod(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, componentName string) (*corev1.Pod, error) {
+func getPrimaryOrLeaderPod(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compSpecName, compDefName string) (*corev1.Pod, error) {
 	var (
 		err     error
 		podList *corev1.PodList
 	)
-	compDef, err := GetComponentDefByCluster(ctx, cli, cluster, componentName)
+	compDef, err := GetComponentDefByCluster(ctx, cli, cluster, compDefName)
 	if err != nil {
 		return nil, err
 	}
@@ -218,9 +218,9 @@ func getPrimaryOrLeaderPod(ctx context.Context, cli client.Client, cluster appsv
 	}
 	switch compDef.WorkloadType {
 	case appsv1alpha1.Replication:
-		podList, err = GetComponentPodListWithRole(ctx, cli, cluster, componentName, constant.Primary)
+		podList, err = GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, constant.Primary)
 	case appsv1alpha1.Consensus:
-		podList, err = GetComponentPodListWithRole(ctx, cli, cluster, componentName, constant.Leader)
+		podList, err = GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, constant.Leader)
 	}
 	if err != nil {
 		return nil, err
@@ -263,7 +263,7 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
 	var workloadEnvs []corev1.EnvVar
-	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, component.Name)
+	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, component.Name, component.CompDefName)
 	if err != nil {
 		return nil, err
 	}
@@ -490,7 +490,7 @@ func checkPodRoleLabelConsistencyAfterSwitchover(ctx context.Context,
 		return true, nil
 	}
 	// get the Pod object whose current role label is primary or leader
-	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, component.Name)
+	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, component.Name, component.CompDefName)
 	if err != nil {
 		return false, err
 	}

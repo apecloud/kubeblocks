@@ -180,7 +180,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	}, cluster); err != nil {
 		return role, err
 	}
-	reqCtx.Log.V(1).Info("handle role changed event", "cluster", cluster.Name, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
+	reqCtx.Log.V(1).Info("handle role changed event", "event uid", event.UID, "cluster", cluster.Name, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
 	compName, componentDef, err := componentutil.GetComponentInfoByPod(reqCtx.Ctx, cli, *cluster, pod)
 	if err != nil {
 		return role, err

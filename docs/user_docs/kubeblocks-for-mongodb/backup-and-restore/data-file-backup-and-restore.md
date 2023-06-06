@@ -112,7 +112,7 @@ kbcli kubeblocks config --set dataProtection.backupPVCName=kubeblocks-backup-dat
 
 :::
 
-## Step 2. Create backup
+## Create backup
 
 **Option 1. Manually Backup**
 
@@ -152,7 +152,7 @@ spec:
       type: datafile
 ```
 
-## Step 3. Restore data from backup
+## Restore data from backup
 
 1. Restore data from the backup.
 

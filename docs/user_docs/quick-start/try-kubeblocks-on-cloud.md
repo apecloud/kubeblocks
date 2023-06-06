@@ -20,7 +20,7 @@ When deploying KubeBlocks on the cloud, cloud resources are initialized with the
 <Tabs>
 <TabItem value="AWS" label="AWS" default>
 
-### Before you start to try KubeBlocks on Cloud (AWS)
+### Before you start to try KubeBlocks on AWS
 
 Make sure you have all the followings prepared.
 
@@ -58,23 +58,6 @@ kbcli playground init --cloud-provider aws --region us-west-2
 * `cloud-provider` specifies the cloud provider.
 * `region` specifies the region to deploy a Kubernetes cluster.
    You can find the region list on [the official website](https://aws.amazon.com/about-aws/global-infrastructure/regional-product-services/?nc1=h_ls).
-  * Americas
-  
-     | Region ID  | Region name         |
-     | :--        | :--                 |
-     | us-east-1  | Northern Virginia   |
-     | us-east-2  | Ohio                |
-     | us-west-1  | Northern California |
-     | us-west-2  | Oregon              |
-
-  * Asia Pacific
-  
-     | Region ID         | Region name |
-     | :--               | :--         |
-     | ap-east-1         | Hong Kong   |
-     | ap-southeast-1    | Singapore   |
-     | cn-north-1        | Beijing     |
-     | cn-northwest-1    | Ningxia     |
 
 During the initialization, `kbcli` clones [the GitHub repository](https://github.com/apecloud/cloud-provider) to the directory `~/.kbcli/playground`, installs KubeBlocks, and creates a MySQL cluster. After executing the `kbcli playground init` command, kbcli automatically switches the current context of kubeconfig to the new Kubernetes cluster.
 Run the command below to view the created cluster.
@@ -96,7 +79,7 @@ The initialization lasts about 20 minutes. If the installation fails after a lon
 </TabItem>
 <TabItem value="GCP" label="GCP">
 
-### Before you start to try KubeBlocks on Cloud (GCP)
+### Before you start to try KubeBlocks on GCP
 
 Make sure you have all the followings prepared.
 
@@ -167,7 +150,7 @@ The initialization takes about 20 minutes. If the installation fails after a lon
 </TabItem>
 <TabItem value="Tencent Cloud" label="Tencent Cloud">
 
-### Before you start to try KubeBlocks on Cloud (Tencent Cloud)
+### Before you start to try KubeBlocks on Tencent Cloud
 
 Make sure you have all the followings prepared.
 
@@ -220,7 +203,7 @@ The initialization takes about 20 minutes. If the installation fails after a lon
 </TabItem>
 <TabItem value="Alibaba Cloud" label="Alibaba Cloud">
 
-### Before you start to try KubeBlocks on Cloud (Alibaba Cloud)
+### Before you start to try KubeBlocks on Alibaba Cloud
 
 Make sure you have all the followings prepared.
 

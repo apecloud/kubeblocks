@@ -203,6 +203,15 @@ func (factory *MockClusterDefFactory) AddSystemAccountSpec(sysAccounts *appsv1al
 	return factory
 }
 
+func (factory *MockClusterDefFactory) AddSwitchoverSpec(switchoverSpec *appsv1alpha1.SwitchoverSpec) *MockClusterDefFactory {
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return factory
+	}
+	comp.SwitchoverSpec = switchoverSpec
+	return factory
+}
+
 func (factory *MockClusterDefFactory) AddInitContainerVolumeMounts(containerName string, volumeMounts []corev1.VolumeMount) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {

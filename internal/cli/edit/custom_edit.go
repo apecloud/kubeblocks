@@ -47,6 +47,7 @@ type CustomEditOptions struct {
 	Factory    cmdutil.Factory
 	PrintFlags *genericclioptions.PrintFlags
 	Method     string
+	TestEnv    bool
 
 	genericclioptions.IOStreams
 }
@@ -57,10 +58,11 @@ func NewCustomEditOptions(f cmdutil.Factory, streams genericclioptions.IOStreams
 		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput("yaml"),
 		IOStreams:  streams,
 		Method:     method,
+		TestEnv:    false,
 	}
 }
 
-func (o *CustomEditOptions) Run(originalObj runtime.Object, testEnv bool) error {
+func (o *CustomEditOptions) Run(originalObj runtime.Object) error {
 	buf := &bytes.Buffer{}
 	var (
 		original []byte
@@ -77,7 +79,7 @@ func (o *CustomEditOptions) Run(originalObj runtime.Object, testEnv bool) error 
 	}
 	original = buf.Bytes()
 
-	if !testEnv {
+	if !o.TestEnv {
 		edited, tmpFile, err = editObject(original)
 		if err != nil {
 			return fmt.Errorf("failed to lanch editor: %v", err)

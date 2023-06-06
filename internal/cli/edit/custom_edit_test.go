@@ -49,6 +49,7 @@ var _ = Describe("Custom edit", func() {
 
 	It("test edit the cluster resource before updating", func() {
 		options := NewCustomEditOptions(tf, streams, "patched")
+		options.TestEnv = true
 		resObj := &unstructured.Unstructured{
 			Object: map[string]interface{}{
 				"apiVersion": "v1",
@@ -61,11 +62,12 @@ var _ = Describe("Custom edit", func() {
 				},
 			},
 		}
-		Expect(options.Run(resObj, true)).Should(Succeed())
+		Expect(options.Run(resObj)).Should(Succeed())
 	})
 
 	It("test edit the cluster resource before creating", func() {
 		options := NewCustomEditOptions(tf, streams, "create")
+		options.TestEnv = true
 		resObj := &unstructured.Unstructured{
 			Object: map[string]interface{}{
 				"apiVersion": "v1",
@@ -78,6 +80,6 @@ var _ = Describe("Custom edit", func() {
 				},
 			},
 		}
-		Expect(options.Run(resObj, true)).Should(Succeed())
+		Expect(options.Run(resObj)).Should(Succeed())
 	})
 })

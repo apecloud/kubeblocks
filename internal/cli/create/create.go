@@ -159,7 +159,7 @@ func (o *CreateOptions) Run() error {
 
 	if o.EditBeforeCreate {
 		customEdit := edit.NewCustomEditOptions(o.Factory, o.IOStreams, "create")
-		if err := customEdit.Run(resObj, false); err != nil {
+		if err := customEdit.Run(resObj); err != nil {
 			return err
 		}
 	}

@@ -187,7 +187,7 @@ func (o *Options) Run(cmd *cobra.Command) error {
 
 			if o.EditBeforeUpdate {
 				customEdit := edit.NewCustomEditOptions(o.Factory, o.IOStreams, "patched")
-				if err = customEdit.Run(patchedObj, false); err != nil {
+				if err = customEdit.Run(patchedObj); err != nil {
 					return fmt.Errorf("unable to edit %s %s/%s: %v", info.Mapping.GroupVersionKind.Kind, info.Namespace, info.Name, err)
 				}
 				patchedObj = &unstructured.Unstructured{

@@ -173,8 +173,6 @@ jobs:
           createrepo_c -pdo kbcli_rpm_test/rpm_repo kbcli_rpm_test/rpm_repo
           createrepo_c --update kbcli_rpm_test/rpm_repo
           cd kbcli_rpm_test
-#          git config --global credential.helper store
-#          git config --global user.name ${{ env.GITHUB_TOKEN }}
           git add .
           git commit -m "update"
           git push https://${{ env.GITHUB_TOKEN }}@github.com/apecloud/kbcli_rpm_test.git

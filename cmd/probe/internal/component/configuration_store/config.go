@@ -233,6 +233,10 @@ func (cs *ConfigurationStore) GetConfigMap(name string) (*v1.ConfigMap, error) {
 	return cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Get(cs.ctx, name, metav1.GetOptions{})
 }
 
+func (cs *ConfigurationStore) DeleteConfigMap(name string) error {
+	return cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Delete(cs.ctx, name, metav1.DeleteOptions{})
+}
+
 func (cs *ConfigurationStore) GetPod(name string) (*v1.Pod, error) {
 	return cs.clientSet.CoreV1().Pods(cs.namespace).Get(cs.ctx, name, metav1.GetOptions{})
 }
@@ -258,10 +262,6 @@ func (cs *ConfigurationStore) CreateConfigMap(name string, annotations map[strin
 	}
 
 	return configMap, nil
-}
-
-func (cs *ConfigurationStore) DeleteConfigMap(name string) error {
-	return cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Delete(cs.ctx, name, metav1.DeleteOptions{})
 }
 
 func (cs *ConfigurationStore) ExecCmdWithPod(ctx context.Context, podName, cmd, container string) (map[string]string, error) {
@@ -329,6 +329,21 @@ func (cs *ConfigurationStore) UpdateLeader(podName string, opTime int64, extra m
 	leaderConfigMap.SetAnnotations(leaderRecord)
 
 	_, err = cs.UpdateConfigMap(leaderConfigMap)
+	return err
+}
+
+func (cs *ConfigurationStore) DeleteLeader(opTime int64) error {
+	leaderConfigMap, err := cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Get(cs.ctx, cs.clusterCompName+LeaderSuffix, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	leaderConfigMap.Annotations[binding.LEADER] = ""
+	if opTime != 0 {
+		leaderConfigMap.Annotations[OpTime] = strconv.FormatInt(opTime, 10)
+	}
+
+	_, err = cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Update(cs.ctx, leaderConfigMap, metav1.UpdateOptions{})
 	return err
 }
 

@@ -151,6 +151,14 @@ func newSwitchover(index string, leader string, candidate string, scheduledAt in
 	}
 }
 
+func (s *Switchover) GetLeader() string {
+	return s.leader
+}
+
+func (s *Switchover) GetCandidate() string {
+	return s.candidate
+}
+
 type MemberData struct {
 	role string
 }

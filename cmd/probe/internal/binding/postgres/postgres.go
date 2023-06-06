@@ -876,7 +876,22 @@ func (pgOps *PostgresOperations) waitPromote(ctx context.Context) error {
 }
 
 func (pgOps *PostgresOperations) Demote(ctx context.Context, podName string) error {
-	return nil
+	stopCmd := "su -c 'pg_ctl stop -m fast' postgres"
+	_, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, stopCmd, pgOps.DBType)
+	if err != nil {
+		pgOps.Logger.Errorf("stop err: %v", err)
+		return err
+	}
+
+	opTime, _ := pgOps.getWalPosition(ctx)
+	err = pgOps.Cs.DeleteLeader(opTime)
+
+	// Give a time to somebody to take the leader lock
+	time.Sleep(time.Second * 2)
+	_ = pgOps.Cs.GetClusterFromKubernetes()
+	leader := pgOps.Cs.GetCluster().Leader
+
+	return pgOps.HandleFollow(ctx, leader, podName, true)
 }
 
 // GetStatus TODO：GetStatus后期考虑用postmaster替代
@@ -983,17 +998,32 @@ func (pgOps *PostgresOperations) isLagging(walPosition int64) bool {
 	return lag > pgOps.Cs.GetCluster().Config.GetData().GetMaxLagOnSwitchover()
 }
 
-func (pgOps *PostgresOperations) HandleFollow(ctx context.Context, leader *configuration_store.Leader, podName string) error {
+func (pgOps *PostgresOperations) HandleFollow(ctx context.Context, leader *configuration_store.Leader, podName string, restart bool) error {
 	need, _ := pgOps.isRewindOrReinitializePossible(ctx, leader, podName)
 	if !need {
 		return nil
 	}
 	pgOps.executeRewind()
+
+	if restart {
+		return pgOps.start(ctx, podName)
+	}
+
+	return nil
+}
+
+func (pgOps *PostgresOperations) start(ctx context.Context, podName string) error {
+	startCmd := "su -c 'postgres -D /postgresql/data --config-file=/opt/bitnami/postgresql/conf/postgresql.conf --external_pid_file=/opt/bitnami/postgresql/tmp/postgresql.pid --hba_file=/opt/bitnami/postgresql/conf/pg_hba.conf' postgres &"
+	_, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, startCmd, pgOps.DBType)
+	if err != nil {
+		pgOps.Logger.Errorf("start err: %v", err)
+		return err
+	}
+
 	return nil
 }
 
 func (pgOps *PostgresOperations) executeRewind() {
-
 }
 
 func (pgOps *PostgresOperations) isRewindOrReinitializePossible(ctx context.Context, leader *configuration_store.Leader, podName string) (bool, error) {
@@ -1193,4 +1223,61 @@ func (pgOps *PostgresOperations) processSyncReplication() error {
 // set synchronous_standby_names and reload
 func (pgOps *PostgresOperations) setSynchronousStandbyNames() error {
 	return nil
+}
+
+func (pgOps *PostgresOperations) ProcessManualSwitchoverFromLeader(ctx context.Context, podName string) error {
+	err := pgOps.Cs.GetClusterFromKubernetes()
+	if err != nil {
+		pgOps.Logger.Errorf("get cluster from k8s failed, err:%v", err)
+		return err
+	}
+
+	switchover := pgOps.Cs.GetCluster().Switchover
+	if switchover == nil {
+		return nil
+	}
+
+	leader := switchover.GetLeader()
+	candidate := switchover.GetCandidate()
+	if leader == "" || leader == podName {
+		if candidate == "" || candidate != podName {
+			replicationMode, err := pgOps.getReplicationMode(ctx)
+			if err != nil {
+				return err
+			}
+
+			var members []string
+			if replicationMode == SynchronousMode {
+				if candidate != "" && pgOps.checkStandbySynchronizedToLeader(ctx, candidate, false) {
+					pgOps.Logger.Warnf("candidate=%s does not match", candidate)
+				} else {
+					for _, m := range pgOps.Cs.GetCluster().Members {
+						if pgOps.checkStandbySynchronizedToLeader(ctx, m.GetName(), false) {
+							members = append(members, m.GetName())
+						}
+					}
+				}
+			} else {
+				for _, m := range pgOps.Cs.GetCluster().Members {
+					if switchover.GetCandidate() != "" || m.GetName() == candidate {
+						members = append(members, m.GetName())
+					}
+				}
+			}
+
+			if pgOps.isFailoverPossible() {
+				return pgOps.Demote(ctx, podName)
+			}
+		} else {
+			pgOps.Logger.Warnf("manual failover: I am already the leader, no need to failover")
+		}
+	} else {
+		pgOps.Logger.Warnf("manual switchover, leader name does not match, %s != %s", switchover.GetLeader(), podName)
+	}
+
+	return pgOps.Cs.DeleteConfigMap(pgOps.Cs.GetClusterCompName() + configuration_store.SwitchoverSuffix)
+}
+
+func (pgOps *PostgresOperations) isFailoverPossible() bool {
+	return true
 }

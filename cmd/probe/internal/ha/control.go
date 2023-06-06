@@ -110,7 +110,6 @@ func (h *Ha) newDbInterface(logger logger.Logger) DB {
 
 func (h *Ha) HaControl(stopCh chan struct{}) {
 	h.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    h.processSwitchover,
 		UpdateFunc: h.clusterControl,
 	})
 
@@ -141,12 +140,23 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 	if h.cs.GetCluster().IsLocked() {
 		if !h.hasLock() {
 			h.setLeader(false)
+			h.follow()
 			return
 		}
 		err = h.updateLockWithRetry(3)
 		if err != nil {
 			h.log.Errorf("update lock err,")
+			if h.DB.IsLeader(h.ctx) {
+				_ = h.DB.Demote(h.ctx, h.podName)
+			}
 		}
+
+		err = h.DB.ProcessManualSwitchoverFromLeader(h.ctx, h.podName)
+		if err != nil {
+			h.log.Errorf("process manual switchover failed, err:%v", err)
+		}
+
+		err = h.DB.EnforcePrimaryRole(h.ctx, h.podName)
 		return
 	}
 
@@ -157,38 +167,16 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 			h.log.Errorf("acquire leader lock err:%v", err)
 			h.follow()
 		}
+
+		if h.cs.GetCluster().Switchover != nil {
+
+		}
+
 		err = h.DB.EnforcePrimaryRole(h.ctx, h.podName)
 	} else {
 		// Give a time to somebody to take the leader lock
 		time.Sleep(time.Second * 2)
 		h.follow()
-	}
-}
-
-// Only in processSwitchover, leader can unlock actively， 处理降主，不处理升
-func (h *Ha) processSwitchover(obj interface{}) {
-	configMap := obj.(*v1.ConfigMap)
-
-	if configMap.Name != h.cs.GetClusterCompName()+configuration_store.SwitchoverSuffix {
-		return
-	}
-
-	err := h.cs.GetClusterFromKubernetes()
-	if err != nil {
-		h.log.Errorf("process switchover get cluster from k8s err:%v", err)
-		return
-	}
-	if !h.hasLock() {
-		h.log.Infof("db:%s does not have lock", h.podName)
-		return
-	}
-
-	err = h.updateLockWithRetry(3)
-	if err != nil {
-		h.log.Errorf("failed to update leader lock")
-		if h.DB.IsLeader(h.ctx) {
-			_ = h.DB.Demote(h.ctx, h.podName)
-		}
 	}
 }
 
@@ -277,7 +265,7 @@ func (h *Ha) follow() {
 		err = h.DB.Demote(h.ctx, h.podName)
 	}
 
-	_ = h.DB.HandleFollow(h.ctx, h.cs.GetCluster().Leader, h.podName)
+	_ = h.DB.HandleFollow(h.ctx, h.cs.GetCluster().Leader, h.podName, false)
 }
 
 /*
@@ -295,11 +283,7 @@ func (h *Ha) demote() error {
 	}
 
 	time.Sleep(5 * time.Second)
-	_, err = h.cs.ExecCommand(h.db.name, "default", "su -c 'postgres -D /postgresql/data --config-file=/opt/bitnami/postgresql/conf/postgresql.conf --external_pid_file=/opt/bitnami/postgresql/tmp/postgresql.pid --hba_file=/opt/bitnami/postgresql/conf/pg_hba.conf' postgres &")
-	if err != nil {
-		h.log.Errorf("start err: %v", err)
-		return err
-	}
+
 	_, err = h.cs.ExecCommand(h.db.name, "default", "su -c './scripts/on_role_change.sh' postgres")
 	if err != nil {
 		h.log.Errorf("shell err: %v", err)

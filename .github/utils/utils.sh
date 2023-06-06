@@ -180,6 +180,12 @@ parse_command_line() {
                     shift
                 fi
                 ;;
+            -f|--folder)
+                if [[ -n "${2:-}" ]]; then
+                    FOLDER="$2"
+                    shift
+                fi
+                ;;
             *)
                 break
                 ;;

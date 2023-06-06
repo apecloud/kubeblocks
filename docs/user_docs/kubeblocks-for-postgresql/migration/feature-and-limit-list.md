@@ -32,7 +32,7 @@ sidebar_label: Full feature and limit list
 ## Limit list
 
 * Overall limits
-  * If the incremental data migration is used, the source database should enable CDC (Change Data Capture) related configurations (both are checked and blocked in precheck). For detailed configurations, see [Configure the source database](#configure-the-source-database).
+  * If the incremental data migration is used, the source database should enable CDC (Change Data Capture) related configurations (both are checked and blocked in precheck). For detailed configurations, see [Configure the source database](./migration_postgresql.md#configure-the-source).
   * A table without a primary key is not supported. And a table with a foreign key is not supported (both are checked and blocked in precheck).
   * Except for the incremental data migration module, other modules do not support resumable upload, i.e. if an exception occurs in this module, such as pod failure caused by downtime and network disconnection, a re-migration is required.
   * During the data transmission task, DDL on the migration objects in the source database is not supported.

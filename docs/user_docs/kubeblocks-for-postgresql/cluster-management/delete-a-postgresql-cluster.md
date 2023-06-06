@@ -20,7 +20,7 @@ The termination policy determines how a cluster is deleted.
 |:----------------------|:-------------------------------------------------------------------------------------------|
 | `DoNotTerminate`      | `DoNotTerminate` blocks delete operation.                                                  |
 | `Halt`                | `Halt` deletes workload resources such as statefulset, deployment workloads but keep PVCs. |
-| `Delete`              | `Delete` delete workload resources and PVCs but keep backups.                              |
+| `Delete`              | `Delete` deletes workload resources and PVCs but keep backups.                              |
 | `WipeOut`             | `WipeOut` deletes workload resources, PVCs and all relevant resources included backups.    |
 
 To check the termination policy, execute the following command.

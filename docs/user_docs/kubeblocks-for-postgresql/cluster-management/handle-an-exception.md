@@ -7,7 +7,7 @@ sidebar_position: 7
 
 # Handle an exception
 
-When there is an exception during your operation, you can perform the following procedure to solve it.
+When there is an exception during your operation, you can perform the following procedures to solve it.
 
 ## Steps
 

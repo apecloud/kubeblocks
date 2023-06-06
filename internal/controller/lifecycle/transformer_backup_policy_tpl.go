@@ -94,7 +94,7 @@ func (r *BackupPolicyTPLTransformer) Transform(ctx graph.TransformContext, dag *
 	return nil
 }
 
-// transformBackupPolicy transform backup policy template to backup policy.
+// transformBackupPolicy transforms backup policy template to backup policy.
 func (r *BackupPolicyTPLTransformer) transformBackupPolicy(transCtx *ClusterTransformContext,
 	policyTPL appsv1alpha1.BackupPolicy,
 	cluster *appsv1alpha1.Cluster,

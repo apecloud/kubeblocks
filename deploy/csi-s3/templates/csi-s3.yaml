@@ -1,3 +1,4 @@
+{{- if not .Values.multiCSI -}}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -123,3 +124,4 @@ spec:
         - name: fuse-device
           hostPath:
             path: /dev/fuse
+{{- end -}}

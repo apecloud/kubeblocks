@@ -56,13 +56,13 @@ var (
 		kbcli alert add-receiver --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=XXX'
 
 		# add email receiver
-        kbcli alter add-receiver --email='a@foo.com,b@foo.com'
+        kbcli alter add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io'
 
 		# add email receiver, and only receive alert from cluster mycluster
-		kbcli alter add-receiver --email='a@foo.com,b@foo.com' --cluster=mycluster
+		kbcli alter add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster
 
 		# add email receiver, and only receive alert from cluster mycluster and alert severity is warning
-		kbcli alter add-receiver --email='a@foo.com,b@foo.com' --cluster=mycluster --severity=warning
+		kbcli alter add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster --severity=warning
 
 		# add slack receiver
   		kbcli alert add-receiver --slack api_url=https://hooks.slackConfig.com/services/foo,channel=monitor,username=kubeblocks-alert-bot`)
@@ -103,7 +103,7 @@ func newAddReceiverCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		},
 	}
 
-	cmd.Flags().StringArrayVar(&o.emails, "email", []string{}, "Add email address, such as bar@foo.com, more than one emailConfig can be specified separated by comma")
+	cmd.Flags().StringArrayVar(&o.emails, "email", []string{}, "Add email address, such as user@kubeblocks.io, more than one emailConfig can be specified separated by comma")
 	cmd.Flags().StringArrayVar(&o.webhooks, "webhook", []string{}, "Add webhook receiver, such as url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=xxxxx")
 	cmd.Flags().StringArrayVar(&o.slacks, "slack", []string{}, "Add slack receiver, such as api_url=https://hooks.slackConfig.com/services/foo,channel=monitor,username=kubeblocks-alert-bot")
 	cmd.Flags().StringArrayVar(&o.clusters, "cluster", []string{}, "Cluster name, such as mycluster, more than one cluster can be specified, such as mycluster1,mycluster2")

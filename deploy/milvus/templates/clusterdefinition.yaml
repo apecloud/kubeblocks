@@ -106,11 +106,13 @@ spec:
                   secretKeyRef:
                     key: accesskey
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    optional: false
               - name: MINIO_SECRET_KEY
                 valueFrom:
                   secretKeyRef:
                     key: secretkey
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    optional: false
         initContainers:
           - name: milvus-init
             command:
@@ -291,9 +293,11 @@ spec:
                   secretKeyRef:
                     key: accesskey
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    optional: false
               - name: MINIO_SECRET_KEY
                 valueFrom:
                   secretKeyRef:
                     key: secretkey
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    optional: false
 

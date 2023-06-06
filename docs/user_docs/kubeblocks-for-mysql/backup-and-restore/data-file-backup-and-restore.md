@@ -1,6 +1,6 @@
 ---
-title: Data file backup and restore for PostgreSQL
-description: How to back up and restore PostgreSQL by data files
+title: Data file backup and restore for MySQL
+description: How to back up and restore MySQL by data files
 keywords: [backup and restore, postgresql, data file]
 sidebar_position: 2
 sidebar_label: Data file
@@ -17,8 +17,7 @@ For KubeBlocks, configuring backup and restoring data is simple with 3 steps. Co
 
 Currently, KubeBlocks backs up and restores data on the storage path predefined.
 
-Choose one of the following options to configure the tartget storage path.
-
+<Tabs>
 <TabItem value="S3" label="AWS S3" default>
 
 Enable CSI-S3 and fill in the values based on your actual environment.
@@ -58,7 +57,6 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
 --set secret.secretKey=<your_access_secret> \
 --set storageClass.singleBucket=<bucket_name>  \
 --set secret.endpoint=https://oss-<region>.aliyuncs.com \
---set storageClass.mounter=s3fs,storageClass.mountOptions="" \
  -n kb-system
 
 # CSI-S3 installs a daemonSet pod on all nodes and you can set tolerations to install daemonSet pods on the specified nodes
@@ -92,6 +90,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
    ```
 
 </TabItem>
+</Tabs>
 
 You can configure a global backup storage to make this storage the default backup destination path of all new clusters. But currently, the global backup storage cannot be synchronized as the backup destination path of created clusters.
 
@@ -121,27 +120,18 @@ kbcli kubeblocks config --set dataProtection.backupPVCName=kubeblocks-backup-dat
 
    ```bash
    kbcli cluster list mysql-cluster
-   > 
-   NAME            NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME                 
-   mysql-cluster   default     apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Apr 18,2023 11:40 UTC+0800  
    ```
 
 2. Create a backup for this cluster.
 
    ```bash
    kbcli cluster backup mysql-cluster --type=datafile
-   > 
-   Backup backup-default-mysql-cluster-20230418124113 created successfully, you can view the progress:
-           kbcli cluster list-backup --name=backup-default-mysql-cluster-20230418124113 -n default
    ```
 
 3. View the backup set.
 
    ```bash
    kbcli cluster list-backups mysql-cluster 
-   > 
-   NAME                                          CLUSTER         TYPE       STATUS      TOTAL-SIZE   DURATION   CREATE-TIME                  COMPLETION-TIME              
-   backup-default-mysql-cluster-20230418124113   mysql-cluster   datafile   Completed                21s        Apr 18,2023 12:41 UTC+0800   Apr 18,2023 12:41 UTC+0800
    ```
 
 **Option 2. Enable scheduled backup**
@@ -168,15 +158,10 @@ spec:
 
    ```bash
    kbcli cluster restore new-mysql-cluster --backup backup-default-mysql-cluster-20230418124113
-   >
-   Cluster new-mysql-cluster created
    ```
 
 2. View this new cluster.
 
    ```bash
    kbcli cluster list new-mysql-cluster
-   >
-   NAME                NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME                 
-   new-mysql-cluster   default     apecloud-mysql       ac-mysql-8.0.30   Delete               Running    Apr 18,2023 12:42 UTC+0800
    ```

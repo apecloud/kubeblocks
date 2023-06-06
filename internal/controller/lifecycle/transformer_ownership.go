@@ -29,7 +29,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// OwnershipTransformer add finalizer to all none cluster objects
+// OwnershipTransformer adds finalizer to all none cluster objects
 type OwnershipTransformer struct{}
 
 var _ graph.Transformer = &OwnershipTransformer{}

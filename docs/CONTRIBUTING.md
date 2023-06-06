@@ -1,4 +1,4 @@
-# Contributing KubeBlocks
+# Contributing to KubeBlocks
 First, thank you for contributing to KubeBlocks! 
 This document provides the guidelines for how to contribute to KubeBlocks. 
 

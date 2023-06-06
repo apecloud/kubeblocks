@@ -189,7 +189,7 @@ func ExecCommand(strCommand string) string {
 	cmd := exec.New().Command("/bin/bash", "-c", strCommand)
 	stdout, _ := cmd.StdoutPipe()
 	if err := cmd.Start(); err != nil {
-		log.Printf("Execute failed when Start:%s\n", err.Error())
+		log.Printf("failed to Start:%s\n", err.Error())
 		return ""
 	}
 	outBytes, _ := io.ReadAll(stdout)
@@ -198,7 +198,7 @@ func ExecCommand(strCommand string) string {
 		return ""
 	}
 	if err := cmd.Wait(); err != nil {
-		log.Printf("Execute failed when Wait:%s\n", err.Error())
+		log.Printf("failed to Wait:%s\n", err.Error())
 		return ""
 	}
 	return string(outBytes)
@@ -252,10 +252,10 @@ func ReplaceClusterVersionRef(fileName string, clusterVersionRef string) {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
-				log.Println("File read ok!")
+				log.Println("file read ok!")
 				break
 			} else {
-				log.Println("Read file error!", err)
+				log.Println("file read error ", err)
 				return
 			}
 		}
@@ -264,14 +264,14 @@ func ReplaceClusterVersionRef(fileName string, clusterVersionRef string) {
 			bytes := []byte("    app.kubernetes.io/version: \"" + version + "\"\n")
 			_, err := file.WriteAt(bytes, pos)
 			if err != nil {
-				log.Println("open file filed.", err)
+				log.Println("file open failed ", err)
 			}
 		}
 		if strings.Contains(line, "clusterVersionRef") {
 			bytes := []byte("  clusterVersionRef: " + clusterVersionRef + "\n")
 			_, err := file.WriteAt(bytes, pos)
 			if err != nil {
-				log.Println("open file filed.", err)
+				log.Println("file open failed ", err)
 			}
 		}
 		pos += int64(len(line))

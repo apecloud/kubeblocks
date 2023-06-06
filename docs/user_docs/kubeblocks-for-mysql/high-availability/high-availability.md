@@ -37,7 +37,7 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
 ***Steps:***
 
-1. View the ApeCloud MySQL Raft Group information. View the leader pod name in `Topology`. In this example, the leader pod's name is mysql-cluster.
+1. View the ApeCloud MySQL Raft Group information. View the leader pod name in `Topology`. In this example, the leader pod's name is mysql-cluster-1.
 
     ```bash
     kbcli cluster describe mysql-cluster
@@ -78,7 +78,7 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
 ***Steps:***
 
-1. Run the command below to view the ApeCloud MySQL Raft Group information and view the follower pod name in `Topology`. In this example, the follower pods are mysql-cluster-mysql-0 and mysql-cluster-mysql-2.
+1. View the ApeCloud MySQL Raft Group information and view the follower pod name in `Topology`. In this example, the follower pods are mysql-cluster-mysql-0 and mysql-cluster-mysql-2.
 
     ```bash
     kbcli cluster describe mysql-cluster
@@ -92,14 +92,14 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
     ```
 
     ![delete_follower_pod](./../../../img/failure_simulation_delete_follower_pod.png)
-3. Run the command below to view the Raft Group status and you can find the follower pod is being terminated in `Component.Instance`.
+3. View the Raft Group status and you can find the follower pod is being terminated in `Component.Instance`.
 
     ```bash
     kbcli cluster describe mysql-cluster
     ```
 
     ![describe_cluster_follower](./../../../img/failure_simulation_describe_cluster_follower.png)
-4. Run the command below to connect to the Raft Group and you can find this single follower exception doesn't affect the R/W of the cluster.
+4. Connect to the Raft Group and you can find this single follower exception doesn't affect the R/W of the cluster.
 
     ```bash
     kbcli cluster connect mysql-cluster
@@ -114,11 +114,12 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 ### Two pods exception
 
 The availability of the cluster generally requires the majority of pods to be in a normal state. When most pods are exceptional, the original leader will be automatically downgraded to a follower. Therefore, any two exceptional pods result in only one follower pod remaining.
-Therefore, whether exceptions occur to one leader and one follower or exceptions occur to two followers, failure performance and automatic recovery are the same.
+
+In this way, whether exceptions occur to one leader and one follower or two followers, failure performance and automatic recovery are the same.
 
 ***Steps:***
 
-1. Run the command below to view the ApeCloud MySQL Raft Group information and view the follower pod name in `Topology`. In this example, the follower pods are mysql-cluster-mysql-1 and mysql-cluster-mysql-0.
+1. View the ApeCloud MySQL Raft Group information and view the follower pod name in `Topology`. In this example, the follower pods are mysql-cluster-mysql-1 and mysql-cluster-mysql-0.
 
     ```bash
     kbcli cluster describe mysql-cluster
@@ -132,7 +133,7 @@ Therefore, whether exceptions occur to one leader and one follower or exceptions
     ```
 
     ![delete_two_pods](./../../../img/failure_simulation_delete_two_pods.png)
-3. Run the command below to view the Raft Group status and you can find the follower pods are being terminated in `Component.Instance`.
+3. View the Raft Group status and you can find the follower pods are pending and a new leader pod is selected.
 
     ```bash
     kbcli cluster describe mysql-cluster
@@ -169,14 +170,14 @@ Therefore, whether exceptions occur to one leader and one follower or exceptions
     ```
 
     ![delete_three_pods](./../../../img/failure_simulation_delete_three_pods.png)
-3. Run the command below to view the deleting process. You can find the pods are being deleted in `Component.Instance` and the follower pod is the last one to be deleted.
+3. Run the command below to view the deleting process. You can find the pods are pending.
 
     ```bash
     kbcli cluster describe mysql-cluster
     ```
 
     ![describe_three_clusters](./../../../img/failure_simulation_describe_three_pods.png)
-4. Run `kbcli cluster connect mysql-cluster` again after a few seconds and you can find the pods in the Raft Group work normally again in `Component.Instance`.
+4. Run `kbcli cluster connect mysql-cluster` again after a few seconds and you can find the pods in the Raft Group work normally again.
 
     ```bash
     kbcli cluster connect mysql-cluster

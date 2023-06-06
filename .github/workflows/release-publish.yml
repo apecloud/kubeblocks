@@ -122,13 +122,13 @@ jobs:
 #            --asset-name ${{ env.ASSET_NAME }} \
 #            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
 
-#      - name: get release kbcli upload url
-#        run: |
-#          echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh \
-#            --tag-name ${{ env.TAG_NAME }} \
-#            --type 3 \
-#            --github-repo ${{ env.CLI_REPO }} \
-#            --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
+      - name: get release kbcli upload url
+        run: |
+          echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh \
+            --tag-name ${{ env.TAG_NAME }} \
+            --type 3 \
+            --github-repo ${{ env.CLI_REPO }} \
+            --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
 #
 #      - name: upload release kbcli asset ${{ matrix.os }}
 #        uses: actions/upload-release-asset@main

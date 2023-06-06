@@ -165,9 +165,9 @@ The initialization takes about 20 minutes. If the installation fails after a lon
 :::
 
 </TabItem>
-<TabItem value="TKE" label="TKE">
+<TabItem value="Tencent Cloud" label="Tencent Cloud">
 
-### Before you start to try KubeBlocks on Cloud (TKE)
+### Before you start to try KubeBlocks on Cloud (Tencent Cloud)
 
 Make sure you have all the followings prepared.
 
@@ -218,9 +218,9 @@ The initialization takes about 20 minutes. If the installation fails after a lon
 :::
 
 </TabItem>
-<TabItem value="ACK" label="ACK">
+<TabItem value="Alibaba Cloud" label="Alibaba Cloud">
 
-### Before you start to try KubeBlocks on Cloud (ACK)
+### Before you start to try KubeBlocks on Cloud (Alibaba Cloud)
 
 Make sure you have all the followings prepared.
 

@@ -53,7 +53,7 @@ Refer to [Enable add-ons](./../installation/enable-addons.md) for details.
 
 :::
 
-1. Enable the database monitoring function.
+2. Enable the database monitoring function.
 
     The monitoring function is enabled by default when a database is created. The open-source or customized Exporter is injected after the monitoring function is enabled. This Exporter can be found by Prometheus server automatically and scrape monitoring indicators at regular intervals.
 
@@ -116,11 +116,11 @@ You can view the dashboard of the corresponding cluster via Grafana Web Console.
        kbcli dashboard open <name>
        ```
 
-    ***Example***
+       ***Example***
 
-     ```bash
-         kbcli dashboard open kubeblocks-grafana
-     ```
+       ```bash
+       kbcli dashboard open kubeblocks-grafana
+       ```
 
     ***Result***
 

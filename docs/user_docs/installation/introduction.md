@@ -11,10 +11,10 @@ sidebar_label: Introduction
 The installation section contains guides for installing `kbcli` and Kubeblocks under different scenarios to build a basic environment for managing clusters on Kubernetes.
 
 * [Install kbcli](./install-kbcli.md)
-* [Install KubeBlocks on new Kubernetes cluster](./install-kbcli-and-kubeblocks-on-new-kubernetes-cluster.md)
-* [Install KubeBlocks on the existed Kubernetes clusters](./install-kbcli-and-kubeblocks-on-the-existed-kubernetes-clusters.md)
-* [Uninstall kbcli and KubeBlocks](./uninstall-kbcli-and-kubeblocks.md)
+* [Install KubeBlocks](./install-kubeblocks.md)
 * [Enable add-ons](./enable-addons.md)
+* [Uninstall kbcli and KubeBlocks](./uninstall-kbcli-and-kubeblocks.md)
+
 
 :::note
 

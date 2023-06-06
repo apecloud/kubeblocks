@@ -1,33 +1,27 @@
 ---
-title: Try out KubeBlocks in 5 minutes on Local Host
-description: A quick tour of KubeBlocks in 5 minutes on Local host on Playground
-keywords: [Playground, try out, local host]
+title: Try out KubeBlocks in 5 minutes on your laptop
+description: A quick tour of KubeBlocks Playground
+keywords: [Playground, try out, laptop,]
 sidebar_position: 1
-sidebar_label: Try out KubeBlocks on local host
+sidebar_label: Try out KubeBlocks on your laptop
 ---
 
-# Try out KubeBlocks in 5 minutes on Local Host
+# Try out KubeBlocks in 5 minutes on your laptop
 
-This guide walks you through the quickest way to get started with KubeBlocks on your local host, demonstrating how to easily create a KubeBlocks demo environment (Playground) with simply one `kbcli` command.
-
-With Playground, you can try out KubeBlocks on your local host (macOS) and on a cloud environment.
+This guide walks you through the quickest way to get started with KubeBlocks, demonstrating how to create a demo environment (Playground) with one command.
 
 ## Before you start
 
-Meet the following requirements for the smooth operation of Playground and other functions.
+Meet the following requirements for a smooth user experience:
 
 * Minimum system requirements:
-  * CPU: 4 cores
-  * RAM: 4 GB
+  * CPU: 4 cores, use `sysctl hw.physicalcpu` command to check CPU;
+  * RAM: 4 GB, use `top -d` command to check memory.
 
-   To check CPU, use `sysctl hw.physicalcpu` command;
-
-   To check memory, use `top -d` command.
-
-* Make sure the following tools are installed on your local host.
-  * Docker: v20.10.5 (runc ≥ v1.0.0-rc93) or above. For installation details, refer to [Get Docker](https://docs.docker.com/get-docker/).
-  * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): It is used to interact with Kubernetes clusters.
-  * [Install `kbcli`](./../../installation/install-kbcli.md). `kbcli` is the command line tool of KubeBlocks and is used for the interaction between Playground and KubeBlocks.
+* Make sure the following tools are installed on your laptop:
+  * [Docker](https://docs.docker.com/get-docker/): v20.10.5 (runc ≥ v1.0.0-rc93) or above;
+  * [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): it is used to interact with Kubernetes clusters;
+  * [kbcli](./../installation/install-kbcli.md): it is used for the interaction between Playground and KubeBlocks.
 
 ## Initialize Playground
 
@@ -41,10 +35,10 @@ Meet the following requirements for the smooth operation of Playground and other
 
    This command:
    1. Creates a Kubernetes cluster in the container with [K3d](https://k3d.io/v5.4.6/).
-   2. Deploys KubeBlocks in this Kubernetes cluster.
-   3. Creates an ApeCloud MySQL Standalone by KubeBlocks.
+   2. Deploys KubeBlocks in the K3d cluster.
+   3. Creates a standalone MySQL cluster.
 
-2. View the created cluster and when the status is `Running`, this cluster is created successfully.
+2. Check the MySQL cluster repeatedly until the status becomes `Running`. 
 
    ```bash
    kbcli cluster list
@@ -52,23 +46,19 @@ Meet the following requirements for the smooth operation of Playground and other
 
    **Result:**
 
-   You just created a cluster named `mycluster` in the default namespace.
-
-   You can find the Playground user guide under the installation success tip. View this guide again by running `kbcli playground init -h`.
+   You just created a cluster named `mycluster` in the default namespace. You can find the user guide under the installation success tip. View this guide again by running `kbcli playground init -h`.
 
 ## Try KubeBlocks with Playground
 
-You can explore KubeBlocks, by [Viewing an ApeCloud MySQL cluster](#view-an-apecloud-mysql-cluster), [Accessing an ApeCloud MySQL cluster](#access-an-apecloud-mysql-cluster), [Observability](#observability), and [High availability](#high-availability-of-apecloud-mysql). Refer to [Overview](./../introduction/introduction.md) to explore detailed KubeBlocks features and you can try all the features of KubeBlocks in a standard Kubernetes cluster.
-
-KubeBlocks supports the complete life cycle management of a database cluster. Go through the following instructions to try basic features of KubeBlocks.
+You can explore KubeBlocks, by referring to [Describe a MySQL cluster](#describe-a-mysql-cluster), [Access a MySQL cluster](#access-a-mysql-cluster), [Observe a MySQL cluster](#observe-a-mysql-cluster), and [High availability](#high-availability-of-mysql). Go through the following instructions to try basic features of KubeBlocks.
 
 :::note
 
-The local host does not support volume expansion, backup, and restore functions.
+Playground does not support volume expansion, backup, and restore functions.
 
 :::
 
-### View an ApeCloud MySQL cluster
+### Describe a MySQL cluster
 
 ***Steps:***
 
@@ -78,15 +68,15 @@ The local host does not support volume expansion, backup, and restore functions.
     kbcli cluster list
     ```
 
-2. View the details of a specified database cluster and get information like `STATUS`, `Endpoints`, `Topology`, `Images`, and `Events`.
+2. View the details of a specified database cluster, such as `STATUS`, `Endpoints`, `Topology`, `Images`, and `Events`.
 
     ```bash
     kbcli cluster describe mycluster
     ```
 
-### Access an ApeCloud MySQL cluster
+### Access a MySQL cluster
 
-**Option 1.** Connect database inside Kubernetes cluster.
+**Option 1.** Connect database from container network.
 
 Wait until the status of this cluster is `Running`, then run `kbcli cluster connect` to access a specified database cluster. For example,
 
@@ -94,17 +84,15 @@ Wait until the status of this cluster is `Running`, then run `kbcli cluster conn
 kbcli cluster connect mycluster
 ```
 
-**Option 2.** Connect database outside Kubernetes cluster.
+**Option 2.** Connect database from host network.
 
-Get the MySQL client connection example.
+***Steps:***
 
-```bash
-kbcli cluster connect --show-example --client=cli mycluster
-```
-
-**Example**
-
-1. Run `port-forward` to connect the cluster from the local host.
+1. Get Credentials.
+   ```bash
+   kbcli cluster connect --show-example --client=cli mycluster
+   ```
+3. Run `port-forward`.
 
    ```bash
    kubectl port-forward service/mycluster-mysql 3306:3306
@@ -112,7 +100,7 @@ kbcli cluster connect --show-example --client=cli mycluster
    Forwarding from 127.0.0.1:3306 -> 3306
    Forwarding from [::1]:3306 -> 3306
 
-2. Open another terminal tab to connect the MySQL Client.
+3. Open another terminal tab to connect the database cluster.
 
    ```bash
    mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
@@ -134,44 +122,42 @@ kbcli cluster connect --show-example --client=cli mycluster
    5 rows in set (0.02 sec)
    ```
 
-### Observability
+### Observe a MySQL cluster
 
 KubeBlocks supports complete observability capabilities. This section demonstrates the monitoring function of KubeBlocks.
 
 ***Steps:***
 
-1. View the monitoring page to observe the service running status.
+1. Open the grafana dashboard.
 
    ```bash
    kbcli dashboard open kubeblocks-grafana
    ```
 
-   **Result**
+   **Result:**
 
    A monitoring page on Grafana website is loaded automatically after the command is executed.
 
 2. Click the Dashboard icon on the left bar and monitoring panels show on the page.
    ![Dashboards](./../../img/quick_start_dashboards.png)
-3. Click **General** -> **MySQL** to monitor the status of the ApeCloud MySQL cluster created by Playground.
+3. Click **General** -> **MySQL** to monitor the status of the MySQL cluster.
    ![MySQL_panel](./../../img/quick_start_mysql_panel.png)
 
-### High availability of ApeCloud MySQL
+### High availability of MySQL
 
-ApeCloud MySQL Raft group delivers high availability with RPO=0 and RTO in less than 30 seconds.
+This guide shows a simple failure simulation to show you the failure recovery capability of MySQL.
 
-This guide shows a simple failure simulation to show you the failure recovery capability of ApeCloud MySQL.
+#### Delete the Standalone MySQL cluster
 
-#### Delete ApeCloud MySQL Standalone
-
-Delete the ApeCloud MySQL Standalone before trying out high availability.
+Delete the Standalone MySQL cluster before trying out high availability.
 
 ```bash
 kbcli cluster delete mycluster
 ```
 
-#### Create an ApeCloud MySQL Raft group
+#### Create a Raft MySQL cluster
 
-Playground creates an ApeCloud MySQL Standalone by default. You can also use `kbcli` to create a new Raft group. The following is an example of creating an ApeCloud MySQL Raft group with default configurations.
+You can use `kbcli` to create a Raft MySQL cluster. The following is an example of creating a Raft MySQL cluster with default configurations.
 
 ```bash
 kbcli cluster create --cluster-definition='apecloud-mysql' --set replicas=3
@@ -189,7 +175,7 @@ In this example, delete the leader pod to simulate a failure.
    kbcli cluster list
    ```
 
-2. View the ApeCloud MySQL Raft group information. View the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-1.
+2. Find the leader pod name in `Topology`. In this example, the leader pod's name is maple05-mysql-1.
 
    ```bash
    kbcli cluster describe maple05
@@ -228,7 +214,7 @@ In this example, delete the leader pod to simulate a failure.
    pod "maple05-mysql-1" deleted
    ```
 
-4. Connect to the ApeCloud MySQL Raft group to test its availability. You can find this group can still be accessed within seconds due to our HA strategy.
+4. Connect to the Raft MySQL cluster. It can be accessed within seconds.
 
    ```bash
    kbcli cluster connect maple05
@@ -285,7 +271,7 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
    kbcli dashboard open kubeblocks-nyancat
    ```
 
-4. Open another terminal tab and delete the leader pod. Then view the influences on the ApeCloud MySQL cluster through the NYAN CAT page.
+4. Open another terminal tab and delete the leader pod. Then view the influences on the Raft MySQL cluster through the NYAN CAT page.
 
    ```bash
    kubectl delete pod maple05-mysql-1
@@ -301,11 +287,11 @@ NON-STOP NYAN CAT is a demo application to observe how the database cluster exce
 
 ## Destroy Playground
 
-Destroying Playground cleans up relevant component services and data:
+Destroying Playground cleans up resources and data:
 
 * Delete all KubeBlocks database clusters.
 * Uninstall KubeBlocks.
-* Delete the local Kubernetes clusters created by K3d.
+* Delete the Kubernetes cluster created by K3d.
 
 Destroy Playground.
 

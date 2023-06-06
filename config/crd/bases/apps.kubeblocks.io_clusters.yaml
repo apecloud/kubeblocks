@@ -830,12 +830,6 @@ spec:
                 type: string
             type: object
         type: object
-        x-kubernetes-validations:
-        - message: cluster name should be less than 16 characters
-          rule: self.metadata.name.size() < 16
-        - message: cluster name must begin with a letter and can only contain letters,
-            numbers, and '-'.
-          rule: self.metadata.name.matches('^[a-z]([-a-z0-9]*[a-z0-9])?$')
     served: true
     storage: true
     subresources:

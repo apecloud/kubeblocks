@@ -480,6 +480,7 @@ type ClassDefRef struct {
 // +kubebuilder:printcolumn:name="TERMINATION-POLICY",type="string",JSONPath=".spec.terminationPolicy",description="Cluster termination policy."
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="Cluster Status."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+
 // Cluster is the Schema for the clusters API.
 type Cluster struct {
 	metav1.TypeMeta   `json:",inline"`

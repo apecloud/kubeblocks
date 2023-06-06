@@ -429,8 +429,8 @@ upload_rpm_repo() {
     curl -X POST \
       -H "Authorization: token $GITHUB_TOKEN" \
       -H "Content-Type: application/vnd.github.v3+json" \
-      -d '{"ref":"main", "path":"", "branch":"main"}' \
-      --data-binary "@." \
+      -d '{"ref":"main", "path":"$FOLDER", "branch":"refs/heads/main"}' \
+      --data-binary "@$FOLDER" \
       $GITHUB_API/repos/$GITHUB_REPO/contents/$FOLDER
 }
 

@@ -170,7 +170,7 @@ jobs:
           cp /home/runner/rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-1.${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm rpm_repo/rpm_repo/
           createrepo_c -pdo rpm_repo/rpm_repo rpm_repo/rpm_repo
           createrepo_c --update rpm_repo/rpm_repo
-          ls -l rpm_repo
+          cd rpm_repo
           bash ${{ github.workspace }}/.github/utils/utils.sh --type 14 \
           --github-repo 'apecloud/kbcli_rpm_test' \
           --tag-name ${{ env.TAG_NAME }} \

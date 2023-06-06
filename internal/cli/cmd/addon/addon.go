@@ -601,7 +601,7 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 	f := o.addonEnableFlags
 	for _, v := range f.ReplicaCountSets {
 		if err := twoTuplesProcessor(v, "replicas", func(s, flag string) (interface{}, error) {
-			v, err := strconv.Atoi(s)
+			v, err := strconv.ParseInt(s, 10, 32)
 			if err != nil {
 				return nil, fmt.Errorf("wrong flag value --%s=%s, with error %v", flag, s, err)
 			}

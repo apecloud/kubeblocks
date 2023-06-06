@@ -764,7 +764,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		}
 
 		// get replicas
-		setReplicas, err := strconv.Atoi(getVal(&c, keyReplicas, sets))
+		setReplicas, err := strconv.ParseInt(getVal(&c, keyReplicas, sets), 10, 32)
 		if err != nil {
 			return nil, fmt.Errorf("repicas is illegal " + err.Error())
 		}

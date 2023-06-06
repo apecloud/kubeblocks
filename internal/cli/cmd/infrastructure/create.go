@@ -42,7 +42,6 @@ type createOptions struct {
 	debug        bool
 	sandBoxImage string
 
-	autoRenewCerts      bool
 	securityEnhancement bool
 }
 

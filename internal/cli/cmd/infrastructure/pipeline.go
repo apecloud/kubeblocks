@@ -39,18 +39,10 @@ func NewCreatePipeline(o *createOptions) []module.Module {
 		&precheck.GreetingsModule{},
 		&tasks.CheckNodeArchitectureModule{},
 		&precheck.NodePreCheckModule{},
-		// install kubekey required packages
 		&tasks.InstallDependenciesModule{},
-		// &precheck.NodePreCheckModule{},
-		// &confirm.InstallConfirmModule{},
-		// &os.RepositoryModule{Skip: !runtime.Arg.InstallPackages},
-		// &binaries.NodeBinariesModule{},
 		&tasks.PrepareK8sBinariesModule{BinaryVersion: o.version},
 		&tasks.ConfigureOSModule{},
-		// &os.ConfigureOSModule{},
-		// &customscripts.CustomScriptsModule{Phase: "PreInstall", Scripts: runtime.Cluster.System.PreInstall},
 		&kubernetes.StatusModule{},
-		// &container.InstallContainerModule{},
 		&tasks.InstallCRIModule{SandBoxImage: o.sandBoxImage},
 		&etcd.PreCheckModule{},
 		&etcd.CertsModule{},
@@ -58,23 +50,14 @@ func NewCreatePipeline(o *createOptions) []module.Module {
 		&etcd.ConfigureModule{},
 		&etcd.BackupModule{},
 		&kubernetes.InstallKubeBinariesModule{},
-		// init kubeVip on first master
-		// &loadbalancer.KubevipModule{},
 		&kubernetes.InitKubernetesModule{},
 		&dns.ClusterDNSModule{},
 		&kubernetes.StatusModule{},
 		&kubernetes.JoinNodesModule{},
-		// deploy kubeVip on other masters
-		// &loadbalancer.KubevipModule{},
-		// &loadbalancer.HaproxyModule{},
 		&network.DeployNetworkPluginModule{},
 		&kubernetes.ConfigureKubernetesModule{},
 		&filesystem.ChownModule{},
-		// &certs.AutoRenewCertsModule{Skip: !o.autoRenewCerts},
 		&kubernetes.SecurityEnhancementModule{Skip: !o.securityEnhancement},
-		// &kubernetes.SaveKubeConfigModule{},
-		// &plugins.DeployPluginsModule{},
-		// &customscripts.CustomScriptsModule{Phase: "PostInstall", Scripts: runtime.Cluster.System.PostInstall},
 	}
 }
 

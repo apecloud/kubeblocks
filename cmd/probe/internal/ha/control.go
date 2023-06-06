@@ -24,7 +24,7 @@ type Ha struct {
 	ctx      context.Context
 	podName  string
 	isLeader int64
-	//TODO:可重入锁
+	//TODO:锁
 	dbType   string
 	log      logger.Logger
 	informer cache.SharedIndexInformer
@@ -267,29 +267,3 @@ func (h *Ha) follow() {
 
 	_ = h.DB.HandleFollow(h.ctx, h.cs.GetCluster().Leader, h.podName, false)
 }
-
-/*
-func (h *Ha) demote() error {
-	resp, err := h.cs.ExecCommand(h.db.name, "default", "su -c 'pg_ctl stop -m fast' postgres")
-	if err != nil {
-		h.log.Errorf("demote err: %v", err)
-		return err
-	}
-
-	_, err = h.cs.ExecCommand(h.db.name, "default", "touch /postgresql/data/standby.signal")
-	if err != nil {
-		h.log.Errorf("touch err: %v", err)
-		return err
-	}
-
-	time.Sleep(5 * time.Second)
-
-	_, err = h.cs.ExecCommand(h.db.name, "default", "su -c './scripts/on_role_change.sh' postgres")
-	if err != nil {
-		h.log.Errorf("shell err: %v", err)
-		return err
-	}
-
-	h.log.Infof("response: ", resp)
-	return nil
-}*/

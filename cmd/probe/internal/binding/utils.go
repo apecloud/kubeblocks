@@ -355,7 +355,7 @@ func ParsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 		`(?P<JUNK> .) `,
 	}
 	result := &PGStandby{
-		Members: mapset.NewSet[string](),
+		Members: mapset.NewSet(),
 	}
 
 	rs := make([]*regexp2.Regexp, len(patterns))

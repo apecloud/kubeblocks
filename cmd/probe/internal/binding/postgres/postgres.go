@@ -38,7 +38,6 @@ import (
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/ha"
 	. "github.com/apecloud/kubeblocks/cmd/probe/util"
 	"github.com/apecloud/kubeblocks/internal/sqlchannel"
 )
@@ -97,7 +96,6 @@ type PostgresOperations struct {
 	BaseOperations
 }
 
-var _ ha.DB = &PostgresOperations{}
 var _ BaseInternalOps = &PostgresOperations{}
 
 // NewPostgres returns a new PostgreSQL output binding.

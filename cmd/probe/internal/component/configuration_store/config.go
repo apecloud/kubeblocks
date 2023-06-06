@@ -18,7 +18,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/util"
 )
 
@@ -78,12 +77,12 @@ func (cs *ConfigurationStore) Init(sysID string, extra map[string]string, opTime
 			Name:      cs.clusterCompName + LeaderSuffix,
 			Namespace: cs.namespace,
 			Annotations: map[string]string{
-				binding.LEADER: leaderName,
-				AcquireTime:    strconv.FormatInt(acquireTime, 10),
-				RenewTime:      strconv.FormatInt(renewTime, 10),
-				TTL:            ttl,
-				OpTime:         strconv.FormatInt(opTime, 10),
-				Extra:          extraJsonStr,
+				LEADER:      leaderName,
+				AcquireTime: strconv.FormatInt(acquireTime, 10),
+				RenewTime:   strconv.FormatInt(renewTime, 10),
+				TTL:         ttl,
+				OpTime:      strconv.FormatInt(opTime, 10),
+				Extra:       extraJsonStr,
 			},
 		},
 	}, createOpt)
@@ -195,7 +194,7 @@ func (cs *ConfigurationStore) loadClusterFromKubernetes(config, switchoverConfig
 		if cs.LeaderObservedTime+leaderRecord.ttl < time.Now().Unix() {
 			leader = nil
 		} else {
-			member := newMember("-1", leaderConfig.Annotations[binding.LEADER], map[string]string{})
+			member := newMember("-1", leaderConfig.Annotations[LEADER], map[string]string{})
 			for _, m := range members {
 				if m.name == member.name {
 					member = m
@@ -210,7 +209,7 @@ func (cs *ConfigurationStore) loadClusterFromKubernetes(config, switchoverConfig
 		annotations := switchoverConfig.Annotations
 		scheduledAt, err := strconv.Atoi(annotations[ScheduledAt])
 		if err == nil {
-			switchover = newSwitchover(switchoverConfig.ResourceVersion, annotations[binding.LEADER], annotations[binding.CANDIDATE], int64(scheduledAt))
+			switchover = newSwitchover(switchoverConfig.ResourceVersion, annotations[LEADER], annotations[CANDIDATE], int64(scheduledAt))
 		}
 	}
 
@@ -317,7 +316,7 @@ func (cs *ConfigurationStore) UpdateLeader(podName string, opTime int64, extra m
 	}
 
 	leaderRecord := leaderConfigMap.GetAnnotations()
-	if leaderRecord[binding.LEADER] != podName {
+	if leaderRecord[LEADER] != podName {
 		return errors.Errorf("lost lock")
 	}
 	leaderRecord[RenewTime] = strconv.FormatInt(time.Now().Unix(), 10)
@@ -338,7 +337,7 @@ func (cs *ConfigurationStore) DeleteLeader(opTime int64) error {
 		return err
 	}
 
-	leaderConfigMap.Annotations[binding.LEADER] = ""
+	leaderConfigMap.Annotations[LEADER] = ""
 	if opTime != 0 {
 		leaderConfigMap.Annotations[OpTime] = strconv.FormatInt(opTime, 10)
 	}
@@ -351,10 +350,10 @@ func (cs *ConfigurationStore) AttemptToAcquireLeaderLock(podName string) error {
 	now := time.Now().Unix()
 	//TODO:only 4 para
 	annotation := map[string]string{
-		binding.LEADER: podName,
-		TTL:            strconv.FormatInt(cs.cluster.Config.data.ttl, 10),
-		RenewTime:      strconv.FormatInt(now, 10),
-		AcquireTime:    strconv.FormatInt(now, 10),
+		LEADER:      podName,
+		TTL:         strconv.FormatInt(cs.cluster.Config.data.ttl, 10),
+		RenewTime:   strconv.FormatInt(now, 10),
+		AcquireTime: strconv.FormatInt(now, 10),
 	}
 
 	configMap, err := cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Get(cs.ctx, cs.clusterCompName+LeaderSuffix, metav1.GetOptions{})
@@ -417,7 +416,7 @@ func newLeaderRecord(data map[string]string) *LeaderRecord {
 
 	return &LeaderRecord{
 		acquireTime: int64(acquireTime),
-		leader:      data[binding.LEADER],
+		leader:      data[LEADER],
 		renewTime:   int64(renewTime),
 		ttl:         int64(ttl),
 		opTime:      int64(opTime),

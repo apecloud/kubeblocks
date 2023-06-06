@@ -21,3 +21,8 @@ const (
 const (
 	KbRoleLabel = "kubeblocks.io/role"
 )
+
+const (
+	LEADER    = "Leader"
+	CANDIDATE = "Candidate"
+)

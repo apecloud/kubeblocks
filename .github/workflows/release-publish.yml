@@ -161,6 +161,15 @@ jobs:
             rpmbuild --target aarch64 -ba /home/runner/rpmbuild/SPECS/kbcli.spec
           fi
 
+      - name: build RPM repo
+        if: matrix.os == 'linux-amd64' || matrix.os == 'linux-arm64'
+        run: |
+          sudo apt-get install -y createrepo
+          mkdir -p rpm_repo
+          cp /home/runner/rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm rpm_repo/
+          createrepo -pdo rpm_repo rpm_repo
+          createrepo --update rpm_repo
+
       - name: upload RPM package
         if: matrix.os == 'linux-amd64' || matrix.os == 'linux-arm64'
         uses: actions/upload-release-asset@main

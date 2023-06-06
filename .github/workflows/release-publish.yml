@@ -166,7 +166,7 @@ jobs:
         run: |
           sudo apt-get install -y createrepo-c
           mkdir -p rpm_repo
-          cp /home/runner/rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-1-${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm rpm_repo/
+          cp /home/runner/rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-1.${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm rpm_repo/
           createrepo_c -pdo rpm_repo rpm_repo
           createrepo_c --update rpm_repo
           bash .github/utils/utils.sh --type 13 \
@@ -180,7 +180,7 @@ jobs:
         uses: actions/upload-release-asset@main
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-1-${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm
+          asset_path: ./rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-1.${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm
           asset_name: ${{ env.CLI_FILENAME }}.rpm
           asset_content_type: application/octet-stream
 

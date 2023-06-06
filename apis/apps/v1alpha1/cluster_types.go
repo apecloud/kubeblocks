@@ -480,8 +480,8 @@ type ClassDefRef struct {
 // +kubebuilder:printcolumn:name="TERMINATION-POLICY",type="string",JSONPath=".spec.terminationPolicy",description="Cluster termination policy."
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="Cluster Status."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
-// +kubebuilder:validation:XValidation:rule="has(self.metadata.name) && self.metadata.name.size() < 16 ", message="cluster name should be less than 16 characters"
-// +kubebuilder:validation:XValidation:rule="has(self.metadata.name) && self.metadata.name.matches([a-z]([-a-z0-9]*[a-z0-9])?)", message="Cluster Name is illegal"
+// +kubebuilder:validation:XValidation:rule="self.metadata.name.size() < 16", message="cluster name should be less than 16 characters"
+// +kubebuilder:validation:XValidation:rule="self.metadata.name.matches('^[a-z]([-a-z0-9]*[a-z0-9])?$')", message="cluster name must begin with a letter and can only contain letters, numbers, and '-'."
 
 // Cluster is the Schema for the clusters API.
 type Cluster struct {

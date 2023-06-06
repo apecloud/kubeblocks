@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"fmt"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -318,6 +319,41 @@ var _ = Describe("Cluster", func() {
 			o.Name = ""
 			// Expected to generate a random name
 			Expect(o.Validate()).Should(Succeed())
+		})
+
+		It("can validate the cluster name must begin with a letter and can only contain lowercase letters, numbers, and '-'.", func() {
+			invalidCharacter := "~!#$%^&*()_=+{}[]`:;'<>/?,.\\"
+			validName := "abcd"
+			o.Name = validName
+			Expect(o.Validate()).Should(Succeed())
+			for i := range invalidCharacter {
+				o.Name = validName[0:1] + string(invalidCharacter[i]) + validName[1:]
+				Expect(o.Validate()).Should(HaveOccurred())
+				o.Name = validName + string(invalidCharacter[i])
+				Expect(o.Validate()).Should(HaveOccurred())
+				o.Name = string(invalidCharacter[i]) + validName
+				Expect(o.Validate()).Should(HaveOccurred())
+			}
+
+			numericCharacters := "0123456789"
+			for i := range numericCharacters {
+				o.Name = validName[0:1] + string(numericCharacters[i]) + validName[1:]
+				Expect(o.Validate()).Should(Succeed())
+				o.Name = validName + string(numericCharacters[i])
+				Expect(o.Validate()).Should(Succeed())
+				o.Name = string(numericCharacters[i]) + validName
+				Expect(o.Validate()).Should(HaveOccurred())
+			}
+
+			o.Name = validName + "-"
+			Expect(o.Validate()).Should(HaveOccurred())
+			o.Name = validName[0:1] + "-" + validName[1:]
+			Expect(o.Validate()).Should(Succeed())
+			o.Name = "-" + validName
+			Expect(o.Validate()).Should(HaveOccurred())
+
+			o.Name = strings.ToUpper(validName)
+			Expect(o.Validate()).Should(HaveOccurred())
 		})
 
 		It("can validate whether the name is not longer than 16 characters when create a new cluster", func() {

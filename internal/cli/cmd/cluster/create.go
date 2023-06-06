@@ -26,6 +26,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -304,6 +305,11 @@ func (o *CreateOptions) Validate() error {
 
 	if len(o.Values) > 0 && len(o.SetFile) > 0 {
 		return fmt.Errorf("does not support --set and --set-file being specified at the same time")
+	}
+
+	matched, _ := regexp.MatchString(`^[a-z]([-a-z0-9]*[a-z0-9])?$`, o.Name)
+	if !matched {
+		return fmt.Errorf("cluster name must begin with a letter and can only contain lowercase letters, numbers, and '-'.")
 	}
 
 	if len(o.Name) > 16 {

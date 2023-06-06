@@ -164,15 +164,15 @@ jobs:
       - name: build RPM repo
         if: matrix.os == 'linux-amd64' || matrix.os == 'linux-arm64'
         run: |
-          sudo apt-get install -y createrepo
+          sudo apt-get install -y createrepo-c
           mkdir -p rpm_repo
           cp rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-1-${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm rpm_repo/
-          createrepo -pdo rpm_repo rpm_repo
-          createrepo --update rpm_repo
+          createrepo_c -pdo rpm_repo rpm_repo
+          createrepo_c --update rpm_repo
           bash .github/utils/utils.sh --type 13 \
           --github-repo 'apecloud/kbcli_rpm' \
           --tag-name ${{ env.TAG_NAME }} \
-          --file "rpm_rpo/ \
+          --file "rpm_rpo \
           --github-token ${{ env.GITHUB_TOKEN }}
 
       - name: upload RPM package

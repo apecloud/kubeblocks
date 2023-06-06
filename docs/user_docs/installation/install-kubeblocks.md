@@ -41,11 +41,12 @@ The quickest way to try out KubeBlocks is to create a new Kubernetes cluster and
 
 ## Installation steps
 
-The command `kbcli kubeblocks install` installs KubeBlocks in the `kb-system` namespace on nodes without taints by default. If you want to install KubeBlocks in other namespaces, use the `--namespace` flag to specify one. KubeBlocks can also be installed on the specified nodes by setting taints and tolerations. Choose from the following options.
+The command `kbcli kubeblocks install` installs KubeBlocks in the `kb-system` namespace, or you can use the `--namespace` flag to specify one. 
+You can also isolate the KubeBlocks control plane and data plane resources by setting taints and tolerations. Choose from the following options.
 
 ### Install KubeBlocks with default tolerations
 
-KubeBlocks defines two default tolerations: `kb-controller:NoSchedule` for control plane nodes and `kb-data:NoSchedule` for data plane nodes. You can apply matching taints to nodes so KubeBlocks is installed only on nodes with the default tolerations.
+By default, KubeBlocks tolerates two taints: `kb-controller:NoSchedule` for the control plane and `kb-data:NoSchedule` for the data plane. You can add these taints to nodes so that KubeBlocks and database clusters are scheduled to the appropriate nodes.
 
 1. Get Kubernetes nodes.
 
@@ -53,13 +54,13 @@ KubeBlocks defines two default tolerations: `kb-controller:NoSchedule` for contr
     kubectl get node
     ```
 
-2. Place taints on the selected nodes.
+2. Add taints to the selected nodes.
 
     ```bash
-    # set control plane taint
+    # add control plane taint
     kubectl taint nodes <nodename> kb-controller=true:NoSchedule
    
-    # set data plane taint
+    # add data plane taint
     kubectl taint nodes <nodename> kb-data=true:NoSchedule
     ```
 
@@ -69,9 +70,9 @@ KubeBlocks defines two default tolerations: `kb-controller:NoSchedule` for contr
     kbcli kubeblocks install
     ```
 
-### Install KubeBlocks with customized tolerations
+### Install KubeBlocks with custom tolerations
 
-If your nodes have existing taints or you want custom taints, specify control plane and data plane tolerations when installing KubeBlocks.
+Another option is to tolerate custom taints, regardless of whether they are already set on the nodes.
 
 1. Get Kubernetes nodes.
 
@@ -79,7 +80,7 @@ If your nodes have existing taints or you want custom taints, specify control pl
     kubectl get node
     ```
 
-2. Place customized taints on the selected nodes. If you already have taints for KubeBlocks, skip this step.
+2. If the selected nodes do not already have custom taints, add them.
 
     ```bash
     # set control plane taint
@@ -92,12 +93,12 @@ If your nodes have existing taints or you want custom taints, specify control pl
 3. Install KubeBlocks with control plane and data plane tolerations.
 
     ```bash
-    kbcli kubeblocks install --create-namespace  --namespace <name> --set-json 'tolerations=[ { "key": "control-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]' --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]'
+    kbcli kubeblocks install --set-json 'tolerations=[ { "key": "control-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]' --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]'
     ```
 
 :::note
 
-When executing the `kbcli kubeblocks install` command, the `preflight` checks run automatically to check the environment. If the current cluster meets the installation requirements, the installation continues. If it does not, the current process is terminated, and an error message is displayed. To skip the `preflight` checks, you can add the `--force` flag after the `kbcli kubeblocks install` command.
+When executing the `kbcli kubeblocks install` command, the `preflight` checks will automatically verify the environment. If the cluster satisfies the basic requirements, the installation process will proceed. Otherwise, the process will be terminated, and an error message will be displayed. To skip the `preflight` checks, add the `--force` flag after the `kbcli kubeblocks install` command.
 
 :::
 
@@ -111,7 +112,7 @@ kubectl get pod -n kb-system
 
 ***Result***
 
-When the following pods are `Running`, it means KubeBlocks is installed successfully.
+If the following pods are all `Running`, KubeBlocks has been installed successfully.
 
 ```bash
 NAME                                                     READY   STATUS      RESTARTS   AGE

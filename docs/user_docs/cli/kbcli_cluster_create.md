@@ -88,6 +88,7 @@ kbcli cluster create [NAME] [flags]
       --cluster-definition string      Specify cluster definition, run "kbcli cd list" to show all available cluster definitions
       --cluster-version string         Specify cluster version, run "kbcli cv list" to show all available cluster versions, use the latest version if not specified
       --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+      --edit                           Edit the API resource before creating
       --enable-all-logs                Enable advanced application all log extraction, set to true will ignore enabledLogs of component level, default is false
   -h, --help                           help for create
       --monitor                        Set monitor enabled and inject metrics exporter (default true)

@@ -24,6 +24,6 @@ jobs:
         with:
           path-to-signatures: 'signatures/version1/cla.json'
           path-to-document: 'https://cla-assistant.io/apecloud/kubeblocks'
-          branch: 'main'
+          branch: 'CLA'
           allowlist: bot*
 

@@ -68,17 +68,19 @@ var (
         kbcli cluster edit-bp <backup-policy-name>
 	`)
 	createBackupExample = templates.Examples(`
-		# create a backup
+		# create a backup, the default type is snapshot.
 		kbcli cluster backup mycluster
 
 		# create a snapshot backup
+		# create a snapshot of the cluster's persistent volume for backup
 		kbcli cluster backup mycluster --type snapshot
 
 		# create a datafile backup
+		# backup all data directory files and save them to the specified storage, only full backup is supported now.
 		kbcli cluster backup mycluster --type datafile
 
 		# create a backup with specified backup policy
-		kbcli cluster backup mycluster --backup-policy <backup-policy-name>
+		kbcli cluster backup mycluster --policy <backup-policy-name>
 	`)
 	listBackupExample = templates.Examples(`
 		# list all backups
@@ -217,8 +219,8 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	}
 
 	cmd.Flags().StringVar(&o.BackupType, "type", "snapshot", "Backup type")
-	cmd.Flags().StringVar(&o.BackupName, "backup-name", "", "Backup name")
-	cmd.Flags().StringVar(&o.BackupPolicy, "backup-policy", "", "Backup policy name, this flag will be ignored when backup-type is snapshot")
+	cmd.Flags().StringVar(&o.BackupName, "name", "", "Backup name")
+	cmd.Flags().StringVar(&o.BackupPolicy, "policy", "", "Backup policy name, this flag will be ignored when backup-type is snapshot")
 
 	return cmd
 }

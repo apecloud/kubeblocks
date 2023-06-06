@@ -1383,29 +1383,19 @@ var _ = Describe("Cluster Controller", func() {
 		changeCompReplicas(clusterKey, updatedReplicas, &clusterObj.Spec.ComponentSpecs[0])
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 
-		// REVIEW: this test flow, should wait/fake still Running phase?
-		By("Creating backup")
-		backupKey := types.NamespacedName{
-			Namespace: testCtx.DefaultNamespace,
-			Name:      "test-backup",
+		ml := client.MatchingLabels{
+			constant.AppInstanceLabelKey:    clusterKey.Name,
+			constant.KBAppComponentLabelKey: compName,
 		}
-		backup := dataprotectionv1alpha1.Backup{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      backupKey.Name,
-				Namespace: backupKey.Namespace,
-				Labels: map[string]string{
-					constant.AppInstanceLabelKey:    clusterKey.Name,
-					constant.KBAppComponentLabelKey: compName,
-					constant.KBManagedByKey:         "cluster",
-				},
-			},
-			Spec: dataprotectionv1alpha1.BackupSpec{
-				BackupPolicyName: lifecycle.DeriveBackupPolicyName(clusterKey.Name, compDefName, ""),
-				BackupType:       "snapshot",
-			},
-		}
-		Expect(testCtx.Create(ctx, &backup)).Should(Succeed())
+		Eventually(testapps.List(&testCtx, generics.BackupSignature,
+			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(1))
 
+		backupList := dataprotectionv1alpha1.BackupList{}
+		Expect(testCtx.Cli.List(testCtx.Ctx, &backupList, ml)).Should(Succeed())
+		backupKey := types.NamespacedName{
+			Namespace: backupList.Items[0].Namespace,
+			Name:      backupList.Items[0].Name,
+		}
 		By("Mocking backup status to failed")
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dataprotectionv1alpha1.Backup) {
 			backup.Status.Phase = dataprotectionv1alpha1.BackupFailed

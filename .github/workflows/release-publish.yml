@@ -65,9 +65,9 @@ jobs:
       - name: make generate
         run: make generate
 
-#      - name: Get release
-#        id: get_release
-#        uses: bruceadams/get-release@v1.3.2
+      - name: Get release
+        id: get_release
+        uses: bruceadams/get-release@v1.3.2
 
       - name: make build
         run: |
@@ -156,9 +156,9 @@ jobs:
           sudo apt-get install -y rpm build-essential
           mv rpmbuild /home/runner/
           if [ "${{ matrix.os }}" = "linux-amd64" ]; then
-            rpmbuild --target x86_64 -ba /home/runner/rpmbuild/SPECS/kbcli.spec
+            rpmbuild --target x86_64 -ba rpmbuild/SPECS/kbcli.spec
           elif [ "${{ matrix.os }}" = "linux-arm64" ]; then
-            rpmbuild --target aarch64 -ba /home/runner/rpmbuild/SPECS/kbcli.spec
+            rpmbuild --target aarch64 -ba rpmbuild/SPECS/kbcli.spec
           fi
 
       - name: build RPM repo
@@ -166,7 +166,7 @@ jobs:
         run: |
           sudo apt-get install -y createrepo
           mkdir -p rpm_repo
-          cp /home/runner/rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm rpm_repo/
+          cp rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-1-${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm rpm_repo/
           createrepo -pdo rpm_repo rpm_repo
           createrepo --update rpm_repo
 
@@ -174,8 +174,8 @@ jobs:
         if: matrix.os == 'linux-amd64' || matrix.os == 'linux-arm64'
         uses: actions/upload-release-asset@main
         with:
-          upload_url: ${{ env.UPLOAD_URL }}
-          asset_path: /home/runner/rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm
+          upload_url: ${{ steps.get_release.outputs.upload_url }}
+          asset_path: ./rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-1-${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm
           asset_name: ${{ env.CLI_FILENAME }}.rpm
           asset_content_type: application/octet-stream
 

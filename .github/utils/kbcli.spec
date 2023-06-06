@@ -1,5 +1,6 @@
 Name:kbcli    
-Version:0.5.0  
+Version:0.5.0
+Release:1
 Summary:Kbcli is command line tool for kubeblocks.    
 Group:Applications/Internet
 License:GPL

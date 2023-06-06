@@ -757,7 +757,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 	}
 
 	var comps []*appsv1alpha1.ClusterComponentSpec
-	for i, c := range cd.Spec.ComponentDefs {
+	for _, c := range cd.Spec.ComponentDefs {
 		sets := map[setKey]string{}
 		if setsMap != nil {
 			sets = setsMap[c.Name]
@@ -817,7 +817,8 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		}}
 		storageClass := getVal(&c, keyStorageClass, sets)
 		if len(storageClass) != 0 {
-			compObj.VolumeClaimTemplates[i].Spec.StorageClassName = &storageClass
+			// now the clusterdefinition components mostly have only one VolumeClaimTemplates in default
+			compObj.VolumeClaimTemplates[0].Spec.StorageClassName = &storageClass
 		}
 		if err = buildSwitchPolicy(&c, compObj, sets); err != nil {
 			return nil, err

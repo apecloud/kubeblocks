@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package infrastructure
 
 import (
+	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/bootstrap/os"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/bootstrap/precheck"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/certs"
+	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/container"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/module"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/etcd"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/filesystem"
@@ -32,8 +34,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/tasks"
 )
 
-func NewCreateK8sClusterForKubeblocks(o *clusterOptions) []module.Module {
-	// TODO: add a new module to check if the cluster is already installed
+func NewCreatePipeline(o *createOptions) []module.Module {
 	return []module.Module{
 		&precheck.GreetingsModule{},
 		&tasks.CheckNodeArchitectureModule{},
@@ -69,10 +70,20 @@ func NewCreateK8sClusterForKubeblocks(o *clusterOptions) []module.Module {
 		&network.DeployNetworkPluginModule{},
 		&kubernetes.ConfigureKubernetesModule{},
 		&filesystem.ChownModule{},
-		&certs.AutoRenewCertsModule{Skip: !o.autoRenewCerts},
+		// &certs.AutoRenewCertsModule{Skip: !o.autoRenewCerts},
 		&kubernetes.SecurityEnhancementModule{Skip: !o.securityEnhancement},
 		// &kubernetes.SaveKubeConfigModule{},
 		// &plugins.DeployPluginsModule{},
 		// &customscripts.CustomScriptsModule{Phase: "PostInstall", Scripts: runtime.Cluster.System.PostInstall},
+	}
+}
+
+func NewDeletePipeline(o *deleteOptions) []module.Module {
+	return []module.Module{
+		&precheck.GreetingsModule{},
+		&kubernetes.ResetClusterModule{},
+		&container.UninstallContainerModule{Skip: !o.deleteCRI},
+		&os.ClearOSEnvironmentModule{},
+		&certs.UninstallAutoRenewCertsModule{},
 	}
 }

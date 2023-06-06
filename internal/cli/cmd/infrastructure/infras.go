@@ -31,5 +31,6 @@ func NewInfraCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Short: "infra command",
 	}
 	cmd.AddCommand(NewCreateKubernetesCmd(streams))
+	cmd.AddCommand(NewDeleteKubernetesCmd(streams))
 	return cmd
 }

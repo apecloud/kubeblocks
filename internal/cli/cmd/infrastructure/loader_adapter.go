@@ -55,7 +55,7 @@ const (
 	builtinRoleGroupsObject     = "RoleGroups"
 )
 
-func buildTemplateParams(o *clusterOptions) *gotemplate.TplValues {
+func buildTemplateParams(o *createOptions) *gotemplate.TplValues {
 	return &gotemplate.TplValues{
 		builtinClusterNameObject:    o.clusterName,
 		builtinClusterVersionObject: o.version.KubernetesVersion,

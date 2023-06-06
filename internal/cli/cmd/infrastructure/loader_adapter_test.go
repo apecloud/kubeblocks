@@ -22,42 +22,43 @@ package infrastructure
 import (
 	"testing"
 
+	"github.com/apecloud/kubeblocks/internal/configuration/container"
 	kubekeyapiv1alpha2 "github.com/kubesphere/kubekey/v3/cmd/kk/apis/kubekey/v1alpha2"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
-
-	"github.com/apecloud/kubeblocks/internal/configuration/container"
 )
 
 func TestCreateClusterWithOptions(t *testing.T) {
 	tests := []struct {
 		name    string
-		args    *clusterOptions
+		args    *createOptions
 		want    *kubekeyapiv1alpha2.ClusterSpec
 		wantErr bool
 	}{{
 		name: "generateClusterTest",
-		args: &clusterOptions{
-			clusterName: "for_test",
-			version:     types.InfraVersionInfo{},
-			criType:     string(container.ContainerdType),
-			userName:    "test",
-			password:    "test",
-			cluster: types.Cluster{
-				Nodes: []types.ClusterNode{
-					{
-						Name:            "node1",
-						Address:         "127.0.0.1",
-						InternalAddress: "127.0.0.1",
-					}, {
-						Name:            "node2",
-						Address:         "127.0.0.2",
-						InternalAddress: "127.0.0.2",
+		args: &createOptions{
+			version: types.InfraVersionInfo{},
+			criType: string(container.ContainerdType),
+			clusterOptions: clusterOptions{
+				clusterName: "for_test",
+				userName:    "test",
+				password:    "test",
+				cluster: types.Cluster{
+					Nodes: []types.ClusterNode{
+						{
+							Name:            "node1",
+							Address:         "127.0.0.1",
+							InternalAddress: "127.0.0.1",
+						}, {
+							Name:            "node2",
+							Address:         "127.0.0.2",
+							InternalAddress: "127.0.0.2",
+						},
 					},
+					ETCD:   []string{"node1"},
+					Master: []string{"node1"},
+					Worker: []string{"node2"},
 				},
-				ETCD:   []string{"node1"},
-				Master: []string{"node1"},
-				Worker: []string{"node2"},
 			},
 		},
 	}}

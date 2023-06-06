@@ -49,7 +49,7 @@ spec:
     {{- if eq $criType "containerd" }}
     containerRuntimeEndpoint: "unix:///run/containerd/containerd.sock"
     {{- end }}
-  {{- if $.CRIType }}
+  {{- if hasKey . "CRIType" }}
   {{ $criType = $.CRIType }}
   {{- end }}
     containerManager: {{ $criType }}

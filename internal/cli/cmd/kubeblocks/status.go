@@ -26,10 +26,9 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/containerd/stargz-snapshotter/estargz/errorutil"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/maps"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -427,11 +426,11 @@ func (o *statusOptions) showK8sClusterInfos(ctx context.Context, allErrs *[]erro
 	}
 	if o.ns != "" {
 		fmt.Fprintf(o.Out, "KubeBlocks is deployed in namespace: %s", o.ns)
-	}
-	if version.KubeBlocks != "" {
-		fmt.Fprintf(o.Out, ",version: %s\n", version.KubeBlocks)
-	} else {
-		printer.PrintBlankLine(o.Out)
+		if version.KubeBlocks != "" {
+			fmt.Fprintf(o.Out, ",version: %s\n", version.KubeBlocks)
+		} else {
+			printer.PrintBlankLine(o.Out)
+		}
 	}
 
 	provider, err := util.GetK8sProvider(version.Kubernetes, o.client)
@@ -441,8 +440,7 @@ func (o *statusOptions) showK8sClusterInfos(ctx context.Context, allErrs *[]erro
 	if !provider.IsCloud() {
 		return
 	}
-	fmt.Fprintf(o.Out, "\nKubernetes Cluster:")
-	printer.PrintBlankLine(o.Out)
+	fmt.Fprintf(o.Out, "\nKubernetes Cluster:\n")
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("VERSION", "PROVIDER", "REGION", "AVAILABLE ZONES")
 	nodesList, err := o.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
@@ -465,7 +463,7 @@ func (o *statusOptions) showK8sClusterInfos(ctx context.Context, allErrs *[]erro
 		availableZones[labels[constant.ZoneLabelKey]] = struct{}{}
 	}
 	if region == "" {
-		tblPrinter.AddRow(version.Kubernetes, provider, "unknown", "unknown")
+		tblPrinter.AddRow(version.Kubernetes, provider, "", "")
 		tblPrinter.Print()
 		return
 	}

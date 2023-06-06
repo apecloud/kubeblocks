@@ -156,9 +156,9 @@ jobs:
           sudo apt-get install -y rpm build-essential
           mv rpmbuild /home/runner/
           if [ "${{ matrix.os }}" = "linux-amd64" ]; then
-            rpmbuild --target x86_64 -ba rpmbuild/SPECS/kbcli.spec
+            rpmbuild --target x86_64 -ba /home/runner/rpmbuild/SPECS/kbcli.spec
           elif [ "${{ matrix.os }}" = "linux-arm64" ]; then
-            rpmbuild --target aarch64 -ba rpmbuild/SPECS/kbcli.spec
+            rpmbuild --target aarch64 -ba /home/runner/rpmbuild/SPECS/kbcli.spec
           fi
 
       - name: build RPM repo

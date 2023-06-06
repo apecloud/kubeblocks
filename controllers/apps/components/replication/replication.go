@@ -21,6 +21,7 @@ package replication
 
 import (
 	"context"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -247,6 +248,9 @@ func (r *ReplicationSet) asyncReplicationPodRoleLabelAndAnnotations(podList []co
 func (r *ReplicationSet) HandleSwitchover(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
 	// check if all Pods have role label
 	podList, err := getRunningPods(ctx, r.Cli, obj)
+	if err != nil {
+		return nil, err
+	}
 	for _, pod := range podList {
 		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
 			return nil, nil

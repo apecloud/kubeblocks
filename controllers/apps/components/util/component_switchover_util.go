@@ -37,7 +37,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlcomputil "github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -51,7 +50,7 @@ const (
 func NeedDeaWithSwitchover(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent) (bool, error) {
+	component *intctrlcomputil.SynthesizedComponent) (bool, error) {
 	// firstly, check whether the candidateInstance is changed by comparing with the pod role label
 	changed, _, err := CheckCandidateInstanceChanged(ctx, cli, cluster, component.Name)
 	if err != nil {
@@ -104,7 +103,7 @@ func NeedDeaWithSwitchover(ctx context.Context,
 func DoSwitchover(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent) error {
+	component *intctrlcomputil.SynthesizedComponent) error {
 	switchoverJob, err := renderSwitchoverCmdJob(ctx, cli, cluster, component)
 	if err != nil {
 		return err
@@ -119,14 +118,15 @@ func DoSwitchover(ctx context.Context,
 		if err != nil {
 			return err
 		}
-		var newSwitchoverCondition *metav1.Condition
 		if len(previousJobs) > 0 {
-			// TODO: delete the previous generation switchoverJob
-
+			// delete the previous generation switchoverJob
+			if err := CleanJobWithLabels(ctx, cli, cluster, ml); err != nil {
+				return err
+			}
 		}
 
 		// update status.conditions to SwitchoverStart
-		newSwitchoverCondition = initSwitchoverCondition(*component.CandidateInstance, component.Name, metav1.ConditionFalse, ReasonSwitchoverStart, cluster.Generation)
+		newSwitchoverCondition := initSwitchoverCondition(*component.CandidateInstance, component.Name, metav1.ConditionFalse, ReasonSwitchoverStart, cluster.Generation)
 		meta.SetStatusCondition(&cluster.Status.Conditions, *newSwitchoverCondition)
 
 		// create the current generation switchoverJob
@@ -146,7 +146,7 @@ func DoSwitchover(ctx context.Context,
 func PostOpsSwitchover(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent) error {
+	component *intctrlcomputil.SynthesizedComponent) error {
 	if component.CandidateInstance == nil {
 		return nil
 	}
@@ -261,7 +261,7 @@ func replaceSwitchoverConnCredentialEnv(clusterName string, switchoverSpec *apps
 func buildSwitchoverWorkloadEnvs(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
+	component *intctrlcomputil.SynthesizedComponent) ([]corev1.EnvVar, error) {
 	var workloadEnvs []corev1.EnvVar
 	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, component.Name, component.CompDefName)
 	if err != nil {
@@ -275,12 +275,12 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 	case appsv1alpha1.Replication:
 		rsEnvs := []corev1.EnvVar{
 			{
-				Name:  constant.KBSwitchoverReplicationPrimaryPodIp,
-				Value: fmt.Sprintf("%s", pod.Status.PodIP),
+				Name:  constant.KBSwitchoverReplicationPrimaryPodIP,
+				Value: pod.Status.PodIP,
 			},
 			{
 				Name:  constant.KBSwitchoverReplicationPrimaryPodName,
-				Value: fmt.Sprintf("%s", pod.Name),
+				Value: pod.Name,
 			},
 			{
 				Name:  constant.KBSwitchoverReplicationPrimaryPodFqdn,
@@ -291,12 +291,12 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 	case appsv1alpha1.Consensus:
 		csEnvs := []corev1.EnvVar{
 			{
-				Name:  constant.KBSwitchoverConsensusLeaderPodIp,
-				Value: fmt.Sprintf("%s", pod.Status.PodIP),
+				Name:  constant.KBSwitchoverConsensusLeaderPodIP,
+				Value: pod.Status.PodIP,
 			},
 			{
 				Name:  constant.KBSwitchoverConsensusLeaderPodName,
-				Value: fmt.Sprintf("%s", pod.Name),
+				Value: pod.Name,
 			},
 			{
 				Name:  constant.KBSwitchoverConsensusLeaderPodFqdn,
@@ -311,7 +311,7 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 // buildSwitchoverCandidateInstanceEnv builds the candidate instance name environment variable for the switchover job.
 func buildSwitchoverCandidateInstanceEnv(
 	cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent) []corev1.EnvVar {
+	component *intctrlcomputil.SynthesizedComponent) []corev1.EnvVar {
 	svcName := strings.Join([]string{cluster.Name, component.Name, "headless"}, "-")
 	if component.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual {
 		cEnvs := []corev1.EnvVar{
@@ -333,7 +333,7 @@ func buildSwitchoverCandidateInstanceEnv(
 func buildSwitchoverEnvs(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
+	component *intctrlcomputil.SynthesizedComponent) ([]corev1.EnvVar, error) {
 	if component.SwitchoverSpec == nil {
 		return nil, errors.New("switchover spec not found")
 	}
@@ -359,7 +359,7 @@ func buildSwitchoverEnvs(ctx context.Context,
 func renderSwitchoverCmdJob(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent) (*batchv1.Job, error) {
+	component *intctrlcomputil.SynthesizedComponent) (*batchv1.Job, error) {
 	if component.SwitchoverSpec == nil {
 		return nil, errors.New("switchover spec not found")
 	}
@@ -485,7 +485,7 @@ func CheckJobSucceed(ctx context.Context,
 func checkPodRoleLabelConsistencyAfterSwitchover(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent) (bool, error) {
+	component *intctrlcomputil.SynthesizedComponent) (bool, error) {
 	if component.CandidateInstance == nil {
 		return true, nil
 	}

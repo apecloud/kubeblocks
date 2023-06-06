@@ -245,10 +245,10 @@ const (
 
 	KBSwitchoverCandidateInstanceName     = "KB_SWITCHOVER_CANDIDATE_INSTANCE_NAME"
 	KBSwitchoverCandidateInstanceFqdn     = "KB_SWITCHOVER_CANDIDATE_INSTANCE_FQDN"
-	KBSwitchoverReplicationPrimaryPodIp   = "KB_REPLICATION_PRIMARY_POD_IP"
+	KBSwitchoverReplicationPrimaryPodIP   = "KB_REPLICATION_PRIMARY_POD_IP"
 	KBSwitchoverReplicationPrimaryPodName = "KB_REPLICATION_PRIMARY_POD_NAME"
 	KBSwitchoverReplicationPrimaryPodFqdn = "KB_REPLICATION_PRIMARY_POD_FQDN"
-	KBSwitchoverConsensusLeaderPodIp      = "KB_CONSENSUS_LEADER_POD_IP"
+	KBSwitchoverConsensusLeaderPodIP      = "KB_CONSENSUS_LEADER_POD_IP"
 	KBSwitchoverConsensusLeaderPodName    = "KB_CONSENSUS_LEADER_POD_NAME"
 	KBSwitchoverConsensusLeaderPodFqdn    = "KB_CONSENSUS_LEADER_POD_FQDN"
 )

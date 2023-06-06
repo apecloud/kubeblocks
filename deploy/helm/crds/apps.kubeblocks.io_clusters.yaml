@@ -664,7 +664,7 @@ spec:
                         type: string
                       description: message records the component details message in
                         current phase. Keys are podName or deployName or statefulSetName.
-                        The format is `<ObjectKind>/<Name>`.
+                        The format is `ObjectKind/Name`.
                       type: object
                     phase:
                       description: 'phase describes the phase of the component and

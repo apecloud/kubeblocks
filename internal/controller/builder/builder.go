@@ -206,10 +206,10 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 }
 
 // BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from sts to pvc.
-func BuildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.PersistentVolumeClaim,
-	component *component.SynthesizedComponent, pvcTplName string) {
+func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent, pvc *corev1.PersistentVolumeClaim,
+	pvcTplName string) {
 	// strict args checking.
-	if sts == nil || pvc == nil || component == nil {
+	if pvc == nil || component == nil {
 		return
 	}
 	if pvc.Labels == nil {
@@ -223,12 +223,6 @@ func BuildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.Persi
 				pvc.Labels[constant.VolumeTypeLabelKey] = string(t.Type)
 				break
 			}
-		}
-	}
-
-	for k, v := range sts.Labels {
-		if _, ok := pvc.Labels[k]; !ok {
-			pvc.Labels[k] = v
 		}
 	}
 }
@@ -306,7 +300,7 @@ func BuildStsLow(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, c
 	// update sts.spec.volumeClaimTemplates[].metadata.labels
 	if len(sts.Spec.VolumeClaimTemplates) > 0 && len(sts.GetLabels()) > 0 {
 		for index, vct := range sts.Spec.VolumeClaimTemplates {
-			BuildPersistentVolumeClaimLabels(&sts, &vct, component, vct.Name)
+			BuildPersistentVolumeClaimLabels(component, &vct, vct.Name)
 			sts.Spec.VolumeClaimTemplates[index] = vct
 		}
 	}
@@ -447,21 +441,22 @@ func BuildDeployLow(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster
 	return &deploy, nil
 }
 
-func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
-	vct corev1.PersistentVolumeClaimTemplate,
+func BuildPVC(cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
+	vct *corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
-	snapshotName string,
-	component *component.SynthesizedComponent) (*corev1.PersistentVolumeClaim, error) {
+	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
 	pvc := corev1.PersistentVolumeClaim{}
 	if err := buildFromCUE("pvc_template.cue", map[string]any{
-		"sts":                 sts,
+		"cluster":             cluster,
+		"component":           component,
 		"volumeClaimTemplate": vct,
 		"pvc_key":             pvcKey,
 		"snapshot_name":       snapshotName,
 	}, "pvc", &pvc); err != nil {
 		return nil, err
 	}
-	BuildPersistentVolumeClaimLabels(sts, &pvc, component, vct.Name)
+	BuildPersistentVolumeClaimLabels(component, &pvc, vct.Name)
 	return &pvc, nil
 }
 
@@ -531,13 +526,15 @@ func BuildEnvConfigLow(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster
 	return &config, nil
 }
 
-func BuildBackup(sts *appsv1.StatefulSet,
+func BuildBackup(cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
 	backupPolicyName string,
 	backupKey types.NamespacedName,
 	backupType string) (*dataprotectionv1alpha1.Backup, error) {
 	backup := dataprotectionv1alpha1.Backup{}
 	if err := buildFromCUE("backup_job_template.cue", map[string]any{
-		"sts":                sts,
+		"cluster":            cluster,
+		"component":          component,
 		"backup_policy_name": backupPolicyName,
 		"backup_job_key":     backupKey,
 		"backup_type":        backupType,

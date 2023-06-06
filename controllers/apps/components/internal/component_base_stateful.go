@@ -650,16 +650,18 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 
 	stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
 
-	succ, err := dataCloneSucceed(reqCtx, cli, c.Component, stsObj)
+	dataClone := NewDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)
+	succeed, err := dataClone.Succeed()
 	if err != nil {
 		return err
 	}
-	if succ {
+	if succeed {
 		// pvcs are ready, stateful_set.replicas should be updated
 		c.WorkloadVertex.Immutable = false
 	} else {
 		c.WorkloadVertex.Immutable = true
-		objs, err := cloneData(reqCtx, cli, c.Cluster, c.Component, backupKey, stsProto, stsObj)
+		// update objs will trigger cluster reconcile, no need to requeue error
+		objs, err := dataClone.CloneData()
 		if err != nil && !intctrlutil.IsDelayedRequeueError(err) {
 			return err
 		}

@@ -197,7 +197,7 @@ var _ = Describe("builder", func() {
 				Namespace: "default",
 				Name:      "data-mysql-01-replicasets-0",
 			}
-			pvc, err := BuildPVCFromSnapshot(sts, params.Component.VolumeClaimTemplates[0], pvcKey, snapshotName, params.Component)
+			pvc, err := BuildPVC(params.Cluster, params.Component, params.Component.VolumeClaimTemplates[0], pvcKey, snapshotName)
 			Expect(err).Should(BeNil())
 			Expect(pvc).ShouldNot(BeNil())
 			Expect(pvc.Spec.AccessModes).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
@@ -405,13 +405,13 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds BackupJob correctly", func() {
-			sts := newStsObj()
+			params := newParams()
 			backupJobKey := types.NamespacedName{
 				Namespace: "default",
 				Name:      "test-backup-job",
 			}
 			backupPolicyName := "test-backup-policy"
-			backupJob, err := BuildBackup(sts, backupPolicyName, backupJobKey, "snapshot")
+			backupJob, err := BuildBackup(params.Cluster, params.Component, backupPolicyName, backupJobKey, "snapshot")
 			Expect(err).Should(BeNil())
 			Expect(backupJob).ShouldNot(BeNil())
 		})

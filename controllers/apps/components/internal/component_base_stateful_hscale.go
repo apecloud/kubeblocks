@@ -163,227 +163,6 @@ func getBackupMatchingLabels(clusterName string, componentName string) client.Ma
 	}
 }
 
-func dataCloneSucceed(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	component *component.SynthesizedComponent,
-	stsObj *appsv1.StatefulSet) (bool, error) {
-
-	checkAllPVCsExist := func() (bool, error) {
-		for i := *stsObj.Spec.Replicas; i < component.Replicas; i++ {
-			for _, vct := range stsObj.Spec.VolumeClaimTemplates {
-				pvcKey := types.NamespacedName{
-					Namespace: stsObj.Namespace,
-					Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-				}
-				// check pvc existence
-				pvcExists, err := isPVCExists(cli, reqCtx.Ctx, pvcKey)
-				if err != nil {
-					return true, err
-				}
-				if !pvcExists {
-					return false, nil
-				}
-			}
-		}
-		return true, nil
-	}
-
-	if component.HorizontalScalePolicy == nil {
-		return true, nil
-	}
-
-	return checkAllPVCsExist()
-}
-
-func cloneData(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent,
-	backupKey types.NamespacedName,
-	stsProto *appsv1.StatefulSet,
-	stsObj *appsv1.StatefulSet) ([]client.Object, error) {
-
-	backupVCT := func() corev1.PersistentVolumeClaimTemplate {
-		vcts := component.VolumeClaimTemplates
-		vct := vcts[0]
-		for _, tmpVct := range vcts {
-			if tmpVct.Name == component.HorizontalScalePolicy.VolumeMountsName {
-				vct = tmpVct
-				break
-			}
-		}
-		return vct
-	}
-
-	toCreatePVCKeys := func() []types.NamespacedName {
-		var pvcKeys []types.NamespacedName
-		vct := backupVCT()
-		for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
-			pvcKey := types.NamespacedName{
-				Namespace: stsObj.Namespace,
-				Name: fmt.Sprintf("%s-%s-%d",
-					vct.Name,
-					stsObj.Name,
-					i),
-			}
-			pvcKeys = append(pvcKeys, pvcKey)
-		}
-		return pvcKeys
-	}
-
-	if component.HorizontalScalePolicy == nil {
-		return nil, nil
-	}
-
-	objs := make([]client.Object, 0)
-
-	// do backup according to component's horizontal scale policy
-	switch component.HorizontalScalePolicy.Type {
-	// use backup tool such as xtrabackup
-	case appsv1alpha1.HScaleDataClonePolicyFromBackup:
-		// TODO: db core not support yet, leave it empty
-		reqCtx.Recorder.Eventf(cluster,
-			corev1.EventTypeWarning,
-			"HorizontalScaleFailed",
-			"scale with backup tool not support yet")
-		// check backup ready
-		backupStatus, err := CheckBackupStatus(reqCtx, cli, backupKey)
-		if err != nil {
-			return nil, err
-		}
-		switch backupStatus {
-		case BackupStatusNotCreated:
-			// create backup
-			backupObjs, err := Backup(reqCtx,
-				cli,
-				backupKey,
-				stsObj,
-				cluster,
-				component.ComponentDef,
-				component.HorizontalScalePolicy.BackupPolicyTemplateName)
-			if err != nil {
-				return nil, err
-			}
-			objs = append(objs, backupObjs...)
-			return objs, intctrlutil.NewDelayedRequeueError(time.Second, "")
-		case BackupStatusProcessing:
-			// requeue to waiting for backup ready
-			return objs, intctrlutil.NewDelayedRequeueError(time.Second, "")
-		case BackupStatusReadyToUse:
-			break
-		}
-		// backup's ready, then start to check restore
-		pvcKeys := toCreatePVCKeys()
-		needRequeue := false
-		for _, pvcKey := range pvcKeys {
-			restoreJobKey := types.NamespacedName{
-				Namespace: pvcKey.Namespace,
-				Name:      "restore-" + pvcKey.Name,
-			}
-			restoreStatus, err := CheckRestoreStatus(reqCtx, cli, restoreJobKey)
-			if err != nil {
-				return nil, err
-			}
-			switch restoreStatus {
-			case RestoreStatusNotCreated:
-				backup := dataprotectionv1alpha1.Backup{}
-				if err := cli.Get(reqCtx.Ctx, backupKey, &backup); err != nil {
-					return nil, err
-				}
-				ml := client.MatchingLabels{
-					constant.ClusterDefLabelKey: component.ClusterDefName,
-				}
-				backupToolList := dataprotectionv1alpha1.BackupToolList{}
-				if err := cli.List(reqCtx.Ctx, &backupToolList, ml); err != nil {
-					return nil, err
-				}
-				if len(backupToolList.Items) == 0 {
-					return nil, fmt.Errorf("backuptool not found for clusterdefinition: %s", component.ClusterDefName)
-				}
-				restoreObjs, err := Restore(restoreJobKey, stsObj, component, &backup, &backupToolList.Items[0], pvcKey)
-				if err != nil {
-					return nil, err
-				}
-				objs = append(objs, restoreObjs...)
-				needRequeue = true
-			case RestoreStatusProcessing:
-				needRequeue = true
-			case RestoreStatusReadyToUse:
-				break
-			}
-		}
-		if needRequeue {
-			return objs, intctrlutil.NewDelayedRequeueError(time.Second, "")
-		}
-		// restore to pvcs all ready
-		return objs, nil
-	// use volume snapshot
-	case appsv1alpha1.HScaleDataClonePolicyFromSnapshot:
-		if !isSnapshotAvailable(cli, reqCtx.Ctx) {
-			// TODO: add ut
-			return nil, fmt.Errorf("HorizontalScaleFailed: volume snapshot not supported")
-		}
-		vcts := component.VolumeClaimTemplates
-		if len(vcts) == 0 {
-			reqCtx.Recorder.Eventf(cluster,
-				corev1.EventTypeNormal,
-				"HorizontalScale",
-				"no VolumeClaimTemplates, no need to do data clone.")
-			break
-		}
-		vsExists, err := isVolumeSnapshotExists(cli, reqCtx.Ctx, cluster, component)
-		if err != nil {
-			return nil, err
-		}
-		// if volumesnapshot not exist, do snapshot to create it.
-		if !vsExists {
-			if snapshots, err := doSnapshot(cli,
-				reqCtx,
-				cluster,
-				backupKey,
-				stsObj,
-				vcts,
-				component.ComponentDef,
-				component.HorizontalScalePolicy.BackupPolicyTemplateName); err != nil {
-				return nil, err
-			} else {
-				objs = append(objs, snapshots...)
-			}
-		}
-		// volumesnapshot exists, check if it is ready for use.
-		ready, err := isVolumeSnapshotReadyToUse(cli, reqCtx.Ctx, cluster, component)
-		if err != nil {
-			return nil, err
-		}
-		// volumesnapshot not ready, wait till it is ready after reconciling.
-		if !ready {
-			break
-		}
-		// if volumesnapshot ready,
-		// create pvc from snapshot for every new pod
-		pvcKeys := toCreatePVCKeys()
-		vct := backupVCT()
-		for _, pvcKey := range pvcKeys {
-			if pvc, err := checkedCreatePVCFromSnapshot(cli,
-				reqCtx.Ctx,
-				pvcKey,
-				cluster,
-				component,
-				vct,
-				stsObj); err != nil {
-				reqCtx.Log.Error(err, "checkedCreatePVCFromSnapshot failed")
-				return nil, err
-			} else if pvc != nil {
-				objs = append(objs, pvc)
-			}
-		}
-	// do nothing
-	case appsv1alpha1.HScaleDataClonePolicyNone:
-		break
-	}
-	return objs, nil
-}
-
 // check snapshot existence
 func isVolumeSnapshotExists(cli types2.ReadonlyClient,
 	ctx context.Context,
@@ -408,6 +187,7 @@ func isVolumeSnapshotExists(cli types2.ReadonlyClient,
 func doSnapshot(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
 	snapshotKey types.NamespacedName,
 	stsObj *appsv1.StatefulSet,
 	vcts []corev1.PersistentVolumeClaimTemplate,
@@ -432,7 +212,7 @@ func doSnapshot(cli client.Client,
 
 	// if there is backuppolicytemplate created by provider
 	// create backupjob CR, will ignore error if already exists
-	return createBackup(reqCtx, cli, stsObj, componentDef, backupPolicyTemplateName, snapshotKey, cluster)
+	return createBackup(reqCtx, cli, stsObj, component, componentDef, backupPolicyTemplateName, snapshotKey, cluster)
 }
 
 // check snapshot ready to use
@@ -464,8 +244,7 @@ func checkedCreatePVCFromSnapshot(cli types2.ReadonlyClient,
 	pvcKey types.NamespacedName,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
-	vct corev1.PersistentVolumeClaimTemplate,
-	stsObj *appsv1.StatefulSet) (client.Object, error) {
+	vct *corev1.PersistentVolumeClaimTemplate) (client.Object, error) {
 	pvc := corev1.PersistentVolumeClaim{}
 	// check pvc existence
 	if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
@@ -490,7 +269,7 @@ func checkedCreatePVCFromSnapshot(cli types2.ReadonlyClient,
 			vsName = vs.Name
 			break
 		}
-		return createPVCFromSnapshot(vct, stsObj, pvcKey, vsName, component)
+		return createPVCFromSnapshot(cluster, component, vct, pvcKey, vsName)
 	}
 	return nil, nil
 }
@@ -499,6 +278,7 @@ func checkedCreatePVCFromSnapshot(cli types2.ReadonlyClient,
 func createBackup(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	sts *appsv1.StatefulSet,
+	component *component.SynthesizedComponent,
 	componentDef,
 	backupPolicyTemplateName string,
 	backupKey types.NamespacedName,
@@ -526,7 +306,7 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 			}
 			return nil
 		}
-		backup, err := builder.BuildBackup(sts, backupPolicyName, backupKey, "snapshot")
+		backup, err := builder.BuildBackup(cluster, component, backupPolicyName, backupKey, "snapshot")
 		if err != nil {
 			return err
 		}
@@ -548,12 +328,13 @@ func createBackup(reqCtx intctrlutil.RequestCtx,
 	return objs, nil
 }
 
-func createPVCFromSnapshot(vct corev1.PersistentVolumeClaimTemplate,
-	sts *appsv1.StatefulSet,
+func createPVCFromSnapshot(
+	cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
+	vct *corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
-	snapshotName string,
-	component *component.SynthesizedComponent) (client.Object, error) {
-	pvc, err := builder.BuildPVCFromSnapshot(sts, vct, pvcKey, snapshotName, component)
+	snapshotName string) (client.Object, error) {
+	pvc, err := builder.BuildPVC(cluster, component, vct, pvcKey, snapshotName)
 	if err != nil {
 		return nil, err
 	}

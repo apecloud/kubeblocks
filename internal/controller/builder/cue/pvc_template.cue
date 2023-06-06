@@ -15,10 +15,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-sts: {
+cluster: {
 	metadata: {
-		labels: [string]: string
+		name:      string
 	}
+}
+component: {
+	clusterDefName: string
+	name:           string
 }
 volumeClaimTemplate: {
 	metadata: {
@@ -42,9 +46,10 @@ pvc: {
 		namespace: pvc_key.Namespace
 		labels: {
 			"apps.kubeblocks.io/vct-name": volumeClaimTemplate.metadata.name
-			for k, v in sts.metadata.labels {
-				"\(k)": "\(v)"
-			}
+			"app.kubernetes.io/name":            "\(component.clusterDefName)"
+			"app.kubernetes.io/instance":        cluster.metadata.name
+			"app.kubernetes.io/managed-by":      "kubeblocks"
+			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 	}
 	spec: {

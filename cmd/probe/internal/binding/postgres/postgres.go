@@ -206,17 +206,18 @@ func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.
 		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 
-	var isRecovery bool
 	for rows.Next() {
+		var isRecovery bool
 		if err = rows.Scan(&isRecovery); err != nil {
 			pgOps.Logger.Errorf("Role query error: %v", err)
 			return "", err
 		}
+		if isRecovery {
+			return SECONDARY, nil
+		}
+		return PRIMARY, nil
 	}
-	if isRecovery {
-		return SECONDARY, nil
-	}
-	return PRIMARY, nil
+	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
 }
 
 func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

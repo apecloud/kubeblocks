@@ -247,8 +247,9 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 			mysqlOps.Logger.Errorf("Role query error: %v", err)
 			return role, err
 		}
+		return role, nil
 	}
-	return role, nil
+	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
 }
 
 func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

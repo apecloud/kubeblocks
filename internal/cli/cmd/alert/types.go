@@ -69,7 +69,7 @@ const (
 	routeMatcherSeverityType = "severity"
 )
 
-// severity is the severity of alert
+// severity is the severity level of alert
 type severity string
 
 const (

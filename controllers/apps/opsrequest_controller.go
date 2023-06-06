@@ -27,6 +27,7 @@ import (
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -69,6 +70,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		r.handleDeletion,
 		r.fetchCluster,
 		r.addClusterLabelAndSetOwnerReference,
+		r.handleCancelSignal,
 		r.handleOpsRequestByPhase,
 	)
 }
@@ -137,12 +139,40 @@ func (r *OpsRequestReconciler) handleOpsRequestByPhase(reqCtx intctrlutil.Reques
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	case appsv1alpha1.OpsPendingPhase, appsv1alpha1.OpsCreatingPhase:
 		return r.doOpsRequestAction(reqCtx, opsRes)
-	case appsv1alpha1.OpsRunningPhase:
-		return r.reconcileStatusDuringRunning(reqCtx, opsRes)
+	case appsv1alpha1.OpsRunningPhase, appsv1alpha1.OpsCancellingPhase:
+		return r.reconcileStatusDuringRunningOrCanceling(reqCtx, opsRes)
 	case appsv1alpha1.OpsSucceedPhase:
 		return r.handleSucceedOpsRequest(reqCtx, opsRes.OpsRequest)
-	case appsv1alpha1.OpsFailedPhase:
+	case appsv1alpha1.OpsFailedPhase, appsv1alpha1.OpsCancelledPhase:
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
+	}
+	return intctrlutil.ResultToP(intctrlutil.Reconciled())
+}
+
+// handleCancelSignal handles the cancel signal for opsRequest.
+func (r *OpsRequestReconciler) handleCancelSignal(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
+	opsRequest := opsRes.OpsRequest
+	if !opsRequest.Spec.Cancel {
+		return nil, nil
+	}
+	if opsRequest.IsComplete() || opsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
+		return nil, nil
+	}
+	opsBehaviour := operations.GetOpsManager().OpsMap[opsRequest.Spec.Type]
+	if opsBehaviour.CancelFunc == nil {
+		r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, reasonOpsCancelActionNotSupported,
+			"Type: %s does not support cancel action.", opsRequest.Spec.Type)
+		return nil, nil
+	}
+	deepCopyOps := opsRequest.DeepCopy()
+	if err := opsBehaviour.CancelFunc(reqCtx, r.Client, opsRes); err != nil {
+		r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, reasonOpsCancelActionFailed, err.Error())
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+	}
+	opsRequest.Status.CancelTimestamp = metav1.Time{Time: time.Now()}
+	if err := operations.PatchOpsStatusWithOpsDeepCopy(reqCtx.Ctx, r.Client, opsRes, deepCopyOps,
+		appsv1alpha1.OpsCancellingPhase, appsv1alpha1.NewCancelingCondition(opsRes.OpsRequest)); err != nil {
+		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
 	return intctrlutil.ResultToP(intctrlutil.Reconciled())
 }
@@ -163,12 +193,12 @@ func (r *OpsRequestReconciler) handleSucceedOpsRequest(reqCtx intctrlutil.Reques
 	return intctrlutil.ResultToP(intctrlutil.Reconciled())
 }
 
-// reconcileStatusDuringRunning reconciles the status of OpsRequest when it is running.
-func (r *OpsRequestReconciler) reconcileStatusDuringRunning(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
+// reconcileStatusDuringRunningOrCanceling reconciles the status of OpsRequest when it is running or canceling.
+func (r *OpsRequestReconciler) reconcileStatusDuringRunningOrCanceling(reqCtx intctrlutil.RequestCtx, opsRes *operations.OpsResource) (*ctrl.Result, error) {
 	opsRequest := opsRes.OpsRequest
 	// wait for OpsRequest.status.phase to Succeed
 	if requeueAfter, err := operations.GetOpsManager().Reconcile(reqCtx, r.Client, opsRes); err != nil {
-		r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, "ReconcileStatusFailed", "Failed to reconcile the status of OpsRequest: %s", err.Error())
+		r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, reasonOpsReconcileStatusFailed, "Failed to reconcile the status of OpsRequest: %s", err.Error())
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	} else if requeueAfter != 0 {
 		// if the reconcileAction need requeue, do it
@@ -209,7 +239,7 @@ func (r *OpsRequestReconciler) doOpsRequestAction(reqCtx intctrlutil.RequestCtx,
 	opsDeepCopy := opsRequest.DeepCopy()
 	res, err := operations.GetOpsManager().Do(reqCtx, r.Client, opsRes)
 	if err != nil {
-		r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, "DoActionFailed", "Failed to process the operation of OpsRequest: %s", err.Error())
+		r.Recorder.Eventf(opsRequest, corev1.EventTypeWarning, reasonOpsDoActionFailed, "Failed to process the operation of OpsRequest: %s", err.Error())
 		if !reflect.DeepEqual(opsRequest.Status, opsDeepCopy.Status) {
 			if patchErr := r.Client.Status().Patch(reqCtx.Ctx, opsRequest, client.MergeFrom(opsDeepCopy)); patchErr != nil {
 				return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
@@ -240,7 +270,7 @@ func (r *OpsRequestReconciler) handleOpsReqDeletedDuringRunning(reqCtx intctrlut
 		if index == -1 {
 			continue
 		}
-		// if the OpsRequest is abnormal end, we should clear the OpsRequest annotation in reference cluster.
+		// if the OpsRequest is abnormal, we should clear the OpsRequest annotation in referencing cluster.
 		opsRequestSlice = slices.Delete(opsRequestSlice, index, index+1)
 		return opsutil.PatchClusterOpsAnnotations(reqCtx.Ctx, r.Client, &cluster, opsRequestSlice)
 	}

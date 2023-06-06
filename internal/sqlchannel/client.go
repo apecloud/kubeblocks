@@ -32,6 +32,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/exec"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type OperationClient struct {
@@ -130,7 +131,7 @@ func (cli *OperationClient) CheckStatus() (string, error) {
 	return result["event"], nil
 }
 
-// GetSystemAccounts list all system accounts created
+// GetSystemAccounts lists all system accounts created
 func (cli *OperationClient) GetSystemAccounts() ([]string, error) {
 	ctxWithReconcileTimeout, cancel := context.WithTimeout(context.Background(), cli.ReconcileTimeout)
 	defer cancel()
@@ -259,7 +260,7 @@ func NewHTTPClientWithChannelPod(pod *corev1.Pod, characterType string) (*Operat
 	return client, nil
 }
 
-// SendRequest exec sql operation, this is a blocking operation and it will use pod EXEC subresource to send an http request to the probe pod
+// SendRequest execs sql operation, this is a blocking operation and use pod EXEC subresource to send a http request to the probed pod
 func (cli *OperationHTTPClient) SendRequest(exec *exec.ExecOptions, request SQLChannelRequest) (SQLChannelResponse, error) {
 	var (
 		strBuffer bytes.Buffer
@@ -287,7 +288,7 @@ type errorResponse struct {
 	Message   string `json:"message"`
 }
 
-// parseResponse parse response to errorResponse or SQLChannelResponse to capture error message if any.
+// parseResponse parses response to errorResponse or SQLChannelResponse to capture error message.
 func parseResponse(data []byte, operation string, charType string) (SQLChannelResponse, error) {
 	errorResponse := errorResponse{}
 	response := SQLChannelResponse{}
@@ -306,7 +307,7 @@ func parseResponse(data []byte, operation string, charType string) (SQLChannelRe
 		}, SQLChannelError{Reason: UnsupportedOps}
 	}
 
-	// conver it to SQLChannelResponse
+	// convert it to SQLChannelResponse
 	err := json.Unmarshal(data, &response)
 	return response, err
 }

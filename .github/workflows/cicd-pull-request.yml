@@ -35,7 +35,7 @@ jobs:
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
     outputs:
       runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
-    runs-on: [ self-hosted, eks-fargate-runner ]
+    runs-on: [ self-hosted, kubeblocks-runner ]
     steps:
       - uses: apecloud/checkout@main
       - name: make mod-vendor and lint

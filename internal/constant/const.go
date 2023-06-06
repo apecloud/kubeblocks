@@ -27,12 +27,12 @@ const (
 	CfgKeyCtrlrMgrNodeSelector          = "CM_NODE_SELECTOR"
 	CfgKeyCtrlrMgrTolerations           = "CM_TOLERATIONS"
 	CfgKeyCtrlrReconcileRetryDurationMS = "CM_RECON_RETRY_DURATION_MS"       // accept time
-	CfgKeyBackupPVCName                 = "BACKUP_PVC_NAME"                  // the global pvc name which persistent volume claim to store the backup data
-	CfgKeyBackupPVCInitCapacity         = "BACKUP_PVC_INIT_CAPACITY"         // the init capacity of pvc for creating the pvc, e.g. 10Gi.
+	CfgKeyBackupPVCName                 = "BACKUP_PVC_NAME"                  // the global persistent volume claim to store the backup data
+	CfgKeyBackupPVCInitCapacity         = "BACKUP_PVC_INIT_CAPACITY"         // the init capacity for creating the pvc, e.g. 10Gi.
 	CfgKeyBackupPVCStorageClass         = "BACKUP_PVC_STORAGE_CLASS"         // the pvc storage class name.
-	CfgKeyBackupPVCCreatePolicy         = "BACKUP_PVC_CREATE_POLICY"         // the pvc create policy. support "IfNotPresent" or "Never"
-	CfgKeyBackupPVConfigmapName         = "BACKUP_PV_CONFIGMAP_NAME"         // the configmap name which contains a persistentVolume template.
-	CfgKeyBackupPVConfigmapNamespace    = "BACKUP_PV_CONFIGMAP_NAMESPACE"    // the configmap namespace which contains a persistentVolume template.
+	CfgKeyBackupPVCCreatePolicy         = "BACKUP_PVC_CREATE_POLICY"         // the pvc creation policy, choice is "IfNotPresent" or "Never"
+	CfgKeyBackupPVConfigmapName         = "BACKUP_PV_CONFIGMAP_NAME"         // the configmap containing the persistentVolume template.
+	CfgKeyBackupPVConfigmapNamespace    = "BACKUP_PV_CONFIGMAP_NAMESPACE"    // the configmap namespace containing the persistentVolume template.
 	CfgRecoverVolumeExpansionFailure    = "RECOVER_VOLUME_EXPANSION_FAILURE" // refer to feature gates RecoverVolumeExpansionFailure of k8s.
 
 	// addon config keys
@@ -45,7 +45,8 @@ const (
 )
 
 const (
-	ConnCredentialPlaceHolder       = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	KBConnCredentialPlaceHolder     = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	KBComponentEnvCMPlaceHolder     = "$(COMP_ENV_CM_NAME)"
 	KBCompNamePlaceHolder           = "$(KB_COMP_NAME)"
 	KBClusterNamePlaceHolder        = "$(KB_CLUSTER_NAME)"
 	KBClusterCompNamePlaceHolder    = "$(KB_CLUSTER_COMP_NAME)"
@@ -66,7 +67,7 @@ const (
 
 	AppName = "kubeblocks"
 
-	// K8s recommonded and well-known label and annotation keys
+	// K8s recommonded well-known labels and annotation keys
 	AppInstanceLabelKey  = "app.kubernetes.io/instance"
 	AppNameLabelKey      = "app.kubernetes.io/name"
 	AppManagedByLabelKey = "app.kubernetes.io/managed-by"
@@ -83,14 +84,14 @@ const (
 	KBAppComponentLabelKey                 = "apps.kubeblocks.io/component-name"
 	KBAppComponentDefRefLabelKey           = "apps.kubeblocks.io/component-def-ref"
 	AppConfigTypeLabelKey                  = "apps.kubeblocks.io/config-type"
-	KBManagedByKey                         = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created during operation
+	KBManagedByKey                         = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created
 	PVCNameLabelKey                        = "apps.kubeblocks.io/pvc-name"
 	VolumeClaimTemplateNameLabelKey        = "apps.kubeblocks.io/vct-name"
 	WorkloadTypeLabelKey                   = "apps.kubeblocks.io/workload-type"
 	ClassProviderLabelKey                  = "class.kubeblocks.io/provider"
 	ClusterDefLabelKey                     = "clusterdefinition.kubeblocks.io/name"
 	CMConfigurationSpecProviderLabelKey    = "config.kubeblocks.io/config-spec"    // CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
-	CMConfigurationCMKeysLabelKey          = "config.kubeblocks.io/configmap-keys" // CMConfigurationCMKeysLabelKey Specify keys
+	CMConfigurationCMKeysLabelKey          = "config.kubeblocks.io/configmap-keys" // CMConfigurationCMKeysLabelKey Specify configmap keys
 	CMConfigurationTemplateNameLabelKey    = "config.kubeblocks.io/config-template-name"
 	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
 	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
@@ -127,6 +128,7 @@ const (
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
+	KubeBlocksGenerationKey                     = "kubeblocks.io/generation"
 
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"

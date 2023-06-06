@@ -209,16 +209,17 @@ func TestRenderJob(t *testing.T) {
 			}
 			// render job with debug mode off
 			endpoint := "10.0.0.1"
-			job := renderJob(engine, compKey, creationStmt, endpoint)
+			mockJobName := "mock-job" + testCtx.GetRandomStr()
+			job := renderJob(mockJobName, engine, compKey, creationStmt, endpoint)
 			assert.NotNil(t, job)
 			_ = calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			assert.NotNil(t, job.Spec.TTLSecondsAfterFinished)
-			assert.Equal(t, (int32)(0), *job.Spec.TTLSecondsAfterFinished)
+			assert.Equal(t, (int32)(1), *job.Spec.TTLSecondsAfterFinished)
 			envList := job.Spec.Template.Spec.Containers[0].Env
 			assert.GreaterOrEqual(t, len(envList), 1)
 			assert.Equal(t, job.Spec.Template.Spec.Containers[0].Image, cmdExecutorConfig.Image)
 			// render job with debug mode on
-			job = renderJob(engine, compKey, creationStmt, endpoint)
+			job = renderJob(mockJobName, engine, compKey, creationStmt, endpoint)
 			assert.NotNil(t, job)
 			// set debug mode on
 			cluster.Annotations[debugClusterAnnotationKey] = "True"
@@ -231,7 +232,7 @@ func TestRenderJob(t *testing.T) {
 			toleration := make([]corev1.Toleration, 0)
 			toleration = append(toleration, generateToleration())
 			cluster.Spec.Tolerations = toleration
-			job = renderJob(engine, compKey, creationStmt, endpoint)
+			job = renderJob(mockJobName, engine, compKey, creationStmt, endpoint)
 			assert.NotNil(t, job)
 			_ = calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			jobToleration := job.Spec.Template.Spec.Tolerations
@@ -244,7 +245,7 @@ func TestRenderJob(t *testing.T) {
 			assert.Contains(t, tolerationKeys, testDataPlaneTolerationKey)
 			assert.Contains(t, tolerationKeys, toleration[0].Key)
 		case appsv1alpha1.ReferToExisting:
-			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, constant.ConnCredentialPlaceHolder))
+			assert.False(t, strings.Contains(acc.ProvisionPolicy.SecretRef.Name, constant.KBConnCredentialPlaceHolder))
 		}
 	}
 }
@@ -338,7 +339,7 @@ func TestRenderCreationStmt(t *testing.T) {
 	}
 
 	for _, account := range accountsSetting.Accounts {
-		// for each accounts, we randomly remove deletion stmt
+		// for each account, we randomly remove deletion stmt
 		if account.ProvisionPolicy.Type == appsv1alpha1.CreateByStmt {
 			toss := rand.Intn(10) % 2
 			if toss == 1 {
@@ -415,7 +416,7 @@ func TestMergeSystemAccountConfig(t *testing.T) {
 	if len(systemAccount.CmdExecutorConfig.Env) > 0 {
 		assert.True(t, reflect.DeepEqual(accountConfig.Env, systemAccount.CmdExecutorConfig.Env))
 	}
-	// sepc with empty envs
+	// spec with empty envs
 	accountConfig = systemAccount.CmdExecutorConfig.DeepCopy()
 	componentVersion.SystemAccountSpec = &appsv1alpha1.SystemAccountShortSpec{
 		CmdExecutorConfig: &appsv1alpha1.CommandExecutorEnvItem{
@@ -428,7 +429,7 @@ func TestMergeSystemAccountConfig(t *testing.T) {
 	assert.Equal(t, mockImageName, accountConfig.Image)
 	assert.Len(t, accountConfig.Env, 0)
 
-	// sepc with envs
+	// spec with envs
 	testEnv := corev1.EnvVar{
 		Name:  "test-env",
 		Value: "test-value",

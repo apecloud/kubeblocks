@@ -34,7 +34,7 @@ import (
 )
 
 func checkEnableCfgUpgrade(object client.Object) bool {
-	// check user disable upgrade
+	// check user's upgrade switch
 	// config.kubeblocks.io/disable-reconfigure = "false"
 	annotations := object.GetAnnotations()
 	value, ok := annotations[constant.DisableUpgradeInsConfigurationAnnotationKey]
@@ -81,7 +81,7 @@ func checkAndApplyConfigsChanged(client client.Client, ctx intctrlutil.RequestCt
 	return lastConfig == string(configData), nil
 }
 
-// updateAppliedConfigs update hash label and last applied config
+// updateAppliedConfigs updates hash label and last applied config
 func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte, reconfigurePhase string) (bool, error) {
 
 	patch := client.MergeFrom(config.DeepCopy())

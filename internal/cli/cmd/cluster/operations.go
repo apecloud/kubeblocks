@@ -24,12 +24,16 @@ import (
 	"fmt"
 	"strings"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -48,7 +52,7 @@ import (
 type OperationsOptions struct {
 	create.CreateOptions  `json:"-"`
 	HasComponentNamesFlag bool `json:"-"`
-	// autoApprove if it is true, will skip the double check.
+	// autoApprove when set true, skip the double check.
 	autoApprove            bool     `json:"-"`
 	ComponentNames         []string `json:"componentNames,omitempty"`
 	OpsRequestName         string   `json:"opsRequestName"`
@@ -116,21 +120,21 @@ func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStr
 	return o
 }
 
-// addCommonFlags add common flags for operations command
+// addCommonFlags adds common flags for operations command
 func (o *OperationsOptions) addCommonFlags(cmd *cobra.Command) {
 	// add print flags
 	printer.AddOutputFlagForCreate(cmd, &o.Format)
 
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
-	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 	if o.HasComponentNamesFlag {
 		cmd.Flags().StringSliceVar(&o.ComponentNames, "components", nil, "Component names to this operations")
 	}
 }
 
-// CompleteRestartOps when restart a cluster and components is null, it means restarting all components of the cluster.
+// CompleteRestartOps restarts all components of the cluster
 // we should set all component names to ComponentNames flag.
 func (o *OperationsOptions) CompleteRestartOps() error {
 	if o.Name == "" {
@@ -151,7 +155,7 @@ func (o *OperationsOptions) CompleteRestartOps() error {
 	return nil
 }
 
-// CompleteComponentsFlag when components flag is null and the cluster only has one component, should auto complete it.
+// CompleteComponentsFlag when components flag is null and the cluster only has one component, auto complete it.
 func (o *OperationsOptions) CompleteComponentsFlag() error {
 	if o.Name == "" {
 		return makeMissingClusterNameErr()
@@ -393,7 +397,7 @@ var restartExample = templates.Examples(`
 		# restart all components
 		kbcli cluster restart mycluster
 
-		# restart specifies the component, separate with commas when component more than one
+		# specified component to restart, separate with commas for multiple components
 		kbcli cluster restart mycluster --components=mysql
 `)
 
@@ -420,11 +424,11 @@ func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 }
 
 var upgradeExample = templates.Examples(`
-		# upgrade the cluster to the specified version 
+		# upgrade the cluster to the target version 
 		kbcli cluster upgrade mycluster --cluster-version=ac-mysql-8.0.30
 `)
 
-// NewUpgradeCmd creates a upgrade command
+// NewUpgradeCmd creates an upgrade command
 func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.UpgradeType, false)
 	cmd := &cobra.Command{
@@ -447,7 +451,7 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 }
 
 var verticalScalingExample = templates.Examples(`
-		# scale the computing resources of specified components, separate with commas when component more than one
+		# scale the computing resources of specified components, separate with commas for multiple components
 		kbcli cluster vscale mycluster --components=mysql --cpu=500m --memory=500Mi 
 
 		# scale the computing resources of specified components by class, run command 'kbcli class list --cluster-definition cluster-definition-name' to get available classes
@@ -472,15 +476,15 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 		},
 	}
 	o.addCommonFlags(cmd)
-	cmd.Flags().StringVar(&o.CPU, "cpu", "", "Requested and limited size of component cpu")
-	cmd.Flags().StringVar(&o.Memory, "memory", "", "Requested and limited size of component memory")
+	cmd.Flags().StringVar(&o.CPU, "cpu", "", "Request and limit size of component cpu")
+	cmd.Flags().StringVar(&o.Memory, "memory", "", "Request and limit size of component memory")
 	cmd.Flags().StringVar(&o.Class, "class", "", "Component class")
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before vertically scaling the cluster")
 	return cmd
 }
 
 var horizontalScalingExample = templates.Examples(`
-		# expand storage resources of specified components, separate with commas when component name more than one
+		# expand storage resources of specified components, separate with commas for multiple components
 		kbcli cluster hscale mycluster --components=mysql --replicas=3
 `)
 
@@ -510,7 +514,7 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 }
 
 var volumeExpansionExample = templates.Examples(`
-		# restart specifies the component, separate with commas when <component-name> more than one
+		# restart specifies the component, separate with commas for multiple components
 		kbcli cluster volume-expand mycluster --components=mysql --volume-claim-templates=data --storage=10Gi
 `)
 
@@ -543,7 +547,7 @@ var (
 		# Expose a cluster to vpc
 		kbcli cluster expose mycluster --type vpc --enable=true
 
-		# Expose a cluster to internet
+		# Expose a cluster to public internet
 		kbcli cluster expose mycluster --type internet --enable=true
 		
 		# Stop exposing a cluster
@@ -633,5 +637,71 @@ func NewStartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		},
 	}
 	o.addCommonFlags(cmd)
+	return cmd
+}
+
+var cancelExample = templates.Examples(`
+		# cancel the opsRequest which is not completed.
+		kbcli cluster cancel-ops <opsRequestName>
+`)
+
+func cancelOps(o *OperationsOptions) error {
+	opsRequest := &appsv1alpha1.OpsRequest{}
+	if err := cluster.GetK8SClientObject(o.Dynamic, opsRequest, o.GVR, o.Namespace, o.Name); err != nil {
+		return err
+	}
+	notSupportedPhases := []appsv1alpha1.OpsPhase{appsv1alpha1.OpsFailedPhase, appsv1alpha1.OpsSucceedPhase, appsv1alpha1.OpsCancelledPhase}
+	if slices.Contains(notSupportedPhases, opsRequest.Status.Phase) {
+		return fmt.Errorf("can not cancel the opsRequest when phase is %s", opsRequest.Status.Phase)
+	}
+	if opsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
+		return fmt.Errorf(`opsRequest "%s" is cancelling`, opsRequest.Name)
+	}
+	supportedType := []appsv1alpha1.OpsType{appsv1alpha1.HorizontalScalingType, appsv1alpha1.VerticalScalingType}
+	if !slices.Contains(supportedType, opsRequest.Spec.Type) {
+		return fmt.Errorf("opsRequest type: %s not support cancel action", opsRequest.Spec.Type)
+	}
+	if !o.autoApprove {
+		if err := delete.Confirm([]string{o.Name}, o.In); err != nil {
+			return err
+		}
+	}
+	oldOps := opsRequest.DeepCopy()
+	opsRequest.Spec.Cancel = true
+	oldData, err := json.Marshal(oldOps)
+	if err != nil {
+		return err
+	}
+	newData, err := json.Marshal(opsRequest)
+	if err != nil {
+		return err
+	}
+	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
+	if err != nil {
+		return err
+	}
+	if _, err = o.Dynamic.Resource(types.OpsGVR()).Namespace(opsRequest.Namespace).Patch(context.TODO(),
+		opsRequest.Name, apitypes.MergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
+		return err
+	}
+	fmt.Fprintf(o.Out, "start to cancel opsRequest \"%s\", you can view the progress:\n\tkbcli cluster list-ops --name %s\n", o.Name, o.Name)
+	return nil
+}
+
+func NewCancelCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := newBaseOperationsOptions(f, streams, "", false)
+	cmd := &cobra.Command{
+		Use:               "cancel-ops NAME",
+		Short:             "cancel the pending/creating/running OpsRequest which type is vscale or hscale.",
+		Example:           cancelExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.OpsGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
+			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(cancelOps(o))
+		},
+	}
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before cancel the opsRequest")
 	return cmd
 }

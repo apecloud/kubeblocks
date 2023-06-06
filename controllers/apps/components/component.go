@@ -34,11 +34,10 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// PodIsAvailable checks whether a pod is available respect to the workload type.
+// PodIsAvailable checks whether a pod is available with respect to the workload type.
 // Deprecated: provide for ops request using, remove this interface later.
 func PodIsAvailable(workloadType appsv1alpha1.WorkloadType, pod *corev1.Pod, minReadySeconds int32) bool {
 	return util.PodIsAvailable(workloadType, pod, minReadySeconds)
@@ -57,7 +56,7 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 	if compSpec != nil {
 		compDef = definition.GetComponentDefByName(compSpec.ComponentDefRef)
 		if compDef == nil {
-			return nil, fmt.Errorf("referenced component definition is not exist, cluster: %s, component: %s, component definition ref:%s",
+			return nil, fmt.Errorf("referenced component definition does not exist, cluster: %s, component: %s, component definition ref:%s",
 				cluster.Name, compSpec.Name, compSpec.ComponentDefRef)
 		}
 		if version != nil {
@@ -76,13 +75,13 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 
 	switch compDef.WorkloadType {
 	case appsv1alpha1.Replication:
-		return replication.NewReplicationComponent(cli, cluster, version, synthesizedComp, dag), nil
+		return replication.NewReplicationComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
 	case appsv1alpha1.Consensus:
-		return consensus.NewConsensusComponent(cli, cluster, version, synthesizedComp, dag), nil
+		return consensus.NewConsensusComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
 	case appsv1alpha1.Stateful:
-		return stateful.NewStatefulComponent(cli, cluster, version, synthesizedComp, dag), nil
+		return stateful.NewStatefulComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
 	case appsv1alpha1.Stateless:
-		return stateless.NewStatelessComponent(cli, cluster, version, synthesizedComp, dag), nil
+		return stateless.NewStatelessComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
 	}
 	panic(fmt.Sprintf("unknown workload type: %s, cluster: %s, component: %s, component definition ref: %s",
 		compDef.WorkloadType, cluster.Name, compSpec.Name, compSpec.ComponentDefRef))
@@ -97,9 +96,6 @@ func composeSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	compVer *appsv1alpha1.ClusterComponentVersion) (*component.SynthesizedComponent, error) {
 	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, cli, *cluster, *clusterDef, *compDef, *compSpec, compVer)
 	if err != nil {
-		return nil, err
-	}
-	if err := plan.DoPITRPrepare(reqCtx.Ctx, cli, cluster, synthesizedComp); err != nil {
 		return nil, err
 	}
 	return synthesizedComp, nil

@@ -39,6 +39,7 @@ kbcli addon enable ADDON_NAME [flags]
       --allow-missing-template-keys    If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
       --cpu stringArray                Sets addon CPU resource values (--cpu [extraName:]<request>/<limit>) (can specify multiple if has extra items))
       --dry-run string[="unchanged"]   Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --edit                           Edit the API resource
       --force                          ignoring the installable restrictions and forcefully enabling.
   -h, --help                           help for enable
       --memory stringArray             Sets addon memory resource values (--memory [extraName:]<request>/<limit>) (can specify multiple if has extra items))
@@ -48,7 +49,7 @@ kbcli addon enable ADDON_NAME [flags]
       --show-managed-fields            If true, keep the managedFields when printing objects in JSON or YAML format.
       --storage stringArray            Sets addon storage size (--storage [extraName:]<request>) (can specify multiple if has extra items)). 
                                        Additional notes:
-                                       1. Specify '0' value will removed storage values settings and explicitly disabled 'persistentVolumeEnabled' attribute.
+                                       1. Specify '0' value will remove storage values settings and explicitly disable 'persistentVolumeEnabled' attribute.
                                        2. For Helm type Addon, that resizing storage will fail if modified value is a storage request size 
                                        that belongs to StatefulSet's volume claim template, to resolve 'Failed' Addon status possible action is disable and 
                                        re-enable the addon (More info on how-to resize a PVC: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources).

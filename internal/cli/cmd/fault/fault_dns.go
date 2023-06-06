@@ -33,11 +33,11 @@ import (
 )
 
 var faultDNSExample = templates.Examples(`
-	// Inject DNS faults into all pods under the default namespace, so that any IP is returned when accessing the baidu.com domain name.
-	kbcli fault dns random --patterns=baidu.com --duration=1m
+	// Inject DNS faults into all pods under the default namespace, so that any IP is returned when accessing the bing.com domain name.
+	kbcli fault dns random --patterns=bing.com --duration=1m
 
-	// Inject DNS faults into all pods under the default namespace, so that error is returned when accessing the baidu.com domain name.
-	kbcli fault dns error --patterns=baidu.com --duration=1m
+	// Inject DNS faults into all pods under the default namespace, so that error is returned when accessing the bing.com domain name.
+	kbcli fault dns error --patterns=bing.com --duration=1m
 `)
 
 type DNSChaosOptions struct {
@@ -113,7 +113,7 @@ func (o *DNSChaosOptions) NewCobraCommand(use, short string) *cobra.Command {
 func (o *DNSChaosOptions) AddCommonFlag(cmd *cobra.Command) {
 	o.FaultBaseOptions.AddCommonFlag(cmd)
 
-	cmd.Flags().StringArrayVar(&o.Patterns, "patterns", nil, `Select the domain name template that matches the failure behavior, and support placeholders ? and wildcards *.`)
+	cmd.Flags().StringArrayVar(&o.Patterns, "patterns", nil, `Select the domain name template that matching the failure behavior & supporting placeholders ? and wildcards *.`)
 
 	// register flag completion func
 	registerFlagCompletionFunc(cmd, o.Factory)

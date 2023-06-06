@@ -17,13 +17,17 @@ spec:
     # chartLocationURL: https://raw.githubusercontent.com/cloudve/helm-charts/master/charts/csi-s3-0.31.3.tgz
     chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/csi-s3-{{ default .Chart.Version .Values.versionOverride }}.tgz
     installValues:
-      configMapRefs:
-        - name: csi-s3-chart-kubeblocks-values
-          key: values-kubeblocks-override.yaml
+      secretRefs:
+        - name: {{ include "kubeblocks.fullname" . }}-cloud-provider
+          key: csi-s3
 
     valuesMapping:
       jsonMap:
         tolerations: tolerations
+      extras:
+      - name: daemonset
+        jsonMap:
+          tolerations: daemonsetTolerations
 
   defaultInstallValues:
     - enabled: true

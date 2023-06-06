@@ -21,23 +21,12 @@ spec:
     restoreCommands:
       - |
         #!/bin/sh
-        set -e
-        # create a new directory for restore
-        mkdir -p ${RESTORE_DATA_DIR} && rm -rf ${RESTORE_DATA_DIR}/*
-        cd ${RESTORE_DATA_DIR}
-        touch kb_restore.sh && touch kb_restore.signal
-        echo "mkdir -p ${DATA_DIR}/../arch" >> kb_restore.sh
-        echo "mv -f ${TMP_DATA_DIR}/* ${DATA_DIR}/" >> kb_restore.sh
-        echo "mv -f ${TMP_ARCH_DATA_DIR}/* ${DATA_DIR}/../arch" >> kb_restore.sh
-        echo "rm -rf ${RESTORE_DATA_DIR}/*" >> kb_restore.sh
-
-        # extract the data file to the temporary data directory
-        mkdir -p ${TMP_DATA_DIR} && mkdir -p ${TMP_ARCH_DATA_DIR}
-        rm -rf ${TMP_ARCH_DATA_DIR}/* && rm -rf ${TMP_DATA_DIR}/*
-        cd ${BACKUP_DIR}
-        tar -xvf base.tar.gz -C ${TMP_DATA_DIR}/
-        tar -xvf pg_wal.tar.gz -C ${TMP_ARCH_DATA_DIR}/
-        echo "done!"
+        set -e;
+        cd ${BACKUP_DIR};
+        mkdir -p ${DATA_DIR};
+        tar -xvf base.tar.gz -C ${DATA_DIR}/;
+        tar -xvf pg_wal.tar.gz -C ${DATA_DIR}/pg_wal/;
+        echo "done!";
     incrementalRestoreCommands: []
   logical:
     restoreCommands: []
@@ -47,4 +36,5 @@ spec:
       set -e;
       mkdir -p ${BACKUP_DIR};
       echo ${DB_PASSWORD} | pg_basebackup -Ft -Pv -Xs -z -D ${BACKUP_DIR} -Z5 -h ${DB_HOST} -U standby -W;
+      echo "TOTAL SIZE: $(du -shx ${BACKUP_DIR}|awk '{print $1}')" > ${DATA_DIR}/basebackup.info;
   incrementalBackupCommands: []

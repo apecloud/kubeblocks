@@ -12,9 +12,9 @@ kbcli cluster grant-role [flags]
 
 ```
   # grant role to user
-  kbcli cluster grant-role NAME --component COMPNAME --name USERNAME --role ROLENAME
+  kbcli cluster grant-role CLUSTERNAME --component COMPNAME --name USERNAME --role ROLENAME
   # grant role to user with default component
-  kbcli cluster grant-role NAME --name USERNAME --role ROLENAME
+  kbcli cluster grant-role CLUSTERNAME --name USERNAME --role ROLENAME
   # grant role to user for instance
   kbcli cluster grant-role --instance INSTANCE --name USERNAME --role ROLENAME
 ```
@@ -22,10 +22,10 @@ kbcli cluster grant-role [flags]
 ### Options
 
 ```
-      --component string   Specify the name of component to be connected. If not specified, the first component will be used.
+      --component string   Specify the name of component to be connected. If not specified, pick the first one.
   -h, --help               help for grant-role
   -i, --instance string    Specify the name of instance to be connected.
-      --name string        Required. Specify the name of user.
+      --name string        Required user name, please specify it.
   -r, --role string        Role name should be one of {SUPERUSER, READWRITE, READONLY}
 ```
 

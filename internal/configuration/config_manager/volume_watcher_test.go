@@ -47,7 +47,7 @@ func TestConfigMapVolumeWatcherFailed(t *testing.T) {
 	volumeWatcher := NewVolumeWatcher([]string{filepath.Join(tmpDir, "not_exist")}, context.Background(), zapLog.Sugar())
 	defer volumeWatcher.Close()
 
-	require.EqualError(t, volumeWatcher.Run(), "require process event handler.")
+	require.EqualError(t, volumeWatcher.Run(), "required process event handler.")
 	volumeWatcher.AddHandler(func(_ context.Context, event fsnotify.Event) error {
 		return nil
 	})

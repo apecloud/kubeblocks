@@ -1,0 +1,90 @@
+---
+title: Install KubeBlocks
+description: Install KubeBlocks on the existing Kubernetes clusters
+keywords: [taints, affinity, tolerance, install, kbcli, KubeBlocks]
+sidebar_position: 3
+sidebar_label: Install KubeBlocks
+---
+
+# Install KubeBlocks
+
+The quickest way to try out KubeBlocks is to create a new Kubernetes cluster and install KubeBlocks using the playground. However, production environments are more complex, with applications running in different namespaces and with resource or permission limitations. This document explains how to deploy KubeBlocks on an existing Kubernetes cluster.
+
+## Environment preparation
+
+<table>
+	<tr>
+	    <th colspan="3">Resource Requirements</th>
+	</tr >
+	<tr>
+	    <td >Control Plane</td>
+	    <td colspan="2">It is recommended to create 1 node with 4 cores, 4GB memory and 50GB storage. </td>
+	</tr >
+	<tr >
+	    <td rowspan="4">Data Plane</td>
+	    <td> MySQL </td>
+	    <td>It is recommended to create at least 3 nodes with 2 cores, 4GB memory and 50GB storage. </td>
+	</tr>
+	<tr>
+	    <td> PostgreSQL </td>
+        <td>It is recommended to create at least 2 nodes with 2 cores, 4GB memory and 50GB storage.  </td>
+	</tr>
+	<tr>
+	    <td> Redis </td>
+        <td>It is recommended to create at least 2 nodes with 2 cores, 4GB memory and 50GB storage. </td>
+	</tr>
+	<tr>
+	    <td> MongoDB </td>
+	    <td>It is recommended to create at least 3 nodes with 2 cores, 4GB memory and 50GB storage. </td>
+	</tr>
+</table>
+
+## Installation steps
+
+**Install KubeBlocks with `kbcli kubeblocks install` command.**
+
+The installation command is `kbcli kubeblocks install`, simply running this command installs KubeBlocks on nodes without taints with default namespace `kb-system`.
+
+But in actual scenarios, you are recommended to install KubeBlocks on nodes with taints and customized namespace.
+
+1. Get Kubernetes nodes.
+
+    ```bash
+    kubectl get node
+    ```
+
+2. Place taints on the selected nodes.
+
+    ```bash
+    kubectl taint nodes <nodename> <taint1name>=true:NoSchedule
+    ```
+
+3. Install KubeBlocks.
+
+    ```bash
+    kbcli kubeblocks install --create-namespace  --namespace <name> --set-json 'tolerations=[ { "key": "taint1name", "operator": "Equal", "effect": "NoSchedule", "value": "true" }, { "key": "taint2name", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]'
+    ```
+
+:::note
+
+When executing the `kbcli kubeblocks install` command, the `preflight` checks run automatically to check the environment. If the current cluster meets the installation requirements, the installation continues. If it does not, the current process is terminated, and an error message is displayed. To skip the `preflight` checks, you can add the `--force` flag after the `kbcli kubeblocks install` command.
+
+:::
+
+4. Verify whether KubeBlocks is installed successfully.
+
+    ```bash
+    kubectl get pod -n kb-system
+    ```
+
+    ***Result***
+
+    When the following pods are `Running`, it means KubeBlocks is installed successfully.
+
+    ```bash
+    NAME                                                     READY   STATUS      RESTARTS   AGE
+    kb-addon-alertmanager-webhook-adaptor-5549f94599-fsnmc   2/2     Running     0          84s
+    kb-addon-grafana-5ddcd7758f-x4t5g                        3/3     Running     0          84s
+    kb-addon-prometheus-alertmanager-0                       2/2     Running     0          84s
+    kb-addon-prometheus-server-0                             2/2     Running     0          84s
+    kubeblocks-846b8878d9-q8g2w                              1/1     Running     0          98s

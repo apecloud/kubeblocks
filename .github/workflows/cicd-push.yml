@@ -109,7 +109,7 @@ jobs:
 
   make-test:
     needs: trigger-mode
-    runs-on: [self-hosted, eks-fargate-runner ]
+    runs-on: [self-hosted, kubeblocks-runner ]
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
     outputs:
       runner-name: ${{ steps.get_runner_name.outputs.runner_name }}

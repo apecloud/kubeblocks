@@ -114,7 +114,7 @@ func GetClusterObservedGeneration(testCtx *testutil.TestContext, clusterKey type
 	}
 }
 
-// NewPVCSpec create appsv1alpha1.PersistentVolumeClaimSpec.
+// NewPVCSpec creates appsv1alpha1.PersistentVolumeClaimSpec.
 func NewPVCSpec(size string) appsv1alpha1.PersistentVolumeClaimSpec {
 	return appsv1alpha1.PersistentVolumeClaimSpec{
 		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},

@@ -43,14 +43,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-)
 
-type UserInfo struct {
-	UserName string `json:"userName"`
-	Password string `json:"password,omitempty"`
-	Expired  string `json:"expired,omitempty"`
-	RoleName string `json:"roleName,omitempty"`
-}
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+)
 
 type RedisEntry struct {
 	Key  string `json:"key"`

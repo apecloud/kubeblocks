@@ -152,7 +152,7 @@ var (
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: constant.ConnCredentialPlaceHolder,
+						Name: constant.KBConnCredentialPlaceHolder,
 					},
 					Key: "password",
 				},
@@ -210,6 +210,10 @@ var (
 		PodSpec: &corev1.PodSpec{
 			Containers: []corev1.Container{defaultMySQLContainer},
 		},
+		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
+			Name: DataVolumeName,
+			Type: appsv1alpha1.VolumeTypeData,
+		}},
 	}
 
 	defaultRedisService = appsv1alpha1.ServiceSpec{
@@ -272,6 +276,10 @@ var (
 		WorkloadType:  appsv1alpha1.Replication,
 		CharacterType: "redis",
 		Service:       &defaultRedisService,
+		VolumeTypes: []appsv1alpha1.VolumeTypeSpec{{
+			Name: DataVolumeName,
+			Type: appsv1alpha1.VolumeTypeData,
+		}},
 		PodSpec: &corev1.PodSpec{
 			Volumes: []corev1.Volume{
 				{
@@ -305,32 +313,12 @@ var (
 		Name:   Class1c1gName,
 		CPU:    resource.MustParse("1"),
 		Memory: resource.MustParse("1Gi"),
-		Volumes: []appsv1alpha1.Volume{
-			{
-				Name: "data",
-				Size: resource.MustParse("20Gi"),
-			},
-			{
-				Name: "log",
-				Size: resource.MustParse("10Gi"),
-			},
-		},
 	}
 
 	Class2c4g = appsv1alpha1.ComponentClass{
 		Name:   Class2c4gName,
 		CPU:    resource.MustParse("2"),
 		Memory: resource.MustParse("4Gi"),
-		Volumes: []appsv1alpha1.Volume{
-			{
-				Name: "data",
-				Size: resource.MustParse("20Gi"),
-			},
-			{
-				Name: "log",
-				Size: resource.MustParse("10Gi"),
-			},
-		},
 	}
 
 	DefaultClasses = map[string]appsv1alpha1.ComponentClass{

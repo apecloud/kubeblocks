@@ -42,11 +42,11 @@ kbcli fault network http replace [flags]
       --annotation stringToString      Select the pod to inject the fault according to Annotation. (default [])
       --body string                    The content of the request body or response body to replace the failure.
       --code int32                     The status code responded by target.
-      --dry-run string[="unchanged"]   Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
       --duration string                Supported formats of the duration are: ms / s / m / h. (default "10s")
   -h, --help                           help for replace
       --label stringToString           label for pod, such as '"app.kubernetes.io/component=mysql, statefulset.kubernetes.io/pod-name=mycluster-mysql-0. (default [])
-      --method string                  The HTTP method of the target request method.For example: GET, POST, PUT, DELETE, HEAD, OPTIONS, PATCH. (default "GET")
+      --method string                  The HTTP method of the target request method. For example: GET, POST, PUT, DELETE, HEAD, OPTIONS, PATCH. (default "GET")
       --mode string                    You can select "one", "all", "fixed", "fixed-percent", "random-max-percent", Specify the experimental mode, that is, which Pods to experiment with. (default "all")
       --node stringArray               Inject faults into pods in the specified node.
       --node-label stringToString      label for node, such as '"kubernetes.io/arch=arm64,kubernetes.io/hostname=minikube-m03,kubernetes.io/os=linux. (default [])
@@ -57,7 +57,7 @@ kbcli fault network http replace [flags]
       --port int32                     The TCP port that the target service listens on. (default 80)
       --replace-method string          The replaced content of the HTTP request method.
       --replace-path string            The URI path used to replace content.
-      --target string                  Specifies whether the target of fault injuection is Request or Response. The target-related fields should be configured at the same time. (default "Request")
+      --target string                  Specifies whether the target of fault injection is Request or Response. The target-related fields should be configured at the same time. (default "Request")
       --value string                   If you choose mode=fixed or fixed-percent or random-max-percent, you can enter a value to specify the number or percentage of pods you want to inject.
 ```
 

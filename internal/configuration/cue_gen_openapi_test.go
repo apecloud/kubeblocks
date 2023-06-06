@@ -108,7 +108,7 @@ func getContentFromFile(file string) []byte {
 func runOpenAPITest(cueFile string, typeName string) ([]byte, error) {
 	cueTpl := getContentFromFile(cueFile)
 	if cueTpl == nil {
-		return nil, MakeError("not open file[%s]", cueTpl)
+		return nil, MakeError("cannot open file[%s]", cueTpl)
 	}
 
 	schema, err := GenerateOpenAPISchema(string(cueTpl), typeName)
@@ -117,7 +117,7 @@ func runOpenAPITest(cueFile string, typeName string) ([]byte, error) {
 	}
 
 	if schema == nil {
-		return nil, MakeError("Cannot found schema.")
+		return nil, MakeError("cannot find schema.")
 	}
 
 	b, _ := json.Marshal(schema)

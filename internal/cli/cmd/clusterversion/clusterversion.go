@@ -37,7 +37,7 @@ import (
 )
 
 var listExample = templates.Examples(`
-		# list all ClusterVersion
+		# list all ClusterVersions
 		kbcli clusterversion list`)
 
 type ListClusterVersionOptions struct {
@@ -97,13 +97,17 @@ func run(o *ListClusterVersionOptions) error {
 	}
 	p := printer.NewTablePrinter(o.Out)
 	p.SetHeader("NAME", "CLUSTER-DEFINITION", "STATUS", "IS-DEFAULT", "CREATED-TIME")
-	p.SortBy(1)
+	p.SortBy(2)
 	for _, info := range infos {
 		var cv v1alpha1.ClusterVersion
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cv); err != nil {
 			return err
 		}
 		isDefaultValue := isDefault(&cv)
+		if isDefaultValue == "true" {
+			p.AddRow(printer.BoldGreen(cv.Name), cv.Labels[constant.ClusterDefLabelKey], cv.Status.Phase, isDefaultValue, util.TimeFormat(&cv.CreationTimestamp))
+			continue
+		}
 		p.AddRow(cv.Name, cv.Labels[constant.ClusterDefLabelKey], cv.Status.Phase, isDefaultValue, util.TimeFormat(&cv.CreationTimestamp))
 	}
 	p.Print()

@@ -25,6 +25,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -38,6 +39,7 @@ import (
 )
 
 func NewStatelessComponent(cli client.Client,
+	recorder record.EventRecorder,
 	cluster *appsv1alpha1.Cluster,
 	clusterVersion *appsv1alpha1.ClusterVersion,
 	synthesizedComponent *component.SynthesizedComponent,
@@ -45,6 +47,7 @@ func NewStatelessComponent(cli client.Client,
 	comp := &statelessComponent{
 		ComponentBase: internal.ComponentBase{
 			Client:         cli,
+			Recorder:       recorder,
 			Cluster:        cluster,
 			ClusterVersion: clusterVersion,
 			Component:      synthesizedComponent,
@@ -269,8 +272,10 @@ func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
 	deployProto := c.WorkloadVertex.Obj.(*appsv1.Deployment)
 
 	util.MergeAnnotations(deployObj.Spec.Template.Annotations, &deployProto.Spec.Template.Annotations)
+	util.BuildWorkLoadAnnotations(deployObjCopy, c.Cluster)
 	deployObjCopy.Spec = deployProto.Spec
 	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
+		// TODO(REVIEW): always return true and update component phase to Updating. deployObj.Spec contains default values which set by Kubernetes
 		c.WorkloadVertex.Obj = deployObjCopy
 		c.WorkloadVertex.Action = ictrltypes.ActionUpdatePtr()
 		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload updated")

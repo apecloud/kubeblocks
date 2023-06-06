@@ -71,7 +71,7 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		return err
 	}
 
-	diff, err := cfgEditContext.getUnifiedDiffString()
+	diff, err := util.GetUnifiedDiffString(cfgEditContext.original, cfgEditContext.edited)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		return nil
 	}
 
-	displayDiffWithColor(o.IOStreams.Out, diff)
+	util.DisplayDiffWithColor(o.IOStreams.Out, diff)
 
 	oldVersion := map[string]string{
 		o.CfgFile: cfgEditContext.getOriginal(),
@@ -89,7 +89,7 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		o.CfgFile: cfgEditContext.getEdited(),
 	}
 
-	configSpec := wrapper.ConfigSpec()
+	configSpec := wrapper.ConfigTemplateSpec()
 	configConstraintKey := client.ObjectKey{
 		Namespace: "",
 		Name:      configSpec.ConfigConstraintRef,
@@ -133,7 +133,7 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 	validatedData := map[string]string{
 		o.CfgFile: cfgEditContext.getEdited(),
 	}
-	options := cfgcore.WithKeySelector(wrapper.ConfigSpec().Keys)
+	options := cfgcore.WithKeySelector(wrapper.ConfigTemplateSpec().Keys)
 	if err = cfgcore.NewConfigValidator(&configConstraint.Spec, options).Validate(validatedData); err != nil {
 		return cfgcore.WrapError(err, "failed to validate edited config")
 	}
@@ -146,7 +146,7 @@ func (o *editConfigOptions) confirmReconfigure(promptStr string) (bool, error) {
 
 	confirmStr := []string{yesStr, noStr}
 	printer.Warning(o.Out, promptStr)
-	input, err := prompt.NewPrompt("Please type [yes/No] to confirm:",
+	input, err := prompt.NewPrompt("Please type [Yes/No] to confirm:",
 		func(input string) error {
 			if !slices.Contains(confirmStr, strings.ToLower(input)) {
 				return fmt.Errorf("typed \"%s\" does not match \"%s\"", input, confirmStr)
@@ -187,6 +187,6 @@ func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		},
 	}
 	o.buildReconfigureCommonFlags(cmd)
-	cmd.Flags().BoolVar(&o.replaceFile, "replace", false, "Specify whether to replace the config file. Default to false.")
+	cmd.Flags().BoolVar(&o.replaceFile, "replace", false, "Boolean flag to enable replacing config file. Default with false.")
 	return cmd
 }

@@ -42,7 +42,7 @@ import (
 
 var logger *zap.SugaredLogger
 
-// NewConfigManagerCommand This command is used to reload configuration
+// NewConfigManagerCommand is used to reload configuration
 func NewConfigManagerCommand(ctx context.Context, name string) *cobra.Command {
 	opt := NewVolumeWatcherOpts()
 	cmd := &cobra.Command{
@@ -159,7 +159,7 @@ func logUnaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.
 
 func checkOptions(opt *VolumeWatcherOpts) error {
 	if len(opt.VolumeDirs) == 0 && opt.NotifyHandType != TPLScript {
-		return cfgutil.MakeError("require volume directory is null.")
+		return cfgutil.MakeError("required volume directory is null.")
 	}
 
 	if opt.NotifyHandType == TPLScript {
@@ -167,11 +167,11 @@ func checkOptions(opt *VolumeWatcherOpts) error {
 	}
 
 	if opt.NotifyHandType == ShellTool && opt.Command == "" {
-		return cfgutil.MakeError("require command is null.")
+		return cfgutil.MakeError("required command is null.")
 	}
 
 	if len(opt.ProcessName) == 0 {
-		return cfgutil.MakeError("require process name is null.")
+		return cfgutil.MakeError("required process name is null.")
 	}
 	return nil
 }
@@ -186,7 +186,7 @@ type TplScriptConfig struct {
 
 func checkTPLScriptOptions(opt *VolumeWatcherOpts) error {
 	if opt.TPLConfig == "" {
-		return cfgutil.MakeError("require tpl config is not null")
+		return cfgutil.MakeError("required tpl config is null")
 	}
 
 	if _, err := os.Stat(opt.TPLConfig); err != nil {
@@ -222,7 +222,7 @@ func initLog(level string) *zap.Logger {
 	}
 
 	if _, ok := levelStrings[level]; !ok {
-		fmt.Printf("not support log level[%s], set default info", level)
+		fmt.Printf("not supported log level[%s], set default info", level)
 		level = "info"
 	}
 
@@ -248,8 +248,8 @@ func createHandlerWithVolumeWatch(opt *VolumeWatcherOpts) (cfgcore.WatchEventHan
 	case TPLScript:
 		return cfgcore.CreateTPLScriptHandler(opt.TPLScriptPath, opt.VolumeDirs, opt.FileRegex, opt.BackupPath, opt.FormatterConfig, opt.DataType, opt.DSN)
 	case SQL, WebHook:
-		return nil, cfgutil.MakeError("event type[%s]: not yet, but in the future", opt.NotifyHandType.String())
+		return nil, cfgutil.MakeError("event type[%s]: not supported", opt.NotifyHandType.String())
 	default:
-		return nil, cfgutil.MakeError("not support event type.")
+		return nil, cfgutil.MakeError("not supported event type.")
 	}
 }

@@ -20,17 +20,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
 var _ = Describe("VerticalScaling OpsRequest", func() {
@@ -42,7 +47,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 		clusterName           = "cluster-for-ops-" + randomStr
 	)
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -70,7 +75,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
 
 			By("create VerticalScaling ops")
-			ops := testapps.NewOpsRequestObj("verticalscaling-ops-"+randomStr, testCtx.DefaultNamespace,
+			ops := testapps.NewOpsRequestObj("vertical-scaling-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, appsv1alpha1.VerticalScalingType)
 
 			ops.Spec.VerticalScalingList = verticalScaling
@@ -84,7 +89,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			vsHandler := verticalScalingHandler{}
 			Expect(vsHandler.Action(reqCtx, k8sClient, opsRes)).Should(Succeed())
 			_, _, err = vsHandler.ReconcileAction(reqCtx, k8sClient, opsRes)
-			Expect(err == nil).Should(BeTrue())
+			Expect(err).ShouldNot(HaveOccurred())
 
 			By("test GetRealAffectedComponentMap function")
 			Expect(len(vsHandler.GetRealAffectedComponentMap(opsRes.OpsRequest))).Should(Equal(1))
@@ -117,6 +122,77 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				},
 			}
 			testVerticalScaling(verticalScaling)
+		})
+
+		It("cancel vertical scaling opsRequest", func() {
+			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
+
+			By("create VerticalScaling ops")
+			ops := testapps.NewOpsRequestObj("vertical-scaling-ops-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, appsv1alpha1.VerticalScalingType)
+			ops.Spec.VerticalScalingList = []appsv1alpha1.VerticalScaling{
+				{
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
+					ResourceRequirements: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("400m"),
+							corev1.ResourceMemory: resource.MustParse("300Mi"),
+						},
+					},
+				},
+			}
+			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+
+			By("mock opsRequest is Running")
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase, consensusComp)
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
+				opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
+				opsRes.OpsRequest.Status.StartTimestamp = metav1.Time{Time: time.Now()}
+			})).ShouldNot(HaveOccurred())
+			// wait 1 second for checking progress
+			time.Sleep(time.Second)
+			reCreatePod := func(pod *corev1.Pod) {
+				pod.Kind = constant.PodKind
+				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
+				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
+				testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, consensusComp, pod.Name, "leader", "ReadWrite")
+			}
+
+			By("mock podList[0] rolling update successfully by re-creating it")
+			reCreatePod(&podList[0])
+
+			By("reconcile opsRequest status")
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("the progress status of pod[0] should be Succeed ")
+			progressDetails := opsRes.OpsRequest.Status.Components[consensusComp].ProgressDetails
+			progressDetail := findStatusProgressDetail(progressDetails, getProgressObjectKey("", podList[0].Name))
+			Expect(progressDetail.Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
+
+			By("cancel verticalScaling opsRequest")
+			cancelOpsRequest(reqCtx, opsRes, opsRes.OpsRequest.Status.StartTimestamp.Time)
+
+			By("mock podList[0] rolled back successfully by re-creating it")
+			reCreatePod(&podList[0])
+
+			By("reconcile opsRequest status after canceling opsRequest and component is Running after rolling update")
+			mockConsensusCompToRunning(opsRes)
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("expect for cancelling opsRequest successfully")
+			opsRequest := opsRes.OpsRequest
+			Expect(opsRequest.Status.Phase).Should(Equal(appsv1alpha1.OpsCancelledPhase))
+			Expect(opsRequest.Status.Progress).Should(Equal("1/1"))
+			progressDetails = opsRequest.Status.Components[consensusComp].ProgressDetails
+			Expect(len(progressDetails)).Should(Equal(1))
+			progressDetail = findStatusProgressDetail(progressDetails, getProgressObjectKey("", podList[0].Name))
+			Expect(progressDetail.Status).Should(Equal(appsv1alpha1.SucceedProgressStatus))
+			Expect(progressDetail.Message).Should(ContainSubstring("with rollback"))
 		})
 	})
 })

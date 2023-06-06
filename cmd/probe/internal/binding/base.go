@@ -34,14 +34,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
-	. "github.com/apecloud/kubeblocks/cmd/probe/util"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type Operation func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error)
 
 type OpsResult map[string]interface{}
 
-// AccessMode define SVC access mode enums.
+// AccessMode defines SVC access mode enums.
 // +enum
 type AccessMode string
 
@@ -267,12 +267,12 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 	return opsRes, nil
 }
 
-// Component may have some internal roles that need not be exposed to end user,
+// Component may have some internal roles that needn't be exposed to end user,
 // and not configured in cluster definition, e.g. ETCD's Candidate.
 // roleValidate is used to filter the internal roles and decrease the number
 // of report events to reduce the possibility of event conflicts.
 func (ops *BaseOperations) roleValidate(role string) (bool, string) {
-	// do not validate when db roles setting is missing
+	// do not validate them when db roles setting is missing
 	if len(ops.DBRoles) == 0 {
 		return true, ""
 	}
@@ -299,7 +299,7 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 	opsRes["operation"] = CheckRunningOperation
 
 	host := net.JoinHostPort(ops.DBAddress, strconv.Itoa(ops.DBPort))
-	// sql exec timeout need to be less than httpget's timeout which default is 1s.
+	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
 	conn, err := net.DialTimeout("tcp", host, 500*time.Millisecond)
 	if err != nil {
 		message = fmt.Sprintf("running check %s error: %v", host, err)

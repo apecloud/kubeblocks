@@ -164,9 +164,7 @@ func calDBPoolSize(args interface{}) (string, error) {
 
 }
 
-// getPodContainerByName for general built-in
-// User overwrite podSpec of Cluster CR, the correctness of access via index cannot be guaranteed
-// if User modify name of container, pray users don't
+// getPodContainerByName gets pod container by name
 func getPodContainerByName(args []interface{}, containerName string) (interface{}, error) {
 	containers, err := fromJSONArray[corev1.Container](args)
 	if err != nil {
@@ -180,7 +178,7 @@ func getPodContainerByName(args []interface{}, containerName string) (interface{
 	return nil, nil
 }
 
-// getVolumeMountPathByName for general built-in
+// getVolumeMountPathByName gets volume mount path by name
 func getVolumeMountPathByName(args interface{}, volumeName string) (string, error) {
 	container, err := fromJSONObject[corev1.Container](args)
 	if err != nil {
@@ -194,7 +192,7 @@ func getVolumeMountPathByName(args interface{}, volumeName string) (string, erro
 	return "", nil
 }
 
-// getPVCByName for general built-in
+// getPVCByName gets pvc by name
 func getPVCByName(args []interface{}, volumeName string) (interface{}, error) {
 	volumes, err := fromJSONArray[corev1.Volume](args)
 	if err != nil {
@@ -208,7 +206,7 @@ func getPVCByName(args []interface{}, volumeName string) (interface{}, error) {
 	return nil, nil
 }
 
-// getContainerCPU for general built-in
+// getContainerCPU gets container cpu limit
 func getContainerCPU(args interface{}) (int64, error) {
 	container, err := fromJSONObject[corev1.Container](args)
 	if err != nil {
@@ -217,7 +215,7 @@ func getContainerCPU(args interface{}) (int64, error) {
 	return intctrlutil.GetCoreNum(*container), nil
 }
 
-// getContainerMemory for general built-in
+// getContainerMemory gets container memory limit
 func getContainerMemory(args interface{}) (int64, error) {
 	container, err := fromJSONObject[corev1.Container](args)
 	if err != nil {
@@ -226,7 +224,7 @@ func getContainerMemory(args interface{}) (int64, error) {
 	return intctrlutil.GetMemorySize(*container), nil
 }
 
-// getContainerRequestMemory for general built-in
+// getContainerRequestMemory gets container memory request
 func getContainerRequestMemory(args interface{}) (int64, error) {
 	container, err := fromJSONObject[corev1.Container](args)
 	if err != nil {
@@ -235,13 +233,13 @@ func getContainerRequestMemory(args interface{}) (int64, error) {
 	return intctrlutil.GetRequestMemorySize(*container), nil
 }
 
-// getArgByName for general built-in
+// getArgByName get arg by name
 func getArgByName(args interface{}, argName string) string {
 	// TODO Support parse command args
 	return emptyString
 }
 
-// getPortByName for general built-in
+// getPortByName get port by name
 func getPortByName(args interface{}, portName string) (interface{}, error) {
 	container, err := fromJSONObject[corev1.Container](args)
 	if err != nil {
@@ -256,17 +254,17 @@ func getPortByName(args interface{}, portName string) (interface{}, error) {
 	return nil, nil
 }
 
-// getCAFile for general builtIn
+// getCAFile gets CA file
 func getCAFile() string {
 	return builder.MountPath + "/" + builder.CAName
 }
 
-// getCertFile for general builtIn
+// getCertFile gets cert file
 func getCertFile() string {
 	return builder.MountPath + "/" + builder.CertName
 }
 
-// getKeyFile for general builtIn
+// getKeyFile gets key file
 func getKeyFile() string {
 	return builder.MountPath + "/" + builder.KeyName
 }

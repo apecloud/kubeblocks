@@ -29,6 +29,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	batchv1 "k8s.io/api/batch/v1"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
@@ -48,13 +49,13 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	probeutil "github.com/apecloud/kubeblocks/cmd/probe/util"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
+	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
@@ -111,7 +112,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	// Cleanups
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -567,6 +568,45 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
 
 		checkUpdatedStsReplicas()
+
+		By("Checking updated sts replicas' PVC")
+		for i := 0; i < updatedReplicas; i++ {
+			pvcKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      getPVCName(comp.Name, i),
+			}
+			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
+		}
+
+		By("Checking pod env config updated")
+		cmKey := types.NamespacedName{
+			Namespace: clusterKey.Namespace,
+			Name:      fmt.Sprintf("%s-%s-env", clusterKey.Name, comp.Name),
+		}
+		Eventually(testapps.CheckObj(&testCtx, cmKey, func(g Gomega, cm *corev1.ConfigMap) {
+			match := func(key, prefix, suffix string) bool {
+				return strings.HasPrefix(key, prefix) && strings.HasSuffix(key, suffix)
+			}
+			foundN := ""
+			for k, v := range cm.Data {
+				if match(k, constant.KBPrefix, "_N") {
+					foundN = v
+					break
+				}
+			}
+			g.Expect(foundN).Should(Equal(strconv.Itoa(updatedReplicas)))
+			for i := 0; i < updatedReplicas; i++ {
+				foundPodHostname := ""
+				suffix := fmt.Sprintf("_%d_HOSTNAME", i)
+				for k, v := range cm.Data {
+					if match(k, constant.KBPrefix, suffix) {
+						foundPodHostname = v
+						break
+					}
+				}
+				g.Expect(foundPodHostname != "").Should(BeTrue())
+			}
+		})).Should(Succeed())
 	}
 
 	// @argument componentDefsWithHScalePolicy assign ClusterDefinition.spec.componentDefs[].horizontalScalePolicy for
@@ -631,20 +671,6 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(clusterDefObj), clusterDefObj)).Should(Succeed())
 		for i, comp := range clusterObj.Spec.ComponentSpecs {
 			horizontalScaleComp(updatedReplicas, &clusterObj.Spec.ComponentSpecs[i], hscalePolicy(comp))
-		}
-
-		By("Checking updated sts replicas' PVC")
-		for _, comp := range clusterObj.Spec.ComponentSpecs {
-			if hscalePolicy(comp) == nil {
-				continue
-			}
-			for i := 0; i < updatedReplicas; i++ {
-				pvcKey := types.NamespacedName{
-					Namespace: clusterKey.Namespace,
-					Name:      getPVCName(comp.Name, i),
-				}
-				Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
-			}
 		}
 
 		By("Checking cluster status and the number of replicas changed")
@@ -1219,7 +1245,7 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(pod.Annotations[constant.ComponentReplicasAnnotationKey]).Should(Equal(strconv.Itoa(int(*sts.Spec.Replicas))))
 			}
 		}).Should(Succeed())
-
+		stsPatch := client.MergeFrom(sts.DeepCopy())
 		By("Updating StatefulSet's status")
 		sts.Status.UpdateRevision = "mock-version"
 		sts.Status.Replicas = int32(replicas)
@@ -1227,7 +1253,7 @@ var _ = Describe("Cluster Controller", func() {
 		sts.Status.CurrentReplicas = int32(replicas)
 		sts.Status.ReadyReplicas = int32(replicas)
 		sts.Status.ObservedGeneration = sts.Generation
-		Expect(k8sClient.Status().Update(ctx, sts)).Should(Succeed())
+		Expect(k8sClient.Status().Patch(ctx, sts, stsPatch)).Should(Succeed())
 
 		By("Checking consensus set pods' role are updated in cluster status")
 		Eventually(func(g Gomega) {
@@ -1803,18 +1829,34 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("creating cluster with backup")
 			restoreFromBackup := fmt.Sprintf(`{"%s":"%s"}`, compName, backupName)
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(compName, compDefName).
 				SetReplicas(3).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				AddAnnotations(constant.RestoreFromBackUpAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("mocking restore job completed")
+			patchK8sJobStatus := func(key types.NamespacedName, jobStatus batchv1.JobConditionType) {
+				Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *batchv1.Job) {
+					jobCondition := batchv1.JobCondition{Type: jobStatus}
+					fetched.Status.Conditions = append(fetched.Status.Conditions, jobCondition)
+				})).Should(Succeed())
+			}
+			for i := 0; i < 3; i++ {
+				restoreJobKey := client.ObjectKey{
+					Name:      fmt.Sprintf("base-%s-%s-%d", clusterObj.Name, compName, i),
+					Namespace: clusterKey.Namespace,
+				}
+				patchK8sJobStatus(restoreJobKey, batchv1.JobComplete)
+			}
 
 			By("Waiting for the cluster controller to create resources completely")
 			waitForCreatingResourceCompletely(clusterKey, compName)
 			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 			sts := stsList.Items[0]
-			Expect(sts.Spec.Template.Spec.InitContainers).Should(HaveLen(1))
 
 			By("mock pod/sts are available and wait for component enter running phase")
 			testapps.MockConsensusComponentPods(&testCtx, &sts, clusterObj.Name, compName)

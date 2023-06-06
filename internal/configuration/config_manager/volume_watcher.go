@@ -40,7 +40,7 @@ const (
 type ConfigMapVolumeWatcher struct {
 	retryCount int
 
-	// volumeDirectory watch directory witch volumeCount
+	// volumeDirectory watches directory witch volumeCount
 	volumeDirectory []string
 
 	// regexSelector string
@@ -89,7 +89,7 @@ func (w *ConfigMapVolumeWatcher) Close() error {
 
 func (w *ConfigMapVolumeWatcher) Run() error {
 	if w.handler == nil {
-		return cfgcore.MakeError("require process event handler.")
+		return cfgcore.MakeError("required process event handler.")
 	}
 
 	watcher, err := fsnotify.NewWatcher()
@@ -102,7 +102,7 @@ func (w *ConfigMapVolumeWatcher) Run() error {
 		w.log.Infof("add watched fs directory: %s", d)
 		err = watcher.Add(d)
 		if err != nil {
-			return cfgcore.WrapError(err, "failed to add watch directory[%s] failed", d)
+			return cfgcore.WrapError(err, "failed to add watch directory[%s]", d)
 		}
 	}
 
@@ -132,7 +132,7 @@ func (w *ConfigMapVolumeWatcher) loopNotifyEvent(watcher *fsnotify.Watcher, ctx 
 		case err := <-watcher.Errors:
 			w.log.Error(err)
 		case <-ctx.Done():
-			w.log.Info("The process has received the end signal.")
+			w.log.Info("The process has received the exit signal.")
 			return
 		}
 	}
@@ -148,7 +148,7 @@ func runWithRetry(ctx context.Context, handler WatchEventHandler, event fsnotify
 		if retryCount <= 0 {
 			return
 		}
-		logger.Errorf("event handler failed, will retry after [%d]s : %s", DefaultSleepRetryTime, err)
+		logger.Errorf("failed event handler, please retry after [%d]s : %s", DefaultSleepRetryTime, err)
 		time.Sleep(time.Second * DefaultRetryCount)
 	}
 }

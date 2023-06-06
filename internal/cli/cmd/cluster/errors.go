@@ -25,25 +25,25 @@ import (
 )
 
 var (
-	clusterNotExistErrMessage          = "cluster[name=%s] is not exist. Please check that <cluster name> is spelled correctly."
-	componentNotExistErrMessage        = "cluster[name=%s] does not has this component[name=%s]. Please check that --component is spelled correctly."
+	clusterNotExistErrMessage          = "cluster[name=%s] does not exist. Please check that <cluster name> is spelled correctly."
+	componentNotExistErrMessage        = "cluster[name=%s] does not have component[name=%s]. Please check that --component is spelled correctly."
 	missingClusterArgErrMassage        = "cluster name should be specified, using --help."
 	missingUpdatedParametersErrMessage = "missing updated parameters, using --help."
 
-	multiComponentsErrorMessage     = "when multi component exist, must specify which component to use. Please using --component"
-	multiConfigTemplateErrorMessage = "when multi config template exist, must specify which config template to use. Please using --config-spec"
-	multiConfigFileErrorMessage     = "when multi config files exist, must specify which config file to update. Please using --config-file"
+	multiComponentsErrorMessage     = "when multi components exist, specify a component, using --component"
+	multiConfigTemplateErrorMessage = "when multi config templates exist, specify a config template,  using --config-spec"
+	multiConfigFileErrorMessage     = "when multi config files exist, specify a config file, using --config-file"
 
-	notFoundValidConfigTemplateErrorMessage = "not find valid config template, component[name=%s] in the cluster[name=%s]"
+	notFoundValidConfigTemplateErrorMessage = "cannot find valid config templates for component[name=%s] in the cluster[name=%s]"
 
-	notFoundConfigSpecErrorMessage = "not find config spec[%s], component[name=%s] in the cluster[name=%s]"
+	notFoundConfigSpecErrorMessage = "cannot find config spec[%s] for component[name=%s] in the cluster[name=%s]"
 
-	notFoundConfigFileErrorMessage   = "not find config file, file[name=%s] in the configspec[name=%s], all configfiles: %v"
-	notSupportFileUpdateErrorMessage = "not support file[%s] update, current support files: %v"
+	notFoundConfigFileErrorMessage   = "cannot find config file[name=%s] in the configspec[name=%s], all configfiles: %v"
+	notSupportFileUpdateErrorMessage = "not supported file[%s] for updating, current supported files: %v"
 
-	notCueSchemaPrompt            = "The config template not define cue schema and parameter explain info cannot be generated."
-	cue2openAPISchemaFailedPrompt = "The cue schema may not satisfy the conversion constraints of openAPISchema and parameter explain info cannot be generated."
-	restartConfirmPrompt          = "The parameter change you modified needs to be restarted, which may cause the cluster to be unavailable for a period of time. Do you need to continue...\n, "
+	notCueSchemaPrompt            = "The config template is not defined in cue schema and parameter explanation info cannot be generated."
+	cue2openAPISchemaFailedPrompt = "The cue schema may not satisfy the conversion constraints of openAPISchema and parameter explanation info cannot be generated."
+	restartConfirmPrompt          = "The parameter change incurs a cluster restart, which brings the cluster down for a while. Enter to continue...\n, "
 	confirmApplyReconfigurePrompt = "Are you sure you want to apply these changes?\n"
 )
 

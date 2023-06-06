@@ -1,20 +1,17 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package v1alpha1
@@ -50,15 +47,15 @@ type ClusterDefinitionSpec struct {
 	// secret for cluster.apps.kubeblocks.io object. Built-in objects are:
 	// `$(RANDOM_PASSWD)` - random 8 characters.
 	// `$(UUID)` - generate a random UUID v4 string.
-	// `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string``.
-	// `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded``.
-	// `$(UUID_HEX)` - generate a random UUID v4 HEX representation``.
+	// `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string.
+	// `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded.
+	// `$(UUID_HEX)` - generate a random UUID v4 HEX representation.
 	// `$(HEADLESS_SVC_FQDN)` - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
 	// `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// `$(SVC_PORT_<PORT-NAME>)` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
-	//    { "name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306 }, and "$(SVC_PORT_mysql)" in the
+	// `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
+	//    `"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306`, and "$(SVC_PORT_mysql)" in the
 	//    connection credential value is 3306.
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
@@ -167,7 +164,7 @@ type ProvisionStatements struct {
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
 type ClusterDefinitionStatus struct {
-	// ClusterDefinition phase, valid values are <empty>, Available.
+	// ClusterDefinition phase, valid values are `empty`, `Available`, 'Unavailable`.
 	// Available is ClusterDefinition become available, and can be referenced for co-related objects.
 	Phase Phase `json:"phase,omitempty"`
 
@@ -201,8 +198,8 @@ type ExporterConfig struct {
 
 type MonitorConfig struct {
 	// builtIn is a switch to enable KubeBlocks builtIn monitoring.
+	// If BuiltIn is set to true, monitor metrics will be scraped automatically.
 	// If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.
-	// BuiltIn set to true is not currently supported but will be soon.
 	// +kubebuilder:default=false
 	// +optional
 	BuiltIn bool `json:"builtIn,omitempty"`
@@ -344,8 +341,8 @@ type ClusterComponentDefinition struct {
 	// according to the volumeType.
 	//
 	// For example:
-	//  `{name: data, type: data}` means that the volume named `data` is used to store `data`.
-	//  `{name: binlog, type: log}` means that the volume named `binlog` is used to store `log`.
+	//  `name: data, type: data` means that the volume named `data` is used to store `data`.
+	//  `name: binlog, type: log` means that the volume named `binlog` is used to store `log`.
 	//
 	// NOTE:
 	//   When volumeTypes is not defined, the backup function will not be supported,
@@ -817,10 +814,14 @@ func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolic
 	if r == nil {
 		r = &ReplicationSetSpec{}
 	}
-	return r.StatefulSetSpec.finalStsUpdateStrategy()
-	// _, s := r.StatefulSetSpec.finalStsUpdateStrategy()
-	// s.Type = appsv1.OnDeleteStatefulSetStrategyType
-	// return appsv1.ParallelPodManagement, s
+	if r.LLUpdateStrategy != nil {
+		return r.LLPodManagementPolicy, *r.LLUpdateStrategy
+	}
+	_, s := r.StatefulSetSpec.finalStsUpdateStrategy()
+	// TODO(xingran): The update of the replicationSet needs to generate a plan according to the role
+	s.Type = appsv1.OnDeleteStatefulSetStrategyType
+	s.RollingUpdate = nil
+	return appsv1.ParallelPodManagement, s
 }
 
 type SwitchPolicy struct {
@@ -921,6 +922,9 @@ type GVKResource struct {
 	Selector map[string]string `json:"selector,omitempty"`
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cd

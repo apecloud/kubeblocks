@@ -24,6 +24,5 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package tools
 
 import (
-	_ "github.com/ahmetb/gen-crd-api-reference-docs"
 	_ "github.com/golang/mock/mockgen"
 )

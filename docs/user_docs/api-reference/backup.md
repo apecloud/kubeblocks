@@ -1,10 +1,11 @@
 ---
-title: KubeBlocks backup API Reference
-description: KubeBlocks backup API Reference
+title: Backup API Reference
+description: Backup API Reference
 keywords: [backup, api]
 sidebar_position: 2
+sidebar_label: Backup
 ---
-
+<br />
 <p>Packages:</p>
 <ul>
 <li>
@@ -27,7 +28,7 @@ Resource Types:
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.Backup">Backup
 </h3>
 <div>
-<p>Backup is the Schema for the backups API (defined by User).</p>
+<p>Backup is the Schema for the backups API (defined by User).</p><br />
 </div>
 <table>
 <thead>
@@ -87,7 +88,7 @@ string
 </em>
 </td>
 <td>
-<p>Which backupPolicy is applied to perform this backup</p>
+<p>Which backupPolicy is applied to perform this backup</p><br />
 </td>
 </tr>
 <tr>
@@ -100,7 +101,7 @@ BackupType
 </em>
 </td>
 <td>
-<p>Backup Type. datafile or logfile or snapshot. If not set, datafile is the default type.</p>
+<p>Backup Type. datafile or logfile or snapshot. If not set, datafile is the default type.</p><br />
 </td>
 </tr>
 <tr>
@@ -112,7 +113,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>if backupType is incremental, parentBackupName is required.</p>
+<p>if backupType is incremental, parentBackupName is required.</p><br />
 </td>
 </tr>
 </table>
@@ -135,7 +136,7 @@ BackupStatus
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupPolicy">BackupPolicy
 </h3>
 <div>
-<p>BackupPolicy is the Schema for the backuppolicies API (defined by User)</p>
+<p>BackupPolicy is the Schema for the backuppolicies API (defined by User)</p><br />
 </div>
 <table>
 <thead>
@@ -198,7 +199,7 @@ RetentionSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>retention describe how long the Backup should be retained. if not set, will be retained forever.</p>
+<p>retention describe how long the Backup should be retained. if not set, will be retained forever.</p><br />
 </td>
 </tr>
 <tr>
@@ -212,7 +213,7 @@ Schedule
 </td>
 <td>
 <em>(Optional)</em>
-<p>schedule policy for backup.</p>
+<p>schedule policy for backup.</p><br />
 </td>
 </tr>
 <tr>
@@ -226,7 +227,7 @@ SnapshotPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>the policy for snapshot backup.</p>
+<p>the policy for snapshot backup.</p><br />
 </td>
 </tr>
 <tr>
@@ -240,7 +241,7 @@ CommonBackupPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>the policy for datafile backup.</p>
+<p>the policy for datafile backup.</p><br />
 </td>
 </tr>
 <tr>
@@ -254,7 +255,7 @@ CommonBackupPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>the policy for logfile backup.</p>
+<p>the policy for logfile backup.</p><br />
 </td>
 </tr>
 </table>
@@ -277,7 +278,7 @@ BackupPolicyStatus
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupTool">BackupTool
 </h3>
 <div>
-<p>BackupTool is the Schema for the backuptools API (defined by provider)</p>
+<p>BackupTool is the Schema for the backuptools API (defined by provider)</p><br />
 </div>
 <table>
 <thead>
@@ -337,7 +338,7 @@ string
 </em>
 </td>
 <td>
-<p>Backup tool Container image name.</p>
+<p>Backup tool Container image name.</p><br />
 </td>
 </tr>
 <tr>
@@ -348,7 +349,7 @@ string
 </em>
 </td>
 <td>
-<p>which kind for run a backup tool.</p>
+<p>which kind for run a backup tool.</p><br />
 </td>
 </tr>
 <tr>
@@ -359,7 +360,7 @@ string
 </em>
 </td>
 <td>
-<p>the type of backup tool, file or pitr</p>
+<p>the type of backup tool, file or pitr</p><br />
 </td>
 </tr>
 <tr>
@@ -373,8 +374,7 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>Compute Resources required by this container.
-Cannot be updated.</p>
+<p>Compute Resources required by this container.<br />Cannot be updated.</p><br />
 </td>
 </tr>
 <tr>
@@ -388,7 +388,7 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>List of environment variables to set in the container.</p>
+<p>List of environment variables to set in the container.</p><br />
 </td>
 </tr>
 <tr>
@@ -402,12 +402,7 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>List of sources to populate environment variables in the container.
-The keys defined within a source must be a C_IDENTIFIER. All invalid keys
-will be reported as an event when the container is starting. When a key exists in multiple
-sources, the value associated with the last source will take precedence.
-Values defined by an Env with a duplicate key will take precedence.
-Cannot be updated.</p>
+<p>List of sources to populate environment variables in the container.<br />The keys defined within a source must be a C_IDENTIFIER. All invalid keys<br />will be reported as an event when the container is starting. When a key exists in multiple<br />sources, the value associated with the last source will take precedence.<br />Values defined by an Env with a duplicate key will take precedence.<br />Cannot be updated.</p><br />
 </td>
 </tr>
 <tr>
@@ -418,9 +413,7 @@ Cannot be updated.</p>
 </em>
 </td>
 <td>
-<p>Array of command that apps can do database backup.
-from invoke args
-the order of commands follows the order of array.</p>
+<p>Array of command that apps can do database backup.<br />from invoke args<br />the order of commands follows the order of array.</p><br />
 </td>
 </tr>
 <tr>
@@ -432,8 +425,7 @@ the order of commands follows the order of array.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Array of command that apps can do database incremental backup.
-like xtrabackup, that can performs an incremental backup file.</p>
+<p>Array of command that apps can do database incremental backup.<br />like xtrabackup, that can performs an incremental backup file.</p><br />
 </td>
 </tr>
 <tr>
@@ -446,7 +438,7 @@ BackupToolRestoreCommand
 </em>
 </td>
 <td>
-<p>backup tool can support physical restore, in this case, restore must be RESTART database.</p>
+<p>backup tool can support physical restore, in this case, restore must be RESTART database.</p><br />
 </td>
 </tr>
 <tr>
@@ -460,7 +452,7 @@ BackupToolRestoreCommand
 </td>
 <td>
 <em>(Optional)</em>
-<p>backup tool can support logical restore, in this case, restore NOT RESTART database.</p>
+<p>backup tool can support logical restore, in this case, restore NOT RESTART database.</p><br />
 </td>
 </tr>
 </table>
@@ -483,7 +475,7 @@ BackupToolStatus
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.RestoreJob">RestoreJob
 </h3>
 <div>
-<p>RestoreJob is the Schema for the restorejobs API (defined by User)</p>
+<p>RestoreJob is the Schema for the restorejobs API (defined by User)</p><br />
 </div>
 <table>
 <thead>
@@ -543,7 +535,7 @@ string
 </em>
 </td>
 <td>
-<p>Specified one backupJob to restore.</p>
+<p>Specified one backupJob to restore.</p><br />
 </td>
 </tr>
 <tr>
@@ -556,7 +548,7 @@ TargetCluster
 </em>
 </td>
 <td>
-<p>the target database workload to restore</p>
+<p>the target database workload to restore</p><br />
 </td>
 </tr>
 <tr>
@@ -569,7 +561,7 @@ TargetCluster
 </em>
 </td>
 <td>
-<p>array of restore volumes .</p>
+<p>array of restore volumes .</p><br />
 </td>
 </tr>
 <tr>
@@ -582,7 +574,7 @@ TargetCluster
 </em>
 </td>
 <td>
-<p>array of restore volume mounts .</p>
+<p>array of restore volume mounts .</p><br />
 </td>
 </tr>
 <tr>
@@ -594,7 +586,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>count of backup stop retries on fail.</p>
+<p>count of backup stop retries on fail.</p><br />
 </td>
 </tr>
 </table>
@@ -640,7 +632,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>startTime records the start time of data logging.</p>
+<p>startTime records the start time of data logging.</p><br />
 </td>
 </tr>
 <tr>
@@ -654,7 +646,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>stopTime records the stop time of data logging.</p>
+<p>stopTime records the stop time of data logging.</p><br />
 </td>
 </tr>
 </tbody>
@@ -665,7 +657,7 @@ Kubernetes meta/v1.Time
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupStatus">BackupStatus</a>)
 </p>
 <div>
-<p>BackupPhase The current phase. Valid values are New, InProgress, Completed, Failed.</p>
+<p>BackupPhase The current phase. Valid values are New, InProgress, Completed, Failed.</p><br />
 </div>
 <table>
 <thead>
@@ -690,7 +682,7 @@ Kubernetes meta/v1.Time
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.SnapshotPolicy">SnapshotPolicy</a>)
 </p>
 <div>
-<p>BackupPolicyHook defines for the database execute commands before and after backup.</p>
+<p>BackupPolicyHook defines for the database execute commands before and after backup.</p><br />
 </div>
 <table>
 <thead>
@@ -709,7 +701,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>pre backup to perform commands</p>
+<p>pre backup to perform commands</p><br />
 </td>
 </tr>
 <tr>
@@ -721,7 +713,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>post backup to perform commands</p>
+<p>post backup to perform commands</p><br />
 </td>
 </tr>
 <tr>
@@ -733,7 +725,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>exec command with image</p>
+<p>exec command with image</p><br />
 </td>
 </tr>
 <tr>
@@ -745,7 +737,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>which container can exec command</p>
+<p>which container can exec command</p><br />
 </td>
 </tr>
 </tbody>
@@ -756,7 +748,7 @@ string
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicyStatus">BackupPolicyStatus</a>)
 </p>
 <div>
-<p>BackupPolicyPhase defines phases for BackupPolicy CR.</p>
+<p>BackupPolicyPhase defines phases for BackupPolicy CR.</p><br />
 </div>
 <table>
 <thead>
@@ -777,7 +769,7 @@ string
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.TargetCluster">TargetCluster</a>)
 </p>
 <div>
-<p>BackupPolicySecret defines for the target database secret that backup tool can connect.</p>
+<p>BackupPolicySecret defines for the target database secret that backup tool can connect.</p><br />
 </div>
 <table>
 <thead>
@@ -795,7 +787,7 @@ string
 </em>
 </td>
 <td>
-<p>the secret name</p>
+<p>the secret name</p><br />
 </td>
 </tr>
 <tr>
@@ -806,7 +798,7 @@ string
 </em>
 </td>
 <td>
-<p>usernameKey the map key of the user in the connection credential secret</p>
+<p>usernameKey the map key of the user in the connection credential secret</p><br />
 </td>
 </tr>
 <tr>
@@ -817,7 +809,7 @@ string
 </em>
 </td>
 <td>
-<p>passwordKey the map key of the password in the connection credential secret</p>
+<p>passwordKey the map key of the password in the connection credential secret</p><br />
 </td>
 </tr>
 </tbody>
@@ -828,7 +820,7 @@ string
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicy">BackupPolicy</a>)
 </p>
 <div>
-<p>BackupPolicySpec defines the desired state of BackupPolicy</p>
+<p>BackupPolicySpec defines the desired state of BackupPolicy</p><br />
 </div>
 <table>
 <thead>
@@ -849,7 +841,7 @@ RetentionSpec
 </td>
 <td>
 <em>(Optional)</em>
-<p>retention describe how long the Backup should be retained. if not set, will be retained forever.</p>
+<p>retention describe how long the Backup should be retained. if not set, will be retained forever.</p><br />
 </td>
 </tr>
 <tr>
@@ -863,7 +855,7 @@ Schedule
 </td>
 <td>
 <em>(Optional)</em>
-<p>schedule policy for backup.</p>
+<p>schedule policy for backup.</p><br />
 </td>
 </tr>
 <tr>
@@ -877,7 +869,7 @@ SnapshotPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>the policy for snapshot backup.</p>
+<p>the policy for snapshot backup.</p><br />
 </td>
 </tr>
 <tr>
@@ -891,7 +883,7 @@ CommonBackupPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>the policy for datafile backup.</p>
+<p>the policy for datafile backup.</p><br />
 </td>
 </tr>
 <tr>
@@ -905,7 +897,7 @@ CommonBackupPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>the policy for logfile backup.</p>
+<p>the policy for logfile backup.</p><br />
 </td>
 </tr>
 </tbody>
@@ -916,7 +908,7 @@ CommonBackupPolicy
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicy">BackupPolicy</a>)
 </p>
 <div>
-<p>BackupPolicyStatus defines the observed state of BackupPolicy</p>
+<p>BackupPolicyStatus defines the observed state of BackupPolicy</p><br />
 </div>
 <table>
 <thead>
@@ -935,9 +927,7 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>observedGeneration is the most recent generation observed for this
-BackupPolicy. It corresponds to the Cluster&rsquo;s generation, which is
-updated on mutation by the API Server.</p>
+<p>observedGeneration is the most recent generation observed for this<br />BackupPolicy. It corresponds to the Cluster&rsquo;s generation, which is<br />updated on mutation by the API Server.</p><br />
 </td>
 </tr>
 <tr>
@@ -951,7 +941,7 @@ BackupPolicyPhase
 </td>
 <td>
 <em>(Optional)</em>
-<p>backup policy phase valid value: Available, Failed.</p>
+<p>backup policy phase valid value: Available, Failed.</p><br />
 </td>
 </tr>
 <tr>
@@ -963,7 +953,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>the reason if backup policy check failed.</p>
+<p>the reason if backup policy check failed.</p><br />
 </td>
 </tr>
 <tr>
@@ -977,7 +967,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>information when was the last time the job was successfully scheduled.</p>
+<p>information when was the last time the job was successfully scheduled.</p><br />
 </td>
 </tr>
 <tr>
@@ -991,7 +981,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>information when was the last time the job successfully completed.</p>
+<p>information when was the last time the job successfully completed.</p><br />
 </td>
 </tr>
 </tbody>
@@ -1020,7 +1010,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>volumeSnapshotName records the volumeSnapshot name.</p>
+<p>volumeSnapshotName records the volumeSnapshot name.</p><br />
 </td>
 </tr>
 <tr>
@@ -1032,10 +1022,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>volumeSnapshotContentName specifies the name of a pre-existing VolumeSnapshotContent
-object representing an existing volume snapshot.
-This field should be set if the snapshot already exists and only needs a representation in Kubernetes.
-This field is immutable.</p>
+<p>volumeSnapshotContentName specifies the name of a pre-existing VolumeSnapshotContent<br />object representing an existing volume snapshot.<br />This field should be set if the snapshot already exists and only needs a representation in Kubernetes.<br />This field is immutable.</p><br />
 </td>
 </tr>
 </tbody>
@@ -1046,7 +1033,7 @@ This field is immutable.</p>
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.Backup">Backup</a>)
 </p>
 <div>
-<p>BackupSpec defines the desired state of Backup.</p>
+<p>BackupSpec defines the desired state of Backup.</p><br />
 </div>
 <table>
 <thead>
@@ -1064,7 +1051,7 @@ string
 </em>
 </td>
 <td>
-<p>Which backupPolicy is applied to perform this backup</p>
+<p>Which backupPolicy is applied to perform this backup</p><br />
 </td>
 </tr>
 <tr>
@@ -1077,7 +1064,7 @@ BackupType
 </em>
 </td>
 <td>
-<p>Backup Type. datafile or logfile or snapshot. If not set, datafile is the default type.</p>
+<p>Backup Type. datafile or logfile or snapshot. If not set, datafile is the default type.</p><br />
 </td>
 </tr>
 <tr>
@@ -1089,7 +1076,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>if backupType is incremental, parentBackupName is required.</p>
+<p>if backupType is incremental, parentBackupName is required.</p><br />
 </td>
 </tr>
 </tbody>
@@ -1100,7 +1087,7 @@ string
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.Backup">Backup</a>)
 </p>
 <div>
-<p>BackupStatus defines the observed state of Backup.</p>
+<p>BackupStatus defines the observed state of Backup.</p><br />
 </div>
 <table>
 <thead>
@@ -1132,7 +1119,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Records parentBackupName if backupType is incremental.</p>
+<p>Records parentBackupName if backupType is incremental.</p><br />
 </td>
 </tr>
 <tr>
@@ -1146,8 +1133,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>The date and time when the Backup is eligible for garbage collection.
-&lsquo;null&rsquo; means the Backup is NOT be cleaned except delete manual.</p>
+<p>The date and time when the Backup is eligible for garbage collection.<br />&lsquo;null&rsquo; means the Backup is NOT be cleaned except delete manual.</p><br />
 </td>
 </tr>
 <tr>
@@ -1161,7 +1147,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>Date/time when the backup started being processed.</p>
+<p>Date/time when the backup started being processed.</p><br />
 </td>
 </tr>
 <tr>
@@ -1175,7 +1161,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>Date/time when the backup finished being processed.</p>
+<p>Date/time when the backup finished being processed.</p><br />
 </td>
 </tr>
 <tr>
@@ -1189,8 +1175,7 @@ Kubernetes meta/v1.Duration
 </td>
 <td>
 <em>(Optional)</em>
-<p>The duration time of backup execution.
-When converted to a string, the form is &ldquo;1h2m0.5s&rdquo;.</p>
+<p>The duration time of backup execution.<br />When converted to a string, the form is &ldquo;1h2m0.5s&rdquo;.</p><br />
 </td>
 </tr>
 <tr>
@@ -1202,8 +1187,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Backup total size.
-A string with capacity units in the form of &ldquo;1Gi&rdquo;, &ldquo;1Mi&rdquo;, &ldquo;1Ki&rdquo;.</p>
+<p>Backup total size.<br />A string with capacity units in the form of &ldquo;1Gi&rdquo;, &ldquo;1Mi&rdquo;, &ldquo;1Ki&rdquo;.</p><br />
 </td>
 </tr>
 <tr>
@@ -1215,7 +1199,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The reason for a backup failure.</p>
+<p>The reason for a backup failure.</p><br />
 </td>
 </tr>
 <tr>
@@ -1227,7 +1211,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>remoteVolume saves the backup data.</p>
+<p>remoteVolume saves the backup data.</p><br />
 </td>
 </tr>
 <tr>
@@ -1239,7 +1223,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>backupToolName references the backup tool name.</p>
+<p>backupToolName references the backup tool name.</p><br />
 </td>
 </tr>
 <tr>
@@ -1253,7 +1237,7 @@ ManifestsStatus
 </td>
 <td>
 <em>(Optional)</em>
-<p>manifests determines the backup metadata info.</p>
+<p>manifests determines the backup metadata info.</p><br />
 </td>
 </tr>
 </tbody>
@@ -1282,8 +1266,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>specify the json path of backup object for patch.
-example: manifests.backupLog &ndash; means patch the backup json path of status.manifests.backupLog.</p>
+<p>specify the json path of backup object for patch.<br />example: manifests.backupLog &ndash; means patch the backup json path of status.manifests.backupLog.</p><br />
 </td>
 </tr>
 <tr>
@@ -1295,7 +1278,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>which container name that kubectl can execute.</p>
+<p>which container name that kubectl can execute.</p><br />
 </td>
 </tr>
 <tr>
@@ -1307,9 +1290,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>the shell Script commands to collect backup status metadata.
-The script must exist in the container of ContainerName and the output format must be set to JSON.
-Note that outputting to stderr may cause the result format to not be in JSON.</p>
+<p>the shell Script commands to collect backup status metadata.<br />The script must exist in the container of ContainerName and the output format must be set to JSON.<br />Note that outputting to stderr may cause the result format to not be in JSON.</p><br />
 </td>
 </tr>
 <tr>
@@ -1323,7 +1304,7 @@ BackupStatusUpdateStage
 </td>
 <td>
 <em>(Optional)</em>
-<p>when to update the backup status, pre: before backup, post: after backup</p>
+<p>when to update the backup status, pre: before backup, post: after backup</p><br />
 </td>
 </tr>
 </tbody>
@@ -1334,7 +1315,7 @@ BackupStatusUpdateStage
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupStatusUpdate">BackupStatusUpdate</a>)
 </p>
 <div>
-<p>BackupStatusUpdateStage defines the stage of backup status update.</p>
+<p>BackupStatusUpdateStage defines the stage of backup status update.</p><br />
 </div>
 <table>
 <thead>
@@ -1373,7 +1354,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>filePath records the file path of backup.</p>
+<p>filePath records the file path of backup.</p><br />
 </td>
 </tr>
 <tr>
@@ -1385,8 +1366,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Backup upload total size.
-A string with capacity units in the form of &ldquo;1Gi&rdquo;, &ldquo;1Mi&rdquo;, &ldquo;1Ki&rdquo;.</p>
+<p>Backup upload total size.<br />A string with capacity units in the form of &ldquo;1Gi&rdquo;, &ldquo;1Mi&rdquo;, &ldquo;1Ki&rdquo;.</p><br />
 </td>
 </tr>
 <tr>
@@ -1398,7 +1378,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Checksum of backup file, generated by md5 or sha1 or sha256.</p>
+<p>Checksum of backup file, generated by md5 or sha1 or sha256.</p><br />
 </td>
 </tr>
 <tr>
@@ -1410,7 +1390,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>backup check point, for incremental backup.</p>
+<p>backup check point, for incremental backup.</p><br />
 </td>
 </tr>
 </tbody>
@@ -1421,7 +1401,7 @@ string
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupToolSpec">BackupToolSpec</a>)
 </p>
 <div>
-<p>BackupToolRestoreCommand defines the restore commands of BackupTool</p>
+<p>BackupToolRestoreCommand defines the restore commands of BackupTool</p><br />
 </div>
 <table>
 <thead>
@@ -1440,8 +1420,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Array of command that apps can perform database restore.
-like xtrabackup, that can performs restore mysql from files.</p>
+<p>Array of command that apps can perform database restore.<br />like xtrabackup, that can performs restore mysql from files.</p><br />
 </td>
 </tr>
 <tr>
@@ -1453,7 +1432,7 @@ like xtrabackup, that can performs restore mysql from files.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Array of incremental restore commands.</p>
+<p>Array of incremental restore commands.</p><br />
 </td>
 </tr>
 </tbody>
@@ -1464,7 +1443,7 @@ like xtrabackup, that can performs restore mysql from files.</p>
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTool">BackupTool</a>)
 </p>
 <div>
-<p>BackupToolSpec defines the desired state of BackupTool</p>
+<p>BackupToolSpec defines the desired state of BackupTool</p><br />
 </div>
 <table>
 <thead>
@@ -1482,7 +1461,7 @@ string
 </em>
 </td>
 <td>
-<p>Backup tool Container image name.</p>
+<p>Backup tool Container image name.</p><br />
 </td>
 </tr>
 <tr>
@@ -1493,7 +1472,7 @@ string
 </em>
 </td>
 <td>
-<p>which kind for run a backup tool.</p>
+<p>which kind for run a backup tool.</p><br />
 </td>
 </tr>
 <tr>
@@ -1504,7 +1483,7 @@ string
 </em>
 </td>
 <td>
-<p>the type of backup tool, file or pitr</p>
+<p>the type of backup tool, file or pitr</p><br />
 </td>
 </tr>
 <tr>
@@ -1518,8 +1497,7 @@ Kubernetes core/v1.ResourceRequirements
 </td>
 <td>
 <em>(Optional)</em>
-<p>Compute Resources required by this container.
-Cannot be updated.</p>
+<p>Compute Resources required by this container.<br />Cannot be updated.</p><br />
 </td>
 </tr>
 <tr>
@@ -1533,7 +1511,7 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>List of environment variables to set in the container.</p>
+<p>List of environment variables to set in the container.</p><br />
 </td>
 </tr>
 <tr>
@@ -1547,12 +1525,7 @@ Cannot be updated.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>List of sources to populate environment variables in the container.
-The keys defined within a source must be a C_IDENTIFIER. All invalid keys
-will be reported as an event when the container is starting. When a key exists in multiple
-sources, the value associated with the last source will take precedence.
-Values defined by an Env with a duplicate key will take precedence.
-Cannot be updated.</p>
+<p>List of sources to populate environment variables in the container.<br />The keys defined within a source must be a C_IDENTIFIER. All invalid keys<br />will be reported as an event when the container is starting. When a key exists in multiple<br />sources, the value associated with the last source will take precedence.<br />Values defined by an Env with a duplicate key will take precedence.<br />Cannot be updated.</p><br />
 </td>
 </tr>
 <tr>
@@ -1563,9 +1536,7 @@ Cannot be updated.</p>
 </em>
 </td>
 <td>
-<p>Array of command that apps can do database backup.
-from invoke args
-the order of commands follows the order of array.</p>
+<p>Array of command that apps can do database backup.<br />from invoke args<br />the order of commands follows the order of array.</p><br />
 </td>
 </tr>
 <tr>
@@ -1577,8 +1548,7 @@ the order of commands follows the order of array.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Array of command that apps can do database incremental backup.
-like xtrabackup, that can performs an incremental backup file.</p>
+<p>Array of command that apps can do database incremental backup.<br />like xtrabackup, that can performs an incremental backup file.</p><br />
 </td>
 </tr>
 <tr>
@@ -1591,7 +1561,7 @@ BackupToolRestoreCommand
 </em>
 </td>
 <td>
-<p>backup tool can support physical restore, in this case, restore must be RESTART database.</p>
+<p>backup tool can support physical restore, in this case, restore must be RESTART database.</p><br />
 </td>
 </tr>
 <tr>
@@ -1605,7 +1575,7 @@ BackupToolRestoreCommand
 </td>
 <td>
 <em>(Optional)</em>
-<p>backup tool can support logical restore, in this case, restore NOT RESTART database.</p>
+<p>backup tool can support logical restore, in this case, restore NOT RESTART database.</p><br />
 </td>
 </tr>
 </tbody>
@@ -1616,7 +1586,7 @@ BackupToolRestoreCommand
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTool">BackupTool</a>)
 </p>
 <div>
-<p>BackupToolStatus defines the observed state of BackupTool</p>
+<p>BackupToolStatus defines the observed state of BackupTool</p><br />
 </div>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupType">BackupType
 (<code>string</code> alias)</h3>
@@ -1624,7 +1594,7 @@ BackupToolRestoreCommand
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupSpec">BackupSpec</a>)
 </p>
 <div>
-<p>BackupType the backup type, marked backup set is datafile or logfile or snapshot.</p>
+<p>BackupType the backup type, marked backup set is datafile or logfile or snapshot.</p><br />
 </div>
 <table>
 <thead>
@@ -1644,7 +1614,7 @@ BackupToolRestoreCommand
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BaseBackupType">BaseBackupType
 (<code>string</code> alias)</h3>
 <div>
-<p>BaseBackupType the base backup type.</p>
+<p>BaseBackupType the base backup type.</p><br />
 </div>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BasePolicy">BasePolicy
 </h3>
@@ -1671,7 +1641,7 @@ TargetCluster
 </em>
 </td>
 <td>
-<p>target database cluster for backup.</p>
+<p>target database cluster for backup.</p><br />
 </td>
 </tr>
 <tr>
@@ -1683,8 +1653,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>the number of automatic backups to retain. Value must be non-negative integer.
-0 means NO limit on the number of backups.</p>
+<p>the number of automatic backups to retain. Value must be non-negative integer.<br />0 means NO limit on the number of backups.</p><br />
 </td>
 </tr>
 <tr>
@@ -1696,7 +1665,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>count of backup stop retries on fail.</p>
+<p>count of backup stop retries on fail.</p><br />
 </td>
 </tr>
 <tr>
@@ -1710,7 +1679,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>define how to update metadata for backup status.</p>
+<p>define how to update metadata for backup status.</p><br />
 </td>
 </tr>
 </tbody>
@@ -1755,7 +1724,7 @@ PersistentVolumeClaim
 </em>
 </td>
 <td>
-<p>refer to PersistentVolumeClaim and the backup data will be stored in the corresponding persistent volume.</p>
+<p>refer to PersistentVolumeClaim and the backup data will be stored in the corresponding persistent volume.</p><br />
 </td>
 </tr>
 <tr>
@@ -1766,7 +1735,7 @@ string
 </em>
 </td>
 <td>
-<p>which backup tool to perform database backup, only support one tool.</p>
+<p>which backup tool to perform database backup, only support one tool.</p><br />
 </td>
 </tr>
 </tbody>
@@ -1777,7 +1746,7 @@ string
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.PersistentVolumeClaim">PersistentVolumeClaim</a>)
 </p>
 <div>
-<p>CreatePVCPolicy the policy how to create the PersistentVolumeClaim for backup.</p>
+<p>CreatePVCPolicy the policy how to create the PersistentVolumeClaim for backup.</p><br />
 </div>
 <table>
 <thead>
@@ -1818,7 +1787,7 @@ BackupLogStatus
 </td>
 <td>
 <em>(Optional)</em>
-<p>backupLog records startTime and stopTime of data logging.</p>
+<p>backupLog records startTime and stopTime of data logging.</p><br />
 </td>
 </tr>
 <tr>
@@ -1830,7 +1799,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>target records the target cluster metadata string, which is in JSON format.</p>
+<p>target records the target cluster metadata string, which is in JSON format.</p><br />
 </td>
 </tr>
 <tr>
@@ -1844,7 +1813,7 @@ BackupSnapshotStatus
 </td>
 <td>
 <em>(Optional)</em>
-<p>snapshot records the volume snapshot metadata.</p>
+<p>snapshot records the volume snapshot metadata.</p><br />
 </td>
 </tr>
 <tr>
@@ -1858,7 +1827,7 @@ BackupToolManifestsStatus
 </td>
 <td>
 <em>(Optional)</em>
-<p>backupTool records information about backup files generated by the backup tool.</p>
+<p>backupTool records information about backup files generated by the backup tool.</p><br />
 </td>
 </tr>
 <tr>
@@ -1870,7 +1839,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>userContext stores some loosely structured and extensible information.</p>
+<p>userContext stores some loosely structured and extensible information.</p><br />
 </td>
 </tr>
 </tbody>
@@ -1898,7 +1867,7 @@ string
 </em>
 </td>
 <td>
-<p>the name of the PersistentVolumeClaim.</p>
+<p>the name of the PersistentVolumeClaim.</p><br />
 </td>
 </tr>
 <tr>
@@ -1910,7 +1879,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>storageClassName is the name of the StorageClass required by the claim.</p>
+<p>storageClassName is the name of the StorageClass required by the claim.</p><br />
 </td>
 </tr>
 <tr>
@@ -1924,8 +1893,7 @@ Kubernetes resource.Quantity
 </td>
 <td>
 <em>(Optional)</em>
-<p>initCapacity represents the init storage size of the PersistentVolumeClaim which should be created if not exist.
-and the default value is 100Gi if it is empty.</p>
+<p>initCapacity represents the init storage size of the PersistentVolumeClaim which should be created if not exist.<br />and the default value is 100Gi if it is empty.</p><br />
 </td>
 </tr>
 <tr>
@@ -1939,9 +1907,7 @@ CreatePVCPolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>createPolicy defines the policy for creating the PersistentVolumeClaim, enum values:
-- Never: do nothing if the PersistentVolumeClaim not exists.
-- IfNotPresent: create the PersistentVolumeClaim if not present and the accessModes only contains &lsquo;ReadWriteMany&rsquo;.</p>
+<p>createPolicy defines the policy for creating the PersistentVolumeClaim, enum values:<br />- Never: do nothing if the PersistentVolumeClaim not exists.<br />- IfNotPresent: create the PersistentVolumeClaim if not present and the accessModes only contains &lsquo;ReadWriteMany&rsquo;.</p><br />
 </td>
 </tr>
 <tr>
@@ -1955,12 +1921,7 @@ PersistentVolumeConfigMap
 </td>
 <td>
 <em>(Optional)</em>
-<p>persistentVolumeConfigMap references the configmap which contains a persistentVolume template.
-key must be &ldquo;persistentVolume&rdquo; and value is the &ldquo;PersistentVolume&rdquo; struct.
-support the following built-in Objects:
-- $(GENERATE_NAME): generate a specific format &ldquo;pvcName-pvcNamespace&rdquo;.
-if the PersistentVolumeClaim not exists and CreatePolicy is &ldquo;IfNotPresent&rdquo;, the controller
-will create it by this template. this is a mutually exclusive setting with &ldquo;storageClassName&rdquo;.</p>
+<p>persistentVolumeConfigMap references the configmap which contains a persistentVolume template.<br />key must be &ldquo;persistentVolume&rdquo; and value is the &ldquo;PersistentVolume&rdquo; struct.<br />support the following built-in Objects:<br />- $(GENERATE_NAME): generate a specific format &ldquo;pvcName-pvcNamespace&rdquo;.<br />if the PersistentVolumeClaim not exists and CreatePolicy is &ldquo;IfNotPresent&rdquo;, the controller<br />will create it by this template. this is a mutually exclusive setting with &ldquo;storageClassName&rdquo;.</p><br />
 </td>
 </tr>
 </tbody>
@@ -1988,7 +1949,7 @@ string
 </em>
 </td>
 <td>
-<p>the name of the persistentVolume ConfigMap.</p>
+<p>the name of the persistentVolume ConfigMap.</p><br />
 </td>
 </tr>
 <tr>
@@ -1999,7 +1960,7 @@ string
 </em>
 </td>
 <td>
-<p>the namespace of the persistentVolume ConfigMap.</p>
+<p>the namespace of the persistentVolume ConfigMap.</p><br />
 </td>
 </tr>
 </tbody>
@@ -2010,7 +1971,7 @@ string
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.RestoreJobStatus">RestoreJobStatus</a>)
 </p>
 <div>
-<p>RestoreJobPhase The current phase. Valid values are New, InProgressPhy, InProgressLogic, Completed, Failed.</p>
+<p>RestoreJobPhase The current phase. Valid values are New, InProgressPhy, InProgressLogic, Completed, Failed.</p><br />
 </div>
 <table>
 <thead>
@@ -2037,7 +1998,7 @@ string
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.RestoreJob">RestoreJob</a>)
 </p>
 <div>
-<p>RestoreJobSpec defines the desired state of RestoreJob</p>
+<p>RestoreJobSpec defines the desired state of RestoreJob</p><br />
 </div>
 <table>
 <thead>
@@ -2055,7 +2016,7 @@ string
 </em>
 </td>
 <td>
-<p>Specified one backupJob to restore.</p>
+<p>Specified one backupJob to restore.</p><br />
 </td>
 </tr>
 <tr>
@@ -2068,7 +2029,7 @@ TargetCluster
 </em>
 </td>
 <td>
-<p>the target database workload to restore</p>
+<p>the target database workload to restore</p><br />
 </td>
 </tr>
 <tr>
@@ -2081,7 +2042,7 @@ TargetCluster
 </em>
 </td>
 <td>
-<p>array of restore volumes .</p>
+<p>array of restore volumes .</p><br />
 </td>
 </tr>
 <tr>
@@ -2094,7 +2055,7 @@ TargetCluster
 </em>
 </td>
 <td>
-<p>array of restore volume mounts .</p>
+<p>array of restore volume mounts .</p><br />
 </td>
 </tr>
 <tr>
@@ -2106,7 +2067,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>count of backup stop retries on fail.</p>
+<p>count of backup stop retries on fail.</p><br />
 </td>
 </tr>
 </tbody>
@@ -2117,7 +2078,7 @@ int32
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.RestoreJob">RestoreJob</a>)
 </p>
 <div>
-<p>RestoreJobStatus defines the observed state of RestoreJob</p>
+<p>RestoreJobStatus defines the observed state of RestoreJob</p><br />
 </div>
 <table>
 <thead>
@@ -2151,8 +2112,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>The date and time when the Backup is eligible for garbage collection.
-&lsquo;null&rsquo; means the Backup is NOT be cleaned except delete manual.</p>
+<p>The date and time when the Backup is eligible for garbage collection.<br />&lsquo;null&rsquo; means the Backup is NOT be cleaned except delete manual.</p><br />
 </td>
 </tr>
 <tr>
@@ -2166,7 +2126,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>Date/time when the backup started being processed.</p>
+<p>Date/time when the backup started being processed.</p><br />
 </td>
 </tr>
 <tr>
@@ -2180,7 +2140,7 @@ Kubernetes meta/v1.Time
 </td>
 <td>
 <em>(Optional)</em>
-<p>Date/time when the backup finished being processed.</p>
+<p>Date/time when the backup finished being processed.</p><br />
 </td>
 </tr>
 <tr>
@@ -2192,7 +2152,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Job failed reason.</p>
+<p>Job failed reason.</p><br />
 </td>
 </tr>
 </tbody>
@@ -2221,8 +2181,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>ttl is a time string ending with the &rsquo;d&rsquo;|&rsquo;D&rsquo;|&lsquo;h&rsquo;|&lsquo;H&rsquo; character to describe how long
-the Backup should be retained. if not set, will be retained forever.</p>
+<p>ttl is a time string ending with the &rsquo;d&rsquo;|&rsquo;D&rsquo;|&lsquo;h&rsquo;|&lsquo;H&rsquo; character to describe how long<br />the Backup should be retained. if not set, will be retained forever.</p><br />
 </td>
 </tr>
 </tbody>
@@ -2253,7 +2212,7 @@ SchedulePolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>schedule policy for snapshot backup.</p>
+<p>schedule policy for snapshot backup.</p><br />
 </td>
 </tr>
 <tr>
@@ -2267,7 +2226,7 @@ SchedulePolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>schedule policy for datafile backup.</p>
+<p>schedule policy for datafile backup.</p><br />
 </td>
 </tr>
 <tr>
@@ -2281,7 +2240,7 @@ SchedulePolicy
 </td>
 <td>
 <em>(Optional)</em>
-<p>schedule policy for logfile backup.</p>
+<p>schedule policy for logfile backup.</p><br />
 </td>
 </tr>
 </tbody>
@@ -2309,7 +2268,7 @@ string
 </em>
 </td>
 <td>
-<p>the cron expression for schedule, the timezone is in UTC. see <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/Cron</a>.</p>
+<p>the cron expression for schedule, the timezone is in UTC. see <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/Cron</a>.</p><br />
 </td>
 </tr>
 <tr>
@@ -2320,7 +2279,7 @@ bool
 </em>
 </td>
 <td>
-<p>enable or disable the schedule.</p>
+<p>enable or disable the schedule.</p><br />
 </td>
 </tr>
 </tbody>
@@ -2366,7 +2325,7 @@ BackupPolicyHook
 </td>
 <td>
 <em>(Optional)</em>
-<p>execute hook commands for backup.</p>
+<p>execute hook commands for backup.</p><br />
 </td>
 </tr>
 </tbody>
@@ -2377,7 +2336,7 @@ BackupPolicyHook
 (<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BasePolicy">BasePolicy</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.RestoreJobSpec">RestoreJobSpec</a>)
 </p>
 <div>
-<p>TargetCluster TODO (dsj): target cluster need redefined from Cluster API</p>
+<p>TargetCluster TODO (dsj): target cluster need redefined from Cluster API</p><br />
 </div>
 <table>
 <thead>
@@ -2397,9 +2356,7 @@ Kubernetes meta/v1.LabelSelector
 </em>
 </td>
 <td>
-<p>labelsSelector is used to find matching pods.
-Pods that match this label selector are counted to determine the number of pods
-in their corresponding topology domain.</p>
+<p>labelsSelector is used to find matching pods.<br />Pods that match this label selector are counted to determine the number of pods<br />in their corresponding topology domain.</p><br />
 </td>
 </tr>
 <tr>
@@ -2413,9 +2370,7 @@ BackupPolicySecret
 </td>
 <td>
 <em>(Optional)</em>
-<p>secret is used to connect to the target database cluster.
-If not set, secret will be inherited from backup policy template.
-if still not set, the controller will check if any system account for dataprotection has been created.</p>
+<p>secret is used to connect to the target database cluster.<br />If not set, secret will be inherited from backup policy template.<br />if still not set, the controller will check if any system account for dataprotection has been created.</p><br />
 </td>
 </tr>
 </tbody>

@@ -39,24 +39,26 @@ jobs:
 
   release-image:
     needs: image-tag
-    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.6.1
+    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "push-manager-image"
       IMG: "apecloud/kubeblocks"
       VERSION: "${{ needs.image-tag.outputs.tag-name }}"
       GO_VERSION: "1.20"
+      APECD_REF: "v0.1.0"
     secrets: inherit
 
   release-tools-image:
     needs: image-tag
-    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.6.1
+    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "push-tools-image"
       IMG: "apecloud/kubeblocks-tools"
       VERSION: "${{ needs.image-tag.outputs.tag-name }}"
       GO_VERSION: "1.20"
+      APECD_REF: "v0.1.0"
     secrets: inherit
 
   send-message:

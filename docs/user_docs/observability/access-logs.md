@@ -1,7 +1,7 @@
 ---
 title: Access logs
 description: How to access cluster log files
-keywords: [mysql, access logs]
+keywords: [access logs]
 sidebar_position: 3
 ---
 
@@ -14,7 +14,7 @@ The KubeBlocks log enhancement function uses methods similar to kubectl exec and
 ## Before you start
 
 - The container image supports `tail` and `xargs` commands.
-- [Install KubeBlocks](./../installation/introduction.md) on the target Kubernetes cluster: Choose one guide that fits your actual environments.
+- [Install KubeBlocks](./../installation/install-kubeblocks.md).
 - In this guide, we take the MySQL engine as an example, the operation is the same for all database engines.
 
 ## Steps
@@ -29,13 +29,12 @@ The KubeBlocks log enhancement function uses methods similar to kubectl exec and
        kbcli cluster create mycluster --cluster-definition='apecloud-mysql' --enable-all-logs=true 
        ```
 
+   * Update this cluster if you did not enable it when creating a cluster.
 
-    * Update this cluster if you did not enable it when creating a cluster.
-       
        ```bash
        kbcli cluster update mycluster --enable-all-logs=true -n <namespace>
        ```
-    
+
     :::note
 
     The default namespace in which a cluster is created is `default`. If you specify a namespace when creating a cluster, fill in `<namespace>` with your customized one.

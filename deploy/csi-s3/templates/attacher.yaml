@@ -1,13 +1,14 @@
+{{- if not .Values.multiCSI -}}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: csi-attacher-sa-{{ .Values.storageClass.name }}
+  name: csi-attacher-sa-{{ .Values.csiName }}
   namespace: {{ .Release.Namespace }}
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: external-attacher-runner-{{ .Values.storageClass.name }}
+  name: external-attacher-runner-{{ .Values.csiName }}
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
@@ -34,14 +35,14 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: csi-attacher-role-{{ .Values.storageClass.name }}
+  name: csi-attacher-role-{{ .Values.csiName }}
 subjects:
   - kind: ServiceAccount
-    name: csi-attacher-sa-{{ .Values.storageClass.name }}
+    name: csi-attacher-sa-{{ .Values.csiName }}
     namespace: {{ .Release.Namespace }}
 roleRef:
   kind: ClusterRole
-  name: external-attacher-runner-{{ .Values.storageClass.name }}
+  name: external-attacher-runner-{{ .Values.csiName }}
   apiGroup: rbac.authorization.k8s.io
 ---
 # needed for StatefulSet
@@ -75,7 +76,7 @@ spec:
       labels:
         app: csi-attacher-s3
     spec:
-      serviceAccount: csi-attacher-sa-{{ .Values.storageClass.name }}
+      serviceAccount: csi-attacher-sa-{{ .Values.csiName }}
       {{- with .Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
@@ -102,3 +103,4 @@ spec:
           hostPath:
             path: /var/lib/kubelet/plugins/ru.yandex.s3.csi
             type: DirectoryOrCreate
+{{- end -}}

@@ -52,6 +52,7 @@ var _ = Describe("monitor_utils", func() {
 			buildMonitorConfig(clusterCompDef, clusterCompSpec, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeFalse())
+			Expect(monitorConfig.BuiltIn).Should(BeFalse())
 			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
 			Expect(monitorConfig.ScrapePath).To(Equal(""))
 		})
@@ -62,6 +63,7 @@ var _ = Describe("monitor_utils", func() {
 			buildMonitorConfig(clusterCompDef, clusterCompSpec, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeTrue())
+			Expect(monitorConfig.BuiltIn).Should(BeFalse())
 			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(9144))
 			Expect(monitorConfig.ScrapePath).To(Equal("/metrics"))
 		})
@@ -73,17 +75,19 @@ var _ = Describe("monitor_utils", func() {
 			buildMonitorConfig(clusterCompDef, clusterCompSpec, component)
 			monitorConfig := component.Monitor
 			Expect(monitorConfig.Enable).Should(BeFalse())
+			Expect(monitorConfig.BuiltIn).Should(BeFalse())
 			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
 			Expect(monitorConfig.ScrapePath).To(Equal(""))
 		})
 
-		It("should disable monitor if ClusterComponentDefinition.Monitor.BuiltIn is true", func() {
+		It("should enable monitor if ClusterComponentDefinition.Monitor.BuiltIn is true", func() {
 			clusterCompSpec.Monitor = true
 			clusterCompDef.Monitor.BuiltIn = true
 			clusterCompDef.Monitor.Exporter = nil
 			buildMonitorConfig(clusterCompDef, clusterCompSpec, component)
 			monitorConfig := component.Monitor
-			Expect(monitorConfig.Enable).Should(BeFalse())
+			Expect(monitorConfig.Enable).Should(BeTrue())
+			Expect(monitorConfig.BuiltIn).Should(BeTrue())
 			Expect(monitorConfig.ScrapePort).To(BeEquivalentTo(0))
 			Expect(monitorConfig.ScrapePath).To(Equal(""))
 		})

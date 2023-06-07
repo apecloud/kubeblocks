@@ -172,21 +172,18 @@ var _ = Describe("Replication Component", func() {
 
 			By("Testing component phase when pods not ready")
 			// mock secondary pod is not ready.
-			testk8s.UpdatePodStatusNotReady(ctx, testCtx, podList[1].Name)
+			testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, podList[1].Name, podList[1].Namespace)
 			status.AvailableReplicas -= 1
 			testk8s.PatchStatefulSetStatus(&testCtx, replicationSetSts.Name, status)
 			phase, _, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
-			// mock primary pod is not ready
-			testk8s.UpdatePodStatusNotReady(ctx, testCtx, primaryPod.Name)
-			phase, _, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
-			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
-
-			// mock pod label is empty
+			// mock primary pod label is empty
 			Expect(testapps.ChangeObj(&testCtx, primaryPod, func(lpod *corev1.Pod) {
 				lpod.Labels[constant.RoleLabelKey] = ""
 			})).Should(Succeed())
+			phase, _, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
+			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 			_, statusMessages, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompName)
 			Expect(statusMessages[fmt.Sprintf("%s/%s", primaryPod.Kind, primaryPod.Name)]).
 				Should(ContainSubstring("empty label for pod, please check"))
@@ -195,7 +192,7 @@ var _ = Describe("Replication Component", func() {
 			Expect(testCtx.Cli.Get(testCtx.Ctx, stsObjectKey, replicationSetSts)).Should(Succeed())
 			vertexes, err := replicationComponent.HandleRestart(ctx, replicationSetSts)
 			Expect(err).To(Succeed())
-			Expect(len(vertexes) == 0).To(BeTrue())
+			Expect(len(vertexes)).To(Equal(0))
 			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, replicationSetSts)
 			Expect(err).To(Succeed())
 			Expect(len(pods)).To(Equal(int(replicas)))

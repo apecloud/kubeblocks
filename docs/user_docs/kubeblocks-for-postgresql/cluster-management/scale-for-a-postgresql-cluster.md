@@ -1,14 +1,14 @@
 ---
 title: Scale for PostgreSQL
 description: How to vertically scale a PostgreSQL cluster
-keywords: [postgresql,vertical scale]
+keywords: [postgresql, vertical scale]
 sidebar_position: 2
 sidebar_label: Scale
 ---
 
 # Scale for PostgreSQL
 
-You can scale PostgreSQL DB instances in two ways, vertical scaling and horizontal scaling.
+Currently, only vertical scaling for PostgreSQL is supported.
 
 ## Vertical scaling
 
@@ -22,7 +22,7 @@ During the vertical scaling process, a concurrent restart is triggered and the l
 
 ### Before you start
 
-Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
+Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
 kbcli cluster list <name>
@@ -136,6 +136,6 @@ pg-cluster   default     postgresql-cluster           postgresql-14.7.0   Delete
     ```
 
    - STATUS=VerticalScaling: it means the vertical scaling is in progress.
-   - STATUS=Running: it means the vertical scaling operation is applied.
+   - STATUS=Running: it means the vertical scaling has been applied.
    - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be the normal instances number is less than the total instance number or the leader instance is running properly while others are abnormal.
      > To solve the problem, you can check manually to see whether resources are sufficient. If AutoScaling is supported, the system recovers when there are enough resources, otherwise, you can create enough resources and check the result with kubectl describe command.

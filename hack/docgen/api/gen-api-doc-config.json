@@ -1,0 +1,35 @@
+{
+    "hideMemberFields": [
+        "TypeMeta"
+    ],
+    "hideTypePatterns": [
+        "ParseError$",
+        "List$"
+    ],
+    "externalPackages": [
+        {
+            "typeMatchPrefix": "^k8s\\.io/(api|apimachinery/pkg/apis)/",
+            "docsURLTemplate": "https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#{{lower .TypeIdentifier}}-{{arrIndex .PackageSegments -1}}-{{arrIndex .PackageSegments -2}}"
+        },
+        {
+            "typeMatchPrefix": "^k8s\\.io/apimachinery/pkg/api/",
+            "docsURLTemplate": "https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#{{lower .TypeIdentifier}}-{{arrIndex .PackageSegments -1}}-core"
+        },
+        {
+            "typeMatchPrefix": "^k8s\\.io/apiextensions-apiserver/pkg/apis/apiextensions",
+            "docsURLTemplate": "https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#{{lower .TypeIdentifier}}-{{arrIndex .PackageSegments -1}}-{{arrIndex .PackageSegments -2}}-k8s-io"
+        },
+        {
+            "typeMatchPrefix": "^k8s\\.io/apimachinery/pkg/util",
+            "docsURLTemplate": "https://pkg.go.dev/k8s.io/apimachinery/pkg/util/{{arrIndex .PackageSegments -1}}#{{.TypeIdentifier}}"
+        }
+    ],
+    "typeDisplayNamePrefixOverrides": {
+        "k8s.io/api/": "Kubernetes ",
+        "k8s.io/apimachinery/pkg/apis/": "Kubernetes ",
+        "k8s.io/apimachinery/pkg/api/": "Kubernetes ",
+        "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/": "Kubernetes api extensions ",
+        "k8s.io/apimachinery/pkg/util/": "Kubernetes api utils "
+    },
+    "markdownDisabled": false
+}

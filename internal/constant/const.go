@@ -45,7 +45,8 @@ const (
 )
 
 const (
-	ConnCredentialPlaceHolder       = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	KBConnCredentialPlaceHolder     = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	KBComponentEnvCMPlaceHolder     = "$(COMP_ENV_CM_NAME)"
 	KBCompNamePlaceHolder           = "$(KB_COMP_NAME)"
 	KBClusterNamePlaceHolder        = "$(KB_CLUSTER_NAME)"
 	KBClusterCompNamePlaceHolder    = "$(KB_CLUSTER_COMP_NAME)"
@@ -76,7 +77,7 @@ const (
 	// kubeblocks.io labels
 	BackupProtectionLabelKey               = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
 	BackupToolTypeLabelKey                 = "kubeblocks.io/backup-tool-type"
-	AddonProviderLableKey                  = "kubeblocks.io/provider" // AddonProviderLableKey marks the addon provider
+	AddonProviderLabelKey                  = "kubeblocks.io/provider" // AddonProviderLabelKey marks the addon provider
 	RoleLabelKey                           = "kubeblocks.io/role"     // RoleLabelKey consensusSet and replicationSet role label key
 	VolumeTypeLabelKey                     = "kubeblocks.io/volume-type"
 	ClusterAccountLabelKey                 = "account.kubeblocks.io/name"

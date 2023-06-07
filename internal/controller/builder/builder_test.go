@@ -351,9 +351,9 @@ var _ = Describe("builder", func() {
 		It("builds Env Config with Replication component correctly", func() {
 			var cfg *corev1.ConfigMap
 			var err error
-      
-      _, cluster, synthesizedComponent := newClusterObjs(nil)
-      synthesizedComponent.WorkloadType = appsv1alpha1.Replication
+
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			synthesizedComponent.WorkloadType = appsv1alpha1.Replication
 
 			checkEnvValues := func() {
 				cfg, err = BuildEnvConfig(cluster, synthesizedComponent)

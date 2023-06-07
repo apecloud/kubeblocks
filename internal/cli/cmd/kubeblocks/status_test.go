@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -89,7 +90,9 @@ var _ = Describe("kubeblocks status", func() {
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
 		}
 
-		version := testing.FakeVersion()
+		version := &version.Info{
+			GitVersion: "1.12.3",
+		}
 		data, _ := json.Marshal(version)
 
 		tf.UnstructuredClient = &clientfake.RESTClient{

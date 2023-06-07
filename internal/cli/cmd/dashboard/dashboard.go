@@ -251,17 +251,18 @@ func (o *openOptions) complete(cmd *cobra.Command, args []string) error {
 }
 
 func (o *openOptions) run() error {
-
-	url := "http://127.0.0.1:" + o.localPort
-	if o.name == "kubeblocks-grafana" {
-		err := buildGrafanaDirectURL(&url, characterType)
-		if err != nil {
-			return err
-		}
-	}
 	go func() {
 		<-o.portForwardOptions.ReadyChannel
 		fmt.Fprintf(o.Out, "Forward successfully! Opening browser ...\n")
+
+		url := "http://127.0.0.1:" + o.localPort
+		if o.name == "kubeblocks-grafana" {
+			err := buildGrafanaDirectURL(&url, characterType)
+			if err != nil {
+				fmt.Fprintf(o.ErrOut, "Failed to open browser: %v", err)
+				return
+			}
+		}
 		if err := util.OpenBrowser(url); err != nil {
 			fmt.Fprintf(o.ErrOut, "Failed to open browser: %v", err)
 		}

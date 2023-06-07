@@ -92,7 +92,7 @@ func getClusterOwningObjects(transCtx *ClusterTransformContext, cluster appsv1al
 }
 
 // sendWaringEventWithError sends a warning event when occurs error.
-func sendWaringEventWithError(
+func sendWarningEventWithError(
 	recorder record.EventRecorder,
 	cluster *appsv1alpha1.Cluster,
 	reason string,

@@ -245,7 +245,7 @@ func createComponentObjects(w *templateRenderWorkflow, ctx intctrlutil.RequestCt
 	}
 
 	objs := make([]client.Object, 0)
-	secret, err := builder.BuildConnCredentialLow(w.clusterDefObj, cluster, component.GetSynthesizedComponent())
+	secret, err := builder.BuildConnCredential(w.clusterDefObj, cluster, component.GetSynthesizedComponent())
 	if err != nil {
 		return nil, err
 	}

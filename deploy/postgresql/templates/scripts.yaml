@@ -86,7 +86,7 @@ data:
     if [ -z "$primary" ]; then
       echo "downwardAPI primary info is empty, try to get KB_PRIMARY_POD_NAME env value." >> /home/postgres/pgdata/.kb_set_up.log
       echo "KB_PRIMARY_POD_NAME=$KB_PRIMARY_POD_NAME" >> /home/postgres/pgdata/.kb_set_up.log
-      primary=$KB_PRIMARY_POD_NAME
+      primary=${KB_PRIMARY_POD_NAME%%\.*}
     fi
     if [ "$primary" != "$KB_POD_NAME" ]; then
         # waiting for primary pod to be ready

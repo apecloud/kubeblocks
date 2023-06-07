@@ -49,6 +49,7 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -313,9 +314,44 @@ func (i *InstallOpts) tryUninstall(cfg *action.Configuration) error {
 	}()
 
 	if _, err := client.Run(i.Name); err != nil {
-		return err
+		// Remove secrets left over when uninstalling kubeblocks, when addon CRD is uninstalled before kubeblocks.
+		secretCount, errRemove := i.RemoveRemainSecrets(cfg)
+		if secretCount == 0 {
+			return err
+		}
+		if errRemove != nil {
+			return fmt.Errorf("failed to remove remain secrets: %v, helm uninstall error: %v", errRemove, err)
+		}
 	}
 	return nil
+}
+
+func (i *InstallOpts) RemoveRemainSecrets(cfg *action.Configuration) (int, error) {
+	clientSet, err := cfg.KubernetesClientSet()
+	if err != nil {
+		return -1, err
+	}
+
+	options := metav1.ListOptions{
+		LabelSelector: "name=kubeblocks,owner=helm,status=uninstalling",
+	}
+
+	secrets, err := clientSet.CoreV1().Secrets(i.Namespace).List(context.TODO(), options)
+	if err != nil {
+		return -1, err
+	}
+	secretCount := len(secrets.Items)
+	if secretCount == 0 {
+		return 0, nil
+	}
+
+	for _, secret := range secrets.Items {
+		err := clientSet.CoreV1().Secrets(i.Namespace).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return -1, fmt.Errorf("failed to delete Secret %s: %v", secret.Name, err)
+		}
+	}
+	return secretCount, nil
 }
 
 func NewActionConfig(cfg *Config) (*action.Configuration, error) {

@@ -143,7 +143,7 @@ func fuzzySearchByNameAndDesc(keyword, name, description string) bool {
 
 func limitString(s string, length int) string {
 	if len(s) > length && length > 3 {
-		s = s[:length-3] + "..."
+		s = s[:length] + "..."
 	}
 	return s
 }

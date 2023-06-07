@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -40,12 +41,16 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-var listOpsExample = templates.Examples(`
+var (
+	listOpsExample = templates.Examples(`
 		# list all opsRequests
 		kbcli cluster list-ops
 
 		# list all opsRequests of specified cluster
 		kbcli cluster list-ops mycluster`)
+
+	defaultDisplayPhase = []string{"pending", "creating", "running", "canceling", "failed"}
+)
 
 type opsListOptions struct {
 	*list.ListOptions
@@ -76,7 +81,8 @@ func NewListOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 	o.AddFlags(cmd)
 	cmd.Flags().StringSliceVar(&o.opsType, "type", nil, "The OpsRequest type")
-	cmd.Flags().StringSliceVar(&o.status, "status", []string{"running", "pending", "failed"}, "Options include all, pending, running, succeeded, failed. by default, outputs the pending/running/failed OpsRequest.")
+	cmd.Flags().StringSliceVar(&o.status, "status", defaultDisplayPhase, fmt.Sprintf("Options include all, %s. by default, outputs the %s OpsRequest.",
+		strings.Join(defaultDisplayPhase, ", "), strings.Join(defaultDisplayPhase, "/")))
 	cmd.Flags().StringVar(&o.opsRequestName, "name", "", "The OpsRequest name to get the details.")
 	return cmd
 }

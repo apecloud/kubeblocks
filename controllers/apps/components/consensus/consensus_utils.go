@@ -408,6 +408,10 @@ func updateConsensusRoleInfo(ctx context.Context,
 	vertexes := make([]graph.Vertex, 0)
 	for idx := range configList.Items {
 		config := configList.Items[idx]
+		config.Data["KB_LEADER"] = leader
+		config.Data["KB_FOLLOWERS"] = followers
+		// TODO: need to deprecate 'compDefName' being part of variable name, as it's redundant
+		// and introduce env/cm key naming reference complexity
 		config.Data["KB_"+strings.ToUpper(compDefName)+"_LEADER"] = leader
 		config.Data["KB_"+strings.ToUpper(compDefName)+"_FOLLOWERS"] = followers
 		vertexes = append(vertexes, &ictrltypes.LifecycleVertex{

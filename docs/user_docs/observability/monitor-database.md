@@ -53,7 +53,7 @@ Refer to [Enable add-ons](./../installation/enable-addons.md) for details.
 
 :::
 
-1. Enable the database monitoring function.
+2. Enable the database monitoring function.
 
     The monitoring function is enabled by default when a database is created. The open-source or customized Exporter is injected after the monitoring function is enabled. This Exporter can be found by Prometheus server automatically and scrape monitoring indicators at regular intervals.
 
@@ -75,7 +75,7 @@ Refer to [Enable add-ons](./../installation/enable-addons.md) for details.
 
     :::note
 
-    The setting of `monitor` is `true` by default and it is not recommended to disable it. In the cluster definition, you can choose any supported database engines, such as PGSQL, MongoDB, Redis.
+    The setting of `monitor` is `true` by default and it is not recommended to disable it. In the cluster definition, you can choose any supported database engine, such as PostgreSQL, MongoDB, Redis.
 
     ```bash
     kbcli cluster create mycluster --cluster-definition='apecloud-mysql' --monitor=true
@@ -116,11 +116,11 @@ You can view the dashboard of the corresponding cluster via Grafana Web Console.
        kbcli dashboard open <name>
        ```
 
-    ***Example***
+       ***Example***
 
-     ```bash
-         kbcli dashboard open kubeblocks-grafana
-     ```
+       ```bash
+       kbcli dashboard open kubeblocks-grafana
+       ```
 
     ***Result***
 
@@ -156,7 +156,7 @@ The Prometheus add-on uses the local ephemeral storage by default, which might c
    kbcli addon enable prometheus --storage 10Gi
    ```
 
-3. (Optional) If you want to stop using the PersistentVolume, execute the command below.
+3. (**Optional**) If you want to stop using the PersistentVolume, execute the command below.
 
    ```bash
    kbcli addon enable prometheus --storage 0Gi

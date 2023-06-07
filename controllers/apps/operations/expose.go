@@ -106,7 +106,7 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", actualProgressCount, expectProgressCount)
 
 	// patch OpsRequest.status.components
-	if !reflect.DeepEqual(oldOpsRequestStatus, opsRequest.Status) {
+	if !reflect.DeepEqual(*oldOpsRequestStatus, opsRequest.Status) {
 		if err := cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
 			return opsRequestPhase, 0, err
 		}

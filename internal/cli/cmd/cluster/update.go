@@ -66,6 +66,12 @@ var clusterUpdateExample = templates.Examples(`
 
 	# update cluster tolerations
 	kbcli cluster update mycluster --tolerations='"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+
+	# edit cluster
+	kbcli cluster update mycluster --edit
+
+	# enable cluster monitor and edit
+    # kbcli cluster update mycluster --monitor=true --edit
 `)
 
 type updateOptions struct {
@@ -165,7 +171,10 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 	}
 
 	buildTolObj := func(obj map[string]interface{}, v pflag.Value, field string) error {
-		tolerations := buildTolerations(o.TolerationsRaw)
+		tolerations, err := util.BuildTolerations(o.TolerationsRaw)
+		if err != nil {
+			return err
+		}
 		return unstructured.SetNestedField(obj, tolerations, field)
 	}
 

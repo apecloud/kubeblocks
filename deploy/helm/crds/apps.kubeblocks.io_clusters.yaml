@@ -519,7 +519,7 @@ spec:
                 type: string
               tolerations:
                 description: tolerations are attached to tolerate any taint that matches
-                  the triple <key,value,effect> using the matching operator <operator>.
+                  the triple `key,value,effect` using the matching operator `operator`.
                 items:
                   description: The pod this Toleration is attached to tolerates any
                     taint that matches the triple <key,value,effect> using the matching
@@ -664,7 +664,7 @@ spec:
                         type: string
                       description: message records the component details message in
                         current phase. Keys are podName or deployName or statefulSetName.
-                        The format is `<ObjectKind>/<Name>`.
+                        The format is `ObjectKind/Name`.
                       type: object
                     phase:
                       description: 'phase describes the phase of the component and

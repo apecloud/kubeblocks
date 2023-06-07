@@ -240,29 +240,33 @@ In this example, data inserted before 19:56:40 is restored.
 
 7. (**Caution**) Delete the PostgreSQL cluster and clean up the backup.
 
-:warning: Data deleted here is only for test. In real scenarios, deleting backup is a critically high-risk operation.
+:::danger
 
-    :::note
+Data deleted here is only for testing. In real scenarios, deleting backup is a critically high-risk operation.
 
-    Expenses incurred when you have snapshots on the cloud. So it is recommended to delete the test cluster.
-
-    :::
+:::
   
-    Delete a PostgreSQL cluster with the following command.
+     Delete a PostgreSQL cluster with the following command.
 
-    ```bash
-    kbcli cluster delete my-pg
-    kbcli cluster delete new-cluster
-    ```
+     ```bash
+     kbcli cluster delete my-pg
+     kbcli cluster delete new-cluster
+     ```
 
     Delete the specified backup.
 
-    ```bash
-    kbcli cluster delete-backup my-pg --name backup-default-my-pg-20230417195547
-    ```
+     ```bash
+     kbcli cluster delete-backup my-pg --name backup-default-my-pg-20230417195547
+     ```
 
     Force delete all backups with `my-pg`.
 
-    ```bash
-    kbcli cluster delete-backup my-pg --force
-    ```
+     ```bash
+     kbcli cluster delete-backup my-pg --force
+     ```
+
+:::note
+
+Expenses incurred when you have snapshots on the cloud. So it is recommended to delete the test cluster.
+
+:::

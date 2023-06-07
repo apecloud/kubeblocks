@@ -242,11 +242,15 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 	var curLeader string
 	var role string
 	var serverID string
+	var isReady bool
 	for rows.Next() {
 		if err = rows.Scan(&curLeader, &role, &serverID); err != nil {
 			mysqlOps.Logger.Errorf("Role query error: %v", err)
 			return role, err
 		}
+		isReady = true
+	}
+	if isReady {
 		return role, nil
 	}
 	return "", errors.Errorf("exec sql %s failed: no data returned", sql)

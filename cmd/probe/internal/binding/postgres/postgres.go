@@ -206,8 +206,9 @@ func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.
 		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 
+	var isRecovery bool
+	var isReady bool
 	for rows.Next() {
-		var isRecovery bool
 		if err = rows.Scan(&isRecovery); err != nil {
 			pgOps.Logger.Errorf("Role query error: %v", err)
 			return "", err
@@ -215,6 +216,9 @@ func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.
 		if isRecovery {
 			return SECONDARY, nil
 		}
+		isReady = true
+	}
+	if isReady {
 		return PRIMARY, nil
 	}
 	return "", errors.Errorf("exec sql %s failed: no data returned", sql)

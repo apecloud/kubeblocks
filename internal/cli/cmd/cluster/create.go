@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -767,6 +768,12 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		setReplicas, err := strconv.Atoi(getVal(&c, keyReplicas, sets))
 		if err != nil {
 			return nil, fmt.Errorf("repicas is illegal " + err.Error())
+		}
+		if setReplicas < 0 {
+			return nil, fmt.Errorf("repicas is illegal, required value >=0")
+		}
+		if setReplicas > math.MaxInt32 {
+			return nil, fmt.Errorf("repicas is illegal, exceed max. value (%d) ", math.MaxInt32)
 		}
 		replicas := int32(setReplicas)
 

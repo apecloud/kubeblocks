@@ -47,15 +47,15 @@ type ClusterDefinitionSpec struct {
 	// secret for cluster.apps.kubeblocks.io object. Built-in objects are:
 	// `$(RANDOM_PASSWD)` - random 8 characters.
 	// `$(UUID)` - generate a random UUID v4 string.
-	// `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string``.
-	// `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded``.
-	// `$(UUID_HEX)` - generate a random UUID v4 HEX representation``.
+	// `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string.
+	// `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded.
+	// `$(UUID_HEX)` - generate a random UUID v4 HEX representation.
 	// `$(HEADLESS_SVC_FQDN)` - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
 	// `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
 	// `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
-	//    { "name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306 }, and "$(SVC_PORT_mysql)" in the
+	//    `"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306`, and "$(SVC_PORT_mysql)" in the
 	//    connection credential value is 3306.
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
@@ -341,8 +341,8 @@ type ClusterComponentDefinition struct {
 	// according to the volumeType.
 	//
 	// For example:
-	//  `{name: data, type: data}` means that the volume named `data` is used to store `data`.
-	//  `{name: binlog, type: log}` means that the volume named `binlog` is used to store `log`.
+	//  `name: data, type: data` means that the volume named `data` is used to store `data`.
+	//  `name: binlog, type: log` means that the volume named `binlog` is used to store `log`.
 	//
 	// NOTE:
 	//   When volumeTypes is not defined, the backup function will not be supported,

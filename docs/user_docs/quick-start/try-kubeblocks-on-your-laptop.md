@@ -1,12 +1,12 @@
 ---
-title: Try out KubeBlocks in 5 minutes on your laptop
+title: Try out KubeBlocks in 5 minutes on laptop
 description: A quick tour of KubeBlocks Playground
 keywords: [Playground, try out, laptop,]
 sidebar_position: 1
-sidebar_label: Try out KubeBlocks on your laptop
+sidebar_label: Try out KubeBlocks on laptop
 ---
 
-# Try out KubeBlocks in 5 minutes on your laptop
+# Try out KubeBlocks in 5 minutes on laptop
 
 This guide walks you through the quickest way to get started with KubeBlocks, demonstrating how to create a demo environment (Playground) with one command.
 
@@ -15,8 +15,8 @@ This guide walks you through the quickest way to get started with KubeBlocks, de
 Meet the following requirements for a smooth user experience:
 
 * Minimum system requirements:
-  * CPU: 4 cores, use `sysctl hw.physicalcpu` command to check CPU;
-  * RAM: 4 GB, use `top -d` command to check memory.
+  * CPU: 4C, use `sysctl hw.physicalcpu` command to check CPU;
+  * RAM: 4G, use `top -d` command to check memory.
 
 * Make sure the following tools are installed on your laptop:
   * [Docker](https://docs.docker.com/get-docker/): v20.10.5 (runc ≥ v1.0.0-rc93) or above;

@@ -1,6 +1,16 @@
 {{ define "packages" }}
 
+---
+title: {{ .apiName | toTitle }} API Reference
+description: {{ .apiName | toTitle }} API Reference
+keywords: [{{ .apiName }}, api]
+sidebar_position: {{ .filerOrder }}
+sidebar_label: {{ .apiName | toTitle }}
+---
+<br />
+
 {{ with .packages}}
+
 <p>Packages:</p>
 <ul>
     {{ range . }}

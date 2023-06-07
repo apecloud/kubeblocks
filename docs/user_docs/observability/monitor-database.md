@@ -75,7 +75,7 @@ Refer to [Enable add-ons](./../installation/enable-addons.md) for details.
 
     :::note
 
-    The setting of `monitor` is `true` by default and it is not recommended to disable it. In the cluster definition, you can choose any supported database engines, such as PGSQL, MongoDB, Redis.
+    The setting of `monitor` is `true` by default and it is not recommended to disable it. In the cluster definition, you can choose any supported database engine, such as PostgreSQL, MongoDB, Redis.
 
     ```bash
     kbcli cluster create mycluster --cluster-definition='apecloud-mysql' --monitor=true
@@ -156,7 +156,7 @@ The Prometheus add-on uses the local ephemeral storage by default, which might c
    kbcli addon enable prometheus --storage 10Gi
    ```
 
-3. (Optional) If you want to stop using the PersistentVolume, execute the command below.
+3. (**Optional**) If you want to stop using the PersistentVolume, execute the command below.
 
    ```bash
    kbcli addon enable prometheus --storage 0Gi

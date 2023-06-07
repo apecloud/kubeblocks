@@ -1,56 +1,53 @@
 ---
 title: Install KubeBlocks
-description: Install KubeBlocks on the existed Kubernetes clusters
+description: Install KubeBlocks on the existing Kubernetes clusters
 keywords: [taints, affinity, tolerance, install, kbcli, KubeBlocks]
 sidebar_position: 3
-sidebar_label: On the existed Kubernetes clusters
+sidebar_label: Install KubeBlocks
 ---
 
 # Install KubeBlocks
 
-In the actual environment, it is normal to install `kbcli` and KubeBlocks on the existing and running Kubernetes clusters.
-To install KubeBlocks on a brand new cluster, you can use Playground, the command is `kbcli playground init`.
+The quickest way to try out KubeBlocks is to create a new Kubernetes cluster and install KubeBlocks using the playground. However, production environments are more complex, with applications running in different namespaces and with resource or permission limitations. This document explains how to deploy KubeBlocks on an existing Kubernetes cluster.
 
 ## Environment preparation
 
 <table>
 	<tr>
-	    <th colspan="3">Installation Requirements</th>
+	    <th colspan="3">Resource Requirements</th>
 	</tr >
 	<tr>
 	    <td >Control Plane</td>
-	    <td colspan="2">It is recommended to create 1 node with at least 4c4g and 50Gi storage. </td>
+	    <td colspan="2">It is recommended to create 1 node with 4 cores, 4GB memory and 50GB storage. </td>
 	</tr >
 	<tr >
 	    <td rowspan="4">Data Plane</td>
-	    <td>For MySQL database </td>
-	    <td>It is recommended to create at least 3 nodes with 2c4Gi and 50Gi storage. </td>
+	    <td> MySQL </td>
+	    <td>It is recommended to create at least 3 nodes with 2 cores, 4GB memory and 50GB storage. </td>
 	</tr>
 	<tr>
-	    <td>For PostgreSQL database </td>
-        <td>It is recommended to create at least 2 nodes with 2c4Gi and 50Gi storage.  </td>
+	    <td> PostgreSQL </td>
+        <td>It is recommended to create at least 2 nodes with 2 cores, 4GB memory and 50GB storage.  </td>
 	</tr>
 	<tr>
-	    <td>For Redis database</td>
-        <td>It is recommended to create at least 2 nodes with 2c4Gi and 50Gi storage. </td>
+	    <td> Redis </td>
+        <td>It is recommended to create at least 2 nodes with 2 cores, 4GB memory and 50GB storage. </td>
 	</tr>
 	<tr>
-	    <td>For MongoDB database</td>
-	    <td>It is recommended to create at least 3 nodes with 2c4Gi and 50Gi storage. </td>
+	    <td> MongoDB </td>
+	    <td>It is recommended to create at least 3 nodes with 2 cores, 4GB memory and 50GB storage. </td>
 	</tr>
 </table>
 
 ## Installation steps
 
-**Before you start**
+The command `kbcli kubeblocks install` installs KubeBlocks in the `kb-system` namespace, or you can use the `--namespace` flag to specify one.
 
-Make sure you have kbcli installed, for detailed information, check [Install kbcli](./install-kbcli.md).
+You can also isolate the KubeBlocks control plane and data plane resources by setting taints and tolerations. Choose from the following options.
 
-**Install KubeBlocks with `kbcli kubeblocks install` command.**
+### Install KubeBlocks with default tolerations
 
-The installation command is `kbcli kubeblocks install`, simply running this command installs KubeBlocks on nodes without taints with default namespace `kb-system`.
-
-But in actual scenarios, you are recommended to install KubeBlocks on nodes with taints and customized namespace.
+By default, KubeBlocks tolerates two taints: `kb-controller:NoSchedule` for the control plane and `kb-data:NoSchedule` for the data plane. You can add these taints to nodes so that KubeBlocks and database clusters are scheduled to the appropriate nodes.
 
 1. Get Kubernetes nodes.
 
@@ -58,38 +55,71 @@ But in actual scenarios, you are recommended to install KubeBlocks on nodes with
     kubectl get node
     ```
 
-2. Place taints on the selected nodes.
+2. Add taints to the selected nodes.
 
     ```bash
-    kubectl taint nodes <nodename> <taint1name>=true:NoSchedule
+    # add control plane taint
+    kubectl taint nodes <nodename> kb-controller=true:NoSchedule
+   
+    # add data plane taint
+    kubectl taint nodes <nodename> kb-data=true:NoSchedule
     ```
 
 3. Install KubeBlocks.
 
     ```bash
-    kbcli kubeblocks install --create-namespace  --namespace <name> --set-json 'tolerations=[ { "key": "taint1name", "operator": "Equal", "effect": "NoSchedule", "value": "true" }, { "key": "taint2name", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]'
+    kbcli kubeblocks install
+    ```
+
+### Install KubeBlocks with custom tolerations
+
+Another option is to tolerate custom taints, regardless of whether they are already set on the nodes.
+
+1. Get Kubernetes nodes.
+
+    ```bash
+    kubectl get node
+    ```
+
+2. If the selected nodes do not already have custom taints, add them.
+
+    ```bash
+    # set control plane taint
+    kubectl taint nodes <nodename> <control-plane-taint>=true:NoSchedule
+     
+    # set data plane taint
+    kubectl taint nodes <nodename> <data-plane-taint>=true:NoSchedule
+    ```
+
+3. Install KubeBlocks with control plane and data plane tolerations.
+
+    ```bash
+    kbcli kubeblocks install --set-json 'tolerations=[ { "key": "control-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]' --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]'
     ```
 
 :::note
 
-When executing the `kbcli kubeblocks install` command, the `preflight` checks run automatically to check the environment. If the current cluster meets the installation requirements, the installation continues. If it does not, the current process is terminated, and an error message is displayed. To skip the `preflight` checks, you can add the `--force` flag after the `kbcli kubeblocks install` command.
+When executing the `kbcli kubeblocks install` command, the `preflight` checks will automatically verify the environment. If the cluster satisfies the basic requirements, the installation process will proceed. Otherwise, the process will be terminated, and an error message will be displayed. To skip the `preflight` checks, add the `--force` flag after the `kbcli kubeblocks install` command.
 
 :::
 
-4. Verify whether KubeBlocks is installed successfully.
+## Verify KubeBlocks
 
-    ```bash
-    kubectl get pod -n kb-system
-    ```
+Run the following command to check whether KubeBlocks is installed successfully.
 
-    ***Result***
+```bash
+kubectl get pod -n kb-system
+```
 
-    When the following pods are `Running`, it means KubeBlocks is installed successfully.
+***Result***
 
-    ```bash
-    NAME                                                     READY   STATUS      RESTARTS   AGE
-    kb-addon-alertmanager-webhook-adaptor-5549f94599-fsnmc   2/2     Running     0          84s
-    kb-addon-grafana-5ddcd7758f-x4t5g                        3/3     Running     0          84s
-    kb-addon-prometheus-alertmanager-0                       2/2     Running     0          84s
-    kb-addon-prometheus-server-0                             2/2     Running     0          84s
-    kubeblocks-846b8878d9-q8g2w                              1/1     Running     0          98s
+If the following pods are all `Running`, KubeBlocks has been installed successfully.
+
+```bash
+NAME                                                     READY   STATUS      RESTARTS   AGE
+kb-addon-alertmanager-webhook-adaptor-5549f94599-fsnmc   2/2     Running     0          84s
+kb-addon-grafana-5ddcd7758f-x4t5g                        3/3     Running     0          84s
+kb-addon-prometheus-alertmanager-0                       2/2     Running     0          84s
+kb-addon-prometheus-server-0                             2/2     Running     0          84s
+kubeblocks-846b8878d9-q8g2w                              1/1     Running     0          98s
+```

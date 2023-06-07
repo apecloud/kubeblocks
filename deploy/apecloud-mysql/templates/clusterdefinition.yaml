@@ -59,7 +59,7 @@ spec:
             port: 3306
             targetPort: mysql
       horizontalScalePolicy:
-        type: Backup
+        type: Snapshot
         backupPolicyTemplateName: apecloud-mysql-backup-policy-for-hscale
       volumeTypes:
         - name: data

@@ -134,7 +134,6 @@ func (c *StatefulComponentBase) Delete(reqCtx intctrlutil.RequestCtx, cli client
 }
 
 func (c *StatefulComponentBase) Update(reqCtx intctrlutil.RequestCtx, cli client.Client, builder ComponentWorkloadBuilder) error {
-
 	if err := c.init(reqCtx, cli, builder, true); err != nil {
 		return err
 	}
@@ -159,11 +158,7 @@ func (c *StatefulComponentBase) Update(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 
-	if err := c.ResolveObjectsAction(reqCtx, cli); err != nil {
-		return err
-	}
-
-	return nil
+	return c.ResolveObjectsAction(reqCtx, cli)
 }
 
 func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client.Client, builder ComponentWorkloadBuilder) error {
@@ -644,8 +639,8 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 		for _, obj := range objs {
 			c.CreateResource(obj, nil)
 		}
+		return nil
 	}
-	return nil
 }
 
 func (c *StatefulComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {

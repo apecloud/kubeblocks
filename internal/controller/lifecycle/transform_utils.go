@@ -31,15 +31,12 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func newRequeueError(after time.Duration, reason string) error {
 	return intctrlutil.NewRequeueError(after, reason)
 }
-
-var _ client2.ReadonlyClient = delegateClient{}
 
 func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkNObjKey, error) {
 	gvk, err := apiutil.GVKForObject(object, scheme)

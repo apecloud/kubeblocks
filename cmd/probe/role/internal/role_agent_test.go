@@ -73,7 +73,7 @@ func (fakeRoleAgent *fakeRoleAgent) Init() error {
 
 func initEnv(ports []int) {
 	viper.Set("KB_FAILED_EVENT_REPORT_FREQUENCY", "3601")
-	viper.Set("KB_ROLE_DETECTION_THRESHOLD", "59")
+	viper.Set("KB_ROLE_OBSERVATION_THRESHOLD", "59")
 	buf, _ := json.Marshal(ports)
 	viper.Set("KB_CONSENSUS_SET_ACTION_SVC_LIST", string(buf))
 }

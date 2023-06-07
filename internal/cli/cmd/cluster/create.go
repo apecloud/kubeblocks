@@ -311,7 +311,7 @@ func (o *CreateOptions) Validate() error {
 
 	matched, _ := regexp.MatchString(`^[a-z]([-a-z0-9]*[a-z0-9])?$`, o.Name)
 	if !matched {
-		return fmt.Errorf("cluster name must begin with a letter and can only contain lowercase letters, numbers, and '-'.")
+		return fmt.Errorf("cluster name must begin with a letter and can only contain lowercase letters, numbers, and '-'")
 	}
 
 	if len(o.Name) > 16 {

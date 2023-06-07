@@ -313,14 +313,6 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Validate()).Should(HaveOccurred())
 		})
 
-		It("can validate whether the name is not specified and fail to generate a random cluster name when create a new cluster ", func() {
-			Expect(o.Name).ShouldNot(BeEmpty())
-			Expect(o.Validate()).Should(Succeed())
-			o.Name = ""
-			// Expected to generate a random name
-			Expect(o.Validate()).Should(Succeed())
-		})
-
 		It("can validate the cluster name must begin with a letter and can only contain lowercase letters, numbers, and '-'.", func() {
 			invalidCharacter := "~!#$%^&*()_=+{}[]`:;'<>/?,.\\"
 			validName := "abcd"

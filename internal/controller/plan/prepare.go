@@ -39,8 +39,8 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// RenderConfigNScriptFiles generate volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
-// and generate configManager sidecar for the reconfigure operation.
+// RenderConfigNScriptFiles generates volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
+// and generates configManager sidecar for the reconfigure operation.
 // TODO rename this function, this function name is not very reasonable, but there is no suitable name.
 func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,

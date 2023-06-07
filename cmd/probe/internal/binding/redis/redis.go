@@ -29,7 +29,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/exp/slices"
 
-	bindings "github.com/dapr/components-contrib/bindings"
+	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 
 	// import this json-iterator package to replace the default

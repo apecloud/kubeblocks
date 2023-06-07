@@ -1,0 +1,46 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: agamotto
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: Agamotto is a high-performance data collection agent with luxuriant function, which inspired by OpenTelemetry.
+  type: Helm
+
+  helm:
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/agamotto-0.1.0-beta.2.tgz
+    installValues:
+      configMapRefs:
+        - name: {{ include "addon.agamotto.name" . }}-chart-kubeblocks-values
+          key: values-kubeblocks-override.yaml
+
+    valuesMapping:
+      valueMap:
+
+      jsonMap:
+        tolerations: tolerations
+
+      resources:
+        cpu:
+          requests: resources.requests.cpu
+          limits: resources.limits.cpu
+        memory:
+          requests: resources.requests.memory
+          limits: resources.limits.memory
+
+  defaultInstallValues:
+    - enabled: true
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
+  installable:
+    autoInstall: {{ .Values.agamotto.enabled }}
+
+

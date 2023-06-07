@@ -128,7 +128,7 @@ func NewComponentTemplateRenderCmd(f cmdutil.Factory, streams genericclioptions.
 	cmd := &cobra.Command{
 		Use:     "template",
 		Aliases: []string{"tpl"},
-		Short:   "tpl - a developer tool integrated with Kubeblocks that can help developers quickly generate rendered configurations or scripts based on Helm templates, and discover errors in the template before creating the database cluster.",
+		Short:   "tpl - a developer tool integrated with KubeBlocks that can help developers quickly generate rendered configurations or scripts based on Helm templates, and discover errors in the template before creating the database cluster.",
 		Example: templateExamples,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete())

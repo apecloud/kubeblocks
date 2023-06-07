@@ -65,15 +65,15 @@ var backupConfigExample = templates.Examples(`
 		# replace the init capacity when it is empty in the backup policy.
 		dataProtection.backupPVCInitCapacity=100Gi
 
-		# the pvc storage class name. replace the storageClassName when it is nil in the backup policy.
+		# the pvc storage class name. replace the storageClassName when it is unset in the backup policy.
 		dataProtection.backupPVCStorageClassName=csi-s3
 
-		# the pvc create policy.
+		# the pvc creation policy.
 		# if the storageClass supports dynamic provisioning, recommend "IfNotPresent" policy.
 		# otherwise, using "Never" policy. only affect the backupPolicy automatically created by KubeBlocks.
 		dataProtection.backupPVCCreatePolicy=Never
 
-		# the configmap name of the pv template. if the csi-driver not support dynamic provisioning,
+		# the configmap name of the pv template. if the csi-driver does not support dynamic provisioning,
 		# you can provide a configmap which contains key "persistentVolume" and value of the persistentVolume struct.
 		dataProtection.backupPVConfigMapName=pv-template
 
@@ -132,7 +132,7 @@ func NewDescribeConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 	return cmd
 }
 
-// getHelmValues get all kubeblocks values by helm and filter the addons values
+// getHelmValues gets all kubeblocks values by helm and filter the addons values
 func getHelmValues(release string, opt *Options) (map[string]interface{}, error) {
 	if len(opt.HelmCfg.Namespace()) == 0 {
 		namespace, err := util.GetKubeBlocksNamespace(opt.Client)
@@ -165,7 +165,7 @@ func getHelmValues(release string, opt *Options) (map[string]interface{}, error)
 
 type fn func(release string, opt *Options) (map[string]interface{}, error)
 
-// describeConfig will output the configs get by the fn in specified format
+// describeConfig outputs the configs got by the fn in specified format
 func describeConfig(o *InstallOptions, format printer.Format, f fn) error {
 	values, err := f(types.KubeBlocksReleaseName, &o.Options)
 	if err != nil {
@@ -176,8 +176,7 @@ func describeConfig(o *InstallOptions, format printer.Format, f fn) error {
 }
 
 // markKubeBlocksPodsToLoadConfigMap marks an annotation of the KubeBlocks pods to load the projected volumes of configmap.
-// kubelet periodically requeues the Pod after 60-90 seconds, exactly how long it takes Secret/ConfigMaps updates to be reflected to the volumes.
-// so can modify the annotation of the pod to directly enter the coordination queue and make changes of the configmap to effective in a timely.
+// kubelet periodically requeues the Pod every 60-90 seconds, exactly the time it takes for Secret/ConfigMaps can be loaded in the config volumes.
 func markKubeBlocksPodsToLoadConfigMap(client kubernetes.Interface) error {
 	deploy, err := util.GetKubeBlocksDeploy(client)
 	if err != nil {

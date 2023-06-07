@@ -56,10 +56,7 @@ func GetParentNameAndOrdinal(pod *corev1.Pod) (string, int) {
 	return parent, ordinal
 }
 
-// GetContainerByConfigSpec function description:
-// Search the container using the configmap of config from the pod
-//
-// Return: The first container pointer of using configs
+// GetContainerByConfigSpec searches for container using the configmap of config from the pod
 //
 //	e.g.:
 //	ClusterDefinition.configTemplateRef:
@@ -86,12 +83,7 @@ func GetContainerByConfigSpec(podSpec *corev1.PodSpec, configs []appsv1alpha1.Co
 	return nil
 }
 
-// GetPodContainerWithVolumeMount function description:
-// Search which containers mounting the volume
-//
-// Case: When the configmap update, we restart all containers who using configmap
-//
-// Return: all containers mount volumeName
+// GetPodContainerWithVolumeMount searches for containers mounting the volume
 func GetPodContainerWithVolumeMount(podSpec *corev1.PodSpec, volumeName string) []*corev1.Container {
 	containers := podSpec.Containers
 	if len(containers) == 0 {
@@ -100,12 +92,7 @@ func GetPodContainerWithVolumeMount(podSpec *corev1.PodSpec, volumeName string) 
 	return getContainerWithVolumeMount(containers, volumeName)
 }
 
-// GetVolumeMountName function description:
-// Find the volume of pod using name of cm
-//
-// Case: When the configmap object of configuration is modified by user, we need to query whose volumeName
-//
-// Return: The volume pointer of pod
+// GetVolumeMountName finds the volume with mount name
 func GetVolumeMountName(volumes []corev1.Volume, resourceName string) *corev1.Volume {
 	for i := range volumes {
 		if volumes[i].ConfigMap != nil && volumes[i].ConfigMap.Name == resourceName {
@@ -200,8 +187,7 @@ func GetVolumeMountByVolume(container *corev1.Container, volumeName string) *cor
 	return nil
 }
 
-// GetCoreNum function description:
-// if not Resource field return 0 else Resources.Limits.cpu
+// GetCoreNum gets content of Resources.Limits.cpu
 func GetCoreNum(container corev1.Container) int64 {
 	limits := container.Resources.Limits
 	if val, ok := (limits)[corev1.ResourceCPU]; ok {
@@ -210,8 +196,7 @@ func GetCoreNum(container corev1.Container) int64 {
 	return 0
 }
 
-// GetMemorySize function description:
-// if not Resource field, return 0 else Resources.Limits.memory
+// GetMemorySize gets content of Resources.Limits.memory
 func GetMemorySize(container corev1.Container) int64 {
 	limits := container.Resources.Limits
 	if val, ok := (limits)[corev1.ResourceMemory]; ok {
@@ -220,8 +205,7 @@ func GetMemorySize(container corev1.Container) int64 {
 	return 0
 }
 
-// GetRequestMemorySize function description:
-// if not Resource field, return 0 else Resources.Limits.memory
+// GetRequestMemorySize gets content of Resources.Limits.memory
 func GetRequestMemorySize(container corev1.Container) int64 {
 	requests := container.Resources.Requests
 	if val, ok := (requests)[corev1.ResourceMemory]; ok {
@@ -230,7 +214,7 @@ func GetRequestMemorySize(container corev1.Container) int64 {
 	return 0
 }
 
-// PodIsReady check the pod is ready
+// PodIsReady checks if pod is ready
 func PodIsReady(pod *corev1.Pod) bool {
 	if pod.Status.Conditions == nil {
 		return false
@@ -248,7 +232,7 @@ func PodIsReady(pod *corev1.Pod) bool {
 	return false
 }
 
-// GetContainerID find the containerID from pod by name
+// GetContainerID gets the containerID from pod by name
 func GetContainerID(pod *corev1.Pod, containerName string) string {
 	const containerSep = "//"
 
@@ -326,12 +310,12 @@ func GetIntOrPercentValue(intOrStr *metautil.IntOrString) (int, bool, error) {
 	}
 	v, err := strconv.Atoi(s)
 	if err != nil {
-		return 0, false, fmt.Errorf("failed to atoi. [%s], error: %v", intOrStr.StrVal, err)
+		return 0, false, fmt.Errorf("failed to atoi [%s], error: %v", intOrStr.StrVal, err)
 	}
 	return v, true, nil
 }
 
-// GetPortByPortName find the Port from pod by name
+// GetPortByPortName gets the Port from pod by name
 func GetPortByPortName(pod *corev1.Pod, portName string) (int32, error) {
 	for _, container := range pod.Spec.Containers {
 		for _, port := range container.Ports {
@@ -351,7 +335,7 @@ func GetProbeHTTPPort(pod *corev1.Pod) (int32, error) {
 	return GetPortByPortName(pod, constant.ProbeHTTPPortName)
 }
 
-// GetProbeContainerName find the probe container from pod
+// GetProbeContainerName gets the probe container from pod
 func GetProbeContainerName(pod *corev1.Pod) (string, error) {
 	for _, container := range pod.Spec.Containers {
 		if container.Name == constant.RoleProbeContainerName {
@@ -362,8 +346,8 @@ func GetProbeContainerName(pod *corev1.Pod) (string, error) {
 
 }
 
-// PodIsReadyWithLabel checks whether pod is ready or not if the component is ConsensusSet or ReplicationSet,
-// it will be available when the pod is ready and labeled with its role.
+// PodIsReadyWithLabel checks if pod is ready for ConsensusSet/ReplicationSet component,
+// it will be available when the pod is ready and labeled with role.
 func PodIsReadyWithLabel(pod corev1.Pod) bool {
 	if _, ok := pod.Labels[constant.RoleLabelKey]; !ok {
 		return false
@@ -377,7 +361,7 @@ func PodIsControlledByLatestRevision(pod *corev1.Pod, sts *appsv1.StatefulSet) b
 	return GetPodRevision(pod) == sts.Status.UpdateRevision && sts.Status.ObservedGeneration == sts.Generation
 }
 
-// GetPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty
+// GetPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision empty
 // string is returned.
 func GetPodRevision(pod *corev1.Pod) string {
 	if pod.Labels == nil {
@@ -389,17 +373,17 @@ func GetPodRevision(pod *corev1.Pod) string {
 // ByPodName sorts a list of jobs by pod name
 type ByPodName []corev1.Pod
 
-// Len return the length of byPodName, for the sort.Sort
+// Len returns the length of byPodName for sort.Sort
 func (c ByPodName) Len() int {
 	return len(c)
 }
 
-// Swap the items, for the sort.Sort
+// Swap swaps the items for sort.Sort
 func (c ByPodName) Swap(i, j int) {
 	c[i], c[j] = c[j], c[i]
 }
 
-// Less define how to compare items, for the sort.Sort
+// Less defines compare method for sort.Sort
 func (c ByPodName) Less(i, j int) bool {
 	return c[i].Name < c[j].Name
 }

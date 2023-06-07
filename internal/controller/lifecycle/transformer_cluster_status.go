@@ -26,7 +26,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
@@ -98,7 +97,6 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 		if err := t.reconcileClusterStatus(transCtx, dag, cluster); err != nil {
 			return err
 		}
-		t.cleanupAnnotationsAfterRunning(cluster)
 	}
 
 	return nil
@@ -151,7 +149,7 @@ func (t *ClusterStatusTransformer) removeInvalidCompStatus(cluster *appsv1alpha1
 	cluster.Status.Components = tmpCompsStatus
 }
 
-// doAnalysisAndUpdateSynchronizer analyses the Cluster.Status.Components and updates the results to the synchronizer.
+// doAnalysisAndUpdateSynchronizer analyzes the Cluster.Status.Components and updates the results to the synchronizer.
 func (t *ClusterStatusTransformer) doAnalysisAndUpdateSynchronizer(dag *graph.DAG, cluster *appsv1alpha1.Cluster) {
 	var (
 		runningCompCount int
@@ -239,17 +237,6 @@ func (t *ClusterStatusTransformer) handleExistAbnormalOrFailed(transCtx *Cluster
 	handleClusterPhaseWhenCompsNotReady(cluster, componentMap, clusterAvailabilityEffectMap)
 }
 
-// cleanupAnnotationsAfterRunning cleans up the cluster annotations after cluster is Running.
-func (t *ClusterStatusTransformer) cleanupAnnotationsAfterRunning(cluster *appsv1alpha1.Cluster) {
-	if !slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase) {
-		return
-	}
-	if _, ok := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]; !ok {
-		return
-	}
-	delete(cluster.Annotations, constant.RestoreFromBackUpAnnotationKey)
-}
-
 // handleClusterPhaseWhenCompsNotReady handles the Cluster.status.phase when some components are Abnormal or Failed.
 func handleClusterPhaseWhenCompsNotReady(cluster *appsv1alpha1.Cluster,
 	componentMap map[string]string,
@@ -281,8 +268,8 @@ func handleClusterPhaseWhenCompsNotReady(cluster *appsv1alpha1.Cluster,
 	}
 }
 
-// getClusterAvailabilityEffect whether the component will affect the cluster availability.
-// if the component can affect and be Failed, the cluster will be Failed too.
+// getClusterAvailabilityEffect checks whether the component affect the cluster availability.
+// if the component affects the availability and being Failed, the cluster is also Failed.
 func getClusterAvailabilityEffect(componentDef *appsv1alpha1.ClusterComponentDefinition) bool {
 	switch componentDef.WorkloadType {
 	case appsv1alpha1.Consensus, appsv1alpha1.Replication:

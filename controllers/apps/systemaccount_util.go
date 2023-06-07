@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -29,28 +28,12 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	componetutil "github.com/apecloud/kubeblocks/internal/controller/component"
 )
-
-const (
-	jobPrefix = "job-system-account-"
-)
-
-// SecretMapStore is a cache, recording all (key, secret) pairs for accounts to be created.
-type secretMapStore struct {
-	cache.Store
-}
-
-// SecretMapEntry records (key, secret) pairs for account to be created.
-type secretMapEntry struct {
-	key   string
-	value *corev1.Secret
-}
 
 // customizedEngine helps render jobs.
 type customizedEngine struct {
@@ -60,52 +43,6 @@ type customizedEngine struct {
 	command       []string
 	args          []string
 	envVarList    []corev1.EnvVar
-}
-
-// SecretKeyFunc to parse out the key from a SecretMapEntry.
-var secretKeyFunc = func(obj interface{}) (string, error) {
-	if e, ok := obj.(*secretMapEntry); ok {
-		return e.key, nil
-	}
-	return "", fmt.Errorf("could not find key for obj %#v", obj)
-}
-
-func newSecretMapStore() *secretMapStore {
-	return &secretMapStore{cache.NewStore(secretKeyFunc)}
-}
-
-func (r *secretMapStore) addSecret(key string, value *corev1.Secret) error {
-	_, exists, err := r.getSecret(key)
-	if err != nil {
-		return err
-	}
-	entry := &secretMapEntry{key: key, value: value}
-	if exists {
-		return r.Update(entry)
-	}
-	return r.Add(entry)
-}
-
-func (r *secretMapStore) getSecret(key string) (*secretMapEntry, bool, error) {
-	exp, exists, err := r.GetByKey(key)
-	if err != nil {
-		return nil, false, err
-	}
-	if exists {
-		return exp.(*secretMapEntry), true, nil
-	}
-	return nil, false, nil
-}
-
-func (r *secretMapStore) deleteSecret(key string) error {
-	exp, exist, err := r.GetByKey(key)
-	if err != nil {
-		return err
-	}
-	if exist {
-		return r.Delete(exp)
-	}
-	return nil
 }
 
 func (e *customizedEngine) getImage() string {
@@ -170,10 +107,7 @@ func getLabelsForSecretsAndJobs(key componentUniqueKey) client.MatchingLabels {
 	}
 }
 
-func renderJob(engine *customizedEngine, key componentUniqueKey, statement []string, endpoint string) *batchv1.Job {
-	randomStr, _ := password.Generate(6, 0, 0, true, false)
-	jobName := jobPrefix + key.clusterName + "-" + randomStr
-
+func renderJob(jobName string, engine *customizedEngine, key componentUniqueKey, statement []string, endpoint string) *batchv1.Job {
 	// inject one more system env variables
 	statementEnv := corev1.EnvVar{
 		Name:  kbAccountStmtEnvName,
@@ -204,7 +138,7 @@ func renderJob(engine *customizedEngine, key componentUniqueKey, statement []str
 					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{
 						{
-							Name:            randomStr,
+							Name:            jobName,
 							Image:           engine.getImage(),
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Command:         engine.getCommand(),
@@ -221,9 +155,10 @@ func renderJob(engine *customizedEngine, key componentUniqueKey, statement []str
 }
 
 func renderSecretWithPwd(key componentUniqueKey, username, passwd string) *corev1.Secret {
-	secretData := map[string][]byte{}
-	secretData[constant.AccountNameForSecret] = []byte(username)
-	secretData[constant.AccountPasswdForSecret] = []byte(passwd)
+	secretData := map[string][]byte{
+		constant.AccountNameForSecret:   []byte(username),
+		constant.AccountPasswdForSecret: []byte(passwd),
+	}
 
 	ml := getLabelsForSecretsAndJobs(key)
 	ml[constant.ClusterAccountLabelKey] = username
@@ -302,12 +237,8 @@ func updateFacts(accountName appsv1alpha1.AccountName, detectedFacts *appsv1alph
 	}
 }
 
-func concatSecretName(key componentUniqueKey, username string) string {
-	return fmt.Sprintf("%s-%s-%s-%s", key.namespace, key.clusterName, key.componentName, username)
-}
-
 func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.PasswordConfig,
-	accountConfig appsv1alpha1.SystemAccountConfig, strategy updateStrategy) ([]string, *corev1.Secret) {
+	accountConfig appsv1alpha1.SystemAccountConfig, strategy updateStrategy) ([]string, string) {
 	// generated password with mixedcases = true
 	passwd, _ := password.Generate((int)(passConfig.Length), (int)(passConfig.NumDigits), (int)(passConfig.NumSymbols), false, false)
 	// refine password to upper or lower cases w.r.t configuration
@@ -338,8 +269,8 @@ func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.P
 		stmt := componetutil.ReplaceNamedVars(namedVars, statements.CreationStatement, -1, true)
 		execStmts = append(execStmts, stmt)
 	}
-	secret := renderSecretWithPwd(key, userName, passwd)
-	return execStmts, secret
+	// secret := renderSecretWithPwd(key, userName, passwd)
+	return execStmts, passwd
 }
 
 func getAllSysAccounts() []appsv1alpha1.AccountName {
@@ -376,7 +307,7 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 	if debugModeOn {
 		job.Spec.TTLSecondsAfterFinished = nil
 	} else {
-		defaultTTLZero := (int32)(0)
+		defaultTTLZero := (int32)(1)
 		job.Spec.TTLSecondsAfterFinished = &defaultTTLZero
 	}
 
@@ -387,6 +318,7 @@ func calibrateJobMetaAndSpec(job *batchv1.Job, cluster *appsv1alpha1.Cluster, co
 		return err
 	}
 	job.Spec.Template.Spec.Tolerations = tolerations
+
 	return nil
 }
 

@@ -10,7 +10,7 @@ sidebar_label: Class types
 
 ApeCloud for MySQL predefines cluster class for different CPU, memory, and storage requirements for you to choose. It is designed to offer convenience and also set a constraints on the resources applied to the cluster to avoid lowering resource utilization and system stability by unreasonable configuration.
 
-You can apply the cluster class when creating or vertically scale a cluster.
+You can apply the cluster class when creating or vertically scaling a cluster.
 
 📎 Table 1. General-purpose class type
 

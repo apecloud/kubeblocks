@@ -38,7 +38,7 @@ kbcli fault io errno [flags]
 ```
       --annotation stringToString      Select the pod to inject the fault according to Annotation. (default [])
   -c, --container stringArray          The name of the container, such as mysql, prometheus.If it's empty, the first container will be injected.
-      --dry-run string[="unchanged"]   Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
       --duration string                Supported formats of the duration are: ms / s / m / h. (default "10s")
       --errno int                      The returned error number.
   -h, --help                           help for errno

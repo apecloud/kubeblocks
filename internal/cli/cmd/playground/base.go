@@ -33,7 +33,7 @@ type baseOptions struct {
 	Timeout   time.Duration
 	// prevCluster is the previous cluster info
 	prevCluster *cp.K8sClusterInfo
-	// kubeConfigPath is the tmp kubeconfig path that will be used when int and destroy
+	// kubeConfigPath is the tmp kubeconfig path that will be used when init and destroy
 	kubeConfigPath string
 	// stateFilePath is the state file path
 	stateFilePath string

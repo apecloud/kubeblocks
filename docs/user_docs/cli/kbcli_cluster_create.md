@@ -75,7 +75,7 @@ kbcli cluster create [NAME] [flags]
   --node-labels '"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
   
   # Create a Cluster with two tolerations
-  kbcli cluster create --cluster-definition apecloud-mysql --tolerations \ '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+  kbcli cluster create --cluster-definition apecloud-mysql --tolerations \ '"engineType=mongo:NoSchedule","diskType=ssd:NoSchedule"'
   
   # Create a cluster, with each pod runs on their own dedicated node
   kbcli cluster create --cluster-definition apecloud-mysql --tenancy=DedicatedNode
@@ -88,6 +88,7 @@ kbcli cluster create [NAME] [flags]
       --cluster-definition string      Specify cluster definition, run "kbcli cd list" to show all available cluster definitions
       --cluster-version string         Specify cluster version, run "kbcli cv list" to show all available cluster versions, use the latest version if not specified
       --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+      --edit                           Edit the API resource before creating
       --enable-all-logs                Enable advanced application all log extraction, set to true will ignore enabledLogs of component level, default is false
   -h, --help                           help for create
       --monitor                        Set monitor enabled and inject metrics exporter (default true)
@@ -98,7 +99,7 @@ kbcli cluster create [NAME] [flags]
   -f, --set-file string                Use yaml file, URL, or stdin to set the cluster resource
       --tenancy string                 Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
       --termination-policy string      Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
-      --tolerations strings            Tolerations for cluster, such as '"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"'
+      --tolerations strings            Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
       --topology-keys stringArray      Topology keys for affinity
 ```
 

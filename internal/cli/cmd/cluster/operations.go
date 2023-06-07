@@ -24,12 +24,16 @@ import (
 	"fmt"
 	"strings"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -123,7 +127,7 @@ func (o *OperationsOptions) addCommonFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
-	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 	if o.HasComponentNamesFlag {
 		cmd.Flags().StringSliceVar(&o.ComponentNames, "components", nil, "Component names to this operations")
@@ -633,5 +637,71 @@ func NewStartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		},
 	}
 	o.addCommonFlags(cmd)
+	return cmd
+}
+
+var cancelExample = templates.Examples(`
+		# cancel the opsRequest which is not completed.
+		kbcli cluster cancel-ops <opsRequestName>
+`)
+
+func cancelOps(o *OperationsOptions) error {
+	opsRequest := &appsv1alpha1.OpsRequest{}
+	if err := cluster.GetK8SClientObject(o.Dynamic, opsRequest, o.GVR, o.Namespace, o.Name); err != nil {
+		return err
+	}
+	notSupportedPhases := []appsv1alpha1.OpsPhase{appsv1alpha1.OpsFailedPhase, appsv1alpha1.OpsSucceedPhase, appsv1alpha1.OpsCancelledPhase}
+	if slices.Contains(notSupportedPhases, opsRequest.Status.Phase) {
+		return fmt.Errorf("can not cancel the opsRequest when phase is %s", opsRequest.Status.Phase)
+	}
+	if opsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
+		return fmt.Errorf(`opsRequest "%s" is cancelling`, opsRequest.Name)
+	}
+	supportedType := []appsv1alpha1.OpsType{appsv1alpha1.HorizontalScalingType, appsv1alpha1.VerticalScalingType}
+	if !slices.Contains(supportedType, opsRequest.Spec.Type) {
+		return fmt.Errorf("opsRequest type: %s not support cancel action", opsRequest.Spec.Type)
+	}
+	if !o.autoApprove {
+		if err := delete.Confirm([]string{o.Name}, o.In); err != nil {
+			return err
+		}
+	}
+	oldOps := opsRequest.DeepCopy()
+	opsRequest.Spec.Cancel = true
+	oldData, err := json.Marshal(oldOps)
+	if err != nil {
+		return err
+	}
+	newData, err := json.Marshal(opsRequest)
+	if err != nil {
+		return err
+	}
+	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
+	if err != nil {
+		return err
+	}
+	if _, err = o.Dynamic.Resource(types.OpsGVR()).Namespace(opsRequest.Namespace).Patch(context.TODO(),
+		opsRequest.Name, apitypes.MergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
+		return err
+	}
+	fmt.Fprintf(o.Out, "start to cancel opsRequest \"%s\", you can view the progress:\n\tkbcli cluster list-ops --name %s\n", o.Name, o.Name)
+	return nil
+}
+
+func NewCancelCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := newBaseOperationsOptions(f, streams, "", false)
+	cmd := &cobra.Command{
+		Use:               "cancel-ops NAME",
+		Short:             "cancel the pending/creating/running OpsRequest which type is vscale or hscale.",
+		Example:           cancelExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.OpsGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
+			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(cancelOps(o))
+		},
+	}
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before cancel the opsRequest")
 	return cmd
 }

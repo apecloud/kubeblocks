@@ -1,20 +1,17 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package v1alpha1
@@ -70,15 +67,22 @@ func (r *OpsRequest) ValidateCreate() error {
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 	opsrequestlog.Info("validate update", "name", r.Name)
-	lastOpsRequest := old.(*OpsRequest)
-	if r.isForbiddenUpdate() && !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
-		return fmt.Errorf("update OpsRequest: %s is forbidden when status.Phase is %s", r.Name, r.Status.Phase)
-	}
+	lastOpsRequest := old.(*OpsRequest).DeepCopy()
 	// if no spec updated, we should skip validation.
 	// if not, we can not delete the OpsRequest when cluster has been deleted.
 	// because when cluster not existed, r.validate will report an error.
 	if reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
 		return nil
+	}
+
+	if r.IsComplete() {
+		return fmt.Errorf("update OpsRequest: %s is forbidden when status.Phase is %s", r.Name, r.Status.Phase)
+	}
+
+	// Keep the cancel consistent between the two opsRequest for comparing the diff.
+	lastOpsRequest.Spec.Cancel = r.Spec.Cancel
+	if !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
+		return fmt.Errorf("update OpsRequest: %s is forbidden except for cancel when status.Phase is %s", r.Name, r.Status.Phase)
 	}
 	return r.validateEntry(false)
 }
@@ -89,15 +93,18 @@ func (r *OpsRequest) ValidateDelete() error {
 	return nil
 }
 
-// IsForbiddenUpdate OpsRequest cannot modify the spec when status is in [Succeed,Running,Failed].
-func (r *OpsRequest) isForbiddenUpdate() bool {
-	return slices.Contains([]OpsPhase{OpsCreatingPhase, OpsRunningPhase, OpsSucceedPhase, OpsFailedPhase}, r.Status.Phase)
+// IsComplete checks if opsRequest has been completed.
+func (r *OpsRequest) IsComplete(phases ...OpsPhase) bool {
+	if len(phases) == 0 {
+		return slices.Contains([]OpsPhase{OpsCancelledPhase, OpsSucceedPhase, OpsFailedPhase}, r.Status.Phase)
+	}
+	return slices.Contains([]OpsPhase{OpsCancelledPhase, OpsSucceedPhase, OpsFailedPhase}, phases[0])
 }
 
 // validateClusterPhase validates whether the current cluster state supports the OpsRequest
 func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	opsBehaviour := OpsRequestBehaviourMapper[r.Spec.Type]
-	// if the OpsType has no cluster phases, ignores it
+	// if the OpsType has no cluster phases, ignore it
 	if len(opsBehaviour.FromClusterPhases) == 0 {
 		return nil
 	}
@@ -126,7 +133,7 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	// check if the opsRequest can be executed in the current cluster phase unless this opsRequest is reentrant.
 	if !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) &&
 		!slices.Contains(opsNamesInQueue, r.Name) {
-		return fmt.Errorf("opsRequest kind: %s is forbidden when Cluster.status.Phase is %s", r.Spec.Type, cluster.Status.Phase)
+		return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
 	}
 	return nil
 }

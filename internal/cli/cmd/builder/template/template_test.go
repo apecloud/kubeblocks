@@ -29,6 +29,8 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )

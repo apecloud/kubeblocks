@@ -96,7 +96,8 @@ func newFailedProvisioningStartedCondition(err error) metav1.Condition {
 
 func setApplyResourceCondition(conditions *[]metav1.Condition, clusterGeneration int64, err error) {
 	condition := newApplyResourcesCondition(clusterGeneration)
-	if err != nil {
+	// ignore requeue error
+	if err != nil && !intctrlutil.IsRequeueError(err) {
 		condition = newFailedApplyResourcesCondition(err)
 	}
 	meta.SetStatusCondition(conditions, condition)

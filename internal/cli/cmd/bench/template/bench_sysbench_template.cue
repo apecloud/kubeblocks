@@ -17,47 +17,47 @@
 
 // required, command line input options for parameters and flags
 options: {
-	driver: string
+	driver:   string
 	database: string
-	host: string
-	port: int
-	user: string
+	host:     string
+	port:     int
+	user:     string
 	password: string
-	mode: string
-	type: string
-	tables: int
-	times: int
+	mode:     string
+	type:     string
+	tables:   int
+	times:    int
 }
 
 // required, k8s api resource content
 content: {
-	apiVersion: "v1",
-	kind: "Pod",
+	apiVersion: "v1"
+	kind:       "Pod"
 	metadata: {
-		namespace: "default",
+		namespace:    "default"
 		generateName: "test-sysbench-prepare-\(options.driver)-"
 	}
 	spec: {
 		containers: [
 			{
-				name: "test-sysbench",
-				image: "registry.cn-hangzhou.aliyuncs.com/apecloud/customsuites:latest",
+				name:  "test-sysbench"
+				image: "registry.cn-hangzhou.aliyuncs.com/apecloud/customsuites:latest"
 				env: [
 					{
-						name: "TYPE",
+						name:  "TYPE"
 						value: "2"
 					},
 					{
-						name: "FLAG",
+						name:  "FLAG"
 						value: "0"
 					},
 					{
-						name: "CONFIGS",
-						 value: "mode:\(options.mode),driver:\(options.driver),host:\(options.host),user:\(options.user),password:\(options.password),port:\(options.port),db:\(options.database),size:\(options.size),tables:\(options.tables),times:\(options.times),type:\(options.type)"
-					}
+						name:  "CONFIGS"
+						value: "mode:\(options.mode),driver:\(options.driver),host:\(options.host),user:\(options.user),password:\(options.password),port:\(options.port),db:\(options.database),size:\(options.size),tables:\(options.tables),times:\(options.times),type:\(options.type)"
+					},
 				]
-			}
-		],
+			},
+		]
 		restartPolicy: "Never"
 	}
 }

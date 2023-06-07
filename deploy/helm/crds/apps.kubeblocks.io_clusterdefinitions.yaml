@@ -8920,9 +8920,9 @@ spec:
                         the volumes mapping the name of the VolumeMounts in the PodSpec.Container
                         field, such as data volume, log volume, etc. When backing
                         up the volume, the volume can be correctly backed up according
-                        to the volumeType. \n For example: `{name: data, type: data}`
+                        to the volumeType. \n For example: `name: data, type: data`
                         means that the volume named `data` is used to store `data`.
-                        `{name: binlog, type: log}` means that the volume named `binlog`
+                        `name: binlog, type: log` means that the volume named `binlog`
                         is used to store `log`. \n NOTE: When volumeTypes is not defined,
                         the backup function will not be supported, even if a persistent
                         volume has been specified."
@@ -8986,17 +8986,17 @@ spec:
                   credential secret for cluster.apps.kubeblocks.io object. Built-in
                   objects are: `$(RANDOM_PASSWD)` - random 8 characters. `$(UUID)`
                   - generate a random UUID v4 string. `$(UUID_B64)` - generate a random
-                  UUID v4 BASE64 encoded string``. `$(UUID_STR_B64)` - generate a
-                  random UUID v4 string then BASE64 encoded``. `$(UUID_HEX)` - generate
-                  a random UUID v4 HEX representation``. `$(HEADLESS_SVC_FQDN)` -
-                  headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
+                  UUID v4 BASE64 encoded string. `$(UUID_STR_B64)` - generate a random
+                  UUID v4 string then BASE64 encoded. `$(UUID_HEX)` - generate a random
+                  UUID v4 HEX representation. `$(HEADLESS_SVC_FQDN)` - headless service
+                  FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
                   where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
                   attribute; `$(SVC_FQDN)` - service FQDN  placeholder, value pattern
                   - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc, where 1ST_COMP_NAME
                   is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service`
                   attribute; `$(SVC_PORT_{PORT-NAME})` - a ServicePort''s port value
-                  with specified port name, i.e, a servicePort JSON struct: { "name":
-                  "mysql", "targetPort": "mysqlContainerPort", "port": 3306 }, and
+                  with specified port name, i.e, a servicePort JSON struct: `"name":
+                  "mysql", "targetPort": "mysqlContainerPort", "port": 3306`, and
                   "$(SVC_PORT_mysql)" in the connection credential value is 3306.'
                 type: object
               type:

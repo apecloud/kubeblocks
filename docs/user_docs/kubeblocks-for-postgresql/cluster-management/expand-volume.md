@@ -99,7 +99,7 @@ pg-cluster        default          postgresql            postgresql-14.7.0      
     terminationPolicy: Halt
   ```
 
-1. Validate the volume expansion.
+2. Validate the volume expansion.
 
    ```bash
    kbcli cluster list <name>

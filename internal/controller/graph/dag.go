@@ -126,6 +126,23 @@ func (d *DAG) Connect(from, to Vertex) bool {
 	return true
 }
 
+// AddConnect add 'to' to the DAG 'd' and connect 'from' to 'to'
+func (d *DAG) AddConnect(from, to Vertex) bool {
+	if !d.AddVertex(to) {
+		return false
+	}
+	return d.Connect(from, to)
+}
+
+// AddConnectRoot add 'v' to the DAG 'd' and connect root to 'v'
+func (d *DAG) AddConnectRoot(v Vertex) bool {
+	root := d.Root()
+	if root == nil {
+		return false
+	}
+	return d.AddConnect(root, v)
+}
+
 // WalkTopoOrder walks the DAG 'd' in topology order
 func (d *DAG) WalkTopoOrder(walkFunc WalkFunc) error {
 	if err := d.validate(); err != nil {
@@ -151,6 +168,43 @@ func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc) error {
 			return err
 		}
 	}
+	return nil
+}
+
+// WalkBFS walks the DAG 'd' in breadth-first order
+func (d *DAG) WalkBFS(walkFunc WalkFunc) error {
+	if err := d.validate(); err != nil {
+		return err
+	}
+	queue := make([]Vertex, 0)
+	walked := make(map[Vertex]bool, len(d.Vertices()))
+
+	root := d.Root()
+	queue = append(queue, root)
+	for len(queue) > 0 {
+		var walkErr error
+		for _, vertex := range queue {
+			if err := walkFunc(vertex); err != nil {
+				walkErr = err
+			}
+		}
+		if walkErr != nil {
+			return walkErr
+		}
+
+		nextStep := make([]Vertex, 0)
+		for _, vertex := range queue {
+			adjs := d.outAdj(vertex)
+			for _, adj := range adjs {
+				if !walked[adj] {
+					nextStep = append(nextStep, adj)
+					walked[adj] = true
+				}
+			}
+		}
+		queue = nextStep
+	}
+
 	return nil
 }
 

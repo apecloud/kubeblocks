@@ -86,11 +86,13 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+                    optional: false
               - name: MONGODB_ROOT_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
             lifecycle:
               postStart:
                 exec:
@@ -124,11 +126,13 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+                    optional: false
               - name: MONGODB_ROOT_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
             command:
               - "/bin/agamotto"
               - "--config=/opt/conf/metrics-config.yaml"

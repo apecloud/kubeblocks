@@ -513,18 +513,20 @@ func (r *SystemAccountReconciler) jobCompletionHandler() *handler.Funcs {
 				clusterName:   clusterName,
 				componentName: componentName,
 			}
+
 			// get password from job
 			passwd := job.Annotations[systemAccountPasswdAnnotation]
 			secret := renderSecretWithPwd(compKey, accountName, passwd)
 			if err := controllerutil.SetControllerReference(cluster, secret, r.Scheme); err != nil {
-				logger.Error(err, "failed to set ownere reference for secret", secret.Name)
+				logger.Error(err, "failed to set ownere reference for secret", "secret", secret.Name)
 				return
 			}
 
 			if err := r.Client.Create(context.TODO(), secret); err != nil {
-				logger.Error(err, "failed to create secret", secret.Name)
+				logger.Error(err, "failed to create secret", "secret", secret.Name)
 				return
 			}
+
 			r.Recorder.Eventf(cluster, corev1.EventTypeNormal, SysAcctCreate,
 				"Created Accounts for cluster: %s, component: %s, accounts: %s", cluster.Name, componentName, accountName)
 		},

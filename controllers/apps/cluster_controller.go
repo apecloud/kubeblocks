@@ -27,6 +27,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -175,6 +176,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&lifecycle.FillClassTransformer{},
 			// create cluster connection credential secret object
 			&lifecycle.ClusterCredentialTransformer{},
+			// handle restore
+			&lifecycle.RestoreTransformer{Client: r.Client},
 			// create all components objects
 			&lifecycle.ComponentTransformer{Client: r.Client},
 			// transform backupPolicy tpl to backuppolicy.dataprotection.kubeblocks.io
@@ -187,8 +190,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&lifecycle.ConfigTransformer{},
 			// update cluster status
 			&lifecycle.ClusterStatusTransformer{},
-			// handle PITR
-			&lifecycle.PITRTransformer{Client: r.Client},
 			// always safe to put your transformer below
 		).
 		Build()
@@ -220,6 +221,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&policyv1.PodDisruptionBudget{}).
 		Owns(&dataprotectionv1alpha1.BackupPolicy{}).
 		Owns(&dataprotectionv1alpha1.Backup{}).
+		Owns(&batchv1.Job{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterPods))
 	if viper.GetBool("VOLUMESNAPSHOT") {
 		if intctrlutil.InVolumeSnapshotV1Beta1() {

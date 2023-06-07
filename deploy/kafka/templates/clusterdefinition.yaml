@@ -130,16 +130,19 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: superusers
+                    optional: false
               - name: KAFKA_KRAFT_CLUSTER_ID
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: kraftClusterID
+                    optional: false
               # - name: KAFKA_CERTIFICATE_PASSWORD
               #   valueFrom:
               #     secretKeyRef:
               #       name: $(CONN_CREDENTIAL_SECRET_NAME)
               #       key: sslCertPassword
+              #       optional: false
 
             ports:
               - name: kafka-client
@@ -306,16 +309,19 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: superusers
+                    optional: false
               - name: KAFKA_KRAFT_CLUSTER_ID
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: kraftClusterID
+                    optional: false
               # - name: KAFKA_CERTIFICATE_PASSWORD
               #   valueFrom:
               #     secretKeyRef:
               #       name: $(CONN_CREDENTIAL_SECRET_NAME)
               #       key: sslCertPassword
+              #       optional: false
 
             ports:
               - name: kafka-ctrlr
@@ -472,16 +478,19 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: superusers
+                    optional: false
               - name: KAFKA_KRAFT_CLUSTER_ID
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: kraftClusterID
+                    optional: false
               # - name: KAFKA_CERTIFICATE_PASSWORD
               #   valueFrom:
               #     secretKeyRef:
               #       name: $(CONN_CREDENTIAL_SECRET_NAME)
               #       key: sslCertPassword
+              #       optional: false
 
             ports:
               - name: kafka-client

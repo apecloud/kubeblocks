@@ -113,8 +113,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 	}
 
 	Context("Test Ops ProgressDetails", func() {
-
-		It("Test Ops ProgressDetails", func() {
+		It("Test Ops ProgressDetails for rolling update", func() {
 			By("init operations resources ")
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
@@ -136,13 +135,21 @@ var _ = Describe("Ops ProgressDetails", func() {
 			Expect(opsRes.OpsRequest.Status.Components[statelessComp].Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterCompPhase)) // appsv1alpha1.RebootingPhase
 			testProgressDetailsWithStatelessPodUpdating(reqCtx, opsRes)
 
+		})
+
+		It("Test Ops ProgressDetails with horizontally scaling replicas", func() {
+			By("init operations resources ")
+			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			opsRes, _, _ := initOperationsResources(clusterDefinitionName, clusterVersionName, clusterName)
+			podList := initConsensusPods(ctx, k8sClient, opsRes, clusterName)
+
 			By("create horizontalScaling operation to test the progressDetails when scaling down the replicas")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, 2)
 			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase, consensusComp) // appsv1alpha1.HorizontalScalingPhase
 			initClusterForOps(opsRes)
 
 			By("mock HorizontalScaling OpsRequest phase is running")
-			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
 			// do h-scale action
@@ -184,6 +191,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			// ops will use the startTimestamp to make decision, start time should not equal the pod createTime during testing.
 			time.Sleep(time.Second)
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, 3)
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.SpecReconcilingClusterCompPhase, consensusComp, statelessComp)
 			// update ops phase to Running first
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -200,7 +208,6 @@ var _ = Describe("Ops ProgressDetails", func() {
 			Expect(getProgressDetailStatus(opsRes, consensusComp, targetPod)).Should(Equal(appsv1alpha1.SucceedProgressStatus))
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"))
 		})
-
 	})
 })
 

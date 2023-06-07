@@ -45,7 +45,8 @@ const (
 )
 
 const (
-	ConnCredentialPlaceHolder       = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	KBConnCredentialPlaceHolder     = "$(CONN_CREDENTIAL_SECRET_NAME)"
+	KBComponentEnvCMPlaceHolder     = "$(COMP_ENV_CM_NAME)"
 	KBCompNamePlaceHolder           = "$(KB_COMP_NAME)"
 	KBClusterNamePlaceHolder        = "$(KB_CLUSTER_NAME)"
 	KBClusterCompNamePlaceHolder    = "$(KB_CLUSTER_COMP_NAME)"

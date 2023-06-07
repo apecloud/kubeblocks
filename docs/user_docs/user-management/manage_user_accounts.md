@@ -58,13 +58,14 @@ KubeBlocks offers a variety of services to enhance the usability, availability, 
 
   :::note
 
-  For security reasons, ```list-accounts```command does not showw all accounts. Accounts with high previledge such as operational accounts and superuser accounts that meet certain rules are hidden.
-  | Database | Hidden Accounts                |
-  | :---     | :---                           |
-  | MySQL    | root <br />kb* <br />Localhost = '' |
-  | postGre  | Postgres <br />kb*              |
+  For security reasons, the `list-accounts` command does not show all accounts. Accounts with high privilege such as operational accounts and superuser accounts that meet certain rules are hidden. Refer to the table below to view the hidden accounts.
 
   :::
+
+  | Database | Hidden Accounts                     |
+  | :---     | :---                                |
+  | MySQL    | root <br />kb* <br />Localhost = '' |
+  | postGre  | Postgres <br />kb*                  |
 
 - Delete a user account
 

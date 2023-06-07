@@ -17,7 +17,7 @@ But for your better high-availability experience, KubeBlocks creates a Redis Pri
 ### Before you start
 
 * [Install `kbcli`](./../../installation/install-kbcli.md).
-* [Install KubeBlocks](./../../installation/introduction.md): Choose one guide that fits your actual environments.
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 * Make sure the PostgreSQL addon is installed with `kbcli addon list`.
   
   ```bash
@@ -37,13 +37,13 @@ But for your better high-availability experience, KubeBlocks creates a Redis Pri
 
 ### (Recommended) Create a cluster on a tainted node
 
-In actual scenarios, you are recommendend to create a cluster on nodes with taints and customized specification.
+In actual scenarios, you are recommended to create a cluster on nodes with taints and customized specifications.
 
 1. Taint your node.
 
    :::note
 
-   If you have already some tainted node, you can skip this step. :::
+   If you have already some tainted nodes, you can skip this step.
 
    :::
 
@@ -61,9 +61,9 @@ In actual scenarios, you are recommendend to create a cluster on nodes with tain
 
 2. Create a Redis cluster.
 
-   The cluster creation command is simply `kbcli cluster create`. Use tolerances to deploy it on the tainted node. Further, you are recommended to create a cluster with specified class and customize your cluster settings as demanded.
+   The cluster creation command is simply `kbcli cluster create`. Use tolerances to deploy it on the tainted node. Further, you are recommended to create a cluster with a specified class and customize your cluster settings as demanded.
 
-   Create a cluster with specified class,you can use `--set` flag and specify your requirement.
+   To create a cluster with specified class, you can use `--set` flag and specify your requirement.
 
    ```bash
    kbcli cluster create redis-cluster  --cluster-definition=redis --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"' --set type=redis,cpu=1,memory=1Gi,replicas=2,storage=10Gi,storageClass=<storageclassname> --set type=redis-sentinel,cpu=1,memory=1Gi,replicas=3,storage=1Gi,storageClass=<storageclassname> --namespace <name> 
@@ -106,13 +106,13 @@ In actual scenarios, you are recommendend to create a cluster on nodes with tain
    EOF
    ```
 
-See the table below for the detailed description for customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended turn on the monitor and enable all logs.
+See the table below for detailed descriptions of customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended turn on the monitor and enable all logs.
 
 📎 Table 1. kbcli cluster create flags description
 
 | Option                 | Description             |
 |:-----------------------|:------------------------|
-| `--cluster-definition` | It specifies the cluster definition, choose the database type. Run `kbcli cd list` to show all available cluster definitions.   |
+| `--cluster-definition` | It specifies the cluster definition. You can choose a database type. Run `kbcli cd list` to show all available cluster definitions.   |
 | `--cluster-version`    | It specifies the cluster version. Run `kbcli cv list` to show all available cluster versions. If you do not specify a cluster version when creating a cluster, the latest version is applied by default.  |
 | `--enable-all-logs`    | It enables you to view all application logs. When this function is enabled, enabledLogs of component level will be ignored. For logs settings, refer to [Access Logs](./../../observability/access-logs.md).  |
 | `--help`               | It shows the help guide for `kbcli cluster create`. You can also use the abbreviated `-h`. |
@@ -122,7 +122,7 @@ See the table below for the detailed description for customizable parameters, se
 | `--set-file`           | It uses a yaml file, URL, or stdin to set the cluster resource. |
 | `--termination-policy` | It specifies how a cluster is deleted. Set the policy when creating a cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
 
-If no flags are used and no information specified, you create a MySQL cluster with default settings.
+If no flags are used and no information is specified, you create a Redis cluster with default settings.
 
 ```bash
 kbcli cluster create redis-cluster --cluster-definition=redis --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"' 
@@ -130,9 +130,9 @@ kbcli cluster create redis-cluster --cluster-definition=redis --tolerations '"ke
 
 ### Create a cluster on a node without taints
 
-The cluster creation command is simply `kbcli cluster create`. Further, you are recommended to create a cluster with specified class and customize your cluster settings as demanded.
+The cluster creation command is simply `kbcli cluster create`. Further, you are recommended to create a cluster with a specified class and customize your cluster settings as demanded.
 
-Create a cluster with specified class,you can use the `--set` flag and specify your requirement.
+To create a cluster with a specified class, you can use the `--set` flag and specify your requirement.
 
 ```bash
 kbcli cluster create redis-cluster  --cluster-definition=redis --set type=redis,cpu=1,memory=1Gi,replicas=2,storage=10Gi,storageClass=<storageclassname> --set type=redis-sentinel,cpu=1,memory=1Gi,replicas=3,storage=1Gi,storageClass=<storageclassname> --namespace <name> 
@@ -175,13 +175,13 @@ Or you can directly change the corresponding parameters in the YAML file.
   EOF
   ```
 
-See the table below for the detailed description for customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended turn on the monitor and enable all logs.
+See the table below for detailed descriptions of customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended turn on the monitor and enable all logs.
 
 📎 Table 1. kbcli cluster create flags description
 
 | Option                 | Description             |
 |:-----------------------|:------------------------|
-| `--cluster-definition` | It specifies the cluster definition, choose the database type. Run `kbcli cd list` to show all available cluster definitions.   |
+| `--cluster-definition` | It specifies the cluster definition. You can choose the database type. Run `kbcli cd list` to show all available cluster definitions.   |
 | `--cluster-version`    | It specifies the cluster version. Run `kbcli cv list` to show all available cluster versions. If you do not specify a cluster version when creating a cluster, the latest version is applied by default.  |
 | `--enable-all-logs`    | It enables you to view all application logs. When this function is enabled, enabledLogs of component level will be ignored. For logs settings, refer to [Access Logs](./../../observability/access-logs.md).  |
 | `--help`               | It shows the help guide for `kbcli cluster create`. You can also use the abbreviated `-h`. |
@@ -191,7 +191,7 @@ See the table below for the detailed description for customizable parameters, se
 | `--set-file`           | It uses a yaml file, URL, or stdin to set the cluster resource. |
 | `--termination-policy` | It specifies how a cluster is deleted. Set the policy when creating a cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
 
-If no flags are used and no information specified, you create a MySQL cluster with default settings.
+If no flags are used and no information is specified, you create a Redis cluster with default settings.
 
 ```bash
 kbcli cluster create redis-cluster --cluster-definition=redis

@@ -44,6 +44,6 @@ $ probe --app-id batch-sdk  --dapr-http-port 3502 --dapr-grpc-port 54215 --app-p
 ```
 
 
-# 7. License
+# 3. License
 
 Probe is under the Apache 2.0 license. See the [LICENSE](../../LICENSE) file for details.

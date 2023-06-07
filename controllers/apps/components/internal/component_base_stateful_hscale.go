@@ -34,8 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -67,39 +65,6 @@ func checkedCreateDeletePVCCronJob(reqCtx intctrlutil.RequestCtx, cli types2.Rea
 	return nil, nil
 }
 
-func isPVCExists(cli types2.ReadonlyClient, ctx context.Context,
-	pvcKey types.NamespacedName) (bool, error) {
-	pvc := corev1.PersistentVolumeClaim{}
-	if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
-		return false, client.IgnoreNotFound(err)
-	}
-	return true, nil
-}
-
-func isAllPVCBound(cli types2.ReadonlyClient,
-	ctx context.Context,
-	stsObj *appsv1.StatefulSet,
-	targetReplicas int) (bool, error) {
-	if len(stsObj.Spec.VolumeClaimTemplates) == 0 {
-		return true, nil
-	}
-	for i := 0; i < targetReplicas; i++ {
-		pvcKey := types.NamespacedName{
-			Namespace: stsObj.Namespace,
-			Name:      fmt.Sprintf("%s-%s-%d", stsObj.Spec.VolumeClaimTemplates[0].Name, stsObj.Name, i),
-		}
-		pvc := corev1.PersistentVolumeClaim{}
-		// check pvc existence
-		if err := cli.Get(ctx, pvcKey, &pvc); err != nil {
-			return false, client.IgnoreNotFound(err)
-		}
-		if pvc.Status.Phase != corev1.ClaimBound {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
 // check volume snapshot available
 func isSnapshotAvailable(cli types2.ReadonlyClient, ctx context.Context) bool {
 	if !viper.GetBool("VOLUMESNAPSHOT") {
@@ -109,53 +74,4 @@ func isSnapshotAvailable(cli types2.ReadonlyClient, ctx context.Context) bool {
 	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
 	getVSErr := compatClient.List(&vsList)
 	return getVSErr == nil
-}
-
-func deleteSnapshot(cli types2.ReadonlyClient,
-	reqCtx intctrlutil.RequestCtx,
-	snapshotKey types.NamespacedName,
-	cluster *appsv1alpha1.Cluster,
-	componentName string) ([]client.Object, error) {
-	objs, err := deleteBackup(reqCtx.Ctx, cli, cluster.Name, componentName)
-	if err != nil {
-		return nil, err
-	}
-	if len(objs) > 0 {
-		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "BackupJobDelete", "Delete backupJob/%s", snapshotKey.Name)
-	}
-
-	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: reqCtx.Ctx}
-	vs := &snapshotv1.VolumeSnapshot{}
-	err = compatClient.Get(snapshotKey, vs)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
-	}
-	if err == nil {
-		objs = append(objs, vs)
-		reqCtx.Recorder.Eventf(cluster, corev1.EventTypeNormal, "VolumeSnapshotDelete", "Delete volumeSnapshot/%s", snapshotKey.Name)
-	}
-
-	return objs, nil
-}
-
-// deleteBackup will delete all backup related resources created during horizontal scaling
-func deleteBackup(ctx context.Context, cli types2.ReadonlyClient, clusterName string, componentName string) ([]client.Object, error) {
-	ml := getBackupMatchingLabels(clusterName, componentName)
-	backupList := dataprotectionv1alpha1.BackupList{}
-	if err := cli.List(ctx, &backupList, ml); err != nil {
-		return nil, err
-	}
-	objs := make([]client.Object, 0)
-	for i := range backupList.Items {
-		objs = append(objs, &backupList.Items[i])
-	}
-	return objs, nil
-}
-
-func getBackupMatchingLabels(clusterName string, componentName string) client.MatchingLabels {
-	return client.MatchingLabels{
-		constant.AppInstanceLabelKey:    clusterName,
-		constant.KBAppComponentLabelKey: componentName,
-		constant.KBManagedByKey:         "cluster", // the resources are managed by which controller
-	}
 }

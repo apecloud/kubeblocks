@@ -651,71 +651,30 @@ func (c *StatefulComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli 
 			Namespace: stsObj.Namespace,
 			Name:      stsObj.Name + "-scaling",
 		}
-		horizontalScalePolicy = c.Component.HorizontalScalePolicy
-
-		checkAllPVCBoundIfNeeded = func() (bool, error) {
-			if horizontalScalePolicy == nil ||
-				horizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-				!isSnapshotAvailable(cli, reqCtx.Ctx) {
-				return true, nil
-			}
-			return isAllPVCBound(cli, reqCtx.Ctx, stsObj, int(c.Component.Replicas))
-		}
-
-		cleanBackupResourcesIfNeeded = func() error {
-			if horizontalScalePolicy == nil ||
-				horizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-				!isSnapshotAvailable(cli, reqCtx.Ctx) {
-				return nil
-			}
-			// if all pvc bounded, clean backup resources
-			objs, err := deleteSnapshot(cli, reqCtx, snapshotKey, c.GetCluster(), c.GetName())
-			if err != nil {
-				return err
-			}
-			for _, obj := range objs {
-				c.DeleteResource(obj, nil)
-			}
-			return nil
-		}
 	)
 
+	d := NewDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsObj, snapshotKey)
+
 	// check all pvc bound, wait next reconciliation if not all ready
-	allPVCBounded, err := checkAllPVCBoundIfNeeded()
+	canClearTmpResources, err := d.CanClearTmpResources()
 	if err != nil {
 		return err
 	}
-	if !allPVCBounded {
+	if !canClearTmpResources {
 		return nil
 	}
 	// clean backup resources.
 	// there will not be any backup resources other than scale out.
-	if err := cleanBackupResourcesIfNeeded(); err != nil {
+	tmpObjs, err := d.ClearTmpResources()
+	if err != nil {
 		return err
+	}
+	for _, obj := range tmpObjs {
+		c.DeleteResource(obj, nil)
 	}
 
 	return nil
 }
-
-//func (c *StatefulComponentBase) statusHorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
-//	ret := c.horizontalScaling(c.runningWorkload)
-//	if ret < 0 {
-//		return nil
-//	}
-//	if ret > 0 {
-//		// forward the h-scaling progress.
-//		return c.scaleOut(reqCtx, cli, c.runningWorkload)
-//	}
-//	if ret == 0 { // sts has been updated
-//		if err := c.postScaleIn(reqCtx, cli, txn); err != nil {
-//			return err
-//		}
-//		if err := c.postScaleOut(reqCtx, cli, c.runningWorkload); err != nil {
-//			return err
-//		}
-//	}
-//	return nil
-//}
 
 func (c *StatefulComponentBase) updateUnderlyingResources(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	if stsObj == nil {

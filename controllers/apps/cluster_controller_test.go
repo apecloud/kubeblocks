@@ -1880,18 +1880,34 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("creating cluster with backup")
 			restoreFromBackup := fmt.Sprintf(`{"%s":"%s"}`, compName, backupName)
+			pvcSpec := testapps.NewPVCSpec("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(compName, compDefName).
 				SetReplicas(3).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				AddAnnotations(constant.RestoreFromBackUpAnnotationKey, restoreFromBackup).Create(&testCtx).GetObject()
 			clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+			By("mocking restore job completed")
+			patchK8sJobStatus := func(key types.NamespacedName, jobStatus batchv1.JobConditionType) {
+				Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *batchv1.Job) {
+					jobCondition := batchv1.JobCondition{Type: jobStatus}
+					fetched.Status.Conditions = append(fetched.Status.Conditions, jobCondition)
+				})).Should(Succeed())
+			}
+			for i := 0; i < 3; i++ {
+				restoreJobKey := client.ObjectKey{
+					Name:      fmt.Sprintf("base-%s-%s-%d", clusterObj.Name, compName, i),
+					Namespace: clusterKey.Namespace,
+				}
+				patchK8sJobStatus(restoreJobKey, batchv1.JobComplete)
+			}
 
 			By("Waiting for the cluster controller to create resources completely")
 			waitForCreatingResourceCompletely(clusterKey, compName)
 			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 			sts := stsList.Items[0]
-			Expect(sts.Spec.Template.Spec.InitContainers).Should(HaveLen(1))
 
 			By("mock pod/sts are available and wait for component enter running phase")
 			testapps.MockConsensusComponentPods(&testCtx, &sts, clusterObj.Name, compName)

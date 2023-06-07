@@ -92,18 +92,18 @@ func UninstallKubeblocks() {
 	})
 	Context("KubeBlocks uninstall", func() {
 		It("delete mycluster", func() {
-			commond := "kbcli cluster delete mycluster --auto-approve"
-			log.Println(commond)
-			result := e2eutil.ExecuteCommand(commond)
+			cmd := "kbcli cluster delete mycluster --auto-approve"
+			log.Println(cmd)
+			result := e2eutil.ExecuteCommand(cmd)
 			Expect(result).Should(BeTrue())
 		})
 		It("check mycluster and pod", func() {
-			commond := "kbcli cluster list -A"
+			cmd := "kbcli cluster list -A"
 			Eventually(func(g Gomega) {
-				cluster := e2eutil.ExecCommand(commond)
+				cluster := e2eutil.ExecCommand(cmd)
 				g.Expect(e2eutil.StringStrip(cluster)).Should(Equal("Noclusterfound"))
 			}, time.Second*10, time.Second*1).Should(Succeed())
-			cmd := "kbcli cluster list-instances"
+			cmd = "kbcli cluster list-instances"
 			Eventually(func(g Gomega) {
 				instances := e2eutil.ExecCommand(cmd)
 				g.Expect(e2eutil.StringStrip(instances)).Should(Equal("Noclusterfound"))

@@ -679,3 +679,29 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - workloads.kubeblocks.io
+  resources:
+  - consensussets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - workloads.kubeblocks.io
+  resources:
+  - consensussets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - workloads.kubeblocks.io
+  resources:
+  - consensussets/status
+  verbs:
+  - get
+  - patch
+  - update

@@ -111,9 +111,15 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	}
 	switch opsRequestPhase {
 	case appsv1alpha1.OpsSucceedPhase:
-		return requeueAfter, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsRequestPhase, appsv1alpha1.NewSucceedCondition(opsRequest))
+		if opsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
+			return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsCancelledPhase, appsv1alpha1.NewCancelSucceedCondition(opsRequest.Name))
+		}
+		return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsRequestPhase, appsv1alpha1.NewSucceedCondition(opsRequest))
 	case appsv1alpha1.OpsFailedPhase:
-		return requeueAfter, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsRequestPhase, appsv1alpha1.NewFailedCondition(opsRequest, err))
+		if opsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
+			return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsCancelledPhase, appsv1alpha1.NewCancelFailedCondition(opsRequest, err))
+		}
+		return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsRequestPhase, appsv1alpha1.NewFailedCondition(opsRequest, err))
 	default:
 		return requeueAfter, nil
 	}

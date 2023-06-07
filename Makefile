@@ -78,6 +78,7 @@ ifeq ($(BUILDX_ENABLED), "")
 		BUILDX_ENABLED = false
 	endif
 endif
+BUILDX_BUILDER ?= "x-builder"
 
 define BUILDX_ERROR
 buildx not enabled, refusing to run this recipe
@@ -277,6 +278,12 @@ kbcli-doc: generate test-go-generate ## generate CLI command reference manual.
 	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 
+
+.PHONY: api-doc
+api-doc:  ## generate API reference manual.
+	@./hack/docgen/api/generate.sh
+
+
 ##@ Operator Controller Manager
 
 .PHONY: manager
@@ -460,7 +467,13 @@ endif
 
 .PHONY: install-docker-buildx
 install-docker-buildx: ## Create `docker buildx` builder.
-	docker buildx create --platform linux/amd64,linux/arm64 --name x-builder --driver docker-container --use
+	@if ! docker buildx inspect $(BUILDX_BUILDER) > /dev/null; then \
+		echo "Buildx builder $(BUILDX_BUILDER) does not exist, creating..."; \
+		docker buildx create --name=$(BUILDX_BUILDER) --use --driver=docker-container --platform linux/amd64,linux/arm64; \
+	else \
+		echo "Buildx builder $(BUILDX_BUILDER) already exists"; \
+	fi
+
 
 .PHONY: golangci
 golangci: GOLANGCILINT_VERSION = v1.51.2

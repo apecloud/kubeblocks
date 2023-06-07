@@ -45,25 +45,31 @@ func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag
 		return err
 	}
 
-	var secret *corev1.Secret
+	var synthesizedComponent *component.SynthesizedComponent
+	compSpecMap := cluster.Spec.GetDefNameMappingComponents()
 	for _, compDef := range transCtx.ClusterDef.Spec.ComponentDefs {
 		if compDef.Service == nil {
 			continue
 		}
-
-		component := &component.SynthesizedComponent{
-			Services: []corev1.Service{
-				{Spec: compDef.Service.ToSVCSpec()},
-			},
+		comps := compSpecMap[compDef.Name]
+		if len(comps) > 0 {
+			synthesizedComponent = &component.SynthesizedComponent{
+				Name: comps[0].Name,
+				Services: []corev1.Service{
+					{Spec: compDef.Service.ToSVCSpec()},
+				},
+			}
+			break
 		}
-		if secret, err = builder.BuildConnCredentialLow(transCtx.ClusterDef, cluster, component); err != nil {
+	}
+	if synthesizedComponent != nil {
+		secret, err := builder.BuildConnCredential(transCtx.ClusterDef, cluster, synthesizedComponent)
+		if err != nil {
 			return err
 		}
-		break
-	}
-
-	if secret != nil {
-		ictrltypes.LifecycleObjectCreate(dag, secret, root)
+		if secret != nil {
+			ictrltypes.LifecycleObjectCreate(dag, secret, root)
+		}
 	}
 	return nil
 }

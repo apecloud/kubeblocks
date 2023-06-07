@@ -48,7 +48,7 @@ BUILDX_ARGS ?=
 
 .PHONY: build-dev-container-image
 build-dev-image: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY) --build-arg GOPROXY=$(GOPROXY)
-build-dev-image: ## Build dev container image.
+build-dev-image: install-docker-buildx ## Build dev container image.
 ifneq ($(BUILDX_ENABLED), true)
 	$(DOCKER) $(DOCKERFILE_DIR)/. $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/${DEV_CONTAINER_DOCKERFILE} -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
 else
@@ -58,7 +58,7 @@ endif
 
 .PHONY: push-dev-container-image
 push-dev-image: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY) --build-arg GOPROXY=$(GOPROXY)
-push-dev-image: ## Push dev container image.
+push-dev-image: install-docker-buildx ## Push dev container image.
 ifneq ($(BUILDX_ENABLED), true)
 	$(DOCKER) push $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
 else
@@ -67,8 +67,8 @@ endif
 
 
 .PHONY: build-manager-image
-build-manager-image: DOCKER_BUILD_ARGS += --cache-to type=gha,scope=${GITHUB_REF_NAME}-manager-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-manager-image
-build-manager-image: generate ## Build Operator manager container image.
+build-manager-image: DOCKER_BUILD_ARGS += --cache-to type=gha,mode=max,scope=${GITHUB_REF_NAME}-manager-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-manager-image
+build-manager-image: install-docker-buildx generate ## Build Operator manager container image.
 ifneq ($(BUILDX_ENABLED), true)
 	$(DOCKER) build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/Dockerfile -t ${IMG}:${VERSION} -t ${IMG}:latest
 else
@@ -81,8 +81,8 @@ endif
 
 
 .PHONY: push-manager-image
-push-manager-image: DOCKER_BUILD_ARGS += --cache-to type=gha,scope=${GITHUB_REF_NAME}-manager-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-manager-image
-push-manager-image: generate ## Push Operator manager container image.
+push-manager-image: DOCKER_BUILD_ARGS += --cache-to type=gha,mode=max,scope=${GITHUB_REF_NAME}-manager-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-manager-image
+push-manager-image: install-docker-buildx generate ## Push Operator manager container image.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)
 	$(DOCKER) push ${IMG}:latest
@@ -98,8 +98,8 @@ endif
 endif
 
 .PHONY: build-tools-image
-build-tools-image: DOCKER_BUILD_ARGS += --cache-to type=gha,scope=${GITHUB_REF_NAME}-tools-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-tools-image
-build-tools-image: generate test-go-generate ## Build tools container image.
+build-tools-image: DOCKER_BUILD_ARGS += --cache-to type=gha,mode=max,scope=${GITHUB_REF_NAME}-tools-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-tools-image
+build-tools-image: install-docker-buildx generate test-go-generate ## Build tools container image.
 ifneq ($(BUILDX_ENABLED), true)
 	$(DOCKER) build . $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/Dockerfile-tools -t ${TOOL_IMG}:${VERSION} -t ${TOOL_IMG}:latest
 else
@@ -111,8 +111,8 @@ endif
 endif
 
 .PHONY: push-tools-image
-push-tools-image: DOCKER_BUILD_ARGS += --cache-to type=gha,scope=${GITHUB_REF_NAME}-tools-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-tools-image
-push-tools-image: generate test-go-generate ## Push tools container image.
+push-tools-image: DOCKER_BUILD_ARGS += --cache-to type=gha,mode=max,scope=${GITHUB_REF_NAME}-tools-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-tools-image
+push-tools-image: install-docker-buildx generate test-go-generate ## Push tools container image.
 ifneq ($(BUILDX_ENABLED), true)
 ifeq ($(TAG_LATEST), true)
 	$(DOCKER) push ${TOOL_IMG}:latest

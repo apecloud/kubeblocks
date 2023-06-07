@@ -55,7 +55,7 @@ pvc: {
 	spec: {
 		accessModes: volumeClaimTemplate.spec.accessModes
 		resources:   volumeClaimTemplate.spec.resources
-		if snapshot_name != "" {
+		if len(snapshot_name) > 0 {
 			dataSource: {
 				"name":     snapshot_name
 				"kind":     "VolumeSnapshot"

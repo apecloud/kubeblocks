@@ -1,4 +1,4 @@
-# Contributing KubeBlocks
+# Contributing to KubeBlocks
 First, thank you for contributing to KubeBlocks! 
 This document provides the guidelines for how to contribute to KubeBlocks. 
 
@@ -72,4 +72,12 @@ All pull requests should be reviewed, a pull request need at least approved by *
 All pull requests are squashed and merged, after code review finished, the pull request will be merged into the main branch.
 
 ## Legal
-TODO: add `DCO`(The Developer Certificate of Origin) or `CLA`(Contributor License Agreement)
+To protect all users of KubeBlocks, the following legal requirements are made. If you have additional questions, please [contact us](mailto:kubeblocks@apecloud.com).
+
+### Contributor License Agreement
+KubeBlocks requires all contributors to sign the Contributor License Agreement (CLA). This gives KubeBlocks the rights to use your contributions as well as ensuring that you own your contributions and can use them for other purposes.
+
+The full text of the CLA can be found at https://cla-assistant.io/apecloud/kubeblocks.
+
+### Granted rights and copyright assignment
+This is covered by the CLA.

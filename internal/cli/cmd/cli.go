@@ -29,6 +29,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
 	kccmd "k8s.io/kubectl/pkg/cmd"
+	kcplugin "k8s.io/kubectl/pkg/cmd/plugin"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -60,6 +61,9 @@ func init() {
 	if _, err := util.GetCliHomeDir(); err != nil {
 		fmt.Println("Failed to create kbcli home dir:", err)
 	}
+
+	// replace the kubectl plugin filename prefixes with ours
+	kcplugin.ValidPluginFilenamePrefixes = plugin.ValidPluginFilenamePrefixes
 }
 
 func NewDefaultCliCmd() *cobra.Command {
@@ -118,6 +122,12 @@ A Command Line Interface for KubeBlocks`,
 		Run: func(cmd *cobra.Command, args []string) {
 			_ = cmd.Help()
 		},
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Name() == cobra.ShellCompRequestCmd {
+				kcplugin.SetupPluginCompletion(cmd, args)
+			}
+			return nil
+		},
 	}
 
 	// Start from this point we get warnings on flags that contain "_" separators
@@ -142,7 +152,7 @@ A Command Line Interface for KubeBlocks`,
 	cmd.AddCommand(
 		playground.NewPlaygroundCmd(ioStreams),
 		kubeblocks.NewKubeBlocksCmd(f, ioStreams),
-		bench.NewBenchCmd(),
+		bench.NewBenchCmd(f, ioStreams),
 		options.NewCmdOptions(ioStreams.Out),
 		version.NewVersionCmd(f),
 		dashboard.NewDashboardCmd(f, ioStreams),

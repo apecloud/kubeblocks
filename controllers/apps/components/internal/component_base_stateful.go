@@ -149,7 +149,7 @@ func (c *StatefulComponentBase) Update(reqCtx intctrlutil.RequestCtx, cli client
 		}
 
 		// cluster.spec.componentSpecs[*].replicas
-		if err := c.HorizontalScale(reqCtx, cli); err != nil {
+		if err := c.HorizontalScale(reqCtx, cli, nil); err != nil {
 			return err
 		}
 	}
@@ -175,7 +175,7 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 
-	if err := c.HorizontalScale(reqCtx, cli); err != nil {
+	if err := c.HorizontalScale(reqCtx, cli, statusTxn); err != nil {
 		return err
 	}
 
@@ -461,10 +461,10 @@ func (c *StatefulComponentBase) hasVolumeExpansionRunning(reqCtx intctrlutil.Req
 	return running, failed, nil
 }
 
-func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
 	ret := c.horizontalScaling(c.runningWorkload)
 	if ret == 0 {
-		if err := c.postScaleIn(reqCtx, cli); err != nil {
+		if err := c.postScaleIn(reqCtx, cli, txn); err != nil {
 			return err
 		}
 		if err := c.postScaleOut(reqCtx, cli, c.runningWorkload); err != nil {
@@ -548,7 +548,7 @@ func (c *StatefulComponentBase) scaleIn(reqCtx intctrlutil.RequestCtx, cli clien
 	return nil
 }
 
-func (c *StatefulComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *StatefulComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
 	hasJobFailed := func(reqCtx intctrlutil.RequestCtx, cli client.Client) (*batchv1.Job, string, error) {
 		jobs, err := util.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.JobSignature, c.GetNamespace(), c.GetMatchingLabels())
 		if err != nil {
@@ -573,9 +573,11 @@ func (c *StatefulComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli c
 		msgKey := fmt.Sprintf("%s/%s", job.GetObjectKind().GroupVersionKind().Kind, job.GetName())
 		statusMessage := appsv1alpha1.ComponentMessageMap{msgKey: msg}
 		// TODO: CT - remove this cronjob later
-		// txn.propose(appsv1alpha1.AbnormalClusterCompPhase, func() {
-		c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, statusMessage, "PVC deletion job failed")
-		// })
+		if txn != nil {
+			txn.propose(appsv1alpha1.AbnormalClusterCompPhase, func() {
+				c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, statusMessage, "PVC deletion job failed")
+			})
+		}
 	}
 	return nil
 }

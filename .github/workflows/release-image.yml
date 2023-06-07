@@ -39,24 +39,26 @@ jobs:
 
   release-image:
     needs: image-tag
-    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "push-manager-image"
       IMG: "apecloud/kubeblocks"
       VERSION: "${{ needs.image-tag.outputs.tag-name }}"
       GO_VERSION: "1.20"
+      APECD_REF: "v0.1.0"
     secrets: inherit
 
   release-tools-image:
     needs: image-tag
-    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "push-tools-image"
       IMG: "apecloud/kubeblocks-tools"
       VERSION: "${{ needs.image-tag.outputs.tag-name }}"
       GO_VERSION: "1.20"
+      APECD_REF: "v0.1.0"
     secrets: inherit
 
   send-message:
@@ -67,12 +69,13 @@ jobs:
       - uses: actions/checkout@v3
       - name: send message
         run: |
-          CONTENT="release\u00a0image\u00a0error"
+          CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0image\u00a0error"
           if [[ "${{ needs.release-image.result }}" == "success" && "${{ needs.release-tools-image.result }}" == "success" ]]; then
-              CONTENT="release\u00a0image\u00a0success"
+              CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0image\u00a0success"
           fi
           
           bash .github/utils/utils.sh --type 12 \
+            --tag-name ${{ env.RELEASE_VERSION }} \
             --content "${CONTENT}"\
             --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

@@ -119,7 +119,7 @@ To create a cluster with specified classes, you can use `--set` flag and specify
 Use `--set` to create a cluster with specified classes and add all taints on the current node in the `--toleration` flag to tolerate them.
 
 ```bash
-kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --set class=general-2c2g,storageClass=<storageclassname> --namespace <name>
+kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --set cpu=2000m,memory=2Gi,storage=20Gi,storageClass=<storageclassname> --namespace <name>
 ```
 
 ***Result***

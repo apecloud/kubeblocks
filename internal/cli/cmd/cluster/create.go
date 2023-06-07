@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -649,7 +650,7 @@ func (o *CreateOptions) isPostgresqlCluster() (bool, error) {
 
 	// get cluster component definition
 	if len(o.ComponentSpecs) == 0 {
-		return false, fmt.Errorf("find no cluster componnet")
+		return false, fmt.Errorf("find no cluster component")
 	}
 	compSpec := o.ComponentSpecs[0]
 	for i, def := range cd.Spec.ComponentDefs {
@@ -660,7 +661,7 @@ func (o *CreateOptions) isPostgresqlCluster() (bool, error) {
 	}
 
 	if compDef == nil {
-		return false, fmt.Errorf("failed to find component definition for componnet %v", compSpec["Name"])
+		return false, fmt.Errorf("failed to find component definition for component %v", compSpec["Name"])
 	}
 
 	// for postgresql, we need to create a service account, a role and a rolebinding
@@ -767,6 +768,12 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		setReplicas, err := strconv.Atoi(getVal(&c, keyReplicas, sets))
 		if err != nil {
 			return nil, fmt.Errorf("repicas is illegal " + err.Error())
+		}
+		if setReplicas < 0 {
+			return nil, fmt.Errorf("repicas is illegal, required value >=0")
+		}
+		if setReplicas > math.MaxInt32 {
+			return nil, fmt.Errorf("repicas is illegal, exceed max. value (%d) ", math.MaxInt32)
 		}
 		replicas := int32(setReplicas)
 

@@ -39,7 +39,7 @@ func (b *replicationComponentWorkloadBuilder) BuildWorkload() internal.Component
 
 func (b *replicationComponentWorkloadBuilder) BuildService() internal.ComponentWorkloadBuilder {
 	buildFn := func() ([]client.Object, error) {
-		svcList, err := builder.BuildSvcListLow(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		svcList, err := builder.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {
 			return nil, err
 		}

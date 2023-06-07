@@ -203,9 +203,12 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 			c.Dag.AddVertex(v)
 		}
 	}
-
+	var delayedRequeueError error
 	if err := c.StatusWorkload(reqCtx, cli, c.runningWorkload, statusTxn); err != nil {
-		return err
+		if !intctrlutil.IsDelayedRequeueError(err) {
+			return err
+		}
+		delayedRequeueError = err
 	}
 
 	if err := statusTxn.commit(); err != nil {
@@ -216,7 +219,7 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 	c.updateWorkload(c.runningWorkload)
-	return nil
+	return delayedRequeueError
 }
 
 func (c *StatefulComponentBase) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {

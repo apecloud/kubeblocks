@@ -207,13 +207,13 @@
 	// Indents parse and plan tree displays.
 	debug_pretty_print?: bool & false | true
 
-	// Logs each querys parse tree.
+	// Logs each queries parse tree.
 	debug_print_parse?: bool & false | true
 
-	// Logs each querys execution plan.
+	// Logs each queries execution plan.
 	debug_print_plan?: bool & false | true
 
-	// Logs each querys rewritten parse tree.
+	// Logs each queries rewritten parse tree.
 	debug_print_rewritten?: bool & false | true
 
 	// Sets the default statistics target.

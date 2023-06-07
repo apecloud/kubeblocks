@@ -244,7 +244,7 @@ func generateConfigMapFromTpl(cluster *appsv1alpha1.Cluster,
 	}
 
 	// Using ConfigMap cue template render to configmap of config
-	return builder.BuildConfigMapWithTemplateLow(cluster, component, configs, cmName, configConstraintName, templateSpec)
+	return builder.BuildConfigMapWithTemplate(cluster, component, configs, cmName, configConstraintName, templateSpec)
 }
 
 // renderConfigMapTemplate renders config file using template engine

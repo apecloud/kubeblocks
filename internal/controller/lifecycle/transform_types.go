@@ -50,12 +50,6 @@ func init() {
 	utilruntime.Must(batchv1.AddToScheme(scheme))
 }
 
-const (
-	// TODO: deduplicate
-	clusterDefLabelKey     = "clusterdefinition.kubeblocks.io/name"
-	clusterVersionLabelKey = "clusterversion.kubeblocks.io/name"
-)
-
 // default reconcile requeue after duration
 var requeueDuration = time.Millisecond * 100
 

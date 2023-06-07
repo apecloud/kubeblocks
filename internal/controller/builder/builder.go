@@ -694,9 +694,6 @@ func BuildRestoreJob(name, namespace string, image string, command []string, arg
 	return job, nil
 }
 
-// TODO: CT - refactor restore to use common code
-// TODO: CT - consider affinity
-// buildRestoreJobForFullBackup
 func BuildRestoreJobForFullBackup(
 	restoreJobName string,
 	component *component.SynthesizedComponent,

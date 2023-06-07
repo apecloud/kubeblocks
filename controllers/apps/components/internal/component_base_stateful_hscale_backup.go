@@ -135,7 +135,7 @@ func (d *baseDataClone) CloneData(realDataClone DataClone) ([]client.Object, err
 			objs = append(objs, restoreObjs...)
 		case backupStatusProcessing:
 		case backupStatusReadyToUse:
-			break
+			continue
 		case backupStatusFailed:
 			return nil, fmt.Errorf("restore failed")
 		}
@@ -526,7 +526,7 @@ var _ DataClone = &backupDataClone{}
 
 func (d *backupDataClone) Succeed() (bool, error) {
 	allPVCsExist, err := d.checkAllPVCsExist()
-	if err != nil || allPVCsExist == false {
+	if err != nil || !allPVCsExist {
 		return allPVCsExist, err
 	}
 	pvcKeys := d.toCreatePVCKeys()

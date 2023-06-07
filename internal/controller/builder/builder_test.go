@@ -26,7 +26,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/leaanthony/debme"
@@ -544,8 +543,6 @@ var _ = Describe("builder", func() {
 			job, err := BuildRestoreJobForFullBackup(restoreJobKey.Name, &component, &backup, &backupTool, podName)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(job).ShouldNot(BeNil())
-			b, err := yaml.Marshal(job)
-			print(string(b))
 		})
 	})
 

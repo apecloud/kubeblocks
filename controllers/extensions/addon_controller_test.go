@@ -20,17 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package extensions
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -367,7 +370,7 @@ var _ = Describe("Addon controller", func() {
 			}).Should(Succeed())
 		})
 
-		It("should successfully reconcile a custom resource for Addon with autoInstall=true", func() {
+		createAutoInstallAddon := func() {
 			By("By create an addon with auto-install")
 			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
 				newOjb.Spec.Installable.AutoInstall = true
@@ -375,6 +378,10 @@ var _ = Describe("Addon controller", func() {
 
 			By("By addon autoInstall auto added")
 			enablingPhaseCheck(2)
+		}
+
+		It("should successfully reconcile a custom resource for Addon with autoInstall=true", func() {
+			createAutoInstallAddon()
 
 			By("By enable addon with fake completed install job status")
 			fakeInstallationCompletedJob(2)
@@ -389,13 +396,7 @@ var _ = Describe("Addon controller", func() {
 		})
 
 		It("should successfully reconcile a custom resource for Addon with autoInstall=true with failed uninstall job", func() {
-			By("By create an addon with auto-install")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
-				newOjb.Spec.Installable.AutoInstall = true
-			})
-
-			By("By addon autoInstall auto added")
-			enablingPhaseCheck(2)
+			createAutoInstallAddon()
 
 			By("By enable addon with fake completed install job status")
 			fakeInstallationCompletedJob(2)
@@ -440,13 +441,7 @@ var _ = Describe("Addon controller", func() {
 		})
 
 		It("should successfully reconcile a custom resource for Addon deletion while disabling", func() {
-			By("By create an addon with auto-install")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
-				newOjb.Spec.Installable.AutoInstall = true
-			})
-
-			By("By addon autoInstall auto added")
-			enablingPhaseCheck(2)
+			createAutoInstallAddon()
 
 			By("By enable addon with fake completed install job status")
 			fakeInstallationCompletedJob(2)
@@ -469,13 +464,7 @@ var _ = Describe("Addon controller", func() {
 		})
 
 		It("should successfully reconcile a custom resource for Addon with autoInstall=true with status.phase=Failed", func() {
-			By("By create an addon with auto-install")
-			createAddonSpecWithRequiredAttributes(func(newOjb *extensionsv1alpha1.Addon) {
-				newOjb.Spec.Installable.AutoInstall = true
-			})
-
-			By("By addon autoInstall auto added")
-			enablingPhaseCheck(2)
+			createAutoInstallAddon()
 
 			By("By enabled addon with fake failed install job status")
 			fakeInstallationFailedJob(2)
@@ -619,6 +608,120 @@ var _ = Describe("Addon controller", func() {
 					})
 			})
 			addonStatusPhaseCheck(2, extensionsv1alpha1.AddonFailed, nil)
+		})
+	})
+})
+
+var _ = Describe("Addon controller manager", func() {
+
+	cleanEnv := func() {
+		// must wait till resources deleted and no longer existed before the testcases start,
+		// otherwise if later it needs to create some new resource objects with the same name,
+		// in race conditions, it will find the existence of old objects, resulting failure to
+		// create the new objects.
+		By("clean resources")
+		// non-namespaced
+		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.AddonSignature, true, ml)
+
+		inNS := client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS))
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.JobSignature, true, inNS,
+			client.HasLabels{
+				constant.AddonNameLabelKey,
+			})
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.JobSignature, true, inNS,
+			client.HasLabels{
+				constant.AppManagedByLabelKey,
+			})
+	}
+
+	BeforeEach(func() {
+		cleanEnv()
+	})
+
+	Context("Addon controller SetupWithManager", func() {
+		It("Do controller SetupWithManager init. flow", func() {
+			By("check SetupWithManager")
+			k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
+				Scheme:             scheme.Scheme,
+				MetricsBindAddress: "0",
+			})
+			Expect(err).ToNot(HaveOccurred())
+			reconciler := &AddonReconciler{
+				Client: k8sManager.GetClient(),
+				Scheme: k8sManager.GetScheme(),
+			}
+			err = reconciler.SetupWithManager(k8sManager)
+			Expect(err).ToNot(HaveOccurred())
+
+			testEventRecorder := func(recorder record.EventRecorder) {
+				reconciler.Recorder = recorder
+				addon := &extensionsv1alpha1.Addon{}
+				reconciler.Event(addon, corev1.EventTypeNormal, "reason", "message")
+				reconciler.Eventf(addon, corev1.EventTypeNormal, "reason", "%s", "message")
+				reconciler.AnnotatedEventf(addon, map[string]string{
+					"key": "value",
+				}, corev1.EventTypeNormal, "reason", "message")
+			}
+
+			By("test nil event recorder")
+			testEventRecorder(nil)
+
+			By("test event recorder")
+			testEventRecorder(k8sManager.GetEventRecorderFor("addon-controller"))
+
+			By("start manager")
+			go func() {
+				defer GinkgoRecover()
+				timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Second)
+				Expect(k8sManager.Start(timeoutCtx)).ToNot(HaveOccurred(), "failed to run manager")
+				if cancelFunc != nil {
+					cancelFunc()
+				}
+			}()
+
+			createJob := func(keys ...string) *batchv1.Job {
+				job := &batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						GenerateName: "addon-test-job",
+						Namespace:    testCtx.DefaultNamespace,
+						Labels:       map[string]string{},
+					},
+					Spec: batchv1.JobSpec{
+						Template: corev1.PodTemplateSpec{
+							Spec: corev1.PodSpec{
+								RestartPolicy: corev1.RestartPolicyNever,
+								Containers: []corev1.Container{
+									{
+										Name:  "kubeblocks",
+										Image: "busybox",
+									},
+								},
+							},
+						},
+					},
+				}
+				for _, key := range keys {
+					job.ObjectMeta.Labels[key] = constant.AppName
+				}
+				return job
+			}
+
+			By("create watch obj type without required labels")
+			job := createJob()
+			Expect(k8sClient.Create(ctx, job)).ToNot(HaveOccurred())
+
+			By("create watch obj with label=" + constant.AddonNameLabelKey)
+			job = createJob(constant.AddonNameLabelKey)
+			Expect(k8sClient.Create(ctx, job)).ToNot(HaveOccurred())
+
+			By("create watch obj with label=" + constant.AppManagedByLabelKey)
+			job = createJob(constant.AppManagedByLabelKey)
+			Expect(k8sClient.Create(ctx, job)).ToNot(HaveOccurred())
+
+			By("create watch obj with required labels")
+			job = createJob(constant.AddonNameLabelKey, constant.AppManagedByLabelKey)
+			Expect(k8sClient.Create(ctx, job)).ToNot(HaveOccurred())
 		})
 	})
 })

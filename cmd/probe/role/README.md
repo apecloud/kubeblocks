@@ -24,9 +24,9 @@ $ go build -o role-observation main.go
 ## 2.2 Configure
 
 Role-Observation reads some configurations from config files, Now there are:
-KB_CONSENSUS_SET_ACTION_SVC_LIST: The active ports of the sidecars on same pod.
-KB_FAILED_EVENT_REPORT_FREQUENCY: The frequency to report the role observation failed, default: 1800.
-KB_ROLE_OBSERVATION_THRESHOLD: The threshold to report the role observation, default: 300.
+- KB_CONSENSUS_SET_ACTION_SVC_LIST: The active ports of the sidecars on same pod. 
+- KB_FAILED_EVENT_REPORT_FREQUENCY: The frequency to report the role observation failed, default: 1800.
+- KB_ROLE_OBSERVATION_THRESHOLD: The threshold to report the role observation, default: 300.
 
 ## 2.3 CommandLine Argument
 

@@ -257,7 +257,7 @@ func (o *openOptions) run() error {
 
 		url := "http://127.0.0.1:" + o.localPort
 		if o.name == "kubeblocks-grafana" {
-			err := buildGrafanaDirectUrl(&url, characterType)
+			err := buildGrafanaDirectURL(&url, characterType)
 			if err != nil {
 				fmt.Fprintf(o.ErrOut, "Failed to open browser: %v", err)
 				return

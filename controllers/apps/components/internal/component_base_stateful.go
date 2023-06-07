@@ -573,9 +573,9 @@ func (c *StatefulComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli c
 		msgKey := fmt.Sprintf("%s/%s", job.GetObjectKind().GroupVersionKind().Kind, job.GetName())
 		statusMessage := appsv1alpha1.ComponentMessageMap{msgKey: msg}
 		// TODO: CT - remove this cronjob later
-		//txn.propose(appsv1alpha1.AbnormalClusterCompPhase, func() {
+		// txn.propose(appsv1alpha1.AbnormalClusterCompPhase, func() {
 		c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, statusMessage, "PVC deletion job failed")
-		//})
+		// })
 	}
 	return nil
 }

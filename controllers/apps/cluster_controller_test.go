@@ -576,7 +576,7 @@ var _ = Describe("Cluster Controller", func() {
 				constant.KBManagedByKey:         "cluster",
 			}
 			jobList := batchv1.JobList{}
-			testCtx.Cli.List(testCtx.Ctx, &jobList, ml)
+			Expect(testCtx.Cli.List(testCtx.Ctx, &jobList, ml)).Should(Succeed())
 			for _, job := range jobList.Items {
 				key := client.ObjectKeyFromObject(&job)
 				Expect(testapps.GetAndChangeObjStatus(&testCtx, key, func(job *batchv1.Job) {

@@ -149,7 +149,7 @@ func (c *StatefulComponentBase) Update(reqCtx intctrlutil.RequestCtx, cli client
 		}
 
 		// cluster.spec.componentSpecs[*].replicas
-		if err := c.HorizontalScale(reqCtx, cli, nil); err != nil {
+		if err := c.HorizontalScale(reqCtx, cli); err != nil {
 			return err
 		}
 	}
@@ -175,7 +175,7 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 
-	if err := c.HorizontalScale(reqCtx, cli, statusTxn); err != nil {
+	if err := c.innerHorizontalScale(reqCtx, cli, statusTxn); err != nil {
 		return err
 	}
 
@@ -461,7 +461,11 @@ func (c *StatefulComponentBase) hasVolumeExpansionRunning(reqCtx intctrlutil.Req
 	return running, failed, nil
 }
 
-func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	return c.innerHorizontalScale(reqCtx, cli, nil)
+}
+
+func (c *StatefulComponentBase) innerHorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
 	ret := c.horizontalScaling(c.runningWorkload)
 	if ret == 0 {
 		if err := c.postScaleIn(reqCtx, cli, txn); err != nil {

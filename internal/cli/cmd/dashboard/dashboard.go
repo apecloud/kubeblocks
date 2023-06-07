@@ -216,7 +216,7 @@ func newOpenCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().StringVar(&o.localPort, "port", "", "dashboard local port")
 	cmd.Flags().Duration(podRunningTimeoutFlag, defaultPodExecTimeout,
 		"The time (like 5s, 2m, or 3h, higher than zero) to wait for at least one pod is running")
-
+	addCharacterFlag(cmd, &characterType)
 	return cmd
 }
 
@@ -256,6 +256,13 @@ func (o *openOptions) run() error {
 		fmt.Fprintf(o.Out, "Forward successfully! Opening browser ...\n")
 
 		url := "http://127.0.0.1:" + o.localPort
+		if o.name == "kubeblocks-grafana" {
+			err := buildGrafanaDirectUrl(&url, characterType)
+			if err != nil {
+				fmt.Fprintf(o.ErrOut, "Failed to open browser: %v", err)
+				return
+			}
+		}
 		if err := util.OpenBrowser(url); err != nil {
 			fmt.Fprintf(o.ErrOut, "Failed to open browser: %v", err)
 		}

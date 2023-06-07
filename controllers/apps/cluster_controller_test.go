@@ -597,14 +597,21 @@ var _ = Describe("Cluster Controller", func() {
 			})()).ShouldNot(HaveOccurred())
 		}
 
-		if policy.Type == appsv1alpha1.HScaleDataClonePolicyFromSnapshot {
-			By("Check backup job cleanup")
-			Eventually(testapps.List(&testCtx, generics.BackupSignature,
+		By("Checking backup job cleanup")
+		Eventually(testapps.List(&testCtx, generics.BackupSignature,
+			client.MatchingLabels{
+				constant.AppInstanceLabelKey:    clusterKey.Name,
+				constant.KBAppComponentLabelKey: comp.Name,
+			}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
+		Eventually(testapps.CheckObjExists(&testCtx, backupKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
+
+		if policy.Type == appsv1alpha1.HScaleDataClonePolicyFromBackup {
+			By("Checking restore job cleanup")
+			Eventually(testapps.List(&testCtx, generics.JobSignature,
 				client.MatchingLabels{
 					constant.AppInstanceLabelKey:    clusterKey.Name,
 					constant.KBAppComponentLabelKey: comp.Name,
 				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
-			Eventually(testapps.CheckObjExists(&testCtx, backupKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
 		}
 
 		checkUpdatedStsReplicas()

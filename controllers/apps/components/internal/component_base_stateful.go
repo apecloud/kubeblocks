@@ -655,14 +655,6 @@ func (c *StatefulComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli 
 
 	d := NewDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsObj, snapshotKey)
 
-	// check all pvc bound, wait next reconciliation if not all ready
-	canClearTmpResources, err := d.CanClearTmpResources()
-	if err != nil {
-		return err
-	}
-	if !canClearTmpResources {
-		return nil
-	}
 	// clean backup resources.
 	// there will not be any backup resources other than scale out.
 	tmpObjs, err := d.ClearTmpResources()

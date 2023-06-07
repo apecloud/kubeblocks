@@ -98,7 +98,7 @@ func sendWaringEventWithError(
 	reason string,
 	err error) {
 	// ignore requeue error
-	if err == nil || intctrlutil.IsRequeueOrDelayedRequeueError(err) {
+	if err == nil || intctrlutil.IsRequeueError(err) {
 		return
 	}
 	controllerErr := intctrlutil.ToControllerError(err)

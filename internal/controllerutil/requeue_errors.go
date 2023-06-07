@@ -56,12 +56,10 @@ func IsDelayedRequeueError(err error) bool {
 	return ok
 }
 
-// IsRequeueOrDelayedRequeueError checks if the error is the RequeueError or DelayedRequeueError
-func IsRequeueOrDelayedRequeueError(err error) bool {
-	if _, ok := err.(RequeueError); ok {
-		return true
-	}
-	return IsDelayedRequeueError(err)
+// IsRequeueError checks if the error is the RequeueError.
+func IsRequeueError(err error) bool {
+	_, ok := err.(RequeueError)
+	return ok
 }
 
 type requeueError struct {

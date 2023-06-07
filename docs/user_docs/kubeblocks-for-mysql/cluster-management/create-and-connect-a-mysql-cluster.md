@@ -59,29 +59,13 @@ In actual scenarios, you are recommended to create a cluster on nodes with taint
 
 2. Create a MySQL cluster.
 
-   The cluster creation command is simply `kbcli cluster create`. Use tolerances to deploy it on the tainted node. Further, you are recommended to create a cluster with a specified class and customize your cluster settings as demanded.
+   The cluster creation command is simply `kbcli cluster create`. Use tolerances to deploy it on the tainted node. Further, you can create a cluster with specified classes and customize your cluster settings as demanded.
 
-   To create a cluster with a specified class, you can use `--set` flag and specify your requirement.
+   The following example shows how use `--set` to create a cluster with specified classes and add all taints on the current node in the `--toleration` flag to tolerate them.
 
-   1. View and select a class for this cluster.
-
-      ```bash
-      kbcli class list --cluster-definition apecloud-mysql  
-      ```
-
-   :::note
-
-   If there is no suitable class listed, you can [customize your own class](./../cluster-type/customize-class-type.md) template and apply the class here.
-
-   Creating clusters that do not meet the constraints is invalid and the system creates the cluster with the minimum CPU value specified.
-
-   :::
-
-   2. Create a cluster with a specified class and add all taints on the current node in the `--toleration` flag to tolerate them.
-
-      ```bash
-      kbcli cluster create mysql-cluster --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"' --cluster-definition=apecloud-mysql --set class=general-2c2g,storageClass=<storageclassname> --namespace <name>
-      ```
+   ```bash
+   kbcli cluster create mysql-cluster --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"' --cluster-definition=apecloud-mysql --set cpu=2000m,memory=2Gi,storage=20Gi,storageClass=<storageclassname> --namespace <name>
+   ```
 
    Or change the corresponding parameters in the YAML file.
 
@@ -128,33 +112,19 @@ kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --tolerat
 
 ### Create a cluster on a node without taints
 
-The cluster creation command is simply `kbcli cluster create`. Further, you are recommended to create a cluster with specified class and customize your cluster settings as demanded.
+The cluster creation command is simply `kbcli cluster create`. Further, you are recommended to create a cluster with specified classes and customize your cluster settings as demanded.
 
-To create a cluster with specified class, you can use `--set` flag and specify your requirement.
+To create a cluster with specified classes, you can use `--set` flag and specify your requirement.
 
-1. View and select a class for this cluster.
+Use `--set` to create a cluster with specified classes and add all taints on the current node in the `--toleration` flag to tolerate them.
 
-   ```bash
-   kbcli class list --cluster-definition apecloud-mysql  
-   ```
+```bash
+kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --set class=general-2c2g,storageClass=<storageclassname> --namespace <name>
+```
 
-   :::note
+***Result***
 
-   If there is no suitable class listed, you can [customize your own class](./../cluster-type/customize-class-type.md) template and apply the class here.
-
-   Creating clusters that do not meet the constraints is invalid and the system creates a cluster with the minimum CPU value specified.
-
-   :::
-
-2. Create a cluster with a specified class and add all taints on the current node in the `--toleration` flag to tolerate them.
-
-   ```bash
-   kbcli cluster create mysql-cluster --cluster-definition=apecloud-mysql --set class=general-2c2g,storageClass=<storageclassname> --namespace <name>
-   ```
-
-   ***Result***
-
-   A cluster is created in the namespace `default` with the specified class.
+A cluster is created in the namespace `default` with the specified class.
 
 Or change the corresponding parameters in the YAML file.
 

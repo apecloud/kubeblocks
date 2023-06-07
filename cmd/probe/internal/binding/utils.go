@@ -350,6 +350,7 @@ func ParsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 		`(?P<JUNK> .) `,
 	}
 	result := &PGStandby{
+		Types:   "off",
 		Members: mapset.NewSet(),
 	}
 
@@ -387,6 +388,9 @@ func ParsePGSyncStandby(standbyRow string) (*PGStandby, error) {
 	}
 
 	length := len(matches)
+	if length == 0 {
+		return result, nil
+	}
 	var syncList [][]string
 	if matches[0][0] == "any" && matches[1][0] == "num" && matches[2][0] == "parenthesis_start" && matches[length-1][0] == "parenthesis_end" {
 		result.Types = "quorum"

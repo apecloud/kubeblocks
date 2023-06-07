@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/spf13/viper"
+	"k8s.io/client-go/dynamic"
 	"os"
 	"strconv"
 	"strings"
@@ -29,6 +32,7 @@ type ConfigurationStore struct {
 	cluster              *Cluster
 	config               *rest.Config
 	clientSet            *kubernetes.Clientset
+	dynamicClient        *dynamic.DynamicClient
 	LeaderObservedRecord *LeaderRecord
 	LeaderObservedTime   int64
 }
@@ -45,6 +49,11 @@ func NewConfigurationStore() *ConfigurationStore {
 		panic(err)
 	}
 
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		panic(err)
+	}
+
 	return &ConfigurationStore{
 		ctx:             ctx,
 		clusterName:     os.Getenv(util.KbClusterName),
@@ -52,12 +61,15 @@ func NewConfigurationStore() *ConfigurationStore {
 		namespace:       os.Getenv(util.KbNamespace),
 		config:          config,
 		clientSet:       clientSet,
+		dynamicClient:   dynamicClient,
 		cluster:         &Cluster{},
 	}
 }
 
-func (cs *ConfigurationStore) Init(sysID string, extra map[string]string, opTime int64) error {
+func (cs *ConfigurationStore) Init(sysID string, extra map[string]string, opTime int64, podName string) error {
 	var createOpt metav1.CreateOptions
+	var getOpt metav1.GetOptions
+	var updateOpt metav1.UpdateOptions
 	var extraJsonStr string
 
 	leaderName := strings.Split(os.Getenv(util.KbPrimaryPodName), ".")[0]
@@ -72,45 +84,85 @@ func (cs *ConfigurationStore) Init(sysID string, extra map[string]string, opTime
 		}
 		extraJsonStr = string(jsonByte)
 	}
-	_, err := cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cs.clusterCompName + LeaderSuffix,
-			Namespace: cs.namespace,
-			Annotations: map[string]string{
-				LEADER:      leaderName,
-				AcquireTime: strconv.FormatInt(acquireTime, 10),
-				RenewTime:   strconv.FormatInt(renewTime, 10),
-				TTL:         ttl,
-				OpTime:      strconv.FormatInt(opTime, 10),
-				Extra:       extraJsonStr,
-			},
+
+	clusterObj, err := cs.dynamicClient.Resource(types.ClusterGVR()).Namespace(cs.namespace).Get(cs.ctx, cs.clusterName, getOpt)
+	if clusterObj == nil && err != nil {
+		return err
+	}
+	ownerReference := []metav1.OwnerReference{
+		{
+			APIVersion: clusterObj.GetAPIVersion(),
+			Kind:       clusterObj.GetKind(),
+			Name:       clusterObj.GetName(),
+			UID:        clusterObj.GetUID(),
 		},
-	}, createOpt)
+	}
+
+	leaderConfigMap, err := cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Get(cs.ctx, cs.clusterCompName+LeaderSuffix, getOpt)
+	if leaderConfigMap == nil || err != nil {
+		if _, err = cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cs.clusterCompName + LeaderSuffix,
+				Namespace: cs.namespace,
+				Annotations: map[string]string{
+					LEADER:      leaderName,
+					AcquireTime: strconv.FormatInt(acquireTime, 10),
+					RenewTime:   strconv.FormatInt(renewTime, 10),
+					TTL:         ttl,
+					OpTime:      strconv.FormatInt(opTime, 10),
+					Extra:       extraJsonStr,
+				},
+				OwnerReferences: ownerReference,
+			},
+		}, createOpt); err != nil {
+			return err
+		}
+	}
 
 	maxLagOnSwitchover := os.Getenv(MaxLagOnSwitchover)
-	if _, err = cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cs.clusterCompName + ConfigSuffix,
-			Namespace: cs.namespace,
-			Annotations: map[string]string{
-				SysID:              sysID,
-				TTL:                ttl,
-				MaxLagOnSwitchover: maxLagOnSwitchover,
+	configMap, err := cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Get(cs.ctx, cs.clusterCompName+ConfigSuffix, getOpt)
+	if configMap == nil || err != nil {
+		if _, err = cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cs.clusterCompName + ConfigSuffix,
+				Namespace: cs.namespace,
+				Annotations: map[string]string{
+					SysID:              sysID,
+					TTL:                ttl,
+					MaxLagOnSwitchover: maxLagOnSwitchover,
+				},
+				OwnerReferences: ownerReference,
 			},
-		},
-	}, createOpt); err != nil {
+		}, createOpt); err != nil {
+			return err
+		}
+	}
+
+	apiUrl := "http://" + os.Getenv(util.KbPodIP) + ":" + viper.GetString("dapr-http-port") +
+		"/v1.0/bindings/" + os.Getenv(util.KbServiceCharacterType)
+	pod, err := cs.clientSet.CoreV1().Pods(cs.namespace).Get(cs.ctx, podName, getOpt)
+	if err != nil {
+		return err
+	}
+	pod.Annotations[Url] = apiUrl
+	_, err = cs.clientSet.CoreV1().Pods(cs.namespace).Update(cs.ctx, pod, updateOpt)
+	if err != nil {
 		return err
 	}
 
 	if extra != nil {
-		if _, err = cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        cs.clusterCompName + ExtraSuffix,
-				Namespace:   cs.namespace,
-				Annotations: extra,
-			},
-		}, createOpt); err != nil {
-			return err
+		extraConfigMap, err := cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Get(cs.ctx, cs.clusterCompName+ExtraSuffix, getOpt)
+		if extraConfigMap == nil || err != nil {
+			if _, err = cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            cs.clusterCompName + ExtraSuffix,
+					Namespace:       cs.namespace,
+					Annotations:     extra,
+					OwnerReferences: ownerReference,
+				},
+			}, createOpt); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -129,6 +181,10 @@ func (cs *ConfigurationStore) GetClusterCompName() string {
 	return cs.clusterCompName
 }
 
+func (cs *ConfigurationStore) GetNamespace() string {
+	return cs.namespace
+}
+
 func (cs *ConfigurationStore) GetClusterFromKubernetes() error {
 	podList, err := cs.clientSet.CoreV1().Pods(cs.namespace).List(cs.ctx, metav1.ListOptions{})
 	if err != nil || podList == nil {
@@ -140,21 +196,21 @@ func (cs *ConfigurationStore) GetClusterFromKubernetes() error {
 	}
 
 	pods := make([]*v1.Pod, 0, len(podList.Items))
-	for i, pod := range podList.Items {
-		pods[i] = &pod
+	for i, _ := range podList.Items {
+		pods = append(pods, &podList.Items[i])
 	}
 
 	var config, switchoverConfig, leaderConfig, extraConfig *v1.ConfigMap
-	for _, cm := range configMapList.Items {
+	for i, cm := range configMapList.Items {
 		switch cm.Name {
 		case cs.clusterCompName + ConfigSuffix:
-			config = &cm
+			config = &configMapList.Items[i]
 		case cs.clusterCompName + SwitchoverSuffix:
-			switchoverConfig = &cm
+			switchoverConfig = &configMapList.Items[i]
 		case cs.clusterCompName + LeaderSuffix:
-			leaderConfig = &cm
+			leaderConfig = &configMapList.Items[i]
 		case cs.clusterCompName + ExtraSuffix:
-			extraConfig = &cm
+			extraConfig = &configMapList.Items[i]
 		}
 	}
 
@@ -174,8 +230,8 @@ func (cs *ConfigurationStore) loadClusterFromKubernetes(config, switchoverConfig
 	)
 
 	members := make([]*Member, 0, len(pods))
-	for i, pod := range pods {
-		members[i] = getMemberFromPod(pod)
+	for _, pod := range pods {
+		members = append(members, getMemberFromPod(pod))
 	}
 
 	if config != nil {
@@ -194,7 +250,7 @@ func (cs *ConfigurationStore) loadClusterFromKubernetes(config, switchoverConfig
 		if cs.LeaderObservedTime+leaderRecord.ttl < time.Now().Unix() {
 			leader = nil
 		} else {
-			member := newMember("-1", leaderConfig.Annotations[LEADER], map[string]string{})
+			member := newMember("-1", leaderConfig.Annotations[LEADER], map[string]string{}, map[string]string{})
 			for _, m := range members {
 				if m.name == member.name {
 					member = m
@@ -207,10 +263,8 @@ func (cs *ConfigurationStore) loadClusterFromKubernetes(config, switchoverConfig
 
 	if switchoverConfig != nil {
 		annotations := switchoverConfig.Annotations
-		scheduledAt, err := strconv.Atoi(annotations[ScheduledAt])
-		if err == nil {
-			switchover = newSwitchover(switchoverConfig.ResourceVersion, annotations[LEADER], annotations[CANDIDATE], int64(scheduledAt))
-		}
+		scheduledAt, _ := strconv.Atoi(annotations[ScheduledAt])
+		switchover = newSwitchover(switchoverConfig.ResourceVersion, annotations[LEADER], annotations[CANDIDATE], int64(scheduledAt))
 	}
 
 	if extraConfig != nil {

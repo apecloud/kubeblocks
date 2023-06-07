@@ -22,6 +22,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/ha"
 	"os"
 	"os/signal"
 	"syscall"
@@ -52,9 +54,7 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/kafka"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mongodb"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/redis"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/ha"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
 )
 
@@ -129,8 +129,10 @@ func main() {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	Ha := ha.NewHa()
-	Ha.HaControl(stopCh)
 	Ha.Init()
+	go func() {
+		Ha.HaControl(stopCh)
+	}()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)

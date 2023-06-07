@@ -43,6 +43,16 @@ func (c *Cluster) HasMember(memberName string) bool {
 	return false
 }
 
+func (c *Cluster) GetMemberWithName(name string) *Member {
+	for _, m := range c.Members {
+		if m.name == name {
+			return m
+		}
+	}
+
+	return nil
+}
+
 func (c *Cluster) GetMemberName() []string {
 	var memberList []string
 	for _, member := range c.Members {
@@ -115,24 +125,25 @@ func (m *Member) GetData() *MemberData {
 	return m.data
 }
 
+func (m *Member) GetName() string {
+	return m.name
+}
+
 func getMemberFromPod(pod *v1.Pod) *Member {
-	member := newMember(pod.ResourceVersion, pod.Name, pod.Labels)
+	member := newMember(pod.ResourceVersion, pod.Name, pod.Labels, pod.Annotations)
 	member.podLabel = pod.Labels
 	return member
 }
 
-func newMember(index string, name string, labels map[string]string) *Member {
+func newMember(index string, name string, labels map[string]string, annotations map[string]string) *Member {
 	return &Member{
 		index: index,
 		name:  name,
 		data: &MemberData{
 			role: labels[KbRoleLabel],
+			url:  annotations[Url],
 		},
 	}
-}
-
-func (m *Member) GetName() string {
-	return m.name
 }
 
 type Switchover struct {
@@ -161,6 +172,11 @@ func (s *Switchover) GetCandidate() string {
 
 type MemberData struct {
 	role string
+	url  string
+}
+
+func (m *MemberData) GetUrl() string {
+	return m.url
 }
 
 type ClusterData struct {

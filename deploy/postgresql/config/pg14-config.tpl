@@ -57,6 +57,7 @@ idle_in_transaction_session_timeout = '1h'
 listen_addresses = '0.0.0.0'
 log_autovacuum_min_duration = '1s'
 log_checkpoints = 'True'
+synchronous_commit = 'off'
 
 {{- block "logsBlock" . }}
 {{- if hasKey $.component "enabledLogs" }}

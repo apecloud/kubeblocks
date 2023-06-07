@@ -3,6 +3,7 @@ package ha
 import (
 	"context"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
+	"github.com/dapr/components-contrib/bindings"
 )
 
 type DB interface {
@@ -12,11 +13,14 @@ type DB interface {
 	GetStatus(ctx context.Context) (string, error)
 	GetExtra(ctx context.Context) (map[string]string, error)
 	GetOpTime(ctx context.Context) (int64, error)
-	IsLeader(ctx context.Context) bool
+	IsLeader(ctx context.Context) (bool, error)
 	IsHealthiest(ctx context.Context, podName string) bool
 	HandleFollow(ctx context.Context, leader *configuration_store.Leader, podName string, restart bool) error
 	EnforcePrimaryRole(ctx context.Context, podName string) error
-	ProcessManualSwitchoverFromLeader(ctx context.Context, podName string) error
+	ProcessManualSwitchoverFromLeader(ctx context.Context, podName string) (bool, error)
+	ProcessManualSwitchoverFromNoLeader(ctx context.Context, podName string) bool
+	InitDelay() error
+	Init(metadata bindings.Metadata) error
 
 	DbConn
 	DbTool

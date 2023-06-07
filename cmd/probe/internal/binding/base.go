@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
+	"github.com/valyala/fasthttp"
 	"net"
 	"strconv"
 	"strings"
@@ -75,6 +76,7 @@ type BaseOperations struct {
 	InitIfNeed             func() bool
 	GetRole                func(context.Context, *bindings.InvokeRequest, *bindings.InvokeResponse) (string, error)
 	OperationMap           map[bindings.OperationKind]Operation
+	httpClient             *fasthttp.Client
 }
 
 func init() {
@@ -110,6 +112,8 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 		GetRoleOperation:      ops.GetRoleOps,
 	}
 	ops.DBAddress = ops.getAddress()
+
+	ops.httpClient = &fasthttp.Client{}
 }
 
 func (ops *BaseOperations) RegisterOperation(opsKind bindings.OperationKind, operation Operation) {
@@ -330,7 +334,28 @@ func (ops *BaseOperations) ExecCmd(ctx context.Context, podName, cmd string) (ma
 	return ops.Cs.ExecCmdWithPod(ctx, podName, cmd, ops.DBType)
 }
 
-// FetchOtherStatus TODO:node against
-func (ops *BaseOperations) FetchOtherStatus() {
+func (ops *BaseOperations) FetchOtherStatus(url string, requestBody string) (map[string]string, error) {
+	//url = `http://localhost:3502/v1.0/bindings/postgresql`
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
 
+	req.SetRequestURI(url)
+	req.Header.SetContentType(`application/json`)
+	req.Header.SetMethod("POST")
+	req.SetBody([]byte(requestBody))
+
+	result := map[string]string{}
+	resp := &fasthttp.Response{}
+	if err := ops.httpClient.Do(req, resp); err != nil {
+		ops.Logger.Errorf("http request err:%v", err)
+		return result, err
+	}
+
+	data := resp.Body()
+	if err := json.Unmarshal(data, &result); err != nil {
+		ops.Logger.Errorf("json unmarshal err:%v", err)
+		return result, err
+	}
+
+	return result, nil
 }

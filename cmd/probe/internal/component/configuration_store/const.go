@@ -3,6 +3,7 @@ package configuration_store
 const (
 	SysID              = "sys_id"
 	TTL                = "ttl"
+	Url                = "url"
 	MaxLagOnSwitchover = "max_lag_on_switchover"
 	AcquireTime        = "acquire_time"
 	RenewTime          = "renew_time"

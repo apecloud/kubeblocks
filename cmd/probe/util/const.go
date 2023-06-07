@@ -19,36 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package util
 
-import "github.com/dapr/components-contrib/bindings"
-
-const (
-	CheckRunningOperation bindings.OperationKind = "checkRunning"
-	CheckStatusOperation  bindings.OperationKind = "checkStatus"
-	CheckRoleOperation    bindings.OperationKind = "checkRole"
-	GetRoleOperation      bindings.OperationKind = "getRole"
-	GetLagOperation       bindings.OperationKind = "getLag"
-	ExecOperation         bindings.OperationKind = "exec"
-	QueryOperation        bindings.OperationKind = "query"
-	CloseOperation        bindings.OperationKind = "close"
-	SwitchoverOperation   bindings.OperationKind = "switchover"
-	FailoverOperation     bindings.OperationKind = "failover"
-
-	// actions for cluster accounts management
-	ListUsersOp          bindings.OperationKind = "listUsers"
-	CreateUserOp         bindings.OperationKind = "createUser"
-	DeleteUserOp         bindings.OperationKind = "deleteUser"
-	DescribeUserOp       bindings.OperationKind = "describeUser"
-	GrantUserRoleOp      bindings.OperationKind = "grantUserRole"
-	RevokeUserRoleOp     bindings.OperationKind = "revokeUserRole"
-	ListSystemAccountsOp bindings.OperationKind = "listSystemAccounts"
-	// actions for cluster roles management
-
-	OperationNotImplemented = "NotImplemented"
-	OperationInvalid        = "Invalid"
-	OperationSuccess        = "Success"
-	OperationFailed         = "Failed"
-)
-
 const (
 	HostName               = "HOSTNAME"
 	KbClusterName          = "KB_CLUSTER_NAME"

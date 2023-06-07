@@ -1,8 +1,10 @@
 package ha
 
 import (
+	"cuelang.org/go/pkg/strconv"
+	"github.com/dapr/components-contrib/bindings"
+	"github.com/dapr/components-contrib/metadata"
 	"os"
-	"reflect"
 	"time"
 
 	"github.com/dapr/kit/logger"
@@ -43,10 +45,10 @@ func NewHa() *Ha {
 		panic(err)
 	}
 
-	sharedInformers := informers.NewSharedInformerFactory(clientSet, 10*time.Second)
-	configMapInformer := sharedInformers.Core().V1().ConfigMaps().Informer()
-
 	cs := configuration_store.NewConfigurationStore()
+
+	sharedInformers := informers.NewSharedInformerFactoryWithOptions(clientSet, 10*time.Second, informers.WithNamespace(cs.GetNamespace()))
+	configMapInformer := sharedInformers.Core().V1().ConfigMaps().Informer()
 
 	ha := &Ha{
 		ctx:      context.Background(),
@@ -62,12 +64,20 @@ func NewHa() *Ha {
 	if ha.DB == nil {
 		panic("unknown db type")
 	}
+	props := map[string]string{
+		"url": "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10",
+	}
+
+	_ = ha.DB.Init(bindings.Metadata{
+		Base: metadata.Base{Properties: props},
+	})
+	_ = ha.DB.InitDelay()
 
 	return ha
 }
 
 func (h *Ha) Init() {
-	if !h.DB.IsLeader(h.ctx) {
+	if isLeader, err := h.DB.IsLeader(h.ctx); !isLeader || err != nil {
 		return
 	}
 
@@ -89,7 +99,7 @@ func (h *Ha) Init() {
 		panic(err)
 	}
 
-	err = h.cs.Init(sysid, extra, opTime)
+	err = h.cs.Init(sysid, extra, opTime, h.podName)
 	if err != nil {
 		h.log.Errorf("configuration store init err:%v", err)
 		panic(err)
@@ -109,27 +119,31 @@ func (h *Ha) newDbInterface(logger logger.Logger) DB {
 }
 
 func (h *Ha) HaControl(stopCh chan struct{}) {
-	h.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		UpdateFunc: h.clusterControl,
-	})
+	h.informer.AddEventHandlerWithResyncPeriod(cache.FilteringResourceEventHandler{
+		FilterFunc: func(obj interface{}) bool {
+			configMap := obj.(*v1.ConfigMap)
+			return configMap.Name == h.cs.GetClusterCompName()+configuration_store.LeaderSuffix
+		},
+		Handler: cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				configMap := obj.(*v1.ConfigMap)
+				configMap.Annotations[configuration_store.RenewTime] = strconv.FormatInt(time.Now().Unix(), 10)
+				_, _ = h.cs.UpdateConfigMap(configMap)
+			},
+			UpdateFunc: h.clusterControl,
+		},
+	}, 0)
 
 	h.informer.Run(stopCh)
 }
 
 // clusterControl 主循环
-func (h *Ha) clusterControl(oldObj, newObj interface{}) {
-	oldConfigMap := oldObj.(*v1.ConfigMap)
-	newConfigMap := newObj.(*v1.ConfigMap)
-	if oldConfigMap.GetName() != h.cs.GetClusterCompName()+configuration_store.LeaderSuffix {
-		return
-	}
-	if reflect.DeepEqual(oldConfigMap.Annotations, newConfigMap.Annotations) {
-		return
-	}
 
+func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 	err := h.cs.GetClusterFromKubernetes()
 	if err != nil {
 		h.log.Errorf("cluster control get cluster from k8s err:%v", err)
+		time.Sleep(time.Second * 10)
 		return
 	}
 
@@ -141,22 +155,27 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 		if !h.hasLock() {
 			h.setLeader(false)
 			h.follow()
+			time.Sleep(time.Second * 10)
 			return
 		}
 		err = h.updateLockWithRetry(3)
 		if err != nil {
 			h.log.Errorf("update lock err,")
-			if h.DB.IsLeader(h.ctx) {
+			if isLeader, err := h.DB.IsLeader(h.ctx); isLeader && err == nil {
 				_ = h.DB.Demote(h.ctx, h.podName)
 			}
 		}
 
-		err = h.DB.ProcessManualSwitchoverFromLeader(h.ctx, h.podName)
+		done, err := h.DB.ProcessManualSwitchoverFromLeader(h.ctx, h.podName)
 		if err != nil {
 			h.log.Errorf("process manual switchover failed, err:%v", err)
 		}
+		if done {
+			return
+		}
 
 		err = h.DB.EnforcePrimaryRole(h.ctx, h.podName)
+		time.Sleep(time.Second * 10)
 		return
 	}
 
@@ -169,7 +188,7 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 		}
 
 		if h.cs.GetCluster().Switchover != nil {
-
+			err = h.cs.DeleteConfigMap(h.cs.GetClusterCompName() + configuration_store.SwitchoverSuffix)
 		}
 
 		err = h.DB.EnforcePrimaryRole(h.ctx, h.podName)
@@ -178,6 +197,7 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 		time.Sleep(time.Second * 2)
 		h.follow()
 	}
+	time.Sleep(time.Second * 10)
 }
 
 func (h *Ha) hasLock() bool {
@@ -220,15 +240,17 @@ func (h *Ha) isHealthiest() bool {
 		return false
 	}
 
-	if h.DB.IsLeader(h.ctx) {
+	if isLeader, err := h.DB.IsLeader(h.ctx); isLeader && err == nil {
 		dbSysId, err := h.DB.GetSysID(h.ctx)
 		if err != nil {
 			h.log.Errorf("get db sysid err:%v", err)
 			return false
 		}
-		if dbSysId != h.cs.GetCluster().SysID {
-			return false
-		}
+		return dbSysId == h.cs.GetCluster().SysID
+	}
+
+	if h.cs.GetCluster().Switchover != nil {
+		return h.DB.ProcessManualSwitchoverFromNoLeader(h.ctx, h.podName)
 	}
 
 	return h.DB.IsHealthiest(h.ctx, h.podName)
@@ -260,7 +282,7 @@ func (h *Ha) follow() {
 		return
 	}
 
-	if h.DB.IsLeader(h.ctx) {
+	if isLeader, err := h.DB.IsLeader(h.ctx); isLeader && err == nil {
 		h.log.Infof("demoted %s after trying and failing to obtain lock", h.podName)
 		err = h.DB.Demote(h.ctx, h.podName)
 	}

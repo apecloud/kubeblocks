@@ -28,6 +28,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
@@ -38,7 +39,6 @@ import (
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
-	"github.com/apecloud/kubeblocks/internal/sqlchannel"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -404,17 +404,14 @@ func (pgOps *PostgresOperations) isSwitchoverPossible(ctx context.Context, prima
 	}
 
 	runningMembers := 0
-	pods, err := pgOps.Cs.ListPods()
-	for _, pod := range pods.Items {
-		client, err := sqlchannel.NewClientWithPod(&pod, pgOps.DBType)
+	requestBody := `{"operation":"checkStatus"}`
+	for _, m := range pgOps.Cs.GetCluster().Members {
+		resp, err := pgOps.FetchOtherStatus(m.GetData().GetUrl(), requestBody)
 		if err != nil {
-			return false, errors.Errorf("new client with pod err:%v", err)
+			pgOps.Logger.Errorf("fetch other member failed, err:%v", err)
 		}
-		resp, err := client.CheckStatus()
-		if err != nil {
-			return false, errors.Errorf("client check status err:%v", err)
-		}
-		if resp == OperationSuccess {
+		pgOps.Logger.Infof("other status", resp)
+		if resp["event"] == OperationSuccess {
 			runningMembers++
 		}
 	}
@@ -508,12 +505,15 @@ func (pgOps *PostgresOperations) exec(ctx context.Context, sql string) (result i
 
 func (pgOps *PostgresOperations) getReplicationMode(ctx context.Context) (string, error) {
 	sql := "select pg_catalog.current_setting('synchronous_commit');"
-	mode, err := pgOps.query(ctx, sql)
+	resp, err := pgOps.query(ctx, sql)
 	if err != nil {
 		return "", err
 	}
+	mode := strings.TrimFunc(strings.Split(string(resp), ":")[1], func(r rune) bool {
+		return !unicode.IsLetter(r)
+	})
 
-	switch string(mode) {
+	switch mode {
 	case "off":
 		return AsynchronousMode, nil
 	case "local":
@@ -536,7 +536,9 @@ func (pgOps *PostgresOperations) checkStandbySynchronizedToLeader(ctx context.Co
 		pgOps.Logger.Errorf("query sql:%s, err:%v", sql, err)
 		return false
 	}
-	syncStandbys, err := ParsePGSyncStandby(string(resp))
+	standbyNames := strings.Split(strings.Split(string(resp), ":")[1], `"`)[1]
+
+	syncStandbys, err := ParsePGSyncStandby(standbyNames)
 	if err != nil {
 		pgOps.Logger.Errorf("parse pg sync standby failed, err:%v", err)
 		return false
@@ -547,8 +549,7 @@ func (pgOps *PostgresOperations) checkStandbySynchronizedToLeader(ctx context.Co
 
 func (pgOps *PostgresOperations) getWalPosition(ctx context.Context) (int64, error) {
 	var lsn int64
-	var err error
-	if pgOps.IsLeader(ctx) {
+	if isLeader, err := pgOps.IsLeader(ctx); isLeader && err == nil {
 		lsn, err = pgOps.getLsn(ctx, "current")
 		if err != nil {
 			return 0, err
@@ -581,8 +582,16 @@ func (pgOps *PostgresOperations) getLsn(ctx context.Context, types string) (int6
 		pgOps.Logger.Errorf("get wal position err:%v", err)
 		return 0, err
 	}
+	lsnStr := strings.TrimFunc(string(resp), func(r rune) bool {
+		return !unicode.IsDigit(r)
+	})
 
-	return int64(binary.BigEndian.Uint64(resp)), nil
+	lsn, err := strconv.ParseInt(lsnStr, 10, 64)
+	if err != nil {
+		pgOps.Logger.Errorf("convert lsnStr to lsn failed, err:%v", err)
+	}
+
+	return lsn, nil
 }
 
 // InternalQuery is used for internal query, implements BaseInternalOps interface
@@ -820,7 +829,10 @@ func (pgOps *PostgresOperations) GetSysID(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(res), nil
+
+	return strings.TrimFunc(string(res), func(r rune) bool {
+		return !unicode.IsDigit(r)
+	}), nil
 }
 
 func (pgOps *PostgresOperations) GetExtra(ctx context.Context) (map[string]string, error) {
@@ -843,7 +855,9 @@ func (pgOps *PostgresOperations) getTimeline(ctx context.Context) (string, error
 		return "", err
 	}
 
-	return string(res), nil
+	return strings.TrimFunc(string(res), func(r rune) bool {
+		return !unicode.IsDigit(r)
+	}), nil
 }
 
 // Promote 考虑异步
@@ -881,7 +895,7 @@ func (pgOps *PostgresOperations) Demote(ctx context.Context, podName string) err
 		pgOps.Logger.Errorf("stop err: %v", err)
 		return err
 	}
-
+	// TODO:
 	opTime, _ := pgOps.getWalPosition(ctx)
 	err = pgOps.Cs.DeleteLeader(opTime)
 
@@ -909,13 +923,14 @@ func (pgOps *PostgresOperations) GetOpTime(ctx context.Context) (int64, error) {
 	return pgOps.getWalPosition(ctx)
 }
 
-func (pgOps *PostgresOperations) IsLeader(ctx context.Context) bool {
+func (pgOps *PostgresOperations) IsLeader(ctx context.Context) (bool, error) {
 	role, err := pgOps.GetRole(ctx, &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
 	if err != nil {
 		pgOps.Logger.Errorf("get role failed, err:%v", err)
+		return false, err
 	}
 
-	return role == PRIMARY
+	return role == PRIMARY, nil
 }
 
 func (pgOps *PostgresOperations) IsHealthiest(ctx context.Context, podName string) bool {
@@ -967,19 +982,15 @@ func (pgOps *PostgresOperations) IsHealthiest(ctx context.Context, podName strin
 		return false
 	}
 
-	pods, err := pgOps.Cs.ListPods()
-	for _, pod := range pods.Items {
-		client, err := sqlchannel.NewClientWithPod(&pod, pgOps.DBType)
+	requestBody := `{"operation":"getRole"}`
+	for _, m := range pgOps.Cs.GetCluster().Members {
+		resp, err := pgOps.FetchOtherStatus(m.GetData().GetUrl(), requestBody)
 		if err != nil {
-			pgOps.Logger.Errorf("new client with pod err:%v", err)
-		}
-		role, err := client.GetRole()
-		if err != nil {
-			pgOps.Logger.Errorf("client check status err:%v", err)
+			pgOps.Logger.Errorf("fetch other status err:%v", err)
 			return false
 		}
-		if role == PRIMARY {
-			pgOps.Logger.Errorf("Primary %s is still alive", pod.Name)
+		if resp["role"] == PRIMARY {
+			pgOps.Logger.Errorf("Primary %s is still alive")
 			return false
 		}
 		// TODO: getLag
@@ -998,10 +1009,12 @@ func (pgOps *PostgresOperations) isLagging(walPosition int64) bool {
 }
 
 func (pgOps *PostgresOperations) HandleFollow(ctx context.Context, leader *configuration_store.Leader, podName string, restart bool) error {
-	need, _ := pgOps.isRewindOrReinitializePossible(ctx, leader, podName)
-	if !need {
-		return nil
-	}
+	/*
+		need, _ := pgOps.isRewindOrReinitializePossible(ctx, leader, podName)
+		if !need {
+			return nil
+		}
+	*/
 	pgOps.executeRewind()
 
 	if restart {
@@ -1012,8 +1025,16 @@ func (pgOps *PostgresOperations) HandleFollow(ctx context.Context, leader *confi
 }
 
 func (pgOps *PostgresOperations) start(ctx context.Context, podName string) error {
+	touchCmd := "touch /postgresql/data/standby.signal"
+
+	_, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, touchCmd, pgOps.DBType)
+	if err != nil {
+		pgOps.Logger.Errorf("touch err: %v", err)
+		return err
+	}
+
 	startCmd := "su -c 'postgres -D /postgresql/data --config-file=/opt/bitnami/postgresql/conf/postgresql.conf --external_pid_file=/opt/bitnami/postgresql/tmp/postgresql.pid --hba_file=/opt/bitnami/postgresql/conf/pg_hba.conf' postgres &"
-	_, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, startCmd, pgOps.DBType)
+	_, err = pgOps.Cs.ExecCmdWithPod(ctx, podName, startCmd, pgOps.DBType)
 	if err != nil {
 		pgOps.Logger.Errorf("start err: %v", err)
 		return err
@@ -1042,14 +1063,12 @@ func (pgOps *PostgresOperations) checkTimelineAndLsn(ctx context.Context, leader
 		return false
 	}
 
-	leaderPod, err := pgOps.Cs.GetPod(leader.GetMember().GetName())
+	requestBody := `{"operation":"getRole"}`
+	resp, err := pgOps.FetchOtherStatus(leader.GetMember().GetData().GetUrl(), requestBody)
 	if err != nil {
-		pgOps.Logger.Errorf("get leader pod failed, err:%v", err)
+		return false
 	}
-	client, err := sqlchannel.NewClientWithPod(leaderPod, pgOps.DBType)
-	// check leader is in recovery
-	role, err := client.GetRole()
-	if role != PRIMARY {
+	if resp["role"] != PRIMARY {
 		pgOps.Logger.Infof("Leader is still in_recovery and therefore can't be used for rewind")
 		return false
 	}
@@ -1193,7 +1212,7 @@ func (pgOps *PostgresOperations) getPgControlData(ctx context.Context, podName s
 }
 
 func (pgOps *PostgresOperations) EnforcePrimaryRole(ctx context.Context, podName string) error {
-	if pgOps.IsLeader(ctx) {
+	if isLeader, err := pgOps.IsLeader(ctx); isLeader && err == nil {
 		err := pgOps.processSyncReplication()
 		return err
 	} else {
@@ -1224,16 +1243,16 @@ func (pgOps *PostgresOperations) setSynchronousStandbyNames() error {
 	return nil
 }
 
-func (pgOps *PostgresOperations) ProcessManualSwitchoverFromLeader(ctx context.Context, podName string) error {
+func (pgOps *PostgresOperations) ProcessManualSwitchoverFromLeader(ctx context.Context, podName string) (bool, error) {
 	err := pgOps.Cs.GetClusterFromKubernetes()
 	if err != nil {
 		pgOps.Logger.Errorf("get cluster from k8s failed, err:%v", err)
-		return err
+		return false, err
 	}
 
 	switchover := pgOps.Cs.GetCluster().Switchover
 	if switchover == nil {
-		return nil
+		return false, nil
 	}
 
 	leader := switchover.GetLeader()
@@ -1242,7 +1261,7 @@ func (pgOps *PostgresOperations) ProcessManualSwitchoverFromLeader(ctx context.C
 		if candidate == "" || candidate != podName {
 			replicationMode, err := pgOps.getReplicationMode(ctx)
 			if err != nil {
-				return err
+				return false, err
 			}
 
 			var members []string
@@ -1258,14 +1277,14 @@ func (pgOps *PostgresOperations) ProcessManualSwitchoverFromLeader(ctx context.C
 				}
 			} else {
 				for _, m := range pgOps.Cs.GetCluster().Members {
-					if switchover.GetCandidate() != "" || m.GetName() == candidate {
+					if switchover.GetCandidate() == "" || m.GetName() == candidate {
 						members = append(members, m.GetName())
 					}
 				}
 			}
 
 			if pgOps.isFailoverPossible() {
-				return pgOps.Demote(ctx, podName)
+				return true, pgOps.Demote(ctx, podName)
 			}
 		} else {
 			pgOps.Logger.Warnf("manual failover: I am already the leader, no need to failover")
@@ -1274,9 +1293,46 @@ func (pgOps *PostgresOperations) ProcessManualSwitchoverFromLeader(ctx context.C
 		pgOps.Logger.Warnf("manual switchover, leader name does not match, %s != %s", switchover.GetLeader(), podName)
 	}
 
-	return pgOps.Cs.DeleteConfigMap(pgOps.Cs.GetClusterCompName() + configuration_store.SwitchoverSuffix)
+	return false, pgOps.Cs.DeleteConfigMap(pgOps.Cs.GetClusterCompName() + configuration_store.SwitchoverSuffix)
 }
 
 func (pgOps *PostgresOperations) isFailoverPossible() bool {
 	return true
+}
+
+func (pgOps *PostgresOperations) ProcessManualSwitchoverFromNoLeader(ctx context.Context, podName string) bool {
+	replicationMode, err := pgOps.getReplicationMode(ctx)
+	if err != nil {
+		pgOps.Logger.Errorf("get replication err:%v", err)
+		return false
+	}
+	if replicationMode == SynchronousMode && pgOps.checkStandbySynchronizedToLeader(ctx, podName, false) {
+		return false
+	}
+
+	switchover := pgOps.Cs.GetCluster().Switchover
+	if switchover.GetCandidate() != "" {
+		if switchover.GetCandidate() == podName {
+			return true
+		}
+		member := pgOps.Cs.GetCluster().GetMemberWithName(switchover.GetCandidate())
+		requestBody := `{"operation":"checkStatus"}`
+		resp, err := pgOps.FetchOtherStatus(member.GetData().GetUrl(), requestBody)
+		if err != nil {
+			pgOps.Logger.Errorf("fetch other status err:%v", err)
+		}
+		if resp["event"] == OperationSuccess {
+			return false
+		}
+	}
+
+	/*
+		if switchover.GetLeader() != "" {
+			if podName == switchover.GetLeader() {
+
+			}
+		}
+	*/
+
+	return pgOps.IsHealthiest(ctx, podName)
 }

@@ -28,6 +28,8 @@ import (
 	"strconv"
 	"strings"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 
 	"github.com/google/uuid"
@@ -440,7 +442,7 @@ func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
 
 // BuildEnvConfig builds cluster component context ConfigMap object, which is to be used in workload container's
 // envFrom.configMapRef with name of "$(cluster.metadata.name)-$(component.name)-env" pattern.
-func BuildEnvConfig(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*corev1.ConfigMap, error) {
+func BuildEnvConfig(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*corev1.ConfigMap, error) {
 	const tplFile = "env_config_template.cue"
 	envData := map[string]string{}
 

@@ -296,8 +296,9 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds Env Config correctly", func() {
+			reqCtx := newReqCtx()
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
+			cfg, err := BuildEnvConfig(reqCtx, k8sClient, cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
 			for _, k := range requiredKeys {
@@ -307,19 +308,21 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds env config with resources recreate", func() {
+			reqCtx := newReqCtx()
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
 
 			uuid := "12345"
 			By("mock a cluster uuid")
 			cluster.UID = types.UID(uuid)
 
-			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
+			cfg, err := BuildEnvConfig(reqCtx, k8sClient, cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
 			Expect(cfg.Data["KB_CLUSTER_UID"]).Should(Equal(uuid))
 		})
 
 		It("builds Env Config with ConsensusSet status correctly", func() {
+			reqCtx := newReqCtx()
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 				synthesizedComponent.Name: {
@@ -334,7 +337,7 @@ var _ = Describe("builder", func() {
 						}},
 					},
 				}}
-			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
+			cfg, err := BuildEnvConfig(reqCtx, k8sClient, cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
 			toCheckKeys := append(requiredKeys, []string{

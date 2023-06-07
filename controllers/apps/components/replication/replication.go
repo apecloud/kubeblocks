@@ -179,7 +179,7 @@ func (r *ReplicationSet) HandleRestart(ctx context.Context, obj client.Object) (
 
 // HandleRoleChange is the implementation of the type Component interface method, which is used to handle the role change of the Replication workload.
 func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	podList, err := getRunningPods(ctx, r.Cli, obj)
+	podList, err := util.GetRunningPods(ctx, r.Cli, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -246,34 +246,7 @@ func (r *ReplicationSet) asyncReplicationPodRoleLabelAndAnnotations(podList []co
 
 // HandleSwitchover is the implementation of the type Component interface method, which is used to handle the switchover of the Replication workload.
 func (r *ReplicationSet) HandleSwitchover(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	// check if all Pods have role label
-	podList, err := getRunningPods(ctx, r.Cli, obj)
-	if err != nil {
-		return nil, err
-	}
-	for _, pod := range podList {
-		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
-			return nil, nil
-		}
-	}
-
-	// check if the switchover is needed
-	needSwitchover, err := util.NeedDeaWithSwitchover(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent())
-	if err != nil {
-		return nil, err
-	}
-	if needSwitchover {
-		// create a job to do switchover and check the result
-		if err := util.DoSwitchover(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent()); err != nil {
-			return nil, err
-		}
-	} else {
-		// if the switchover is not needed, it means that the switchover has been completed, and the switchover job can be deleted.
-		if err := util.PostOpsSwitchover(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent()); err != nil {
-			return nil, err
-		}
-	}
-	return nil, nil
+	return nil, util.HandleSwitchover(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent(), obj)
 }
 
 // HandleFailover is the implementation of the type Component interface method, which is used to handle the failover of the Replication workload.

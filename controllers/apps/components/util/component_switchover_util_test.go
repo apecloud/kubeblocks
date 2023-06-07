@@ -28,13 +28,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlcomputil "github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
-	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("ReplicationSet Util", func() {
@@ -123,21 +124,21 @@ var _ = Describe("ReplicationSet Util", func() {
 		}
 
 		By("Test cluster.status.Switchover.Condition is nil, candidateInstance consistent with pod role label, should not need to deal with switchover.")
-		needSwitchover, err := NeedDeaWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
+		needSwitchover, err := NeedDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeFalse())
 
 		By("Test cluster.status.Switchover.Condition is nil, candidateInstance is not consistent with pod role label, should need to deal with switchover.")
 		component.CandidateInstance.Index = 1
 		component.CandidateInstance.Operator = appsv1alpha1.CandidateOpEqual
-		needSwitchover, err = NeedDeaWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
+		needSwitchover, err = NeedDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
 
 		By("Test cluster.status.Switchover.Condition is nil, candidateInstance is not consistent with pod role label and operator is NotEqual, should need to deal with switchover.")
 		component.CandidateInstance.Index = 0
 		component.CandidateInstance.Operator = appsv1alpha1.CandidateOpNotEqual
-		needSwitchover, err = NeedDeaWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
+		needSwitchover, err = NeedDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
 
@@ -146,7 +147,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		component.CandidateInstance.Operator = appsv1alpha1.CandidateOpEqual
 		newSwitchoverCondition := initSwitchoverCondition(*component.CandidateInstance, component.Name, metav1.ConditionFalse, ReasonSwitchoverStart, clusterObj.Generation)
 		meta.SetStatusCondition(&clusterObj.Status.Conditions, *newSwitchoverCondition)
-		needSwitchover, err = NeedDeaWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
+		needSwitchover, err = NeedDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
 
@@ -155,7 +156,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		component.CandidateInstance.Operator = appsv1alpha1.CandidateOpEqual
 		newSwitchoverCondition = initSwitchoverCondition(*component.CandidateInstance, component.Name, metav1.ConditionTrue, ReasonSwitchoverSucceed, clusterObj.Generation)
 		meta.SetStatusCondition(&clusterObj.Status.Conditions, *newSwitchoverCondition)
-		needSwitchover, err = NeedDeaWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
+		needSwitchover, err = NeedDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeFalse())
 
@@ -166,7 +167,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		meta.SetStatusCondition(&clusterObj.Status.Conditions, *newSwitchoverCondition)
 		component.CandidateInstance.Index = 2
 		component.CandidateInstance.Operator = appsv1alpha1.CandidateOpEqual
-		needSwitchover, err = NeedDeaWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
+		needSwitchover, err = NeedDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
 	}

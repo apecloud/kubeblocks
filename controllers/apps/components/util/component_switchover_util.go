@@ -46,8 +46,51 @@ const (
 	ReasonSwitchoverStart   = "SwitchoverStart"   // ReasonSwitchoverSucceed the component is starting switchover
 )
 
-// NeedDeaWithSwitchover checks whether we need to handle the switchover process.
-func NeedDeaWithSwitchover(ctx context.Context,
+// HandleSwitchover is the entrypoint of workload switchover
+func HandleSwitchover(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	component *intctrlcomputil.SynthesizedComponent,
+	obj client.Object) error {
+	if component.CandidateInstance == nil {
+		return nil
+	}
+	// check if all Pods have role label
+	podList, err := GetRunningPods(ctx, cli, obj)
+	if err != nil {
+		return err
+	}
+	if component.CandidateInstance.Index > int32(len(podList)-1) {
+		return errors.New("the candidate instance index is out of range")
+	}
+	for _, pod := range podList {
+		// if the pod does not have the role label, we do nothing.
+		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
+			return nil
+		}
+	}
+
+	// check if the switchover is needed
+	needSwitchover, err := NeedDealWithSwitchover(ctx, cli, cluster, component)
+	if err != nil {
+		return err
+	}
+	if needSwitchover {
+		// create a job to do switchover and check the result
+		if err := DoSwitchover(ctx, cli, cluster, component); err != nil {
+			return err
+		}
+	} else {
+		// if the switchover is not needed, it means that the switchover has been completed, and the switchover job can be deleted.
+		if err := PostOpsSwitchover(ctx, cli, cluster, component); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// NeedDealWithSwitchover checks whether we need to handle the switchover process.
+func NeedDealWithSwitchover(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomputil.SynthesizedComponent) (bool, error) {
@@ -532,4 +575,13 @@ func initSwitchoverCondition(candidateInstance appsv1alpha1.CandidateInstance, c
 		Reason:             reason,
 		ObservedGeneration: clusterGeneration,
 	}
+}
+
+// GetRunningPods gets the running pods of the specified statefulSet.
+func GetRunningPods(ctx context.Context, cli client.Client, obj client.Object) ([]corev1.Pod, error) {
+	sts := ConvertToStatefulSet(obj)
+	if sts == nil || sts.Generation != sts.Status.ObservedGeneration {
+		return nil, nil
+	}
+	return GetPodListByStatefulSet(ctx, cli, sts)
 }

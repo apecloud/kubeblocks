@@ -289,23 +289,7 @@ func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) 
 
 // HandleSwitchover is the implementation of the type Component interface method, which is used to handle the switchover of the Consensus workload.
 func (r *ConsensusSet) HandleSwitchover(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	// check if the switchover is needed
-	needSwitchover, err := util.NeedDeaWithSwitchover(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent())
-	if err != nil {
-		return nil, err
-	}
-	if needSwitchover {
-		// create a job to do switchover and check the result
-		if err := util.DoSwitchover(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent()); err != nil {
-			return nil, err
-		}
-	} else {
-		// if the switchover is not needed, it means that the switchover has been completed, and the switchover job can be deleted.
-		if err := util.PostOpsSwitchover(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent()); err != nil {
-			return nil, err
-		}
-	}
-	return nil, nil
+	return nil, util.HandleSwitchover(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent(), obj)
 }
 
 // HandleFailover is the implementation of the type Component interface method, which is used to handle the failover of the Consensus workload.

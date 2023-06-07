@@ -120,14 +120,6 @@ func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSet
 	return nil
 }
 
-func getRunningPods(ctx context.Context, cli client.Client, obj client.Object) ([]corev1.Pod, error) {
-	sts := util.ConvertToStatefulSet(obj)
-	if sts.Generation != sts.Status.ObservedGeneration {
-		return nil, nil
-	}
-	return util.GetPodListByStatefulSet(ctx, cli, sts)
-}
-
 // GetAndCheckReplicationSetPrimaryPod gets and checks the primary Pod of the replication workload.
 func GetAndCheckReplicationSetPrimaryPod(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compSpecName string) (*corev1.Pod, error) {
 	podList, err := util.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, constant.Primary)

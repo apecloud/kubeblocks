@@ -57,7 +57,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	component *component.SynthesizedComponent) ([]client.Object, error) {
 	resources := make([]client.Object, 0)
 	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
-		envConfig, err := builder.BuildEnvConfig(cluster, component)
+		envConfig, err := builder.BuildEnvConfig(reqCtx, cli, cluster, component)
 		if err != nil {
 			return err
 		}

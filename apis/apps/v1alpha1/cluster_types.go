@@ -100,6 +100,8 @@ type ClusterStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
+// ClusterComponentSpec defines the cluster component spec.
+// +kubebuilder:validation:XValidation:rule="has(self.candidateInstance.index) && self.candidateInstance.index < self.replicas",message="candidateInstance.Index cannot be larger than replicas"
 type ClusterComponentSpec struct {
 	// name defines cluster's component name.
 	// +kubebuilder:validation:Required
@@ -313,8 +315,7 @@ type CandidateInstance struct {
 	// false indicates that the results of failover will not be synchronized to the candidateInstance.
 	// At this situation, there may be inconsistencies between the candidateInstance and the real primary/leader instance,
 	// If consistency is required, the user needs to manually update the index and operator value.
-	// +kubebuilder:default=true
-	// +optional
+	// +kubebuilder:validation:Required
 	FailoverSync bool `json:"failoverSync"`
 }
 

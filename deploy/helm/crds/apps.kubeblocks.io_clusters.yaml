@@ -112,6 +112,8 @@ spec:
                   and ClusterVersion. It will replace the field in ClusterDefinition's
                   and ClusterVersion's component if type is matching.
                 items:
+                  description: ClusterComponentSpec defines the cluster component
+                    spec.
                   properties:
                     affinity:
                       description: affinity describes affinities specified by users.
@@ -160,7 +162,6 @@ spec:
                         and describe the information of the candidate primary or leader.
                       properties:
                         failoverSync:
-                          default: true
                           description: failoverSync indicates whether to synchronize
                             the results of failover to candidateInstance. true indicates
                             that the results of the failover will be asynchronously
@@ -198,6 +199,7 @@ spec:
                           - NotEqual
                           type: string
                       required:
+                      - failoverSync
                       - index
                       - operator
                       type: object
@@ -538,6 +540,10 @@ spec:
                   - name
                   - replicas
                   type: object
+                  x-kubernetes-validations:
+                  - message: candidateInstance.Index cannot be larger than replicas
+                    rule: has(self.candidateInstance.index) && self.candidateInstance.index
+                      < self.replicas
                 minItems: 1
                 type: array
                 x-kubernetes-list-map-keys:

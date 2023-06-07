@@ -46,10 +46,14 @@ pvc: {
 		namespace: pvc_key.Namespace
 		labels: {
 			"apps.kubeblocks.io/vct-name": volumeClaimTemplate.metadata.name
-			"app.kubernetes.io/name":            "\(component.clusterDefName)"
+			if component.clusterDefName != _|_ {
+				"app.kubernetes.io/name":            "\(component.clusterDefName)"
+			}
+			if component.name != _|_ {
+			  "apps.kubeblocks.io/component-name": "\(component.name)"
+			}
 			"app.kubernetes.io/instance":        cluster.metadata.name
 			"app.kubernetes.io/managed-by":      "kubeblocks"
-			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 	}
 	spec: {

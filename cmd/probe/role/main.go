@@ -29,57 +29,50 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/observation"
-
-	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"go.uber.org/automaxprocs/maxprocs"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/role/internal"
 )
 
 func main() {
-	// set GOMAXPROCS
-	_, _ = maxprocs.Set()
 
 	var err error
-	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-	pflag.Parse()
-	err = viper.BindPFlags(pflag.CommandLine)
-	if err != nil {
-		panic(fmt.Errorf("fatal error viper bindPFlags: %v", err))
-	}
-	viper.SetConfigFile(viper.GetString("config")) // path to look for the config file in
-	err = viper.ReadInConfig()                     // Find and read the config file
-	if err != nil {                                // Handle errors reading the config file
-		panic(fmt.Errorf("fatal error config file: %v", err))
-	}
 
-	custom := observation.NewRoleAgent(os.Stdin, "")
-	err = custom.Init()
+	var port int
+	var url string
+	flag.IntVar(&port, "port", internal.DefaultRoleObservationPort, "")
+	flag.StringVar(&url, "url", internal.DefaultRoleObservationPath, "")
+
+	viper.SetConfigFile(viper.GetString("config")) // path to look for the config file in
+	_ = viper.ReadInConfig()                       // Find and read the config file
+	// just ignore err, if we hit err, use default settings
+
+	agent := internal.NewRoleAgent(os.Stdin, "ROLE_OBSERVATION")
+	err = agent.Init()
 	if err != nil {
 		panic(fmt.Errorf("fatal error custom init: %v", err))
 	}
 
-	err = http.ListenAndServe("localhost:3501", nil)
+	err = http.ListenAndServe(fmt.Sprintf("localhost:%d", port), nil)
 	if err != nil {
 		panic(fmt.Errorf("fatal error http listen: %v", err))
 	}
-	url := "/role"
 
 	http.HandleFunc(url, func(writer http.ResponseWriter, request *http.Request) {
-		opsRes, shouldNotify := custom.CheckRoleOps(request.Context())
+		opsRes, shouldNotify := agent.CheckRole(request.Context())
 		buf, err := json.Marshal(opsRes)
 		if err != nil {
 			panic(fmt.Errorf("fatal error json parse: %v", err))
 		}
 
 		if _, exist := opsRes["event"]; !exist || len(opsRes) == 0 {
-			code, _ := strconv.Atoi(observation.RealReadinessFail)
+			code, _ := strconv.Atoi(internal.RealReadinessFail)
 			writer.WriteHeader(code)
 			return
 		}
 
 		if shouldNotify {
-			code, _ := strconv.Atoi(observation.OperationFailedHTTPCode)
+			code, _ := strconv.Atoi(internal.OperationFailedHTTPCode)
 			writer.WriteHeader(code)
 			_, err = writer.Write(buf)
 			if err != nil {
@@ -93,5 +86,5 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
 	<-stop
-	custom.ShutDownClient()
+	agent.ShutDownClient()
 }

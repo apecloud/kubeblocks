@@ -1,4 +1,4 @@
-package observation
+package internal
 
 import (
 	"context"
@@ -18,16 +18,19 @@ func TestInit(t *testing.T) {
 	var ports = []int{1, 2, 3}
 	initEnv(ports)
 
-	faker := mockFakeController()
-	faker.Init()
+	faker := mockFakeAgent()
+	err := faker.Init()
+	if err != nil {
+		t.Errorf("faker init failed ,err = %v", err)
+	}
 	if faker.FailedEventReportFrequency != 3600 {
 		t.Errorf("faker.FailedEventReportFrequency init failed: %d", faker.FailedEventReportFrequency)
 	}
-	if faker.RoleDetectionThreshold != 60 {
-		t.Errorf("faker.RoleDetectionThreshold init failed: %d", faker.RoleDetectionThreshold)
+	if faker.RoleObservationThreshold != 60 {
+		t.Errorf("faker.RoleObservationThreshold init failed: %d", faker.RoleObservationThreshold)
 	}
 	if faker.client == nil {
-		t.Errorf("faker.client init failed")
+		t.Error("faker.client init failed")
 	}
 	if len(*faker.actionSvcPorts) != len(ports) {
 		t.Errorf("faker.actionSvcPorts init failed: len = %d", len(*faker.actionSvcPorts))
@@ -38,39 +41,39 @@ func TestInit(t *testing.T) {
 			}
 		}
 	}
-	if len(faker.DBRoles) == 0 {
-		t.Errorf("faker.DBRoles init failed: empty")
-	}
 }
 
 func TestGetRoleFailed(t *testing.T) {
 	var ports = []int{8080}
 	initEnv(ports)
-	faker := mockFakeController()
-	faker.Init()
-	ops, b := faker.CheckRoleOps(context.Background())
+	faker := mockFakeAgent()
+	err := faker.Init()
+	if err != nil {
+		t.Errorf("faker init failed ,err = %v", err)
+	}
+	ops, b := faker.CheckRole(context.Background())
 	event, has := ops["event"]
-	if !has || !b || (has && event == OperationFailed) {
-		t.Errorf("faker CheckRoleOps failed")
+	if !has || !b || (has && event == OperationSuccess) {
+		t.Error("faker CheckRole failed")
 	}
 }
 
-func mockFakeController() *fakeRoleAgent {
+func mockFakeAgent() *fakeRoleAgent {
 	roleAgent := NewRoleAgent(os.Stdin, "")
 	return &fakeRoleAgent{RoleAgent: roleAgent}
 }
 
-func (fakeRoleAgent *fakeRoleAgent) Init() {
-	fakeRoleAgent.RoleAgent.Init()
+func (fakeRoleAgent *fakeRoleAgent) Init() error {
+	err := fakeRoleAgent.RoleAgent.Init()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func initEnv(ports []int) {
 	viper.Set("KB_FAILED_EVENT_REPORT_FREQUENCY", "3601")
 	viper.Set("KB_ROLE_DETECTION_THRESHOLD", "59")
-	serviceRoles := make(map[string]interface{})
-	serviceRoles["leader"] = ReadWrite
-	buf, _ := json.Marshal(serviceRoles)
-	viper.Set("KB_SERVICE_ROLES", string(buf))
-	buf, _ = json.Marshal(ports)
+	buf, _ := json.Marshal(ports)
 	viper.Set("KB_CONSENSUS_SET_ACTION_SVC_LIST", string(buf))
 }

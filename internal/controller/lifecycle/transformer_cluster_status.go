@@ -26,7 +26,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 )
@@ -98,7 +97,6 @@ func (t *ClusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 		if err := t.reconcileClusterStatus(transCtx, dag, cluster); err != nil {
 			return err
 		}
-		t.cleanupAnnotationsAfterRunning(cluster)
 	}
 
 	return nil
@@ -237,17 +235,6 @@ func (t *ClusterStatusTransformer) handleExistAbnormalOrFailed(transCtx *Cluster
 		*transCtx.ClusterDef, "")
 	// handle the cluster status when some components are not ready.
 	handleClusterPhaseWhenCompsNotReady(cluster, componentMap, clusterAvailabilityEffectMap)
-}
-
-// cleanupAnnotationsAfterRunning cleans up the cluster annotations after cluster is Running.
-func (t *ClusterStatusTransformer) cleanupAnnotationsAfterRunning(cluster *appsv1alpha1.Cluster) {
-	if !slices.Contains(appsv1alpha1.GetClusterTerminalPhases(), cluster.Status.Phase) {
-		return
-	}
-	if _, ok := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]; !ok {
-		return
-	}
-	delete(cluster.Annotations, constant.RestoreFromBackUpAnnotationKey)
 }
 
 // handleClusterPhaseWhenCompsNotReady handles the Cluster.status.phase when some components are Abnormal or Failed.

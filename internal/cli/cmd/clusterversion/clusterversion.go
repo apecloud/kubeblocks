@@ -70,7 +70,7 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(o.clusterDefinitionRef) != 0 {
-				o.LabelSelector = util.BuildClusterDefinitionRefLable(o.LabelSelector, []string{o.clusterDefinitionRef})
+				o.LabelSelector = util.BuildClusterDefinitionRefLabel(o.LabelSelector, []string{o.clusterDefinitionRef})
 			}
 			o.Names = args
 			util.CheckErr(run(o))

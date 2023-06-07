@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
@@ -176,7 +175,6 @@ func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 		existLatestRevisionFailedPod bool
 		leaderIsReady                bool
 		consensusSpec                = r.getConsensusSpec()
-		statusMessages               = appsv1alpha1.ComponentMessageMap{}
 	)
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
@@ -188,14 +186,12 @@ func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 			leaderIsReady = true
 			continue
 		}
-		isFailed, _, message := internal.IsPodFailedAndTimedOut(&v)
-		if isFailed && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
+		if !intctrlutil.PodIsReady(&v) && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
 			existLatestRevisionFailedPod = true
-			statusMessages.SetObjectMessage(v.Kind, v.Name, message)
 		}
 	}
 	return util.GetCompPhaseByConditions(existLatestRevisionFailedPod, leaderIsReady,
-		componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas), statusMessages, nil
+		componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas), nil, nil
 }
 
 func (r *ConsensusSet) HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {

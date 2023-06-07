@@ -49,28 +49,6 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    - `--memory` describes the requested and limited size of the component memory.
    - `--cpu` describes the requested and limited size of the component CPU.
 
-   You can also vertically scale a cluster with specified class type.
-
-   1. List all classes with `kbcli class list` command and choose the one you need, or check [class type](./../cluster-type/cluster-types.md) document for reference.
-
-      ```bash
-      kbcli class list --cluster-definition apecloud-mysql  
-      ```
-
-   :::note
-  
-   If there is no suitable class listed, you can [customize your own class](./../cluster-type/customize-class-type.md) template and apply the class here.
-
-   Creating clusters that does not meet the constraints is invalid and the system creates a cluster with the minimum CPU value specified.
-
-   :::
-
-   2. Use `--set` option with `kbcli cluster vscale` command to apply the vertical scaling.
-
-      ```bash
-      kbcli cluster vscale mysql-clsuter --components="mysql" --cluster-definition apecloud-mysql --set class=general-2c2g
-      ```
-
    **Option 2.** Create an OpsRequest
   
    Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.

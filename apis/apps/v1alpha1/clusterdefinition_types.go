@@ -240,7 +240,7 @@ type VolumeTypeSpec struct {
 // ClusterComponentDefinition provides a workload component specification template,
 // with attributes that strongly work with stateful workloads and day-2 operations
 // behaviors.
-// +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Consensus' ?  has(self.consensusSpec) : !has(self.consensusSpec)",message="componentDefs.consensusSpec is required when componentDefs.workloadType is Consensus, and forbidden otherwise"
+// +kubebuilder:validation:XValidation:rule="g && self.workloadType == 'Consensus' ?  has(self.consensusSpec) : !has(self.consensusSpec)",message="componentDefs.consensusSpec is required when componentDefs.workloadType is Consensus, and forbidden otherwise"
 type ClusterComponentDefinition struct {
 	// name of the component, it can be any valid string.
 	// +kubebuilder:validation:Required
@@ -795,15 +795,6 @@ type ConsensusMember struct {
 
 type ReplicationSetSpec struct {
 	StatefulSetSpec `json:",inline"`
-
-	// switchPolicies defines a collection of different types of switchPolicy, and each type of switchPolicy is limited to one.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	SwitchPolicies []SwitchPolicy `json:"switchPolicies,omitempty"`
-
-	// switchCmdExecutorConfig configs how to get client SDK and perform switch statements.
-	// +kubebuilder:validation:Required
-	SwitchCmdExecutorConfig *SwitchCmdExecutorConfig `json:"switchCmdExecutorConfig"`
 }
 
 var _ StatefulSetWorkload = &ReplicationSetSpec{}
@@ -827,57 +818,6 @@ func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolic
 	s.Type = appsv1.OnDeleteStatefulSetStrategyType
 	s.RollingUpdate = nil
 	return appsv1.ParallelPodManagement, s
-}
-
-type SwitchPolicy struct {
-	// switchPolicyType defines type of the switchPolicy.
-	// MaximumAvailability: when the primary is active, do switch if the synchronization delay = 0 in the user-defined lagProbe data delay detection logic, otherwise do not switch. The primary is down, switch immediately.
-	// MaximumDataProtection: when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch.
-	// Noop: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=MaximumAvailability
-	Type SwitchPolicyType `json:"type"`
-
-	// switchStatements defines switching actions according to their respective roles, We divide all pods into three switchStatement role={Promote,Demote,Follow}.
-	// Promote: candidate primary after elected, which to be promoted
-	// Demote: primary before switch, which to be demoted
-	// Follow: the other secondaries that are not selected as the primary, which to follow the new primary
-	// if switchStatements is not set，we will try to use the built-in switchStatements for the database engine with built-in support.
-	// +optional
-	SwitchStatements *SwitchStatements `json:"switchStatements,omitempty"`
-}
-
-type SwitchStatements struct {
-	// promote defines the switching actions for the candidate primary which to be promoted.
-	// +optional
-	Promote []string `json:"promote,omitempty"`
-
-	// demote defines the switching actions for the old primary which to be demoted.
-	// +optional
-	Demote []string `json:"demote,omitempty"`
-
-	// follow defines the switching actions for the other secondaries which are not selected as the primary.
-	// +optional
-	Follow []string `json:"follow,omitempty"`
-}
-
-type SwitchCmdExecutorConfig struct {
-	CommandExecutorEnvItem `json:",inline"`
-
-	// switchSteps definition, users can customize the switching steps on the provided three roles - NewPrimary, OldPrimary, and Secondaries.
-	// the same role can customize multiple steps in the order of the list, and KubeBlocks will perform switching operations in the defined order.
-	// if switchStep is not set, we will try to use the built-in switchStep for the database engine with built-in support.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +optional
-	SwitchSteps []SwitchStep `json:"switchSteps"`
-}
-
-type SwitchStep struct {
-	CommandExecutorItem `json:",inline"`
-
-	// role determines which role to execute the command on, role is divided into three roles NewPrimary, OldPrimary, and Secondaries.
-	Role SwitchStepRole `json:"role"`
 }
 
 type SwitchoverSpec struct {

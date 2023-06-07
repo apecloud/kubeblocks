@@ -100,8 +100,6 @@ type ClusterStatus struct {
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-// ClusterComponentSpec defines the cluster component spec.
-// +kubebuilder:validation:XValidation:rule="has(self.candidateInstance.index) && self.candidateInstance.index < self.replicas",message="candidateInstance.Index cannot be larger than replicas"
 type ClusterComponentSpec struct {
 	// name defines cluster's component name.
 	// +kubebuilder:validation:Required
@@ -322,9 +320,12 @@ type CandidateInstance struct {
 type ClusterSwitchPolicy struct {
 	// TODO other attribute extensions
 
-	// clusterSwitchPolicy type defined by Provider in ClusterDefinition, refer components[i].replicationSpec.switchPolicies[x].type
+	// clusterSwitchPolicy defines type of the switchPolicy when workloadType is Replication.
+	// MaximumAvailability: [WIP] when the primary is active, do switch if the synchronization delay = 0 in the user-defined lagProbe data delay detection logic, otherwise do not switch. The primary is down, switch immediately. Subsequent versions will soon support.
+	// MaximumDataProtection: [WIP] when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch. Subsequent versions will soon support.
+	// Noop: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves or integrate open source HA solution.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default=MaximumAvailability
+	// +kubebuilder:default=Noop
 	// +optional
 	Type SwitchPolicyType `json:"type"`
 }

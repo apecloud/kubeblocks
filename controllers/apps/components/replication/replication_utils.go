@@ -128,21 +128,6 @@ func getRunningPods(ctx context.Context, cli client.Client, obj client.Object) (
 	return util.GetPodListByStatefulSet(ctx, cli, sts)
 }
 
-// checkObjRoleLabelIsPrimary checks whether it is the primary obj(statefulSet or pod) by the label tag on obj.
-func checkObjRoleLabelIsPrimary[T generics.Object, PT generics.PObject[T]](obj PT) (bool, error) {
-	if obj == nil || obj.GetLabels() == nil {
-		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
-		// error type checking (errors.Is)
-		return false, fmt.Errorf("obj %s or obj's labels is nil, pls check", obj.GetName())
-	}
-	if _, ok := obj.GetLabels()[constant.RoleLabelKey]; !ok {
-		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
-		// error type checking (errors.Is)
-		return false, fmt.Errorf("obj %s or obj labels key is nil, pls check", obj.GetName())
-	}
-	return obj.GetLabels()[constant.RoleLabelKey] == constant.Primary, nil
-}
-
 // GetAndCheckReplicationSetPrimaryPod gets and checks the primary Pod of the replication workload.
 func GetAndCheckReplicationSetPrimaryPod(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compSpecName string) (*corev1.Pod, error) {
 	podList, err := util.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, constant.Primary)
@@ -183,25 +168,6 @@ func patchPodsPrimaryAnnotation(pods []corev1.Pod, primary string) ([]graph.Vert
 		}
 	}
 	return vertexes, nil
-}
-
-// filterReplicationWorkload filters workload which workloadType is not Replication.
-func filterReplicationWorkload(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	compSpecName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
-	if compSpecName == "" {
-		return nil, fmt.Errorf("cluster's compSpecName is nil, pls check")
-	}
-	compDefName := cluster.Spec.GetComponentDefRefName(compSpecName)
-	compDef, err := util.GetComponentDefByCluster(ctx, cli, *cluster, compDefName)
-	if err != nil {
-		return compDef, err
-	}
-	if compDef == nil || compDef.WorkloadType != appsv1alpha1.Replication {
-		return nil, nil
-	}
-	return compDef, nil
 }
 
 // HandleReplicationSetRoleChangeEvent handles the role change event of the replication workload when switchPolicy is Noop.

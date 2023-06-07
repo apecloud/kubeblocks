@@ -112,8 +112,6 @@ spec:
                   and ClusterVersion. It will replace the field in ClusterDefinition's
                   and ClusterVersion's component if type is matching.
                 items:
-                  description: ClusterComponentSpec defines the cluster component
-                    spec.
                   properties:
                     affinity:
                       description: affinity describes affinities specified by users.
@@ -395,9 +393,22 @@ spec:
                         and failover when workloadType is Replication.
                       properties:
                         type:
-                          default: MaximumAvailability
-                          description: clusterSwitchPolicy type defined by Provider
-                            in ClusterDefinition, refer components[i].replicationSpec.switchPolicies[x].type
+                          default: Noop
+                          description: 'clusterSwitchPolicy defines type of the switchPolicy
+                            when workloadType is Replication. MaximumAvailability:
+                            [WIP] when the primary is active, do switch if the synchronization
+                            delay = 0 in the user-defined lagProbe data delay detection
+                            logic, otherwise do not switch. The primary is down, switch
+                            immediately. Subsequent versions will soon support. MaximumDataProtection:
+                            [WIP] when the primary is active, do switch if synchronization
+                            delay = 0 in the user-defined lagProbe data lag detection
+                            logic, otherwise do not switch. If the primary is down,
+                            if it can be judged that the primary and secondary data
+                            are consistent, then do the switch, otherwise do not switch.
+                            Subsequent versions will soon support. Noop: KubeBlocks
+                            will not perform high-availability switching on components.
+                            Users need to implement HA by themselves or integrate
+                            open source HA solution.'
                           enum:
                           - MaximumAvailability
                           - MaximumDataProtection
@@ -540,10 +551,6 @@ spec:
                   - name
                   - replicas
                   type: object
-                  x-kubernetes-validations:
-                  - message: candidateInstance.Index cannot be larger than replicas
-                    rule: has(self.candidateInstance.index) && self.candidateInstance.index
-                      < self.replicas
                 minItems: 1
                 type: array
                 x-kubernetes-list-map-keys:

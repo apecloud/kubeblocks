@@ -633,6 +633,7 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 	if succeed {
 		// pvcs are ready, stateful_set.replicas should be updated
 		c.WorkloadVertex.Immutable = false
+		return c.postScaleOut(reqCtx, cli, stsObj)
 	} else {
 		c.WorkloadVertex.Immutable = true
 		// update objs will trigger cluster reconcile, no need to requeue error
@@ -644,8 +645,7 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 			c.CreateResource(obj, nil)
 		}
 	}
-
-	return c.postScaleOut(reqCtx, cli, stsObj)
+	return nil
 }
 
 func (c *StatefulComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {

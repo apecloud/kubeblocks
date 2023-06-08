@@ -115,6 +115,7 @@ jobs:
       runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
     steps:
       - uses: apecloud/checkout@main
+
       - name: make manifests check
         run: |
           mkdir -p ./bin
@@ -128,9 +129,14 @@ jobs:
             echo "make manifests causes inconsistent files"
             exit 1
           fi
-      - name: make mod-vendor and lint
+
+      - name: make mod-vendor
         run: |
-          make mod-vendor lint
+          make mod-vendor
+
+      - name: make lint
+        run: |
+          make lint
 
       - name: make test
         run: |

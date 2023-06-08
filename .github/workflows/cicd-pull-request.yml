@@ -38,12 +38,16 @@ jobs:
     runs-on: [ self-hosted, kubeblocks-runner ]
     steps:
       - uses: apecloud/checkout@main
-      - name: make mod-vendor and lint
+      - name: make mod-vendor
         run: |
           mkdir -p ./bin
           cp -r /go/bin/controller-gen ./bin/controller-gen
           cp -r /go/bin/setup-envtest ./bin/setup-envtest
-          make mod-vendor lint
+          make mod-vendor
+
+      - name: make lint
+        run: |
+          make lint
 
       - name: make test
         run: |

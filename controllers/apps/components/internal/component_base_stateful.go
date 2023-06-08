@@ -623,9 +623,7 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 	}
 
 	c.WorkloadVertex.Immutable = true
-
 	stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
-
 	dataClone := NewDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)
 	var succeed bool
 	var err error

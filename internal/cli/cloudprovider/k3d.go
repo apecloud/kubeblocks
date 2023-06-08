@@ -379,7 +379,7 @@ func setUpK3d(ctx context.Context, cluster *config.ClusterConfig) error {
 	for _, c := range l {
 		if c.Name == cluster.Name {
 			if c, err := k3dClient.ClusterGet(ctx, runtimes.SelectedRuntime, c); err == nil {
-				fmt.Printf("Detected an existing cluster: %s\n", c.Name)
+				klog.V(1).Infof("Detected an existing cluster: %s", c.Name)
 				return nil
 			}
 			break

@@ -357,15 +357,13 @@ func main() {
 		}
 	}
 
-	if viper.GetBool("enable_consensus_set") {
-		if err = (&workloadscontrollers.ConsensusSetReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("consensus-set-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ConsensusSet")
-			os.Exit(1)
-		}
+	if err = (&workloadscontrollers.ConsensusSetReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("consensus-set-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ConsensusSet")
+		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 

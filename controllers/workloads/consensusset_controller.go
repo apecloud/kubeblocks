@@ -21,7 +21,6 @@ package workloads
 
 import (
 	"context"
-
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -141,6 +140,7 @@ func (r *ConsensusSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				Client:    r.Client,
 				OwnerType: &workloads.ConsensusSet{},
 				UpToLevel: 2,
+				InTypes:   []runtime.Object{&appsv1.StatefulSet{}},
 			}).
 		Complete(r)
 }

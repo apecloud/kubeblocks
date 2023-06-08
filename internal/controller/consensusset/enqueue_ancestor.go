@@ -66,8 +66,16 @@ type EnqueueRequestForAncestor struct {
 	// find event source up to UpToLevel
 	UpToLevel int
 
+	// InTypes specified the range to look for the ancestor, means all ancestors' type in the looking up tree should be in InTypes.
+	// OwnerType will be included.
+	// nil means only look for in OwnerType.
+	InTypes []runtime.Object
+
 	// groupKind is the cached Group and Kind from OwnerType
 	groupKind schema.GroupKind
+
+	// ancestorGroupKinds is the cached Group and Kind from InTypes
+	ancestorGroupKinds []schema.GroupKind
 
 	// mapper maps GroupVersionKinds to Resources
 	mapper meta.RESTMapper
@@ -132,6 +140,29 @@ func (e *EnqueueRequestForAncestor) parseOwnerTypeGroupKind(scheme *runtime.Sche
 	return nil
 }
 
+// parseInTypesGroupKind parses the InTypes into a Group and Kind and caches the result.  Returns false
+// if the InTypes could not be parsed using the scheme.
+func (e *EnqueueRequestForAncestor) parseInTypesGroupKind(scheme *runtime.Scheme) error {
+	e.ancestorGroupKinds = append(e.ancestorGroupKinds, e.groupKind)
+	for _, inType := range e.InTypes {
+		// Get the kinds of the type
+		kinds, _, err := scheme.ObjectKinds(inType)
+		if err != nil {
+			log.Error(err, "Could not get ObjectKinds for InTypes", "inType", fmt.Sprintf("%T", inType))
+			return err
+		}
+		// Expect only 1 kind.  If there is more than one kind this is probably an edge case such as ListOptions.
+		if len(kinds) != 1 {
+			err := fmt.Errorf("expected exactly 1 kind for InType %T, but found %s kinds", inType, kinds)
+			log.Error(nil, "expected exactly 1 kind for InType", "inType", fmt.Sprintf("%T", inType), "kinds", kinds)
+			return err
+		}
+		// Cache the Group and Kind for the inType
+		e.ancestorGroupKinds = append(e.ancestorGroupKinds, schema.GroupKind{Group: kinds[0].Group, Kind: kinds[0].Kind})
+	}
+	return nil
+}
+
 // getOwnerReconcileRequest looks at object and builds a map of reconcile.Request to reconcile
 // owners of object that match e.OwnerType.
 func (e *EnqueueRequestForAncestor) getOwnerReconcileRequest(obj client.Object, result map[reconcile.Request]empty) {
@@ -147,7 +178,7 @@ func (e *EnqueueRequestForAncestor) getOwnerReconcileRequest(obj client.Object, 
 	ctx := context.Background()
 	ref, err := e.getOwnerUpTo(ctx, object, e.UpToLevel, scheme)
 	if err != nil {
-		log.Info("cloud not find top object",
+		log.Info("cloud not find ancestor object",
 			"source object gvk", object.GetObjectKind().GroupVersionKind(),
 			"name", object.GetName(),
 			"up to level", e.UpToLevel,
@@ -155,7 +186,7 @@ func (e *EnqueueRequestForAncestor) getOwnerReconcileRequest(obj client.Object, 
 		return
 	}
 	if ref == nil {
-		log.Info("cloud not find top object",
+		log.Info("cloud not find ancestor object",
 			"source object gvk", object.GetObjectKind().GroupVersionKind(),
 			"name", object.GetName(),
 			"up to level", e.UpToLevel)
@@ -229,6 +260,9 @@ func (e *EnqueueRequestForAncestor) getOwnerUpTo(ctx context.Context, object cli
 	if upToLevel <= 0 {
 		return nil, nil
 	}
+	if object == nil {
+		return nil, nil
+	}
 	ownerRef := metav1.GetControllerOf(object)
 	if ownerRef == nil {
 		return nil, nil
@@ -252,6 +286,9 @@ func (e *EnqueueRequestForAncestor) getObjectByOwnerRef(ctx context.Context, own
 		Group:   gv.Group,
 		Version: gv.Version,
 		Kind:    ownerRef.Kind,
+	}
+	if !e.inAncestorRange(gvk) {
+		return nil, nil
 	}
 	objectRT, err := scheme.New(gvk)
 	if err != nil {
@@ -279,11 +316,23 @@ func (e *EnqueueRequestForAncestor) getObjectByOwnerRef(ctx context.Context, own
 	return object, nil
 }
 
+func (e *EnqueueRequestForAncestor) inAncestorRange(gvk schema.GroupVersionKind) bool {
+	for _, groupKind := range e.ancestorGroupKinds {
+		if gvk.Group == groupKind.Group && gvk.Kind == groupKind.Kind {
+			return true
+		}
+	}
+	return false
+}
+
 var _ inject.Scheme = &EnqueueRequestForAncestor{}
 
 // InjectScheme is called by the Controller to provide a singleton scheme to the EnqueueRequestForAncestor.
 func (e *EnqueueRequestForAncestor) InjectScheme(s *runtime.Scheme) error {
-	return e.parseOwnerTypeGroupKind(s)
+	if err := e.parseOwnerTypeGroupKind(s); err != nil {
+		return err
+	}
+	return e.parseInTypesGroupKind(s)
 }
 
 var _ inject.Mapper = &EnqueueRequestForAncestor{}

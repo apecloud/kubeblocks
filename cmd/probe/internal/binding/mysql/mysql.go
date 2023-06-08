@@ -226,10 +226,7 @@ func (mysqlOps *MysqlOperations) GetRunningPort() int {
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	sql := "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
 
-	// sql exec timeout need to be less than httpget's timeout which default is 1s.
-	ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-	rows, err := mysqlOps.db.QueryContext(ctx1, sql)
+	rows, err := mysqlOps.db.QueryContext(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Infof("error executing %s: %v", sql, err)
 		return "", errors.Wrapf(err, "error executing %s", sql)
@@ -243,13 +240,18 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 	var curLeader string
 	var role string
 	var serverID string
+	var isReady bool
 	for rows.Next() {
 		if err = rows.Scan(&curLeader, &role, &serverID); err != nil {
 			mysqlOps.Logger.Errorf("Role query error: %v", err)
 			return role, err
 		}
+		isReady = true
 	}
-	return role, nil
+	if isReady {
+		return role, nil
+	}
+	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
 }
 
 func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

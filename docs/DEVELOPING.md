@@ -173,7 +173,7 @@ You can use cloud Kubernetes service, such as [`EKS`](https://aws.amazon.com/eks
 
 `kbcli` is a [cobra-based](https://github.com/spf13/cobra) command line interface for `KubeBlocks` which support to the basic interaction commands such as `install/uninstall/upgrade` KubeBlocks and all kinds of actions for KubeBlocks
 
-The source directory fo `kbcli` is `/internal/cli/` and the `main.go` is `/cmd/cli/main.go`
+The source directory for `kbcli` is `/internal/cli/` and the `main.go` is `/cmd/cli/main.go`
 
 Build the local kbcli binary executables by:
 ```shell

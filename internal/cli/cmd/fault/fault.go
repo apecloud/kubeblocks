@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
@@ -186,6 +187,7 @@ func (o *FaultBaseOptions) checkChaosMeshEnable() (bool, error) {
 		LabelSelector: "app.kubernetes.io/part-of=chaos-mesh",
 	})
 	if err != nil {
+		klog.V(1).Info(err)
 		return false, err
 	}
 

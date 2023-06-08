@@ -9,7 +9,7 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 #  TAG_NAME: ${{ github.ref_name }}
-  TAG_NAME: "0.5.99"
+  TAG_NAME: "0.5.98"
   GO_VERSION: "1.20"
   CLI_NAME: 'kbcli'
   CLI_REPO: 'apecloud/kbcli'
@@ -87,9 +87,8 @@ jobs:
         if: matrix.os == 'windows-amd64'
         run: |
           mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }}.exe 
-          curl -H 'Accept: application/vnd.github.v3.raw' -o README.md https://api.github.com/repos/${{ env.CLI_REPO }}/readme 
-          cp README.md ${{ matrix.os }}/                        # add readme.md
-          cp ${{ github.workspace }}/LICENSE ${{ matrix.os }}/  # add LICENSE
+          curl -H 'Accept: application/vnd.github.v3.raw' -o ${{ matrix.os }}/README.md https://api.github.com/repos/${{ env.CLI_REPO }}/readme 
+          cp ${{ github.workspace }}/LICENSE ${{ matrix.os }}/  
           cp ${{ matrix.os }}/${{ env.CLI_NAME }}.exe bin/
           zip -r -o ${{ env.CLI_FILENAME }}.zip  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.zip  # for debug 
@@ -104,8 +103,7 @@ jobs:
         if: matrix.os != 'windows-amd64'
         run: |
           mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }} 
-          curl -H 'Accept: application/vnd.github.v3.raw' -o README.md https://api.github.com/repos/${{ env.CLI_REPO }}/readme
-          cp README.md ${{ matrix.os }}/
+          curl -H 'Accept: application/vnd.github.v3.raw' -o ${{ matrix.os }}/README.md  https://api.github.com/repos/${{ env.CLI_REPO }}/readme
           cp ${{ github.workspace }}/LICENSE ${{ matrix.os }}/
           tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.tar.gz  # for debug 

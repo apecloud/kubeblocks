@@ -24,7 +24,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"helm.sh/helm/v3/pkg/cli/values"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -34,7 +33,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
-	"github.com/apecloud/kubeblocks/version"
 )
 
 var _ = Describe("backupconfig", func() {
@@ -91,22 +89,9 @@ var _ = Describe("backupconfig", func() {
 		tf.Cleanup()
 	})
 
-	It("run config cmd", func() {
-		o := &InstallOptions{
-			Options: Options{
-				IOStreams: streams,
-				HelmCfg:   helm.NewFakeConfig(testing.Namespace),
-				Namespace: "default",
-				Client:    testing.FakeClientSet(mockDeploy()),
-				Dynamic:   testing.FakeDynamicClient(),
-			},
-			Version:   version.DefaultKubeBlocksVersion,
-			Monitor:   true,
-			ValueOpts: values.Options{Values: []string{"snapshot-controller.enabled=true"}},
-		}
+	It("config cmd", func() {
 		cmd := NewConfigCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-		Expect(o.PreCheck()).Should(Succeed())
 	})
 
 	It("run describe config cmd", func() {

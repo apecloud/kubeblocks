@@ -156,9 +156,9 @@ func (o *UninstallOptions) Uninstall() error {
 	// custom resources will not be deleted, so we will remove finalizers later.
 	v, _ := util.GetVersionInfo(o.Client)
 	chart := helm.InstallOpts{
-		Name:      types.KubeBlocksChartName,
-		Namespace: o.Namespace,
-
+		Name:           types.KubeBlocksChartName,
+		Namespace:      o.Namespace,
+		ForceUninstall: true,
 		// KubeBlocks chart has a hook to delete addons, but we have already deleted addons,
 		// and that webhook may fail, so we need to disable hooks.
 		DisableHooks: true,

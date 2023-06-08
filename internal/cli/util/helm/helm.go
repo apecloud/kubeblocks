@@ -72,6 +72,7 @@ type InstallOpts struct {
 	Timeout         time.Duration
 	Atomic          bool
 	DisableHooks    bool
+	ForceUninstall  bool
 
 	// for helm template
 	DryRun    *bool
@@ -314,13 +315,18 @@ func (i *InstallOpts) tryUninstall(cfg *action.Configuration) error {
 	}()
 
 	if _, err := client.Run(i.Name); err != nil {
-		// Remove secrets left over when uninstalling kubeblocks, when addon CRD is uninstalled before kubeblocks.
-		secretCount, errRemove := i.RemoveRemainSecrets(cfg)
-		if secretCount == 0 {
+		if i.ForceUninstall {
+			// Remove secrets left over when uninstalling kubeblocks, when addon CRD is uninstalled before kubeblocks.
+			secretCount, errRemove := i.RemoveRemainSecrets(cfg)
+			if secretCount == 0 {
+				return err
+			}
+			if errRemove != nil {
+				errMsg := fmt.Sprintf("failed to remove remain secrets, please remove them manually, %v", errRemove)
+				return errors.Wrap(err, errMsg)
+			}
+		} else {
 			return err
-		}
-		if errRemove != nil {
-			return fmt.Errorf("failed to remove remain secrets: %v, helm uninstall error: %v", errRemove, err)
 		}
 	}
 	return nil
@@ -332,8 +338,33 @@ func (i *InstallOpts) RemoveRemainSecrets(cfg *action.Configuration) (int, error
 		return -1, err
 	}
 
+	labelSelector := metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "name",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{i.Name},
+			},
+			{
+				Key:      "owner",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"helm"},
+			},
+			{
+				Key:      "status",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"uninstalling", "superseded"},
+			},
+		},
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
+	if err != nil {
+		fmt.Printf("Failed to build label selector: %v\n", err)
+		return -1, err
+	}
 	options := metav1.ListOptions{
-		LabelSelector: "name=kubeblocks,owner=helm,status=uninstalling",
+		LabelSelector: selector.String(),
 	}
 
 	secrets, err := clientSet.CoreV1().Secrets(i.Namespace).List(context.TODO(), options)
@@ -348,6 +379,7 @@ func (i *InstallOpts) RemoveRemainSecrets(cfg *action.Configuration) (int, error
 	for _, secret := range secrets.Items {
 		err := clientSet.CoreV1().Secrets(i.Namespace).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
 		if err != nil {
+			klog.V(1).Info(err)
 			return -1, fmt.Errorf("failed to delete Secret %s: %v", secret.Name, err)
 		}
 	}

@@ -85,6 +85,8 @@ jobs:
         if: matrix.os == 'windows-amd64'
         run: |
           mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }}.exe 
+          curl -H 'Accept: application/vnd.github.v3.raw' -o ${{ matrix.os }}/README.md https://api.github.com/repos/${{ env.CLI_REPO }}/readme 
+          cp ${{ github.workspace }}/LICENSE ${{ matrix.os }}/  
           cp ${{ matrix.os }}/${{ env.CLI_NAME }}.exe bin/
           zip -r -o ${{ env.CLI_FILENAME }}.zip  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.zip  # for debug 
@@ -99,6 +101,8 @@ jobs:
         if: matrix.os != 'windows-amd64'
         run: |
           mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }} 
+          curl -H 'Accept: application/vnd.github.v3.raw' -o ${{ matrix.os }}/README.md  https://api.github.com/repos/${{ env.CLI_REPO }}/readme
+          cp ${{ github.workspace }}/LICENSE ${{ matrix.os }}/
           tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
           file ${{ env.CLI_FILENAME }}.tar.gz  # for debug 
           mkdir -p sha256

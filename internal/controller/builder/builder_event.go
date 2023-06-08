@@ -17,44 +17,23 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package consensusset
+package builder
 
 import (
-	"testing"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
-	"github.com/golang/mock/gomock"
-
-	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
-	"github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
+	corev1 "k8s.io/api/core/v1"
 )
 
-var (
-	controller *gomock.Controller
-	k8sMock    *mocks.MockClient
-)
-
-// These tests use Ginkgo (BDD-style Go testing framework). Refer to
-// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
-
-func init() {
+type EventBuilder struct {
+	BaseBuilder[corev1.Event, *corev1.Event, EventBuilder]
 }
 
-func TestAPIs(t *testing.T) {
-	RegisterFailHandler(Fail)
-
-	RunSpecs(t, "ConsensusSet Suite")
+func NewEventBuilder(namespace, name string) *EventBuilder {
+	builder := &EventBuilder{}
+	builder.init(namespace, name, &corev1.Event{}, builder)
+	return builder
 }
 
-var _ = BeforeSuite(func() {
-	controller, k8sMock = testutil.SetupK8sMock()
-	go func() {
-		defer GinkgoRecover()
-	}()
-})
-
-var _ = AfterSuite(func() {
-	controller.Finish()
-})
+func (builder *EventBuilder) SetInvolvedObject(objectRef corev1.ObjectReference) *EventBuilder {
+	builder.get().InvolvedObject = objectRef
+	return builder
+}

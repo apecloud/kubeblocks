@@ -72,7 +72,7 @@ type EnqueueRequestForAncestor struct {
 	InTypes []runtime.Object
 
 	// groupKind is the cached Group and Kind from OwnerType
-	groupKind schema.GroupKind
+	groupKind *schema.GroupKind
 
 	// ancestorGroupKinds is the cached Group and Kind from InTypes
 	ancestorGroupKinds []schema.GroupKind
@@ -136,14 +136,16 @@ func (e *EnqueueRequestForAncestor) parseOwnerTypeGroupKind(scheme *runtime.Sche
 		return err
 	}
 	// Cache the Group and Kind for the OwnerType
-	e.groupKind = schema.GroupKind{Group: kinds[0].Group, Kind: kinds[0].Kind}
+	e.groupKind = &schema.GroupKind{Group: kinds[0].Group, Kind: kinds[0].Kind}
 	return nil
 }
 
 // parseInTypesGroupKind parses the InTypes into a Group and Kind and caches the result.  Returns false
 // if the InTypes could not be parsed using the scheme.
 func (e *EnqueueRequestForAncestor) parseInTypesGroupKind(scheme *runtime.Scheme) error {
-	e.ancestorGroupKinds = append(e.ancestorGroupKinds, e.groupKind)
+	if e.groupKind != nil {
+		e.ancestorGroupKinds = append(e.ancestorGroupKinds, *e.groupKind)
+	}
 	for _, inType := range e.InTypes {
 		// Get the kinds of the type
 		kinds, _, err := scheme.ObjectKinds(inType)
@@ -212,7 +214,7 @@ func (e *EnqueueRequestForAncestor) getOwnerReconcileRequest(obj client.Object, 
 		}}
 
 		// if owner is not namespaced then we should set the namespace to the empty
-		mapping, err := e.mapper.RESTMapping(e.groupKind, refGV.Version)
+		mapping, err := e.mapper.RESTMapping(*e.groupKind, refGV.Version)
 		if err != nil {
 			log.Error(err, "Could not retrieve rest mapping", "kind", e.groupKind)
 			return

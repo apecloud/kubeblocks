@@ -22,6 +22,7 @@ package builder
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/types"
 
 	appsv1 "k8s.io/api/apps/v1"
 )
@@ -31,6 +32,7 @@ var _ = Describe("base builder", func() {
 		const (
 			name                             = "foo"
 			ns                               = "default"
+			uid                              = types.UID("foo-bar")
 			labelKey1, labelValue1           = "foo-1", "bar-1"
 			labelKey2, labelValue2           = "foo-2", "bar-2"
 			labelKey3, labelValue3           = "foo-3", "bar-3"
@@ -47,6 +49,7 @@ var _ = Describe("base builder", func() {
 		ownerAPIVersion := "workloads.kubeblocks.io/v1alpha1"
 		ownerKind := "ConsensusSet"
 		obj := NewConfigMapBuilder(ns, name).
+			SetUID(uid).
 			AddLabels(labelKey1, labelValue1, labelKey2, labelValue2).
 			AddLabelsInMap(labels).
 			AddAnnotations(annotationKey1, annotationValue1, annotationKey2, annotationValue2).
@@ -58,6 +61,7 @@ var _ = Describe("base builder", func() {
 
 		Expect(obj.Name).Should(Equal(name))
 		Expect(obj.Namespace).Should(Equal(ns))
+		Expect(obj.UID).Should(Equal(uid))
 		Expect(len(obj.Labels)).Should(Equal(4))
 		Expect(obj.Labels[labelKey1]).Should(Equal(labelValue1))
 		Expect(obj.Labels[labelKey2]).Should(Equal(labelValue2))

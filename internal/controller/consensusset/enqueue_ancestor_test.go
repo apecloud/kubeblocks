@@ -20,13 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package consensusset
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/golang/mock/gomock"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
@@ -35,10 +46,15 @@ func init() {
 }
 
 var _ = Describe("enqueue ancestor", func() {
+	const namespace = "foo"
+
 	scheme := model.GetScheme()
+	ctx := context.Background()
 	var handler *EnqueueRequestForAncestor
+
 	BeforeEach(func() {
 		handler = &EnqueueRequestForAncestor{
+			Client:    k8sMock,
 			OwnerType: &workloads.ConsensusSet{},
 			UpToLevel: 2,
 			InTypes:   []runtime.Object{&appsv1.StatefulSet{}},
@@ -48,7 +64,7 @@ var _ = Describe("enqueue ancestor", func() {
 	Context("parseOwnerTypeGroupKind", func() {
 		It("should work well", func() {
 			Expect(handler.parseOwnerTypeGroupKind(scheme)).Should(Succeed())
-			Expect(handler.groupKind.Group).Should(Equal(" workloads.kubeblocks.io"))
+			Expect(handler.groupKind.Group).Should(Equal("workloads.kubeblocks.io"))
 			Expect(handler.groupKind.Kind).Should(Equal("ConsensusSet"))
 		})
 	})
@@ -61,4 +77,253 @@ var _ = Describe("enqueue ancestor", func() {
 			Expect(handler.ancestorGroupKinds[0].Kind).Should(Equal("StatefulSet"))
 		})
 	})
+
+	Context("getObjectByOwnerRef", func() {
+		BeforeEach(func() {
+			Expect(handler.InjectScheme(scheme)).Should(Succeed())
+			Expect(handler.InjectMapper(newFakeMapper())).Should(Succeed())
+		})
+
+		It("should return err if groupVersion parsing error", func() {
+			wrongAPIVersion := "wrong/group/version"
+			ownerRef := metav1.OwnerReference{
+				APIVersion: wrongAPIVersion,
+			}
+			_, err := handler.getObjectByOwnerRef(ctx, namespace, ownerRef, *scheme)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring(wrongAPIVersion))
+		})
+
+		It("should return nil if ancestor's type out of range", func() {
+			ownerRef := metav1.OwnerReference{
+				APIVersion: "apps/v1",
+				Kind:       "Deployment",
+				Name:       "foo",
+				UID:        "bar",
+			}
+			object, err := handler.getObjectByOwnerRef(ctx, namespace, ownerRef, *scheme)
+			Expect(err).Should(BeNil())
+			Expect(object).Should(BeNil())
+		})
+
+		It("should return the owner object", func() {
+			ownerName := "foo"
+			ownerUID := types.UID("bar")
+			ownerRef := metav1.OwnerReference{
+				APIVersion: "apps/v1",
+				Kind:       "StatefulSet",
+				Name:       ownerName,
+				UID:        ownerUID,
+			}
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &appsv1.StatefulSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ client.ObjectKey, obj *appsv1.StatefulSet, _ ...client.ListOption) error {
+					obj.Name = ownerName
+					obj.UID = ownerUID
+					return nil
+				}).Times(1)
+			object, err := handler.getObjectByOwnerRef(ctx, namespace, ownerRef, *scheme)
+			Expect(err).Should(BeNil())
+			Expect(object).ShouldNot(BeNil())
+			Expect(object.GetName()).Should(Equal(ownerName))
+			Expect(object.GetUID()).Should(Equal(ownerUID))
+		})
+	})
+
+	Context("getOwnerUpTo", func() {
+		BeforeEach(func() {
+			Expect(handler.InjectScheme(scheme)).Should(Succeed())
+			Expect(handler.InjectMapper(newFakeMapper())).Should(Succeed())
+		})
+
+		It("should work well", func() {
+			By("set upToLevel to 0")
+			ownerRef, err := handler.getOwnerUpTo(ctx, nil, 0, *scheme)
+			Expect(err).Should(BeNil())
+			Expect(ownerRef).Should(BeNil())
+
+			By("set object to nil")
+			ownerRef, err = handler.getOwnerUpTo(ctx, nil, handler.UpToLevel, *scheme)
+			Expect(err).Should(BeNil())
+			Expect(ownerRef).Should(BeNil())
+
+			By("builder ancestor tree")
+			ancestorLevel2 := builder.NewConsensusSetBuilder(namespace, "foo").GetObject()
+			ancestorL2APIVersion := "workloads.kubeblocks.io/v1alpha1"
+			ancestorL2Kind := "ConsensusSet"
+			ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, "foo").
+				SetOwnerReferences(ancestorL2APIVersion, ancestorL2Kind, ancestorLevel2).
+				GetObject()
+			ancestorL1APIVersion := "apps/v1"
+			ancestorL1Kind := "StatefulSet"
+			object := builder.NewPodBuilder(namespace, "foo-0").
+				SetOwnerReferences(ancestorL1APIVersion, ancestorL1Kind, ancestorLevel1).
+				GetObject()
+
+			By("set upToLevel to 1")
+			ownerRef, err = handler.getOwnerUpTo(ctx, object, 1, *scheme)
+			Expect(err).Should(BeNil())
+			Expect(ownerRef).ShouldNot(BeNil())
+			Expect(ownerRef.APIVersion).Should(Equal(ancestorL1APIVersion))
+			Expect(ownerRef.Kind).Should(Equal(ancestorL1Kind))
+			Expect(ownerRef.Name).Should(Equal(ancestorLevel1.Name))
+			Expect(ownerRef.UID).Should(Equal(ancestorLevel1.UID))
+
+			By("set upToLevel to 2")
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &appsv1.StatefulSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, sts *appsv1.StatefulSet, _ ...client.ListOptions) error {
+					sts.Namespace = objKey.Namespace
+					sts.Name = objKey.Name
+					sts.OwnerReferences = ancestorLevel1.OwnerReferences
+					return nil
+				}).Times(1)
+			ownerRef, err = handler.getOwnerUpTo(ctx, object, handler.UpToLevel, *scheme)
+			Expect(err).Should(BeNil())
+			Expect(ownerRef).ShouldNot(BeNil())
+			Expect(ownerRef.APIVersion).Should(Equal(ancestorL2APIVersion))
+			Expect(ownerRef.Kind).Should(Equal(ancestorL2Kind))
+			Expect(ownerRef.Name).Should(Equal(ancestorLevel2.Name))
+			Expect(ownerRef.UID).Should(Equal(ancestorLevel2.UID))
+		})
+	})
+
+	Context("getSourceObject", func() {
+		BeforeEach(func() {
+			Expect(handler.InjectScheme(scheme)).Should(Succeed())
+			Expect(handler.InjectMapper(newFakeMapper())).Should(Succeed())
+		})
+
+		It("should work well", func() {
+			By("build a non-event object")
+			name := "foo"
+			uid := types.UID("bar")
+			object1 := builder.NewPodBuilder(namespace, name).SetUID(uid).GetObject()
+			objectSrc1, err := handler.getSourceObject(object1)
+			Expect(err).Should(BeNil())
+			Expect(objectSrc1 == object1).Should(BeTrue())
+
+			By("build an event object")
+			handler.InTypes = append(handler.InTypes, &corev1.Pod{})
+			Expect(handler.InjectScheme(scheme)).Should(Succeed())
+			objectRef := corev1.ObjectReference{
+				APIVersion: "v1",
+				Kind:       "Pod",
+				Namespace:  namespace,
+				Name:       object1.Name,
+				UID:        object1.UID,
+			}
+			object2 := builder.NewEventBuilder(namespace, "foo").
+				SetInvolvedObject(objectRef).
+				GetObject()
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &corev1.Pod{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *corev1.Pod, _ ...client.ListOptions) error {
+					obj.Name = objKey.Name
+					obj.Namespace = objKey.Namespace
+					obj.UID = objectRef.UID
+					return nil
+				}).Times(1)
+			objectSrc2, err := handler.getSourceObject(object2)
+			Expect(err).Should(BeNil())
+			Expect(objectSrc2).ShouldNot(BeNil())
+			Expect(objectSrc2.GetName()).Should(Equal(object1.Name))
+			Expect(objectSrc2.GetNamespace()).Should(Equal(object1.Namespace))
+			Expect(objectSrc2.GetUID()).Should(Equal(object1.UID))
+		})
+	})
+
+	Context("getOwnerReconcileRequest", func() {
+		BeforeEach(func() {
+			Expect(handler.InjectScheme(scheme)).Should(Succeed())
+			Expect(handler.InjectMapper(newFakeMapper())).Should(Succeed())
+		})
+
+		It("should work well", func() {
+			By("build ancestors")
+			ancestorLevel2 := builder.NewConsensusSetBuilder(namespace, "foo-level-2").GetObject()
+			ancestorL2APIVersion := "workloads.kubeblocks.io/v1alpha1"
+			ancestorL2Kind := "ConsensusSet"
+			ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, "foo-level-1").
+				SetOwnerReferences(ancestorL2APIVersion, ancestorL2Kind, ancestorLevel2).
+				GetObject()
+			ancestorL1APIVersion := "apps/v1"
+			ancestorL1Kind := "StatefulSet"
+			object := builder.NewPodBuilder(namespace, "foo-level-1-0").
+				SetOwnerReferences(ancestorL1APIVersion, ancestorL1Kind, ancestorLevel1).
+				GetObject()
+
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &appsv1.StatefulSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, sts *appsv1.StatefulSet, _ ...client.ListOptions) error {
+					sts.Namespace = objKey.Namespace
+					sts.Name = objKey.Name
+					sts.OwnerReferences = ancestorLevel1.OwnerReferences
+					return nil
+				}).Times(1)
+
+			By("get object with ancestors")
+			result := make(map[reconcile.Request]empty)
+			handler.getOwnerReconcileRequest(object, result)
+			Expect(len(result)).Should(Equal(1))
+			for request := range result {
+				Expect(request.Namespace).Should(Equal(ancestorLevel2.Namespace))
+				Expect(request.Name).Should(Equal(ancestorLevel2.Name))
+			}
+
+			By("set obj not exist")
+			wrongAPIVersion := "wrong/api/version"
+			object.OwnerReferences[0].APIVersion = wrongAPIVersion
+			result = make(map[reconcile.Request]empty)
+			handler.getOwnerReconcileRequest(object, result)
+			Expect(len(result)).Should(Equal(0))
+
+			By("set level 1 ancestor's owner not exist")
+			object.OwnerReferences[0].APIVersion = ancestorL1APIVersion
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &appsv1.StatefulSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, sts *appsv1.StatefulSet, _ ...client.ListOptions) error {
+					sts.Namespace = objKey.Namespace
+					sts.Name = objKey.Name
+					return nil
+				}).Times(1)
+			result = make(map[reconcile.Request]empty)
+			handler.getOwnerReconcileRequest(object, result)
+			Expect(len(result)).Should(Equal(0))
+		})
+	})
 })
+
+type fakeMapper struct{}
+
+func (f *fakeMapper) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
+	return schema.GroupVersionKind{}, nil
+}
+
+func (f *fakeMapper) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
+	return nil, nil
+}
+
+func (f *fakeMapper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error) {
+	return schema.GroupVersionResource{}, nil
+}
+
+func (f *fakeMapper) ResourcesFor(input schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
+	return nil, nil
+}
+
+func (f *fakeMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	return &meta.RESTMapping{Scope: meta.RESTScopeNamespace}, nil
+}
+
+func (f *fakeMapper) RESTMappings(gk schema.GroupKind, versions ...string) ([]*meta.RESTMapping, error) {
+	return nil, nil
+}
+
+func (f *fakeMapper) ResourceSingularizer(resource string) (singular string, err error) {
+	return "", nil
+}
+
+func newFakeMapper() meta.RESTMapper {
+	return &fakeMapper{}
+}

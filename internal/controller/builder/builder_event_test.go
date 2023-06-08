@@ -17,44 +17,36 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package consensusset
+package builder
 
 import (
-	"testing"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/golang/mock/gomock"
-
-	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
-	"github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
-var (
-	controller *gomock.Controller
-	k8sMock    *mocks.MockClient
-)
+var _ = Describe("event builder", func() {
+	It("should work well", func() {
+		const (
+			name = "foo"
+			ns   = "default"
+			uid  = types.UID("bar")
+		)
+		objectRef := corev1.ObjectReference{
+			APIVersion: "v1",
+			Kind:       "Pod",
+			Namespace:  ns,
+			Name:       name,
+			UID:        uid,
+		}
+		event := NewEventBuilder(ns, "foo").
+			SetInvolvedObject(objectRef).
+			GetObject()
 
-// These tests use Ginkgo (BDD-style Go testing framework). Refer to
-// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
-
-func init() {
-}
-
-func TestAPIs(t *testing.T) {
-	RegisterFailHandler(Fail)
-
-	RunSpecs(t, "ConsensusSet Suite")
-}
-
-var _ = BeforeSuite(func() {
-	controller, k8sMock = testutil.SetupK8sMock()
-	go func() {
-		defer GinkgoRecover()
-	}()
-})
-
-var _ = AfterSuite(func() {
-	controller.Finish()
+		Expect(event.Name).Should(Equal(name))
+		Expect(event.Namespace).Should(Equal(ns))
+		Expect(event.InvolvedObject).Should(Equal(objectRef))
+	})
 })

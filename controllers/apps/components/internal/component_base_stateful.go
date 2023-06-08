@@ -277,7 +277,7 @@ func (c *StatefulComponentBase) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli
 	// 2. Delete the PVC. Since PV has Retain reclaim policy - we will not lose any data when we recreate the PVC.
 	// 3. Delete the claimRef entry from PV specs, so as new PVC can bind to it. This should make the PV Available.
 	// 4. Re-create the PVC with smaller size than PV and set volumeName field of the PVC to the name of the PV. This should bind new PVC to existing PV.
-	// 5. Don't forget to restore the reclaim policy of the PV.
+	// 5. Don't forget to Restore the reclaim policy of the PV.
 	newPVC := pvc.DeepCopy()
 	if pvcNotFound {
 		newPVC.Name = pvcKey.Name
@@ -370,7 +370,7 @@ func (c *StatefulComponentBase) updatePVCSize(reqCtx intctrlutil.RequestCtx, cli
 			return c.CreateResource(newPVC, fromVertex)
 		},
 		pvRestorePolicyStep: func(fromVertex *ictrltypes.LifecycleVertex, step pvcRecreateStep) *ictrltypes.LifecycleVertex {
-			// step 5: restore to previous pv policy
+			// step 5: Restore to previous pv policy
 			restorePV := pv.DeepCopy()
 			policy := corev1.PersistentVolumeReclaimPolicy(restorePV.Annotations[constant.PVLastClaimPolicyAnnotationKey])
 			if len(policy) == 0 {
@@ -662,8 +662,8 @@ func (c *StatefulComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli 
 	)
 
 	if d := NewDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsObj, snapshotKey); d != nil {
-		// clean backup resources.
-		// there will not be any backup resources other than scale out.
+		// clean Backup resources.
+		// there will not be any Backup resources other than scale out.
 		tmpObjs, err := d.ClearTmpResources()
 		if err != nil {
 			return err
@@ -765,7 +765,7 @@ func (c *StatefulComponentBase) getRunningVolumes(reqCtx intctrlutil.RequestCtx,
 	return matchedPVCs, nil
 }
 
-// handleGarbageOfRestoreBeforeRunning handles the garbage for restore before cluster phase changes to Running.
+// handleGarbageOfRestoreBeforeRunning handles the garbage for Restore before cluster phase changes to Running.
 // @return ErrNoOps if no operation
 // REVIEW: this handling is rather hackish, call for refactor.
 // Deprecated: to be removed by PITR feature.
@@ -781,9 +781,9 @@ func (c *StatefulComponentBase) handleGarbageOfRestoreBeforeRunning() error {
 		return nil
 	}
 
-	// remove the garbage for restore if the component restores from backup.
+	// remove the garbage for Restore if the component restores from Backup.
 	for _, v := range clusterBackupResourceMap {
-		// remove the init container for restore
+		// remove the init container for Restore
 		if err = c.removeStsInitContainerForRestore(v); err != nil {
 			return err
 		}
@@ -792,7 +792,7 @@ func (c *StatefulComponentBase) handleGarbageOfRestoreBeforeRunning() error {
 	return nil
 }
 
-// getClusterBackupSourceMap gets the backup source map from cluster.annotations
+// getClusterBackupSourceMap gets the Backup source map from cluster.annotations
 func (c *StatefulComponentBase) getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string, error) {
 	compBackupMapString := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
 	if len(compBackupMapString) == 0 {
@@ -802,13 +802,13 @@ func (c *StatefulComponentBase) getClusterBackupSourceMap(cluster *appsv1alpha1.
 	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
 	for k := range compBackupMap {
 		if cluster.Spec.GetComponentByName(k) == nil {
-			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNotFound, "restore: not found componentSpecs[*].name %s", k)
+			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNotFound, "Restore: not found componentSpecs[*].name %s", k)
 		}
 	}
 	return compBackupMap, err
 }
 
-// removeStsInitContainerForRestore removes the statefulSet's init container which restores data from backup.
+// removeStsInitContainerForRestore removes the statefulSet's init container which restores data from Backup.
 func (c *StatefulComponentBase) removeStsInitContainerForRestore(backupName string) error {
 	sts := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
 	initContainers := sts.Spec.Template.Spec.InitContainers
@@ -827,6 +827,6 @@ func (c *StatefulComponentBase) removeStsInitContainerForRestore(backupName stri
 	}
 	// TODO: it seems not reasonable to reset component phase back to Creating.
 	//// if need to remove init container, reset component to Creating.
-	// c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, "Remove init container for restore")
+	// c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, "Remove init container for Restore")
 	return nil
 }

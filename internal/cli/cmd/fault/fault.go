@@ -20,14 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package fault
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
@@ -115,6 +118,11 @@ func (o *FaultBaseOptions) AddCommonFlag(cmd *cobra.Command) {
 }
 
 func (o *FaultBaseOptions) BaseValidate() error {
+	enable, _ := o.checkChaosMeshEnable()
+	if !enable && o.DryRun != "none" {
+		return fmt.Errorf("chaos-mesh is not enabled")
+	}
+
 	if ok, err := IsRegularMatch(o.Duration); !ok {
 		return err
 	}
@@ -159,4 +167,27 @@ func IsInteger(str string) (bool, error) {
 
 func GetGVR(group, version, resourceName string) schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: group, Version: version, Resource: resourceName}
+}
+
+func (o *FaultBaseOptions) checkChaosMeshEnable() (bool, error) {
+	config, err := o.Factory.ToRESTConfig()
+	if err != nil {
+		return false, err
+	}
+
+	clientSet, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return false, err
+	}
+	podList, err := clientSet.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/part-of=chaos-mesh",
+	})
+	if err != nil {
+		return false, err
+	}
+
+	if len(podList.Items) > 0 {
+		return true, nil
+	}
+	return false, nil
 }

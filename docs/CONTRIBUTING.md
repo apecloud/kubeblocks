@@ -39,7 +39,7 @@ Currently, there are 4 types of issues:
 
 - **Bug report**: You’ve found a bug with the code, and want to report or track the bug. Show more details, and let us know about an unexpected error, a crash, or an incorrect behavior.
 - **Feature request**: Suggest a new feature. This allows feedback from others before the code is written.
-- **Document request**: Contribute to the [KubeBlocks documentation](https://kubeblocks.io/docs/overview).
+- **Document request**: Contribute to the [KubeBlocks documentation](https://kubeblocks.io/docs/preview/user_docs/introduction).
 - **Report a security vulnerability**: Review our security policy first and then report a vulnerability.
 
 ### Make your changes

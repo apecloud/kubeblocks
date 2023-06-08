@@ -47,7 +47,7 @@ func NewDataClone(reqCtx intctrlutil.RequestCtx,
 	stsProto *appsv1.StatefulSet,
 	key types.NamespacedName) DataClone {
 	if component == nil || component.HorizontalScalePolicy == nil {
-		return &baseDataClone{}
+		return nil
 	}
 	switch component.HorizontalScalePolicy.Type {
 	case appsv1alpha1.HScaleDataClonePolicyFromSnapshot:
@@ -75,7 +75,7 @@ func NewDataClone(reqCtx intctrlutil.RequestCtx,
 			},
 		}
 	}
-	return &baseDataClone{}
+	return nil
 }
 
 type baseDataClone struct {
@@ -86,12 +86,6 @@ type baseDataClone struct {
 	stsObj    *appsv1.StatefulSet
 	stsProto  *appsv1.StatefulSet
 	key       types.NamespacedName
-}
-
-var _ DataClone = &baseDataClone{}
-
-func (d *baseDataClone) Succeed() (bool, error) {
-	return true, nil
 }
 
 func (d *baseDataClone) CloneData(realDataClone DataClone) ([]client.Object, error) {
@@ -207,31 +201,6 @@ func (d *baseDataClone) getBackupMatchingLabels() client.MatchingLabels {
 		constant.KBAppComponentLabelKey: d.component.Name,
 		constant.KBManagedByKey:         "cluster", // the resources are managed by which controller
 	}
-}
-
-// the following functions of baseDataClone should not be called
-func (d *baseDataClone) CanClearTmpResources() (bool, error) {
-	return false, nil
-}
-
-func (d *baseDataClone) ClearTmpResources() ([]client.Object, error) {
-	return nil, nil
-}
-
-func (d *baseDataClone) checkBackupStatus() (backupStatus, error) {
-	return backupStatusFailed, nil
-}
-
-func (d *baseDataClone) backup() ([]client.Object, error) {
-	return nil, nil
-}
-
-func (d *baseDataClone) checkRestoreStatus(name types.NamespacedName) (backupStatus, error) {
-	return backupStatusFailed, nil
-}
-
-func (d *baseDataClone) restore(name types.NamespacedName) ([]client.Object, error) {
-	return nil, nil
 }
 
 type snapshotDataClone struct {
@@ -622,6 +591,7 @@ func (d *backupDataClone) restore(pvcKey types.NamespacedName) ([]client.Object,
 		return nil, err
 	}
 	objs = append(objs, pvc)
+	// TODO: @dengshao refactor it to backup api
 	job, err := builder.BuildRestoreJobForFullBackup(restoreJobKey.Name, d.component, &backup, &backupToolList.Items[0], pvcKey.Name)
 	if err != nil {
 		return nil, err

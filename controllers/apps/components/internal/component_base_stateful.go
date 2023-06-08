@@ -175,7 +175,7 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 
-	if err := c.innerHorizontalScale(reqCtx, cli, statusTxn); err != nil {
+	if err := c.horizontalScale(reqCtx, cli, statusTxn); err != nil {
 		return err
 	}
 
@@ -462,10 +462,10 @@ func (c *StatefulComponentBase) hasVolumeExpansionRunning(reqCtx intctrlutil.Req
 }
 
 func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.innerHorizontalScale(reqCtx, cli, nil)
+	return c.horizontalScale(reqCtx, cli, nil)
 }
 
-func (c *StatefulComponentBase) innerHorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+func (c *StatefulComponentBase) horizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
 	ret := c.horizontalScaling(c.runningWorkload)
 	if ret == 0 {
 		if err := c.postScaleIn(reqCtx, cli, txn); err != nil {
@@ -627,9 +627,15 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 	stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
 
 	dataClone := NewDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)
-	succeed, err := dataClone.Succeed()
-	if err != nil {
-		return err
+	var succeed bool
+	var err error
+	if dataClone == nil {
+		succeed = true
+	} else {
+		succeed, err = dataClone.Succeed()
+		if err != nil {
+			return err
+		}
 	}
 	if succeed {
 		// pvcs are ready, stateful_set.replicas should be updated
@@ -657,16 +663,16 @@ func (c *StatefulComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli 
 		}
 	)
 
-	d := NewDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsObj, snapshotKey)
-
-	// clean backup resources.
-	// there will not be any backup resources other than scale out.
-	tmpObjs, err := d.ClearTmpResources()
-	if err != nil {
-		return err
-	}
-	for _, obj := range tmpObjs {
-		c.DeleteResource(obj, nil)
+	if d := NewDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsObj, snapshotKey); d != nil {
+		// clean backup resources.
+		// there will not be any backup resources other than scale out.
+		tmpObjs, err := d.ClearTmpResources()
+		if err != nil {
+			return err
+		}
+		for _, obj := range tmpObjs {
+			c.DeleteResource(obj, nil)
+		}
 	}
 
 	return nil

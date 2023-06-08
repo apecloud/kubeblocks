@@ -889,7 +889,7 @@
 	recovery_init_sync_method?: string & "fsync" | "syncfs"
 
 	// When set to on, which is the default, PostgreSQL will automatically remove temporary files after a backend crash
-	remove_temp_files_after_crash: float & >=0 & <=1 | *0
+	remove_temp_files_after_crash: string & "on" | "off"
 
 	// Reinitialize server after backend crash.
 	restart_after_crash?: bool & false | true
@@ -1034,7 +1034,7 @@
 	vacuum_defer_cleanup_age?: int & >=0 & <=1000000
 
 	// Specifies the maximum age (in transactions) that a table's pg_class.relfrozenxid field can attain before VACUUM takes extraordinary measures to avoid system-wide transaction ID wraparound failure
-	vacuum_failsafe_age: int & >=0 & <=1200000000 | *1200000000
+	vacuum_failsafe_age: int & >=0 & <=2100000000 | *2100000000
 
 	// Minimum age at which VACUUM should freeze a table row.
 	vacuum_freeze_min_age?: int & >=0 & <=1000000000
@@ -1043,7 +1043,7 @@
 	vacuum_freeze_table_age?: int & >=0 & <=2000000000
 
 	// Specifies the maximum age (in transactions) that a table's pg_class.relminmxid field can attain before VACUUM takes extraordinary measures to avoid system-wide multixact ID wraparound failure
-	vacuum_multixact_failsafe_age: int & >=0 & <=1200000000 | *1200000000
+	vacuum_multixact_failsafe_age: int & >=0 & <=2100000000 | *2100000000
 
 	// Minimum age at which VACUUM should freeze a MultiXactId in a table row.
 	vacuum_multixact_freeze_min_age?: int & >=0 & <=1000000000

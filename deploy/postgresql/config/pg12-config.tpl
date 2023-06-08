@@ -69,12 +69,10 @@ client_min_messages = 'notice'
 # commit_delay = '20'
 commit_siblings = '5'
 constraint_exclusion = 'partition'
-
-#extension: pg_cron
+# extension: pg_cron
 cron.database_name = 'postgres'
 cron.log_statement = 'on'
 cron.max_running_jobs = '32'
-
 cursor_tuple_fraction = '0.1'
 datestyle = 'ISO,YMD'
 deadlock_timeout = '1000ms'
@@ -85,7 +83,6 @@ debug_print_rewritten = 'False'
 default_statistics_target = '100'
 default_transaction_deferrable = 'False'
 default_transaction_isolation = 'read committed'
-# unit 8KB
 {{- if gt $phy_memory 0 }}
 effective_cache_size = '{{ printf "%dMB" ( div ( div $phy_memory 16384 ) 128 ) }}'
 {{- end }}
@@ -102,9 +99,7 @@ enable_nestloop = 'True'
 enable_parallel_append = 'True'
 enable_parallel_hash = 'True'
 enable_partition_pruning = 'True'
-# patroni off
 enable_partitionwise_aggregate = 'True'
-# patroni off
 enable_partitionwise_join = 'True'
 enable_seqscan = 'True'
 enable_sort = 'True'
@@ -113,8 +108,8 @@ escape_string_warning = 'True'
 extra_float_digits = '1'
 force_parallel_mode = '0'
 from_collapse_limit = '8'
-#fsync=off # patroni for Extreme Performance
-#full_page_writes=off # patroni for Extreme Performance
+# fsync=off
+# full_page_writes=off
 geqo = 'True'
 geqo_effort = '5'
 geqo_generations = '0'
@@ -124,11 +119,8 @@ geqo_selection_bias = '2'
 geqo_threshold = '12'
 gin_fuzzy_search_limit = '0'
 gin_pending_list_limit = '4096kB'
-# patroni on
 hot_standby_feedback = 'False'
-# rds huge_pages=on, patroni try
 huge_pages = 'try'
-#patroni 10min
 idle_in_transaction_session_timeout = '3600000ms'
 index_adviser.enable_log = 'on'
 index_adviser.max_aggregation_column_count = '10'
@@ -139,14 +131,12 @@ lc_monetary = 'C'
 lc_numeric = 'C'
 lc_time = 'C'
 lock_timeout = '0'
-# patroni 1s
 log_autovacuum_min_duration = '10000'
 log_checkpoints = 'True'
 log_connections = 'False'
 log_disconnections = 'False'
 log_duration = 'False'
 log_executor_stats = 'False'
-
 {{- block "logsBlock" . }}
 {{- if hasKey $.component "enabledLogs" }}
 {{- if mustHas "running" $.component.enabledLogs }}
@@ -157,7 +147,6 @@ log_filename = 'postgresql-%Y-%m-%d.log'
 {{ end -}}
 {{ end -}}
 {{ end }}
-
 # log_lock_waits = 'True'
 log_min_duration_statement = '1000'
 log_parser_stats = 'False'
@@ -181,101 +170,74 @@ max_pred_locks_per_transaction = '64'
 max_prepared_transactions = '100'
 max_replication_slots = '16'
 max_stack_depth = '2MB'
-
 max_standby_archive_delay = '300000ms'
 max_standby_streaming_delay = '300000ms'
 max_sync_workers_per_subscription = '2'
 max_wal_senders = '64'
-# {LEAST(GREATEST(DBInstanceClassMemory/2097152, 2048), 16384)}
 max_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 2097152 ) 4096 ) 32768 ) }}'
 max_worker_processes = '{{ max $phy_cpu 8 }}'
-# min_parallel_index_scan_size unit is 8KB, 64 = 512KB
 min_parallel_index_scan_size = '512kB'
-# min_parallel_table_scan_size unit is 8KB, 1024 = 8MB
 min_parallel_table_scan_size = '8MB'
 {{- if gt $phy_memory 0 }}
 min_wal_size = '{{ printf "%dMB" ( min ( max ( div $phy_memory 8388608 ) 2048 ) 8192 ) }}'
 {{- end }}
-
 old_snapshot_threshold = '-1'
-operator_precedence_warning = 'off'
 parallel_leader_participation = 'True'
-
 password_encryption = 'md5'
 pg_stat_statements.max = '5000'
 pg_stat_statements.save = 'False'
-
-# patroni all
 pg_stat_statements.track = 'top'
 # pg_stat_statements.track_planning = 'False'
 pg_stat_statements.track_utility = 'False'
-
-#extension: pgaudit
+# extension: pgaudit
 pgaudit.log_catalog = 'True'
 pgaudit.log_level = 'log'
 pgaudit.log_parameter = 'False'
 pgaudit.log_relation = 'False'
 pgaudit.log_statement_once = 'False'
-# TODO
 # pgaudit.role = ''
-
 #extension: pglogical
 pglogical.batch_inserts = 'True'
 pglogical.conflict_log_level = 'log'
 pglogical.conflict_resolution = 'apply_remote'
-# TODO
 # pglogical.extra_connection_options = ''
 pglogical.synchronous_commit = 'False'
 pglogical.use_spi = 'False'
 plan_cache_mode = 'auto'
 quote_all_identifiers = 'False'
-
 random_page_cost = '1.1'
 row_security = 'True'
 session_replication_role = 'origin'
-
-#extension: sql_firewall
+# extension: sql_firewall
 sql_firewall.firewall = 'disable'
-
-#auto generated
 shared_buffers = '{{ printf "%d%s" $shared_buffers $buffer_unit }}'
 # shared_preload_libraries = 'pg_stat_statements,auto_explain,bg_mon,pgextwlist,pg_auth_mon,set_user,pg_cron,pg_stat_kcache'
-
 {{- if $.component.tls }}
 {{- $ca_file := getCAFile }}
 {{- $cert_file := getCertFile }}
 {{- $key_file := getKeyFile }}
-# tls
 ssl = 'True'
 ssl_ca_file = '{{ $ca_file }}'
 ssl_cert_file = '{{ $cert_file }}'
 ssl_key_file = '{{ $key_file }}'
 {{- end }}
-
-# ssl_max_protocol_version=''
 ssl_min_protocol_version = 'TLSv1'
 standard_conforming_strings = 'True'
 statement_timeout = '0'
-#patroni 10
 superuser_reserved_connections = '20'
 synchronize_seqscans = 'True'
-
-# rds off ，patroni off for Extreme Performance
 synchronous_commit = 'off'
 # synchronous_standby_names=''
 tcp_keepalives_count = '10'
 tcp_keepalives_idle = '45s'
 tcp_keepalives_interval = '10s'
 temp_buffers = '8MB'
-
-# {DBInstanceClassMemory/1024}
 {{- if gt $phy_memory 0 }}
 temp_file_limit = '{{ printf "%dkB" ( div $phy_memory 1024 ) }}'
 {{- end }}
-
-#extension: timescaledb
-#timescaledb.max_background_workers = '6'
-#timescaledb.telemetry_level = 'off'
+# extension: timescaledb
+# timescaledb.max_background_workers = '6'
+# timescaledb.telemetry_level = 'off'
 # TODO timezone
 # timezone=Asia/Shanghai
 track_activity_query_size = '4096'
@@ -283,39 +245,31 @@ track_commit_timestamp = 'False'
 track_functions = 'pl'
 track_io_timing = 'True'
 transform_null_equals = 'False'
-
-vacuum_cleanup_index_scale_factor = '0.1'
-# patroni 20ms
 vacuum_cost_delay = '0'
-# patroni 2000
 vacuum_cost_limit = '10000'
 vacuum_cost_page_dirty = '20'
 vacuum_cost_page_hit = '1'
 vacuum_cost_page_miss = '2'
-# patroni 50000
 vacuum_defer_cleanup_age = '0'
 vacuum_freeze_min_age = '50000000'
 vacuum_freeze_table_age = '200000000'
 vacuum_multixact_freeze_min_age = '5000000'
 vacuum_multixact_freeze_table_age = '200000000'
-# wal_buffers ={LEAST(GREATEST(DBInstanceClassMemory/2097152, 2048), 16384)} # patroni 16M
-# unit 8KB
 wal_buffers = '{{ printf "%dMB" ( div ( min ( max ( div $phy_memory 2097152 ) 2048) 16384 ) 128 ) }}'
 wal_compression = 'True'
-wal_keep_segments = '4'
-# patroni minimal for Extreme Performance
+wal_init_zero = off
 wal_level = 'replica'
-# patroni on , off for Extreme Performance
 wal_log_hints = 'False'
 wal_receiver_status_interval = '1s'
 wal_receiver_timeout = '60000'
 wal_sender_timeout = '60000'
-# patroni 20ms
 wal_writer_delay = '200ms'
-# rds unit 8KB, so 1M, patroni 1M
 wal_writer_flush_after = '1MB'
-# {GREATEST(DBInstanceClassMemory/4194304, 4096)}
 work_mem = '{{ printf "%dkB" ( max ( div $phy_memory 4194304 ) 4096 ) }}'
 xmlbinary = 'base64'
 xmloption = 'content'
-wal_init_zero = off
+
+## the following parameters have been deprecated in postgresql 14
+operator_precedence_warning = 'off'
+vacuum_cleanup_index_scale_factor = '0.1'
+wal_keep_segments = '0'

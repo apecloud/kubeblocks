@@ -25,6 +25,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -238,6 +239,9 @@ func (o *openOptions) complete(cmd *cobra.Command, args []string) error {
 	dash := getDashboardByName(o.name)
 	if dash == nil {
 		return fmt.Errorf("failed to find dashboard \"%s\", run \"kbcli dashboard list\" to list all dashboards", o.name)
+	}
+	if os.Getenv("SSH_CLIENT") != "" {
+		return fmt.Errorf("could not open the dashboard in remote situation")
 	}
 
 	if o.localPort == "" {

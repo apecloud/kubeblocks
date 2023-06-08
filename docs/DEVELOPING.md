@@ -173,55 +173,8 @@ You can use cloud Kubernetes service, such as [`EKS`](https://aws.amazon.com/eks
 
 `kbcli` is a [cobra-based](https://github.com/spf13/cobra) command line interface for `KubeBlocks` which support to the basic interaction commands such as `install/uninstall/upgrade` KubeBlocks and all kinds of actions for KubeBlocks
 
-For Example :
-1. manager your database
-`accounts`,cluster `addons`,cluster `class`,cluster `plugins`,cluster `alert`
-2. list the Kubeblocks available infos like `cluster version`,`cluster definition`, k8s and Kubeblocks `version`
-3. data `migration` between two data sources.
-4. `bench` test and `fault` inject test for cluster
-5. start the `playground` for Kubeblocks in local or cloud
-6. quick generate cluster helm template
-6. so on.
+The source directory fo `kbcli` is `/internal/cli/` and the `main.go` is `/cmd/cli/main.go`
 
-Here is the directory structure for `kbcli`
-```text
-kubeblocks/cmd/cli
-└── main.go                  # kbcli main.go
-
-kubeblocks/internal/cli/
-├── cloudprovider            # the cloud support for kubeblocks
-├── cluster                  # kubeblocks cluster 
-├── cmd                      # all commands for kbcli
-│   ├── accounts       
-│   ├── addon
-│   ├── alert
-│   ├── bench
-│   ├── builder
-│   ├── class
-│   ├── cluster
-│   ├── clusterdefinition
-│   ├── clusterversion
-│   ├── dashboard
-│   ├── fault
-│   ├── kubeblocks
-│   ├── migration
-│   ├── options              # options flags for all commands
-│   ├── playground
-│   ├── plugin
-│   └── version
-├── create                   # create component
-│   └── template            
-├── delete                   # delete component
-├── edit                     # edit component
-├── exec                     # exec component
-├── list                     # list component
-├── patch                    # patch component
-├── printer                  # printer for kbcli output
-├── spinner                  # output spinner
-├── testing                  # common testing component
-├── types                    # constant types definition
-└── util                     # util component
-```
 Build the local kbcli binary executables by:
 ```shell
 make kbcli 
@@ -230,7 +183,10 @@ or
 ```shell
 make kbcli-fast 
 ``` 
-The file will be generated in `kubeblocks/bin/`
+The file will be generated in `/bin/`
+
+Run `kbcli --help` to list all commands of `kbcli`.
+
 ### Code style
 First, read the Go (Golang) coding guidelines again, looking for any style violations. It's easier to remember a style rule once you've violated it.
 

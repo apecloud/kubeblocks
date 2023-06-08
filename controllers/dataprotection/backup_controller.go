@@ -136,9 +136,9 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	if viper.GetBool("VOLUMESNAPSHOT") {
 		if intctrlutil.InVolumeSnapshotV1Beta1() {
-			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.Predicates{})
 		} else {
-			b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+			b.Owns(&snapshotv1.VolumeSnapshot{}, builder.Predicates{})
 		}
 	}
 

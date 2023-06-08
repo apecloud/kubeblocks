@@ -225,9 +225,9 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterPods))
 	if viper.GetBool("VOLUMESNAPSHOT") {
 		if intctrlutil.InVolumeSnapshotV1Beta1() {
-			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.Predicates{})
 		} else {
-			b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+			b.Owns(&snapshotv1.VolumeSnapshot{}, builder.Predicates{})
 		}
 	}
 	return b.Complete(r)

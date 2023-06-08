@@ -14,7 +14,7 @@ You can get started with Role-Observation by docker image `apecloud/kubeblocks-r
 
 Compiler `Go 1.20+` (Generics Programming Support), checking the [Go Installation](https://go.dev/doc/install) to see how to install Go on your platform.
 
-Use `go build` to build and produce the `probe` binary file. The executable is produced under current directory.
+Use `go build` to build and produce the `role-observe` binary file. The executable is produced under current directory.
 
 ```shell
 $ cd kubeblocks/cmd/probe/role
@@ -31,9 +31,9 @@ Role-Observation reads some configurations from config files, Now there are:
 ## 2.3 CommandLine Argument
 
 Role-Observation accepts 2 arguments:
-- port: the port that role-observation runs on.
-- url: the url for kubelet's readiness probe.
+- port: the port that role-observation runs on, default: 7979.
+- url: the url for kubelet's readiness probe, default: "/role".
 
 # 3. License
 
-Role-Observation is under the Apache 2.0 license. See the [LICENSE](../../LICENSE) file for details.
+Role-Observation is under the AGPL-3.0-only license. See the [LICENSE](../../../LICENSE) file for details.

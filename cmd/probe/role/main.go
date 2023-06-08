@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -50,19 +51,19 @@ func main() {
 	agent := internal.NewRoleAgent(os.Stdin, "ROLE_OBSERVATION")
 	err = agent.Init()
 	if err != nil {
-		panic(fmt.Errorf("fatal error custom init: %v", err))
+		log.Fatal(fmt.Errorf("fatal error custom init: %v", err))
 	}
 
 	err = http.ListenAndServe(fmt.Sprintf("localhost:%d", port), nil)
 	if err != nil {
-		panic(fmt.Errorf("fatal error http listen: %v", err))
+		log.Fatal(fmt.Errorf("fatal error http listen: %v", err))
 	}
 
 	http.HandleFunc(url, func(writer http.ResponseWriter, request *http.Request) {
 		opsRes, shouldNotify := agent.CheckRole(request.Context())
 		buf, err := json.Marshal(opsRes)
 		if err != nil {
-			panic(fmt.Errorf("fatal error json parse: %v", err))
+			log.Fatal(fmt.Errorf("fatal error json parse: %v", err))
 		}
 
 		if _, exist := opsRes["event"]; !exist || len(opsRes) == 0 {
@@ -76,7 +77,7 @@ func main() {
 			writer.WriteHeader(code)
 			_, err = writer.Write(buf)
 			if err != nil {
-				panic(fmt.Errorf("fatal error response write: %v", err))
+				log.Fatal(fmt.Errorf("fatal error response write: %v", err))
 			}
 		} else {
 			writer.WriteHeader(http.StatusNoContent)

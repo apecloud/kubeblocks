@@ -119,7 +119,7 @@ func (o *FaultBaseOptions) AddCommonFlag(cmd *cobra.Command) {
 
 func (o *FaultBaseOptions) BaseValidate() error {
 	enable, _ := o.checkChaosMeshEnable()
-	if !enable && o.DryRun != "none" {
+	if !enable && o.DryRun == "none" {
 		return fmt.Errorf("chaos-mesh is not enabled")
 	}
 

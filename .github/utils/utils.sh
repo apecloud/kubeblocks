@@ -35,6 +35,11 @@ Usage: $(basename "$0") <options>
     -ru, --run-url            The run url
     -fl, --file               The release notes file
     -ip, --ignore-pkgs        The ignore cover pkgs
+<<<<<<< HEAD
+=======
+    -br, --base-branch        The base branch name
+    -bc, --base-commit        The base commit id
+>>>>>>> origin/main
 EOF
 }
 
@@ -56,6 +61,12 @@ main() {
     local RUN_URL=""
     local FILE=""
     local IGNORE_PKGS=""
+<<<<<<< HEAD
+=======
+    local BASE_BRANCH=""
+    local BASE_COMMIT=""
+    local BASE_COMMIT_ID=HEAD^
+>>>>>>> origin/main
 
     parse_command_line "$@"
 
@@ -188,6 +199,21 @@ parse_command_line() {
                     shift
                 fi
                 ;;
+<<<<<<< HEAD
+=======
+            -br|--base-branch)
+                if [[ -n "${2:-}" ]]; then
+                    BASE_BRANCH="$2"
+                    shift
+                fi
+                ;;
+            -bc|--base-commit)
+                if [[ -n "${2:-}" ]]; then
+                    BASE_COMMIT="$2"
+                    shift
+                fi
+                ;;
+>>>>>>> origin/main
             *)
                 break
                 ;;
@@ -353,8 +379,35 @@ add_trigger_mode() {
     fi
 }
 
+get_base_commit_id() {
+    if [[ ! -z "$BASE_COMMIT" ]]; then
+        BASE_COMMIT_ID=$BASE_COMMIT
+        return
+    fi
+    base_branch_commits="$( git rev-list $BASE_BRANCH -n 100 )"
+    current_branch_commits="$( git rev-list $BRANCH_NAME -n 50 )"
+    for base_commit_id in $( echo "$base_branch_commits" ); do
+        found=false
+        for cur_commit_id in $( echo "$current_branch_commits" ); do
+            if [[ "$cur_commit_id" == "$base_commit_id" ]]; then
+                BASE_COMMIT_ID=$base_commit_id
+                found=true
+                break
+              fi
+        done
+        if [[ $found == true ]]; then
+            break
+        fi
+    done
+}
+
 get_trigger_mode() {
-    for filePath in $( git diff --name-only HEAD HEAD^ ); do
+    if [[ ! ("$BRANCH_NAME" == "main" || "$BRANCH_NAME" == "release-"* || "$BRANCH_NAME" == "releasing-"*) ]]; then
+        get_base_commit_id
+    fi
+    echo "BASE_COMMIT_ID:$BASE_COMMIT_ID"
+    filePaths=$( git diff --name-only HEAD ${BASE_COMMIT_ID} )
+    for filePath in $( echo "$filePaths" ); do
         if [[ "$filePath" == "go."* ]]; then
             add_trigger_mode "[test]"
             continue
@@ -430,6 +483,7 @@ patch_release_notes() {
 ignore_cover_pkgs() {
     ignore_pkgs=$(echo "$IGNORE_PKGS" | sed 's/|/ /g')
     while read line; do
+<<<<<<< HEAD
       ignore=false
       for pkgs in $(echo "$ignore_pkgs"); do
           if [[ "$line" == *"$LATEST_REPO/$pkgs"* ]]; then
@@ -441,6 +495,19 @@ ignore_cover_pkgs() {
           continue
       fi
       echo $line >> cover_new.out
+=======
+        ignore=false
+        for pkgs in $(echo "$ignore_pkgs"); do
+            if [[ "$line" == *"$LATEST_REPO/$pkgs"* ]]; then
+                ignore=true
+                break
+            fi
+        done
+        if [[ $ignore == true ]]; then
+            continue
+        fi
+        echo $line >> cover_new.out
+>>>>>>> origin/main
     done < ${FILE}
 }
 

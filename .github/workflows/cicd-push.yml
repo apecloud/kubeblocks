@@ -11,7 +11,7 @@ on:
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
-
+  BASE_BRANCH: origin/main
 
 jobs:
   trigger-mode:
@@ -25,7 +25,10 @@ jobs:
       - name: Get trigger mode
         id: get_trigger_mode
         run: |
-          TRIGGER_MODE=`bash .github/utils/utils.sh --type 6`
+          TRIGGER_MODE=`bash .github/utils/utils.sh --type 6 \
+              --branch-name "${{ github.ref_name }}" \
+              --base-branch "${{ env.BASE_BRANCH }}"`
+          
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
 
@@ -39,7 +42,6 @@ jobs:
   pre-push:
     needs: trigger-mode
     runs-on: ubuntu-latest
-    if: ${{ github.ref_name != 'main' }}
     name: Push Pre-Check
     steps:
       - uses: actions/checkout@v3
@@ -72,7 +74,7 @@ jobs:
   cli-doc:
     needs: trigger-mode
     runs-on: ubuntu-latest
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[cli]') && github.ref_name != 'main' }}
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[cli]') }}
     steps:
       - uses: actions/checkout@v3
       - name: install lib
@@ -114,8 +116,7 @@ jobs:
     outputs:
       runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
     steps:
-      - uses: apecloud/checkout@main
-
+      - uses: actions/checkout@v3
       - name: make manifests check
         run: |
           mkdir -p ./bin
@@ -146,7 +147,7 @@ jobs:
         run: |
           bash .github/utils/utils.sh --type 14 \
               --file cover.out \
-              --ignore-pkgs "cmd/|internal/cli|internal/controller/model|internal/controller/consensusset|controllers/k8score" 
+              --ignore-pkgs "cmd/|internal/cli|internal/controller/consensusset|internal/controller/model|controllers/k8score" 
 
       - name: upload coverage report
         uses: codecov/codecov-action@v3
@@ -179,7 +180,7 @@ jobs:
 
   check-image:
     needs: trigger-mode
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') && github.ref_name != 'main' }}
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') }}
     uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
     with:
       MAKE_OPS_PRE: "generate"
@@ -194,7 +195,7 @@ jobs:
 
   check-tools-image:
     needs: trigger-mode
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') && github.ref_name != 'main' }}
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') }}
     uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
     with:
       MAKE_OPS_PRE: "generate"
@@ -209,7 +210,7 @@ jobs:
 
   check-helm:
     needs: trigger-mode
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]') && github.ref_name != 'main' }}
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]') }}
     uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.0
     with:
       MAKE_OPS: "bump-chart-ver"
@@ -235,7 +236,7 @@ jobs:
   build-kbcli:
     needs: trigger-mode
     runs-on: ubuntu-latest
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[cli]') && github.ref_name != 'main' }}
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[cli]') }}
     strategy:
       matrix:
         os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64]

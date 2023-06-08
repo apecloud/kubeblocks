@@ -508,12 +508,12 @@ func BuildBackup(cluster *appsv1alpha1.Cluster,
 	backupType string) (*dataprotectionv1alpha1.Backup, error) {
 	backup := dataprotectionv1alpha1.Backup{}
 	if err := buildFromCUE("backup_job_template.cue", map[string]any{
-		"cluster":            cluster,
-		"component":          component,
-		"backup_policy_name": backupPolicyName,
-		"backup_job_key":     backupKey,
-		"backup_type":        backupType,
-	}, "backup_job", &backup); err != nil {
+		"cluster":          cluster,
+		"component":        component,
+		"backupPolicyName": backupPolicyName,
+		"backupJobKey":     backupKey,
+		"backupType":       backupType,
+	}, "backupJob", &backup); err != nil {
 		return nil, err
 	}
 	return &backup, nil

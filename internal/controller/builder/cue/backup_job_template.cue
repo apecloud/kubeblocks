@@ -24,22 +24,22 @@ component: {
 	clusterDefName: string
 	name:           string
 }
-backup_policy_name: string
-backup_job_key: {
+backupPolicyName: string
+backupJobKey: {
 	Name:      string
 	Namespace: string
 }
-backup_type: string
-backup_job: {
+backupType: string
+backupJob: {
 	apiVersion: "dataprotection.kubeblocks.io/v1alpha1"
 	kind:       "Backup"
 	metadata: {
-		name:      backup_job_key.Name
-		namespace: backup_job_key.Namespace
+		name:      backupJobKey.Name
+		namespace: backupJobKey.Namespace
 		labels: {
-			"dataprotection.kubeblocks.io/backup-type":         backup_type
+			"dataprotection.kubeblocks.io/backup-type":         backupType
 			"apps.kubeblocks.io/managed-by":                    "cluster"
-			"backuppolicies.dataprotection.kubeblocks.io/name": backup_policy_name
+			"backuppolicies.dataprotection.kubeblocks.io/name": backupPolicyName
 			"app.kubernetes.io/name":            "\(component.clusterDefName)"
 			"app.kubernetes.io/instance":        cluster.metadata.name
 			"app.kubernetes.io/managed-by":      "kubeblocks"
@@ -47,7 +47,7 @@ backup_job: {
 		}
 	}
 	spec: {
-		"backupPolicyName": backup_policy_name
-		"backupType":       backup_type
+		"backupPolicyName": backupPolicyName
+		"backupType":       backupType
 	}
 }

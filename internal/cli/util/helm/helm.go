@@ -578,3 +578,14 @@ func GetValues(release string, cfg *Config) (map[string]interface{}, error) {
 	client.AllValues = true
 	return client.Run(release)
 }
+
+// GetManifest gives an implementation of 'helm get manifest' for target release
+func GetManifest(release string, cfg *Config) ([]byte, error) {
+	actionConfig, err := NewActionConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	client := action.NewGet(actionConfig)
+	res, err := client.Run(release)
+	return []byte(res.Manifest), err
+}

@@ -106,6 +106,7 @@ func (o *InstallOptions) Upgrade() error {
 		fmt.Fprintf(o.Out, "Current version %s is same with the upgraded version, no need to upgrade.\n", o.Version)
 		return nil
 	}
+	// Todo v is a struct
 	fmt.Fprintf(o.Out, "Current KubeBlocks version %s.\n", v)
 
 	if err = o.checkVersion(v); err != nil {

@@ -119,12 +119,14 @@ func (o *FaultBaseOptions) AddCommonFlag(cmd *cobra.Command) {
 }
 
 func (o *FaultBaseOptions) BaseValidate() error {
-	enable, err := o.checkChaosMeshEnable()
-	if err != nil {
-		return err
-	}
-	if !enable && o.DryRun == "none" {
-		return fmt.Errorf("chaos-mesh is not enabled, use `kbcli addon enable chaos-mesh` to  enable chaos-mesh first")
+	if o.DryRun == "none" {
+		enable, err := o.checkChaosMeshEnable()
+		if err != nil {
+			return err
+		}
+		if !enable {
+			return fmt.Errorf("chaos-mesh is not enabled, use `kbcli addon enable chaos-mesh` to  enable chaos-mesh first")
+		}
 	}
 
 	if ok, err := IsRegularMatch(o.Duration); !ok {

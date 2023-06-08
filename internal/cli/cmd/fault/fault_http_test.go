@@ -76,7 +76,7 @@ var _ = Describe("Fault Network HTPP", func() {
 
 		It("fault network http delay", func() {
 			inputs := [][]string{
-				{""},
+				{"--dry-run=client"},
 				{"--delay=50s", "--dry-run=client"},
 			}
 			o := NewHTTPChaosOptions(tf, streams, "")

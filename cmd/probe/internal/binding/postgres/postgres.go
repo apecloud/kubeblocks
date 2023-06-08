@@ -213,10 +213,10 @@ func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.
 			pgOps.Logger.Errorf("Role query error: %v", err)
 			return "", err
 		}
-		if isRecovery {
-			return SECONDARY, nil
-		}
 		isReady = true
+	}
+	if isRecovery {
+		return SECONDARY, nil
 	}
 	if isReady {
 		return PRIMARY, nil

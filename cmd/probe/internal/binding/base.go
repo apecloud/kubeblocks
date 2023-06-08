@@ -200,7 +200,7 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 	}
 
 	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
-	ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx1, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
 	role, err := ops.GetRole(ctx1, req, resp)
 	if err != nil {

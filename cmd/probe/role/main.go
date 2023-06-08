@@ -30,8 +30,6 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/spf13/viper"
-
 	"github.com/apecloud/kubeblocks/cmd/probe/role/internal"
 )
 
@@ -43,10 +41,6 @@ func main() {
 	var url string
 	flag.IntVar(&port, "port", internal.DefaultRoleObservationPort, "")
 	flag.StringVar(&url, "url", internal.DefaultRoleObservationPath, "")
-
-	viper.SetConfigFile(viper.GetString("config")) // path to look for the config file in
-	_ = viper.ReadInConfig()                       // Find and read the config file
-	// just ignore err, if we hit err, use default settings
 
 	agent := internal.NewRoleAgent(os.Stdin, "ROLE_OBSERVATION")
 	err = agent.Init()
@@ -63,13 +57,12 @@ func main() {
 		opsRes, shouldNotify := agent.CheckRole(request.Context())
 		buf, err := json.Marshal(opsRes)
 		if err != nil {
-			log.Fatal(fmt.Errorf("fatal error json parse: %v", err))
+			shouldNotify = true
+			buf = []byte(err.Error())
 		}
 
 		if _, exist := opsRes["event"]; !exist || len(opsRes) == 0 {
-			code, _ := strconv.Atoi(internal.RealReadinessFail)
-			writer.WriteHeader(code)
-			return
+			shouldNotify = true
 		}
 
 		if shouldNotify {
@@ -77,7 +70,7 @@ func main() {
 			writer.WriteHeader(code)
 			_, err = writer.Write(buf)
 			if err != nil {
-				log.Fatal(fmt.Errorf("fatal error response write: %v", err))
+				log.Printf("fatal error ResponseWriter write: %v", err)
 			}
 		} else {
 			writer.WriteHeader(http.StatusNoContent)

@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "delphic.fullname" . }}
+  labels:
+    {{- include "delphic.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "delphic.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "delphic.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "delphic.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+      - name: postgres-init
+        image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.postgres.repository }}:{{ .Values.image.postgres.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          PGPASSWORD=${POSTGRES_PASSWORD} psql -h${POSTGRES_HOST} -U ${POSTGRES_USER} -p ${POSTGRES_PORT} -tc "SELECT 1 FROM pg_database WHERE datname = '${POSTGRES_DB}'"
+          if [ $? != 0 ]; then
+            PGPASSWORD=${POSTGRES_PASSWORD} psql -h${POSTGRES_HOST} -U ${POSTGRES_USER} -p ${POSTGRES_PORT} -c "CREATE DATABASE ${POSTGRES_DB}"
+          fi
+        env:
+        {{ include "delphic.common.envs" . | nindent 12}}
+      containers:
+        - name: django
+          command:
+          - /entrypoint
+          - /start
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: OPENAI_API_KEY
+              value: {{ .Values.openai_api_key }}
+          {{ include "delphic.common.envs" . | nindent 12}}
+        - name: frontend
+          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.frontend.repository }}:{{ .Values.image.frontend.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+        - name: celeryworker
+          command:
+          - /entrypoint
+          - /start-celeryworker
+          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.celeryWorker.resources | nindent 12 }}
+          env:
+          {{ include "delphic.common.envs" . | nindent 12}}
+        - name: celerybeat
+          command:
+          - /entrypoint
+          - /start-celerybeat
+          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.celeryBeat.resources | nindent 12 }}
+          env:
+          {{ include "delphic.common.envs" . | nindent 12}}
+        - name: flower
+          command:
+          - /entrypoint
+          - /start-flower
+          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.flower.resources | nindent 12 }}
+          env:
+            - name: CELERY_FLOWER_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "delphic.fullname" . }}-celery-flower-secret
+                  key: username
+            - name: CELERY_FLOWER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "delphic.fullname" . }}-celery-flower-secret
+                  key: password
+          {{ include "delphic.common.envs" . | nindent 12}}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

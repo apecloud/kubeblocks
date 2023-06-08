@@ -89,6 +89,44 @@ func HandleSwitchover(ctx context.Context,
 	return nil
 }
 
+// HandleFailoverSync synchronizes the results of failover to candidateInstance if necessary.
+func HandleFailoverSync(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	component *intctrlcomputil.SynthesizedComponent) error {
+	if component.CandidateInstance == nil {
+		return nil
+	}
+	// if the failover sync is not enabled, we do not sync the failover result.
+	if !component.CandidateInstance.FailoverSync {
+		return nil
+	}
+	switchoverCondition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeSwitchoverPrefix+component.Name)
+	// if the switchover condition is exist and status is not true, it means that the switchover is not completed, we do not sync the failover result.
+	if switchoverCondition != nil && switchoverCondition.Status != metav1.ConditionTrue {
+		return nil
+	}
+	ok, pod, err := checkPodRoleLabelConsistency(ctx, cli, cluster, component)
+	if err != nil {
+		return err
+	}
+	if ok || pod == nil {
+		return nil
+	}
+	// synchronize the current primary or leader pod ordinal to candidateInstance.Index and set candidateInstance.Operator to equal.
+	_, o := ParseParentNameAndOrdinal(pod.Name)
+	for index, compSpec := range cluster.Spec.ComponentSpecs {
+		if compSpec.Name == component.Name {
+			cluster.Spec.ComponentSpecs[index].CandidateInstance = &appsv1alpha1.CandidateInstance{
+				Index:        o,
+				Operator:     appsv1alpha1.CandidateOpEqual,
+				FailoverSync: true,
+			}
+		}
+	}
+	return nil
+}
+
 // NeedDealWithSwitchover checks whether we need to handle the switchover process.
 func NeedDealWithSwitchover(ctx context.Context,
 	cli client.Client,
@@ -200,7 +238,7 @@ func PostOpsSwitchover(ctx context.Context,
 
 	ml := getSwitchoverCmdJobLabel(cluster.Name, component.Name)
 	// check pod role label consistency
-	ok, err := checkPodRoleLabelConsistencyAfterSwitchover(ctx, cli, cluster, component)
+	ok, _, err := checkPodRoleLabelConsistency(ctx, cli, cluster, component)
 	if err != nil {
 		return err
 	}
@@ -527,29 +565,29 @@ func CheckJobSucceed(ctx context.Context,
 }
 
 // checkPodRoleLabelConsistency checks whether the pod role label is consistent with the specified role label.
-func checkPodRoleLabelConsistencyAfterSwitchover(ctx context.Context,
+func checkPodRoleLabelConsistency(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *intctrlcomputil.SynthesizedComponent) (bool, error) {
+	component *intctrlcomputil.SynthesizedComponent) (bool, *corev1.Pod, error) {
 	if component.CandidateInstance == nil {
-		return true, nil
+		return true, nil, nil
 	}
 	// get the Pod object whose current role label is primary or leader
 	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, component.Name, component.CompDefName)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	if pod == nil {
-		return false, nil
+		return false, nil, nil
 	}
 	candidateInstanceName := fmt.Sprintf("%s-%s-%d", cluster.Name, component.Name, component.CandidateInstance.Index)
 	if component.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual {
-		return pod.Name == candidateInstanceName, nil
+		return pod.Name == candidateInstanceName, pod, nil
 	}
 	if component.CandidateInstance.Operator == appsv1alpha1.CandidateOpNotEqual {
-		return pod.Name != candidateInstanceName, nil
+		return pod.Name != candidateInstanceName, pod, nil
 	}
-	return false, nil
+	return false, pod, nil
 }
 
 // switchoverConditionIsChanged checks whether the switchover condition candidateInstance information is changed.

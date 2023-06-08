@@ -251,7 +251,7 @@ func (r *ReplicationSet) HandleSwitchover(ctx context.Context, obj client.Object
 
 // HandleFailover is the implementation of the type Component interface method, which is used to handle the failover of the Replication workload.
 func (r *ReplicationSet) HandleFailover(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	return nil, nil
+	return nil, util.HandleFailoverSync(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent())
 }
 
 // DefaultRole is used to get the default role of the Pod of the Replication workload.

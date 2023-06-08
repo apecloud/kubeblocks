@@ -294,7 +294,7 @@ func (r *ConsensusSet) HandleSwitchover(ctx context.Context, obj client.Object) 
 
 // HandleFailover is the implementation of the type Component interface method, which is used to handle the failover of the Consensus workload.
 func (r *ConsensusSet) HandleFailover(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	return nil, nil
+	return nil, util.HandleFailoverSync(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent())
 }
 
 // newConsensusSet is the constructor of the type ConsensusSet.

@@ -203,6 +203,15 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 			c.Dag.AddVertex(v)
 		}
 	}
+
+	if vertexes, err := c.ComponentSet.HandleFailover(reqCtx.Ctx, c.runningWorkload); err != nil {
+		return err
+	} else {
+		for _, v := range vertexes {
+			c.Dag.AddVertex(v)
+		}
+	}
+
 	var delayedRequeueError error
 	if err := c.StatusWorkload(reqCtx, cli, c.runningWorkload, statusTxn); err != nil {
 		if !intctrlutil.IsDelayedRequeueError(err) {

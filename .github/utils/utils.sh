@@ -35,11 +35,8 @@ Usage: $(basename "$0") <options>
     -ru, --run-url            The run url
     -fl, --file               The release notes file
     -ip, --ignore-pkgs        The ignore cover pkgs
-<<<<<<< HEAD
-=======
     -br, --base-branch        The base branch name
     -bc, --base-commit        The base commit id
->>>>>>> origin/main
 EOF
 }
 
@@ -61,12 +58,9 @@ main() {
     local RUN_URL=""
     local FILE=""
     local IGNORE_PKGS=""
-<<<<<<< HEAD
-=======
     local BASE_BRANCH=""
     local BASE_COMMIT=""
     local BASE_COMMIT_ID=HEAD^
->>>>>>> origin/main
 
     parse_command_line "$@"
 
@@ -199,8 +193,6 @@ parse_command_line() {
                     shift
                 fi
                 ;;
-<<<<<<< HEAD
-=======
             -br|--base-branch)
                 if [[ -n "${2:-}" ]]; then
                     BASE_BRANCH="$2"
@@ -213,7 +205,6 @@ parse_command_line() {
                     shift
                 fi
                 ;;
->>>>>>> origin/main
             *)
                 break
                 ;;
@@ -483,19 +474,6 @@ patch_release_notes() {
 ignore_cover_pkgs() {
     ignore_pkgs=$(echo "$IGNORE_PKGS" | sed 's/|/ /g')
     while read line; do
-<<<<<<< HEAD
-      ignore=false
-      for pkgs in $(echo "$ignore_pkgs"); do
-          if [[ "$line" == *"$LATEST_REPO/$pkgs"* ]]; then
-              ignore=true
-              break
-          fi
-      done
-      if [[ $ignore == true ]]; then
-          continue
-      fi
-      echo $line >> cover_new.out
-=======
         ignore=false
         for pkgs in $(echo "$ignore_pkgs"); do
             if [[ "$line" == *"$LATEST_REPO/$pkgs"* ]]; then
@@ -507,7 +485,6 @@ ignore_cover_pkgs() {
             continue
         fi
         echo $line >> cover_new.out
->>>>>>> origin/main
     done < ${FILE}
 }
 

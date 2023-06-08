@@ -4,22 +4,22 @@ import (
 	"cuelang.org/go/pkg/strconv"
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/components-contrib/metadata"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"os"
 	"time"
-
-	"github.com/dapr/kit/logger"
-	"golang.org/x/net/context"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
 	"github.com/apecloud/kubeblocks/cmd/probe/util"
+	"github.com/dapr/kit/logger"
+	"golang.org/x/net/context"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 )
 
 type Ha struct {
@@ -35,9 +35,13 @@ type Ha struct {
 }
 
 func NewHa() *Ha {
-	configs, err := clientcmd.BuildConfigFromFlags("", "/Users/buyanbujuan/.kube/config")
+	//configs, err := clientcmd.BuildConfigFromFlags("", "/Users/buyanbujuan/.kube/config")
+	configs, err := restclient.InClusterConfig()
 	if err != nil {
-		panic(err)
+		configs, err = clientcmd.BuildConfigFromFlags("", "/Users/buyanbujuan/.kube/config")
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	clientSet, err := kubernetes.NewForConfig(configs)
@@ -77,8 +81,18 @@ func NewHa() *Ha {
 }
 
 func (h *Ha) Init() {
-	if isLeader, err := h.DB.IsLeader(h.ctx); !isLeader || err != nil {
-		return
+	//TODO:重试包装
+	for i := 0; i < 2; i++ {
+		isLeader, err := h.DB.IsLeader(h.ctx)
+		if err == nil {
+			if isLeader {
+				return
+			}
+			break
+		}
+		if i == 1 && (err != nil || !isLeader) {
+			return
+		}
 	}
 
 	sysid, err := h.DB.GetSysID(h.ctx)
@@ -127,7 +141,7 @@ func (h *Ha) HaControl(stopCh chan struct{}) {
 		Handler: cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				configMap := obj.(*v1.ConfigMap)
-				configMap.Annotations[configuration_store.RenewTime] = strconv.FormatInt(time.Now().Unix(), 10)
+				configMap.Annotations[configuration_store.RenewTime] = strconv.FormatInt(time.Now().Unix()+1, 10)
 				_, _ = h.cs.UpdateConfigMap(configMap)
 			},
 			UpdateFunc: h.clusterControl,
@@ -137,9 +151,13 @@ func (h *Ha) HaControl(stopCh chan struct{}) {
 	h.informer.Run(stopCh)
 }
 
-// clusterControl 主循环
-
 func (h *Ha) clusterControl(oldObj, newObj interface{}) {
+	oldConfigMap := oldObj.(*v1.ConfigMap)
+	newConfigMap := newObj.(*v1.ConfigMap)
+	if oldConfigMap.ResourceVersion == newConfigMap.ResourceVersion {
+		return
+	}
+
 	err := h.cs.GetClusterFromKubernetes()
 	if err != nil {
 		h.log.Errorf("cluster control get cluster from k8s err:%v", err)
@@ -154,7 +172,7 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 	if h.cs.GetCluster().IsLocked() {
 		if !h.hasLock() {
 			h.setLeader(false)
-			h.follow()
+			_ = h.follow()
 			time.Sleep(time.Second * 10)
 			return
 		}
@@ -184,7 +202,7 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 		err = h.acquireLeaderLock()
 		if err != nil {
 			h.log.Errorf("acquire leader lock err:%v", err)
-			h.follow()
+			_ = h.follow()
 		}
 
 		if h.cs.GetCluster().Switchover != nil {
@@ -195,7 +213,7 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 	} else {
 		// Give a time to somebody to take the leader lock
 		time.Sleep(time.Second * 2)
-		h.follow()
+		_ = h.follow()
 	}
 	time.Sleep(time.Second * 10)
 }
@@ -274,18 +292,18 @@ func (h *Ha) isDBRunning() bool {
 	return status == util.Running
 }
 
-func (h *Ha) follow() {
+func (h *Ha) follow() error {
 	// refresh cluster
 	err := h.cs.GetClusterFromKubernetes()
 	if err != nil {
 		h.log.Errorf("get cluster from k8s failed, err:%v")
-		return
+		return err
 	}
 
 	if isLeader, err := h.DB.IsLeader(h.ctx); isLeader && err == nil {
 		h.log.Infof("demoted %s after trying and failing to obtain lock", h.podName)
-		err = h.DB.Demote(h.ctx, h.podName)
+		return h.DB.Demote(h.ctx, h.podName)
 	}
 
-	_ = h.DB.HandleFollow(h.ctx, h.cs.GetCluster().Leader, h.podName, false)
+	return h.DB.HandleFollow(h.ctx, h.cs.GetCluster().Leader, h.podName)
 }

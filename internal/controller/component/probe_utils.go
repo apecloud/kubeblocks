@@ -154,6 +154,12 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 		ValueFrom: nil,
 	})
 
+	container.Env = append(container.Env, corev1.EnvVar{
+		Name:      constant.KBPrefix + "TTL",
+		Value:     "30",
+		ValueFrom: nil,
+	})
+
 	container.Ports = []corev1.ContainerPort{{
 		ContainerPort: int32(probeSvcHTTPPort),
 		Name:          constant.ProbeHTTPPortName,

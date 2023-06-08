@@ -901,10 +901,9 @@ func (pgOps *PostgresOperations) Demote(ctx context.Context, podName string) err
 
 	// Give a time to somebody to take the leader lock
 	time.Sleep(time.Second * 2)
-	_ = pgOps.Cs.GetClusterFromKubernetes()
-	leader := pgOps.Cs.GetCluster().Leader
+	//TODO:Follow which
 
-	return pgOps.HandleFollow(ctx, leader, podName, true)
+	return pgOps.follow(ctx, podName)
 }
 
 // GetStatus TODO：GetStatus后期考虑用postmaster替代
@@ -1008,20 +1007,20 @@ func (pgOps *PostgresOperations) isLagging(walPosition int64) bool {
 	return lag > pgOps.Cs.GetCluster().Config.GetData().GetMaxLagOnSwitchover()
 }
 
-func (pgOps *PostgresOperations) HandleFollow(ctx context.Context, leader *configuration_store.Leader, podName string, restart bool) error {
-	/*
-		need, _ := pgOps.isRewindOrReinitializePossible(ctx, leader, podName)
-		if !need {
-			return nil
-		}
-	*/
+func (pgOps *PostgresOperations) HandleFollow(ctx context.Context, leader *configuration_store.Leader, podName string) error {
+	need, _ := pgOps.isRewindOrReinitializePossible(ctx, leader, podName)
+	if !need {
+		return nil
+	}
 	pgOps.executeRewind()
 
-	if restart {
-		return pgOps.start(ctx, podName)
-	}
-
 	return nil
+
+	//return pgOps.follow(ctx, podName)
+}
+
+func (pgOps *PostgresOperations) follow(ctx context.Context, podName string) error {
+	return pgOps.start(ctx, podName)
 }
 
 func (pgOps *PostgresOperations) start(ctx context.Context, podName string) error {

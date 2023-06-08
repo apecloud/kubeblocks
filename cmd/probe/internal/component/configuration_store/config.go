@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 
@@ -39,9 +40,12 @@ type ConfigurationStore struct {
 
 func NewConfigurationStore() *ConfigurationStore {
 	ctx := context.Background()
-	config, err := clientcmd.BuildConfigFromFlags("", "/Users/buyanbujuan/.kube/config")
+	config, err := restclient.InClusterConfig()
 	if err != nil {
-		panic(err)
+		config, err = clientcmd.BuildConfigFromFlags("", "/Users/buyanbujuan/.kube/config")
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	clientSet, err := kubernetes.NewForConfig(config)

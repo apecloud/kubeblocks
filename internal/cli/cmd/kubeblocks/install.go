@@ -403,6 +403,7 @@ func (o *InstallOptions) checkVersion(v util.Version) error {
 		}
 		return fmt.Errorf("version %s does not exist, please use \"kbcli kubeblocks list-versions --devel\" to show the available versions", o.Version)
 	}
+	// Todo: refuse upgrade if target version is older than existed version
 
 	versionErr := fmt.Errorf("failed to get kubernetes version")
 	k8sVersionStr := v.Kubernetes

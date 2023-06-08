@@ -142,12 +142,18 @@ jobs:
         run: |
           make test
 
+      - name: ignore cover pkgs
+        run: |
+          bash .github/utils/utils.sh --type 14 \
+              --file cover.out \
+              --ignore-pkgs "cmd/|internal/cli|internal/controller/model|internal/controller/consensusset|controllers/k8score" 
+
       - name: upload coverage report
         uses: codecov/codecov-action@v3
         continue-on-error: true
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./cover.out
+          files: ./cover_new.out
           flags: unittests
           name: codecov-report
           verbose: true

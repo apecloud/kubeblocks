@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package lifecycle
+package apps
 
 import (
 	corev1 "k8s.io/api/core/v1"
@@ -60,11 +60,11 @@ func (t *RestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		}
 		syncComp := comp.GetSynthesizedComponent()
 		if cluster.Annotations[constant.RestoreFromBackUpAnnotationKey] != "" {
-			if err = plan.DoRestore(reqCtx.Ctx, t.Client, cluster, syncComp, scheme); err != nil {
+			if err = plan.DoRestore(reqCtx.Ctx, t.Client, cluster, syncComp, rscheme); err != nil {
 				return commitError(err)
 			}
 		} else if cluster.Annotations[constant.RestoreFromTimeAnnotationKey] != "" {
-			if err = plan.DoPITR(reqCtx.Ctx, t.Client, cluster, syncComp, scheme); err != nil {
+			if err = plan.DoPITR(reqCtx.Ctx, t.Client, cluster, syncComp, rscheme); err != nil {
 				return commitError(err)
 			}
 		}

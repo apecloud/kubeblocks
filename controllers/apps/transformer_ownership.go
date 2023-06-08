@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package lifecycle
+package apps
 
 import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -44,7 +44,7 @@ func (f *OwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.
 	controllerutil.AddFinalizer(rootVertex.Obj, constant.DBClusterFinalizerName)
 	for _, vertex := range vertices {
 		v, _ := vertex.(*ictrltypes.LifecycleVertex)
-		if err := intctrlutil.SetOwnership(rootVertex.Obj, v.Obj, scheme, constant.DBClusterFinalizerName); err != nil {
+		if err := intctrlutil.SetOwnership(rootVertex.Obj, v.Obj, rscheme, constant.DBClusterFinalizerName); err != nil {
 			if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
 				continue
 			}

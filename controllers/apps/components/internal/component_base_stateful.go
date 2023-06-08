@@ -624,13 +624,13 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 
 	c.WorkloadVertex.Immutable = true
 	stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
-	dataClone := NewDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)
+	dataClone := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)
 	var succeed bool
 	var err error
 	if dataClone == nil {
 		succeed = true
 	} else {
-		succeed, err = dataClone.Succeed()
+		succeed, err = dataClone.succeed()
 		if err != nil {
 			return err
 		}
@@ -642,7 +642,7 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 	} else {
 		c.WorkloadVertex.Immutable = true
 		// update objs will trigger cluster reconcile, no need to requeue error
-		objs, err := dataClone.CloneData(dataClone)
+		objs, err := dataClone.cloneData(dataClone)
 		if err != nil {
 			return err
 		}
@@ -661,10 +661,10 @@ func (c *StatefulComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli 
 		}
 	)
 
-	if d := NewDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsObj, snapshotKey); d != nil {
+	if d := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsObj, snapshotKey); d != nil {
 		// clean backup resources.
 		// there will not be any backup resources other than scale out.
-		tmpObjs, err := d.ClearTmpResources()
+		tmpObjs, err := d.clearTmpResources()
 		if err != nil {
 			return err
 		}

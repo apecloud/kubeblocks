@@ -304,7 +304,7 @@ vacuum_multixact_freeze_table_age = '200000000'
 # unit 8KB
 wal_buffers = '{{ printf "%dMB" ( div ( min ( max ( div $phy_memory 2097152 ) 2048) 16384 ) 128 ) }}'
 wal_compression = 'True'
-wal_keep_segments = '256'
+wal_keep_segments = '0'
 # patroni minimal for Extreme Performance
 wal_level = 'replica'
 # patroni on , off for Extreme Performance

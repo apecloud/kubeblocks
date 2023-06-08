@@ -26,8 +26,6 @@ const (
 
 	// 451 Unavailable For Legal Reasons, used to indicate operation failed.
 	OperationFailedHTTPCode = "451"
-	// 503 Readiness failed but not because of role observation.
-	RealReadinessFail = "503"
 
 	// default viper config
 	roleEventRecordQPS                = 1. / 60.

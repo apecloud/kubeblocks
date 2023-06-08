@@ -186,7 +186,7 @@ var _ = Describe("set-default", func() {
 		// set-default
 		cmd.Run(cmd, []string{cluterversion, ClusterversionOtherCD})
 		validateSetOrUnsetResult([]string{cluterversion, ClusterversionOtherCD}, []string{annotationTrueValue, annotationTrueValue})
-		// unset-defautl
+		// unset-default
 		cmd = newUnSetDefaultCMD(tf, streams)
 		cmd.Run(cmd, []string{cluterversion, ClusterversionOtherCD})
 		validateSetOrUnsetResult([]string{cluterversion, ClusterversionOtherCD}, []string{annotationFalseValue, annotationFalseValue})

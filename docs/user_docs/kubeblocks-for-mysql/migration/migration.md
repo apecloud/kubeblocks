@@ -25,7 +25,7 @@ The Kubernetes ClusterIP of ApeCloud MySQL is exposed by default in the EKS envi
 ***Before you start***
 
 * [Install `kbcli`](./../../installation/install-kbcli.md).
-* [Install KubeBlocks](./../../installation/introduction.md): Choose one guide that fits your actual environments.
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 * Enable the AWS loadbalancer controller add-on.
 
    ```bash

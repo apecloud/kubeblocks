@@ -645,9 +645,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		}
 
 		controllerutil.AddFinalizer(snap, dataProtectionFinalizerName)
-
-		scheme, _ := dataprotectionv1alpha1.SchemeBuilder.Build()
-		if err = controllerutil.SetControllerReference(backup, snap, scheme); err != nil {
+		if err = controllerutil.SetControllerReference(backup, snap, r.Scheme); err != nil {
 			return err
 		}
 

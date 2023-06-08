@@ -49,7 +49,7 @@ import (
 	metrics "k8s.io/metrics/pkg/client/clientset/versioned"
 
 	tablePrinter "github.com/jedib0t/go-pretty/v6/table"
-	text "github.com/jedib0t/go-pretty/v6/text"
+	"github.com/jedib0t/go-pretty/v6/text"
 )
 
 var (
@@ -249,7 +249,7 @@ func (o *statusOptions) showAddons() {
 	for _, addon := range o.addons {
 		if addon.Labels == nil {
 			provider = notAvailable
-		} else if provider, ok = addon.Labels[constant.AddonProviderLableKey]; !ok {
+		} else if provider, ok = addon.Labels[constant.AddonProviderLabelKey]; !ok {
 			provider = notAvailable
 		}
 		tbl.AddRow(addon.Name, addon.Status.Phase, addon.Spec.Type, provider)
@@ -449,7 +449,7 @@ func computeMetricByWorkloads(ctx context.Context, ns string, workloads []*unstr
 	computeMetrics := func(namespace, name string, matchLabels string) {
 		if pods, err := mc.MetricsV1beta1().PodMetricses(namespace).List(ctx, metav1.ListOptions{LabelSelector: matchLabels}); err != nil {
 			if klog.V(1).Enabled() {
-				klog.Errorf("faied to get pod metrics for %s/%s, selector: , error: %v", namespace, name, matchLabels, err)
+				klog.Errorf("failed to get pod metrics for %s/%s, selector: , error: %v", namespace, name, matchLabels, err)
 			}
 		} else {
 			cpuUsage, memUsage := int64(0), int64(0)
@@ -518,11 +518,11 @@ func computeMetricByWorkloads(ctx context.Context, ns string, workloads []*unstr
 	return cpuMetricMap, memMetricMap, readyMap
 }
 
-func listResourceByGVR(ctx context.Context, client dynamic.Interface, namespace string, gvrlist []schema.GroupVersionResource, selector []metav1.ListOptions, allErrs *[]error) []*unstructured.UnstructuredList {
+func listResourceByGVR(ctx context.Context, client dynamic.Interface, namespace string, gvrs []schema.GroupVersionResource, selector []metav1.ListOptions, allErrs *[]error) []*unstructured.UnstructuredList {
 	unstructuredList := make([]*unstructured.UnstructuredList, 0)
-	for _, gvr := range gvrlist {
+	for _, gvr := range gvrs {
 		for _, labelSelector := range selector {
-			klog.V(1).Infof("listResourceByGVR: namespace=%s, gvrlist=%v, selector=%v", namespace, gvr, labelSelector)
+			klog.V(1).Infof("listResourceByGVR: namespace=%s, gvr=%v, selector=%v", namespace, gvr, labelSelector)
 			resource, err := client.Resource(gvr).Namespace(namespace).List(ctx, labelSelector)
 			if err != nil {
 				appendErrIgnoreNotFound(allErrs, err)

@@ -228,7 +228,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 					return err
 				}
 			case appsv1alpha1.ReferToExisting:
-				if err := r.createByReferingToExisting(reqCtx, cluster, compKey, account); err != nil {
+				if err := r.createByReferringToExisting(reqCtx, cluster, compKey, account); err != nil {
 					return err
 				}
 			}
@@ -276,7 +276,7 @@ func (r *SystemAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.Cluster{}).
 		Owns(&corev1.Secret{}).
-		Watches(&source.Kind{Type: &batchv1.Job{}}, r.jobCompletionHander()).
+		Watches(&source.Kind{Type: &batchv1.Job{}}, r.jobCompletionHandler()).
 		Complete(r)
 }
 
@@ -327,7 +327,7 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 	return nil
 }
 
-func (r *SystemAccountReconciler) createByReferingToExisting(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, key componentUniqueKey, account appsv1alpha1.SystemAccountConfig) error {
+func (r *SystemAccountReconciler) createByReferringToExisting(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, key componentUniqueKey, account appsv1alpha1.SystemAccountConfig) error {
 	// get secret
 	secret := &corev1.Secret{}
 	secretRef := account.ProvisionPolicy.SecretRef
@@ -355,9 +355,9 @@ func (r *SystemAccountReconciler) isComponentReady(reqCtx intctrlutil.RequestCtx
 	headlessEP := &corev1.Endpoints{}
 	headlessSvcName := serviceName + "-headless"
 
-	svcerr := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: serviceName}, svcEP)
-	if svcerr != nil {
-		return false, nil, nil, svcerr
+	svcErr := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: serviceName}, svcEP)
+	if svcErr != nil {
+		return false, nil, nil, svcErr
 	}
 
 	headlessSvcErr := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: headlessSvcName}, headlessEP)
@@ -400,7 +400,7 @@ func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx,
 }
 
 func (r *SystemAccountReconciler) getEngineFacts(reqCtx intctrlutil.RequestCtx, key componentUniqueKey) (appsv1alpha1.KBAccountType, error) {
-	// get pods for this cluster-component, by lable
+	// get pods for this cluster-component, by label
 	ml := getLabelsForSecretsAndJobs(key)
 	pods := &corev1.PodList{}
 	if err := r.Client.List(reqCtx.Ctx, pods, client.InNamespace(key.namespace), ml); err != nil {
@@ -430,12 +430,12 @@ func (r *SystemAccountReconciler) getEngineFacts(reqCtx intctrlutil.RequestCtx, 
 	}
 	accountsID := appsv1alpha1.KBAccountInvalid
 	for _, acc := range accounts {
-		updateFacts((appsv1alpha1.AccountName(acc)), &accountsID)
+		updateFacts(appsv1alpha1.AccountName(acc), &accountsID)
 	}
 	return accountsID, nil
 }
 
-func (r *SystemAccountReconciler) jobCompletionHander() *handler.Funcs {
+func (r *SystemAccountReconciler) jobCompletionHandler() *handler.Funcs {
 	logger := systemAccountLog.WithName("jobCompletionHandler")
 
 	containsJobCondition := func(job batchv1.Job, jobConditions []batchv1.JobCondition,
@@ -513,18 +513,20 @@ func (r *SystemAccountReconciler) jobCompletionHander() *handler.Funcs {
 				clusterName:   clusterName,
 				componentName: componentName,
 			}
+
 			// get password from job
 			passwd := job.Annotations[systemAccountPasswdAnnotation]
 			secret := renderSecretWithPwd(compKey, accountName, passwd)
 			if err := controllerutil.SetControllerReference(cluster, secret, r.Scheme); err != nil {
-				logger.Error(err, "failed to set ownere reference for secret", secret.Name)
+				logger.Error(err, "failed to set ownere reference for secret", "secret", secret.Name)
 				return
 			}
 
 			if err := r.Client.Create(context.TODO(), secret); err != nil {
-				logger.Error(err, "failed to create secret", secret.Name)
+				logger.Error(err, "failed to create secret", "secret", secret.Name)
 				return
 			}
+
 			r.Recorder.Eventf(cluster, corev1.EventTypeNormal, SysAcctCreate,
 				"Created Accounts for cluster: %s, component: %s, accounts: %s", cluster.Name, componentName, accountName)
 		},

@@ -29,6 +29,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
 	kccmd "k8s.io/kubectl/pkg/cmd"
+	kcplugin "k8s.io/kubectl/pkg/cmd/plugin"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -59,6 +60,14 @@ const (
 func init() {
 	if _, err := util.GetCliHomeDir(); err != nil {
 		fmt.Println("Failed to create kbcli home dir:", err)
+	}
+
+	// replace the kubectl plugin filename prefixes with ours
+	kcplugin.ValidPluginFilenamePrefixes = plugin.ValidPluginFilenamePrefixes
+
+	// put the download directory of the plugin into the PATH
+	if err := util.AddDirToPath(fmt.Sprintf("%s/.%s/plugins/bin", os.Getenv("HOME"), cliName)); err != nil {
+		fmt.Println("Failed to add kbcli bin dir to PATH:", err)
 	}
 }
 
@@ -117,6 +126,12 @@ A Command Line Interface for KubeBlocks`,
 
 		Run: func(cmd *cobra.Command, args []string) {
 			_ = cmd.Help()
+		},
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Name() == cobra.ShellCompRequestCmd {
+				kcplugin.SetupPluginCompletion(cmd, args)
+			}
+			return nil
 		},
 	}
 

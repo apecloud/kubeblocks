@@ -10,8 +10,8 @@ on:
 
 jobs:
   delete-release:
-    uses: apecloud/apecd/.github/workflows/release-delete.yml@v0.7.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-delete.yml@v0.1.0
     with:
       VERSION: "${{ inputs.release-version }}"
-      APECD_REF: "v0.7.0"
+      APECD_REF: "v0.1.0"
     secrets: inherit

@@ -57,7 +57,7 @@ data:
         global_info=`mysql -uroot $password_flag 2>/dev/null -e "select IP_PORT from information_schema.wesql_cluster_global order by MATCH_INDEX desc;"`
         echo "all nodes: $global_info" >> /data/mysql/.kb_pre_stop.log
         global_info_arr=($global_info)
-        echo "all nodes arrary: ${global_info_arr[0]},${global_info_arr[1]},${global_info_arr[2]},${global_info_arr[3]}"  >> /data/mysql/.kb_pre_stop.log
+        echo "all nodes array: ${global_info_arr[0]},${global_info_arr[1]},${global_info_arr[2]},${global_info_arr[3]}"  >> /data/mysql/.kb_pre_stop.log
         echo "array size: ${#global_info_arr[@]}, the first one is not real address,just the field name IP_PORT"  >> /data/mysql/.kb_pre_stop.log
 
         host=$(eval echo \$KB_"$idx"_HOSTNAME)

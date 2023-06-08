@@ -14,7 +14,7 @@ The KubeBlocks log enhancement function uses methods similar to kubectl exec and
 ## Before you start
 
 - The container image supports `tail` and `xargs` commands.
-- [Install KubeBlocks](./../installation/introduction.md) on the target Kubernetes cluster: Choose one guide that fits your actual environments.
+- [Install KubeBlocks](./../installation/install-kubeblocks.md).
 - In this guide, we take the MySQL engine as an example, the operation is the same for all database engines.
 
 ## Steps

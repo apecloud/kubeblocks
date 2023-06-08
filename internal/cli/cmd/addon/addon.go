@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"path"
 	"sort"
 	"strconv"
@@ -604,6 +605,12 @@ func (o *addonCmdOpts) buildEnablePatch(flags []*pflag.Flag, spec, install map[s
 			v, err := strconv.Atoi(s)
 			if err != nil {
 				return nil, fmt.Errorf("wrong flag value --%s=%s, with error %v", flag, s, err)
+			}
+			if v < 0 {
+				return nil, fmt.Errorf("wrong flag value --%s=%s replica count value", flag, s)
+			}
+			if v > math.MaxInt32 {
+				return nil, fmt.Errorf("wrong flag value --%s=%s replica count exceed max. value (%d) ", flag, s, math.MaxInt32)
 			}
 			r := int32(v)
 			return &r, nil

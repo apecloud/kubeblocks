@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	dapr "github.com/dapr/go-sdk/client"
@@ -273,7 +274,9 @@ func (cli *OperationHTTPClient) SendRequest(exec *exec.ExecOptions, request SQLC
 		return response, err
 	} else {
 		exec.ContainerName = cli.containerName
-		exec.Command = []string{"sh", "-c", cli.httpRequestPrefix + " -d '" + string(jsonData) + "'"}
+		// escape single quote
+		data := strings.ReplaceAll(string(jsonData), "'", "\\'")
+		exec.Command = []string{"sh", "-c", fmt.Sprintf("%s -d '%s'", cli.httpRequestPrefix, data)}
 	}
 
 	// redirect output to strBuffer to be parsed later

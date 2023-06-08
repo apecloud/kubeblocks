@@ -101,6 +101,7 @@ type ClusterStatus struct {
 }
 
 // ClusterComponentSpec defines the cluster component spec.
+// +kubebuilder:validation:XValidation:rule="has(self.candidateInstance) ? self.candidateInstance.index < self.replicas : !has(self.candidateInstance)",message="candidateInstance.index cannot be larger than replicas"
 type ClusterComponentSpec struct {
 	// name defines cluster's component name.
 	// +kubebuilder:validation:Required
@@ -294,8 +295,8 @@ type ReplicationMemberStatus struct {
 }
 
 type CandidateInstance struct {
-	// index of the candidate instance, 0 <= index <= componentSpecs[x].replicas-1.
-	// +kubebuilder:validation:Minimum=0
+	// index of the candidate instance, -1 <= index <= componentSpecs[x].replicas-1.
+	// +kubebuilder:validation:Minimum=-1
 	// +kubebuilder:validation:Required
 	Index int32 `json:"index"`
 

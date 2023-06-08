@@ -176,10 +176,10 @@ spec:
                             value.
                           type: boolean
                         index:
-                          description: index of the candidate instance, 0 <= index
+                          description: index of the candidate instance, -1 <= index
                             <= componentSpecs[x].replicas-1.
                           format: int32
-                          minimum: 0
+                          minimum: -1
                           type: integer
                         operator:
                           description: operator represents a relationship to the index
@@ -553,6 +553,10 @@ spec:
                   - name
                   - replicas
                   type: object
+                  x-kubernetes-validations:
+                  - message: candidateInstance.index cannot be larger than replicas
+                    rule: 'has(self.candidateInstance) ? self.candidateInstance.index
+                      < self.replicas : !has(self.candidateInstance)'
                 minItems: 1
                 type: array
                 x-kubernetes-list-map-keys:

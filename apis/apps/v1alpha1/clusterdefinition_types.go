@@ -44,18 +44,20 @@ type ClusterDefinitionSpec struct {
 	ComponentDefs []ClusterComponentDefinition `json:"componentDefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Connection credential template used for creating a connection credential
-	// secret for cluster.apps.kubeblocks.io object. Built-in objects are:
-	// `$(RANDOM_PASSWD)` - random 8 characters.
-	// `$(UUID)` - generate a random UUID v4 string.
-	// `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string.
-	// `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded.
-	// `$(UUID_HEX)` - generate a random UUID v4 HEX representation.
-	// `$(HEADLESS_SVC_FQDN)` - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
+	// secret for cluster.apps.kubeblocks.io object.
+	//
+	// Built-in objects are:
+	// - `$(RANDOM_PASSWD)` - random 8 characters.
+	// - `$(UUID)` - generate a random UUID v4 string.
+	// - `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string.
+	// - `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded.
+	// - `$(UUID_HEX)` - generate a random UUID v4 HEX representation.
+	// - `$(HEADLESS_SVC_FQDN)` - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
+	// - `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
-	//    `"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306`, and "$(SVC_PORT_mysql)" in the
+	// - `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
+	//    `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and "$(SVC_PORT_mysql)" in the
 	//    connection credential value is 3306.
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
@@ -126,7 +128,7 @@ type ProvisionPolicy struct {
 	// type defines the way to provision an account, either `CreateByStmt` or `ReferToExisting`.
 	// +kubebuilder:validation:Required
 	Type ProvisionPolicyType `json:"type"`
-	// scope is the scope to provision account, and the scope could be `anyPod` or `allPods`.
+	// scope is the scope to provision account, and the scope could be `AnyPod` or `AllPods`.
 	// +kubebuilder:default=AnyPods
 	Scope ProvisionScope `json:"scope"`
 	// statements will be used when Type is CreateByStmt.

@@ -104,7 +104,7 @@ func (h *Ha) Init() {
 		time.Sleep(time.Second * 2)
 	}
 	if isLeader {
-		if !h.DB.IsRunning(h.ctx) {
+		if !h.isDBRunning() {
 			panic("db is not running")
 		}
 	}

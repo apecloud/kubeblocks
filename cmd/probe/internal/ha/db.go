@@ -37,5 +37,4 @@ type DbTool interface {
 
 type ProcessControl interface {
 	Stop(ctx context.Context) error
-	IsRunning(ctx context.Context) bool
 }

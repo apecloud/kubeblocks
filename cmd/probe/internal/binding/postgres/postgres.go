@@ -1004,10 +1004,6 @@ func (pgOps *PostgresOperations) IsHealthiest(ctx context.Context, podName strin
 	return true
 }
 
-func (pgOps *PostgresOperations) IsRunning(ctx context.Context) bool {
-	return true
-}
-
 func (pgOps *PostgresOperations) isLagging(walPosition int64) bool {
 	lag := pgOps.Cs.GetCluster().GetOpTime() - walPosition
 	return lag > pgOps.Cs.GetCluster().Config.GetData().GetMaxLagOnSwitchover()

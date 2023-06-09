@@ -21,10 +21,10 @@ kbcli dashboard open [flags]
 ### Options
 
 ```
+      --cluster-type string            the cluster type opened directly in dashboard, support 'mysql','cadvisor','jmx','kafka','mongodb','node','postgresql','redis' and 'weaviate'
   -h, --help                           help for open
       --pod-running-timeout duration   The time (like 5s, 2m, or 3h, higher than zero) to wait for at least one pod is running (default 1m0s)
       --port string                    dashboard local port
-      --type string                    the cluster type opened directly in dashboard. eg 'apecloud-mysql'
 ```
 
 ### Options inherited from parent commands

@@ -16,7 +16,7 @@ image:
   repository: apecloud/kubeblocks
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: 0.5.1
+  tag: ""
   imagePullSecrets: []
   tools:
     repository: apecloud/kubeblocks-tools
@@ -512,7 +512,6 @@ prometheus:
       repository: registry.cn-hangzhou.aliyuncs.com/apecloud/prometheus
       tag: v2.44.0
 
-    # TODO
     global:
       ## How frequently to scrape targets by default
       ##
@@ -541,8 +540,6 @@ prometheus:
     ##
     remoteWrite: []
 
-    # ODOT
-
     ## Prefix used to register routes, overriding externalUrl route.
     ## Useful for proxies that rewrite URLs.
     ##
@@ -567,6 +564,7 @@ prometheus:
                   operator: In
                   values:
                     - "true"
+
     persistentVolume:
       ## If true, Prometheus server will create/use a Persistent Volume Claim
       ## If false, use emptyDir
@@ -590,7 +588,6 @@ prometheus:
     ##
     replicaCount: 1
 
-    #ODOT
     statefulSet:
       ## If true, use a statefulset instead of a deployment for pod management.
       ## This allows to scale replicas to more than 1 pod
@@ -709,7 +706,6 @@ prometheus:
   ## NOTE: Please review these carefully as thresholds and behavior may not meet
   ##       your SLOs or labels.
   ##
-
   alertmanagerFiles:
     alertmanager.yml:
       global: { }

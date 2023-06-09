@@ -8544,9 +8544,9 @@ spec:
                         image:
                           description: image for Connector when executing the command.
                           type: string
-                        withCandidateInstance:
-                          description: withCandidateInstance corresponds to the switchover
-                            of the specified candidate primary/leader instance.
+                        withCandidate:
+                          description: withCandidate corresponds to the switchover
+                            of the specified candidate primary or leader instance.
                           properties:
                             args:
                               description: args is used to perform statements.
@@ -8562,9 +8562,9 @@ spec:
                           required:
                           - command
                           type: object
-                        withoutCandidateInstance:
-                          description: withoutCandidateInstance corresponds to a switchover
-                            that does not specify a candidate primary/leader instance.
+                        withoutCandidate:
+                          description: withoutCandidate corresponds to a switchover
+                            that does not specify a candidate primary or leader instance.
                           properties:
                             args:
                               description: args is used to perform statements.

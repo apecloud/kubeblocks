@@ -181,7 +181,7 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		r.validateComponentResources(allErrs, v.Resources, i)
 	}
 
-	r.validateCandidateInstance(allErrs)
+	r.validateSwitchoverCandidate(allErrs)
 
 	r.validateComponentTLSSettings(allErrs)
 
@@ -219,16 +219,16 @@ func (r *Cluster) validateComponentTLSSettings(allErrs *field.ErrorList) {
 	}
 }
 
-// validateCandidateInstance checks candidateInstance.index value cannot be larger than replicas.
-func (r *Cluster) validateCandidateInstance(allErrs *field.ErrorList) {
+// validateSwitchoverCandidate checks switchoverCandidate.index value cannot be larger than replicas.
+func (r *Cluster) validateSwitchoverCandidate(allErrs *field.ErrorList) {
 	for index, component := range r.Spec.ComponentSpecs {
-		if component.CandidateInstance == nil || component.Replicas == 0 {
+		if component.SwitchoverCandidate == nil || component.Replicas == 0 {
 			continue
 		}
-		if component.CandidateInstance.Index > component.Replicas-1 {
-			path := fmt.Sprintf("spec.components[%d].CandidateInstance.Index", index)
+		if component.SwitchoverCandidate.Index > component.Replicas-1 {
+			path := fmt.Sprintf("spec.components[%d].SwitchoverCandidate.Index", index)
 			*allErrs = append(*allErrs, field.Invalid(field.NewPath(path),
-				component.CandidateInstance.Index, "CandidateInstance.Index cannot be larger than Replicas."))
+				component.SwitchoverCandidate.Index, "SwitchoverCandidate.Index cannot be larger than Replicas."))
 		}
 	}
 }

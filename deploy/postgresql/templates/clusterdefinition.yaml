@@ -81,13 +81,13 @@ spec:
           type: data
       switchoverSpec:
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
-        withCandidateInstance:
+        withCandidate:
           command:
             - /bin/bash
             - -c
           args:
-            - curl -s http://$(KB_REPLICATION_PRIMARY_POD_FQDN):8008/switchover -XPOST -d '{"leader":"$(KB_REPLICATION_PRIMARY_POD_NAME)","candidate":"$(KB_SWITCHOVER_CANDIDATE_INSTANCE_NAME)"}'
-        withoutCandidateInstance:
+            - curl -s http://$(KB_REPLICATION_PRIMARY_POD_FQDN):8008/switchover -XPOST -d '{"leader":"$(KB_REPLICATION_PRIMARY_POD_NAME)","candidate":"$(KB_SWITCHOVER_CANDIDATE_NAME)"}'
+        withoutCandidate:
           command:
             - /bin/bash
             - -c

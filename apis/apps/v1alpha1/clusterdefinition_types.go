@@ -823,13 +823,13 @@ func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolic
 type SwitchoverSpec struct {
 	CommandExecutorEnvItem `json:",inline"`
 
-	// withCandidateInstance corresponds to the switchover of the specified candidate primary/leader instance.
+	// withCandidate corresponds to the switchover of the specified candidate primary or leader instance.
 	// +optional
-	WithCandidateInstance *SwitchoverAction `json:"withCandidateInstance,omitempty"`
+	WithCandidate *SwitchoverAction `json:"withCandidate,omitempty"`
 
-	// withoutCandidateInstance corresponds to a switchover that does not specify a candidate primary/leader instance.
+	// withoutCandidate corresponds to a switchover that does not specify a candidate primary or leader instance.
 	// +optional
-	WithoutCandidateInstance *SwitchoverAction `json:"withoutCandidateInstance,omitempty"`
+	WithoutCandidate *SwitchoverAction `json:"withoutCandidate,omitempty"`
 }
 
 type SwitchoverAction struct {

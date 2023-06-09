@@ -243,8 +243,8 @@ const (
 	KBSwitchoverJobNamePrefix    = "kb-switchover-job"
 	KBSwitchoverJobContainerName = "kb-switchover-job-container"
 
-	KBSwitchoverCandidateInstanceName     = "KB_SWITCHOVER_CANDIDATE_INSTANCE_NAME"
-	KBSwitchoverCandidateInstanceFqdn     = "KB_SWITCHOVER_CANDIDATE_INSTANCE_FQDN"
+	KBSwitchoverCandidateName             = "KB_SWITCHOVER_CANDIDATE_NAME"
+	KBSwitchoverCandidateFqdn             = "KB_SWITCHOVER_CANDIDATE_FQDN"
 	KBSwitchoverReplicationPrimaryPodIP   = "KB_REPLICATION_PRIMARY_POD_IP"
 	KBSwitchoverReplicationPrimaryPodName = "KB_REPLICATION_PRIMARY_POD_NAME"
 	KBSwitchoverReplicationPrimaryPodFqdn = "KB_REPLICATION_PRIMARY_POD_FQDN"

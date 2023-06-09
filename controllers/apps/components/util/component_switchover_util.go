@@ -52,7 +52,7 @@ func HandleSwitchover(ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomputil.SynthesizedComponent,
 	obj client.Object) error {
-	if component.CandidateInstance == nil {
+	if component.SwitchoverCandidate == nil {
 		return nil
 	}
 	// check if all Pods have role label
@@ -60,7 +60,7 @@ func HandleSwitchover(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	if component.CandidateInstance.Index > int32(len(podList)-1) {
+	if component.SwitchoverCandidate.Index > int32(len(podList)-1) {
 		return errors.New("the candidate instance index is out of range")
 	}
 	for _, pod := range podList {
@@ -89,16 +89,16 @@ func HandleSwitchover(ctx context.Context,
 	return nil
 }
 
-// HandleFailoverSync synchronizes the results of failover to candidateInstance if necessary.
-func HandleFailoverSync(ctx context.Context,
+// HandleRoleSync synchronizes the results of roleChange to switchoverCandidate if necessary.
+func HandleRoleSync(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomputil.SynthesizedComponent) error {
-	if component.CandidateInstance == nil {
+	if component.SwitchoverCandidate == nil {
 		return nil
 	}
 	// if the failover sync is not enabled, we do not sync the failover result.
-	if !component.CandidateInstance.FailoverSync {
+	if !component.SwitchoverCandidate.RoleSync {
 		return nil
 	}
 	switchoverCondition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeSwitchoverPrefix+component.Name)
@@ -113,14 +113,14 @@ func HandleFailoverSync(ctx context.Context,
 	if ok || pod == nil {
 		return nil
 	}
-	// synchronize the current primary or leader pod ordinal to candidateInstance.Index and set candidateInstance.Operator to equal.
+	// synchronize the current primary or leader pod ordinal to switchoverCandidate.Index and set switchoverCandidate.Operator to equal.
 	_, o := ParseParentNameAndOrdinal(pod.Name)
 	for index, compSpec := range cluster.Spec.ComponentSpecs {
 		if compSpec.Name == component.Name {
-			cluster.Spec.ComponentSpecs[index].CandidateInstance = &appsv1alpha1.CandidateInstance{
-				Index:        o,
-				Operator:     appsv1alpha1.CandidateOpEqual,
-				FailoverSync: true,
+			cluster.Spec.ComponentSpecs[index].SwitchoverCandidate = &appsv1alpha1.SwitchoverCandidate{
+				Index:    o,
+				Operator: appsv1alpha1.CandidateOpEqual,
+				RoleSync: true,
 			}
 		}
 	}
@@ -132,12 +132,12 @@ func NeedDealWithSwitchover(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomputil.SynthesizedComponent) (bool, error) {
-	// firstly, check whether the candidateInstance is changed by comparing with the pod role label
-	changed, _, err := CheckCandidateInstanceChanged(ctx, cli, cluster, component.Name)
+	// firstly, check whether the switchoverCandidate is changed by comparing with the pod role label
+	changed, _, err := CheckSwitchoverCandidateChanged(ctx, cli, cluster, component.Name)
 	if err != nil {
 		return false, err
 	}
-	// if the candidateInstance is not changed, no need to deal with switchover
+	// if the switchoverCandidate is not changed, no need to deal with switchover
 	if !changed {
 		return false, nil
 	}
@@ -146,22 +146,22 @@ func NeedDealWithSwitchover(ctx context.Context,
 	oldSwitchoverCondition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeSwitchoverPrefix+component.Name)
 	if oldSwitchoverCondition == nil {
 		// TODO(xingran):under the current implementation, the following scenarios need to be optimized:
-		// when the candidateInstance is patched for the first time, but there is no switching (for example, the specified index is consistent with the current primary),
-		// and then a failover occurs, and the result of the failover is not synchronized to the candidateInstance, and an unexpected switchover will occur at this time
+		// when the switchoverCandidate is patched for the first time, but there is no switching (for example, the specified index is consistent with the current primary),
+		// and then a failover occurs, and the result of the failover is not synchronized to the switchoverCandidate, and an unexpected switchover will occur at this time
 
 		// if the switchover condition is not exist, it means the first time to do switchover.
 		return true, nil
 	}
 
 	// if the old switchover condition status is true, it indicates that the last switchover has been successful.
-	// We need to judge whether the current candidateInstance information is consistent with the last successful switchover in order to decide whether to perform a new switchover.
+	// We need to judge whether the current switchoverCandidate information is consistent with the last successful switchover in order to decide whether to perform a new switchover.
 	if oldSwitchoverCondition.Status == metav1.ConditionTrue {
-		conditionChanged, err := switchoverConditionIsChanged(cluster, component.CandidateInstance, component.Name)
+		conditionChanged, err := switchoverConditionIsChanged(cluster, component.SwitchoverCandidate, component.Name)
 		if err != nil {
 			return false, err
 		}
 		if conditionChanged {
-			// if switchover condition candidateInstance information is changed, it means that another new switchover is triggered.
+			// if switchover condition switchoverCandidate information is changed, it means that another new switchover is triggered.
 			return true, nil
 		}
 		if oldSwitchoverCondition.ObservedGeneration != cluster.Generation {
@@ -169,9 +169,9 @@ func NeedDealWithSwitchover(ctx context.Context,
 			meta.SetStatusCondition(&cluster.Status.Conditions, *oldSwitchoverCondition)
 		}
 		// TODO(xingran): under the current implementation, the following scenarios need to be optimized:
-		// when a failover occurs, and the result of the failover is not synchronized to the candidateInstance (eg. candidateInstance.failoverSync=false),
-		// at this time, the information of candidateInstance is inconsistent with the current primary or leader,
-		// and the user cannot switch back to the node in the current candidateInstance at this time because the switchover condition is not changed.
+		// when a failover occurs, and the result of the failover is not synchronized to the switchoverCandidate (eg. switchoverCandidate.failoverSync=false),
+		// at this time, the information of switchoverCandidate is inconsistent with the current primary or leader,
+		// and the user cannot switch back to the node in the current switchoverCandidate at this time because the switchover condition is not changed.
 		return false, nil
 	}
 
@@ -207,7 +207,7 @@ func DoSwitchover(ctx context.Context,
 		}
 
 		// update status.conditions to SwitchoverStart
-		newSwitchoverCondition := initSwitchoverCondition(*component.CandidateInstance, component.Name, metav1.ConditionFalse, ReasonSwitchoverStart, cluster.Generation)
+		newSwitchoverCondition := initSwitchoverCondition(*component.SwitchoverCandidate, component.Name, metav1.ConditionFalse, ReasonSwitchoverStart, cluster.Generation)
 		meta.SetStatusCondition(&cluster.Status.Conditions, *newSwitchoverCondition)
 
 		// create the current generation switchoverJob
@@ -228,7 +228,7 @@ func PostOpsSwitchover(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomputil.SynthesizedComponent) error {
-	if component.CandidateInstance == nil {
+	if component.SwitchoverCandidate == nil {
 		return nil
 	}
 	oldSwitchoverCondition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeSwitchoverPrefix+component.Name)
@@ -247,23 +247,23 @@ func PostOpsSwitchover(ctx context.Context,
 	}
 
 	// update status.conditions to SwitchoverSucceed
-	newSwitchoverCondition := initSwitchoverCondition(*component.CandidateInstance, component.Name, metav1.ConditionTrue, ReasonSwitchoverSucceed, cluster.Generation)
+	newSwitchoverCondition := initSwitchoverCondition(*component.SwitchoverCandidate, component.Name, metav1.ConditionTrue, ReasonSwitchoverSucceed, cluster.Generation)
 	meta.SetStatusCondition(&cluster.Status.Conditions, *newSwitchoverCondition)
 
 	// delete the successful job
 	return CleanJobWithLabels(ctx, cli, cluster, ml)
 }
 
-// CheckCandidateInstanceChanged checks whether candidateInstance has changed.
-// @return bool - true is candidateInstance inconsistent
+// CheckSwitchoverCandidateChanged checks whether switchoverCandidate has changed.
+// @return bool - true is switchoverCandidate inconsistent
 // @return string - current primary/leader Instance name; "" if error
 // @return error
-func CheckCandidateInstanceChanged(ctx context.Context,
+func CheckSwitchoverCandidateChanged(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	componentName string) (bool, string, error) {
 	compSpec := GetClusterComponentSpecByName(*cluster, componentName)
-	if compSpec.CandidateInstance == nil {
+	if compSpec.SwitchoverCandidate == nil {
 		return false, "", nil
 	}
 	// get the Pod object whose current role label is primary or leader
@@ -274,12 +274,12 @@ func CheckCandidateInstanceChanged(ctx context.Context,
 	if pod == nil {
 		return false, "", nil
 	}
-	candidateInstanceName := fmt.Sprintf("%s-%s-%d", cluster.Name, componentName, compSpec.CandidateInstance.Index)
-	if compSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual {
-		return pod.Name != candidateInstanceName, pod.Name, nil
+	switchoverCandidateName := fmt.Sprintf("%s-%s-%d", cluster.Name, componentName, compSpec.SwitchoverCandidate.Index)
+	if compSpec.SwitchoverCandidate.Operator == appsv1alpha1.CandidateOpEqual {
+		return pod.Name != switchoverCandidateName, pod.Name, nil
 	}
-	if compSpec.CandidateInstance.Operator == appsv1alpha1.CandidateOpNotEqual {
-		return pod.Name == candidateInstanceName, pod.Name, nil
+	if compSpec.SwitchoverCandidate.Operator == appsv1alpha1.CandidateOpNotEqual {
+		return pod.Name == switchoverCandidateName, pod.Name, nil
 	}
 	return false, pod.Name, nil
 }
@@ -389,20 +389,20 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 	return workloadEnvs, nil
 }
 
-// buildSwitchoverCandidateInstanceEnv builds the candidate instance name environment variable for the switchover job.
-func buildSwitchoverCandidateInstanceEnv(
+// buildSwitchoverCandidateEnv builds the candidate instance name environment variable for the switchover job.
+func buildSwitchoverCandidateEnv(
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomputil.SynthesizedComponent) []corev1.EnvVar {
 	svcName := strings.Join([]string{cluster.Name, component.Name, "headless"}, "-")
-	if component.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual {
+	if component.SwitchoverCandidate.Operator == appsv1alpha1.CandidateOpEqual {
 		cEnvs := []corev1.EnvVar{
 			{
-				Name:  constant.KBSwitchoverCandidateInstanceName,
-				Value: fmt.Sprintf("%s-%s-%d", cluster.Name, component.Name, component.CandidateInstance.Index),
+				Name:  constant.KBSwitchoverCandidateName,
+				Value: fmt.Sprintf("%s-%s-%d", cluster.Name, component.Name, component.SwitchoverCandidate.Index),
 			},
 			{
-				Name:  constant.KBSwitchoverCandidateInstanceFqdn,
-				Value: fmt.Sprintf("%s-%s-%d.%s", cluster.Name, component.Name, component.CandidateInstance.Index, svcName),
+				Name:  constant.KBSwitchoverCandidateFqdn,
+				Value: fmt.Sprintf("%s-%s-%d.%s", cluster.Name, component.Name, component.SwitchoverCandidate.Index, svcName),
 			},
 		}
 		return cEnvs
@@ -431,8 +431,8 @@ func buildSwitchoverEnvs(ctx context.Context,
 	switchoverEnvs = append(switchoverEnvs, workloadEnvs...)
 
 	// inject the candidate instance name into the environment variable if specify the candidate instance
-	candidateInstanceEnvs := buildSwitchoverCandidateInstanceEnv(cluster, component)
-	switchoverEnvs = append(switchoverEnvs, candidateInstanceEnvs...)
+	switchoverCandidateEnvs := buildSwitchoverCandidateEnv(cluster, component)
+	switchoverEnvs = append(switchoverEnvs, switchoverCandidateEnvs...)
 	return switchoverEnvs, nil
 }
 
@@ -447,11 +447,11 @@ func renderSwitchoverCmdJob(ctx context.Context,
 
 	renderJob := func(switchoverSpec *appsv1alpha1.SwitchoverSpec, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
 		var switchoverAction *appsv1alpha1.SwitchoverAction
-		switch component.CandidateInstance.Operator {
+		switch component.SwitchoverCandidate.Operator {
 		case appsv1alpha1.CandidateOpEqual:
-			switchoverAction = switchoverSpec.WithCandidateInstance
+			switchoverAction = switchoverSpec.WithCandidate
 		case appsv1alpha1.CandidateOpNotEqual:
-			switchoverAction = switchoverSpec.WithoutCandidateInstance
+			switchoverAction = switchoverSpec.WithoutCandidate
 		}
 		if switchoverAction == nil {
 			return nil, errors.New("switchover action not found")
@@ -569,7 +569,7 @@ func checkPodRoleLabelConsistency(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomputil.SynthesizedComponent) (bool, *corev1.Pod, error) {
-	if component.CandidateInstance == nil {
+	if component.SwitchoverCandidate == nil {
 		return true, nil, nil
 	}
 	// get the Pod object whose current role label is primary or leader
@@ -580,32 +580,32 @@ func checkPodRoleLabelConsistency(ctx context.Context,
 	if pod == nil {
 		return false, nil, nil
 	}
-	candidateInstanceName := fmt.Sprintf("%s-%s-%d", cluster.Name, component.Name, component.CandidateInstance.Index)
-	if component.CandidateInstance.Operator == appsv1alpha1.CandidateOpEqual {
-		return pod.Name == candidateInstanceName, pod, nil
+	switchoverCandidateName := fmt.Sprintf("%s-%s-%d", cluster.Name, component.Name, component.SwitchoverCandidate.Index)
+	if component.SwitchoverCandidate.Operator == appsv1alpha1.CandidateOpEqual {
+		return pod.Name == switchoverCandidateName, pod, nil
 	}
-	if component.CandidateInstance.Operator == appsv1alpha1.CandidateOpNotEqual {
-		return pod.Name != candidateInstanceName, pod, nil
+	if component.SwitchoverCandidate.Operator == appsv1alpha1.CandidateOpNotEqual {
+		return pod.Name != switchoverCandidateName, pod, nil
 	}
 	return false, pod, nil
 }
 
-// switchoverConditionIsChanged checks whether the switchover condition candidateInstance information is changed.
-func switchoverConditionIsChanged(cluster *appsv1alpha1.Cluster, currentCandidateInstance *appsv1alpha1.CandidateInstance, componentName string) (bool, error) {
+// switchoverConditionIsChanged checks whether the switchover condition switchoverCandidate information is changed.
+func switchoverConditionIsChanged(cluster *appsv1alpha1.Cluster, currentSwitchoverCandidate *appsv1alpha1.SwitchoverCandidate, componentName string) (bool, error) {
 	switchoverCondition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeSwitchoverPrefix+componentName)
 	if switchoverCondition == nil {
 		return true, nil
 	}
-	var oldCandidateInstance *appsv1alpha1.CandidateInstance
-	if err := json.Unmarshal([]byte(switchoverCondition.Message), &oldCandidateInstance); err != nil {
+	var oldSwitchoverCandidate *appsv1alpha1.SwitchoverCandidate
+	if err := json.Unmarshal([]byte(switchoverCondition.Message), &oldSwitchoverCandidate); err != nil {
 		return false, err
 	}
-	return !reflect.DeepEqual(oldCandidateInstance, currentCandidateInstance), nil
+	return !reflect.DeepEqual(oldSwitchoverCandidate, currentSwitchoverCandidate), nil
 }
 
 // initSwitchoverCondition initializes the switchover condition.
-func initSwitchoverCondition(candidateInstance appsv1alpha1.CandidateInstance, componentName string, status metav1.ConditionStatus, reason string, clusterGeneration int64) *metav1.Condition {
-	msg, _ := json.Marshal(candidateInstance)
+func initSwitchoverCondition(switchoverCandidate appsv1alpha1.SwitchoverCandidate, componentName string, status metav1.ConditionStatus, reason string, clusterGeneration int64) *metav1.Condition {
+	msg, _ := json.Marshal(switchoverCandidate)
 	return &metav1.Condition{
 		Type:               appsv1alpha1.ConditionTypeSwitchoverPrefix + componentName,
 		Status:             status,

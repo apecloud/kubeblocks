@@ -91,12 +91,12 @@ func TestFsmParse(t *testing.T) {
 				param:           &Item{},
 				splitCharacters: trimChars,
 			}
-			if err := f.Parse(tt.args); (err != nil) != tt.wantErr {
-				t.Errorf("Parse() error = %v, wantErr %v", err, tt.wantErr)
+			if err := f.parse(tt.args); (err != nil) != tt.wantErr {
+				t.Errorf("parse() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			if tt.expected != nil && !reflect.DeepEqual(f.param.Values, tt.expected) {
-				t.Errorf("Parse() param = %v, expected %v", f.param.Values, tt.expected)
+				t.Errorf("parse() param = %v, expected %v", f.param.Values, tt.expected)
 			}
 		})
 	}

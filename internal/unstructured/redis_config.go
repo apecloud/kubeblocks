@@ -54,15 +54,15 @@ func (r *redisConfig) setString(key string, value string) error {
 	lineNo := math.MaxInt32
 	if v != nil {
 		lineNo = v.LineNo
-		r.lex.RemoveParameter(v)
+		r.lex.removeParameter(v)
 	}
 	keys = append(keys, value)
-	t, err := r.lex.ParseParameter(strings.Join(keys, " "), lineNo)
+	t, err := r.lex.parseParameter(strings.Join(keys, " "), lineNo)
 	if err == nil {
 		if v != nil {
 			t.Comments = v.Comments
 		}
-		r.lex.AppendValidParameter(t, lineNo)
+		r.lex.appendValidParameter(t, lineNo)
 	}
 	return err
 }
@@ -86,7 +86,7 @@ func (r *redisConfig) Get(key string) interface{} {
 }
 
 func (r *redisConfig) GetItem(keys []string) *Item {
-	v := r.lex.GetItem(keys[0])
+	v := r.lex.getItem(keys[0])
 	if v == nil {
 		return nil
 	}
@@ -126,7 +126,7 @@ func (r *redisConfig) GetString(key string) (string, error) {
 
 func (r *redisConfig) GetAllParameters() map[string]interface{} {
 	params := make(map[string]interface{})
-	for key, param := range r.lex.GetAllParams() {
+	for key, param := range r.lex.getAllParams() {
 		if len(param) == 0 {
 			continue
 		}
@@ -195,15 +195,15 @@ func (r *redisConfig) SubConfig(key string) ConfigObject {
 }
 
 func (r *redisConfig) Marshal() (string, error) {
-	if r.lex.Empty() {
+	if r.lex.empty() {
 		return "", nil
 	}
-	if !r.lex.IsUpdated() {
-		return r.lex.ToString(), nil
+	if !r.lex.isUpdated {
+		return r.lex.toString(), nil
 	}
 
 	out := &bytes.Buffer{}
-	for i, param := range r.lex.SortParameters() {
+	for i, param := range r.lex.sortParameters() {
 		if i > 0 {
 			out.WriteByte('\n')
 		}

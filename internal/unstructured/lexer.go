@@ -48,24 +48,24 @@ func (i *Item) addToken(str string) {
 	i.Values = append(i.Values, str)
 }
 
-func (l *Lexer) GetItem(key string) []Item {
+func (l *Lexer) getItem(key string) []Item {
 	return l.dict[key]
 }
 
-func (l *Lexer) ParseParameter(paramLine string, paramID int) (Item, error) {
+func (l *Lexer) parseParameter(paramLine string, paramID int) (Item, error) {
 	paramItem := Item{LineNo: paramID}
 	itemWrap := fsm{
 		param:           &paramItem,
 		splitCharacters: trimChars,
 	}
-	return paramItem, itemWrap.Parse(paramLine)
+	return paramItem, itemWrap.parse(paramLine)
 }
 
 func (l *Lexer) appendConfigLine(parameterLine string) {
 	l.lines = append(l.lines, parameterLine)
 }
 
-func (l *Lexer) AppendValidParameter(param Item, fromNo int) {
+func (l *Lexer) appendValidParameter(param Item, fromNo int) {
 	newItem := param
 	key := newItem.Values[0]
 	l.addParameterComments(&newItem, fromNo+1, param.LineNo)
@@ -97,17 +97,17 @@ func (l *Lexer) Load(str string) error {
 			continue
 		}
 		lastScanNo := param.LineNo
-		if param, err = l.ParseParameter(parameterLine, lineNo); err != nil {
+		if param, err = l.parseParameter(parameterLine, lineNo); err != nil {
 			return err
 		}
-		l.AppendValidParameter(param, lastScanNo)
+		l.appendValidParameter(param, lastScanNo)
 	}
 
 	l.isUpdated = false
 	return nil
 }
 
-func (l *Lexer) RemoveParameter(it *Item) {
+func (l *Lexer) removeParameter(it *Item) {
 	v, ok := l.dict[it.Values[0]]
 	if !ok {
 		return
@@ -127,7 +127,7 @@ func (l *Lexer) RemoveParameter(it *Item) {
 	l.isUpdated = true
 }
 
-func (l *Lexer) SortParameters() []Item {
+func (l *Lexer) sortParameters() []Item {
 	items := make([]Item, 0)
 	for _, v := range l.dict {
 		items = append(items, v...)
@@ -143,18 +143,14 @@ func (l *Lexer) SortParameters() []Item {
 	return items
 }
 
-func (l *Lexer) Empty() bool {
+func (l *Lexer) empty() bool {
 	return len(l.dict) == 0
 }
 
-func (l *Lexer) GetAllParams() map[string][]Item {
+func (l *Lexer) getAllParams() map[string][]Item {
 	return l.dict
 }
 
-func (l Lexer) IsUpdated() bool {
-	return l.isUpdated
-}
-
-func (l *Lexer) ToString() string {
+func (l *Lexer) toString() string {
 	return strings.Join(l.lines, "\n")
 }

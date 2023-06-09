@@ -46,7 +46,7 @@ type fsm struct {
 	token []rune
 }
 
-func (f *fsm) Parse(line string) error {
+func (f *fsm) parse(line string) error {
 	f.input = line
 
 	for handle := prepareScan(f); handle != nil; {

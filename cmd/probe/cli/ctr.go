@@ -58,11 +58,11 @@ type daprVersion struct {
 }
 
 var (
-	cliVersion      string
-	versionFlag     bool
-	daprVer         daprVersion
-	logAsJSON       bool
-	daprRuntimePath string
+	cliVersion            string
+	versionFlag           bool
+	daprVer               daprVersion
+	logAsJSON             bool
+	sqlChannelRuntimePath string
 )
 
 // Execute adds all child commands to the root command.
@@ -114,15 +114,14 @@ func initConfig() {
 }
 
 func init() {
-	RootCmd.PersistentFlags().BoolVarP(&logAsJSON, "log-as-json", "", false, "Log output in JSON format")
-	RootCmd.PersistentFlags().StringVarP(&daprRuntimePath, "runtime-path", "", "", "The path to the dapr runtime installation directory")
+	RootCmd.PersistentFlags().StringVarP(&sqlChannelRuntimePath, "kb-runtime-dir", "", "/kubeblocks/", "The directory of kubeblocks binaries")
 }
 
 // GetRuntimeVersion returns the version for the local Dapr runtime.
 func GetRuntimeVersion() string {
-	daprCMD := filepath.Join(daprRuntimePath, "probe")
+	sqlchannelCMD := filepath.Join(sqlChannelRuntimePath, "probe")
 
-	out, err := exec.Command(daprCMD, "--version").Output()
+	out, err := exec.Command(sqlchannelCMD, "--version").Output()
 	if err != nil {
 		return "n/a\n"
 	}

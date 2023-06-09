@@ -14,12 +14,13 @@ limitations under the License.
 package cli
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"reflect"
-
-	"gopkg.in/yaml.v2"
+	"time"
 
 	"github.com/dapr/cli/pkg/print"
 )
@@ -36,14 +37,9 @@ type Options struct {
 	MetricsPort        int    `env:"DAPR_METRICS_PORT" arg:"metrics-port"`
 	MaxRequestBodySize int    `arg:"dapr-http-max-request-size"`
 	HTTPReadBufferSize int    `arg:"dapr-http-read-buffer-size"`
-	UnixDomainSocket   string `arg:"unix-domain-socket"`
 	InternalGRPCPort   int    `arg:"dapr-internal-grpc-port"`
 	EnableAppHealth    bool   `arg:"enable-app-health-check"`
-	AppHealthPath      string `arg:"app-health-check-path"`
-	AppHealthInterval  int    `arg:"app-health-probe-interval" ifneq:"0"`
-	AppHealthTimeout   int    `arg:"app-health-probe-timeout" ifneq:"0"`
 	AppHealthThreshold int    `arg:"app-health-threshold" ifneq:"0"`
-	EnableAPILogging   bool   `arg:"enable-api-logging"`
 }
 
 func (options *Options) validate() error {
@@ -59,7 +55,7 @@ func (options *Options) validate() error {
 }
 
 func (options *Options) getArgs() []string {
-	args := []string{}
+	args := []string{"--app-id", "dbservice"}
 	schema := reflect.ValueOf(*options)
 	for i := 0; i < schema.NumField(); i++ {
 		valueField := schema.Field(i).Interface()
@@ -83,17 +79,6 @@ func (options *Options) getArgs() []string {
 				args = append(args, key, value)
 			}
 		}
-	}
-	if options.ConfigFile != "" {
-		sentryAddress := mtlsEndpoint(options.ConfigFile)
-		if sentryAddress != "" {
-			// mTLS is enabled locally, set it up.
-			args = append(args, "--enable-mtls", "--sentry-address", sentryAddress)
-		}
-	}
-
-	if print.IsJSONLogEnabled() {
-		args = append(args, "--log-as-json")
 	}
 
 	return args
@@ -120,44 +105,25 @@ func (options *Options) getEnv() []string {
 	return env
 }
 
-// RunOutput represents the run output.
-type RunOutput struct {
-	DaprCMD      *exec.Cmd
-	DaprErr      error
-	DaprHTTPPort int
-	DaprGRPCPort int
-	AppID        string
-	AppCMD       *exec.Cmd
-	AppErr       error
+// Commands represents the managed subprocesses.
+type Commands struct {
+	SQLChannelCMD      *exec.Cmd
+	SQLChannelErr      error
+	SQLChannelHTTPPort int
+	SQLChannelGRPCPort int
+	SQLChannelStarted  chan bool
+	AppCMD             *exec.Cmd
+	AppErr             error
+	AppStarted         chan bool
+	IsStopped          bool
+	Options            *Options
 }
 
-func getDaprCommand(options *Options) (*exec.Cmd, error) {
-	daprCMD := binaryFilePath(defaultDaprBinPath(), "daprd")
+func getSQLChannelCommand(options *Options) (*exec.Cmd, error) {
+	sqlChannelCMD := filepath.Join(sqlChannelRuntimePath, "probe")
 	args := options.getArgs()
-	cmd := exec.Command(daprCMD, args...)
+	cmd := exec.Command(sqlChannelCMD, args...)
 	return cmd, nil
-}
-
-func mtlsEndpoint(configFile string) string {
-	if configFile == "" {
-		return ""
-	}
-
-	b, err := os.ReadFile(configFile)
-	if err != nil {
-		return ""
-	}
-
-	var options mtlsConfig
-	err = yaml.Unmarshal(b, &options)
-	if err != nil {
-		return ""
-	}
-
-	if options.Spec.MTLS.Enabled {
-		return sentryDefaultAddress
-	}
-	return ""
 }
 
 func getAppCommand(options *Options) *exec.Cmd {
@@ -180,27 +146,145 @@ func getAppCommand(options *Options) *exec.Cmd {
 	return cmd
 }
 
-func Run(options *Options) (*RunOutput, error) {
+func newCommands(options *Options) (*Commands, error) {
 	//nolint
 	err := options.validate()
 	if err != nil {
 		return nil, err
 	}
 
-	daprCMD, err := getDaprCommand(options)
+	sqlChannelCMD, err := getSQLChannelCommand(options)
 	if err != nil {
 		return nil, err
 	}
 
 	//nolint
 	var appCMD *exec.Cmd = getAppCommand(options)
-	return &RunOutput{
-		DaprCMD:      daprCMD,
-		DaprErr:      nil,
-		AppCMD:       appCMD,
-		AppErr:       nil,
-		AppID:        options.AppID,
-		DaprHTTPPort: options.HTTPPort,
-		DaprGRPCPort: options.GRPCPort,
+	return &Commands{
+		SQLChannelCMD:      sqlChannelCMD,
+		SQLChannelErr:      nil,
+		SQLChannelHTTPPort: options.HTTPPort,
+		SQLChannelGRPCPort: options.GRPCPort,
+		SQLChannelStarted:  make(chan bool, 1),
+		AppCMD:             appCMD,
+		AppErr:             nil,
+		AppStarted:         make(chan bool, 1),
+		Options:            options,
 	}, nil
+}
+
+func (commands *Commands) RestartDBServiceIfExited() {
+	for !commands.IsStopped {
+		if commands.AppCMD == nil || (commands.AppCMD.ProcessState != nil && commands.AppCMD.ProcessState.Exited()) {
+			commands.RestartDBService()
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
+
+func (commands *Commands) RestartDBService() {
+	commands.StopDBService()
+	commands.AppCMD = getAppCommand(commands.Options)
+	commands.AppErr = nil
+	commands.AppStarted = make(chan bool, 1)
+	commands.StartDBService()
+
+}
+
+func (commands *Commands) StartDBService() {
+	if commands.AppCMD == nil {
+		commands.AppStarted <- true
+		return
+	}
+
+	stdErrPipe, pipeErr := commands.AppCMD.StderrPipe()
+	if pipeErr != nil {
+		print.FailureStatusEvent(os.Stderr, fmt.Sprintf("Error creating stderr for DB Service: %s", pipeErr.Error()))
+		commands.AppStarted <- false
+		return
+	}
+
+	stdOutPipe, pipeErr := commands.AppCMD.StdoutPipe()
+	if pipeErr != nil {
+		print.FailureStatusEvent(os.Stderr, fmt.Sprintf("Error creating stdout for DB Service: %s", pipeErr.Error()))
+		commands.AppStarted <- false
+		return
+	}
+
+	errScanner := bufio.NewScanner(stdErrPipe)
+	outScanner := bufio.NewScanner(stdOutPipe)
+	go func() {
+		for errScanner.Scan() {
+			fmt.Println(print.Blue(fmt.Sprintf("== DB Service == %s", errScanner.Text())))
+		}
+		fmt.Println("== scanner exited == ")
+
+	}()
+
+	go func() {
+		for outScanner.Scan() {
+			fmt.Println(print.Blue(fmt.Sprintf("== DB Service == %s", outScanner.Text())))
+		}
+		fmt.Println("== scanner exited == ")
+	}()
+
+	err := commands.AppCMD.Start()
+	if err != nil {
+		print.FailureStatusEvent(os.Stderr, err.Error())
+		commands.AppStarted <- false
+		return
+	}
+	commands.AppStarted <- true
+
+	go commands.WaitDBService()
+}
+
+func (commands *Commands) StopSQLChannel() bool {
+	exitWithError := false
+	if commands.SQLChannelErr != nil {
+		exitWithError = true
+		print.FailureStatusEvent(os.Stderr, fmt.Sprintf("Error exiting SQLChannel: %s", commands.SQLChannelErr))
+	} else if commands.SQLChannelCMD.ProcessState == nil || !commands.SQLChannelCMD.ProcessState.Exited() {
+		err := commands.SQLChannelCMD.Process.Kill()
+		if err != nil {
+			exitWithError = true
+			print.FailureStatusEvent(os.Stderr, fmt.Sprintf("Error exiting SQLChannel: %s", err))
+		} else {
+			print.SuccessStatusEvent(os.Stdout, "Exited SQLChannel successfully")
+		}
+	}
+	return exitWithError
+}
+
+func (commands *Commands) StopDBService() bool {
+	exitWithError := false
+	if commands.AppErr != nil {
+		exitWithError = true
+		print.FailureStatusEvent(os.Stderr, fmt.Sprintf("Error exiting App: %s", commands.AppErr))
+	} else if commands.AppCMD != nil && (commands.AppCMD.ProcessState == nil || !commands.AppCMD.ProcessState.Exited()) {
+		err := commands.AppCMD.Process.Kill()
+		if err != nil {
+			exitWithError = true
+			print.FailureStatusEvent(os.Stderr, fmt.Sprintf("Error exiting App: %s", err))
+		} else {
+			print.SuccessStatusEvent(os.Stdout, "Exited App successfully")
+		}
+	}
+	commands.WaitDBService()
+	return exitWithError
+}
+
+func (commands *Commands) WaitDBService() {
+	if commands.AppCMD == nil || (commands.AppCMD.ProcessState != nil && commands.AppCMD.ProcessState.Exited()) {
+		return
+	}
+
+	appErr := commands.AppCMD.Wait()
+
+	if appErr != nil {
+		commands.AppErr = appErr
+		print.FailureStatusEvent(os.Stderr, "The DB Service exited with error code: %s", appErr.Error())
+	} else {
+		print.SuccessStatusEvent(os.Stdout, "The DB Service exited")
+	}
 }

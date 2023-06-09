@@ -26,11 +26,13 @@ import (
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/connector"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/pipeline"
 	"github.com/spf13/cobra"
+	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/tasks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/configuration/container"
 )
 
@@ -49,6 +51,19 @@ var createExamples = `
 `
 
 func (o *createOptions) Run() error {
+	const minKubernetesVersion = "v1.24.0"
+
+	v, err := versionutil.ParseSemantic(o.version.KubernetesVersion)
+	if err != nil {
+		return err
+	}
+	c, err := v.Compare(minKubernetesVersion)
+	if err != nil {
+		return err
+	}
+	if c < 0 {
+		return cfgcore.MakeError("kubernetes version must be greater than %s", minKubernetesVersion)
+	}
 
 	cluster, err := createClusterWithOptions(buildTemplateParams(o))
 	if err != nil {

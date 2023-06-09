@@ -109,7 +109,7 @@ func (r *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componentName s
 	}
 	stsObj := stsList.Items[0]
 	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, r.getReplicas(),
-		stsObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), nil, nil
+		stsObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), statusMessages, nil
 }
 
 func (r *Stateful) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {

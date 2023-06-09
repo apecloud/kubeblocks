@@ -69,6 +69,8 @@ type UninstallOptions struct {
 	RemoveNamespace bool
 	addons          []*extensionsv1alpha1.Addon
 	Quiet           bool
+
+	ForceUninstall bool
 }
 
 func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -76,7 +78,8 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		Options: Options{
 			IOStreams: streams,
 		},
-		Factory: f,
+		Factory:        f,
+		ForceUninstall: true,
 	}
 	cmd := &cobra.Command{
 		Use:     "uninstall",
@@ -158,7 +161,7 @@ func (o *UninstallOptions) Uninstall() error {
 	chart := helm.InstallOpts{
 		Name:           types.KubeBlocksChartName,
 		Namespace:      o.Namespace,
-		ForceUninstall: true,
+		ForceUninstall: o.ForceUninstall,
 		// KubeBlocks chart has a hook to delete addons, but we have already deleted addons,
 		// and that webhook may fail, so we need to disable hooks.
 		DisableHooks: true,

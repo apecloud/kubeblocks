@@ -17,32 +17,36 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package lifecycle
+package apps
 
 import (
-	"testing"
+	"fmt"
+	"sync"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-// These tests use Ginkgo (BDD-style Go testing framework). Refer to
-// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
-
-func init() {
+type ParallelTransformers struct {
+	transformers []graph.Transformer
 }
 
-func TestAPIs(t *testing.T) {
-	RegisterFailHandler(Fail)
+var _ graph.Transformer = &ParallelTransformers{}
 
-	RunSpecs(t, "Lifecycle Suite")
+func (t *ParallelTransformers) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	var group sync.WaitGroup
+	var errs error
+	for _, transformer := range t.transformers {
+		transformer := transformer
+		group.Add(1)
+		go func() {
+			err := transformer.Transform(ctx, dag)
+			if err != nil {
+				// TODO: sync.Mutex errs
+				errs = fmt.Errorf("%v; %v", errs, err)
+			}
+			group.Done()
+		}()
+	}
+	group.Wait()
+	return errs
 }
-
-var _ = BeforeSuite(func() {
-	go func() {
-		defer GinkgoRecover()
-	}()
-})
-
-var _ = AfterSuite(func() {
-})

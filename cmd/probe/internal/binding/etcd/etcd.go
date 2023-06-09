@@ -145,6 +145,5 @@ func (e *Etcd) GetRunningPort() int {
 
 func (e *Etcd) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
 	// TODO implement me when proposal is passed
-	// proposal: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 	return nil, nil
 }

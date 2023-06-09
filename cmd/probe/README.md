@@ -5,7 +5,7 @@ Probe is a health check service that can do health checking for multi DB engines
 
 # 1. Introduction
 
-Probe is capable of doing multi checks, include running check/status check/role changed check, serviced through HTTP API. we use kubelet readinessprobe to config and enable probe in kubeblocks. [Design Details](https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb)
+Probe is capable of doing multi checks, include running check/status check/role changed check, serviced through HTTP API. we use kubelet readinessprobe to config and enable probe in kubeblocks.
 
 
 # 2. Getting Started
@@ -44,6 +44,6 @@ $ probe --app-id batch-sdk  --dapr-http-port 3502 --dapr-grpc-port 54215 --app-p
 ```
 
 
-# 7. License
+# 3. License
 
-Probe is under the Apache 2.0 license. See the [LICENSE](../../LICENSE) file for details.
+Probe is under the AGPL 3.0 license. See the [LICENSE](../../LICENSE) file for details.

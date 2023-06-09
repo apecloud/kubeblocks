@@ -469,6 +469,12 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 	}
 
 	if err = insOpts.PreCheck(); err != nil {
+		// if the KubeBlocks has been installed, we ignore the error
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "repeated installation is not supported") {
+			fmt.Fprintf(o.Out, strings.Split(errMsg, ",")[0]+"\n")
+			return nil
+		}
 		return err
 	}
 	return insOpts.Install()

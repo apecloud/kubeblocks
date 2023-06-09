@@ -109,7 +109,6 @@ func (kafkaOps *KafkaOperations) InitDelay() error {
 	return nil
 }
 
-// CheckStatusOps design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 func (kafkaOps *KafkaOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	result := OpsResult{}
 	topic := "kb_health_check"

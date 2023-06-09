@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -70,4 +71,43 @@ func TestMin(t *testing.T) {
 		makeTestData("ab", ""),
 		makeTestData("", ""),
 	}, []int{1, 0, 0, 1, 0, 1, 0})
+}
+
+func TestSafe2Int32(t *testing.T) {
+	tests := []struct {
+		name string
+		args int
+		want int32
+	}{{
+		name: "test",
+		args: 0,
+		want: 0,
+	}, {
+		name: "test",
+		args: 999,
+		want: 999,
+	}, {
+		name: "test",
+		args: math.MinInt32,
+		want: math.MinInt32,
+	}, {
+		name: "test",
+		args: math.MaxInt32,
+		want: math.MaxInt32,
+	}, {
+		name: "test",
+		args: math.MinInt32 - 2,
+		want: math.MinInt32,
+	}, {
+		name: "test",
+		args: math.MaxInt32 + 10,
+		want: math.MaxInt32,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Safe2Int32(tt.args); got != tt.want {
+				t.Errorf("Safe2Int32() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

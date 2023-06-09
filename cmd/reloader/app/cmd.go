@@ -83,11 +83,13 @@ func runConfigManagerCommand(ctx context.Context, opt *VolumeWatcherOpts) error 
 }
 
 func run(ctx context.Context, opt *VolumeWatcherOpts) error {
-	volumeWatcher, err := startVolumeWatcher(ctx, opt)
-	if err != nil {
-		return err
+	if len(opt.VolumeDirs) > 0 {
+		volumeWatcher, err := startVolumeWatcher(ctx, opt)
+		if err != nil {
+			return err
+		}
+		defer volumeWatcher.Close()
 	}
-	defer volumeWatcher.Close()
 
 	serviceOpt := opt.ServiceOpt
 	if serviceOpt.ContainerRuntimeEnable || serviceOpt.RemoteOnlineUpdateEnable {

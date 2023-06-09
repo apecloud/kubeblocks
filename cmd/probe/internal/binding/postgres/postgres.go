@@ -342,17 +342,18 @@ func (pgOps *PostgresOperations) SwitchoverOps(ctx context.Context, req *binding
 		return result, nil
 	}
 
-	if ok, err := pgOps.getSwitchoverResult(candidate, primary); err != nil {
+	var newPrimary string
+	if newPrimary, err = pgOps.getSwitchoverResult(candidate, primary); err != nil {
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 		return result, nil
-	} else if !ok {
+	} else if newPrimary == "" {
 		result["event"] = OperationFailed
 		result["message"] = fmt.Sprintf("%s to candidate: %s fail", string(req.Operation), candidate)
 		return result, nil
 	}
 	result["event"] = OperationSuccess
-	result["message"] = fmt.Sprintf("Successfully %s to: %s", string(req.Operation), candidate)
+	result["message"] = fmt.Sprintf("Successfully %s to: %s", string(req.Operation), newPrimary)
 
 	return result, nil
 }
@@ -435,18 +436,18 @@ func (pgOps *PostgresOperations) manualSwitchover(primary, candidate string) err
 	return nil
 }
 
-func (pgOps *PostgresOperations) getSwitchoverResult(oldPrimary, candidate string) (bool, error) {
+func (pgOps *PostgresOperations) getSwitchoverResult(oldPrimary, candidate string) (string, error) {
 	wait := int(pgOps.Cs.GetCluster().Config.GetData().GetTtl() / 2)
 	for i := 0; i < wait; i++ {
 		time.Sleep(time.Second)
 		_ = pgOps.Cs.GetClusterFromKubernetes()
 		newPrimary := pgOps.Cs.GetCluster().Leader.GetMember().GetName()
 		if newPrimary == candidate || (newPrimary != oldPrimary && candidate == "") {
-			return true, nil
+			return newPrimary, nil
 		}
 	}
 
-	return false, errors.New("switchover fail")
+	return "", errors.New("switchover fail")
 }
 
 func (pgOps *PostgresOperations) FailoverOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

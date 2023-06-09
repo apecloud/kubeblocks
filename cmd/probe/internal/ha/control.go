@@ -103,6 +103,11 @@ func (h *Ha) Init() {
 		}
 		time.Sleep(time.Second * 2)
 	}
+	if isLeader {
+		if !h.DB.IsRunning(h.ctx) {
+			panic("db is not running")
+		}
+	}
 
 	sysid, err = h.DB.GetSysID(h.ctx)
 	if err != nil {

@@ -178,6 +178,11 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 		return
 	}
 
+	if !h.isDBRunning() {
+		h.log.Errorf("in control loop, db is not running now")
+		return
+	}
+
 	if !h.cs.GetCluster().HasMember(h.podName) {
 		h.touchMember()
 	}

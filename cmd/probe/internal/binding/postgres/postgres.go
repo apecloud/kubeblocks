@@ -344,7 +344,7 @@ func (pgOps *PostgresOperations) SwitchoverOps(ctx context.Context, req *binding
 	}
 
 	var newPrimary string
-	if newPrimary, err = pgOps.getSwitchoverResult(candidate, primary); err != nil {
+	if newPrimary, err = pgOps.getSwitchoverResult(primary, candidate); err != nil {
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 		return result, nil

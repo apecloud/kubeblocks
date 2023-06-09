@@ -5,7 +5,7 @@ Probe is a health check service that can do health checking for multi DB engines
 
 # 1. Introduction
 
-Probe is capable of doing multi checks, include running check/status check/role changed check, serviced through HTTP API. we use kubelet readinessprobe to config and enable probe in kubeblocks. [Design Details](https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb)
+Probe is capable of doing multi checks, include running check/status check/role changed check, serviced through HTTP API. we use kubelet readinessprobe to config and enable probe in kubeblocks.
 
 
 # 2. Getting Started

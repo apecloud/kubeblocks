@@ -244,7 +244,6 @@ func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.Invo
 	return result, nil
 }
 
-// CheckStatusOps design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 func (pgOps *PostgresOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	rwSQL := fmt.Sprintf(`begin;
 create table if not exists kb_health_check(type int, check_ts timestamp, primary key(type));

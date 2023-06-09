@@ -266,7 +266,6 @@ func (mongoOps *MongoDBOperations) GetRoleOps(ctx context.Context, req *bindings
 
 func (mongoOps *MongoDBOperations) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) (OpsResult, error) {
 	// TODO implement me when proposal is passed
-	// proposal: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 	return nil, nil
 }
 

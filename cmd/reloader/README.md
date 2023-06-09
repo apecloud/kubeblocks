@@ -4,8 +4,6 @@
 
 Reloader is a service that watch changes in `ConfigMap` and trigger a config dynamic reload without process restart. Reloader is capable of killing containers or processes in pod, serviced through GRPC API, the controller do rolling upgrades on Pods by using the API.
 
-. [Design Details](https://infracreate.feishu.cn/wiki/wikcn24AWAgXXBedVZZ0YgvjGuc)
-
 # 2. Getting Started
 
 You can get started with Reloader, by any of the following methods:

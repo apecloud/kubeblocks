@@ -501,6 +501,13 @@ var _ = Describe("OpsRequest Controller", func() {
 					g.Expect(*sts.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
 
+			By("Checking pvc created")
+			Eventually(testapps.List(&testCtx, intctrlutil.PersistentVolumeClaimSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: mysqlCompName,
+				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(int(replicas)))
+
 			By("mock all new PVCs scaled bounded")
 			for i := 0; i < int(replicas); i++ {
 				pvcKey := types.NamespacedName{

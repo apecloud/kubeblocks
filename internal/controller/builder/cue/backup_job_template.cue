@@ -15,36 +15,39 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-sts: {
+cluster: {
 	metadata: {
-		labels: {
-			"app.kubernetes.io/instance": string
-		}
-		namespace: string
+		name:      string
 	}
 }
-backup_policy_name: string
-backup_job_key: {
+component: {
+	clusterDefName: string
+	name:           string
+}
+backupPolicyName: string
+backupJobKey: {
 	Name:      string
 	Namespace: string
 }
-backup_job: {
+backupType: string
+backupJob: {
 	apiVersion: "dataprotection.kubeblocks.io/v1alpha1"
 	kind:       "Backup"
 	metadata: {
-		generateName: "\(backup_job_key.Name)-"
-		namespace:    backup_job_key.Namespace
+		name:      backupJobKey.Name
+		namespace: backupJobKey.Namespace
 		labels: {
-			"dataprotection.kubeblocks.io/backup-type":         "snapshot"
+			"dataprotection.kubeblocks.io/backup-type":         backupType
 			"apps.kubeblocks.io/managed-by":                    "cluster"
-			"backuppolicies.dataprotection.kubeblocks.io/name": backup_policy_name
-			for k, v in sts.metadata.labels {
-				"\(k)": "\(v)"
-			}
+			"backuppolicies.dataprotection.kubeblocks.io/name": backupPolicyName
+			"app.kubernetes.io/name":            "\(component.clusterDefName)"
+			"app.kubernetes.io/instance":        cluster.metadata.name
+			"app.kubernetes.io/managed-by":      "kubeblocks"
+			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 	}
 	spec: {
-		"backupPolicyName": backup_policy_name
-		"backupType":       "snapshot"
+		"backupPolicyName": backupPolicyName
+		"backupType":       backupType
 	}
 }

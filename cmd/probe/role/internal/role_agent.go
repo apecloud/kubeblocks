@@ -79,7 +79,7 @@ func (roleAgent *RoleAgent) Init() error {
 		roleAgent.RoleObservationThreshold = 300
 	}
 
-	actionSvcList := viper.GetString("KB_CONSENSUS_SET_ACTION_SVC_LIST")
+	actionSvcList := viper.GetString("KB_SRS_ACTION_SVC_LIST")
 	if len(actionSvcList) > 0 {
 		err := json.Unmarshal([]byte(actionSvcList), roleAgent.actionSvcPorts)
 		if err != nil {
@@ -161,7 +161,7 @@ func (roleAgent *RoleAgent) getRole(ctx context.Context) (string, error) {
 	)
 
 	for _, port := range *roleAgent.actionSvcPorts {
-		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_CONSENSUS_SET_LAST_STDOUT=%s", port, url.QueryEscape(lastOutput))
+		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_SRS_LAST_STDOUT=%s", port, url.QueryEscape(lastOutput))
 		lastOutput, err = roleAgent.callAction(ctx, u)
 		if err != nil {
 			return "", err

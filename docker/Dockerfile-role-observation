@@ -36,6 +36,12 @@ RUN --mount=type=bind,target=. \
 
 
 # Use alpine
-FROM docker.io/alpine:3.17 as dist
+FROM docker.io/alpine:3.18 as dist
+ARG APK_MIRROR
+ENV APK_MIRROR=${APK_MIRROR}
+RUN if [ -n "${APK_MIRROR}" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; fi
+RUN apk add --no-cache curl \
+    && rm -rf /var/cache/apk/*
+
 # copy role observation
-COPY --from=builder /out/role-observe  /bin/role-observe
+COPY --from=builder /out/role-observe  /bin/role-agent

@@ -289,7 +289,6 @@ func injectRoleObserveContainer(srs workloads.StatefulReplicaSet, template *core
 	if observationDaemonPort == 0 {
 		observationDaemonPort = defaultRoleObservationDaemonPort
 	}
-	//roleObserveURI := fmt.Sprintf(roleObservationURIFormat, strconv.Itoa(observationDaemonPort))
 	env := credentialEnv
 	env = append(env,
 		corev1.EnvVar{
@@ -330,10 +329,9 @@ func injectRoleObserveContainer(srs workloads.StatefulReplicaSet, template *core
 		Name:            roleObservationName,
 		Image:           image,
 		ImagePullPolicy: "IfNotPresent",
-		Command: []string{"role-agent",
+		Command: []string{
+			"role-agent",
 			"--port", strconv.Itoa(observationDaemonPort),
-			"--protocol", "http",
-			"--log-level", "info",
 		},
 		Ports: []corev1.ContainerPort{{
 			ContainerPort: int32(observationDaemonPort),
@@ -343,8 +341,8 @@ func injectRoleObserveContainer(srs workloads.StatefulReplicaSet, template *core
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Port: intstr.FromInt(7979),
-					Path: "role",
+					Port: intstr.FromInt(observationDaemonPort),
+					Path: roleObservationPath,
 					HTTPHeaders: []corev1.HTTPHeader{
 						{
 							Name:  "Content-Type",
@@ -352,15 +350,6 @@ func injectRoleObserveContainer(srs workloads.StatefulReplicaSet, template *core
 						},
 					},
 				},
-				//Exec: &corev1.ExecAction{
-				//	Command: []string{
-				//		"curl", "-X", "POST",
-				//		"--max-time", "1",
-				//		"--fail-with-body", "--silent",
-				//		"-H", "Content-ComponentDefRef: application/json",
-				//		roleObserveURI,
-				//	},
-				//},
 			},
 			InitialDelaySeconds: roleObservation.InitialDelaySeconds,
 			TimeoutSeconds:      roleObservation.TimeoutSeconds,

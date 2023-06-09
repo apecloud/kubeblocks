@@ -47,8 +47,8 @@ type clusterOptions struct {
 
 	clusterConfig string
 	clusterName   string
-	nodes         []string
 	timeout       int64
+	nodes         []string
 }
 
 func buildCommonFlags(cmd *cobra.Command, o *clusterOptions) {

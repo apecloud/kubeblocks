@@ -141,6 +141,7 @@ Inject faults to pod.
 infra command
 
 * [kbcli infra create](kbcli_infra_create.md)	 - create kubernetes cluster.
+* [kbcli infra delete](kbcli_infra_delete.md)	 - delete kubernetes cluster.
 
 
 ## [kubeblocks](kbcli_kubeblocks.md)

@@ -18,6 +18,7 @@ kbcli infra create [flags]
 ### Options
 
 ```
+  -c, --config string              Specify infra cluster config file. [option]
       --container-runtime string   Specify kubernetes container runtime. default is containerd (default "containerd")
       --debug                      set debug mode
       --etcd strings               Specify etcd nodes
@@ -28,6 +29,7 @@ kbcli infra create [flags]
   -p, --password string            Specify the password for the account to execute sudo. [option]
       --private-key string         The PrimaryKey for ssh to the remote machine. [option]
       --private-key-path string    Specify the file PrimaryKeyPath of ssh to the remote machine. default ~/.ssh/id_rsa.
+      --sandbox-image string       Specified sandbox-image will not be used by the cri. [option] (default "k8s.gcr.io/pause:3.8")
   -t, --timeout int                Specify the ssh timeout.[option] (default 30)
   -u, --user string                Specify the account to access the remote server. [require]
       --version string             Specify install kubernetes version. default version is v1.26.5 (default "v1.26.5")

@@ -1,13 +1,37 @@
 ---
-title: kbcli infra
+title: kbcli infra delete
 ---
 
-infra command
+delete kubernetes cluster.
+
+```
+kbcli infra delete [flags]
+```
+
+### Examples
+
+```
+
+
+```
 
 ### Options
 
 ```
-  -h, --help   help for infra
+  -c, --config string             Specify infra cluster config file. [option]
+      --debug                     set debug mode
+      --delete-cri                delete cri
+      --etcd strings              Specify etcd nodes
+  -h, --help                      help for delete
+      --master strings            Specify master nodes
+      --name string               Specify kubernetes cluster name
+      --nodes strings             List of machines on which kubernetes is installed. [require]
+  -p, --password string           Specify the password for the account to execute sudo. [option]
+      --private-key string        The PrimaryKey for ssh to the remote machine. [option]
+      --private-key-path string   Specify the file PrimaryKeyPath of ssh to the remote machine. default ~/.ssh/id_rsa.
+  -t, --timeout int               Specify the ssh timeout.[option] (default 30)
+  -u, --user string               Specify the account to access the remote server. [require]
+      --worker strings            Specify worker nodes
 ```
 
 ### Options inherited from parent commands
@@ -31,14 +55,11 @@ infra command
   -s, --server string                  The address and port of the Kubernetes API server
       --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
       --token string                   Bearer token for authentication to the API server
-      --user string                    The name of the kubeconfig user to use
 ```
 
 ### SEE ALSO
 
-
-* [kbcli infra create](kbcli_infra_create.md)	 - create kubernetes cluster.
-* [kbcli infra delete](kbcli_infra_delete.md)	 - delete kubernetes cluster.
+* [kbcli infra](kbcli_infra.md)	 - infra command
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

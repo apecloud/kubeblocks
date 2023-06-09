@@ -1,75 +1,32 @@
-## @section PostgreSQL common parameters
-podSecurityPolicy:
-  enabled: false
-terminationPolicy: Delete
-images:
-  pullPolicy: IfNotPresent
-  tag: 14.7.2
-  configmapReload:
-    repository: jimmidyson/configmap-reload
-    tag: v0.5.0
-  prometheus:
-    repository: quay.io/prometheus/prometheus
-    tag: v2.39.1
-  kubeStateMetrics:
-    repository: registry.k8s.io/kube-state-metrics/kube-state-metrics
-    tag: v2.5.0
-  alertmanager:
-    repository: quay.io/prometheus/alertmanager
-    tag: v0.24.0
-  pushgateway:
-    repository: prom/pushgateway
-    tag: v1.4.3
-
-imagePullSecrets:
-# - name: "image-pull-secret"
-
-## Define serviceAccount names for components. Defaults to component's fully qualified name.
-##
-serviceAccounts:
-  alertmanager:
-    create: true
-    name:
-    annotations: {}
-  nodeExporter:
-    create: true
-    name:
-    annotations: {}
-  pushgateway:
-    create: true
-    name:
-    annotations: {}
-  server:
-    create: true
-    name:
-    annotations: {}
+clusterVersionOverride: ""
 
 alertmanager:
-  ## If false, alertmanager will not be installed
-  ##
-  enabled: true
-
   ## alertmanager container image
   ##
   image:
-    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/alertmanager
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/alertmanager
+    pullPolicy: IfNotPresent
     tag: v0.24.0
 
   ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.alertmanager.configMapOverrideName}}
   ## Defining configMapOverrideName will cause templates/alertmanager-configmap.yaml
   ## to NOT generate a ConfigMap resource
   ##
+  ## TODO:
   configMapOverrideName: "alertmanager-config"
 
   ## Node tolerations for alertmanager scheduling to nodes with taints
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
   ##
+  ## TODO:
   tolerations:
     - key: kb-controller
       operator: Equal
       value: "true"
       effect: NoSchedule
 
+  ## TODO:
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
@@ -81,33 +38,16 @@ alertmanager:
                 values:
                   - "true"
 
+  ## TODO:
   persistentVolume:
     ## If true, alertmanager will create/use a Persistent Volume Claim
     ## If false, use emptyDir
     ##
     enabled: false
 
-    ## alertmanager data Persistent Volume mount root path
-    ##
-    mountPath: /data
-
     ## alertmanager data Persistent Volume size
     ##
     size: 1Gi
-
-    ## Subdirectory of alertmanager data Persistent Volume to mount
-    ## Useful if the volume's root directory is not empty
-    ##
-    subPath: ""
-
-    ## alertmanager data Persistent Volume Claim annotations
-    ##
-    annotations: { }
-
-    ## alertmanager data Persistent Volume existing claim name
-    ## Requires alertmanager.persistentVolume.enabled: true
-    ## If defined, PVC must be created manually before volume will be bound
-    existingClaim: ""
 
     ## alertmanager data Persistent Volume Storage Class
     ## If defined, storageClassName: <storageClass>
@@ -118,154 +58,46 @@ alertmanager:
     ##
     # storageClass: "-"
 
-  ## Use a StatefulSet if replicaCount needs to be greater than 1 (see below)
-  ##
-  replicaCount: 1
-
-  statefulSet:
-    ## If true, use a statefulset instead of a deployment for pod management.
-    ## This allows to scale replicas to more than 1 pod
-    ##
-    enabled: true
-
-    ## Alertmanager headless service to use for the statefulset
-    ##
-    headless:
-      ## Enabling peer mesh service end points for enabling the HA alert manager
-      ## Ref: https://github.com/prometheus/alertmanager/blob/master/README.md
-      enableMeshPeer: true
-
-  ## alertmanager resource requests and limits
-  ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/
-  ##
-  resources: {}
-    # limits:
-    #   cpu: 10m
-    #   memory: 32Mi
-    # requests:
-    #   cpu: 10m
-  #   memory: 32Mi
-
   ## Security context to be added to alertmanager pods
   ##
+  ## TODO:
   securityContext:
     runAsUser: 0
     runAsNonRoot: false
     runAsGroup: 65534
     fsGroup: 65534
 
+  ## TODO:
   containerSecurityContext:
     allowPrivilegeEscalation: false
-
-  ingress:
-    ## If true, alertmanager Ingress will be created
-    ##
-    enabled: false
-
-    # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
-    # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
-    # ingressClassName: nginx
-
-    ## alertmanager Ingress annotations
-    ##
-    annotations: {}
-    #   kubernetes.io/ingress.class: nginx
-    #   kubernetes.io/tls-acme: 'true'
-
-    ## alertmanager Ingress additional labels
-    ##
-    extraLabels: {}
-
-    ## alertmanager Ingress hostnames with optional path
-    ## Must be provided if Ingress is enabled
-    ##
-    hosts: []
-    #   - alertmanager.domain.com
-    #   - domain.com/alertmanager
-
-    path: /
-
-    # pathType is only for k8s >= 1.18
-    pathType: Prefix
-
-    ## Extra paths to prepend to every host configuration. This is useful when working with annotation based services.
-    extraPaths: []
-    # - path: /*
-    #   backend:
-    #     serviceName: ssl-redirect
-    #     servicePort: use-annotation
-
-    ## alertmanager Ingress TLS configuration
-    ## Secrets must be manually created in the namespace
-    ##
-    tls: []
-    #   - secretName: prometheus-alerts-tls
-    #     hosts:
-    #       - alertmanager.domain.com
-
-  service:
-    annotations: {}
-    labels: {}
-    clusterIP: ""
-
-    ## Enabling peer mesh service end points for enabling the HA alert manager
-    ## Ref: https://github.com/prometheus/alertmanager/blob/master/README.md
-    # enableMeshPeer : true
-
-    ## List of IP addresses at which the alertmanager service is available
-    ## Ref: https://kubernetes.io/docs/user-guide/services/#external-ips
-    ##
-    externalIPs: []
-
-    loadBalancerIP: ""
-    loadBalancerSourceRanges: []
-    servicePort: 80
-    # nodePort: 30000
-    sessionAffinity: None
-    type: ClusterIP
-
-kubeStateMetrics:
-  ## If false, kube-state-metrics sub-chart will not be installed
-  ##
-  enabled: false
-
-nodeExporter:
-  ## If false, node-exporter will not be installed
-  ##
-  enabled: false
-
-  ## node-exporter container image
-  ##
-  image:
-    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/node-exporter
-    tag: v1.3.1
 
 configmapReload:
   prometheus:
     ## configmap-reload container image
     ##
     image:
-      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/configmap-reload
+      registry: registry.cn-hangzhou.aliyuncs.com
+      repository: apecloud/configmap-reload
+      pullPolicy: IfNotPresent
       tag: v0.5.0
   alertmanager:
     ## configmap-reload container image
     ##
     image:
-      repository: registry.cn-hangzhou.aliyuncs.com/apecloud/configmap-reload
+      registry: registry.cn-hangzhou.aliyuncs.com
+      repository: apecloud/configmap-reload
+      pullPolicy: IfNotPresent
       tag: v0.5.0
 
 server:
-  ## Prometheus server container name
-  ##
-  enabled: true
-
   ## Prometheus server container image
   ##
   image:
-    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/prometheus
-    tag: v2.39.1
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/prometheus
+    pullPolicy: IfNotPresent
+    tag: v2.44.0
 
-  #opsrequest
   global:
     ## How frequently to scrape targets by default
     ##
@@ -282,48 +114,36 @@ server:
   extraFlags:
     - web.enable-lifecycle
     - web.enable-remote-write-receiver
-    ## web.enable-admin-api flag controls access to the administrative HTTP API which includes functionality such as
-    ## deleting time series. This is disabled by default.
-    # - web.enable-admin-api
-    ##
-    ## storage.tsdb.no-lockfile flag controls BD locking
-    # - storage.tsdb.no-lockfile
-    ##
-    ## storage.tsdb.wal-compression flag enables compression of the write-ahead log (WAL)
-    # - storage.tsdb.wal-compression
-
-  ## Path to a configuration file on prometheus server container FS
-  configPath: /etc/config/prometheus.yml
-
-  ### The data directory used by prometheus to set --storage.tsdb.path
-  ### When empty server.persistentVolume.mountPath is used instead
-  storagePath: /data
 
   ## Additional Prometheus server container arguments
   ##
   extraArgs:
     log.level: info
+    storage.tsdb.min-block-duration: 30m
+    enable-feature: memory-snapshot-on-shutdown
 
   ## https://prometheus.io/docs/prometheus/latest/configuration/configuration/#remote_write
   ##
+  ## TODO:
   remoteWrite: []
-
-  # ODOT
 
   ## Prefix used to register routes, overriding externalUrl route.
   ## Useful for proxies that rewrite URLs.
   ##
+  ## TODO:
   routePrefix: /
 
   ## Node tolerations for server scheduling to nodes with taints
   ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
   ##
+  ## TODO:
   tolerations:
     - key: kb-controller
       operator: Equal
       value: "true"
       effect: NoSchedule
 
+  ## TODO:
   affinity:
     nodeAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
@@ -334,6 +154,8 @@ server:
                 operator: In
                 values:
                   - "true"
+
+  ## TODO:
   persistentVolume:
     ## If true, Prometheus server will create/use a Persistent Volume Claim
     ## If false, use emptyDir
@@ -342,7 +164,7 @@ server:
 
     ## Prometheus server data Persistent Volume size
     ##
-    size: 8Gi
+    size: 20Gi
 
     ## Prometheus server data Persistent Volume Storage Class
     ## If defined, storageClassName: <storageClass>
@@ -353,123 +175,20 @@ server:
     ##
     # storageClass: "-"
 
-  ## Use a StatefulSet if replicaCount needs to be greater than 1 (see below)
-  ##
-  replicaCount: 1
-
-  statefulSet:
-    ## If true, use a statefulset instead of a deployment for pod management.
-    ## This allows to scale replicas to more than 1 pod
-    ##
-    enabled: true
-
-  ## Prometheus server resource requests and limits
-  ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/
-  ##
-  resources: {}
-    # limits:
-    #   cpu: 500m
-    #   memory: 512Mi
-    # requests:
-    #   cpu: 500m
-  #   memory: 512Mi
-
   ## Prometheus' data retention period (default if not specified is 15 days)
   ##
 
-  retention: "3d"
+  retention: "2d"
 
   ## Security context to be added to server pods
   ##
+  ## TODO:
   securityContext:
     runAsUser: 0
     runAsNonRoot: false
     runAsGroup: 65534
     fsGroup: 65534
 
+  ## TODO:
   containerSecurityContext:
     allowPrivilegeEscalation: false
-
-  service:
-    ## If false, no Service will be created for the Prometheus server
-    ##
-    enabled: true
-
-    annotations: {}
-    labels: {}
-    clusterIP: ""
-
-    ## List of IP addresses at which the Prometheus server service is available
-    ## Ref: https://kubernetes.io/docs/user-guide/services/#external-ips
-    ##
-    externalIPs: []
-
-    loadBalancerIP: ""
-    loadBalancerSourceRanges: []
-    servicePort: 80
-    sessionAffinity: None
-    type: ClusterIP
-
-    ## Enable gRPC port on service to allow auto discovery with thanos-querier
-    gRPC:
-      enabled: false
-      servicePort: 10901
-      # nodePort: 10901
-
-    ## If using a statefulSet (statefulSet.enabled=true), configure the
-    ## service to connect to a specific replica to have a consistent view
-    ## of the data.
-    statefulsetReplica:
-      enabled: false
-      replica: 0
-
-  ingress:
-    ## If true, Prometheus server Ingress will be created
-    ##
-    enabled: false
-
-    # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
-    # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
-    # ingressClassName: nginx
-
-    ## Prometheus server Ingress annotations
-    ##
-    annotations: {}
-    #   kubernetes.io/ingress.class: nginx
-    #   kubernetes.io/tls-acme: 'true'
-
-    ## Prometheus server Ingress additional labels
-    ##
-    extraLabels: {}
-
-    ## Prometheus server Ingress hostnames with optional path
-    ## Must be provided if Ingress is enabled
-    ##
-    hosts: []
-    #   - prometheus.domain.com
-    #   - domain.com/prometheus
-
-    path: /
-
-    # pathType is only for k8s >= 1.18
-    pathType: Prefix
-
-    ## Extra paths to prepend to every host configuration. This is useful when working with annotation based services.
-    extraPaths: []
-    # - path: /*
-    #   backend:
-    #     serviceName: ssl-redirect
-    #     servicePort: use-annotation
-
-    ## Prometheus server Ingress TLS configuration
-    ## Secrets must be manually created in the namespace
-    ##
-    tls: []
-    #   - secretName: prometheus-server-tls
-    #     hosts:
-    #       - prometheus.domain.com
-
-pushgateway:
-  ## If false, pushgateway will not be installed
-  ##
-  enabled: false

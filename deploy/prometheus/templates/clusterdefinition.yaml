@@ -7,9 +7,9 @@ metadata:
 spec:
   type: prometheus
   componentDefs:
-    # kind: Deployment
-    - name: prometheus-server
+    - name: server
       workloadType: Stateful
+      characterType: prometheus
       service:
         ports:
           - name: http
@@ -30,15 +30,7 @@ spec:
           runAsUser: 0
         enableServiceLinks: true
         containers:
-          - name: prometheus-server-configmap-reload
-            securityContext:
-              runAsUser: 0
-            env:
-              - name: POD_IP
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: status.podIP
+          - name: configmap-reload
             args:
               - --volume-dir=/etc/config
               - --webhook-url=http://127.0.0.1:9090/-/reload
@@ -46,37 +38,22 @@ spec:
               - name: config-volume
                 mountPath: /etc/config
                 readOnly: true
-
-          - name: prometheus-server
+          - name: server
             securityContext:
               runAsUser: 0
             args:
-            {{- if .Values.server.defaultFlagsOverride }}
-              {{ toYaml .Values.server.defaultFlagsOverride }}
-            {{- else }}
-              {{- if .Values.server.prefixURL }}
-                - --web.route-prefix={{ .Values.server.prefixURL }}
-              {{- end }}
-              {{- if .Values.server.retention }}
-                - --storage.tsdb.retention.time={{ .Values.server.retention }}
-              {{- end }}
-                - --config.file={{ .Values.server.configPath }}
-              {{- if .Values.server.storagePath }}
-                - --storage.tsdb.path={{ .Values.server.storagePath }}
-              {{- else }}
-                - --storage.tsdb.path={{ .Values.server.persistentVolume.mdountPath }}
-              {{- end }}
-                - --web.console.libraries=/etc/prometheus/console_libraries
-                - --web.console.templates=/etc/prometheus/consoles
-              {{- range .Values.server.extraFlags }}
-                - --{{ . }}
-              {{- end }}
-              {{- range $key, $value := .Values.server.extraArgs }}
-                - --{{ $key }}={{ $value }}
-              {{- end }}
-              {{- if .Values.server.baseURL }}
-                - --web.external-url={{ .Values.server.baseURL }}
-              {{- end }}
+            {{- if .Values.server.retention }}
+              - --storage.tsdb.retention.time={{ .Values.server.retention }}
+            {{- end }}
+              - --config.file=/etc/config/prometheus.yml
+              - --storage.tsdb.path=/data
+              - --web.console.libraries=/etc/prometheus/console_libraries
+              - --web.console.templates=/etc/prometheus/consoles
+            {{- range .Values.server.extraFlags }}
+              - --{{ . }}
+            {{- end }}
+            {{- range $key, $value := .Values.server.extraArgs }}
+              - --{{ $key }}={{ $value }}
             {{- end }}
             readinessProbe:
               httpGet:
@@ -110,7 +87,7 @@ spec:
               - containerPort: 9090
                 name: server
         dnsPolicy: ClusterFirst
-        terminationGracePeriodSeconds: 300
+        terminationGracePeriodSeconds: 30
         volumes:
           - name: config-volume
             configMap:
@@ -120,28 +97,36 @@ spec:
               name: prometheus-rule
 
     - name: alertmanager
-      workloadType: Stateful # Consensus
-      characterType: prometheus
-      configSpecs:
-        - name: alertmanager-configuration
-          templateRef: prometheus-alertmanager
-          namespace: {{ .Release.Namespace }}
-          volumeName: config-volume
-          defaultMode: 0777
-      volumeTypes:
-        - name: alert
-          type: data
+      workloadType: Stateful
+      characterType: alertmanager
       service:
         ports:
           - name: http
             port: 80
             protocol: TCP
             targetPort: 9093
+      volumeTypes:
+        - name: alert
+          type: data
+      configSpecs:
+        - name: alertmanager-configuration
+          templateRef: prometheus-alertmanager
+          namespace: {{ .Release.Namespace }}
+          volumeName: config-volume
+          defaultMode: 0777
       podSpec:
         securityContext:
           runAsUser: 0
         containers:
-          - name: prometheus-alertmanager
+          - name: configmap-reload
+            args:
+              - --volume-dir=/etc/config
+              - --webhook-url=http://127.0.0.1:9093/-/reload
+            volumeMounts:
+              - name: config-volume
+                mountPath: /etc/config
+                readOnly: true
+          - name: alertmanager
             env:
               - name: POD_IP
                 valueFrom:
@@ -150,19 +135,10 @@ spec:
                     fieldPath: status.podIP
             args:
               - --config.file=/etc/config/alertmanager.yml
-              - --storage.path={{ .Values.alertmanager.persistentVolume.mountPath }}
-              {{- if .Values.alertmanager.statefulSet.headless.enableMeshPeer }}
-                - --cluster.advertise-address=[$(POD_IP)]:6783
-                - --cluster.listen-address=0.0.0.0:6783
-              {{- else }}
-                - --cluster.listen-address=
-              {{- end }}
-              {{- range $key, $value := .Values.alertmanager.extraArgs }}
-                - --{{ $key }}={{ $value }}
-              {{- end }}
-              {{- if .Values.alertmanager.baseURL }}
-                - --web.external-url={{ .Values.alertmanager.baseURL }}
-              {{- end }}
+              - --storage.path=/data
+              - --cluster.advertise-address=[$(POD_IP)]:6783
+              - --cluster.listen-address=0.0.0.0:6783
+              - --web.external-url=http://localhost:9093
             readinessProbe:
               httpGet:
                 path: /-/ready
@@ -178,21 +154,6 @@ spec:
               - name: data
                 mountPath: "/data"
                 subPath: ""
-
-          - name: prometheus-alertmanager-configmap-reload
-            args:
-              - --volume-dir=/etc/config
-              - --webhook-url=http://127.0.0.1:9093/-/reload
-            readinessProbe:
-              httpGet:
-                path: /-/ready
-                port: 9093
-              initialDelaySeconds: 30
-              timeoutSeconds: 30
-            volumeMounts:
-              - name: config-volume
-                mountPath: /etc/config
-                readOnly: true
         volumes:
           - name: config-volume
             configMap:

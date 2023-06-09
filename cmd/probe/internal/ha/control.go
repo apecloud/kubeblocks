@@ -155,7 +155,7 @@ func (h *Ha) HaControl(stopCh chan struct{}) {
 			},
 			UpdateFunc: h.clusterControl,
 		},
-	}, 0)
+	}, time.Second*10)
 
 	h.informer.Run(stopCh)
 }
@@ -163,14 +163,13 @@ func (h *Ha) HaControl(stopCh chan struct{}) {
 func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 	oldConfigMap := oldObj.(*v1.ConfigMap)
 	newConfigMap := newObj.(*v1.ConfigMap)
-	if oldConfigMap.ResourceVersion == newConfigMap.ResourceVersion {
+	if oldConfigMap.ResourceVersion != newConfigMap.ResourceVersion {
 		return
 	}
 
 	err := h.cs.GetClusterFromKubernetes()
 	if err != nil {
 		h.log.Errorf("cluster control get cluster from k8s err:%v", err)
-		time.Sleep(time.Second * 10)
 		return
 	}
 
@@ -182,7 +181,6 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 		if !h.hasLock() {
 			h.setLeader(false)
 			_ = h.follow()
-			time.Sleep(time.Second * 10)
 			return
 		}
 		err = h.updateLockWithRetry(3)
@@ -202,7 +200,6 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 		}
 
 		err = h.DB.EnforcePrimaryRole(h.ctx, h.podName)
-		time.Sleep(time.Second * 10)
 		return
 	}
 
@@ -217,6 +214,9 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 
 		if h.cs.GetCluster().Switchover != nil {
 			err = h.cs.DeleteConfigMap(h.cs.GetClusterCompName() + configuration_store.SwitchoverSuffix)
+			if err != nil {
+				return
+			}
 		}
 
 		err = h.DB.EnforcePrimaryRole(h.ctx, h.podName)
@@ -225,7 +225,6 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 		time.Sleep(time.Second * 2)
 		_ = h.follow()
 	}
-	time.Sleep(time.Second * 10)
 }
 
 func (h *Ha) hasLock() bool {
@@ -246,7 +245,6 @@ func (h *Ha) updateLockWithRetry(retryTimes int) error {
 		if err == nil {
 			return nil
 		}
-		time.Sleep(time.Second * 10)
 	}
 
 	return err

@@ -928,6 +928,7 @@ func (pgOps *PostgresOperations) IsLeader(ctx context.Context) (bool, error) {
 		pgOps.Logger.Errorf("get role failed, err:%v", err)
 		return false, err
 	}
+	pgOps.OriRole = role
 
 	return role == PRIMARY, nil
 }

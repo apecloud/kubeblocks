@@ -308,11 +308,25 @@ func (cs *ConfigurationStore) UpdateConfigMap(configMap *v1.ConfigMap) (*v1.Conf
 }
 
 func (cs *ConfigurationStore) CreateConfigMap(name string, annotations map[string]string) (*v1.ConfigMap, error) {
+	clusterObj, err := cs.dynamicClient.Resource(types.ClusterGVR()).Namespace(cs.namespace).Get(cs.ctx, cs.clusterName, metav1.GetOptions{})
+	if clusterObj == nil && err != nil {
+		return nil, err
+	}
+	ownerReference := []metav1.OwnerReference{
+		{
+			APIVersion: clusterObj.GetAPIVersion(),
+			Kind:       clusterObj.GetKind(),
+			Name:       clusterObj.GetName(),
+			UID:        clusterObj.GetUID(),
+		},
+	}
+
 	configMap, err := cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Namespace:   cs.namespace,
-			Annotations: annotations,
+			Name:            name,
+			Namespace:       cs.namespace,
+			Annotations:     annotations,
+			OwnerReferences: ownerReference,
 		},
 	}, metav1.CreateOptions{})
 	if err != nil {
@@ -391,7 +405,7 @@ func (cs *ConfigurationStore) UpdateLeader(podName string, opTime int64, extra m
 }
 
 func (cs *ConfigurationStore) DeleteLeader(opTime int64) error {
-	leaderConfigMap, err := cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Get(cs.ctx, cs.clusterCompName+LeaderSuffix, metav1.GetOptions{})
+	leaderConfigMap, err := cs.GetConfigMap(cs.clusterCompName + LeaderSuffix)
 	if err != nil {
 		return err
 	}
@@ -401,7 +415,7 @@ func (cs *ConfigurationStore) DeleteLeader(opTime int64) error {
 		leaderConfigMap.Annotations[OpTime] = strconv.FormatInt(opTime, 10)
 	}
 
-	_, err = cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Update(cs.ctx, leaderConfigMap, metav1.UpdateOptions{})
+	_, err = cs.UpdateConfigMap(leaderConfigMap)
 	return err
 }
 
@@ -415,18 +429,12 @@ func (cs *ConfigurationStore) AttemptToAcquireLeaderLock(podName string) error {
 		AcquireTime: strconv.FormatInt(now, 10),
 	}
 
-	configMap, err := cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Get(cs.ctx, cs.clusterCompName+LeaderSuffix, metav1.GetOptions{})
+	configMap, err := cs.GetConfigMap(cs.clusterCompName + LeaderSuffix)
 	if err != nil || configMap == nil {
-		_, err = cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        cs.clusterCompName + LeaderSuffix,
-				Namespace:   cs.namespace,
-				Annotations: annotation,
-			},
-		}, metav1.CreateOptions{})
+		_, err = cs.CreateConfigMap(cs.clusterCompName+LeaderSuffix, annotation)
 	} else {
 		configMap.SetAnnotations(annotation)
-		_, err = cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Update(cs.ctx, configMap, metav1.UpdateOptions{})
+		_, err = cs.UpdateConfigMap(configMap)
 	}
 
 	return err

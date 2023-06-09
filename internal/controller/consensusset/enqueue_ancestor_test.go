@@ -292,6 +292,18 @@ var _ = Describe("enqueue ancestor", func() {
 			Expect(len(result)).Should(Equal(0))
 		})
 	})
+
+	Context("handler interface", func() {
+		BeforeEach(func() {
+			Expect(handler.InjectScheme(scheme)).Should(Succeed())
+			Expect(handler.InjectMapper(newFakeMapper())).Should(Succeed())
+		})
+
+		It("should work well", func() {
+			By("build events and queue")
+			
+		})
+	})
 })
 
 type fakeMapper struct{}

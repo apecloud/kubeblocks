@@ -61,9 +61,9 @@ const (
 	shell2httpImage                  = "msoap/shell2http:1.16.0"
 	shell2httpBinaryPath             = "/app/shell2http"
 	shell2httpServePath              = "/role"
-	defaultRoleObservationImage      = "apecloud/kubeblocks-role-observation:latest"
+	defaultRoleObservationImage      = "apecloud/kubeblocks-role-agent:latest"
 	defaultRoleObservationDaemonPort = 3501
-	roleObservationURIFormat         = "http://localhost:%s/getRole"
+	roleObservationURIFormat         = "http://localhost:%s/role"
 	defaultActionImage               = "busybox:latest"
 	usernameCredentialVarName        = "KB_SRS_USERNAME"
 	passwordCredentialVarName        = "KB_SRS_PASSWORD"

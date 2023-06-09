@@ -26,16 +26,16 @@ import (
 )
 
 type ConsensusSetBuilder struct {
-	BaseBuilder[workloads.ConsensusSet, *workloads.ConsensusSet, ConsensusSetBuilder]
+	BaseBuilder[workloads.StatefulReplicaSet, *workloads.StatefulReplicaSet, ConsensusSetBuilder]
 }
 
 func NewConsensusSetBuilder(namespace, name string) *ConsensusSetBuilder {
 	builder := &ConsensusSetBuilder{}
 	builder.init(namespace, name,
-		&workloads.ConsensusSet{
-			Spec: workloads.ConsensusSetSpec{
+		&workloads.StatefulReplicaSet{
+			Spec: workloads.StatefulReplicaSetSpec{
 				Replicas: 1,
-				Roles: []workloads.ConsensusRole{
+				Roles: []workloads.ReplicaRole{
 					{
 						Name:       "leader",
 						AccessMode: workloads.ReadWriteMode,
@@ -54,7 +54,7 @@ func (builder *ConsensusSetBuilder) SetReplicas(replicas int32) *ConsensusSetBui
 	return builder
 }
 
-func (builder *ConsensusSetBuilder) SetRoles(roles []workloads.ConsensusRole) *ConsensusSetBuilder {
+func (builder *ConsensusSetBuilder) SetRoles(roles []workloads.ReplicaRole) *ConsensusSetBuilder {
 	builder.get().Spec.Roles = roles
 	return builder
 }

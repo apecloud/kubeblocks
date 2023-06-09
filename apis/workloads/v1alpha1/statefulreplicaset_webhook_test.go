@@ -28,18 +28,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var _ = Describe("ConsensusSet Webhook", func() {
+var _ = Describe("StatefulReplicaSet Webhook", func() {
 	Context("spec validation", func() {
-		const name = "test-consensus-set"
-		var csSet *ConsensusSet
+		const name = "test-stateful-replica-set"
+		var srs *StatefulReplicaSet
 
 		BeforeEach(func() {
-			csSet = &ConsensusSet{
+			srs = &StatefulReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: testCtx.DefaultNamespace,
 				},
-				Spec: ConsensusSetSpec{
+				Spec: StatefulReplicaSetSpec{
 					Replicas: 1,
 					RoleObservation: RoleObservation{
 						ObservationActions: []Action{
@@ -64,48 +64,48 @@ var _ = Describe("ConsensusSet Webhook", func() {
 		})
 
 		It("should return an error if no leader set", func() {
-			csSet.Spec.Roles = []ConsensusRole{
+			srs.Spec.Roles = []ReplicaRole{
 				{
 					Name:       "leader",
 					IsLeader:   false,
 					AccessMode: ReadWriteMode,
 				},
 			}
-			err := k8sClient.Create(ctx, csSet)
+			err := k8sClient.Create(ctx, srs)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("leader is required"))
 		})
 
 		It("should return an error if servicePort not provided", func() {
-			csSet.Spec.Roles = []ConsensusRole{
+			srs.Spec.Roles = []ReplicaRole{
 				{
 					Name:       "leader",
 					IsLeader:   true,
 					AccessMode: ReadWriteMode,
 				},
 			}
-			err := k8sClient.Create(ctx, csSet)
+			err := k8sClient.Create(ctx, srs)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("servicePort must provide"))
 		})
 
 		It("should succeed if spec is well defined", func() {
-			csSet.Spec.Roles = []ConsensusRole{
+			srs.Spec.Roles = []ReplicaRole{
 				{
 					Name:       "leader",
 					IsLeader:   true,
 					AccessMode: ReadWriteMode,
 				},
 			}
-			csSet.Spec.Service.Ports = []corev1.ServicePort{
+			srs.Spec.Service.Ports = []corev1.ServicePort{
 				{
 					Name:     "foo",
 					Protocol: "tcp",
 					Port:     12345,
 				},
 			}
-			Expect(k8sClient.Create(ctx, csSet)).Should(Succeed())
-			Expect(k8sClient.Delete(ctx, csSet)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, srs)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, srs)).Should(Succeed())
 		})
 	})
 })

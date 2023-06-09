@@ -28,8 +28,8 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// ConsensusSetSpec defines the desired state of ConsensusSet
-type ConsensusSetSpec struct {
+// StatefulReplicaSetSpec defines the desired state of StatefulReplicaSet
+type StatefulReplicaSetSpec struct {
 	// Replicas defines number of Pods
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=0
@@ -46,7 +46,7 @@ type ConsensusSetSpec struct {
 	Template corev1.PodTemplateSpec `json:"template"`
 
 	// volumeClaimTemplates is a list of claims that pods are allowed to reference.
-	// The ConsensusSet controller is responsible for mapping network identities to
+	// The StatefulReplicaSet controller is responsible for mapping network identities to
 	// claims in a way that maintains the identity of a pod. Every claim in
 	// this list must have at least one matching (by name) volumeMount in one
 	// container in the template. A claim in this list takes precedence over
@@ -54,9 +54,9 @@ type ConsensusSetSpec struct {
 	// +optional
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 
-	// Roles, a list of roles defined in this consensus system.
+	// Roles, a list of roles defined in the system.
 	// +kubebuilder:validation:Required
-	Roles []ConsensusRole `json:"roles"`
+	Roles []ReplicaRole `json:"roles"`
 
 	// RoleObservation provides method to observe role.
 	// +kubebuilder:validation:Required
@@ -82,8 +82,8 @@ type ConsensusSetSpec struct {
 	Credential *Credential `json:"credential,omitempty"`
 }
 
-// ConsensusSetStatus defines the observed state of ConsensusSet
-type ConsensusSetStatus struct {
+// StatefulReplicaSetStatus defines the observed state of StatefulReplicaSet
+type StatefulReplicaSetStatus struct {
 	appsv1.StatefulSetStatus `json:",inline"`
 
 	// InitReplicas is the number of pods(members) when cluster first initialized
@@ -97,36 +97,36 @@ type ConsensusSetStatus struct {
 
 	// members' status.
 	// +optional
-	MembersStatus []ConsensusMemberStatus `json:"membersStatus,omitempty"`
+	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks,all},shortName=csset
+// +kubebuilder:resource:categories={kubeblocks,all},shortName=srs
 // +kubebuilder:printcolumn:name="LEADER",type="string",JSONPath=".status.membersStatus[?(@.role.isLeader==true)].podName",description="leader pod name."
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.readyReplicas",description="ready replicas."
 // +kubebuilder:printcolumn:name="REPLICAS",type="string",JSONPath=".status.replicas",description="total replicas."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ConsensusSet is the Schema for the consensussets API
-type ConsensusSet struct {
+// StatefulReplicaSet is the Schema for the statefulreplicasets API
+type StatefulReplicaSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ConsensusSetSpec   `json:"spec,omitempty"`
-	Status ConsensusSetStatus `json:"status,omitempty"`
+	Spec   StatefulReplicaSetSpec   `json:"spec,omitempty"`
+	Status StatefulReplicaSetStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// ConsensusSetList contains a list of ConsensusSet
-type ConsensusSetList struct {
+// StatefulReplicaSetList contains a list of StatefulReplicaSet
+type StatefulReplicaSetList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ConsensusSet `json:"items"`
+	Items           []StatefulReplicaSet `json:"items"`
 }
 
-type ConsensusRole struct {
+type ReplicaRole struct {
 	// Name, role name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=leader
@@ -175,9 +175,9 @@ type RoleObservation struct {
 	// after all actions done, the final output should be a single string of the role name defined in spec.Roles
 	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured
 	// Environment variables can be used in Command:
-	// - v_KB_CONSENSUS_SET_LAST_STDOUT stdout from last action, watch 'v_' prefixed
-	// - KB_CONSENSUS_SET_USERNAME username part of credential
-	// - KB_CONSENSUS_SET_PASSWORD password part of credential
+	// - v_KB_SRS_LAST_STDOUT stdout from last action, watch 'v_' prefixed
+	// - KB_SRS_USERNAME username part of credential
+	// - KB_SRS_PASSWORD password part of credential
 	// +kubebuilder:validation:Required
 	ObservationActions []Action `json:"observationActions"`
 
@@ -202,6 +202,7 @@ type RoleObservation struct {
 	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
 
 	// Minimum consecutive successes for the observation to be considered successful after having failed.
+	// Minimum consecutive successes for the observation to be considered successful after having failed.
 	// Defaults to 1. Minimum value is 1.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=1
@@ -218,12 +219,12 @@ type RoleObservation struct {
 
 type Credential struct {
 	// Username
-	// variable name will be KB_CONSENSUS_SET_USERNAME
+	// variable name will be KB_SRS_USERNAME
 	// +kubebuilder:validation:Required
 	Username CredentialVar `json:"username"`
 
 	// Password
-	// variable name will be KB_CONSENSUS_SET_PASSWORD
+	// variable name will be KB_SRS_PASSWORD
 	// +kubebuilder:validation:Required
 	Password CredentialVar `json:"password"`
 }
@@ -250,11 +251,11 @@ type CredentialVar struct {
 
 type MembershipReconfiguration struct {
 	// Environment variables can be used in all following Actions:
-	// - KB_CONSENSUS_SET_USERNAME username part of credential
-	// - KB_CONSENSUS_SET_PASSWORD password part of credential
-	// - KB_CONSENSUS_SET_LEADER_HOST leader host
-	// - KB_CONSENSUS_SET_TARGET_HOST target host
-	// - KB_CONSENSUS_SET_SERVICE_PORT port
+	// - KB_SRS_USERNAME username part of credential
+	// - KB_SRS_PASSWORD password part of credential
+	// - KB_SRS_LEADER_HOST leader host
+	// - KB_SRS_TARGET_HOST target host
+	// - KB_SRS_SERVICE_PORT port
 
 	// SwitchoverAction specifies how to do switchover
 	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured
@@ -292,15 +293,15 @@ type Action struct {
 	Command []string `json:"command"`
 }
 
-type ConsensusMemberStatus struct {
+type MemberStatus struct {
 	// PodName pod name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Unknown
 	PodName string `json:"podName"`
 
-	ConsensusRole `json:"role"`
+	ReplicaRole `json:"role"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ConsensusSet{}, &ConsensusSetList{})
+	SchemeBuilder.Register(&StatefulReplicaSet{}, &StatefulReplicaSetList{})
 }

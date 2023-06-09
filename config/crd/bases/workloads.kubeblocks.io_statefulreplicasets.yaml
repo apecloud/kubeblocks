@@ -5,19 +5,19 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: consensussets.workloads.kubeblocks.io
+  name: statefulreplicasets.workloads.kubeblocks.io
 spec:
   group: workloads.kubeblocks.io
   names:
     categories:
     - kubeblocks
     - all
-    kind: ConsensusSet
-    listKind: ConsensusSetList
-    plural: consensussets
+    kind: StatefulReplicaSet
+    listKind: StatefulReplicaSetList
+    plural: statefulreplicasets
     shortNames:
-    - csset
-    singular: consensusset
+    - srs
+    singular: statefulreplicaset
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -39,7 +39,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ConsensusSet is the Schema for the consensussets API
+        description: StatefulReplicaSet is the Schema for the statefulreplicasets
+          API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -54,13 +55,13 @@ spec:
           metadata:
             type: object
           spec:
-            description: ConsensusSetSpec defines the desired state of ConsensusSet
+            description: StatefulReplicaSetSpec defines the desired state of StatefulReplicaSet
             properties:
               credential:
                 description: Credential used to connect to DB engine
                 properties:
                   password:
-                    description: Password variable name will be KB_CONSENSUS_SET_PASSWORD
+                    description: Password variable name will be KB_SRS_PASSWORD
                     properties:
                       value:
                         description: 'Variable references $(VAR_NAME) are expanded
@@ -158,7 +159,7 @@ spec:
                         type: object
                     type: object
                   username:
-                    description: Username variable name will be KB_CONSENSUS_SET_USERNAME
+                    description: Username variable name will be KB_SRS_USERNAME
                     properties:
                       value:
                         description: 'Variable references $(VAR_NAME) are expanded
@@ -382,9 +383,9 @@ spec:
                       single string of the role name defined in spec.Roles latest
                       [BusyBox](https://busybox.net/) image will be used if Image
                       not configured Environment variables can be used in Command:
-                      - v_KB_CONSENSUS_SET_LAST_STDOUT stdout from last action, watch
-                      ''v_'' prefixed - KB_CONSENSUS_SET_USERNAME username part of
-                      credential - KB_CONSENSUS_SET_PASSWORD password part of credential'
+                      - v_KB_SRS_LAST_STDOUT stdout from last action, watch ''v_''
+                      prefixed - KB_SRS_USERNAME username part of credential - KB_SRS_PASSWORD
+                      password part of credential'
                     items:
                       properties:
                         command:
@@ -411,8 +412,9 @@ spec:
                   successThreshold:
                     default: 1
                     description: Minimum consecutive successes for the observation
-                      to be considered successful after having failed. Defaults to
-                      1. Minimum value is 1.
+                      to be considered successful after having failed. Minimum consecutive
+                      successes for the observation to be considered successful after
+                      having failed. Defaults to 1. Minimum value is 1.
                     format: int32
                     minimum: 1
                     type: integer
@@ -427,7 +429,7 @@ spec:
                 - observationActions
                 type: object
               roles:
-                description: Roles, a list of roles defined in this consensus system.
+                description: Roles, a list of roles defined in the system.
                 items:
                   properties:
                     accessMode:
@@ -8156,7 +8158,7 @@ spec:
                 type: string
               volumeClaimTemplates:
                 description: volumeClaimTemplates is a list of claims that pods are
-                  allowed to reference. The ConsensusSet controller is responsible
+                  allowed to reference. The StatefulReplicaSet controller is responsible
                   for mapping network identities to claims in a way that maintains
                   the identity of a pod. Every claim in this list must have at least
                   one matching (by name) volumeMount in one container in the template.
@@ -8507,7 +8509,7 @@ spec:
             - template
             type: object
           status:
-            description: ConsensusSetStatus defines the observed state of ConsensusSet
+            description: StatefulReplicaSetStatus defines the observed state of StatefulReplicaSet
             properties:
               availableReplicas:
                 description: Total number of available pods (ready for at least minReadySeconds)

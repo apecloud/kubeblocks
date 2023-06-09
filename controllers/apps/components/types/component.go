@@ -101,7 +101,7 @@ type ComponentSet interface {
 	// if the component is Stateless/StatefulSet, the available conditions follows as:
 	// 1. the pod is ready.
 	// 2. readyTime reached minReadySeconds.
-	// if the component is ConsensusSet,it will be available when the pod is ready and labeled with its role.
+	// if the component is StatefulReplicaSet,it will be available when the pod is ready and labeled with its role.
 	PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool
 
 	// GetPhaseWhenPodsReadyAndProbeTimeout when the pods of component are ready but the probe timed-out,

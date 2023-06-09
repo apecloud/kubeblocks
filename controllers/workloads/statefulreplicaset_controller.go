@@ -38,35 +38,35 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// ConsensusSetReconciler reconciles a ConsensusSet object
-type ConsensusSetReconciler struct {
+// StatefulReplicaSetReconciler reconciles a StatefulReplicaSet object
+type StatefulReplicaSetReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=consensussets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=consensussets/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=consensussets/finalizers,verbs=update
+//+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=statefulreplicasets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=statefulreplicasets/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=statefulreplicasets/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the ConsensusSet object against the actual cluster state, and then
+// the StatefulReplicaSet object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
-func (r *ConsensusSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *StatefulReplicaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithValues("ConsensusSet", req.NamespacedName),
+		Log:      log.FromContext(ctx).WithValues("StatefulReplicaSet", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
 
-	reqCtx.Log.V(1).Info("reconcile", "ConsensusSet", req.NamespacedName)
+	reqCtx.Log.V(1).Info("reconcile", "StatefulReplicaSet", req.NamespacedName)
 
 	requeueError := func(err error) (ctrl.Result, error) {
 		if re, ok := err.(model.RequeueError); ok {
@@ -75,7 +75,7 @@ func (r *ConsensusSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	// the consensus set reconciliation loop is a 3-stage model: plan Init, plan Build and plan Execute
+	// the stateful_replica_set reconciliation loop is a two-phase model: plan Build and plan Execute
 	// Init stage
 	planBuilder := consensusset.NewCSSetPlanBuilder(reqCtx, r.Client, req)
 	if err := planBuilder.Init(); err != nil {
@@ -131,15 +131,15 @@ func (r *ConsensusSetReconciler) Reconcile(ctx context.Context, req ctrl.Request
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ConsensusSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *StatefulReplicaSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&workloads.ConsensusSet{}).
+		For(&workloads.StatefulReplicaSet{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&batchv1.Job{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}},
 			&consensusset.EnqueueRequestForAncestor{
 				Client:    r.Client,
-				OwnerType: &workloads.ConsensusSet{},
+				OwnerType: &workloads.StatefulReplicaSet{},
 				UpToLevel: 2,
 				InTypes:   []runtime.Object{&appsv1.StatefulSet{}},
 			}).

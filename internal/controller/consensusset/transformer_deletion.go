@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// CSSetDeletionTransformer handles ConsensusSet deletion
+// CSSetDeletionTransformer handles StatefulReplicaSet deletion
 type CSSetDeletionTransformer struct{}
 
 func (t *CSSetDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {

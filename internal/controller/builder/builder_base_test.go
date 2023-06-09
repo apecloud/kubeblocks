@@ -47,7 +47,7 @@ var _ = Describe("base builder", func() {
 		owner := NewConsensusSetBuilder(ns, name).GetObject()
 		owner.UID = "sdfwsedqw-swed-sdswe"
 		ownerAPIVersion := "workloads.kubeblocks.io/v1alpha1"
-		ownerKind := "ConsensusSet"
+		ownerKind := "StatefulReplicaSet"
 		obj := NewConfigMapBuilder(ns, name).
 			SetUID(uid).
 			AddLabels(labelKey1, labelValue1, labelKey2, labelValue2).

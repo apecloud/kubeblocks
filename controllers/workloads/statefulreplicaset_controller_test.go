@@ -30,7 +30,7 @@ import (
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
-var _ = Describe("ConsensusSet Controller", func() {
+var _ = Describe("StatefulReplicaSet Controller", func() {
 	Context("reconciliation", func() {
 		It("should reconcile well", func() {
 			name := "text-consensus-set"
@@ -71,12 +71,12 @@ var _ = Describe("ConsensusSet Controller", func() {
 				GetObject()
 			Expect(k8sClient.Create(ctx, csSet)).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(csSet),
-				func(g Gomega, set *workloads.ConsensusSet) {
+				func(g Gomega, set *workloads.StatefulReplicaSet) {
 					g.Expect(set.Status.ObservedGeneration).Should(BeEquivalentTo(1))
 				}),
 			).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, csSet)).Should(Succeed())
-			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(csSet), &workloads.ConsensusSet{}, false)).
+			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(csSet), &workloads.StatefulReplicaSet{}, false)).
 				Should(Succeed())
 		})
 	})

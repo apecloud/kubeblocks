@@ -57,11 +57,11 @@ func init() {
 // PlanBuilder implementation
 
 func (b *csSetPlanBuilder) Init() error {
-	csSet := &workloads.ConsensusSet{}
+	csSet := &workloads.StatefulReplicaSet{}
 	if err := b.cli.Get(b.transCtx.Context, b.req.NamespacedName, csSet); err != nil {
 		return err
 	}
-	b.AddTransformer(&initTransformer{ConsensusSet: csSet})
+	b.AddTransformer(&initTransformer{StatefulReplicaSet: csSet})
 	return nil
 }
 

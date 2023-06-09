@@ -58,7 +58,7 @@ var _ = Describe("enqueue ancestor", func() {
 	BeforeEach(func() {
 		handler = &EnqueueRequestForAncestor{
 			Client:    k8sMock,
-			OwnerType: &workloads.ConsensusSet{},
+			OwnerType: &workloads.StatefulReplicaSet{},
 			UpToLevel: 2,
 			InTypes:   []runtime.Object{&appsv1.StatefulSet{}},
 		}
@@ -68,7 +68,7 @@ var _ = Describe("enqueue ancestor", func() {
 		It("should work well", func() {
 			Expect(handler.parseOwnerTypeGroupKind(scheme)).Should(Succeed())
 			Expect(handler.groupKind.Group).Should(Equal("workloads.kubeblocks.io"))
-			Expect(handler.groupKind.Kind).Should(Equal("ConsensusSet"))
+			Expect(handler.groupKind.Kind).Should(Equal("StatefulReplicaSet"))
 		})
 	})
 
@@ -153,7 +153,7 @@ var _ = Describe("enqueue ancestor", func() {
 			By("builder ancestor tree")
 			ancestorLevel2 := builder.NewConsensusSetBuilder(namespace, "foo").GetObject()
 			ancestorL2APIVersion := "workloads.kubeblocks.io/v1alpha1"
-			ancestorL2Kind := "ConsensusSet"
+			ancestorL2Kind := "StatefulReplicaSet"
 			ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, "foo").
 				SetOwnerReferences(ancestorL2APIVersion, ancestorL2Kind, ancestorLevel2).
 				GetObject()
@@ -246,7 +246,7 @@ var _ = Describe("enqueue ancestor", func() {
 			By("build ancestors")
 			ancestorLevel2 := builder.NewConsensusSetBuilder(namespace, "foo-level-2").GetObject()
 			ancestorL2APIVersion := "workloads.kubeblocks.io/v1alpha1"
-			ancestorL2Kind := "ConsensusSet"
+			ancestorL2Kind := "StatefulReplicaSet"
 			ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, "foo-level-1").
 				SetOwnerReferences(ancestorL2APIVersion, ancestorL2Kind, ancestorLevel2).
 				GetObject()
@@ -307,7 +307,7 @@ var _ = Describe("enqueue ancestor", func() {
 			queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "enqueue-ancestor-test")
 			ancestorLevel2 := builder.NewConsensusSetBuilder(namespace, "foo-level-2").GetObject()
 			ancestorL2APIVersion := "workloads.kubeblocks.io/v1alpha1"
-			ancestorL2Kind := "ConsensusSet"
+			ancestorL2Kind := "StatefulReplicaSet"
 			ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, "foo-level-1").
 				SetOwnerReferences(ancestorL2APIVersion, ancestorL2Kind, ancestorLevel2).
 				GetObject()

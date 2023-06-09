@@ -51,9 +51,9 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-workloads-kubeblocks-io-v1alpha1-consensusset
+      path: /mutate-workloads-kubeblocks-io-v1alpha1-statefulreplicaset
   failurePolicy: Fail
-  name: mconsensusset.kb.io
+  name: mstatefulreplicaset.kb.io
   rules:
   - apiGroups:
     - workloads.kubeblocks.io
@@ -63,7 +63,7 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - consensussets
+    - statefulreplicasets
   sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
@@ -158,9 +158,9 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-workloads-kubeblocks-io-v1alpha1-consensusset
+      path: /validate-workloads-kubeblocks-io-v1alpha1-statefulreplicaset
   failurePolicy: Fail
-  name: vconsensusset.kb.io
+  name: vstatefulreplicaset.kb.io
   rules:
   - apiGroups:
     - workloads.kubeblocks.io
@@ -170,5 +170,5 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - consensussets
+    - statefulreplicasets
   sideEffects: None

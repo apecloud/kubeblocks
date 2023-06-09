@@ -139,7 +139,7 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 // consensus_set level 'ready' state:
 // 1. all replicas exist
 // 2. all members have role set
-func isConsensusSetReady(csSet *workloads.ConsensusSet) bool {
+func isConsensusSetReady(csSet *workloads.StatefulReplicaSet) bool {
 	membersStatus := csSet.Status.MembersStatus
 	if len(membersStatus) != int(csSet.Spec.Replicas) {
 		return false
@@ -165,7 +165,7 @@ func isStatefulSetReady(sts *apps.StatefulSet) bool {
 	return false
 }
 
-func isMemberReady(podName string, membersStatus []workloads.ConsensusMemberStatus) bool {
+func isMemberReady(podName string, membersStatus []workloads.MemberStatus) bool {
 	for _, memberStatus := range membersStatus {
 		if memberStatus.PodName == podName {
 			return true
@@ -192,7 +192,7 @@ func cleanAction(transCtx *CSSetTransformContext, dag *graph.DAG) error {
 	return nil
 }
 
-func isActionDone(csSet *workloads.ConsensusSet, action *batchv1.Job) bool {
+func isActionDone(csSet *workloads.StatefulReplicaSet, action *batchv1.Job) bool {
 	ordinal, _ := getActionOrdinal(action.Name)
 	podName := getPodName(csSet.Name, ordinal)
 	membersStatus := csSet.Status.MembersStatus
@@ -218,7 +218,7 @@ func deleteAction(dag *graph.DAG, action *batchv1.Job) {
 	doActionCleanup(dag, action)
 }
 
-func createNextAction(transCtx *CSSetTransformContext, dag *graph.DAG, csSet *workloads.ConsensusSet, currentAction *batchv1.Job) error {
+func createNextAction(transCtx *CSSetTransformContext, dag *graph.DAG, csSet *workloads.StatefulReplicaSet, currentAction *batchv1.Job) error {
 	actionInfoList := generateActionInfoList(csSet)
 
 	if len(actionInfoList) == 0 {
@@ -265,7 +265,7 @@ func createNextAction(transCtx *CSSetTransformContext, dag *graph.DAG, csSet *wo
 	return createAction(dag, csSet, nextAction)
 }
 
-func generateActionInfoList(csSet *workloads.ConsensusSet) []*actionInfo {
+func generateActionInfoList(csSet *workloads.StatefulReplicaSet) []*actionInfo {
 	var actionInfoList []*actionInfo
 	memberReadyReplicas := int32(len(csSet.Status.MembersStatus))
 
@@ -304,7 +304,7 @@ func isPreAction(actionType string) bool {
 	return actionType == jobTypeSwitchover || actionType == jobTypeMemberLeaveNotifying
 }
 
-func shouldHaveActions(csSet *workloads.ConsensusSet) bool {
+func shouldHaveActions(csSet *workloads.StatefulReplicaSet) bool {
 	currentReplicas := len(csSet.Status.MembersStatus)
 	expectedReplicas := int(csSet.Spec.Replicas)
 
@@ -323,7 +323,7 @@ func shouldHaveActions(csSet *workloads.ConsensusSet) bool {
 	return false
 }
 
-func shouldCreateAction(csSet *workloads.ConsensusSet, actionType string, checker conditionChecker) bool {
+func shouldCreateAction(csSet *workloads.StatefulReplicaSet, actionType string, checker conditionChecker) bool {
 	if checker != nil && !checker() {
 		return false
 	}
@@ -370,9 +370,9 @@ func getUnderlyingStsVertex(dag *graph.DAG) (*model.ObjectVertex, error) {
 // all members with ordinal less than action target pod should be in a good consensus state:
 // 1. they should be in membersStatus
 // 2. they should have a leader
-func abnormalAnalysis(csSet *workloads.ConsensusSet, action *batchv1.Job) error {
+func abnormalAnalysis(csSet *workloads.StatefulReplicaSet, action *batchv1.Job) error {
 	membersStatus := csSet.Status.MembersStatus
-	statusMap := make(map[string]workloads.ConsensusMemberStatus, len(membersStatus))
+	statusMap := make(map[string]workloads.MemberStatus, len(membersStatus))
 	for _, status := range membersStatus {
 		statusMap[status.PodName] = status
 	}
@@ -411,7 +411,7 @@ func abnormalAnalysis(csSet *workloads.ConsensusSet, action *batchv1.Job) error 
 	return nil
 }
 
-func generateActionInfos(csSet *workloads.ConsensusSet, ordinal int, actionTypeList []string) []*actionInfo {
+func generateActionInfos(csSet *workloads.StatefulReplicaSet, ordinal int, actionTypeList []string) []*actionInfo {
 	var actionInfos []*actionInfo
 	leaderPodName := getLeaderPodName(csSet.Status.MembersStatus)
 	podName := getPodName(csSet.Name, ordinal)

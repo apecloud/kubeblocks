@@ -39,7 +39,7 @@ type updatePlan interface {
 }
 
 type realUpdatePlan struct {
-	csSet           workloads.ConsensusSet
+	csSet           workloads.StatefulReplicaSet
 	pods            []corev1.Pod
 	dag             *graph.DAG
 	podsToBeUpdated []*corev1.Pod
@@ -184,7 +184,7 @@ func (p *realUpdatePlan) execute() ([]*corev1.Pod, error) {
 	return p.podsToBeUpdated, nil
 }
 
-func newUpdatePlan(csSet workloads.ConsensusSet, pods []corev1.Pod) updatePlan {
+func newUpdatePlan(csSet workloads.StatefulReplicaSet, pods []corev1.Pod) updatePlan {
 	return &realUpdatePlan{
 		csSet: csSet,
 		pods:  pods,

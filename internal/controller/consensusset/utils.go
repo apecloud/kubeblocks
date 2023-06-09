@@ -74,7 +74,7 @@ func sortPods(pods []corev1.Pod, rolePriorityMap map[string]int, reverse bool) {
 	sortMembers(pods, rolePriorityMap, getRoleFunc, getOrdinalFunc, reverse)
 }
 
-func sortMembersStatus(membersStatus []workloads.ConsensusMemberStatus, rolePriorityMap map[string]int) {
+func sortMembersStatus(membersStatus []workloads.MemberStatus, rolePriorityMap map[string]int) {
 	getRoleFunc := func(i int) string {
 		return membersStatus[i].Name
 	}
@@ -110,7 +110,7 @@ func sortMembers[T any](membersStatus []T,
 }
 
 // composeRolePriorityMap generates a priority map based on roles.
-func composeRolePriorityMap(set workloads.ConsensusSet) map[string]int {
+func composeRolePriorityMap(set workloads.StatefulReplicaSet) map[string]int {
 	rolePriorityMap := make(map[string]int, 0)
 	rolePriorityMap[""] = emptyPriority
 	for _, role := range set.Spec.Roles {
@@ -138,7 +138,7 @@ func composeRolePriorityMap(set workloads.ConsensusSet) map[string]int {
 // updatePodRoleLabel updates pod role label when internal container role changed
 func updatePodRoleLabel(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
-	set workloads.ConsensusSet,
+	set workloads.StatefulReplicaSet,
 	pod *corev1.Pod, roleName string) error {
 	ctx := reqCtx.Ctx
 	roleMap := composeRoleMap(set)
@@ -159,17 +159,17 @@ func updatePodRoleLabel(cli client.Client,
 	return cli.Patch(ctx, pod, patch)
 }
 
-func composeRoleMap(set workloads.ConsensusSet) map[string]workloads.ConsensusRole {
-	roleMap := make(map[string]workloads.ConsensusRole, 0)
+func composeRoleMap(set workloads.StatefulReplicaSet) map[string]workloads.ReplicaRole {
+	roleMap := make(map[string]workloads.ReplicaRole, 0)
 	for _, role := range set.Spec.Roles {
 		roleMap[strings.ToLower(role.Name)] = role
 	}
 	return roleMap
 }
 
-func setMembersStatus(set *workloads.ConsensusSet, pods []corev1.Pod) {
+func setMembersStatus(set *workloads.StatefulReplicaSet, pods []corev1.Pod) {
 	// compose new status
-	newMembersStatus := make([]workloads.ConsensusMemberStatus, 0)
+	newMembersStatus := make([]workloads.MemberStatus, 0)
 	roleMap := composeRoleMap(*set)
 	for _, pod := range pods {
 		if !intctrlutil.PodIsReadyWithLabel(pod) {
@@ -180,19 +180,19 @@ func setMembersStatus(set *workloads.ConsensusSet, pods []corev1.Pod) {
 		if !ok {
 			continue
 		}
-		memberStatus := workloads.ConsensusMemberStatus{
-			PodName:       pod.Name,
-			ConsensusRole: role,
+		memberStatus := workloads.MemberStatus{
+			PodName:     pod.Name,
+			ReplicaRole: role,
 		}
 		newMembersStatus = append(newMembersStatus, memberStatus)
 	}
 
 	// members(pods) being scheduled should be kept
-	oldMemberMap := make(map[string]*workloads.ConsensusMemberStatus, len(set.Status.MembersStatus))
+	oldMemberMap := make(map[string]*workloads.MemberStatus, len(set.Status.MembersStatus))
 	for i, status := range set.Status.MembersStatus {
 		oldMemberMap[status.PodName] = &set.Status.MembersStatus[i]
 	}
-	newMemberMap := make(map[string]*workloads.ConsensusMemberStatus, len(newMembersStatus))
+	newMemberMap := make(map[string]*workloads.MemberStatus, len(newMembersStatus))
 	for i, status := range newMembersStatus {
 		newMemberMap[status.PodName] = &newMembersStatus[i]
 	}
@@ -252,11 +252,11 @@ func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsO
 	return pods, nil
 }
 
-func getHeadlessSvcName(set workloads.ConsensusSet) string {
+func getHeadlessSvcName(set workloads.StatefulReplicaSet) string {
 	return strings.Join([]string{set.Name, "headless"}, "-")
 }
 
-func findSvcPort(csSet workloads.ConsensusSet) int {
+func findSvcPort(csSet workloads.StatefulReplicaSet) int {
 	port := csSet.Spec.Service.Ports[0]
 	for _, c := range csSet.Spec.Template.Spec.Containers {
 		for _, p := range c.Ports {
@@ -296,7 +296,7 @@ func getActionName(parent string, generation, ordinal int, actionType string) st
 	return fmt.Sprintf("%s-%d-%d-%s", parent, generation, ordinal, actionType)
 }
 
-func getLeaderPodName(membersStatus []workloads.ConsensusMemberStatus) string {
+func getLeaderPodName(membersStatus []workloads.MemberStatus) string {
 	for _, memberStatus := range membersStatus {
 		if memberStatus.IsLeader {
 			return memberStatus.PodName
@@ -314,7 +314,7 @@ func getPodOrdinal(podName string) (int, error) {
 }
 
 // ordinal is the ordinal of pod which this action apply to
-func createAction(dag *graph.DAG, csSet *workloads.ConsensusSet, action *batchv1.Job) error {
+func createAction(dag *graph.DAG, csSet *workloads.StatefulReplicaSet, action *batchv1.Job) error {
 	if err := intctrlutil.SetOwnership(csSet, action, model.GetScheme(), csSetFinalizerName); err != nil {
 		return err
 	}
@@ -322,7 +322,7 @@ func createAction(dag *graph.DAG, csSet *workloads.ConsensusSet, action *batchv1
 	return nil
 }
 
-func buildAction(csSet *workloads.ConsensusSet, actionName, actionType, actionScenario string, leader, target string) *batchv1.Job {
+func buildAction(csSet *workloads.StatefulReplicaSet, actionName, actionType, actionScenario string, leader, target string) *batchv1.Job {
 	env := buildActionEnv(csSet, leader, target)
 	template := buildActionPodTemplate(csSet, env, actionType)
 	return builder.NewJobBuilder(csSet.Namespace, actionName).
@@ -336,7 +336,7 @@ func buildAction(csSet *workloads.ConsensusSet, actionName, actionType, actionSc
 		GetObject()
 }
 
-func buildActionPodTemplate(csSet *workloads.ConsensusSet, env []corev1.EnvVar, actionType string) *corev1.PodTemplateSpec {
+func buildActionPodTemplate(csSet *workloads.StatefulReplicaSet, env []corev1.EnvVar, actionType string) *corev1.PodTemplateSpec {
 	credential := csSet.Spec.Credential
 	credentialEnv := make([]corev1.EnvVar, 0)
 	if credential != nil {
@@ -372,7 +372,7 @@ func buildActionPodTemplate(csSet *workloads.ConsensusSet, env []corev1.EnvVar, 
 	return template
 }
 
-func buildActionEnv(csSet *workloads.ConsensusSet, leader, target string) []corev1.EnvVar {
+func buildActionEnv(csSet *workloads.StatefulReplicaSet, leader, target string) []corev1.EnvVar {
 	svcName := getHeadlessSvcName(*csSet)
 	leaderHost := fmt.Sprintf("%s.%s", leader, svcName)
 	targetHost := fmt.Sprintf("%s.%s", target, svcName)

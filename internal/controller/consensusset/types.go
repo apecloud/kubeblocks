@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	kindConsensusSet = "ConsensusSet"
+	kindConsensusSet = "StatefulReplicaSet"
 
 	defaultPodName = "Unknown"
 
@@ -77,8 +77,8 @@ type CSSetTransformContext struct {
 	Client roclient.ReadonlyClient
 	record.EventRecorder
 	logr.Logger
-	CSSet     *workloads.ConsensusSet
-	OrigCSSet *workloads.ConsensusSet
+	CSSet     *workloads.StatefulReplicaSet
+	OrigCSSet *workloads.StatefulReplicaSet
 }
 
 func (c *CSSetTransformContext) GetContext() context.Context {

@@ -121,7 +121,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	return nil
 }
 
-func buildSvc(csSet workloads.ConsensusSet) *corev1.Service {
+func buildSvc(csSet workloads.StatefulReplicaSet) *corev1.Service {
 	svcBuilder := builder.NewServiceBuilder(csSet.Namespace, csSet.Name).
 		AddLabels(model.AppInstanceLabelKey, csSet.Name).
 		AddLabels(model.KBManagedByKey, kindConsensusSet).
@@ -138,7 +138,7 @@ func buildSvc(csSet workloads.ConsensusSet) *corev1.Service {
 	return svcBuilder.GetObject()
 }
 
-func buildHeadlessSvc(csSet workloads.ConsensusSet) *corev1.Service {
+func buildHeadlessSvc(csSet workloads.StatefulReplicaSet) *corev1.Service {
 	hdlBuilder := builder.NewHeadlessServiceBuilder(csSet.Namespace, getHeadlessSvcName(csSet)).
 		AddLabels(model.AppInstanceLabelKey, csSet.Name).
 		AddLabels(model.KBManagedByKey, kindConsensusSet).
@@ -170,7 +170,7 @@ func buildHeadlessSvc(csSet workloads.ConsensusSet) *corev1.Service {
 	return hdlBuilder.GetObject()
 }
 
-func buildSts(csSet workloads.ConsensusSet, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
+func buildSts(csSet workloads.StatefulReplicaSet, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
 	stsBuilder := builder.NewStatefulSetBuilder(csSet.Namespace, csSet.Name)
 	template := buildStsPodTemplate(csSet, envConfig)
 	stsBuilder.AddLabels(model.AppInstanceLabelKey, csSet.Name).
@@ -186,7 +186,7 @@ func buildSts(csSet workloads.ConsensusSet, headlessSvcName string, envConfig co
 	return stsBuilder.GetObject()
 }
 
-func buildEnvConfigMap(csSet workloads.ConsensusSet) *corev1.ConfigMap {
+func buildEnvConfigMap(csSet workloads.StatefulReplicaSet) *corev1.ConfigMap {
 	envData := buildEnvConfigData(csSet)
 	return builder.NewConfigMapBuilder(csSet.Namespace, csSet.Name+"-env").
 		AddLabels(model.AppInstanceLabelKey, csSet.Name).
@@ -194,7 +194,7 @@ func buildEnvConfigMap(csSet workloads.ConsensusSet) *corev1.ConfigMap {
 		SetData(envData).GetObject()
 }
 
-func buildStsPodTemplate(csSet workloads.ConsensusSet, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
+func buildStsPodTemplate(csSet workloads.StatefulReplicaSet, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
 	template := csSet.Spec.Template
 	labels := template.Labels
 	if labels == nil {
@@ -221,7 +221,7 @@ func buildStsPodTemplate(csSet workloads.ConsensusSet, envConfig corev1.ConfigMa
 	return &template
 }
 
-func injectRoleObservationContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec) {
+func injectRoleObservationContainer(csSet workloads.StatefulReplicaSet, template *corev1.PodTemplateSpec) {
 	roleObservation := csSet.Spec.RoleObservation
 	credential := csSet.Spec.Credential
 	credentialEnv := make([]corev1.EnvVar, 0)
@@ -277,7 +277,7 @@ func findAllUsedPorts(template *corev1.PodTemplateSpec) []int32 {
 	return allUsedPorts
 }
 
-func injectRoleObserveContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
+func injectRoleObserveContainer(csSet workloads.StatefulReplicaSet, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
 	// compute parameters for role observation container
 	roleObservation := csSet.Spec.RoleObservation
 	credential := csSet.Spec.Credential
@@ -365,7 +365,7 @@ func injectRoleObserveContainer(csSet workloads.ConsensusSet, template *corev1.P
 	template.Spec.Containers = append(template.Spec.Containers, container)
 }
 
-func injectObservationActionContainer(csSet workloads.ConsensusSet, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
+func injectObservationActionContainer(csSet workloads.StatefulReplicaSet, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
 	// inject shared volume
 	agentVolume := corev1.Volume{
 		Name: roleAgentVolumeName,
@@ -420,7 +420,7 @@ func injectObservationActionContainer(csSet workloads.ConsensusSet, template *co
 	}
 }
 
-func buildEnvConfigData(set workloads.ConsensusSet) map[string]string {
+func buildEnvConfigData(set workloads.StatefulReplicaSet) map[string]string {
 	envData := map[string]string{}
 
 	prefix := constant.KBPrefix + "_" + strings.ToUpper(set.Name) + "_"

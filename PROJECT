@@ -145,7 +145,7 @@ resources:
   controller: true
   domain: kubeblocks.io
   group: workloads
-  kind: ConsensusSet
+  kind: StatefulReplicaSet
   path: github.com/apecloud/kubeblocks/apis/workloads/v1alpha1
   version: v1alpha1
   webhooks:

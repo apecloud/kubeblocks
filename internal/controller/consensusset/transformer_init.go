@@ -26,13 +26,13 @@ import (
 )
 
 type initTransformer struct {
-	*workloads.ConsensusSet
+	*workloads.StatefulReplicaSet
 }
 
 func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	// init context
 	transCtx, _ := ctx.(*CSSetTransformContext)
-	transCtx.CSSet, transCtx.OrigCSSet = t.ConsensusSet, t.ConsensusSet.DeepCopy()
+	transCtx.CSSet, transCtx.OrigCSSet = t.StatefulReplicaSet, t.StatefulReplicaSet.DeepCopy()
 
 	// init dag
 	model.PrepareStatus(dag, transCtx.OrigCSSet, transCtx.CSSet)

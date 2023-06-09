@@ -30,9 +30,9 @@ import (
 )
 
 // log is for logging in this package.
-var consensussetlog = logf.Log.WithName("consensusset-resource")
+var statefulreplicasetlog = logf.Log.WithName("statefulreplicaset-resource")
 
-func (r *ConsensusSet) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (r *StatefulReplicaSet) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
@@ -40,44 +40,44 @@ func (r *ConsensusSet) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 // TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
-//+kubebuilder:webhook:path=/mutate-workloads-kubeblocks-io-v1alpha1-consensusset,mutating=true,failurePolicy=fail,sideEffects=None,groups=workloads.kubeblocks.io,resources=consensussets,verbs=create;update,versions=v1alpha1,name=mconsensusset.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/mutate-workloads-kubeblocks-io-v1alpha1-statefulreplicaset,mutating=true,failurePolicy=fail,sideEffects=None,groups=workloads.kubeblocks.io,resources=statefulreplicasets,verbs=create;update,versions=v1alpha1,name=mstatefulreplicaset.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Defaulter = &ConsensusSet{}
+var _ webhook.Defaulter = &StatefulReplicaSet{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *ConsensusSet) Default() {
-	consensussetlog.Info("default", "name", r.Name)
+func (r *StatefulReplicaSet) Default() {
+	statefulreplicasetlog.Info("default", "name", r.Name)
 
 	// TODO(user): fill in your defaulting logic.
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-workloads-kubeblocks-io-v1alpha1-consensusset,mutating=false,failurePolicy=fail,sideEffects=None,groups=workloads.kubeblocks.io,resources=consensussets,verbs=create;update,versions=v1alpha1,name=vconsensusset.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-workloads-kubeblocks-io-v1alpha1-statefulreplicaset,mutating=false,failurePolicy=fail,sideEffects=None,groups=workloads.kubeblocks.io,resources=statefulreplicasets,verbs=create;update,versions=v1alpha1,name=vstatefulreplicaset.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Validator = &ConsensusSet{}
+var _ webhook.Validator = &StatefulReplicaSet{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ConsensusSet) ValidateCreate() error {
-	consensussetlog.Info("validate create", "name", r.Name)
+func (r *StatefulReplicaSet) ValidateCreate() error {
+	statefulreplicasetlog.Info("validate create", "name", r.Name)
 
 	return r.validate()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ConsensusSet) ValidateUpdate(old runtime.Object) error {
-	consensussetlog.Info("validate update", "name", r.Name)
+func (r *StatefulReplicaSet) ValidateUpdate(old runtime.Object) error {
+	statefulreplicasetlog.Info("validate update", "name", r.Name)
 
 	return r.validate()
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ConsensusSet) ValidateDelete() error {
-	consensussetlog.Info("validate delete", "name", r.Name)
+func (r *StatefulReplicaSet) ValidateDelete() error {
+	statefulreplicasetlog.Info("validate delete", "name", r.Name)
 
 	return r.validate()
 }
 
-func (r *ConsensusSet) validate() error {
+func (r *StatefulReplicaSet) validate() error {
 	var allErrs field.ErrorList
 
 	// Leader is required
@@ -104,7 +104,7 @@ func (r *ConsensusSet) validate() error {
 		return apierrors.NewInvalid(
 			schema.GroupKind{
 				Group: "workloads.kubeblocks.io/v1alpha1",
-				Kind:  "ConsensusSet",
+				Kind:  "StatefulReplicaSet",
 			},
 			r.Name, allErrs)
 	}

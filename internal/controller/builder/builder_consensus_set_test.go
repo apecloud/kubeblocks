@@ -36,7 +36,7 @@ var _ = Describe("consensus_set builder", func() {
 			replicas = int32(5)
 			port     = int32(12345)
 		)
-		role := workloads.ConsensusRole{
+		role := workloads.ReplicaRole{
 			Name:       "foo",
 			AccessMode: workloads.ReadWriteMode,
 			IsLeader:   true,
@@ -79,7 +79,7 @@ var _ = Describe("consensus_set builder", func() {
 		}
 		csSet := NewConsensusSetBuilder(ns, name).
 			SetReplicas(replicas).
-			SetRoles([]workloads.ConsensusRole{role}).
+			SetRoles([]workloads.ReplicaRole{role}).
 			SetTemplate(template).
 			SetObservationActions(actions).
 			AddObservationAction(action).

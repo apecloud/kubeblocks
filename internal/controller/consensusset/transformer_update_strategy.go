@@ -137,7 +137,7 @@ func doSwitchoverIfNeeded(transCtx *CSSetTransformContext, dag *graph.DAG, pods 
 	return false, nil
 }
 
-func createSwitchoverAction(dag *graph.DAG, csSet *workloads.ConsensusSet, pods []corev1.Pod) error {
+func createSwitchoverAction(dag *graph.DAG, csSet *workloads.StatefulReplicaSet, pods []corev1.Pod) error {
 	leader := getLeaderPodName(csSet.Status.MembersStatus)
 	targetOrdinal := selectSwitchoverTarget(csSet, pods)
 	target := getPodName(csSet.Name, targetOrdinal)
@@ -150,7 +150,7 @@ func createSwitchoverAction(dag *graph.DAG, csSet *workloads.ConsensusSet, pods 
 	return createAction(dag, csSet, action)
 }
 
-func selectSwitchoverTarget(csSet *workloads.ConsensusSet, pods []corev1.Pod) int {
+func selectSwitchoverTarget(csSet *workloads.StatefulReplicaSet, pods []corev1.Pod) int {
 	var podUpdated, podUpdatedWithLabel string
 	for _, pod := range pods {
 		if intctrlutil.GetPodRevision(&pod) != csSet.Status.UpdateRevision {
@@ -180,7 +180,7 @@ func selectSwitchoverTarget(csSet *workloads.ConsensusSet, pods []corev1.Pod) in
 	return ordinal
 }
 
-func shouldSwitchover(csSet *workloads.ConsensusSet, podsToBeUpdated []*corev1.Pod) bool {
+func shouldSwitchover(csSet *workloads.StatefulReplicaSet, podsToBeUpdated []*corev1.Pod) bool {
 	leaderName := getLeaderPodName(csSet.Status.MembersStatus)
 	for _, pod := range podsToBeUpdated {
 		if pod.Name == leaderName {

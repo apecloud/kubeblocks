@@ -49,11 +49,11 @@ var log = logf.FromContext(context.Background()).WithName("eventhandler").WithNa
 // EnqueueRequestForAncestor enqueues Requests for the ancestor object.
 // E.g. the ancestor object creates the StatefulSet/Deployment which then creates the Pod.
 //
-// If a ConsensusSet creates Pods, users may reconcile the ConsensusSet in response to Pod Events using:
+// If a StatefulReplicaSet creates Pods, users may reconcile the StatefulReplicaSet in response to Pod Events using:
 //
 // - a source.Kind Source with Type of Pod.
 //
-// - a EnqueueRequestForAncestor EventHandler with an OwnerType of ConsensusSet and UpToLevel set to 2.
+// - a EnqueueRequestForAncestor EventHandler with an OwnerType of StatefulReplicaSet and UpToLevel set to 2.
 //
 // If source kind is corev1.Event, Event.InvolvedObject will be used as the source kind
 type EnqueueRequestForAncestor struct {
@@ -254,8 +254,8 @@ func (e *EnqueueRequestForAncestor) getSourceObject(object client.Object) (clien
 }
 
 // getOwnerUpTo gets the owner of object up to upToLevel.
-// E.g. If ConsensusSet creates the StatefulSet which then creates the Pod,
-// if the object is the Pod, then set upToLevel to 2 if you want to find the ConsensusSet.
+// E.g. If StatefulReplicaSet creates the StatefulSet which then creates the Pod,
+// if the object is the Pod, then set upToLevel to 2 if you want to find the StatefulReplicaSet.
 // Each level of ownership should be a controller-relationship (i.e. controller=true in ownerReferences).
 // nil return if no owner find in any level.
 func (e *EnqueueRequestForAncestor) getOwnerUpTo(ctx context.Context, object client.Object, upToLevel int, scheme runtime.Scheme) (*metav1.OwnerReference, error) {

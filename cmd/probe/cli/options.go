@@ -15,14 +15,15 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"sync"
+	"syscall"
 	"time"
-
-	"github.com/dapr/cli/pkg/print"
 )
 
 // Options represents the application configuration parameters.
@@ -107,6 +108,8 @@ func (options *Options) getEnv() []string {
 
 // Commands represents the managed subprocesses.
 type Commands struct {
+	ctx                context.Context
+	WaitGroup          sync.WaitGroup
 	SQLChannelCMD      *exec.Cmd
 	SQLChannelErr      error
 	SQLChannelHTTPPort int
@@ -115,7 +118,6 @@ type Commands struct {
 	AppCMD             *exec.Cmd
 	AppErr             error
 	AppStarted         chan bool
-	IsStopped          bool
 	Options            *Options
 }
 
@@ -146,7 +148,7 @@ func getAppCommand(options *Options) *exec.Cmd {
 	return cmd
 }
 
-func newCommands(options *Options) (*Commands, error) {
+func newCommands(ctx context.Context, options *Options) (*Commands, error) {
 	//nolint
 	err := options.validate()
 	if err != nil {
@@ -161,6 +163,7 @@ func newCommands(options *Options) (*Commands, error) {
 	//nolint
 	var appCMD *exec.Cmd = getAppCommand(options)
 	return &Commands{
+		ctx:                ctx,
 		SQLChannelCMD:      sqlChannelCMD,
 		SQLChannelErr:      nil,
 		SQLChannelHTTPPort: options.HTTPPort,
@@ -173,9 +176,38 @@ func newCommands(options *Options) (*Commands, error) {
 	}, nil
 }
 
+func (commands *Commands) StartSQLChannel() {
+	var startInfo string
+	fmt.Fprintf(os.Stdout, "Starting SQLChannel HTTP Port: %v. gRPC Port: %v\n",
+		commands.SQLChannelHTTPPort,
+		commands.SQLChannelGRPCPort)
+	fmt.Fprintln(os.Stdout, startInfo)
+
+	commands.SQLChannelCMD.Stdout = os.Stdout
+	commands.SQLChannelCMD.Stderr = os.Stderr
+
+	err := commands.SQLChannelCMD.Start()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+
+	commands.SQLChannelStarted <- true
+}
+
 func (commands *Commands) RestartDBServiceIfExited() {
-	for !commands.IsStopped {
-		if commands.AppCMD == nil || (commands.AppCMD.ProcessState != nil && commands.AppCMD.ProcessState.Exited()) {
+	if commands.AppCMD == nil {
+		return
+	}
+	commands.WaitGroup.Add(1)
+	for true {
+		select {
+		case <-commands.ctx.Done():
+			commands.WaitGroup.Done()
+			return
+		default:
+		}
+		if commands.AppCMD.ProcessState != nil && commands.AppCMD.ProcessState.Exited() {
 			commands.RestartDBService()
 		}
 		time.Sleep(1 * time.Second)
@@ -183,6 +215,9 @@ func (commands *Commands) RestartDBServiceIfExited() {
 }
 
 func (commands *Commands) RestartDBService() {
+	if commands.AppCMD == nil {
+		return
+	}
 	commands.StopDBService()
 	commands.AppCMD = getAppCommand(commands.Options)
 	commands.AppErr = nil
@@ -199,14 +234,14 @@ func (commands *Commands) StartDBService() {
 
 	stdErrPipe, pipeErr := commands.AppCMD.StderrPipe()
 	if pipeErr != nil {
-		print.FailureStatusEvent(os.Stderr, fmt.Sprintf("Error creating stderr for DB Service: %s", pipeErr.Error()))
+		fmt.Fprintf(os.Stderr, "Error creating stderr for DB Service: %s\n", pipeErr.Error())
 		commands.AppStarted <- false
 		return
 	}
 
 	stdOutPipe, pipeErr := commands.AppCMD.StdoutPipe()
 	if pipeErr != nil {
-		print.FailureStatusEvent(os.Stderr, fmt.Sprintf("Error creating stdout for DB Service: %s", pipeErr.Error()))
+		fmt.Fprintf(os.Stderr, "Error creating stdout for DB Service: %s\n", pipeErr.Error())
 		commands.AppStarted <- false
 		return
 	}
@@ -215,44 +250,42 @@ func (commands *Commands) StartDBService() {
 	outScanner := bufio.NewScanner(stdOutPipe)
 	go func() {
 		for errScanner.Scan() {
-			fmt.Println(print.Blue(fmt.Sprintf("== DB Service == %s", errScanner.Text())))
+			fmt.Printf("== DB Service == %s\n", errScanner.Text())
 		}
-		fmt.Println("== scanner exited == ")
-
 	}()
 
 	go func() {
 		for outScanner.Scan() {
-			fmt.Println(print.Blue(fmt.Sprintf("== DB Service == %s", outScanner.Text())))
+			fmt.Printf("== DB Service == %s\n", outScanner.Text())
 		}
-		fmt.Println("== scanner exited == ")
 	}()
 
 	err := commands.AppCMD.Start()
 	if err != nil {
-		print.FailureStatusEvent(os.Stderr, err.Error())
+		fmt.Fprintln(os.Stderr, err.Error())
 		commands.AppStarted <- false
 		return
 	}
 	commands.AppStarted <- true
-
-	go commands.WaitDBService()
 }
 
 func (commands *Commands) StopSQLChannel() bool {
 	exitWithError := false
 	if commands.SQLChannelErr != nil {
 		exitWithError = true
-		print.FailureStatusEvent(os.Stderr, fmt.Sprintf("Error exiting SQLChannel: %s", commands.SQLChannelErr))
+		fmt.Fprintf(os.Stderr, "Error exiting SQLChannel: %s\n", commands.SQLChannelErr)
 	} else if commands.SQLChannelCMD.ProcessState == nil || !commands.SQLChannelCMD.ProcessState.Exited() {
-		err := commands.SQLChannelCMD.Process.Kill()
+		err := commands.SQLChannelCMD.Process.Signal(syscall.SIGTERM)
 		if err != nil {
 			exitWithError = true
-			print.FailureStatusEvent(os.Stderr, fmt.Sprintf("Error exiting SQLChannel: %s", err))
+			fmt.Fprintf(os.Stderr, "Error exiting SQLChannel: %s\n", err)
 		} else {
-			print.SuccessStatusEvent(os.Stdout, "Exited SQLChannel successfully")
+			fmt.Fprintln(os.Stdout, "Send SIGTERM to SQLChannel")
 		}
 	}
+	//state, err = commands.SQLChannelCMD.Process.Wait()
+	//fmt.Printf("state: %v, err: %v\n", state, err)
+	commands.WaitSQLChannel()
 	return exitWithError
 }
 
@@ -260,14 +293,14 @@ func (commands *Commands) StopDBService() bool {
 	exitWithError := false
 	if commands.AppErr != nil {
 		exitWithError = true
-		print.FailureStatusEvent(os.Stderr, fmt.Sprintf("Error exiting App: %s", commands.AppErr))
+		fmt.Fprintf(os.Stderr, "Error exiting App: %s\n", commands.AppErr)
 	} else if commands.AppCMD != nil && (commands.AppCMD.ProcessState == nil || !commands.AppCMD.ProcessState.Exited()) {
-		err := commands.AppCMD.Process.Kill()
+		err := commands.AppCMD.Process.Signal(syscall.SIGTERM)
 		if err != nil {
 			exitWithError = true
-			print.FailureStatusEvent(os.Stderr, fmt.Sprintf("Error exiting App: %s", err))
+			fmt.Fprintf(os.Stderr, "Error exiting App: %s\n", err)
 		} else {
-			print.SuccessStatusEvent(os.Stdout, "Exited App successfully")
+			fmt.Fprintln(os.Stdout, "Exited App successfully")
 		}
 	}
 	commands.WaitDBService()
@@ -275,16 +308,23 @@ func (commands *Commands) StopDBService() bool {
 }
 
 func (commands *Commands) WaitDBService() {
-	if commands.AppCMD == nil || (commands.AppCMD.ProcessState != nil && commands.AppCMD.ProcessState.Exited()) {
-		return
+	commands.AppErr = waitCmd(commands.AppCMD)
+}
+
+func (commands *Commands) WaitSQLChannel() {
+	commands.SQLChannelErr = waitCmd(commands.SQLChannelCMD)
+}
+
+func waitCmd(cmd *exec.Cmd) error {
+	if cmd == nil || (cmd.ProcessState != nil && cmd.ProcessState.Exited()) {
+		return nil
 	}
 
-	appErr := commands.AppCMD.Wait()
-
-	if appErr != nil {
-		commands.AppErr = appErr
-		print.FailureStatusEvent(os.Stderr, "The DB Service exited with error code: %s", appErr.Error())
+	err := cmd.Wait()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "The command [%s] exited with error code: %s\n", cmd.String(), err.Error())
 	} else {
-		print.SuccessStatusEvent(os.Stdout, "The DB Service exited")
+		fmt.Fprintf(os.Stdout, "The command [%s] exited\n", cmd.String())
 	}
+	return err
 }

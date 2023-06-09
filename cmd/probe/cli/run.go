@@ -14,6 +14,7 @@ limitations under the License.
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -21,8 +22,6 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-
-	"github.com/dapr/cli/pkg/print"
 )
 
 var (
@@ -51,10 +50,11 @@ sqlchannelctr run  -- mysqld
 	Args: cobra.MinimumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
-			fmt.Println(print.WhiteBold("WARNING: no application command found."))
+			fmt.Println("WARNING: no DB Service found.")
 		}
+		ctx, cancel := context.WithCancel(context.Background())
 
-		commands, err := newCommands(&Options{
+		commands, err := newCommands(ctx, &Options{
 			HTTPPort:           port,
 			GRPCPort:           grpcPort,
 			ConfigFile:         configFile,
@@ -68,75 +68,32 @@ sqlchannelctr run  -- mysqld
 			InternalGRPCPort:   internalGRPCPort,
 		})
 		if err != nil {
-			print.FailureStatusEvent(os.Stderr, err.Error())
+			fmt.Fprintf(os.Stderr, err.Error())
 			os.Exit(1)
 		}
 
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
-		sqlchannelRunning := make(chan bool, 1)
 
-		go func() {
-			var startInfo string
-			startInfo = fmt.Sprintf(
-				"Starting SQLChannel HTTP Port: %v. gRPC Port: %v",
-				commands.SQLChannelHTTPPort,
-				commands.SQLChannelGRPCPort)
-			print.InfoStatusEvent(os.Stdout, startInfo)
-
-			commands.SQLChannelCMD.Stdout = os.Stdout
-			commands.SQLChannelCMD.Stderr = os.Stderr
-
-			err = commands.SQLChannelCMD.Start()
-			if err != nil {
-				print.FailureStatusEvent(os.Stderr, err.Error())
-				os.Exit(1)
-			}
-
-			go func() {
-				sqlchannelErr := commands.SQLChannelCMD.Wait()
-
-				if sqlchannelErr != nil {
-					commands.SQLChannelErr = sqlchannelErr
-					print.FailureStatusEvent(os.Stderr, "The daprd process exited with error code: %s", sqlchannelErr.Error())
-				} else {
-					print.SuccessStatusEvent(os.Stdout, "Exited SQLChannel successfully")
-				}
-				sigCh <- os.Interrupt
-			}()
-
-			sqlchannelRunning <- true
-		}()
-
-		<-sqlchannelRunning
+		go commands.StartSQLChannel()
+		<-commands.SQLChannelStarted
 
 		go commands.StartDBService()
-
-		appRunStatus := <-commands.AppStarted
+		<-commands.AppStarted
 		go commands.RestartDBServiceIfExited()
-
-		if !appRunStatus {
-			// Start App failed, try to stop SQLChannel and exit.
-			err = commands.SQLChannelCMD.Process.Kill()
-			if err != nil {
-				print.FailureStatusEvent(os.Stderr, fmt.Sprintf("Start App failed, try to stop SQLChannel Error: %s", err))
-			} else {
-				print.SuccessStatusEvent(os.Stdout, "Start App failed, try to stop SQLChannel successfully")
-			}
-			os.Exit(1)
-		}
 
 		if commands.AppCMD != nil {
 			appCommand := strings.Join(args, " ")
-			print.SuccessStatusEvent(os.Stdout, fmt.Sprintf("start DB Service with %s.\n", appCommand))
-			print.SuccessStatusEvent(os.Stdout, "SQLChannel logs and DB logs will appear here.\n")
+			fmt.Fprintf(os.Stdout, "Start DB Service with %s.\n", appCommand)
+			fmt.Fprintf(os.Stdout, "SQLChannel logs and DB logs will appear here.\n")
 		} else {
-			print.SuccessStatusEvent(os.Stdout, "You're up and running! SQLChannel logs will appear here.\n")
+			fmt.Fprintf(os.Stdout, "SQLChannel logs will appear here.\n")
 		}
 
-		<-sigCh
-		commands.IsStopped = true
-		print.InfoStatusEvent(os.Stdout, "\nterminated signal received: shutting down")
+		sig := <-sigCh
+		fmt.Printf("\n %v signal received: shutting down\n", sig)
+		cancel()
+		commands.WaitGroup.Wait()
 
 		exitWithError := commands.StopSQLChannel() || commands.StopDBService()
 		if exitWithError {

@@ -54,7 +54,7 @@ To address these challenges, and solve the problem of complexity, KubeBlocks int
 
 ## Get started with KubeBlocks
 
-[Quick Start](./docs/user_docs/quick-start/) shows you the quickest way to get started with KubeBlocks.
+[Quick Start](https://kubeblocks.io/docs/preview/user_docs/quick-start/try-kubeblocks-on-your-laptop) shows you the quickest way to get started with KubeBlocks.
 
 ## Community
 

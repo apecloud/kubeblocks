@@ -24,6 +24,10 @@ spec:
         - "dnsServer.create=true"
         - "chaosDaemon.runtime=containerd"
         - "chaosDaemon.socketPath=/run/containerd/containerd.sock"
+        - "images.registry=registry.cn-hangzhou.aliyuncs.com"
+        - "controllerManager.image.repository=apecloud/chaos-mesh"
+        - "chaosDaemon.image.repository=apecloud/chaos-daemon"
+        - "dashboard.image.repository=apecloud/chaos-dashboard"
 
     valuesMapping:
       valueMap:

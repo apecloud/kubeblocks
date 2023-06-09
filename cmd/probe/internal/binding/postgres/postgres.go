@@ -212,26 +212,28 @@ func (pgOps *PostgresOperations) GetRunningPort() int {
 func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	sql := "select pg_is_in_recovery();"
 
-	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
-	ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-	rows, err := pgOps.db.Query(ctx1, sql)
+	rows, err := pgOps.db.Query(ctx, sql)
 	if err != nil {
 		pgOps.Logger.Infof("error executing %s: %v", sql, err)
 		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 
 	var isRecovery bool
+	var isReady bool
 	for rows.Next() {
 		if err = rows.Scan(&isRecovery); err != nil {
 			pgOps.Logger.Errorf("Role query error: %v", err)
 			return "", err
 		}
+		isReady = true
 	}
 	if isRecovery {
 		return SECONDARY, nil
 	}
-	return PRIMARY, nil
+	if isReady {
+		return PRIMARY, nil
+	}
+	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
 }
 
 func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
@@ -254,7 +256,6 @@ func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.Invo
 	return result, nil
 }
 
-// CheckStatusOps design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 func (pgOps *PostgresOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	rwSQL := fmt.Sprintf(`begin;
 create table if not exists kb_health_check(type int, check_ts timestamp, primary key(type));

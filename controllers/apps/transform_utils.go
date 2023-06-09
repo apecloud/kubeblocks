@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package lifecycle
+package apps
 
 import (
 	"reflect"
@@ -81,7 +81,7 @@ func getClusterOwningObjects(transCtx *ClusterTransformContext, cluster appsv1al
 		for i := 0; i < l; i++ {
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
-			name, err := getGVKName(object, scheme)
+			name, err := getGVKName(object, rscheme)
 			if err != nil {
 				return nil, err
 			}

@@ -205,9 +205,12 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 		return opsRes, nil
 	}
 
-	role, err := ops.GetRole(ctx, req, resp)
+	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
+	ctx1, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
+	role, err := ops.GetRole(ctx1, req, resp)
 	if err != nil {
-		ops.Logger.Infof("error executing checkRole: %v", err)
+		ops.Logger.Errorf("error executing checkRole: %v", err)
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {

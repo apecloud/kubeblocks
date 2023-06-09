@@ -17,36 +17,38 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package lifecycle
+package apps
 
 import (
 	"fmt"
-	"sync"
+	"reflect"
+	"testing"
 
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	v1 "k8s.io/api/apps/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type ParallelTransformers struct {
-	transformers []graph.Transformer
-}
-
-var _ graph.Transformer = &ParallelTransformers{}
-
-func (t *ParallelTransformers) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	var group sync.WaitGroup
-	var errs error
-	for _, transformer := range t.transformers {
-		transformer := transformer
-		group.Add(1)
-		go func() {
-			err := transformer.Transform(ctx, dag)
-			if err != nil {
-				// TODO: sync.Mutex errs
-				errs = fmt.Errorf("%v; %v", errs, err)
-			}
-			group.Done()
-		}()
+func TestReflect(t *testing.T) {
+	var list client.ObjectList
+	sts := v1.StatefulSet{}
+	sts.SetName("hello")
+	list = &v1.StatefulSetList{Items: []v1.StatefulSet{sts}}
+	v := reflect.ValueOf(list).Elem().FieldByName("Items")
+	if v.Kind() != reflect.Slice {
+		t.Error("not slice")
 	}
-	group.Wait()
-	return errs
+	c := v.Len()
+	objects := make([]client.Object, c)
+	for i := 0; i < c; i++ {
+		var st = v.Index(i).Addr().Interface()
+		objects[i] = st.(client.Object)
+	}
+	for _, e := range objects {
+		fmt.Println(e)
+	}
+
+	var o client.Object = &sts
+	ptr := reflect.ValueOf(o)
+	v = ptr.Elem().FieldByName("Spec")
+	fmt.Println(v)
 }

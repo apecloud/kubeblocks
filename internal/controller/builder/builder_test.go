@@ -464,9 +464,8 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds config manager sidecar container correctly", func() {
-			reqCtx := newReqCtx()
-			params := newParams()
-			cfg, err := BuildEnvConfig(*params, reqCtx, k8sClient)
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:   "cfgmgr",
 				CharacterType: "mysql",
@@ -476,10 +475,10 @@ var _ = Describe("builder", func() {
 				Args:          []string{},
 				Envs:          []corev1.EnvVar{},
 				Volumes:       []corev1.VolumeMount{},
-				Cluster:       params.Cluster,
+				Cluster:       cluster,
 			}
 			Expect(err).Should(BeNil())
-			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, params.Component)
+			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
 		})

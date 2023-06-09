@@ -89,8 +89,11 @@ func run(ctx context.Context, opt *VolumeWatcherOpts) error {
 	if configHandler, err = cfgcore.CreateCombinedHandler(opt.CombConfig, opt.BackupPath); err != nil {
 		return err
 	}
-	if volumeWatcher, err = startVolumeWatcher(ctx, opt, configHandler); err != nil {
-		return err
+	if len(opt.VolumeDirs) == 0 {
+		if volumeWatcher, err = startVolumeWatcher(ctx, opt, configHandler); err != nil {
+			return err
+		}
+		defer volumeWatcher.Close()
 	}
 
 	if err = checkAndCreateService(ctx, opt, configHandler); err != nil {

@@ -19,7 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package util
 
-import "golang.org/x/exp/constraints"
+import (
+	"math"
+
+	"golang.org/x/exp/constraints"
+)
 
 func Min[T constraints.Ordered](l, r T) T {
 	if l < r {
@@ -33,4 +37,15 @@ func Max[T constraints.Ordered](l, r T) T {
 		return r
 	}
 	return l
+}
+
+func Safe2Int32(v int) int32 {
+	switch {
+	default:
+		return int32(v)
+	case v < math.MinInt32:
+		return math.MinInt32
+	case v > math.MaxInt32:
+		return math.MaxInt32
+	}
 }

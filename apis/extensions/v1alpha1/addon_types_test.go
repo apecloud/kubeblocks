@@ -254,6 +254,10 @@ func TestHelmInstallSpecBuildMergedValues(t *testing.T) {
 		InstallValues: HelmInstallValues{
 			SetValues:     []string{},
 			SetJSONValues: []string{},
+			URLs:          []string{"https://kubeblock.io/test"},
+		},
+		InstallOptions: HelmInstallOptions{
+			"--atomic": "true",
 		},
 		ValuesMapping: HelmValuesMapping{
 			HelmValuesMappingItem: buildHelmValuesMappingItem("primary"),
@@ -340,6 +344,9 @@ func TestHelmInstallSpecBuildMergedValues(t *testing.T) {
 	mergedValues = helmValues.BuildMergedValues(&installSpec)
 	g.Expect(fmt.Sprintf("%s=null",
 		mappingName("primary", sc))).Should(BeElementOf(mergedValues.SetValues))
+
+	helmContainer := corev1.Container{}
+	g.Expect(helmValues.BuildContainerArgs(&helmContainer, mergedValues)).ShouldNot(HaveOccurred())
 }
 
 func TestAddonMisc(t *testing.T) {
@@ -349,6 +356,27 @@ func TestAddonMisc(t *testing.T) {
 	g.Expect(addon.Spec.Installable.GetSelectorsStrings()).Should(BeEmpty())
 	g.Expect(addon.Spec.InstallSpec.GetEnabled()).Should(BeFalse())
 	g.Expect(addon.Spec.Helm.BuildMergedValues(nil)).Should(BeEquivalentTo(HelmInstallValues{}))
+
+	addon.Spec.Type = HelmType
+	g.Expect(addon.GetExtraNames()).Should(BeEmpty())
+
+	addon.Spec.Helm = &HelmTypeInstallSpec{}
+	g.Expect(addon.GetExtraNames()).Should(BeEmpty())
+
+	addon.Spec.Helm = &HelmTypeInstallSpec{
+		ValuesMapping: HelmValuesMapping{
+			ExtraItems: []HelmValuesMappingExtraItem{
+				{
+					Name: "extra",
+				},
+			},
+		},
+	}
+	en := addon.GetExtraNames()
+	g.Expect(en).ShouldNot(BeEmpty())
+	for i, n := range addon.Spec.Helm.ValuesMapping.ExtraItems {
+		g.Expect(en[i]).Should(Equal(n.Name))
+	}
 
 	addon.Spec.InstallSpec = &AddonInstallSpec{
 		Enabled:              true,
@@ -376,8 +404,21 @@ func TestAddonMisc(t *testing.T) {
 		},
 	}
 
+	for _, di := range addon.Spec.DefaultInstallValues {
+		ss := di.GetSelectorsStrings()
+		if len(di.Selectors) > 0 {
+			g.Expect(ss[0]).ShouldNot(BeEmpty())
+		} else {
+			g.Expect(ss).Should(BeEmpty())
+		}
+	}
+
 	di := addon.Spec.GetSortedDefaultInstallValues()
 	g.Expect(di).Should(HaveLen(2))
+
+	addon.Spec.Installable = &InstallableSpec{}
+	ss := addon.Spec.Installable.GetSelectorsStrings()
+	g.Expect(ss).Should(BeEmpty())
 }
 
 func TestAddonInstallHasSetValues(t *testing.T) {

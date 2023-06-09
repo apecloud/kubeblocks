@@ -1,0 +1,19 @@
+name: PULL-REQUEST-LABEL-SIZE
+
+on: [pull_request]
+
+env:
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+jobs:
+  size-label:
+    runs-on: ubuntu-latest
+    outputs:
+      size-label: ${{ steps.get_size_label.outputs.size_label }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: set size label
+        run: |
+          bash .github/utils/utils.sh --type 15 \
+              --github-token ${{ env.GITHUB_TOKEN }} \
+              --pr-number ${{ github.event.pull_request.number }}

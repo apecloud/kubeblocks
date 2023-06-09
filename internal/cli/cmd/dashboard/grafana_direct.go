@@ -28,7 +28,8 @@ import (
 )
 
 var (
-	characterType  string
+	clusterType string
+	// Todo: availableTypes is hard code, better to do a dynamic query but where the source from?
 	availableTypes = [...]string{
 		"apecloud-mysql",
 		"cadvisor",
@@ -42,9 +43,9 @@ var (
 	}
 )
 
-func addCharacterFlag(cmd *cobra.Command, characterType *string) {
-	cmd.Flags().StringVar(characterType, "character-type", "", "the cluster character type opened directly. eg 'apecloud-mysql'")
-	util.CheckErr(cmd.RegisterFlagCompletionFunc("character-type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+func addCharacterFlag(cmd *cobra.Command, dashboardType *string) {
+	cmd.Flags().StringVar(dashboardType, "type", "", "the cluster type opened directly in dashboard. eg 'apecloud-mysql'")
+	util.CheckErr(cmd.RegisterFlagCompletionFunc("type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var name []string
 		for i := range availableTypes {
 			if strings.HasPrefix(availableTypes[i], toComplete) {

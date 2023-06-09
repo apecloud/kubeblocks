@@ -410,7 +410,7 @@ func (pgOps *PostgresOperations) isSwitchoverPossible(ctx context.Context, prima
 		if err != nil {
 			pgOps.Logger.Errorf("fetch other member failed, err:%v", err)
 		}
-		pgOps.Logger.Infof("other status", resp)
+		pgOps.Logger.Infof("other status:%v", resp)
 		if resp["event"] == OperationSuccess {
 			runningMembers++
 		}
@@ -1300,6 +1300,12 @@ func (pgOps *PostgresOperations) isFailoverPossible() bool {
 }
 
 func (pgOps *PostgresOperations) ProcessManualSwitchoverFromNoLeader(ctx context.Context, podName string) bool {
+	err := pgOps.Cs.GetClusterFromKubernetes()
+	if err != nil {
+		pgOps.Logger.Errorf("get cluster from k8s err:%v", err)
+		return false
+	}
+
 	replicationMode, err := pgOps.getReplicationMode(ctx)
 	if err != nil {
 		pgOps.Logger.Errorf("get replication err:%v", err)
@@ -1310,7 +1316,7 @@ func (pgOps *PostgresOperations) ProcessManualSwitchoverFromNoLeader(ctx context
 	}
 
 	switchover := pgOps.Cs.GetCluster().Switchover
-	if switchover.GetCandidate() != "" {
+	if switchover != nil && switchover.GetCandidate() != "" {
 		if switchover.GetCandidate() == podName {
 			return true
 		}

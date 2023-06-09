@@ -208,6 +208,7 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 
 	// Process no leader cluster
 	if h.isHealthiest() {
+		h.log.Warnf("cluster has no leader now")
 		err = h.acquireLeaderLock()
 		if err != nil {
 			h.log.Errorf("acquire leader lock err:%v", err)

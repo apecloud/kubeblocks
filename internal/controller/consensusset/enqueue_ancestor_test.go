@@ -21,6 +21,9 @@ package consensusset
 
 import (
 	"context"
+	"fmt"
+	"k8s.io/client-go/util/workqueue"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -301,7 +304,71 @@ var _ = Describe("enqueue ancestor", func() {
 
 		It("should work well", func() {
 			By("build events and queue")
-			
+			queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "enqueue-ancestor-test")
+			ancestorLevel2 := builder.NewConsensusSetBuilder(namespace, "foo-level-2").GetObject()
+			ancestorL2APIVersion := "workloads.kubeblocks.io/v1alpha1"
+			ancestorL2Kind := "ConsensusSet"
+			ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, "foo-level-1").
+				SetOwnerReferences(ancestorL2APIVersion, ancestorL2Kind, ancestorLevel2).
+				GetObject()
+			ancestorL1APIVersion := "apps/v1"
+			ancestorL1Kind := "StatefulSet"
+			object := builder.NewPodBuilder(namespace, "foo-level-1-0").
+				SetOwnerReferences(ancestorL1APIVersion, ancestorL1Kind, ancestorLevel1).
+				GetObject()
+			createEvent := event.CreateEvent{Object: object}
+			updateEvent := event.UpdateEvent{ObjectOld: object, ObjectNew: object}
+			deleteEvent := event.DeleteEvent{Object: object}
+			genericEvent := event.GenericEvent{Object: object}
+
+			cases := []struct {
+				name     string
+				testFunc func()
+				getTimes int
+			}{
+				{
+					name:     "Create",
+					testFunc: func() { handler.Create(createEvent, queue) },
+					getTimes: 1,
+				},
+				{
+					name:     "Update",
+					testFunc: func() { handler.Update(updateEvent, queue) },
+					getTimes: 2,
+				},
+				{
+					name:     "Delete",
+					testFunc: func() { handler.Delete(deleteEvent, queue) },
+					getTimes: 1,
+				},
+				{
+					name:     "Generic",
+					testFunc: func() { handler.Generic(genericEvent, queue) },
+					getTimes: 1,
+				},
+			}
+			for _, c := range cases {
+				By(fmt.Sprintf("test %s interface", c.name))
+				k8sMock.EXPECT().
+					Get(gomock.Any(), gomock.Any(), &appsv1.StatefulSet{}, gomock.Any()).
+					DoAndReturn(func(_ context.Context, objKey client.ObjectKey, sts *appsv1.StatefulSet, _ ...client.ListOptions) error {
+						sts.Namespace = objKey.Namespace
+						sts.Name = objKey.Name
+						sts.OwnerReferences = ancestorLevel1.OwnerReferences
+						return nil
+					}).Times(c.getTimes)
+				c.testFunc()
+				item, shutdown := queue.Get()
+				Expect(shutdown).Should(BeFalse())
+				request, ok := item.(reconcile.Request)
+				Expect(ok).Should(BeTrue())
+				Expect(request.Namespace).Should(Equal(ancestorLevel2.Namespace))
+				Expect(request.Name).Should(Equal(ancestorLevel2.Name))
+				queue.Done(item)
+				queue.Forget(item)
+			}
+
+			queue.ShutDown()
 		})
 	})
 })

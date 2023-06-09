@@ -30,8 +30,8 @@ metadata:
   name: prometheus-rule
   namespace: default
 data:
-{{ range $path, $content := .Files.Glob "config/prometheus-server/rulesFiles/*" }}
-  {{ trimPrefix "config/prometheus-server/rulesFiles/" $path }}: |-
+{{ range $path, $content := .Files.Glob "config/server/rulesFiles/*" }}
+  {{ trimPrefix "config/server/rulesFiles/" $path }}: |-
   {{- $content | toString | nindent 4 }}
 {{ end }}
 ---
@@ -48,8 +48,8 @@ metadata:
   namespace: default
 data:
 {{- $values := .Values }}
-{{ range $path, $content := .Files.Glob "config/prometheus-server/serverFiles/*" }}
-  {{ trimPrefix "config/prometheus-server/serverFiles/" $path }}: |-
+{{ range $path, $content := .Files.Glob "config/server/serverFiles/*" }}
+  {{ trimPrefix "config/server/serverFiles/" $path }}: |-
     global:
     {{- with $values.server.global }}
       scrape_interval: {{ .scrape_interval }}

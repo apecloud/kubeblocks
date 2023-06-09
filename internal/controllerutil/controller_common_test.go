@@ -29,6 +29,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
@@ -39,6 +40,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var tlog = ctrl.Log.WithName("controller_testing")
@@ -324,6 +327,63 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			_, err := ValidateReferenceCR(reqCtx, k8sClient, obj, referencedLabelKey, recordEvent, &corev1.ConfigMapList{})
 			Expect(err == nil)
+		})
+
+		It("Do test functions which depend on k8s env", func() {
+			By("test IgnoreIsAlreadyExists function")
+			obj, _ := createObj()
+			// reset resourceVersion
+			obj.ResourceVersion = ""
+			err := k8sClient.Create(ctx, obj)
+			Expect(err).Should(HaveOccurred())
+			Expect(IgnoreIsAlreadyExists(err)).Should(BeNil())
+
+			By("test ManagedByKubeBlocksFilterPredicate function")
+			Expect(ManagedByKubeBlocksFilterPredicate(obj)).Should(BeFalse())
+			// set managed by KubeBlocks label
+			obj.Labels = map[string]string{
+				constant.AppManagedByLabelKey: constant.AppName,
+			}
+			Expect(ManagedByKubeBlocksFilterPredicate(obj)).Should(BeTrue())
+
+			By("test WorkloadFilterPredicate function")
+			Expect(WorkloadFilterPredicate(obj)).Should(BeFalse())
+			// set component name label
+			obj.Labels[constant.KBAppComponentLabelKey] = "mysql"
+			Expect(WorkloadFilterPredicate(obj)).Should(BeTrue())
+
+			By("test RecordCreatedEvent function")
+			RecordCreatedEvent(nil, obj)
+
+			By("test RequeueWithErrorAndRecordEvent function")
+			notFoundErr := NewNotFound("pod not found")
+			_, err = RequeueWithErrorAndRecordEvent(obj, nil, notFoundErr, tlog)
+			Expect(IsNotFound(err)).Should(BeTrue())
+		})
+
+		It("Do check resources exists and set ownership", func() {
+			By("obj not exists")
+			notExistObj := &corev1.ConfigMap{}
+			exists, err := CheckResourceExists(ctx, k8sClient, types.NamespacedName{Name: "cm1", Namespace: "default"}, notExistObj)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(exists).Should(BeFalse())
+
+			By("obj exists")
+			obj, key := createObj()
+			exists, err = CheckResourceExists(ctx, k8sClient, key, obj)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(exists).Should(BeTrue())
+
+			By("set controllerReference")
+			obj1, _ := createObj()
+			Expect(SetOwnership(obj, obj1, k8sClient.Scheme(), "")).Should(Succeed())
+			Expect(obj1.OwnerReferences[0].Name).Should(Equal(obj.Name))
+			Expect(*obj1.OwnerReferences[0].Controller).Should(BeTrue())
+
+			By("set ownerReference")
+			Expect(SetOwnership(obj, obj1, k8sClient.Scheme(), "", true)).Should(Succeed())
+			Expect(obj1.OwnerReferences[0].Name).Should(Equal(obj.Name))
+			Expect(obj1.OwnerReferences[0].Controller).Should(BeNil())
 		})
 	})
 })

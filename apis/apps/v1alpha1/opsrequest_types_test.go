@@ -33,12 +33,12 @@ func mockRestartOps() *OpsRequest {
 	return ops
 }
 
-func TestGetRestartComponentNameMap(t *testing.T) {
+func TestGetRestartComponentNameSet(t *testing.T) {
 	ops := mockRestartOps()
-	componentNameMap := ops.Spec.GetRestartComponentNameSet()
-	checkComponentMap(t, componentNameMap, len(ops.Spec.RestartList), componentName)
-	componentNameMap1 := ops.GetComponentNameSet()
-	checkComponentMap(t, componentNameMap1, len(ops.Spec.RestartList), componentName)
+	componentNameSet := ops.Spec.GetRestartComponentNameSet()
+	checkComponentMap(t, componentNameSet, len(ops.Spec.RestartList), componentName)
+	componentNameSet1 := ops.GetComponentNameSet()
+	checkComponentMap(t, componentNameSet1, len(ops.Spec.RestartList), componentName)
 }
 
 func mockVerticalScalingOps() *OpsRequest {
@@ -54,12 +54,12 @@ func mockVerticalScalingOps() *OpsRequest {
 	return ops
 }
 
-func TestVerticalScalingComponentNameMap(t *testing.T) {
+func TestGetVerticalScalingComponentNameSet(t *testing.T) {
 	ops := mockVerticalScalingOps()
-	componentNameMap := ops.Spec.GetVerticalScalingComponentNameSet()
-	checkComponentMap(t, componentNameMap, len(ops.Spec.VerticalScalingList), componentName)
-	componentNameMap1 := ops.GetComponentNameSet()
-	checkComponentMap(t, componentNameMap1, len(ops.Spec.VerticalScalingList), componentName)
+	componentNameSet := ops.Spec.GetVerticalScalingComponentNameSet()
+	checkComponentMap(t, componentNameSet, len(ops.Spec.VerticalScalingList), componentName)
+	componentNameSet1 := ops.GetComponentNameSet()
+	checkComponentMap(t, componentNameSet1, len(ops.Spec.VerticalScalingList), componentName)
 }
 
 func mockHorizontalScalingOps() *OpsRequest {
@@ -75,12 +75,12 @@ func mockHorizontalScalingOps() *OpsRequest {
 	return ops
 }
 
-func TestHorizontalScalingComponentNameMap(t *testing.T) {
+func TestGetHorizontalScalingComponentNameSet(t *testing.T) {
 	ops := mockHorizontalScalingOps()
-	componentNameMap := ops.Spec.GetHorizontalScalingComponentNameSet()
-	checkComponentMap(t, componentNameMap, len(ops.Spec.HorizontalScalingList), componentName)
-	componentNameMap1 := ops.GetComponentNameSet()
-	checkComponentMap(t, componentNameMap1, len(ops.Spec.HorizontalScalingList), componentName)
+	componentNameSet := ops.Spec.GetHorizontalScalingComponentNameSet()
+	checkComponentMap(t, componentNameSet, len(ops.Spec.HorizontalScalingList), componentName)
+	componentNameSet1 := ops.GetComponentNameSet()
+	checkComponentMap(t, componentNameSet1, len(ops.Spec.HorizontalScalingList), componentName)
 }
 
 func mockVolumeExpansionOps() *OpsRequest {
@@ -96,19 +96,19 @@ func mockVolumeExpansionOps() *OpsRequest {
 	return ops
 }
 
-func TestVolumeExpansionComponentNameMap(t *testing.T) {
+func TestVolumeExpansioncomponentNameSet(t *testing.T) {
 	ops := mockVolumeExpansionOps()
-	componentNameMap := ops.Spec.GetVolumeExpansionComponentNameSet()
-	checkComponentMap(t, componentNameMap, len(ops.Spec.VolumeExpansionList), componentName)
-	componentNameMap1 := ops.GetComponentNameSet()
-	checkComponentMap(t, componentNameMap1, len(ops.Spec.VolumeExpansionList), componentName)
+	componentNameSet := ops.Spec.GetVolumeExpansionComponentNameSet()
+	checkComponentMap(t, componentNameSet, len(ops.Spec.VolumeExpansionList), componentName)
+	componentNameSet1 := ops.GetComponentNameSet()
+	checkComponentMap(t, componentNameSet1, len(ops.Spec.VolumeExpansionList), componentName)
 }
 
-func checkComponentMap(t *testing.T, componentNameMap map[string]struct{}, expectLen int, expectName string) {
-	if len(componentNameMap) != expectLen {
+func checkComponentMap(t *testing.T, componentNameSet map[string]struct{}, expectLen int, expectName string) {
+	if len(componentNameSet) != expectLen {
 		t.Error(`Expected component name map length equals list length`)
 	}
-	if _, ok := componentNameMap[expectName]; !ok {
+	if _, ok := componentNameSet[expectName]; !ok {
 		t.Error(`Expected component name map exists the key of "mysql"`)
 	}
 }
@@ -146,11 +146,11 @@ func TestToHorizontalScalingListToMap(t *testing.T) {
 	}
 }
 
-func TestGetUpgradeComponentNameMap(t *testing.T) {
+func TestGetUpgradeComponentNameSet(t *testing.T) {
 	ops := &OpsRequest{}
 	ops.Spec.Type = UpgradeType
-	componentNameMap := ops.GetUpgradeComponentNameSet()
-	if componentNameMap != nil {
+	componentNameSet := ops.GetUpgradeComponentNameSet()
+	if componentNameSet != nil {
 		t.Error(`Expected component name map of upgrade ops is nil`)
 	}
 	ops.Spec.Upgrade = &Upgrade{
@@ -160,10 +160,53 @@ func TestGetUpgradeComponentNameMap(t *testing.T) {
 		componentName: {},
 	}
 
-	componentNameMap = ops.GetUpgradeComponentNameSet()
-	checkComponentMap(t, componentNameMap, len(ops.Status.Components), componentName)
-	componentNameMap1 := ops.GetComponentNameSet()
-	checkComponentMap(t, componentNameMap1, len(ops.Status.Components), componentName)
+	componentNameSet = ops.GetUpgradeComponentNameSet()
+	checkComponentMap(t, componentNameSet, len(ops.Status.Components), componentName)
+	componentNameSet1 := ops.GetComponentNameSet()
+	checkComponentMap(t, componentNameSet1, len(ops.Status.Components), componentName)
+}
+
+func mockExposeOps() *OpsRequest {
+	ops := &OpsRequest{}
+	ops.Spec.Type = ExposeType
+	ops.Spec.ExposeList = []Expose{
+		{
+			ComponentOps: ComponentOps{
+				ComponentName: componentName,
+			},
+		},
+	}
+	return ops
+}
+
+func TestToExposeListToMap(t *testing.T) {
+	ops := mockExposeOps()
+	exposeMap := ops.Spec.ToExposeListToMap()
+	if len(exposeMap) != len(ops.Spec.ExposeList) {
+		t.Error(`Expected expose map length equals list length`)
+	}
+	if _, ok := exposeMap[componentName]; !ok {
+		t.Error(`Expected component name map exists the key of "mysql"`)
+	}
+}
+
+func TestGetExposeComponentNameSet(t *testing.T) {
+	ops := mockExposeOps()
+	componentNameSet := ops.Spec.GetExposeComponentNameSet()
+	checkComponentMap(t, componentNameSet, len(ops.Spec.ExposeList), componentName)
+	componentNameSet1 := ops.GetComponentNameSet()
+	checkComponentMap(t, componentNameSet1, len(ops.Spec.ExposeList), componentName)
+}
+
+func TestGetReconfiguringComponentNameSet(t *testing.T) {
+	ops := &OpsRequest{}
+	ops.Spec.Type = ReconfiguringType
+	ops.Spec.Reconfigure = &Reconfigure{
+		ComponentOps: ComponentOps{
+			ComponentName: componentName,
+		},
+	}
+	ops.Spec.GetReconfiguringComponentNameSet()
 }
 
 func TestSetStatusAndMessage(t *testing.T) {

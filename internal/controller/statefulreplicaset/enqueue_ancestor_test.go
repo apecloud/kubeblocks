@@ -56,15 +56,23 @@ var _ = Describe("enqueue ancestor", func() {
 	var handler *EnqueueRequestForAncestor
 
 	buildAncestorTree := func() (*workloads.StatefulReplicaSet, *appsv1.StatefulSet, *corev1.Pod) {
-		ancestorLevel2 := builder.NewStatefulReplicaSetBuilder(namespace, "foo").GetObject()
 		ancestorL2APIVersion := "workloads.kubeblocks.io/v1alpha1"
 		ancestorL2Kind := "StatefulReplicaSet"
-		ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, "foo").
-			SetOwnerReferences(ancestorL2APIVersion, ancestorL2Kind, ancestorLevel2).
-			GetObject()
+		ancestorL2Name := "ancestor-level-2"
 		ancestorL1APIVersion := "apps/v1"
 		ancestorL1Kind := "StatefulSet"
-		object := builder.NewPodBuilder(namespace, "foo-0").
+		ancestorL1Name := "ancestor-level-1"
+		objectName := ancestorL1Name + "-0"
+
+		ancestorLevel2 := builder.NewStatefulReplicaSetBuilder(namespace, ancestorL2Name).GetObject()
+		ancestorLevel2.APIVersion = ancestorL2APIVersion
+		ancestorLevel2.Kind = ancestorL2Kind
+		ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, ancestorL1Name).
+			SetOwnerReferences(ancestorL2APIVersion, ancestorL2Kind, ancestorLevel2).
+			GetObject()
+		ancestorLevel1.APIVersion = ancestorL1APIVersion
+		ancestorLevel1.Kind = ancestorL1Kind
+		object := builder.NewPodBuilder(namespace, objectName).
 			SetOwnerReferences(ancestorL1APIVersion, ancestorL1Kind, ancestorLevel1).
 			GetObject()
 

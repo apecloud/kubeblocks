@@ -57,6 +57,6 @@ Flags:
 ```
 
 
-# 7. License
+# 3. License
 
-Reloader is under the Apache 2.0 license. See the [LICENSE](../../LICENSE) file for details.
+Reloader is under the AGPL 3.0 license. See the [LICENSE](../../LICENSE) file for details.

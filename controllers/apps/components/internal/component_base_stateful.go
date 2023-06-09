@@ -466,22 +466,26 @@ func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, c
 }
 
 func (c *StatefulComponentBase) horizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
-	ret := c.horizontalScaling(c.runningWorkload)
+	sts := c.runningWorkload
+	if sts.Status.ReadyReplicas == c.Component.Replicas {
+		return nil
+	}
+	ret := c.horizontalScaling(sts)
 	if ret == 0 {
 		if err := c.postScaleIn(reqCtx, cli, txn); err != nil {
 			return err
 		}
-		if err := c.postScaleOut(reqCtx, cli, c.runningWorkload); err != nil {
+		if err := c.postScaleOut(reqCtx, cli, sts); err != nil {
 			return err
 		}
 		return nil
 	}
 	if ret < 0 {
-		if err := c.scaleIn(reqCtx, cli, c.runningWorkload); err != nil {
+		if err := c.scaleIn(reqCtx, cli, sts); err != nil {
 			return err
 		}
 	} else {
-		if err := c.scaleOut(reqCtx, cli, c.runningWorkload); err != nil {
+		if err := c.scaleOut(reqCtx, cli, sts); err != nil {
 			return err
 		}
 	}

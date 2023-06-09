@@ -22,11 +22,13 @@ package kubeblocks
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/containerd/stargz-snapshotter/estargz/errorutil"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/maps"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -49,7 +51,7 @@ import (
 	metrics "k8s.io/metrics/pkg/client/clientset/versioned"
 
 	tablePrinter "github.com/jedib0t/go-pretty/v6/table"
-	text "github.com/jedib0t/go-pretty/v6/text"
+	"github.com/jedib0t/go-pretty/v6/text"
 )
 
 var (
@@ -159,8 +161,6 @@ func (o *statusOptions) complete(f cmdutil.Factory) error {
 	if o.ns == "" {
 		printer.Warning(o.Out, "Failed to find deployed KubeBlocks in any namespace\n")
 		printer.Warning(o.Out, "Will check all namespaces for KubeBlocks resources left behind\n")
-	} else {
-		fmt.Fprintf(o.Out, "Kuberblocks is deployed in namespace: %s\n", o.ns)
 	}
 
 	o.selectorList = []metav1.ListOptions{
@@ -176,6 +176,7 @@ func (o *statusOptions) run() error {
 
 	allErrs := make([]error, 0)
 	o.buildSelectorList(ctx, &allErrs)
+	o.showK8sClusterInfos(ctx, &allErrs)
 	o.showWorkloads(ctx, &allErrs)
 	o.showAddons()
 
@@ -249,7 +250,7 @@ func (o *statusOptions) showAddons() {
 	for _, addon := range o.addons {
 		if addon.Labels == nil {
 			provider = notAvailable
-		} else if provider, ok = addon.Labels[constant.AddonProviderLableKey]; !ok {
+		} else if provider, ok = addon.Labels[constant.AddonProviderLabelKey]; !ok {
 			provider = notAvailable
 		}
 		tbl.AddRow(addon.Name, addon.Status.Phase, addon.Spec.Type, provider)
@@ -418,6 +419,55 @@ func (o *statusOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
 	tblPrinter.Print()
 }
 
+func (o *statusOptions) showK8sClusterInfos(ctx context.Context, allErrs *[]error) {
+	version, err := util.GetVersionInfo(o.client)
+	if err != nil {
+		appendErrIgnoreNotFound(allErrs, err)
+	}
+	if o.ns != "" {
+		fmt.Fprintf(o.Out, "KubeBlocks is deployed in namespace: %s", o.ns)
+		if version.KubeBlocks != "" {
+			fmt.Fprintf(o.Out, ",version: %s\n", version.KubeBlocks)
+		} else {
+			printer.PrintBlankLine(o.Out)
+		}
+	}
+
+	provider, err := util.GetK8sProvider(version.Kubernetes, o.client)
+	if err != nil {
+		*allErrs = append(*allErrs, fmt.Errorf("failed to get kubernetes provider: %v", err))
+	}
+	if !provider.IsCloud() {
+		return
+	}
+	fmt.Fprintf(o.Out, "\nKubernetes Cluster:\n")
+	tblPrinter := printer.NewTablePrinter(o.Out)
+	tblPrinter.SetHeader("VERSION", "PROVIDER", "REGION", "AVAILABLE ZONES")
+	nodesList, err := o.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		appendErrIgnoreNotFound(allErrs, err)
+	}
+	if nodesList == nil {
+		tblPrinter.AddRow(version.Kubernetes, provider, "", "")
+		tblPrinter.Print()
+		return
+	}
+	var region string
+	availableZones := make(map[string]struct{})
+	for _, node := range nodesList.Items {
+		labels := node.GetLabels()
+		if labels == nil {
+			continue
+		}
+		region = labels[constant.RegionLabelKey]
+		availableZones[labels[constant.ZoneLabelKey]] = struct{}{}
+	}
+	allZones := maps.Keys(availableZones)
+	sort.Strings(allZones)
+	tblPrinter.AddRow(version.Kubernetes, provider, region, strings.Join(allZones, ","))
+	tblPrinter.Print()
+}
+
 func getNestedSelectorAsString(obj map[string]interface{}, fields ...string) (string, error) {
 	val, found, err := unstructured.NestedStringMap(obj, fields...)
 	if !found || err != nil {
@@ -449,7 +499,7 @@ func computeMetricByWorkloads(ctx context.Context, ns string, workloads []*unstr
 	computeMetrics := func(namespace, name string, matchLabels string) {
 		if pods, err := mc.MetricsV1beta1().PodMetricses(namespace).List(ctx, metav1.ListOptions{LabelSelector: matchLabels}); err != nil {
 			if klog.V(1).Enabled() {
-				klog.Errorf("faied to get pod metrics for %s/%s, selector: , error: %v", namespace, name, matchLabels, err)
+				klog.Errorf("failed to get pod metrics for %s/%s, selector: , error: %v", namespace, name, matchLabels, err)
 			}
 		} else {
 			cpuUsage, memUsage := int64(0), int64(0)
@@ -518,11 +568,11 @@ func computeMetricByWorkloads(ctx context.Context, ns string, workloads []*unstr
 	return cpuMetricMap, memMetricMap, readyMap
 }
 
-func listResourceByGVR(ctx context.Context, client dynamic.Interface, namespace string, gvrlist []schema.GroupVersionResource, selector []metav1.ListOptions, allErrs *[]error) []*unstructured.UnstructuredList {
+func listResourceByGVR(ctx context.Context, client dynamic.Interface, namespace string, gvrs []schema.GroupVersionResource, selector []metav1.ListOptions, allErrs *[]error) []*unstructured.UnstructuredList {
 	unstructuredList := make([]*unstructured.UnstructuredList, 0)
-	for _, gvr := range gvrlist {
+	for _, gvr := range gvrs {
 		for _, labelSelector := range selector {
-			klog.V(1).Infof("listResourceByGVR: namespace=%s, gvrlist=%v, selector=%v", namespace, gvr, labelSelector)
+			klog.V(1).Infof("listResourceByGVR: namespace=%s, gvr=%v, selector=%v", namespace, gvr, labelSelector)
 			resource, err := client.Resource(gvr).Namespace(namespace).List(ctx, labelSelector)
 			if err != nil {
 				appendErrIgnoreNotFound(allErrs, err)

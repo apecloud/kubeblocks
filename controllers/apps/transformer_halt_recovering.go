@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package lifecycle
+package apps
 
 import (
 	"encoding/json"
@@ -138,7 +138,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 				return emitError(metav1.Condition{
 					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
 					Reason: "HaltRecoveryFailed",
-					Message: fmt.Sprintf("not equal to last applied cluster.spec.componetSpecs[%s].componentDefRef=%s",
+					Message: fmt.Sprintf("not equal to last applied cluster.spec.componentSpecs[%s].componentDefRef=%s",
 						comp.Name, lastUsedComp.ComponentDefRef),
 				})
 			}
@@ -146,7 +146,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 				return emitError(metav1.Condition{
 					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
 					Reason: "HaltRecoveryFailed",
-					Message: fmt.Sprintf("not equal to last applied cluster.spec.componetSpecs[%s].replicas=%d",
+					Message: fmt.Sprintf("not equal to last applied cluster.spec.componentSpecs[%s].replicas=%d",
 						comp.Name, lastUsedComp.Replicas),
 				})
 			}
@@ -162,7 +162,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 				return emitError(metav1.Condition{
 					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
 					Reason: "HaltRecoveryFailed",
-					Message: fmt.Sprintf("not equal to last applied cluster.spec.componetSpecs[%s].volumeClaimTemplates=%s; add '%s=true' annotation to void this check",
+					Message: fmt.Sprintf("not equal to last applied cluster.spec.componentSpecs[%s].volumeClaimTemplates=%s; add '%s=true' annotation to void this check",
 						comp.Name, objJSON, constant.HaltRecoveryAllowInconsistentResAnnotKey),
 				})
 			}
@@ -173,7 +173,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 					return emitError(metav1.Condition{
 						Type:   appsv1alpha1.ConditionTypeHaltRecovery,
 						Reason: "HaltRecoveryFailed",
-						Message: fmt.Sprintf("not equal to last applied cluster.spec.componetSpecs[%s].classDefRef=%s; add '%s=true' annotation to void this check",
+						Message: fmt.Sprintf("not equal to last applied cluster.spec.componentSpecs[%s].classDefRef=%s; add '%s=true' annotation to void this check",
 							comp.Name, objJSON, constant.HaltRecoveryAllowInconsistentResAnnotKey),
 					})
 				}
@@ -181,7 +181,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 				return emitError(metav1.Condition{
 					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
 					Reason: "HaltRecoveryFailed",
-					Message: fmt.Sprintf("not equal to last applied cluster.spec.componetSpecs[%s].classDefRef=null; add '%s=true' annotation to void this check",
+					Message: fmt.Sprintf("not equal to last applied cluster.spec.componentSpecs[%s].classDefRef=null; add '%s=true' annotation to void this check",
 						comp.Name, constant.HaltRecoveryAllowInconsistentResAnnotKey),
 				})
 			}
@@ -191,7 +191,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 				return emitError(metav1.Condition{
 					Type:   appsv1alpha1.ConditionTypeHaltRecovery,
 					Reason: "HaltRecoveryFailed",
-					Message: fmt.Sprintf("not equal to last applied cluster.spec.componetSpecs[%s].resources=%s; add '%s=true' annotation to void this check",
+					Message: fmt.Sprintf("not equal to last applied cluster.spec.componentSpecs[%s].resources=%s; add '%s=true' annotation to void this check",
 						comp.Name, objJSON, constant.HaltRecoveryAllowInconsistentResAnnotKey),
 				})
 			}
@@ -202,7 +202,7 @@ func (t *HaltRecoveryTransformer) Transform(ctx graph.TransformContext, dag *gra
 			return emitError(metav1.Condition{
 				Type:   appsv1alpha1.ConditionTypeHaltRecovery,
 				Reason: "HaltRecoveryFailed",
-				Message: fmt.Sprintf("cluster.spec.componetSpecs[%s] not found in last applied cluster",
+				Message: fmt.Sprintf("cluster.spec.componentSpecs[%s] not found in last applied cluster",
 					comp.Name),
 			})
 		}

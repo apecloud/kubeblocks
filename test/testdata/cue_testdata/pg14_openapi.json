@@ -484,7 +484,7 @@
           ]
         },
         "debug_print_parse": {
-          "description": "Logs each querys parse tree.",
+          "description": "Logs each queries parse tree.",
           "type": "boolean",
           "enum": [
             false,
@@ -492,7 +492,7 @@
           ]
         },
         "debug_print_plan": {
-          "description": "Logs each querys execution plan.",
+          "description": "Logs each queries execution plan.",
           "type": "boolean",
           "enum": [
             false,
@@ -500,7 +500,7 @@
           ]
         },
         "debug_print_rewritten": {
-          "description": "Logs each querys rewritten parse tree.",
+          "description": "Logs each queries rewritten parse tree.",
           "type": "boolean",
           "enum": [
             false,

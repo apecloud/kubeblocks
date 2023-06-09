@@ -21,11 +21,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Get trigger mode
         id: get_trigger_mode
         run: |
-          TRIGGER_MODE=`bash .github/utils/utils.sh --type 6`
+          TRIGGER_MODE=`bash .github/utils/utils.sh --type 6 \
+              --branch-name "${{ github.event.pull_request.head.ref }}" \
+              --base-commit "${{ github.event.pull_request.base.sha }}"`
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
 
@@ -37,13 +39,17 @@ jobs:
       runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
     runs-on: [ self-hosted, kubeblocks-runner ]
     steps:
-      - uses: apecloud/checkout@main
-      - name: make mod-vendor and lint
+      - uses: actions/checkout@v3
+      - name: make mod-vendor
         run: |
           mkdir -p ./bin
           cp -r /go/bin/controller-gen ./bin/controller-gen
           cp -r /go/bin/setup-envtest ./bin/setup-envtest
-          make mod-vendor lint
+          make mod-vendor
+
+      - name: make lint
+        run: |
+          make lint
 
       - name: make test
         run: |

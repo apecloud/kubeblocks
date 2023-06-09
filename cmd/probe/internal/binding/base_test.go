@@ -93,6 +93,7 @@ func TestInvoke(t *testing.T) {
 			Operation: CheckRunningOperation,
 		}
 		t.Run("Failed", func(t *testing.T) {
+			p.CheckRunningFailedCount = 1
 			resp, err := p.Invoke(context.Background(), req)
 			if err != nil {
 				t.Errorf("CheckRunning failed: %s", err)
@@ -131,6 +132,7 @@ func TestInvoke(t *testing.T) {
 
 		t.Run("Success", func(t *testing.T) {
 			p.BaseOperations.GetRole = p.GetRole
+			p.BaseOperations.OriRole = testRole
 			resp, err := p.Invoke(context.Background(), req)
 			if err != nil {
 				t.Errorf("CheckRole error: %s", err)
@@ -179,6 +181,7 @@ func TestInvoke(t *testing.T) {
 
 		t.Run("Failed", func(t *testing.T) {
 			p.BaseOperations.GetRole = p.GetRoleFailed
+			p.CheckRoleFailedCount = 1
 			resp, err := p.Invoke(context.Background(), req)
 			if err != nil {
 				t.Errorf("GetRole error: %s", err)

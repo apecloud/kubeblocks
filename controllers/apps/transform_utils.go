@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package lifecycle
+package apps
 
 import (
 	"reflect"
@@ -81,7 +81,7 @@ func getClusterOwningObjects(transCtx *ClusterTransformContext, cluster appsv1al
 		for i := 0; i < l; i++ {
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
-			name, err := getGVKName(object, scheme)
+			name, err := getGVKName(object, rscheme)
 			if err != nil {
 				return nil, err
 			}
@@ -91,13 +91,14 @@ func getClusterOwningObjects(transCtx *ClusterTransformContext, cluster appsv1al
 	return objs, nil
 }
 
-// sendWaringEventForCluster sends a warning event when occurs error.
-func sendWaringEventWithError(
+// sendWaringEventWithError sends a warning event when occurs error.
+func sendWarningEventWithError(
 	recorder record.EventRecorder,
 	cluster *appsv1alpha1.Cluster,
 	reason string,
 	err error) {
-	if err == nil {
+	// ignore requeue error
+	if err == nil || intctrlutil.IsRequeueError(err) {
 		return
 	}
 	controllerErr := intctrlutil.ToControllerError(err)

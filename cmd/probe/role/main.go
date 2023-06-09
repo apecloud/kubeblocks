@@ -38,9 +38,10 @@ func main() {
 	var err error
 
 	var port int
-	var url string
+	var path string
 	flag.IntVar(&port, "port", internal.DefaultRoleObservationPort, "")
-	flag.StringVar(&url, "url", internal.DefaultRoleObservationPath, "")
+	flag.StringVar(&path, "path", internal.DefaultRoleObservationPath, "")
+	flag.Parse()
 
 	agent := internal.NewRoleAgent(os.Stdin, "ROLE_OBSERVATION")
 	err = agent.Init()
@@ -48,12 +49,12 @@ func main() {
 		log.Fatal(fmt.Errorf("fatal error custom init: %v", err))
 	}
 
-	err = http.ListenAndServe(fmt.Sprintf("localhost:%d", port), nil)
+	err = http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 	if err != nil {
 		log.Fatal(fmt.Errorf("fatal error http listen: %v", err))
 	}
 
-	http.HandleFunc(url, func(writer http.ResponseWriter, request *http.Request) {
+	http.HandleFunc(path, func(writer http.ResponseWriter, request *http.Request) {
 		opsRes, shouldNotify := agent.CheckRole(request.Context())
 		buf, err := json.Marshal(opsRes)
 		if err != nil {

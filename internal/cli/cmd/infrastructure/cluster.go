@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/tasks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
@@ -63,7 +62,6 @@ func buildCommonFlags(cmd *cobra.Command, o *clusterOptions) {
 	cmd.Flags().StringVarP(&o.userName, "user", "u", "", "Specify the account to access the remote server. [require]")
 	cmd.Flags().Int64VarP(&o.timeout, "timeout", "t", 30, "Specify the ssh timeout.[option]")
 	cmd.Flags().StringVarP(&o.password, "password", "p", "", "Specify the password for the account to execute sudo. [option]")
-	cmd.Flags().StringVarP(&o.password, "sandbox-image", "", tasks.DefaultSandBoxImage, "Specified image will not be used by the cri. [option]")
 	cmd.Flags().StringVarP(&o.privateKey, "private-key", "", "", "The PrimaryKey for ssh to the remote machine. [option]")
 	cmd.Flags().StringVarP(&o.privateKeyPath, "private-key-path", "", "", "Specify the file PrimaryKeyPath of ssh to the remote machine. default ~/.ssh/id_rsa.")
 

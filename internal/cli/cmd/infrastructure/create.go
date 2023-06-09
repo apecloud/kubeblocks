@@ -49,6 +49,7 @@ var createExamples = `
 `
 
 func (o *createOptions) Run() error {
+
 	cluster, err := createClusterWithOptions(buildTemplateParams(o))
 	if err != nil {
 		return err
@@ -104,9 +105,9 @@ func NewCreateKubernetesCmd(streams genericclioptions.IOStreams) *cobra.Command 
 func (o *createOptions) buildCreateInfraFlags(cmd *cobra.Command) {
 	buildCommonFlags(cmd, &o.clusterOptions)
 	cmd.Flags().StringVarP(&o.version.KubernetesVersion, "version", "", o.version.KubernetesVersion, fmt.Sprintf("Specify install kubernetes version. default version is %s", o.version.KubernetesVersion))
+	cmd.Flags().StringVarP(&o.sandBoxImage, "sandbox-image", "", tasks.DefaultSandBoxImage, "Specified sandbox-image will not be used by the cri. [option]")
 	cmd.Flags().StringVarP(&o.criType, "container-runtime", "", string(container.ContainerdType), "Specify kubernetes container runtime. default is containerd")
 	cmd.Flags().BoolVarP(&o.debug, "debug", "", false, "set debug mode")
-
 }
 
 func (o *createOptions) setDefaultVersion() {

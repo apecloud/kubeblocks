@@ -78,10 +78,14 @@ service: {
 		ports: [
 			for _, container in component.podSpec.containers if container.ports != _|_
 			for _, v in container.ports {
-				name:       v.name
-				protocol:   v.protocol
 				port:       v.containerPort
-				targetPort: v.name
+				if v.name != _|_ {
+					name:       v.name
+					targetPort: v.name
+				}
+				if v.protocol != _|_ {
+					protocol:   v.protocol
+				}
 			},
 		]
 	}

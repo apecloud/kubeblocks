@@ -502,7 +502,7 @@ type ServicePort struct {
 	// All ports within a ServiceSpec must have unique names. When considering
 	// the endpoints for a Service, this must match the 'name' field in the
 	// EndpointPort.
-	// +kubebuilder:validation:Required
+	// +optional
 	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
 
 	// The IP protocol for this port. Supports "TCP", "UDP", and "SCTP".

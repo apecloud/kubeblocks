@@ -81,8 +81,20 @@ func NewFaultCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		NewIOChaosCmd(f, streams),
 		NewStressChaosCmd(f, streams),
 		NewNodeChaosCmd(f, streams),
+		NewDeleteCmd(f),
 	)
 	return cmd
+}
+
+func NewDeleteCmd(f cmdutil.Factory) *cobra.Command {
+	return &cobra.Command{
+		Use:     "delete",
+		Short:   "Delete chaos resources.",
+		Example: "delete all chaos resources \n kbcli fault delete",
+		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(deleteResources(f, "chaos-mesh.org/v1alpha1"))
+		},
+	}
 }
 
 func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
@@ -197,4 +209,45 @@ func (o *FaultBaseOptions) checkChaosMeshEnable() (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func deleteResources(f cmdutil.Factory, groupVersion string) error {
+	discoveryClient, err := f.ToDiscoveryClient()
+	if err != nil {
+		return fmt.Errorf("failed to create discovery client: %v", err)
+	}
+
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return err
+	}
+
+	apiResources, err := discoveryClient.ServerResourcesForGroupVersion(groupVersion)
+	if err != nil {
+		return fmt.Errorf("failed to get server resources for %s: %s", groupVersion, err)
+	}
+
+	for _, resource := range apiResources.APIResources {
+		// skip subresources
+		if len(strings.Split(resource.Name, "/")) > 1 {
+			continue
+		}
+		gvr := schema.GroupVersionResource{
+			Group:    Group,
+			Version:  Version,
+			Resource: resource.Name,
+		}
+		resourceList, err := dynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to list %s: %s", gvr, err)
+		}
+		for _, obj := range resourceList.Items {
+			err = dynamicClient.Resource(gvr).Namespace(obj.GetNamespace()).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{})
+			if err != nil {
+				return fmt.Errorf("failed to delete %s: %s", gvr, err)
+			}
+			fmt.Println("delete resource", obj.GetName())
+		}
+	}
+	return nil
 }

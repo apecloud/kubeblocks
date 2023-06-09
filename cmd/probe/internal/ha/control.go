@@ -305,6 +305,8 @@ func (h *Ha) acquireLeaderLock() error {
 func (h *Ha) isDBRunning() bool {
 	status, err := h.DB.GetStatus(h.ctx)
 	if err != nil {
+		// set origin role
+		_, _ = h.DB.IsLeader(h.ctx)
 		h.log.Errorf("get db status failed, err:%v", err)
 		return false
 	}

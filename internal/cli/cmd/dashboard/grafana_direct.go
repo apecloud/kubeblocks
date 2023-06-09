@@ -31,7 +31,7 @@ var (
 	clusterType string
 	// Todo: availableTypes is hard code, better to do a dynamic query but where the source from?
 	availableTypes = [...]string{
-		"apecloud-mysql",
+		"mysql",
 		"cadvisor",
 		"jmx",
 		"kafka",
@@ -41,11 +41,12 @@ var (
 		"redis",
 		"weaviate",
 	}
+	usage = `the cluster type opened directly in dashboard, support 'mysql','cadvisor','jmx','kafka','mongodb','node','postgresql','redis' and 'weaviate'`
 )
 
-func addCharacterFlag(cmd *cobra.Command, dashboardType *string) {
-	cmd.Flags().StringVar(dashboardType, "type", "", "the cluster type opened directly in dashboard. eg 'apecloud-mysql'")
-	util.CheckErr(cmd.RegisterFlagCompletionFunc("type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+func addCharacterFlag(cmd *cobra.Command, clusterType *string) {
+	cmd.Flags().StringVar(clusterType, "cluster-type", "", usage)
+	util.CheckErr(cmd.RegisterFlagCompletionFunc("cluster-type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var name []string
 		for i := range availableTypes {
 			if strings.HasPrefix(availableTypes[i], toComplete) {
@@ -66,5 +67,5 @@ func buildGrafanaDirectURL(url *string, targetType string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("input an invalid character type, please check your input")
+	return fmt.Errorf("input an invalid cluster type, please check your input")
 }

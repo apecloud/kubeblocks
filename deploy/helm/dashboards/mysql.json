@@ -4968,7 +4968,7 @@
   },
   "timezone": "",
   "title": "MySQL",
-  "uid": "apecloud-mysql",
+  "uid": "mysql",
   "version": 1,
   "weekStart": ""
 }

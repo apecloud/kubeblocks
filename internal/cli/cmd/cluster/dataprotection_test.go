@@ -209,8 +209,8 @@ var _ = Describe("DataProtection", func() {
 		// create backup
 		cmd := NewCreateBackupCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
-		_ = cmd.Flags().Set("backup-type", "snapshot")
-		_ = cmd.Flags().Set("backup-name", backupName)
+		_ = cmd.Flags().Set("type", "snapshot")
+		_ = cmd.Flags().Set("name", backupName)
 		cmd.Run(nil, []string{clusterName})
 
 		By("restore new cluster from source cluster which is not deleted")

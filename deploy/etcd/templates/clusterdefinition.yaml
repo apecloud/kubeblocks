@@ -47,11 +47,11 @@ spec:
                 PEERS=""
                 DOMAIN=$KB_NAMESPACE".svc.cluster.local"
                 i=0
-                while [ $i -lt $KB_ETCD_N ]; do
+                while [ $i -lt $KB_REPLICA_COUNT ]; do
                 	if [ $i -ne 0 ]; then
                 		PEERS="$PEERS,";
                 	fi;
-                	host=$(eval echo \$KB_ETCD_"$i"_HOSTNAME)
+                	host=$(eval echo \$KB_"$i"_HOSTNAME)
                     host=$host"."$DOMAIN
                 	PEERS="$PEERS$host=http://$host:2380"
                     i=$(( i + 1))

@@ -22,7 +22,7 @@ During the vertical scaling process, all pods restart in the order of learner ->
 
 ### Before you start
 
-Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
+Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
 
 ```bash
 kbcli cluster list mysql-cluster
@@ -48,28 +48,6 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    - `--components` describes the component name ready for vertical scaling.
    - `--memory` describes the requested and limited size of the component memory.
    - `--cpu` describes the requested and limited size of the component CPU.
-
-   You can also vertically scale a cluster with specified class type.
-
-   1. List all classes with `kbcli class list` command and choose the one you need, or check [class type](./../cluster-type/cluster-types.md) document for reference.
-
-   ```bash
-   kbcli class list --cluster-definition apecloud-mysql  
-   ```
-
-   :::note
-  
-   If there is no suitable class listed, you can [customize your own class](./../cluster-type/customize-class-type.md) template and apply the class here.
-
-   Creating clusters that does not meet the constraints is invalid and system creates the cluster with the minimum CPU value specified.
-
-   :::
-
-   2. Use `--set` option with `kbcli cluster vscale` command to apply the vertical scaling.
-
-   ```bash
-   kbcli cluster vscale mysql-clsuter --components="mysql" --cluster-definition apecloud-mysql --set class=general-2c2g
-   ```
 
    **Option 2.** Create an OpsRequest
   
@@ -101,7 +79,7 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
 
    ***Example***
 
-   ```YAML
+   ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
@@ -146,6 +124,12 @@ mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30 
    - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
      > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
 
+3. Check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mysql-cluster
+    ```
+
 ## Horizontal scaling
 
 Horizontal scaling changes the amount of pods. For example, you can apply horizontal scaling to scale pods up from three to five. The scaling process includes the backup and restoration of data.
@@ -175,12 +159,12 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
    --components="mysql" --replicas=3
    ```
 
-   - `--components` describes the component name ready for vertical scaling.
+   - `--components` describes the component name ready for horizontal scaling.
    - `--replicas` describes the replicas with the specified components.
 
    **Option 2.** Create an OpsRequest
 
-   Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+   Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
    ```bash
    kubectl apply -f - <<EOF
@@ -199,11 +183,11 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
    **Option 3.** Change the YAML file of the cluster
 
-   Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stand for the pod amount and changing this value triggers a horizontal scaling of a cluster.
+   Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
 
    ***Example***
 
-   ```YAML
+   ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
@@ -240,6 +224,12 @@ Horizontal scaling changes the amount of pods. For example, you can apply horizo
 
    - STATUS=HorizontalScaling: it means horizontal scaling is in progress.
    - STATUS=Running: it means horizontal scaling has been applied.
+
+3. Check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mysql-cluster
+    ```
 
 ### Handle the snapshot exception
 

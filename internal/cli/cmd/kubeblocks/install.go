@@ -22,6 +22,7 @@ package kubeblocks
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -46,7 +47,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -55,7 +55,10 @@ import (
 )
 
 const (
-	kMonitorParam = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t"
+	kMonitorParam    = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t"
+	kNodeAffinity    = "affinity.nodeAffinity=%s"
+	kPodAntiAffinity = "affinity.podAntiAffinity=%s"
+	kTolerations     = "tolerations=%s"
 )
 
 type Options struct {
@@ -79,6 +82,12 @@ type InstallOptions struct {
 	CreateNamespace bool
 	Check           bool
 	ValueOpts       values.Options
+
+	// ConfiguredOptions is the options that kubeblocks
+	PodAntiAffinity string
+	TopologyKeys    []string
+	NodeLabels      map[string]string
+	TolerationsRaw  []string
 }
 
 type addonStatus struct {
@@ -141,6 +150,10 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for installing KubeBlocks, such as --timeout=10m")
 	cmd.Flags().BoolVar(&o.Wait, "wait", true, "Wait for KubeBlocks to be ready, including all the auto installed add-ons. It will wait for a --timeout period")
 	cmd.Flags().BoolVar(&p.force, flagForce, p.force, "If present, just print fail item and continue with the following steps")
+	cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "", "Pod anti-affinity type, one of: (Preferred, Required)")
+	cmd.Flags().StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
+	cmd.Flags().StringToStringVar(&o.NodeLabels, "node-labels", nil, "Node label selector")
+	cmd.Flags().StringSliceVar(&o.TolerationsRaw, "tolerations", nil, `Tolerations for Kubeblocks, such as '"dev=true:NoSchedule,large=true:NoSchedule"'`)
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
@@ -197,9 +210,7 @@ func (o *InstallOptions) PreCheck() error {
 	// For example: 'kbcli playground init' in windows will fail and try 'kbcli playground init' again immediately,
 	// kbcli will output SUCCESSFULLY, however the addon csi is still failed and KubeBlocks is not installed SUCCESSFULLY
 	if v.KubeBlocks != "" {
-		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", v.KubeBlocks)
-		fmt.Fprintln(o.Out, "If you want to upgrade it, please use \"kbcli kubeblocks upgrade\".")
-		return cmdutil.ErrExit
+		return fmt.Errorf("KubeBlocks %s already exists, repeated installation is not supported", v.KubeBlocks)
 	}
 
 	// check whether the namespace exists
@@ -223,6 +234,37 @@ func (o *InstallOptions) Install() error {
 	var err error
 	// add monitor parameters
 	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
+
+	// add pod anti-affinity
+	if o.PodAntiAffinity != "" || len(o.TopologyKeys) > 0 {
+		podAntiAffinityJSON, err := json.Marshal(util.BuildPodAntiAffinity(o.PodAntiAffinity, o.TopologyKeys))
+		if err != nil {
+			return err
+		}
+		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kPodAntiAffinity, podAntiAffinityJSON))
+	}
+
+	// add node affinity
+	if len(o.NodeLabels) > 0 {
+		nodeLabelsJSON, err := json.Marshal(util.BuildNodeAffinity(o.NodeLabels))
+		if err != nil {
+			return err
+		}
+		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kNodeAffinity, string(nodeLabelsJSON)))
+	}
+
+	// parse tolerations and add to values
+	if len(o.TolerationsRaw) > 0 {
+		tolerations, err := util.BuildTolerations(o.TolerationsRaw)
+		if err != nil {
+			return err
+		}
+		tolerationsJSON, err := json.Marshal(tolerations)
+		if err != nil {
+			return err
+		}
+		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kTolerations, string(tolerationsJSON)))
+	}
 
 	// add helm repo
 	s := spinner.New(o.Out, spinnerMsg("Add and update repo "+types.KubeBlocksRepoName))

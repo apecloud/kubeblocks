@@ -91,6 +91,9 @@ type MemoryConstraint struct {
 	MinPerCPU *resource.Quantity `json:"minPerCPU,omitempty"`
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:categories={kubeblocks,all},scope=Cluster,shortName=crc
 

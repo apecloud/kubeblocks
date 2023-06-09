@@ -136,9 +136,9 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	if viper.GetBool("VOLUMESNAPSHOT") {
 		if intctrlutil.InVolumeSnapshotV1Beta1() {
-			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.Predicates{})
 		} else {
-			b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+			b.Owns(&snapshotv1.VolumeSnapshot{}, builder.Predicates{})
 		}
 	}
 
@@ -207,8 +207,12 @@ func (r *BackupReconciler) doNewPhaseAction(
 			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 	}
-
-	target, err := r.getTargetPod(reqCtx, backup, targetCluster.LabelsSelector.MatchLabels)
+	// clean cached annotations if in NEW phase
+	backupCopy := backup.DeepCopy()
+	if backupCopy.Annotations[dataProtectionBackupTargetPodKey] != "" {
+		delete(backupCopy.Annotations, dataProtectionBackupTargetPodKey)
+	}
+	target, err := r.getTargetPod(reqCtx, backupCopy, targetCluster.LabelsSelector.MatchLabels)
 	if err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
@@ -373,7 +377,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 		if !isOK {
-			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+			return intctrlutil.Reconciled()
 		}
 		msg := fmt.Sprintf("Created volumeSnapshot %s ready.", key.Name)
 		r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedVolumeSnapshot", msg)
@@ -421,7 +425,7 @@ func (r *BackupReconciler) doInProgressPhaseAction(
 			return r.updateStatusIfFailed(reqCtx, backup, err)
 		}
 		if !isOK {
-			return intctrlutil.RequeueAfter(reconcileInterval, reqCtx.Log, "")
+			return intctrlutil.Reconciled()
 		}
 		job, err := r.getBatchV1Job(reqCtx, backup)
 		if err != nil {
@@ -641,9 +645,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		}
 
 		controllerutil.AddFinalizer(snap, dataProtectionFinalizerName)
-
-		scheme, _ := dataprotectionv1alpha1.SchemeBuilder.Build()
-		if err = controllerutil.SetOwnerReference(backup, snap, scheme); err != nil {
+		if err = controllerutil.SetControllerReference(backup, snap, r.Scheme); err != nil {
 			return err
 		}
 
@@ -710,11 +712,15 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 	basePolicy *dataprotectionv1alpha1.BasePolicy,
 	updateInfo dataprotectionv1alpha1.BackupStatusUpdate) error {
 	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	updatePath := updateInfo.Path
+	if updateInfo.Path == "" {
+		updatePath = "status"
+	}
 	jobName := backup.Name
 	if len(backup.Name) > 30 {
 		jobName = backup.Name[:30]
 	}
-	key := types.NamespacedName{Namespace: mgrNS, Name: jobName + "-" + strings.ToLower(updateInfo.Path)}
+	key := types.NamespacedName{Namespace: mgrNS, Name: jobName + "-" + strings.ToLower(updatePath)}
 	job := &batchv1.Job{}
 	// check if job is created
 	if exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, job); err != nil {
@@ -940,6 +946,11 @@ func (r *BackupReconciler) createBatchV1Job(
 		},
 	}
 	controllerutil.AddFinalizer(job, dataProtectionFinalizerName)
+	if backup.Namespace == job.Namespace {
+		if err := controllerutil.SetControllerReference(backup, job, r.Scheme); err != nil {
+			return err
+		}
+	}
 
 	reqCtx.Log.V(1).Info("create a built-in job from backup", "job", job)
 	return client.IgnoreAlreadyExists(r.Client.Create(reqCtx.Ctx, job))
@@ -1376,7 +1387,11 @@ func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 	args := "set -o errexit; set -o nounset;" +
 		"OUTPUT=$(kubectl -n %s exec -it pod/%s -c %s -- %s);" +
 		"kubectl -n %s patch backup %s --subresource=status --type=merge --patch \"%s\";"
-	patchJSON := generateJSON("status."+updateInfo.Path, "$OUTPUT")
+	statusPath := "status." + updateInfo.Path
+	if updateInfo.Path == "" {
+		statusPath = "status"
+	}
+	patchJSON := generateJSON(statusPath, "$OUTPUT")
 	args = fmt.Sprintf(args, targetPod.Namespace, targetPod.Name, updateInfo.ContainerName,
 		updateInfo.Script, backup.Namespace, backup.Name, patchJSON)
 	container.Args = []string{args}

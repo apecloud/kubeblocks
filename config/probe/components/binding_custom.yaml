@@ -1,0 +1,8 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: custom
+spec:
+  type: bindings.custom
+  version: v1
+  metadata: []

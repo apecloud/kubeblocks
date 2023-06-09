@@ -1377,7 +1377,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Replace is used primarly for object storage.",
+      "description": "Replace is used primarily for object storage.",
       "fieldConfig": {
         "defaults": {
           "color": {

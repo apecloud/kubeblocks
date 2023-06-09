@@ -219,7 +219,7 @@ func (r *deletionStage) Handle(ctx context.Context) {
 				return
 			}
 			r.reqCtx.Log.V(1).Info("progress to", "phase", phase)
-			r.reconciler.Event(addon, "Normal", reason,
+			r.reconciler.Event(addon, corev1.EventTypeNormal, reason,
 				fmt.Sprintf("Progress to %s phase", phase))
 			r.setReconciled()
 		}
@@ -269,7 +269,7 @@ func (r *installableCheckStage) Handle(ctx context.Context) {
 			return
 		}
 		if addon.Annotations != nil && addon.Annotations[SkipInstallableCheck] == trueVal {
-			r.reconciler.Event(addon, "Warning", InstallableCheckSkipped,
+			r.reconciler.Event(addon, corev1.EventTypeWarning, InstallableCheckSkipped,
 				"Installable check skipped.")
 			return
 		}
@@ -297,7 +297,7 @@ func (r *installableCheckStage) Handle(ctx context.Context) {
 				r.setRequeueWithErr(err, "")
 				return
 			}
-			r.reconciler.Event(addon, "Warning", InstallableRequirementUnmatched,
+			r.reconciler.Event(addon, corev1.EventTypeWarning, InstallableRequirementUnmatched,
 				fmt.Sprintf("Does not meet installable requirements for key %v", s))
 			r.setReconciled()
 			return
@@ -351,7 +351,7 @@ func (r *progressingHandler) Handle(ctx context.Context) {
 				r.setRequeueWithErr(err, "")
 				return
 			}
-			r.reconciler.Event(addon, "Normal", reason,
+			r.reconciler.Event(addon, corev1.EventTypeNormal, reason,
 				fmt.Sprintf("Progress to %s phase", phase))
 			r.setReconciled()
 		}
@@ -602,7 +602,7 @@ func (r *helmTypeUninstallStage) Handle(ctx context.Context) {
 			// info. from conditions.
 			if helmUninstallJob.Status.Failed > 0 {
 				r.reqCtx.Log.V(1).Info("helm uninstall job failed", "job", key)
-				r.reconciler.Event(addon, "Warning", UninstallationFailed,
+				r.reconciler.Event(addon, corev1.EventTypeWarning, UninstallationFailed,
 					fmt.Sprintf("Uninstallation failed, do inspect error from jobs.batch %s",
 						key.String()))
 				// only allow to do pod logs if max concurrent reconciles > 1, also considered that helm
@@ -725,7 +725,7 @@ func (r *terminalStateStage) Handle(ctx context.Context) {
 				r.setRequeueWithErr(err, "")
 				return
 			}
-			r.reconciler.Event(addon, "Normal", reason,
+			r.reconciler.Event(addon, corev1.EventTypeNormal, reason,
 				fmt.Sprintf("Progress to %s phase", phase))
 			r.setReconciled()
 		}
@@ -897,7 +897,7 @@ func enabledAddonWithDefaultValues(ctx context.Context, stageCtx *stageCtx,
 			stageCtx.setRequeueWithErr(err, "")
 			return
 		}
-		stageCtx.reconciler.Event(addon, "Normal", reason, message)
+		stageCtx.reconciler.Event(addon, corev1.EventTypeNormal, reason, message)
 		stageCtx.setReconciled()
 	}
 
@@ -944,9 +944,9 @@ func setAddonErrorConditions(ctx context.Context,
 		return
 	}
 	if len(eventMessage) > 0 && eventMessage[0] != "" {
-		stageCtx.reconciler.Event(addon, "Warning", reason, eventMessage[0])
+		stageCtx.reconciler.Event(addon, corev1.EventTypeWarning, reason, eventMessage[0])
 	} else {
-		stageCtx.reconciler.Event(addon, "Warning", reason, message)
+		stageCtx.reconciler.Event(addon, corev1.EventTypeWarning, reason, message)
 	}
 }
 

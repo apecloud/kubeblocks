@@ -44,7 +44,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -138,7 +137,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// the cluster reconciliation loop is a 3-stage model: plan Init, plan Build and plan Execute
 	// Init stage
-	planBuilder := lifecycle.NewClusterPlanBuilder(reqCtx, r.Client, req)
+	planBuilder := NewClusterPlanBuilder(reqCtx, r.Client, req)
 	if err := planBuilder.Init(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -160,36 +159,36 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		AddTransformer(
 			// handle deletion
 			// handle cluster deletion first
-			&lifecycle.ClusterDeletionTransformer{},
+			&ClusterDeletionTransformer{},
 			// check is recovering from halted cluster
-			&lifecycle.HaltRecoveryTransformer{},
+			&HaltRecoveryTransformer{},
 			// assure meta-data info
 			// update finalizer and cd&cv labels
-			&lifecycle.AssureMetaTransformer{},
+			&AssureMetaTransformer{},
 			// validate ref objects
 			// validate cd & cv's existence and availability
-			&lifecycle.ValidateAndLoadRefResourcesTransformer{},
+			&ValidateAndLoadRefResourcesTransformer{},
 			// validate config
-			&lifecycle.ValidateEnableLogsTransformer{},
+			&ValidateEnableLogsTransformer{},
 			// fix spec
 			// fill class related info
-			&lifecycle.FillClassTransformer{},
+			&FillClassTransformer{},
 			// create cluster connection credential secret object
-			&lifecycle.ClusterCredentialTransformer{},
+			&ClusterCredentialTransformer{},
 			// handle restore
-			&lifecycle.RestoreTransformer{Client: r.Client},
+			&RestoreTransformer{Client: r.Client},
 			// create all components objects
-			&lifecycle.ComponentTransformer{Client: r.Client},
+			&ComponentTransformer{Client: r.Client},
 			// transform backupPolicy tpl to backuppolicy.dataprotection.kubeblocks.io
-			&lifecycle.BackupPolicyTPLTransformer{},
+			&BackupPolicyTPLTransformer{},
 			// add our finalizer to all objects
-			&lifecycle.OwnershipTransformer{},
+			&OwnershipTransformer{},
 			// make all workload objects depending on credential secret
-			&lifecycle.SecretTransformer{},
+			&SecretTransformer{},
 			// make config configmap immutable
-			&lifecycle.ConfigTransformer{},
+			&ConfigTransformer{},
 			// update cluster status
-			&lifecycle.ClusterStatusTransformer{},
+			&ClusterStatusTransformer{},
 			// always safe to put your transformer below
 		).
 		Build()

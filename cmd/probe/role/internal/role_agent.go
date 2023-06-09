@@ -120,9 +120,10 @@ func (roleAgent *RoleAgent) CheckRole(ctx context.Context) (OpsResult, bool) {
 		opsRes["message"] = err.Error()
 		if roleAgent.CheckRoleFailedCount%roleAgent.FailedEventReportFrequency == 0 {
 			roleAgent.Logger.Printf("role checks failed %v times continuously", roleAgent.CheckRoleFailedCount)
+			needNotify = true
 		}
 		roleAgent.CheckRoleFailedCount++
-		return opsRes, true
+		return opsRes, needNotify
 	}
 
 	roleAgent.CheckRoleFailedCount = 0

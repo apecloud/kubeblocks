@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/spf13/viper"
 	"log"
 	"net/http"
 	"os"
@@ -34,6 +35,7 @@ import (
 )
 
 func main() {
+	viper.AutomaticEnv()
 
 	var err error
 

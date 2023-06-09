@@ -30,8 +30,8 @@ type InfraVersionInfo struct {
 }
 
 type Cluster struct {
-	User  ClusterUser
-	Nodes []ClusterNode
+	User  ClusterUser   `json:"user"`
+	Nodes []ClusterNode `json:"nodes"`
 
 	ETCD   []string `json:"etcd"`
 	Master []string `json:"master"`
@@ -50,5 +50,6 @@ type ClusterUser struct {
 	// sudo password
 	Password string `json:"password"`
 	// ssh privateKey
-	PrivateKey string `json:"privateKey"`
+	PrivateKey     string `json:"privateKey"`
+	PrivateKeyPath string `json:"privateKeyPath"`
 }

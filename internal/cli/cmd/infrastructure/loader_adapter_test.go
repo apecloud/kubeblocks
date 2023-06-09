@@ -41,9 +41,7 @@ func TestCreateClusterWithOptions(t *testing.T) {
 			criType: string(container.ContainerdType),
 			clusterOptions: clusterOptions{
 				clusterName: "for_test",
-				userName:    "test",
-				password:    "test",
-				cluster: types.Cluster{
+				Cluster: types.Cluster{
 					Nodes: []types.ClusterNode{
 						{
 							Name:            "node1",
@@ -54,6 +52,10 @@ func TestCreateClusterWithOptions(t *testing.T) {
 							Address:         "127.0.0.2",
 							InternalAddress: "127.0.0.2",
 						},
+					},
+					User: types.ClusterUser{
+						Name:     "test",
+						Password: "test",
 					},
 					ETCD:   []string{"node1"},
 					Master: []string{"node1"},

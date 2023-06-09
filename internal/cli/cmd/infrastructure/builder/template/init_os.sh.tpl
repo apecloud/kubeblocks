@@ -65,6 +65,7 @@ function set_network() {
   sysctl_set_keyvalue "net.bridge.bridge-nf-call-arptables" "1"
   sysctl_set_keyvalue "net.bridge.bridge-nf-call-ip6tables" "1"
   sysctl_set_keyvalue "net.bridge.bridge-nf-call-iptables" "1"
+  # for node port
   sysctl_set_keyvalue "net.ipv4.ip_local_reserved_ports" "30000-32767"
 
   echo
@@ -132,10 +133,11 @@ install_ipvs
 install_hosts
 common_os_setting
 
+# for es/opensearch
 sysctl_set_keyvalue "vm.max_map_count" "262144"
-sysctl_set_keyvalue "vm.swappiness" "1"
+# for kubeblocks
+sysctl_set_keyvalue "fs.inotify.max_user_watches" "524288"
 sysctl_set_keyvalue "fs.inotify.max_user_instances" "524288"
-sysctl_set_keyvalue "kernel.pid_max" "65535"
 sysctl -p
 
 # Make sure the iptables utility doesn't use the nftables backend.

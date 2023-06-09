@@ -49,8 +49,6 @@ const (
 	builtinClusterVersionObject = "Version"
 	builtinCRITypeObject        = "CRIType"
 	builtinUserObject           = "User"
-	builtinPasswordObject       = "Password"
-	builtinPrivateKeyObject     = "PrivateKey"
 	builtinHostsObject          = "Hosts"
 	builtinRoleGroupsObject     = "RoleGroups"
 )
@@ -60,15 +58,13 @@ func buildTemplateParams(o *createOptions) *gotemplate.TplValues {
 		builtinClusterNameObject:    o.clusterName,
 		builtinClusterVersionObject: o.version.KubernetesVersion,
 		builtinCRITypeObject:        o.criType,
-		builtinUserObject:           o.userName,
-		builtinPasswordObject:       o.password,
-		builtinPrivateKeyObject:     o.privateKey,
-		builtinHostsObject:          o.cluster.Nodes,
+		builtinUserObject:           o.User,
+		builtinHostsObject:          o.Nodes,
 		builtinTimeoutObject:        o.timeout,
 		builtinRoleGroupsObject: gotemplate.TplValues{
-			common.ETCD:   o.cluster.ETCD,
-			common.Master: o.cluster.Master,
-			common.Worker: o.cluster.Worker,
+			common.ETCD:   o.ETCD,
+			common.Master: o.Master,
+			common.Worker: o.Worker,
 		},
 	}
 }

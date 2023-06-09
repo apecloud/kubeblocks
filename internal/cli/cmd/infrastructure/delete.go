@@ -42,16 +42,14 @@ type deleteOptions struct {
 func (o *deleteOptions) Run() error {
 	cluster, err := createClusterWithOptions(&gotemplate.TplValues{
 		builtinClusterNameObject:    o.clusterName,
-		builtinUserObject:           o.userName,
 		builtinClusterVersionObject: "0.0.0",
-		builtinPasswordObject:       o.password,
-		builtinPrivateKeyObject:     o.privateKey,
-		builtinHostsObject:          o.cluster.Nodes,
+		builtinUserObject:           o.User,
+		builtinHostsObject:          o.Nodes,
 		builtinTimeoutObject:        o.timeout,
 		builtinRoleGroupsObject: gotemplate.TplValues{
-			common.ETCD:   o.cluster.ETCD,
-			common.Master: o.cluster.Master,
-			common.Worker: o.cluster.Worker,
+			common.ETCD:   o.ETCD,
+			common.Master: o.Master,
+			common.Worker: o.Worker,
 		},
 	})
 	if err != nil {

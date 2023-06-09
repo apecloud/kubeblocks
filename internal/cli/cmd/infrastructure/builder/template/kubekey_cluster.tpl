@@ -8,9 +8,9 @@ spec:
   - name: {{ .Name }}
     address: {{ .Address }}
     internalAddress: {{ .InternalAddress }}
-    user: {{ $.User }}
-    password: {{ $.Password }}
-    privateKey: {{ $.PrivateKey | quote }}
+    user: {{ $.User.Name }}
+    password: {{ $.User.Password }}
+    privateKey: {{ $.User.PrivateKey | quote }}
     timeout: {{ $.Timeout }}
   {{- end }}
   roleGroups:

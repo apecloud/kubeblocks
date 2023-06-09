@@ -289,6 +289,7 @@ func injectRoleObserveContainer(srs workloads.StatefulReplicaSet, template *core
 	if observationDaemonPort == 0 {
 		observationDaemonPort = defaultRoleObservationDaemonPort
 	}
+	roleObserveURI := fmt.Sprintf(roleObservationURIFormat, strconv.Itoa(observationDaemonPort))
 	env := credentialEnv
 	env = append(env,
 		corev1.EnvVar{
@@ -340,14 +341,13 @@ func injectRoleObserveContainer(srs workloads.StatefulReplicaSet, template *core
 		}},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Port: intstr.FromInt(observationDaemonPort),
-					Path: roleObservationPath,
-					HTTPHeaders: []corev1.HTTPHeader{
-						{
-							Name:  "Content-Type",
-							Value: "application/json",
-						},
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"curl", "-X", "POST",
+						"--max-time", "1",
+						"--fail-with-body", "--silent",
+						"-H", "Content-Type: application/json",
+						roleObserveURI,
 					},
 				},
 			},

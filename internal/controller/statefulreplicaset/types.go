@@ -63,7 +63,7 @@ const (
 	shell2httpServePath              = "/role"
 	defaultRoleObservationImage      = "apecloud/kubeblocks-role-agent:latest"
 	defaultRoleObservationDaemonPort = 3501
-	roleObservationPath              = "role"
+	roleObservationURIFormat         = "http://localhost:%s/role"
 	defaultActionImage               = "busybox:latest"
 	usernameCredentialVarName        = "KB_SRS_USERNAME"
 	passwordCredentialVarName        = "KB_SRS_PASSWORD"

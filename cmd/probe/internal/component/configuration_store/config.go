@@ -70,23 +70,26 @@ func NewConfigurationStore() *ConfigurationStore {
 	}
 }
 
-func (cs *ConfigurationStore) Init(sysID string, extra map[string]string, opTime int64, podName string) error {
+func (cs *ConfigurationStore) Init(isLeader bool, sysID string, extra map[string]string, opTime int64, podName string) error {
 	var createOpt metav1.CreateOptions
 	var getOpt metav1.GetOptions
 	var updateOpt metav1.UpdateOptions
 	var extraJsonStr string
 
-	leaderName := strings.Split(os.Getenv(util.KbPrimaryPodName), ".")[0]
-	acquireTime := time.Now().Unix()
-	renewTime := acquireTime
-	ttl := os.Getenv(util.KbTtl)
+	apiUrl := "http://" + os.Getenv(util.KbPodIP) + ":" + viper.GetString("dapr-http-port") +
+		"/v1.0/bindings/" + os.Getenv(util.KbServiceCharacterType)
+	pod, err := cs.clientSet.CoreV1().Pods(cs.namespace).Get(cs.ctx, podName, getOpt)
+	if err != nil {
+		return err
+	}
+	pod.Annotations[Url] = apiUrl
+	_, err = cs.clientSet.CoreV1().Pods(cs.namespace).Update(cs.ctx, pod, updateOpt)
+	if err != nil {
+		return err
+	}
 
-	if extra != nil {
-		jsonByte, err := json.Marshal(extra)
-		if err != nil {
-			jsonByte = []byte{}
-		}
-		extraJsonStr = string(jsonByte)
+	if !isLeader {
+		return nil
 	}
 
 	clusterObj, err := cs.dynamicClient.Resource(types.ClusterGVR()).Namespace(cs.namespace).Get(cs.ctx, cs.clusterName, getOpt)
@@ -102,6 +105,10 @@ func (cs *ConfigurationStore) Init(sysID string, extra map[string]string, opTime
 		},
 	}
 
+	leaderName := strings.Split(os.Getenv(util.KbPrimaryPodName), ".")[0]
+	acquireTime := time.Now().Unix()
+	renewTime := acquireTime
+	ttl := os.Getenv(util.KbTtl)
 	leaderConfigMap, err := cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Get(cs.ctx, cs.clusterCompName+LeaderSuffix, getOpt)
 	if leaderConfigMap == nil || err != nil {
 		if _, err = cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{
@@ -142,19 +149,13 @@ func (cs *ConfigurationStore) Init(sysID string, extra map[string]string, opTime
 		}
 	}
 
-	apiUrl := "http://" + os.Getenv(util.KbPodIP) + ":" + viper.GetString("dapr-http-port") +
-		"/v1.0/bindings/" + os.Getenv(util.KbServiceCharacterType)
-	pod, err := cs.clientSet.CoreV1().Pods(cs.namespace).Get(cs.ctx, podName, getOpt)
-	if err != nil {
-		return err
-	}
-	pod.Annotations[Url] = apiUrl
-	_, err = cs.clientSet.CoreV1().Pods(cs.namespace).Update(cs.ctx, pod, updateOpt)
-	if err != nil {
-		return err
-	}
-
 	if extra != nil {
+		jsonByte, err := json.Marshal(extra)
+		if err != nil {
+			jsonByte = []byte{}
+		}
+		extraJsonStr = string(jsonByte)
+
 		extraConfigMap, err := cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Get(cs.ctx, cs.clusterCompName+ExtraSuffix, getOpt)
 		if extraConfigMap == nil || err != nil {
 			if _, err = cs.clientSet.CoreV1().ConfigMaps(cs.namespace).Create(cs.ctx, &v1.ConfigMap{

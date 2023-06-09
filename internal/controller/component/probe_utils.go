@@ -155,7 +155,7 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 	})
 
 	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBPrefix + "TTL",
+		Name:      constant.KBPrefix + "_TTL",
 		Value:     "30",
 		ValueFrom: nil,
 	})

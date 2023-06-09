@@ -75,45 +75,54 @@ func NewHa() *Ha {
 	_ = ha.DB.Init(bindings.Metadata{
 		Base: metadata.Base{Properties: props},
 	})
-	_ = ha.DB.InitDelay()
+
+	for i := 0; i < 3; i++ {
+		err = ha.DB.InitDelay()
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Second * 3)
+	}
 
 	return ha
 }
 
 func (h *Ha) Init() {
 	//TODO:重试包装
-	for i := 0; i < 2; i++ {
-		isLeader, err := h.DB.IsLeader(h.ctx)
+	var (
+		isLeader bool
+		sysid    string
+		opTime   int64
+		extra    map[string]string
+		err      error
+	)
+	for i := 0; i < 3; i++ {
+		isLeader, err = h.DB.IsLeader(h.ctx)
 		if err == nil {
-			if isLeader {
-				return
-			}
 			break
 		}
-		if i == 1 && (err != nil || !isLeader) {
-			return
-		}
+		time.Sleep(time.Second * 2)
 	}
 
-	sysid, err := h.DB.GetSysID(h.ctx)
+	sysid, err = h.DB.GetSysID(h.ctx)
 	if err != nil {
 		h.log.Errorf("can not get sysID, err:%v", err)
 		panic(err)
 	}
 
-	extra, err := h.DB.GetExtra(h.ctx)
+	extra, err = h.DB.GetExtra(h.ctx)
 	if err != nil {
 		h.log.Errorf("can not get extra, err:%v", err)
 		panic(err)
 	}
 
-	opTime, err := h.DB.GetOpTime(h.ctx)
+	opTime, err = h.DB.GetOpTime(h.ctx)
 	if err != nil {
 		h.log.Errorf("can not get op time, err:%v", err)
 		panic(err)
 	}
 
-	err = h.cs.Init(sysid, extra, opTime, h.podName)
+	err = h.cs.Init(isLeader, sysid, extra, opTime, h.podName)
 	if err != nil {
 		h.log.Errorf("configuration store init err:%v", err)
 		panic(err)

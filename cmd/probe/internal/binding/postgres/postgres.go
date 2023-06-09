@@ -1058,7 +1058,7 @@ func (pgOps *PostgresOperations) checkTimelineAndLsn(ctx context.Context, leader
 		return false
 	}
 
-	if leader.GetMember().GetName() != MASTER {
+	if leader == nil || leader.GetMember().GetName() != MASTER {
 		return false
 	}
 

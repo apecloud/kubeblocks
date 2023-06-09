@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:experimental
-
 # Build the kubeblocks tools binaries
 # includes kbcli, kubectl, and manager tools.
 
@@ -70,6 +68,10 @@ ARG APK_MIRROR="mirrors.aliyun.com"
 
 # install tools via apk
 ENV APK_MIRROR=${APK_MIRROR}
+ENV KB_TTL = "30"
+RUN if [ -n "${APK_MIRROR}" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; fi
+RUN apk add --no-cache curl  \
+    && rm -rf /var/cache/apk/*
 
 # use apk to install kubectl in the next alpine version.
 

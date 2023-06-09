@@ -25,12 +25,12 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
-type ConsensusSetBuilder struct {
-	BaseBuilder[workloads.StatefulReplicaSet, *workloads.StatefulReplicaSet, ConsensusSetBuilder]
+type StatefulReplicaSetBuilder struct {
+	BaseBuilder[workloads.StatefulReplicaSet, *workloads.StatefulReplicaSet, StatefulReplicaSetBuilder]
 }
 
-func NewConsensusSetBuilder(namespace, name string) *ConsensusSetBuilder {
-	builder := &ConsensusSetBuilder{}
+func NewStatefulReplicaSetBuilder(namespace, name string) *StatefulReplicaSetBuilder {
+	builder := &StatefulReplicaSetBuilder{}
 	builder.init(namespace, name,
 		&workloads.StatefulReplicaSet{
 			Spec: workloads.StatefulReplicaSetSpec{
@@ -49,34 +49,34 @@ func NewConsensusSetBuilder(namespace, name string) *ConsensusSetBuilder {
 	return builder
 }
 
-func (builder *ConsensusSetBuilder) SetReplicas(replicas int32) *ConsensusSetBuilder {
+func (builder *StatefulReplicaSetBuilder) SetReplicas(replicas int32) *StatefulReplicaSetBuilder {
 	builder.get().Spec.Replicas = replicas
 	return builder
 }
 
-func (builder *ConsensusSetBuilder) SetRoles(roles []workloads.ReplicaRole) *ConsensusSetBuilder {
+func (builder *StatefulReplicaSetBuilder) SetRoles(roles []workloads.ReplicaRole) *StatefulReplicaSetBuilder {
 	builder.get().Spec.Roles = roles
 	return builder
 }
 
-func (builder *ConsensusSetBuilder) SetTemplate(template corev1.PodTemplateSpec) *ConsensusSetBuilder {
+func (builder *StatefulReplicaSetBuilder) SetTemplate(template corev1.PodTemplateSpec) *StatefulReplicaSetBuilder {
 	builder.get().Spec.Template = template
 	return builder
 }
 
-func (builder *ConsensusSetBuilder) SetObservationActions(actions []workloads.Action) *ConsensusSetBuilder {
+func (builder *StatefulReplicaSetBuilder) SetObservationActions(actions []workloads.Action) *StatefulReplicaSetBuilder {
 	builder.get().Spec.RoleObservation.ObservationActions = actions
 	return builder
 }
 
-func (builder *ConsensusSetBuilder) AddObservationAction(action workloads.Action) *ConsensusSetBuilder {
+func (builder *StatefulReplicaSetBuilder) AddObservationAction(action workloads.Action) *StatefulReplicaSetBuilder {
 	actions := builder.get().Spec.RoleObservation.ObservationActions
 	actions = append(actions, action)
 	builder.get().Spec.RoleObservation.ObservationActions = actions
 	return builder
 }
 
-func (builder *ConsensusSetBuilder) SetService(service corev1.ServiceSpec) *ConsensusSetBuilder {
+func (builder *StatefulReplicaSetBuilder) SetService(service corev1.ServiceSpec) *StatefulReplicaSetBuilder {
 	builder.get().Spec.Service = service
 	return builder
 }

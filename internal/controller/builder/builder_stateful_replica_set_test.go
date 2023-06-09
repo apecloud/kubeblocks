@@ -28,7 +28,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
-var _ = Describe("consensus_set builder", func() {
+var _ = Describe("stateful_replica_set builder", func() {
 	It("should work well", func() {
 		const (
 			name     = "foo"
@@ -77,7 +77,7 @@ var _ = Describe("consensus_set builder", func() {
 				},
 			},
 		}
-		csSet := NewConsensusSetBuilder(ns, name).
+		srs := NewStatefulReplicaSetBuilder(ns, name).
 			SetReplicas(replicas).
 			SetRoles([]workloads.ReplicaRole{role}).
 			SetTemplate(template).
@@ -86,15 +86,15 @@ var _ = Describe("consensus_set builder", func() {
 			SetService(service).
 			GetObject()
 
-		Expect(csSet.Name).Should(Equal(name))
-		Expect(csSet.Namespace).Should(Equal(ns))
-		Expect(csSet.Spec.Replicas).Should(Equal(replicas))
-		Expect(len(csSet.Spec.Roles)).Should(Equal(1))
-		Expect(csSet.Spec.Roles[0]).Should(Equal(role))
-		Expect(csSet.Spec.Template).Should(Equal(template))
-		Expect(len(csSet.Spec.RoleObservation.ObservationActions)).Should(Equal(2))
-		Expect(csSet.Spec.RoleObservation.ObservationActions[0]).Should(Equal(actions[0]))
-		Expect(csSet.Spec.RoleObservation.ObservationActions[1]).Should(Equal(action))
-		Expect(csSet.Spec.Service).Should(Equal(service))
+		Expect(srs.Name).Should(Equal(name))
+		Expect(srs.Namespace).Should(Equal(ns))
+		Expect(srs.Spec.Replicas).Should(Equal(replicas))
+		Expect(len(srs.Spec.Roles)).Should(Equal(1))
+		Expect(srs.Spec.Roles[0]).Should(Equal(role))
+		Expect(srs.Spec.Template).Should(Equal(template))
+		Expect(len(srs.Spec.RoleObservation.ObservationActions)).Should(Equal(2))
+		Expect(srs.Spec.RoleObservation.ObservationActions[0]).Should(Equal(actions[0]))
+		Expect(srs.Spec.RoleObservation.ObservationActions[1]).Should(Equal(action))
+		Expect(srs.Spec.Service).Should(Equal(service))
 	})
 })

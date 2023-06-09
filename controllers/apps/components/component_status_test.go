@@ -249,7 +249,7 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 		})
 	})
 
-	Context("with consensusset component", func() {
+	Context("with statefulreplicaset component", func() {
 		var (
 			clusterDef *appsv1alpha1.ClusterDefinition
 			cluster    *appsv1alpha1.Cluster

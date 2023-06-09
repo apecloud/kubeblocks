@@ -50,10 +50,8 @@ const (
 )
 
 const (
-	AppInstanceLabelKey            = "app.kubernetes.io/instance"
-	KBManagedByKey                 = "apps.kubeblocks.io/managed-by"
-	RoleLabelKey                   = "kubeblocks.io/role"
-	ConsensusSetAccessModeLabelKey = "cs.apps.kubeblocks.io/access-mode"
+	AppInstanceLabelKey = "app.kubernetes.io/instance"
+	KBManagedByKey      = "apps.kubeblocks.io/managed-by"
 )
 
 // RequeueDuration default reconcile requeue after duration

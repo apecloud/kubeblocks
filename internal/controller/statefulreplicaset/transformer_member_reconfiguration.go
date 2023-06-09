@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package consensusset
+package statefulreplicaset
 
 import (
 	"fmt"
@@ -47,11 +47,11 @@ type conditionChecker = func() bool
 var actionNameRegex = regexp.MustCompile(`(.*)-([0-9]+)-([0-9]+)-([a-zA-Z\-]+)$`)
 
 func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*CSSetTransformContext)
-	if model.IsObjectDeleting(transCtx.CSSet) {
+	transCtx, _ := ctx.(*SRSTransformContext)
+	if model.IsObjectDeleting(transCtx.srs) {
 		return nil
 	}
-	csSet := transCtx.CSSet
+	srs := transCtx.srs
 
 	// get the underlying sts
 	stsVertex, err := getUnderlyingStsVertex(dag)
@@ -61,42 +61,42 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 
 	// handle cluster initialization
 	// set initReplicas at creation
-	if csSet.Status.InitReplicas == 0 {
-		csSet.Status.InitReplicas = csSet.Spec.Replicas
+	if srs.Status.InitReplicas == 0 {
+		srs.Status.InitReplicas = srs.Spec.Replicas
 		return nil
 	}
 	// update readyInitReplicas
-	if csSet.Status.ReadyInitReplicas < csSet.Status.InitReplicas {
-		csSet.Status.ReadyInitReplicas = int32(len(csSet.Status.MembersStatus))
+	if srs.Status.ReadyInitReplicas < srs.Status.InitReplicas {
+		srs.Status.ReadyInitReplicas = int32(len(srs.Status.MembersStatus))
 	}
 	// return if cluster initialization not done
-	if csSet.Status.ReadyInitReplicas != csSet.Status.InitReplicas {
+	if srs.Status.ReadyInitReplicas != srs.Status.InitReplicas {
 		return nil
 	}
 
 	// cluster initialization done, handle dynamic membership reconfiguration
 
-	// consensus cluster is ready
-	if isConsensusSetReady(csSet) {
+	// srs is ready
+	if isStatefulReplicaSetReady(srs) {
 		return cleanAction(transCtx, dag)
 	}
 
-	if !shouldHaveActions(csSet) {
+	if !shouldHaveActions(srs) {
 		return nil
 	}
 
 	// no enough replicas in scale out, tell sts to create them.
 	sts, _ := stsVertex.OriObj.(*apps.StatefulSet)
-	memberReadyReplicas := int32(len(csSet.Status.MembersStatus))
-	if memberReadyReplicas < csSet.Spec.Replicas &&
-		sts.Status.ReadyReplicas < csSet.Spec.Replicas {
+	memberReadyReplicas := int32(len(srs.Status.MembersStatus))
+	if memberReadyReplicas < srs.Spec.Replicas &&
+		sts.Status.ReadyReplicas < srs.Spec.Replicas {
 		return nil
 	}
 
 	stsVertex.Immutable = true
 
 	// barrier: the underlying sts is ready and has enough replicas
-	if sts.Status.ReadyReplicas < csSet.Spec.Replicas || !isStatefulSetReady(sts) {
+	if sts.Status.ReadyReplicas < srs.Spec.Replicas || !isStatefulSetReady(sts) {
 		return nil
 	}
 
@@ -108,7 +108,7 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 
 	// if no action, create the first one
 	if len(actionList) == 0 {
-		return createNextAction(transCtx, dag, csSet, nil)
+		return createNextAction(transCtx, dag, srs, nil)
 	}
 
 	// got action, there should be only one action
@@ -117,35 +117,35 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 	case action.Status.Succeeded > 0:
 		// wait action's result:
 		// e.g. action with ordinal 3 and type member-join, wait member 3 until it appears in status.membersStatus
-		if !isActionDone(csSet, action) {
+		if !isActionDone(srs, action) {
 			return nil
 		}
 		// mark it as 'handled'
 		deleteAction(dag, action)
-		return createNextAction(transCtx, dag, csSet, action)
+		return createNextAction(transCtx, dag, srs, action)
 	case action.Status.Failed > 0:
 		emitEvent(transCtx, action)
 		if !isSwitchoverAction(action) {
 			// need manual handling
 			return nil
 		}
-		return createNextAction(transCtx, dag, csSet, action)
+		return createNextAction(transCtx, dag, srs, action)
 	default:
 		// action in progress
 		return nil
 	}
 }
 
-// consensus_set level 'ready' state:
+// srs level 'ready' state:
 // 1. all replicas exist
 // 2. all members have role set
-func isConsensusSetReady(csSet *workloads.StatefulReplicaSet) bool {
-	membersStatus := csSet.Status.MembersStatus
-	if len(membersStatus) != int(csSet.Spec.Replicas) {
+func isStatefulReplicaSetReady(srs *workloads.StatefulReplicaSet) bool {
+	membersStatus := srs.Status.MembersStatus
+	if len(membersStatus) != int(srs.Spec.Replicas) {
 		return false
 	}
-	for i := 0; i < int(csSet.Spec.Replicas); i++ {
-		podName := getPodName(csSet.Name, i)
+	for i := 0; i < int(srs.Spec.Replicas); i++ {
+		podName := getPodName(srs.Name, i)
 		if !isMemberReady(podName, membersStatus) {
 			return false
 		}
@@ -174,7 +174,7 @@ func isMemberReady(podName string, membersStatus []workloads.MemberStatus) bool 
 	return false
 }
 
-func cleanAction(transCtx *CSSetTransformContext, dag *graph.DAG) error {
+func cleanAction(transCtx *SRSTransformContext, dag *graph.DAG) error {
 	actionList, err := getActionList(transCtx, jobScenarioMembership)
 	if err != nil {
 		return err
@@ -192,13 +192,13 @@ func cleanAction(transCtx *CSSetTransformContext, dag *graph.DAG) error {
 	return nil
 }
 
-func isActionDone(csSet *workloads.StatefulReplicaSet, action *batchv1.Job) bool {
+func isActionDone(srs *workloads.StatefulReplicaSet, action *batchv1.Job) bool {
 	ordinal, _ := getActionOrdinal(action.Name)
-	podName := getPodName(csSet.Name, ordinal)
-	membersStatus := csSet.Status.MembersStatus
+	podName := getPodName(srs.Name, ordinal)
+	membersStatus := srs.Status.MembersStatus
 	switch action.Labels[jobTypeLabel] {
 	case jobTypeSwitchover:
-		leader := getLeaderPodName(csSet.Status.MembersStatus)
+		leader := getLeaderPodName(srs.Status.MembersStatus)
 		return podName != leader
 	case jobTypeMemberLeaveNotifying:
 		return !isMemberReady(podName, membersStatus)
@@ -218,8 +218,8 @@ func deleteAction(dag *graph.DAG, action *batchv1.Job) {
 	doActionCleanup(dag, action)
 }
 
-func createNextAction(transCtx *CSSetTransformContext, dag *graph.DAG, csSet *workloads.StatefulReplicaSet, currentAction *batchv1.Job) error {
-	actionInfoList := generateActionInfoList(csSet)
+func createNextAction(transCtx *SRSTransformContext, dag *graph.DAG, srs *workloads.StatefulReplicaSet, currentAction *batchv1.Job) error {
+	actionInfoList := generateActionInfoList(srs)
 
 	if len(actionInfoList) == 0 {
 		return nil
@@ -232,7 +232,7 @@ func createNextAction(transCtx *CSSetTransformContext, dag *graph.DAG, csSet *wo
 	default:
 		nextActionInfo = nil
 		ordinal, _ := getActionOrdinal(currentAction.Name)
-		shortName := buildShortActionName(csSet.Name, ordinal, currentAction.Labels[jobTypeLabel])
+		shortName := buildShortActionName(srs.Name, ordinal, currentAction.Labels[jobTypeLabel])
 		for i := 0; i < len(actionInfoList); i++ {
 			if actionInfoList[i].shortActionName != shortName {
 				continue
@@ -248,42 +248,42 @@ func createNextAction(transCtx *CSSetTransformContext, dag *graph.DAG, csSet *wo
 		return nil
 	}
 
-	leader := getLeaderPodName(csSet.Status.MembersStatus)
+	leader := getLeaderPodName(srs.Status.MembersStatus)
 	ordinal := nextActionInfo.ordinal
 	if nextActionInfo.actionType == jobTypeSwitchover {
 		ordinal = 0
 	}
-	target := getPodName(csSet.Name, ordinal)
-	actionName := getActionName(csSet.Name, int(csSet.Generation), nextActionInfo.ordinal, nextActionInfo.actionType)
-	nextAction := buildAction(csSet, actionName, nextActionInfo.actionType, jobScenarioMembership, leader, target)
+	target := getPodName(srs.Name, ordinal)
+	actionName := getActionName(srs.Name, int(srs.Generation), nextActionInfo.ordinal, nextActionInfo.actionType)
+	nextAction := buildAction(srs, actionName, nextActionInfo.actionType, jobScenarioMembership, leader, target)
 
-	if err := abnormalAnalysis(csSet, nextAction); err != nil {
+	if err := abnormalAnalysis(srs, nextAction); err != nil {
 		emitAbnormalEvent(transCtx, nextActionInfo.actionType, actionName, err)
 		return err
 	}
 
-	return createAction(dag, csSet, nextAction)
+	return createAction(dag, srs, nextAction)
 }
 
-func generateActionInfoList(csSet *workloads.StatefulReplicaSet) []*actionInfo {
+func generateActionInfoList(srs *workloads.StatefulReplicaSet) []*actionInfo {
 	var actionInfoList []*actionInfo
-	memberReadyReplicas := int32(len(csSet.Status.MembersStatus))
+	memberReadyReplicas := int32(len(srs.Status.MembersStatus))
 
 	switch {
-	case memberReadyReplicas < csSet.Spec.Replicas:
+	case memberReadyReplicas < srs.Spec.Replicas:
 		// member join
-		// members with ordinal less than 'spec.replicas' should in the consensus cluster
+		// members with ordinal less than 'spec.replicas' should in the active cluster
 		actionTypeList := []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
-		for i := memberReadyReplicas; i < csSet.Spec.Replicas; i++ {
-			actionInfos := generateActionInfos(csSet, int(i), actionTypeList)
+		for i := memberReadyReplicas; i < srs.Spec.Replicas; i++ {
+			actionInfos := generateActionInfos(srs, int(i), actionTypeList)
 			actionInfoList = append(actionInfoList, actionInfos...)
 		}
-	case memberReadyReplicas > csSet.Spec.Replicas:
+	case memberReadyReplicas > srs.Spec.Replicas:
 		// member leave
-		// members with ordinal greater than 'spec.replicas - 1' should not in the consensus cluster
+		// members with ordinal greater than 'spec.replicas - 1' should not in the active cluster
 		actionTypeList := []string{jobTypeSwitchover, jobTypeMemberLeaveNotifying}
-		for i := memberReadyReplicas - 1; i >= csSet.Spec.Replicas; i-- {
-			actionInfos := generateActionInfos(csSet, int(i), actionTypeList)
+		for i := memberReadyReplicas - 1; i >= srs.Spec.Replicas; i-- {
+			actionInfos := generateActionInfos(srs, int(i), actionTypeList)
 			actionInfoList = append(actionInfoList, actionInfos...)
 		}
 	}
@@ -304,9 +304,9 @@ func isPreAction(actionType string) bool {
 	return actionType == jobTypeSwitchover || actionType == jobTypeMemberLeaveNotifying
 }
 
-func shouldHaveActions(csSet *workloads.StatefulReplicaSet) bool {
-	currentReplicas := len(csSet.Status.MembersStatus)
-	expectedReplicas := int(csSet.Spec.Replicas)
+func shouldHaveActions(srs *workloads.StatefulReplicaSet) bool {
+	currentReplicas := len(srs.Status.MembersStatus)
+	expectedReplicas := int(srs.Spec.Replicas)
 
 	var actionTypeList []string
 	switch {
@@ -316,18 +316,18 @@ func shouldHaveActions(csSet *workloads.StatefulReplicaSet) bool {
 		actionTypeList = []string{jobTypeMemberJoinNotifying, jobTypeLogSync, jobTypePromote}
 	}
 	for _, actionType := range actionTypeList {
-		if shouldCreateAction(csSet, actionType, nil) {
+		if shouldCreateAction(srs, actionType, nil) {
 			return true
 		}
 	}
 	return false
 }
 
-func shouldCreateAction(csSet *workloads.StatefulReplicaSet, actionType string, checker conditionChecker) bool {
+func shouldCreateAction(srs *workloads.StatefulReplicaSet, actionType string, checker conditionChecker) bool {
 	if checker != nil && !checker() {
 		return false
 	}
-	reconfiguration := csSet.Spec.MembershipReconfiguration
+	reconfiguration := srs.Spec.MembershipReconfiguration
 	if reconfiguration == nil {
 		return false
 	}
@@ -367,11 +367,11 @@ func getUnderlyingStsVertex(dag *graph.DAG) (*model.ObjectVertex, error) {
 	return stsVertex, nil
 }
 
-// all members with ordinal less than action target pod should be in a good consensus state:
+// all members with ordinal less than action target pod should be in a good replication state:
 // 1. they should be in membersStatus
 // 2. they should have a leader
-func abnormalAnalysis(csSet *workloads.StatefulReplicaSet, action *batchv1.Job) error {
-	membersStatus := csSet.Status.MembersStatus
+func abnormalAnalysis(srs *workloads.StatefulReplicaSet, action *batchv1.Job) error {
+	membersStatus := srs.Status.MembersStatus
 	statusMap := make(map[string]workloads.MemberStatus, len(membersStatus))
 	for _, status := range membersStatus {
 		statusMap[status.PodName] = status
@@ -383,7 +383,7 @@ func abnormalAnalysis(csSet *workloads.StatefulReplicaSet, action *batchv1.Job) 
 	}
 	var abnormalPodList, leaderPodList []string
 	for i := 0; i < currentMembers; i++ {
-		podName := getPodName(csSet.Name, i)
+		podName := getPodName(srs.Name, i)
 		status, ok := statusMap[podName]
 		if !ok {
 			abnormalPodList = append(abnormalPodList, podName)
@@ -411,10 +411,10 @@ func abnormalAnalysis(csSet *workloads.StatefulReplicaSet, action *batchv1.Job) 
 	return nil
 }
 
-func generateActionInfos(csSet *workloads.StatefulReplicaSet, ordinal int, actionTypeList []string) []*actionInfo {
+func generateActionInfos(srs *workloads.StatefulReplicaSet, ordinal int, actionTypeList []string) []*actionInfo {
 	var actionInfos []*actionInfo
-	leaderPodName := getLeaderPodName(csSet.Status.MembersStatus)
-	podName := getPodName(csSet.Name, ordinal)
+	leaderPodName := getLeaderPodName(srs.Status.MembersStatus)
+	podName := getPodName(srs.Name, ordinal)
 	for _, actionType := range actionTypeList {
 		checker := func() bool {
 			return podName == leaderPodName
@@ -422,11 +422,11 @@ func generateActionInfos(csSet *workloads.StatefulReplicaSet, ordinal int, actio
 		if actionType != jobTypeSwitchover {
 			checker = nil
 		}
-		if !shouldCreateAction(csSet, actionType, checker) {
+		if !shouldCreateAction(srs, actionType, checker) {
 			continue
 		}
 		info := &actionInfo{
-			shortActionName: buildShortActionName(csSet.Name, ordinal, actionType),
+			shortActionName: buildShortActionName(srs.Name, ordinal, actionType),
 			ordinal:         ordinal,
 			actionType:      actionType,
 		}

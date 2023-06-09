@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package consensusset
+package statefulreplicaset
 
 import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -29,19 +29,19 @@ import (
 type FixMetaTransformer struct{}
 
 func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*CSSetTransformContext)
-	csSet := transCtx.CSSet
-	if model.IsObjectDeleting(csSet) {
+	transCtx, _ := ctx.(*SRSTransformContext)
+	obj := transCtx.srs
+	if model.IsObjectDeleting(obj) {
 		return nil
 	}
 
 	// The object is not being deleted, so if it does not have our finalizer,
 	// then lets add the finalizer and update the object. This is equivalent
 	// registering our finalizer.
-	if controllerutil.ContainsFinalizer(csSet, csSetFinalizerName) {
+	if controllerutil.ContainsFinalizer(obj, srsFinalizerName) {
 		return nil
 	}
-	controllerutil.AddFinalizer(csSet, csSetFinalizerName)
+	controllerutil.AddFinalizer(obj, srsFinalizerName)
 	if err := model.PrepareRootUpdate(dag); err != nil {
 		return err
 	}

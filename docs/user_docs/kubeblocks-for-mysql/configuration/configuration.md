@@ -50,7 +50,7 @@ You can also view the details of this configuration file and parameters.
 
   ```bash
   template meta:
-    ConfigSpec: mysql-consensusset-config        ComponentName: mysql        ClusterName: mysql-cluster
+    ConfigSpec: mysql-statefulreplicaset-config        ComponentName: mysql        ClusterName: mysql-cluster
 
   Configure Constraint:
     Parameter Name:     innodb_buffer_pool_size
@@ -138,7 +138,7 @@ The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
      Name: mysql-cluster-reconfiguring-z2wvn        NameSpace: default        Cluster: mysql-cluster        Type: Reconfiguring
 
     Command:
-      kbcli cluster configure mysql-cluster --component-names=mysql --template-name=mysql-consensusset-config --config-file=my.cnf --set innodb_buffer_pool_size=512M --set max_connections=600
+      kbcli cluster configure mysql-cluster --component-names=mysql --template-name=mysql-statefulreplicaset-config --config-file=my.cnf --set innodb_buffer_pool_size=512M --set max_connections=600
 
     Status:
       Start Time:         Mar 13,2023 02:55 UTC+0800
@@ -152,8 +152,8 @@ The example below reconfigures `max_connection` and `innodb_buffer_pool_size`.
     Mar 13,2023 02:55 UTC+0800   Progressing          OpsRequestProgressingStarted      True     Start to process the OpsRequest: mysql-cluster-reconfiguring-z2wvn in Cluster: mysql-cluster
     Mar 13,2023 02:55 UTC+0800   Validated            ValidateOpsRequestPassed          True     OpsRequest: mysql-cluster-reconfiguring-z2wvn is validated
     Mar 13,2023 02:55 UTC+0800   Reconfigure          ReconfigureStarted                True     Start to reconfigure in Cluster: mysql-cluster, Component: mysql
-    Mar 13,2023 02:55 UTC+0800   ReconfigureMerged    ReconfigureMerged                 True     Reconfiguring in Cluster: mysql-cluster, Component: mysql, ConfigTpl: mysql-consensusset-config, info: updated: map[my.cnf:{"mysqld":{"innodb_buffer_pool_size":"512M","max_connections":"600"}}], added: map[], deleted:map[]
-    Mar 13,2023 02:55 UTC+0800   ReconfigureSucceed   ReconfigureSucceed                True     Reconfiguring in Cluster: mysql-cluster, Component: mysql, ConfigTpl: mysql-consensusset-config, info: updated policy: <autoReload>, updated: map[my.cnf:{"mysqld":{"innodb_buffer_pool_size":"512M","max_connections":"600"}}], added: map[], deleted:map[]
+    Mar 13,2023 02:55 UTC+0800   ReconfigureMerged    ReconfigureMerged                 True     Reconfiguring in Cluster: mysql-cluster, Component: mysql, ConfigTpl: mysql-statefulreplicaset-config, info: updated: map[my.cnf:{"mysqld":{"innodb_buffer_pool_size":"512M","max_connections":"600"}}], added: map[], deleted:map[]
+    Mar 13,2023 02:55 UTC+0800   ReconfigureSucceed   ReconfigureSucceed                True     Reconfiguring in Cluster: mysql-cluster, Component: mysql, ConfigTpl: mysql-statefulreplicaset-config, info: updated policy: <autoReload>, updated: map[my.cnf:{"mysqld":{"innodb_buffer_pool_size":"512M","max_connections":"600"}}], added: map[], deleted:map[]
     Mar 13,2023 02:55 UTC+0800   Succeed              OpsRequestProcessedSuccessfully   True     Successfully processed the OpsRequest: mysql-cluster-reconfiguring-z2wvn in Cluster: mysql-cluster
     ```
 
@@ -244,7 +244,7 @@ Static parameter reconfiguring requires restarting the pod. The following exampl
      Name: mysql-cluster-reconfiguring-nrnpf        NameSpace: default        Cluster: mysql-cluster        Type: Reconfiguring
 
    Command:
-     kbcli cluster configure mysql-cluster --component-names=mysql --template-name=mysql-consensusset-config --config-file=my.cnf --set ngram_token_size=6
+     kbcli cluster configure mysql-cluster --component-names=mysql --template-name=mysql-statefulreplicaset-config --config-file=my.cnf --set ngram_token_size=6
 
    Status:
      Start Time:         Mar 13,2023 03:37 UTC+0800
@@ -262,7 +262,7 @@ Static parameter reconfiguring requires restarting the pod. The following exampl
      Name: mysql-cluster-reconfiguring-nrnpf        NameSpace: default        Cluster: mysql-cluster        Type: Reconfiguring
 
    Command:
-     kbcli cluster configure mysql-cluster --component-names=mysql --template-name=mysql-consensusset-config --config-file=my.cnf --set ngram_token_size=6
+     kbcli cluster configure mysql-cluster --component-names=mysql --template-name=mysql-statefulreplicaset-config --config-file=my.cnf --set ngram_token_size=6
 
    Status:
      Start Time:         Mar 13,2023 03:37 UTC+0800
@@ -305,13 +305,13 @@ kbcli cluster describe-config mysql-cluster
 >
 ConfigSpecs Meta:
 CONFIG-SPEC-NAME            FILE     ENABLED   TEMPLATE                   CONSTRAINT                    RENDERED                                  COMPONENT   CLUSTER                
-mysql-consensusset-config   my.cnf   true      mysql8.0-config-template   mysql8.0-config-constraints   mysql-cluster-mysql-mysql-config   mysql       mysql-cluster   
+mysql-statefulreplicaset-config   my.cnf   true      mysql8.0-config-template   mysql8.0-config-constraints   mysql-cluster-mysql-mysql-config   mysql       mysql-cluster   
 
 History modifications:
 OPS-NAME                            CLUSTER         COMPONENT   CONFIG-SPEC-NAME            FILE     STATUS    POLICY   PROGRESS   CREATED-TIME                 VALID-UPDATED                                                                                                                     
-mysql-cluster-reconfiguring-4q5kv   mysql-cluster   mysql       mysql-consensusset-config   my.cnf   Succeed   reload   -/-        Mar 16,2023 15:44 UTC+0800   {"my.cnf":"{\"mysqld\":{\"max_connections\":\"3000\",\"read_buffer_size\":\"24288\"}}"}                                           
-mysql-cluster-reconfiguring-cclvm   mysql-cluster   mysql       mysql-consensusset-config   my.cnf   Succeed   reload   -/-        Mar 16,2023 17:28 UTC+0800   {"my.cnf":"{\"mysqld\":{\"innodb_buffer_pool_size\":\"1G\",\"max_connections\":\"600\"}}"}   
-mysql-cluster-reconfiguring-gx58r   mysql-cluster   mysql       mysql-consensusset-config   my.cnf   Succeed            -/-        Mar 16,2023 17:28 UTC+0800                       
+mysql-cluster-reconfiguring-4q5kv   mysql-cluster   mysql       mysql-statefulreplicaset-config   my.cnf   Succeed   reload   -/-        Mar 16,2023 15:44 UTC+0800   {"my.cnf":"{\"mysqld\":{\"max_connections\":\"3000\",\"read_buffer_size\":\"24288\"}}"}                                           
+mysql-cluster-reconfiguring-cclvm   mysql-cluster   mysql       mysql-statefulreplicaset-config   my.cnf   Succeed   reload   -/-        Mar 16,2023 17:28 UTC+0800   {"my.cnf":"{\"mysqld\":{\"innodb_buffer_pool_size\":\"1G\",\"max_connections\":\"600\"}}"}   
+mysql-cluster-reconfiguring-gx58r   mysql-cluster   mysql       mysql-statefulreplicaset-config   my.cnf   Succeed            -/-        Mar 16,2023 17:28 UTC+0800                       
 ```
 
 From the above results, there are three parameter modifications.
@@ -322,7 +322,7 @@ Compare these modifications to view the configured parameters and their differen
 kbcli cluster diff-config mysql-cluster-reconfiguring-4q5kv mysql-cluster-reconfiguring-gx58r
 >
 DIFF-CONFIGURE RESULT:
-  ConfigFile: my.cnf    TemplateName: mysql-consensusset-config ComponentName: mysql    ClusterName: mysql-cluster       UpdateType: update      
+  ConfigFile: my.cnf    TemplateName: mysql-statefulreplicaset-config ComponentName: mysql    ClusterName: mysql-cluster       UpdateType: update      
 
 PARAMETERNAME             MYSQL-CLUSTER-RECONFIGURING-4Q5KV   MYSQL-CLUSTER-RECONFIGURING-GX58R   
 max_connections           3000                                600                                        

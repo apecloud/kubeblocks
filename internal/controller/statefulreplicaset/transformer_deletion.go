@@ -17,20 +17,21 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package consensusset
+package statefulreplicaset
 
 import (
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// CSSetDeletionTransformer handles StatefulReplicaSet deletion
-type CSSetDeletionTransformer struct{}
+// SRSDeletionTransformer handles StatefulReplicaSet deletion
+type SRSDeletionTransformer struct{}
 
-func (t *CSSetDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*CSSetTransformContext)
-	obj := transCtx.CSSet
+func (t *SRSDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*SRSTransformContext)
+	obj := transCtx.srs
 	if !model.IsObjectDeleting(obj) {
 		return nil
 	}
@@ -56,4 +57,4 @@ func (t *CSSetDeletionTransformer) Transform(ctx graph.TransformContext, dag *gr
 	return graph.ErrPrematureStop
 }
 
-var _ graph.Transformer = &CSSetDeletionTransformer{}
+var _ graph.Transformer = &SRSDeletionTransformer{}

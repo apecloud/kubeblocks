@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package consensusset
+package statefulreplicaset
 
 import (
 	"errors"
@@ -39,7 +39,7 @@ type updatePlan interface {
 }
 
 type realUpdatePlan struct {
-	csSet           workloads.StatefulReplicaSet
+	srs             workloads.StatefulReplicaSet
 	pods            []corev1.Pod
 	dag             *graph.DAG
 	podsToBeUpdated []*corev1.Pod
@@ -69,7 +69,7 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 	}
 
 	// if pod is the latest version, we do nothing
-	if intctrlutil.GetPodRevision(pod) == p.csSet.Status.UpdateRevision {
+	if intctrlutil.GetPodRevision(pod) == p.srs.Status.UpdateRevision {
 		if intctrlutil.PodIsReadyWithLabel(*pod) {
 			return ErrContinue
 		} else {
@@ -88,11 +88,11 @@ func (p *realUpdatePlan) build() {
 	root := &model.ObjectVertex{}
 	p.dag.AddVertex(root)
 
-	rolePriorityMap := composeRolePriorityMap(p.csSet)
+	rolePriorityMap := composeRolePriorityMap(p.srs)
 	sortPods(p.pods, rolePriorityMap, false)
 
 	// generate plan by UpdateStrategy
-	switch p.csSet.Spec.UpdateStrategy {
+	switch p.srs.Spec.UpdateStrategy {
 	case workloads.SerialUpdateStrategy:
 		p.buildSerialUpdatePlan()
 	case workloads.ParallelUpdateStrategy:
@@ -184,11 +184,11 @@ func (p *realUpdatePlan) execute() ([]*corev1.Pod, error) {
 	return p.podsToBeUpdated, nil
 }
 
-func newUpdatePlan(csSet workloads.StatefulReplicaSet, pods []corev1.Pod) updatePlan {
+func newUpdatePlan(srs workloads.StatefulReplicaSet, pods []corev1.Pod) updatePlan {
 	return &realUpdatePlan{
-		csSet: csSet,
-		pods:  pods,
-		dag:   graph.NewDAG(),
+		srs:  srs,
+		pods: pods,
+		dag:  graph.NewDAG(),
 	}
 }
 

@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package consensusset
+package statefulreplicaset
 
 import (
 	apps "k8s.io/api/apps/v1"
@@ -27,46 +27,46 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
-// CSSetStatusTransformer computes the current status:
-// 1. read the underlying sts's status and copy them to consensus set's status
-// 2. read pod role label and update consensus set's status role fields
-type CSSetStatusTransformer struct{}
+// SRSStatusTransformer computes the current status:
+// 1. read the underlying sts's status and copy them to stateful_replica_set's status
+// 2. read pod role label and update stateful_replica_set's status role fields
+type SRSStatusTransformer struct{}
 
-func (t *CSSetStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*CSSetTransformContext)
-	csSet := transCtx.CSSet
-	origCSSet := transCtx.OrigCSSet
+func (t *SRSStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*SRSTransformContext)
+	srs := transCtx.srs
+	srsOrig := transCtx.srsOrig
 
 	// fast return
-	if model.IsObjectDeleting(origCSSet) {
+	if model.IsObjectDeleting(srsOrig) {
 		return nil
 	}
 
 	switch {
-	case model.IsObjectUpdating(origCSSet):
-		// use consensus set's generation instead of sts's
-		csSet.Status.ObservedGeneration = csSet.Generation
+	case model.IsObjectUpdating(srsOrig):
+		// use srs's generation instead of sts's
+		srs.Status.ObservedGeneration = srs.Generation
 		// hack for sts initialization error: is invalid: status.replicas: Required value
-		if csSet.Status.Replicas == 0 {
-			csSet.Status.Replicas = csSet.Spec.Replicas
+		if srs.Status.Replicas == 0 {
+			srs.Status.Replicas = srs.Spec.Replicas
 		}
-	case model.IsObjectStatusUpdating(origCSSet):
+	case model.IsObjectStatusUpdating(srsOrig):
 		// read the underlying sts
 		sts := &apps.StatefulSet{}
-		if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(csSet), sts); err != nil {
+		if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(srs), sts); err != nil {
 			return err
 		}
-		// keep csSet's ObservedGeneration to avoid override by sts's ObservedGeneration
-		generation := csSet.Status.ObservedGeneration
-		csSet.Status.StatefulSetStatus = sts.Status
-		csSet.Status.ObservedGeneration = generation
-		// read all pods belong to the sts, hence belong to our consensus set
+		// keep srs's ObservedGeneration to avoid override by sts's ObservedGeneration
+		generation := srs.Status.ObservedGeneration
+		srs.Status.StatefulSetStatus = sts.Status
+		srs.Status.ObservedGeneration = generation
+		// read all pods belong to the sts, hence belong to the srs
 		pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
 		if err != nil {
 			return err
 		}
 		// update role fields
-		setMembersStatus(csSet, pods)
+		setMembersStatus(srs, pods)
 	}
 
 	if err := model.PrepareRootStatus(dag); err != nil {
@@ -76,4 +76,4 @@ func (t *CSSetStatusTransformer) Transform(ctx graph.TransformContext, dag *grap
 	return nil
 }
 
-var _ graph.Transformer = &CSSetStatusTransformer{}
+var _ graph.Transformer = &SRSStatusTransformer{}

@@ -33,8 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/consensusset"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
+	"github.com/apecloud/kubeblocks/internal/controller/statefulreplicaset"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -77,7 +77,7 @@ func (r *StatefulReplicaSetReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	// the stateful_replica_set reconciliation loop is a two-phase model: plan Build and plan Execute
 	// Init stage
-	planBuilder := consensusset.NewCSSetPlanBuilder(reqCtx, r.Client, req)
+	planBuilder := statefulreplicaset.NewSRSPlanBuilder(reqCtx, r.Client, req)
 	if err := planBuilder.Init(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -98,18 +98,18 @@ func (r *StatefulReplicaSetReconciler) Reconcile(ctx context.Context, req ctrl.R
 	plan, err := planBuilder.
 		AddTransformer(
 			// fix meta
-			&consensusset.FixMetaTransformer{},
+			&statefulreplicaset.FixMetaTransformer{},
 			// handle deletion
 			// handle cluster deletion first
-			&consensusset.CSSetDeletionTransformer{},
+			&statefulreplicaset.SRSDeletionTransformer{},
 			// handle secondary objects generation
-			&consensusset.ObjectGenerationTransformer{},
+			&statefulreplicaset.ObjectGenerationTransformer{},
 			// handle status
-			&consensusset.CSSetStatusTransformer{},
+			&statefulreplicaset.SRSStatusTransformer{},
 			// handle UpdateStrategy
-			&consensusset.UpdateStrategyTransformer{},
+			&statefulreplicaset.UpdateStrategyTransformer{},
 			// handle member reconfiguration
-			&consensusset.MemberReconfigurationTransformer{},
+			&statefulreplicaset.MemberReconfigurationTransformer{},
 			// always safe to put your transformer below
 		).
 		Build()
@@ -137,7 +137,7 @@ func (r *StatefulReplicaSetReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&batchv1.Job{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}},
-			&consensusset.EnqueueRequestForAncestor{
+			&statefulreplicaset.EnqueueRequestForAncestor{
 				Client:    r.Client,
 				OwnerType: &workloads.StatefulReplicaSet{},
 				UpToLevel: 2,

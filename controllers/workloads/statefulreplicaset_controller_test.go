@@ -33,7 +33,7 @@ import (
 var _ = Describe("StatefulReplicaSet Controller", func() {
 	Context("reconciliation", func() {
 		It("should reconcile well", func() {
-			name := "text-consensus-set"
+			name := "test-stateful-replica-set"
 			port := int32(12345)
 			service := corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
@@ -64,7 +64,7 @@ var _ = Describe("StatefulReplicaSet Controller", func() {
 				Image:   "foo",
 				Command: []string{"bar"},
 			}
-			csSet := builder.NewConsensusSetBuilder(testCtx.DefaultNamespace, name).
+			csSet := builder.NewStatefulReplicaSetBuilder(testCtx.DefaultNamespace, name).
 				SetService(service).
 				SetTemplate(template).
 				AddObservationAction(action).

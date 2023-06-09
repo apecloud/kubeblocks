@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package consensusset
+package statefulreplicaset
 
 import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -32,19 +32,19 @@ import (
 type UpdateStrategyTransformer struct{}
 
 func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*CSSetTransformContext)
-	csSet := transCtx.CSSet
-	origCSSet := transCtx.OrigCSSet
-	if !model.IsObjectStatusUpdating(origCSSet) {
+	transCtx, _ := ctx.(*SRSTransformContext)
+	srs := transCtx.srs
+	srsOrig := transCtx.srsOrig
+	if !model.IsObjectStatusUpdating(srsOrig) {
 		return nil
 	}
 
 	// read the underlying sts
 	stsObj := &apps.StatefulSet{}
-	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(csSet), stsObj); err != nil {
+	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(srs), stsObj); err != nil {
 		return err
 	}
-	// read all pods belong to the sts, hence belong to our consensus set
+	// read all pods belong to the sts, hence belong to the srs
 	pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, stsObj)
 	if err != nil {
 		return err
@@ -65,13 +65,13 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 	}
 
 	// we don't check whether pod role label present: prefer stateful set's Update done than role probing ready
-	// TODO(free6om): maybe should wait consensus ready for high availability:
+	// TODO(free6om): maybe should wait srs ready for high availability:
 	// 1. after some pods updated
 	// 2. before switchover
 	// 3. after switchover done
 
 	// generate the pods Deletion plan
-	plan := newUpdatePlan(*csSet, pods)
+	plan := newUpdatePlan(*srs, pods)
 	podsToBeUpdated, err := plan.execute()
 	if err != nil {
 		return err
@@ -93,13 +93,13 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 }
 
 // return true means action created or in progress, should wait it to the termination state
-func doSwitchoverIfNeeded(transCtx *CSSetTransformContext, dag *graph.DAG, pods []corev1.Pod, podsToBeUpdated []*corev1.Pod) (bool, error) {
+func doSwitchoverIfNeeded(transCtx *SRSTransformContext, dag *graph.DAG, pods []corev1.Pod, podsToBeUpdated []*corev1.Pod) (bool, error) {
 	if len(podsToBeUpdated) == 0 {
 		return false, nil
 	}
 
-	csSet := transCtx.CSSet
-	if !shouldSwitchover(csSet, podsToBeUpdated) {
+	srs := transCtx.srs
+	if !shouldSwitchover(srs, podsToBeUpdated) {
 		return false, nil
 	}
 
@@ -108,16 +108,16 @@ func doSwitchoverIfNeeded(transCtx *CSSetTransformContext, dag *graph.DAG, pods 
 		return true, err
 	}
 	if len(actionList) == 0 {
-		return true, createSwitchoverAction(dag, csSet, pods)
+		return true, createSwitchoverAction(dag, srs, pods)
 	}
 
 	// switch status if found:
 	// 1. succeed means action executed successfully,
-	//    but the consensus cluster may have false positive(apecloud-mysql only?),
+	//    but some kind of cluster may have false positive(apecloud-mysql only?),
 	//    we can't wait forever, update is more important.
 	//    do the next pod update stage
 	// 2. failed means action executed failed,
-	//    but this doesn't mean the consensus cluster didn't switchover(again, apecloud-mysql only?)
+	//    but this doesn't mean the cluster didn't switchover(again, apecloud-mysql only?)
 	//    we can't do anything either in this situation, emit failed event and
 	//    do the next pod update state
 	// 3. in progress means action still running,
@@ -137,29 +137,29 @@ func doSwitchoverIfNeeded(transCtx *CSSetTransformContext, dag *graph.DAG, pods 
 	return false, nil
 }
 
-func createSwitchoverAction(dag *graph.DAG, csSet *workloads.StatefulReplicaSet, pods []corev1.Pod) error {
-	leader := getLeaderPodName(csSet.Status.MembersStatus)
-	targetOrdinal := selectSwitchoverTarget(csSet, pods)
-	target := getPodName(csSet.Name, targetOrdinal)
+func createSwitchoverAction(dag *graph.DAG, srs *workloads.StatefulReplicaSet, pods []corev1.Pod) error {
+	leader := getLeaderPodName(srs.Status.MembersStatus)
+	targetOrdinal := selectSwitchoverTarget(srs, pods)
+	target := getPodName(srs.Name, targetOrdinal)
 	actionType := jobTypeSwitchover
 	ordinal, _ := getPodOrdinal(leader)
-	actionName := getActionName(csSet.Name, int(csSet.Generation), ordinal, actionType)
-	action := buildAction(csSet, actionName, actionType, jobScenarioUpdate, leader, target)
+	actionName := getActionName(srs.Name, int(srs.Generation), ordinal, actionType)
+	action := buildAction(srs, actionName, actionType, jobScenarioUpdate, leader, target)
 
 	// don't do cluster abnormal status analysis, prefer faster update process
-	return createAction(dag, csSet, action)
+	return createAction(dag, srs, action)
 }
 
-func selectSwitchoverTarget(csSet *workloads.StatefulReplicaSet, pods []corev1.Pod) int {
+func selectSwitchoverTarget(srs *workloads.StatefulReplicaSet, pods []corev1.Pod) int {
 	var podUpdated, podUpdatedWithLabel string
 	for _, pod := range pods {
-		if intctrlutil.GetPodRevision(&pod) != csSet.Status.UpdateRevision {
+		if intctrlutil.GetPodRevision(&pod) != srs.Status.UpdateRevision {
 			continue
 		}
 		if len(podUpdated) == 0 {
 			podUpdated = pod.Name
 		}
-		if _, ok := pod.Labels[model.RoleLabelKey]; !ok {
+		if _, ok := pod.Labels[roleLabelKey]; !ok {
 			continue
 		}
 		if len(podUpdatedWithLabel) == 0 {
@@ -180,8 +180,8 @@ func selectSwitchoverTarget(csSet *workloads.StatefulReplicaSet, pods []corev1.P
 	return ordinal
 }
 
-func shouldSwitchover(csSet *workloads.StatefulReplicaSet, podsToBeUpdated []*corev1.Pod) bool {
-	leaderName := getLeaderPodName(csSet.Status.MembersStatus)
+func shouldSwitchover(srs *workloads.StatefulReplicaSet, podsToBeUpdated []*corev1.Pod) bool {
+	leaderName := getLeaderPodName(srs.Status.MembersStatus)
 	for _, pod := range podsToBeUpdated {
 		if pod.Name == leaderName {
 			return true

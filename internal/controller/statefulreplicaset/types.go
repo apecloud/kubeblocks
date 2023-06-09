@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package consensusset
+package statefulreplicaset
 
 import (
 	"context"
@@ -31,15 +31,18 @@ import (
 )
 
 const (
-	kindConsensusSet = "StatefulReplicaSet"
+	kindStatefulReplicaSet = "StatefulReplicaSet"
+
+	roleLabelKey          = "kubeblocks.io/role"
+	srsAccessModeLabelKey = "srs.apps.kubeblocks.io/access-mode"
 
 	defaultPodName = "Unknown"
 
-	csSetFinalizerName = "cs.workloads.kubeblocks.io/finalizer"
+	srsFinalizerName = "srs.workloads.kubeblocks.io/finalizer"
 
-	jobHandledLabel             = "cs.workloads.kubeblocks.io/job-handled"
-	jobTypeLabel                = "cs.workloads.kubeblocks.io/job-type"
-	jobScenarioLabel            = "cs.workloads.kubeblocks.io/job-scenario"
+	jobHandledLabel             = "srs.workloads.kubeblocks.io/job-handled"
+	jobTypeLabel                = "srs.workloads.kubeblocks.io/job-type"
+	jobScenarioLabel            = "srs.workloads.kubeblocks.io/job-scenario"
 	jobHandledTrue              = "true"
 	jobHandledFalse             = "false"
 	jobTypeSwitchover           = "switchover"
@@ -62,39 +65,39 @@ const (
 	defaultRoleObservationDaemonPort = 3501
 	roleObservationURIFormat         = "http://localhost:%s/getRole"
 	defaultActionImage               = "busybox:latest"
-	usernameCredentialVarName        = "KB_CONSENSUS_SET_USERNAME"
-	passwordCredentialVarName        = "KB_CONSENSUS_SET_PASSWORD"
-	servicePortVarName               = "KB_CONSENSUS_SET_SERVICE_PORT"
-	actionSvcListVarName             = "KB_CONSENSUS_SET_ACTION_SVC_LIST"
-	leaderHostVarName                = "KB_CONSENSUS_SET_LEADER_HOST"
-	targetHostVarName                = "KB_CONSENSUS_SET_TARGET_HOST"
+	usernameCredentialVarName        = "KB_SRS_USERNAME"
+	passwordCredentialVarName        = "KB_SRS_PASSWORD"
+	servicePortVarName               = "KB_SRS_SERVICE_PORT"
+	actionSvcListVarName             = "KB_SRS_ACTION_SVC_LIST"
+	leaderHostVarName                = "KB_SRS_LEADER_HOST"
+	targetHostVarName                = "KB_SRS_TARGET_HOST"
 	roleObservationEventFieldPath    = "spec.containers{" + roleObservationName + "}"
 	actionSvcPortBase                = int32(36500)
 )
 
-type CSSetTransformContext struct {
+type SRSTransformContext struct {
 	context.Context
 	Client roclient.ReadonlyClient
 	record.EventRecorder
 	logr.Logger
-	CSSet     *workloads.StatefulReplicaSet
-	OrigCSSet *workloads.StatefulReplicaSet
+	srs     *workloads.StatefulReplicaSet
+	srsOrig *workloads.StatefulReplicaSet
 }
 
-func (c *CSSetTransformContext) GetContext() context.Context {
+func (c *SRSTransformContext) GetContext() context.Context {
 	return c.Context
 }
 
-func (c *CSSetTransformContext) GetClient() roclient.ReadonlyClient {
+func (c *SRSTransformContext) GetClient() roclient.ReadonlyClient {
 	return c.Client
 }
 
-func (c *CSSetTransformContext) GetRecorder() record.EventRecorder {
+func (c *SRSTransformContext) GetRecorder() record.EventRecorder {
 	return c.EventRecorder
 }
 
-func (c *CSSetTransformContext) GetLogger() logr.Logger {
+func (c *SRSTransformContext) GetLogger() logr.Logger {
 	return c.Logger
 }
 
-var _ graph.TransformContext = &CSSetTransformContext{}
+var _ graph.TransformContext = &SRSTransformContext{}

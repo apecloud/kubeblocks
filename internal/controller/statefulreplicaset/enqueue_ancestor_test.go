@@ -17,13 +17,11 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package consensusset
+package statefulreplicaset
 
 import (
 	"context"
 	"fmt"
-	"k8s.io/client-go/util/workqueue"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -36,7 +34,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -151,7 +151,7 @@ var _ = Describe("enqueue ancestor", func() {
 			Expect(ownerRef).Should(BeNil())
 
 			By("builder ancestor tree")
-			ancestorLevel2 := builder.NewConsensusSetBuilder(namespace, "foo").GetObject()
+			ancestorLevel2 := builder.NewStatefulReplicaSetBuilder(namespace, "foo").GetObject()
 			ancestorL2APIVersion := "workloads.kubeblocks.io/v1alpha1"
 			ancestorL2Kind := "StatefulReplicaSet"
 			ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, "foo").
@@ -244,7 +244,7 @@ var _ = Describe("enqueue ancestor", func() {
 
 		It("should work well", func() {
 			By("build ancestors")
-			ancestorLevel2 := builder.NewConsensusSetBuilder(namespace, "foo-level-2").GetObject()
+			ancestorLevel2 := builder.NewStatefulReplicaSetBuilder(namespace, "foo-level-2").GetObject()
 			ancestorL2APIVersion := "workloads.kubeblocks.io/v1alpha1"
 			ancestorL2Kind := "StatefulReplicaSet"
 			ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, "foo-level-1").
@@ -305,7 +305,7 @@ var _ = Describe("enqueue ancestor", func() {
 		It("should work well", func() {
 			By("build events and queue")
 			queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "enqueue-ancestor-test")
-			ancestorLevel2 := builder.NewConsensusSetBuilder(namespace, "foo-level-2").GetObject()
+			ancestorLevel2 := builder.NewStatefulReplicaSetBuilder(namespace, "foo-level-2").GetObject()
 			ancestorL2APIVersion := "workloads.kubeblocks.io/v1alpha1"
 			ancestorL2Kind := "StatefulReplicaSet"
 			ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, "foo-level-1").

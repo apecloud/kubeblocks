@@ -14,5 +14,5 @@ spec:
                 value: "OFF"
               - key: max_connections
                 value: "2000"
-        name: mysql-consensusset-config
+        name: mysql-statefulreplicaset-config
   type: Reconfiguring

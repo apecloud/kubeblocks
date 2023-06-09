@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package consensusset
+package statefulreplicaset
 
 import (
 	"errors"
@@ -36,18 +36,18 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type csSetPlanBuilder struct {
+type srsPlanBuilder struct {
 	req          ctrl.Request
 	cli          client.Client
-	transCtx     *CSSetTransformContext
+	transCtx     *SRSTransformContext
 	transformers graph.TransformerChain
 }
 
-type csSetPlan struct {
+type srsPlan struct {
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc
 	cli      client.Client
-	transCtx *CSSetTransformContext
+	transCtx *SRSTransformContext
 }
 
 func init() {
@@ -56,26 +56,26 @@ func init() {
 
 // PlanBuilder implementation
 
-func (b *csSetPlanBuilder) Init() error {
-	csSet := &workloads.StatefulReplicaSet{}
-	if err := b.cli.Get(b.transCtx.Context, b.req.NamespacedName, csSet); err != nil {
+func (b *srsPlanBuilder) Init() error {
+	srs := &workloads.StatefulReplicaSet{}
+	if err := b.cli.Get(b.transCtx.Context, b.req.NamespacedName, srs); err != nil {
 		return err
 	}
-	b.AddTransformer(&initTransformer{StatefulReplicaSet: csSet})
+	b.AddTransformer(&initTransformer{StatefulReplicaSet: srs})
 	return nil
 }
 
-func (b *csSetPlanBuilder) AddTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
+func (b *srsPlanBuilder) AddTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
 	b.transformers = append(b.transformers, transformer...)
 	return b
 }
 
-func (b *csSetPlanBuilder) AddParallelTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
+func (b *srsPlanBuilder) AddParallelTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
 	b.transformers = append(b.transformers, &model.ParallelTransformer{Transformers: transformer})
 	return b
 }
 
-func (b *csSetPlanBuilder) Build() (graph.Plan, error) {
+func (b *srsPlanBuilder) Build() (graph.Plan, error) {
 	var err error
 	// new a DAG and apply chain on it, after that we should get the final Plan
 	dag := graph.NewDAG()
@@ -84,9 +84,9 @@ func (b *csSetPlanBuilder) Build() (graph.Plan, error) {
 	b.transCtx.Logger.Info(fmt.Sprintf("DAG: %s", dag))
 
 	// we got the execution plan
-	plan := &csSetPlan{
+	plan := &srsPlan{
 		dag:      dag,
-		walkFunc: b.csSetWalkFunc,
+		walkFunc: b.srsWalkFunc,
 		cli:      b.cli,
 		transCtx: b.transCtx,
 	}
@@ -95,13 +95,13 @@ func (b *csSetPlanBuilder) Build() (graph.Plan, error) {
 
 // Plan implementation
 
-func (p *csSetPlan) Execute() error {
+func (p *srsPlan) Execute() error {
 	return p.dag.WalkReverseTopoOrder(p.walkFunc)
 }
 
 // Do the real works
 
-func (b *csSetPlanBuilder) csSetWalkFunc(v graph.Vertex) error {
+func (b *srsPlanBuilder) srsWalkFunc(v graph.Vertex) error {
 	vertex, ok := v.(*model.ObjectVertex)
 	if !ok {
 		return fmt.Errorf("wrong vertex type %v", v)
@@ -129,7 +129,7 @@ func (b *csSetPlanBuilder) csSetWalkFunc(v graph.Vertex) error {
 			return err
 		}
 	case model.DELETE:
-		if controllerutil.RemoveFinalizer(vertex.Obj, csSetFinalizerName) {
+		if controllerutil.RemoveFinalizer(vertex.Obj, srsFinalizerName) {
 			err := b.cli.Update(b.transCtx.Context, vertex.Obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				b.transCtx.Logger.Error(err, fmt.Sprintf("delete %T error: %s", vertex.Obj, vertex.Obj.GetName()))
@@ -151,7 +151,7 @@ func (b *csSetPlanBuilder) csSetWalkFunc(v graph.Vertex) error {
 	return nil
 }
 
-func (b *csSetPlanBuilder) buildUpdateObj(vertex *model.ObjectVertex) (client.Object, error) {
+func (b *srsPlanBuilder) buildUpdateObj(vertex *model.ObjectVertex) (client.Object, error) {
 	handleSts := func(origObj, targetObj *appsv1.StatefulSet) (client.Object, error) {
 		origObj.Spec.Template = targetObj.Spec.Template
 		origObj.Spec.Replicas = targetObj.Spec.Replicas
@@ -194,12 +194,12 @@ func (b *csSetPlanBuilder) buildUpdateObj(vertex *model.ObjectVertex) (client.Ob
 	return vertex.Obj, nil
 }
 
-// NewCSSetPlanBuilder returns a csSetPlanBuilder powered PlanBuilder
-func NewCSSetPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request) graph.PlanBuilder {
-	return &csSetPlanBuilder{
+// NewSRSPlanBuilder returns a srsPlanBuilder powered PlanBuilder
+func NewSRSPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request) graph.PlanBuilder {
+	return &srsPlanBuilder{
 		req: req,
 		cli: cli,
-		transCtx: &CSSetTransformContext{
+		transCtx: &SRSTransformContext{
 			Context:       ctx.Ctx,
 			Client:        cli,
 			EventRecorder: ctx.Recorder,
@@ -208,5 +208,5 @@ func NewCSSetPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl
 	}
 }
 
-var _ graph.PlanBuilder = &csSetPlanBuilder{}
-var _ graph.Plan = &csSetPlan{}
+var _ graph.PlanBuilder = &srsPlanBuilder{}
+var _ graph.Plan = &srsPlan{}

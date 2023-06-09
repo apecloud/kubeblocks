@@ -262,7 +262,7 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 			ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
 				{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:        "mysql-consensusset-config",
+						Name:        "mysql-statefulreplicaset-config",
 						TemplateRef: "mysql8.0-config-template",
 						Namespace:   Namespace,
 						VolumeName:  "mysql-config",
@@ -277,7 +277,7 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 			ConfigSpecs: []appsv1alpha1.ComponentConfigSpec{
 				{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name:        "mysql-consensusset-config",
+						Name:        "mysql-statefulreplicaset-config",
 						TemplateRef: "mysql8.0-config-template",
 						Namespace:   Namespace,
 						VolumeName:  "mysql-config",

@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package consensusset
+package statefulreplicaset
 
 import (
 	"encoding/json"
@@ -43,30 +43,30 @@ import (
 type ObjectGenerationTransformer struct{}
 
 func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*CSSetTransformContext)
-	csSet := transCtx.CSSet
-	oriSet := transCtx.OrigCSSet
+	transCtx, _ := ctx.(*SRSTransformContext)
+	srs := transCtx.srs
+	srsOrig := transCtx.srsOrig
 
-	if model.IsObjectDeleting(oriSet) {
+	if model.IsObjectDeleting(srsOrig) {
 		return nil
 	}
 
 	// generate objects by current spec
-	svc := buildSvc(*csSet)
-	headLessSvc := buildHeadlessSvc(*csSet)
-	envConfig := buildEnvConfigMap(*csSet)
-	sts := buildSts(*csSet, headLessSvc.Name, *envConfig)
+	svc := buildSvc(*srs)
+	headLessSvc := buildHeadlessSvc(*srs)
+	envConfig := buildEnvConfigMap(*srs)
+	sts := buildSts(*srs, headLessSvc.Name, *envConfig)
 	objects := []client.Object{svc, headLessSvc, envConfig, sts}
 
 	for _, object := range objects {
-		if err := controllerutil.SetOwnership(csSet, object, model.GetScheme(), csSetFinalizerName); err != nil {
+		if err := controllerutil.SetOwnership(srs, object, model.GetScheme(), srsFinalizerName); err != nil {
 			return err
 		}
 	}
 
 	// read cache snapshot
-	ml := client.MatchingLabels{model.AppInstanceLabelKey: csSet.Name, model.KBManagedByKey: kindConsensusSet}
-	oldSnapshot, err := model.ReadCacheSnapshot(ctx, csSet, ml, ownedKinds()...)
+	ml := client.MatchingLabels{model.AppInstanceLabelKey: srs.Name, model.KBManagedByKey: kindStatefulReplicaSet}
+	oldSnapshot, err := model.ReadCacheSnapshot(ctx, srs, ml, ownedKinds()...)
 	if err != nil {
 		return err
 	}
@@ -121,36 +121,36 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	return nil
 }
 
-func buildSvc(csSet workloads.StatefulReplicaSet) *corev1.Service {
-	svcBuilder := builder.NewServiceBuilder(csSet.Namespace, csSet.Name).
-		AddLabels(model.AppInstanceLabelKey, csSet.Name).
-		AddLabels(model.KBManagedByKey, kindConsensusSet).
-		// AddAnnotationsInMap(csSet.Annotations).
-		AddSelectors(model.AppInstanceLabelKey, csSet.Name).
-		AddSelectors(model.KBManagedByKey, kindConsensusSet).
-		AddPorts(csSet.Spec.Service.Ports...).
-		SetType(csSet.Spec.Service.Type)
-	for _, role := range csSet.Spec.Roles {
+func buildSvc(srs workloads.StatefulReplicaSet) *corev1.Service {
+	svcBuilder := builder.NewServiceBuilder(srs.Namespace, srs.Name).
+		AddLabels(model.AppInstanceLabelKey, srs.Name).
+		AddLabels(model.KBManagedByKey, kindStatefulReplicaSet).
+		// AddAnnotationsInMap(srs.Annotations).
+		AddSelectors(model.AppInstanceLabelKey, srs.Name).
+		AddSelectors(model.KBManagedByKey, kindStatefulReplicaSet).
+		AddPorts(srs.Spec.Service.Ports...).
+		SetType(srs.Spec.Service.Type)
+	for _, role := range srs.Spec.Roles {
 		if role.IsLeader && len(role.Name) > 0 {
-			svcBuilder.AddSelectors(model.ConsensusSetAccessModeLabelKey, string(role.AccessMode))
+			svcBuilder.AddSelectors(srsAccessModeLabelKey, string(role.AccessMode))
 		}
 	}
 	return svcBuilder.GetObject()
 }
 
-func buildHeadlessSvc(csSet workloads.StatefulReplicaSet) *corev1.Service {
-	hdlBuilder := builder.NewHeadlessServiceBuilder(csSet.Namespace, getHeadlessSvcName(csSet)).
-		AddLabels(model.AppInstanceLabelKey, csSet.Name).
-		AddLabels(model.KBManagedByKey, kindConsensusSet).
-		AddSelectors(model.AppInstanceLabelKey, csSet.Name).
-		AddSelectors(model.KBManagedByKey, kindConsensusSet)
+func buildHeadlessSvc(srs workloads.StatefulReplicaSet) *corev1.Service {
+	hdlBuilder := builder.NewHeadlessServiceBuilder(srs.Namespace, getHeadlessSvcName(srs)).
+		AddLabels(model.AppInstanceLabelKey, srs.Name).
+		AddLabels(model.KBManagedByKey, kindStatefulReplicaSet).
+		AddSelectors(model.AppInstanceLabelKey, srs.Name).
+		AddSelectors(model.KBManagedByKey, kindStatefulReplicaSet)
 	//	.AddAnnotations("prometheus.io/scrape", strconv.FormatBool(component.Monitor.Enable))
 	// if component.Monitor.Enable {
 	//	hdBuilder.AddAnnotations("prometheus.io/path", component.Monitor.ScrapePath).
 	//		AddAnnotations("prometheus.io/port", strconv.Itoa(int(component.Monitor.ScrapePort))).
 	//		AddAnnotations("prometheus.io/scheme", "http")
 	// }
-	for _, container := range csSet.Spec.Template.Spec.Containers {
+	for _, container := range srs.Spec.Template.Spec.Containers {
 		for _, port := range container.Ports {
 			servicePort := corev1.ServicePort{
 				Protocol: port.Protocol,
@@ -170,38 +170,38 @@ func buildHeadlessSvc(csSet workloads.StatefulReplicaSet) *corev1.Service {
 	return hdlBuilder.GetObject()
 }
 
-func buildSts(csSet workloads.StatefulReplicaSet, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
-	stsBuilder := builder.NewStatefulSetBuilder(csSet.Namespace, csSet.Name)
-	template := buildStsPodTemplate(csSet, envConfig)
-	stsBuilder.AddLabels(model.AppInstanceLabelKey, csSet.Name).
-		AddLabels(model.KBManagedByKey, kindConsensusSet).
-		AddMatchLabel(model.AppInstanceLabelKey, csSet.Name).
-		AddMatchLabel(model.KBManagedByKey, kindConsensusSet).
+func buildSts(srs workloads.StatefulReplicaSet, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
+	stsBuilder := builder.NewStatefulSetBuilder(srs.Namespace, srs.Name)
+	template := buildStsPodTemplate(srs, envConfig)
+	stsBuilder.AddLabels(model.AppInstanceLabelKey, srs.Name).
+		AddLabels(model.KBManagedByKey, kindStatefulReplicaSet).
+		AddMatchLabel(model.AppInstanceLabelKey, srs.Name).
+		AddMatchLabel(model.KBManagedByKey, kindStatefulReplicaSet).
 		SetServiceName(headlessSvcName).
-		SetReplicas(csSet.Spec.Replicas).
+		SetReplicas(srs.Spec.Replicas).
 		SetPodManagementPolicy(apps.OrderedReadyPodManagement).
-		SetVolumeClaimTemplates(csSet.Spec.VolumeClaimTemplates...).
+		SetVolumeClaimTemplates(srs.Spec.VolumeClaimTemplates...).
 		SetTemplate(*template).
 		SetUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType)
 	return stsBuilder.GetObject()
 }
 
-func buildEnvConfigMap(csSet workloads.StatefulReplicaSet) *corev1.ConfigMap {
-	envData := buildEnvConfigData(csSet)
-	return builder.NewConfigMapBuilder(csSet.Namespace, csSet.Name+"-env").
-		AddLabels(model.AppInstanceLabelKey, csSet.Name).
-		AddLabels(model.KBManagedByKey, kindConsensusSet).
+func buildEnvConfigMap(srs workloads.StatefulReplicaSet) *corev1.ConfigMap {
+	envData := buildEnvConfigData(srs)
+	return builder.NewConfigMapBuilder(srs.Namespace, srs.Name+"-env").
+		AddLabels(model.AppInstanceLabelKey, srs.Name).
+		AddLabels(model.KBManagedByKey, kindStatefulReplicaSet).
 		SetData(envData).GetObject()
 }
 
-func buildStsPodTemplate(csSet workloads.StatefulReplicaSet, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
-	template := csSet.Spec.Template
+func buildStsPodTemplate(srs workloads.StatefulReplicaSet, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
+	template := srs.Spec.Template
 	labels := template.Labels
 	if labels == nil {
 		labels = make(map[string]string, 2)
 	}
-	labels[model.AppInstanceLabelKey] = csSet.Name
-	labels[model.KBManagedByKey] = kindConsensusSet
+	labels[model.AppInstanceLabelKey] = srs.Name
+	labels[model.KBManagedByKey] = kindStatefulReplicaSet
 	template.Labels = labels
 
 	// inject env ConfigMap into workload pods only
@@ -216,14 +216,14 @@ func buildStsPodTemplate(csSet workloads.StatefulReplicaSet, envConfig corev1.Co
 				}})
 	}
 
-	injectRoleObservationContainer(csSet, &template)
+	injectRoleObservationContainer(srs, &template)
 
 	return &template
 }
 
-func injectRoleObservationContainer(csSet workloads.StatefulReplicaSet, template *corev1.PodTemplateSpec) {
-	roleObservation := csSet.Spec.RoleObservation
-	credential := csSet.Spec.Credential
+func injectRoleObservationContainer(srs workloads.StatefulReplicaSet, template *corev1.PodTemplateSpec) {
+	roleObservation := srs.Spec.RoleObservation
+	credential := srs.Spec.Credential
 	credentialEnv := make([]corev1.EnvVar, 0)
 	if credential != nil {
 		credentialEnv = append(credentialEnv,
@@ -245,9 +245,9 @@ func injectRoleObservationContainer(csSet workloads.StatefulReplicaSet, template
 		svcPort = findNextAvailablePort(svcPort, allUsedPorts)
 		actionSvcPorts = append(actionSvcPorts, svcPort)
 	}
-	injectObservationActionContainer(csSet, template, actionSvcPorts, credentialEnv)
+	injectObservationActionContainer(srs, template, actionSvcPorts, credentialEnv)
 	actionSvcList, _ := json.Marshal(actionSvcPorts)
-	injectRoleObserveContainer(csSet, template, string(actionSvcList), credentialEnv)
+	injectRoleObserveContainer(srs, template, string(actionSvcList), credentialEnv)
 }
 
 func findNextAvailablePort(base int32, allUsedPorts []int32) int32 {
@@ -277,10 +277,10 @@ func findAllUsedPorts(template *corev1.PodTemplateSpec) []int32 {
 	return allUsedPorts
 }
 
-func injectRoleObserveContainer(csSet workloads.StatefulReplicaSet, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
+func injectRoleObserveContainer(srs workloads.StatefulReplicaSet, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
 	// compute parameters for role observation container
-	roleObservation := csSet.Spec.RoleObservation
-	credential := csSet.Spec.Credential
+	roleObservation := srs.Spec.RoleObservation
+	credential := srs.Spec.Credential
 	image := viper.GetString("ROLE_OBSERVATION_IMAGE")
 	if len(image) == 0 {
 		image = defaultRoleObservationImage
@@ -311,7 +311,7 @@ func injectRoleObserveContainer(csSet workloads.StatefulReplicaSet, template *co
 			})
 	}
 	// find service port of th db engine
-	servicePort := findSvcPort(csSet)
+	servicePort := findSvcPort(srs)
 	if servicePort > 0 {
 		env = append(env,
 			corev1.EnvVar{
@@ -365,7 +365,7 @@ func injectRoleObserveContainer(csSet workloads.StatefulReplicaSet, template *co
 	template.Spec.Containers = append(template.Spec.Containers, container)
 }
 
-func injectObservationActionContainer(csSet workloads.StatefulReplicaSet, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
+func injectObservationActionContainer(srs workloads.StatefulReplicaSet, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
 	// inject shared volume
 	agentVolume := corev1.Volume{
 		Name: roleAgentVolumeName,
@@ -395,7 +395,7 @@ func injectObservationActionContainer(csSet workloads.StatefulReplicaSet, templa
 	template.Spec.InitContainers = append(template.Spec.InitContainers, initContainer)
 
 	// inject action containers based on utility images
-	for i, action := range csSet.Spec.RoleObservation.ObservationActions {
+	for i, action := range srs.Spec.RoleObservation.ObservationActions {
 		image := action.Image
 		if len(image) == 0 {
 			image = defaultActionImage
@@ -423,8 +423,7 @@ func injectObservationActionContainer(csSet workloads.StatefulReplicaSet, templa
 func buildEnvConfigData(set workloads.StatefulReplicaSet) map[string]string {
 	envData := map[string]string{}
 
-	prefix := constant.KBPrefix + "_" + strings.ToUpper(set.Name) + "_"
-	prefix = strings.ReplaceAll(prefix, "-", "_")
+	prefix := constant.KBPrefix + "_SRS_"
 	svcName := getHeadlessSvcName(set)
 	envData[prefix+"N"] = strconv.Itoa(int(set.Spec.Replicas))
 	for i := 0; i < int(set.Spec.Replicas); i++ {
@@ -433,7 +432,7 @@ func buildEnvConfigData(set workloads.StatefulReplicaSet) map[string]string {
 		envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
 	}
 
-	// build consensus env from set.Status.MembersStatus
+	// build member related envs from set.Status.MembersStatus
 	followers := ""
 	for _, memberStatus := range set.Status.MembersStatus {
 		if memberStatus.PodName == "" || memberStatus.PodName == defaultPodName {
@@ -456,7 +455,7 @@ func buildEnvConfigData(set workloads.StatefulReplicaSet) map[string]string {
 	// set owner uid to let pod know if the owner is recreated
 	uid := string(set.UID)
 	envData[prefix+"OWNER_UID"] = uid
-	envData[constant.KBPrefix+"_CONSENSUS_SET_OWNER_UID_SUFFIX8"] = uid[len(uid)-4:]
+	envData[prefix+"OWNER_UID_SUFFIX8"] = uid[len(uid)-4:]
 
 	return envData
 }

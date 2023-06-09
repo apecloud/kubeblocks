@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package consensusset
+package statefulreplicaset
 
 import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -31,11 +31,11 @@ type initTransformer struct {
 
 func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	// init context
-	transCtx, _ := ctx.(*CSSetTransformContext)
-	transCtx.CSSet, transCtx.OrigCSSet = t.StatefulReplicaSet, t.StatefulReplicaSet.DeepCopy()
+	transCtx, _ := ctx.(*SRSTransformContext)
+	transCtx.srs, transCtx.srsOrig = t.StatefulReplicaSet, t.StatefulReplicaSet.DeepCopy()
 
 	// init dag
-	model.PrepareStatus(dag, transCtx.OrigCSSet, transCtx.CSSet)
+	model.PrepareStatus(dag, transCtx.srsOrig, transCtx.srs)
 	return nil
 }
 

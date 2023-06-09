@@ -15,7 +15,10 @@ data:
     idx=${KB_POD_NAME##*-}
     host=$(eval echo \$KB_MYSQL_"$idx"_HOSTNAME)
     echo "host=$host"
-    if [ -z "$leader" -o "$KB_POD_NAME" = "$leader" ]; then
+    if [ -z "$leader" ] || [ "$KB_POD_NAME" = "$leader" ] || [ ! -f "/data/mysql/data/.restore" ]; then
+      if [ ! -f "/data/mysql/data/.restore" ]; then
+        echo ".restore file not exists, it's not a scale-out."
+      fi
       echo "no leader or self is leader, no need to call add."
     else 
       leader_idx=${leader##*-}

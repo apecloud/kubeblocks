@@ -16,3 +16,5 @@ spec:
     systemAccountSpec:
       cmdExecutorConfig:
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+    switchoverSpec:
+      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}

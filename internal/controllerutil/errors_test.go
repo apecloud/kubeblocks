@@ -49,6 +49,38 @@ func TestNerErrorf(t *testing.T) {
 	}
 }
 
+func TestNewErrors(t *testing.T) {
+	backupNotSupported := NewBackupNotSupported("datafile", "policy-test")
+	if !IsTargetError(backupNotSupported, ErrorTypeBackupNotSupported) {
+		t.Error("should be error of BackupNotSupported")
+	}
+	pvTemplateNotFound := NewBackupPVTemplateNotFound("configName", "default")
+	if !IsTargetError(pvTemplateNotFound, ErrorTypeBackupPVTemplateNotFound) {
+		t.Error("should be error of BackupPVTemplateNotFound")
+	}
+	pvsIsEmpty := NewBackupPVCNameIsEmpty("policy-test1")
+	if !IsTargetError(pvsIsEmpty, ErrorTypeBackupPVCNameIsEmpty) {
+		t.Error("should be error of BackupPVCNameIsEmpty")
+	}
+	jobFailed := NewBackupJobFailed("jobName")
+	if !IsTargetError(jobFailed, ErrorTypeBackupJobFailed) {
+		t.Error("should be error of BackupJobFailed")
+	}
+}
+
+func TestUnwrapControllerError(t *testing.T) {
+	backupNotSupported := NewBackupNotSupported("datafile", "policy-test")
+	newErr := UnwrapControllerError(backupNotSupported)
+	if newErr == nil {
+		t.Error("should unwrap a controller error, but got nil")
+	}
+	err := errors.New("test error")
+	newErr = UnwrapControllerError(err)
+	if newErr != nil {
+		t.Errorf("should not unwrap a controller error, but got: %v", newErr)
+	}
+}
+
 func TestIsTargetError(t *testing.T) {
 	var err1 error
 	if IsTargetError(err1, ErrorWaitCacheRefresh) {

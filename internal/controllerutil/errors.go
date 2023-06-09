@@ -89,8 +89,8 @@ func IsTargetError(err error, errorType ErrorType) bool {
 	return false
 }
 
-// ToControllerError converts the error to the Controller error.
-func ToControllerError(err error) *Error {
+// UnwrapControllerError unwraps the Controller error from target error.
+func UnwrapControllerError(err error) *Error {
 	if tmpErr, ok := err.(*Error); ok || errors.As(err, &tmpErr) {
 		return tmpErr
 	}

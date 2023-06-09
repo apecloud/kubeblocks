@@ -101,7 +101,7 @@ func sendWarningEventWithError(
 	if err == nil || intctrlutil.IsRequeueError(err) {
 		return
 	}
-	controllerErr := intctrlutil.ToControllerError(err)
+	controllerErr := intctrlutil.UnwrapControllerError(err)
 	if controllerErr != nil {
 		reason = string(controllerErr.Type)
 	}

@@ -77,7 +77,7 @@ func getConditionReasonWithError(defaultReason string, err error) string {
 	if err == nil {
 		return defaultReason
 	}
-	controllerErr := intctrlutil.ToControllerError(err)
+	controllerErr := intctrlutil.UnwrapControllerError(err)
 	if controllerErr != nil {
 		defaultReason = string(controllerErr.Type)
 	}

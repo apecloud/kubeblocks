@@ -33,7 +33,7 @@ jobs:
 
   release-chart:
     needs: chart-version
-    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.6.1
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.0
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "${{ needs.chart-version.outputs.chart-version }}"
@@ -41,6 +41,7 @@ jobs:
       CHART_DIR: "deploy/helm"
       DEP_CHART_DIR: "deploy/helm/depend-charts"
       DEP_REPO: "helm dep update deploy/delphic"
+      APECD_REF: "v0.1.0"
     secrets: inherit
 
   send-message:
@@ -57,6 +58,7 @@ jobs:
           fi
           
           bash .github/utils/utils.sh --type 12 \
+            --tag-name ${{ env.RELEASE_VERSION }} \
             --content "${CONTENT}"\
             --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

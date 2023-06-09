@@ -1,128 +1,171 @@
 ---
 title: Create and connect to a PostgreSQL Cluster
 description: How to create and connect to a PostgreSQL cluster
+keywords: [postgresql, create a postgresql cluster, connect to a postgresql cluster]
 sidebar_position: 1
 sidebar_label: Create and connect
 ---
 
-# Create and connect to a PostgreSQL Cluster
-## Create a PostgreSQL Cluster
+# Create and connect to a PostgreSQL cluster
+
+This document shows how to create and connect to a PostgreSQL cluster.
+
+## Create a PostgreSQL cluster
 
 ### Before you start
 
-* `kbcli`: Install `kbcli` on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
-  1. Run the command below to install `kbcli`.
-   ```bash
-   curl -fsSL https://www.kubeblocks.io/installer/install_cli.sh | bash
-   ```
-  2. Run the command below to check the version and verify whether `kbcli` is installed successfully.
-   ```bash
-   kbcli version
-   ```
-* KubeBlocks: Install KubeBlocks on your host. Refer to [Install/Uninstall kbcli and KubeBlocks](./../../installation/install-and-uninstall-kbcli-and-kubeblocks.md) for details.
-  1. Run the command below to install KubeBlocks.
-     ```bash
-     kbcli kubeblocks install
-     ```
-
-     :::note
-
-     If you want to specify a namespace for KubeBlocks, use `--namespace` or the abbreviated `-n` to name your namespace and configure `--create-namespace` as `true` to create a namespace if it does not exist. For example,
-     ```bash
-     kbcli kubeblocks install -n kubeblocks --create-namespace=true
-     ```
-
-     :::
-
-  2. Run the command below to verify whether KubeBlocks is installed successfully.
-     ```bash
-     kubectl get pod
-     ```
-
-     ***Result***
-
-     Four pods starting with `kubeblocks` are displayed. For example,
-     ```
-     NAME                                                  READY   STATUS    RESTARTS   AGE
-     kubeblocks-7d4c6fd684-9hjh7                           1/1     Running   0          3m33s
-     kubeblocks-grafana-b765d544f-wj6c6                    3/3     Running   0          3m33s
-     kubeblocks-prometheus-alertmanager-7c558865f5-hsfn5   2/2     Running   0          3m33s
-     kubeblocks-prometheus-server-5c89c8bc89-mwrx7         2/2     Running   0          3m33s
-     ```
-* Run the command below to view all the database types available for creating a cluster. 
+* [Install kbcli](./../../installation/install-kbcli.md).
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* Make sure the PostgreSQL add-on is installed and enabled with `kbcli addon list`.
+  
   ```bash
-  kbcli clusterdefinition list
+  kbcli addon list
+  >
+  NAME                           TYPE   STATUS     EXTRAS         AUTO-INSTALL   INSTALLABLE-SELECTOR
+  ...
+  postgresql                     Helm   Enabled                   true
+  ...
   ```
 
-### Steps
+* View all the database types and versions available for creating a cluster.
 
-1. Run the command below to list all the available kernel versions and choose the one that you need.
+  ```bash
+  kbcli clusterversion list
+  ```
+
+### (Recommended) Create a cluster on a tainted node
+
+In actual scenarios, you are recommended to create a cluster on nodes with taints and customized specifications.
+
+1. Taint your node.
+
+   :::note
+
+   If you have already some tainted nodes, you can skip this step.
+
+   :::
+
+   1. Get Kubernetes nodes.
+
+      ```bash
+      kubectl get node
+      ```
+
+   2. Place taints on the selected nodes.
+
+      ```bash
+      kubectl taint nodes <nodename> <taint1name>=true:NoSchedule
+      kubectl taint nodes <nodename> <taint2name>=true:NoSchedule
+      ```
+
+2. Create a PostgreSQL cluster.
+
+   The cluster creation command is simply `kbcli cluster create`. Use tolerances to deploy it on the tainted node. Further, you can customize your cluster resources as demanded.
+
+   The following example shows how to use `--set` to create a cluster with customized resources and add all taints on the current node in the `--toleration` flag to tolerate them.
+
    ```bash
-   kbcli clusterversion list
+   kbcli cluster create pg-cluster --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"' --cluster-definition=postgresql --set cpu=2,memory=2Gi,replicas=2,storage=20Gi,storageClass=<storageclassname> --namespace <name>
    ```
 
-2. Run the command below to create a PostgreSQL cluster.
+  Or change the corresponding parameters in the YAML file.
+
    ```bash
-   kbcli cluster create pg-cluster --cluster-definition='postgresql'
-   ```
-   ***Result***
-
-   * A cluster then is created in the default namespace. You can specify a namespace for your cluster by using `--namespace` or the abbreviated `-n` option. For example,
-
-     ```bash
-     kubectl create namespace demo
-
-     kbcli cluster create -n demo --cluster-definition='postgresql'
-     ```
-   * A cluster is created with built-in toleration which tolerates the node with the `kb-data=true:NoSchedule` taint.
-   * A cluster is created with built-in node affinity which first deploys the node with the `kb-data:true` label.
-   * For configuring pod affinity for a cluster, refer to [Configure pod affinity for database cluster](../../resource-scheduling/resource-scheduling.md).
-  
-   To create a cluster with specified parameters, follow the steps below, and you have three options.
-
-   **Option 1.** (**Recommended**) Use `--set` option
-   
-    Add the `--set` option when creating a cluster. For example,
-    ```bash
-    kbcli cluster create pg-cluster --cluster-definition postgresql --set cpu=1000m,memory=1Gi,storage=10Gi
-    ```
-
-   **Option 2.** Change YAML file configurations
-
-   Change the corresponding parameters in the YAML file.
-   ```bash
-   kbcli cluster create pg-cluster --cluster-definition="postgresql" --set-file -<<EOF
-   - name: postgresql
-     replicas: 1
+   kbcli cluster create pg-cluster --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"' --cluster-definition=postgresql --namespace <name> --set-file -<<EOF
+   - name: pg-cluster
+     replicas: 3
      componentDefRef: postgresql
      volumeClaimTemplates:
      - name: data
        spec:
+         storageClassName: <storageclassname>
          accessModes:
          - ReadWriteOnce
          resources:
            requests:
-             storage: 20Gi
+             cpu: 2000m
+             memory: 2Gi
+             storage: 10Gi
    EOF
    ```
 
-### kbcli cluster create options description
+See the table below for the detailed descriptions for customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.
 
-| Option   | Description      |
-| :--      | :--              |
-| `--cluster-definition` | It specifies the cluster definition. Run `kbcli cd list` to show all available cluster definitions. |
-| `--cluster-version` | It specifies the cluster version. Run `kbcli cv list` to show all available cluster versions. If you do not specify a cluster version when creating a cluster, the latest version is used by default. |
-| `--enable-all-logs` | It enables you to view all application logs. When this option is enabled, enabledLogs of component level will be ignored. This option is set as true by default. |
-| `--help` | It shows the help guide for `kbcli cluster create`. You can also use the abbreviated `-h`. |
-| `--monitor` | It is used to enable the monitor function and inject metrics exporter. It is set as true by default. |
-| `--node-labels` | It is a node label selector. Its default value is [] and means empty value. If you want set node labels, you can follow the example format: <br />```kbcli cluster create --cluster-definition='postgresql' --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'``` |
-| `--set` | It sets the cluster resource including CPU, memory, and storage, each set corresponds to a component. For example, `--set cpu=1000m,memory=1Gi,storage=10Gi`. |
-| `--set-file` | It uses a yaml file, URL, or stdin to set the cluster resource. |
-| `--termination-policy` | It specifies the termination policy of the cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
+📎 Table 1. kbcli cluster create flags description
+
+| Option                 | Description             |
+|:-----------------------|:------------------------|
+| `--cluster-definition` | It specifies the cluster definition. You can choose a database type. Run `kbcli cd list` to show all available cluster definitions.   |
+| `--cluster-version`    | It specifies the cluster version. Run `kbcli cv list` to show all available cluster versions. If you do not specify a cluster version when creating a cluster, the latest version is applied by default.  |
+| `--enable-all-logs`    | It enables you to view all application logs. When this function is enabled, enabledLogs of component level will be ignored. For logs settings, refer to [Access Logs](./../../observability/access-logs.md).  |
+| `--help`               | It shows the help guide for `kbcli cluster create`. You can also use the abbreviated `-h`. |
+| `--monitor`            | It is used to enable the monitor function and inject metrics exporter. It is set as true by default. |
+| `--node-labels`        | It is a node label selector. Its default value is [] and means empty value. If you want to set node labels, you can follow the example format: <br />`kbcli cluster create pg-cluster --cluster-definition=postgresql --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'`  |
+| `--set`                | It sets the cluster resource including CPU, memory, replicas, and storage, ang each set corresponds to a component. For example, `--set cpu=1000m,memory=1Gi,replicas=1,storage=10Gi`.  |
+| `--set-file`           | It uses a yaml file, URL, or stdin to set the cluster resource. |
+| `--termination-policy` | It specifies how a cluster is deleted. Set the policy when creating a cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
+
+If no flags are used and no information specified, you create a PostgreSQL cluster with default settings.
+
+```bash
+kbcli cluster create pg-cluster --cluster-definition=postgresql --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"' 
+```
+
+### Create a cluster on a node without taints
+
+The cluster creation command is simply `kbcli cluster create`. Further, you can customize your cluster resources as demanded by using the `--set` flag.
+
+```bash
+kbcli cluster create pg-cluster --cluster-definition=postgresql --namespace <name> --set cpu=2,memory=2Gi,replicas=2,storage=20Gi,storageClass=<storageclassname>
+```
+
+Or you can directly change the corresponding parameters in the YAML file.
+
+```bash
+kbcli cluster create pg-cluster  --cluster-definition=postgresql --namespace <name> --set-file -<<EOF
+- name: pg-cluster
+  replicas: 3
+  componentDefRef: postgresql
+  volumeClaimTemplates:
+  - name: data
+    spec:
+      storageClassName: <storageclassname>
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+          storage: 10Gi
+EOF
+```
+
+See the table below for detailed descriptions of customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.
+
+📎 Table 2. kbcli cluster create flags description
+
+| Option                 | Description             |
+|:-----------------------|:------------------------|
+| `--cluster-definition` | It specifies the cluster definition, choose the database type. Run `kbcli cd list` to show all available cluster definitions.   |
+| `--cluster-version`    | It specifies the cluster version. Run `kbcli cv list` to show all available cluster versions. If you do not specify a cluster version when creating a cluster, the latest version is applied by default.  |
+| `--enable-all-logs`    | It enables you to view all application logs. When this function is enabled, enabledLogs of component level will be ignored. For logs settings, refer to [Access Logs](./../../observability/access-logs.md).  |
+| `--help`               | It shows the help guide for `kbcli cluster create`. You can also use the abbreviated `-h`. |
+| `--monitor`            | It is used to enable the monitor function and inject metrics exporter. It is set as true by default. |
+| `--node-labels`        | It is a node label selector. Its default value is [] and means empty value. If you want set node labels, you can follow the example format: <br />`kbcli cluster create pg-cluster --cluster-definition=postgresql --node-labels='"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'`  |
+| `--set`                | It sets the cluster resource including CPU, memory, replicas, and storage, each set corresponds to a component. For example, `--set cpu=1000m,memory=1Gi,replicas=1,storage=10Gi`.  |
+| `--set-file`           | It uses a yaml file, URL, or stdin to set the cluster resource. |
+| `--termination-policy` | It specifies how a cluster is deleted. Set the policy when creating a cluster. There are four available values, namely `DoNotTerminate`, `Halt`, `Delete`, and `WipeOut`. `Delete` is set as the default. <br /> - `DoNotTerminate`: DoNotTerminate blocks the delete operation. <br /> - `Halt`: Halt deletes workload resources such as statefulset, deployment workloads but keeps PVCs. <br /> - `Delete`: Delete is based on Halt and deletes PVCs. <br /> - `WipeOut`: WipeOut is based on Delete and wipes out all volume snapshots and snapshot data from backup storage location. |
+
+If no flags are used and no information is specified, you create a PostgreSQL cluster with default settings.
+
+```bash
+kbcli cluster create pg-cluster --cluster-definition=postgresql
+```
 
 ## Connect to a PostgreSQL Cluster
 
-Run the command below to connect to a cluster. For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).
 ```bash
-kbcli cluster connect pg-cluster
+kbcli cluster connect <clustername>  --namespace <name>
 ```
+
+For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).

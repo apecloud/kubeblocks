@@ -380,7 +380,7 @@ func (r *BackupPolicyReconciler) reconcileCronJob(reqCtx intctrlutil.RequestCtx,
 	return r.Client.Patch(reqCtx.Ctx, cronJob, patch)
 }
 
-// handlePolicy the common function to handle backup policy.
+// handlePolicy handles backup policy.
 func (r *BackupPolicyReconciler) handlePolicy(reqCtx intctrlutil.RequestCtx,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
 	basePolicy dataprotectionv1alpha1.BasePolicy,
@@ -492,7 +492,7 @@ func (r *BackupPolicyReconciler) reconfigure(reqCtx intctrlutil.RequestCtx,
 	if commonSchedule != nil {
 		enable = commonSchedule.Enable
 	}
-	if backupPolicy.Annotations[constant.LastAppliedConfigAnnotation] == "" && !enable {
+	if backupPolicy.Annotations[constant.LastAppliedConfigAnnotationKey] == "" && !enable {
 		// disable in the first policy created, no need reconfigure because default configs had been set.
 		return nil
 	}
@@ -510,7 +510,7 @@ func (r *BackupPolicyReconciler) reconfigure(reqCtx intctrlutil.RequestCtx,
 	}
 	updateParameterPairsBytes, _ := json.Marshal(parameters)
 	updateParameterPairs := string(updateParameterPairsBytes)
-	if updateParameterPairs == backupPolicy.Annotations[constant.LastAppliedConfigAnnotation] {
+	if updateParameterPairs == backupPolicy.Annotations[constant.LastAppliedConfigAnnotationKey] {
 		// reconcile the config job if finished
 		return r.reconcileReconfigure(reqCtx, backupPolicy)
 	}
@@ -553,11 +553,11 @@ func (r *BackupPolicyReconciler) reconfigure(reqCtx intctrlutil.RequestCtx,
 	if backupPolicy.Annotations == nil {
 		backupPolicy.Annotations = map[string]string{}
 	}
-	backupPolicy.Annotations[constant.LastAppliedConfigAnnotation] = updateParameterPairs
+	backupPolicy.Annotations[constant.LastAppliedConfigAnnotationKey] = updateParameterPairs
 	if err := r.Client.Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
 		return err
 	}
-	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting ops %s finished.", ops.Name)
+	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for ops %s finished.", ops.Name)
 }
 
 func (r *BackupPolicyReconciler) reconcileReconfigure(reqCtx intctrlutil.RequestCtx,
@@ -577,7 +577,7 @@ func (r *BackupPolicyReconciler) reconcileReconfigure(reqCtx intctrlutil.Request
 		if latestOps.Status.Phase == appsv1alpha1.OpsFailedPhase {
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeReconfigureFailed, "ops failed %s", latestOps.Name)
 		} else if latestOps.Status.Phase != appsv1alpha1.OpsSucceedPhase {
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting ops %s finished.", latestOps.Name)
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for ops %s finished.", latestOps.Name)
 		}
 	}
 	return nil

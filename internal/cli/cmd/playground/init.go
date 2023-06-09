@@ -40,7 +40,6 @@ import (
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	cmdcluster "github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
-	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -53,7 +52,7 @@ import (
 var (
 	initLong = templates.LongDesc(`Bootstrap a kubernetes cluster and install KubeBlocks for playground.
 
-If no any cloud provider be specified, a k3d cluster named kb-playground will be created on local host,
+If no cloud provider is specified, a k3d cluster named kb-playground will be created on local host,
 otherwise a kubernetes cluster will be created on the specified cloud. Then KubeBlocks will be installed
 on the created kubernetes cluster, and an apecloud-mysql cluster named mycluster will be created.`)
 
@@ -62,7 +61,7 @@ on the created kubernetes cluster, and an apecloud-mysql cluster named mycluster
 		kbcli playground init
 
 		# create an AWS EKS cluster and install KubeBlocks, the region is required
-		kbcli playground init --cloud-provider aws --region cn-northwest-1
+		kbcli playground init --cloud-provider aws --region us-west-1
 
 		# create an Alibaba cloud ACK cluster and install KubeBlocks, the region is required
 		kbcli playground init --cloud-provider alicloud --region cn-hangzhou
@@ -285,7 +284,7 @@ func (o *initOptions) cloud() error {
 	return o.installKBAndCluster(clusterInfo)
 }
 
-// confirmToContinue confirms to continue init or not if there is an existed kubernetes cluster
+// confirmToContinue confirms to continue init process if there is an existed kubernetes cluster
 func (o *initOptions) confirmToContinue() error {
 	clusterName := o.prevCluster.ClusterName
 	if !o.autoApprove {
@@ -303,8 +302,7 @@ func (o *initOptions) confirmToContinue() error {
 
 func (o *initOptions) confirmInitNewKubeCluster() error {
 	printer.Warning(o.Out, `This action will create a kubernetes cluster on the cloud that may
-  incur charges. Be sure to delete your infrastructure promptly to avoid
-  additional charges. We are not responsible for any charges you may incur.
+  incur charges. Be sure to delete your infrastructure properly to avoid additional charges. 
 `)
 
 	fmt.Fprintf(o.Out, `
@@ -455,8 +453,8 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 			"csi-hostpath-driver.enabled=true",
 
 			// disable the persistent volume of prometheus, if not, the prometheus
-			// will dependent the hostpath csi driver ready to create persistent
-			// volume, but the order of addon installation is not guaranteed that
+			// will depend on the hostpath csi driver to create persistent
+			// volume, but the order of addon installation is not guaranteed which
 			// will cause the prometheus PVC pending forever.
 			"prometheus.server.persistentVolume.enabled=false",
 			"prometheus.server.statefulSet.enabled=false",
@@ -471,63 +469,62 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 	}
 
 	if err = insOpts.PreCheck(); err != nil {
+		// if the KubeBlocks has been installed, we ignore the error
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "repeated installation is not supported") {
+			fmt.Fprintf(o.Out, strings.Split(errMsg, ",")[0]+"\n")
+			return nil
+		}
 		return err
 	}
 	return insOpts.Install()
 }
 
-// createCluster construct a cluster create options and run
+// createCluster constructs a cluster create options and run
 func (o *initOptions) createCluster() error {
-	options := &cmdcluster.CreateOptions{
-		CreateOptions: create.CreateOptions{
-			Factory:         util.NewFactory(),
-			IOStreams:       genericclioptions.NewTestIOStreamsDiscard(),
-			Namespace:       defaultNamespace,
-			Name:            kbClusterName,
-			CueTemplateName: cmdcluster.CueTemplateName,
-			GVR:             types.ClusterGVR(),
-		},
-		UpdatableFlags: cmdcluster.UpdatableFlags{
-			TerminationPolicy: "WipeOut",
-			Monitor:           true,
-			PodAntiAffinity:   "Preferred",
-			Tenancy:           "SharedNode",
-		},
-		ClusterDefRef:     o.clusterDef,
-		ClusterVersionRef: o.clusterVersion,
+	c := cmdcluster.NewCreateOptions(util.NewFactory(), genericclioptions.NewTestIOStreamsDiscard())
+	c.ClusterDefRef = o.clusterDef
+	c.ClusterVersionRef = o.clusterVersion
+	c.Namespace = defaultNamespace
+	c.Name = kbClusterName
+	c.UpdatableFlags = cmdcluster.UpdatableFlags{
+		TerminationPolicy: "WipeOut",
+		Monitor:           true,
+		PodAntiAffinity:   "Preferred",
+		Tenancy:           "SharedNode",
 	}
-	options.CreateOptions.Options = options
-	options.CreateOptions.PreCreate = options.PreCreate
 
 	// if we are running on local, create cluster with one replica
 	if o.cloudProvider == cp.Local {
-		options.Values = append(options.Values, "replicas=1")
+		c.Values = append(c.Values, "replicas=1")
 	} else {
 		// if we are running on cloud, create cluster with three replicas
-		options.Values = append(options.Values, "replicas=3")
+		c.Values = append(c.Values, "replicas=3")
 	}
 
-	if err := options.CreateOptions.Complete(); err != nil {
+	if err := c.CreateOptions.Complete(); err != nil {
 		return err
 	}
-	if err := options.Validate(); err != nil {
+	if err := c.Validate(); err != nil {
 		return err
 	}
-	if err := options.Complete(); err != nil {
+	if err := c.Complete(); err != nil {
 		return err
 	}
-	return options.Run()
+	return c.Run()
 }
 
-// checkExistedCluster check playground kubernetes cluster exists or not, playground
-// only supports one kubernetes cluster exists at the same time
+// checkExistedCluster checks playground kubernetes cluster exists or not, a kbcli client only
+// support a single playground, they are bound to each other with a hidden context config file,
+// the hidden file ensures that when destroy the playground it always goes with the fixed context,
+// it makes the dangerous operation more safe and prevents from manipulating another context
 func (o *initOptions) checkExistedCluster() error {
 	if o.prevCluster == nil {
 		return nil
 	}
 
-	warningMsg := fmt.Sprintf("playground only supports one kubernetes cluster at the same time,\n  one cluster already existed, please destroy it first.\n%s\n", o.prevCluster.String())
-	// if cloud provider is not same with the exited cluster cloud provider, informer
+	warningMsg := fmt.Sprintf("playground only supports one kubernetes cluster,\n  if a cluster is already existed, please destroy it first.\n%s\n", o.prevCluster.String())
+	// if cloud provider is not same with the existed cluster cloud provider, suggest
 	// user to destroy the previous cluster first
 	if o.prevCluster.CloudProvider != o.cloudProvider {
 		printer.Warning(o.Out, warningMsg)
@@ -539,7 +536,7 @@ func (o *initOptions) checkExistedCluster() error {
 	}
 
 	// previous kubernetes cluster is a cloud provider cluster, check if the region
-	// is same with the new cluster region, if not, informer user to destroy the previous
+	// is same with the new cluster region, if not, suggest user to destroy the previous
 	// cluster first
 	if o.prevCluster.Region != o.region {
 		printer.Warning(o.Out, warningMsg)

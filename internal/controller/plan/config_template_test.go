@@ -155,7 +155,7 @@ single_thread_memory = 294912
 		component = &ctrlcomp.SynthesizedComponent{
 			ClusterDefName: "mysql-three-node-definition",
 			Name:           "replicasets",
-			Type:           "replicasets",
+			CompDefName:    "replicasets",
 			Replicas:       5,
 		}
 		cfgTemplate = []appsv1alpha1.ComponentConfigSpec{{
@@ -182,8 +182,7 @@ single_thread_memory = 294912
 				},
 				nil, nil, nil)
 
-			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(
-				podSpec, cfgTemplate, component, nil)).Should(BeNil())
+			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, nil)).Should(BeNil())
 
 			cfgBuilder.componentValues.Resource = &ResourceDefinition{
 				MemorySize: 8 * 1024 * 1024 * 1024,

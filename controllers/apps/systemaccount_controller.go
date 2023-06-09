@@ -22,6 +22,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/spf13/viper"
@@ -29,19 +30,19 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/sqlchannel"
@@ -50,9 +51,8 @@ import (
 // SystemAccountReconciler reconciles a SystemAccount object.
 type SystemAccountReconciler struct {
 	client.Client
-	Scheme         *runtime.Scheme
-	Recorder       record.EventRecorder
-	SecretMapStore *secretMapStore
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // componentUniqueKey is used internally to uniquely identify a component, by namespace-clusterName-componentName.
@@ -86,11 +86,13 @@ const (
 
 // ENABLE_DEBUG_SYSACCOUNTS is used for debug only.
 const (
-	systemAccountsDebugMode string = "ENABLE_DEBUG_SYSACCOUNTS"
+	systemAccountsDebugMode       string = "ENABLE_DEBUG_SYSACCOUNTS"
+	systemAccountPasswdAnnotation string = "passwd"
+	systemAccountjobPrefix               = "sysacc"
 )
 
 var (
-	// systemAccountLog is a logger for use during runtime
+	// systemAccountLog is a logger during runtime
 	systemAccountLog logr.Logger
 )
 
@@ -134,7 +136,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	}
 	// cluster is under deletion, do nothing
 	if !cluster.GetDeletionTimestamp().IsZero() {
-		reqCtx.Log.Info("Cluster is under deletion.", "cluster", req.NamespacedName)
+		reqCtx.Log.V(1).Info("Cluster is under deletion.", "cluster", req.NamespacedName)
 		return intctrlutil.Reconciled()
 	}
 
@@ -157,7 +159,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	componentVersions := clusterVersion.Spec.GetDefNameMappingComponents()
 
-	// process accounts per component
+	// process accounts for each component
 	processAccountsForComponent := func(compDef *appsv1alpha1.ClusterComponentDefinition, compDecl *appsv1alpha1.ClusterComponentSpec,
 		svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints) error {
 		var (
@@ -176,11 +178,15 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 		// expectations: collect accounts from default setting, cluster and cluster definition.
 		toCreate = getDefaultAccounts()
+		reqCtx.Log.V(1).Info("accounts to create", "cluster", req.NamespacedName, "accounts", toCreate)
+
 		// facts: accounts have been created, in form of k8s secrets.
 		if detectedK8SFacts, err = r.getAccountFacts(reqCtx, compKey); err != nil {
 			reqCtx.Log.Error(err, "failed to get secrets")
 			return err
 		}
+		reqCtx.Log.V(1).Info("detected k8s facts", "cluster", req.NamespacedName, "accounts", detectedK8SFacts)
+
 		// toCreate = account to create - account exists
 		// (toCreate \intersect detectedEngineFacts) means the set of account exists in engine but not in k8s, and should be updated or altered, not re-created.
 		toCreate &= toCreate ^ detectedK8SFacts
@@ -193,6 +199,7 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			reqCtx.Log.Error(err, "failed to get accounts", "cluster", cluster.Name, "component", compDecl.Name)
 			// we don't return error here, because we can still create accounts in k8s and will give it a try.
 		}
+		reqCtx.Log.V(1).Info("detected database facts", "cluster", req.NamespacedName, "accounts", detectedEngineFacts)
 
 		// replace KubeBlocks ENVs.
 		replaceEnvsValues(cluster.Name, compDef.SystemAccounts)
@@ -216,11 +223,12 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 					completeExecConfig(execConfig, componentVersions[compDef.Name])
 					engine = newCustomizedEngine(execConfig, cluster, compDecl.Name)
 				}
+				reqCtx.Log.V(1).Info("create account by stmt", "cluster", req.NamespacedName, "account", account.Name, "strategy", strategy)
 				if err := r.createByStmt(reqCtx, cluster, compDef, compKey, engine, account, svcEP, headlessEP, strategy); err != nil {
 					return err
 				}
 			case appsv1alpha1.ReferToExisting:
-				if err := r.createByReferingToExisting(reqCtx, cluster, compKey, account); err != nil {
+				if err := r.createByReferringToExisting(reqCtx, cluster, compKey, account); err != nil {
 					return err
 				}
 			}
@@ -265,11 +273,10 @@ func (r *SystemAccountReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *SystemAccountReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.SecretMapStore = newSecretMapStore()
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1alpha1.Cluster{}, r.clusterDeletionHander()).
+		For(&appsv1alpha1.Cluster{}).
 		Owns(&corev1.Secret{}).
-		Watches(&source.Kind{Type: &batchv1.Job{}}, r.jobCompletionHander()).
+		Watches(&source.Kind{Type: &batchv1.Job{}}, r.jobCompletionHandler()).
 		Complete(r)
 }
 
@@ -280,41 +287,47 @@ func (r *SystemAccountReconciler) createByStmt(reqCtx intctrlutil.RequestCtx,
 	engine *customizedEngine,
 	account appsv1alpha1.SystemAccountConfig,
 	svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints, strategy updateStrategy) error {
-	// render statements
-	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 	policy := account.ProvisionPolicy
 
-	stmts, secret := getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account, strategy)
-
-	uprefErr := controllerutil.SetControllerReference(cluster, secret, scheme)
-	if uprefErr != nil {
-		return uprefErr
+	generateJobName := func() string {
+		// render a job object, named after account name
+		randSuffix := rand.String(5)
+		fullJobName := strings.Join([]string{systemAccountjobPrefix, compKey.clusterName, compKey.componentName, string(account.Name), randSuffix}, "-")
+		if len(fullJobName) > 63 {
+			return systemAccountjobPrefix + "-" + string(account.Name) + "-" + randSuffix
+		} else {
+			return fullJobName
+		}
 	}
 
+	stmts, passwd := getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account, strategy)
+
 	for _, ep := range retrieveEndpoints(policy.Scope, svcEP, headlessEP) {
-		// render a job object
-		job := renderJob(engine, compKey, stmts, ep)
-		// before create job, we adjust job's attributes, such as labels, tolerations w.r.t cluster info.
+		job := renderJob(generateJobName(), engine, compKey, stmts, ep)
+		controllerutil.AddFinalizer(job, constant.DBClusterFinalizerName)
+		if job.Annotations == nil {
+			job.Annotations = map[string]string{}
+		}
+		job.Annotations[systemAccountPasswdAnnotation] = passwd
+
+		// before creating job, we adjust job's attributes, such as labels, tolerations w.r.t cluster info.
 		if err := calibrateJobMetaAndSpec(job, cluster, compKey, account.Name); err != nil {
 			return err
 		}
 		// update owner reference
-		if err := controllerutil.SetControllerReference(cluster, job, scheme); err != nil {
+		if err := controllerutil.SetControllerReference(cluster, job, r.Scheme); err != nil {
 			return err
 		}
 		// create job
 		if err := r.Client.Create(reqCtx.Ctx, job); err != nil {
 			return err
 		}
+		reqCtx.Log.V(1).Info("created job", "job", job.Name, "passwd", passwd)
 	}
-	// push secret to global SecretMapStore, and secret will not be created until job succeeds.
-	key := concatSecretName(compKey, (string)(account.Name))
-	return r.SecretMapStore.addSecret(key, secret)
+	return nil
 }
 
-func (r *SystemAccountReconciler) createByReferingToExisting(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, key componentUniqueKey, account appsv1alpha1.SystemAccountConfig) error {
-	scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-
+func (r *SystemAccountReconciler) createByReferringToExisting(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, key componentUniqueKey, account appsv1alpha1.SystemAccountConfig) error {
 	// get secret
 	secret := &corev1.Secret{}
 	secretRef := account.ProvisionPolicy.SecretRef
@@ -324,7 +337,7 @@ func (r *SystemAccountReconciler) createByReferingToExisting(reqCtx intctrlutil.
 	}
 	// and make a copy of it
 	newSecret := renderSecretByCopy(key, (string)(account.Name), secret)
-	if uprefErr := controllerutil.SetControllerReference(cluster, newSecret, scheme); uprefErr != nil {
+	if uprefErr := controllerutil.SetControllerReference(cluster, newSecret, r.Scheme); uprefErr != nil {
 		return uprefErr
 	}
 
@@ -342,16 +355,16 @@ func (r *SystemAccountReconciler) isComponentReady(reqCtx intctrlutil.RequestCtx
 	headlessEP := &corev1.Endpoints{}
 	headlessSvcName := serviceName + "-headless"
 
-	svcerr := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: serviceName}, svcEP)
-	if svcerr != nil {
-		return false, nil, nil, svcerr
+	svcErr := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: serviceName}, svcEP)
+	if svcErr != nil {
+		return false, nil, nil, svcErr
 	}
 
 	headlessSvcErr := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: reqCtx.Req.Namespace, Name: headlessSvcName}, headlessEP)
 	if headlessSvcErr != nil {
 		return false, nil, nil, headlessSvcErr
 	}
-	// either service or endpoints is not ready.
+	// Neither service nor endpoints is ready.
 	if len(svcEP.Subsets) == 0 || len(headlessEP.Subsets) == 0 {
 		return false, nil, nil, nil
 	}
@@ -364,7 +377,7 @@ func (r *SystemAccountReconciler) isComponentReady(reqCtx intctrlutil.RequestCtx
 	return true, svcEP, headlessEP, nil
 }
 
-// getAccountFacts parse secrets for given cluster as facts, i.e., accounts created
+// getAccountFacts parses secrets for given cluster as facts, i.e., accounts created
 // TODO: @shanshan, should verify accounts on database cluster as well.
 func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx, key componentUniqueKey) (appsv1alpha1.KBAccountType, error) {
 	// get account facts, i.e., secrets created
@@ -382,11 +395,12 @@ func (r *SystemAccountReconciler) getAccountFacts(reqCtx intctrlutil.RequestCtx,
 	}
 
 	detectedFacts := getAccountFacts(secrets, jobs)
+	reqCtx.Log.V(1).Info("Detected account facts", "facts", detectedFacts)
 	return detectedFacts, nil
 }
 
 func (r *SystemAccountReconciler) getEngineFacts(reqCtx intctrlutil.RequestCtx, key componentUniqueKey) (appsv1alpha1.KBAccountType, error) {
-	// get pods for this cluster-component, by lable
+	// get pods for this cluster-component, by label
 	ml := getLabelsForSecretsAndJobs(key)
 	pods := &corev1.PodList{}
 	if err := r.Client.List(reqCtx.Ctx, pods, client.InNamespace(key.namespace), ml); err != nil {
@@ -416,12 +430,12 @@ func (r *SystemAccountReconciler) getEngineFacts(reqCtx intctrlutil.RequestCtx, 
 	}
 	accountsID := appsv1alpha1.KBAccountInvalid
 	for _, acc := range accounts {
-		updateFacts((appsv1alpha1.AccountName(acc)), &accountsID)
+		updateFacts(appsv1alpha1.AccountName(acc), &accountsID)
 	}
 	return accountsID, nil
 }
 
-func (r *SystemAccountReconciler) jobCompletionHander() *handler.Funcs {
+func (r *SystemAccountReconciler) jobCompletionHandler() *handler.Funcs {
 	logger := systemAccountLog.WithName("jobCompletionHandler")
 
 	containsJobCondition := func(job batchv1.Job, jobConditions []batchv1.JobCondition,
@@ -434,105 +448,94 @@ func (r *SystemAccountReconciler) jobCompletionHander() *handler.Funcs {
 		return false
 	}
 
+	// check against a job to make sure it
+	// 1. works for sysaccount (by checking labels)
+	// 2. has completed (either successed or failed)
+	// 3. is under deletion (either by user or by TTL, where deletionTimestamp is set)
 	return &handler.Funcs{
-		DeleteFunc: func(e event.DeleteEvent, q workqueue.RateLimitingInterface) {
-			if e.Object == nil {
+		UpdateFunc: func(e event.UpdateEvent, q workqueue.RateLimitingInterface) {
+			var (
+				jobTerminated = false
+				job           *batchv1.Job
+				ok            bool
+			)
+
+			defer func() {
+				// prepare a patch by removing finalizer
+				if jobTerminated {
+					patch := client.MergeFrom(job.DeepCopy())
+					controllerutil.RemoveFinalizer(job, constant.DBClusterFinalizerName)
+					_ = r.Client.Patch(context.Background(), job, patch)
+				}
+			}()
+
+			if e.ObjectNew == nil {
 				return
 			}
 
-			job, ok := e.Object.(*batchv1.Job)
-			if !ok {
+			if job, ok = e.ObjectNew.(*batchv1.Job); !ok {
 				return
 			}
 
-			ml := job.ObjectMeta.Labels
-			accountName := ml[constant.ClusterAccountLabelKey]
-			clusterName := ml[constant.AppInstanceLabelKey]
-			componentName := ml[constant.KBAppComponentLabelKey]
+			if job.DeletionTimestamp != nil || job.Annotations == nil || job.Labels == nil {
+				return
+			}
+
+			accountName := job.ObjectMeta.Labels[constant.ClusterAccountLabelKey]
+			clusterName := job.ObjectMeta.Labels[constant.AppInstanceLabelKey]
+			componentName := job.ObjectMeta.Labels[constant.KBAppComponentLabelKey]
+
 			if len(accountName) == 0 || len(clusterName) == 0 || len(componentName) == 0 {
 				return
 			}
 
-			// job failed, reconcile
+			if containsJobCondition(*job, job.Status.Conditions, batchv1.JobFailed, corev1.ConditionTrue) {
+				logger.V(1).Info("job failed", "job", job.Name)
+				jobTerminated = true
+				return
+			}
+
 			if !containsJobCondition(*job, job.Status.Conditions, batchv1.JobComplete, corev1.ConditionTrue) {
 				return
 			}
 
-			// job for cluster-component-account succeeded
-			// create secret for this account
+			logger.V(1).Info("job succeeded", "job", job.Name)
+			jobTerminated = true
+			clusterKey := types.NamespacedName{Namespace: job.Namespace, Name: clusterName}
+			cluster := &appsv1alpha1.Cluster{}
+			if err := r.Client.Get(context.TODO(), clusterKey, cluster); err != nil {
+				logger.Error(err, "failed to get cluster", "cluster key", clusterKey)
+				return
+			}
+
 			compKey := componentUniqueKey{
 				namespace:     job.Namespace,
 				clusterName:   clusterName,
 				componentName: componentName,
 			}
 
-			key := concatSecretName(compKey, accountName)
-			entry, ok, err := r.SecretMapStore.getSecret(key)
-			if err != nil || !ok {
+			// get password from job
+			passwd := job.Annotations[systemAccountPasswdAnnotation]
+			secret := renderSecretWithPwd(compKey, accountName, passwd)
+			if err := controllerutil.SetControllerReference(cluster, secret, r.Scheme); err != nil {
+				logger.Error(err, "failed to set ownere reference for secret", "secret", secret.Name)
 				return
 			}
 
-			err = r.Client.Create(context.TODO(), entry.value)
-			if err != nil {
-				logger.Error(err, "failed to create secret, will try later", "secret key", key)
+			if err := r.Client.Create(context.TODO(), secret); err != nil {
+				logger.Error(err, "failed to create secret", "secret", secret.Name)
 				return
 			}
 
-			clusterKey := types.NamespacedName{Namespace: job.Namespace, Name: clusterName}
-			cluster := &appsv1alpha1.Cluster{}
-			if err := r.Client.Get(context.TODO(), clusterKey, cluster); err != nil {
-				logger.Error(err, "failed to get cluster", "cluster key", clusterKey)
-			} else {
-				r.Recorder.Eventf(cluster, corev1.EventTypeNormal, SysAcctCreate,
-					"Created Accounts for cluster: %s, component: %s, accounts: %s", cluster.Name, componentName, accountName)
-				// delete secret from cache store
-				if err = r.SecretMapStore.deleteSecret(key); err != nil {
-					logger.Error(err, "failed to delete secret by key", "secret key", key)
-				}
-			}
+			r.Recorder.Eventf(cluster, corev1.EventTypeNormal, SysAcctCreate,
+				"Created Accounts for cluster: %s, component: %s, accounts: %s", cluster.Name, componentName, accountName)
 		},
 	}
 }
 
-// Delete removes cached entries from SystemAccountReconciler.SecretMapStore
-func (r *SystemAccountReconciler) clusterDeletionHander() builder.Predicates {
-	logger := systemAccountLog.WithName("clusterDeletionHandler")
-	predicate := predicate.Funcs{
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			if e.Object == nil {
-				return false
-			}
-			cluster, ok := e.Object.(*appsv1alpha1.Cluster)
-			if !ok {
-				return false
-			}
-
-			// for each component from the cluster, delete cached secrets
-			for _, comp := range cluster.Spec.ComponentSpecs {
-				compKey := componentUniqueKey{
-					namespace:     cluster.Namespace,
-					clusterName:   cluster.Name,
-					componentName: comp.Name,
-				}
-				for _, accName := range getAllSysAccounts() {
-					key := concatSecretName(compKey, string(accName))
-					// delete left-over secrets, and ignore errors if it has been removed.
-					_, exists, err := r.SecretMapStore.getSecret(key)
-					if err != nil {
-						logger.Error(err, "failed to get secrets", "secret key", key)
-						continue
-					}
-					if !exists {
-						continue
-					}
-					err = r.SecretMapStore.deleteSecret(key)
-					if err != nil {
-						logger.Error(err, "failed to delete secrets", "secret key", key)
-					}
-				}
-			}
-			return false
-		},
-	}
-	return builder.WithPredicates(predicate)
+// existsOperations checks if the cluster is doing operations
+func existsOperations(cluster *appsv1alpha1.Cluster) bool {
+	opsRequestMap, _ := opsutil.GetOpsRequestSliceFromCluster(cluster)
+	_, isRestoring := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
+	return len(opsRequestMap) > 0 || isRestoring
 }

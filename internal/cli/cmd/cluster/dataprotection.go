@@ -54,7 +54,7 @@ import (
 
 var (
 	listBackupPolicyExample = templates.Examples(`
-		# list all backup policy
+		# list all backup policies
 		kbcli cluster list-backup-policy 
         
 		# using short cmd to list backup policy of the specified cluster 
@@ -68,20 +68,22 @@ var (
         kbcli cluster edit-bp <backup-policy-name>
 	`)
 	createBackupExample = templates.Examples(`
-		# create a backup
+		# create a backup, the default type is snapshot.
 		kbcli cluster backup mycluster
 
 		# create a snapshot backup
+		# create a snapshot of the cluster's persistent volume for backup
 		kbcli cluster backup mycluster --type snapshot
 
 		# create a datafile backup
+		# backup all files under the data directory and save them to the specified storage, only full backup is supported now.
 		kbcli cluster backup mycluster --type datafile
 
 		# create a backup with specified backup policy
-		kbcli cluster backup mycluster --backup-policy <backup-policy-name>
+		kbcli cluster backup mycluster --policy <backup-policy-name>
 	`)
 	listBackupExample = templates.Examples(`
-		# list all backup
+		# list all backups
 		kbcli cluster list-backups
 	`)
 	deleteBackupExample = templates.Examples(`
@@ -217,8 +219,8 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	}
 
 	cmd.Flags().StringVar(&o.BackupType, "type", "snapshot", "Backup type")
-	cmd.Flags().StringVar(&o.BackupName, "backup-name", "", "Backup name")
-	cmd.Flags().StringVar(&o.BackupPolicy, "backup-policy", "", "Backup policy name, this flag will be ignored when backup-type is snapshot")
+	cmd.Flags().StringVar(&o.BackupName, "name", "", "Backup name")
+	cmd.Flags().StringVar(&o.BackupPolicy, "policy", "", "Backup policy name, this flag will be ignored when backup-type is snapshot")
 
 	return cmd
 }
@@ -262,7 +264,7 @@ func printBackupList(o ListBackupOptions) error {
 	// sort the unstructured objects with the creationTimestamp in positive order
 	sort.Sort(unstructuredList(backupList.Items))
 	tbl := printer.NewTablePrinter(o.Out)
-	tbl.SetHeader("NAME", "CLUSTER", "TYPE", "STATUS", "TOTAL-SIZE", "DURATION", "CREATE-TIME", "COMPLETION-TIME")
+	tbl.SetHeader("NAME", "CLUSTER", "TYPE", "STATUS", "TOTAL-SIZE", "DURATION", "CREATE-TIME", "COMPLETION-TIME", "EXPIRATION")
 	for _, obj := range backupList.Items {
 		backup := &dataprotectionv1alpha1.Backup{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backup); err != nil {
@@ -284,14 +286,15 @@ func printBackupList(o ListBackupOptions) error {
 			continue
 		}
 		tbl.AddRow(backup.Name, clusterName, backup.Spec.BackupType, backup.Status.Phase, backup.Status.TotalSize,
-			durationStr, util.TimeFormat(&backup.CreationTimestamp), util.TimeFormat(backup.Status.CompletionTimestamp))
+			durationStr, util.TimeFormat(&backup.CreationTimestamp), util.TimeFormat(backup.Status.CompletionTimestamp),
+			util.TimeFormat(backup.Status.Expiration))
 	}
 	tbl.Print()
 	return nil
 }
 
 func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &ListBackupOptions{ListOptions: list.NewListOptions(f, streams, types.OpsGVR())}
+	o := &ListBackupOptions{ListOptions: list.NewListOptions(f, streams, types.BackupGVR())}
 	cmd := &cobra.Command{
 		Use:               "list-backups",
 		Short:             "List backups.",
@@ -327,7 +330,7 @@ func NewDeleteBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	return cmd
 }
 
-// completeForDeleteBackup complete cmd for delete backup
+// completeForDeleteBackup completes cmd for delete backup
 func completeForDeleteBackup(o *delete.DeleteOptions, args []string) error {
 	if len(args) == 0 {
 		return errors.New("Missing cluster name")
@@ -339,8 +342,8 @@ func completeForDeleteBackup(o *delete.DeleteOptions, args []string) error {
 		return errors.New("Missing --name as backup name.")
 	}
 	if o.Force && len(o.Names) == 0 {
-		// do force action, if specified --force and not specified --name, all backups with the cluster will be deleted
-		// if no specify backup name and cluster name is specified. it will delete all backups with the cluster
+		// do force action, for --force and --name unset, delete all backups of the cluster
+		// if backup name unset and cluster name set, delete all backups of the cluster
 		o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
 		o.ConfirmedNames = args
 	}
@@ -367,7 +370,7 @@ func (o *CreateRestoreOptions) getClusterObject(backup *dataprotectionv1alpha1.B
 		return nil, err
 	}
 	if apierrors.IsNotFound(err) {
-		// if the source cluster does not exist, obtain it from the cluster snapshot of the backup.
+		// if the source cluster does not exist, get it from the cluster snapshot of the backup.
 		clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
 		if !ok {
 			return nil, fmt.Errorf("source cluster: %s not found", clusterName)
@@ -448,7 +451,7 @@ func (o *CreateRestoreOptions) runPITR() error {
 	}
 	backup := &dataprotectionv1alpha1.Backup{}
 
-	// no need check items len because it is validated by o.validateRestoreTime().
+	// no need to check items len because it is validated by o.validateRestoreTime().
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(objs.Items[0].Object, backup); err != nil {
 		return err
 	}
@@ -560,7 +563,7 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 }
 
 func NewListBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := list.NewListOptions(f, streams, types.OpsGVR())
+	o := list.NewListOptions(f, streams, types.BackupPolicyGVR())
 	cmd := &cobra.Command{
 		Use:               "list-backup-policy",
 		Short:             "List backups policies.",

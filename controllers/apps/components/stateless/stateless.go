@@ -28,7 +28,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -45,18 +45,31 @@ import (
 // is at least the minimum available pods that need to run for the deployment.
 const NewRSAvailableReason = "NewReplicaSetAvailable"
 
-type StatelessComponent types.ComponentBase
+type Stateless struct {
+	types.ComponentSetBase
+}
 
-var _ types.Component = &StatelessComponent{}
+var _ types.ComponentSet = &Stateless{}
 
-func (stateless *StatelessComponent) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
+func (stateless *Stateless) getReplicas() int32 {
+	if stateless.Component != nil {
+		return stateless.Component.GetReplicas()
+	}
+	return stateless.ComponentSpec.Replicas
+}
+
+func (stateless *Stateless) SetComponent(comp types.Component) {
+	stateless.Component = comp
+}
+
+func (stateless *Stateless) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if stateless == nil {
 		return false, nil
 	}
 	return stateless.PodsReady(ctx, obj)
 }
 
-func (stateless *StatelessComponent) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
+func (stateless *Stateless) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	if stateless == nil {
 		return false, nil
 	}
@@ -64,29 +77,28 @@ func (stateless *StatelessComponent) PodsReady(ctx context.Context, obj client.O
 	if !ok {
 		return false, nil
 	}
-	return deploymentIsReady(deploy, &stateless.Component.Replicas), nil
+	targetReplicas := stateless.getReplicas()
+	return deploymentIsReady(deploy, &targetReplicas), nil
 }
 
-func (stateless *StatelessComponent) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	if stateless == nil || pod == nil {
 		return false
 	}
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 
-// HandleProbeTimeoutWhenPodsReady the stateless component has no role detection, empty implementation here.
-func (stateless *StatelessComponent) HandleProbeTimeoutWhenPodsReady(ctx context.Context,
-	recorder record.EventRecorder) (bool, error) {
-	return false, nil
+func (stateless *Stateless) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap) {
+	return "", nil
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
-func (stateless *StatelessComponent) GetPhaseWhenPodsNotReady(ctx context.Context,
-	componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
+func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
+	componentName string) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	deployList := &appsv1.DeploymentList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, stateless.Cli, *stateless.Cluster, componentName, deployList)
 	if err != nil || len(deployList.Items) == 0 {
-		return "", err
+		return "", nil, err
 	}
 	// if the failed pod is not controlled by the new ReplicaSetKind
 	checkExistFailedPodOfNewRS := func(pod *corev1.Pod, workload metav1.Object) bool {
@@ -94,31 +106,38 @@ func (stateless *StatelessComponent) GetPhaseWhenPodsNotReady(ctx context.Contex
 		return !intctrlutil.PodIsReady(pod) && belongToNewReplicaSet(d, pod)
 	}
 	deploy := &deployList.Items[0]
-	return util.GetComponentPhaseWhenPodsNotReady(podList, deploy, stateless.Component.Replicas,
-		deploy.Status.AvailableReplicas, checkExistFailedPodOfNewRS), nil
+	return util.GetComponentPhaseWhenPodsNotReady(podList, deploy, stateless.getReplicas(),
+		deploy.Status.AvailableReplicas, checkExistFailedPodOfNewRS), nil, nil
 }
 
-func (stateless *StatelessComponent) HandleUpdate(ctx context.Context, obj client.Object) error {
-	return nil
+func (stateless *Stateless) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {
+	return nil, nil
 }
 
-func NewStatelessComponent(
-	cli client.Client,
+func (stateless *Stateless) HandleRoleChange(context.Context, client.Object) ([]graph.Vertex, error) {
+	return nil, nil
+}
+
+func (stateless *Stateless) HandleHA(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
+	return nil, nil
+}
+
+func newStateless(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition) (types.Component, error) {
-	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
-		return nil, err
+	spec *appsv1alpha1.ClusterComponentSpec,
+	def appsv1alpha1.ClusterComponentDefinition) *Stateless {
+	return &Stateless{
+		ComponentSetBase: types.ComponentSetBase{
+			Cli:           cli,
+			Cluster:       cluster,
+			ComponentSpec: spec,
+			ComponentDef:  &def,
+			Component:     nil,
+		},
 	}
-	return &StatelessComponent{
-		Cli:          cli,
-		Cluster:      cluster,
-		Component:    component,
-		ComponentDef: &componentDef,
-	}, nil
 }
 
-// deploymentIsReady check deployment is ready
+// deploymentIsReady checks deployment is ready
 func deploymentIsReady(deploy *appsv1.Deployment, targetReplicas *int32) bool {
 	var (
 		componentIsRunning = true
@@ -148,7 +167,7 @@ func deploymentIsReady(deploy *appsv1.Deployment, targetReplicas *int32) bool {
 	return componentIsRunning
 }
 
-// hasProgressDeadline checks if the Deployment d is expected to surface the reason
+// hasProgressDeadline checks if the Deployment d is expected to suffice the reason
 // "ProgressDeadlineExceeded" when the Deployment progress takes longer than expected time.
 func hasProgressDeadline(d *appsv1.Deployment) bool {
 	return d.Spec.ProgressDeadlineSeconds != nil &&

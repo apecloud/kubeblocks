@@ -2,16 +2,11 @@
     template: |
       cpu: "{{ or .cpu 1 }}"
       memory: "{{ or .memory 4 }}Gi"
-      volumes:
-      - name: data
-        size: "{{ or .dataStorageSize 10 }}Gi"
-      - name: log
-        size: "{{ or .logStorageSize 1 }}Gi"
-    vars: [cpu, memory, dataStorageSize, logStorageSize]
+    vars: [cpu, memory]
     series:
     - namingTemplate: "custom-{{ .cpu }}c{{ .memory }}g"
       classes:
-      - args: ["1", "1", "100", "10"]
+      - args: ["1", "1"]
       - name: custom-4c16g
         cpu: 4
         memory: 16Gi
@@ -20,14 +15,9 @@
     template: |
       cpu: "{{ or .cpu 1 }}"
       memory: "{{ or .memory 4 }}Gi"
-      volumes:
-      - name: data
-        size: "{{ or .dataStorageSize 10 }}Gi"
-      - name: log
-        size: "{{ or .logStorageSize 1 }}Gi"
-    vars: [cpu, memory, dataStorageSize, logStorageSize]
+    vars: [cpu, memory]
     series:
     - namingTemplate: "custom-{{ .cpu }}c{{ .memory }}g"
       classes:
-      - args: ["2", "16", "100", "10"]
-      - args: ["4", "64", "100", "10"]
+      - args: ["2", "16"]
+      - args: ["4", "64"]

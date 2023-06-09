@@ -32,7 +32,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	ctrlcomp "github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
@@ -72,14 +71,13 @@ bootstrap:
 					Namespace: "default",
 				},
 				Data: map[string]string{
-					"KB_MYSQL_0_HOSTNAME": "my-mysql-0.my-mysql-headless",
-					"KB_MYSQL_FOLLOWERS":  "",
-					"KB_MYSQL_LEADER":     "my-mysql-0",
-					"KB_MYSQL_N":          "1",
-					"KB_MYSQL_RECREATE":   "false",
-					"LOOP_REFERENCE_A":    "$(LOOP_REFERENCE_B)",
-					"LOOP_REFERENCE_B":    "$(LOOP_REFERENCE_C)",
-					"LOOP_REFERENCE_C":    "$(LOOP_REFERENCE_A)",
+					"KB_0_HOSTNAME":    "my-mysql-0.my-mysql-headless",
+					"KB_FOLLOWERS":     "",
+					"KB_LEADER":        "my-mysql-0",
+					"KB_REPLICA_COUNT": "1",
+					"LOOP_REFERENCE_A": "$(LOOP_REFERENCE_B)",
+					"LOOP_REFERENCE_B": "$(LOOP_REFERENCE_C)",
+					"LOOP_REFERENCE_C": "$(LOOP_REFERENCE_A)",
 				}},
 			&corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
@@ -195,14 +193,15 @@ bootstrap:
 				},
 			},
 		}
-		component = &ctrlcomp.SynthesizedComponent{
-			Name: "mysql",
-		}
 		cluster = &appsv1alpha1.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "my",
 				UID:  "b006a20c-fb03-441c-bffa-2605cad7e297",
 			},
+		}
+		component = &ctrlcomp.SynthesizedComponent{
+			Name:        "mysql",
+			ClusterName: cluster.Name,
 		}
 		cfgTemplate = []appsv1alpha1.ComponentConfigSpec{{
 			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
@@ -233,29 +232,30 @@ bootstrap:
 				nil, ctx, mockClient.Client(),
 			)
 
-			task := intctrltypes.InitReconcileTask(nil, nil, cluster, component)
-			task.AppendResource(&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "patroni-template-config",
-					Namespace: "default",
-				},
-				Data: map[string]string{
-					"postgresql.yaml": patroniTemplate,
-				}})
-			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, task)).Should(BeNil())
+			localObjs := []coreclient.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "patroni-template-config",
+						Namespace: "default",
+					},
+					Data: map[string]string{
+						"postgresql.yaml": patroniTemplate,
+					}},
+			}
+			Expect(cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, cfgTemplate, component, localObjs)).Should(BeNil())
 
 			rendered, err := cfgBuilder.render(map[string]string{
 				// KB_CLUSTER_NAME, KB_COMP_NAME from env
 				// MYSQL_USER,MYSQL_PASSWORD from valueFrom secret key
 				// SPILO_CONFIGURATION from valueFrom configmap key
-				// KB_MYSQL_LEADER from envFrom configmap
+				// KB_LEADER from envFrom configmap
 				// MEMORY_SIZE, CPU from resourceFieldRef
 				"my":            "{{ getEnvByName ( index $.podSpec.containers 0 ) \"KB_CLUSTER_NAME\" }}",
 				"mysql":         "{{ getEnvByName ( index $.podSpec.containers 0 ) \"KB_COMP_NAME\" }}",
 				"root":          "{{ getEnvByName ( index $.podSpec.containers 0 ) \"MYSQL_USER\" }}",
 				"4zrqfl2r":      "{{ getEnvByName ( index $.podSpec.containers 0 ) \"MYSQL_PASSWORD\" }}",
 				patroniTemplate: "{{ getEnvByName ( index $.podSpec.containers 0 ) \"SPILO_CONFIGURATION\" }}",
-				"my-mysql-0":    "{{ getEnvByName ( index $.podSpec.containers 0 ) \"KB_MYSQL_LEADER\" }}",
+				"my-mysql-0":    "{{ getEnvByName ( index $.podSpec.containers 0 ) \"KB_LEADER\" }}",
 
 				strconv.Itoa(4):                      "{{ getEnvByName ( index $.podSpec.containers 0 ) \"CPU\" }}",
 				strconv.Itoa(8 * 1024 * 1024 * 1024): "{{ getEnvByName ( index $.podSpec.containers 0 ) \"MEMORY_SIZE\" }}",
@@ -276,7 +276,7 @@ bootstrap:
 				"error_loop_reference": "{{ getEnvByName ( index $.podSpec.containers 0 ) \"LOOP_REFERENCE_A\" }}",
 			})
 			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("too many reference count, maybe there is a loop reference"))
+			Expect(err.Error()).Should(ContainSubstring("too many reference count, maybe there is a cycled reference"))
 		})
 	})
 })

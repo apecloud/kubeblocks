@@ -1,20 +1,17 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package v1alpha1
@@ -28,7 +25,7 @@ import (
 
 const (
 	// condition types
-
+	ConditionTypeCancelled         = "Cancelled"
 	ConditionTypeProgressing       = "Progressing"
 	ConditionTypeValidated         = "Validated"
 	ConditionTypeSucceed           = "Succeed"
@@ -56,6 +53,9 @@ const (
 	ReasonValidateFailed       = "ValidateFailed"
 	ReasonClusterNotFound      = "ClusterNotFound"
 	ReasonOpsRequestFailed     = "OpsRequestFailed"
+	ReasonOpsCanceling         = "Canceling"
+	ReasonOpsCancelFailed      = "CancelFailed"
+	ReasonOpsCancelSucceed     = "CancelSucceed"
 )
 
 func (r *OpsRequest) SetStatusCondition(condition metav1.Condition) {
@@ -74,7 +74,45 @@ func NewProgressingCondition(ops *OpsRequest) *metav1.Condition {
 	}
 }
 
-// NewValidatePassedCondition creates a condition that the operation validation.
+// NewCancelingCondition the controller is canceling the OpsRequest
+func NewCancelingCondition(ops *OpsRequest) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeCancelled,
+		Status:             metav1.ConditionFalse,
+		Reason:             ReasonOpsCanceling,
+		LastTransitionTime: metav1.Now(),
+		Message: fmt.Sprintf(`Start to cancel the OpsRequest "%s" in Cluster: "%s"`,
+			ops.Name, ops.Spec.ClusterRef),
+	}
+}
+
+// NewCancelFailedCondition creates a condition for canceling failed.
+func NewCancelFailedCondition(ops *OpsRequest, err error) *metav1.Condition {
+	msg := fmt.Sprintf(`Failed to cancel OpsRequest "%s"`, ops.Name)
+	if err != nil {
+		msg = err.Error()
+	}
+	return &metav1.Condition{
+		Type:               ConditionTypeCancelled,
+		Status:             metav1.ConditionTrue,
+		Reason:             ReasonOpsCancelFailed,
+		LastTransitionTime: metav1.Now(),
+		Message:            msg,
+	}
+}
+
+// NewCancelSucceedCondition creates a condition for canceling successfully.
+func NewCancelSucceedCondition(opsName string) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeCancelled,
+		Status:             metav1.ConditionTrue,
+		Reason:             ReasonOpsCancelSucceed,
+		LastTransitionTime: metav1.Now(),
+		Message:            fmt.Sprintf(`Cancel OpsRequest "%s" successfully`, opsName),
+	}
+}
+
+// NewValidatePassedCondition creates a condition for operation validation to pass.
 func NewValidatePassedCondition(opsRequestName string) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeValidated,
@@ -85,7 +123,7 @@ func NewValidatePassedCondition(opsRequestName string) *metav1.Condition {
 	}
 }
 
-// NewValidateFailedCondition creates a condition that the operation validation.
+// NewValidateFailedCondition creates a condition for operation validation failure.
 func NewValidateFailedCondition(reason, message string) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeValidated,

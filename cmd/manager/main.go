@@ -47,15 +47,18 @@ import (
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	dataprotectioncontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	"github.com/apecloud/kubeblocks/internal/constant"
+
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 
 	// +kubebuilder:scaffold:imports
 
 	discoverycli "k8s.io/client-go/discovery"
 
-	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -82,12 +85,13 @@ func init() {
 	utilruntime.Must(snapshotv1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1beta1.AddToScheme(scheme))
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(workloadsv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
 	viper.SetConfigType("yaml")                            // REQUIRED if the config file does not have the extension in the name
 	viper.AddConfigPath(fmt.Sprintf("/etc/%s/", appName))  // path to look for the config file in
-	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s", appName)) // call multiple times to add many search paths
+	viper.AddConfigPath(fmt.Sprintf("$HOME/.%s", appName)) // call multiple times to append search path
 	viper.AddConfigPath(".")                               // optionally look for config in the working directory
 	viper.AutomaticEnv()
 
@@ -190,7 +194,7 @@ func main() {
 	})
 
 	if err := viper.BindPFlags(pflag.CommandLine); err != nil {
-		setupLog.Error(err, "unable able to bind flags")
+		setupLog.Error(err, "unable to bind flags")
 		os.Exit(1)
 	}
 
@@ -201,7 +205,7 @@ func main() {
 
 	// Find and read the config file
 	if err := viper.ReadInConfig(); err != nil { // Handle errors reading the config file
-		setupLog.Info("unable read in config, errors ignored")
+		setupLog.Info("unable to read in config, errors ignored")
 	}
 	setupLog.Info(fmt.Sprintf("config file: %s", viper.GetViper().ConfigFileUsed()))
 	viper.OnConfigChange(func(e fsnotify.Event) {
@@ -235,12 +239,12 @@ func main() {
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
-		// speeds up voluntary leader transitions as the new leader don't have to wait
+		// speeds up voluntary leader transitions as the new leader doesn't have to wait
 		// LeaseDuration time first.
 		//
 		// In the default scaffold provided, the program ends immediately after
 		// the manager stops, so would be fine to enable this option. However,
-		// if you are doing or is intended to do any operation such as perform cleanups
+		// if you are doing or intending to do any operation such as performing cleanups
 		// after the manager stops then its usage might be unsafe.
 		LeaderElectionReleaseOnCancel: true,
 
@@ -353,6 +357,16 @@ func main() {
 		}
 	}
 
+	if viper.GetBool("enable_consensus_set") {
+		if err = (&workloadscontrollers.ConsensusSetReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("consensus-set-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ConsensusSet")
+			os.Exit(1)
+		}
+	}
 	// +kubebuilder:scaffold:builder
 
 	if err = (&configuration.ReconfigureRequestReconciler{
@@ -391,20 +405,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&components.StatefulSetReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("stateful-set-controller"),
-	}).SetupWithManager(mgr); err != nil {
+	if err = components.NewStatefulSetReconciler(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "StatefulSet")
 		os.Exit(1)
 	}
 
-	if err = (&components.DeploymentReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("deployment-controller"),
-	}).SetupWithManager(mgr); err != nil {
+	if err = components.NewDeploymentReconciler(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Deployment")
 		os.Exit(1)
 	}
@@ -439,6 +445,11 @@ func main() {
 
 		if err = (&appsv1alpha1.OpsRequest{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "OpsRequest")
+			os.Exit(1)
+		}
+
+		if err = (&workloadsv1alpha1.ConsensusSet{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ConsensusSet")
 			os.Exit(1)
 		}
 

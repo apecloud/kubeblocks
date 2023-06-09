@@ -138,7 +138,7 @@ spec:
           - sh
           - -c
           args:
-          - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT)"
+          - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT) | redis-cli -h $(KB_ACCOUNT_ENDPOINT) acl save "
         passwordConfig:
           length: 10
           numDigits: 5
@@ -146,33 +146,23 @@ spec:
           letterCase: MixedCases
         accounts:
           - name: kbadmin
-            provisionPolicy:
+            provisionPolicy: &kbadminAcctRef
               type: CreateByStmt
               scope: AllPods
               statements:
                 creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allcommands allkeys
                 update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbdataprotection
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AllPods
-              statements:
-                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allcommands allkeys
-                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
+            provisionPolicy: *kbadminAcctRef
           - name: kbmonitoring
-            provisionPolicy:
+            provisionPolicy: &kbReadOnlyAcctRef
               type: CreateByStmt
               scope: AllPods
               statements:
                 creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allkeys +get
                 update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbprobe
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AllPods
-              statements:
-                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) allkeys +get
-                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
+            provisionPolicy: *kbReadOnlyAcctRef
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt

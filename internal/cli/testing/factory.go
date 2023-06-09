@@ -33,7 +33,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-// NewTestFactory like cmdtesting.NewTestFactory, register KubeBlocks custom objects
+// NewTestFactory is like cmdtesting.NewTestFactory, registers KubeBlocks custom objects
 func NewTestFactory(namespace string) *cmdtesting.TestFactory {
 	tf := cmdtesting.NewTestFactory()
 	mapper := restmapper.NewDiscoveryRESTMapper(testDynamicResources())

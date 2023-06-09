@@ -1,20 +1,17 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package v1alpha1
@@ -167,45 +164,19 @@ var _ = Describe("OpsRequest webhook", func() {
 		By("Test existing other operations in cluster")
 		// update cluster existing operations
 		addClusterRequestAnnotation(cluster, "testOpsName", SpecReconcilingClusterPhase)
-		Eventually(func() string {
-			err := testCtx.CreateObj(ctx, opsRequest)
-			if err == nil {
-				return ""
-			}
-			return err.Error()
-		}).Should(ContainSubstring("existing OpsRequest: testOpsName"))
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("existing OpsRequest: testOpsName"))
 		// test opsRequest reentry
 		addClusterRequestAnnotation(cluster, opsRequest.Name, SpecReconcilingClusterPhase)
+
 		By("By creating a upgrade opsRequest, it should be succeed")
-		Eventually(func() bool {
-			opsRequest.Spec.Upgrade.ClusterVersionRef = newClusterVersion.Name
-			err := testCtx.CheckedCreateObj(ctx, opsRequest)
-			return err == nil
-		}).Should(BeTrue())
+		opsRequest.Spec.Upgrade.ClusterVersionRef = newClusterVersion.Name
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
+		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: opsRequest.Name,
+			Namespace: opsRequest.Namespace}, opsRequest)).Should(Succeed())
 
-		// wait until OpsRequest created
-		Eventually(func() bool {
-			err := k8sClient.Get(context.Background(), client.ObjectKey{Name: opsRequest.Name,
-				Namespace: opsRequest.Namespace}, opsRequest)
-			return err == nil
-		}).Should(BeTrue())
-
-		newClusterName := clusterName + "1"
-		newCluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, newClusterName)
-		Expect(testCtx.CheckedCreateObj(ctx, newCluster)).Should(Succeed())
-
-		By("By testing Immutable when status.phase in Succeed")
-		// if running in real cluster, the opsRequest will reconcile all the time.
-		// so we should add eventually block.
-		Eventually(func() bool {
-			patch := client.MergeFrom(opsRequest.DeepCopy())
-			opsRequest.Status.Phase = OpsSucceedPhase
-			Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
-
-			patch = client.MergeFrom(opsRequest.DeepCopy())
-			opsRequest.Spec.ClusterRef = newClusterName
-			return Expect(k8sClient.Patch(ctx, opsRequest, patch).Error()).To(ContainSubstring("is forbidden when status.Phase is Succeed"))
-		}).Should(BeTrue())
+		By("expect an error for cancelling this opsRequest")
+		opsRequest.Spec.Cancel = true
+		Expect(k8sClient.Update(context.Background(), opsRequest).Error()).Should(ContainSubstring("forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']"))
 	}
 
 	testVerticalScaling := func(cluster *Cluster) {
@@ -258,11 +229,51 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, VerticalScalingType)
 		opsRequest.Spec.VerticalScalingList = []VerticalScaling{verticalScalingList[2]}
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("must be less than or equal to cpu limit"))
-		Eventually(func() bool {
-			opsRequest.Spec.VerticalScalingList[0].Requests[corev1.ResourceCPU] = resource.MustParse("100m")
-			err := testCtx.CheckedCreateObj(ctx, opsRequest)
-			return err == nil
-		}).Should(BeTrue())
+
+		By("expect successful")
+		opsRequest.Spec.VerticalScalingList[0].Requests[corev1.ResourceCPU] = resource.MustParse("100m")
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
+
+		By("test spec immutable")
+		newClusterName := clusterName + "1"
+		newCluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, newClusterName)
+		Expect(testCtx.CheckedCreateObj(ctx, newCluster)).Should(Succeed())
+
+		testSpecImmutable := func(phase OpsPhase) {
+			By(fmt.Sprintf("spec is immutable when status.phase in %s", phase))
+			patch := client.MergeFrom(opsRequest.DeepCopy())
+			opsRequest.Status.Phase = phase
+			Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
+
+			patch = client.MergeFrom(opsRequest.DeepCopy())
+			opsRequest.Spec.Cancel = true
+			Expect(k8sClient.Patch(ctx, opsRequest, patch).Error()).To(ContainSubstring(fmt.Sprintf("is forbidden when status.Phase is %s", phase)))
+		}
+		phaseList := []OpsPhase{OpsSucceedPhase, OpsFailedPhase, OpsCancelledPhase}
+		for _, phase := range phaseList {
+			testSpecImmutable(phase)
+		}
+
+		By("test spec immutable except for cancel")
+		testSpecImmutableExpectForCancel := func(phase OpsPhase) {
+			patch := client.MergeFrom(opsRequest.DeepCopy())
+			opsRequest.Status.Phase = phase
+			Expect(k8sClient.Status().Patch(ctx, opsRequest, patch)).Should(Succeed())
+
+			patch = client.MergeFrom(opsRequest.DeepCopy())
+			By(fmt.Sprintf("cancel opsRequest when ops phase is %s", phase))
+			opsRequest.Spec.Cancel = !opsRequest.Spec.Cancel
+			Expect(k8sClient.Patch(ctx, opsRequest, patch)).ShouldNot(HaveOccurred())
+
+			By(fmt.Sprintf("expect an error for updating spec.ClusterRef when ops phase is %s", phase))
+			opsRequest.Spec.ClusterRef = newClusterName
+			Expect(k8sClient.Patch(ctx, opsRequest, patch).Error()).To(ContainSubstring("forbidden to update spec.clusterRef"))
+		}
+
+		phaseList = []OpsPhase{OpsCreatingPhase, OpsRunningPhase, OpsCancellingPhase}
+		for _, phase := range phaseList {
+			testSpecImmutableExpectForCancel(phase)
+		}
 	}
 
 	testVolumeExpansion := func(cluster *Cluster) {
@@ -360,11 +371,9 @@ var _ = Describe("OpsRequest webhook", func() {
 			clusterDef.Spec.ComponentDefs = clusterDef.Spec.ComponentDefs[:1]
 		}
 		Expect(k8sClient.Patch(ctx, clusterDef, patch)).Should(Succeed())
-		Eventually(func() bool {
-			tmp := &ClusterDefinition{}
-			_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDef.Name, Namespace: clusterDef.Namespace}, tmp)
-			return len(tmp.Spec.ComponentDefs) == 1
-		}).Should(BeTrue())
+		tmp := &ClusterDefinition{}
+		_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDef.Name, Namespace: clusterDef.Namespace}, tmp)
+		Expect(len(tmp.Spec.ComponentDefs)).Should(Equal(1))
 
 		By("By testing horizontalScaling - target component not exist")
 		opsRequest := createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
@@ -378,18 +387,14 @@ var _ = Describe("OpsRequest webhook", func() {
 
 		By("By testing horizontalScaling. if api is legal, it will create successfully")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
-		Eventually(func() bool {
-			opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[2]}
-			return testCtx.CheckedCreateObj(ctx, opsRequest) == nil
-		}).Should(BeTrue())
+		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[2]}
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
 
 		By("test min, max is zero")
 		opsRequest = createTestOpsRequest(clusterName, opsRequestName, HorizontalScalingType)
-		Eventually(func() bool {
-			opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[2]}
-			opsRequest.Spec.HorizontalScalingList[0].Replicas = 5
-			return testCtx.CheckedCreateObj(ctx, opsRequest) == nil
-		}).Should(BeTrue())
+		opsRequest.Spec.HorizontalScalingList = []HorizontalScaling{hScalingList[2]}
+		opsRequest.Spec.HorizontalScalingList[0].Replicas = 5
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
 	}
 
 	testWhenClusterDeleted := func(cluster *Cluster, opsRequest *OpsRequest) {
@@ -399,10 +404,7 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(k8sClient.Delete(ctx, newCluster)).Should(Succeed())
 
 		By("test path labels")
-		Eventually(func() bool {
-			err := k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, &Cluster{})
-			return err != nil
-		}).Should(BeTrue())
+		Eventually(k8sClient.Get(ctx, client.ObjectKey{Name: clusterName, Namespace: cluster.Namespace}, &Cluster{})).Should(HaveOccurred())
 
 		patch := client.MergeFrom(opsRequest.DeepCopy())
 		opsRequest.Labels["test"] = "test-ops"
@@ -418,11 +420,8 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(notFoundComponentsString("replicasets1")))
 
 		By("By testing restart. if api is legal, it will create successfully")
-		Eventually(func() bool {
-			opsRequest.Spec.RestartList[0].ComponentName = componentName
-			err := testCtx.CheckedCreateObj(ctx, opsRequest)
-			return err == nil
-		}).Should(BeTrue())
+		opsRequest.Spec.RestartList[0].ComponentName = componentName
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
 		return opsRequest
 	}
 
@@ -430,28 +429,21 @@ var _ = Describe("OpsRequest webhook", func() {
 		It("Should webhook validate passed", func() {
 			By("By create a clusterDefinition")
 
-			clusterDef := &ClusterDefinition{}
 			// wait until ClusterDefinition and ClusterVersion created
-			Eventually(func() bool {
-				clusterDef, _ = createTestClusterDefinitionObj(clusterDefinitionName)
-				Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
-				By("By creating a clusterVersion")
-				clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
-				err := testCtx.CheckedCreateObj(ctx, clusterVersion)
-				return err == nil
-			}).Should(BeTrue())
+			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
+			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
+			By("By creating a clusterVersion")
+			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
+			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
 
 			opsRequest := createTestOpsRequest(clusterName, opsRequestName, UpgradeType)
-			cluster := &Cluster{}
-			// wait until Cluster created
-			Eventually(func() bool {
-				By("By testing spec.clusterDef is legal")
-				Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).ShouldNot(Succeed())
-				By("By create a new cluster ")
-				cluster, _ = createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
-				err := testCtx.CheckedCreateObj(ctx, cluster)
-				return err == nil
-			}).Should(BeTrue())
+
+			// create Cluster
+			By("By testing spec.clusterDef is legal")
+			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(HaveOccurred())
+			By("By create a new cluster ")
+			cluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
+			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
 
 			testUpgrade(cluster)
 

@@ -164,7 +164,7 @@ func (o *PluginListOptions) ListPlugins() ([]string, []error) {
 		files, err := os.ReadDir(dir)
 		if err != nil {
 			if _, ok := err.(*os.PathError); ok {
-				klog.V(1).Info("Unable read directory %q from your PATH: %v. Skipping...\n", dir, err)
+				klog.V(1).Info("Unable to read directory %q from your PATH: %v. Skipping...\n", dir, err)
 				continue
 			}
 
@@ -187,7 +187,7 @@ func (o *PluginListOptions) ListPlugins() ([]string, []error) {
 	return plugins, errors
 }
 
-// PathVerifier receives a path and determines if it is valid or not.
+// PathVerifier receives a path and validates it.
 type PathVerifier interface {
 	Verify(path string) []error
 }
@@ -218,7 +218,7 @@ func (v *CommandOverrideVerifier) Verify(path string) []error {
 	if isExec, err := isExecutable(path); err == nil && !isExec {
 		errors = append(errors, fmt.Errorf("warning: %q identified as a kbcli or kubectl plugin, but it is not executable", path))
 	} else if err != nil {
-		errors = append(errors, fmt.Errorf("error: unable to indentify %s as an executable file: %v", path, err))
+		errors = append(errors, fmt.Errorf("error: unable to identify %s as an executable file: %v", path, err))
 	}
 
 	if existingPath, ok := v.seenPlugins[binName]; ok {
@@ -299,15 +299,18 @@ func InitPlugin() {
 		klog.Fatal(err)
 	}
 
-	// check if index exist, if indexes don't exist, download default index
+	// check if index exists, if indexes don't exist, download default index
 	indexes, err := ListIndexes(paths)
 	if err != nil {
 		klog.Fatal(err)
 	}
 	if len(indexes) == 0 {
-		klog.V(1).Info("no indexes found, downloading default index")
+		klog.V(1).Info("no index found, downloading default index")
 		if err := AddIndex(paths, DefaultIndexName, DefaultIndexURI); err != nil {
 			klog.Fatal("failed to download default index", err)
+		}
+		if err := AddIndex(paths, KrewIndexName, KrewIndexURI); err != nil {
+			klog.Fatal("failed to download krew index", err)
 		}
 	}
 }

@@ -32,13 +32,15 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-// FillClassTransformer fill the class related info to cluster
+// FillClassTransformer fills the class related info to cluster
 type FillClassTransformer struct{}
+
+var _ graph.Transformer = &FillClassTransformer{}
 
 func (r *FillClassTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
-	if isClusterDeleting(*cluster) {
+	if cluster.IsDeleting() {
 		return nil
 	}
 	return r.fillClass(transCtx)
@@ -112,35 +114,7 @@ func (r *FillClassTransformer) fillClass(transCtx *ClusterTransformContext) erro
 		requests.DeepCopyInto(&comp.Resources.Requests)
 		requests.DeepCopyInto(&comp.Resources.Limits)
 
-		var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
-		if len(comp.VolumeClaimTemplates) > 0 {
-			volumes = comp.VolumeClaimTemplates
-		} else {
-			volumes = buildVolumeClaimByClass(cls)
-		}
-		comp.VolumeClaimTemplates = volumes
 		cluster.Spec.ComponentSpecs[idx] = comp
 	}
 	return nil
 }
-
-func buildVolumeClaimByClass(cls *appsv1alpha1.ComponentClassInstance) []appsv1alpha1.ClusterComponentVolumeClaimTemplate {
-	var volumes []appsv1alpha1.ClusterComponentVolumeClaimTemplate
-	for _, volume := range cls.Volumes {
-		volumes = append(volumes, appsv1alpha1.ClusterComponentVolumeClaimTemplate{
-			Name: volume.Name,
-			Spec: appsv1alpha1.PersistentVolumeClaimSpec{
-				// TODO define access mode in class
-				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-				Resources: corev1.ResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceStorage: volume.Size,
-					},
-				},
-			},
-		})
-	}
-	return volumes
-}
-
-var _ graph.Transformer = &FillClassTransformer{}

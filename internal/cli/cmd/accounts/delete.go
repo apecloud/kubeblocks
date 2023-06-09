@@ -25,24 +25,24 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
-	"github.com/apecloud/kubeblocks/internal/sqlchannel"
+	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type DeleteUserOptions struct {
 	*AccountBaseOptions
-	info        sqlchannel.UserInfo
 	AutoApprove bool
+	info        channelutil.UserInfo
 }
 
 func NewDeleteUserOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *DeleteUserOptions {
 	return &DeleteUserOptions{
-		AccountBaseOptions: NewAccountBaseOptions(f, streams, sqlchannel.DeleteUserOp),
+		AccountBaseOptions: NewAccountBaseOptions(f, streams, channelutil.DeleteUserOp),
 	}
 }
 
 func (o *DeleteUserOptions) AddFlags(cmd *cobra.Command) {
 	o.AccountBaseOptions.AddFlags(cmd)
-	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required. Specify the name of user")
+	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required user name, please specify it")
 }
 
 func (o *DeleteUserOptions) Validate(args []string) error {

@@ -22,6 +22,8 @@ Usage: $(basename "$0") <options>
                                 10) trigger release
                                 11) release message
                                 12) send message
+                                13) patch release notes
+                                14) ignore cover pkgs
     -tn, --tag-name           Release tag name
     -gr, --github-repo        Github Repo
     -gt, --github-token       Github token
@@ -31,6 +33,10 @@ Usage: $(basename "$0") <options>
     -bw, --bot-webhook        The bot webhook
     -tt, --trigger-type       The trigger type (e.g. release/package)
     -ru, --run-url            The run url
+    -fl, --file               The release notes file
+    -ip, --ignore-pkgs        The ignore cover pkgs
+    -br, --base-branch        The base branch name
+    -bc, --base-commit        The base commit id
 EOF
 }
 
@@ -50,6 +56,11 @@ main() {
     local TRIGGER_TYPE="release"
     local RELEASE_VERSION=""
     local RUN_URL=""
+    local FILE=""
+    local IGNORE_PKGS=""
+    local BASE_BRANCH=""
+    local BASE_COMMIT=""
+    local BASE_COMMIT_ID=HEAD^
 
     parse_command_line "$@"
 
@@ -89,6 +100,12 @@ main() {
         ;;
         12)
             send_message
+        ;;
+        13)
+            patch_release_notes
+        ;;
+        14)
+            ignore_cover_pkgs
         ;;
         *)
             show_help
@@ -161,6 +178,30 @@ parse_command_line() {
             -ru|--run-url)
                 if [[ -n "${2:-}" ]]; then
                     RUN_URL="$2"
+                    shift
+                fi
+                ;;
+            -fl|--file)
+                if [[ -n "${2:-}" ]]; then
+                    FILE="$2"
+                    shift
+                fi
+                ;;
+            -ip|--ignore-pkgs)
+                if [[ -n "${2:-}" ]]; then
+                    IGNORE_PKGS="$2"
+                    shift
+                fi
+                ;;
+            -br|--base-branch)
+                if [[ -n "${2:-}" ]]; then
+                    BASE_BRANCH="$2"
+                    shift
+                fi
+                ;;
+            -bc|--base-commit)
+                if [[ -n "${2:-}" ]]; then
+                    BASE_COMMIT="$2"
                     shift
                 fi
                 ;;
@@ -308,6 +349,11 @@ release_message() {
 }
 
 send_message() {
+    if [[ "$TAG_NAME" != "v"*"."*"."* ]]; then
+        echo "invalid tag name"
+        return
+    fi
+
     if [[ "$CONTENT" == *"success" ]]; then
         curl -H "Content-Type: application/json" -X POST $BOT_WEBHOOK \
             -d '{"msg_type":"post","content":{"post":{"zh_cn":{"title":"Success:","content":[[{"tag":"text","text":"'$CONTENT'"}]]}}}}'
@@ -324,8 +370,35 @@ add_trigger_mode() {
     fi
 }
 
+get_base_commit_id() {
+    if [[ ! -z "$BASE_COMMIT" ]]; then
+        BASE_COMMIT_ID=$BASE_COMMIT
+        return
+    fi
+    base_branch_commits="$( git rev-list $BASE_BRANCH -n 100 )"
+    current_branch_commits="$( git rev-list $BRANCH_NAME -n 50 )"
+    for base_commit_id in $( echo "$base_branch_commits" ); do
+        found=false
+        for cur_commit_id in $( echo "$current_branch_commits" ); do
+            if [[ "$cur_commit_id" == "$base_commit_id" ]]; then
+                BASE_COMMIT_ID=$base_commit_id
+                found=true
+                break
+              fi
+        done
+        if [[ $found == true ]]; then
+            break
+        fi
+    done
+}
+
 get_trigger_mode() {
-    for filePath in $( git diff --name-only HEAD HEAD^ ); do
+    if [[ ! ("$BRANCH_NAME" == "main" || "$BRANCH_NAME" == "release-"* || "$BRANCH_NAME" == "releasing-"*) ]]; then
+        get_base_commit_id
+    fi
+    echo "BASE_COMMIT_ID:$BASE_COMMIT_ID"
+    filePaths=$( git diff --name-only HEAD ${BASE_COMMIT_ID} )
+    for filePath in $( echo "$filePaths" ); do
         if [[ "$filePath" == "go."* ]]; then
             add_trigger_mode "[test]"
             continue
@@ -377,6 +450,42 @@ check_package_version() {
         echo "$(tput -T xterm setaf 2)Version allows packaging$(tput -T xterm sgr0)"
     fi
     exit $exit_status
+}
+
+patch_release_notes() {
+    release_note=""
+    while read line; do
+      if [[ -z "${release_note}" ]]; then
+        release_note="$line"
+      else
+        release_note="$release_note\n$line"
+      fi
+    done < ${FILE}
+
+    release_id=`gh_curl -s $GITHUB_API/repos/$GITHUB_REPO/releases/tags/$TAG_NAME | jq -r '.id'`
+
+    curl -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3.raw" \
+           -X PATCH \
+    $GITHUB_API/repos/$GITHUB_REPO/releases/$release_id \
+    -d '{"body":"'"$release_note"'"}'
+}
+
+ignore_cover_pkgs() {
+    ignore_pkgs=$(echo "$IGNORE_PKGS" | sed 's/|/ /g')
+    while read line; do
+        ignore=false
+        for pkgs in $(echo "$ignore_pkgs"); do
+            if [[ "$line" == *"$LATEST_REPO/$pkgs"* ]]; then
+                ignore=true
+                break
+            fi
+        done
+        if [[ $ignore == true ]]; then
+            continue
+        fi
+        echo $line >> cover_new.out
+    done < ${FILE}
 }
 
 main "$@"

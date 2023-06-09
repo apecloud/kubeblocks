@@ -29,16 +29,16 @@ import (
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
-	"github.com/apecloud/kubeblocks/internal/sqlchannel"
+	channelutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type GrantOptions struct {
 	*AccountBaseOptions
-	info sqlchannel.UserInfo
+	info channelutil.UserInfo
 }
 
 func NewGrantOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, op bindings.OperationKind) *GrantOptions {
-	if (op != sqlchannel.GrantUserRoleOp) && (op != sqlchannel.RevokeUserRoleOp) {
+	if (op != channelutil.GrantUserRoleOp) && (op != channelutil.RevokeUserRoleOp) {
 		klog.V(1).Infof("invalid operation kind: %s", op)
 		return nil
 	}
@@ -49,7 +49,7 @@ func NewGrantOptions(f cmdutil.Factory, streams genericclioptions.IOStreams, op 
 
 func (o *GrantOptions) AddFlags(cmd *cobra.Command) {
 	o.AccountBaseOptions.AddFlags(cmd)
-	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required. Specify the name of user.")
+	cmd.Flags().StringVar(&o.info.UserName, "name", "", "Required user name, please specify it.")
 	cmd.Flags().StringVarP(&o.info.RoleName, "role", "r", "", "Role name should be one of {SUPERUSER, READWRITE, READONLY}")
 }
 
@@ -70,7 +70,7 @@ func (o *GrantOptions) Validate(args []string) error {
 }
 
 func (o *GrantOptions) validRoleName() error {
-	candidates := []string{sqlchannel.SuperUserRole, sqlchannel.ReadWriteRole, sqlchannel.ReadOnlyRole}
+	candidates := []string{string(channelutil.SuperUserRole), string(channelutil.ReadWriteRole), string(channelutil.ReadOnlyRole)}
 	if slices.Contains(candidates, strings.ToLower(o.info.RoleName)) {
 		return nil
 	}

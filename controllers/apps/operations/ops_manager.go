@@ -35,7 +35,7 @@ var (
 	opsManager     *OpsManager
 )
 
-// RegisterOps register operation with OpsType and OpsBehaviour
+// RegisterOps registers operation with OpsType and OpsBehaviour
 func (opsMgr *OpsManager) RegisterOps(opsType appsv1alpha1.OpsType, opsBehaviour OpsBehaviour) {
 	opsManager.OpsMap[opsType] = opsBehaviour
 	appsv1alpha1.OpsRequestBehaviourMapper[opsType] = appsv1alpha1.OpsRequestBehaviour{
@@ -45,7 +45,7 @@ func (opsMgr *OpsManager) RegisterOps(opsType appsv1alpha1.OpsType, opsBehaviour
 	}
 }
 
-// Do the common entry function for handling OpsRequest
+// Do the entry function for handling OpsRequest
 func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*ctrl.Result, error) {
 	var (
 		opsBehaviour OpsBehaviour
@@ -66,7 +66,7 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 	}
 	if opsRequest.Status.Phase != appsv1alpha1.OpsCreatingPhase {
 		// If the operation causes the cluster phase to change, the cluster needs to be locked.
-		// At the same time, only one operation is running if these operations are mutex(exist opsBehaviour.ToClusterPhase).
+		// At the same time, only one operation is running if these operations are mutually exclusive(exist opsBehaviour.ToClusterPhase).
 		if err = addOpsRequestAnnotationToCluster(reqCtx.Ctx, cli, opsRes, opsBehaviour); err != nil {
 			return nil, err
 		}
@@ -111,9 +111,15 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	}
 	switch opsRequestPhase {
 	case appsv1alpha1.OpsSucceedPhase:
-		return requeueAfter, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsRequestPhase, appsv1alpha1.NewSucceedCondition(opsRequest))
+		if opsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
+			return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsCancelledPhase, appsv1alpha1.NewCancelSucceedCondition(opsRequest.Name))
+		}
+		return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsRequestPhase, appsv1alpha1.NewSucceedCondition(opsRequest))
 	case appsv1alpha1.OpsFailedPhase:
-		return requeueAfter, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsRequestPhase, appsv1alpha1.NewFailedCondition(opsRequest, err))
+		if opsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
+			return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, appsv1alpha1.OpsCancelledPhase, appsv1alpha1.NewCancelFailedCondition(opsRequest, err))
+		}
+		return 0, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsRequestPhase, appsv1alpha1.NewFailedCondition(opsRequest, err))
 	default:
 		return requeueAfter, nil
 	}

@@ -14,7 +14,7 @@ kbcli cluster expose NAME --enable=[true|false] --type=[vpc|internet] [flags]
   # Expose a cluster to vpc
   kbcli cluster expose mycluster --type vpc --enable=true
   
-  # Expose a cluster to internet
+  # Expose a cluster to public internet
   kbcli cluster expose mycluster --type internet --enable=true
   
   # Stop exposing a cluster
@@ -26,7 +26,7 @@ kbcli cluster expose NAME --enable=[true|false] --type=[vpc|internet] [flags]
 ```
       --auto-approve                   Skip interactive approval before exposing the cluster
       --components strings             Component names to this operations
-      --dry-run string[="unchanged"]   Must be "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
       --enable string                  Enable or disable the expose, values can be true or false
   -h, --help                           help for expose
       --name string                    OpsRequest name. if not specified, it will be randomly generated 

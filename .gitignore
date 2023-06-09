@@ -22,6 +22,10 @@ bin
 testbin/*
 __debug_bin
 
+output
+helm-output
+
+
 # Test binary, build with `go test -c`
 *.test
 

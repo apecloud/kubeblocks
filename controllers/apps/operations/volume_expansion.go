@@ -49,7 +49,7 @@ const (
 )
 
 func init() {
-	// the volume expansion operation only support online expanding now, so this operation not affect the cluster availability.
+	// the volume expansion operation only supports online expansion now
 	volumeExpansionBehaviour := OpsBehaviour{
 		OpsHandler: volumeExpansionOpsHandler{},
 	}
@@ -97,14 +97,12 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 		err                    error
 		opsRequestPhase        = appsv1alpha1.OpsRunningPhase
 		oldOpsRequestStatus    = opsRequest.Status.DeepCopy()
-		oldClusterStatus       = opsRes.Cluster.Status.DeepCopy()
 		expectProgressCount    int
 		succeedProgressCount   int
 		completedProgressCount int
 	)
 
 	patch := client.MergeFrom(opsRequest.DeepCopy())
-	clusterPatch := client.MergeFrom(opsRes.Cluster.DeepCopy())
 	if opsRequest.Status.Components == nil {
 		ve.initComponentStatus(opsRequest)
 	}
@@ -130,13 +128,13 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	}
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedProgressCount, expectProgressCount)
 	// patch OpsRequest.status.components
-	if !reflect.DeepEqual(oldOpsRequestStatus, opsRequest.Status) {
+	if !reflect.DeepEqual(*oldOpsRequestStatus, opsRequest.Status) {
 		if err = cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
 			return opsRequestPhase, requeueAfter, err
 		}
 	}
 
-	// check all pvcs of volumeClaimTemplate are successful
+	// check all PVCs of volumeClaimTemplate are successful
 	if expectProgressCount == completedProgressCount {
 		if expectProgressCount == succeedProgressCount {
 			opsRequestPhase = appsv1alpha1.OpsSucceedPhase
@@ -146,14 +144,10 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	} else {
 		// check whether the volume expansion operation has timed out
 		if time.Now().After(opsRequest.Status.StartTimestamp.Add(VolumeExpansionTimeOut)) {
-			// if volume expansion timed out, do it
+			// if volume expansion timed out
 			opsRequestPhase = appsv1alpha1.OpsFailedPhase
-			err = errors.New(fmt.Sprintf("Timed out waiting for volume expansion completed, the timeout is %g minutes", VolumeExpansionTimeOut.Minutes()))
+			err = errors.New(fmt.Sprintf("Timed out waiting for volume expansion to complete, the timeout value is %g minutes", VolumeExpansionTimeOut.Minutes()))
 		}
-	}
-	// when opsRequest completed or cluster status is changed, do it
-	if patchErr := ve.patchClusterStatus(reqCtx, cli, opsRes, opsRequestPhase, oldClusterStatus, clusterPatch); patchErr != nil {
-		return "", requeueAfter, patchErr
 	}
 	return opsRequestPhase, requeueAfter, err
 }
@@ -192,24 +186,6 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 	return nil
 }
 
-// patchClusterStatus patch cluster status
-func (ve volumeExpansionOpsHandler) patchClusterStatus(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	opsRes *OpsResource,
-	opsRequestPhase appsv1alpha1.OpsPhase,
-	oldClusterStatus *appsv1alpha1.ClusterStatus,
-	clusterPatch client.Patch) error {
-	// when the OpsRequest.status.phase is Succeed or Failed, do it
-	if opsRequestIsCompleted(opsRequestPhase) && opsRes.Cluster.Status.Phase == appsv1alpha1.SpecReconcilingClusterPhase {
-		opsRes.Cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
-	}
-	// if cluster status changed, patch it
-	if !reflect.DeepEqual(oldClusterStatus, opsRes.Cluster.Status) {
-		return cli.Status().Patch(reqCtx.Ctx, opsRes.Cluster, clusterPatch)
-	}
-	return nil
-}
-
 // pvcIsResizing when pvc start resizing, it will set conditions type to Resizing/FileSystemResizePending
 func (ve volumeExpansionOpsHandler) pvcIsResizing(pvc *corev1.PersistentVolumeClaim) bool {
 	var isResizing bool
@@ -233,7 +209,7 @@ func (ve volumeExpansionOpsHandler) getRequestStorageMap(opsRequest *appsv1alpha
 	return storageMap
 }
 
-// initComponentStatus init status.components for the VolumeExpansion OpsRequest
+// initComponentStatus inits status.components for the VolumeExpansion OpsRequest
 func (ve volumeExpansionOpsHandler) initComponentStatus(opsRequest *appsv1alpha1.OpsRequest) {
 	opsRequest.Status.Components = map[string]appsv1alpha1.OpsRequestComponentStatus{}
 	for _, v := range opsRequest.Spec.VolumeExpansionList {
@@ -241,7 +217,7 @@ func (ve volumeExpansionOpsHandler) initComponentStatus(opsRequest *appsv1alpha1
 	}
 }
 
-// handleVCTExpansionProgress check whether the pvc of the volume claim template is resizing/expansion succeeded/expansion completed.
+// handleVCTExpansionProgress checks whether the pvc of the volume claim template is in (resizing, expansion succeeded, expansion completed).
 func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
@@ -272,7 +248,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 	requestStorage := storageMap[vctKey]
 	var ordinal int
 	for _, v := range pvcList.Items {
-		// filter PVC(s) with ordinal larger than comp.Replicas - 1, which left by scale-in
+		// filter PVC(s) with ordinal no larger than comp.Replicas - 1, which left by scale-in
 		ordinal, err = getPVCOrdinal(v.Name)
 		if err != nil {
 			return 0, 0, 0, err

@@ -20,7 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package kubeblocks
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -28,9 +31,11 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -77,9 +82,18 @@ var _ = Describe("kubeblocks status", func() {
 		cronjobList := &batchv1.CronJobList{}
 		cronjobList.Items = []batchv1.CronJob{*cronjob}
 
+		node := testing.FakeNode()
+		nodeList := &corev1.NodeList{}
+		nodeList.Items = []corev1.Node{*node}
+
 		httpResp := func(obj runtime.Object) *http.Response {
 			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, obj)}
 		}
+
+		version := &version.Info{
+			GitVersion: "1.12.3",
+		}
+		data, _ := json.Marshal(version)
 
 		tf.UnstructuredClient = &clientfake.RESTClient{
 			GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
@@ -92,6 +106,8 @@ var _ = Describe("kubeblocks status", func() {
 					urlPrefix + "/jobs":         httpResp(jobList),
 					urlPrefix + "/cronjobs":     httpResp(cronjobList),
 					urlPrefix + "/pods":         httpResp(stsPods),
+					"/api/v1/nodes":             httpResp(nodeList),
+					"/version":                  {StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader(data))},
 				}[req.URL.Path], nil
 			}),
 		}

@@ -34,7 +34,7 @@ import (
 type EditOptions struct {
 	editor.EditOptions
 	Factory cmdutil.Factory
-	// Name are the resource name
+	// Name is the resource name
 	Name string
 	GVR  schema.GroupVersionResource
 }

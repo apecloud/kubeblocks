@@ -49,11 +49,6 @@ func main() {
 		log.Fatal(fmt.Errorf("fatal error custom init: %v", err))
 	}
 
-	err = http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
-	if err != nil {
-		log.Fatal(fmt.Errorf("fatal error http listen: %v", err))
-	}
-
 	http.HandleFunc(path, func(writer http.ResponseWriter, request *http.Request) {
 		opsRes, shouldNotify := agent.CheckRole(request.Context())
 		buf, err := json.Marshal(opsRes)
@@ -77,6 +72,11 @@ func main() {
 			writer.WriteHeader(http.StatusNoContent)
 		}
 	})
+
+	err = http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	if err != nil {
+		log.Fatal(fmt.Errorf("fatal error http listen: %v", err))
+	}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)

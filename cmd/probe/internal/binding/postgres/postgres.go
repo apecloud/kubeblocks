@@ -969,18 +969,21 @@ func (pgOps *PostgresOperations) IsHealthiest(ctx context.Context, podName strin
 		return false
 	}
 
-	timeline, err := pgOps.getTimeline(ctx)
-	if err != nil {
-		pgOps.Logger.Errorf("get timelineID  err:%v", err)
-		return false
-	}
-	clusterTimeLine := pgOps.Cs.LeaderObservedRecord.GetExtra()["timeline_id"]
-	timelineID, _ := strconv.Atoi(timeline)
-	clusterTimeLineID, _ := strconv.Atoi(clusterTimeLine)
-	if timelineID < clusterTimeLineID {
-		pgOps.Logger.Infof("My timeline %s is behind last known cluster timeline %s", timeline, clusterTimeLine)
-		return false
-	}
+	// TODO:还没有维护timeline
+	/*
+		timeline, err := pgOps.getTimeline(ctx)
+		if err != nil {
+			pgOps.Logger.Errorf("get timelineID  err:%v", err)
+			return false
+		}
+		clusterTimeLine := pgOps.Cs.LeaderObservedRecord.GetExtra()["timeline_id"]
+		timelineID, _ := strconv.Atoi(timeline)
+		clusterTimeLineID, _ := strconv.Atoi(clusterTimeLine)
+		if timelineID < clusterTimeLineID {
+			pgOps.Logger.Infof("My timeline %s is behind last known cluster timeline %s", timeline, clusterTimeLine)
+			return false
+		}
+	*/
 
 	requestBody := `{"operation":"getRole"}`
 	for _, m := range pgOps.Cs.GetCluster().Members {

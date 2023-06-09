@@ -1,0 +1,10 @@
+{{- if .Values.jobmanager.replicaCount }}
+  {{- if ne (int .Values.jobmanager.replicaCount) 1 }}
+    {{ fail "Flink cluster does not support running with more than one JobManager." }}
+  {{- end }}
+{{- end }}
+{{- if .Values.taskmanager.replicaCount }}
+  {{- if lt (int .Values.taskmanager.replicaCount) 1 }}
+    {{ fail "Flink cluster does not support running with no TaskManager." }}
+  {{- end }}
+{{- end -}}

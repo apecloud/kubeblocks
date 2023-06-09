@@ -55,6 +55,22 @@ var _ = Describe("enqueue ancestor", func() {
 	ctx := context.Background()
 	var handler *EnqueueRequestForAncestor
 
+	buildAncestorTree := func() (*workloads.StatefulReplicaSet, *appsv1.StatefulSet, *corev1.Pod) {
+		ancestorLevel2 := builder.NewStatefulReplicaSetBuilder(namespace, "foo").GetObject()
+		ancestorL2APIVersion := "workloads.kubeblocks.io/v1alpha1"
+		ancestorL2Kind := "StatefulReplicaSet"
+		ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, "foo").
+			SetOwnerReferences(ancestorL2APIVersion, ancestorL2Kind, ancestorLevel2).
+			GetObject()
+		ancestorL1APIVersion := "apps/v1"
+		ancestorL1Kind := "StatefulSet"
+		object := builder.NewPodBuilder(namespace, "foo-0").
+			SetOwnerReferences(ancestorL1APIVersion, ancestorL1Kind, ancestorLevel1).
+			GetObject()
+
+		return ancestorLevel2, ancestorLevel1, object
+	}
+
 	BeforeEach(func() {
 		handler = &EnqueueRequestForAncestor{
 			Client:    k8sMock,
@@ -151,24 +167,14 @@ var _ = Describe("enqueue ancestor", func() {
 			Expect(ownerRef).Should(BeNil())
 
 			By("builder ancestor tree")
-			ancestorLevel2 := builder.NewStatefulReplicaSetBuilder(namespace, "foo").GetObject()
-			ancestorL2APIVersion := "workloads.kubeblocks.io/v1alpha1"
-			ancestorL2Kind := "StatefulReplicaSet"
-			ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, "foo").
-				SetOwnerReferences(ancestorL2APIVersion, ancestorL2Kind, ancestorLevel2).
-				GetObject()
-			ancestorL1APIVersion := "apps/v1"
-			ancestorL1Kind := "StatefulSet"
-			object := builder.NewPodBuilder(namespace, "foo-0").
-				SetOwnerReferences(ancestorL1APIVersion, ancestorL1Kind, ancestorLevel1).
-				GetObject()
+			ancestorLevel2, ancestorLevel1, object := buildAncestorTree()
 
 			By("set upToLevel to 1")
 			ownerRef, err = handler.getOwnerUpTo(ctx, object, 1, *scheme)
 			Expect(err).Should(BeNil())
 			Expect(ownerRef).ShouldNot(BeNil())
-			Expect(ownerRef.APIVersion).Should(Equal(ancestorL1APIVersion))
-			Expect(ownerRef.Kind).Should(Equal(ancestorL1Kind))
+			Expect(ownerRef.APIVersion).Should(Equal(ancestorLevel1.APIVersion))
+			Expect(ownerRef.Kind).Should(Equal(ancestorLevel1.Kind))
 			Expect(ownerRef.Name).Should(Equal(ancestorLevel1.Name))
 			Expect(ownerRef.UID).Should(Equal(ancestorLevel1.UID))
 
@@ -184,8 +190,8 @@ var _ = Describe("enqueue ancestor", func() {
 			ownerRef, err = handler.getOwnerUpTo(ctx, object, handler.UpToLevel, *scheme)
 			Expect(err).Should(BeNil())
 			Expect(ownerRef).ShouldNot(BeNil())
-			Expect(ownerRef.APIVersion).Should(Equal(ancestorL2APIVersion))
-			Expect(ownerRef.Kind).Should(Equal(ancestorL2Kind))
+			Expect(ownerRef.APIVersion).Should(Equal(ancestorLevel2.APIVersion))
+			Expect(ownerRef.Kind).Should(Equal(ancestorLevel2.Kind))
 			Expect(ownerRef.Name).Should(Equal(ancestorLevel2.Name))
 			Expect(ownerRef.UID).Should(Equal(ancestorLevel2.UID))
 		})
@@ -243,18 +249,8 @@ var _ = Describe("enqueue ancestor", func() {
 		})
 
 		It("should work well", func() {
-			By("build ancestors")
-			ancestorLevel2 := builder.NewStatefulReplicaSetBuilder(namespace, "foo-level-2").GetObject()
-			ancestorL2APIVersion := "workloads.kubeblocks.io/v1alpha1"
-			ancestorL2Kind := "StatefulReplicaSet"
-			ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, "foo-level-1").
-				SetOwnerReferences(ancestorL2APIVersion, ancestorL2Kind, ancestorLevel2).
-				GetObject()
-			ancestorL1APIVersion := "apps/v1"
-			ancestorL1Kind := "StatefulSet"
-			object := builder.NewPodBuilder(namespace, "foo-level-1-0").
-				SetOwnerReferences(ancestorL1APIVersion, ancestorL1Kind, ancestorLevel1).
-				GetObject()
+			By("build ancestor tree")
+			ancestorLevel2, ancestorLevel1, object := buildAncestorTree()
 
 			k8sMock.EXPECT().
 				Get(gomock.Any(), gomock.Any(), &appsv1.StatefulSet{}, gomock.Any()).
@@ -282,7 +278,7 @@ var _ = Describe("enqueue ancestor", func() {
 			Expect(len(result)).Should(Equal(0))
 
 			By("set level 1 ancestor's owner not exist")
-			object.OwnerReferences[0].APIVersion = ancestorL1APIVersion
+			object.OwnerReferences[0].APIVersion = ancestorLevel1.APIVersion
 			k8sMock.EXPECT().
 				Get(gomock.Any(), gomock.Any(), &appsv1.StatefulSet{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, sts *appsv1.StatefulSet, _ ...client.ListOptions) error {
@@ -305,17 +301,7 @@ var _ = Describe("enqueue ancestor", func() {
 		It("should work well", func() {
 			By("build events and queue")
 			queue := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "enqueue-ancestor-test")
-			ancestorLevel2 := builder.NewStatefulReplicaSetBuilder(namespace, "foo-level-2").GetObject()
-			ancestorL2APIVersion := "workloads.kubeblocks.io/v1alpha1"
-			ancestorL2Kind := "StatefulReplicaSet"
-			ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, "foo-level-1").
-				SetOwnerReferences(ancestorL2APIVersion, ancestorL2Kind, ancestorLevel2).
-				GetObject()
-			ancestorL1APIVersion := "apps/v1"
-			ancestorL1Kind := "StatefulSet"
-			object := builder.NewPodBuilder(namespace, "foo-level-1-0").
-				SetOwnerReferences(ancestorL1APIVersion, ancestorL1Kind, ancestorLevel1).
-				GetObject()
+			ancestorLevel2, ancestorLevel1, object := buildAncestorTree()
 			createEvent := event.CreateEvent{Object: object}
 			updateEvent := event.UpdateEvent{ObjectOld: object, ObjectNew: object}
 			deleteEvent := event.DeleteEvent{Object: object}

@@ -367,6 +367,9 @@ func (pgOps *PostgresOperations) isSwitchoverPossible(ctx context.Context, prima
 		return false, errors.Errorf("switchover need a primary")
 	}
 
+	if primary != "" && (pgOps.Cs.GetCluster().Leader == nil || pgOps.Cs.GetCluster().Leader.GetMember().GetName() != primary) {
+		return false, errors.Errorf("leader name does not match")
+	}
 	replicationMode, err := pgOps.getReplicationMode(ctx)
 	if err != nil {
 		return false, errors.Errorf("get replication mode failed, err:%v", err)
@@ -1040,6 +1043,7 @@ func (pgOps *PostgresOperations) start(ctx context.Context, podName string) erro
 		pgOps.Logger.Errorf("start err: %v", err)
 		return err
 	}
+	_ = pgOps.InitDelay()
 
 	return nil
 }

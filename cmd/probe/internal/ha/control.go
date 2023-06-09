@@ -179,6 +179,7 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 	}
 
 	if !h.isDBRunning() {
+		_ = h.DB.InitDelay()
 		h.log.Errorf("in control loop, db is not running now")
 		return
 	}

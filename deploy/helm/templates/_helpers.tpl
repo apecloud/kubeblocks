@@ -257,6 +257,13 @@ Define addon prometheus name
 {{- end }}
 
 {{/*
+Define addon prometheus name
+*/}}
+{{- define "addon.prometheus-kubeblocks.name" -}}
+{{- print "p" }}
+{{- end }}
+
+{{/*
 Define addon alertmanager-webhook-adaptor name
 */}}
 {{- define "addon.alertmanager-webhook-adaptor.name" -}}

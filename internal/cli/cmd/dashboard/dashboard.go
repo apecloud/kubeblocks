@@ -101,6 +101,18 @@ var (
 			TargetPort: "19090",
 		},
 		{
+			Name:       "kb-addon-p-kb-prometheus-cluster-alertmanager",
+			AddonName:  "kb-addon-p-kb-prometheus-cluster-alertmanager",
+			Label:      "app.kubernetes.io/instance=kb-addon-p-prometheus-cluster,app.kubernetes.io/managed-by=kubeblocks,apps.kubeblocks.io/component-name=server",
+			TargetPort: "19093",
+		},
+		{
+			Name:       "kb-addon-p-kb-prometheus-cluster-alertmanagerserver",
+			AddonName:  "kb-addon-p-kb-prometheus-cluster-alertmanagerserver",
+			Label:      "app.kubernetes.io/instance=kb-addon-p-prometheus-cluster,app.kubernetes.io/managed-by=kubeblocks,apps.kubeblocks.io/component-name=alertmanager",
+			TargetPort: "19090",
+		},
+		{
 			Name:       "kubeblocks-nyancat",
 			AddonName:  "kb-addon-nyancat",
 			Label:      "app.kubernetes.io/instance=kb-addon-nyancat",

@@ -1,0 +1,40 @@
+---
+# Source: prometheus/templates/alertmanager/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    component: "alertmanager"
+    app: prometheus
+    release: my-promethus
+    chart: prometheus-15.16.1
+    heritage: Helm
+  name: prometheus-alertmanager
+subjects:
+  - kind: ServiceAccount
+    name: prometheus-alertmanager
+    namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-alertmanager
+---
+# Source: prometheus/templates/server/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    component: "server"
+    app: prometheus
+    release: my-promethus
+    chart: prometheus-15.16.1
+    heritage: Helm
+  name: prometheus-server
+subjects:
+  - kind: ServiceAccount
+    name: prometheus-server
+    namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-server

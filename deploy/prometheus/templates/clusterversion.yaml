@@ -1,0 +1,30 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: prometheus-{{ .Values.images.tag }}
+  labels:
+      {{- include "prometheus.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: prometheus
+  componentVersions:
+  - componentDefRef: prometheus-server
+    versionsContext:
+      containers:
+      - name: prometheus-server-configmap-reload
+        image: {{ .Values.images.configmapReload.repository }}:{{ default .Chart.AppVersion .Values.images.configmapReload.tag }}
+        imagePullPolicy: {{ default .Values.images.pullPolicy "IfNotPresent" }}
+
+      - name: prometheus-server
+        image:  {{ .Values.images.prometheus.repository }}:{{ default .Chart.AppVersion .Values.images.prometheus.tag }}
+        imagePullPolicy: {{ default .Values.images.pullPolicy "IfNotPresent" }}
+
+  - componentDefRef: alertmanager
+    versionsContext:
+      containers:
+        - name: prometheus-alertmanager
+          image: {{ .Values.images.alertmanager.repository }}:{{ default .Chart.AppVersion .Values.images.alertmanager.tag }}
+          imagePullPolicy: {{ default .Values.images.pullPolicy "IfNotPresent" }}
+        - name: prometheus-alertmanager-configmap-reload
+          image: {{ .Values.images.configmapReload.repository }}:{{ default .Chart.AppVersion .Values.images.configmapReload.tag }}
+          magePullPolicy: {{ default .Values.images.pullPolicy "IfNotPresent" }}
+

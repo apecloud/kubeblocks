@@ -1,0 +1,60 @@
+---
+# Source: prometheus/templates/alertmanager/cm.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    component: "alertmanager"
+    app: prometheus
+    release: my-promethus
+    chart: prometheus-15.16.1
+    heritage: Helm
+  name: prometheus-alertmanager
+  namespace: default
+data:
+{{ range $path, $content := .Files.Glob "config/alertmanager/*.yml" }}
+  {{ trimPrefix "config/alertmanager/" $path }}: |-
+  {{- $content | toString | nindent 4 }}
+{{ end }}
+---
+# Source: prometheus/templates/server/cm.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    component: "server"
+    app: prometheus
+    release: my-promethus
+    chart: prometheus-15.16.1
+    heritage: Helm
+  name: prometheus-rule
+  namespace: default
+data:
+{{ range $path, $content := .Files.Glob "config/prometheus-server/rulesFiles/*" }}
+  {{ trimPrefix "config/prometheus-server/rulesFiles/" $path }}: |-
+  {{- $content | toString | nindent 4 }}
+{{ end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    component: "server"
+    app: prometheus
+    release: my-promethus
+    chart: prometheus-15.16.1
+    heritage: Helm
+  name: prometheus-server
+  namespace: default
+data:
+{{- $values := .Values }}
+{{ range $path, $content := .Files.Glob "config/prometheus-server/serverFiles/*" }}
+  {{ trimPrefix "config/prometheus-server/serverFiles/" $path }}: |-
+    global:
+    {{- with $values.server.global }}
+      scrape_interval: {{ .scrape_interval }}
+      scrape_timeout: {{ .scrape_timeout }}
+      evaluation_interval: {{ .evaluation_interval }}
+    {{ end }}
+  {{- $content | toString | nindent 4 }}
+{{ end }}

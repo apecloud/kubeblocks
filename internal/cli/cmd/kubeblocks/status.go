@@ -22,11 +22,13 @@ package kubeblocks
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/containerd/stargz-snapshotter/estargz/errorutil"
 	"github.com/spf13/cobra"
+	"golang.org/x/exp/maps"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
@@ -159,8 +161,6 @@ func (o *statusOptions) complete(f cmdutil.Factory) error {
 	if o.ns == "" {
 		printer.Warning(o.Out, "Failed to find deployed KubeBlocks in any namespace\n")
 		printer.Warning(o.Out, "Will check all namespaces for KubeBlocks resources left behind\n")
-	} else {
-		fmt.Fprintf(o.Out, "Kuberblocks is deployed in namespace: %s\n", o.ns)
 	}
 
 	o.selectorList = []metav1.ListOptions{
@@ -176,6 +176,7 @@ func (o *statusOptions) run() error {
 
 	allErrs := make([]error, 0)
 	o.buildSelectorList(ctx, &allErrs)
+	o.showK8sClusterInfos(ctx, &allErrs)
 	o.showWorkloads(ctx, &allErrs)
 	o.showAddons()
 
@@ -415,6 +416,55 @@ func (o *statusOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
 			tblPrinter.AddRow(row...)
 		}
 	}
+	tblPrinter.Print()
+}
+
+func (o *statusOptions) showK8sClusterInfos(ctx context.Context, allErrs *[]error) {
+	version, err := util.GetVersionInfo(o.client)
+	if err != nil {
+		appendErrIgnoreNotFound(allErrs, err)
+	}
+	if o.ns != "" {
+		fmt.Fprintf(o.Out, "KubeBlocks is deployed in namespace: %s", o.ns)
+		if version.KubeBlocks != "" {
+			fmt.Fprintf(o.Out, ",version: %s\n", version.KubeBlocks)
+		} else {
+			printer.PrintBlankLine(o.Out)
+		}
+	}
+
+	provider, err := util.GetK8sProvider(version.Kubernetes, o.client)
+	if err != nil {
+		*allErrs = append(*allErrs, fmt.Errorf("failed to get kubernetes provider: %v", err))
+	}
+	if !provider.IsCloud() {
+		return
+	}
+	fmt.Fprintf(o.Out, "\nKubernetes Cluster:\n")
+	tblPrinter := printer.NewTablePrinter(o.Out)
+	tblPrinter.SetHeader("VERSION", "PROVIDER", "REGION", "AVAILABLE ZONES")
+	nodesList, err := o.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		appendErrIgnoreNotFound(allErrs, err)
+	}
+	if nodesList == nil {
+		tblPrinter.AddRow(version.Kubernetes, provider, "", "")
+		tblPrinter.Print()
+		return
+	}
+	var region string
+	availableZones := make(map[string]struct{})
+	for _, node := range nodesList.Items {
+		labels := node.GetLabels()
+		if labels == nil {
+			continue
+		}
+		region = labels[constant.RegionLabelKey]
+		availableZones[labels[constant.ZoneLabelKey]] = struct{}{}
+	}
+	allZones := maps.Keys(availableZones)
+	sort.Strings(allZones)
+	tblPrinter.AddRow(version.Kubernetes, provider, region, strings.Join(allZones, ","))
 	tblPrinter.Print()
 }
 

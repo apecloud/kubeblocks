@@ -52,7 +52,6 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
@@ -632,7 +631,7 @@ var _ = Describe("Cluster Controller", func() {
 					}
 
 					By("Checking backup policy created from backup policy template")
-					policyName := lifecycle.DeriveBackupPolicyName(clusterKey.Name, compDef.Name, "")
+					policyName := DeriveBackupPolicyName(clusterKey.Name, compDef.Name, "")
 					clusterDef.Spec.ComponentDefs[i].HorizontalScalePolicy =
 						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
 							BackupPolicyTemplateName: backupPolicyTPLName}
@@ -1330,7 +1329,7 @@ var _ = Describe("Cluster Controller", func() {
 				},
 			},
 			Spec: dataprotectionv1alpha1.BackupSpec{
-				BackupPolicyName: lifecycle.DeriveBackupPolicyName(clusterKey.Name, compDefName, ""),
+				BackupPolicyName: DeriveBackupPolicyName(clusterKey.Name, compDefName, ""),
 				BackupType:       "snapshot",
 			},
 		}
@@ -1938,7 +1937,7 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(tmpCluster.Status.ObservedGeneration).Should(BeZero())
 				condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
 				g.Expect(condition).ShouldNot(BeNil())
-				g.Expect(condition.Reason).Should(BeEquivalentTo(lifecycle.ReasonPreCheckFailed))
+				g.Expect(condition.Reason).Should(BeEquivalentTo(ReasonPreCheckFailed))
 			})).Should(Succeed())
 
 			// TODO: removed conditionsError phase need to review correct-ness of following commented off block:
@@ -1977,7 +1976,7 @@ var _ = Describe("Cluster Controller", func() {
 					g.Expect(cluster.Status.ObservedGeneration).Should(BeZero())
 					condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
 					g.Expect(condition).ShouldNot(BeNil())
-					g.Expect(condition.Reason).Should(BeEquivalentTo(lifecycle.ReasonPreCheckFailed))
+					g.Expect(condition.Reason).Should(BeEquivalentTo(ReasonPreCheckFailed))
 				})).Should(Succeed())
 			}).Should(Succeed())
 
@@ -1997,7 +1996,7 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(cluster.Status.ObservedGeneration).Should(BeZero())
 				condition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
 				g.Expect(condition).ShouldNot(BeNil())
-				g.Expect(condition.Reason).Should(Equal(lifecycle.ReasonPreCheckFailed))
+				g.Expect(condition.Reason).Should(Equal(ReasonPreCheckFailed))
 			})).Should(Succeed())
 
 			By("reset and waiting cluster to Creating")
@@ -2034,7 +2033,7 @@ var _ = Describe("Cluster Controller", func() {
 					// REVIEW/TODO: (wangyelei) following expects causing inconsistent behavior
 					condition := meta.FindStatusCondition(tmpCluster.Status.Conditions, appsv1alpha1.ConditionTypeApplyResources)
 					g.Expect(condition).ShouldNot(BeNil())
-					g.Expect(condition.Reason).Should(Equal(lifecycle.ReasonApplyResourcesFailed))
+					g.Expect(condition.Reason).Should(Equal(ReasonApplyResourcesFailed))
 				})).Should(Succeed())
 		})
 	})

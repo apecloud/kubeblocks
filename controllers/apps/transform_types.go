@@ -17,15 +17,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package lifecycle
+package apps
 
 import (
-	"time"
-
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,30 +36,18 @@ import (
 )
 
 var (
-	scheme = runtime.NewScheme()
+	rscheme = runtime.NewScheme()
 )
 
 func init() {
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(clientgoscheme.AddToScheme(rscheme))
 
-	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(dataprotectionv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(snapshotv1.AddToScheme(scheme))
-	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(batchv1.AddToScheme(scheme))
+	utilruntime.Must(appsv1alpha1.AddToScheme(rscheme))
+	utilruntime.Must(dataprotectionv1alpha1.AddToScheme(rscheme))
+	utilruntime.Must(snapshotv1.AddToScheme(rscheme))
+	utilruntime.Must(extensionsv1alpha1.AddToScheme(rscheme))
+	utilruntime.Must(batchv1.AddToScheme(rscheme))
 }
-
-type Action string
-
-const (
-	CREATE = Action("CREATE")
-	UPDATE = Action("UPDATE")
-	DELETE = Action("DELETE")
-	STATUS = Action("STATUS")
-)
-
-// default reconcile requeue after duration
-var requeueDuration = time.Millisecond * 100
 
 type gvkNObjKey struct {
 	schema.GroupVersionKind

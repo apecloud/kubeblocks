@@ -136,9 +136,9 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	if viper.GetBool("VOLUMESNAPSHOT") {
 		if intctrlutil.InVolumeSnapshotV1Beta1() {
-			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.Predicates{})
 		} else {
-			b.Owns(&snapshotv1.VolumeSnapshot{}, builder.OnlyMetadata, builder.Predicates{})
+			b.Owns(&snapshotv1.VolumeSnapshot{}, builder.Predicates{})
 		}
 	}
 
@@ -645,9 +645,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 		}
 
 		controllerutil.AddFinalizer(snap, dataProtectionFinalizerName)
-
-		scheme, _ := dataprotectionv1alpha1.SchemeBuilder.Build()
-		if err = controllerutil.SetControllerReference(backup, snap, scheme); err != nil {
+		if err = controllerutil.SetControllerReference(backup, snap, r.Scheme); err != nil {
 			return err
 		}
 

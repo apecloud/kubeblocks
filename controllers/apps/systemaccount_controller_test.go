@@ -99,6 +99,8 @@ var _ = Describe("SystemAccount Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		testapps.ClearResources(&testCtx, intctrlutil.EndpointsSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
 	}
 
 	/**
@@ -643,7 +645,7 @@ var _ = Describe("SystemAccount Controller", func() {
 
 				// delete one job directly, but the job is completed.
 				By("Delete one job and mark it as JobComplete, the system should create new secrets.")
-				jobKey = client.ObjectKeyFromObject(&jobs.Items[0])
+				jobKey = client.ObjectKeyFromObject(&jobs.Items[1])
 				Eventually(func(g Gomega) {
 					tmpJob := &batchv1.Job{}
 					g.Expect(k8sClient.Get(ctx, jobKey, tmpJob)).To(Succeed())
@@ -656,6 +658,7 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(k8sClient.Delete(ctx, tmpJob)).Should(Succeed())
 					g.Expect(testapps.ChangeObj(&testCtx, tmpJob, func(ljob *batchv1.Job) {
 						controllerutil.RemoveFinalizer(ljob, orphanFinalizerName)
+						controllerutil.RemoveFinalizer(ljob, constant.DBClusterFinalizerName)
 					})).To(Succeed())
 
 				}).Should(Succeed())

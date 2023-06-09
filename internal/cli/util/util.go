@@ -885,3 +885,18 @@ func BuildPodAntiAffinity(podAntiAffinityStrategy string, topologyKeys []string)
 
 	return podAntiAffinity
 }
+
+// AddDirToPath add a dir to the PATH environment variable
+func AddDirToPath(dir string) error {
+	if dir == "" {
+		return fmt.Errorf("can't put empty dir into PATH")
+	}
+	p := strings.TrimSpace(os.Getenv("PATH"))
+	dir = strings.TrimSpace(dir)
+	if p == "" {
+		p = dir
+	} else {
+		p = dir + ":" + p
+	}
+	return os.Setenv("PATH", p)
+}

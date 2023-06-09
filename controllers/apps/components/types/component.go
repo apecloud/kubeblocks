@@ -38,7 +38,7 @@ const (
 	ComponentPhaseTransition = "ComponentPhaseTransition"
 
 	// PodContainerFailedTimeout the timeout for container of pod failures, the component phase will be set to Failed/Abnormal after this time.
-	PodContainerFailedTimeout = time.Minute
+	PodContainerFailedTimeout = 10 * time.Second
 
 	// PodScheduledFailedTimeout timeout for scheduling failure.
 	PodScheduledFailedTimeout = 30 * time.Second

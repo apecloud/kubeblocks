@@ -1,14 +1,20 @@
 /*
-Copyright 2021 The Dapr Authors
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-    http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cli
@@ -34,15 +40,14 @@ var RootCmd = &cobra.Command{
 	Use:   "sqlctl",
 	Short: "SQL Channel CLI",
 	Long: `
-	  __                
-     ____/ /___ _____  _____
-    / __  / __ '/ __ \/ ___/
-   / /_/ / /_/ / /_/ / /    
-   \__,_/\__,_/ .___/_/     
-	     /_/            
+   _____ ____    __       ________                           __
+  / ___// __ \  / /      / ____/ /_  ____ _____  ____  ___  / /
+  \__ \/ / / / / /      / /   / __ \/ __ \/ __ \/ __ \/ _ \/ /
+ ___/ / /_/ / / /___   / /___/ / / / /_/ / / / / / / /  __/ /
+/____/\___\_\/_____/   \____/_/ /_/\__,_/_/ /_/_/ /_/\___/_/
 									   
 ===============================
-Distributed Application Runtime`,
+SQL Channel client`,
 	Run: func(cmd *cobra.Command, _ []string) {
 		if versionFlag {
 			printVersion()
@@ -52,7 +57,7 @@ Distributed Application Runtime`,
 	},
 }
 
-type daprVersion struct {
+type sqlChannelVersion struct {
 	CliVersion     string `json:"Cli version"`
 	RuntimeVersion string `json:"Runtime version"`
 }
@@ -60,7 +65,7 @@ type daprVersion struct {
 var (
 	cliVersion            string
 	versionFlag           bool
-	daprVer               daprVersion
+	sqlChannelVer         sqlChannelVersion
 	logAsJSON             bool
 	sqlChannelRuntimePath string
 )
@@ -70,7 +75,7 @@ func Execute(version, apiVersion string) {
 	cliVersion = version
 	api.RuntimeAPIVersion = apiVersion
 
-	daprVer = daprVersion{
+	sqlChannelVer = sqlChannelVersion{
 		CliVersion:     version,
 		RuntimeVersion: strings.ReplaceAll(standalone.GetRuntimeVersion(), "\n", ""),
 	}
@@ -86,12 +91,12 @@ func Execute(version, apiVersion string) {
 }
 
 func setVersion() {
-	template := fmt.Sprintf(cliVersionTemplateString, daprVer.CliVersion, daprVer.RuntimeVersion)
+	template := fmt.Sprintf(cliVersionTemplateString, sqlChannelVer.CliVersion, sqlChannelVer.RuntimeVersion)
 	RootCmd.SetVersionTemplate(template)
 }
 
 func printVersion() {
-	fmt.Printf(cliVersionTemplateString, daprVer.CliVersion, daprVer.RuntimeVersion)
+	fmt.Printf(cliVersionTemplateString, sqlChannelVer.CliVersion, sqlChannelVer.RuntimeVersion)
 }
 
 func initConfig() {
@@ -99,16 +104,16 @@ func initConfig() {
 		print.EnableJSONFormat()
 	}
 
-	// err intentionally ignored since daprd may not yet be installed.
+	// err intentionally ignored since sqlChanneld may not yet be installed.
 	runtimeVer := GetRuntimeVersion()
 
-	daprVer = daprVersion{
+	sqlChannelVer = sqlChannelVersion{
 		// Set in Execute() method in this file before initConfig() is called by cmd.Execute().
 		CliVersion:     cliVersion,
 		RuntimeVersion: strings.ReplaceAll(runtimeVer, "\n", ""),
 	}
 
-	viper.SetEnvPrefix("dapr")
+	viper.SetEnvPrefix("sqlChannel")
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
 }
@@ -117,7 +122,7 @@ func init() {
 	RootCmd.PersistentFlags().StringVarP(&sqlChannelRuntimePath, "kb-runtime-dir", "", "/kubeblocks/", "The directory of kubeblocks binaries")
 }
 
-// GetRuntimeVersion returns the version for the local Dapr runtime.
+// GetRuntimeVersion returns the version for the local sqlChannel runtime.
 func GetRuntimeVersion() string {
 	sqlchannelCMD := filepath.Join(sqlChannelRuntimePath, "probe")
 

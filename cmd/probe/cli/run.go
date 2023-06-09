@@ -1,14 +1,20 @@
 /*
-Copyright 2021 The Dapr Authors
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-    http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 package cli
@@ -25,16 +31,13 @@ import (
 )
 
 var (
-	configFile         string
-	port               int
-	grpcPort           int
-	internalGRPCPort   int
-	logLevel           string
-	componentsPath     string
-	metricsPort        int
-	maxRequestBodySize int
-	readBufferSize     int
-	enableAppHealth    bool
+	configFile       string
+	port             int
+	grpcPort         int
+	internalGRPCPort int
+	logLevel         string
+	componentsPath   string
+	enableAppHealth  bool
 )
 
 const (
@@ -55,17 +58,14 @@ sqlchannelctr run  -- mysqld
 		ctx, cancel := context.WithCancel(context.Background())
 
 		commands, err := newCommands(ctx, &Options{
-			HTTPPort:           port,
-			GRPCPort:           grpcPort,
-			ConfigFile:         configFile,
-			Arguments:          args,
-			LogLevel:           logLevel,
-			ComponentsPath:     componentsPath,
-			MetricsPort:        metricsPort,
-			MaxRequestBodySize: maxRequestBodySize,
-			HTTPReadBufferSize: readBufferSize,
-			EnableAppHealth:    enableAppHealth,
-			InternalGRPCPort:   internalGRPCPort,
+			HTTPPort:         port,
+			GRPCPort:         grpcPort,
+			ConfigFile:       configFile,
+			Arguments:        args,
+			LogLevel:         logLevel,
+			ComponentsPath:   componentsPath,
+			EnableAppHealth:  enableAppHealth,
+			InternalGRPCPort: internalGRPCPort,
 		})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, err.Error())
@@ -109,10 +109,7 @@ func init() {
 	RunCmd.Flags().IntVarP(&internalGRPCPort, "dapr-internal-grpc-port", "I", 56471, "The gRPC port for the Dapr internal API to listen on")
 	RunCmd.Flags().StringVarP(&logLevel, "log-level", "", "info", "The log verbosity. Valid values are: debug, info, warn, error, fatal, or panic")
 	RunCmd.Flags().StringVarP(&componentsPath, "components-path", "d", "/kubeblocks/probe/components", "The path for components directory")
-	RunCmd.Flags().IntVarP(&metricsPort, "metrics-port", "M", -1, "The port of metrics on dapr")
 	RunCmd.Flags().BoolP("help", "h", false, "Print this help message")
-	RunCmd.Flags().IntVarP(&maxRequestBodySize, "dapr-http-max-request-size", "", -1, "Max size of request body in MB")
-	RunCmd.Flags().IntVarP(&readBufferSize, "dapr-http-read-buffer-size", "", -1, "HTTP header read buffer in KB")
 
 	RootCmd.AddCommand(RunCmd)
 }

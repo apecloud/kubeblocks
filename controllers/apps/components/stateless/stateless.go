@@ -33,11 +33,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // NewRSAvailableReason is added in a deployment when its newest replica set is made available
@@ -100,14 +100,20 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
 	if err != nil || len(deployList.Items) == 0 {
 		return "", nil, err
 	}
+	statusMessages := appsv1alpha1.ComponentMessageMap{}
 	// if the failed pod is not controlled by the new ReplicaSetKind
 	checkExistFailedPodOfNewRS := func(pod *corev1.Pod, workload metav1.Object) bool {
 		d := workload.(*appsv1.Deployment)
-		return !intctrlutil.PodIsReady(pod) && belongToNewReplicaSet(d, pod)
+		isFailed, _, message := internal.IsPodFailedAndTimedOut(pod)
+		existLatestRevisionFailedPod := isFailed && belongToNewReplicaSet(d, pod)
+		if existLatestRevisionFailedPod {
+			statusMessages.SetObjectMessage(pod.Kind, pod.Name, message)
+		}
+		return existLatestRevisionFailedPod
 	}
 	deploy := &deployList.Items[0]
 	return util.GetComponentPhaseWhenPodsNotReady(podList, deploy, stateless.getReplicas(),
-		deploy.Status.AvailableReplicas, checkExistFailedPodOfNewRS), nil, nil
+		deploy.Status.AvailableReplicas, checkExistFailedPodOfNewRS), statusMessages, nil
 }
 
 func (stateless *Stateless) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {

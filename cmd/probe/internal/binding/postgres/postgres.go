@@ -1043,6 +1043,8 @@ func (pgOps *PostgresOperations) start(ctx context.Context, podName string) erro
 		pgOps.Logger.Errorf("start err: %v", err)
 		return err
 	}
+
+	pgOps.OriRole = SECONDARY
 	_ = pgOps.InitDelay()
 
 	return nil

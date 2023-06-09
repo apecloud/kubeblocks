@@ -301,6 +301,7 @@ func (h *Ha) acquireLeaderLock() error {
 	return err
 }
 
+// TODO:后续可以改为直接判断进程
 func (h *Ha) isDBRunning() bool {
 	status, err := h.DB.GetStatus(h.ctx)
 	if err != nil {

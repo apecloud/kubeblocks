@@ -73,13 +73,15 @@ There are two ways to install kbcli on Windows:
 :::note
 
 By default, the script will be installed at C:\Program Files\kbcli-windows-amd64 and cannot be modified.
+
 If you need to customize the installation path, use the zip file.
 
 :::
 
 1. Run PowerShell as an **administrator** and execute `Set-ExecutionPolicy Unrestricted`.
 2. Install kbcli.  
-The following script will automatically install the environment variables at C:\Program Files\kbcli-windows-amd64.
+
+   The following script will automatically install the environment variables at C:\Program Files\kbcli-windows-amd64.
 
     ```bash
     powershell -Command " & ([scriptblock]::Create((iwr https://www.kubeblocks.io/installer/install_cli.ps1)))"

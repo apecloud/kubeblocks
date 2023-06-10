@@ -22,7 +22,7 @@ Uninstallation order:
 
 2. Uninstall KubeBlocks.
 
-3. Uninstall `kbcli`.
+3. Uninstall kbcli.
 
 ## Uninstall KubeBlocks
 
@@ -48,7 +48,7 @@ helm uninstall kubeblocks -n kb-system
 
 ## Uninstall kbcli
 
-Uninstall `kbcli` if you want to delete `kbcli` after your trial. Use the same option as the way you install `kbcli`.
+Uninstall kbcli if you want to delete kbcli after your trial. Use the same option as the way you install kbcli.
 
 <Tabs>
 <TabItem value="macOS" label="macOS" default>
@@ -64,6 +64,8 @@ For Homebrew, run
 ```bash
 brew uninstall kbcli
 ```
+
+kbcli creates a hidden folder named `~./kbcli` under the HOME directory to store configuration information and temporary files. You can delete this folder after uninstalling kbcli.
 
 </TabItem>
 
@@ -83,6 +85,10 @@ brew uninstall kbcli
       * If you install `kbcli` by script, double-click **Path** in **User variables**.
       * If you customize the installation path, double-click **Path** based on where you created the variable before.
    5. Select `C:\Program Files\kbcli-windows-amd64` or your customized path and delete it. This operation requires double confirmation.
+
+3. Delete a folder named `.kbcli`.
+
+   kbcli creates a folder named `./kbcli` under the C:\Users\username directory to store configuration information and temporary files. You can delete this folder after uninstalling kbcli.
 
 </TabItem>
 

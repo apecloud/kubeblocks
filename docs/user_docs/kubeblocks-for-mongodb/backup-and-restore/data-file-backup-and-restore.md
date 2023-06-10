@@ -120,6 +120,15 @@ Check your backup destination path. If there is no backup destination path, edit
 
 ```bash
 kbcli cluster edit-backup-policy mongodb-cluster-mongodb-backup-policy
+>...
+spec:
+  datafile:
+    ... 
+    persistentVolumeClaim:
+      createPolicy: IfNotPresent
+      initCapacity: 20Gi
+      name: kubeblocks-backup-data
+      storageClassName: csi-s3
 ```
 
 **Option 1. Manually Backup**

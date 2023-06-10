@@ -325,7 +325,7 @@ func (pgOps *PostgresOperations) query(ctx context.Context, sql string) (result 
 		}
 
 		if err = rows.Scan(values...); err != nil {
-			return
+			return nil, fmt.Errorf("error scanning row: %w", err)
 		}
 
 		r := map[string]interface{}{}

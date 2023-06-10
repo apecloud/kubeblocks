@@ -17,7 +17,7 @@
 
 cluster: {
 	metadata: {
-		name:      string
+		name: string
 	}
 }
 component: {
@@ -47,13 +47,13 @@ pvc: {
 		labels: {
 			"apps.kubeblocks.io/vct-name": volumeClaimTemplate.metadata.name
 			if component.clusterDefName != _|_ {
-				"app.kubernetes.io/name":            "\(component.clusterDefName)"
+				"app.kubernetes.io/name": "\(component.clusterDefName)"
 			}
 			if component.name != _|_ {
-			  "apps.kubeblocks.io/component-name": "\(component.name)"
+				"apps.kubeblocks.io/component-name": "\(component.name)"
 			}
-			"app.kubernetes.io/instance":        cluster.metadata.name
-			"app.kubernetes.io/managed-by":      "kubeblocks"
+			"app.kubernetes.io/instance":   cluster.metadata.name
+			"app.kubernetes.io/managed-by": "kubeblocks"
 		}
 	}
 	spec: {

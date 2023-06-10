@@ -5,24 +5,4 @@ metadata:
 data:
   setup.sh: |
     #!/bin/bash
-    cluster_info="";
-    for (( i=0; i<$KB_REPLICASETS_N; i++ )); do
-      if [ $i -ne 0 ]; then
-        cluster_info="$cluster_info;";
-      fi;
-      host=$(eval echo \$KB_REPLICASETS_"$i"_HOSTNAME)
-      cluster_info="$cluster_info$host:13306";
-    done;
-    idx=0;
-    while IFS='-' read -ra ADDR; do
-      for i in "${ADDR[@]}"; do
-        idx=$i;
-      done;
-    done <<< "$KB_POD_NAME";
-    echo $idx;
-    cluster_info="$cluster_info@$(($idx+1))";
-    echo $cluster_info;
-    mkdir -p /data/mysql/data;
-    mkdir -p /data/mysql/log;
-    chmod +777 -R /data/mysql;
-    docker-entrypoint.sh mysqld --cluster-start-index=1 --cluster-info="$cluster_info" --cluster-id=1
+    exec docker-entrypoint.sh

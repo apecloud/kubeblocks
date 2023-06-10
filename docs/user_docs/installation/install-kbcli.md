@@ -87,7 +87,7 @@ If you need to customize the installation path, use the zip file.
     To install a specified version of kbcli, use -v after the command and describe the version you want to install.
 
     ```bash
-    powershell -Command " & ([scriptblock]::Create((iwr <https://www.kubeblocks.io/installer/install_cli.ps1>))) -v 0.5.2-beta.3"
+    powershell -Command " & ([scriptblock]::Create((iwr <https://www.kubeblocks.io/installer/install_cli.ps1>))) -v 0.5.2"
     ```
 
 - Option 2: Install using the installation package.

@@ -58,12 +58,6 @@ If you previously ran `kbcli playground init` and it failed, running it again ma
 
 You can explore KubeBlocks, by referring to [Describe a MySQL cluster](#describe-a-mysql-cluster), [Access a MySQL cluster](#access-a-mysql-cluster), [Observe a MySQL cluster](#observe-a-mysql-cluster), and [High availability](#high-availability-of-mysql). Go through the following instructions to try basic features of KubeBlocks.
 
-:::note
-
-Playground does not support volume expansion, backup, and restore functions.
-
-:::
-
 ### Describe a MySQL cluster
 
 ***Steps:***

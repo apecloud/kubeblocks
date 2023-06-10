@@ -38,6 +38,12 @@ Meet the following requirements for a smooth user experience:
    2. Deploys KubeBlocks in the K3d cluster.
    3. Creates a standalone MySQL cluster.
 
+:::note
+
+If you previously ran `kbcli playground init` and it failed, running it again may cause errors. Please run the `kbcli playground destroy` command first to clean up the environment, then run `kbcli playground init` again.
+
+:::
+
 2. Check the MySQL cluster repeatedly until the status becomes `Running`. 
 
    ```bash

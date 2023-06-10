@@ -77,8 +77,9 @@ If you need to customize the installation path, use the zip file.
 
 :::
 
-1. Use PowerShell and run `Set-ExecutionPolicy Unrestricted`（Run PowerShell as the **administrator** ）.
-2. Install kbcli.The following script will automatically install the environment variables at C:\Program Files\kbcli-windows-amd64.
+1. Run PowerShell as an **administrator** and execute `Set-ExecutionPolicy Unrestricted`.
+2. Install kbcli.  
+The following script will automatically install the environment variables at C:\Program Files\kbcli-windows-amd64.
 
     ```bash
     powershell -Command " & ([scriptblock]::Create((iwr https://www.kubeblocks.io/installer/install_cli.ps1)))"

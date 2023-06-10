@@ -1,0 +1,23 @@
+apiVersion: v2
+name: nebulagraph 
+description: .
+
+type: application
+
+# This is the chart version
+version: 0.5.1-beta.0
+
+# This is the version number of nebulagraph
+appVersion: "3.5.0"
+
+home: https://github.com/vesoft-inc/nebula
+icon: https://camo.githubusercontent.com/7328ff61254fad959c362d1b3974a5a4384d8879d37df191de5e0b5c609156fe/68747470733a2f2f646f63732d63646e2e6e6562756c612d67726170682e636f6d2e636e2f666967757265732f6e6562756c617265706f2d6c6f676f2d6e65772e706e67
+
+
+maintainers:
+  - name: ApeCloud
+    url: https://github.com/apecloud/kubeblocks/
+
+
+sources:
+  - https://github.com/apecloud/kubeblocks/

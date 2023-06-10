@@ -1,0 +1,613 @@
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: nebulagraph
+  labels:
+    {{- include "nebulagraph.labels" . | nindent 4 }}
+spec:
+  connectionCredential:
+    username: root
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-nebulagraph)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tcp-nebulagraph)"
+    accesskey: ""
+    secretkey: ""
+  componentDefs:
+    - name: nebula-metad-0
+      workloadType: Stateful
+      characterType: nebula-metad
+      probes:
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9187
+      logConfigs:
+      configSpecs:
+        - name: nebula-metad-config
+          templateRef: nebula-metad-config-template
+          volumeName: nebula-metad-config
+          namespace: {{.Release.Namespace}}
+      service:
+        ports:
+          - name: tcp-nebula-metad
+            port: 9559
+            targetPort: tcp-nebula-metad
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+        containers:
+          - name: nebula-metad
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            securityContext:
+              runAsUser: 0
+            livenessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 10
+            readinessProbe:
+              failureThreshold: 2
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 3
+            startupProbe:
+              failureThreshold: 18
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /nebulagraph/configs/nebula-metad.conf
+                name: nebula-metad-config
+                readOnly: true
+                subPath: nebula-metad.conf
+            dnsPolicy: ClusterFirst
+            enableServiceLinks: true
+            ports:
+              - name: tcp-nebula-metad
+                containerPort: 9559
+              - name: tcp-metrics
+                containerPort: 9091
+            args:
+            env:
+              - name: CACHE_SIZE
+                valueFrom:
+                  resourceFieldRef:
+                    divisor: 1Gi
+                    resource: limits.memory
+        serviceAccountName: default
+        terminationGracePeriodSeconds: 300
+        volumes:
+          - emptyDir: {}
+            name: tools
+    - name: nebula-metad-1
+      workloadType: Stateful
+      characterType: nebula-metad
+      probes:
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9187
+      logConfigs:
+      configSpecs:
+        - name: nebula-metad-config
+          templateRef: nebula-metad-config-template
+          volumeName: nebula-metad-config
+          namespace: {{.Release.Namespace}}
+      service:
+        ports:
+          - name: tcp-nebula-metad
+            port: 9559
+            targetPort: tcp-nebula-metad
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+        containers:
+          - name: nebula-metad
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            securityContext:
+              runAsUser: 0
+            livenessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 10
+            readinessProbe:
+              failureThreshold: 2
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 3
+            startupProbe:
+              failureThreshold: 18
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /nebulagraph/configs/nebula-metad.conf
+                name: nebula-metad-config
+                readOnly: true
+                subPath: nebula-metad.conf
+            dnsPolicy: ClusterFirst
+            enableServiceLinks: true
+            ports:
+              - name: tcp-nebula-metad
+                containerPort: 9559
+              - name: tcp-metrics
+                containerPort: 9091
+            args:
+            env:
+              - name: CACHE_SIZE
+                valueFrom:
+                  resourceFieldRef:
+                    divisor: 1Gi
+                    resource: limits.memory
+        serviceAccountName: default
+        terminationGracePeriodSeconds: 300
+        volumes:
+          - emptyDir: {}
+            name: tools
+    - name: nebula-metad-2
+      workloadType: Stateful
+      characterType: nebula-metad
+      probes:
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9187
+      logConfigs:
+      configSpecs:
+        - name: nebula-metad-config
+          templateRef: nebula-metad-config-template
+          volumeName: nebula-metad-config
+          namespace: {{.Release.Namespace}}
+      service:
+        ports:
+          - name: tcp-nebula-metad
+            port: 9559
+            targetPort: tcp-nebula-metad
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+        containers:
+          - name: nebula-metad
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            securityContext:
+              runAsUser: 0
+            livenessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 10
+            readinessProbe:
+              failureThreshold: 2
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 3
+            startupProbe:
+              failureThreshold: 18
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /nebulagraph/configs/nebula-metad.conf
+                name: nebula-metad-config
+                readOnly: true
+                subPath: nebula-metad.conf
+            dnsPolicy: ClusterFirst
+            enableServiceLinks: true
+            ports:
+              - name: tcp-nebula-metad
+                containerPort: 9559
+              - name: tcp-metrics
+                containerPort: 9091
+            args:
+            env:
+              - name: CACHE_SIZE
+                valueFrom:
+                  resourceFieldRef:
+                    divisor: 1Gi
+                    resource: limits.memory
+        serviceAccountName: default
+        terminationGracePeriodSeconds: 300
+        volumes:
+          - emptyDir: {}
+            name: tools
+
+    - name: nebula-storaged-0
+      workloadType: Stateful
+      characterType: nebula-storaged
+      probes:
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9187
+      logConfigs:
+      configSpecs:
+        - name: nebula-storaged-config
+          templateRef: nebula-storaged-config-template
+          volumeName: nebula-storaged
+          namespace: {{.Release.Namespace}}
+      service:
+        ports:
+          - name: tcp-nebula-storaged
+            port: 9669
+            targetPort: tcp-nebula-storaged
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+        containers:
+          - name: nebula-storaged
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            securityContext:
+              runAsUser: 0
+            livenessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 10
+            readinessProbe:
+              failureThreshold: 2
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 3
+            startupProbe:
+              failureThreshold: 18
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /nebulagraph/configs/nebula-storaged.conf
+                name: nebula-storaged-config
+                readOnly: true
+                subPath: nebula-storaged.conf
+            dnsPolicy: ClusterFirst
+            enableServiceLinks: true
+            ports:
+              - name: tcp-nebula-storaged
+                containerPort: 9669
+              - name: tcp-metrics
+                containerPort: 9091
+            args:
+            env:
+              - name: CACHE_SIZE
+                valueFrom:
+                  resourceFieldRef:
+                    divisor: 1Gi
+                    resource: limits.memory
+        serviceAccountName: default
+        terminationGracePeriodSeconds: 300
+        volumes:
+          - emptyDir: {}
+            name: tools
+    - name: nebula-storaged-1
+      workloadType: Stateful
+      characterType: nebula-storaged
+      probes:
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9187
+      logConfigs:
+      configSpecs:
+        - name: nebula-storaged-config
+          templateRef: nebula-storaged-config-template
+          volumeName: nebula-storaged
+          namespace: {{.Release.Namespace}}
+      service:
+        ports:
+          - name: tcp-nebula-storaged
+            port: 9669
+            targetPort: tcp-nebula-storaged
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+        containers:
+          - name: nebula-storaged
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            securityContext:
+              runAsUser: 0
+            livenessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 10
+            readinessProbe:
+              failureThreshold: 2
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 3
+            startupProbe:
+              failureThreshold: 18
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /nebulagraph/configs/nebula-storaged.conf
+                name: nebula-storaged-config
+                readOnly: true
+                subPath: nebula-storaged.conf
+            dnsPolicy: ClusterFirst
+            enableServiceLinks: true
+            ports:
+              - name: tcp-nebula-storaged
+                containerPort: 9669
+              - name: tcp-metrics
+                containerPort: 9091
+            args:
+            env:
+              - name: CACHE_SIZE
+                valueFrom:
+                  resourceFieldRef:
+                    divisor: 1Gi
+                    resource: limits.memory
+        serviceAccountName: default
+        terminationGracePeriodSeconds: 300
+        volumes:
+          - emptyDir: {}
+            name: tools
+    - name: nebula-storaged-2
+      workloadType: Stateful
+      characterType: nebula-storaged
+      probes:
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9187
+      logConfigs:
+      configSpecs:
+        - name: nebula-storaged-config
+          templateRef: nebula-storaged-config-template
+          volumeName: nebula-storaged
+          namespace: {{.Release.Namespace}}
+      service:
+        ports:
+          - name: tcp-nebula-storaged
+            port: 9669
+            targetPort: tcp-nebula-storaged
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+        containers:
+          - name: nebula-storaged
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            securityContext:
+              runAsUser: 0
+            livenessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 10
+            readinessProbe:
+              failureThreshold: 2
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 3
+            startupProbe:
+              failureThreshold: 18
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /nebulagraph/configs/nebula-storaged.conf
+                name: nebula-storaged-config
+                readOnly: true
+                subPath: nebula-storaged.conf
+            dnsPolicy: ClusterFirst
+            enableServiceLinks: true
+            ports:
+              - name: tcp-nebula-storaged
+                containerPort: 9669
+              - name: tcp-metrics
+                containerPort: 9091
+            args:
+            env:
+              - name: CACHE_SIZE
+                valueFrom:
+                  resourceFieldRef:
+                    divisor: 1Gi
+                    resource: limits.memory
+        serviceAccountName: default
+        terminationGracePeriodSeconds: 300
+        volumes:
+          - emptyDir: {}
+            name: tools
+    - name: nebula-graphd-0
+      workloadType: Stateful
+      characterType: nebula-graphd
+      probes:
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9187
+      logConfigs:
+      configSpecs:
+        - name: nebula-graphd-config
+          templateRef: nebula-graphd-config-template
+          volumeName: nebula-graphd
+          namespace: {{.Release.Namespace}}
+      service:
+        ports:
+          - name: tcp-nebula-graphd
+            port: 9779
+            targetPort: tcp-nebula-graphd
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+        containers:
+          - name: nebula-graphd
+            imagePullPolicy: {{default .Values.images.pullPolicy "IfNotPresent"}}
+            securityContext:
+              runAsUser: 0
+            livenessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 10
+            readinessProbe:
+              failureThreshold: 2
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 15
+              successThreshold: 1
+              timeoutSeconds: 3
+            startupProbe:
+              failureThreshold: 18
+              httpGet:
+                path: /healthz
+                port: 9091
+                scheme: HTTP
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 3
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /nebulagraph/configs/nebula-graphd.conf
+                name: nebula-graphd-config
+                readOnly: true
+                subPath: nebula-graphd.conf
+            dnsPolicy: ClusterFirst
+            enableServiceLinks: true
+            ports:
+              - name: tcp-nebula-metad
+                containerPort: 9779
+              - name: tcp-metrics
+                containerPort: 9091
+            args:
+            env:
+              - name: CACHE_SIZE
+                valueFrom:
+                  resourceFieldRef:
+                    divisor: 1Gi
+                    resource: limits.memory
+        serviceAccountName: default
+        terminationGracePeriodSeconds: 300
+        volumes:
+          - emptyDir: {}
+            name: tools

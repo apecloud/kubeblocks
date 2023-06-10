@@ -1,0 +1,34 @@
+# Default values for milvus.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+
+clusterVersionOverride: ""
+nameOverride: ""
+fullnameOverride: ""
+
+
+## @param commonLabels Labels to add to all deployed objects
+##
+commonLabels: {}
+
+## @param application images
+##
+images:
+  pullPolicy: IfNotPresent
+  nebula-graphd:
+    repository: docker.io/vesoft/nebula-graphd
+    tag: v3.5.0
+  nebula-storaged:
+    repository: docker.io/vesoft/nebula-storaged
+    tag: v3.5.0
+  nebula-metad:
+    repository: dockker.io/vesoft/nebula-metad
+    tag: v3.5.0
+  nebula-console:
+    repository: docker.io/vesoft/nebula-console
+    tag: v3.5.0
+
+## @param debugEnabled enables containers' debug logging
+##
+debugEnabled: true

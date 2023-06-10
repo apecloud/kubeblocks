@@ -1,0 +1,29 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: nebulagraph-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "nebulagraph.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: nebulagraph
+  componentVersions:
+    - componentDefRef: nebula-graphd
+      versionsContext:
+        contains:
+        -name: nebula-graphd
+          image: {{ .Values.images.nebula-graphd.repository }}:{{ default .Chart.AppVersion .Values.images.minio.tag }}
+    - componentDefRef: nebula-storaged
+      versionsContext:
+        contains:
+        -name: nebula-storaged
+          image: {{ .Values.images.nebula-storaged.repository }}:{{ default .Chart.AppVersion .Values.images.minio.tag }}
+    - componentDefRef: nebula-metad
+      versionsContext:
+        contains:
+        -name: nebula-metad
+          image: {{ .Values.images.nebula-metad.repository }}:{{ default .Chart.AppVersion .Values.images.minio.tag }}
+    - componentDefRef: nebula-console
+      versionsContext:
+        contains:
+        -name: nebula-console
+          image: {{ .Values.images.nebula-console.repository }}:{{ default .Chart.AppVersion .Values.images.minio.tag }}

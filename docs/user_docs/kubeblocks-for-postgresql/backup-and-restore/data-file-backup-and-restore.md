@@ -114,6 +114,14 @@ kbcli kubeblocks config --set dataProtection.backupPVCName=kubeblocks-backup-dat
 
 ## Create backup
 
+***Before you start***
+
+Check your backup destination path. If there is no backup destination path, edit the backup policy of this cluster first. Make sure the destination path is configured before creating the backup.
+
+```bash
+kbcli cluster edit-backup-policy pg-cluster-postgresql-backup-policy
+```
+
 **Option 1. Manually Backup**
 
 1. Check whether the cluster is running.

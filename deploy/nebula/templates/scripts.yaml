@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nebula-graphd-scripts-template
+  labels:
+    {{- include "nebula.labels" . | nindent 4 }}
+data:
+  nebula-graphd-start.sh: |
+    {{- .Files.Get "scripts/nebula-graphd-start.sh.tpl" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nebula-storaged-scripts-template
+  labels:
+    {{- include "nebula.labels" . | nindent 4 }}
+data:
+  nebula-storaged-start.sh: |
+    {{- .Files.Get "scripts/nebula-storaged-start.sh.tpl" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nebula-metad-scripts-template
+  labels:
+    {{- include "nebula.labels" . | nindent 4 }}
+data:
+  nebula-metad-start.sh: |
+    {{- .Files.Get "scripts/nebula-metad-start.sh.tpl" | nindent 4 }}

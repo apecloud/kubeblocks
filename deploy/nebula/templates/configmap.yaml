@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nebula-metad-config-template
+  labels:
+    {{- include "nebula.labels" . | nindent 4 }}
+data:
+  nebula-metad.conf: |-
+    {{- .Files.Get "configs/nebula-metad.conf.tpl" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nebula-storaged-config-template
+  labels:
+    {{- include "nebula.labels" . | nindent 4 }}
+data:
+  nebula-storaged.conf: |-
+    {{- .Files.Get "configs/nebula-storaged.conf.tpl" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nebula-graphd-config-template
+  labels:
+    {{- include "nebula.labels" . | nindent 4 }}
+data:
+  nebula-graphd.conf: |-
+    {{- .Files.Get "configs/nebula-graphd.conf.tpl" | nindent 4 }}

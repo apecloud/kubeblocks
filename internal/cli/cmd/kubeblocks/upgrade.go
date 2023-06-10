@@ -21,6 +21,7 @@ package kubeblocks
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -68,6 +69,7 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before upgrade")
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for upgrading KubeBlocks, such as --timeout=10m")
 	cmd.Flags().BoolVar(&o.Wait, "wait", true, "Wait for KubeBlocks to be ready. It will wait for a --timeout period")
+	cmd.Flags().BoolVar(&o.diff, "diff", o.diff, "list the difference between the current version and target version. It will stop the upgrade.")
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
@@ -121,6 +123,10 @@ func (o *InstallOptions) Upgrade() error {
 	}
 	s.Success()
 
+	if o.diff {
+		return o.showUpgradeDiff()
+	}
+
 	// it's time to upgrade
 	msg := ""
 	if o.Version != "" {
@@ -146,4 +152,25 @@ func (o *InstallOptions) Upgrade() error {
 
 func (o *InstallOptions) upgradeChart() error {
 	return o.buildChart().Upgrade(o.HelmCfg)
+}
+
+func (o *InstallOptions) showUpgradeDiff() error {
+	// get kubeblocks current version manifest
+	oldManifest, err := helm.GetManifest(types.KubeBlocksReleaseName, o.HelmCfg)
+	if err != nil {
+		return fmt.Errorf("could not get the helm release manifest")
+	}
+	old, _ := os.Create("oldManifest.yaml")
+	defer old.Close()
+	_, err = old.Write([]byte(oldManifest))
+	// helm.Get
+	dryRun := true
+	helmInstallOps := o.buildChart()
+	helmInstallOps.DryRun = &dryRun
+	newManifest, err := helmInstallOps.GetChartManifestByDryRun(o.HelmCfg)
+	new_, _ := os.Create("newManifest.yaml")
+	defer new_.Close()
+	_, err = new_.Write([]byte(newManifest))
+	return err
+	// can get the uninstall version manifest, ues the target chart helm template
 }

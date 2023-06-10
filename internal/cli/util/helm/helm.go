@@ -398,10 +398,10 @@ func (i *InstallOpts) Upgrade(cfg *Config) error {
 	return nil
 }
 
-func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
+func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (*release.Release, error) {
 	installed, err := i.GetInstalled(cfg)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	settings := cli.New()
@@ -411,6 +411,7 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 	client.Wait = i.Wait
 	client.WaitForJobs = i.Wait
 	client.Timeout = i.Timeout
+	client.DryRun = *i.DryRun
 	if client.Timeout == 0 {
 		client.Timeout = defaultTimeout
 	}
@@ -426,30 +427,30 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 
 	cp, err := client.ChartPathOptions.LocateChart(i.Chart, settings)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	p := getter.All(settings)
 	vals, err := i.ValueOpts.MergeValues(p)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	// get coalesced values of current chart
 	currentValues, err := chartutil.CoalesceValues(installed.Chart, installed.Config)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	// merge current values into vals, so current release's user values can be kept
 	installed.Chart.Values = currentValues
 	vals, err = chartutil.CoalesceValues(installed.Chart, vals)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Check Chart dependencies to make sure all are present in /charts
 	chartRequested, err := loader.Load(cp)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Create context and prepare the handle of SIGTERM
@@ -472,22 +473,22 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 		// Read in the resources
 		target, err := cfg.KubeClient.Build(bytes.NewBuffer(obj.File.Data), false)
 		if err != nil {
-			return "", errors.Wrapf(err, "failed to update CRD %s", obj.Name)
+			return nil, errors.Wrapf(err, "failed to update CRD %s", obj.Name)
 		}
 
 		// helm only use the original.Info part for looking up original CRD in Update interface
 		// so set original with target as they have same .Info part
 		original := target
 		if _, err := cfg.KubeClient.Update(original, target, false); err != nil {
-			return "", errors.Wrapf(err, "failed to update CRD %s", obj.Name)
+			return nil, errors.Wrapf(err, "failed to update CRD %s", obj.Name)
 		}
 	}
 
 	released, err := client.RunWithContext(ctx, i.Name, chartRequested, vals)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return released.Info.Notes, nil
+	return released, nil
 }
 
 func GetChartVersions(chartName string) ([]*semver.Version, error) {
@@ -580,12 +581,12 @@ func GetValues(release string, cfg *Config) (map[string]interface{}, error) {
 }
 
 // GetManifest gives an implementation of 'helm get manifest' for target release
-func GetManifest(release string, cfg *Config) ([]byte, error) {
+func GetManifest(release string, cfg *Config) (string, error) {
 	actionConfig, err := NewActionConfig(cfg)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	client := action.NewGet(actionConfig)
 	res, err := client.Run(release)
-	return []byte(res.Manifest), err
+	return res.Manifest, err
 }

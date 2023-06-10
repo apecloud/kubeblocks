@@ -92,7 +92,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
 </TabItem>
 </Tabs>
 
-You can configure a global backup storage to make this storage the default backup destination path of all new clusters. But currently, the global backup storage cannot be synchronized as the backup destination path of created clusters.
+You can configure a global backup storage to make this storage the default backup destination path of all new clusters. But currently, the global backup storage cannot be synchronized as the backup destination path of existing clusters.
 
 Set the backup policy with the following command.
 

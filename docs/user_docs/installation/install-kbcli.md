@@ -92,7 +92,7 @@ If you need to customize the installation path, use the zip file.
 
 - Option 2: Install using the installation package.
 
-1. Download the kbcli installation zip package from GitHub.
+1. Download the kbcli installation zip package from [GitHub](https://github.com/apecloud/kubeblocks/releases/).
 2. Extract the file and add it to the environment variables.
     1. Click the Windows icon and select **System Settings**.
     2. Click **Settings** -> **Related Settings** -> **Advanced system settings**.

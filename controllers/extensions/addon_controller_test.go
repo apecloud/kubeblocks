@@ -61,6 +61,10 @@ var _ = Describe("Addon controller", func() {
 			client.HasLabels{
 				constant.AddonNameLabelKey,
 			})
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.JobSignature, true, inNS,
+			client.HasLabels{
+				constant.AppManagedByLabelKey,
+			})
 
 		// delete rest mocked objects
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
@@ -609,34 +613,6 @@ var _ = Describe("Addon controller", func() {
 			})
 			addonStatusPhaseCheck(2, extensionsv1alpha1.AddonFailed, nil)
 		})
-	})
-})
-
-var _ = Describe("Addon controller manager", func() {
-
-	cleanEnv := func() {
-		// must wait till resources deleted and no longer existed before the testcases start,
-		// otherwise if later it needs to create some new resource objects with the same name,
-		// in race conditions, it will find the existence of old objects, resulting failure to
-		// create the new objects.
-		By("clean resources")
-		// non-namespaced
-		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.AddonSignature, true, ml)
-
-		inNS := client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS))
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.JobSignature, true, inNS,
-			client.HasLabels{
-				constant.AddonNameLabelKey,
-			})
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.JobSignature, true, inNS,
-			client.HasLabels{
-				constant.AppManagedByLabelKey,
-			})
-	}
-
-	BeforeEach(func() {
-		cleanEnv()
 	})
 
 	Context("Addon controller SetupWithManager", func() {

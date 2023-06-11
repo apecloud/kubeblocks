@@ -19,7 +19,7 @@ spec:
     minioAccessKey: {{ .Values.minio.accessKey }}
     minioSecretKey: {{ .Values.minio.secretKey }}
   componentDefs:
-    - name: foxlake
+    - name: foxlake-server
       workloadType: Stateless
       characterType: foxlake
       service:

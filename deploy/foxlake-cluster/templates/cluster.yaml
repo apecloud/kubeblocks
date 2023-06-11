@@ -15,8 +15,8 @@ spec:
   tolerations: {{ . | toYaml | nindent 4 }}
   {{- end }}
   componentSpecs:
-    - name: foxlake # user-defined
-      componentDefRef: foxlake # ref clusterdefinition componentDefs.name
+    - name: foxlake-server # user-defined
+      componentDefRef: foxlake-server # ref clusterdefinition componentDefs.name
       serviceAccountName: {{ include "foxlake-cluster.serviceAccountName" . }}
       replicas: 1
       resources:

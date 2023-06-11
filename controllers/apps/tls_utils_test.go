@@ -45,7 +45,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 		clusterDefName      = "test-clusterdef-tls"
 		clusterVersionName  = "test-clusterversion-tls"
 		clusterNamePrefix   = "test-cluster"
-		statefulCompDefName = "replicasets"
+		statefulCompDefName = "mysql"
 		statefulCompName    = "mysql"
 		mysqlContainerName  = "mysql"
 		configSpecName      = "mysql-config-tpl"
@@ -291,8 +291,11 @@ var _ = Describe("TLS self-signed cert function", func() {
 					SetTLS(false).
 					Create(&testCtx).
 					GetObject()
-				Eventually(testapps.GetClusterObservedGeneration(&testCtx, client.ObjectKeyFromObject(clusterObj))).Should(BeEquivalentTo(1))
-				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, client.ObjectKeyFromObject(clusterObj))
+				clusterKey := client.ObjectKeyFromObject(clusterObj)
+				Eventually(k8sClient.Get(ctx, clusterKey, clusterObj)).Should(Succeed())
+				Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+				stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
 				sts := stsList.Items[0]
 				cd := &appsv1alpha1.ClusterDefinition{}
 				Expect(k8sClient.Get(ctx, types.NamespacedName{Name: clusterDefName, Namespace: testCtx.DefaultNamespace}, cd)).Should(Succeed())

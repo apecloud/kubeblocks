@@ -42,6 +42,7 @@ var _ = Describe("Cluster", func() {
 		testComponentWithInvalidClassPath    = "../../testing/testdata/component_with_invalid_class.yaml"
 		testComponentWithResourcePath        = "../../testing/testdata/component_with_resource_1c1g.yaml"
 		testComponentWithInvalidResourcePath = "../../testing/testdata/component_with_invalid_resource.yaml"
+		testClusterPath                      = "../../testing/testdata/cluster.yaml"
 	)
 
 	const (
@@ -55,7 +56,7 @@ var _ = Describe("Cluster", func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		cd := testing.FakeClusterDef()
-		fakeDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName, testing.IsDefautl)
+		fakeDefaultStorageClass := testing.FakeStorageClass(testing.StorageClassName, testing.IsDefault)
 		tf.FakeDynamicClient = testing.FakeDynamicClient(cd, fakeDefaultStorageClass, testing.FakeClusterVersion())
 		tf.Client = &clientfake.RESTClient{}
 	})
@@ -79,22 +80,12 @@ var _ = Describe("Cluster", func() {
 					IOStreams: streams,
 				},
 			}
+			o.Options = o
+			Expect(o.Complete()).To(Succeed())
 			Expect(o.Validate()).To(Succeed())
 			Expect(o.Name).ShouldNot(BeEmpty())
+			Expect(o.Run()).Should(HaveOccurred())
 		})
-
-		It("new command", func() {
-			cmd := NewCreateCmd(tf, streams)
-			Expect(cmd).ShouldNot(BeNil())
-			Expect(cmd.Flags().Set("cluster-definition", testing.ClusterDefName)).Should(Succeed())
-			Expect(cmd.Flags().Set("cluster-version", testing.ClusterVersionName)).Should(Succeed())
-			Expect(cmd.Flags().Set("set-file", testComponentPath)).Should(Succeed())
-			Expect(cmd.Flags().Set("termination-policy", "Delete")).Should(Succeed())
-
-			// must succeed otherwise exit 1 and make test fails
-			cmd.Run(nil, []string{"test1"})
-		})
-
 	})
 
 	Context("run", func() {
@@ -104,7 +95,8 @@ var _ = Describe("Cluster", func() {
 			clusterDef := testing.FakeClusterDef()
 			tf.FakeDynamicClient = testing.FakeDynamicClient(
 				clusterDef,
-				testing.FakeStorageClass(testing.StorageClassName, testing.IsDefautl),
+				testing.FakeStorageClass(testing.StorageClassName, testing.IsDefault),
+				testing.FakeClusterVersion(),
 				testing.FakeComponentClassDef(fmt.Sprintf("custom-%s", testing.ComponentDefName), clusterDef.Name, testing.ComponentDefName),
 				testing.FakeComponentClassDef("custom-mysql", clusterDef.Name, "mysql"),
 			)
@@ -119,12 +111,12 @@ var _ = Describe("Cluster", func() {
 				},
 				SetFile:           "",
 				ClusterDefRef:     testing.ClusterDefName,
-				ClusterVersionRef: "cluster-version",
+				ClusterVersionRef: testing.ClusterVersionName,
 				UpdatableFlags: UpdatableFlags{
 					PodAntiAffinity: "Preferred",
 					TopologyKeys:    []string{"kubernetes.io/hostname"},
 					NodeLabels:      map[string]string{"testLabelKey": "testLabelValue"},
-					TolerationsRaw:  []string{"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"},
+					TolerationsRaw:  []string{"engineType=mongo:NoSchedule"},
 					Tenancy:         string(appsv1alpha1.SharedNode),
 				},
 			}
@@ -177,7 +169,7 @@ var _ = Describe("Cluster", func() {
 			Run()
 		})
 
-		It("should fail if component with resource not matching to any class", func() {
+		It("should fail if component with resource not matching any class", func() {
 			o.Values = []string{fmt.Sprintf("type=%s,cpu=1,memory=2Gi", testing.ComponentDefName)}
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
@@ -189,7 +181,7 @@ var _ = Describe("Cluster", func() {
 			Run()
 		})
 
-		It("should fail if component with cpu not matching to any class", func() {
+		It("should fail if component with cpu not matching any class", func() {
 			o.Values = []string{fmt.Sprintf("type=%s,cpu=3", testing.ComponentDefName)}
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
@@ -206,14 +198,14 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
 
-		It("should succeed if component don't have class definition", func() {
+		It("should succeed if component hasn't class definition", func() {
 			o.Values = []string{fmt.Sprintf("type=%s,cpu=3,memory=7Gi", testing.ExtraComponentDefName)}
 			Expect(o.Complete()).Should(Succeed())
 			Expect(o.Validate()).Should(Succeed())
 			Run()
 		})
 
-		It("should fail if create cluster by file not existing", func() {
+		It("should fail if create cluster by non-existed file", func() {
 			o.SetFile = "test.yaml"
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
@@ -246,14 +238,20 @@ var _ = Describe("Cluster", func() {
 			Run()
 		})
 
-		It("should fail if create cluster by file with class not exists", func() {
+		It("should fail if create cluster by file with non-existed class", func() {
 			o.SetFile = testComponentWithInvalidClassPath
 			Expect(o.Complete()).Should(HaveOccurred())
 		})
 
-		It("should fail if create cluster by file with resource not matching to any class", func() {
+		It("should fail if create cluster by file with resource not matching any class", func() {
 			o.SetFile = testComponentWithInvalidResourcePath
 			Expect(o.Complete()).Should(HaveOccurred())
+		})
+
+		It("should succeed if create cluster with a complete config file", func() {
+			o.SetFile = testClusterPath
+			Expect(o.Complete()).Should(Succeed())
+			Expect(o.Validate()).Should(Succeed())
 		})
 	})
 
@@ -338,7 +336,7 @@ var _ = Describe("Cluster", func() {
 		})
 
 		Context("validate storageClass", func() {
-			It("can get all StorageClasses in K8S and check out if the cluster have a defalut StorageClasses by GetStorageClasses()", func() {
+			It("can get all StorageClasses in K8S and check out if the cluster have a default StorageClasses by GetStorageClasses()", func() {
 				storageClasses, existedDefault, err := getStorageClasses(o.Dynamic)
 				Expect(err).Should(Succeed())
 				Expect(storageClasses).Should(HaveKey(testing.StorageClassName))

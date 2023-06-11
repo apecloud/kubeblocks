@@ -125,7 +125,7 @@ func (o *listReceiversOptions) run() error {
 	return nil
 }
 
-// getRouteInfo get route clusters and severity
+// getRouteInfo gets route clusters and severity
 func getRouteInfo(route *route) map[string][]string {
 	routeInfoMap := map[string][]string{
 		routeMatcherClusterKey:  {},

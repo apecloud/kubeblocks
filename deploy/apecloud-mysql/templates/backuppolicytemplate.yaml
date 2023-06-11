@@ -11,12 +11,15 @@ spec:
   clusterDefinitionRef: apecloud-mysql
   backupPolicies:
   - componentDefRef: mysql
-    ttl: 7d
+    retention:
+      ttl: 7d
     schedule:
-      baseBackup:
-        type: snapshot
+      snapshot:
         enable: false
-        cronExpression: "0 18 * * 0"
+        cronExpression: "0 18 * * *"
+      datafile:
+        enable: false
+        cronExpression: "0 18 * * *"
     snapshot:
       hooks:
         containerName: mysql
@@ -26,5 +29,5 @@ spec:
         - "rm -f /data/mysql/data/.restore_new_cluster; sync"
       target:
         role: leader
-    full:
+    datafile:
       backupToolName: xtrabackup-for-apecloud-mysql

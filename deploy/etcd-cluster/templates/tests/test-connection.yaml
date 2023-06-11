@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: "{{ include "etcd-cluster.fullname" . }}-test-connection"
+  name: "{{ include "clustername" . }}-test-connection"
   labels:
     {{- include "etcd-cluster.labels" . | nindent 4 }}
   annotations:
@@ -11,5 +11,5 @@ spec:
     - name: wget
       image: busybox
       command: ['wget']
-      args: ['{{ include "etcd-cluster.fullname" . }}:{{ .Values.service.port }}']
+      args: ['{{ include "clustername" . }}:{{ .Values.service.port }}']
   restartPolicy: Never

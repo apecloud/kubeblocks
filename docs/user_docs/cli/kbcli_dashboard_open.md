@@ -22,7 +22,7 @@ kbcli dashboard open [flags]
 
 ```
   -h, --help                           help for open
-      --pod-running-timeout duration   The length of time (like 5s, 2m, or 3h, higher than zero) to wait until at least one pod is running (default 1m0s)
+      --pod-running-timeout duration   The time (like 5s, 2m, or 3h, higher than zero) to wait for at least one pod is running (default 1m0s)
       --port string                    dashboard local port
 ```
 

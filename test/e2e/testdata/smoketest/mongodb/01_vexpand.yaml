@@ -6,7 +6,7 @@ spec:
   clusterRef: mycluster
   type: VolumeExpansion
   volumeExpansion:
-    - componentName: replicaset
+    - componentName: mongodb
       volumeClaimTemplates:
         - name: data
           storage: "2Gi"

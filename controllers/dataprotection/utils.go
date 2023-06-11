@@ -26,13 +26,13 @@ import (
 // byBackupStartTime sorts a list of jobs by start timestamp, using their names as a tie breaker.
 type byBackupStartTime []dataprotectionv1alpha1.Backup
 
-// Len return the length of byBackupStartTime, for the sort.Sort
+// Len returns the length of byBackupStartTime, for the sort.Sort
 func (o byBackupStartTime) Len() int { return len(o) }
 
 // Swap the items, for the sort.Sort
 func (o byBackupStartTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
-// Less define how to compare items, for the sort.Sort
+// Less defines how to compare items, for the sort.Sort
 func (o byBackupStartTime) Less(i, j int) bool {
 	if o[i].Status.StartTimestamp == nil && o[j].Status.StartTimestamp != nil {
 		return false

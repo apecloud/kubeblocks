@@ -22,6 +22,9 @@ Usage: $(basename "$0") <options>
                                 10) trigger release
                                 11) release message
                                 12) send message
+                                13) patch release notes
+                                14) ignore cover pkgs
+                                15) set size label
     -tn, --tag-name           Release tag name
     -gr, --github-repo        Github Repo
     -gt, --github-token       Github token
@@ -31,6 +34,11 @@ Usage: $(basename "$0") <options>
     -bw, --bot-webhook        The bot webhook
     -tt, --trigger-type       The trigger type (e.g. release/package)
     -ru, --run-url            The run url
+    -fl, --file               The release notes file
+    -ip, --ignore-pkgs        The ignore cover pkgs
+    -br, --base-branch        The base branch name
+    -bc, --base-commit        The base commit id
+    -pn, --pr-number          The pull request number
 EOF
 }
 
@@ -50,6 +58,12 @@ main() {
     local TRIGGER_TYPE="release"
     local RELEASE_VERSION=""
     local RUN_URL=""
+    local FILE=""
+    local IGNORE_PKGS=""
+    local BASE_BRANCH=""
+    local BASE_COMMIT=""
+    local BASE_COMMIT_ID=HEAD^
+    local PR_NUMBER
 
     parse_command_line "$@"
 
@@ -89,6 +103,15 @@ main() {
         ;;
         12)
             send_message
+        ;;
+        13)
+            patch_release_notes
+        ;;
+        14)
+            ignore_cover_pkgs
+        ;;
+        15)
+            set_size_label
         ;;
         *)
             show_help
@@ -164,6 +187,36 @@ parse_command_line() {
                     shift
                 fi
                 ;;
+            -fl|--file)
+                if [[ -n "${2:-}" ]]; then
+                    FILE="$2"
+                    shift
+                fi
+                ;;
+            -ip|--ignore-pkgs)
+                if [[ -n "${2:-}" ]]; then
+                    IGNORE_PKGS="$2"
+                    shift
+                fi
+                ;;
+            -br|--base-branch)
+                if [[ -n "${2:-}" ]]; then
+                    BASE_BRANCH="$2"
+                    shift
+                fi
+                ;;
+            -bc|--base-commit)
+                if [[ -n "${2:-}" ]]; then
+                    BASE_COMMIT="$2"
+                    shift
+                fi
+                ;;
+            -pn|--pr-number)
+                if [[ -n "${2:-}" ]]; then
+                    PR_NUMBER="$2"
+                    shift
+                fi
+                ;;
             *)
                 break
                 ;;
@@ -236,7 +289,7 @@ check_numeric() {
 get_next_available_tag() {
     tag_type="$1"
     index=""
-    release_list=$( gh release list --repo $LATEST_REPO )
+    release_list=$( gh release list --repo $LATEST_REPO --limit 100 )
     for tag in $( echo "$release_list" | (grep "$tag_type" || true) ) ;do
         if [[ "$tag" != "$tag_type"* ]]; then
             continue
@@ -246,7 +299,7 @@ get_next_available_tag() {
         if [[ "$numeric" == "no" ]]; then
             continue
         fi
-        if [[ $numeric -gt $index ]]; then
+        if [[ $numeric -gt $index || -z "$index" ]]; then
             index=$numeric
         fi
     done
@@ -262,11 +315,13 @@ get_next_available_tag() {
 
 release_next_available_tag() {
     dispatches_url=$1
-    v_head="v$TAG_NAME"
-    alpha_type="$v_head.0-alpha."
-    beta_type="$v_head.0-beta."
-    rc_type="$v_head.0-rc."
-    stable_type="$v_head."
+    v_major_minor="v$TAG_NAME"
+    stable_type="$v_major_minor."
+    get_next_available_tag $stable_type
+    v_number=$RELEASE_VERSION
+    alpha_type="$v_number-alpha."
+    beta_type="$v_number-beta."
+    rc_type="$v_number-rc."
     case "$CONTENT" in
         *alpha*)
             get_next_available_tag "$alpha_type"
@@ -276,9 +331,6 @@ release_next_available_tag() {
         ;;
         *rc*)
             get_next_available_tag "$rc_type"
-        ;;
-        *stable*)
-            get_next_available_tag $stable_type
         ;;
     esac
 
@@ -309,6 +361,11 @@ release_message() {
 }
 
 send_message() {
+    if [[ "$TAG_NAME" != "v"*"."*"."* ]]; then
+        echo "invalid tag name"
+        return
+    fi
+
     if [[ "$CONTENT" == *"success" ]]; then
         curl -H "Content-Type: application/json" -X POST $BOT_WEBHOOK \
             -d '{"msg_type":"post","content":{"post":{"zh_cn":{"title":"Success:","content":[[{"tag":"text","text":"'$CONTENT'"}]]}}}}'
@@ -325,8 +382,35 @@ add_trigger_mode() {
     fi
 }
 
+get_base_commit_id() {
+    if [[ ! -z "$BASE_COMMIT" ]]; then
+        BASE_COMMIT_ID=$BASE_COMMIT
+        return
+    fi
+    base_branch_commits="$( git rev-list $BASE_BRANCH -n 100 )"
+    current_branch_commits="$( git rev-list $BRANCH_NAME -n 50 )"
+    for base_commit_id in $( echo "$base_branch_commits" ); do
+        found=false
+        for cur_commit_id in $( echo "$current_branch_commits" ); do
+            if [[ "$cur_commit_id" == "$base_commit_id" ]]; then
+                BASE_COMMIT_ID=$base_commit_id
+                found=true
+                break
+              fi
+        done
+        if [[ $found == true ]]; then
+            break
+        fi
+    done
+}
+
 get_trigger_mode() {
-    for filePath in $( git diff --name-only HEAD HEAD^ ); do
+    if [[ ! ("$BRANCH_NAME" == "main" || "$BRANCH_NAME" == "release-"* || "$BRANCH_NAME" == "releasing-"*) ]]; then
+        get_base_commit_id
+    fi
+    echo "BASE_COMMIT_ID:$BASE_COMMIT_ID"
+    filePaths=$( git diff --name-only HEAD ${BASE_COMMIT_ID} )
+    for filePath in $( echo "$filePaths" ); do
         if [[ "$filePath" == "go."* ]]; then
             add_trigger_mode "[test]"
             continue
@@ -378,6 +462,98 @@ check_package_version() {
         echo "$(tput -T xterm setaf 2)Version allows packaging$(tput -T xterm sgr0)"
     fi
     exit $exit_status
+}
+
+patch_release_notes() {
+    release_note=""
+    while read line; do
+      if [[ -z "${release_note}" ]]; then
+        release_note="$line"
+      else
+        release_note="$release_note\n$line"
+      fi
+    done < ${FILE}
+
+    release_id=`gh_curl -s $GITHUB_API/repos/$GITHUB_REPO/releases/tags/$TAG_NAME | jq -r '.id'`
+
+    curl -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3.raw" \
+           -X PATCH \
+    $GITHUB_API/repos/$GITHUB_REPO/releases/$release_id \
+    -d '{"body":"'"$release_note"'"}'
+}
+
+ignore_cover_pkgs() {
+    ignore_pkgs=$(echo "$IGNORE_PKGS" | sed 's/|/ /g')
+    while read line; do
+        ignore=false
+        for pkgs in $(echo "$ignore_pkgs"); do
+            if [[ "$line" == *"$LATEST_REPO/$pkgs"* ]]; then
+                ignore=true
+                break
+            fi
+        done
+        if [[ $ignore == true ]]; then
+            continue
+        fi
+        echo $line >> cover_new.out
+    done < ${FILE}
+}
+
+set_size_label() {
+    pr_changes=$( gh_curl -s $GITHUB_API/repos/$LATEST_REPO/pulls/$PR_NUMBER/files | jq -r '.[].changes' )
+    total_changes=0
+    for changes in $( echo "$pr_changes" ); do
+       total_changes=$(( $total_changes + $changes ))
+    done
+    size_label=""
+    if [[ $total_changes -lt 10 ]]; then
+        size_label="size/XS"
+    elif [[ $total_changes -lt 30 ]]; then
+        size_label="size/S"
+    elif [[ $total_changes -lt 100 ]]; then
+        size_label="size/M"
+    elif [[ $total_changes -lt 500 ]]; then
+        size_label="size/L"
+    elif [[ $total_changes -lt 1000 ]]; then
+        size_label="size/XL"
+    else
+        size_label="size/XXL"
+    fi
+    echo "size label:$size_label"
+    label_list=$( gh pr view $PR_NUMBER --repo $LATEST_REPO | grep labels: )
+    remove_label=""
+    add_label=true
+    for label in $( echo "$label_list" ); do
+        label=${label/,/}
+        case $label in
+            $size_label)
+                add_label=false
+                continue
+            ;;
+            size/*)
+                if [[ -z "$remove_label" ]]; then
+                    remove_label=$label
+                else
+                    remove_label="$label,$remove_label"
+                fi
+            ;;
+        esac
+    done
+    if [[ "$remove_label" == *"," ]]; then
+        echo $remove_label
+        remove_label=${remove_label::-1}
+    fi
+
+    if [[ ! -z "$remove_label" ]]; then
+        echo "remove label:$remove_label"
+        gh pr edit $PR_NUMBER --repo $LATEST_REPO --remove-label "$remove_label"
+    fi
+
+    if [[ $add_label == true ]]; then
+        echo "add label:$size_label"
+        gh pr edit $PR_NUMBER --repo $LATEST_REPO --add-label "$size_label"
+    fi
 }
 
 main "$@"

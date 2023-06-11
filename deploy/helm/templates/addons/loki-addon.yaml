@@ -1,0 +1,75 @@
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  name: loki
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+    "kubeblocks.io/provider": community
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  description: Grafana Loki is a horizontally scalable, highly available, and multi-tenant log aggregation system, which inspired by Prometheus.
+  type: Helm
+
+  helm:
+    chartLocationURL: "https://github.com/grafana/helm-charts/releases/download/helm-loki-5.5.8/loki-5.5.8.tgz"
+    # chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/...
+    installValues:
+      configMapRefs:
+        - name: {{ include "addon.loki.name" . }}-chart-kubeblocks-values
+          key: values-kubeblocks-override.yaml
+
+    valuesMapping:
+      valueMap:
+        replicaCount: singleBinary.replicas
+        storageClass: singleBinary.persistence.storageClass
+        persistentVolumeEnabled: singleBinary.persistence.enabled
+
+      jsonMap:
+        tolerations: singleBinary.tolerations
+
+      resources:
+        storage: singleBinary.persistence.size
+
+  defaultInstallValues:
+    - replicas: 1
+      storageClass:
+      resources:
+        requests:
+          storage: 8Gi
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+    # for ACK, the smallest storage size is 20Gi, the format of GitVersion is v1.24.6-aliyun.1
+    - selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - aliyun
+      replicas: 1
+      resources:
+        requests:
+          storage: 20Gi
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+    # for TKE, the smallest storage size is 10Gi, the format of GitVersion is v1.24.4-tke.5
+    - selectors:
+        - key: KubeGitVersion
+          operator: Contains
+          values:
+            - tke
+      replicas: 1
+      resources:
+        requests:
+          storage: 10Gi
+      {{- with .Values.tolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
+
+  installable:
+    autoInstall: {{ .Values.loki.enabled }}
+
+

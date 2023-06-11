@@ -34,7 +34,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	. "github.com/apecloud/kubeblocks/cmd/probe/util"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 const (
@@ -196,7 +196,7 @@ func TestPostgresIntegration(t *testing.T) {
 	})
 }
 
-// SETUP TESTS, run as `postgre` to manage accounts
+// SETUP TESTS, run as `postgres` to manage accounts
 // 1. export PGUSER=potgres
 // 2. export PGPASSWORD=<your-pg-password>
 // 4. export POSTGRES_TEST_CONN_URL="postgres://${PGUSER}:${PGPASSWORD}@localhost:5432/postgres"

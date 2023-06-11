@@ -268,7 +268,7 @@ func WithConstructSequenceResult(mockObjs map[client.ObjectKey][]MockGetReturned
 	return func(key client.ObjectKey, obj client.Object) error {
 		accessibleSequence, ok := mockObjs[key]
 		if !ok {
-			return fmt.Errorf("not exist: %v", key)
+			return fmt.Errorf("not existed key: %v", key)
 		}
 		index := sequenceAccessCounter[key]
 		mockReturned := accessibleSequence[index]
@@ -332,7 +332,7 @@ func WithGetReturned(action HandleGetReturnedObject, times ...CallMockOptions) C
 			})
 			handleTimes(call, times...)
 		default:
-			panic("not walk here!")
+			panic("impossible dead end!")
 		}
 	}
 }
@@ -346,7 +346,7 @@ func WithPatchReturned(action HandlePatchReturnedObject, times ...CallMockOption
 			})
 			handleTimes(call, times...)
 		default:
-			panic("not walk here!")
+			panic("impossible dead end!")
 		}
 	}
 }

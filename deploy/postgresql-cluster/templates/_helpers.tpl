@@ -50,13 +50,26 @@ app.kubernetes.io/name: {{ include "postgresqlcluster.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{- define "clustername" -}}
+{{ include "postgresqlcluster.fullname" .}}
+{{- end}}
+
 {{/*
 Create the name of the service account to use
 */}}
 {{- define "postgresqlcluster.serviceAccountName" -}}
-{{- if .Values.serviceAccount.enabled }}
-{{- printf "kb-sa-%s" .Release.Name | trunc 63 | trimSuffix "-"  }}
+{{- default (printf "kb-%s" (include "clustername" .)) .Values.serviceAccount.name }}
+{{- end }}
+
+{{/*
+Create the name of the storageClass to use
+lookup function refer: https://helm.sh/docs/chart_template_guide/functions_and_pipelines/#using-the-lookup-function
+*/}}
+{{- define "postgresqlcluster.storageClassName" -}}
+{{- $sc := (lookup "v1" "StorageClass" "" "kb-default-sc") }}
+{{- if $sc }}
+  {{- printf "kb-default-sc" -}}
 {{- else }}
-{{- .Values.serviceAccount.name }}
-{{- end }}
-{{- end }}
+  {{- printf "%s" $.Values.persistence.data.storageClassName -}}
+{{- end -}}
+{{- end -}}

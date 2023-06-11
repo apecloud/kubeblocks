@@ -34,7 +34,7 @@ import (
 )
 
 func checkEnableCfgUpgrade(object client.Object) bool {
-	// check user disable upgrade
+	// check user's upgrade switch
 	// config.kubeblocks.io/disable-reconfigure = "false"
 	annotations := object.GetAnnotations()
 	value, ok := annotations[constant.DisableUpgradeInsConfigurationAnnotationKey]
@@ -73,7 +73,7 @@ func checkAndApplyConfigsChanged(client client.Client, ctx intctrlutil.RequestCt
 		return false, err
 	}
 
-	lastConfig, ok := annotations[constant.LastAppliedConfigAnnotation]
+	lastConfig, ok := annotations[constant.LastAppliedConfigAnnotationKey]
 	if !ok {
 		return updateAppliedConfigs(client, ctx, cm, configData, cfgcore.ReconfigureCreatedPhase)
 	}
@@ -81,7 +81,7 @@ func checkAndApplyConfigsChanged(client client.Client, ctx intctrlutil.RequestCt
 	return lastConfig == string(configData), nil
 }
 
-// updateAppliedConfigs update hash label and last applied config
+// updateAppliedConfigs updates hash label and last applied config
 func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, configData []byte, reconfigurePhase string) (bool, error) {
 
 	patch := client.MergeFrom(config.DeepCopy())
@@ -89,7 +89,7 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
 
-	config.ObjectMeta.Annotations[constant.LastAppliedConfigAnnotation] = string(configData)
+	config.ObjectMeta.Annotations[constant.LastAppliedConfigAnnotationKey] = string(configData)
 	hash, err := util.ComputeHash(config.Data)
 	if err != nil {
 		return false, err
@@ -116,7 +116,7 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 
 func getLastVersionConfig(cm *corev1.ConfigMap) (map[string]string, error) {
 	data := make(map[string]string, 0)
-	cfgContent, ok := cm.GetAnnotations()[constant.LastAppliedConfigAnnotation]
+	cfgContent, ok := cm.GetAnnotations()[constant.LastAppliedConfigAnnotationKey]
 	if !ok {
 		return data, nil
 	}

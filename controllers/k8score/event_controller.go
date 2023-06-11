@@ -22,7 +22,6 @@ package k8score
 import (
 	"context"
 	"encoding/json"
-	"regexp"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -39,7 +38,9 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/consensusset"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type EventHandler interface {
@@ -75,6 +76,7 @@ var _ EventHandler = &RoleChangeEventHandler{}
 
 func init() {
 	EventHandlerMap["role-change-handler"] = &RoleChangeEventHandler{}
+	EventHandlerMap["consensus-set-event-handler"] = &consensusset.PodRoleEventHandler{}
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -115,7 +117,7 @@ func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // Handle handles role changed event.
 func (r *RoleChangeEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
-	if event.InvolvedObject.FieldPath != constant.ProbeCheckRolePath {
+	if event.Reason != string(probeutil.CheckRoleOperation) {
 		return nil
 	}
 	var (
@@ -149,7 +151,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 		return "", nil
 	}
 
-	// if probe event operation is not impl, check role failed or role invalid, ignore it
+	// if probe event operation is not implemented, check role failed or invalid, ignore it
 	if message.Event == ProbeEventOperationNotImpl || message.Event == ProbeEventCheckRoleFailed || message.Event == ProbeEventRoleInvalid {
 		reqCtx.Log.Info("probe event failed", "message", message.Message)
 		return "", nil
@@ -178,7 +180,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 	}, cluster); err != nil {
 		return role, err
 	}
-	reqCtx.Log.V(1).Info("handle role change event", "cluster", cluster.Name, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
+	reqCtx.Log.V(1).Info("handle role changed event", "cluster", cluster.Name, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
 	compName, componentDef, err := componentutil.GetComponentInfoByPod(reqCtx.Ctx, cli, *cluster, pod)
 	if err != nil {
 		return role, err
@@ -195,14 +197,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 // ParseProbeEventMessage parses probe event message.
 func ParseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) *ProbeMessage {
 	message := &ProbeMessage{}
-	re := regexp.MustCompile(`Readiness probe failed: ({.*})`)
-	matches := re.FindStringSubmatch(event.Message)
-	if len(matches) != 2 {
-		reqCtx.Log.Info("parser Readiness probe event message failed", "message", event.Message)
-		return nil
-	}
-	msg := matches[1]
-	err := json.Unmarshal([]byte(msg), message)
+	err := json.Unmarshal([]byte(event.Message), message)
 	if err != nil {
 		// not role related message, ignore it
 		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)

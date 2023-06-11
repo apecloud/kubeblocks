@@ -30,9 +30,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -103,6 +105,9 @@ var _ = BeforeSuite(func() {
 	err = snapshotv1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
+	err = snapshotv1beta1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	err = appsv1alpha1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -120,6 +125,9 @@ var _ = BeforeSuite(func() {
 		&dataprotectionv1alpha1.BackupTool{},
 		&dataprotectionv1alpha1.Backup{},
 		&dataprotectionv1alpha1.RestoreJob{},
+		&snapshotv1.VolumeSnapshot{},
+		&snapshotv1beta1.VolumeSnapshot{},
+		&batchv1.Job{},
 	}
 	// run reconcile
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{

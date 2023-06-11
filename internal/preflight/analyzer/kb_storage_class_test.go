@@ -25,6 +25,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubectl/pkg/util/storage"
 
 	troubleshoot "github.com/replicatedhq/troubleshoot/pkg/apis/troubleshoot/v1beta2"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
@@ -38,6 +40,15 @@ var (
 			{
 				Provisioner: "ebs.csi.aws.com",
 				Parameters:  map[string]string{"type": "gp3"},
+			},
+		},
+	}
+	clusterResources2 = storagev1beta1.StorageClassList{
+		Items: []storagev1beta1.StorageClass{
+			{
+				Provisioner: "ebs.csi.aws.com",
+				Parameters:  map[string]string{"type": "gp3"},
+				ObjectMeta:  metav1.ObjectMeta{Annotations: map[string]string{storage.IsDefaultStorageClassAnnotation: "true"}},
 			},
 		},
 	}
@@ -116,6 +127,21 @@ var _ = Describe("kb_storage_class_test", func() {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(res[0].IsPass).Should(BeFalse())
 				g.Expect(res[0].IsFail).Should(BeTrue())
+			}).Should(Succeed())
+		})
+		It("Analyze test, and analyzer result is expected that fail is true", func() {
+			Eventually(func(g Gomega) {
+				g.Expect(analyzer.IsExcluded()).Should(BeFalse())
+				b, err := json.Marshal(clusterResources2)
+				g.Expect(err).NotTo(HaveOccurred())
+				getCollectedFileContents := func(filename string) ([]byte, error) {
+					return b, nil
+				}
+				analyzer.analyzer.StorageClassType = ""
+				res, err := analyzer.Analyze(getCollectedFileContents, nil)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(res[0].IsPass).Should(BeTrue())
+				g.Expect(res[0].IsWarn).Should(BeFalse())
 			}).Should(Succeed())
 		})
 	})

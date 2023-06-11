@@ -37,24 +37,6 @@ reloader: test-go-generate build-checks ## Build reloader related binaries
 clean-reloader: ## Clean bin/reloader.
 	rm -f bin/reloader
 
-## tpltool cmd
-
-CONFIG_TOOL_LD_FLAGS = "-s -w"
-
-bin/tpltool.%: ## Cross build bin/tpltool.$(OS).$(ARCH) .
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CONFIG_TOOL_LD_FLAGS} -o $@ ./cmd/tpl/main.go
-
-.PHONY: tpltool
-tpltool: OS=$(shell $(GO) env GOOS)
-tpltool: ARCH=$(shell $(GO) env GOARCH)
-tpltool: build-checks ## Build tpltool related binaries
-	$(MAKE) bin/tpltool.${OS}.${ARCH}
-	mv bin/tpltool.${OS}.${ARCH} bin/tpltool
-
-.PHONY: clean-tpltool
-clean-tpltool: ## Clean bin/tpltool.
-	rm -f bin/tpltool
-
 ## cue-helper cmd
 
 CUE_HELPER_LD_FLAGS = "-s -w"

@@ -33,7 +33,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-// NewTestFactory like cmdtesting.NewTestFactory, register KubeBlocks custom objects
+// NewTestFactory is like cmdtesting.NewTestFactory, registers KubeBlocks custom objects
 func NewTestFactory(namespace string) *cmdtesting.TestFactory {
 	tf := cmdtesting.NewTestFactory()
 	mapper := restmapper.NewDiscoveryRESTMapper(testDynamicResources())
@@ -116,6 +116,8 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 			VersionedResources: map[string][]metav1.APIResource{
 				"v1alpha1": {
 					{Name: "clusters", Namespaced: true, Kind: "Cluster"},
+					{Name: "clusterdefinitions", Namespaced: false, Kind: "clusterdefinition"},
+					{Name: "clusterversions", Namespaced: false, Kind: "clusterversion"},
 					{Name: "opsrequests", Namespaced: true, Kind: "OpsRequest"},
 				},
 			},

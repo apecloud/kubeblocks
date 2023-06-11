@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -40,12 +41,16 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-var listOpsExample = templates.Examples(`
+var (
+	listOpsExample = templates.Examples(`
 		# list all opsRequests
 		kbcli cluster list-ops
 
 		# list all opsRequests of specified cluster
 		kbcli cluster list-ops mycluster`)
+
+	defaultDisplayPhase = []string{"pending", "creating", "running", "canceling", "failed"}
+)
 
 type opsListOptions struct {
 	*list.ListOptions
@@ -76,7 +81,8 @@ func NewListOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	}
 	o.AddFlags(cmd)
 	cmd.Flags().StringSliceVar(&o.opsType, "type", nil, "The OpsRequest type")
-	cmd.Flags().StringSliceVar(&o.status, "status", []string{"running", "pending", "failed"}, "Options include all, pending, running, succeeded, failed. by default, outputs the pending/running/failed OpsRequest.")
+	cmd.Flags().StringSliceVar(&o.status, "status", defaultDisplayPhase, fmt.Sprintf("Options include all, %s. by default, outputs the %s OpsRequest.",
+		strings.Join(defaultDisplayPhase, ", "), strings.Join(defaultDisplayPhase, "/")))
 	cmd.Flags().StringVar(&o.opsRequestName, "name", "", "The OpsRequest name to get the details.")
 	return cmd
 }
@@ -103,7 +109,7 @@ func (o *opsListOptions) printOpsList() error {
 	// sort the unstructured objects with the creationTimestamp in positive order
 	sort.Sort(unstructuredList(opsList.Items))
 
-	// check if specific the "all" keyword for status.
+	// check if specified with "all" keyword for status.
 	isAllStatus := o.isAllStatus()
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAME", "TYPE", "CLUSTER", "COMPONENT", "STATUS", "PROGRESS", "CREATED-TIME")
@@ -120,7 +126,7 @@ func (o *opsListOptions) printOpsList() error {
 			}
 			continue
 		}
-		// if the OpsRequest phase is not in the expected phases, continue
+		// if the OpsRequest phase is not expected, continue
 		if !isAllStatus && !o.containsIgnoreCase(o.status, phase) {
 			continue
 		}
@@ -136,7 +142,6 @@ func (o *opsListOptions) printOpsList() error {
 	}
 	message := "No opsRequests found"
 	if len(o.opsRequestName) == 0 && !o.isAllStatus() {
-		// if do not view the ops in all status and do not specify the opsName, add this prompt command.
 		message += ", you can try as follows:\n\tkbcli cluster list-ops --status all"
 	}
 	printer.PrintLine(message)

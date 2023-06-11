@@ -121,6 +121,54 @@ spec:
               value: {{.Values.datastore.REDIS_DISTANCE_METRIC | default "COSINE" | quote}}
             - name: REDIS_INDEX_TYPE
               value: {{.Values.datastore.REDIS_INDEX_TYPE | default "FLAT" | quote}}
+            - name: LLAMA_INDEX_TYPE
+              value: {{.Values.datastore.LLAMA_INDEX_TYPE | default "simple_dict" | quote}}
+            - name: LLAMA_INDEX_JSON_PATH
+              value: {{.Values.datastore.LLAMA_INDEX_JSON_PATH | default | quote}}
+            - name: LLAMA_QUERY_KWARGS_JSON_PATH
+              value: {{.Values.datastore.LLAMA_QUERY_KWARGS_JSON_PATH | default | quote}}
+            - name: LLAMA_RESPONSE_MODE
+              value: {{.Values.datastore.LLAMA_RESPONSE_MODE | default "no_text" | quote}}
+            - name: CHROMA_COLLECTION
+              value: {{.Values.datastore.CHROMA_COLLECTION | default "openaiembeddings" | quote}}
+            - name: CHROMA_IN_MEMORY
+              value: {{.Values.datastore.CHROMA_IN_MEMORY | default "True" | quote}}
+            - name: CHROMA_PERSISTENCE_DIR
+              value: {{.Values.datastore.CHROMA_PERSISTENCE_DIR | default "openai" | quote}}
+            - name: CHROMA_HOST
+              value: {{.Values.datastore.CHROMA_HOST | default "http://127.0.0.1" | quote}}
+            - name: CHROMA_PORT
+              value: {{.Values.datastore.CHROMA_PORT | default "8080" | quote}}
+            - name: AZURESEARCH_SERVICE
+              value: {{.Values.datastore.AZURESEARCH_SERVICE | default | quote}}
+            - name: AZURESEARCH_INDEX
+              value: {{.Values.datastore.AZURESEARCH_INDEX | default | quote}}
+            - name: AZURESEARCH_API_KEY
+              value: {{.Values.datastore.AZURESEARCH_API_KEY | default | quote}}
+            - name: AZURESEARCH_DISABLE_HYBRID
+              value: {{.Values.datastore.AZURESEARCH_DISABLE_HYBRID | default | quote}}
+            - name: AZURESEARCH_SEMANTIC_CONFIG
+              value: {{.Values.datastore.AZURESEARCH_SEMANTIC_CONFIG | default | quote}}
+            - name: AZURESEARCH_LANGUAGE
+              value: {{.Values.datastore.AZURESEARCH_LANGUAGE | default "en-us" | quote}}
+            - name: AZURESEARCH_DIMENSIONS
+              value: {{.Values.datastore.AZURESEARCH_DIMENSIONS | default "1536" | quote}}
+            - name: SUPABASE_URL
+              value: {{.Values.datastore.SUPABASE_URL | default | quote}}
+            - name: SUPABASE_ANON_KEY
+              value: {{.Values.datastore.SUPABASE_ANON_KEY | default | quote}}
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              value: {{.Values.datastore.SUPABASE_SERVICE_ROLE_KEY | default | quote}}
+            - name: PG_HOST
+              value: {{.Values.datastore.PG_HOST | default "localhost" | quote}}
+            - name: PG_PORT
+              value: {{.Values.datastore.PG_PORT | default "5432" | quote}}
+            - name: PG_PASSWORD
+              value: {{.Values.datastore.PG_PASSWORD | default "postgres" | quote}}
+            - name: PG_USER
+              value: {{.Values.datastore.PG_USER | default "postgres" | quote}}
+            - name: PG_DB
+              value: {{.Values.datastore.PG_DB | default "postgres" | quote}}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -45,7 +45,7 @@ user_values:
       ru: Секретный ключ S3
     string_value:
       default_value: ""
-  - name: storageClass.singleBucket
+  - name: storageClass.bucket
     title:
       en: Single S3 bucket for volumes
       ru: Общий S3 бакет для томов
@@ -84,21 +84,25 @@ user_values:
       values:
         - Delete
         - Retain
-  - name: storageClass.name
+  - name: csiName
     title:
-      en: Storage class name
-      ru: Название класса хранения
+      en: csi name
     description:
-      en: Name of the storage class that will be created
-      ru: Название класса хранения, который будет создан при установке
+      en: Name of the csi driver
     string_value:
-      default_value: csi-s3
-  - name: secret.name
+      default_value: s3
+  - name: multiCSI
     title:
-      en: Name of the secret
-      ru: Название секрета
+      en: Check if this CSI has been installed multiple times.
     description:
-      en: Name of the secret to create or use for the storage class
-      ru: Название секрета, который будет создан или использован для класса хранения
+      en: Check if this CSI has been installed multiple times. if true only install storageClass and secret.
     string_value:
-      default_value: csi-s3-secret
+      default_value: false
+  - name: secret.cloudProvider
+    title:
+      en: cloud provider: [aws,aliyun].
+    description:
+      en: cloud provider: [aws,aliyun].
+    string_value:
+      default_value: ""
+

@@ -96,7 +96,7 @@ var _ = Describe("kubeblocks install", func() {
 		o.printNotes()
 	})
 
-	It("preCheck", func() {
+	It("checkVersion", func() {
 		o := &InstallOptions{
 			Options: Options{
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
@@ -106,14 +106,14 @@ var _ = Describe("kubeblocks install", func() {
 		}
 		By("kubernetes version is empty")
 		v := util.Version{}
-		Expect(o.preCheck(v).Error()).Should(ContainSubstring("failed to get kubernetes version"))
+		Expect(o.checkVersion(v).Error()).Should(ContainSubstring("failed to get kubernetes version"))
 
 		By("kubernetes is provided by cloud provider")
 		v.Kubernetes = "v1.25.0-eks"
-		Expect(o.preCheck(v)).Should(Succeed())
+		Expect(o.checkVersion(v)).Should(Succeed())
 
 		By("kubernetes is not provided by cloud provider")
 		v.Kubernetes = "v1.25.0"
-		Expect(o.preCheck(v)).Should(Succeed())
+		Expect(o.checkVersion(v)).Should(Succeed())
 	})
 })

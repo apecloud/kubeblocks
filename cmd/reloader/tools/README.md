@@ -31,7 +31,7 @@ Usage of ./bin/cue-helper:
   -boolean-promotion
     	enable using OFF or ON.
   -file-path string
-    	The generate cue scripts from file.
+    	The generated cue scripts from file.
   -ignore-string-default
     	ignore string default.  (default true)
   -type-name string

@@ -38,6 +38,7 @@ import (
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
+	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -51,7 +52,7 @@ var _ = Describe("Event Controller", func() {
 	var ctx = context.Background()
 
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -125,7 +126,7 @@ involvedObject:
   kind: Pod
   name: {{ .PodName }}
   namespace: default
-message: "Readiness probe failed: {\"event\":\"roleChanged\",\"originalRole\":\"secondary\",\"role\":\"{{ .Role }}\"}"
+message: "{\"event\":\"roleChanged\",\"originalRole\":\"secondary\",\"role\":\"{{ .Role }}\"}"
 reason: RoleChanged
 type: Normal
 `
@@ -149,12 +150,14 @@ type: Normal
 		return nil, err
 	}
 
-	event, _, err := scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, nil)
+	event := &corev1.Event{}
+	_, _, err = scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, event)
 	if err != nil {
 		return nil, err
 	}
+	event.Reason = string(probeutil.CheckRoleOperation)
 
-	return event.(*corev1.Event), nil
+	return event, nil
 }
 
 func createInvolvedPod(name string) corev1.Pod {

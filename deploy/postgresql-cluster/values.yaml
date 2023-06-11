@@ -37,11 +37,21 @@ resources: { }
   #   memory: 2Gi
   # requests:
   #   cpu: 100m
-  #   memory: 1Gi 
+  #   memory: 1Gi
+
 persistence:
   enabled: true
   data:
-    storageClassName:
-    size: 1Gi
+    storageClassName: ""
+    size: 4Gi
+
 enabledLogs:
   - running
+
+topologyKeys:
+  - kubernetes.io/hostname
+
+## @param tolerations
+## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+##
+tolerations: [ ]

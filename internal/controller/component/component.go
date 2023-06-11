@@ -25,6 +25,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -32,10 +33,39 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// BuildComponent generates a new Component object, which is a mixture of
+func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster appsv1alpha1.Cluster,
+	clusterDef appsv1alpha1.ClusterDefinition,
+	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
+	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
+) (*SynthesizedComponent, error) {
+	synthesizedComp, err := buildComponent(reqCtx, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+	if err != nil {
+		return nil, err
+	}
+	/*
+		if err := buildRestoreInfoFromBackup(reqCtx, cli, cluster, synthesizedComp); err != nil {
+			return nil, err
+		}
+	*/
+	return synthesizedComp, nil
+}
+
+func BuildComponent(reqCtx intctrlutil.RequestCtx,
+	cluster appsv1alpha1.Cluster,
+	clusterDef appsv1alpha1.ClusterDefinition,
+	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
+	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
+) (*SynthesizedComponent, error) {
+	return buildComponent(reqCtx, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+}
+
+// buildComponent generates a new Component object, which is a mixture of
 // component-related configs from input Cluster, ClusterDef and ClusterVersion.
-func BuildComponent(
-	reqCtx intctrlutil.RequestCtx,
+func buildComponent(reqCtx intctrlutil.RequestCtx,
 	cluster appsv1alpha1.Cluster,
 	clusterDef appsv1alpha1.ClusterDefinition,
 	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
@@ -46,32 +76,32 @@ func BuildComponent(
 	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
 		ClusterDefName:        clusterDef.Name,
+		ClusterName:           cluster.Name,
+		ClusterUID:            string(cluster.UID),
 		Name:                  clusterCompSpec.Name,
-		Type:                  clusterCompDefObj.Name,
+		CompDefName:           clusterCompDefObj.Name,
 		CharacterType:         clusterCompDefObj.CharacterType,
-		MaxUnavailable:        clusterCompDefObj.MaxUnavailable,
 		WorkloadType:          clusterCompDefObj.WorkloadType,
+		StatelessSpec:         clusterCompDefObj.StatelessSpec,
+		StatefulSpec:          clusterCompDefObj.StatefulSpec,
 		ConsensusSpec:         clusterCompDefObj.ConsensusSpec,
+		ReplicationSpec:       clusterCompDefObj.ReplicationSpec,
 		PodSpec:               clusterCompDefObj.PodSpec,
 		Probes:                clusterCompDefObj.Probes,
 		LogConfigs:            clusterCompDefObj.LogConfigs,
 		HorizontalScalePolicy: clusterCompDefObj.HorizontalScalePolicy,
+		ConfigTemplates:       clusterCompDefObj.ConfigSpecs,
+		ScriptTemplates:       clusterCompDefObj.ScriptSpecs,
+		VolumeTypes:           clusterCompDefObj.VolumeTypes,
+		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
+		StatefulSetWorkload:   clusterCompDefObj.GetStatefulSetWorkload(),
+		MinAvailable:          clusterCompSpec.GetMinAvailable(clusterCompDefObj.GetMinAvailable()),
 		Replicas:              clusterCompSpec.Replicas,
 		EnabledLogs:           clusterCompSpec.EnabledLogs,
 		TLS:                   clusterCompSpec.TLS,
 		Issuer:                clusterCompSpec.Issuer,
-		VolumeTypes:           clusterCompDefObj.VolumeTypes,
-		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
 		ComponentDef:          clusterCompSpec.ComponentDefRef,
 		ServiceAccountName:    clusterCompSpec.ServiceAccountName,
-	}
-
-	// resolve component.ConfigTemplates
-	if clusterCompDefObj.ConfigSpecs != nil {
-		component.ConfigTemplates = clusterCompDefObj.ConfigSpecs
-	}
-	if clusterCompDefObj.ScriptSpecs != nil {
-		component.ScriptTemplates = clusterCompDefObj.ScriptSpecs
 	}
 
 	if len(clusterCompVers) > 0 && clusterCompVers[0] != nil {
@@ -87,6 +117,7 @@ func BuildComponent(
 		}
 	}
 
+	// handle component.PodSpec extra settings
 	// set affinity and tolerations
 	affinity := cluster.Spec.Affinity
 	if clusterCompSpec.Affinity != nil {
@@ -105,16 +136,13 @@ func BuildComponent(
 	if clusterCompSpec.VolumeClaimTemplates != nil {
 		component.VolumeClaimTemplates = clusterCompSpec.ToVolumeClaimTemplates()
 	}
-
 	if clusterCompSpec.Resources.Requests != nil || clusterCompSpec.Resources.Limits != nil {
 		component.PodSpec.Containers[0].Resources = clusterCompSpec.Resources
 	}
-
 	if clusterCompDefObj.Service != nil {
 		service := corev1.Service{Spec: clusterCompDefObj.Service.ToSVCSpec()}
 		service.Spec.Type = corev1.ServiceTypeClusterIP
 		component.Services = append(component.Services, service)
-
 		for _, item := range clusterCompSpec.Services {
 			service = corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -127,13 +155,12 @@ func BuildComponent(
 			component.Services = append(component.Services, service)
 		}
 	}
-
 	component.PrimaryIndex = clusterCompSpec.PrimaryIndex
 	// set component.PodSpec.ServiceAccountName
 	component.PodSpec.ServiceAccountName = component.ServiceAccountName
 
-	// TODO(zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
-	// At present, it is possible to distinguish between ConfigMap volume and normal volume,
+	// TODO: (zhixu.zt) We need to reserve the VolumeMounts of the container for ConfigMap or Secret,
+	// At present, it is not possible to distinguish between ConfigMap volume and normal volume,
 	// Compare the VolumeName of configTemplateRef and Name of VolumeMounts
 	//
 	// if component.VolumeClaimTemplates == nil {
@@ -147,13 +174,11 @@ func BuildComponent(
 		reqCtx.Log.Error(err, "build probe container failed.")
 		return nil, err
 	}
-
 	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
-
 	return component, nil
 }
 
-// appendOrOverrideContainerAttr is used to append targetContainer to compContainers or override the attributes of compContainers with a given targetContainer,
+// appendOrOverrideContainerAttr appends targetContainer to compContainers or overrides the attributes of compContainers with a given targetContainer,
 // if targetContainer does not exist in compContainers, it will be appended. otherwise it will be updated with the attributes of the target container.
 func appendOrOverrideContainerAttr(compContainers []corev1.Container, targetContainer corev1.Container) []corev1.Container {
 	index, compContainer := intctrlutil.GetContainerByName(compContainers, targetContainer.Name)
@@ -229,7 +254,7 @@ func doContainerAttrOverride(compContainer *corev1.Container, container corev1.C
 // GetEnvReplacementMapForConnCredential gets the replacement map for connect credential
 func GetEnvReplacementMapForConnCredential(clusterName string) map[string]string {
 	return map[string]string{
-		constant.ConnCredentialPlaceHolder: GenerateConnCredential(clusterName),
+		constant.KBConnCredentialPlaceHolder: GenerateConnCredential(clusterName),
 	}
 }
 
@@ -243,12 +268,20 @@ func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedVal
 }
 
 // GetReplacementMapForBuiltInEnv gets the replacement map for KubeBlocks built-in environment variables.
-func GetReplacementMapForBuiltInEnv(clusterName, componentName string) map[string]string {
-	return map[string]string{
+func GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
+	cc := fmt.Sprintf("%s-%s", clusterName, componentName)
+	replacementMap := map[string]string{
 		constant.KBClusterNamePlaceHolder:     clusterName,
 		constant.KBCompNamePlaceHolder:        componentName,
-		constant.KBClusterCompNamePlaceHolder: fmt.Sprintf("%s-%s", clusterName, componentName),
+		constant.KBClusterCompNamePlaceHolder: cc,
+		constant.KBComponentEnvCMPlaceHolder:  fmt.Sprintf("%s-env", cc),
 	}
+	if len(clusterUID) > 8 {
+		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = clusterUID[len(clusterUID)-8:]
+	} else {
+		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = clusterUID
+	}
+	return replacementMap
 }
 
 // ReplaceNamedVars replaces the placeholder in targetVar if it is match and returns the replaced result

@@ -6,15 +6,8 @@ metadata:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
-  image: registry.cn-hangzhou.aliyuncs.com/apecloud/percona-xtrabackup
+  image: registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
   deployKind: job
-  resources:
-    limits:
-      cpu: "1"
-      memory: 2Gi
-    requests:
-      cpu: "500m"
-      memory: 128Mi
   env:
     - name: DATA_DIR
       value: /data/mysql/data

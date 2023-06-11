@@ -78,7 +78,7 @@ EOF
 	}
 }
 
-cronjob_incremental: {
+cronjob_logfile: {
 	apiVersion: "batch/v1"
 	kind:       "CronJob"
 	metadata: {

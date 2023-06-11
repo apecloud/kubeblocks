@@ -28,14 +28,14 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
-// GetParameterFromConfiguration get configure parameter
+// GetParameterFromConfiguration gets configure parameter
 // ctx: apiserver context
 // cli: apiserver client
 // cluster: appsv1alpha1.Cluster
 // component: component name
 func GetParameterFromConfiguration(configMap *corev1.ConfigMap, allFiles bool, fieldPath ...string) ([]string, error) {
 	if configMap == nil || len(configMap.Data) == 0 {
-		return nil, MakeError("configmap not any configuration files. [%v]", configMap)
+		return nil, MakeError("required configmap [%v]", configMap)
 	}
 
 	// Load configmap

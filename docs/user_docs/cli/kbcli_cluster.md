@@ -38,6 +38,8 @@ Cluster command.
 
 
 * [kbcli cluster backup](kbcli_cluster_backup.md)	 - Create a backup for the cluster.
+* [kbcli cluster cancel-ops](kbcli_cluster_cancel-ops.md)	 - cancel the pending/creating/running OpsRequest which type is vscale or hscale.
+* [kbcli cluster configure](kbcli_cluster_configure.md)	 - Configure parameters with the specified components in the cluster.
 * [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a cluster or instance.
 * [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster.
 * [kbcli cluster create-account](kbcli_cluster_create-account.md)	 - Create account for a cluster
@@ -67,7 +69,6 @@ Cluster command.
 * [kbcli cluster list-logs](kbcli_cluster_list-logs.md)	 - List supported log files in cluster.
 * [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - List all opsRequests.
 * [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file.
-* [kbcli cluster reconfigure](kbcli_cluster_reconfigure.md)	 - Reconfigure parameters with the specified components in the cluster.
 * [kbcli cluster restart](kbcli_cluster_restart.md)	 - Restart the specified components in the cluster.
 * [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup.
 * [kbcli cluster revoke-role](kbcli_cluster_revoke-role.md)	 - Revoke role from account

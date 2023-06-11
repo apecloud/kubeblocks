@@ -45,7 +45,6 @@ var _ = Describe("create", func() {
 	fillResources := func(o *CreateOptions, cpu string, memory string, storage []string) {
 		o.CPU = cpu
 		o.Memory = memory
-		o.Storage = storage
 		o.ClassName = fmt.Sprintf("custom-%s-%s", cpu, memory)
 		o.Constraint = generalResourceConstraint.Name
 	}
@@ -92,18 +91,18 @@ var _ = Describe("create", func() {
 			Expect(out.String()).Should(ContainSubstring(createOptions.ClassName))
 		})
 
-		It("should fail if constraint not exist", func() {
+		It("should fail if constraint not existed", func() {
 			fillResources(createOptions, "2", "8Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
 			createOptions.Constraint = "constraint-not-exist"
 			Expect(createOptions.run()).Should(HaveOccurred())
 		})
 
-		It("should fail if not conform to constraint", func() {
-			By("memory not conform to constraint")
+		It("should fail if not conformed to constraint", func() {
+			By("memory not conformed to constraint")
 			fillResources(createOptions, "2", "9Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
 			Expect(createOptions.run()).Should(HaveOccurred())
 
-			By("cpu with invalid step")
+			By("CPU with invalid step")
 			fillResources(createOptions, "0.6", "0.6Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
 			Expect(createOptions.run()).Should(HaveOccurred())
 		})

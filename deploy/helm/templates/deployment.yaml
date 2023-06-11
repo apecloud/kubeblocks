@@ -85,7 +85,7 @@ spec:
             - name: ENABLE_WEBHOOKS
               value: "true"
             {{- end }}
-            {{- if not ( include "kubeblocks.addonControllerEnabled" . ) }}
+            {{- if ( include "kubeblocks.addonControllerEnabled" . ) | deepEqual "false" }}
             - name: DISABLE_ADDON_CTRLER
               value: "true"
             {{- else }}
@@ -95,6 +95,10 @@ spec:
               value: {{ .jobImagePullPolicy | default "IfNotPresent" }}
             - name: KUBEBLOCKS_ADDON_SA_NAME
               value: {{ include "kubeblocks.addonSAName" . }}
+            {{- end }}
+            {{- if .Values.enabledAlphaFeatureGates.recoverVolumeExpansionFailure }}
+            - name: RECOVER_VOLUME_EXPANSION_FAILURE
+              value: "true"
             {{- end }}
           {{- with .Values.securityContext }}
           securityContext:

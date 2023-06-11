@@ -81,7 +81,7 @@ func NewListOptions(f cmdutil.Factory, streams genericclioptions.IOStreams,
 
 func (o *ListOptions) AddFlags(cmd *cobra.Command, isClusterScope ...bool) {
 	if len(isClusterScope) == 0 || !isClusterScope[0] {
-		cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespace", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+		cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	}
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
 	cmd.Flags().BoolVar(&o.ShowLabels, "show-labels", false, "When printing, show all labels as the last column (default hide labels column)")

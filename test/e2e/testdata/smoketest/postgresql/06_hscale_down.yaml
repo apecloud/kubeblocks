@@ -3,7 +3,7 @@ kind: OpsRequest
 metadata:
   name: ops-hscale-down
 spec:
-  clusterRef: mycluster
+  clusterRef: mycluster-pgcluster
   type: HorizontalScaling
   horizontalScaling:
     - componentName: postgresql

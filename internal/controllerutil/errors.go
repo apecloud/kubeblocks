@@ -45,6 +45,8 @@ const (
 	// ErrorTypeNotFound not found any resource.
 	ErrorTypeNotFound ErrorType = "NotFound"
 
+	ErrorTypeRequeue ErrorType = "Requeue" // requeue for reconcile.
+
 	// ErrorType for backup
 	ErrorTypeBackupNotSupported       ErrorType = "BackupNotSupported"       // this backup type not supported
 	ErrorTypeBackupPVTemplateNotFound ErrorType = "BackupPVTemplateNotFound" // this pv template not found
@@ -52,6 +54,7 @@ const (
 	ErrorTypeBackupPVCNameIsEmpty     ErrorType = "BackupPVCNameIsEmpty"     // pvc name for backup is empty
 	ErrorTypeBackupJobFailed          ErrorType = "BackupJobFailed"          // backup job failed
 	ErrorTypeStorageNotMatch          ErrorType = "ErrorTypeStorageNotMatch"
+	ErrorTypeReconfigureFailed        ErrorType = "ErrorTypeReconfigureFailed"
 
 	// ErrorType for cluster controller
 	ErrorTypeBackupFailed ErrorType = "BackupFailed"
@@ -86,8 +89,8 @@ func IsTargetError(err error, errorType ErrorType) bool {
 	return false
 }
 
-// ToControllerError converts the error to the Controller error.
-func ToControllerError(err error) *Error {
+// UnwrapControllerError unwraps the Controller error from target error.
+func UnwrapControllerError(err error) *Error {
 	if tmpErr, ok := err.(*Error); ok || errors.As(err, &tmpErr) {
 		return tmpErr
 	}

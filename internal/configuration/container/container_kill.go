@@ -48,7 +48,7 @@ const (
 	KillContainerSignalEnvName = "KILL_CONTAINER_SIGNAL"
 )
 
-// dockerContainer support docker cri
+// dockerContainer supports docker cri
 type dockerContainer struct {
 	dockerEndpoint string
 	logger         *zap.SugaredLogger
@@ -66,27 +66,27 @@ func init() {
 }
 
 func (d *dockerContainer) Kill(ctx context.Context, containerIDs []string, signal string, _ *time.Duration) error {
-	d.logger.Debugf("following docker containers are going to be stopped: %v", containerIDs)
+	d.logger.Debugf("docker containers going to be stopped: %v", containerIDs)
 	if signal == "" {
 		signal = defaultSignal
 	}
 
 	allContainer, err := getExistsContainers(ctx, containerIDs, d.dc)
 	if err != nil {
-		return cfgcore.WrapError(err, "failed to search container")
+		return cfgcore.WrapError(err, "failed to search docker container")
 	}
 
 	errs := make([]error, 0, len(containerIDs))
-	d.logger.Debugf("all docker container: %v", util.ToSet(allContainer).AsSlice())
+	d.logger.Debugf("all containers: %v", util.ToSet(allContainer).AsSlice())
 	for _, containerID := range containerIDs {
 		d.logger.Infof("stopping docker container: %s", containerID)
 		container, ok := allContainer[containerID]
 		if !ok {
-			d.logger.Infof("container[%s] not exist and pass.", containerID)
+			d.logger.Infof("docker container[%s] not existed and continue.", containerID)
 			continue
 		}
 		if container.State == "exited" {
-			d.logger.Infof("container[%s] is exited, status: %s", containerID, container.Status)
+			d.logger.Infof("docker container[%s] exited, status: %s", containerID, container.Status)
 			continue
 		}
 		if err := d.dc.ContainerKill(ctx, containerID, signal); err != nil {
@@ -133,7 +133,7 @@ func (d *dockerContainer) Init(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		d.logger.Infof("create docker client success! docker info: %v", ping)
+		d.logger.Infof("create docker client succeed, docker info: %v", ping)
 	}
 	return err
 }
@@ -143,14 +143,14 @@ func createDockerClient(dockerEndpoint string, logger *zap.SugaredLogger) (*dock
 		dockerEndpoint = dockerapi.DefaultDockerHost
 	}
 
-	logger.Infof("connecting to docker on the endpoint: %s", dockerEndpoint)
+	logger.Infof("connecting to docker container endpoint: %s", dockerEndpoint)
 	return dockerapi.NewClientWithOpts(
 		dockerapi.WithHost(formatSocketPath(dockerEndpoint)),
 		dockerapi.WithVersion(""),
 	)
 }
 
-// dockerContainer support docker cri
+// dockerContainer supports docker cri
 type containerdContainer struct {
 	runtimeEndpoint string
 	logger          *zap.SugaredLogger
@@ -183,9 +183,9 @@ func (c *containerdContainer) Kill(ctx context.Context, containerIDs []string, s
 		case err != nil:
 			errs = append(errs, err)
 		case containers == nil || len(containers.Containers) == 0:
-			c.logger.Infof("container[%s] not exist and pass.", containerID)
+			c.logger.Infof("containerd container[%s] not existed and continue.", containerID)
 		case containers.Containers[0].State == runtimeapi.ContainerState_CONTAINER_EXITED:
-			c.logger.Infof("container[%s] not exited and pass.", containerID)
+			c.logger.Infof("containerd container[%s] not exited and continue.", containerID)
 		default:
 			request.ContainerId = containerID
 			_, err = c.backendRuntime.StopContainer(ctx, request)
@@ -262,7 +262,7 @@ func NewContainerKiller(containerRuntime CRIType, runtimeEndpoint string, logger
 			logger:          logger,
 		}
 	default:
-		return nil, cfgcore.MakeError("not support cri type: %s", containerRuntime)
+		return nil, cfgcore.MakeError("not supported cri type: %s", containerRuntime)
 	}
 	return killer, nil
 }

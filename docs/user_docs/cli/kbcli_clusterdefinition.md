@@ -38,6 +38,7 @@ ClusterDefinition command.
 
 
 * [kbcli clusterdefinition list](kbcli_clusterdefinition_list.md)	 - List ClusterDefinitions.
+* [kbcli clusterdefinition list-components](kbcli_clusterdefinition_list-components.md)	 - List cluster definition components.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

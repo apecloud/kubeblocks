@@ -62,7 +62,7 @@ var _ = Describe("ReplicationSet Switch", func() {
 	)
 
 	cleanAll := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -233,7 +233,7 @@ var _ = Describe("ReplicationSet Switch", func() {
 		BeforeEach(func() {
 
 			By("Mock a replicationSpec with SwitchPolicy and SwitchCmdExecutorConfig.")
-			mockReplicationSpec := &appsv1alpha1.ReplicationSpec{
+			mockReplicationSpec := &appsv1alpha1.ReplicationSetSpec{
 				SwitchPolicies: []appsv1alpha1.SwitchPolicy{
 					{
 						Type: appsv1alpha1.MaximumAvailability,

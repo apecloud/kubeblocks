@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -74,6 +73,10 @@ func deleteCluster(o *delete.DeleteOptions, args []string) error {
 }
 
 func clusterPreDeleteHook(o *delete.DeleteOptions, object runtime.Object) error {
+	if object == nil {
+		return nil
+	}
+
 	cluster, err := getClusterFromObject(object)
 	if err != nil {
 		return err
@@ -85,12 +88,11 @@ func clusterPreDeleteHook(o *delete.DeleteOptions, object runtime.Object) error 
 }
 
 func clusterPostDeleteHook(o *delete.DeleteOptions, object runtime.Object) error {
-	c, err := getClusterFromObject(object)
-	if err != nil {
-		return err
+	if object == nil {
+		return nil
 	}
 
-	dynamic, err := o.Factory.DynamicClient()
+	c, err := getClusterFromObject(object)
 	if err != nil {
 		return err
 	}
@@ -101,26 +103,10 @@ func clusterPostDeleteHook(o *delete.DeleteOptions, object runtime.Object) error
 	}
 
 	// HACK: for a postgresql cluster, we need to delete the sa, role and rolebinding
-	cd, err := cluster.GetClusterDefByName(dynamic, c.Spec.ClusterDefRef)
-	if err != nil {
+	if err = deleteDependencies(client, c.Namespace, c.Name); err != nil {
 		return err
-	}
-	for _, compSpec := range c.Spec.ComponentSpecs {
-		if err = deleteCompDependencies(client, c.Namespace, c.Name, cd, &compSpec); err != nil {
-			return err
-		}
 	}
 	return nil
-}
-
-func deleteCompDependencies(client kubernetes.Interface, ns string, name string, cd *appsv1alpha1.ClusterDefinition,
-	compSpec *appsv1alpha1.ClusterComponentSpec) error {
-	if d, err := shouldCreateDependencies(cd, compSpec); err != nil {
-		return err
-	} else if !d {
-		return nil
-	}
-	return deleteDependencies(client, ns, name)
 }
 
 func deleteDependencies(client kubernetes.Interface, ns string, name string) error {
@@ -167,9 +153,9 @@ func getClusterFromObject(object runtime.Object) (*appsv1alpha1.Cluster, error) 
 	if object.GetObjectKind().GroupVersionKind().Kind != appsv1alpha1.ClusterKind {
 		return nil, fmt.Errorf("object %s is not of kind %s", object.GetObjectKind().GroupVersionKind().Kind, appsv1alpha1.ClusterKind)
 	}
-	unstructured := object.(*unstructured.Unstructured)
+	u := object.(*unstructured.Unstructured)
 	cluster := &appsv1alpha1.Cluster{}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructured.Object, cluster); err != nil {
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, cluster); err != nil {
 		return nil, err
 	}
 	return cluster, nil

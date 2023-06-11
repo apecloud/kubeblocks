@@ -27,9 +27,9 @@ kbcli cluster describe-config [flags]
 ### Options
 
 ```
-      --component string       Specify the name of Component to be describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter."
+      --component string       Specify the name of Component to describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter."
       --config-file strings    Specify the name of the configuration file to be describe (e.g. for mysql: --config-file=my.cnf). If unset, all files.
-      --config-specs strings   Specify the name of the configuration template to be describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)
+      --config-specs strings   Specify the name of the configuration template to describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)
   -h, --help                   help for describe-config
       --show-detail            If true, the content of the files specified by config-file will be printed.
 ```

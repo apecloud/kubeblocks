@@ -42,7 +42,7 @@ var _ = Describe("RestoreJob Controller", func() {
 		compName    = "cluster"
 	)
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -82,7 +82,7 @@ var _ = Describe("RestoreJob Controller", func() {
 		By("By assure an backup obj")
 		return testapps.NewBackupFactory(testCtx.DefaultNamespace, "backup-job-").
 			WithRandomName().SetBackupPolicyName(backupPolicy).
-			SetBackupType(dataprotectionv1alpha1.BackupTypeFull).
+			SetBackupType(dataprotectionv1alpha1.BackupTypeDataFile).
 			Create(&testCtx).GetObject()
 	}
 
@@ -152,7 +152,7 @@ var _ = Describe("RestoreJob Controller", func() {
 	testRestoreJob := func(withResources ...bool) {
 		By("By creating a statefulset and pod")
 		sts := assureStatefulSetObj()
-		testapps.MockConsensusComponentPods(testCtx, sts, clusterName, compName)
+		testapps.MockConsensusComponentPods(&testCtx, sts, clusterName, compName)
 
 		By("By creating a backupTool")
 		backupTool := assureBackupToolObj(withResources...)

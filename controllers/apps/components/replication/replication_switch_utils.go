@@ -299,7 +299,7 @@ func (pdm *ProbeDetectManager) roleDetect(pod *corev1.Pod) (*RoleDetectResult, e
 	return &res, nil
 }
 
-// lagDetect is the implementation of the SwitchDetectManager interface, which gets data delay detection information by actively calling the API provided by the probe
+// lagDetect is the implementation of the SwitchDetectManager interface, which gets replication lag detection information by actively calling the API provided by the probe
 // TODO(xingran) Wait for the probe interface to be ready before implementation
 func (pdm *ProbeDetectManager) lagDetect(pod *corev1.Pod) (*LagDetectResult, error) {
 	var res LagDetectResult = 0
@@ -308,7 +308,7 @@ func (pdm *ProbeDetectManager) lagDetect(pod *corev1.Pod) (*LagDetectResult, err
 
 // getSwitchStatementsBySwitchPolicyType gets the SwitchStatements corresponding to switchPolicyType
 func getSwitchStatementsBySwitchPolicyType(switchPolicyType appsv1alpha1.SwitchPolicyType,
-	replicationSpec *appsv1alpha1.ReplicationSpec) (*appsv1alpha1.SwitchStatements, error) {
+	replicationSpec *appsv1alpha1.ReplicationSetSpec) (*appsv1alpha1.SwitchStatements, error) {
 	if replicationSpec == nil || len(replicationSpec.SwitchPolicies) == 0 {
 		return nil, fmt.Errorf("replicationSpec and replicationSpec.SwitchPolicies can not be nil")
 	}
@@ -466,7 +466,7 @@ func cleanSwitchCmdJobs(s *Switch) error {
 	return nil
 }
 
-// getSwitchCmdJobLabel gets the labels for job that execute the switch commands.
+// getSwitchCmdJobLabel gets the labels for job that executes the switch commands.
 func getSwitchCmdJobLabel(clusterName, componentName string) map[string]string {
 	return map[string]string{
 		constant.AppInstanceLabelKey:    clusterName,
@@ -489,6 +489,9 @@ func CheckPrimaryIndexChanged(ctx context.Context,
 	pod, err := getReplicationSetPrimaryObj(ctx, cli, cluster, generics.PodSignature, compName)
 	if err != nil {
 		return false, -1, err
+	}
+	if pod == nil {
+		return false, -1, nil
 	}
 	_, o := util.ParseParentNameAndOrdinal(pod.Name)
 	return currentPrimaryIndex != o, o, nil

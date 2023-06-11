@@ -41,6 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -232,6 +233,9 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 	}
 	tbl := newTbl(out, "\nData Protection:", "AUTO-BACKUP", "BACKUP-SCHEDULE", "TYPE", "BACKUP-TTL", "LAST-SCHEDULE", "RECOVERABLE-TIME")
 	for _, policy := range backupPolicies {
+		if policy.Annotations[constant.DefaultBackupPolicyAnnotationKey] != "true" {
+			continue
+		}
 		if policy.Status.Phase != dpv1alpha1.PolicyAvailable {
 			continue
 		}
@@ -239,28 +243,33 @@ func showDataProtection(backupPolicies []dpv1alpha1.BackupPolicy, backups []dpv1
 		backupSchedule := printer.NoneString
 		backupType := printer.NoneString
 		scheduleEnable := "Disabled"
-		if policy.Spec.Schedule.BaseBackup != nil {
-			if policy.Spec.Schedule.BaseBackup.Enable {
+		if policy.Spec.Schedule.Snapshot != nil {
+			if policy.Spec.Schedule.Snapshot.Enable {
 				scheduleEnable = "Enabled"
+				backupSchedule = policy.Spec.Schedule.Snapshot.CronExpression
+				backupType = string(dpv1alpha1.BackupTypeSnapshot)
 			}
-			backupSchedule = policy.Spec.Schedule.BaseBackup.CronExpression
-			backupType = string(policy.Spec.Schedule.BaseBackup.Type)
-
 		}
-		if policy.Spec.TTL != nil {
-			ttlString = *policy.Spec.TTL
+		if policy.Spec.Schedule.Datafile != nil {
+			if policy.Spec.Schedule.Datafile.Enable {
+				scheduleEnable = "Enabled"
+				backupSchedule = policy.Spec.Schedule.Datafile.CronExpression
+				backupType = string(dpv1alpha1.BackupTypeDataFile)
+			}
+		}
+		if policy.Spec.Retention != nil && policy.Spec.Retention.TTL != nil {
+			ttlString = *policy.Spec.Retention.TTL
 		}
 		lastScheduleTime := printer.NoneString
 		if policy.Status.LastScheduleTime != nil {
 			lastScheduleTime = util.TimeFormat(policy.Status.LastScheduleTime)
 		}
-
 		tbl.AddRow(scheduleEnable, backupSchedule, backupType, ttlString, lastScheduleTime, getBackupRecoverableTime(backups))
 	}
 	tbl.Print()
 }
 
-// getBackupRecoverableTime return the recoverable time range string
+// getBackupRecoverableTime returns the recoverable time range string
 func getBackupRecoverableTime(backups []dpv1alpha1.Backup) string {
 	recoverabelTime := dpv1alpha1.GetRecoverableTimeRange(backups)
 	var result string

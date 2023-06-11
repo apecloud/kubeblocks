@@ -39,7 +39,7 @@ func (p *parallelUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatu
 
 	switch params.WorkloadType() {
 	default:
-		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not support component workload type[%s]", params.WorkloadType())
+		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not supported component workload type[%s]", params.WorkloadType())
 	case appsv1alpha1.Consensus:
 		funcs = GetConsensusRollingUpgradeFuncs()
 	case appsv1alpha1.Stateful:

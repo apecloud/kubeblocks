@@ -26,7 +26,7 @@ import (
 )
 
 // Capture replaces os.Stdout with a writer that buffers any data written
-// to os.Stdout. Call the returned function to cleanup and get the data
+// to os.Stdout. Call the returned function to clean up and return the data
 // as a string.
 func Capture() func() (string, error) {
 	r, w, err := os.Pipe()

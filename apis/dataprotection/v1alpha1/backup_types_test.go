@@ -1,20 +1,17 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package v1alpha1
@@ -22,22 +19,64 @@ package v1alpha1
 import (
 	"testing"
 	"time"
+
+	. "github.com/onsi/gomega"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func expectToDuration(t *testing.T, ttl string, baseNum, targetNum int) {
-	d := ToDuration(&ttl)
-	if d != time.Hour*time.Duration(baseNum)*time.Duration(targetNum) {
-		t.Errorf(`Expected duration is "%d*%d*time.Hour"", got %v`, targetNum, baseNum, d)
-	}
+func TestValidate(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	backupPolicy := &BackupPolicy{Spec: BackupPolicySpec{Snapshot: &SnapshotPolicy{}}}
+	backupSpec := &BackupSpec{BackupType: BackupTypeSnapshot}
+	g.Expect(backupSpec.Validate(backupPolicy)).Should(Succeed())
+
+	backupPolicy = &BackupPolicy{}
+	backupSpec = &BackupSpec{BackupType: BackupTypeSnapshot}
+	g.Expect(backupSpec.Validate(backupPolicy)).Should(HaveOccurred())
+
+	backupSpec = &BackupSpec{BackupType: BackupTypeDataFile}
+	g.Expect(backupSpec.Validate(backupPolicy)).Should(HaveOccurred())
+
+	backupSpec = &BackupSpec{BackupType: BackupTypeLogFile}
+	g.Expect(backupSpec.Validate(backupPolicy)).Should(HaveOccurred())
 }
 
-func TestToDuration(t *testing.T) {
-	d := ToDuration(nil)
-	if d != time.Duration(0) {
-		t.Errorf("Expected duration is 0, got %v", d)
+func TestGetRecoverableTimeRange(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	// test empty backups
+	emptyBackups := []Backup{}
+	g.Expect(GetRecoverableTimeRange(emptyBackups)).Should(BeEmpty())
+
+	now := metav1.Now()
+	backupSnapshot := Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup-snapshot"},
+		Spec:       BackupSpec{BackupType: BackupTypeSnapshot},
+		Status: BackupStatus{
+			Phase: BackupCompleted,
+			Manifests: &ManifestsStatus{
+				BackupLog: &BackupLogStatus{
+					StartTime: &now,
+					StopTime:  &now,
+				},
+			},
+		},
 	}
-	expectToDuration(t, "7d", 24, 7)
-	expectToDuration(t, "7D", 24, 7)
-	expectToDuration(t, "12h", 1, 12)
-	expectToDuration(t, "12H", 1, 12)
+	backupLogfile := Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup-logfile"},
+		Spec:       BackupSpec{BackupType: BackupTypeLogFile},
+		Status: BackupStatus{
+			Manifests: &ManifestsStatus{
+				BackupLog: &BackupLogStatus{
+					StartTime: &now,
+					StopTime:  &metav1.Time{Time: now.Add(time.Hour)},
+				},
+			},
+		},
+	}
+
+	backups := []Backup{backupSnapshot, backupLogfile, {}}
+	g.Expect(GetRecoverableTimeRange(backups)).ShouldNot(BeEmpty())
 }

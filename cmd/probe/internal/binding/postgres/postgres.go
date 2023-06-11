@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
@@ -35,7 +34,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	. "github.com/apecloud/kubeblocks/cmd/probe/util"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 // List of operations.
@@ -139,7 +138,7 @@ func (pgOps *PostgresOperations) initIfNeed() bool {
 			if err != nil {
 				pgOps.Logger.Errorf("Postgres connection init failed: %v", err)
 			} else {
-				pgOps.Logger.Info("Postgres connection init success: %s", pgOps.db.Config().ConnConfig)
+				pgOps.Logger.Info("Postgres connection init succeeded: %s", pgOps.db.Config().ConnConfig)
 			}
 		}()
 		return true
@@ -172,7 +171,7 @@ func (pgOps *PostgresOperations) InitDelay() error {
 	}
 
 	// This context doesn't control the lifetime of the connection pool, and is
-	// only scoped to postgres creating resources at init.
+	// only creating resources at init.
 	pgOps.db, err = pgxpool.NewWithConfig(context.Background(), poolConfig)
 	if err != nil {
 		return fmt.Errorf("unable to ping the DB: %w", err)
@@ -201,26 +200,28 @@ func (pgOps *PostgresOperations) GetRunningPort() int {
 func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	sql := "select pg_is_in_recovery();"
 
-	// sql exec timeout need to be less than httpget's timeout which default is 1s.
-	ctx1, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-	rows, err := pgOps.db.Query(ctx1, sql)
+	rows, err := pgOps.db.Query(ctx, sql)
 	if err != nil {
 		pgOps.Logger.Infof("error executing %s: %v", sql, err)
 		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 
 	var isRecovery bool
+	var isReady bool
 	for rows.Next() {
 		if err = rows.Scan(&isRecovery); err != nil {
 			pgOps.Logger.Errorf("Role query error: %v", err)
 			return "", err
 		}
+		isReady = true
 	}
 	if isRecovery {
 		return SECONDARY, nil
 	}
-	return PRIMARY, nil
+	if isReady {
+		return PRIMARY, nil
+	}
+	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
 }
 
 func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
@@ -243,7 +244,6 @@ func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.Invo
 	return result, nil
 }
 
-// CheckStatusOps design details: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 func (pgOps *PostgresOperations) CheckStatusOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	rwSQL := fmt.Sprintf(`begin;
 create table if not exists kb_health_check(type int, check_ts timestamp, primary key(type));
@@ -354,17 +354,17 @@ func (pgOps *PostgresOperations) exec(ctx context.Context, sql string) (result i
 	return
 }
 
-// InternalQuery is used for internal query, implement BaseInternalOps interface
+// InternalQuery is used for internal query, implements BaseInternalOps interface
 func (pgOps *PostgresOperations) InternalQuery(ctx context.Context, sql string) (result []byte, err error) {
 	return pgOps.query(ctx, sql)
 }
 
-// InternalExec is used for internal execution, implement BaseInternalOps interface
+// InternalExec is used for internal execution, implements BaseInternalOps interface
 func (pgOps *PostgresOperations) InternalExec(ctx context.Context, sql string) (result int64, err error) {
 	return pgOps.exec(ctx, sql)
 }
 
-// GetLogger is used for getting logger, implement BaseInternalOps interface
+// GetLogger is used for getting logger, implements BaseInternalOps interface
 func (pgOps *PostgresOperations) GetLogger() logger.Logger {
 	return pgOps.Logger
 }

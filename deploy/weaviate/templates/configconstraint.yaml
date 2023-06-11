@@ -1,0 +1,44 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: weaviate-env-constraints
+  labels:
+    {{- include "weaviate.labels" . | nindent 4 }}
+spec:
+  # top level weaviate configuration type
+  cfgSchemaTopLevelName: WeaviateEnvs
+
+  # ConfigurationSchema that impose restrictions on engine parameter's rule
+  configurationSchema:
+    cue: |-
+      {{- .Files.Get "config/weaviate-env-constraint.cue" | nindent 6 }}
+
+  ## define static parameter list
+  staticParameters:
+  - ENABLE_MODULES
+  - TRANSFORMERS_INFERENCE_API
+  - CLIP_INFERENCE_API
+  - QNA_INFERENCE_API
+  - IMAGE_INFERENCE_API
+  - SPELLCHECK_INFERENCE_API
+  - NER_INFERENCE_API
+  - SUM_INFERENCE_API
+  - OPENAI_APIKEY
+  - HUGGINGFACE_APIKEY
+  - COHERE_APIKEY
+  - PALM_APIKEY
+  - AWS_ACCESS_KEY_ID
+  - AWS_SECRET_ACCESS_KEY
+  - GOOGLE_APPLICATION_CREDENTIALS
+  - AZURE_STORAGE_ACCOUNT
+  - AZURE_STORAGE_KEY
+  - AZURE_STORAGE_CONNECTION_STRING
+  - AUTHENTICATION_APIKEY_ENABLED
+  - AUTHENTICATION_APIKEY_ALLOWED_KEYS
+  - AUTHENTICATION_APIKEY_USERS
+  - AUTHORIZATION_ADMINLIST_ENABLED
+  - AUTHORIZATION_ADMINLIST_USERS
+  - AUTHORIZATION_ADMINLIST_READONLY_USERS
+
+  formatterConfig:
+    format: dotenv

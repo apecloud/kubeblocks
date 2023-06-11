@@ -42,10 +42,10 @@ func NewBackupPolicyFactory(namespace, name string) *MockBackupPolicyFactory {
 func (factory *MockBackupPolicyFactory) setBasePolicyField(setField func(basePolicy *dataprotectionv1alpha1.BasePolicy)) {
 	var basePolicy *dataprotectionv1alpha1.BasePolicy
 	switch factory.backupType {
-	case dataprotectionv1alpha1.BackupTypeFull:
-		basePolicy = &factory.get().Spec.Full.BasePolicy
-	case dataprotectionv1alpha1.BackupTypeIncremental:
-		basePolicy = &factory.get().Spec.Incremental.BasePolicy
+	case dataprotectionv1alpha1.BackupTypeDataFile:
+		basePolicy = &factory.get().Spec.Datafile.BasePolicy
+	case dataprotectionv1alpha1.BackupTypeLogFile:
+		basePolicy = &factory.get().Spec.Logfile.BasePolicy
 	case dataprotectionv1alpha1.BackupTypeSnapshot:
 		basePolicy = &factory.get().Spec.Snapshot.BasePolicy
 	}
@@ -59,10 +59,10 @@ func (factory *MockBackupPolicyFactory) setBasePolicyField(setField func(basePol
 func (factory *MockBackupPolicyFactory) setCommonPolicyField(setField func(commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy)) {
 	var commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy
 	switch factory.backupType {
-	case dataprotectionv1alpha1.BackupTypeFull:
-		commonPolicy = factory.get().Spec.Full
-	case dataprotectionv1alpha1.BackupTypeIncremental:
-		commonPolicy = factory.get().Spec.Incremental
+	case dataprotectionv1alpha1.BackupTypeDataFile:
+		commonPolicy = factory.get().Spec.Datafile
+	case dataprotectionv1alpha1.BackupTypeLogFile:
+		commonPolicy = factory.get().Spec.Logfile
 	}
 	if commonPolicy == nil {
 		// ignore
@@ -74,15 +74,16 @@ func (factory *MockBackupPolicyFactory) setCommonPolicyField(setField func(commo
 func (factory *MockBackupPolicyFactory) setScheduleField(setField func(schedulePolicy *dataprotectionv1alpha1.SchedulePolicy)) {
 	var schedulePolicy *dataprotectionv1alpha1.SchedulePolicy
 	switch factory.backupType {
-	case dataprotectionv1alpha1.BackupTypeFull, dataprotectionv1alpha1.BackupTypeSnapshot:
-		factory.get().Spec.Schedule.BaseBackup = &dataprotectionv1alpha1.BaseBackupSchedulePolicy{
-			SchedulePolicy: dataprotectionv1alpha1.SchedulePolicy{},
-			Type:           dataprotectionv1alpha1.BaseBackupType(factory.backupType),
-		}
-		schedulePolicy = &factory.get().Spec.Schedule.BaseBackup.SchedulePolicy
-	case dataprotectionv1alpha1.BackupTypeIncremental:
-		schedulePolicy = &dataprotectionv1alpha1.SchedulePolicy{}
-		factory.get().Spec.Schedule.Incremental = schedulePolicy
+	case dataprotectionv1alpha1.BackupTypeDataFile:
+		factory.get().Spec.Schedule.Datafile = &dataprotectionv1alpha1.SchedulePolicy{}
+		schedulePolicy = factory.get().Spec.Schedule.Datafile
+	case dataprotectionv1alpha1.BackupTypeSnapshot:
+		factory.get().Spec.Schedule.Snapshot = &dataprotectionv1alpha1.SchedulePolicy{}
+		schedulePolicy = factory.get().Spec.Schedule.Snapshot
+	// todo: set logfile schedule
+	case dataprotectionv1alpha1.BackupTypeLogFile:
+		factory.get().Spec.Schedule.Logfile = &dataprotectionv1alpha1.SchedulePolicy{}
+		schedulePolicy = factory.get().Spec.Schedule.Snapshot
 	}
 	if schedulePolicy == nil {
 		// ignore
@@ -100,22 +101,22 @@ func (factory *MockBackupPolicyFactory) AddSnapshotPolicy() *MockBackupPolicyFac
 }
 
 func (factory *MockBackupPolicyFactory) AddFullPolicy() *MockBackupPolicyFactory {
-	factory.get().Spec.Full = &dataprotectionv1alpha1.CommonBackupPolicy{
+	factory.get().Spec.Datafile = &dataprotectionv1alpha1.CommonBackupPolicy{
 		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
 			CreatePolicy: dataprotectionv1alpha1.CreatePVCPolicyIfNotPresent,
 		},
 	}
-	factory.backupType = dataprotectionv1alpha1.BackupTypeFull
+	factory.backupType = dataprotectionv1alpha1.BackupTypeDataFile
 	return factory
 }
 
 func (factory *MockBackupPolicyFactory) AddIncrementalPolicy() *MockBackupPolicyFactory {
-	factory.get().Spec.Incremental = &dataprotectionv1alpha1.CommonBackupPolicy{
+	factory.get().Spec.Logfile = &dataprotectionv1alpha1.CommonBackupPolicy{
 		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
 			CreatePolicy: dataprotectionv1alpha1.CreatePVCPolicyIfNotPresent,
 		},
 	}
-	factory.backupType = dataprotectionv1alpha1.BackupTypeIncremental
+	factory.backupType = dataprotectionv1alpha1.BackupTypeLogFile
 	return factory
 }
 
@@ -135,7 +136,9 @@ func (factory *MockBackupPolicyFactory) SetSchedule(schedule string, enable bool
 }
 
 func (factory *MockBackupPolicyFactory) SetTTL(duration string) *MockBackupPolicyFactory {
-	factory.get().Spec.TTL = &duration
+	factory.get().Spec.Retention = &dataprotectionv1alpha1.RetentionSpec{
+		TTL: &duration,
+	}
 	return factory
 }
 

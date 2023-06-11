@@ -86,7 +86,6 @@ func (r *RestoreJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return *res, err
 	}
 
-	// restore job reconcile logic here
 	switch restoreJob.Status.Phase {
 	case "", dataprotectionv1alpha1.RestoreJobNew:
 		return r.doRestoreNewPhaseAction(reqCtx, restoreJob)
@@ -112,7 +111,7 @@ func (r *RestoreJobReconciler) doRestoreNewPhaseAction(
 	restoreJob *dataprotectionv1alpha1.RestoreJob) (ctrl.Result, error) {
 
 	// 1. get stateful service and
-	// 2. set stateful set replicate 0
+	// 2. set stateful replicas to 0
 	patch := []byte(`{"spec":{"replicas":0}}`)
 	if err := r.patchTargetCluster(reqCtx, restoreJob, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -172,11 +171,11 @@ func (r *RestoreJobReconciler) doRestoreInProgressPhyAction(
 
 	switch jobStatusConditions[0].Type {
 	case batchv1.JobComplete:
-		// update Phase to in Completed
+		// update Phase to Completed
 		restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobCompleted
 		restoreJob.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
 		// get stateful service and
-		// set stateful set replicate to 1
+		// set stateful replicas to 1
 		patch := []byte(`{"spec":{"replicas":1}}`)
 		if err := r.patchTargetCluster(reqCtx, restoreJob, patch); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -325,9 +324,9 @@ func (r *RestoreJobReconciler) patchTargetCluster(reqCtx intctrlutil.RequestCtx,
 	clusterItemsLen := len(clusterTarget.Items)
 	if clusterItemsLen != 1 {
 		if clusterItemsLen <= 0 {
-			restoreJob.Status.FailureReason = "Can not found any stateful sets by labelsSelector."
+			restoreJob.Status.FailureReason = "Can not find any statefulsets with labelsSelector."
 		} else {
-			restoreJob.Status.FailureReason = "Match labels result more than one, check labelsSelector."
+			restoreJob.Status.FailureReason = "Match more than one results, please check the labelsSelector."
 		}
 		restoreJob.Status.Phase = dataprotectionv1alpha1.RestoreJobFailed
 		reqCtx.Log.Info(restoreJob.Status.FailureReason)

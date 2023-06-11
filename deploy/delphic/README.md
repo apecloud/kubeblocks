@@ -45,6 +45,6 @@
     
 6. Port-forward the Plugin Portal to access it.
    ```shell
-   kubectl port-forward port-forward deployment/delphic 3000:3000 8000:8000
+   kubectl port-forward deployment/delphic 3000:3000 8000:8000
    ```
 7. In your web browser, open the plugin portal with the address ```http://127.0.0.1:3000```

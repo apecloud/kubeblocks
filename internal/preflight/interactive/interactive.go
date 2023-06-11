@@ -38,7 +38,7 @@ var (
 	isShowingSaved = false
 )
 
-// ShowInteractiveResults displays the results with interactive mode
+// ShowInteractiveResults displays the results in interactive mode
 func ShowInteractiveResults(preflightName string, analyzeResults []*analyzerunner.AnalyzeResult, outputPath string) error {
 	if err := ui.Init(); err != nil {
 		return errors.Wrap(err, "failed to create terminal ui")

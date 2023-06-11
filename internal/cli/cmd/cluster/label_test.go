@@ -77,7 +77,7 @@ var _ = Describe("cluster label", func() {
 			Expect(o.validate()).Should(HaveOccurred())
 		})
 
-		It("can not both modify and remove label in the same command", func() {
+		It("cannot modify and remove label within the same command", func() {
 			Expect(o.complete(cmd, []string{"c1", "env=dev", "env-"})).Should(HaveOccurred())
 		})
 	})

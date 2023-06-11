@@ -29,8 +29,8 @@ import (
 
 var _ = Describe("playground", func() {
 	var (
-		provider    = NewLocalCloudProvider(os.Stdout, os.Stderr)
-		clusterName = "k3d-tb-est"
+		provider    = newLocalCloudProvider(os.Stdout, os.Stderr)
+		clusterName = "k3d-kb-test"
 	)
 
 	It("k3d util function", func() {

@@ -31,7 +31,7 @@ import (
 )
 
 var listExample = templates.Examples(`
-		# list all ClusterDefinition
+		# list all ClusterDefinitions
 		kbcli clusterdefinition list`)
 
 func NewClusterDefinitionCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -42,6 +42,7 @@ func NewClusterDefinitionCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 	}
 
 	cmd.AddCommand(NewListCmd(f, streams))
+	cmd.AddCommand(NewListComponentsCmd(f, streams))
 	return cmd
 }
 

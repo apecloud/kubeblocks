@@ -44,7 +44,7 @@ const (
 )
 
 const (
-	invalidMigrationCrdAdvice = "to use migration-related functions, please ensure that the addon of migration is enabled. you can use: 'kbcli addon enable migration' to enable the addon"
+	invalidMigrationCrdAdvice = "to use migration-related functions, please ensure that the addon of migration is enabled, use: 'kbcli addon enable migration' to enable the addon"
 )
 
 // Endpoint
@@ -60,14 +60,14 @@ type EndpointModel struct {
 
 func (e *EndpointModel) BuildFromStr(msgArr *[]string, endpointStr string) error {
 	if endpointStr == "" {
-		BuildErrorMsg(msgArr, "endpoint string can not be empty")
+		BuildErrorMsg(msgArr, "endpoint string cannot be empty")
 		return nil
 	}
 	e.clear()
 	endpointStr = strings.TrimSpace(endpointStr)
 	accountURLPair := strings.Split(endpointStr, "@")
 	if len(accountURLPair) != 2 {
-		BuildErrorMsg(msgArr, "endpoint maybe does not contain account info")
+		BuildErrorMsg(msgArr, "endpoint may not contain account info")
 		return nil
 	}
 	accountPair := strings.Split(accountURLPair[0], ":")
@@ -116,13 +116,13 @@ type TableObjectExpress struct {
 
 func (m *MigrationObjectModel) BuildFromStrs(errMsgArr *[]string, objStrs []string) error {
 	if len(objStrs) == 0 {
-		BuildErrorMsg(errMsgArr, "migration object can not be empty")
+		BuildErrorMsg(errMsgArr, "migration object cannot be empty")
 		return nil
 	}
 	for _, str := range objStrs {
 		msg := ""
 		if str == "" {
-			msg = "the database or database.table in migration object can not be empty"
+			msg = "the database or database.table in migration object cannot be empty"
 		}
 		dbTablePair := strings.Split(str, ".")
 		if len(dbTablePair) > 2 {

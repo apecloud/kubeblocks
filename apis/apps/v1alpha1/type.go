@@ -1,26 +1,26 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 // Package v1alpha1 contains API Schema definitions for the apps v1alpha1 API group
 package v1alpha1
 
 import (
+	"errors"
+
+	appsv1 "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
@@ -115,20 +115,12 @@ const (
 	SpecReconcilingClusterCompPhase ClusterComponentPhase = "Updating"
 	CreatingClusterCompPhase        ClusterComponentPhase = "Creating"
 	// DeletingClusterCompPhase        ClusterComponentPhase = "Deleting" // DO REVIEW: may merged with  Stopping
-
-	// REVIEW: following are variant of "Updating", why not have "Updating" phase with detail Status.Conditions
-	// VolumeExpandingClusterCompPhase   ClusterComponentPhase = "VolumeExpanding"
-	// HorizontalScalingClusterCompPhase ClusterComponentPhase = "HorizontalScaling"
-	// VerticalScalingClusterCompPhase   ClusterComponentPhase = "VerticalScaling"
-	// VersionUpgradingClusterCompPhase  ClusterComponentPhase = "Upgrading"
-	// ReconfiguringClusterCompPhase     ClusterComponentPhase = "Reconfiguring"
-	// ExposingClusterCompPhase          ClusterComponentPhase = "Exposing"
-	// RollingClusterCompPhase           ClusterComponentPhase = "Rolling" // REVIEW: original value is Rebooting, and why not having stopping -> stopped -> starting -> running
 )
 
 const (
 	// define the cluster condition type
 	ConditionTypeLatestOpsRequestProcessed = "LatestOpsRequestProcessed" // ConditionTypeLatestOpsRequestProcessed describes whether the latest OpsRequest that affect the cluster lifecycle has been processed.
+	ConditionTypeHaltRecovery              = "HaltRecovery"              // ConditionTypeHaltRecovery describe Halt recovery processing stage
 	ConditionTypeProvisioningStarted       = "ProvisioningStarted"       // ConditionTypeProvisioningStarted the operator starts resource provisioning to create or change the cluster
 	ConditionTypeApplyResources            = "ApplyResources"            // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
 	ConditionTypeReplicasReady             = "ReplicasReady"             // ConditionTypeReplicasReady all pods of components are ready
@@ -159,15 +151,17 @@ const (
 
 // OpsPhase defines opsRequest phase.
 // +enum
-// +kubebuilder:validation:Enum={Pending,Creating,Running,Failed,Succeed}
+// +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Failed,Succeed}
 type OpsPhase string
 
 const (
-	OpsPendingPhase  OpsPhase = "Pending"
-	OpsCreatingPhase OpsPhase = "Creating"
-	OpsRunningPhase  OpsPhase = "Running"
-	OpsFailedPhase   OpsPhase = "Failed"
-	OpsSucceedPhase  OpsPhase = "Succeed"
+	OpsPendingPhase    OpsPhase = "Pending"
+	OpsCreatingPhase   OpsPhase = "Creating"
+	OpsRunningPhase    OpsPhase = "Running"
+	OpsCancellingPhase OpsPhase = "Cancelling"
+	OpsSucceedPhase    OpsPhase = "Succeed"
+	OpsCancelledPhase  OpsPhase = "Cancelled"
+	OpsFailedPhase     OpsPhase = "Failed"
 )
 
 // OpsType defines operation types.
@@ -249,7 +243,7 @@ const (
 
 // HScaleDataClonePolicyType defines data clone policy when horizontal scaling.
 // +enum
-// +kubebuilder:validation:Enum={None,Snapshot}
+// +kubebuilder:validation:Enum={None,Snapshot,Backup}
 type HScaleDataClonePolicyType string
 
 const (
@@ -524,3 +518,16 @@ func RegisterWebhookManager(mgr manager.Manager) {
 }
 
 type ComponentNameSet map[string]struct{}
+
+var (
+	ErrWorkloadTypeIsUnknown   = errors.New("workloadType is unknown")
+	ErrWorkloadTypeIsStateless = errors.New("workloadType should not be stateless")
+	ErrNotMatchingCompDef      = errors.New("not matching componentDefRef")
+)
+
+// StatefulSetWorkload interface
+// +kubebuilder:object:generate=false
+type StatefulSetWorkload interface {
+	FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy)
+	GetUpdateStrategy() UpdateStrategy
+}

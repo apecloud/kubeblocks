@@ -38,7 +38,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	. "github.com/apecloud/kubeblocks/cmd/probe/util"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 const (
@@ -84,7 +84,7 @@ func TestInit(t *testing.T) {
 func TestInitDelay(t *testing.T) {
 	// Initialize a new instance of MysqlOperations.
 	mysqlOps, _, _ := mockDatabase(t)
-	mysqlOps.initIfNeed()
+	// mysqlOps.initIfNeed()
 	t.Run("Invalid url", func(t *testing.T) {
 		mysqlOps.db = nil
 		mysqlOps.initIfNeed()

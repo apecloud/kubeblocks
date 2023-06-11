@@ -9,19 +9,22 @@ spec:
   clusterDefinitionRef: mongodb
   backupPolicies:
   - componentDefRef: mongodb
-    ttl: 7d
+    retention:
+      ttl: 7d
     schedule:
-      baseBackup:
-        type: full
+      snapshot:
         enable: false
-        cronExpression: "0 18 * * 0"
+        cronExpression: "0 18 * * *"
+      datafile:
+        enable: false
+        cronExpression: "0 18 * * *"
     snapshot:
       target:
         role: primary
         connectionCredentialKey:
           passwordKey: password
           usernameKey: username
-    full:
+    datafile:
       backupToolName: mongodb-physical-backup-tool
       backupsHistoryLimit: 7
       target:

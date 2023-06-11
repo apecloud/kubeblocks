@@ -32,7 +32,7 @@ import (
 
 const checkFailedHTTPCode = "451"
 
-// mockedRequestHandler acts like an upstream service returns success status code 200 and a fixed response body.
+// mockedRequestHandler acts like an upstream service, returns success status code 200 and a fixed response body.
 func mockedRequestHandler(ctx *fasthttp.RequestCtx) {
 	ctx.Response.Header.SetStatusCode(http.StatusOK)
 	ctx.Response.SetBodyString("mock response")

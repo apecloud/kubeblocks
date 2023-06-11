@@ -24,8 +24,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	appsv1 "k8s.io/api/apps/v1"
 
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -74,5 +77,69 @@ var _ = Describe("kubeblocks", func() {
 		in.Reset()
 		_, _ = in.Write([]byte("uninstall-kubeblocks\n"))
 		Expect(confirmUninstall(in)).Should(Succeed())
+	})
+
+	It("printAddonMsg", func() {
+		const (
+			reason = "test-failed-reason"
+		)
+
+		fakeAddOn := func(name string, conditionTrue bool, msg string) *extensionsv1alpha1.Addon {
+			addon := &extensionsv1alpha1.Addon{}
+			addon.Name = name
+			addon.Status = extensionsv1alpha1.AddonStatus{}
+			if conditionTrue {
+				addon.Status.Phase = extensionsv1alpha1.AddonEnabled
+			} else {
+				addon.Status.Phase = extensionsv1alpha1.AddonFailed
+				addon.Status.Conditions = []metav1.Condition{
+					{
+						Message: msg,
+						Reason:  reason,
+						Status:  metav1.ConditionFalse,
+					},
+					{
+						Message: msg,
+						Reason:  reason,
+						Status:  metav1.ConditionFalse,
+					},
+				}
+			}
+			return addon
+		}
+
+		testCases := []struct {
+			desc     string
+			addons   []*extensionsv1alpha1.Addon
+			expected string
+		}{
+			{
+				desc:     "addons is nil",
+				addons:   nil,
+				expected: "",
+			},
+			{
+				desc: "addons without false condition",
+				addons: []*extensionsv1alpha1.Addon{
+					fakeAddOn("addon", true, ""),
+				},
+				expected: "",
+			},
+			{
+				desc: "addons with false condition",
+				addons: []*extensionsv1alpha1.Addon{
+					fakeAddOn("addon1", true, ""),
+					fakeAddOn("addon2", false, "failed to enable addon2"),
+				},
+				expected: "failed to enable addon2",
+			},
+		}
+
+		for _, c := range testCases {
+			By(c.desc)
+			out := &bytes.Buffer{}
+			printAddonMsg(out, c.addons, true)
+			Expect(out.String()).To(ContainSubstring(c.expected))
+		}
 	})
 })

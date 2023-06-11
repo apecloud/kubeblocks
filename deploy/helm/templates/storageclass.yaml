@@ -1,0 +1,86 @@
+{{- if (.Capabilities.KubeVersion.GitVersion | contains "-eks") }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: kb-default-sc
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+allowVolumeExpansion: true
+parameters:
+  ## parameters references: https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/parameters.md
+  type: {{ .Values.storageClass.provider.eks.volumeType }} # io2, io1, gp3, gp2 are all SSD variant
+  "csi.storage.k8s.io/fstype": {{ .Values.storageClass.provider.eks.fsType | default "xfs" }}
+provisioner: ebs.csi.aws.com
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+---
+{{- else if (.Capabilities.KubeVersion.GitVersion | contains "-gke") }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: kb-default-sc
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+allowVolumeExpansion: true
+parameters:
+  ## refer: https://github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/issues/617
+  type: {{ .Values.storageClass.provider.gke.volumeType }}
+  csi.storage.k8s.io/fstype: {{ .Values.storageClass.provider.gke.fsType | default "xfs" }}
+provisioner: pd.csi.storage.gke.io
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+---
+{{- else if (.Capabilities.KubeVersion.GitVersion | contains "-aliyun") }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: kb-default-sc
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+allowVolumeExpansion: true
+parameters:
+  ## parameters references: https://github.com/kubernetes-sigs/alibaba-cloud-csi-driver/blob/master/docs/disk.md
+  fstype: {{ .Values.storageClass.provider.aliyun.fsType | default "xfs" }}
+  type: {{ .Values.storageClass.provider.aliyun.volumeType }}
+provisioner: diskplugin.csi.alibabacloud.com
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+---
+{{- else if (.Capabilities.KubeVersion.GitVersion | contains "-tke") }}
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: kb-default-sc
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+parameters:
+  ## parameters references: https://cloud.tencent.com/document/product/457/44239, the fsType is not supported by tke.
+  type: {{ .Values.storageClass.provider.tke.volumeType }}
+reclaimPolicy: Delete
+provisioner: com.tencent.cloud.csi.cbs
+volumeBindingMode: WaitForFirstConsumer
+---
+{{- else if (.Capabilities.KubeVersion.GitVersion | contains "-aks") }}
+---
+## it doesn't work here because aks does not support .Capabilities.KubeVersion.GitVersion to judge the provider.
+## refer: https://github.com/Azure/AKS/issues/3375
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: kb-default-sc
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+parameters:
+  # parameters references: https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/driver-parameters.md
+  fsType: {{ .Values.storageClass.provider.aks.fsType | default "xfs" }}
+  kind: {{ .Values.storageClass.provider.aks.volumeType }}
+  skuName: Standard_LRS
+provisioner: kubernetes.io/azure-disk
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+---
+{{- end }}

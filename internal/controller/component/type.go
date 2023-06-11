@@ -28,19 +28,25 @@ import (
 
 type MonitorConfig struct {
 	Enable     bool   `json:"enable"`
+	BuiltIn    bool   `json:"builtIn"`
 	ScrapePort int32  `json:"scrapePort,omitempty"`
 	ScrapePath string `json:"scrapePath,omitempty"`
 }
 
 type SynthesizedComponent struct {
 	ClusterDefName        string                                 `json:"clusterDefName,omitempty"`
+	ClusterName           string                                 `json:"clusterName,omitempty"`
+	ClusterUID            string                                 `json:"clusterUID,omitempty"`
 	Name                  string                                 `json:"name,omitempty"`
-	Type                  string                                 `json:"type,omitempty"`
+	CompDefName           string                                 `json:"compDefName,omitempty"`
 	CharacterType         string                                 `json:"characterType,omitempty"`
-	MaxUnavailable        *intstr.IntOrString                    `json:"maxUnavailable,omitempty"`
+	MinAvailable          *intstr.IntOrString                    `json:"minAvailable,omitempty"`
 	Replicas              int32                                  `json:"replicas"`
 	WorkloadType          v1alpha1.WorkloadType                  `json:"workloadType,omitempty"`
+	StatelessSpec         *v1alpha1.StatelessSetSpec             `json:"statelessSpec,omitempty"`
+	StatefulSpec          *v1alpha1.StatefulSetSpec              `json:"statefulSpec,omitempty"`
 	ConsensusSpec         *v1alpha1.ConsensusSetSpec             `json:"consensusSpec,omitempty"`
+	ReplicationSpec       *v1alpha1.ReplicationSetSpec           `json:"replicationSpec,omitempty"`
 	PrimaryIndex          *int32                                 `json:"primaryIndex,omitempty"`
 	PodSpec               *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	Services              []corev1.Service                       `json:"services,omitempty"`
@@ -54,14 +60,15 @@ type SynthesizedComponent struct {
 	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy        `json:"horizontalScalePolicy,omitempty"`
 	TLS                   bool                                   `json:"tls"`
 	Issuer                *v1alpha1.Issuer                       `json:"issuer,omitempty"`
-	VolumeTypes           []v1alpha1.VolumeTypeSpec              `json:"VolumeTypes,omitempty"`
+	VolumeTypes           []v1alpha1.VolumeTypeSpec              `json:"volumeTypes,omitempty"`
 	CustomLabelSpecs      []v1alpha1.CustomLabelSpec             `json:"customLabelSpecs,omitempty"`
 	ComponentDef          string                                 `json:"componentDef,omitempty"`
 	ServiceAccountName    string                                 `json:"serviceAccountName,omitempty"`
+	StatefulSetWorkload   v1alpha1.StatefulSetWorkload
 }
 
 // GetPrimaryIndex provides PrimaryIndex value getter, if PrimaryIndex is
-// a nil pointer it's treated at 0, return -1 if function receiver is nil.
+// a nil pointer it's treated as 0, return -1 if function receiver is nil.
 func (r *SynthesizedComponent) GetPrimaryIndex() int32 {
 	if r == nil {
 		return -1

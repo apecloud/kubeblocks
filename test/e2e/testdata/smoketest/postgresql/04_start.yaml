@@ -3,7 +3,7 @@ kind: OpsRequest
 metadata:
   name: ops-start
 spec:
-  clusterRef: mycluster
+  clusterRef: mycluster-pgcluster
   ttlSecondsAfterSucceed: 5432
   type: Start
   restart:

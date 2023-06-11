@@ -19,7 +19,7 @@ spec:
     - name: mongos
       scriptSpecs:
         - name: mongodb-scripts
-          templateRef: mongodb-scripts
+          templateRef: mongodb-sharding-scripts
           volumeName: scripts
           namespace: {{ .Release.Namespace }}
           defaultMode: 493
@@ -44,7 +44,7 @@ spec:
     - name: configsvr
       scriptSpecs:
         - name: mongodb-scripts
-          templateRef: mongodb-scripts
+          templateRef: mongodb-sharding-scripts
           volumeName: scripts
           namespace: {{ .Release.Namespace }}
           defaultMode: 493
@@ -94,7 +94,7 @@ spec:
     - name: shard
       scriptSpecs:
         - name: mongodb-scripts
-          templateRef: mongodb-scripts
+          templateRef: mongodb-sharding-scripts
           volumeName: scripts
           namespace: {{ .Release.Namespace }}
           defaultMode: 493

@@ -64,7 +64,7 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		if replicasOfSnapshot == 0 {
 			continue
 		}
-		// only reset the component which replicas number is 0
+		// only reset the component whose replicas number is 0
 		if v.Replicas == 0 {
 			cluster.Spec.ComponentSpecs[i].Replicas = replicasOfSnapshot
 		}

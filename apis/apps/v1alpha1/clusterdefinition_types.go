@@ -1,20 +1,17 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package v1alpha1
@@ -22,6 +19,7 @@ package v1alpha1
 import (
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -49,15 +47,15 @@ type ClusterDefinitionSpec struct {
 	// secret for cluster.apps.kubeblocks.io object. Built-in objects are:
 	// `$(RANDOM_PASSWD)` - random 8 characters.
 	// `$(UUID)` - generate a random UUID v4 string.
-	// `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string``.
-	// `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded``.
-	// `$(UUID_HEX)` - generate a random UUID v4 HEX representation``.
+	// `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string.
+	// `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded.
+	// `$(UUID_HEX)` - generate a random UUID v4 HEX representation.
 	// `$(HEADLESS_SVC_FQDN)` - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
 	// `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// `$(SVC_PORT_<PORT-NAME>)` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
-	//    { "name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306 }, and "$(SVC_PORT_mysql)" in the
+	// `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
+	//    `"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306`, and "$(SVC_PORT_mysql)" in the
 	//    connection credential value is 3306.
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
@@ -84,8 +82,7 @@ type SystemAccountSpec struct {
 // CmdExecutorConfig specifies how to perform creation and deletion statements.
 type CmdExecutorConfig struct {
 	CommandExecutorEnvItem `json:",inline"`
-
-	CommandExecutorItem `json:",inline"`
+	CommandExecutorItem    `json:",inline"`
 }
 
 // PasswordConfig helps provide to customize complexity of password generation pattern.
@@ -167,7 +164,7 @@ type ProvisionStatements struct {
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
 type ClusterDefinitionStatus struct {
-	// ClusterDefinition phase, valid values are <empty>, Available.
+	// ClusterDefinition phase, valid values are `empty`, `Available`, 'Unavailable`.
 	// Available is ClusterDefinition become available, and can be referenced for co-related objects.
 	Phase Phase `json:"phase,omitempty"`
 
@@ -201,8 +198,8 @@ type ExporterConfig struct {
 
 type MonitorConfig struct {
 	// builtIn is a switch to enable KubeBlocks builtIn monitoring.
+	// If BuiltIn is set to true, monitor metrics will be scraped automatically.
 	// If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.
-	// BuiltIn set to true is not currently supported but will be soon.
 	// +kubebuilder:default=false
 	// +optional
 	BuiltIn bool `json:"builtIn,omitempty"`
@@ -243,6 +240,7 @@ type VolumeTypeSpec struct {
 // ClusterComponentDefinition provides a workload component specification template,
 // with attributes that strongly work with stateful workloads and day-2 operations
 // behaviors.
+// +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Consensus' ?  has(self.consensusSpec) : !has(self.consensusSpec)",message="componentDefs.consensusSpec is required when componentDefs.workloadType is Consensus, and forbidden otherwise"
 type ClusterComponentDefinition struct {
 	// name of the component, it can be any valid string.
 	// +kubebuilder:validation:Required
@@ -266,14 +264,6 @@ type ClusterComponentDefinition struct {
 	// KubeBlocks will generate proper monitor configs for well-known characterType when builtIn is true.
 	// +optional
 	CharacterType string `json:"characterType,omitempty"`
-
-	// The maximum number of pods that can be unavailable during scaling.
-	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
-	// Absolute number is calculated from percentage by rounding down. This value is ignored
-	// if workloadType is Consensus.
-	// +kubebuilder:validation:XIntOrString
-	// +optional
-	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
 	// The configSpec field provided by provider, and
 	// finally this configTemplateRefs will be rendered into the user's own configuration file according to the user's cluster.
@@ -320,13 +310,21 @@ type ClusterComponentDefinition struct {
 	// +optional
 	Service *ServiceSpec `json:"service,omitempty"`
 
+	// statelessSpec defines stateless related spec if workloadType is Stateless.
+	// +optional
+	StatelessSpec *StatelessSetSpec `json:"statelessSpec,omitempty"`
+
+	// statefulSpec defines stateful related spec if workloadType is Stateful.
+	// +optional
+	StatefulSpec *StatefulSetSpec `json:"statefulSpec,omitempty"`
+
 	// consensusSpec defines consensus related spec if workloadType is Consensus, required if workloadType is Consensus.
 	// +optional
 	ConsensusSpec *ConsensusSetSpec `json:"consensusSpec,omitempty"`
 
-	// replicationSpec defines replication related spec if workloadType is Replication, required if workloadType is Replication.
+	// replicationSpec defines replication related spec if workloadType is Replication.
 	// +optional
-	ReplicationSpec *ReplicationSpec `json:"replicationSpec,omitempty"`
+	ReplicationSpec *ReplicationSetSpec `json:"replicationSpec,omitempty"`
 
 	// horizontalScalePolicy controls the behavior of horizontal scale.
 	// +optional
@@ -343,8 +341,8 @@ type ClusterComponentDefinition struct {
 	// according to the volumeType.
 	//
 	// For example:
-	//  `{name: data, type: data}` means that the volume named `data` is used to store `data`.
-	//  `{name: binlog, type: log}` means that the volume named `binlog` is used to store `log`.
+	//  `name: data, type: data` means that the volume named `data` is used to store `data`.
+	//  `name: binlog, type: log` means that the volume named `binlog` is used to store `log`.
 	//
 	// NOTE:
 	//   When volumeTypes is not defined, the backup function will not be supported,
@@ -359,6 +357,118 @@ type ClusterComponentDefinition struct {
 	// +listMapKey=key
 	// +optional
 	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
+}
+
+func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
+	switch r.WorkloadType {
+	case Stateless:
+		return nil
+	case Stateful:
+		return r.StatefulSpec
+	case Consensus:
+		return r.ConsensusSpec
+	case Replication:
+		return r.ReplicationSpec
+	}
+	panic("unreachable")
+}
+
+// GetMinAvailable get workload's minAvailable settings, return 51% for workloadType=Consensus,
+// value 1 pod for workloadType=[Stateless|Stateful|Replication].
+func (r *ClusterComponentDefinition) GetMinAvailable() *intstr.IntOrString {
+	if r == nil {
+		return nil
+	}
+	switch r.WorkloadType {
+	case Consensus:
+		// Consensus workload have min pods of >50%.
+		v := intstr.FromString("51%")
+		return &v
+	case Replication, Stateful, Stateless:
+		// Stateful & Replication workload have min. pod being 1.
+		v := intstr.FromInt(1)
+		return &v
+	}
+	return nil
+}
+
+// GetMaxUnavailable get workload's maxUnavailable settings, this value is not suitable for PDB.spec.maxUnavailable
+// usage, as a PDB with maxUnavailable=49% and if workload's replicaCount=3 and allowed disruption pod count is 2,
+// check following setup:
+//
+// #cmd: kubectl get sts,po,pdb  -l app.kubernetes.io/instance=consul
+// NAME                      READY   AGE
+// statefulset.apps/consul   3/3     3h23m
+//
+// NAME           READY   STATUS    RESTARTS   AGE
+// pod/consul-0   1/1     Running   0          3h
+// pod/consul-2   1/1     Running   0          16s
+// pod/consul-1   1/1     Running   0          16s
+//
+// NAME                                MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS   AGE
+// poddisruptionbudget.policy/consul   N/A             49%               2                     3h23m
+//
+// VS. using minAvailable=51% will result allowed disruption pod count is 1
+//
+// NAME                      READY   AGE
+// statefulset.apps/consul   3/3     3h26m
+//
+// NAME           READY   STATUS    RESTARTS   AGE
+// pod/consul-0   1/1     Running   0          3h3m
+// pod/consul-2   1/1     Running   0          3m35s
+// pod/consul-1   1/1     Running   0          3m35s
+//
+// NAME                                MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS   AGE
+// poddisruptionbudget.policy/consul   51%             N/A               1                     3h26m
+func (r *ClusterComponentDefinition) GetMaxUnavailable() *intstr.IntOrString {
+	if r == nil {
+		return nil
+	}
+
+	getMaxUnavailable := func(ssus appsv1.StatefulSetUpdateStrategy) *intstr.IntOrString {
+		if ssus.RollingUpdate == nil {
+			return nil
+		}
+		return ssus.RollingUpdate.MaxUnavailable
+	}
+
+	switch r.WorkloadType {
+	case Stateless:
+		if r.StatelessSpec == nil || r.StatelessSpec.UpdateStrategy.RollingUpdate == nil {
+			return nil
+		}
+		return r.StatelessSpec.UpdateStrategy.RollingUpdate.MaxUnavailable
+	case Stateful, Consensus, Replication:
+		_, s := r.GetStatefulSetWorkload().FinalStsUpdateStrategy()
+		return getMaxUnavailable(s)
+	}
+	panic("unreachable")
+}
+
+func (r *ClusterComponentDefinition) IsStatelessWorkload() bool {
+	return r.WorkloadType == Stateless
+}
+
+func (r *ClusterComponentDefinition) GetCommonStatefulSpec() (*StatefulSetSpec, error) {
+	if r.IsStatelessWorkload() {
+		return nil, ErrWorkloadTypeIsStateless
+	}
+	switch r.WorkloadType {
+	case Stateful:
+		return r.StatefulSpec, nil
+	case Consensus:
+		if r.ConsensusSpec != nil {
+			return &r.ConsensusSpec.StatefulSetSpec, nil
+		}
+	case Replication:
+		if r.ReplicationSpec != nil {
+			return &r.ReplicationSpec.StatefulSetSpec, nil
+		}
+	default:
+		panic("unreachable")
+		// return nil, ErrWorkloadTypeIsUnknown
+	}
+	return nil, nil
 }
 
 type ServiceSpec struct {
@@ -516,7 +626,100 @@ type ClusterDefinitionProbes struct {
 	RoleProbeTimeoutAfterPodsReady int32 `json:"roleProbeTimeoutAfterPodsReady,omitempty"`
 }
 
+type StatelessSetSpec struct {
+	// updateStrategy defines the underlying deployment strategy to use to replace existing pods with new ones.
+	// +optional
+	// +patchStrategy=retainKeys
+	UpdateStrategy appsv1.DeploymentStrategy `json:"updateStrategy,omitempty"`
+}
+
+type StatefulSetSpec struct {
+	// updateStrategy, Pods update strategy.
+	// In case of workloadType=Consensus the update strategy will be following:
+	//
+	// serial: update Pods one by one that guarantee minimum component unavailable time.
+	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
+	// bestEffortParallel: update Pods in parallel that guarantee minimum component un-writable time.
+	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time.
+	// parallel: force parallel
+	// +kubebuilder:default=Serial
+	// +optional
+	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
+
+	// llPodManagementPolicy is the low-level controls how pods are created during initial scale up,
+	// when replacing pods on nodes, or when scaling down.
+	// `OrderedReady` policy specify where pods are created in increasing order (pod-0, then
+	// pod-1, etc) and the controller will wait until each pod is ready before
+	// continuing. When scaling down, the pods are removed in the opposite order.
+	// `Parallel` policy specify create pods in parallel
+	// to match the desired scale without waiting, and on scale down will delete
+	// all pods at once.
+	// +optional
+	LLPodManagementPolicy appsv1.PodManagementPolicyType `json:"llPodManagementPolicy,omitempty"`
+
+	// llUpdateStrategy indicates the low-level StatefulSetUpdateStrategy that will be
+	// employed to update Pods in the StatefulSet when a revision is made to
+	// Template. Will ignore `updateStrategy` attribute if provided.
+	// +optional
+	LLUpdateStrategy *appsv1.StatefulSetUpdateStrategy `json:"llUpdateStrategy,omitempty"`
+}
+
+var _ StatefulSetWorkload = &StatefulSetSpec{}
+
+func (r *StatefulSetSpec) GetUpdateStrategy() UpdateStrategy {
+	if r == nil {
+		return SerialStrategy
+	}
+	return r.UpdateStrategy
+}
+
+func (r *StatefulSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy) {
+	if r == nil {
+		r = &StatefulSetSpec{
+			UpdateStrategy: SerialStrategy,
+		}
+	}
+	return r.finalStsUpdateStrategy()
+}
+
+func (r *StatefulSetSpec) finalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy) {
+	if r.LLUpdateStrategy != nil {
+		return r.LLPodManagementPolicy, *r.LLUpdateStrategy
+	}
+
+	switch r.UpdateStrategy {
+	case BestEffortParallelStrategy:
+		m := intstr.FromString("49%")
+		return appsv1.ParallelPodManagement, appsv1.StatefulSetUpdateStrategy{
+			Type: appsv1.RollingUpdateStatefulSetStrategyType,
+			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+				// alpha feature since v1.24
+				// ref: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
+				MaxUnavailable: &m,
+			},
+		}
+	case ParallelStrategy:
+		return appsv1.ParallelPodManagement, appsv1.StatefulSetUpdateStrategy{
+			Type: appsv1.RollingUpdateStatefulSetStrategyType,
+		}
+	case SerialStrategy:
+		fallthrough
+	default:
+		m := intstr.FromInt(1)
+		return appsv1.OrderedReadyPodManagement, appsv1.StatefulSetUpdateStrategy{
+			Type: appsv1.RollingUpdateStatefulSetStrategyType,
+			RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+				// alpha feature since v1.24
+				// ref: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
+				MaxUnavailable: &m,
+			},
+		}
+	}
+}
+
 type ConsensusSetSpec struct {
+	StatefulSetSpec `json:",inline"`
+
 	// leader, one single leader.
 	// +kubebuilder:validation:Required
 	Leader ConsensusMember `json:"leader"`
@@ -528,16 +731,40 @@ type ConsensusSetSpec struct {
 	// learner, no voting right.
 	// +optional
 	Learner *ConsensusMember `json:"learner,omitempty"`
+}
 
-	// updateStrategy, Pods update strategy.
-	// serial: update Pods one by one that guarantee minimum component unavailable time.
-	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
-	// bestEffortParallel: update Pods in parallel that guarantee minimum component un-writable time.
-	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time.
-	// parallel: force parallel
-	// +kubebuilder:default=Serial
-	// +optional
-	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
+var _ StatefulSetWorkload = &ConsensusSetSpec{}
+
+func (r *ConsensusSetSpec) GetUpdateStrategy() UpdateStrategy {
+	if r == nil {
+		return SerialStrategy
+	}
+	return r.UpdateStrategy
+}
+
+func (r *ConsensusSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy) {
+	if r == nil {
+		r = NewConsensusSetSpec()
+	}
+	if r.LLUpdateStrategy != nil {
+		return r.LLPodManagementPolicy, *r.LLUpdateStrategy
+	}
+	_, s := r.StatefulSetSpec.finalStsUpdateStrategy()
+	// switch r.UpdateStrategy {
+	// case SerialStrategy, BestEffortParallelStrategy:
+	s.Type = appsv1.OnDeleteStatefulSetStrategyType
+	s.RollingUpdate = nil
+	// }
+	return appsv1.ParallelPodManagement, s
+}
+
+func NewConsensusSetSpec() *ConsensusSetSpec {
+	return &ConsensusSetSpec{
+		Leader: DefaultLeader,
+		StatefulSetSpec: StatefulSetSpec{
+			UpdateStrategy: SerialStrategy,
+		},
+	}
 }
 
 type ConsensusMember struct {
@@ -561,7 +788,9 @@ type ConsensusMember struct {
 	Replicas *int32 `json:"replicas,omitempty"`
 }
 
-type ReplicationSpec struct {
+type ReplicationSetSpec struct {
+	StatefulSetSpec `json:",inline"`
+
 	// switchPolicies defines a collection of different types of switchPolicy, and each type of switchPolicy is limited to one.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
@@ -570,6 +799,29 @@ type ReplicationSpec struct {
 	// switchCmdExecutorConfig configs how to get client SDK and perform switch statements.
 	// +kubebuilder:validation:Required
 	SwitchCmdExecutorConfig *SwitchCmdExecutorConfig `json:"switchCmdExecutorConfig"`
+}
+
+var _ StatefulSetWorkload = &ReplicationSetSpec{}
+
+func (r *ReplicationSetSpec) GetUpdateStrategy() UpdateStrategy {
+	if r == nil {
+		return SerialStrategy
+	}
+	return r.UpdateStrategy
+}
+
+func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolicyType, appsv1.StatefulSetUpdateStrategy) {
+	if r == nil {
+		r = &ReplicationSetSpec{}
+	}
+	if r.LLUpdateStrategy != nil {
+		return r.LLPodManagementPolicy, *r.LLUpdateStrategy
+	}
+	_, s := r.StatefulSetSpec.finalStsUpdateStrategy()
+	// TODO(xingran): The update of the replicationSet needs to generate a plan according to the role
+	s.Type = appsv1.OnDeleteStatefulSetStrategyType
+	s.RollingUpdate = nil
+	return appsv1.ParallelPodManagement, s
 }
 
 type SwitchPolicy struct {
@@ -670,6 +922,9 @@ type GVKResource struct {
 	Selector map[string]string `json:"selector,omitempty"`
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cd

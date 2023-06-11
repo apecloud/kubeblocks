@@ -9,10 +9,10 @@ spec:
   clusterDefinitionRef: milvus
   backupPolicies:
   - componentDefRef: milvus
-    ttl: 7d
+    retention:
+      ttl: 7d
     schedule:
-      baseBackup:
-        type: snapshot
+      snapshot:
         enable: false
         cronExpression: "0 18 * * 0"
     snapshot:

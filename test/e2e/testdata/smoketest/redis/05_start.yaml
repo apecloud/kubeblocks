@@ -3,7 +3,7 @@ kind: OpsRequest
 metadata:
   name: ops-start
 spec:
-  clusterRef: mycluster
+  clusterRef: mycluster-redis-cluster
   ttlSecondsAfterSucceed: 3600
   type: Start
   restart:

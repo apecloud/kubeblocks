@@ -41,10 +41,30 @@ jobs:
 
   release-homebrew-tap:
     needs: update-release-kbcli
-    uses: apecloud/apecd/.github/workflows/trigger-workflow.yml@v0.5.1
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.0
     with:
       GITHUB_REPO: "apecloud/homebrew-tap"
       WORKFLOW_ID: "release.yml"
       VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
+      APECD_REF: "v0.1.0"
     secrets: inherit
 
+  release-winget-kbcli:
+    needs: update-release-kbcli
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.0
+    with:
+      GITHUB_REPO: "apecloud/apecloud-cd"
+      WORKFLOW_ID: "publish-kbcli-winget.yml"
+      VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
+      APECD_REF: "v0.1.0"
+    secrets: inherit
+
+  release-scoop-kbcli:
+    needs: update-release-kbcli
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.0
+    with:
+      GITHUB_REPO: "apecloud/apecloud-cd"
+      WORKFLOW_ID: "publish-kbcli-scoop.yml"
+      VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
+      APECD_REF: "v0.1.0"
+    secrets: inherit

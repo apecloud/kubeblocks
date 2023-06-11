@@ -27,7 +27,7 @@ import (
 )
 
 type Interface interface {
-	// Name return the cloud provider name
+	// Name returns the cloud provider name
 	Name() string
 
 	// CreateK8sCluster creates a kubernetes cluster
@@ -36,16 +36,16 @@ type Interface interface {
 	// DeleteK8sCluster deletes the created kubernetes cluster
 	DeleteK8sCluster(clusterInfo *K8sClusterInfo) error
 
-	// GetClusterInfo get cluster info
+	// GetClusterInfo gets cluster info
 	GetClusterInfo() (*K8sClusterInfo, error)
 }
 
 func New(provider, tfRootPath string, stdout, stderr io.Writer) (Interface, error) {
 	switch provider {
 	case AWS, TencentCloud, AliCloud, GCP:
-		return NewCloudProvider(provider, tfRootPath, stdout, stderr)
+		return newCloudProvider(provider, tfRootPath, stdout, stderr)
 	case Local:
-		return NewLocalCloudProvider(stdout, stderr), nil
+		return newLocalCloudProvider(stdout, stderr), nil
 	default:
 		return nil, errors.New(fmt.Sprintf("Unknown cloud provider %s", provider))
 	}

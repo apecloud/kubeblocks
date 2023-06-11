@@ -22,6 +22,7 @@ package kubeblocks
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -31,6 +32,7 @@ import (
 	"github.com/replicatedhq/troubleshoot/pkg/preflight"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"golang.org/x/exp/maps"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/repo"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -45,7 +47,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -54,7 +55,10 @@ import (
 )
 
 const (
-	kMonitorParam = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t"
+	kMonitorParam    = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t"
+	kNodeAffinity    = "affinity.nodeAffinity=%s"
+	kPodAntiAffinity = "affinity.podAntiAffinity=%s"
+	kTolerations     = "tolerations=%s"
 )
 
 type Options struct {
@@ -62,7 +66,7 @@ type Options struct {
 
 	HelmCfg *helm.Config
 
-	// Namespace is the current namespace that the command is running
+	// Namespace is the current namespace the command running in
 	Namespace string
 	Client    kubernetes.Interface
 	Dynamic   dynamic.Interface
@@ -78,6 +82,19 @@ type InstallOptions struct {
 	CreateNamespace bool
 	Check           bool
 	ValueOpts       values.Options
+
+	// ConfiguredOptions is the options that kubeblocks
+	PodAntiAffinity string
+	TopologyKeys    []string
+	NodeLabels      map[string]string
+	TolerationsRaw  []string
+}
+
+type addonStatus struct {
+	allEnabled  bool
+	allDisabled bool
+	hasFailed   bool
+	outputMsg   string
 }
 
 var (
@@ -111,6 +128,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		IOStreams:      streams,
 	}
 	*p.Interactive = false
+	*p.Format = "kbcli"
 
 	cmd := &cobra.Command{
 		Use:     "install",
@@ -119,7 +137,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Example: installExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f, cmd))
-			util.CheckErr(o.PrecheckBeforeInstall())
+			util.CheckErr(o.PreCheck())
 			util.CheckErr(p.Preflight(f, args, o.ValueOpts))
 			util.CheckErr(o.Install())
 		},
@@ -128,10 +146,14 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Auto install monitoring add-ons including prometheus, grafana and alertmanager-webhook-adaptor")
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "Create the namespace if not present")
-	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before install")
+	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before installation")
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for installing KubeBlocks, such as --timeout=10m")
-	cmd.Flags().BoolVar(&o.Wait, "wait", true, "Wait for KubeBlocks to be ready, including all the auto installed add-ons. It will wait for as long as --timeout")
+	cmd.Flags().BoolVar(&o.Wait, "wait", true, "Wait for KubeBlocks to be ready, including all the auto installed add-ons. It will wait for a --timeout period")
 	cmd.Flags().BoolVar(&p.force, flagForce, p.force, "If present, just print fail item and continue with the following steps")
+	cmd.Flags().StringVar(&o.PodAntiAffinity, "pod-anti-affinity", "", "Pod anti-affinity type, one of: (Preferred, Required)")
+	cmd.Flags().StringArrayVar(&o.TopologyKeys, "topology-keys", nil, "Topology keys for affinity")
+	cmd.Flags().StringToStringVar(&o.NodeLabels, "node-labels", nil, "Node label selector")
+	cmd.Flags().StringSliceVar(&o.TolerationsRaw, "tolerations", nil, `Tolerations for Kubeblocks, such as '"dev=true:NoSchedule,large=true:NoSchedule"'`)
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
@@ -177,20 +199,18 @@ func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	return err
 }
 
-func (o *InstallOptions) PrecheckBeforeInstall() error {
+func (o *InstallOptions) PreCheck() error {
 	// check if KubeBlocks has been installed
 	v, err := util.GetVersionInfo(o.Client)
 	if err != nil {
 		return err
 	}
 
-	// Todo: KubeBlocks maybe already install but it's status could be Failed.
+	// Todo: KubeBlocks maybe already installed but it's status could be Failed.
 	// For example: 'kbcli playground init' in windows will fail and try 'kbcli playground init' again immediately,
-	// kbcli will output SUCCESSFULLY, however the addon csi is failed and KubeBlocks do not install SUCCESSFULLY
+	// kbcli will output SUCCESSFULLY, however the addon csi is still failed and KubeBlocks is not installed SUCCESSFULLY
 	if v.KubeBlocks != "" {
-		printer.Warning(o.Out, "KubeBlocks %s already exists, repeated installation is not supported.\n\n", v.KubeBlocks)
-		fmt.Fprintln(o.Out, "If you want to upgrade it, please use \"kbcli kubeblocks upgrade\".")
-		return nil
+		return fmt.Errorf("KubeBlocks %s already exists, repeated installation is not supported", v.KubeBlocks)
 	}
 
 	// check whether the namespace exists
@@ -204,7 +224,7 @@ func (o *InstallOptions) PrecheckBeforeInstall() error {
 		return err
 	}
 
-	if err = o.preCheck(v); err != nil {
+	if err = o.checkVersion(v); err != nil {
 		return err
 	}
 	return nil
@@ -214,6 +234,37 @@ func (o *InstallOptions) Install() error {
 	var err error
 	// add monitor parameters
 	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
+
+	// add pod anti-affinity
+	if o.PodAntiAffinity != "" || len(o.TopologyKeys) > 0 {
+		podAntiAffinityJSON, err := json.Marshal(util.BuildPodAntiAffinity(o.PodAntiAffinity, o.TopologyKeys))
+		if err != nil {
+			return err
+		}
+		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kPodAntiAffinity, podAntiAffinityJSON))
+	}
+
+	// add node affinity
+	if len(o.NodeLabels) > 0 {
+		nodeLabelsJSON, err := json.Marshal(util.BuildNodeAffinity(o.NodeLabels))
+		if err != nil {
+			return err
+		}
+		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kNodeAffinity, string(nodeLabelsJSON)))
+	}
+
+	// parse tolerations and add to values
+	if len(o.TolerationsRaw) > 0 {
+		tolerations, err := util.BuildTolerations(o.TolerationsRaw)
+		if err != nil {
+			return err
+		}
+		tolerationsJSON, err := json.Marshal(tolerations)
+		if err != nil {
+			return err
+		}
+		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kTolerations, string(tolerationsJSON)))
+	}
 
 	// add helm repo
 	s := spinner.New(o.Out, spinnerMsg("Add and update repo "+types.KubeBlocksRepoName))
@@ -234,6 +285,7 @@ func (o *InstallOptions) Install() error {
 
 	// wait for auto-install addons to be ready
 	if err = o.waitAddonsEnabled(); err != nil {
+		fmt.Fprintf(o.Out, "Failed to wait for auto-install addons to be enabled, run \"kbcli kubeblocks status\" to check the status\n")
 		return err
 	}
 
@@ -257,109 +309,89 @@ func (o *InstallOptions) waitAddonsEnabled() error {
 		return nil
 	}
 
-	// addons record the addons and its status
-	addons := make(map[string]string)
-	checkAddons := func() (bool, error) {
-		allEnabled := true
+	addons := make(map[string]*extensionsv1alpha1.Addon)
+	fetchAddons := func() error {
 		objs, err := o.Dynamic.Resource(types.AddonGVR()).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: buildKubeBlocksSelectorLabels(),
 		})
 		if err != nil && !apierrors.IsNotFound(err) {
-			return false, err
+			return err
 		}
 		if objs == nil || len(objs.Items) == 0 {
 			klog.V(1).Info("No Addons found")
-			return true, nil
+			return nil
 		}
 
 		for _, obj := range objs.Items {
-			addon := extensionsv1alpha1.Addon{}
-			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, &addon); err != nil {
-				return false, err
+			addon := &extensionsv1alpha1.Addon{}
+			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, addon); err != nil {
+				return err
 			}
 
 			if addon.Status.ObservedGeneration == 0 {
 				klog.V(1).Infof("Addon %s is not observed yet", addon.Name)
-				allEnabled = false
 				continue
 			}
 
 			// addon should be auto installed, check its status
 			if addon.Spec.InstallSpec.GetEnabled() {
-				addons[addon.Name] = string(addon.Status.Phase)
+				addons[addon.Name] = addon
 				if addon.Status.Phase != extensionsv1alpha1.AddonEnabled {
 					klog.V(1).Infof("Addon %s is not enabled yet, status %s", addon.Name, addon.Status.Phase)
-					allEnabled = false
+				}
+				if addon.Status.Phase == extensionsv1alpha1.AddonFailed {
+					klog.V(1).Infof("Addon %s failed:", addon.Name)
+					for _, c := range addon.Status.Conditions {
+						klog.V(1).Infof("  %s: %s", c.Reason, c.Message)
+					}
 				}
 			}
 		}
-		return allEnabled, nil
+		return nil
 	}
 
 	suffixMsg := func(msg string) string {
 		return fmt.Sprintf("%-50s", msg)
 	}
 
-	addonMsg := func(msg, status string) string {
-		return fmt.Sprintf("%-48s %s", msg, status)
-	}
-
 	// create spinner
-	allMsg := ""
-	msg := "Wait for addons to be enabled"
-	s := spinner.New(o.Out, spinnerMsg(msg))
-
-	// check addon installing progress
-	checkProgress := func() {
-		if len(addons) == 0 {
-			return
-		}
-		all := make([]string, 0)
-		for k, v := range addons {
-			if v == string(extensionsv1alpha1.AddonEnabled) {
-				all = append(all, addonMsg("Addon "+k, printer.BoldGreen("OK")))
-				continue
-			}
-			all = append(all, addonMsg("Addon "+k, v))
-		}
-		sort.Strings(all)
-		allMsg = fmt.Sprintf("%s\n  %s", msg, strings.Join(all, "\n  "))
-		s.SetMessage(suffixMsg(allMsg))
-	}
-
+	msg := ""
+	header := "Wait for addons to be enabled"
+	failedErr := errors.New("some addons are failed to be enabled")
+	s := spinner.New(o.Out, spinnerMsg(header))
 	var (
-		allEnabled  bool
 		err         error
-		spinnerDone = func(s spinner.Interface) {
-			s.SetFinalMsg(allMsg)
+		spinnerDone = func() {
+			s.SetFinalMsg(msg)
 			s.Done("")
 			fmt.Fprintln(o.Out)
 		}
 	)
 	// wait all addons to be enabled, or timeout
 	if err = wait.PollImmediate(5*time.Second, o.Timeout, func() (bool, error) {
-		allEnabled, err = checkAddons()
-		if err != nil {
+		if err = fetchAddons(); err != nil || len(addons) == 0 {
 			return false, err
 		}
-		checkProgress()
-		if allEnabled {
-			spinnerDone(s)
+		status := checkAddons(maps.Values(addons), true)
+		msg = suffixMsg(fmt.Sprintf("%s\n  %s", header, status.outputMsg))
+		s.SetMessage(msg)
+		if status.allEnabled {
+			spinnerDone()
 			return true, nil
+		} else if status.hasFailed {
+			return false, failedErr
 		}
 		return false, nil
 	}); err != nil {
-		spinnerDone(s)
-		if err == wait.ErrWaitTimeout {
-			return errors.New("timeout waiting for auto-install addons to be enabled, run \"kbcli addon list\" to check addon status")
-		}
+		spinnerDone()
+		printAddonMsg(o.Out, maps.Values(addons), true)
 		return err
 	}
 
 	return nil
 }
 
-func (o *InstallOptions) preCheck(v util.Version) error {
+func (o *InstallOptions) checkVersion(v util.Version) error {
 	if !o.Check {
 		return nil
 	}

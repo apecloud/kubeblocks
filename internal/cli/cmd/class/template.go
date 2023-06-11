@@ -35,23 +35,18 @@ const ComponentClassTemplate = `
   template: |
     cpu: "{{ or .cpu 1 }}"
     memory: "{{ or .memory 4 }}Gi"
-    volumes:
-    - name: data
-      size: "{{ or .dataStorageSize 10 }}Gi"
-    - name: log
-      size: "{{ or .logStorageSize 1 }}Gi"
   # template variables used to define classes
-  vars: [cpu, memory, dataStorageSize, logStorageSize]
+  vars: [cpu, memory]
   series:
   - # class naming template, you can reference variables in class template
     # it's also ok to define static class name in the following class definitions
     namingTemplate: "custom-{{ .cpu }}c{{ .memory }}g"
 
     # class definitions, we support two kinds of class definitions:
-    # 1. define values for template variables and the full class definition will be dynamically rendered
-    # 2. statically define the complete class
+    # 1. dynamically classes rendered with defined values & template variables 
+    # 2. statically defined classes
     classes:
-    - args: [1, 1, 100, 10]
+    - args: [1, 1]
 `
 
 type TemplateOptions struct {

@@ -144,7 +144,7 @@ var _ = AfterSuite(func() {
 func initOperationsResources(clusterDefinitionName,
 	clusterVersionName,
 	clusterName string) (*OpsResource, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster) {
-	clusterDef, _, clusterObject := testapps.InitClusterWithHybridComps(testCtx, clusterDefinitionName,
+	clusterDef, _, clusterObject := testapps.InitClusterWithHybridComps(&testCtx, clusterDefinitionName,
 		clusterVersionName, clusterName, statelessComp, statefulComp, consensusComp)
 	opsRes := &OpsResource{
 		Cluster:  clusterObject,
@@ -171,7 +171,7 @@ func initOperationsResources(clusterDefinitionName,
 
 func initConsensusPods(ctx context.Context, cli client.Client, opsRes *OpsResource, clusterName string) []corev1.Pod {
 	// mock the pods of consensusSet component
-	testapps.MockConsensusComponentPods(testCtx, nil, clusterName, consensusComp)
+	testapps.MockConsensusComponentPods(&testCtx, nil, clusterName, consensusComp)
 	podList, err := util.GetComponentPodList(ctx, cli, *opsRes.Cluster, consensusComp)
 	Expect(err).Should(Succeed())
 	// the opsRequest will use startTime to check some condition.

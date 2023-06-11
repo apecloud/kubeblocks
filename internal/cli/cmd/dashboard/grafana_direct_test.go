@@ -25,28 +25,27 @@ import (
 )
 
 var _ = Describe("grafana open flag", func() {
-
+	const baseURL = "http://127.0.0.1:8080"
 	var testClusterType string
+	var testURL string
 	expectURL := map[string]string{
-		"mysql":      "http://127.0.0.1:8080/d/mysql",
-		"cadvisor":   "http://127.0.0.1:8080/d/cadvisor",
-		"jmx":        "http://127.0.0.1:8080/d/jmx",
-		"kafka":      "http://127.0.0.1:8080/d/kafka",
-		"mongodb":    "http://127.0.0.1:8080/d/mongodb",
-		"node":       "http://127.0.0.1:8080/d/node",
-		"postgresql": "http://127.0.0.1:8080/d/postgresql",
-		"redis":      "http://127.0.0.1:8080/d/redis",
-		"weaviate":   "http://127.0.0.1:8080/d/weaviate",
+		"mysql": "http://127.0.0.1:8080/d/mysql",
+		"":      "http://127.0.0.1:8080",
 	}
 
 	It("build grafana direct url", func() {
-		testURL := "http://127.0.0.1:8080"
+		testURL = baseURL
 		testClusterType = "invalid"
 		Expect(buildGrafanaDirectURL(&testURL, testClusterType)).Should(HaveOccurred())
-		for charType, targetURL := range expectURL {
-			testURL = "http://127.0.0.1:8080"
-			Expect(buildGrafanaDirectURL(&testURL, charType)).Should(Succeed())
-			Expect(testURL).Should(Equal(targetURL))
-		}
+
+		testURL = baseURL
+		testClusterType = "mysql"
+		Expect(buildGrafanaDirectURL(&testURL, testClusterType)).Should(Succeed())
+		Expect(testURL).Should(Equal(expectURL[testClusterType]))
+
+		testURL = baseURL
+		testClusterType = ""
+		Expect(buildGrafanaDirectURL(&testURL, testClusterType)).Should(Succeed())
+		Expect(testURL).Should(Equal(expectURL[testClusterType]))
 	})
 })

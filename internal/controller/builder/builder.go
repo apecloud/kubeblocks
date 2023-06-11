@@ -187,6 +187,22 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 			{Name: "KB_TLS_KEY_FILE", Value: KeyName},
 		}...)
 	}
+
+	if udeValue, ok := cluster.Annotations[constant.ExtraEnvAnnotationKey]; ok {
+		udeMap := make(map[string]string, 0)
+		if err := json.Unmarshal([]byte(udeValue), &udeMap); err == nil {
+			for k, v := range udeMap {
+				if k == "" || v == "" {
+					continue
+				}
+				toInjectEnvs = append(toInjectEnvs, corev1.EnvVar{
+					Name:  k,
+					Value: v,
+				})
+			}
+		}
+	}
+
 	// have injected variables placed at the front of the slice
 	if len(c.Env) == 0 {
 		c.Env = toInjectEnvs

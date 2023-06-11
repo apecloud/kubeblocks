@@ -1,0 +1,2206 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.9.0
+  creationTimestamp: null
+  name: channeldefinitions.datachannel.kubeblocks.io
+spec:
+  group: datachannel.kubeblocks.io
+  names:
+    categories:
+    - kubeblocks
+    kind: ChannelDefinition
+    listKind: ChannelDefinitionList
+    plural: channeldefinitions
+    shortNames:
+    - chd
+    singular: channeldefinition
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.clusterDefinitionRef
+      name: CLUSTER-DEFINITION
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ChannelDefinition is the Schema for the channelDefinition API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ChannelDefinitionSpec defines the desired state of ChannelDefinition
+            properties:
+              isDefault:
+                type: boolean
+              kubeblocksSetting:
+                properties:
+                  clusterDefinitionRef:
+                    type: string
+                  expose:
+                    properties:
+                      componentDefRef:
+                        type: string
+                      service:
+                        description: ServicePort contains information on service's
+                          port.
+                        properties:
+                          appProtocol:
+                            description: The application protocol for this port. This
+                              field follows standard Kubernetes label syntax. Un-prefixed
+                              names are reserved for IANA standard service names (as
+                              per RFC-6335 and https://www.iana.org/assignments/service-names).
+                              Non-standard protocols should use prefixed names such
+                              as mycompany.com/my-custom-protocol.
+                            type: string
+                          name:
+                            description: The name of this port within the service.
+                              This must be a DNS_LABEL. All ports within a ServiceSpec
+                              must have unique names. When considering the endpoints
+                              for a Service, this must match the 'name' field in the
+                              EndpointPort. Optional if only one ServicePort is defined
+                              on this service.
+                            type: string
+                          nodePort:
+                            description: 'The port on each node on which this service
+                              is exposed when type is NodePort or LoadBalancer.  Usually
+                              assigned by the system. If a value is specified, in-range,
+                              and not in use it will be used, otherwise the operation
+                              will fail.  If not specified, a port will be allocated
+                              if this Service requires one.  If this field is specified
+                              when creating a Service which does not need it, creation
+                              will fail. This field will be wiped when updating a
+                              Service to no longer need it (e.g. changing type from
+                              NodePort to ClusterIP). More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport'
+                            format: int32
+                            type: integer
+                          port:
+                            description: The port that will be exposed by this service.
+                            format: int32
+                            type: integer
+                          protocol:
+                            default: TCP
+                            description: The IP protocol for this port. Supports "TCP",
+                              "UDP", and "SCTP". Default is TCP.
+                            type: string
+                          targetPort:
+                            anyOf:
+                            - type: integer
+                            - type: string
+                            description: 'Number or name of the port to access on
+                              the pods targeted by the service. Number must be in
+                              the range 1 to 65535. Name must be an IANA_SVC_NAME.
+                              If this is a string, it will be looked up as a named
+                              port in the target Pod''s container ports. If this is
+                              not specified, the value of the ''port'' field is used
+                              (an identity map). This field is ignored for services
+                              with clusterIP=None, and should be omitted or set equal
+                              to the ''port'' field. More info: https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service'
+                            x-kubernetes-int-or-string: true
+                        required:
+                        - port
+                        type: object
+                    type: object
+                type: object
+              sink:
+                properties:
+                  kubeblocks:
+                    properties:
+                      accountRequests:
+                        properties:
+                          accountName:
+                            type: string
+                          componentName:
+                            type: string
+                        type: object
+                      cluster:
+                        description: ClusterSpec defines the desired state of Cluster.
+                        properties:
+                          affinity:
+                            description: affinity is a group of affinity scheduling
+                              rules.
+                            properties:
+                              nodeLabels:
+                                additionalProperties:
+                                  type: string
+                                description: nodeLabels describes that pods must be
+                                  scheduled to the nodes with the specified node labels.
+                                type: object
+                              podAntiAffinity:
+                                default: Preferred
+                                description: podAntiAffinity describes the anti-affinity
+                                  level of pods within a component. Preferred means
+                                  try spread pods by `TopologyKeys`. Required means
+                                  must spread pods by `TopologyKeys`.
+                                enum:
+                                - Preferred
+                                - Required
+                                type: string
+                              tenancy:
+                                default: SharedNode
+                                description: tenancy describes how pods are distributed
+                                  across node. SharedNode means multiple pods may
+                                  share the same node. DedicatedNode means each pod
+                                  runs on their own dedicated node.
+                                enum:
+                                - SharedNode
+                                - DedicatedNode
+                                type: string
+                              topologyKeys:
+                                description: topologyKey is the key of node labels.
+                                  Nodes that have a label with this key and identical
+                                  values are considered to be in the same topology.
+                                  It's used as the topology domain for pod anti-affinity
+                                  and pod spread constraint. Some well-known label
+                                  keys, such as "kubernetes.io/hostname" and "topology.kubernetes.io/zone"
+                                  are often used as TopologyKey, as well as any other
+                                  custom label key.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: set
+                            type: object
+                          clusterDefinitionRef:
+                            description: Cluster referencing ClusterDefinition name.
+                              This is an immutable attribute.
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          clusterVersionRef:
+                            description: Cluster referencing ClusterVersion name.
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          componentSpecs:
+                            description: List of componentSpecs you want to replace
+                              in ClusterDefinition and ClusterVersion. It will replace
+                              the field in ClusterDefinition's and ClusterVersion's
+                              component if type is matching.
+                            items:
+                              properties:
+                                affinity:
+                                  description: affinity describes affinities specified
+                                    by users.
+                                  properties:
+                                    nodeLabels:
+                                      additionalProperties:
+                                        type: string
+                                      description: nodeLabels describes that pods
+                                        must be scheduled to the nodes with the specified
+                                        node labels.
+                                      type: object
+                                    podAntiAffinity:
+                                      default: Preferred
+                                      description: podAntiAffinity describes the anti-affinity
+                                        level of pods within a component. Preferred
+                                        means try spread pods by `TopologyKeys`. Required
+                                        means must spread pods by `TopologyKeys`.
+                                      enum:
+                                      - Preferred
+                                      - Required
+                                      type: string
+                                    tenancy:
+                                      default: SharedNode
+                                      description: tenancy describes how pods are
+                                        distributed across node. SharedNode means
+                                        multiple pods may share the same node. DedicatedNode
+                                        means each pod runs on their own dedicated
+                                        node.
+                                      enum:
+                                      - SharedNode
+                                      - DedicatedNode
+                                      type: string
+                                    topologyKeys:
+                                      description: topologyKey is the key of node
+                                        labels. Nodes that have a label with this
+                                        key and identical values are considered to
+                                        be in the same topology. It's used as the
+                                        topology domain for pod anti-affinity and
+                                        pod spread constraint. Some well-known label
+                                        keys, such as "kubernetes.io/hostname" and
+                                        "topology.kubernetes.io/zone" are often used
+                                        as TopologyKey, as well as any other custom
+                                        label key.
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: set
+                                  type: object
+                                classDefRef:
+                                  description: classDefRef references the class defined
+                                    in ComponentClassDefinition.
+                                  properties:
+                                    class:
+                                      description: Class refers to the name of the
+                                        class that is defined in the ComponentClassDefinition.
+                                      type: string
+                                    name:
+                                      description: Name refers to the name of the
+                                        ComponentClassDefinition.
+                                      type: string
+                                  required:
+                                  - class
+                                  type: object
+                                componentDefRef:
+                                  description: componentDefRef references the componentDef
+                                    defined in ClusterDefinition spec.
+                                  maxLength: 63
+                                  pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                  type: string
+                                enabledLogs:
+                                  description: enabledLogs indicates which log file
+                                    takes effect in the database cluster. element
+                                    is the log type which is defined in cluster definition
+                                    logConfig.name, and will set relative variables
+                                    about this log type in database kernel.
+                                  items:
+                                    type: string
+                                  type: array
+                                  x-kubernetes-list-type: set
+                                issuer:
+                                  description: issuer defines provider context for
+                                    TLS certs. required when TLS enabled
+                                  properties:
+                                    name:
+                                      default: KubeBlocks
+                                      description: 'Name of issuer. Options supported:
+                                        - KubeBlocks - Certificates signed by KubeBlocks
+                                        Operator. - UserProvided - User provided own
+                                        CA-signed certificates.'
+                                      enum:
+                                      - KubeBlocks
+                                      - UserProvided
+                                      type: string
+                                    secretRef:
+                                      description: secretRef. TLS certs Secret reference
+                                        required when from is UserProvided
+                                      properties:
+                                        ca:
+                                          description: CA cert key in Secret
+                                          type: string
+                                        cert:
+                                          description: Cert key in Secret
+                                          type: string
+                                        key:
+                                          description: Key of TLS private key in Secret
+                                          type: string
+                                        name:
+                                          description: Name of the Secret
+                                          type: string
+                                      required:
+                                      - ca
+                                      - cert
+                                      - key
+                                      - name
+                                      type: object
+                                  required:
+                                  - name
+                                  type: object
+                                monitor:
+                                  default: false
+                                  description: monitor is a switch to enable monitoring
+                                    and is set as false by default. KubeBlocks provides
+                                    an extension mechanism to support component level
+                                    monitoring, which will scrape metrics auto or
+                                    manually from servers in component and export
+                                    metrics to Time Series Database.
+                                  type: boolean
+                                name:
+                                  description: name defines cluster's component name.
+                                  maxLength: 15
+                                  pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                  type: string
+                                noCreatePDB:
+                                  default: false
+                                  description: noCreatePDB defines the PodDistruptionBudget
+                                    creation behavior and is set to true if creation
+                                    of PodDistruptionBudget for this component is
+                                    not needed. It defaults to false.
+                                  type: boolean
+                                primaryIndex:
+                                  description: primaryIndex determines which index
+                                    is primary when workloadType is Replication. Index
+                                    number starts from zero.
+                                  format: int32
+                                  minimum: 0
+                                  type: integer
+                                replicas:
+                                  default: 1
+                                  description: Component replicas. The default value
+                                    is used in ClusterDefinition spec if not specified.
+                                  format: int32
+                                  minimum: 0
+                                  type: integer
+                                resources:
+                                  description: Resources requests and limits of workload.
+                                  properties:
+                                    claims:
+                                      description: "Claims lists the names of resources,
+                                        defined in spec.resourceClaims, that are used
+                                        by this container. \n This is an alpha field
+                                        and requires enabling the DynamicResourceAllocation
+                                        feature gate. \n This field is immutable."
+                                      items:
+                                        description: ResourceClaim references one
+                                          entry in PodSpec.ResourceClaims.
+                                        properties:
+                                          name:
+                                            description: Name must match the name
+                                              of one entry in pod.spec.resourceClaims
+                                              of the Pod where this field is used.
+                                              It makes that resource available inside
+                                              a container.
+                                            type: string
+                                        required:
+                                        - name
+                                        type: object
+                                      type: array
+                                      x-kubernetes-list-map-keys:
+                                      - name
+                                      x-kubernetes-list-type: map
+                                    limits:
+                                      additionalProperties:
+                                        anyOf:
+                                        - type: integer
+                                        - type: string
+                                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                        x-kubernetes-int-or-string: true
+                                      description: 'Limits describes the maximum amount
+                                        of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                      type: object
+                                    requests:
+                                      additionalProperties:
+                                        anyOf:
+                                        - type: integer
+                                        - type: string
+                                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                        x-kubernetes-int-or-string: true
+                                      description: 'Requests describes the minimum
+                                        amount of compute resources required. If Requests
+                                        is omitted for a container, it defaults to
+                                        Limits if that is explicitly specified, otherwise
+                                        to an implementation-defined value. More info:
+                                        https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                      type: object
+                                  type: object
+                                  x-kubernetes-preserve-unknown-fields: true
+                                serviceAccountName:
+                                  description: serviceAccountName is the name of the
+                                    ServiceAccount that running component depends
+                                    on.
+                                  type: string
+                                services:
+                                  description: Services expose endpoints that can
+                                    be accessed by clients.
+                                  items:
+                                    properties:
+                                      annotations:
+                                        additionalProperties:
+                                          type: string
+                                        description: 'If ServiceType is LoadBalancer,
+                                          cloud provider related parameters can be
+                                          put here More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
+                                        type: object
+                                      name:
+                                        description: Service name
+                                        maxLength: 15
+                                        type: string
+                                      serviceType:
+                                        default: ClusterIP
+                                        description: 'serviceType determines how the
+                                          Service is exposed. Valid options are ClusterIP,
+                                          NodePort, and LoadBalancer. "ClusterIP"
+                                          allocates a cluster-internal IP address
+                                          for load-balancing to endpoints. Endpoints
+                                          are determined by the selector or if that
+                                          is not specified, they are determined by
+                                          manual construction of an Endpoints object
+                                          or EndpointSlice objects. If clusterIP is
+                                          "None", no virtual IP is allocated and the
+                                          endpoints are published as a set of endpoints
+                                          rather than a virtual IP. "NodePort" builds
+                                          on ClusterIP and allocates a port on every
+                                          node which routes to the same endpoints
+                                          as the clusterIP. "LoadBalancer" builds
+                                          on NodePort and creates an external load-balancer
+                                          (if supported in the current cloud) which
+                                          routes to the same endpoints as the clusterIP.
+                                          More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.'
+                                        enum:
+                                        - ClusterIP
+                                        - NodePort
+                                        - LoadBalancer
+                                        type: string
+                                        x-kubernetes-preserve-unknown-fields: true
+                                    required:
+                                    - name
+                                    type: object
+                                  type: array
+                                switchPolicy:
+                                  description: switchPolicy defines the strategy for
+                                    switchover and failover when workloadType is Replication.
+                                  properties:
+                                    type:
+                                      default: MaximumAvailability
+                                      description: clusterSwitchPolicy type defined
+                                        by Provider in ClusterDefinition, refer components[i].replicationSpec.switchPolicies[x].type
+                                      enum:
+                                      - MaximumAvailability
+                                      - MaximumDataProtection
+                                      - Noop
+                                      type: string
+                                  type: object
+                                tls:
+                                  description: Enables or disables TLS certs.
+                                  type: boolean
+                                tolerations:
+                                  description: Component tolerations will override
+                                    ClusterSpec.Tolerations if specified.
+                                  items:
+                                    description: The pod this Toleration is attached
+                                      to tolerates any taint that matches the triple
+                                      <key,value,effect> using the matching operator
+                                      <operator>.
+                                    properties:
+                                      effect:
+                                        description: Effect indicates the taint effect
+                                          to match. Empty means match all taint effects.
+                                          When specified, allowed values are NoSchedule,
+                                          PreferNoSchedule and NoExecute.
+                                        type: string
+                                      key:
+                                        description: Key is the taint key that the
+                                          toleration applies to. Empty means match
+                                          all taint keys. If the key is empty, operator
+                                          must be Exists; this combination means to
+                                          match all values and all keys.
+                                        type: string
+                                      operator:
+                                        description: Operator represents a key's relationship
+                                          to the value. Valid operators are Exists
+                                          and Equal. Defaults to Equal. Exists is
+                                          equivalent to wildcard for value, so that
+                                          a pod can tolerate all taints of a particular
+                                          category.
+                                        type: string
+                                      tolerationSeconds:
+                                        description: TolerationSeconds represents
+                                          the period of time the toleration (which
+                                          must be of effect NoExecute, otherwise this
+                                          field is ignored) tolerates the taint. By
+                                          default, it is not set, which means tolerate
+                                          the taint forever (do not evict). Zero and
+                                          negative values will be treated as 0 (evict
+                                          immediately) by the system.
+                                        format: int64
+                                        type: integer
+                                      value:
+                                        description: Value is the taint value the
+                                          toleration matches to. If the operator is
+                                          Exists, the value should be empty, otherwise
+                                          just a regular string.
+                                        type: string
+                                    type: object
+                                  type: array
+                                  x-kubernetes-preserve-unknown-fields: true
+                                volumeClaimTemplates:
+                                  description: volumeClaimTemplates information for
+                                    statefulset.spec.volumeClaimTemplates.
+                                  items:
+                                    properties:
+                                      name:
+                                        description: Reference `ClusterDefinition.spec.componentDefs.containers.volumeMounts.name`.
+                                        type: string
+                                      spec:
+                                        description: spec defines the desired characteristics
+                                          of a volume requested by a pod author.
+                                        properties:
+                                          accessModes:
+                                            description: 'accessModes contains the
+                                              desired access modes the volume should
+                                              have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1.'
+                                            items:
+                                              type: string
+                                            type: array
+                                            x-kubernetes-preserve-unknown-fields: true
+                                          resources:
+                                            description: 'resources represents the
+                                              minimum resources the volume should
+                                              have. If RecoverVolumeExpansionFailure
+                                              feature is enabled users are allowed
+                                              to specify resource requirements that
+                                              are lower than previous value but must
+                                              still be higher than capacity recorded
+                                              in the status field of the claim. More
+                                              info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources.'
+                                            properties:
+                                              claims:
+                                                description: "Claims lists the names
+                                                  of resources, defined in spec.resourceClaims,
+                                                  that are used by this container.
+                                                  \n This is an alpha field and requires
+                                                  enabling the DynamicResourceAllocation
+                                                  feature gate. \n This field is immutable."
+                                                items:
+                                                  description: ResourceClaim references
+                                                    one entry in PodSpec.ResourceClaims.
+                                                  properties:
+                                                    name:
+                                                      description: Name must match
+                                                        the name of one entry in pod.spec.resourceClaims
+                                                        of the Pod where this field
+                                                        is used. It makes that resource
+                                                        available inside a container.
+                                                      type: string
+                                                  required:
+                                                  - name
+                                                  type: object
+                                                type: array
+                                                x-kubernetes-list-map-keys:
+                                                - name
+                                                x-kubernetes-list-type: map
+                                              limits:
+                                                additionalProperties:
+                                                  anyOf:
+                                                  - type: integer
+                                                  - type: string
+                                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                                  x-kubernetes-int-or-string: true
+                                                description: 'Limits describes the
+                                                  maximum amount of compute resources
+                                                  allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                                type: object
+                                              requests:
+                                                additionalProperties:
+                                                  anyOf:
+                                                  - type: integer
+                                                  - type: string
+                                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                                  x-kubernetes-int-or-string: true
+                                                description: 'Requests describes the
+                                                  minimum amount of compute resources
+                                                  required. If Requests is omitted
+                                                  for a container, it defaults to
+                                                  Limits if that is explicitly specified,
+                                                  otherwise to an implementation-defined
+                                                  value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                                type: object
+                                            type: object
+                                            x-kubernetes-preserve-unknown-fields: true
+                                          storageClassName:
+                                            description: 'storageClassName is the
+                                              name of the StorageClass required by
+                                              the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.'
+                                            type: string
+                                        type: object
+                                    required:
+                                    - name
+                                    type: object
+                                  type: array
+                              required:
+                              - componentDefRef
+                              - name
+                              - replicas
+                              type: object
+                            minItems: 1
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - name
+                            x-kubernetes-list-type: map
+                          terminationPolicy:
+                            description: Cluster termination policy. Valid values
+                              are DoNotTerminate, Halt, Delete, WipeOut. DoNotTerminate
+                              will block delete operation. Halt will delete workload
+                              resources such as statefulset, deployment workloads
+                              but keep PVCs. Delete is based on Halt and deletes PVCs.
+                              WipeOut is based on Delete and wipe out all volume snapshots
+                              and snapshot data from backup storage location.
+                            enum:
+                            - DoNotTerminate
+                            - Halt
+                            - Delete
+                            - WipeOut
+                            type: string
+                          tolerations:
+                            description: tolerations are attached to tolerate any
+                              taint that matches the triple <key,value,effect> using
+                              the matching operator <operator>.
+                            items:
+                              description: The pod this Toleration is attached to
+                                tolerates any taint that matches the triple <key,value,effect>
+                                using the matching operator <operator>.
+                              properties:
+                                effect:
+                                  description: Effect indicates the taint effect to
+                                    match. Empty means match all taint effects. When
+                                    specified, allowed values are NoSchedule, PreferNoSchedule
+                                    and NoExecute.
+                                  type: string
+                                key:
+                                  description: Key is the taint key that the toleration
+                                    applies to. Empty means match all taint keys.
+                                    If the key is empty, operator must be Exists;
+                                    this combination means to match all values and
+                                    all keys.
+                                  type: string
+                                operator:
+                                  description: Operator represents a key's relationship
+                                    to the value. Valid operators are Exists and Equal.
+                                    Defaults to Equal. Exists is equivalent to wildcard
+                                    for value, so that a pod can tolerate all taints
+                                    of a particular category.
+                                  type: string
+                                tolerationSeconds:
+                                  description: TolerationSeconds represents the period
+                                    of time the toleration (which must be of effect
+                                    NoExecute, otherwise this field is ignored) tolerates
+                                    the taint. By default, it is not set, which means
+                                    tolerate the taint forever (do not evict). Zero
+                                    and negative values will be treated as 0 (evict
+                                    immediately) by the system.
+                                  format: int64
+                                  type: integer
+                                value:
+                                  description: Value is the taint value the toleration
+                                    matches to. If the operator is Exists, the value
+                                    should be empty, otherwise just a regular string.
+                                  type: string
+                              type: object
+                            type: array
+                            x-kubernetes-preserve-unknown-fields: true
+                        required:
+                        - clusterDefinitionRef
+                        - terminationPolicy
+                        type: object
+                      configureRequests:
+                        properties:
+                          componentName:
+                            description: componentName cluster component name.
+                            type: string
+                          configurations:
+                            description: configurations defines which components perform
+                              the operation.
+                            items:
+                              properties:
+                                keys:
+                                  description: keys is used to set the parameters
+                                    to be updated.
+                                  items:
+                                    properties:
+                                      key:
+                                        description: key indicates the key name of
+                                          ConfigMap.
+                                        type: string
+                                      parameters:
+                                        description: Setting the list of parameters
+                                          for a single configuration file.
+                                        items:
+                                          properties:
+                                            key:
+                                              description: key is name of the parameter
+                                                to be updated.
+                                              type: string
+                                            value:
+                                              description: parameter values to be
+                                                updated. if set nil, the parameter
+                                                defined by the key field will be deleted
+                                                from the configuration file.
+                                              type: string
+                                          required:
+                                          - key
+                                          - value
+                                          type: object
+                                        minItems: 1
+                                        type: array
+                                    required:
+                                    - key
+                                    - parameters
+                                    type: object
+                                  minItems: 1
+                                  type: array
+                                  x-kubernetes-list-map-keys:
+                                  - key
+                                  x-kubernetes-list-type: map
+                                name:
+                                  description: name is a config template name.
+                                  maxLength: 63
+                                  pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                  type: string
+                              required:
+                              - keys
+                              - name
+                              type: object
+                            minItems: 1
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - name
+                            x-kubernetes-list-type: map
+                        required:
+                        - componentName
+                        - configurations
+                        type: object
+                      extraEnvs:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      opsRequest:
+                        items:
+                          description: OpsRequestSpec defines the desired state of
+                            OpsRequest
+                          properties:
+                            clusterRef:
+                              description: clusterRef references clusterDefinition.
+                              type: string
+                            expose:
+                              description: expose defines services the component needs
+                                to expose.
+                              items:
+                                properties:
+                                  componentName:
+                                    description: componentName cluster component name.
+                                    type: string
+                                  services:
+                                    description: Setting the list of services to be
+                                      exposed.
+                                    items:
+                                      properties:
+                                        annotations:
+                                          additionalProperties:
+                                            type: string
+                                          description: 'If ServiceType is LoadBalancer,
+                                            cloud provider related parameters can
+                                            be put here More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
+                                          type: object
+                                        name:
+                                          description: Service name
+                                          maxLength: 15
+                                          type: string
+                                        serviceType:
+                                          default: ClusterIP
+                                          description: 'serviceType determines how
+                                            the Service is exposed. Valid options
+                                            are ClusterIP, NodePort, and LoadBalancer.
+                                            "ClusterIP" allocates a cluster-internal
+                                            IP address for load-balancing to endpoints.
+                                            Endpoints are determined by the selector
+                                            or if that is not specified, they are
+                                            determined by manual construction of an
+                                            Endpoints object or EndpointSlice objects.
+                                            If clusterIP is "None", no virtual IP
+                                            is allocated and the endpoints are published
+                                            as a set of endpoints rather than a virtual
+                                            IP. "NodePort" builds on ClusterIP and
+                                            allocates a port on every node which routes
+                                            to the same endpoints as the clusterIP.
+                                            "LoadBalancer" builds on NodePort and
+                                            creates an external load-balancer (if
+                                            supported in the current cloud) which
+                                            routes to the same endpoints as the clusterIP.
+                                            More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.'
+                                          enum:
+                                          - ClusterIP
+                                          - NodePort
+                                          - LoadBalancer
+                                          type: string
+                                          x-kubernetes-preserve-unknown-fields: true
+                                      required:
+                                      - name
+                                      type: object
+                                    type: array
+                                required:
+                                - componentName
+                                - services
+                                type: object
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - componentName
+                              x-kubernetes-list-type: map
+                            horizontalScaling:
+                              description: horizontalScaling defines what component
+                                need to horizontal scale the specified replicas.
+                              items:
+                                description: HorizontalScaling defines the variables
+                                  of horizontal scaling operation
+                                properties:
+                                  componentName:
+                                    description: componentName cluster component name.
+                                    type: string
+                                  replicas:
+                                    description: replicas for the workloads.
+                                    format: int32
+                                    minimum: 0
+                                    type: integer
+                                required:
+                                - componentName
+                                - replicas
+                                type: object
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - componentName
+                              x-kubernetes-list-type: map
+                            reconfigure:
+                              description: reconfigure defines the variables that
+                                need to input when updating configuration.
+                              properties:
+                                componentName:
+                                  description: componentName cluster component name.
+                                  type: string
+                                configurations:
+                                  description: configurations defines which components
+                                    perform the operation.
+                                  items:
+                                    properties:
+                                      keys:
+                                        description: keys is used to set the parameters
+                                          to be updated.
+                                        items:
+                                          properties:
+                                            key:
+                                              description: key indicates the key name
+                                                of ConfigMap.
+                                              type: string
+                                            parameters:
+                                              description: Setting the list of parameters
+                                                for a single configuration file.
+                                              items:
+                                                properties:
+                                                  key:
+                                                    description: key is name of the
+                                                      parameter to be updated.
+                                                    type: string
+                                                  value:
+                                                    description: parameter values
+                                                      to be updated. if set nil, the
+                                                      parameter defined by the key
+                                                      field will be deleted from the
+                                                      configuration file.
+                                                    type: string
+                                                required:
+                                                - key
+                                                - value
+                                                type: object
+                                              minItems: 1
+                                              type: array
+                                          required:
+                                          - key
+                                          - parameters
+                                          type: object
+                                        minItems: 1
+                                        type: array
+                                        x-kubernetes-list-map-keys:
+                                        - key
+                                        x-kubernetes-list-type: map
+                                      name:
+                                        description: name is a config template name.
+                                        maxLength: 63
+                                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                        type: string
+                                    required:
+                                    - keys
+                                    - name
+                                    type: object
+                                  minItems: 1
+                                  type: array
+                                  x-kubernetes-list-map-keys:
+                                  - name
+                                  x-kubernetes-list-type: map
+                              required:
+                              - componentName
+                              - configurations
+                              type: object
+                            restart:
+                              description: restart the specified component.
+                              items:
+                                description: ComponentOps defines the common variables
+                                  of component scope operations.
+                                properties:
+                                  componentName:
+                                    description: componentName cluster component name.
+                                    type: string
+                                required:
+                                - componentName
+                                type: object
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - componentName
+                              x-kubernetes-list-type: map
+                            restoreFrom:
+                              description: cluster RestoreFrom backup or point in
+                                time
+                              properties:
+                                backup:
+                                  description: use the backup name and component name
+                                    for restore, support for multiple components'
+                                    recovery.
+                                  items:
+                                    properties:
+                                      ref:
+                                        description: specify a reference backup to
+                                          restore
+                                        properties:
+                                          name:
+                                            description: specified the name
+                                            type: string
+                                          namespace:
+                                            description: specified the namespace
+                                            type: string
+                                        type: object
+                                    type: object
+                                  type: array
+                                pointInTime:
+                                  description: specified the point in time to recovery
+                                  properties:
+                                    ref:
+                                      description: specify a reference source cluster
+                                        to restore
+                                      properties:
+                                        name:
+                                          description: specified the name
+                                          type: string
+                                        namespace:
+                                          description: specified the namespace
+                                          type: string
+                                      type: object
+                                    time:
+                                      description: specify the time point to restore,
+                                        with UTC as the time zone.
+                                      format: date-time
+                                      type: string
+                                  type: object
+                              type: object
+                            ttlSecondsAfterSucceed:
+                              description: ttlSecondsAfterSucceed OpsRequest will
+                                be deleted after TTLSecondsAfterSucceed second when
+                                OpsRequest.status.phase is Succeed.
+                              format: int32
+                              type: integer
+                            type:
+                              description: type defines the operation type.
+                              enum:
+                              - Upgrade
+                              - VerticalScaling
+                              - VolumeExpansion
+                              - HorizontalScaling
+                              - Restart
+                              - Reconfiguring
+                              - Start
+                              - Stop
+                              - Expose
+                              type: string
+                            upgrade:
+                              description: upgrade specifies the cluster version by
+                                specifying clusterVersionRef.
+                              properties:
+                                clusterVersionRef:
+                                  description: clusterVersionRef references ClusterVersion
+                                    name.
+                                  type: string
+                              required:
+                              - clusterVersionRef
+                              type: object
+                            verticalScaling:
+                              description: verticalScaling defines what component
+                                need to vertical scale the specified compute resources.
+                              items:
+                                description: VerticalScaling defines the variables
+                                  that need to input when scaling compute resources.
+                                properties:
+                                  claims:
+                                    description: "Claims lists the names of resources,
+                                      defined in spec.resourceClaims, that are used
+                                      by this container. \n This is an alpha field
+                                      and requires enabling the DynamicResourceAllocation
+                                      feature gate. \n This field is immutable."
+                                    items:
+                                      description: ResourceClaim references one entry
+                                        in PodSpec.ResourceClaims.
+                                      properties:
+                                        name:
+                                          description: Name must match the name of
+                                            one entry in pod.spec.resourceClaims of
+                                            the Pod where this field is used. It makes
+                                            that resource available inside a container.
+                                          type: string
+                                      required:
+                                      - name
+                                      type: object
+                                    type: array
+                                    x-kubernetes-list-map-keys:
+                                    - name
+                                    x-kubernetes-list-type: map
+                                  class:
+                                    description: class specifies the class name of
+                                      the component
+                                    type: string
+                                  componentName:
+                                    description: componentName cluster component name.
+                                    type: string
+                                  limits:
+                                    additionalProperties:
+                                      anyOf:
+                                      - type: integer
+                                      - type: string
+                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                      x-kubernetes-int-or-string: true
+                                    description: 'Limits describes the maximum amount
+                                      of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                    type: object
+                                  requests:
+                                    additionalProperties:
+                                      anyOf:
+                                      - type: integer
+                                      - type: string
+                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                      x-kubernetes-int-or-string: true
+                                    description: 'Requests describes the minimum amount
+                                      of compute resources required. If Requests is
+                                      omitted for a container, it defaults to Limits
+                                      if that is explicitly specified, otherwise to
+                                      an implementation-defined value. More info:
+                                      https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                    type: object
+                                required:
+                                - componentName
+                                type: object
+                                x-kubernetes-preserve-unknown-fields: true
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - componentName
+                              x-kubernetes-list-type: map
+                            volumeExpansion:
+                              description: volumeExpansion defines what component
+                                and volumeClaimTemplate need to expand the specified
+                                storage.
+                              items:
+                                description: VolumeExpansion defines the variables
+                                  of volume expansion operation.
+                                properties:
+                                  componentName:
+                                    description: componentName cluster component name.
+                                    type: string
+                                  volumeClaimTemplates:
+                                    description: volumeClaimTemplates specifies the
+                                      storage size and volumeClaimTemplate name.
+                                    items:
+                                      properties:
+                                        name:
+                                          description: name references volumeClaimTemplate
+                                            name from cluster components.
+                                          type: string
+                                        storage:
+                                          anyOf:
+                                          - type: integer
+                                          - type: string
+                                          description: Request storage size.
+                                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                          x-kubernetes-int-or-string: true
+                                      required:
+                                      - name
+                                      - storage
+                                      type: object
+                                    type: array
+                                    x-kubernetes-list-map-keys:
+                                    - name
+                                    x-kubernetes-list-type: map
+                                required:
+                                - componentName
+                                - volumeClaimTemplates
+                                type: object
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - componentName
+                              x-kubernetes-list-type: map
+                          required:
+                          - clusterRef
+                          - type
+                          type: object
+                        type: array
+                    required:
+                    - cluster
+                    type: object
+                  syncObjEnvExpress:
+                    items:
+                      properties:
+                        metaObjConnectSymbol:
+                          type: string
+                        metaTypeConnectSymbol:
+                          type: string
+                        metaTypeRequired:
+                          items:
+                            type: string
+                          type: array
+                        name:
+                          type: string
+                        prefix:
+                          type: string
+                        selectMode:
+                          type: string
+                        suffix:
+                          type: string
+                      type: object
+                    type: array
+                type: object
+              source:
+                properties:
+                  kubeblocks:
+                    properties:
+                      accountRequests:
+                        properties:
+                          accountName:
+                            type: string
+                          componentName:
+                            type: string
+                        type: object
+                      cluster:
+                        description: ClusterSpec defines the desired state of Cluster.
+                        properties:
+                          affinity:
+                            description: affinity is a group of affinity scheduling
+                              rules.
+                            properties:
+                              nodeLabels:
+                                additionalProperties:
+                                  type: string
+                                description: nodeLabels describes that pods must be
+                                  scheduled to the nodes with the specified node labels.
+                                type: object
+                              podAntiAffinity:
+                                default: Preferred
+                                description: podAntiAffinity describes the anti-affinity
+                                  level of pods within a component. Preferred means
+                                  try spread pods by `TopologyKeys`. Required means
+                                  must spread pods by `TopologyKeys`.
+                                enum:
+                                - Preferred
+                                - Required
+                                type: string
+                              tenancy:
+                                default: SharedNode
+                                description: tenancy describes how pods are distributed
+                                  across node. SharedNode means multiple pods may
+                                  share the same node. DedicatedNode means each pod
+                                  runs on their own dedicated node.
+                                enum:
+                                - SharedNode
+                                - DedicatedNode
+                                type: string
+                              topologyKeys:
+                                description: topologyKey is the key of node labels.
+                                  Nodes that have a label with this key and identical
+                                  values are considered to be in the same topology.
+                                  It's used as the topology domain for pod anti-affinity
+                                  and pod spread constraint. Some well-known label
+                                  keys, such as "kubernetes.io/hostname" and "topology.kubernetes.io/zone"
+                                  are often used as TopologyKey, as well as any other
+                                  custom label key.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: set
+                            type: object
+                          clusterDefinitionRef:
+                            description: Cluster referencing ClusterDefinition name.
+                              This is an immutable attribute.
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          clusterVersionRef:
+                            description: Cluster referencing ClusterVersion name.
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          componentSpecs:
+                            description: List of componentSpecs you want to replace
+                              in ClusterDefinition and ClusterVersion. It will replace
+                              the field in ClusterDefinition's and ClusterVersion's
+                              component if type is matching.
+                            items:
+                              properties:
+                                affinity:
+                                  description: affinity describes affinities specified
+                                    by users.
+                                  properties:
+                                    nodeLabels:
+                                      additionalProperties:
+                                        type: string
+                                      description: nodeLabels describes that pods
+                                        must be scheduled to the nodes with the specified
+                                        node labels.
+                                      type: object
+                                    podAntiAffinity:
+                                      default: Preferred
+                                      description: podAntiAffinity describes the anti-affinity
+                                        level of pods within a component. Preferred
+                                        means try spread pods by `TopologyKeys`. Required
+                                        means must spread pods by `TopologyKeys`.
+                                      enum:
+                                      - Preferred
+                                      - Required
+                                      type: string
+                                    tenancy:
+                                      default: SharedNode
+                                      description: tenancy describes how pods are
+                                        distributed across node. SharedNode means
+                                        multiple pods may share the same node. DedicatedNode
+                                        means each pod runs on their own dedicated
+                                        node.
+                                      enum:
+                                      - SharedNode
+                                      - DedicatedNode
+                                      type: string
+                                    topologyKeys:
+                                      description: topologyKey is the key of node
+                                        labels. Nodes that have a label with this
+                                        key and identical values are considered to
+                                        be in the same topology. It's used as the
+                                        topology domain for pod anti-affinity and
+                                        pod spread constraint. Some well-known label
+                                        keys, such as "kubernetes.io/hostname" and
+                                        "topology.kubernetes.io/zone" are often used
+                                        as TopologyKey, as well as any other custom
+                                        label key.
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: set
+                                  type: object
+                                classDefRef:
+                                  description: classDefRef references the class defined
+                                    in ComponentClassDefinition.
+                                  properties:
+                                    class:
+                                      description: Class refers to the name of the
+                                        class that is defined in the ComponentClassDefinition.
+                                      type: string
+                                    name:
+                                      description: Name refers to the name of the
+                                        ComponentClassDefinition.
+                                      type: string
+                                  required:
+                                  - class
+                                  type: object
+                                componentDefRef:
+                                  description: componentDefRef references the componentDef
+                                    defined in ClusterDefinition spec.
+                                  maxLength: 63
+                                  pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                  type: string
+                                enabledLogs:
+                                  description: enabledLogs indicates which log file
+                                    takes effect in the database cluster. element
+                                    is the log type which is defined in cluster definition
+                                    logConfig.name, and will set relative variables
+                                    about this log type in database kernel.
+                                  items:
+                                    type: string
+                                  type: array
+                                  x-kubernetes-list-type: set
+                                issuer:
+                                  description: issuer defines provider context for
+                                    TLS certs. required when TLS enabled
+                                  properties:
+                                    name:
+                                      default: KubeBlocks
+                                      description: 'Name of issuer. Options supported:
+                                        - KubeBlocks - Certificates signed by KubeBlocks
+                                        Operator. - UserProvided - User provided own
+                                        CA-signed certificates.'
+                                      enum:
+                                      - KubeBlocks
+                                      - UserProvided
+                                      type: string
+                                    secretRef:
+                                      description: secretRef. TLS certs Secret reference
+                                        required when from is UserProvided
+                                      properties:
+                                        ca:
+                                          description: CA cert key in Secret
+                                          type: string
+                                        cert:
+                                          description: Cert key in Secret
+                                          type: string
+                                        key:
+                                          description: Key of TLS private key in Secret
+                                          type: string
+                                        name:
+                                          description: Name of the Secret
+                                          type: string
+                                      required:
+                                      - ca
+                                      - cert
+                                      - key
+                                      - name
+                                      type: object
+                                  required:
+                                  - name
+                                  type: object
+                                monitor:
+                                  default: false
+                                  description: monitor is a switch to enable monitoring
+                                    and is set as false by default. KubeBlocks provides
+                                    an extension mechanism to support component level
+                                    monitoring, which will scrape metrics auto or
+                                    manually from servers in component and export
+                                    metrics to Time Series Database.
+                                  type: boolean
+                                name:
+                                  description: name defines cluster's component name.
+                                  maxLength: 15
+                                  pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                  type: string
+                                noCreatePDB:
+                                  default: false
+                                  description: noCreatePDB defines the PodDistruptionBudget
+                                    creation behavior and is set to true if creation
+                                    of PodDistruptionBudget for this component is
+                                    not needed. It defaults to false.
+                                  type: boolean
+                                primaryIndex:
+                                  description: primaryIndex determines which index
+                                    is primary when workloadType is Replication. Index
+                                    number starts from zero.
+                                  format: int32
+                                  minimum: 0
+                                  type: integer
+                                replicas:
+                                  default: 1
+                                  description: Component replicas. The default value
+                                    is used in ClusterDefinition spec if not specified.
+                                  format: int32
+                                  minimum: 0
+                                  type: integer
+                                resources:
+                                  description: Resources requests and limits of workload.
+                                  properties:
+                                    claims:
+                                      description: "Claims lists the names of resources,
+                                        defined in spec.resourceClaims, that are used
+                                        by this container. \n This is an alpha field
+                                        and requires enabling the DynamicResourceAllocation
+                                        feature gate. \n This field is immutable."
+                                      items:
+                                        description: ResourceClaim references one
+                                          entry in PodSpec.ResourceClaims.
+                                        properties:
+                                          name:
+                                            description: Name must match the name
+                                              of one entry in pod.spec.resourceClaims
+                                              of the Pod where this field is used.
+                                              It makes that resource available inside
+                                              a container.
+                                            type: string
+                                        required:
+                                        - name
+                                        type: object
+                                      type: array
+                                      x-kubernetes-list-map-keys:
+                                      - name
+                                      x-kubernetes-list-type: map
+                                    limits:
+                                      additionalProperties:
+                                        anyOf:
+                                        - type: integer
+                                        - type: string
+                                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                        x-kubernetes-int-or-string: true
+                                      description: 'Limits describes the maximum amount
+                                        of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                      type: object
+                                    requests:
+                                      additionalProperties:
+                                        anyOf:
+                                        - type: integer
+                                        - type: string
+                                        pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                        x-kubernetes-int-or-string: true
+                                      description: 'Requests describes the minimum
+                                        amount of compute resources required. If Requests
+                                        is omitted for a container, it defaults to
+                                        Limits if that is explicitly specified, otherwise
+                                        to an implementation-defined value. More info:
+                                        https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                      type: object
+                                  type: object
+                                  x-kubernetes-preserve-unknown-fields: true
+                                serviceAccountName:
+                                  description: serviceAccountName is the name of the
+                                    ServiceAccount that running component depends
+                                    on.
+                                  type: string
+                                services:
+                                  description: Services expose endpoints that can
+                                    be accessed by clients.
+                                  items:
+                                    properties:
+                                      annotations:
+                                        additionalProperties:
+                                          type: string
+                                        description: 'If ServiceType is LoadBalancer,
+                                          cloud provider related parameters can be
+                                          put here More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
+                                        type: object
+                                      name:
+                                        description: Service name
+                                        maxLength: 15
+                                        type: string
+                                      serviceType:
+                                        default: ClusterIP
+                                        description: 'serviceType determines how the
+                                          Service is exposed. Valid options are ClusterIP,
+                                          NodePort, and LoadBalancer. "ClusterIP"
+                                          allocates a cluster-internal IP address
+                                          for load-balancing to endpoints. Endpoints
+                                          are determined by the selector or if that
+                                          is not specified, they are determined by
+                                          manual construction of an Endpoints object
+                                          or EndpointSlice objects. If clusterIP is
+                                          "None", no virtual IP is allocated and the
+                                          endpoints are published as a set of endpoints
+                                          rather than a virtual IP. "NodePort" builds
+                                          on ClusterIP and allocates a port on every
+                                          node which routes to the same endpoints
+                                          as the clusterIP. "LoadBalancer" builds
+                                          on NodePort and creates an external load-balancer
+                                          (if supported in the current cloud) which
+                                          routes to the same endpoints as the clusterIP.
+                                          More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.'
+                                        enum:
+                                        - ClusterIP
+                                        - NodePort
+                                        - LoadBalancer
+                                        type: string
+                                        x-kubernetes-preserve-unknown-fields: true
+                                    required:
+                                    - name
+                                    type: object
+                                  type: array
+                                switchPolicy:
+                                  description: switchPolicy defines the strategy for
+                                    switchover and failover when workloadType is Replication.
+                                  properties:
+                                    type:
+                                      default: MaximumAvailability
+                                      description: clusterSwitchPolicy type defined
+                                        by Provider in ClusterDefinition, refer components[i].replicationSpec.switchPolicies[x].type
+                                      enum:
+                                      - MaximumAvailability
+                                      - MaximumDataProtection
+                                      - Noop
+                                      type: string
+                                  type: object
+                                tls:
+                                  description: Enables or disables TLS certs.
+                                  type: boolean
+                                tolerations:
+                                  description: Component tolerations will override
+                                    ClusterSpec.Tolerations if specified.
+                                  items:
+                                    description: The pod this Toleration is attached
+                                      to tolerates any taint that matches the triple
+                                      <key,value,effect> using the matching operator
+                                      <operator>.
+                                    properties:
+                                      effect:
+                                        description: Effect indicates the taint effect
+                                          to match. Empty means match all taint effects.
+                                          When specified, allowed values are NoSchedule,
+                                          PreferNoSchedule and NoExecute.
+                                        type: string
+                                      key:
+                                        description: Key is the taint key that the
+                                          toleration applies to. Empty means match
+                                          all taint keys. If the key is empty, operator
+                                          must be Exists; this combination means to
+                                          match all values and all keys.
+                                        type: string
+                                      operator:
+                                        description: Operator represents a key's relationship
+                                          to the value. Valid operators are Exists
+                                          and Equal. Defaults to Equal. Exists is
+                                          equivalent to wildcard for value, so that
+                                          a pod can tolerate all taints of a particular
+                                          category.
+                                        type: string
+                                      tolerationSeconds:
+                                        description: TolerationSeconds represents
+                                          the period of time the toleration (which
+                                          must be of effect NoExecute, otherwise this
+                                          field is ignored) tolerates the taint. By
+                                          default, it is not set, which means tolerate
+                                          the taint forever (do not evict). Zero and
+                                          negative values will be treated as 0 (evict
+                                          immediately) by the system.
+                                        format: int64
+                                        type: integer
+                                      value:
+                                        description: Value is the taint value the
+                                          toleration matches to. If the operator is
+                                          Exists, the value should be empty, otherwise
+                                          just a regular string.
+                                        type: string
+                                    type: object
+                                  type: array
+                                  x-kubernetes-preserve-unknown-fields: true
+                                volumeClaimTemplates:
+                                  description: volumeClaimTemplates information for
+                                    statefulset.spec.volumeClaimTemplates.
+                                  items:
+                                    properties:
+                                      name:
+                                        description: Reference `ClusterDefinition.spec.componentDefs.containers.volumeMounts.name`.
+                                        type: string
+                                      spec:
+                                        description: spec defines the desired characteristics
+                                          of a volume requested by a pod author.
+                                        properties:
+                                          accessModes:
+                                            description: 'accessModes contains the
+                                              desired access modes the volume should
+                                              have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1.'
+                                            items:
+                                              type: string
+                                            type: array
+                                            x-kubernetes-preserve-unknown-fields: true
+                                          resources:
+                                            description: 'resources represents the
+                                              minimum resources the volume should
+                                              have. If RecoverVolumeExpansionFailure
+                                              feature is enabled users are allowed
+                                              to specify resource requirements that
+                                              are lower than previous value but must
+                                              still be higher than capacity recorded
+                                              in the status field of the claim. More
+                                              info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources.'
+                                            properties:
+                                              claims:
+                                                description: "Claims lists the names
+                                                  of resources, defined in spec.resourceClaims,
+                                                  that are used by this container.
+                                                  \n This is an alpha field and requires
+                                                  enabling the DynamicResourceAllocation
+                                                  feature gate. \n This field is immutable."
+                                                items:
+                                                  description: ResourceClaim references
+                                                    one entry in PodSpec.ResourceClaims.
+                                                  properties:
+                                                    name:
+                                                      description: Name must match
+                                                        the name of one entry in pod.spec.resourceClaims
+                                                        of the Pod where this field
+                                                        is used. It makes that resource
+                                                        available inside a container.
+                                                      type: string
+                                                  required:
+                                                  - name
+                                                  type: object
+                                                type: array
+                                                x-kubernetes-list-map-keys:
+                                                - name
+                                                x-kubernetes-list-type: map
+                                              limits:
+                                                additionalProperties:
+                                                  anyOf:
+                                                  - type: integer
+                                                  - type: string
+                                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                                  x-kubernetes-int-or-string: true
+                                                description: 'Limits describes the
+                                                  maximum amount of compute resources
+                                                  allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                                type: object
+                                              requests:
+                                                additionalProperties:
+                                                  anyOf:
+                                                  - type: integer
+                                                  - type: string
+                                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                                  x-kubernetes-int-or-string: true
+                                                description: 'Requests describes the
+                                                  minimum amount of compute resources
+                                                  required. If Requests is omitted
+                                                  for a container, it defaults to
+                                                  Limits if that is explicitly specified,
+                                                  otherwise to an implementation-defined
+                                                  value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                                type: object
+                                            type: object
+                                            x-kubernetes-preserve-unknown-fields: true
+                                          storageClassName:
+                                            description: 'storageClassName is the
+                                              name of the StorageClass required by
+                                              the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.'
+                                            type: string
+                                        type: object
+                                    required:
+                                    - name
+                                    type: object
+                                  type: array
+                              required:
+                              - componentDefRef
+                              - name
+                              - replicas
+                              type: object
+                            minItems: 1
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - name
+                            x-kubernetes-list-type: map
+                          terminationPolicy:
+                            description: Cluster termination policy. Valid values
+                              are DoNotTerminate, Halt, Delete, WipeOut. DoNotTerminate
+                              will block delete operation. Halt will delete workload
+                              resources such as statefulset, deployment workloads
+                              but keep PVCs. Delete is based on Halt and deletes PVCs.
+                              WipeOut is based on Delete and wipe out all volume snapshots
+                              and snapshot data from backup storage location.
+                            enum:
+                            - DoNotTerminate
+                            - Halt
+                            - Delete
+                            - WipeOut
+                            type: string
+                          tolerations:
+                            description: tolerations are attached to tolerate any
+                              taint that matches the triple <key,value,effect> using
+                              the matching operator <operator>.
+                            items:
+                              description: The pod this Toleration is attached to
+                                tolerates any taint that matches the triple <key,value,effect>
+                                using the matching operator <operator>.
+                              properties:
+                                effect:
+                                  description: Effect indicates the taint effect to
+                                    match. Empty means match all taint effects. When
+                                    specified, allowed values are NoSchedule, PreferNoSchedule
+                                    and NoExecute.
+                                  type: string
+                                key:
+                                  description: Key is the taint key that the toleration
+                                    applies to. Empty means match all taint keys.
+                                    If the key is empty, operator must be Exists;
+                                    this combination means to match all values and
+                                    all keys.
+                                  type: string
+                                operator:
+                                  description: Operator represents a key's relationship
+                                    to the value. Valid operators are Exists and Equal.
+                                    Defaults to Equal. Exists is equivalent to wildcard
+                                    for value, so that a pod can tolerate all taints
+                                    of a particular category.
+                                  type: string
+                                tolerationSeconds:
+                                  description: TolerationSeconds represents the period
+                                    of time the toleration (which must be of effect
+                                    NoExecute, otherwise this field is ignored) tolerates
+                                    the taint. By default, it is not set, which means
+                                    tolerate the taint forever (do not evict). Zero
+                                    and negative values will be treated as 0 (evict
+                                    immediately) by the system.
+                                  format: int64
+                                  type: integer
+                                value:
+                                  description: Value is the taint value the toleration
+                                    matches to. If the operator is Exists, the value
+                                    should be empty, otherwise just a regular string.
+                                  type: string
+                              type: object
+                            type: array
+                            x-kubernetes-preserve-unknown-fields: true
+                        required:
+                        - clusterDefinitionRef
+                        - terminationPolicy
+                        type: object
+                      configureRequests:
+                        properties:
+                          componentName:
+                            description: componentName cluster component name.
+                            type: string
+                          configurations:
+                            description: configurations defines which components perform
+                              the operation.
+                            items:
+                              properties:
+                                keys:
+                                  description: keys is used to set the parameters
+                                    to be updated.
+                                  items:
+                                    properties:
+                                      key:
+                                        description: key indicates the key name of
+                                          ConfigMap.
+                                        type: string
+                                      parameters:
+                                        description: Setting the list of parameters
+                                          for a single configuration file.
+                                        items:
+                                          properties:
+                                            key:
+                                              description: key is name of the parameter
+                                                to be updated.
+                                              type: string
+                                            value:
+                                              description: parameter values to be
+                                                updated. if set nil, the parameter
+                                                defined by the key field will be deleted
+                                                from the configuration file.
+                                              type: string
+                                          required:
+                                          - key
+                                          - value
+                                          type: object
+                                        minItems: 1
+                                        type: array
+                                    required:
+                                    - key
+                                    - parameters
+                                    type: object
+                                  minItems: 1
+                                  type: array
+                                  x-kubernetes-list-map-keys:
+                                  - key
+                                  x-kubernetes-list-type: map
+                                name:
+                                  description: name is a config template name.
+                                  maxLength: 63
+                                  pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                  type: string
+                              required:
+                              - keys
+                              - name
+                              type: object
+                            minItems: 1
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - name
+                            x-kubernetes-list-type: map
+                        required:
+                        - componentName
+                        - configurations
+                        type: object
+                      extraEnvs:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      opsRequest:
+                        items:
+                          description: OpsRequestSpec defines the desired state of
+                            OpsRequest
+                          properties:
+                            clusterRef:
+                              description: clusterRef references clusterDefinition.
+                              type: string
+                            expose:
+                              description: expose defines services the component needs
+                                to expose.
+                              items:
+                                properties:
+                                  componentName:
+                                    description: componentName cluster component name.
+                                    type: string
+                                  services:
+                                    description: Setting the list of services to be
+                                      exposed.
+                                    items:
+                                      properties:
+                                        annotations:
+                                          additionalProperties:
+                                            type: string
+                                          description: 'If ServiceType is LoadBalancer,
+                                            cloud provider related parameters can
+                                            be put here More info: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer.'
+                                          type: object
+                                        name:
+                                          description: Service name
+                                          maxLength: 15
+                                          type: string
+                                        serviceType:
+                                          default: ClusterIP
+                                          description: 'serviceType determines how
+                                            the Service is exposed. Valid options
+                                            are ClusterIP, NodePort, and LoadBalancer.
+                                            "ClusterIP" allocates a cluster-internal
+                                            IP address for load-balancing to endpoints.
+                                            Endpoints are determined by the selector
+                                            or if that is not specified, they are
+                                            determined by manual construction of an
+                                            Endpoints object or EndpointSlice objects.
+                                            If clusterIP is "None", no virtual IP
+                                            is allocated and the endpoints are published
+                                            as a set of endpoints rather than a virtual
+                                            IP. "NodePort" builds on ClusterIP and
+                                            allocates a port on every node which routes
+                                            to the same endpoints as the clusterIP.
+                                            "LoadBalancer" builds on NodePort and
+                                            creates an external load-balancer (if
+                                            supported in the current cloud) which
+                                            routes to the same endpoints as the clusterIP.
+                                            More info: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types.'
+                                          enum:
+                                          - ClusterIP
+                                          - NodePort
+                                          - LoadBalancer
+                                          type: string
+                                          x-kubernetes-preserve-unknown-fields: true
+                                      required:
+                                      - name
+                                      type: object
+                                    type: array
+                                required:
+                                - componentName
+                                - services
+                                type: object
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - componentName
+                              x-kubernetes-list-type: map
+                            horizontalScaling:
+                              description: horizontalScaling defines what component
+                                need to horizontal scale the specified replicas.
+                              items:
+                                description: HorizontalScaling defines the variables
+                                  of horizontal scaling operation
+                                properties:
+                                  componentName:
+                                    description: componentName cluster component name.
+                                    type: string
+                                  replicas:
+                                    description: replicas for the workloads.
+                                    format: int32
+                                    minimum: 0
+                                    type: integer
+                                required:
+                                - componentName
+                                - replicas
+                                type: object
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - componentName
+                              x-kubernetes-list-type: map
+                            reconfigure:
+                              description: reconfigure defines the variables that
+                                need to input when updating configuration.
+                              properties:
+                                componentName:
+                                  description: componentName cluster component name.
+                                  type: string
+                                configurations:
+                                  description: configurations defines which components
+                                    perform the operation.
+                                  items:
+                                    properties:
+                                      keys:
+                                        description: keys is used to set the parameters
+                                          to be updated.
+                                        items:
+                                          properties:
+                                            key:
+                                              description: key indicates the key name
+                                                of ConfigMap.
+                                              type: string
+                                            parameters:
+                                              description: Setting the list of parameters
+                                                for a single configuration file.
+                                              items:
+                                                properties:
+                                                  key:
+                                                    description: key is name of the
+                                                      parameter to be updated.
+                                                    type: string
+                                                  value:
+                                                    description: parameter values
+                                                      to be updated. if set nil, the
+                                                      parameter defined by the key
+                                                      field will be deleted from the
+                                                      configuration file.
+                                                    type: string
+                                                required:
+                                                - key
+                                                - value
+                                                type: object
+                                              minItems: 1
+                                              type: array
+                                          required:
+                                          - key
+                                          - parameters
+                                          type: object
+                                        minItems: 1
+                                        type: array
+                                        x-kubernetes-list-map-keys:
+                                        - key
+                                        x-kubernetes-list-type: map
+                                      name:
+                                        description: name is a config template name.
+                                        maxLength: 63
+                                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                        type: string
+                                    required:
+                                    - keys
+                                    - name
+                                    type: object
+                                  minItems: 1
+                                  type: array
+                                  x-kubernetes-list-map-keys:
+                                  - name
+                                  x-kubernetes-list-type: map
+                              required:
+                              - componentName
+                              - configurations
+                              type: object
+                            restart:
+                              description: restart the specified component.
+                              items:
+                                description: ComponentOps defines the common variables
+                                  of component scope operations.
+                                properties:
+                                  componentName:
+                                    description: componentName cluster component name.
+                                    type: string
+                                required:
+                                - componentName
+                                type: object
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - componentName
+                              x-kubernetes-list-type: map
+                            restoreFrom:
+                              description: cluster RestoreFrom backup or point in
+                                time
+                              properties:
+                                backup:
+                                  description: use the backup name and component name
+                                    for restore, support for multiple components'
+                                    recovery.
+                                  items:
+                                    properties:
+                                      ref:
+                                        description: specify a reference backup to
+                                          restore
+                                        properties:
+                                          name:
+                                            description: specified the name
+                                            type: string
+                                          namespace:
+                                            description: specified the namespace
+                                            type: string
+                                        type: object
+                                    type: object
+                                  type: array
+                                pointInTime:
+                                  description: specified the point in time to recovery
+                                  properties:
+                                    ref:
+                                      description: specify a reference source cluster
+                                        to restore
+                                      properties:
+                                        name:
+                                          description: specified the name
+                                          type: string
+                                        namespace:
+                                          description: specified the namespace
+                                          type: string
+                                      type: object
+                                    time:
+                                      description: specify the time point to restore,
+                                        with UTC as the time zone.
+                                      format: date-time
+                                      type: string
+                                  type: object
+                              type: object
+                            ttlSecondsAfterSucceed:
+                              description: ttlSecondsAfterSucceed OpsRequest will
+                                be deleted after TTLSecondsAfterSucceed second when
+                                OpsRequest.status.phase is Succeed.
+                              format: int32
+                              type: integer
+                            type:
+                              description: type defines the operation type.
+                              enum:
+                              - Upgrade
+                              - VerticalScaling
+                              - VolumeExpansion
+                              - HorizontalScaling
+                              - Restart
+                              - Reconfiguring
+                              - Start
+                              - Stop
+                              - Expose
+                              type: string
+                            upgrade:
+                              description: upgrade specifies the cluster version by
+                                specifying clusterVersionRef.
+                              properties:
+                                clusterVersionRef:
+                                  description: clusterVersionRef references ClusterVersion
+                                    name.
+                                  type: string
+                              required:
+                              - clusterVersionRef
+                              type: object
+                            verticalScaling:
+                              description: verticalScaling defines what component
+                                need to vertical scale the specified compute resources.
+                              items:
+                                description: VerticalScaling defines the variables
+                                  that need to input when scaling compute resources.
+                                properties:
+                                  claims:
+                                    description: "Claims lists the names of resources,
+                                      defined in spec.resourceClaims, that are used
+                                      by this container. \n This is an alpha field
+                                      and requires enabling the DynamicResourceAllocation
+                                      feature gate. \n This field is immutable."
+                                    items:
+                                      description: ResourceClaim references one entry
+                                        in PodSpec.ResourceClaims.
+                                      properties:
+                                        name:
+                                          description: Name must match the name of
+                                            one entry in pod.spec.resourceClaims of
+                                            the Pod where this field is used. It makes
+                                            that resource available inside a container.
+                                          type: string
+                                      required:
+                                      - name
+                                      type: object
+                                    type: array
+                                    x-kubernetes-list-map-keys:
+                                    - name
+                                    x-kubernetes-list-type: map
+                                  class:
+                                    description: class specifies the class name of
+                                      the component
+                                    type: string
+                                  componentName:
+                                    description: componentName cluster component name.
+                                    type: string
+                                  limits:
+                                    additionalProperties:
+                                      anyOf:
+                                      - type: integer
+                                      - type: string
+                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                      x-kubernetes-int-or-string: true
+                                    description: 'Limits describes the maximum amount
+                                      of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                    type: object
+                                  requests:
+                                    additionalProperties:
+                                      anyOf:
+                                      - type: integer
+                                      - type: string
+                                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                      x-kubernetes-int-or-string: true
+                                    description: 'Requests describes the minimum amount
+                                      of compute resources required. If Requests is
+                                      omitted for a container, it defaults to Limits
+                                      if that is explicitly specified, otherwise to
+                                      an implementation-defined value. More info:
+                                      https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
+                                    type: object
+                                required:
+                                - componentName
+                                type: object
+                                x-kubernetes-preserve-unknown-fields: true
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - componentName
+                              x-kubernetes-list-type: map
+                            volumeExpansion:
+                              description: volumeExpansion defines what component
+                                and volumeClaimTemplate need to expand the specified
+                                storage.
+                              items:
+                                description: VolumeExpansion defines the variables
+                                  of volume expansion operation.
+                                properties:
+                                  componentName:
+                                    description: componentName cluster component name.
+                                    type: string
+                                  volumeClaimTemplates:
+                                    description: volumeClaimTemplates specifies the
+                                      storage size and volumeClaimTemplate name.
+                                    items:
+                                      properties:
+                                        name:
+                                          description: name references volumeClaimTemplate
+                                            name from cluster components.
+                                          type: string
+                                        storage:
+                                          anyOf:
+                                          - type: integer
+                                          - type: string
+                                          description: Request storage size.
+                                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                          x-kubernetes-int-or-string: true
+                                      required:
+                                      - name
+                                      - storage
+                                      type: object
+                                    type: array
+                                    x-kubernetes-list-map-keys:
+                                    - name
+                                    x-kubernetes-list-type: map
+                                required:
+                                - componentName
+                                - volumeClaimTemplates
+                                type: object
+                              type: array
+                              x-kubernetes-list-map-keys:
+                              - componentName
+                              x-kubernetes-list-type: map
+                          required:
+                          - clusterRef
+                          - type
+                          type: object
+                        type: array
+                    required:
+                    - cluster
+                    type: object
+                  syncObjEnvExpress:
+                    items:
+                      properties:
+                        metaObjConnectSymbol:
+                          type: string
+                        metaTypeConnectSymbol:
+                          type: string
+                        metaTypeRequired:
+                          items:
+                            type: string
+                          type: array
+                        name:
+                          type: string
+                        prefix:
+                          type: string
+                        selectMode:
+                          type: string
+                        suffix:
+                          type: string
+                      type: object
+                    type: array
+                type: object
+              topologyStructs:
+                items:
+                  type: string
+                type: array
+              type:
+                type: string
+            type: object
+          status:
+            description: ChannelDefinitionStatus defines the observed state of ChannelDefinition
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -302,6 +302,10 @@ func updateFacts(accountName appsv1alpha1.AccountName, detectedFacts *appsv1alph
 		*detectedFacts |= appsv1alpha1.KBAccountMonitor
 	case appsv1alpha1.ReplicatorAccount:
 		*detectedFacts |= appsv1alpha1.KBAccountReplicator
+	case appsv1alpha1.ChannelSourceAccount:
+		*detectedFacts |= appsv1alpha1.KBAccountChannelSource
+	case appsv1alpha1.ChannelSinkAccount:
+		*detectedFacts |= appsv1alpha1.KBAccountChannelSink
 	}
 }
 
@@ -352,6 +356,8 @@ func getAllSysAccounts() []appsv1alpha1.AccountName {
 		appsv1alpha1.ProbeAccount,
 		appsv1alpha1.MonitorAccount,
 		appsv1alpha1.ReplicatorAccount,
+		appsv1alpha1.ChannelSourceAccount,
+		appsv1alpha1.ChannelSinkAccount,
 	}
 }
 

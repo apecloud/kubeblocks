@@ -99,6 +99,7 @@ const (
 	BackupTypeLabelKeyKey                  = "dataprotection.kubeblocks.io/backup-type"
 	AddonNameLabelKey                      = "extensions.kubeblocks.io/addon-name"
 	OpsRequestTypeLabelKey                 = "ops.kubeblocks.io/ops-type"
+	ChannelTopologyLabelKey                = "datachannel.kubeblocks.io/channel-topology"
 
 	// kubeblocks.io annotations
 	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"            // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
@@ -110,6 +111,7 @@ const (
 	RestoreFromSrcClusterAnnotationKey          = "kubeblocks.io/restore-from-source-cluster" // RestoreFromSrcClusterAnnotationKey specifies the source cluster to recover from the backup.
 	RestoreFromBackUpAnnotationKey              = "kubeblocks.io/restore-from-backup"         // RestoreFromBackUpAnnotationKey specifies the component to recover from the backup.
 	SnapShotForStartAnnotationKey               = "kubeblocks.io/snapshot-for-start"
+	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"               // Todo: this is a temporary plan
 	ComponentReplicasAnnotationKey              = "apps.kubeblocks.io/component-replicas" // ComponentReplicasAnnotationKey specifies the number of pods in replicas
 	BackupPolicyTemplateAnnotationKey           = "apps.kubeblocks.io/backup-policy-template"
 	LastAppliedClusterAnnotationKey             = "apps.kubeblocks.io/last-applied-cluster"
@@ -128,6 +130,10 @@ const (
 	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
 	KubeBlocksGenerationKey                     = "kubeblocks.io/generation"
+	ChannelNameAnnotationKey                    = "datachannel.kubeblocks.io/channel-name"
+	ChannelTypeAnnotationKey                    = "datachannel.kubeblocks.io/channel-type"
+	ChannelSourceRelationAnnotationKey          = "datachannel.kubeblocks.io/source-channels" // ChannelSourceRelationAnnotationKey specified when cluster is a source-cluster role in a channel topology
+	ChannelSinkRelationAnnotationKey            = "datachannel.kubeblocks.io/sink-channels"   // ChannelSinkRelationAnnotationKey specified when cluster is a sink-cluster role in a channel topology
 
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"

@@ -233,3 +233,17 @@ spec:
               statements:
                 creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION SLAVE ON *.* TO $(USERNAME) WITH GRANT OPTION;
                 update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
+          - name: kbchannelsource
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION SLAVE, REPLICATION CLIENT, SELECT, LOCK TABLES, RELOAD ON *.* TO $(USERNAME) WITH GRANT OPTION;
+                update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
+          - name: kbchannelsink
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, DROP ON *.* TO $(USERNAME) WITH GRANT OPTION;
+                update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';

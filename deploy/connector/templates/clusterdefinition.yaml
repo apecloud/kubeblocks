@@ -1,0 +1,108 @@
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: {{ include "connector.name" . }}
+  labels:
+    {{- include "connector.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
+spec:
+  type: connector
+  connectionCredential:
+  componentDefs:
+    - name: connectors
+      description:
+      workloadType: Stateless
+      characterType: connector
+      probes:
+      configSpecs:
+      scriptSpecs:
+        - name: connector-scripts
+          templateRef: {{ include "connector.name" . }}-scripts
+          volumeName: scripts
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0755
+      service:
+        ports:
+          - name: connectors
+            targetPort: connectors
+            port: 8083
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+        containers:
+          - name: connector
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
+            securityContext:
+              allowPrivilegeEscalation: false
+              runAsNonRoot: true
+              runAsUser: 1001
+            env:
+              - name: CONNECT_BOOTSTRAP_SERVERS
+                value: "127.0.0.1:9092"
+              - name: CONNECT_REST_ADVERTISED_HOST_NAME
+                value: "$(KB_CLUSTER_COMP_NAME)-$(KB_COMP_NAME)-server"
+              - name: CONNECT_GROUP_ID
+                value: "$(KB_CLUSTER_COMP_NAME)"
+              - name: CONNECT_CONFIG_STORAGE_TOPIC
+                value: kb-connect-configs
+              - name: CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR
+                value: "1"
+              - name: CONNECT_OFFSET_STORAGE_TOPIC
+                value: kb-connect-offsets
+              - name: CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR
+                value: "1"
+              - name: CONNECT_STATUS_STORAGE_TOPIC
+                value: kb-connect-status
+              - name: CONNECT_STATUS_STORAGE_REPLICATION_FACTOR
+                value: "1"
+              - name: CONNECT_KEY_CONVERTER
+                value: "org.apache.kafka.connect.json.JsonConverter"
+              - name: CONNECT_VALUE_CONVERTER
+                value: "org.apache.kafka.connect.json.JsonConverter"
+              - name: CONNECT_PLUGIN_PATH
+                value: "/usr/share/confluent-hub-components"
+              - name: CONNECT_METADATA_MAX_AGE_MS
+                value: "60000"
+              - name: CONNECT_CONSUMER_METADATA_MAX_AGE_MS
+                value: "30000"
+            ports:
+              - name: connectors
+                containerPort: 8083
+            livenessProbe:
+              failureThreshold: 3
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              tcpSocket:
+                port: connectors
+            startupProbe:
+              failureThreshold: 10
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              exec:
+                command:
+                  - /bin/bash
+                  - -c
+                  - |
+                    curl localhost:8083/connectors
+                    if [ $? -ne 0 ]; then
+                      exit 1
+                    fi
+                    /scripts/task-start.sh
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts/connector-run.sh
+                subPath: connector-run.sh
+              - name: scripts
+                mountPath: /scripts/task-start.sh
+                subPath: task-start.sh
+

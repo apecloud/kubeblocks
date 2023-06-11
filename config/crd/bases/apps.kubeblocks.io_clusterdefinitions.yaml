@@ -8668,6 +8668,8 @@ spec:
                                 - kbprobe
                                 - kbmonitoring
                                 - kbreplicator
+                                - kbchannelsource
+                                - kbchannelsink
                                 type: string
                               provisionPolicy:
                                 description: provisionPolicy defines how to create

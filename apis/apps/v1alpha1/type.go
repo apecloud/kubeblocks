@@ -328,12 +328,14 @@ const (
 	KBAccountProbe                        = 1 << 2
 	KBAccountMonitor                      = 1 << 3
 	KBAccountReplicator                   = 1 << 4
-	KBAccountMAX                          = KBAccountReplicator // KBAccountMAX indicates the max value of KBAccountType, used for validation.
+	KBAccountChannelSource                = 1 << 5
+	KBAccountChannelSink                  = 1 << 6
+	KBAccountMAX                          = KBAccountChannelSink // KBAccountMAX indicates the max value of KBAccountType, used for validation.
 )
 
 // AccountName defines system account names.
 // +enum
-// +kubebuilder:validation:Enum={kbadmin,kbdataprotection,kbprobe,kbmonitoring,kbreplicator}
+// +kubebuilder:validation:Enum={kbadmin,kbdataprotection,kbprobe,kbmonitoring,kbreplicator,kbchannelsource,kbchannelsink}
 type AccountName string
 
 const (
@@ -342,6 +344,8 @@ const (
 	ProbeAccount          AccountName = "kbprobe"
 	MonitorAccount        AccountName = "kbmonitoring"
 	ReplicatorAccount     AccountName = "kbreplicator"
+	ChannelSourceAccount  AccountName = "kbchannelsource"
+	ChannelSinkAccount    AccountName = "kbchannelsink"
 )
 
 func (r AccountName) GetAccountID() KBAccountType {
@@ -356,6 +360,10 @@ func (r AccountName) GetAccountID() KBAccountType {
 		return KBAccountMonitor
 	case ReplicatorAccount:
 		return KBAccountReplicator
+	case ChannelSourceAccount:
+		return KBAccountChannelSource
+	case ChannelSinkAccount:
+		return KBAccountChannelSink
 	}
 	return KBAccountInvalid
 }

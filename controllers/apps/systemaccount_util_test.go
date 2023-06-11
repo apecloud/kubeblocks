@@ -132,8 +132,8 @@ func TestUpdateFacts(t *testing.T) {
 			expect:   appsv1alpha1.KBAccountAdmin | appsv1alpha1.KBAccountDataprotection | appsv1alpha1.KBAccountProbe | appsv1alpha1.KBAccountMonitor,
 		},
 		{
-			accounts: []appsv1alpha1.AccountName{appsv1alpha1.AdminAccount, appsv1alpha1.DataprotectionAccount, appsv1alpha1.ProbeAccount, appsv1alpha1.MonitorAccount, appsv1alpha1.ReplicatorAccount},
-			expect:   appsv1alpha1.KBAccountAdmin | appsv1alpha1.KBAccountDataprotection | appsv1alpha1.KBAccountProbe | appsv1alpha1.KBAccountMonitor | appsv1alpha1.KBAccountReplicator,
+			accounts: []appsv1alpha1.AccountName{appsv1alpha1.AdminAccount, appsv1alpha1.DataprotectionAccount, appsv1alpha1.ProbeAccount, appsv1alpha1.MonitorAccount, appsv1alpha1.ReplicatorAccount, appsv1alpha1.ChannelSourceAccount, appsv1alpha1.ChannelSinkAccount},
+			expect:   appsv1alpha1.KBAccountAdmin | appsv1alpha1.KBAccountDataprotection | appsv1alpha1.KBAccountProbe | appsv1alpha1.KBAccountMonitor | appsv1alpha1.KBAccountReplicator | appsv1alpha1.KBAccountChannelSource | appsv1alpha1.KBAccountChannelSink,
 		},
 	}
 

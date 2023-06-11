@@ -140,7 +140,7 @@ func (w *envWrapper) secretValue(secretRef *corev1.SecretKeySelector, container 
 	}
 	secretCiphertext := func(m map[string][]byte) (string, error) {
 		if v, ok := m[secretRef.Key]; ok {
-			return decodeString(v)
+			return DecodeString(v)
 		}
 		return "", nil
 	}
@@ -296,7 +296,8 @@ func getResourceObject[T generics.Object, PT generics.PObject[T]](w *envWrapper,
 	return obj, nil
 }
 
-func decodeString(encoded []byte) (string, error) {
+// DecodeString Decrypt the byte array by base64 and convert it into a string
+func DecodeString(encoded []byte) (string, error) {
 	decoded, err := b64.StdEncoding.DecodeString(string(encoded))
 	if err != nil {
 		return "", err

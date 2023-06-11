@@ -1,0 +1,16 @@
+apiVersion: datachannel.kubeblocks.io/v1alpha1
+kind: ChannelDefinition
+metadata:
+  labels:
+    "clusterdefinition.kubeblocks.io/name": {{ include "kafka.name" . }}
+  name: {{ include "kafka.name" . }}-channel
+spec:
+  type: KubeBlocks
+    kubeblocksSetting:
+      clusterDefinitionRef: {{ include "kafka.name" . }}
+      expose:
+        # Todo: this is a cluster component name, not a clusterDefinition component name, how to support multi component.
+        componentDefRef: broker
+        service:
+          port: 9092
+  isDefault: true

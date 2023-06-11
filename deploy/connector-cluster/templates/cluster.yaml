@@ -1,0 +1,34 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ include "connector.fullname" . }}
+  labels: {{ include "connector.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: connector
+  clusterVersionRef: connector-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  terminationPolicy: {{ .Values.terminationPolicy }}
+  affinity:
+    {{- with .Values.topologyKeys }}
+    topologyKeys: {{ . | toYaml | nindent 6 }}
+    {{- end }}
+  {{- with $.Values.tolerations }}
+  tolerations: {{ . | toYaml | nindent 4 }}
+  {{- end }}
+  componentSpecs:
+    - name: connectors
+      componentDefRef: connectors
+      monitor: {{ .Values.connector.monitor.enabled | default false }}
+      replicas: {{ $.Values.connector.replicaCount | default 1 }}
+      {{- with  .Values.resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+        {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}

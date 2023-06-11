@@ -29,7 +29,6 @@ spec:
         deployment environments.
       workloadType: Stateful # Consensus
       characterType: kafka
-      maxUnavailable: 49%
       probes:
       monitor:
         builtIn: false
@@ -200,7 +199,6 @@ spec:
         Kafka controller that act as controllers (kraft) only server.
       workloadType: Stateful # Consensus
       characterType: kafka
-      maxUnavailable: 49%
       probes:
       monitor:
         builtIn: false

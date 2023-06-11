@@ -1,0 +1,16 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: connector-{{ default .Chart.AppVersion .Values.connectorVersionOverride }}
+  labels:
+    {{- include "connector.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: connector
+  componentVersions:
+    - componentDefRef: connectors
+      versionsContext:
+        containers:
+        - name: connector
+          image: {{ .Values.images.connector.repository }}:{{ default .Chart.AppVersion .Values.images.connector.tag }}
+          command:
+            - /scripts/connector-run.sh

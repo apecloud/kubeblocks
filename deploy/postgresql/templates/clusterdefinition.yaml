@@ -365,3 +365,19 @@ spec:
               statements:
                 creation: CREATE USER $(USERNAME) WITH REPLICATION PASSWORD '$(PASSWD)';
                 update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
+          - name: kbchannelsource
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                ## creation: CREATE USER $(USERNAME) WITH REPLICATION PASSWORD '$(PASSWD)'; GRANT pg_read_all_data TO $(USERNAME);  Todo: role only support 14+
+                creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';
+          - name: kbchannelsink
+            provisionPolicy:
+              type: CreateByStmt
+              scope: AnyPods
+              statements:
+                ## creation: CREATE USER $(USERNAME) WITH PASSWORD '$(PASSWD)'; GRANT pg_read_all_data, pg_write_all_data TO $(USERNAME); Todo: role only support 14+
+                creation: CREATE USER $(USERNAME) SUPERUSER PASSWORD '$(PASSWD)';
+                update: ALTER USER $(USERNAME) WITH PASSWORD '$(PASSWD)';

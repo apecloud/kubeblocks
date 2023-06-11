@@ -1,0 +1,131 @@
+apiVersion: datachannel.kubeblocks.io/v1alpha1
+kind: ChannelDefinition
+metadata:
+  labels:
+    "clusterdefinition.kubeblocks.io/name": postgresql
+  name: apecloud-postgresql-channel
+spec:
+  type: KubeBlocks
+  kubeblocksSetting:
+    clusterDefinitionRef: postgresql
+    expose:
+      componentDefRef: postgresql
+      service:
+        port: 5432
+  source:
+    kubeblocks:
+      configureRequests:
+        componentName: postgresql
+        configurations:
+          - keys:
+              - key: postgresql.conf
+                parameters:
+                  - key: wal_level
+                    value: "logical"
+            name: postgresql-configuration
+      accountRequests:
+        componentName: postgresql
+        accountName: kbchannelsource
+      cluster:
+        clusterDefinitionRef: connector
+        clusterVersionRef: connector-2.2.4
+        componentSpecs:
+          - componentDefRef: connectors
+            name: connectors
+            replicas: 1
+            resources:
+        terminationPolicy: Delete
+      extraEnvs:
+        KB_CHANNEL_CONNECTOR_NAME: ${KB_CHANNEL_NAME}-${KB_CHANNEL_TYPE}
+        KB_CHANNEL_CONFIG: |
+          {
+              "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+              "database.hostname": "${KB_CHANNEL_SOURCE_HOSTNAME}",
+              "database.port": "${KB_CHANNEL_SOURCE_PORT}",
+              "database.user": "${KB_CHANNEL_SOURCE_USER}",
+              "database.password": "${KB_CHANNEL_SOURCE_PASSWORD}",
+              "database.dbname": "${KB_CHANNEL_INVOLVED_DB}"
+              "schema.history.internal.kafka.bootstrap.servers": "${KB_CHANNEL_SINK_HOSTNAME}:${KB_CHANNEL_SINK_PORT}",
+              "schema.history.internal.kafka.topic": "${KB_CHANNEL_TOPOLOGY_NAME}_${KB_CHANNEL_NAME}_${KB_CHANNEL_TYPE}_history",
+              "snapshot.mode": "initial",
+              "table.include.list": "${KB_CHANNEL_SYNC_TABLE}",
+              "topic.prefix": "${KB_CHANNEL_TOPOLOGY_NAME}-${KB_CHANNEL_NAME}"
+          }
+    syncObjEnvExpress:
+      - name: sync_db
+        metaTypeRequired:
+          - Database
+        metaTypeConnectSymbol: "."
+        metaObjConnectSymbol: ","
+      - name: involved_db
+        metaTypeRequired:
+          - Database
+        metaObjConnectSymbol: ","
+        selectMode: Involved
+      - name: sync_table
+        metaTypeRequired:
+          - Schema
+          - Table
+        metaTypeConnectSymbol: "."
+        metaObjConnectSymbol: ","
+  sink:
+    kubeblocks:
+      accountRequests:
+        componentName: postgresql
+        accountName: kbchannelsink
+      cluster:
+        clusterDefinitionRef: connector
+        clusterVersionRef: connector-2.2.4
+        componentSpecs:
+          - componentDefRef: connectors
+            name: connectors
+            replicas: 1
+            resources:
+        terminationPolicy: Delete
+      extraEnvs:
+        KB_CHANNEL_CONNECTOR_NAME: ${KB_CHANNEL_NAME}-${KB_CHANNEL_TYPE}
+        KB_CHANNEL_CONFIG: |
+          {
+              "auto.create":"false",
+              "auto.evolve":"false",
+              "connector.class":"io.confluent.connect.jdbc.JdbcSinkConnector",
+              "connection.url":"jdbc:postgresql://${KB_CHANNEL_SINK_HOSTNAME}:${KB_CHANNEL_SINK_PORT}/${KB_CHANNEL_INVOLVED_DB}?currentSchema=${KB_CHANNEL_INVOLVED_SCHEMA}",
+              "connection.user":"${KB_CHANNEL_SINK_USER}",
+              "connection.password":"${KB_CHANNEL_SINK_PASSWORD}",
+              "delete.enabled":"true",
+              "dialect.name":"PostgreSqlDatabaseDialect",
+              "insert.mode":"upsert",
+              "pk.mode":"record_key",
+              "topics":"${KB_CHANNEL_SYNC_TABLE}",
+              "transforms":"dropPrefix,unwrap",
+              "transforms.dropPrefix.regex":"^${KB_CHANNEL_TOPOLOGY_NAME}-${KB_CHANNEL_NAME}\\..*\\.(.*)",
+              "transforms.dropPrefix.replacement":"$1",
+              "transforms.dropPrefix.type":"org.apache.kafka.connect.transforms.RegexRouter",
+              "transforms.unwrap.drop.tombstones":"false",
+              "transforms.unwrap.type":"io.debezium.transforms.ExtractNewRecordState"
+          }
+    syncObjEnvExpress:
+      - name: sync_db
+        metaTypeRequired:
+          - Database
+        metaObjConnectSymbol: ","
+      - name: involved_db
+        metaTypeRequired:
+          - Database
+        metaObjConnectSymbol: ","
+        selectMode: Involved
+      - name: involved_schema
+        metaTypeRequired:
+          - Schema
+        metaObjConnectSymbol: ","
+        selectMode: Involved
+      - name: sync_table
+        metaTypeRequired:
+          - Schema
+          - Table
+        metaObjConnectSymbol: ","
+        metaTypeConnectSymbol: "."
+        prefix: "${channelTopologyName}-${channelName}."
+  topologyStructs:
+    - dag
+  isDefault: true

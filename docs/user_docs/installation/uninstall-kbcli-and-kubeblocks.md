@@ -65,7 +65,7 @@ For Homebrew, run
 brew uninstall kbcli
 ```
 
-kbcli creates a hidden folder named `~./kbcli` under the HOME directory to store configuration information and temporary files. You can delete this folder after uninstalling kbcli.
+kbcli creates a hidden folder named `~/.kbcli` under the HOME directory to store configuration information and temporary files. You can delete this folder after uninstalling kbcli.
 
 </TabItem>
 
@@ -88,7 +88,7 @@ kbcli creates a hidden folder named `~./kbcli` under the HOME directory to store
 
 3. Delete a folder named `.kbcli`.
 
-   kbcli creates a folder named `./kbcli` under the C:\Users\username directory to store configuration information and temporary files. You can delete this folder after uninstalling kbcli.
+   kbcli creates a folder named `/.kbcli` under the C:\Users\username directory to store configuration information and temporary files. You can delete this folder after uninstalling kbcli.
 
 </TabItem>
 

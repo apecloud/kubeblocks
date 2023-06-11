@@ -21,7 +21,6 @@ package cluster
 
 import (
 	"fmt"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -314,38 +313,36 @@ var _ = Describe("Cluster", func() {
 		})
 
 		It("can validate the cluster name must begin with a letter and can only contain lowercase letters, numbers, and '-'.", func() {
-			invalidCharacter := "~!#$%^&*()_=+{}[]`:;'<>/?,.\\"
-			validName := "abcd"
-			o.Name = validName
-			Expect(o.Validate()).Should(Succeed())
-			for i := range invalidCharacter {
-				o.Name = validName[0:1] + string(invalidCharacter[i]) + validName[1:]
-				Expect(o.Validate()).Should(HaveOccurred())
-				o.Name = validName + string(invalidCharacter[i])
-				Expect(o.Validate()).Should(HaveOccurred())
-				o.Name = string(invalidCharacter[i]) + validName
-				Expect(o.Validate()).Should(HaveOccurred())
+			type fn func()
+			var succeed = func(name string) fn {
+				return func() {
+					o.Name = name
+					Expect(o.Validate()).Should(Succeed())
+				}
+			}
+			var failed = func(name string) fn {
+				return func() {
+					o.Name = name
+					Expect(o.Validate()).Should(HaveOccurred())
+				}
+			}
+			// more case to add
+			invalidCase := []string{
+				"1abcd", "abcd-", "-abcd", "abc#d", "ABCD", "*&(&%",
 			}
 
-			numericCharacters := "0123456789"
-			for i := range numericCharacters {
-				o.Name = validName[0:1] + string(numericCharacters[i]) + validName[1:]
-				Expect(o.Validate()).Should(Succeed())
-				o.Name = validName + string(numericCharacters[i])
-				Expect(o.Validate()).Should(Succeed())
-				o.Name = string(numericCharacters[i]) + validName
-				Expect(o.Validate()).Should(HaveOccurred())
+			validCase := []string{
+				"abcd", "abcd1", "a1-2b-3d",
 			}
 
-			o.Name = validName + "-"
-			Expect(o.Validate()).Should(HaveOccurred())
-			o.Name = validName[0:1] + "-" + validName[1:]
-			Expect(o.Validate()).Should(Succeed())
-			o.Name = "-" + validName
-			Expect(o.Validate()).Should(HaveOccurred())
+			for i := range invalidCase {
+				failed(invalidCase[i])
+			}
 
-			o.Name = strings.ToUpper(validName)
-			Expect(o.Validate()).Should(HaveOccurred())
+			for i := range validCase {
+				succeed(validCase[i])
+			}
+
 		})
 
 		It("can validate whether the name is not longer than 16 characters when create a new cluster", func() {

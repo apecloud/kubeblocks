@@ -485,12 +485,14 @@ func (r *SystemAccountReconciler) jobCompletionHandler() *handler.Funcs {
 			clusterName := job.Labels[constant.AppInstanceLabelKey]
 			componentName := job.Labels[constant.KBAppComponentLabelKey]
 
+			// filter out jobs that are not for system account
 			if len(accountName) == 0 || len(clusterName) == 0 || len(componentName) == 0 {
 				return
 			}
-
+			// filter out jobs that have not reached completion (either completed or failed) or have been handled
 			if !containsJobCondition(*job, job.Status.Conditions, batchv1.JobFailed, corev1.ConditionTrue) &&
-				!containsJobCondition(*job, job.Status.Conditions, batchv1.JobComplete, corev1.ConditionTrue) {
+				!containsJobCondition(*job, job.Status.Conditions, batchv1.JobComplete, corev1.ConditionTrue) ||
+				!controllerutil.ContainsFinalizer(job, constant.DBClusterFinalizerName) {
 				return
 			}
 

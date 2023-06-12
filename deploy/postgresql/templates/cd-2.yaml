@@ -63,7 +63,6 @@ spec:
         - name: data
           type: data
       podSpec:
-        shareProcessNamespace: true
         securityContext:
           runAsUser: 0
           fsGroup: 103

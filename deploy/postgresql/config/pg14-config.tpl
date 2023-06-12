@@ -133,7 +133,6 @@ lc_time = 'C'
 lock_timeout = '0'
 log_autovacuum_min_duration = '10000'
 log_checkpoints = 'True'
-synchronous_commit = 'off'
 
 log_connections = 'False'
 log_disconnections = 'False'

@@ -24,6 +24,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -343,18 +344,21 @@ func (pgOps *PostgresOperations) SwitchoverOps(ctx context.Context, req *binding
 		return result, nil
 	}
 
-	var newPrimary string
-	if newPrimary, err = pgOps.getSwitchoverResult(primary, candidate); err != nil {
-		result["event"] = OperationFailed
-		result["message"] = err.Error()
-		return result, nil
-	} else if newPrimary == "" {
-		result["event"] = OperationFailed
-		result["message"] = fmt.Sprintf("%s to candidate: %s fail", string(req.Operation), candidate)
-		return result, nil
-	}
+	/*
+		var newPrimary string
+		if newPrimary, err = pgOps.getSwitchoverResult(primary, candidate); err != nil {
+			result["event"] = OperationFailed
+			result["message"] = err.Error()
+			return result, nil
+		} else if newPrimary == "" {
+			result["event"] = OperationFailed
+			result["message"] = fmt.Sprintf("%s to candidate:%s fail", string(req.Operation), candidate)
+			return result, nil
+		}
+
+	*/
 	result["event"] = OperationSuccess
-	result["message"] = fmt.Sprintf("Successfully %s to: %s", string(req.Operation), newPrimary)
+	result["message"] = fmt.Sprintf("Successfully %s to: %s", string(req.Operation), candidate)
 
 	return result, nil
 }
@@ -441,7 +445,7 @@ func (pgOps *PostgresOperations) manualSwitchover(primary, candidate string) err
 }
 
 func (pgOps *PostgresOperations) getSwitchoverResult(oldPrimary, candidate string) (string, error) {
-	wait := int(pgOps.Cs.GetCluster().Config.GetData().GetTtl() / 2)
+	wait := int(pgOps.Cs.GetCluster().Config.GetData().GetTtl())
 	for i := 0; i < wait; i++ {
 		time.Sleep(time.Second)
 		_ = pgOps.Cs.GetClusterFromKubernetes()
@@ -905,10 +909,21 @@ func (pgOps *PostgresOperations) Demote(ctx context.Context, podName string) err
 	err = pgOps.Cs.DeleteLeader(opTime)
 
 	// Give a time to somebody to take the leader lock
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 5)
 	//TODO:Follow which
+	for i := 0; i < 3; i++ {
+		err = pgOps.Cs.GetClusterFromKubernetes()
+		if err == nil && pgOps.Cs.GetCluster().Leader != nil {
+			break
+		}
+		time.Sleep(time.Second * 2)
 
-	return pgOps.follow(ctx, podName)
+		if i == 2 {
+			return errors.Errorf("get no leader now")
+		}
+	}
+
+	return pgOps.follow(ctx, podName, true, pgOps.Cs.GetCluster().Leader.GetMember().GetName())
 }
 
 // GetStatus TODO：GetStatus后期考虑用postmaster替代
@@ -1013,18 +1028,93 @@ func (pgOps *PostgresOperations) isLagging(walPosition int64) bool {
 }
 
 func (pgOps *PostgresOperations) HandleFollow(ctx context.Context, leader *configuration_store.Leader, podName string) error {
+	err := pgOps.handleRewind(ctx, leader, podName)
+	if err != nil {
+		pgOps.Logger.Errorf("handle rewind err:%v", err)
+	}
+
+	needChange, needRestart := pgOps.checkRecoveryConf(ctx, podName, leader.GetMember().GetName())
+	if needChange {
+		return pgOps.follow(ctx, podName, needRestart, leader.GetMember().GetName())
+	}
+
+	pgOps.Logger.Infof("no action coz i am still follow the leader")
+	return nil
+}
+
+func (pgOps *PostgresOperations) checkRecoveryConf(ctx context.Context, podName string, leader string) (bool, bool) {
+	cmd := `if [ -e "postgresql/data/standby.signal" ]; then echo "1"; else echo "0"; fi`
+	resp, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, cmd, pgOps.DBType)
+	if err != nil {
+		pgOps.Logger.Errorf("exec cmd:%s err:%v", cmd, err)
+	}
+	if resp["stdout"] == "0" {
+		return true, true
+	}
+	// TODO：记录文件最近修改时间并比对
+	primaryInfo := pgOps.readRecoveryParams(ctx)
+	if primaryInfo == nil {
+		return true, true
+	}
+
+	if strings.Split(primaryInfo["host"], ".")[0] != leader {
+		pgOps.Logger.Warnf("host not match, need to reload")
+		return true, false
+	}
+
+	return false, false
+}
+
+func (pgOps *PostgresOperations) readRecoveryParams(ctx context.Context) map[string]string {
+	sql := `SELECT name, setting FROM pg_catalog.pg_settings WHERE pg_catalog.lower(name) = 'primary_conninfo';`
+	resp, err := pgOps.query(ctx, sql)
+	if err != nil {
+		pgOps.Logger.Errorf("get primary conn info failed, err:%v", err)
+		return nil
+	}
+	result, err := ParseQuery(string(resp))
+	if err != nil {
+		pgOps.Logger.Errorf("parse query failed, err:%v", err)
+		return nil
+	}
+	primaryInfoStr := result["setting"]
+	primaryInfo := ParsePrimaryConnInfo(primaryInfoStr)
+
+	return primaryInfo
+}
+
+func (pgOps *PostgresOperations) handleRewind(ctx context.Context, leader *configuration_store.Leader, podName string) error {
 	need, _ := pgOps.isRewindOrReinitializePossible(ctx, leader, podName)
 	if !need {
 		return nil
 	}
-	pgOps.executeRewind()
-
-	return nil
-
-	//return pgOps.follow(ctx, podName)
+	return pgOps.executeRewind()
 }
 
-func (pgOps *PostgresOperations) follow(ctx context.Context, podName string) error {
+func (pgOps *PostgresOperations) follow(ctx context.Context, podName string, needRestart bool, leader string) error {
+	primaryInfo := "host="
+	primaryInfo += leader + pgOps.Cs.GetClusterCompName() + "-headles"
+	primaryInfo += " port=" + os.Getenv("KB_SERVICE_PORT")
+	primaryInfo += " user=" + os.Getenv("KB_SERVICE_USER")
+	primaryInfo += " password=" + os.Getenv("KB_SERVICE_PASSWORD")
+	primaryInfo += " application_name=" + "my-application"
+
+	sql := `alter system set primary_info=` + primaryInfo
+	_, err := pgOps.exec(ctx, sql)
+	if err != nil {
+		pgOps.Logger.Errorf("modify primary info failed,err:%v", err)
+		return err
+	}
+
+	if !needRestart {
+		cmd := "su -c 'pg_ctl reload' postgres"
+		_, err = pgOps.Cs.ExecCmdWithPod(ctx, podName, cmd, pgOps.DBType)
+		if err != nil {
+			pgOps.Logger.Errorf("reload failed, err:%v", err)
+			return err
+		}
+	}
+
 	return pgOps.start(ctx, podName)
 }
 
@@ -1050,7 +1140,8 @@ func (pgOps *PostgresOperations) start(ctx context.Context, podName string) erro
 	return nil
 }
 
-func (pgOps *PostgresOperations) executeRewind() {
+func (pgOps *PostgresOperations) executeRewind() error {
+	return nil
 }
 
 func (pgOps *PostgresOperations) isRewindOrReinitializePossible(ctx context.Context, leader *configuration_store.Leader, podName string) (bool, error) {

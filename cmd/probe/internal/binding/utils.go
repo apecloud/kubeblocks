@@ -466,3 +466,34 @@ func ParsePgLsn(str string) int64 {
 	suffix, _ := strconv.ParseInt(list[1], 16, 64)
 	return prefix*0x100000000 + suffix
 }
+
+func ParseQuery(str string) (map[string]string, error) {
+	lines := strings.Split(str, "\n")
+	key, value := lines[0], lines[2]
+
+	result := make(map[string]string)
+	keys := strings.Split(key, "|")
+	values := strings.Split(value, "|")
+	if len(keys) != len(values) {
+		return result, errors.New("invalid key count")
+	}
+	for i, k := range keys {
+		result[strings.TrimSpace(k)] = strings.TrimSpace(values[i])
+	}
+
+	return result, nil
+}
+
+func ParsePrimaryConnInfo(str string) map[string]string {
+	infos := strings.Split(str, " ")
+	result := make(map[string]string)
+
+	for _, info := range infos {
+		v := strings.Split(info, "=")
+		if len(v) >= 2 {
+			result[v[0]] = v[1]
+		}
+	}
+
+	return result
+}

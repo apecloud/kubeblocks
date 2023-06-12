@@ -48,6 +48,7 @@ type RoleAgent struct {
 	RoleObservationThreshold int
 	OriRole                  string
 	Logger                   log.Logger
+	RoleURL                  string
 	actionSvcPorts           *[]int
 	client                   *http.Client
 }
@@ -57,9 +58,10 @@ func init() {
 	viper.SetDefault("KB_ROLE_OBSERVATION_THRESHOLD", defaultRoleObservationThreshold)
 }
 
-func NewRoleAgent(writer io.Writer, prefix string) *RoleAgent {
+func NewRoleAgent(writer io.Writer, prefix, url string) *RoleAgent {
 	return &RoleAgent{
 		Logger:         *log.New(writer, prefix, log.LstdFlags),
+		RoleURL:        url,
 		actionSvcPorts: &[]int{},
 	}
 }
@@ -162,7 +164,7 @@ func (roleAgent *RoleAgent) getRole(ctx context.Context) (string, error) {
 	)
 
 	for _, port := range *roleAgent.actionSvcPorts {
-		u := fmt.Sprintf("http://127.0.0.1:%d/role?KB_RSM_LAST_STDOUT=%s", port, url.QueryEscape(lastOutput))
+		u := fmt.Sprintf("http://127.0.0.1:%d/%s?KB_RSM_LAST_STDOUT=%s", port, roleAgent.RoleURL, url.QueryEscape(lastOutput))
 		lastOutput, err = roleAgent.callAction(ctx, u)
 		if err != nil {
 			return "", err

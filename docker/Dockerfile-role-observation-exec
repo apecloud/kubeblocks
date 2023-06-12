@@ -1,0 +1,54 @@
+# Build the kubeblocks tools binaries
+# only includes role-observation.
+
+## docker buildx build injected build-args:
+#BUILDPLATFORM — matches the current machine. (e.g. linux/amd64)
+#BUILDOS — os component of BUILDPLATFORM, e.g. linux
+#BUILDARCH — e.g. amd64, arm64, riscv64
+#BUILDVARIANT — used to set build ARM variant, e.g. v7
+#TARGETPLATFORM — The value set with --platform flag on build
+#TARGETOS - OS component from --platform, e.g. linux
+#TARGETARCH - Architecture from --platform, e.g. arm64
+#TARGETVARIANT - used to set target ARM variant, e.g. v7
+
+ARG GO_VERSION=1.20
+
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as builder
+ARG TARGETOS
+ARG TARGETARCH
+ARG GOPROXY
+##ARG GOPROXY=https://goproxy.cn
+ARG LD_FLAGS="-s -w"
+
+ENV GONOPROXY=github.com/apecloud
+ENV GONOSUMDB=github.com/apecloud
+ENV GOPRIVATE=github.com/apecloud
+ENV GOPROXY=${GOPROXY}
+
+WORKDIR /src
+
+# Build
+# role-observe
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/role-observe cmd/probe/role/main.go
+
+
+# grpc-health-probe
+RUN GRPC_HEALTH_PROBE_VERSION=v0.4.13 && \
+    wget -qO /bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-amd64 && \
+    chmod +x /bin/grpc_health_probe
+
+
+# Use alpine
+FROM docker.io/alpine:3.18 as dist
+ARG APK_MIRROR
+ENV APK_MIRROR=${APK_MIRROR}
+RUN if [ -n "${APK_MIRROR}" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; fi
+RUN apk add --no-cache curl \
+    && rm -rf /var/cache/apk/*
+
+# copy role observation and grpc-health-probe
+COPY --from=builder /out/role-observe  /bin/role-agent
+COPY --from=builder /bin/grpc_health_probe /bin/grpc_health_probe

@@ -24,15 +24,9 @@ const (
 	OperationFailed  = "Failed"
 	OperationSuccess = "Success"
 
-	// 451 Unavailable For Legal Reasons, used to indicate operation failed.
-	OperationFailedHTTPCode = "451"
-
 	// default viper config
 	roleEventRecordQPS                = 1. / 60.
 	roleEventReportFrequency          = int(1 / roleEventRecordQPS)
 	defaultFailedEventReportFrequency = 1800
 	defaultRoleObservationThreshold   = 300
-
-	DefaultRoleObservationPort = 7979
-	DefaultRoleObservationPath = "/role"
 )

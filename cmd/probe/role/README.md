@@ -4,7 +4,7 @@ Role-Observation is a role observation service that can check pod's role periodi
 
 # 1. Introduction
 
-Role-Observation is only used for observing pod's role, it only supports readiness probe now.
+Role-Observation is only used for observing pod's role, it only supports readiness probe in grpc way now.
 
 # 2. Getting Started
 

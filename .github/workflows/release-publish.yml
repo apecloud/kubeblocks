@@ -182,7 +182,7 @@ jobs:
       - name: Push kbcli rpm repo
         uses: ad-m/github-push-action@master
         with:
-          GITHUB_REPO: apecloud/kbcli_rpm_test
+          repository: apecloud/kbcli_rpm_test
           github_token: ${{ env.GITHUB_TOKEN }}
           branch: "main"
 

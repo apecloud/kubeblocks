@@ -234,6 +234,66 @@ var _ = Describe("ReplicationSet Util", func() {
 		Expect(err).Should(Succeed())
 	}
 
+	testHandleRoleSync := func() {
+		By("Creating a cluster with replication workloadType.")
+		switchoverCandidate := &appsv1alpha1.SwitchoverCandidate{
+			Index:    0,
+			Operator: appsv1alpha1.CandidateOpEqual,
+			RoleSync: true,
+		}
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddComponent(testapps.DefaultRedisCompSpecName, testapps.DefaultRedisCompDefName).
+			SetReplicas(testapps.DefaultReplicationReplicas).
+			SetSwitchoverCandidate(switchoverCandidate).
+			Create(&testCtx).GetObject()
+
+		By("Creating a statefulSet of replication workloadType.")
+		container := corev1.Container{
+			Name:            "mock-redis-container",
+			Image:           testapps.DefaultRedisImageName,
+			ImagePullPolicy: corev1.PullIfNotPresent,
+		}
+		sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace,
+			clusterObj.Name+"-"+testapps.DefaultRedisCompSpecName, clusterObj.Name, testapps.DefaultRedisCompSpecName).
+			AddFinalizers([]string{constant.DBClusterFinalizerName}).
+			AddContainer(container).
+			AddAppInstanceLabel(clusterObj.Name).
+			AddAppComponentLabel(testapps.DefaultRedisCompSpecName).
+			AddAppManangedByLabel().
+			SetReplicas(2).
+			Create(&testCtx).GetObject()
+
+		By("Creating Pods of replication workloadType.")
+		for i := int32(0); i < *sts.Spec.Replicas; i++ {
+			_ = testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", sts.Name, i)).
+				AddContainer(container).
+				AddLabelsInMap(sts.Labels).
+				AddRoleLabel(defaultRole(i)).
+				Create(&testCtx).GetObject()
+		}
+		component := &intctrlcomputil.SynthesizedComponent{
+			Name:                clusterObj.Spec.ComponentSpecs[0].Name,
+			CompDefName:         clusterObj.Spec.ComponentSpecs[0].ComponentDefRef,
+			SwitchoverCandidate: clusterObj.Spec.ComponentSpecs[0].SwitchoverCandidate,
+			SwitchoverSpec:      clusterDefObj.Spec.ComponentDefs[0].SwitchoverSpec,
+			WorkloadType:        clusterDefObj.Spec.ComponentDefs[0].WorkloadType,
+		}
+
+		By("Test HandleRoleSync succeed when switchoverCandidate is consistency with role label.")
+		err := HandleRoleSync(testCtx.Ctx, k8sClient, clusterObj, component)
+		Expect(err).Should(Succeed())
+
+		By("Test HandleRoleSync succeed when switchoverCandidate is not consistency with role label.")
+		component.SwitchoverCandidate.Index = 1
+		component.SwitchoverCandidate.Operator = appsv1alpha1.CandidateOpEqual
+		err = HandleRoleSync(testCtx.Ctx, k8sClient, clusterObj, component)
+		Expect(err).Should(Succeed())
+		Expect(clusterObj.Spec.ComponentSpecs[0].SwitchoverCandidate.Index).Should(Equal(int32(0)))
+		Expect(clusterObj.Spec.ComponentSpecs[0].SwitchoverCandidate.Operator).Should(Equal(appsv1alpha1.CandidateOpEqual))
+		Expect(clusterObj.Spec.ComponentSpecs[0].SwitchoverCandidate.RoleSync).Should(BeTrue())
+	}
+
 	// Scenarios
 
 	Context("test replicationSet util", func() {
@@ -273,6 +333,10 @@ var _ = Describe("ReplicationSet Util", func() {
 
 		It("Test DoSwitchover when switchoverCandidate triggers", func() {
 			testDoSwitchover()
+		})
+
+		It("Test HandleRoleSync when switchoverCandidate is not consistency with role label", func() {
+			testHandleRoleSync()
 		})
 	})
 })

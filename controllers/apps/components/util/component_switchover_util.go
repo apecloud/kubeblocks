@@ -60,8 +60,9 @@ func HandleSwitchover(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	if component.SwitchoverCandidate.Index > int32(len(podList)-1) {
-		return errors.New("the candidate instance index is out of range")
+	// if the switchover candidate index is invalid, we do nothing.
+	if component.SwitchoverCandidate.Index > int32(len(podList)-1) || component.SwitchoverCandidate.Index < 0 {
+		return nil
 	}
 	for _, pod := range podList {
 		// if the pod does not have the role label, we do nothing.

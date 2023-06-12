@@ -360,7 +360,7 @@ func main() {
 	if err = (&workloadscontrollers.ReplicatedStateMachineReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("consensus-set-controller"),
+		Recorder: mgr.GetEventRecorderFor("replicated-state-machine-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ReplicatedStateMachine")
 		os.Exit(1)

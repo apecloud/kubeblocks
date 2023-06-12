@@ -7,8 +7,8 @@ metadata:
 spec:
   type: redis
   connectionCredential:
-    username: ""
-    password: ""
+    username: redis
+    password: "$(RANDOM_PASSWD)"
     endpoint: "$(SVC_FQDN):$(SVC_PORT_redis)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_redis)"
@@ -105,6 +105,23 @@ spec:
                 mountPath: /scripts
               - name: redis-conf
                 mountPath: /etc/redis
+            env:
+              - name: REDIS_REPL_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: REDIS_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: REDIS_SENTINEL_USER
+                value: "$(REDIS_REPL_USER)-sentinel"
+              - name: REDIS_ARGS
+                value: "--requirepass $(REDIS_PASSWORD)"
             command: ["/scripts/redis-start.sh"]
             lifecycle:
               postStart:
@@ -207,6 +224,21 @@ spec:
             - name: scripts
               mountPath: /scripts
           command: [ "/scripts/redis-sentinel-setup.sh" ]
+          env:
+            - name: REDIS_REPL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: username
+                  optional: false
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
+            - name: REDIS_SENTINEL_USER
+              value: "$(REDIS_REPL_USER)-sentinel"
         containers:
         - name: redis-sentinel
           imagePullPolicy: IfNotPresent
@@ -222,6 +254,21 @@ spec:
               mountPath: /etc/sentinel
             - name: scripts
               mountPath: /scripts
+          env:
+            - name: REDIS_REPL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: username
+                  optional: false
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
+            - name: REDIS_SENTINEL_USER
+              value: "$(REDIS_REPL_USER)-sentinel"
           command:
             - /bin/bash
           args:

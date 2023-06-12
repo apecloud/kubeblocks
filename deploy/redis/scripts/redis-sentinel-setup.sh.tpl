@@ -30,5 +30,7 @@ sentinel monitor {{ $sentinel_monitor }} 6379 2
 sentinel down-after-milliseconds {{ $clusterName }}-{{ $redis_component.name }} 5000
 sentinel failover-timeout {{ $clusterName }}-{{ $redis_component.name }} 60000
 sentinel parallel-syncs {{ $clusterName }}-{{ $redis_component.name }} 1
+sentinel auth-user {{ $clusterName }}-{{ $redis_component.name }} $REDIS_SENTINEL_USER
+sentinel auth-pass {{ $clusterName }}-{{ $redis_component.name }} $REDIS_PASSWORD
 {{- /* $primary_svc := printf "%s-%s.%s.svc" $clusterName $redis_component.name $namespace */}}
 EOF

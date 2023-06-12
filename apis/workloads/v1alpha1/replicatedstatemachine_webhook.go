@@ -30,7 +30,7 @@ import (
 )
 
 // log is for logging in this package.
-var replicatedstatemachinelog = logf.Log.WithName("rsm-resource")
+var replicatedstatemachinelog = logf.Log.WithName("replicatedstatemachine-resource")
 
 func (r *ReplicatedStateMachine) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
@@ -40,7 +40,7 @@ func (r *ReplicatedStateMachine) SetupWebhookWithManager(mgr ctrl.Manager) error
 
 // TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
-//+kubebuilder:webhook:path=/mutate-workloads-kubeblocks-io-v1alpha1-rsm,mutating=true,failurePolicy=fail,sideEffects=None,groups=workloads.kubeblocks.io,resources=replicatedstatemachines,verbs=create;update,versions=v1alpha1,name=mreplicatedstatemachine.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/mutate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine,mutating=true,failurePolicy=fail,sideEffects=None,groups=workloads.kubeblocks.io,resources=replicatedstatemachines,verbs=create;update,versions=v1alpha1,name=mreplicatedstatemachine.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &ReplicatedStateMachine{}
 
@@ -52,7 +52,7 @@ func (r *ReplicatedStateMachine) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-workloads-kubeblocks-io-v1alpha1-rsm,mutating=false,failurePolicy=fail,sideEffects=None,groups=workloads.kubeblocks.io,resources=replicatedstatemachines,verbs=create;update,versions=v1alpha1,name=vreplicatedstatemachine.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine,mutating=false,failurePolicy=fail,sideEffects=None,groups=workloads.kubeblocks.io,resources=replicatedstatemachines,verbs=create;update,versions=v1alpha1,name=vreplicatedstatemachine.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &ReplicatedStateMachine{}
 

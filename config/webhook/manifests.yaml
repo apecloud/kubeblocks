@@ -51,7 +51,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-workloads-kubeblocks-io-v1alpha1-rsm
+      path: /mutate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
   failurePolicy: Fail
   name: mreplicatedstatemachine.kb.io
   rules:
@@ -158,7 +158,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-workloads-kubeblocks-io-v1alpha1-rsm
+      path: /validate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
   failurePolicy: Fail
   name: vreplicatedstatemachine.kb.io
   rules:

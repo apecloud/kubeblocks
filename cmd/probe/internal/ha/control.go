@@ -35,7 +35,6 @@ type Ha struct {
 }
 
 func NewHa() *Ha {
-	//configs, err := clientcmd.BuildConfigFromFlags("", "/Users/buyanbujuan/.kube/config")
 	configs, err := restclient.InClusterConfig()
 	if err != nil {
 		configs, err = clientcmd.BuildConfigFromFlags("", "/Users/buyanbujuan/.kube/config")

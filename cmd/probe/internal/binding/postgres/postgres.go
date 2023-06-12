@@ -965,7 +965,7 @@ func (pgOps *PostgresOperations) IsRunning(ctx context.Context, podName string) 
 		return false
 	}
 
-	return resp["stdout"] == "1"
+	return strings.Trim(resp["stdout"], "\n") == "1"
 }
 
 func (pgOps *PostgresOperations) IsHealthiest(ctx context.Context, podName string) bool {
@@ -1063,7 +1063,7 @@ func (pgOps *PostgresOperations) checkRecoveryConf(ctx context.Context, podName 
 	if err != nil {
 		pgOps.Logger.Errorf("exec cmd:%s err:%v", cmd, err)
 	}
-	if resp["stdout"] == "0" {
+	if strings.Trim(resp["stdout"], "\n") == "0" {
 		return true, true
 	}
 	// TODO：记录文件最近修改时间并比对

@@ -14,6 +14,7 @@ type DB interface {
 	GetExtra(ctx context.Context) (map[string]string, error)
 	GetOpTime(ctx context.Context) (int64, error)
 	IsLeader(ctx context.Context) (bool, error)
+	IsRunning(ctx context.Context, podName string) bool
 	IsHealthiest(ctx context.Context, podName string) bool
 	HandleFollow(ctx context.Context, leader *configuration_store.Leader, podName string) error
 	EnforcePrimaryRole(ctx context.Context, podName string) error
@@ -21,7 +22,7 @@ type DB interface {
 	ProcessManualSwitchoverFromNoLeader(ctx context.Context, podName string) bool
 	InitDelay() error
 	Init(metadata bindings.Metadata) error
-	Follow(ctx context.Context, podName string, needRestart bool, leader string) error
+	Start(ctx context.Context, podName string) error
 
 	DbConn
 	DbTool

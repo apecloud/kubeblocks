@@ -957,6 +957,17 @@ func (pgOps *PostgresOperations) IsLeader(ctx context.Context) (bool, error) {
 	return role == PRIMARY, nil
 }
 
+func (pgOps *PostgresOperations) IsRunning(ctx context.Context, podName string) bool {
+	cmd := `if [ -e "postgresql/data/standby.signal" ]; then echo "1"; else echo "0"; fi`
+	resp, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, cmd, pgOps.DBType)
+	if err != nil {
+		pgOps.Logger.Errorf("exec cmd:%s err:%v", cmd, err)
+		return false
+	}
+
+	return resp["stdout"] == "0"
+}
+
 func (pgOps *PostgresOperations) IsHealthiest(ctx context.Context, podName string) bool {
 	err := pgOps.Cs.GetClusterFromKubernetes()
 	if err != nil {
@@ -1119,10 +1130,10 @@ func (pgOps *PostgresOperations) Follow(ctx context.Context, podName string, nee
 		}
 	}
 
-	return pgOps.start(ctx, podName)
+	return pgOps.Start(ctx, podName)
 }
 
-func (pgOps *PostgresOperations) start(ctx context.Context, podName string) error {
+func (pgOps *PostgresOperations) Start(ctx context.Context, podName string) error {
 	touchCmd := "touch /postgresql/data/standby.signal"
 
 	_, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, touchCmd, pgOps.DBType)

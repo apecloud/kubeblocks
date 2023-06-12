@@ -104,7 +104,7 @@ func (h *Ha) Init() {
 		time.Sleep(time.Second * 2)
 	}
 	if isLeader {
-		if !h.isDBRunning() {
+		if !h.DB.IsRunning(h.ctx, h.podName) {
 			panic("db is not running")
 		}
 	}
@@ -178,10 +178,10 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 		return
 	}
 
-	if !h.isDBRunning() {
-		if h.cs.GetCluster().Leader != nil {
-			leader := h.cs.GetCluster().Leader.GetMember().GetName()
-			_ = h.DB.Follow(h.ctx, h.podName, true, leader)
+	if !h.DB.IsRunning(h.ctx, h.podName) {
+		err = h.DB.Start(h.ctx, h.podName)
+		if err != nil {
+			h.log.Errorf("db start failed, err:%v", err)
 		}
 
 		err = h.DB.InitDelay()
@@ -281,7 +281,7 @@ func (h *Ha) setLeader(shouldSet bool) {
 func (h *Ha) touchMember() {}
 
 func (h *Ha) isHealthiest() bool {
-	if !h.isDBRunning() {
+	if !h.DB.IsRunning(h.ctx, h.podName) {
 		return false
 	}
 
@@ -307,19 +307,6 @@ func (h *Ha) acquireLeaderLock() error {
 		h.setLeader(true)
 	}
 	return err
-}
-
-// TODO:后续可以改为直接判断进程
-func (h *Ha) isDBRunning() bool {
-	status, err := h.DB.GetStatus(h.ctx)
-	if err != nil {
-		// set origin role
-		_, _ = h.DB.IsLeader(h.ctx)
-		h.log.Errorf("get db status failed, err:%v", err)
-		return false
-	}
-
-	return status == util.Running
 }
 
 func (h *Ha) follow() error {

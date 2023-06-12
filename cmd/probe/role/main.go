@@ -20,18 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package main
 
 import (
-	"encoding/json"
 	"flag"
-	"fmt"
-	"github.com/spf13/viper"
 	"log"
-	"net/http"
+	"net"
 	"os"
+
 	"os/signal"
-	"strconv"
 	"syscall"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/role/internal"
+	"google.golang.org/grpc"
+	health "google.golang.org/grpc/health/grpc_health_v1"
+
+	"github.com/apecloud/kubeblocks/cmd/probe/role/healthprobe"
+	"github.com/spf13/viper"
 )
 
 func main() {
@@ -39,49 +40,34 @@ func main() {
 
 	var err error
 
-	var port int
-	var path string
-	flag.IntVar(&port, "port", internal.DefaultRoleObservationPort, "")
-	flag.StringVar(&path, "path", internal.DefaultRoleObservationPath, "")
+	var port string
+	var serviceName string
+	flag.StringVar(&port, "port", healthprobe.DefaultPort, "")
+	flag.StringVar(&serviceName, "name", healthprobe.DefaultServiceName, "")
 	flag.Parse()
 
-	agent := internal.NewRoleAgent(os.Stdin, "ROLE_OBSERVATION")
-	err = agent.Init()
+	server, err := healthprobe.NewGrpcServer()
 	if err != nil {
-		log.Fatal(fmt.Errorf("fatal error custom init: %v", err))
+		log.Fatalf("fatal error init grpcserver failed: %v", err)
 	}
 
-	http.HandleFunc(path, func(writer http.ResponseWriter, request *http.Request) {
-		opsRes, shouldNotify := agent.CheckRole(request.Context())
-		buf, err := json.Marshal(opsRes)
-		if err != nil {
-			shouldNotify = true
-			buf = []byte(err.Error())
-		}
-
-		if _, exist := opsRes["event"]; !exist || len(opsRes) == 0 {
-			shouldNotify = true
-		}
-
-		if shouldNotify {
-			code, _ := strconv.Atoi(internal.OperationFailedHTTPCode)
-			writer.WriteHeader(code)
-			_, err = writer.Write(buf)
-			if err != nil {
-				log.Printf("fatal error ResponseWriter write: %v", err)
-			}
-		} else {
-			writer.WriteHeader(http.StatusNoContent)
-		}
-	})
-
-	err = http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	port = ":" + port
+	listener, err := net.Listen("tcp", port)
 	if err != nil {
-		log.Fatal(fmt.Errorf("fatal error http listen: %v", err))
+		log.Fatalf("fatal error net listen failed :%v", err)
+	}
+
+	s := grpc.NewServer()
+	health.RegisterHealthServer(s, server)
+	log.Println("start gRPC liston on port " + port)
+
+	err = s.Serve(listener)
+	if err != nil {
+		log.Fatalf("fatal error grpcserver serve failed: %v", err)
 	}
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
 	<-stop
-	agent.ShutDownClient()
+	server.ShutDownClient()
 }

@@ -22,9 +22,6 @@ package dashboard
 import (
 	"fmt"
 	"strings"
-
-	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -43,18 +40,7 @@ var (
 	}
 )
 
-func addClusterTypeFlag(cmd *cobra.Command, clusterType *string) {
-	cmd.Flags().StringVar(clusterType, "cluster-type", "", fmt.Sprintf("The cluster type opened directly in dashboard, support %s", strings.Join(availableTypes, ",")))
-	util.CheckErr(cmd.RegisterFlagCompletionFunc("cluster-type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		var name []string
-		for i := range availableTypes {
-			if strings.HasPrefix(availableTypes[i], toComplete) {
-				name = append(name, availableTypes[i])
-			}
-		}
-		return name, cobra.ShellCompDirectiveNoFileComp
-	}))
-}
+const supportDirectDashboard = "kubeblocks-grafana"
 
 func buildGrafanaDirectURL(url *string, targetType string) error {
 	if targetType == "" {

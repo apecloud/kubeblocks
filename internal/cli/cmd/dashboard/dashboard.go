@@ -25,6 +25,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -72,6 +73,9 @@ var (
 
 		# Open a dashboard with a specific local port
 		kbcli dashboard open kubeblocks-grafana --port 8080
+
+		# for dashboard kubeblocks-grafana, support direct the specified dashboard name
+		kbcli dashboard open kubeblocks-grafana mysql
 	`)
 
 	// we do not use the default port to port-forward to avoid conflict with other services
@@ -197,10 +201,19 @@ func newOpenOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *ope
 func newOpenCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newOpenOptions(f, streams)
 	cmd := &cobra.Command{
-		Use:     "open",
+		Use:     "open [dashboard-type] | open kubeblocks-grafana [dashboard-name]",
 		Short:   "Open one dashboard.",
 		Example: openExample,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) == 1 && args[0] == supportDirectDashboard {
+				var name []string
+				for i := range availableTypes {
+					if strings.HasPrefix(availableTypes[i], toComplete) {
+						name = append(name, availableTypes[i])
+					}
+				}
+				return name, cobra.ShellCompDirectiveNoFileComp
+			}
 			var names []string
 			for _, d := range dashboards {
 				names = append(names, d.Name)
@@ -216,7 +229,6 @@ func newOpenCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().StringVar(&o.localPort, "port", "", "dashboard local port")
 	cmd.Flags().Duration(podRunningTimeoutFlag, defaultPodExecTimeout,
 		"The time (like 5s, 2m, or 3h, higher than zero) to wait for at least one pod is running")
-	addClusterTypeFlag(cmd, &clusterType)
 	return cmd
 }
 
@@ -239,7 +251,9 @@ func (o *openOptions) complete(cmd *cobra.Command, args []string) error {
 	if dash == nil {
 		return fmt.Errorf("failed to find dashboard \"%s\", run \"kbcli dashboard list\" to list all dashboards", o.name)
 	}
-
+	if dash.Name == supportDirectDashboard && len(args) > 1 {
+		clusterType = args[1]
+	}
 	if o.localPort == "" {
 		o.localPort = dash.TargetPort
 	}

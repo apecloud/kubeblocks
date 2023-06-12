@@ -25,8 +25,9 @@ kbcli dashboard open NAME [DASHBOARD-TYPE] [--port PORT] [flags]
 ### Options
 
 ```
-  -h, --help          help for open
-      --port string   dashboard local port
+  -h, --help                           help for open
+      --pod-running-timeout duration   The time (like 5s, 2m, or 3h, higher than zero) to wait for at least one pod is running (default 1m0s)
+      --port string                    dashboard local port
 ```
 
 ### Options inherited from parent commands

@@ -7,7 +7,7 @@ metadata:
 spec:
   type: redis
   connectionCredential:
-    username: redis
+    username: default
     password: "$(RANDOM_PASSWD)"
     endpoint: "$(SVC_FQDN):$(SVC_PORT_redis)"
     host: "$(SVC_FQDN)"
@@ -107,12 +107,14 @@ spec:
                 mountPath: /etc/redis
             env:
               - name: REDIS_REPL_USER
+                value: "kbreplicator"
+              - name: REDIS_REPL_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: username
+                    key: password
                     optional: false
-              - name: REDIS_PASSWORD
+              - name: REDIS_DEFAULT_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
@@ -120,6 +122,12 @@ spec:
                     optional: false
               - name: REDIS_SENTINEL_USER
                 value: "$(REDIS_REPL_USER)-sentinel"
+              - name: REDIS_SENTINEL_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
               - name: REDIS_ARGS
                 value: "--requirepass $(REDIS_PASSWORD)"
             command: ["/scripts/redis-start.sh"]
@@ -151,11 +159,18 @@ spec:
 # Instead, using a shell script to wrap redis-cli and pass $(KB_ACCOUNT_STATEMENT) to it will do.
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+          env:
+            - name: REDIS_DEFAULT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
           command:
           - sh
           - -c
           args:
-          - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT) | redis-cli -h $(KB_ACCOUNT_ENDPOINT) acl save "
+          - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) -a $REDIS_DEFAULT_PASSWORD $(KB_ACCOUNT_STATEMENT) | redis-cli -h $(KB_ACCOUNT_ENDPOINT) -a $REDIS_DEFAULT_PASSWORD acl save "
         passwordConfig:
           length: 10
           numDigits: 5
@@ -180,13 +195,6 @@ spec:
                 update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbprobe
             provisionPolicy: *kbReadOnlyAcctRef
-          - name: kbreplicator
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AllPods
-              statements:
-                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) +psync +replconf +ping
-                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
     - name: redis-sentinel
       workloadType: Stateful
       characterType: redis
@@ -226,12 +234,14 @@ spec:
           command: [ "/scripts/redis-sentinel-setup.sh" ]
           env:
             - name: REDIS_REPL_USER
+              value: "kbreplicator"
+            - name: REDIS_REPL_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: $(CONN_CREDENTIAL_SECRET_NAME)
-                  key: username
+                  key: password
                   optional: false
-            - name: REDIS_PASSWORD
+            - name: REDIS_DEFAULT_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: $(CONN_CREDENTIAL_SECRET_NAME)
@@ -239,6 +249,12 @@ spec:
                   optional: false
             - name: REDIS_SENTINEL_USER
               value: "$(REDIS_REPL_USER)-sentinel"
+            - name: REDIS_SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
         containers:
         - name: redis-sentinel
           imagePullPolicy: IfNotPresent
@@ -256,12 +272,14 @@ spec:
               mountPath: /scripts
           env:
             - name: REDIS_REPL_USER
+              value: "kbreplicator"
+            - name: REDIS_REPL_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: $(CONN_CREDENTIAL_SECRET_NAME)
-                  key: username
+                  key: password
                   optional: false
-            - name: REDIS_PASSWORD
+            - name: REDIS_DEFAULT_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: $(CONN_CREDENTIAL_SECRET_NAME)
@@ -269,6 +287,12 @@ spec:
                   optional: false
             - name: REDIS_SENTINEL_USER
               value: "$(REDIS_REPL_USER)-sentinel"
+            - name: REDIS_SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
           command:
             - /bin/bash
           args:

@@ -435,10 +435,9 @@ upload_rpm_repo() {
     do
         if [ -f "$file" ]; then
           echo "$file"
-          curl -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
+          curl -H "Authorization: token $GITHUB_TOKEN" \
             -T "$file" \
-            $GITHUB_API/repos/$GITHUB_REPO/contents/rpm_repo/repodata/"$file"
+            $GITHUB_API/repos/$GITHUB_REPO/raw/main/rpm_repo/repodata/
         fi
     done
 }

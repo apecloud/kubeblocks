@@ -233,6 +233,10 @@ func deleteResources(f cmdutil.Factory, groupVersion string) error {
 		if len(strings.Split(resource.Name, "/")) > 1 {
 			continue
 		}
+		// skip podhttpchaos and podnetworkchaos etc.
+		if resource.Name != "podchaos" && strings.HasPrefix(resource.Name, "pod") {
+			continue
+		}
 		gvr := schema.GroupVersionResource{
 			Group:    Group,
 			Version:  Version,
@@ -242,6 +246,9 @@ func deleteResources(f cmdutil.Factory, groupVersion string) error {
 		if err != nil {
 			klog.V(1).Info(err)
 			return fmt.Errorf("failed to list %s: %s", gvr, err)
+		}
+		if len(resourceList.Items) == 0 {
+			continue
 		}
 		for _, obj := range resourceList.Items {
 			err = dynamicClient.Resource(gvr).Namespace(obj.GetNamespace()).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{})

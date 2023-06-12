@@ -46,10 +46,10 @@ GITHUB_API="https://api.github.com"
 LATEST_REPO=apecloud/kubeblocks
 
 main() {
-    local TYPE
-    local TAG_NAME
-    local GITHUB_REPO
-    local GITHUB_TOKEN
+    local TYPE=""
+    local TAG_NAME=""
+    local GITHUB_REPO=""
+    local GITHUB_TOKEN=""
     local TRIGGER_MODE=""
     local RUNNER_NAME=""
     local BRANCH_NAME=""
@@ -63,7 +63,7 @@ main() {
     local BASE_BRANCH=""
     local BASE_COMMIT=""
     local BASE_COMMIT_ID=HEAD^
-    local PR_NUMBER
+    local PR_NUMBER=""
 
     parse_command_line "$@"
 
@@ -227,9 +227,14 @@ parse_command_line() {
 }
 
 gh_curl() {
-    curl -H "Authorization: token $GITHUB_TOKEN" \
-      -H "Accept: application/vnd.github.v3.raw" \
-      $@
+    if [[ -z "$GITHUB_TOKEN" ]]; then
+        curl -H "Accept: application/vnd.github.v3.raw" \
+            $@
+    else
+        curl -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3.raw" \
+            $@
+    fi
 }
 
 get_upload_url() {

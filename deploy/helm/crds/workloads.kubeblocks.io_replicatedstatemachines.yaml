@@ -17,7 +17,7 @@ spec:
     plural: replicatedstatemachines
     shortNames:
     - rsm
-    singular: rsm
+    singular: replicatedstatemachine
   scope: Namespaced
   versions:
   - additionalPrinterColumns:

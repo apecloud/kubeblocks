@@ -25,13 +25,14 @@ import (
 	"net"
 	"os"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/role/internal"
+
 	"os/signal"
 	"syscall"
 
 	"google.golang.org/grpc"
 	health "google.golang.org/grpc/health/grpc_health_v1"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/role/healthprobe"
 	"github.com/spf13/viper"
 )
 
@@ -41,13 +42,13 @@ func main() {
 	var err error
 
 	var port string
-	var serviceName string
-	flag.StringVar(&port, "port", healthprobe.DefaultPort, "")
-	flag.StringVar(&serviceName, "name", healthprobe.DefaultServiceName, "")
+	var url string
+	flag.StringVar(&port, "port", internal.DefaultPort, "")
+	flag.StringVar(&url, "url", internal.DefaultServiceName, "")
 	flag.Parse()
 
-	server, err := healthprobe.NewGrpcServer()
-	if err != nil {
+	server := internal.NewGrpcServer(url)
+	if err = server.Init(); err != nil {
 		log.Fatalf("fatal error init grpcserver failed: %v", err)
 	}
 

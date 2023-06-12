@@ -70,7 +70,7 @@ func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, o.GVR),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(o.clusterDefinitionRef) != 0 {
-				o.LabelSelector = util.BuildClusterDefinitionRefLable(o.LabelSelector, []string{o.clusterDefinitionRef})
+				o.LabelSelector = util.BuildClusterDefinitionRefLabel(o.LabelSelector, []string{o.clusterDefinitionRef})
 			}
 			o.Names = args
 			util.CheckErr(run(o))
@@ -97,13 +97,17 @@ func run(o *ListClusterVersionOptions) error {
 	}
 	p := printer.NewTablePrinter(o.Out)
 	p.SetHeader("NAME", "CLUSTER-DEFINITION", "STATUS", "IS-DEFAULT", "CREATED-TIME")
-	p.SortBy(1)
+	p.SortBy(2)
 	for _, info := range infos {
 		var cv v1alpha1.ClusterVersion
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(info.Object.(*unstructured.Unstructured).Object, &cv); err != nil {
 			return err
 		}
 		isDefaultValue := isDefault(&cv)
+		if isDefaultValue == "true" {
+			p.AddRow(printer.BoldGreen(cv.Name), cv.Labels[constant.ClusterDefLabelKey], cv.Status.Phase, isDefaultValue, util.TimeFormat(&cv.CreationTimestamp))
+			continue
+		}
 		p.AddRow(cv.Name, cv.Labels[constant.ClusterDefLabelKey], cv.Status.Phase, isDefaultValue, util.TimeFormat(&cv.CreationTimestamp))
 	}
 	p.Print()

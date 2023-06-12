@@ -17,10 +17,10 @@ data:
       echo "no leader or self is leader, exit" >> /data/mysql/.kb_pre_stop.log
       exit 0
     fi
-    host=$(eval echo \$KB_MYSQL_"$idx"_HOSTNAME)
+    host=$(eval echo \$KB_"$idx"_HOSTNAME)
     echo "host=$host" >> /data/mysql/.kb_pre_stop.log
     leader_idx=${leader##*-}
-    leader_host=$(eval echo \$KB_MYSQL_"$leader_idx"_HOSTNAME)
+    leader_host=$(eval echo \$KB_"$leader_idx"_HOSTNAME)
     if [ ! -z $leader_host ]; then 
       host_flag="-h$leader_host"
     fi
@@ -36,7 +36,7 @@ data:
       if [ ! -z $MYSQL_ROOT_PASSWORD ]; then 
         password_flag="-p$MYSQL_ROOT_PASSWORD"
       fi
-      new_leader_host=$KB_MYSQL_0_HOSTNAME
+      new_leader_host=$KB_0_HOSTNAME
       if [ "$KB_POD_NAME" = "$leader" ]; then
         echo "self is leader, need to switchover" >> /data/mysql/.kb_pre_stop.log
         echo "mysql -uroot $password_flag -e \"call dbms_consensus.change_leader('$new_leader_host:13306');\" 2>&1" >> /data/mysql/.kb_pre_stop.log

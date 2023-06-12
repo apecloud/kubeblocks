@@ -22,6 +22,7 @@ package cluster
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -79,6 +80,27 @@ var _ = Describe("operations", func() {
 		o.Name = clusterName
 		o.Namespace = testing.Namespace
 		return o
+	}
+
+	getOpsName := func(opsType appsv1alpha1.OpsType, phase appsv1alpha1.OpsPhase) string {
+		return strings.ToLower(string(opsType)) + "-" + strings.ToLower(string(phase))
+	}
+
+	generationOps := func(opsType appsv1alpha1.OpsType, phase appsv1alpha1.OpsPhase) *appsv1alpha1.OpsRequest {
+		return &appsv1alpha1.OpsRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      getOpsName(opsType, phase),
+				Namespace: testing.Namespace,
+			},
+			Spec: appsv1alpha1.OpsRequestSpec{
+				ClusterRef: "test-cluster",
+				Type:       opsType,
+			},
+			Status: appsv1alpha1.OpsRequestStatus{
+				Phase: phase,
+			},
+		}
+
 	}
 
 	It("Upgrade Ops", func() {
@@ -223,5 +245,61 @@ var _ = Describe("operations", func() {
 		restartCmd.Run(restartCmd, []string{clusterName})
 		capturedOutput, _ := done()
 		Expect(testing.ContainExpectStrings(capturedOutput, "kbcli cluster describe-ops")).Should(BeTrue())
+	})
+
+	It("cancel ops", func() {
+		By("init some opsRequests which are needed for canceling opsRequest")
+		completedPhases := []appsv1alpha1.OpsPhase{appsv1alpha1.OpsCancelledPhase, appsv1alpha1.OpsSucceedPhase, appsv1alpha1.OpsFailedPhase}
+		supportedOpsType := []appsv1alpha1.OpsType{appsv1alpha1.VerticalScalingType, appsv1alpha1.HorizontalScalingType}
+		notSupportedOpsType := []appsv1alpha1.OpsType{appsv1alpha1.RestartType, appsv1alpha1.UpgradeType}
+		processingPhases := []appsv1alpha1.OpsPhase{appsv1alpha1.OpsPendingPhase, appsv1alpha1.OpsCreatingPhase, appsv1alpha1.OpsRunningPhase}
+		opsList := make([]runtime.Object, 0)
+		for _, opsType := range supportedOpsType {
+			for _, phase := range completedPhases {
+				opsList = append(opsList, generationOps(opsType, phase))
+			}
+			for _, phase := range processingPhases {
+				opsList = append(opsList, generationOps(opsType, phase))
+			}
+			// mock cancelling opsRequest
+			opsList = append(opsList, generationOps(opsType, appsv1alpha1.OpsCancellingPhase))
+		}
+
+		for _, opsType := range notSupportedOpsType {
+			opsList = append(opsList, generationOps(opsType, appsv1alpha1.OpsRunningPhase))
+		}
+		tf.FakeDynamicClient = testing.FakeDynamicClient(opsList...)
+
+		By("expect an error for not supported phase")
+		o := newBaseOperationsOptions(tf, streams, "", false)
+		o.Dynamic = tf.FakeDynamicClient
+		o.Namespace = testing.Namespace
+		o.autoApprove = true
+		for _, phase := range completedPhases {
+			for _, opsType := range supportedOpsType {
+				o.Name = getOpsName(opsType, phase)
+				Expect(cancelOps(o).Error()).Should(Equal(fmt.Sprintf("can not cancel the opsRequest when phase is %s", phase)))
+			}
+		}
+
+		By("expect an error for not supported opsType")
+		for _, opsType := range notSupportedOpsType {
+			o.Name = getOpsName(opsType, appsv1alpha1.OpsRunningPhase)
+			Expect(cancelOps(o).Error()).Should(Equal(fmt.Sprintf("opsRequest type: %s not support cancel action", opsType)))
+		}
+
+		By("expect an error for cancelling opsRequest")
+		for _, opsType := range supportedOpsType {
+			o.Name = getOpsName(opsType, appsv1alpha1.OpsCancellingPhase)
+			Expect(cancelOps(o).Error()).Should(Equal(fmt.Sprintf(`opsRequest "%s" is cancelling`, o.Name)))
+		}
+
+		By("expect succeed for canceling the opsRequest which is processing")
+		for _, phase := range processingPhases {
+			for _, opsType := range supportedOpsType {
+				o.Name = getOpsName(opsType, phase)
+				Expect(cancelOps(o)).Should(Succeed())
+			}
+		}
 	})
 })

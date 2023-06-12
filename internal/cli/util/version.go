@@ -42,23 +42,23 @@ type Version struct {
 // GetVersionInfo gets version include KubeBlocks, CLI and kubernetes
 func GetVersionInfo(client kubernetes.Interface) (Version, error) {
 	var err error
-	version := Version{
+	v := Version{
 		Cli: version.GetVersion(),
 	}
 
 	if client == nil || reflect.ValueOf(client).IsNil() {
-		return version, nil
+		return v, nil
 	}
 
-	if version.Kubernetes, err = GetK8sVersion(client.Discovery()); err != nil {
-		return version, err
+	if v.Kubernetes, err = GetK8sVersion(client.Discovery()); err != nil {
+		return v, err
 	}
 
-	if version.KubeBlocks, err = getKubeBlocksVersion(client); err != nil {
-		return version, err
+	if v.KubeBlocks, err = getKubeBlocksVersion(client); err != nil {
+		return v, err
 	}
 
-	return version, nil
+	return v, nil
 }
 
 // getKubeBlocksVersion gets KubeBlocks version

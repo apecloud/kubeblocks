@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 
@@ -35,6 +36,7 @@ import (
 	l "github.com/k3d-io/k3d/v5/pkg/logger"
 	"github.com/k3d-io/k3d/v5/pkg/runtimes"
 	k3d "github.com/k3d-io/k3d/v5/pkg/types"
+	"github.com/k3d-io/k3d/v5/pkg/types/fixes"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/clientcmd"
@@ -53,11 +55,11 @@ var (
 	// K3sImage is k3s image repo
 	K3sImage = "rancher/k3s:" + version.K3sImageTag
 
-	// K3dToolsImage is k3d tools image repo
-	K3dToolsImage = "docker.io/apecloud/k3d-tools:" + version.K3dVersion
-
 	// K3dProxyImage is k3d proxy image repo
 	K3dProxyImage = "docker.io/apecloud/k3d-proxy:" + version.K3dVersion
+
+	// K3dFixEnv
+	KBEnvFix fixes.K3DFixEnv = "KB_FIX_MOUNTS"
 )
 
 //go:embed assets/k3d-entrypoint-mount.sh
@@ -356,6 +358,12 @@ func buildKubeconfigOptions() config.SimpleConfigOptionsKubeconfig {
 }
 
 func setUpK3d(ctx context.Context, cluster *config.ClusterConfig) error {
+	// add fix Envs
+	if err := os.Setenv(string(KBEnvFix), "1"); err != nil {
+		return err
+	}
+	fixes.FixEnvs = append(fixes.FixEnvs, KBEnvFix)
+
 	l, err := k3dClient.ClusterList(ctx, runtimes.SelectedRuntime)
 	if err != nil {
 		return err
@@ -368,7 +376,7 @@ func setUpK3d(ctx context.Context, cluster *config.ClusterConfig) error {
 	for _, c := range l {
 		if c.Name == cluster.Name {
 			if c, err := k3dClient.ClusterGet(ctx, runtimes.SelectedRuntime, c); err == nil {
-				klog.V(1).Info("Detected an existing cluster: %s\n", c.Name)
+				klog.V(1).Infof("Detected an existing cluster: %s", c.Name)
 				return nil
 			}
 			break

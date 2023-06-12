@@ -30,15 +30,16 @@ import (
 )
 
 const (
-	DefaultIndexURI   = "https://github.com/kubernetes-sigs/krew-index.git"
+	DefaultIndexURI   = "https://github.com/apecloud/block-index.git"
 	DefaultIndexName  = "default"
+	KrewIndexURI      = "https://github.com/kubernetes-sigs/krew-index.git"
+	KrewIndexName     = "krew"
 	ManifestExtension = ".yaml"
 	PluginKind        = "Plugin"
 )
 
 var SupportAPIVersion = []string{
 	"krew.googlecontainertools.github.com/v1alpha2",
-	"kbcli.googlecontainertools.github.com/v1alpha2",
 }
 
 type Paths struct {

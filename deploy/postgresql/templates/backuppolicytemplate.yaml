@@ -49,6 +49,14 @@ spec:
           updateStage: post
     datafile:
       backupToolName: postgres-basebackup
+      backupStatusUpdates:
+        - path: manifests.backupLog
+          containerName: postgresql
+          script: /kb-scripts/backup-log-collector.sh true
+          updateStage: post
+        - containerName: postgresql
+          script: /kb-scripts/filesize-collector.sh basebackup.info
+          updateStage: post
     logfile:
       backupToolName: postgres-pitr
       target:
@@ -57,4 +65,7 @@ spec:
         - path: manifests.backupLog
           containerName: postgresql
           script: /kb-scripts/backup-log-collector.sh false
+          updateStage: post
+        - containerName: postgresql
+          script: /kb-scripts/filesize-collector.sh logfile.info
           updateStage: post

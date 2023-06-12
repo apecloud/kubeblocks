@@ -157,7 +157,7 @@ func (r *ClusterVersion) GetInconsistentComponentsInfo(clusterDef *ClusterDefini
 }
 
 func getComponentDefNotFoundMsg(invalidComponentDefNames []string, clusterDefName string) string {
-	return fmt.Sprintf(" %v is not found in ClusterDefinition.spec.componentDefs[*].name %s",
+	return fmt.Sprintf(" %v is not found in ClusterDefinition.spec.componentDefs[*].name of %s",
 		invalidComponentDefNames, clusterDefName)
 }
 

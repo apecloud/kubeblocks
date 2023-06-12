@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 spec:
-  description: 'Kubeblocks CSI driver provides a container storage interface used by Container Orchestrators
+  description: 'KubeBlocks CSI driver provides a container storage interface used by Container Orchestrators
     to manage the lifecycle of block storage for cloud vendors.'
   type: Helm
 

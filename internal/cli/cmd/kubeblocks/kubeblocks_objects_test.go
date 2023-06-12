@@ -226,13 +226,13 @@ func mockCRs() []runtime.Object {
 func mockRBACResources() []runtime.Object {
 	sa := testing.FakeServiceAccount(mockName())
 
-	cluserRole := testing.FakeClusterRole(mockName())
-	cluserRoleBinding := testing.FakeClusterRoleBinding(mockName(), sa, cluserRole)
+	clusterRole := testing.FakeClusterRole(mockName())
+	clusterRoleBinding := testing.FakeClusterRoleBinding(mockName(), sa, clusterRole)
 
 	role := testing.FakeRole(mockName())
 	roleBinding := testing.FakeRoleBinding(mockName(), sa, role)
 
-	return []runtime.Object{sa, cluserRole, cluserRoleBinding, role, roleBinding}
+	return []runtime.Object{sa, clusterRole, clusterRoleBinding, role, roleBinding}
 }
 
 func mockConfigMaps() []runtime.Object {

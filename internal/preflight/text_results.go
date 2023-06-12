@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	FailMessage = "Fail items were found. Please resolve the fail items and try again."
+	FailMessage = "Failed items were found. Please resolve the failed items and try again."
 )
 
 type TextResultOutput struct {

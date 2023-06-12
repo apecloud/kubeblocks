@@ -15,7 +15,7 @@ The name KubeBlocks is derived from Kubernetes and LEGO blocks, which indicates 
 
 ## Why you need KubeBlocks
 
-Kubernetes has become the de facto standard for container orchestration. It manages an ever-increasing number of stateless workloads with the scalability and availability provided by ReplicaSet and the rollout and rollback capabilities provided by Deployment. However, managing stateful workloads poses great challenges for Kubernetes. Although statefulSet provides stable persistent storage and unique network identifiers, these abilities are far from enough for complex stateful workloads.
+Kubernetes has become the de facto standard for container orchestration. It manages an ever-increasing number of stateless workloads with the scalability and availability provided by ReplicaSet and the rollout and rollback capabilities provided by Deployment. However, managing stateful workloads poses great challenges for Kubernetes. Although StatefulSet provides stable persistent storage and unique network identifiers, these abilities are far from enough for complex stateful workloads.
 
 To address these challenges, and solve the problem of complexity, KubeBlocks introduces ReplicationSet and ConsensusSet, with the following capabilities:
 
@@ -30,4 +30,7 @@ To address these challenges, and solve the problem of complexity, KubeBlocks int
 - Simplifies day-2 operations, such as upgrading, scaling, monitoring, backup, and restore.
 - Contains a powerful and intuitive command line tool.
 - Sets up a full-stack, production-ready data infrastructure in minutes.
-![KubeBlocks Architecture](./../../img/kubeblocks-structure.png)
+
+## Architecture
+
+![KubeBlocks Architecture](../../img/kubeblocks-structure-new.jpg)

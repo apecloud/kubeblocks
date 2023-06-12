@@ -45,13 +45,10 @@ type OpsHandler interface {
 	// and this method will be executed together when opsRequest in running.
 	SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error
 
-	// GetRealAffectedComponentMap returns a changed configuration componentName map by
-	// compared current configuration with the last configuration.
-	// we only changed the component status of cluster.status to the ToClusterPhase
-	// of OpsBehaviour, which component name is in the returned componentName map.
-	// Note: if the operation will not modify the Spec struct of the component workload,
-	// GetRealAffectedComponentMap function should return nil unless phase management of cluster & components
-	// is implemented at ReconcileAction function.
+	// GetRealAffectedComponentMap returns a component map that is actually affected by the opsRequest.
+	// when MaintainClusterPhaseBySelf of the opsBehaviour is true,
+	// will change the phase of the component to Updating after Action is done which exists in this map.
+	// Deprecated: will be removed soon.
 	GetRealAffectedComponentMap(opsRequest *appsv1alpha1.OpsRequest) realAffectedComponentMap
 }
 
@@ -72,6 +69,10 @@ type OpsBehaviour struct {
 	// is only valid when ToClusterPhase is not empty. it will indicate what operation the cluster is doing and
 	// will be displayed of "kbcli cluster list".
 	ProcessingReasonInClusterCondition string
+
+	// CancelFunc this function defines the cancel action and does not patch/update the opsRequest by client-go in here.
+	// only update the opsRequest object, then opsRequest controller will update uniformly.
+	CancelFunc func(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error
 
 	OpsHandler OpsHandler
 }

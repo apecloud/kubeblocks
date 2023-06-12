@@ -89,5 +89,6 @@ spec:
       done
       echo "done."
       sync;
+      echo "TOTAL SIZE: $(du -shx ${BACKUP_DIR}|awk '{print $1}')" > ${DATA_DIR}/logfile.info;
 
   type: pitr

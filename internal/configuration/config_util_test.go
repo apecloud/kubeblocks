@@ -44,7 +44,7 @@ var _ = Describe("config_util", func() {
 	})
 
 	Context("MergeAndValidateConfigs", func() {
-		It("Should success with no error", func() {
+		It("Should succeed with no error", func() {
 			type args struct {
 				configConstraint v1alpha1.ConfigConstraintSpec
 				baseCfg          map[string]string

@@ -106,7 +106,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 			configFile: "cue_testdata/mysql_err.cnf",
 			format:     appsv1alpha1.Ini,
 		},
-		err: errors.New(`failed to cue template render configure: [mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction:
+		err: errors.New(`failed to render cue template configure: [mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction:
 mysqld.innodb_autoinc_lock_mode: conflicting values 0 and 100:
     31:35
 mysqld.innodb_autoinc_lock_mode: conflicting values 1 and 100:

@@ -22,12 +22,8 @@ package cluster
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"path/filepath"
-	"strings"
 
-	"github.com/fatih/color"
-	"github.com/pmezard/go-difflib/difflib"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -88,17 +84,6 @@ func (c *configEditContext) editConfig(editor editor.Editor) error {
 	return nil
 }
 
-func (c *configEditContext) getUnifiedDiffString() (string, error) {
-	diff := difflib.UnifiedDiff{
-		A:        difflib.SplitLines(c.original),
-		B:        difflib.SplitLines(c.edited),
-		FromFile: "Original",
-		ToFile:   "Current",
-		Context:  3,
-	}
-	return difflib.GetUnifiedDiffString(diff)
-}
-
 func newConfigContext(baseOptions create.CreateOptions, clusterName, componentName, configSpec, file string) *configEditContext {
 	return &configEditContext{
 		CreateOptions:  baseOptions,
@@ -106,22 +91,6 @@ func newConfigContext(baseOptions create.CreateOptions, clusterName, componentNa
 		componentName:  componentName,
 		configSpecName: configSpec,
 		configKey:      file,
-	}
-}
-
-func displayDiffWithColor(out io.Writer, diffText string) {
-	for _, line := range difflib.SplitLines(diffText) {
-		switch {
-		case strings.HasPrefix(line, "---"), strings.HasPrefix(line, "+++"):
-			line = color.HiYellowString(line)
-		case strings.HasPrefix(line, "@@"):
-			line = color.HiBlueString(line)
-		case strings.HasPrefix(line, "-"):
-			line = color.RedString(line)
-		case strings.HasPrefix(line, "+"):
-			line = color.GreenString(line)
-		}
-		fmt.Fprint(out, line)
 	}
 }
 

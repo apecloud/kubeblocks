@@ -129,7 +129,7 @@ func (factory *MockBackupPolicyTemplateFactory) AddSnapshotPolicy() *MockBackupP
 	return factory
 }
 
-func (factory *MockBackupPolicyTemplateFactory) AddFullPolicy() *MockBackupPolicyTemplateFactory {
+func (factory *MockBackupPolicyTemplateFactory) AddDatafilePolicy() *MockBackupPolicyTemplateFactory {
 	backupPolicy := factory.getLastBackupPolicy()
 	backupPolicy.Datafile = &appsv1alpha1.CommonBackupPolicy{}
 	factory.backupType = dataprotectionv1alpha1.BackupTypeDataFile

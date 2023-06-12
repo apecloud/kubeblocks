@@ -24,8 +24,8 @@ data:
         "has_user_authentication": false
       },
       "logo_url": "{{- .Values.website.logo_url | default "https://your-app-url.com/.well-known/logo.png"}}",
-      "contact_email": "{{- .Values.website.contact_email | default "hello@contact.com"}}",
-      "legal_info_url": "{{- .Values.website.legal_info_url | default "hello@legal.com"}}"
+      "contact_email": "{{- .Values.website.contact_email | default "admin@kubeblocks.io"}}",
+      "legal_info_url": "{{- .Values.website.legal_info_url | default "admin@kubeblocks.io"}}"
     }
   openapi.yaml: |-
     openapi: 3.0.2

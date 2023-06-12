@@ -66,7 +66,7 @@ type ComponentWorkloadBuilderBase struct {
 
 func (b *ComponentWorkloadBuilderBase) BuildEnv() ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		envCfg, err := builder.BuildEnvConfigLow(b.ReqCtx, b.Client, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		envCfg, err := builder.BuildEnvConfig(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		b.EnvConfig = envCfg
 		b.LocalObjs = append(b.LocalObjs, envCfg)
 		return []client.Object{envCfg}, err
@@ -104,7 +104,7 @@ func (b *ComponentWorkloadBuilderBase) BuildWorkload4StatefulSet(workloadType st
 		}
 
 		component := b.Comp.GetSynthesizedComponent()
-		sts, err := builder.BuildStsLow(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
+		sts, err := builder.BuildSts(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -122,7 +122,7 @@ func (b *ComponentWorkloadBuilderBase) BuildPDB() ComponentWorkloadBuilder {
 		// conditionally build PodDisruptionBudget
 		synthesizedComponent := b.Comp.GetSynthesizedComponent()
 		if synthesizedComponent.MinAvailable != nil {
-			pdb, err := builder.BuildPDBLow(b.Comp.GetCluster(), synthesizedComponent)
+			pdb, err := builder.BuildPDB(b.Comp.GetCluster(), synthesizedComponent)
 			if err != nil {
 				return nil, err
 			}
@@ -167,7 +167,7 @@ func (b *ComponentWorkloadBuilderBase) BuildVolumeMount() ComponentWorkloadBuild
 
 func (b *ComponentWorkloadBuilderBase) BuildService() ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		svcList, err := builder.BuildSvcListLow(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		svcList, err := builder.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {
 			return nil, err
 		}
@@ -182,7 +182,7 @@ func (b *ComponentWorkloadBuilderBase) BuildService() ComponentWorkloadBuilder {
 
 func (b *ComponentWorkloadBuilderBase) BuildHeadlessService() ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		svc, err := builder.BuildHeadlessSvcLow(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		svc, err := builder.BuildHeadlessSvc(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		return []client.Object{svc}, err
 	}
 	return b.BuildWrapper(buildfn)

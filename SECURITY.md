@@ -50,7 +50,7 @@ The primary objectives of this security policy are to:
 
 ## Reporting Security Issues
 
-Security is of the highest importance and all security vulnerabilities or suspected security vulnerabilities should be reported to Kubeblocks privately, to minimize attacks against current users of Kubeblocks before they are fixed. Vulnerabilities will be investigated and patched on the next patch (or minor) release as soon as possible. This information could be kept entirely internal to the project.
+Security is of the highest importance and all security vulnerabilities or suspected security vulnerabilities should be reported to KubeBlocks privately, to minimize attacks against current users of KubeBlocks before they are fixed. Vulnerabilities will be investigated and patched on the next patch (or minor) release as soon as possible. This information could be kept entirely internal to the project.
 
 **IMPORTANT: Please do not disclose security vulnerabilities publicly until the KubeBlocks security team has had a reasonable amount of time to address the issue.**
 

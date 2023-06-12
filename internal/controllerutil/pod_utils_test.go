@@ -276,17 +276,17 @@ var _ = Describe("pod utils", func() {
 	// for test GetContainerByConfigSpec
 	Context("GetContainerByConfigSpec test", func() {
 		// found name: mysql3
-		It("Should success with no error", func() {
+		It("Should succeed with no error", func() {
 			podSpec := &statefulSet.Spec.Template.Spec
 			Expect(GetContainerByConfigSpec(podSpec, configTemplates)).To(Equal(&podSpec.Containers[2]))
 		})
 		// found name: init_mysql
-		It("Should success with no error", func() {
+		It("Should succeed with no error", func() {
 			podSpec := &statefulSet.Spec.Template.Spec
 			Expect(GetContainerByConfigSpec(podSpec, foundInitContainerConfigTemplates)).To(Equal(&podSpec.InitContainers[0]))
 		})
 		// not found container
-		It("Should failed", func() {
+		It("Should fail", func() {
 			podSpec := &statefulSet.Spec.Template.Spec
 			Expect(GetContainerByConfigSpec(podSpec, notFoundConfigTemplates)).To(BeNil(), "get container is nil!")
 		})
@@ -294,7 +294,7 @@ var _ = Describe("pod utils", func() {
 
 	// for test GetVolumeMountName
 	Context("GetPodContainerWithVolumeMount test", func() {
-		It("Should success with no error", func() {
+		It("Should succeed with no error", func() {
 			mountedContainers := GetPodContainerWithVolumeMount(&pod.Spec, "config1")
 			Expect(len(mountedContainers)).To(Equal(2))
 			Expect(mountedContainers[0].Name).To(Equal("mysql"))
@@ -306,7 +306,7 @@ var _ = Describe("pod utils", func() {
 			Expect(mountedContainers[0].Name).To(Equal("mysql"))
 			Expect(mountedContainers[1].Name).To(Equal("mysql3"))
 		})
-		It("Should failed", func() {
+		It("Should fail", func() {
 			Expect(len(GetPodContainerWithVolumeMount(&pod.Spec, "not_exist_cm"))).To(Equal(0))
 
 			emptyPod := corev1.Pod{}
@@ -319,14 +319,14 @@ var _ = Describe("pod utils", func() {
 
 	// for test GetContainerWithVolumeMount
 	Context("GetVolumeMountName test", func() {
-		It("Should success with no error", func() {
+		It("Should succeed with no error", func() {
 			volume := GetVolumeMountName(pod.Spec.Volumes, "stateful_test-config1")
 			Expect(volume).NotTo(BeNil())
 			Expect(volume.Name).To(Equal("config1"))
 
 			Expect(GetVolumeMountName(pod.Spec.Volumes, "stateful_test-config1")).To(Equal(&pod.Spec.Volumes[0]))
 		})
-		It("Should failed", func() {
+		It("Should fail", func() {
 			Expect(GetVolumeMountName(pod.Spec.Volumes, "not_exist_resource")).To(BeNil())
 		})
 	})
@@ -392,7 +392,7 @@ var _ = Describe("pod utils", func() {
 	})
 
 	Context("testGetContainerID", func() {
-		It("Should success with no error", func() {
+		It("Should succeed with no error", func() {
 			pods := []*corev1.Pod{{
 				Status: corev1.PodStatus{
 					ContainerStatuses: []corev1.ContainerStatus{
@@ -450,7 +450,7 @@ var _ = Describe("pod utils", func() {
 	})
 
 	Context("common funcs test", func() {
-		It("GetContainersByConfigmap Should success with no error", func() {
+		It("GetContainersByConfigmap Should succeed with no error", func() {
 			type args struct {
 				containers []corev1.Container
 				volumeName string
@@ -498,7 +498,7 @@ var _ = Describe("pod utils", func() {
 
 		})
 
-		It("GetIntOrPercentValue Should success with no error", func() {
+		It("GetIntOrPercentValue Should succeed with no error", func() {
 			fn := func(v metautil.IntOrString) *metautil.IntOrString { return &v }
 			tests := []struct {
 				name      string
@@ -535,7 +535,7 @@ var _ = Describe("pod utils", func() {
 		})
 	})
 	Context("test sort by pod name", func() {
-		It("Should success with no error", func() {
+		It("Should succeed with no error", func() {
 			pods := []corev1.Pod{{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod-2"},
 			}, {

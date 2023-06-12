@@ -49,6 +49,7 @@ import (
 
 	"go.uber.org/automaxprocs/maxprocs"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/custom"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/etcd"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/kafka"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mongodb"
@@ -70,6 +71,7 @@ func init() {
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(mongodb.NewMongoDB, "mongodb")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(redis.NewRedis, "redis")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(postgres.NewPostgres, "postgres")
+	bindingsLoader.DefaultRegistry.RegisterOutputBinding(custom.NewHTTPCustom, "custom")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(dhttp.NewHTTP, "http")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(localstorage.NewLocalStorage, "localstorage")
 	bindingsLoader.DefaultRegistry.RegisterOutputBinding(kafka.NewKafka, "kafka")

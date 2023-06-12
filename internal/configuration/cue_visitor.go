@@ -89,14 +89,14 @@ func (c *cueTypeExtractor) visitStruct(v cue.Value, parentPath string) {
 	}
 
 	switch op, v := v.Expr(); op {
-	// SelectorOp refer of other struct type
+	// SelectorOp refers to other struct type
 	case cue.NoOp, cue.SelectorOp:
 		// pass
-		// cue.NoOp describes the value is an underlying field.
-		// cue.SelectorOp describes the value is a type reference field.
+		// cue.NoOp: the value is an underlying field.
+		// cue.SelectorOp: the value is a type reference field.
 	default:
 		// not support op, e.g. cue.Or, cue.And.
-		log.Log.V(1).Info(fmt.Sprintf("cue type extractor unsupported op %v for object type (%v)", op, v))
+		log.Log.V(1).Info(fmt.Sprintf("cue type extractor does not support op %v for object type (%v)", op, v))
 		return
 	}
 
@@ -111,7 +111,7 @@ func (c *cueTypeExtractor) visitList(v cue.Value, path string) {
 	case cue.NoOp, cue.SelectorOp:
 		// pass
 	default:
-		log.Log.Info(fmt.Sprintf("unsupported op %v for object type (%v)", op, v))
+		log.Log.Info(fmt.Sprintf("not supported op %v for object type (%v)", op, v))
 	}
 
 	count := 0
@@ -199,7 +199,7 @@ func processTypeTrans[T int | int64 | float64 | float32 | bool](obj reflect.Valu
 		}
 		updateFn(v)
 	case reflect.Array, reflect.Slice, reflect.Struct:
-		return MakeError("not support type[%s] trans.", obj.Type().Kind())
+		return MakeError("not supported type[%s] trans.", obj.Type().Kind())
 	}
 
 	return nil

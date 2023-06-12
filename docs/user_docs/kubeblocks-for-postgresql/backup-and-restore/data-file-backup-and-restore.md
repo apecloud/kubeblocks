@@ -17,8 +17,7 @@ For KubeBlocks, configuring backup and restoring data is simple with 3 steps. Co
 
 Currently, KubeBlocks backs up and restores data on the storage path predefined.
 
-Choose one of the following options to configure the tartget storage path.
-
+<Tabs>
 <TabItem value="S3" label="AWS S3" default>
 
 Enable CSI-S3 and fill in the values based on your actual environment.
@@ -58,7 +57,6 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
 --set secret.secretKey=<your_access_secret> \
 --set storageClass.singleBucket=<bucket_name>  \
 --set secret.endpoint=https://oss-<region>.aliyuncs.com \
---set storageClass.mounter=s3fs,storageClass.mountOptions="" \
  -n kb-system
 
 # CSI-S3 installs a daemonSet pod on all nodes and you can set tolerations to install daemonSet pods on the specified nodes
@@ -92,8 +90,9 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
    ```
 
 </TabItem>
+</Tabs>
 
-You can configure a global backup storage to make this storage the default backup destination path of all new clusters. But currently, the global backup storage cannot be synchronized as the backup destination path of created clusters.
+You can configure a global backup storage to make this storage the default backup destination path of all new clusters. But currently, the global backup storage cannot be synchronized as the backup destination path of existing clusters.
 
 Set the backup policy with the following command.
 
@@ -115,33 +114,42 @@ kbcli kubeblocks config --set dataProtection.backupPVCName=kubeblocks-backup-dat
 
 ## Create backup
 
+***Before you start***
+
+Check your backup destination path. If there is no backup destination path, edit the backup policy of this cluster first. Make sure the destination path is configured before creating the backup.
+
+```bash
+kbcli cluster edit-backup-policy pg-cluster-postgresql-backup-policy
+>
+...
+spec:
+  datafile:
+    ... 
+    persistentVolumeClaim:
+      createPolicy: IfNotPresent
+      initCapacity: 20Gi
+      name: kubeblocks-backup-data
+      storageClassName: csi-s3
+```
+
 **Option 1. Manually Backup**
 
 1. Check whether the cluster is running.
 
    ```bash
    kbcli cluster list pg-cluster
-   > 
-   NAME         NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME                 
-   pg-cluster   default     postgresql           postgresql-14.7.0   Delete               Running   Apr 18,2023 11:40 UTC+0800  
    ```
 
 2. Create a backup for this cluster.
 
    ```bash
    kbcli cluster backup pg-cluster --type=datafile
-   > 
-   Backup backup-default-pg-cluster-20230418124113 created successfully, you can view the progress:
-           kbcli cluster list-backup --name=backup-default-pg-cluster-20230418124113 -n default
    ```
 
 3. View the backup set.
 
    ```bash
    kbcli cluster list-backups pg-cluster 
-   > 
-   NAME                                       CLUSTER      TYPE       STATUS      TOTAL-SIZE   DURATION   CREATE-TIME                  COMPLETION-TIME              
-   backup-default-pg-cluster-20230418124113   pg-cluster   datafile   Completed                21s        Apr 18,2023 12:41 UTC+0800   Apr 18,2023 12:41 UTC+0800
    ```
 
 **Option 2. Enable scheduled backup**
@@ -168,15 +176,10 @@ spec:
 
    ```bash
    kbcli cluster restore new-pg-cluster --backup backup-default-pg-cluster-20230418124113
-   >
-   Cluster new-pg-cluster created
    ```
 
 2. View this new cluster.
 
    ```bash
    kbcli cluster list new-pg-cluster
-   >
-   NAME             NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS     CREATED-TIME                 
-   new-pg-cluster   default     postgresql           postgresql-14.7.0   Delete               Running    Apr 18,2023 12:42 UTC+0800
    ```

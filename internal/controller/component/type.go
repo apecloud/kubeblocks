@@ -28,6 +28,7 @@ import (
 
 type MonitorConfig struct {
 	Enable     bool   `json:"enable"`
+	BuiltIn    bool   `json:"builtIn"`
 	ScrapePort int32  `json:"scrapePort,omitempty"`
 	ScrapePath string `json:"scrapePath,omitempty"`
 }
@@ -37,7 +38,7 @@ type SynthesizedComponent struct {
 	ClusterName           string                                 `json:"clusterName,omitempty"`
 	ClusterUID            string                                 `json:"clusterUID,omitempty"`
 	Name                  string                                 `json:"name,omitempty"`
-	Type                  string                                 `json:"type,omitempty"`
+	CompDefName           string                                 `json:"compDefName,omitempty"`
 	CharacterType         string                                 `json:"characterType,omitempty"`
 	MinAvailable          *intstr.IntOrString                    `json:"minAvailable,omitempty"`
 	Replicas              int32                                  `json:"replicas"`
@@ -59,7 +60,7 @@ type SynthesizedComponent struct {
 	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy        `json:"horizontalScalePolicy,omitempty"`
 	TLS                   bool                                   `json:"tls"`
 	Issuer                *v1alpha1.Issuer                       `json:"issuer,omitempty"`
-	VolumeTypes           []v1alpha1.VolumeTypeSpec              `json:"VolumeTypes,omitempty"`
+	VolumeTypes           []v1alpha1.VolumeTypeSpec              `json:"volumeTypes,omitempty"`
 	CustomLabelSpecs      []v1alpha1.CustomLabelSpec             `json:"customLabelSpecs,omitempty"`
 	ComponentDef          string                                 `json:"componentDef,omitempty"`
 	ServiceAccountName    string                                 `json:"serviceAccountName,omitempty"`
@@ -68,7 +69,7 @@ type SynthesizedComponent struct {
 }
 
 // GetPrimaryIndex provides PrimaryIndex value getter, if PrimaryIndex is
-// a nil pointer it's treated at 0, return -1 if function receiver is nil.
+// a nil pointer it's treated as 0, return -1 if function receiver is nil.
 func (r *SynthesizedComponent) GetPrimaryIndex() int32 {
 	if r == nil {
 		return -1

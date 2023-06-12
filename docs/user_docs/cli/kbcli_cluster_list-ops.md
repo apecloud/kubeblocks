@@ -27,7 +27,7 @@ kbcli cluster list-ops [flags]
   -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
   -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
       --show-labels       When printing, show all labels as the last column (default hide labels column)
-      --status strings    Options include all, pending, running, succeeded, failed. by default, outputs the pending/running/failed OpsRequest. (default [running,pending,failed])
+      --status strings    Options include all, pending, creating, running, canceling, failed. by default, outputs the pending/creating/running/canceling/failed OpsRequest. (default [pending,creating,running,canceling,failed])
       --type strings      The OpsRequest type
 ```
 

@@ -21,7 +21,7 @@ This section shows how to use `kbcli` to back up and restore a MySQL cluster.
    kbcli kubeblocks install --set snapshot-controller.enabled=true
    ```
 
-   If you have installed KubeBlock without enabling the snapshot-controller, run the command below.
+   If you have installed KubeBlocks without enabling the snapshot-controller, run the command below.
 
    ```bash
    kbcli kubeblocks upgrade --set snapshot-controller.enabled=true

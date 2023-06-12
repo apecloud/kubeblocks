@@ -43,3 +43,10 @@ const (
 	// annotations values
 	lifecycleDeletePVCAnnotation = "delete-pvc"
 )
+
+const (
+	reasonOpsCancelActionNotSupported = "CancelActionNotSupported"
+	reasonOpsCancelActionFailed       = "CancelActionFailed"
+	reasonOpsReconcileStatusFailed    = "ReconcileStatusFailed"
+	reasonOpsDoActionFailed           = "DoActionFailed"
+)

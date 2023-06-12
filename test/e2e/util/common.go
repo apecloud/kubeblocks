@@ -56,7 +56,7 @@ func CreateSecretFromFiles(ctx context.Context, client TestClient, namespace str
 	return err
 }
 
-// WaitForPods waits until all of the pods have gone to PodRunning state
+// WaitForPods waits till all pods arrive at PodRunning state
 func WaitForPods(ctx context.Context, client TestClient, namespace string, pods []string) error {
 	timeout := 5 * time.Minute
 	interval := 5 * time.Second
@@ -67,13 +67,13 @@ func WaitForPods(ctx context.Context, client TestClient, namespace string, pods 
 				fmt.Println(errors.Wrap(err, fmt.Sprintf("Failed to verify pod %s/%s is %s, try again...\n", namespace, podName, corev1api.PodRunning)))
 				return false, nil
 			}
-			// If any pod is still waiting we don't need to check any more so return and wait for next poll interval
+			// If any pod is still waiting, no need to check, just return and wait for next poll interval
 			if checkPod.Status.Phase != corev1api.PodRunning {
 				fmt.Printf("Pod %s is in state %s waiting for it to be %s\n", podName, checkPod.Status.Phase, corev1api.PodRunning)
 				return false, nil
 			}
 		}
-		// All pods were in PodRunning state, we're successful
+		// All pods were in PodRunning state
 		return true, nil
 	})
 	if err != nil {

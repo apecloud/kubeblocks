@@ -39,7 +39,7 @@ func (b *consensusComponentWorkloadBuilder) BuildWorkload() internal.ComponentWo
 
 func (b *consensusComponentWorkloadBuilder) BuildService() internal.ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
-		svcList, err := builder.BuildSvcListLow(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
+		svcList, err := builder.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {
 			return nil, err
 		}

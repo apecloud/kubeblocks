@@ -57,7 +57,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	component *component.SynthesizedComponent) ([]client.Object, error) {
 	resources := make([]client.Object, 0)
 	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
-		envConfig, err := builder.BuildEnvConfigLow(reqCtx, cli, cluster, component)
+		envConfig, err := builder.BuildEnvConfig(cluster, component)
 		if err != nil {
 			return err
 		}
@@ -73,7 +73,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 			resources = append(resources, workload)
 		}()
 
-		svc, err := builder.BuildHeadlessSvcLow(cluster, component)
+		svc, err := builder.BuildHeadlessSvc(cluster, component)
 		if err != nil {
 			return err
 		}
@@ -162,7 +162,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	// if no these handle, the cluster controller will occur an error during reconciling.
 	// conditional build PodDisruptionBudget
 	if component.MinAvailable != nil {
-		pdb, err := builder.BuildPDBLow(cluster, component)
+		pdb, err := builder.BuildPDB(cluster, component)
 		if err != nil {
 			return nil, err
 		}
@@ -193,14 +193,14 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	case appsv1alpha1.Stateless:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return builder.BuildDeployLow(reqCtx, cluster, component)
+				return builder.BuildDeploy(reqCtx, cluster, component)
 			}); err != nil {
 			return nil, err
 		}
 	case appsv1alpha1.Stateful, appsv1alpha1.Consensus, appsv1alpha1.Replication:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return builder.BuildStsLow(reqCtx, cluster, component, envConfig.Name)
+				return builder.BuildSts(reqCtx, cluster, component, envConfig.Name)
 			}); err != nil {
 			return nil, err
 		}

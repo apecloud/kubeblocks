@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"testing"
 
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -131,3 +132,22 @@ spec:
 	g.Expect(len(noContainersComponents)).To(Equal(1))
 	g.Expect(noContainersComponents[0]).To(Equal("component2"))
 }
+
+var _ = Describe("", func() {
+
+	It("test GetTerminalPhases", func() {
+		r := ClusterVersionStatus{}
+		Expect(r.GetTerminalPhases()).Should(ContainElement(AvailablePhase))
+	})
+
+	It("test GetDefNameMappingComponents", func() {
+		r := ClusterVersionSpec{}
+		compDefRef := "test-comp-def"
+		r.ComponentVersions = []ClusterComponentVersion{
+			{
+				ComponentDefRef: compDefRef,
+			},
+		}
+		Expect(r.GetDefNameMappingComponents()[compDefRef]).ShouldNot(BeNil())
+	})
+})

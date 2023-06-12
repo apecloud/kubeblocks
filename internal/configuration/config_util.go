@@ -34,7 +34,7 @@ type ParamPairs struct {
 	UpdatedParams map[string]interface{}
 }
 
-// MergeAndValidateConfigs does merge configuration files and validate
+// MergeAndValidateConfigs merges and validates configuration files
 func MergeAndValidateConfigs(configConstraint appsv1alpha1.ConfigConstraintSpec, baseConfigs map[string]string, cmKey []string, updatedParams []ParamPairs) (map[string]string, error) {
 	var (
 		err error
@@ -68,9 +68,9 @@ func MergeAndValidateConfigs(configConstraint appsv1alpha1.ConfigConstraintSpec,
 		return nil, WrapError(err, "failed to generate config file")
 	}
 
-	// The ToCfgContent interface returns the file contents of all keys, and after the configuration file is encoded and decoded,
-	// the content may be inconsistent, such as comments, blank lines, etc,
-	// in order to minimize the impact on the original configuration file, only update the changed file content.
+	// The ToCfgContent interface returns the file contents of all keys, the configuration file is encoded and decoded into keys,
+	// the content may be different with the original file, such as comments, blank lines, etc,
+	// in order to minimize the impact on the original file, only update the changed part.
 	updatedCfg := fromUpdatedConfig(newCfg, updatedKeys)
 	if err = NewConfigValidator(&configConstraint, WithKeySelector(cmKey)).Validate(updatedCfg); err != nil {
 		return nil, WrapError(err, "failed to validate updated config")
@@ -92,7 +92,7 @@ func mergeUpdatedConfig(baseMap, updatedMap map[string]string) map[string]string
 	return r
 }
 
-// fromUpdatedConfig function is to filter out changed file contents.
+// fromUpdatedConfig filters out changed file contents.
 func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[string]string {
 	if sets.Length() == 0 {
 		return map[string]string{}

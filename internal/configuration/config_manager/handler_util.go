@@ -74,7 +74,7 @@ func checkTPLScriptTrigger(options *appsv1alpha1.TPLScriptTrigger, cli client.Cl
 
 func checkShellTrigger(options *appsv1alpha1.ShellTrigger) error {
 	if options.Exec == "" {
-		return cfgutil.MakeError("shell trigger require exec not empty!")
+		return cfgutil.MakeError("required shell trigger")
 	}
 	return nil
 }
@@ -82,7 +82,7 @@ func checkShellTrigger(options *appsv1alpha1.ShellTrigger) error {
 func checkSignalTrigger(options *appsv1alpha1.UnixSignalTrigger) error {
 	signal := options.Signal
 	if !IsValidUnixSignal(signal) {
-		return cfgutil.MakeError("this special signal [%s] is not supported for now!", signal)
+		return cfgutil.MakeError("this special signal [%s] is not supported now.", signal)
 	}
 	return nil
 }
@@ -98,7 +98,7 @@ func CreateCfgRegexFilter(regexString string) (NotifyEventFilter, error) {
 	}, nil
 }
 
-// CreateValidConfigMapFilter process configmap volume
+// CreateValidConfigMapFilter processes configmap volume
 // https://github.com/ossrs/srs/issues/1635
 func CreateValidConfigMapFilter() NotifyEventFilter {
 	return func(event fsnotify.Event) (bool, error) {

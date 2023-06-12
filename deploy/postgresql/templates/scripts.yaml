@@ -129,3 +129,19 @@ data:
       LOG_STOP_TIME=$(date -d "$LOG_STOP_TIME" -u '+%Y-%m-%dT%H:%M:%SZ')
       printf "{\"startTime\": \"$LOG_START_TIME\" ,\"stopTime\": \"$LOG_STOP_TIME\"}"
     fi
+  filesize-collector.sh: |
+    #!/bin/bash
+    set -e;
+    function getProperty() {
+       file=$1; key=$2;
+       echo $(grep "${key}: " ${file} | awk -F ': ' '{print $2}')
+    }
+    filename=$1
+    fileinfo=${PGDATA}/${filename}
+    if [ -f ${fileinfo} ]; then
+      TOTAL_SIZE=$(getProperty ${fileinfo} "TOTAL SIZE")
+      rm -f ${fileinfo}
+      printf "{\"totalSize\":\"${TOTAL_SIZE}\",\"manifests\":{\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}"
+    else
+      printf "{}"
+    fi

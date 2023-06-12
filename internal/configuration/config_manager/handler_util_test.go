@@ -114,7 +114,7 @@ var _ = Describe("Handler Util Test", func() {
 	})
 
 	Context("TestValidateReloadOptions", func() {
-		It("Should success with no error", func() {
+		It("Should succeed with no error", func() {
 			type args struct {
 				reloadOptions *appsv1alpha1.ReloadOptions
 				cli           client.Client

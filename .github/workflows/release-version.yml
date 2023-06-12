@@ -35,11 +35,11 @@ jobs:
 
   release-test:
     needs: release-message
-    runs-on: [ self-hosted, eks-fargate-runner ]
+    runs-on: [ self-hosted, kubeblocks-runner ]
     outputs:
       runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
     steps:
-      - uses: apecloud/checkout@main
+      - uses: actions/checkout@v3
       - name: vendor lint test
         run: |
           mkdir -p ./bin

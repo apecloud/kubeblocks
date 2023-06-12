@@ -191,7 +191,7 @@ func (c *configTemplateBuilder) injectBuiltInObjects(podSpec *corev1.PodSpec, co
 		}
 	}
 	c.componentValues = &componentTemplateValues{
-		TypeName:    component.Type,
+		TypeName:    component.CompDefName,
 		Replicas:    component.Replicas,
 		Resource:    resource,
 		ConfigSpecs: configSpecs,

@@ -30,7 +30,7 @@ kbcli cluster list <name>
 kbcli cluster list redis-cluster
 >
 NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-redis-cluster        default          redis                     redis-7.0.6        Delete                    Running        Apr 10,2023 19:00 UTC+0800
+redis-cluster        default          redis                     redis-7.0.6            Delete                    Running        Apr 10,2023 19:00 UTC+0800
 ```
 
 ## Steps

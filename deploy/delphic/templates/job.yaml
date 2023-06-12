@@ -37,7 +37,7 @@ spec:
                 name: {{ include "delphic.fullname" . }}-django-secret
                 key: password
           - name: DJANGO_SUPERUSER_EMAIL
-            value: admin@admin.org
+            value: admin@kubeblocks.io
         {{ include "delphic.common.envs" . | nindent 10}}
       {{- with .Values.affinity }}
       affinity:

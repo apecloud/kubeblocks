@@ -172,7 +172,7 @@ func (w *envWrapper) secretValue(secretRef *corev1.SecretKeySelector, container 
 
 func (w *envWrapper) configMapValue(configmapRef *corev1.ConfigMapKeySelector, container *corev1.Container) (string, error) {
 	if w.cli == nil {
-		return "", cfgcore.MakeError("not support configmap[%s] value in local mode, cli is nil", configmapRef.Name)
+		return "", cfgcore.MakeError("not supported configmap[%s] value in local mode, cli is nil", configmapRef.Name)
 	}
 
 	cmName, err := w.checkAndReplaceEnv(configmapRef.Name, container)
@@ -238,13 +238,13 @@ func (w *envWrapper) doEnvReplace(replacedVars *set.LinkedHashSetString, oldValu
 		builtInEnvMap = component.GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName)
 	)
 
-	builtInEnvMap[constant.ConnCredentialPlaceHolder] = component.GenerateConnCredential(clusterName)
+	builtInEnvMap[constant.KBConnCredentialPlaceHolder] = component.GenerateConnCredential(clusterName)
 	kbInnerEnvReplaceFn := func(envName string, strToReplace string) string {
 		return strings.ReplaceAll(strToReplace, envName, builtInEnvMap[envName])
 	}
 
 	if !w.incAndCheckReferenceCount() {
-		return "", cfgcore.MakeError("too many reference count, maybe there is a loop reference: [%s] more than %d times ", oldValue, w.referenceCount)
+		return "", cfgcore.MakeError("too many reference count, maybe there is a cycled reference: [%s] more than %d times ", oldValue, w.referenceCount)
 	}
 
 	replacedValue := oldValue

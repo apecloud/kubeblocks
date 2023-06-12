@@ -95,7 +95,7 @@ func (m *Mysql) Init(metadata map[string]string) error {
 	return nil
 }
 
-// Close will close the DB.
+// Close closes the DB.
 func (m *Mysql) Close() error {
 	if m.db != nil {
 		return m.db.Close()

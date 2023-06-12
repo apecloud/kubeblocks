@@ -70,6 +70,8 @@ type RestoreJobStatus struct {
 	FailureReason string `json:"failureReason,omitempty"`
 }
 
+// +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced

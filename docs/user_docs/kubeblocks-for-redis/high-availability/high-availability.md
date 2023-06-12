@@ -15,7 +15,7 @@ In the Redis PrimarySecondary provided by KubeBlocks, Sentinel is deployed as an
 
 ## Before you start
 
-* [Install KubeBlocks](./../../installation/introduction.md): Choose one guide that fits your actual environments.
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 * [Create a Redis PrimarySecondary](./../cluster-management/create-and-connect-a-redis-cluster.md#create-a-redis-cluster).
 * Check the Switch Policy and the role probe.
   * Check whether the switch policy is `Noop`.

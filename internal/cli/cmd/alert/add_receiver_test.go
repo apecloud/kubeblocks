@@ -47,11 +47,11 @@ var mockBaseOptions = func(s genericclioptions.IOStreams) baseOptions {
 	o := baseOptions{IOStreams: s}
 	alertManagerConfig := `
     global:
-      smtp_from: alert-test@apecloud.com
+      smtp_from: user@kubeblocks.io
       smtp_smarthost: smtp.feishu.cn:587
-      smtp_auth_username: alert-test@apecloud.com
+      smtp_auth_username: admin@kubeblocks.io
       smtp_auth_password: 123456abc
-      smtp_auth_identity: alert-test@apecloud.com
+      smtp_auth_identity: admin@kubeblocks.io
     receivers:
     - name: default-receiver
     - name: receiver-7pb52
@@ -113,7 +113,7 @@ var _ = Describe("add receiver", func() {
 		Expect(o.validate([]string{})).Should(HaveOccurred())
 
 		By("set email, do not specify the name")
-		o.emails = []string{"foo@bar.com"}
+		o.emails = []string{"user@kubeblocks.io"}
 		o.alterConfigMap = mockConfigmap(alertConfigmapName, alertConfigFileName, "")
 		Expect(o.validate([]string{})).Should(HaveOccurred())
 		Expect(o.name).ShouldNot(BeEmpty())
@@ -130,7 +130,7 @@ var _ = Describe("add receiver", func() {
 
 	It("build receiver", func() {
 		o := addReceiverOptions{baseOptions: baseOptions{IOStreams: s}}
-		o.emails = []string{"foo@bar.com", "foo1@bar.com,foo2@bar.com"}
+		o.emails = []string{"user@kubeblocks.io", "user1@kubeblocks.io,user2@kubeblocks.io"}
 		o.webhooks = []string{"url=https://oapi.dingtalk.com/robot/send", "url=https://oapi.dingtalk.com/robot/send,url=https://oapi.dingtalk.com/robot/send?"}
 		o.slacks = []string{"api_url=https://foo.com,channel=foo,username=test"}
 		o.webhookConfigMap = mockConfigmap(webhookAdaptorConfigmapName, webhookAdaptorFileName, "")

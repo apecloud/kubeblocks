@@ -52,10 +52,14 @@ func NewDelayedRequeueError(after time.Duration, reason string) error {
 }
 
 func IsDelayedRequeueError(err error) bool {
-	if _, ok := err.(DelayedRequeueError); ok {
-		return true
-	}
-	return false
+	_, ok := err.(DelayedRequeueError)
+	return ok
+}
+
+// IsRequeueError checks if the error is the RequeueError.
+func IsRequeueError(err error) bool {
+	_, ok := err.(RequeueError)
+	return ok
 }
 
 type requeueError struct {

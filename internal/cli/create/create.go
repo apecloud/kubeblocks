@@ -42,6 +42,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 
+	"github.com/apecloud/kubeblocks/internal/cli/edit"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 )
 
@@ -55,7 +56,6 @@ type CreateDependency func(dryRun []string) error
 type DryRunStrategy int
 
 const (
-	// DryRunNone indicates the client will make all mutating calls
 	DryRunNone DryRunStrategy = iota
 	DryRunClient
 	DryRunServer
@@ -67,13 +67,14 @@ type CreateOptions struct {
 	Namespace string
 
 	// Name Resource name of the command line operation
-	Name      string
-	Args      []string
-	Dynamic   dynamic.Interface
-	Client    kubernetes.Interface
-	Format    printer.Format
-	ToPrinter func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error)
-	DryRun    string
+	Name             string
+	Args             []string
+	Dynamic          dynamic.Interface
+	Client           kubernetes.Interface
+	Format           printer.Format
+	ToPrinter        func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error)
+	DryRun           string
+	EditBeforeCreate bool
 
 	// CueTemplateName cue template file name to render the resource
 	CueTemplateName string
@@ -152,6 +153,13 @@ func (o *CreateOptions) Run() error {
 
 	if o.PreCreate != nil {
 		if err = o.PreCreate(resObj); err != nil {
+			return err
+		}
+	}
+
+	if o.EditBeforeCreate {
+		customEdit := edit.NewCustomEditOptions(o.Factory, o.IOStreams, "create")
+		if err := customEdit.Run(resObj); err != nil {
 			return err
 		}
 	}

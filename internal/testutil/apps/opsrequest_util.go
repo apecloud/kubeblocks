@@ -32,7 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
 
-// CreateRestartOpsRequest creates a OpsRequest of restart type for testing.
+// CreateRestartOpsRequest creates an OpsRequest of restart type for testing.
 func CreateRestartOpsRequest(testCtx *testutil.TestContext, clusterName, opsRequestName string, componentNames []string) *appsv1alpha1.OpsRequest {
 	opsRequest := NewOpsRequestObj(opsRequestName, testCtx.DefaultNamespace, clusterName, appsv1alpha1.RestartType)
 	componentList := make([]appsv1alpha1.ComponentOps, len(componentNames))
@@ -69,7 +69,7 @@ func CreateOpsRequest(ctx context.Context, testCtx testutil.TestContext, opsRequ
 	return opsRequest
 }
 
-// GetOpsRequestCompPhase gets the component phase of testing OpsRequest  for verification.
+// GetOpsRequestCompPhase gets the component phase of testing OpsRequest for verification.
 func GetOpsRequestCompPhase(ctx context.Context, testCtx testutil.TestContext, opsName, componentName string) func(g gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
 	return func(g gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
 		tmpOps := &appsv1alpha1.OpsRequest{}

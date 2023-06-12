@@ -90,11 +90,13 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+                    optional: false
               - name: MYSQL_ROOT_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
               - name: MYSQL_DATABASE
                 value: {{- if .Values.auth.createDatabase }} {{ .Values.auth.database | quote }}  {{- else }} "" {{- end }}
               - name: MYSQL_USER
@@ -117,6 +119,31 @@ spec:
                 value: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
               - name: KB_EMBEDDED_WESQL
                 value: {{ .Values.cluster.kbWeSQLImage | default "1" | quote }}
+              # - name: KB_MYSQL_LEADER
+              #   valueFrom:
+              #     configMapKeyRef:
+              #       name: $(COMP_ENV_CM_NAME)
+              #       key: KB_LEADER
+              #       optional: false
+              # - name: KB_MYSQL_FOLLOWERS
+              #   valueFrom:
+              #     configMapKeyRef:
+              #       name: $(COMP_ENV_CM_NAME)
+              #       key: KB_FOLLOWERS
+              #       optional: false
+              # - name: KB_MYSQL_N
+              #   valueFrom:
+              #     configMapKeyRef:
+              #       name: $(COMP_ENV_CM_NAME)
+              #       key: KB_REPLICA_COUNT
+              #       optional: false
+              # - name: KB_MYSQL_CLUSTER_UID
+              #   valueFrom:
+              #     configMapKeyRef:
+              #       name: $(COMP_ENV_CM_NAME)
+              #       key: KB_CLUSTER_UID
+              #       optional: false
+
             command: ["/scripts/setup.sh"]
             lifecycle:
               preStop:
@@ -134,11 +161,13 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
+                    optional: false
               - name: MYSQL_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
+                    optional: false
               - name: DATA_SOURCE_NAME
                 value: "$(MYSQL_USER):$(MYSQL_PASSWORD)@(localhost:3306)/"
             command:
@@ -192,11 +221,13 @@ spec:
               secretKeyRef:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: username
+                optional: false
           - name: MYSQL_ROOT_PASSWORD
             valueFrom:
               secretKeyRef:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: password
+                optional: false
         passwordConfig:
           length: 10
           numDigits: 5

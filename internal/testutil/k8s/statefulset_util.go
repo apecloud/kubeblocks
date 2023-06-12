@@ -114,19 +114,20 @@ func DeletePodLabelKey(ctx context.Context, testCtx testutil.TestContext, podNam
 	}).Should(gomega.Succeed())
 }
 
-// UpdatePodStatusNotReady updates the pod status to make it not ready.
-func UpdatePodStatusNotReady(ctx context.Context, testCtx testutil.TestContext, podName string) {
+// UpdatePodStatusScheduleFailed updates the pod status to mock the schedule failure.
+func UpdatePodStatusScheduleFailed(ctx context.Context, testCtx testutil.TestContext, podName, namespace string) {
 	pod := &corev1.Pod{}
-	gomega.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, pod)).Should(gomega.Succeed())
+	gomega.Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: podName, Namespace: namespace}, pod)).Should(gomega.Succeed())
 	patch := client.MergeFrom(pod.DeepCopy())
-	pod.Status.Conditions = nil
+	pod.Status.Conditions = []corev1.PodCondition{
+		{
+			Type:    corev1.PodScheduled,
+			Status:  corev1.ConditionFalse,
+			Message: "0/1 node cpu Insufficient",
+			Reason:  "Unschedulable",
+		},
+	}
 	gomega.Expect(testCtx.Cli.Status().Patch(ctx, pod, patch)).Should(gomega.Succeed())
-	gomega.Eventually(func(g gomega.Gomega) {
-		tmpPod := &corev1.Pod{}
-		_ = testCtx.Cli.Get(context.Background(),
-			client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, tmpPod)
-		g.Expect(tmpPod.Status.Conditions).Should(gomega.BeNil())
-	}).Should(gomega.Succeed())
 }
 
 // MockPodIsTerminating mocks pod is terminating.

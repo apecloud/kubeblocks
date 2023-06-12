@@ -13,7 +13,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
 
 :::note
 
-Restaring a PostgreSQL cluster triggers a concurrent and the leader may change after the cluster restarts.
+Restarting a PostgreSQL cluster triggers a concurrent restart and the leader may change after the cluster restarts.
 
 :::
 
@@ -33,7 +33,7 @@ Restaring a PostgreSQL cluster triggers a concurrent and the leader may change a
    ```
 
    - `components` describes the component name that needs to be restarted.
-   - `ttlSecondsAfterSucceed` describes the time to live of OpsRequest job after the restarting succeeds.
+   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
 
    **Option 2.** Create an OpsRequest
 

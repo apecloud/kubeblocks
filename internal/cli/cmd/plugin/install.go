@@ -75,12 +75,19 @@ func NewPluginInstallCmd(streams genericclioptions.IOStreams) *cobra.Command {
 func (o *PluginInstallOption) Complete(names []string) error {
 	for _, name := range names {
 		indexName, pluginName := CanonicalPluginName(name)
+
+		// check whether the plugin exists
+		if _, err := os.Stat(paths.PluginInstallReceiptPath(pluginName)); err == nil {
+			fmt.Fprintf(o.Out, "plugin %q is already installed\n", name)
+			continue
+		}
+
 		plugin, err := LoadPluginByName(paths.IndexPluginsPath(indexName), pluginName)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return errors.Errorf("plugin %q does not exist in the plugin index", name)
+				return errors.Errorf("plugin %q does not exist in the %s plugin index", name, indexName)
 			}
-			return errors.Wrapf(err, "failed to load plugin %q from the index", name)
+			return errors.Wrapf(err, "failed to load plugin %q from the %s plugin index", name, indexName)
 		}
 		o.plugins = append(o.plugins, pluginEntry{
 			index:  indexName,

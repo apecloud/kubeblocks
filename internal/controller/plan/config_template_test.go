@@ -155,7 +155,7 @@ single_thread_memory = 294912
 		component = &ctrlcomp.SynthesizedComponent{
 			ClusterDefName: "mysql-three-node-definition",
 			Name:           "replicasets",
-			Type:           "replicasets",
+			CompDefName:    "replicasets",
 			Replicas:       5,
 		}
 		cfgTemplate = []appsv1alpha1.ComponentConfigSpec{{

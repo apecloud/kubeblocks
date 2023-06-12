@@ -160,7 +160,7 @@ func buildNewAffinity(
 	return affinity
 }
 
-// mergeAffinity merge affinity from src to dest
+// mergeAffinity merges affinity from src to dest
 func mergeAffinity(dest, src *corev1.Affinity) (*corev1.Affinity, error) {
 	if src == nil {
 		return dest, nil

@@ -172,6 +172,7 @@ spec:
               secretKeyRef:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: endpoint
+                optional: false
           - name: SERVER_HOST
             value: "0.0.0.0"
           startupProbe:

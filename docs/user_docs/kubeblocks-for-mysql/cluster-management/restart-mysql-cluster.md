@@ -36,7 +36,7 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
 
    **Option 2.** Create an OpsRequest
 
-   Run the command below to apply the restarting to a cluster.
+   Run the command below to restart a cluster.
 
    ```bash
    kubectl apply -f - <<EOF

@@ -427,7 +427,7 @@ patch_release_notes() {
 }
 
 upload_rpm_repo() {
-    cd kbcli_rpm_test/rpm_repo/repo
+    cd kbcli_rpm_test/rpm_repo/repodata
     current_dir=$(pwd)
     pwd
     ls
@@ -439,7 +439,7 @@ upload_rpm_repo() {
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3.raw" \
             -F "file_name=@$file" \
-            $GITHUB_API/repos/$GITHUB_REPO/contents/rpm_repo/repo
+            $GITHUB_API/repos/$GITHUB_REPO/contents/rpm_repo/repodata
         fi
     done
 }

@@ -175,7 +175,7 @@ jobs:
           bash .github/utils/utils.sh --type 14 \
             --github-repo 'apecloud/kbcli_rpm_test' \
             --tag-name ${{ env.TAG_NAME }} \
-            --file "./kbcli_rpm_test/rpm_repo/repo" \
+            --file "./kbcli_rpm_test/rpm_repo/repodata" \
             --github-token ${{ env.GITHUB_TOKEN }}   
 
 #

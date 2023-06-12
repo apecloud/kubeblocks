@@ -46,9 +46,9 @@ const (
 
 var RunCmd = &cobra.Command{
 	Use:   "run",
-	Short: "Run sqlchannel and db service side by side.",
+	Short: "Run sqlchannel and db service.",
 	Example: `
-sqlchannelctr run  -- mysqld
+sqlctl run  -- mysqld
   `,
 	Args: cobra.MinimumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -103,12 +103,12 @@ sqlchannelctr run  -- mysqld
 }
 
 func init() {
-	RunCmd.Flags().StringVarP(&configFile, "config", "c", "/kubeblocks/probe/config.yaml", "Dapr configuration file")
+	RunCmd.Flags().StringVarP(&configFile, "config", "c", "/kubeblocks/config/probe/config.yaml", "Dapr configuration file")
 	RunCmd.Flags().IntVarP(&port, "dapr-http-port", "H", -1, "The HTTP port for Dapr to listen on")
 	RunCmd.Flags().IntVarP(&grpcPort, "dapr-grpc-port", "G", -1, "The gRPC port for Dapr to listen on")
 	RunCmd.Flags().IntVarP(&internalGRPCPort, "dapr-internal-grpc-port", "I", 56471, "The gRPC port for the Dapr internal API to listen on")
 	RunCmd.Flags().StringVarP(&logLevel, "log-level", "", "info", "The log verbosity. Valid values are: debug, info, warn, error, fatal, or panic")
-	RunCmd.Flags().StringVarP(&componentsPath, "components-path", "d", "/kubeblocks/probe/components", "The path for components directory")
+	RunCmd.Flags().StringVarP(&componentsPath, "components-path", "d", "/kubeblocks/config/probe/components", "The path for components directory")
 	RunCmd.Flags().BoolP("help", "h", false, "Print this help message")
 
 	RootCmd.AddCommand(RunCmd)

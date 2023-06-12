@@ -91,15 +91,16 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 
 	initContainer := container.DeepCopy()
 	buildProbeInitContainer(component, initContainer)
+	modifyMainContainerForProbe(component, int(probeSvcHTTPPort), int(probeSvcGRPCPort))
 	component.PodSpec.InitContainers = append(component.PodSpec.InitContainers, *initContainer)
 	if len(probeContainers) >= 1 {
 		container := &probeContainers[0]
-		buildProbeServiceContainer(component, container, int(probeSvcHTTPPort), int(probeSvcGRPCPort))
+		buildProbeServiceContainer(component, container)
 	}
 
 	reqCtx.Log.V(1).Info("probe", "containers", probeContainers)
 	component.PodSpec.Containers = append(component.PodSpec.Containers, probeContainers...)
-	component.PodSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
+	// component.PodSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
 	return nil
 }
 
@@ -126,35 +127,20 @@ func buildProbeInitContainer(component *SynthesizedComponent, container *corev1.
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.Name = constant.ProbeInitContainerName
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-	container.Command = []string{"cp", "-r", "/bin/probe", "/config", "/kubeblocks/"}
+	container.Command = []string{"cp", "-r", "/bin/sqlctl", "/bin/probe", "/config", "/kubeblocks/"}
 	container.StartupProbe = nil
 	container.ReadinessProbe = nil
 	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
 	container.VolumeMounts = []corev1.VolumeMount{volumeMount}
 }
 
-func buildProbeServiceContainer(component *SynthesizedComponent, container *corev1.Container, probeSvcHTTPPort int, probeSvcGRPCPort int) {
-	container.Image = component.ToolsImage
-	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
-	logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
-	container.Command = []string{"/kubeblocks/probe", "--app-id", "batch-sdk",
+func modifyMainContainerForProbe(component *SynthesizedComponent, probeSvcHTTPPort int, probeSvcGRPCPort int) {
+	container := component.PodSpec.Containers[0]
+	command := []string{"/kubeblocks/sqlctl", "run",
 		"--dapr-http-port", strconv.Itoa(probeSvcHTTPPort),
 		"--dapr-grpc-port", strconv.Itoa(probeSvcGRPCPort),
-		"--log-level", logLevel,
-		"--config", "/kubeblocks/config/probe/config.yaml",
-		"--components-path", "/kubeblocks/config/probe/components"}
-
-	if len(component.PodSpec.Containers) > 0 && len(component.PodSpec.Containers[0].Ports) > 0 {
-		mainContainer := component.PodSpec.Containers[0]
-		port := mainContainer.Ports[0]
-		dbPort := port.ContainerPort
-		container.Env = append(container.Env, corev1.EnvVar{
-			Name:      constant.KBPrefix + "_SERVICE_PORT",
-			Value:     strconv.Itoa(int(dbPort)),
-			ValueFrom: nil,
-		})
-	}
-
+		"--"}
+	container.Command = append(command, container.Command...)
 	volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
 	container.VolumeMounts = append(container.VolumeMounts, volumeMount)
 	roles := getComponentRoles(component)
@@ -163,24 +149,81 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 		Name:      constant.KBPrefix + "_SERVICE_ROLES",
 		Value:     string(rolesJSON),
 		ValueFrom: nil,
-	})
+	},
+		corev1.EnvVar{
+			Name:      constant.KBPrefix + "_SERVICE_CHARACTER_TYPE",
+			Value:     component.CharacterType,
+			ValueFrom: nil,
+		},
+		corev1.EnvVar{
+			Name: constant.KBPrefix + "_SERVICE_USER",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{Key: "username", LocalObjectReference: corev1.LocalObjectReference{Name: "$(CONN_CREDENTIAL_SECRET_NAME)"}},
+			},
+		},
+		corev1.EnvVar{
+			Name: constant.KBPrefix + "_SERVICE_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{Key: "password", LocalObjectReference: corev1.LocalObjectReference{Name: "$(CONN_CREDENTIAL_SECRET_NAME)"}},
+			},
+		})
 
-	container.Env = append(container.Env, corev1.EnvVar{
-		Name:      constant.KBPrefix + "_SERVICE_CHARACTER_TYPE",
-		Value:     component.CharacterType,
-		ValueFrom: nil,
-	})
-
-	container.Ports = []corev1.ContainerPort{{
+	container.Ports = append(container.Ports, corev1.ContainerPort{
 		ContainerPort: int32(probeSvcHTTPPort),
 		Name:          constant.ProbeHTTPPortName,
 		Protocol:      "TCP",
 	},
-		{
+		corev1.ContainerPort{
 			ContainerPort: int32(probeSvcGRPCPort),
 			Name:          constant.ProbeGRPCPortName,
 			Protocol:      "TCP",
-		}}
+		})
+	component.PodSpec.Containers[0] = container
+}
+
+func buildProbeServiceContainer(component *SynthesizedComponent, container *corev1.Container) {
+	container.Image = component.ToolsImage
+	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
+	// logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
+	container.Command = []string{"/bin/sh", "-c", "while true; do sleep 10; done"}
+
+	// if len(component.PodSpec.Containers) > 0 && len(component.PodSpec.Containers[0].Ports) > 0 {
+	// 	mainContainer := component.PodSpec.Containers[0]
+	// 	port := mainContainer.Ports[0]
+	// 	dbPort := port.ContainerPort
+	// 	container.Env = append(container.Env, corev1.EnvVar{
+	// 		Name:      constant.KBPrefix + "_SERVICE_PORT",
+	// 		Value:     strconv.Itoa(int(dbPort)),
+	// 		ValueFrom: nil,
+	// 	})
+	// }
+
+	// volumeMount := corev1.VolumeMount{Name: "kubeblocks", MountPath: "/kubeblocks"}
+	// container.VolumeMounts = append(container.VolumeMounts, volumeMount)
+	// roles := getComponentRoles(component)
+	// rolesJSON, _ := json.Marshal(roles)
+	// container.Env = append(container.Env, corev1.EnvVar{
+	// 	Name:      constant.KBPrefix + "_SERVICE_ROLES",
+	// 	Value:     string(rolesJSON),
+	// 	ValueFrom: nil,
+	// })
+
+	// container.Env = append(container.Env, corev1.EnvVar{
+	// 	Name:      constant.KBPrefix + "_SERVICE_CHARACTER_TYPE",
+	// 	Value:     component.CharacterType,
+	// 	ValueFrom: nil,
+	// })
+
+	// container.Ports = []corev1.ContainerPort{{
+	// 	ContainerPort: int32(probeSvcHTTPPort),
+	// 	Name:          constant.ProbeHTTPPortName,
+	// 	Protocol:      "TCP",
+	// },
+	// 	{
+	// 		ContainerPort: int32(probeSvcGRPCPort),
+	// 		Name:          constant.ProbeGRPCPortName,
+	// 		Protocol:      "TCP",
+	// 	}}
 }
 
 func getComponentRoles(component *SynthesizedComponent) map[string]string {

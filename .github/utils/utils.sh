@@ -429,7 +429,6 @@ patch_release_notes() {
 upload_rpm_repo() {
     cd kbcli_rpm_test/rpm_repo/repodata
     current_dir=$(pwd)
-    pwd
     ls
 
     for file in "$current_dir"/*

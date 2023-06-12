@@ -22,8 +22,12 @@ package internal
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -32,12 +36,12 @@ type fakeRoleAgent struct {
 	*RoleAgent
 }
 
-func TestInit(t *testing.T) {
+func TestRoleAgent_Init(t *testing.T) {
 
 	var ports = []int{1, 2, 3}
 	initEnv(ports)
 
-	faker := mockFakeAgent()
+	faker := mockFakeAgent("role")
 	err := faker.Init()
 	if err != nil {
 		t.Errorf("faker init failed ,err = %v", err)
@@ -62,24 +66,59 @@ func TestInit(t *testing.T) {
 	}
 }
 
-func TestGetRoleFailed(t *testing.T) {
-	var ports = []int{8080}
-	initEnv(ports)
-	faker := mockFakeAgent()
-	err := faker.Init()
-	if err != nil {
-		t.Errorf("faker init failed ,err = %v", err)
-	}
-	ops, b := faker.CheckRole(context.Background())
-	event, has := ops["event"]
-	if !has || !b || (has && event == OperationSuccess) {
-		t.Error("faker CheckRole failed")
-	}
+func TestGetRole(t *testing.T) {
+
+	t.Run("Success", func(t *testing.T) {
+		var ports = []int{9723}
+		initEnv(ports)
+
+		path := "role_agent_success"
+		faker := mockFakeAgent(path)
+		err := faker.Init()
+		if err != nil {
+			t.Errorf("faker init failed ,err = %v", err)
+		}
+
+		roleExpected := "leader"
+		initHttp(roleExpected, path, 9723, true)
+		time.Sleep(1 * time.Second) // wait for http listen
+
+		ops, notify := faker.CheckRole(context.Background())
+
+		if len(ops) == 0 {
+			t.Error("CheckRole returns empty ...")
+		}
+		event, has := ops["event"]
+		if !has || event != OperationSuccess || !notify {
+			t.Error("faker CheckRole failed")
+		}
+
+	})
+
+	t.Run("Failure", func(t *testing.T) {
+		var ports = []int{7171}
+		initEnv(ports)
+		path := "role_agent_failure"
+		faker := mockFakeAgent(path)
+		err := faker.Init()
+		if err != nil {
+			t.Errorf("faker init failed ,err = %v", err)
+		}
+
+		initHttp("", path, 7171, false)
+		time.Sleep(1 * time.Second)
+
+		ops, notify := faker.CheckRole(context.Background())
+		event, has := ops["event"]
+		if !has || event != OperationFailed || !notify {
+			t.Error("faker CheckRole failed")
+		}
+	})
+
 }
 
-func mockFakeAgent() *fakeRoleAgent {
-	roleAgent := NewRoleAgent(os.Stdin, "")
-	return &fakeRoleAgent{RoleAgent: roleAgent}
+func mockFakeAgent(path string) *fakeRoleAgent {
+	return &fakeRoleAgent{RoleAgent: NewRoleAgent(os.Stdin, "", path)}
 }
 
 func (fakeRoleAgent *fakeRoleAgent) Init() error {
@@ -94,5 +133,19 @@ func initEnv(ports []int) {
 	viper.Set("KB_FAILED_EVENT_REPORT_FREQUENCY", "3601")
 	viper.Set("KB_ROLE_OBSERVATION_THRESHOLD", "59")
 	buf, _ := json.Marshal(ports)
-	viper.Set("KB_CONSENSUS_SET_ACTION_SVC_LIST", string(buf))
+	viper.Set("KB_SRS_ACTION_SVC_LIST", string(buf))
+}
+
+func initHttp(roleExpected, path string, port int, good bool) {
+	path = "/" + path
+	http.HandleFunc(path, func(writer http.ResponseWriter, request *http.Request) {
+		if good {
+			io.WriteString(writer, roleExpected)
+		} else {
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	})
+	go func() {
+		http.ListenAndServe(fmt.Sprintf("localhost:%d", port), nil)
+	}()
 }

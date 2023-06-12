@@ -64,6 +64,11 @@ func init() {
 
 	// replace the kubectl plugin filename prefixes with ours
 	kcplugin.ValidPluginFilenamePrefixes = plugin.ValidPluginFilenamePrefixes
+
+	// put the download directory of the plugin into the PATH
+	if err := util.AddDirToPath(fmt.Sprintf("%s/.%s/plugins/bin", os.Getenv("HOME"), cliName)); err != nil {
+		fmt.Println("Failed to add kbcli bin dir to PATH:", err)
+	}
 }
 
 func NewDefaultCliCmd() *cobra.Command {

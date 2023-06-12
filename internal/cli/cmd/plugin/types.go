@@ -40,7 +40,6 @@ const (
 
 var SupportAPIVersion = []string{
 	"krew.googlecontainertools.github.com/v1alpha2",
-	"kbcli.googlecontainertools.github.com/v1alpha2",
 }
 
 type Paths struct {

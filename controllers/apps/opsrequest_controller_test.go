@@ -38,7 +38,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -445,7 +444,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				condition := meta.FindStatusCondition(fetched.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
 				g.Expect(condition).ShouldNot(BeNil())
 				g.Expect(condition.Status).Should(BeFalse())
-				g.Expect(condition.Reason).Should(Equal(lifecycle.ReasonPreCheckFailed))
+				g.Expect(condition.Reason).Should(Equal(ReasonPreCheckFailed))
 				g.Expect(condition.Message).Should(Equal("HorizontalScaleFailed: volume snapshot not support"))
 			}))
 
@@ -501,6 +500,13 @@ var _ = Describe("OpsRequest Controller", func() {
 				func(g Gomega, sts *appsv1.StatefulSet) {
 					g.Expect(*sts.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
+
+			By("Checking pvc created")
+			Eventually(testapps.List(&testCtx, intctrlutil.PersistentVolumeClaimSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: mysqlCompName,
+				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(int(replicas)))
 
 			By("mock all new PVCs scaled bounded")
 			for i := 0; i < int(replicas); i++ {

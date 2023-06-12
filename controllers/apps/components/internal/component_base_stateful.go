@@ -175,7 +175,7 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 
-	if err := c.statusHorizontalScale(reqCtx, cli, statusTxn); err != nil {
+	if err := c.horizontalScale(reqCtx, cli, statusTxn); err != nil {
 		return err
 	}
 
@@ -462,16 +462,30 @@ func (c *StatefulComponentBase) hasVolumeExpansionRunning(reqCtx intctrlutil.Req
 }
 
 func (c *StatefulComponentBase) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	ret := c.horizontalScaling(c.runningWorkload)
+	return c.horizontalScale(reqCtx, cli, nil)
+}
+
+func (c *StatefulComponentBase) horizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
+	sts := c.runningWorkload
+	if sts.Status.ReadyReplicas == c.Component.Replicas {
+		return nil
+	}
+	ret := c.horizontalScaling(sts)
 	if ret == 0 {
+		if err := c.postScaleIn(reqCtx, cli, txn); err != nil {
+			return err
+		}
+		if err := c.postScaleOut(reqCtx, cli, sts); err != nil {
+			return err
+		}
 		return nil
 	}
 	if ret < 0 {
-		if err := c.scaleIn(reqCtx, cli, c.runningWorkload); err != nil {
+		if err := c.scaleIn(reqCtx, cli, sts); err != nil {
 			return err
 		}
 	} else {
-		if err := c.scaleOut(reqCtx, cli, c.runningWorkload); err != nil {
+		if err := c.scaleOut(reqCtx, cli, sts); err != nil {
 			return err
 		}
 	}
@@ -566,9 +580,12 @@ func (c *StatefulComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli c
 	} else if job != nil {
 		msgKey := fmt.Sprintf("%s/%s", job.GetObjectKind().GroupVersionKind().Kind, job.GetName())
 		statusMessage := appsv1alpha1.ComponentMessageMap{msgKey: msg}
-		txn.propose(appsv1alpha1.AbnormalClusterCompPhase, func() {
-			c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, statusMessage, "PVC deletion job failed")
-		})
+		// TODO: CT - remove this cronjob later
+		if txn != nil {
+			txn.propose(appsv1alpha1.AbnormalClusterCompPhase, func() {
+				c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, statusMessage, "PVC deletion job failed")
+			})
+		}
 	}
 	return nil
 }
@@ -579,11 +596,10 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 			Namespace: stsObj.Namespace,
 			Name:      stsObj.Name,
 		}
-		snapshotKey = types.NamespacedName{
+		backupKey = types.NamespacedName{
 			Namespace: stsObj.Namespace,
 			Name:      stsObj.Name + "-scaling",
 		}
-		horizontalScalePolicy = c.Component.HorizontalScalePolicy
 
 		cleanCronJobs = func() error {
 			for i := *stsObj.Spec.Replicas; i < c.Component.Replicas; i++ {
@@ -604,45 +620,33 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 			}
 			return nil
 		}
-
-		checkAllPVCsExist = func() (bool, error) {
-			for i := *stsObj.Spec.Replicas; i < c.Component.Replicas; i++ {
-				for _, vct := range stsObj.Spec.VolumeClaimTemplates {
-					pvcKey := types.NamespacedName{
-						Namespace: key.Namespace,
-						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-					}
-					// check pvc existence
-					pvcExists, err := isPVCExists(cli, reqCtx.Ctx, pvcKey)
-					if err != nil {
-						return true, err
-					}
-					if !pvcExists {
-						return false, nil
-					}
-				}
-			}
-			return true, nil
-		}
 	)
 
 	if err := cleanCronJobs(); err != nil {
 		return err
 	}
 
-	allPVCsExist, err := checkAllPVCsExist()
-	if err != nil {
-		return err
-	}
-	if !allPVCsExist {
-		if horizontalScalePolicy == nil {
-			c.WorkloadVertex.Immutable = false
-			return nil
+	c.WorkloadVertex.Immutable = true
+	stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
+	dataClone := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)
+	var succeed bool
+	var err error
+	if dataClone == nil {
+		succeed = true
+	} else {
+		succeed, err = dataClone.succeed()
+		if err != nil {
+			return err
 		}
-		// do backup according to component's horizontal scale policy
+	}
+	if succeed {
+		// pvcs are ready, stateful_set.replicas should be updated
+		c.WorkloadVertex.Immutable = false
+		return c.postScaleOut(reqCtx, cli, stsObj)
+	} else {
 		c.WorkloadVertex.Immutable = true
-		stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
-		objs, err := doBackup(reqCtx, cli, c.Cluster, c.Component, snapshotKey, stsProto, stsObj)
+		// update objs will trigger cluster reconcile, no need to requeue error
+		objs, err := dataClone.cloneData(dataClone)
 		if err != nil {
 			return err
 		}
@@ -651,10 +655,6 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 		}
 		return nil
 	}
-	// pvcs are ready, stateful_set.replicas should be updated
-	c.WorkloadVertex.Immutable = false
-
-	return c.postScaleOut(reqCtx, cli, stsObj)
 }
 
 func (c *StatefulComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
@@ -663,69 +663,20 @@ func (c *StatefulComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli 
 			Namespace: stsObj.Namespace,
 			Name:      stsObj.Name + "-scaling",
 		}
-		horizontalScalePolicy = c.Component.HorizontalScalePolicy
-
-		checkAllPVCBoundIfNeeded = func() (bool, error) {
-			if horizontalScalePolicy == nil ||
-				horizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-				!isSnapshotAvailable(cli, reqCtx.Ctx) {
-				return true, nil
-			}
-			return isAllPVCBound(cli, reqCtx.Ctx, stsObj, int(c.Component.Replicas))
-		}
-
-		cleanBackupResourcesIfNeeded = func() error {
-			if horizontalScalePolicy == nil ||
-				horizontalScalePolicy.Type != appsv1alpha1.HScaleDataClonePolicyFromSnapshot ||
-				!isSnapshotAvailable(cli, reqCtx.Ctx) {
-				return nil
-			}
-			// if all pvc bounded, clean backup resources
-			objs, err := deleteSnapshot(cli, reqCtx, snapshotKey, c.GetCluster(), c.GetName())
-			if err != nil {
-				return err
-			}
-			for _, obj := range objs {
-				c.DeleteResource(obj, nil)
-			}
-			return nil
-		}
 	)
 
-	// check all pvc bound, wait next reconciliation if not all ready
-	allPVCBounded, err := checkAllPVCBoundIfNeeded()
-	if err != nil {
-		return err
-	}
-	if !allPVCBounded {
-		return nil
-	}
-	// clean backup resources.
-	// there will not be any backup resources other than scale out.
-	if err := cleanBackupResourcesIfNeeded(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (c *StatefulComponentBase) statusHorizontalScale(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
-	ret := c.horizontalScaling(c.runningWorkload)
-	if ret < 0 {
-		return nil
-	}
-	if ret > 0 {
-		// forward the h-scaling progress.
-		return c.scaleOut(reqCtx, cli, c.runningWorkload)
-	}
-	if ret == 0 { // sts has been updated
-		if err := c.postScaleIn(reqCtx, cli, txn); err != nil {
+	if d := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsObj, snapshotKey); d != nil {
+		// clean backup resources.
+		// there will not be any backup resources other than scale out.
+		tmpObjs, err := d.clearTmpResources()
+		if err != nil {
 			return err
 		}
-		if err := c.postScaleOut(reqCtx, cli, c.runningWorkload); err != nil {
-			return err
+		for _, obj := range tmpObjs {
+			c.DeleteResource(obj, nil)
 		}
 	}
+
 	return nil
 }
 

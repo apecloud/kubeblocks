@@ -25,9 +25,11 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -72,6 +74,10 @@ var (
 
 		# Open a dashboard with a specific local port
 		kbcli dashboard open kubeblocks-grafana --port 8080
+
+		# for dashboard kubeblocks-grafana, support to direct the specified dashboard type
+		# now we support mysql,mongodb,postgresql,redis,weaviate,kafka,cadvisor,jmx and node
+		kbcli dashboard open kubeblocks-grafana mysql
 	`)
 
 	// we do not use the default port to port-forward to avoid conflict with other services
@@ -197,10 +203,19 @@ func newOpenOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *ope
 func newOpenCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newOpenOptions(f, streams)
 	cmd := &cobra.Command{
-		Use:     "open",
+		Use:     "open NAME [DASHBOARD-TYPE] [--port PORT]",
 		Short:   "Open one dashboard.",
 		Example: openExample,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) == 1 && args[0] == supportDirectDashboard {
+				var name []string
+				for i := range availableTypes {
+					if strings.HasPrefix(availableTypes[i], toComplete) {
+						name = append(name, availableTypes[i])
+					}
+				}
+				return name, cobra.ShellCompDirectiveNoFileComp
+			}
 			var names []string
 			for _, d := range dashboards {
 				names = append(names, d.Name)
@@ -216,7 +231,6 @@ func newOpenCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().StringVar(&o.localPort, "port", "", "dashboard local port")
 	cmd.Flags().Duration(podRunningTimeoutFlag, defaultPodExecTimeout,
 		"The time (like 5s, 2m, or 3h, higher than zero) to wait for at least one pod is running")
-
 	return cmd
 }
 
@@ -239,7 +253,9 @@ func (o *openOptions) complete(cmd *cobra.Command, args []string) error {
 	if dash == nil {
 		return fmt.Errorf("failed to find dashboard \"%s\", run \"kbcli dashboard list\" to list all dashboards", o.name)
 	}
-
+	if dash.Name == supportDirectDashboard && len(args) > 1 {
+		clusterType = args[1]
+	}
 	if o.localPort == "" {
 		o.localPort = dash.TargetPort
 	}
@@ -251,11 +267,16 @@ func (o *openOptions) complete(cmd *cobra.Command, args []string) error {
 }
 
 func (o *openOptions) run() error {
+	url := "http://127.0.0.1:" + o.localPort
+	if o.name == "kubeblocks-grafana" {
+		err := buildGrafanaDirectURL(&url, clusterType)
+		if err != nil {
+			return err
+		}
+	}
 	go func() {
 		<-o.portForwardOptions.ReadyChannel
 		fmt.Fprintf(o.Out, "Forward successfully! Opening browser ...\n")
-
-		url := "http://127.0.0.1:" + o.localPort
 		if err := util.OpenBrowser(url); err != nil {
 			fmt.Fprintf(o.ErrOut, "Failed to open browser: %v", err)
 		}

@@ -94,7 +94,7 @@ func (w *ConfigMapVolumeWatcher) Run() error {
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return cfgcore.MakeError("failed to create fs notify watcher.")
+		return cfgcore.WrapError(err, "failed to create fs notify watcher")
 	}
 
 	go w.loopNotifyEvent(watcher, w.ctx)

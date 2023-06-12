@@ -167,7 +167,7 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 	if isPercentage {
 		r = int32(math.Floor(float64(v) * float64(replicas) / 100))
 	} else {
-		r = int32(util.Min(v, param.getTargetReplicas()))
+		r = util.Safe2Int32(util.Min(v, param.getTargetReplicas()))
 	}
 	return util.Max(r, defaultRolling)
 }

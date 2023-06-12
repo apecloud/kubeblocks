@@ -6,7 +6,7 @@ metadata:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
-  image: registry.cn-hangzhou.aliyuncs.com/apecloud/percona-xtrabackup
+  image: registry.cn-hangzhou.aliyuncs.com/apecloud/apecloud-xtrabackup:latest
   deployKind: job
   env:
     - name: DATA_DIR

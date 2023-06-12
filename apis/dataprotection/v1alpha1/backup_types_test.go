@@ -19,22 +19,64 @@ package v1alpha1
 import (
 	"testing"
 	"time"
+
+	. "github.com/onsi/gomega"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func expectToDuration(t *testing.T, ttl string, baseNum, targetNum int) {
-	d := ToDuration(&ttl)
-	if d != time.Hour*time.Duration(baseNum)*time.Duration(targetNum) {
-		t.Errorf(`Expected duration is "%d*%d*time.Hour"", got %v`, targetNum, baseNum, d)
-	}
+func TestValidate(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	backupPolicy := &BackupPolicy{Spec: BackupPolicySpec{Snapshot: &SnapshotPolicy{}}}
+	backupSpec := &BackupSpec{BackupType: BackupTypeSnapshot}
+	g.Expect(backupSpec.Validate(backupPolicy)).Should(Succeed())
+
+	backupPolicy = &BackupPolicy{}
+	backupSpec = &BackupSpec{BackupType: BackupTypeSnapshot}
+	g.Expect(backupSpec.Validate(backupPolicy)).Should(HaveOccurred())
+
+	backupSpec = &BackupSpec{BackupType: BackupTypeDataFile}
+	g.Expect(backupSpec.Validate(backupPolicy)).Should(HaveOccurred())
+
+	backupSpec = &BackupSpec{BackupType: BackupTypeLogFile}
+	g.Expect(backupSpec.Validate(backupPolicy)).Should(HaveOccurred())
 }
 
-func TestToDuration(t *testing.T) {
-	d := ToDuration(nil)
-	if d != time.Duration(0) {
-		t.Errorf("Expected duration is 0, got %v", d)
+func TestGetRecoverableTimeRange(t *testing.T) {
+	g := NewGomegaWithT(t)
+
+	// test empty backups
+	emptyBackups := []Backup{}
+	g.Expect(GetRecoverableTimeRange(emptyBackups)).Should(BeEmpty())
+
+	now := metav1.Now()
+	backupSnapshot := Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup-snapshot"},
+		Spec:       BackupSpec{BackupType: BackupTypeSnapshot},
+		Status: BackupStatus{
+			Phase: BackupCompleted,
+			Manifests: &ManifestsStatus{
+				BackupLog: &BackupLogStatus{
+					StartTime: &now,
+					StopTime:  &now,
+				},
+			},
+		},
 	}
-	expectToDuration(t, "7d", 24, 7)
-	expectToDuration(t, "7D", 24, 7)
-	expectToDuration(t, "12h", 1, 12)
-	expectToDuration(t, "12H", 1, 12)
+	backupLogfile := Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup-logfile"},
+		Spec:       BackupSpec{BackupType: BackupTypeLogFile},
+		Status: BackupStatus{
+			Manifests: &ManifestsStatus{
+				BackupLog: &BackupLogStatus{
+					StartTime: &now,
+					StopTime:  &metav1.Time{Time: now.Add(time.Hour)},
+				},
+			},
+		},
+	}
+
+	backups := []Backup{backupSnapshot, backupLogfile, {}}
+	g.Expect(GetRecoverableTimeRange(backups)).ShouldNot(BeEmpty())
 }

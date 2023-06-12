@@ -85,7 +85,7 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				"cannot be deleted because of existing referencing Cluster.")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, clusterVersion,
-			constant.ClusterVersionLabelKey, recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
+			constant.ClusterVerLabelKey, recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, r.deleteExternalResources(reqCtx, clusterVersion)

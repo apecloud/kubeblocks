@@ -243,7 +243,7 @@ const (
 
 // HScaleDataClonePolicyType defines data clone policy when horizontal scaling.
 // +enum
-// +kubebuilder:validation:Enum={None,Snapshot}
+// +kubebuilder:validation:Enum={None,Snapshot,Backup}
 type HScaleDataClonePolicyType string
 
 const (
@@ -513,7 +513,7 @@ type BaseBackupType string
 // +kubebuilder:validation:Enum={pre,post}
 type BackupStatusUpdateStage string
 
-// CandidateOperator is the set of operators that can be used in a candidateInstance spec.
+// CandidateOperator is the set of operators that can be used in a switchoverCandidate spec.
 // +enum
 // +kubebuilder:validation:Enum={Equal,NotEqual}
 type CandidateOperator string

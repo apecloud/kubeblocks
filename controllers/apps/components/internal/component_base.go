@@ -400,7 +400,7 @@ func (c *ComponentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isR
 		// if component is not running and probe is not timed out, requeue.
 		if phase == "" {
 			c.Recorder.Event(c.Cluster, corev1.EventTypeNormal, "WaitingForProbeSuccess", "Waiting for probe success")
-			return phase, statusMessage, intctrlutil.NewDelayedRequeueError(time.Second*30, "Waiting for probe success")
+			return phase, statusMessage, intctrlutil.NewDelayedRequeueError(time.Second*10, "Waiting for probe success")
 		}
 		return phase, statusMessage, nil
 	}
@@ -463,7 +463,7 @@ func hasFailedAndTimedOutPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMe
 		requeueAfter   time.Duration
 	)
 	for _, pod := range pods {
-		isFailed, isTimedOut, messageStr := isPodFailedAndTimedOut(pod)
+		isFailed, isTimedOut, messageStr := IsPodFailedAndTimedOut(pod)
 		if !isFailed {
 			continue
 		}
@@ -475,7 +475,7 @@ func hasFailedAndTimedOutPod(pods []*corev1.Pod) (bool, appsv1alpha1.ComponentMe
 		}
 	}
 	if hasFailedPod && !hasTimedOutPod {
-		requeueAfter = time.Second * 30
+		requeueAfter = types.PodContainerFailedTimeout
 	}
 	return hasTimedOutPod, messages, requeueAfter
 }
@@ -494,8 +494,8 @@ func isPodScheduledFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
 	return false, false, ""
 }
 
-// isPodFailedAndTimedOut checks if the pod is failed and timed out.
-func isPodFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
+// IsPodFailedAndTimedOut checks if the pod is failed and timed out.
+func IsPodFailedAndTimedOut(pod *corev1.Pod) (bool, bool, string) {
 	if isFailed, isTimedOut, message := isPodScheduledFailedAndTimedOut(pod); isFailed {
 		return isFailed, isTimedOut, message
 	}

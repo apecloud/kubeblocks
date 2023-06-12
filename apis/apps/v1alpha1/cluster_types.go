@@ -164,9 +164,9 @@ type ClusterComponentSpec struct {
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
 
-	// candidateInstance is used to trigger switchover and describe the information of the candidate primary or leader.
+	// switchoverCandidate is used to trigger switchover and describe the information of the candidate primary or leader.
 	// +optional
-	CandidateInstance *CandidateInstance `json:"candidateInstance,omitempty"`
+	SwitchoverCandidate *SwitchoverCandidate `json:"switchoverCandidate,omitempty"`
 
 	// switchPolicy defines the strategy for switchover and failover when workloadType is Replication.
 	// +optional
@@ -294,9 +294,9 @@ type ReplicationMemberStatus struct {
 	Pod string `json:"pod"`
 }
 
-type CandidateInstance struct {
-	// index of the candidate instance, -1 <= index <= componentSpecs[x].replicas-1.
-	// +kubebuilder:validation:Minimum=-1
+type SwitchoverCandidate struct {
+	// index of the candidate instance, 0 <= index <= componentSpecs[x].replicas-1.
+	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Required
 	Index int32 `json:"index"`
 
@@ -309,14 +309,15 @@ type CandidateInstance struct {
 	// +kubebuilder:validation:Required
 	Operator CandidateOperator `json:"operator"`
 
-	// failoverSync indicates whether to synchronize the results of failover to candidateInstance.
-	// true indicates that the results of the failover will be asynchronously synchronized to candidateInstance field,
+	// In some specific scenarios, such as failover and horizontal scaling down, the role information of the instance may change,
+	// roleSync indicates whether to synchronize the results of roleChange to switchoverCandidate.
+	// true indicates that the results of the roleChange will be asynchronously synchronized to switchoverCandidate field,
 	// the index will be synchronized with the new primary or leader index, and the operator will be synchronized to Equal.
-	// false indicates that the results of failover will not be synchronized to the candidateInstance.
-	// At this situation, there may be inconsistencies between the candidateInstance and the real primary/leader instance,
+	// false indicates that the results of roleChange will not be synchronized to the switchoverCandidate.
+	// At this situation, there may be inconsistencies between the switchoverCandidate and the real primary or leader instance,
 	// If consistency is required, the user needs to manually update the index and operator value.
 	// +kubebuilder:validation:Required
-	FailoverSync bool `json:"failoverSync"`
+	RoleSync bool `json:"roleSync"`
 }
 
 type ClusterSwitchPolicy struct {

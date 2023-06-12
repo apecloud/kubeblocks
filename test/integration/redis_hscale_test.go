@@ -110,7 +110,7 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		Expect(err).To(Succeed())
 		Expect(len(podList)).Should(BeEquivalentTo(replicas))
 		for _, pod := range podList {
-			if strings.HasSuffix(pod.Name, strconv.Itoa(testapps.DefaultReplicationCandidateInstanceIndex)) {
+			if strings.HasSuffix(pod.Name, strconv.Itoa(testapps.DefaultReplicationCandidateIndex)) {
 				Expect(pod.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(constant.Primary))
 			} else {
 				Expect(pod.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(constant.Secondary))

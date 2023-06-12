@@ -14,7 +14,7 @@ This document shows how to create and connect to a MongoDB cluster.
 
 ### Before you start
 
-* [Install `kbcli`](./../../installation/install-kbcli.md).
+* [Install kbcli](./../../installation/install-kbcli.md).
 * [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 * Make sure MongoDB addon is installed with `kbcli addon list`.
 
@@ -61,9 +61,9 @@ In actual scenarios, you are recommended to create a cluster on nodes with taint
 
 2. Create a MongoDB cluster.
 
-   The cluster creation command is simply `kbcli cluster create`. Use tolerances to deploy it on the tainted node. Further, you are recommended to create a cluster with a specified class and customize your cluster settings as demanded.
+   The cluster creation command is simply `kbcli cluster create`. Use tolerances to deploy it on the tainted node. Further, you can customize your cluster resources as demanded.
 
-   To create a cluster with a specified class, you can use `--set` flag and specify your requirement.
+   The following example shows how to use `--set` to create a cluster with customized resources and add all taints on the current node in the `--toleration` flag to tolerate them.
 
    ```bash
    kbcli cluster create mongodb-cluster --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"'  --cluster-definition=mongodb --namespace <name> --set cpu=1,memory=1Gi,storage=10Gi,storageClass=<storageclassname>
@@ -92,7 +92,7 @@ In actual scenarios, you are recommended to create a cluster on nodes with taint
    EOF
    ```
 
-See the table below for detailed descriptions of customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended turn on the monitor and enable all logs.
+See the table below for detailed descriptions of customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.
 
 📎 Table 1. kbcli cluster create flags description
 
@@ -116,11 +116,7 @@ kbcli cluster create <clustername>  --cluster-definition=mongodb --tolerations '
 
 ### Create a MongoDB cluster on a node without taints
 
-Create a MongoDB cluster.
-
-The cluster creation command is simply `kbcli cluster create`. Further, you are recommended to create a cluster with a specified class and customize your cluster settings as demanded.
-
-To create a cluster with a specified class, you can use `--set` flag and specify your requirement.
+The cluster creation command is simply `kbcli cluster create`. Further, you can customize your cluster resources as demanded by using the `--set` flag.
 
 ```bash
 kbcli cluster create mongodb-cluster --cluster-definition=mongodb --namespace <name> --set cpu=1,memory=1Gi,storage=10Gi,storageClass=<storageclassname>
@@ -145,9 +141,9 @@ kbcli cluster create mongodb-cluster --cluster-definition="mongodb" --namespace 
 EOF
 ```
 
-See the table below for detailed descriptions of customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended turn on the monitor and enable all logs.
+See the table below for detailed descriptions of customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.
 
-📎 Table 1. kbcli cluster create flags description
+📎 Table 2. kbcli cluster create flags description
 
 | Option                 | Description                                   |
 |:-----------------------|:----------------------------------------------|

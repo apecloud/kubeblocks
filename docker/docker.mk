@@ -47,8 +47,8 @@ BUILDX_ARGS ?=
 ##@ Docker containers
 
 .PHONY: build-dev-container-image
-build-dev-image: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY) --build-arg GOPROXY=$(GOPROXY)
-build-dev-image: install-docker-buildx ## Build dev container image.
+build-dev-container-image: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY) --build-arg GOPROXY=$(GOPROXY)
+build-dev-container-image: install-docker-buildx ## Build dev container image.
 ifneq ($(BUILDX_ENABLED), true)
 	$(DOCKER) $(DOCKERFILE_DIR)/. $(DOCKER_BUILD_ARGS) -f $(DOCKERFILE_DIR)/${DEV_CONTAINER_DOCKERFILE} -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
 else
@@ -57,12 +57,12 @@ endif
 
 
 .PHONY: push-dev-container-image
-push-dev-image: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY) --build-arg GOPROXY=$(GOPROXY)
-push-dev-image: install-docker-buildx ## Push dev container image.
+push-dev-container-image: DOCKER_BUILD_ARGS += --build-arg DEBIAN_MIRROR=$(DEBIAN_MIRROR) --build-arg GITHUB_PROXY=$(GITHUB_PROXY) --build-arg GOPROXY=$(GOPROXY)
+push-dev-container-image: install-docker-buildx ## Push dev container image.
 ifneq ($(BUILDX_ENABLED), true)
 	$(DOCKER) push $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG)
 else
-	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -f $(DOCKERFILE_DIR)/$(DEV_CONTAINER_DOCKERFILE) -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG) --push $(BUILDX_ARGS)
+	$(DOCKER) buildx build  $(DOCKERFILE_DIR)/. $(DOCKER_BUILD_ARGS) --platform $(BUILDX_PLATFORMS) -f $(DOCKERFILE_DIR)/$(DEV_CONTAINER_DOCKERFILE) -t $(DEV_CONTAINER_IMAGE_NAME):$(DEV_CONTAINER_VERSION_TAG) --push $(BUILDX_ARGS)
 endif
 
 

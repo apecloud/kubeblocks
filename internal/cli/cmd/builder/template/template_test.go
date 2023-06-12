@@ -26,9 +26,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/test/testdata"

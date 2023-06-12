@@ -152,28 +152,28 @@ var _ = Describe("cluster webhook", func() {
 			cluster.Spec.ComponentSpecs[0].Resources.Requests[corev1.ResourceMemory] = resource.MustParse("80Mi")
 			Expect(k8sClient.Patch(ctx, cluster, patch)).Should(Succeed())
 
-			// A series of tests of cluster.Spec.ComponentSpecs[x].CandidateInstance.Index
-			candidateInstance := &CandidateInstance{
+			// A series of tests of cluster.Spec.ComponentSpecs[x].SwitchoverCandidate.Index
+			switchoverCandidate := &SwitchoverCandidate{
 				Index:    3,
 				Operator: CandidateOpEqual,
 			}
-			By("By updating cluster.Spec.ComponentDefs[0].CandidateInstance.Index larger than cluster.Spec.ComponentDefs[0].Replicas, expect not succeed")
+			By("By updating cluster.Spec.ComponentDefs[0].SwitchoverCandidate.Index larger than cluster.Spec.ComponentDefs[0].Replicas, expect not succeed")
 			patch = client.MergeFrom(cluster.DeepCopy())
-			cluster.Spec.ComponentSpecs[0].CandidateInstance = candidateInstance
+			cluster.Spec.ComponentSpecs[0].SwitchoverCandidate = switchoverCandidate
 			cluster.Spec.ComponentSpecs[0].Replicas = int32(3)
 			Expect(k8sClient.Patch(ctx, cluster, patch)).ShouldNot(Succeed())
 
-			By("By updating cluster.Spec.ComponentDefs[0].CandidateInstance.Index less than cluster.Spec.ComponentDefs[0].Replicas, expect succeed")
+			By("By updating cluster.Spec.ComponentDefs[0].SwitchoverCandidate.Index less than cluster.Spec.ComponentDefs[0].Replicas, expect succeed")
 			patch = client.MergeFrom(cluster.DeepCopy())
-			candidateInstance.Index = 1
-			cluster.Spec.ComponentSpecs[0].CandidateInstance = candidateInstance
+			switchoverCandidate.Index = 1
+			cluster.Spec.ComponentSpecs[0].SwitchoverCandidate = switchoverCandidate
 			cluster.Spec.ComponentSpecs[0].Replicas = int32(2)
 			Expect(k8sClient.Patch(ctx, cluster, patch)).Should(Succeed())
 
-			By("By updating cluster.Spec.ComponentDefs[0].CandidateInstance.Index less than 0, expect not succeed")
+			By("By updating cluster.Spec.ComponentDefs[0].SwitchoverCandidate.Index less than 0, expect not succeed")
 			patch = client.MergeFrom(cluster.DeepCopy())
-			candidateInstance.Index = -1
-			cluster.Spec.ComponentSpecs[0].CandidateInstance = candidateInstance
+			switchoverCandidate.Index = -1
+			cluster.Spec.ComponentSpecs[0].SwitchoverCandidate = switchoverCandidate
 			cluster.Spec.ComponentSpecs[0].Replicas = int32(2)
 			Expect(k8sClient.Patch(ctx, cluster, patch)).ShouldNot(Succeed())
 		})

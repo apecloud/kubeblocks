@@ -61,7 +61,7 @@ spec:
     - replicas: 1
       resources:
         requests:
-          storage: 10Gi
+          storage: 20Gi
           memory: 512Mi
         limits:
           memory: 4Gi
@@ -115,7 +115,7 @@ spec:
       replicas: 1
       resources:
         requests:
-          storage: 10Gi
+          storage: 20Gi
           memory: 512Mi
         limits:
           memory: 4Gi

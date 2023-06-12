@@ -165,10 +165,10 @@ func (factory *MockClusterFactory) SetMonitor(monitor bool) *MockClusterFactory 
 	return factory
 }
 
-func (factory *MockClusterFactory) SetCandidateInstance(candidate *appsv1alpha1.CandidateInstance) *MockClusterFactory {
+func (factory *MockClusterFactory) SetSwitchoverCandidate(candidate *appsv1alpha1.SwitchoverCandidate) *MockClusterFactory {
 	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {
-		comps[len(comps)-1].CandidateInstance = candidate
+		comps[len(comps)-1].SwitchoverCandidate = candidate
 	}
 	factory.get().Spec.ComponentSpecs = comps
 	return factory

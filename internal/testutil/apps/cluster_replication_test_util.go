@@ -22,14 +22,11 @@ package apps
 import (
 	"context"
 	"fmt"
-	"reflect"
-
 	"github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
@@ -89,32 +86,4 @@ func MockReplicationComponentPods(
 		pods = append(pods, MockReplicationComponentPod(g, testCtx, sts, clusterName, compName, podName, role))
 	}
 	return pods
-}
-
-// UpdateClusterCompSpecCandidateInstance updates cluster component spec candidateInstance.
-func UpdateClusterCompSpecCandidateInstance(testCtx *testutil.TestContext,
-	cluster *appsv1alpha1.Cluster,
-	compName string,
-	candidateInstance *appsv1alpha1.CandidateInstance) {
-	objectKey := client.ObjectKey{Name: cluster.Name, Namespace: testCtx.DefaultNamespace}
-	gomega.Expect(GetAndChangeObj(testCtx, objectKey, func(newCluster *appsv1alpha1.Cluster) {
-		var index int
-		comps := newCluster.Spec.ComponentSpecs
-		if len(comps) > 0 {
-			for i, compSpec := range newCluster.Spec.ComponentSpecs {
-				if compSpec.Name == compName {
-					index = i
-				}
-			}
-			comps[index].CandidateInstance = candidateInstance
-		}
-		newCluster.Spec.ComponentSpecs = comps
-	})()).Should(gomega.Succeed())
-	gomega.Eventually(CheckObj(testCtx, objectKey, func(g gomega.Gomega, newCluster *appsv1alpha1.Cluster) {
-		for index, compSpec := range newCluster.Spec.ComponentSpecs {
-			if compSpec.Name == compName {
-				g.Expect(reflect.DeepEqual(newCluster.Spec.ComponentSpecs[index].CandidateInstance, candidateInstance)).Should(gomega.BeTrue())
-			}
-		}
-	})).Should(gomega.Succeed())
 }

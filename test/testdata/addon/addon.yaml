@@ -1,7 +1,7 @@
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
-  name: prometheus
+  generateName: addon-test
 spec:
   # Addon spec. description.
   description: Prometheus is a monitoring system and time series database.

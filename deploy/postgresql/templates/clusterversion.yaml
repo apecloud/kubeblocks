@@ -22,7 +22,7 @@ spec:
       cmdExecutorConfig:
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
     switchoverSpec:
-      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1
+      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
 
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1

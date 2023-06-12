@@ -358,7 +358,11 @@ func (pgOps *PostgresOperations) SwitchoverOps(ctx context.Context, req *binding
 
 	*/
 	result["event"] = OperationSuccess
-	result["message"] = fmt.Sprintf("Successfully %s to: %s", string(req.Operation), candidate)
+	if candidate == "" {
+		result["message"] = "Successfully switchover to a healthiest node"
+	} else {
+		result["message"] = fmt.Sprintf("Successfully %s to: %s", string(req.Operation), candidate)
+	}
 
 	return result, nil
 }
@@ -1099,8 +1103,8 @@ func (pgOps *PostgresOperations) follow(ctx context.Context, podName string, nee
 	primaryInfo += " password=" + os.Getenv("KB_SERVICE_PASSWORD")
 	primaryInfo += " application_name=" + "my-application"
 
-	sql := `alter system set primary_info=` + primaryInfo
-	_, err := pgOps.exec(ctx, sql)
+	cmd := `echo primary_conninfo=` + primaryInfo + " >> /opt/bitnami/postgresql/conf/postgresql.conf"
+	_, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, cmd, pgOps.DBType)
 	if err != nil {
 		pgOps.Logger.Errorf("modify primary info failed,err:%v", err)
 		return err

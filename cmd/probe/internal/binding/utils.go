@@ -468,17 +468,12 @@ func ParsePgLsn(str string) int64 {
 }
 
 func ParseQuery(str string) (map[string]string, error) {
-	lines := strings.Split(str, "\n")
-	key, value := lines[0], lines[2]
-
 	result := make(map[string]string)
-	keys := strings.Split(key, "|")
-	values := strings.Split(value, "|")
-	if len(keys) != len(values) {
-		return result, errors.New("invalid key count")
-	}
-	for i, k := range keys {
-		result[strings.TrimSpace(k)] = strings.TrimSpace(values[i])
+	str = strings.Trim(str, "[]")
+
+	err := json.Unmarshal([]byte(str), &result)
+	if err != nil {
+		return nil, errors.Errorf("json unmarshal failed, err:%v", err)
 	}
 
 	return result, nil

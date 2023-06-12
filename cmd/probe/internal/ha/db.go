@@ -10,7 +10,6 @@ type DB interface {
 	Promote(ctx context.Context, podName string) error
 	Demote(ctx context.Context, podName string) error
 
-	GetStatus(ctx context.Context) (string, error)
 	GetExtra(ctx context.Context) (map[string]string, error)
 	GetOpTime(ctx context.Context) (int64, error)
 	IsLeader(ctx context.Context) (bool, error)

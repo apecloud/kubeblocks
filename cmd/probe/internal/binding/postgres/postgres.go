@@ -930,18 +930,6 @@ func (pgOps *PostgresOperations) Demote(ctx context.Context, podName string) err
 	return pgOps.Follow(ctx, podName, true, pgOps.Cs.GetCluster().Leader.GetMember().GetName())
 }
 
-// GetStatus TODO：GetStatus后期考虑用postmaster替代
-func (pgOps *PostgresOperations) GetStatus(ctx context.Context) (string, error) {
-	resp, err := pgOps.CheckStatusOps(ctx, &bindings.InvokeRequest{}, &bindings.InvokeResponse{
-		Metadata: map[string]string{},
-	})
-	if err != nil || resp["event"] == OperationFailed {
-		return "", errors.Errorf("get status failed:%s", resp["message"])
-	}
-
-	return "running", nil
-}
-
 func (pgOps *PostgresOperations) GetOpTime(ctx context.Context) (int64, error) {
 	return pgOps.getWalPosition(ctx)
 }
@@ -1108,13 +1096,13 @@ func (pgOps *PostgresOperations) handleRewind(ctx context.Context, leader *confi
 
 func (pgOps *PostgresOperations) Follow(ctx context.Context, podName string, needRestart bool, leader string) error {
 	primaryInfo := "host="
-	primaryInfo += leader + pgOps.Cs.GetClusterCompName() + "-headles"
+	primaryInfo += leader + "." + pgOps.Cs.GetClusterCompName() + "-headless"
 	primaryInfo += " port=" + os.Getenv("KB_SERVICE_PORT")
 	primaryInfo += " user=" + os.Getenv("KB_SERVICE_USER")
 	primaryInfo += " password=" + os.Getenv("KB_SERVICE_PASSWORD")
 	primaryInfo += " application_name=" + "my-application"
 
-	cmd := `echo primary_conninfo=` + primaryInfo + " >> /opt/bitnami/postgresql/conf/postgresql.conf"
+	cmd := fmt.Sprintf(`echo primary_conninfo = \'%s\' >> /opt/bitnami/postgresql/conf/postgresql.conf`, primaryInfo)
 	_, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, cmd, pgOps.DBType)
 	if err != nil {
 		pgOps.Logger.Errorf("modify primary info failed,err:%v", err)
@@ -1128,6 +1116,7 @@ func (pgOps *PostgresOperations) Follow(ctx context.Context, podName string, nee
 			pgOps.Logger.Errorf("reload failed, err:%v", err)
 			return err
 		}
+		return nil
 	}
 
 	return pgOps.Start(ctx, podName)
@@ -1143,8 +1132,8 @@ func (pgOps *PostgresOperations) Start(ctx context.Context, podName string) erro
 	}
 
 	startCmd := "su -c 'postgres -D /postgresql/data --config-file=/opt/bitnami/postgresql/conf/postgresql.conf --external_pid_file=/opt/bitnami/postgresql/tmp/postgresql.pid --hba_file=/opt/bitnami/postgresql/conf/pg_hba.conf' postgres &"
-	_, err = pgOps.Cs.ExecCmdWithPod(ctx, podName, startCmd, pgOps.DBType)
-	if err != nil {
+	resp, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, startCmd, pgOps.DBType)
+	if err != nil || resp["stderr"] != "" {
 		pgOps.Logger.Errorf("start err: %v", err)
 		return err
 	}
@@ -1251,8 +1240,7 @@ func (pgOps *PostgresOperations) getPrimaryTimeLine(ctx context.Context, podName
 func (pgOps *PostgresOperations) getLocalTimeLineAndLsn(ctx context.Context, podName string) (bool, int64, int64) {
 	var isRecovery bool
 
-	status, err := pgOps.GetStatus(ctx)
-	if err != nil || status != "running" {
+	if !pgOps.IsRunning(ctx, podName) {
 		return pgOps.getLocalTimeLineAndLsnFromControlData(ctx, podName)
 	}
 

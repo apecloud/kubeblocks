@@ -106,6 +106,12 @@ func (h *Ha) Init() {
 		if !h.DB.IsRunning(h.ctx, h.podName) {
 			panic("db is not running")
 		}
+	} else {
+		err = h.cs.Init(false, "", nil, 0, h.podName)
+		if err != nil {
+			panic(err)
+		}
+		return
 	}
 
 	sysid, err = h.DB.GetSysID(h.ctx)
@@ -178,16 +184,11 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 	}
 
 	if !h.DB.IsRunning(h.ctx, h.podName) {
+		h.log.Warnf("in control loop, db is not running now")
 		err = h.DB.Start(h.ctx, h.podName)
 		if err != nil {
 			h.log.Errorf("db start failed, err:%v", err)
 		}
-
-		err = h.DB.InitDelay()
-		if err != nil {
-			h.log.Errorf("init failed, err:%v", err)
-		}
-		h.log.Errorf("in control loop, db is not running now")
 		return
 	}
 

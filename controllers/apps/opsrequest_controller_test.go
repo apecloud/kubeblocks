@@ -314,7 +314,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		})
 	})
 
-	Context("with Cluster which has MySQL ReplicatedStateMachine", func() {
+	Context("with Cluster which has MySQL ConsensusSet", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).

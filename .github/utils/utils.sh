@@ -431,7 +431,7 @@ upload_rpm_repo() {
     current_dir=$(pwd)
     pwd
     ls
-    curl --request GET -H "Authorization: token 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" --url https://api.github.com/repos/apecloud/kbcli_rpm_test
+    curl --request GET -H "Authorization: token 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" --url https://api.github.com/repos/apecloud/kbcli_rpm_test
 
     for file in "$current_dir"/*
     do
@@ -440,7 +440,7 @@ upload_rpm_repo() {
         echo "$filename"
         echo "https://api.github.com/repos/apecloud/kbcli_rpm_test/contents/rpm_repo/repodata/$filename"
 
-        curl -X PUT -H "Authorization: token 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" -H "Content-Type: application/json" -d '{"message": "Upload file", "content": "'$(base64 < ./$filename)'"}' $GITHUB_API/repos/$GITHUB_REPO/contents/rpm_repo/repodata/$filename
+        curl -X PUT -H "Authorization: token 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" -H "Content-Type: application/json" -d '{"message": "Upload file", "content": "'$(base64 < ./$filename)'"}' $GITHUB_API/repos/$GITHUB_REPO/contents/rpm_repo/repodata/$filename
       fi
     done
 }

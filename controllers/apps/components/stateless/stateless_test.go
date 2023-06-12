@@ -83,7 +83,7 @@ var _ = Describe("Stateful Component", func() {
 			componentDef := clusterDef.GetComponentDefByName(clusterComponent.ComponentDefRef)
 			statelessComponent := newStateless(k8sClient, cluster, clusterComponent, *componentDef)
 			By("test pods number of deploy is 0 ")
-			phase, _, _ := statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
+			phase, _, _ := statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName, false)
 			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
 
 			By("test pod is ready")
@@ -95,7 +95,9 @@ var _ = Describe("Stateful Component", func() {
 
 			By("test a part pods of deploy are not ready")
 			// mock pod is not ready
-			testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, pod.Name, pod.Namespace)
+			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+				pod.Status.Conditions = []corev1.PodCondition{}
+			})).Should(Succeed())
 			// mock deployment is processing rs
 			Expect(testapps.ChangeObjStatus(&testCtx, deploy, func() {
 				deploy.Status.Conditions = []appsv1.DeploymentCondition{
@@ -116,7 +118,17 @@ var _ = Describe("Stateful Component", func() {
 			})).Should(Succeed())
 			podsReady, _ := statelessComponent.PodsReady(ctx, deploy)
 			Expect(podsReady).Should(BeFalse())
-			phase, _, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
+			By("should return empty string if pod of component is only not ready when component is not up running")
+			phase, _, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName, false)
+			Expect(string(phase)).Should(Equal(""))
+
+			By("expect component phase is Failed when pod of component is not ready and component is up running")
+			phase, _, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName, true)
+			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
+
+			By("expect component phase is Abnormal when pod of component is failed")
+			testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, pod.Name, pod.Namespace)
+			phase, _, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName, false)
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			By("test pods of deployment are ready")
@@ -142,7 +154,7 @@ var _ = Describe("Stateful Component", func() {
 			// requeue, _ := statelessComponent.HandleProbeTimeoutWhenPodsReady(ctx, nil)
 			// Expect(requeue == false).Should(BeTrue())
 
-			By("test pod is not ready and not controlled by new ReplicaSet of deployment")
+			By("test pod is not failed and not controlled by new ReplicaSet of deployment")
 			Expect(testapps.ChangeObjStatus(&testCtx, deploy, func() {
 				deploy.Status.Conditions = []appsv1.DeploymentCondition{
 					{
@@ -153,7 +165,7 @@ var _ = Describe("Stateful Component", func() {
 					},
 				}
 			})).Should(Succeed())
-			phase, _, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName)
+			phase, _, _ = statelessComponent.GetPhaseWhenPodsNotReady(ctx, statelessCompName, false)
 			Expect(string(phase)).Should(Equal(""))
 		})
 	})

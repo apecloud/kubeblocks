@@ -118,7 +118,8 @@ func (r *ReplicationSet) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod
 // when the pods of replicationSet are not ready, calculate the component phase is Failed or Abnormal.
 // if return an empty phase, means the pods of component are ready and skips it.
 func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
-	componentName string) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
+	componentName string,
+	originPhaseIsUpRunning bool) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	stsList := &appsv1.StatefulSetList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster,
 		componentName, stsList)
@@ -149,6 +150,10 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 		}
 		if labelValue == "" {
 			statusMessages.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
+		}
+		if originPhaseIsUpRunning && !intctrlutil.PodIsReady(&v) && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
+			existLatestRevisionFailedPod = true
+			continue
 		}
 		isFailed, _, message := internal.IsPodFailedAndTimedOut(&v)
 		if isFailed && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {

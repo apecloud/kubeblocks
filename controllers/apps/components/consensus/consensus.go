@@ -158,7 +158,8 @@ func (r *ConsensusSet) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) 
 }
 
 func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
-	componentName string) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
+	componentName string,
+	originPhaseIsUpRunning bool) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	stsList := &appsv1.StatefulSetList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster,
 		componentName, stsList)
@@ -186,6 +187,10 @@ func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 		labelValue := v.Labels[constant.RoleLabelKey]
 		if consensusSpec != nil && labelValue == consensusSpec.Leader.Name && intctrlutil.PodIsReady(&v) {
 			leaderIsReady = true
+			continue
+		}
+		if originPhaseIsUpRunning && !intctrlutil.PodIsReady(&v) && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
+			existLatestRevisionFailedPod = true
 			continue
 		}
 		isFailed, _, message := internal.IsPodFailedAndTimedOut(&v)

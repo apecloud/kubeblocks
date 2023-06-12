@@ -413,8 +413,9 @@ func (c *ComponentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isR
 	}
 
 	// get the phase if failed pods have timed out or the pods are not running when there are no changes to the component.
-	if hasFailedPodTimedOut || slices.Contains(appsv1alpha1.GetComponentUpRunningPhase(), c.GetPhase()) {
-		phase, statusMessage, err = c.ComponentSet.GetPhaseWhenPodsNotReady(ctx, c.GetName())
+	originPhaseIsUpRunning := slices.Contains(appsv1alpha1.GetComponentUpRunningPhase(), c.GetPhase())
+	if hasFailedPodTimedOut || originPhaseIsUpRunning {
+		phase, statusMessage, err = c.ComponentSet.GetPhaseWhenPodsNotReady(ctx, c.GetName(), originPhaseIsUpRunning)
 		if err != nil {
 			return "", nil, err
 		}

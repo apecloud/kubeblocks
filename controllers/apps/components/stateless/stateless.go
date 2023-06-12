@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // NewRSAvailableReason is added in a deployment when its newest replica set is made available
@@ -94,7 +95,8 @@ func (stateless *Stateless) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
 func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
-	componentName string) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
+	componentName string,
+	originPhaseIsUpRunning bool) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	deployList := &appsv1.DeploymentList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, stateless.Cli, *stateless.Cluster, componentName, deployList)
 	if err != nil || len(deployList.Items) == 0 {
@@ -104,6 +106,9 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
 	// if the failed pod is not controlled by the new ReplicaSetKind
 	checkExistFailedPodOfNewRS := func(pod *corev1.Pod, workload metav1.Object) bool {
 		d := workload.(*appsv1.Deployment)
+		if originPhaseIsUpRunning {
+			return !intctrlutil.PodIsReady(pod) && belongToNewReplicaSet(d, pod)
+		}
 		isFailed, _, message := internal.IsPodFailedAndTimedOut(pod)
 		existLatestRevisionFailedPod := isFailed && belongToNewReplicaSet(d, pod)
 		if existLatestRevisionFailedPod {

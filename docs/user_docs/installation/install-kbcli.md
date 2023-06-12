@@ -24,7 +24,7 @@ kbcli now supports MacOS and Windows.
 <Tabs>
 <TabItem value="MacOS" label="MacOS" default>
 
-You can install kbcli with `curl` or `homebrew`.
+You can install kbcli with `curl` or `brew`.
 
 - Option 1: Install kbcli using the `curl` command.
 
@@ -102,6 +102,26 @@ If you need to customize the installation path, use the zip file.
     3. Click **Environment Variables** on the **Advanced** tab.
     4. Click **New** to add the path of the kbcli installation package to the user and system variables.
     5. Click **Apply** and **OK**.
+
+</TabItem>
+
+<TabItem value="Linux" label="Linux" default>
+
+Install kbcli using the `curl` command.
+
+1. Install kbcli.
+
+   ```bash
+   curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
+   ```
+
+2. Run `kbcli version` to check the version of kbcli and ensure that it is successfully installed.
+
+:::note
+
+- If a timeout exception occurs during installation, please check your network settings and retry.
+
+:::
 
 </TabItem>
 </Tabs>

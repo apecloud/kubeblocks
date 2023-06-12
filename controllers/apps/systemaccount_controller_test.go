@@ -50,7 +50,6 @@ var _ = Describe("SystemAccount Controller", func() {
 		mysqlCompTypeWOSysAcctDefName = "wo-sysacct"
 		mysqlCompName                 = "mysql"
 		mysqlCompNameWOSysAcct        = "wo-sysacct"
-		orphanFinalizerName           = "orphan"
 		clusterEndPointsSize          = 3
 	)
 
@@ -411,18 +410,6 @@ var _ = Describe("SystemAccount Controller", func() {
 					}
 				}).Should(Succeed())
 
-				// remove 'orphan' finalizers to make sure all jobs can be deleted.
-				Eventually(func(g Gomega) {
-					jobs := &batchv1.JobList{}
-					g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-					for _, job := range jobs.Items {
-						g.Expect(testapps.ChangeObj(&testCtx, &job, func(ljob *batchv1.Job) {
-							controllerutil.RemoveFinalizer(ljob, orphanFinalizerName)
-						})).To(Succeed())
-					}
-					g.Expect(len(jobs.Items)).To(Equal(0), "Verify all jobs completed and deleted")
-				}).Should(Succeed())
-
 				By("Check secrets created")
 				Eventually(func(g Gomega) {
 					secrets := &corev1.SecretList{}
@@ -617,16 +604,24 @@ var _ = Describe("SystemAccount Controller", func() {
 				By("Delete one job directly, the system should not create new secrets.")
 				jobToDelete := jobs.Items[0]
 				jobKey := client.ObjectKeyFromObject(&jobToDelete)
+
+				tmpJob := &batchv1.Job{}
+				Eventually(func(g Gomega) {
+					g.Expect(k8sClient.Get(ctx, jobKey, tmpJob)).To(Succeed())
+					g.Expect(len(tmpJob.ObjectMeta.Finalizers)).To(BeEquivalentTo(1))
+				}).Should(Succeed())
+
+				Expect(testapps.ChangeObjStatus(&testCtx, tmpJob, func() {
+					tmpJob.Status.Conditions = []batchv1.JobCondition{{
+						Type:   batchv1.JobFailed,
+						Status: corev1.ConditionTrue,
+					}}
+				})).To(Succeed())
 				Expect(k8sClient.Delete(ctx, &jobToDelete)).To(Succeed())
 
+				By("Wait for a while till the job is deleted, should succeed")
 				Eventually(func(g Gomega) {
-					tmpJob := &batchv1.Job{}
-					g.Expect(k8sClient.Get(ctx, jobKey, tmpJob)).To(Succeed())
-					g.Expect(len(tmpJob.ObjectMeta.Finalizers)).To(BeEquivalentTo(2))
-					g.Expect(testapps.ChangeObj(&testCtx, tmpJob, func(ljob *batchv1.Job) {
-						controllerutil.RemoveFinalizer(ljob, orphanFinalizerName)
-						controllerutil.RemoveFinalizer(ljob, constant.DBClusterFinalizerName)
-					})).To(Succeed())
+					g.Expect(apierrors.IsNotFound(k8sClient.Get(ctx, jobKey, &batchv1.Job{}))).Should(BeTrue())
 				}).Should(Succeed())
 
 				By("Verify jobs size decreased and secrets size does not increase")
@@ -641,41 +636,25 @@ var _ = Describe("SystemAccount Controller", func() {
 					secretsLen = len(secrets.Items)
 				}).Should(Succeed())
 
-				By("Wait for a while till the job is deleted, should succeed")
-				Eventually(func(g Gomega) {
-					tmpJob := &batchv1.Job{}
-					err := k8sClient.Get(ctx, jobKey, tmpJob)
-					g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
-				}).Should(Succeed())
-
-				By("Fetch all jobs should succeed")
-				Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).Should(Succeed()) // mark one jobs as completed
 				if len(jobs.Items) == 0 {
 					continue
 				}
 				// delete one job directly, but the job is completed.
 				By("Delete one job and mark it as JobComplete, the system should create new secrets.")
 				jobKey = client.ObjectKeyFromObject(&jobs.Items[0])
-				Eventually(func(g Gomega) {
-					tmpJob := &batchv1.Job{}
-					g.Expect(k8sClient.Get(ctx, jobKey, tmpJob)).To(Succeed())
-					g.Expect(testapps.ChangeObjStatus(&testCtx, tmpJob, func() {
-						tmpJob.Status.Conditions = []batchv1.JobCondition{{
-							Type:   batchv1.JobComplete,
-							Status: corev1.ConditionTrue,
-						}}
-					})).To(Succeed())
-					g.Expect(k8sClient.Delete(ctx, tmpJob)).Should(Succeed())
-					g.Expect(testapps.ChangeObj(&testCtx, tmpJob, func(ljob *batchv1.Job) {
-						controllerutil.RemoveFinalizer(ljob, orphanFinalizerName)
-						controllerutil.RemoveFinalizer(ljob, constant.DBClusterFinalizerName)
-					})).To(Succeed())
+				tmpJob = &batchv1.Job{}
+				Expect(k8sClient.Get(ctx, jobKey, tmpJob)).To(Succeed())
+				Expect(len(tmpJob.ObjectMeta.Finalizers)).To(BeEquivalentTo(1))
+				Expect(testapps.ChangeObjStatus(&testCtx, tmpJob, func() {
+					tmpJob.Status.Conditions = []batchv1.JobCondition{{
+						Type:   batchv1.JobComplete,
+						Status: corev1.ConditionTrue,
+					}}
+				})).To(Succeed())
 
-				}).Should(Succeed())
-
+				Expect(k8sClient.Delete(ctx, tmpJob)).Should(Succeed())
 				Eventually(func(g Gomega) {
-					err := k8sClient.Get(ctx, jobKey, &batchv1.Job{})
-					g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
+					g.Expect(apierrors.IsNotFound(k8sClient.Get(ctx, jobKey, &batchv1.Job{}))).Should(BeTrue())
 				}).Should(Succeed())
 
 				By("Verify jobs size decreased and secrets size increased")

@@ -21,7 +21,6 @@ package dashboard
 
 import (
 	"net/http"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -96,7 +95,6 @@ var _ = Describe("kubeblocks", func() {
 		cmd := newOpenCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
-		Expect(cmd.Flags().Set(podRunningTimeoutFlag, time.Second.String())).Should(Succeed())
 		By("open options")
 		o := newOpenOptions(tf, streams)
 		Expect(o).ShouldNot(BeNil())

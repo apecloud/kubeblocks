@@ -26,9 +26,9 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -42,11 +42,6 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-)
-
-const (
-	podRunningTimeoutFlag = "pod-running-timeout"
-	defaultPodExecTimeout = 60 * time.Second
 )
 
 type dashboard struct {
@@ -74,7 +69,8 @@ var (
 		# Open a dashboard with a specific local port
 		kbcli dashboard open kubeblocks-grafana --port 8080
 
-		# for dashboard kubeblocks-grafana, support direct the specified dashboard name
+		# for dashboard kubeblocks-grafana, support to direct the specified dashboard type
+		# now we support mysql,mongodb,postgresql,redis,weaviate,kafka,cadvisor,jmx and node
 		kbcli dashboard open kubeblocks-grafana mysql
 	`)
 
@@ -201,7 +197,7 @@ func newOpenOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *ope
 func newOpenCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newOpenOptions(f, streams)
 	cmd := &cobra.Command{
-		Use:     "open [dashboard-type] | open kubeblocks-grafana [dashboard-name]",
+		Use:     "open NAME [DASHBOARD-TYPE] [--port PORT]",
 		Short:   "Open one dashboard.",
 		Example: openExample,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -227,8 +223,6 @@ func newOpenCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	}
 
 	cmd.Flags().StringVar(&o.localPort, "port", "", "dashboard local port")
-	cmd.Flags().Duration(podRunningTimeoutFlag, defaultPodExecTimeout,
-		"The time (like 5s, 2m, or 3h, higher than zero) to wait for at least one pod is running")
 	return cmd
 }
 

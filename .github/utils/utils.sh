@@ -435,11 +435,12 @@ upload_rpm_repo() {
     for file in "$current_dir"/*
     do
         if [ -f "$file" ]; then
-          echo "https://api.github.com/repos/apecloud/kbcli_rpm_test/contents/rpm_repo/repodata/$file"
+          filename=$(basename "$file")
+          echo "https://api.github.com/repos/apecloud/kbcli_rpm_test/contents/rpm_repo/repodata/$filename"
 
           curl -X PUT -H "Authorization: token $GITHUB_TOKEN" \
           -H "Content-Type: application/json" -d '{"message": "Upload file", "content": "'$(base64 < "$file")'"}' \
-          https://api.github.com/repos/apecloud/kbcli_rpm_test/contents/rpm_repo/repodata/$file
+          https://api.github.com/repos/apecloud/kbcli_rpm_test/contents/rpm_repo/repodata/$filename
         fi
     done
 }

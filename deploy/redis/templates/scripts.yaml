@@ -8,6 +8,9 @@ data:
   setup.sh: |
     #!/bin/sh
     set -ex
+    # set default user password and replication user password
+    until redis-cli -h 127.0.0.1 -p 6379 ping; do sleep 1; done
+    redis-cli -h 127.0.0.1 -p 6379 ACL SETUSER default ON \>$REDIS_DEFAULT_PASSWORD allcommands allkeys
     # first get the primary pod information from the DownwardAPI annotation, if it does not exist, get the primary pod information from env
     primary=`cat /kb-podinfo/primary-pod`
     echo "downwardAPI gey primary=$primary" >> /etc/redis/.kb_set_up.log
@@ -23,8 +26,8 @@ data:
     else
       primary_fqdn="$primary.$KB_CLUSTER_NAME-$KB_COMP_NAME-headless.$KB_NAMESPACE.svc"
       echo "primary_fqdn=$primary_fqdn" >> /etc/redis/.kb_set_up.log
-      until redis-cli -h $primary_fqdn -p 6379 ping; do sleep 1; done
-      redis-cli -h 127.0.0.1 -p 6379 replicaof $primary_fqdn 6379 || exit 1
+      until redis-cli -h $primary_fqdn -p 6379 -a $REDIS_DEFAULT_PASSWORD ping; do sleep 1; done
+      redis-cli -h 127.0.0.1 -p 6379 -a $REDIS_DEFAULT_PASSWORD replicaof $primary_fqdn 6379 || exit 1
     fi
   redis-start.sh: |
     {{- .Files.Get "scripts/redis7-start.sh.tpl" | nindent 4 }}
@@ -32,6 +35,12 @@ data:
     {{- .Files.Get "scripts/redis-sentinel-setup.sh.tpl" | nindent 4 }}
   redis-sentinel-start.sh: |-
     {{- .Files.Get "scripts/redis-sentinel-start.sh.tpl" | nindent 4 }}
+  redis-sentinel-post-start.sh: |-
+    #!/bin/sh
+    set -ex
+    # set default user password and replication user password
+    until redis-cli -h 127.0.0.1 -p 26379 ping; do sleep 1; done
+    redis-cli -h 127.0.0.1 -p 26379 ACL SETUSER $SENTINEL_USER ON \>$SENTINEL_PASSWORD allchannels +@all
   redis-sentinel-ping.sh: |-
     #!/bin/sh
     set -ex
@@ -40,6 +49,7 @@ data:
           redis-cli \
             -h localhost \
             -p 26379 \
+            -a $SENTINEL_PASSWORD \
             ping
         )
     if [ "$?" -eq "124" ]; then

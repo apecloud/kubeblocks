@@ -169,7 +169,7 @@ func NeedDealWithSwitchover(ctx context.Context,
 			meta.SetStatusCondition(&cluster.Status.Conditions, *oldSwitchoverCondition)
 		}
 		// TODO(xingran): under the current implementation, the following scenarios need to be optimized:
-		// when a failover occurs, and the result of the failover is not synchronized to the switchoverCandidate (eg. switchoverCandidate.failoverSync=false),
+		// when a failover occurs, and the result of the failover is not synchronized to the switchoverCandidate (eg. switchoverCandidate.roleSync=false),
 		// at this time, the information of switchoverCandidate is inconsistent with the current primary or leader,
 		// and the user cannot switch back to the node in the current switchoverCandidate at this time because the switchover condition is not changed.
 		return false, nil

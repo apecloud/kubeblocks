@@ -101,7 +101,7 @@ type ClusterStatus struct {
 }
 
 // ClusterComponentSpec defines the cluster component spec.
-// +kubebuilder:validation:XValidation:rule="has(self.candidateInstance) ? self.candidateInstance.index < self.replicas : !has(self.candidateInstance)",message="candidateInstance.index cannot be larger than replicas"
+// +kubebuilder:validation:XValidation:rule="has(self.switchoverCandidate) ? self.switchoverCandidate.index < self.replicas : !has(self.switchoverCandidate)",message="switchoverCandidate.index cannot be larger than replicas"
 type ClusterComponentSpec struct {
 	// name defines cluster's component name.
 	// +kubebuilder:validation:Required

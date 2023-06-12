@@ -965,7 +965,7 @@ func (pgOps *PostgresOperations) IsRunning(ctx context.Context, podName string) 
 		return false
 	}
 
-	return resp["stdout"] == "0"
+	return resp["stdout"] == "1"
 }
 
 func (pgOps *PostgresOperations) IsHealthiest(ctx context.Context, podName string) bool {

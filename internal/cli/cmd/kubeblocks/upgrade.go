@@ -21,7 +21,6 @@ package kubeblocks
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -160,17 +159,21 @@ func (o *InstallOptions) showUpgradeDiff() error {
 	if err != nil {
 		return fmt.Errorf("could not get the helm release manifest")
 	}
-	old, _ := os.Create("oldManifest.yaml")
-	defer old.Close()
-	_, err = old.Write([]byte(oldManifest))
-	// helm.Get
-	dryRun := true
-	helmInstallOps := o.buildChart()
-	helmInstallOps.DryRun = &dryRun
-	newManifest, err := helmInstallOps.GetChartManifestByDryRun(o.HelmCfg)
-	new_, _ := os.Create("newManifest.yaml")
-	defer new_.Close()
-	_, err = new_.Write([]byte(newManifest))
+	newSpecs, err := helm.Parse(oldManifest, o.Namespace, true)
+	for key, value := range newSpecs {
+		fmt.Printf("key: %s value:%v \n", key, *value)
+	}
+	//old, _ := os.Create("oldManifest.yaml")
+	//defer old.Close()
+	//_, err = old.Write([]byte(oldManifest))
+	//// helm.Get
+	//dryRun := true
+	//helmInstallOps := o.buildChart()
+	//helmInstallOps.DryRun = &dryRun
+	//newManifest, err := helmInstallOps.GetChartManifestByDryRun(o.HelmCfg)
+	//new_, _ := os.Create("newManifest.yaml")
+	//defer new_.Close()
+	//_, err = new_.Write([]byte(newManifest))
 	return err
 	// can get the uninstall version manifest, ues the target chart helm template
 }

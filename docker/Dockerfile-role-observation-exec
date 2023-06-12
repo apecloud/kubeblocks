@@ -27,12 +27,18 @@ ENV GOPROXY=${GOPROXY}
 
 WORKDIR /src
 
-
 # Build
+# role-observe
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
      CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/role-observe cmd/probe/role/main.go
+
+
+# grpc-health-probe
+RUN GRPC_HEALTH_PROBE_VERSION=v0.4.13 && \
+    wget -qO /bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-amd64 && \
+    chmod +x /bin/grpc_health_probe
 
 
 # Use alpine
@@ -43,5 +49,6 @@ RUN if [ -n "${APK_MIRROR}" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.ali
 RUN apk add --no-cache curl \
     && rm -rf /var/cache/apk/*
 
-# copy role observation
+# copy role observation and grpc-health-probe
 COPY --from=builder /out/role-observe  /bin/role-agent
+COPY --from=builder /bin/grpc_health_probe /bin/grpc_health_probe

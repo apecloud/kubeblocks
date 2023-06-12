@@ -927,7 +927,7 @@ func (pgOps *PostgresOperations) Demote(ctx context.Context, podName string) err
 		}
 	}
 
-	return pgOps.follow(ctx, podName, true, pgOps.Cs.GetCluster().Leader.GetMember().GetName())
+	return pgOps.Follow(ctx, podName, true, pgOps.Cs.GetCluster().Leader.GetMember().GetName())
 }
 
 // GetStatus TODO：GetStatus后期考虑用postmaster替代
@@ -1039,7 +1039,7 @@ func (pgOps *PostgresOperations) HandleFollow(ctx context.Context, leader *confi
 
 	needChange, needRestart := pgOps.checkRecoveryConf(ctx, podName, leader.GetMember().GetName())
 	if needChange {
-		return pgOps.follow(ctx, podName, needRestart, leader.GetMember().GetName())
+		return pgOps.Follow(ctx, podName, needRestart, leader.GetMember().GetName())
 	}
 
 	pgOps.Logger.Infof("no action coz i am still follow the leader")
@@ -1095,7 +1095,7 @@ func (pgOps *PostgresOperations) handleRewind(ctx context.Context, leader *confi
 	return pgOps.executeRewind()
 }
 
-func (pgOps *PostgresOperations) follow(ctx context.Context, podName string, needRestart bool, leader string) error {
+func (pgOps *PostgresOperations) Follow(ctx context.Context, podName string, needRestart bool, leader string) error {
 	primaryInfo := "host="
 	primaryInfo += leader + pgOps.Cs.GetClusterCompName() + "-headles"
 	primaryInfo += " port=" + os.Getenv("KB_SERVICE_PORT")

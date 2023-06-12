@@ -179,6 +179,11 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 	}
 
 	if !h.isDBRunning() {
+		if h.cs.GetCluster().Leader != nil {
+			leader := h.cs.GetCluster().Leader.GetMember().GetName()
+			_ = h.DB.Follow(h.ctx, h.podName, true, leader)
+		}
+
 		err = h.DB.InitDelay()
 		if err != nil {
 			h.log.Errorf("init failed, err:%v", err)

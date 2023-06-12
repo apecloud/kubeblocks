@@ -21,6 +21,7 @@ type DB interface {
 	ProcessManualSwitchoverFromNoLeader(ctx context.Context, podName string) bool
 	InitDelay() error
 	Init(metadata bindings.Metadata) error
+	Follow(ctx context.Context, podName string, needRestart bool, leader string) error
 
 	DbConn
 	DbTool

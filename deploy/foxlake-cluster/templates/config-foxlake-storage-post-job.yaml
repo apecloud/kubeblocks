@@ -16,7 +16,7 @@ spec:
       restartPolicy: Never
       initContainers:
         - name: wait-for-foxlake
-          image: "busybox:latest"
+          image: "busybox:1.35"
           command:
             - "sh"
             - "-c"
@@ -25,7 +25,7 @@ spec:
             {{- include "foxlake-cluster.endPointEnv" . | nindent 12}} 
       containers:
         - name: config-storage
-          image: "mysql:latest"
+          image: "mysql:8.0.30"
           command:
             - "scripts/setup_{{- include "foxlake-cluster.deployEnv" . -}}_storage.sh"
           env:

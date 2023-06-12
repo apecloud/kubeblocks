@@ -17,7 +17,7 @@ spec:
       {{- if eq (include "foxlake-cluster.deployEnv" .) "local" }}
       initContainers:
         - name: wait-for-minio
-          image: "busybox:latest"
+          image: "busybox:1.35"
           command:
             - "sh"
             - "-c"

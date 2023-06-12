@@ -20,7 +20,7 @@ images:
   mysql:
     repository: mysql
     pullPolicy: IfNotPresent
-    tag: "latest"
+    tag: "8.0.30"
   minio:
     repository: docker.io/minio/minio
     tag: RELEASE.2022-03-17T06-34-49Z

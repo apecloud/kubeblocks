@@ -73,9 +73,9 @@ minio
 {{- end }}
 {{- define "foxlake-cluster.postJobImage" -}}
 {{- if eq (include "foxlake-cluster.deployEnv" .) "cloud" -}}
-amazon/aws-cli
+docker.io/amazon/aws-cli:2.11.27
 {{- else -}}  
-minio/mc
+docker.io/minio/mc:RELEASE.2023-06-06T13-48-56Z
 {{- end }}
 {{- end }}
 

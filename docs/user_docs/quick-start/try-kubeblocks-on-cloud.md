@@ -220,7 +220,7 @@ Make sure you have all the followings prepared.
 
    :::note
 
-   For users in China, refer to [the corresponding guide](https://help.aliyun.com/document_detail/161387.htm?spm=a2c4g.85903.0.0.478d2246FdHMGt#task-2470091).
+   For users who deploy Alibaba Cloud in China Mainland, refer to [the corresponding guide](https://help.aliyun.com/document_detail/161387.htm?spm=a2c4g.85903.0.0.478d2246FdHMGt#task-2470091).
 
    :::
 3. Click [AliyunOOSLifecycleHook4CSRole](https://ram.console.aliyun.com/role/authorize?spm=5176.2020520152.0.0.5b4716ddI6QevL&request=%7B%22ReturnUrl%22%3A%22https%3A%2F%2Fram.console.aliyun.com%22%2C%22Services%22%3A%5B%7B%22Roles%22%3A%5B%7B%22RoleName%22%3A%22AliyunOOSLifecycleHook4CSRole%22%2C%22TemplateId%22%3A%22AliyunOOSLifecycleHook4CSRole%22%7D%5D%2C%22Service%22%3A%22OOS%22%7D%5D%7D) and click **Agree to Authorization** to create an AliyunOOSLifecycleHook4CSRole role.

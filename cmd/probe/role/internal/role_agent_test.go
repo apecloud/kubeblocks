@@ -80,7 +80,7 @@ func TestGetRole(t *testing.T) {
 		}
 
 		roleExpected := "leader"
-		initHttp(roleExpected, path, 9723, true)
+		initHTTP(roleExpected, path, 9723, true)
 		time.Sleep(1 * time.Second) // wait for http listen
 
 		ops, notify := faker.CheckRole(context.Background())
@@ -105,7 +105,7 @@ func TestGetRole(t *testing.T) {
 			t.Errorf("faker init failed ,err = %v", err)
 		}
 
-		initHttp("", path, 7171, false)
+		initHTTP("", path, 7171, false)
 		time.Sleep(1 * time.Second)
 
 		ops, notify := faker.CheckRole(context.Background())
@@ -136,16 +136,22 @@ func initEnv(ports []int) {
 	viper.Set("KB_SRS_ACTION_SVC_LIST", string(buf))
 }
 
-func initHttp(roleExpected, path string, port int, good bool) {
+func initHTTP(roleExpected, path string, port int, good bool) {
 	path = "/" + path
 	http.HandleFunc(path, func(writer http.ResponseWriter, request *http.Request) {
 		if good {
-			io.WriteString(writer, roleExpected)
+			_, err := io.WriteString(writer, roleExpected)
+			if err != nil {
+				return
+			}
 		} else {
 			writer.WriteHeader(http.StatusNotFound)
 		}
 	})
 	go func() {
-		http.ListenAndServe(fmt.Sprintf("localhost:%d", port), nil)
+		err := http.ListenAndServe(fmt.Sprintf("localhost:%d", port), nil)
+		if err != nil {
+			return
+		}
 	}()
 }

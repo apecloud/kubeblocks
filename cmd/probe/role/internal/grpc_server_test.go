@@ -27,7 +27,7 @@ func TestCheck(t *testing.T) {
 
 		roleExpected := "leader"
 		path := "check_success"
-		initHttp(roleExpected, path, 8080, true)
+		initHTTP(roleExpected, path, 8080, true)
 		time.Sleep(time.Second * 2)
 
 		faker := mockFakeGrpcServer(path)
@@ -35,7 +35,9 @@ func TestCheck(t *testing.T) {
 			t.Errorf("fake init failed: %v", err)
 		}
 
-		ctx, _ := context.WithTimeout(context.Background(), time.Second*30)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+		defer cancel()
+
 		resp, err := faker.Check(metadata.NewOutgoingContext(ctx, make(metadata.MD)), &health.HealthCheckRequest{})
 		if resp.Status != health.HealthCheckResponse_NOT_SERVING || err == nil {
 			t.Error("faker check didn't get role change ...")
@@ -66,7 +68,7 @@ func TestCheck(t *testing.T) {
 		initEnv(ports)
 
 		path := "check_failed"
-		initHttp("", path, 8081, false)
+		initHTTP("", path, 8081, false)
 		time.Sleep(1 * time.Second)
 
 		faker := mockFakeGrpcServer(path)
@@ -74,7 +76,9 @@ func TestCheck(t *testing.T) {
 			t.Errorf("fake init failed: %v", err)
 		}
 
-		ctx, _ := context.WithTimeout(context.Background(), time.Second*30)
+		ctx, cacel := context.WithTimeout(context.Background(), time.Second*30)
+		defer cacel()
+
 		resp, err := faker.Check(metadata.NewOutgoingContext(ctx, make(metadata.MD)), &health.HealthCheckRequest{})
 
 		if resp.Status != health.HealthCheckResponse_NOT_SERVING || err == nil {

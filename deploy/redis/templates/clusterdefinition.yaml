@@ -255,6 +255,14 @@ spec:
                   name: $(CONN_CREDENTIAL_SECRET_NAME)
                   key: password
                   optional: false
+            - name: SENTINEL_USER
+              value: "default"
+            - name: SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
         containers:
         - name: redis-sentinel
           imagePullPolicy: IfNotPresent
@@ -293,6 +301,14 @@ spec:
                   name: $(CONN_CREDENTIAL_SECRET_NAME)
                   key: password
                   optional: false
+            - name: SENTINEL_USER
+              value: "default"
+            - name: SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
           command:
             - /bin/bash
           args:
@@ -300,6 +316,10 @@ spec:
             - |
               set -ex
               /scripts/redis-sentinel-start.sh
+          lifecycle:
+            postStart:
+              exec:
+                command: [ "/scripts/redis-sentinel-post-start.sh" ]
           livenessProbe:
             initialDelaySeconds: 10
             periodSeconds: 5

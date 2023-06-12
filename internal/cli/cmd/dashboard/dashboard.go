@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -42,6 +43,11 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+)
+
+const (
+	podRunningTimeoutFlag = "pod-running-timeout"
+	defaultPodExecTimeout = 60 * time.Second
 )
 
 type dashboard struct {
@@ -223,6 +229,8 @@ func newOpenCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	}
 
 	cmd.Flags().StringVar(&o.localPort, "port", "", "dashboard local port")
+	cmd.Flags().Duration(podRunningTimeoutFlag, defaultPodExecTimeout,
+		"The time (like 5s, 2m, or 3h, higher than zero) to wait for at least one pod is running")
 	return cmd
 }
 

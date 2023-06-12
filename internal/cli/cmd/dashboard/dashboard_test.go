@@ -21,6 +21,7 @@ package dashboard
 
 import (
 	"net/http"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -97,6 +98,7 @@ var _ = Describe("kubeblocks", func() {
 
 		By("open options")
 		o := newOpenOptions(tf, streams)
+		Expect(cmd.Flags().Set(podRunningTimeoutFlag, time.Second.String())).Should(Succeed())
 		Expect(o).ShouldNot(BeNil())
 		Expect(o.complete(cmd, []string{})).Should(HaveOccurred())
 		Expect(o.complete(cmd, []string{"kubeblocks-grafana"})).Should(HaveOccurred())

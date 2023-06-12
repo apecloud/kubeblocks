@@ -610,9 +610,7 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(len(jobs.Items)).To(BeEquivalentTo(jobsNum))
 				}).Should(Succeed())
 
-				By("Mark partial jobs as completed and make sure it cannot be found")
-				// mark one jobs as completed
-				if jobsNum < 2 {
+				if len(jobs.Items) == 0 {
 					continue
 				}
 				// delete one job, but the job IS NOT completed.
@@ -643,9 +641,21 @@ var _ = Describe("SystemAccount Controller", func() {
 					secretsLen = len(secrets.Items)
 				}).Should(Succeed())
 
+				By("Wait for a while till the job is deleted, should succeed")
+				Eventually(func(g Gomega) {
+					tmpJob := &batchv1.Job{}
+					err := k8sClient.Get(ctx, jobKey, tmpJob)
+					g.Expect(apierrors.IsNotFound(err)).Should(BeTrue())
+				}).Should(Succeed())
+
+				By("Fetch all jobs should succeed")
+				Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).Should(Succeed()) // mark one jobs as completed
+				if len(jobs.Items) == 0 {
+					continue
+				}
 				// delete one job directly, but the job is completed.
 				By("Delete one job and mark it as JobComplete, the system should create new secrets.")
-				jobKey = client.ObjectKeyFromObject(&jobs.Items[1])
+				jobKey = client.ObjectKeyFromObject(&jobs.Items[0])
 				Eventually(func(g Gomega) {
 					tmpJob := &batchv1.Job{}
 					g.Expect(k8sClient.Get(ctx, jobKey, tmpJob)).To(Succeed())

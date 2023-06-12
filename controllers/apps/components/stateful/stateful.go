@@ -102,6 +102,9 @@ func (r *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context,
 	// if the failed pod is not controlled by the latest revision
 	checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
 		sts := workload.(*appsv1.StatefulSet)
+		// if component is up running but pod is not ready, this pod should be failed.
+		// for example: full disk cause readiness probe failed and serve is not available.
+		// but kubelet only sets the container is not ready and pod is also Running.
 		if originPhaseIsUpRunning {
 			return !intctrlutil.PodIsReady(pod) && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
 		}

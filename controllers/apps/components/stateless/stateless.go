@@ -106,6 +106,9 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
 	// if the failed pod is not controlled by the new ReplicaSetKind
 	checkExistFailedPodOfNewRS := func(pod *corev1.Pod, workload metav1.Object) bool {
 		d := workload.(*appsv1.Deployment)
+		// if component is up running but pod is not ready, this pod should be failed.
+		// for example: full disk cause readiness probe failed and serve is not available.
+		// but kubelet only sets the container is not ready and pod is also Running.
 		if originPhaseIsUpRunning {
 			return !intctrlutil.PodIsReady(pod) && belongToNewReplicaSet(d, pod)
 		}

@@ -151,6 +151,9 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 		if labelValue == "" {
 			statusMessages.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
 		}
+		// if component is up running but pod is not ready, this pod should be failed.
+		// for example: full disk cause readiness probe failed and serve is not available.
+		// but kubelet only sets the container is not ready and pod is also Running.
 		if originPhaseIsUpRunning && !intctrlutil.PodIsReady(&v) && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
 			existLatestRevisionFailedPod = true
 			continue

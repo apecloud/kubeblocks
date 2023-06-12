@@ -438,7 +438,7 @@ upload_rpm_repo() {
         echo "$filename"
         echo "https://api.github.com/repos/apecloud/kbcli_rpm_test/contents/rpm_repo/repodata/$filename"
 
-        curl -X POST -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/json" -d '{"message": "Upload file", "content": "'$(base64 < ./$filename)'"}' $GITHUB_API/repos/$GITHUB_REPO/contents/rpm_repo/repodata/$filename
+        curl -X PUT -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/json" -d '{"message": "Upload file", "content": "'$(base64 < ./$filename)'"}' $GITHUB_API/repos/$GITHUB_REPO/contents/rpm_repo/repodata/$filename
       fi
     done
 }

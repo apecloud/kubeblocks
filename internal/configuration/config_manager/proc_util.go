@@ -26,8 +26,8 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
-// findPidFromProcessName gets parent pid
-func findPidFromProcessName(processName string, ctx ...context.Context) (PID, error) {
+// findParentPIDByProcessName gets parent pid
+func findParentPIDByProcessName(processName string, ctx ...context.Context) (PID, error) {
 	var fctx context.Context
 
 	if len(ctx) == 0 {

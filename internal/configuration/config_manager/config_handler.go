@@ -125,13 +125,13 @@ type unixSignalHandler struct {
 	mountPoint string
 }
 
-func (u *unixSignalHandler) OnlineUpdate(ctx context.Context, name string, updatedParams map[string]string) error {
-	logger.Info("not support online update")
+func (u *unixSignalHandler) OnlineUpdate(ctx context.Context, _ string, updatedParams map[string]string) error {
+	logger.Info(fmt.Sprintf("not support online update, param: %v", updatedParams))
 	return nil
 }
 
-func (u *unixSignalHandler) VolumeHandle(ctx context.Context, event fsnotify.Event) error {
-	pid, err := findPidFromProcessName(u.processName, ctx)
+func (u *unixSignalHandler) VolumeHandle(ctx context.Context, _ fsnotify.Event) error {
+	pid, err := findParentPIDByProcessName(u.processName, ctx)
 	if err != nil {
 		return err
 	}

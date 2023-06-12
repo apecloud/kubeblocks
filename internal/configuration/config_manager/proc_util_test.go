@@ -31,15 +31,15 @@ func init() {
 	SetLogger(zapLog)
 }
 
-func TestFindParentPidFromProcessName(t *testing.T) {
-	processName := getProcName()
+func TestFindParentPidByProcessName(t *testing.T) {
+	processName := findCurrProcName()
 	fmt.Printf("current test program name: %s\n", processName)
-	pid, err := findPidFromProcessName(processName)
+	pid, err := findParentPIDByProcessName(processName)
 	require.Nil(t, err)
 	require.Equal(t, PID(os.Getpid()), pid)
 }
 
-func getProcName() string {
+func findCurrProcName() string {
 	pid := int32(os.Getpid())
 	procs, _ := process.Processes()
 	for _, proc := range procs {

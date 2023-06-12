@@ -194,7 +194,55 @@ spec:
               httpGet:
                 path: /
                 port: http-metrics
+          - name: log-manager
+            image: apecloud/agamotto:0.0.5-yunju.10
+            imagePullPolicy: IfNotPresent
+            securityContext:
+              runAsNonRoot: false
+              runAsUser: 0
+            args:
+              - --config=/opt/agamotto/config.yaml
+            env:
+              - name: DB_TYPE
+                value: mysql
+            volumeMounts:
+              - name: data
+                mountPath: /data/mysql
+              - name: log-data
+                mountPath: /var/log/kubeblocks
+                readOnly: false
+              - name: agamotto-log-sidecar-config
+                mountPath: /opt/agamotto
+                readOnly: true
+            ports:
+              - name: http-health
+                containerPort: 13133
+            livenessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              httpGet:
+                path: /
+                port: http-health
+            readinessProbe:
+              failureThreshold: 6
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+              httpGet:
+                path: /
+                port: http-health
         volumes:
+          - name: agamotto-log-sidecar-config
+            configMap:
+              name: agamotto-log-sidecar-config
+          - name: log-data
+            hostPath:
+              path: /var/log/kubeblocks
+              type: DirectoryOrCreate
           - name: annotations
             downwardAPI:
               items:

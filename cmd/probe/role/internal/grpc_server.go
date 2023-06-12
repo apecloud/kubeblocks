@@ -1,22 +1,24 @@
-package healthprobe
+package internal
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"os"
-
-	"github.com/apecloud/kubeblocks/cmd/probe/role/internal"
 
 	"google.golang.org/grpc/codes"
 	health "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
 )
 
+const (
+	DefaultPort        = "7373"
+	DefaultServiceName = ""
+)
+
 type GrpcServer struct {
-	internal.RoleAgent
+	RoleAgent
 }
 
 func (s *GrpcServer) Check(ctx context.Context, in *health.HealthCheckRequest) (*health.HealthCheckResponse, error) {
@@ -33,7 +35,6 @@ func (s *GrpcServer) Check(ctx context.Context, in *health.HealthCheckRequest) (
 	}
 
 	roleInfo := string(buf)
-	fmt.Println(roleInfo)
 	if shouldNotify {
 		return &health.HealthCheckResponse{Status: health.HealthCheckResponse_NOT_SERVING}, errors.New(roleInfo)
 	} else {
@@ -42,17 +43,14 @@ func (s *GrpcServer) Check(ctx context.Context, in *health.HealthCheckRequest) (
 }
 
 func (s *GrpcServer) Watch(in *health.HealthCheckRequest, _ health.Health_WatchServer) error {
-	// todo didn't implement the `watch` function
+	// didn't implement the `watch` function
 	return status.Error(codes.Unimplemented, "unimplemented")
 }
 
-func NewGrpcServer() (*GrpcServer, error) {
-	res := &GrpcServer{
-		RoleAgent: *internal.NewRoleAgent(os.Stdin, ""),
-	}
-	err := res.RoleAgent.Init()
-	if err != nil {
-		return nil, err
-	}
-	return res, nil
+func (s *GrpcServer) Init() error {
+	return s.RoleAgent.Init()
+}
+
+func NewGrpcServer(path string) *GrpcServer {
+	return &GrpcServer{RoleAgent: *NewRoleAgent(os.Stdin, "", path)}
 }

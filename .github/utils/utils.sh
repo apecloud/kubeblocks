@@ -23,6 +23,7 @@ Usage: $(basename "$0") <options>
                                 11) release message
                                 12) send message
                                 13) patch release notes
+                                14) upload rpm repo
     -tn, --tag-name           Release tag name
     -gr, --github-repo        Github Repo
     -gt, --github-token       Github token
@@ -426,11 +427,18 @@ patch_release_notes() {
 }
 
 upload_rpm_repo() {
-    curl -X POST \
-      -H "Authorization: token $GITHUB_TOKEN" \
-      -H "Content-Type: application/octet-stream" \
-      --data-binary "@." \
-      $GITHUB_API/repos/$GITHUB_REPO/contents/$FOLDER?ref=main
+    cd kbcli_rpm_test/rpm_repo/repo
+    current_dir=$(pwd)
+    for file in "$current_dir"/*
+    do
+        if [ -f "$file" ]; then
+          curl -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Type: application/octet-stream" \
+            -F "file_name=@$file" \
+            $GITHUB_API/repos/$GITHUB_REPO/contents/rpm_repo/repo
+        fi
+    done
 }
 
 main "$@"

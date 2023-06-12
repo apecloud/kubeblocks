@@ -172,10 +172,11 @@ jobs:
           cp /home/runner/rpmbuild/RPMS/${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}/${{ env.CLI_NAME }}-${{ env.TAG_NAME }}-1.${{ matrix.os == 'linux-amd64' && 'x86_64' || 'aarch64' }}.rpm kbcli_rpm_test/rpm_repo/
           createrepo_c -pdo kbcli_rpm_test/rpm_repo kbcli_rpm_test/rpm_repo
           createrepo_c --update kbcli_rpm_test/rpm_repo
-          cd kbcli_rpm_test
-          git add .
-          git commit -m "update"
-          git push https://${{ env.GITHUB_TOKEN }}@github.com/apecloud/kbcli_rpm_test.git
+          bash .github/utils/utils.sh --type 14 \
+            --github-repo 'apecloud/kbcli_rpm_test' \
+            --tag-name ${{ env.TAG_NAME }} \
+            --file "./kbcli_rpm_test/rpm_repo/repo" \
+            --github-token ${{ env.GITHUB_TOKEN }}   
 
 #
 #      - name: upload RPM package
@@ -236,20 +237,20 @@ jobs:
 #        with:
 #          name: sha256
 
-  send-message:
-    runs-on: ubuntu-latest
-    needs: upload-release-assert
-    if: ${{ always() }}
-    steps:
-      - uses: actions/checkout@v3
-      - name: send message
-        run: |
-          CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0error"
-          if [[ "${{ needs.upload-release-assert.result }}" == "success" ]]; then
-              CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0success"
-          fi
-          bash .github/utils/utils.sh --type 12 \
-            --tag-name ${{ env.TAG_NAME }} \
-            --content "${CONTENT}"\
-            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
-            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+#  send-message:
+#    runs-on: ubuntu-latest
+#    needs: upload-release-assert
+#    if: ${{ always() }}
+#    steps:
+#      - uses: actions/checkout@v3
+#      - name: send message
+#        run: |
+#          CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0error"
+#          if [[ "${{ needs.upload-release-assert.result }}" == "success" ]]; then
+#              CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0success"
+#          fi
+#          bash .github/utils/utils.sh --type 12 \
+#            --tag-name ${{ env.TAG_NAME }} \
+#            --content "${CONTENT}"\
+#            --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
+#            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

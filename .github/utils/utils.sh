@@ -437,9 +437,9 @@ upload_rpm_repo() {
           echo "$file"
           curl -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3.raw" \
-            -F "file_name=@$file" \
-            $GITHUB_API/repos/$GITHUB_REPO/contents/rpm_repo/repodata
+            -H "Accept: application/octet-stream" \
+            --data-binary "@$file" \
+            $GITHUB_API/repos/$GITHUB_REPO/contents/rpm_repo/repodata/"$file"
         fi
     done
 }

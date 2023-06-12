@@ -42,6 +42,8 @@ var _ = Describe("ConfigManager Test", func() {
 	const (
 		scriptsName = "script_cm"
 		scriptsNS   = "default"
+
+		secondaryRenderedTemplateName = "secondary-rendered-template"
 	)
 
 	var mockK8sCli *testutil.K8sClientMockHelper
@@ -126,6 +128,8 @@ var _ = Describe("ConfigManager Test", func() {
 			},
 			Volumes:                newVolumeMounts(),
 			ConfigSpecsBuildParams: newConfigSpecMeta(),
+			ConfigSecondaryVolumes: make(map[string]corev1.VolumeMount),
+			DownwardAPIVolumes:     make([]corev1.VolumeMount, 0),
 		}
 		if hasScripts {
 			param.ConfigSpecsBuildParams[0].ScriptConfig = []appsv1alpha1.ScriptConfig{
@@ -152,8 +156,35 @@ fileRegex: my.cnf
 formatterConfig:
   format: ini
 `,
-				}}}), testutil.WithAnyTimes()))
-		mockK8sCli.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithTimes(1)))
+				}},
+			&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secondaryRenderedTemplateName,
+					Namespace: scriptsNS,
+				},
+				Data: map[string]string{
+					"my.cnf": "",
+				}},
+		}), testutil.WithAnyTimes()))
+		mockK8sCli.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
+	}
+
+	newDownwardAPIVolumes := func() []appsv1alpha1.DownwardAPIOption {
+		return []appsv1alpha1.DownwardAPIOption{
+			{
+				Name:       "downward-api",
+				MountPoint: "/etc/podinfo",
+				Command:    []string{"/bin/true"},
+				Items: []corev1.DownwardAPIVolumeFile{
+					{
+						Path: "labels/role",
+						FieldRef: &corev1.ObjectFieldSelector{
+							FieldPath: `metadata.labels['kubeblocks.io/role']`,
+						},
+					},
+				},
+			},
+		}
 	}
 
 	AfterEach(func() {
@@ -161,103 +192,6 @@ formatterConfig:
 	})
 
 	Context("TestBuildConfigManagerContainer", func() {
-		// It("Should success with no error", func() {
-		//	type args struct {
-		//		reloadOptions *appsv1alpha1.ReloadOptions
-		//		volumeDirs    []corev1.VolumeMount
-		//		cli           client.Client
-		//		ctx           context.Context
-		//		param         *CfgManagerBuildParams
-		//	}
-		//	tests := []struct {
-		//		name         string
-		//		args         args
-		//		expectedArgs []string
-		//		wantErr      bool
-		//	}{
-		//		{
-		//			name: "buildCfgContainerParams",
-		//			args: args{
-		//				reloadOptions: newReloadOptions(appsv1alpha1.UnixSignalType, nil),
-		//				volumeDirs:    newVolumeMounts2(),
-		//			},
-		//			expectedArgs: []string{
-		//				`--volume-dir`, `/postgresql/conf`,
-		//				`--volume-dir`, `/postgresql/conf2`,
-		//			},
-		//		}, {
-		//			name: "buildCfgContainerParams",
-		//			args: args{
-		//				reloadOptions: newReloadOptions(appsv1alpha1.ShellType, nil),
-		//				volumeDirs:    newVolumeMounts(),
-		//			},
-		//			expectedArgs: []string{
-		//				`--volume-dir`, `/postgresql/conf`,
-		//			},
-		//		}, {
-		//			name: "buildCfgContainerParams",
-		//			args: args{
-		//				reloadOptions: newReloadOptions(appsv1alpha1.ShellType, nil),
-		//				volumeDirs: []corev1.VolumeMount{
-		//					{
-		//						MountPath: "/postgresql/conf",
-		//						Name:      "pg_config",
-		//					}},
-		//				cli:   mockK8sCli.Client(),
-		//				ctx:   context.TODO(),
-		//				param: newCMBuildParams(),
-		//			},
-		//			expectedArgs: []string{
-		//				`--volume-dir`, `/postgresql/conf`,
-		//			},
-		//		},
-		//		{
-		//			name: "buildCfgContainerParams",
-		//			args: args{
-		//				reloadOptions: newReloadOptions(appsv1alpha1.TPLScriptType, syncFn(true)),
-		//				volumeDirs:    newVolumeMounts(),
-		//				cli:           mockK8sCli.Client(),
-		//				ctx:           context.TODO(),
-		//				param:         newCMBuildParams(),
-		//			},
-		//			expectedArgs: []string{
-		//				`--operator-update-enable`,
-		//			},
-		//			wantErr: false,
-		//		}, {
-		//			name: "buildCfgContainerParamsWithOutSync",
-		//			args: args{
-		//				reloadOptions: newReloadOptions(appsv1alpha1.TPLScriptType, syncFn(false)),
-		//				volumeDirs:    newVolumeMounts(),
-		//				cli:           mockK8sCli.Client(),
-		//				ctx:           context.TODO(),
-		//				param:         newCMBuildParams(),
-		//			},
-		//			expectedArgs: []string{
-		//				`--volume-dir`, `/postgresql/conf`,
-		//			},
-		//			wantErr: false,
-		//		}}
-		//	for _, tt := range tests {
-		//		param := tt.args.param
-		//		if param == nil {
-		//			param = &CfgManagerBuildParams{}
-		//		}
-		//		for i := range param.ConfigSpecsBuildParams {
-		//			buildParam := &param.ConfigSpecsBuildParams[i]
-		//			buildParam.ReloadOptions = tt.args.reloadOptions
-		//			buildParam.ReloadType = FromReloadTypeConfig(tt.args.reloadOptions)
-		//		}
-		//		err := BuildConfigManagerContainerParams(tt.args.cli, tt.args.ctx, param, tt.args.volumeDirs)
-		//		Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
-		//		if !tt.wantErr {
-		//			for _, arg := range tt.expectedArgs {
-		//				Expect(param.Args).Should(ContainElement(arg))
-		//			}
-		//		}
-		//	}
-		// })
-
 		It("builds unixSignal reloader correctly", func() {
 			param := newCMBuildParams(false)
 			reloadOptions := newReloadOptions(appsv1alpha1.UnixSignalType, nil)
@@ -324,6 +258,35 @@ formatterConfig:
 			for _, arg := range []string{`--volume-dir`, `/postgresql/conf`} {
 				Expect(param.Args).Should(ContainElement(arg))
 			}
+		})
+
+		It("builds secondary render correctly", func() {
+			mockTplScriptCM()
+			param := newCMBuildParams(false)
+			reloadOptions := newReloadOptions(appsv1alpha1.TPLScriptType, syncFn(false))
+			for i := range param.ConfigSpecsBuildParams {
+				buildParam := &param.ConfigSpecsBuildParams[i]
+				buildParam.ReloadOptions = reloadOptions
+				buildParam.ReloadType = appsv1alpha1.TPLScriptType
+				buildParam.ConfigSpec.SecondaryRenderedConfigSpec = &appsv1alpha1.SecondaryRenderedTemplateSpec{
+					Namespace:   scriptsNS,
+					TemplateRef: secondaryRenderedTemplateName,
+				}
+			}
+			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
+			for _, buildParam := range param.ConfigSpecsBuildParams {
+				Expect(FindVolumeMount(param.Volumes, GetConfigVolumeName(buildParam.ConfigSpec))).ShouldNot(BeNil())
+			}
+		})
+
+		It("builds downwardAPI correctly", func() {
+			mockTplScriptCM()
+			param := newCMBuildParams(false)
+			buildParam := &param.ConfigSpecsBuildParams[0]
+			buildParam.DownwardAPIOptions = newDownwardAPIVolumes()
+			buildParam.ReloadOptions = newReloadOptions(appsv1alpha1.TPLScriptType, syncFn(true))
+			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
+			Expect(FindVolumeMount(param.DownwardAPIVolumes, buildParam.DownwardAPIOptions[0].Name)).ShouldNot(BeNil())
 		})
 	})
 

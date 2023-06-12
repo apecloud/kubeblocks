@@ -5,7 +5,7 @@ title: kbcli dashboard open
 Open one dashboard.
 
 ```
-kbcli dashboard open [flags]
+kbcli dashboard open [dashboard-type] | open kubeblocks-grafana [dashboard-name] [flags]
 ```
 
 ### Examples
@@ -16,12 +16,14 @@ kbcli dashboard open [flags]
   
   # Open a dashboard with a specific local port
   kbcli dashboard open kubeblocks-grafana --port 8080
+  
+  # for dashboard kubeblocks-grafana, support direct the specified dashboard name
+  kbcli dashboard open kubeblocks-grafana mysql
 ```
 
 ### Options
 
 ```
-      --cluster-type string            The cluster type opened directly in dashboard, support mysql,cadvisor,jmx,kafka,mongodb,node,postgresql,redis,weaviate
   -h, --help                           help for open
       --pod-running-timeout duration   The time (like 5s, 2m, or 3h, higher than zero) to wait for at least one pod is running (default 1m0s)
       --port string                    dashboard local port

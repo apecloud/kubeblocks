@@ -26,11 +26,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/redis/go-redis/v9"
-	"golang.org/x/exp/slices"
-
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
+	"github.com/redis/go-redis/v9"
+	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 
 	// import this json-iterator package to replace the default
 	// to avoid the error: 'json: unsupported type: map[interface {}]interface {}'
@@ -50,6 +50,11 @@ var (
 		"kbprobe",
 		"kbreplicator",
 	}
+)
+
+var (
+	redisUser   = "default"
+	redisPasswd = ""
 )
 
 // Redis is a redis output binding.
@@ -74,6 +79,14 @@ func NewRedis(logger logger.Logger) bindings.OutputBinding {
 // Init performs metadata parsing and connection creation.
 func (r *Redis) Init(meta bindings.Metadata) (err error) {
 	r.BaseOperations.Init(meta)
+
+	if viper.IsSet("KB_SERVICE_USER") {
+		redisUser = viper.GetString("KB_SERVICE_USER")
+	}
+
+	if viper.IsSet("KB_SERVICE_PASSWORD") {
+		redisPasswd = viper.GetString("KB_SERVICE_PASSWORD")
+	}
 
 	r.Logger.Debug("Initializing Redis binding")
 	r.DBType = "redis"
@@ -133,7 +146,11 @@ func (r *Redis) initDelay() error {
 		return nil
 	}
 	var err error
-	r.client, r.clientSettings, err = rediscomponent.ParseClientFromProperties(r.Metadata.Properties, nil)
+	defaultSettings := &rediscomponent.Settings{
+		Password: redisPasswd,
+		Username: redisUser,
+	}
+	r.client, r.clientSettings, err = rediscomponent.ParseClientFromProperties(r.Metadata.Properties, defaultSettings)
 	if err != nil {
 		return err
 	}

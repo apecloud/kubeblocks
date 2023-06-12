@@ -24,6 +24,7 @@ Usage: $(basename "$0") <options>
                                 12) send message
                                 13) patch release notes
                                 14) ignore cover pkgs
+                                15) set size label
     -tn, --tag-name           Release tag name
     -gr, --github-repo        Github Repo
     -gt, --github-token       Github token
@@ -37,6 +38,7 @@ Usage: $(basename "$0") <options>
     -ip, --ignore-pkgs        The ignore cover pkgs
     -br, --base-branch        The base branch name
     -bc, --base-commit        The base commit id
+    -pn, --pr-number          The pull request number
 EOF
 }
 
@@ -44,10 +46,10 @@ GITHUB_API="https://api.github.com"
 LATEST_REPO=apecloud/kubeblocks
 
 main() {
-    local TYPE
-    local TAG_NAME
-    local GITHUB_REPO
-    local GITHUB_TOKEN
+    local TYPE=""
+    local TAG_NAME=""
+    local GITHUB_REPO=""
+    local GITHUB_TOKEN=""
     local TRIGGER_MODE=""
     local RUNNER_NAME=""
     local BRANCH_NAME=""
@@ -61,6 +63,7 @@ main() {
     local BASE_BRANCH=""
     local BASE_COMMIT=""
     local BASE_COMMIT_ID=HEAD^
+    local PR_NUMBER=""
 
     parse_command_line "$@"
 
@@ -106,6 +109,9 @@ main() {
         ;;
         14)
             ignore_cover_pkgs
+        ;;
+        15)
+            set_size_label
         ;;
         *)
             show_help
@@ -205,6 +211,12 @@ parse_command_line() {
                     shift
                 fi
                 ;;
+            -pn|--pr-number)
+                if [[ -n "${2:-}" ]]; then
+                    PR_NUMBER="$2"
+                    shift
+                fi
+                ;;
             *)
                 break
                 ;;
@@ -215,9 +227,14 @@ parse_command_line() {
 }
 
 gh_curl() {
-    curl -H "Authorization: token $GITHUB_TOKEN" \
-      -H "Accept: application/vnd.github.v3.raw" \
-      $@
+    if [[ -z "$GITHUB_TOKEN" ]]; then
+        curl -H "Accept: application/vnd.github.v3.raw" \
+            $@
+    else
+        curl -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3.raw" \
+            $@
+    fi
 }
 
 get_upload_url() {
@@ -486,6 +503,62 @@ ignore_cover_pkgs() {
         fi
         echo $line >> cover_new.out
     done < ${FILE}
+}
+
+set_size_label() {
+    pr_changes=$( gh_curl -s $GITHUB_API/repos/$LATEST_REPO/pulls/$PR_NUMBER/files | jq -r '.[].changes' )
+    total_changes=0
+    for changes in $( echo "$pr_changes" ); do
+       total_changes=$(( $total_changes + $changes ))
+    done
+    size_label=""
+    if [[ $total_changes -lt 10 ]]; then
+        size_label="size/XS"
+    elif [[ $total_changes -lt 30 ]]; then
+        size_label="size/S"
+    elif [[ $total_changes -lt 100 ]]; then
+        size_label="size/M"
+    elif [[ $total_changes -lt 500 ]]; then
+        size_label="size/L"
+    elif [[ $total_changes -lt 1000 ]]; then
+        size_label="size/XL"
+    else
+        size_label="size/XXL"
+    fi
+    echo "size label:$size_label"
+    label_list=$( gh pr view $PR_NUMBER --repo $LATEST_REPO | grep labels: )
+    remove_label=""
+    add_label=true
+    for label in $( echo "$label_list" ); do
+        label=${label/,/}
+        case $label in
+            $size_label)
+                add_label=false
+                continue
+            ;;
+            size/*)
+                if [[ -z "$remove_label" ]]; then
+                    remove_label=$label
+                else
+                    remove_label="$label,$remove_label"
+                fi
+            ;;
+        esac
+    done
+    if [[ "$remove_label" == *"," ]]; then
+        echo $remove_label
+        remove_label=${remove_label::-1}
+    fi
+
+    if [[ ! -z "$remove_label" ]]; then
+        echo "remove label:$remove_label"
+        gh pr edit $PR_NUMBER --repo $LATEST_REPO --remove-label "$remove_label"
+    fi
+
+    if [[ $add_label == true ]]; then
+        echo "add label:$size_label"
+        gh pr edit $PR_NUMBER --repo $LATEST_REPO --add-label "$size_label"
+    fi
 }
 
 main "$@"

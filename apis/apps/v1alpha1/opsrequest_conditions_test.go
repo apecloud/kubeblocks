@@ -36,6 +36,15 @@ func TestNewAllCondition(t *testing.T) {
 	NewValidateFailedCondition(ReasonClusterPhaseMismatch, "fail")
 	NewFailedCondition(opsRequest, nil)
 	NewFailedCondition(opsRequest, errors.New("opsRequest run failed"))
+	NewCancelingCondition(opsRequest)
+	NewCancelFailedCondition(opsRequest, nil)
+	NewCancelFailedCondition(opsRequest, errors.New("cancel opsRequest failed"))
+	NewCancelSucceedCondition(opsRequest.Name)
+	NewExposingCondition(opsRequest)
+	NewStopCondition(opsRequest)
+	NewStopCondition(opsRequest)
+	NewReconfigureFailedCondition(opsRequest, nil)
+	NewReconfigureFailedCondition(opsRequest, errors.New("reconfigure opsRequest failed"))
 
 	opsRequest.Spec.Reconfigure = &Reconfigure{
 		ComponentOps: ComponentOps{

@@ -71,7 +71,7 @@ jobs:
       - name: remove runner
         run: |
           bash .github/utils/utils.sh --type 9 \
-            --github-token ${{ env.GITHUB_TOKEN }} \
+            --github-token "${{ env.GITHUB_TOKEN }}" \
             --runner-name ${{ needs.make-test.outputs.runner-name }}
 
   check-image:

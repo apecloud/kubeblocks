@@ -59,7 +59,7 @@ type SynthesizedComponent struct {
 	HorizontalScalePolicy *v1alpha1.HorizontalScalePolicy        `json:"horizontalScalePolicy,omitempty"`
 	TLS                   bool                                   `json:"tls"`
 	Issuer                *v1alpha1.Issuer                       `json:"issuer,omitempty"`
-	VolumeTypes           []v1alpha1.VolumeTypeSpec              `json:"VolumeTypes,omitempty"`
+	VolumeTypes           []v1alpha1.VolumeTypeSpec              `json:"volumeTypes,omitempty"`
 	CustomLabelSpecs      []v1alpha1.CustomLabelSpec             `json:"customLabelSpecs,omitempty"`
 	SwitchoverSpec        *v1alpha1.SwitchoverSpec               `json:"switchoverSpec,omitempty"`
 	ComponentDef          string                                 `json:"componentDef,omitempty"`

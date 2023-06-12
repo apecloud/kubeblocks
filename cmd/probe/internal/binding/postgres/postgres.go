@@ -958,7 +958,7 @@ func (pgOps *PostgresOperations) IsLeader(ctx context.Context) (bool, error) {
 }
 
 func (pgOps *PostgresOperations) IsRunning(ctx context.Context, podName string) bool {
-	cmd := `if [ -e "postgresql/data/standby.signal" ]; then echo "1"; else echo "0"; fi`
+	cmd := `if [ -e "/opt/bitnami/postgresql/tmp/postgresql.pid" ]; then echo "1"; else echo "0"; fi`
 	resp, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, cmd, pgOps.DBType)
 	if err != nil {
 		pgOps.Logger.Errorf("exec cmd:%s err:%v", cmd, err)

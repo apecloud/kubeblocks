@@ -429,12 +429,15 @@ patch_release_notes() {
 upload_rpm_repo() {
     cd kbcli_rpm_test/rpm_repo/repo
     current_dir=$(pwd)
+    pwd
+    ls
     for file in "$current_dir"/*
     do
         if [ -f "$file" ]; then
+          echo "$file"
           curl -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Content-Type: application/octet-stream" \
+            -H "Accept: application/vnd.github.v3.raw" \
             -F "file_name=@$file" \
             $GITHUB_API/repos/$GITHUB_REPO/contents/rpm_repo/repo
         fi

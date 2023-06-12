@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package statefulreplicaset
+package rsm
 
 import (
 	"context"
@@ -31,18 +31,18 @@ import (
 )
 
 const (
-	kindStatefulReplicaSet = "ReplicatedStateMachine"
+	kindReplicatedStateMachine = "ReplicatedStateMachine"
 
 	roleLabelKey          = "kubeblocks.io/role"
-	srsAccessModeLabelKey = "srs.apps.kubeblocks.io/access-mode"
+	rsmAccessModeLabelKey = "rsm.apps.kubeblocks.io/access-mode"
 
 	defaultPodName = "Unknown"
 
-	srsFinalizerName = "srs.workloads.kubeblocks.io/finalizer"
+	rsmFinalizerName = "rsm.workloads.kubeblocks.io/finalizer"
 
-	jobHandledLabel             = "srs.workloads.kubeblocks.io/job-handled"
-	jobTypeLabel                = "srs.workloads.kubeblocks.io/job-type"
-	jobScenarioLabel            = "srs.workloads.kubeblocks.io/job-scenario"
+	jobHandledLabel             = "rsm.workloads.kubeblocks.io/job-handled"
+	jobTypeLabel                = "rsm.workloads.kubeblocks.io/job-type"
+	jobScenarioLabel            = "rsm.workloads.kubeblocks.io/job-scenario"
 	jobHandledTrue              = "true"
 	jobHandledFalse             = "false"
 	jobTypeSwitchover           = "switchover"
@@ -65,39 +65,39 @@ const (
 	defaultRoleObservationDaemonPort = 3501
 	roleObservationURIFormat         = "http://localhost:%s/role"
 	defaultActionImage               = "busybox:latest"
-	usernameCredentialVarName        = "KB_SRS_USERNAME"
-	passwordCredentialVarName        = "KB_SRS_PASSWORD"
-	servicePortVarName               = "KB_SRS_SERVICE_PORT"
-	actionSvcListVarName             = "KB_SRS_ACTION_SVC_LIST"
-	leaderHostVarName                = "KB_SRS_LEADER_HOST"
-	targetHostVarName                = "KB_SRS_TARGET_HOST"
+	usernameCredentialVarName        = "KB_RSM_USERNAME"
+	passwordCredentialVarName        = "KB_RSM_PASSWORD"
+	servicePortVarName               = "KB_RSM_SERVICE_PORT"
+	actionSvcListVarName             = "KB_RSM_ACTION_SVC_LIST"
+	leaderHostVarName                = "KB_RSM_LEADER_HOST"
+	targetHostVarName                = "KB_RSM_TARGET_HOST"
 	roleObservationEventFieldPath    = "spec.containers{" + roleObservationName + "}"
 	actionSvcPortBase                = int32(36500)
 )
 
-type SRSTransformContext struct {
+type rsmTransformContext struct {
 	context.Context
 	Client roclient.ReadonlyClient
 	record.EventRecorder
 	logr.Logger
-	srs     *workloads.ReplicatedStateMachine
-	srsOrig *workloads.ReplicatedStateMachine
+	rsm     *workloads.ReplicatedStateMachine
+	rsmOrig *workloads.ReplicatedStateMachine
 }
 
-func (c *SRSTransformContext) GetContext() context.Context {
+func (c *rsmTransformContext) GetContext() context.Context {
 	return c.Context
 }
 
-func (c *SRSTransformContext) GetClient() roclient.ReadonlyClient {
+func (c *rsmTransformContext) GetClient() roclient.ReadonlyClient {
 	return c.Client
 }
 
-func (c *SRSTransformContext) GetRecorder() record.EventRecorder {
+func (c *rsmTransformContext) GetRecorder() record.EventRecorder {
 	return c.EventRecorder
 }
 
-func (c *SRSTransformContext) GetLogger() logr.Logger {
+func (c *rsmTransformContext) GetLogger() logr.Logger {
 	return c.Logger
 }
 
-var _ graph.TransformContext = &SRSTransformContext{}
+var _ graph.TransformContext = &rsmTransformContext{}

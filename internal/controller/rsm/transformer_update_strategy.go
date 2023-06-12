@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package statefulreplicaset
+package rsm
 
 import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -32,19 +32,19 @@ import (
 type UpdateStrategyTransformer struct{}
 
 func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*SRSTransformContext)
-	srs := transCtx.srs
-	srsOrig := transCtx.srsOrig
-	if !model.IsObjectStatusUpdating(srsOrig) {
+	transCtx, _ := ctx.(*rsmTransformContext)
+	rsm := transCtx.rsm
+	rsmOrig := transCtx.rsmOrig
+	if !model.IsObjectStatusUpdating(rsmOrig) {
 		return nil
 	}
 
 	// read the underlying sts
 	stsObj := &apps.StatefulSet{}
-	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(srs), stsObj); err != nil {
+	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), stsObj); err != nil {
 		return err
 	}
-	// read all pods belong to the sts, hence belong to the srs
+	// read all pods belong to the sts, hence belong to the rsm
 	pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, stsObj)
 	if err != nil {
 		return err
@@ -64,14 +64,14 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 		return nil
 	}
 
-	// we don't check whether pod role label present: prefer stateful set's Update done than role probing ready
-	// TODO(free6om): maybe should wait srs ready for high availability:
+	// we don't check whether pod role label present: prefer stateful_set's Update done than role probing ready
+	// TODO(free6om): maybe should wait rsm ready for high availability:
 	// 1. after some pods updated
 	// 2. before switchover
 	// 3. after switchover done
 
 	// generate the pods Deletion plan
-	plan := newUpdatePlan(*srs, pods)
+	plan := newUpdatePlan(*rsm, pods)
 	podsToBeUpdated, err := plan.execute()
 	if err != nil {
 		return err
@@ -93,13 +93,13 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 }
 
 // return true means action created or in progress, should wait it to the termination state
-func doSwitchoverIfNeeded(transCtx *SRSTransformContext, dag *graph.DAG, pods []corev1.Pod, podsToBeUpdated []*corev1.Pod) (bool, error) {
+func doSwitchoverIfNeeded(transCtx *rsmTransformContext, dag *graph.DAG, pods []corev1.Pod, podsToBeUpdated []*corev1.Pod) (bool, error) {
 	if len(podsToBeUpdated) == 0 {
 		return false, nil
 	}
 
-	srs := transCtx.srs
-	if !shouldSwitchover(srs, podsToBeUpdated) {
+	rsm := transCtx.rsm
+	if !shouldSwitchover(rsm, podsToBeUpdated) {
 		return false, nil
 	}
 
@@ -108,7 +108,7 @@ func doSwitchoverIfNeeded(transCtx *SRSTransformContext, dag *graph.DAG, pods []
 		return true, err
 	}
 	if len(actionList) == 0 {
-		return true, createSwitchoverAction(dag, srs, pods)
+		return true, createSwitchoverAction(dag, rsm, pods)
 	}
 
 	// switch status if found:
@@ -137,23 +137,23 @@ func doSwitchoverIfNeeded(transCtx *SRSTransformContext, dag *graph.DAG, pods []
 	return false, nil
 }
 
-func createSwitchoverAction(dag *graph.DAG, srs *workloads.ReplicatedStateMachine, pods []corev1.Pod) error {
-	leader := getLeaderPodName(srs.Status.MembersStatus)
-	targetOrdinal := selectSwitchoverTarget(srs, pods)
-	target := getPodName(srs.Name, targetOrdinal)
+func createSwitchoverAction(dag *graph.DAG, rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) error {
+	leader := getLeaderPodName(rsm.Status.MembersStatus)
+	targetOrdinal := selectSwitchoverTarget(rsm, pods)
+	target := getPodName(rsm.Name, targetOrdinal)
 	actionType := jobTypeSwitchover
 	ordinal, _ := getPodOrdinal(leader)
-	actionName := getActionName(srs.Name, int(srs.Generation), ordinal, actionType)
-	action := buildAction(srs, actionName, actionType, jobScenarioUpdate, leader, target)
+	actionName := getActionName(rsm.Name, int(rsm.Generation), ordinal, actionType)
+	action := buildAction(rsm, actionName, actionType, jobScenarioUpdate, leader, target)
 
 	// don't do cluster abnormal status analysis, prefer faster update process
-	return createAction(dag, srs, action)
+	return createAction(dag, rsm, action)
 }
 
-func selectSwitchoverTarget(srs *workloads.ReplicatedStateMachine, pods []corev1.Pod) int {
+func selectSwitchoverTarget(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) int {
 	var podUpdated, podUpdatedWithLabel string
 	for _, pod := range pods {
-		if intctrlutil.GetPodRevision(&pod) != srs.Status.UpdateRevision {
+		if intctrlutil.GetPodRevision(&pod) != rsm.Status.UpdateRevision {
 			continue
 		}
 		if len(podUpdated) == 0 {
@@ -180,8 +180,8 @@ func selectSwitchoverTarget(srs *workloads.ReplicatedStateMachine, pods []corev1
 	return ordinal
 }
 
-func shouldSwitchover(srs *workloads.ReplicatedStateMachine, podsToBeUpdated []*corev1.Pod) bool {
-	leaderName := getLeaderPodName(srs.Status.MembersStatus)
+func shouldSwitchover(rsm *workloads.ReplicatedStateMachine, podsToBeUpdated []*corev1.Pod) bool {
+	leaderName := getLeaderPodName(rsm.Status.MembersStatus)
 	for _, pod := range podsToBeUpdated {
 		if pod.Name == leaderName {
 			return true

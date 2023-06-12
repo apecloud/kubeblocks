@@ -25,12 +25,12 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
-type StatefulReplicaSetBuilder struct {
-	BaseBuilder[workloads.ReplicatedStateMachine, *workloads.ReplicatedStateMachine, StatefulReplicaSetBuilder]
+type ReplicatedStateMachineBuilder struct {
+	BaseBuilder[workloads.ReplicatedStateMachine, *workloads.ReplicatedStateMachine, ReplicatedStateMachineBuilder]
 }
 
-func NewStatefulReplicaSetBuilder(namespace, name string) *StatefulReplicaSetBuilder {
-	builder := &StatefulReplicaSetBuilder{}
+func NewReplicatedStateMachineBuilder(namespace, name string) *ReplicatedStateMachineBuilder {
+	builder := &ReplicatedStateMachineBuilder{}
 	builder.init(namespace, name,
 		&workloads.ReplicatedStateMachine{
 			Spec: workloads.ReplicatedStateMachineSpec{
@@ -49,34 +49,34 @@ func NewStatefulReplicaSetBuilder(namespace, name string) *StatefulReplicaSetBui
 	return builder
 }
 
-func (builder *StatefulReplicaSetBuilder) SetReplicas(replicas int32) *StatefulReplicaSetBuilder {
+func (builder *ReplicatedStateMachineBuilder) SetReplicas(replicas int32) *ReplicatedStateMachineBuilder {
 	builder.get().Spec.Replicas = replicas
 	return builder
 }
 
-func (builder *StatefulReplicaSetBuilder) SetRoles(roles []workloads.ReplicaRole) *StatefulReplicaSetBuilder {
+func (builder *ReplicatedStateMachineBuilder) SetRoles(roles []workloads.ReplicaRole) *ReplicatedStateMachineBuilder {
 	builder.get().Spec.Roles = roles
 	return builder
 }
 
-func (builder *StatefulReplicaSetBuilder) SetTemplate(template corev1.PodTemplateSpec) *StatefulReplicaSetBuilder {
+func (builder *ReplicatedStateMachineBuilder) SetTemplate(template corev1.PodTemplateSpec) *ReplicatedStateMachineBuilder {
 	builder.get().Spec.Template = template
 	return builder
 }
 
-func (builder *StatefulReplicaSetBuilder) SetObservationActions(actions []workloads.Action) *StatefulReplicaSetBuilder {
+func (builder *ReplicatedStateMachineBuilder) SetObservationActions(actions []workloads.Action) *ReplicatedStateMachineBuilder {
 	builder.get().Spec.RoleObservation.ObservationActions = actions
 	return builder
 }
 
-func (builder *StatefulReplicaSetBuilder) AddObservationAction(action workloads.Action) *StatefulReplicaSetBuilder {
+func (builder *ReplicatedStateMachineBuilder) AddObservationAction(action workloads.Action) *ReplicatedStateMachineBuilder {
 	actions := builder.get().Spec.RoleObservation.ObservationActions
 	actions = append(actions, action)
 	builder.get().Spec.RoleObservation.ObservationActions = actions
 	return builder
 }
 
-func (builder *StatefulReplicaSetBuilder) SetService(service corev1.ServiceSpec) *StatefulReplicaSetBuilder {
+func (builder *ReplicatedStateMachineBuilder) SetService(service corev1.ServiceSpec) *ReplicatedStateMachineBuilder {
 	builder.get().Spec.Service = service
 	return builder
 }

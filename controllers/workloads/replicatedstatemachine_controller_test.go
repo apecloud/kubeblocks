@@ -64,19 +64,19 @@ var _ = Describe("ReplicatedStateMachine Controller", func() {
 				Image:   "foo",
 				Command: []string{"bar"},
 			}
-			srs := builder.NewStatefulReplicaSetBuilder(testCtx.DefaultNamespace, name).
+			rsm := builder.NewReplicatedStateMachineBuilder(testCtx.DefaultNamespace, name).
 				SetService(service).
 				SetTemplate(template).
 				AddObservationAction(action).
 				GetObject()
-			Expect(k8sClient.Create(ctx, srs)).Should(Succeed())
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(srs),
+			Expect(k8sClient.Create(ctx, rsm)).Should(Succeed())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(rsm),
 				func(g Gomega, set *workloads.ReplicatedStateMachine) {
 					g.Expect(set.Status.ObservedGeneration).Should(BeEquivalentTo(1))
 				}),
 			).Should(Succeed())
-			Expect(k8sClient.Delete(ctx, srs)).Should(Succeed())
-			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(srs), &workloads.ReplicatedStateMachine{}, false)).
+			Expect(k8sClient.Delete(ctx, rsm)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(rsm), &workloads.ReplicatedStateMachine{}, false)).
 				Should(Succeed())
 		})
 	})

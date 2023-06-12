@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package statefulreplicaset
+package rsm
 
 import (
 	apps "k8s.io/api/apps/v1"
@@ -27,46 +27,46 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
-// SRSStatusTransformer computes the current status:
-// 1. read the underlying sts's status and copy them to stateful_replica_set's status
-// 2. read pod role label and update stateful_replica_set's status role fields
-type SRSStatusTransformer struct{}
+// ObjectStatusTransformer computes the current status:
+// 1. read the underlying sts's status and copy them to the primary object's status
+// 2. read pod role label and update the primary object's status role fields
+type ObjectStatusTransformer struct{}
 
-func (t *SRSStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*SRSTransformContext)
-	srs := transCtx.srs
-	srsOrig := transCtx.srsOrig
+func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*rsmTransformContext)
+	rsm := transCtx.rsm
+	rsmOrig := transCtx.rsmOrig
 
 	// fast return
-	if model.IsObjectDeleting(srsOrig) {
+	if model.IsObjectDeleting(rsmOrig) {
 		return nil
 	}
 
 	switch {
-	case model.IsObjectUpdating(srsOrig):
-		// use srs's generation instead of sts's
-		srs.Status.ObservedGeneration = srs.Generation
+	case model.IsObjectUpdating(rsmOrig):
+		// use rsm's generation instead of sts's
+		rsm.Status.ObservedGeneration = rsm.Generation
 		// hack for sts initialization error: is invalid: status.replicas: Required value
-		if srs.Status.Replicas == 0 {
-			srs.Status.Replicas = srs.Spec.Replicas
+		if rsm.Status.Replicas == 0 {
+			rsm.Status.Replicas = rsm.Spec.Replicas
 		}
-	case model.IsObjectStatusUpdating(srsOrig):
+	case model.IsObjectStatusUpdating(rsmOrig):
 		// read the underlying sts
 		sts := &apps.StatefulSet{}
-		if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(srs), sts); err != nil {
+		if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(rsm), sts); err != nil {
 			return err
 		}
-		// keep srs's ObservedGeneration to avoid override by sts's ObservedGeneration
-		generation := srs.Status.ObservedGeneration
-		srs.Status.StatefulSetStatus = sts.Status
-		srs.Status.ObservedGeneration = generation
-		// read all pods belong to the sts, hence belong to the srs
+		// keep rsm's ObservedGeneration to avoid override by sts's ObservedGeneration
+		generation := rsm.Status.ObservedGeneration
+		rsm.Status.StatefulSetStatus = sts.Status
+		rsm.Status.ObservedGeneration = generation
+		// read all pods belong to the sts, hence belong to the rsm
 		pods, err := getPodsOfStatefulSet(transCtx.Context, transCtx.Client, sts)
 		if err != nil {
 			return err
 		}
 		// update role fields
-		setMembersStatus(srs, pods)
+		setMembersStatus(rsm, pods)
 	}
 
 	if err := model.PrepareRootStatus(dag); err != nil {
@@ -76,4 +76,4 @@ func (t *SRSStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.
 	return nil
 }
 
-var _ graph.Transformer = &SRSStatusTransformer{}
+var _ graph.Transformer = &ObjectStatusTransformer{}

@@ -1,4 +1,4 @@
-# permissions for end users to edit replicatedstatemachine.
+# permissions for end users to edit rsm.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:

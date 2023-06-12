@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package statefulreplicaset
+package rsm
 
 import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -29,8 +29,8 @@ import (
 type FixMetaTransformer struct{}
 
 func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*SRSTransformContext)
-	obj := transCtx.srs
+	transCtx, _ := ctx.(*rsmTransformContext)
+	obj := transCtx.rsm
 	if model.IsObjectDeleting(obj) {
 		return nil
 	}
@@ -38,10 +38,10 @@ func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 	// The object is not being deleted, so if it does not have our finalizer,
 	// then lets add the finalizer and update the object. This is equivalent
 	// registering our finalizer.
-	if controllerutil.ContainsFinalizer(obj, srsFinalizerName) {
+	if controllerutil.ContainsFinalizer(obj, rsmFinalizerName) {
 		return nil
 	}
-	controllerutil.AddFinalizer(obj, srsFinalizerName)
+	controllerutil.AddFinalizer(obj, rsmFinalizerName)
 	if err := model.PrepareRootUpdate(dag); err != nil {
 		return err
 	}

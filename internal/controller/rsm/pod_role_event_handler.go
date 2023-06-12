@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package statefulreplicaset
+package rsm
 
 import (
 	"encoding/json"
@@ -118,13 +118,13 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 		return role, nil
 	}
 	name := pod.Labels[constant.AppInstanceLabelKey]
-	srs := &workloads.ReplicatedStateMachine{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: name}, srs); err != nil {
+	rsm := &workloads.ReplicatedStateMachine{}
+	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: name}, rsm); err != nil {
 		return "", err
 	}
 	reqCtx.Log.V(1).Info("handle role change event", "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
 
-	return role, updatePodRoleLabel(cli, reqCtx, *srs, pod, role)
+	return role, updatePodRoleLabel(cli, reqCtx, *rsm, pod, role)
 }
 
 // parseProbeEventMessage parses probe event message.

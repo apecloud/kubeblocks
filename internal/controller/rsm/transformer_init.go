@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package statefulreplicaset
+package rsm
 
 import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -31,11 +31,11 @@ type initTransformer struct {
 
 func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	// init context
-	transCtx, _ := ctx.(*SRSTransformContext)
-	transCtx.srs, transCtx.srsOrig = t.ReplicatedStateMachine, t.ReplicatedStateMachine.DeepCopy()
+	transCtx, _ := ctx.(*rsmTransformContext)
+	transCtx.rsm, transCtx.rsmOrig = t.ReplicatedStateMachine, t.ReplicatedStateMachine.DeepCopy()
 
 	// init dag
-	model.PrepareStatus(dag, transCtx.srsOrig, transCtx.srs)
+	model.PrepareStatus(dag, transCtx.rsmOrig, transCtx.rsm)
 	return nil
 }
 

@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package statefulreplicaset
+package rsm
 
 import (
 	"errors"
@@ -36,18 +36,18 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type srsPlanBuilder struct {
+type rsmPlanBuilder struct {
 	req          ctrl.Request
 	cli          client.Client
-	transCtx     *SRSTransformContext
+	transCtx     *rsmTransformContext
 	transformers graph.TransformerChain
 }
 
-type srsPlan struct {
+type rsmPlan struct {
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc
 	cli      client.Client
-	transCtx *SRSTransformContext
+	transCtx *rsmTransformContext
 }
 
 func init() {
@@ -56,26 +56,26 @@ func init() {
 
 // PlanBuilder implementation
 
-func (b *srsPlanBuilder) Init() error {
-	srs := &workloads.ReplicatedStateMachine{}
-	if err := b.cli.Get(b.transCtx.Context, b.req.NamespacedName, srs); err != nil {
+func (b *rsmPlanBuilder) Init() error {
+	rsm := &workloads.ReplicatedStateMachine{}
+	if err := b.cli.Get(b.transCtx.Context, b.req.NamespacedName, rsm); err != nil {
 		return err
 	}
-	b.AddTransformer(&initTransformer{ReplicatedStateMachine: srs})
+	b.AddTransformer(&initTransformer{ReplicatedStateMachine: rsm})
 	return nil
 }
 
-func (b *srsPlanBuilder) AddTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
+func (b *rsmPlanBuilder) AddTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
 	b.transformers = append(b.transformers, transformer...)
 	return b
 }
 
-func (b *srsPlanBuilder) AddParallelTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
+func (b *rsmPlanBuilder) AddParallelTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
 	b.transformers = append(b.transformers, &model.ParallelTransformer{Transformers: transformer})
 	return b
 }
 
-func (b *srsPlanBuilder) Build() (graph.Plan, error) {
+func (b *rsmPlanBuilder) Build() (graph.Plan, error) {
 	var err error
 	// new a DAG and apply chain on it, after that we should get the final Plan
 	dag := graph.NewDAG()
@@ -84,9 +84,9 @@ func (b *srsPlanBuilder) Build() (graph.Plan, error) {
 	b.transCtx.Logger.Info(fmt.Sprintf("DAG: %s", dag))
 
 	// we got the execution plan
-	plan := &srsPlan{
+	plan := &rsmPlan{
 		dag:      dag,
-		walkFunc: b.srsWalkFunc,
+		walkFunc: b.rsmWalkFunc,
 		cli:      b.cli,
 		transCtx: b.transCtx,
 	}
@@ -95,13 +95,13 @@ func (b *srsPlanBuilder) Build() (graph.Plan, error) {
 
 // Plan implementation
 
-func (p *srsPlan) Execute() error {
+func (p *rsmPlan) Execute() error {
 	return p.dag.WalkReverseTopoOrder(p.walkFunc)
 }
 
 // Do the real works
 
-func (b *srsPlanBuilder) srsWalkFunc(v graph.Vertex) error {
+func (b *rsmPlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 	vertex, ok := v.(*model.ObjectVertex)
 	if !ok {
 		return fmt.Errorf("wrong vertex type %v", v)
@@ -129,7 +129,7 @@ func (b *srsPlanBuilder) srsWalkFunc(v graph.Vertex) error {
 			return err
 		}
 	case model.DELETE:
-		if controllerutil.RemoveFinalizer(vertex.Obj, srsFinalizerName) {
+		if controllerutil.RemoveFinalizer(vertex.Obj, rsmFinalizerName) {
 			err := b.cli.Update(b.transCtx.Context, vertex.Obj)
 			if err != nil && !apierrors.IsNotFound(err) {
 				b.transCtx.Logger.Error(err, fmt.Sprintf("delete %T error: %s", vertex.Obj, vertex.Obj.GetName()))
@@ -151,7 +151,7 @@ func (b *srsPlanBuilder) srsWalkFunc(v graph.Vertex) error {
 	return nil
 }
 
-func (b *srsPlanBuilder) buildUpdateObj(vertex *model.ObjectVertex) (client.Object, error) {
+func (b *rsmPlanBuilder) buildUpdateObj(vertex *model.ObjectVertex) (client.Object, error) {
 	handleSts := func(origObj, targetObj *appsv1.StatefulSet) (client.Object, error) {
 		origObj.Spec.Template = targetObj.Spec.Template
 		origObj.Spec.Replicas = targetObj.Spec.Replicas
@@ -194,12 +194,12 @@ func (b *srsPlanBuilder) buildUpdateObj(vertex *model.ObjectVertex) (client.Obje
 	return vertex.Obj, nil
 }
 
-// NewSRSPlanBuilder returns a srsPlanBuilder powered PlanBuilder
-func NewSRSPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request) graph.PlanBuilder {
-	return &srsPlanBuilder{
+// NewRSMPlanBuilder returns a rsmPlanBuilder powered PlanBuilder
+func NewRSMPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request) graph.PlanBuilder {
+	return &rsmPlanBuilder{
 		req: req,
 		cli: cli,
-		transCtx: &SRSTransformContext{
+		transCtx: &rsmTransformContext{
 			Context:       ctx.Ctx,
 			Client:        cli,
 			EventRecorder: ctx.Recorder,
@@ -208,5 +208,5 @@ func NewSRSPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.R
 	}
 }
 
-var _ graph.PlanBuilder = &srsPlanBuilder{}
-var _ graph.Plan = &srsPlan{}
+var _ graph.PlanBuilder = &rsmPlanBuilder{}
+var _ graph.Plan = &rsmPlan{}

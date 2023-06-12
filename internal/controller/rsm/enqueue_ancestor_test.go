@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package statefulreplicaset
+package rsm
 
 import (
 	"context"
@@ -64,7 +64,7 @@ var _ = Describe("enqueue ancestor", func() {
 		ancestorL1Name := "ancestor-level-1"
 		objectName := ancestorL1Name + "-0"
 
-		ancestorLevel2 := builder.NewStatefulReplicaSetBuilder(namespace, ancestorL2Name).GetObject()
+		ancestorLevel2 := builder.NewReplicatedStateMachineBuilder(namespace, ancestorL2Name).GetObject()
 		ancestorLevel2.APIVersion = ancestorL2APIVersion
 		ancestorLevel2.Kind = ancestorL2Kind
 		ancestorLevel1 := builder.NewStatefulSetBuilder(namespace, ancestorL1Name).

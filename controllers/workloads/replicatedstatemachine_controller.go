@@ -34,7 +34,7 @@ import (
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
-	"github.com/apecloud/kubeblocks/internal/controller/statefulreplicaset"
+	"github.com/apecloud/kubeblocks/internal/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -77,7 +77,7 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 
 	// the RSM reconciliation loop is a two-phase model: plan Build and plan Execute
 	// Init stage
-	planBuilder := statefulreplicaset.NewSRSPlanBuilder(reqCtx, r.Client, req)
+	planBuilder := rsm.NewRSMPlanBuilder(reqCtx, r.Client, req)
 	if err := planBuilder.Init(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -98,18 +98,18 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 	plan, err := planBuilder.
 		AddTransformer(
 			// fix meta
-			&statefulreplicaset.FixMetaTransformer{},
+			&rsm.FixMetaTransformer{},
 			// handle deletion
 			// handle cluster deletion first
-			&statefulreplicaset.SRSDeletionTransformer{},
+			&rsm.ObjectDeletionTransformer{},
 			// handle secondary objects generation
-			&statefulreplicaset.ObjectGenerationTransformer{},
+			&rsm.ObjectGenerationTransformer{},
 			// handle status
-			&statefulreplicaset.SRSStatusTransformer{},
+			&rsm.ObjectStatusTransformer{},
 			// handle UpdateStrategy
-			&statefulreplicaset.UpdateStrategyTransformer{},
+			&rsm.UpdateStrategyTransformer{},
 			// handle member reconfiguration
-			&statefulreplicaset.MemberReconfigurationTransformer{},
+			&rsm.MemberReconfigurationTransformer{},
 			// always safe to put your transformer below
 		).
 		Build()
@@ -137,7 +137,7 @@ func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) er
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&batchv1.Job{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}},
-			&statefulreplicaset.EnqueueRequestForAncestor{
+			&rsm.EnqueueRequestForAncestor{
 				Client:    r.Client,
 				OwnerType: &workloads.ReplicatedStateMachine{},
 				UpToLevel: 2,

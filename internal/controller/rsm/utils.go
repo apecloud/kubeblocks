@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package statefulreplicaset
+package rsm
 
 import (
 	"context"
@@ -151,10 +151,10 @@ func updatePodRoleLabel(cli client.Client,
 	switch ok {
 	case true:
 		pod.Labels[roleLabelKey] = role.Name
-		pod.Labels[srsAccessModeLabelKey] = string(role.AccessMode)
+		pod.Labels[rsmAccessModeLabelKey] = string(role.AccessMode)
 	case false:
 		delete(pod.Labels, roleLabelKey)
-		delete(pod.Labels, srsAccessModeLabelKey)
+		delete(pod.Labels, rsmAccessModeLabelKey)
 	}
 	return cli.Patch(ctx, pod, patch)
 }
@@ -256,9 +256,9 @@ func getHeadlessSvcName(set workloads.ReplicatedStateMachine) string {
 	return strings.Join([]string{set.Name, "headless"}, "-")
 }
 
-func findSvcPort(srs workloads.ReplicatedStateMachine) int {
-	port := srs.Spec.Service.Ports[0]
-	for _, c := range srs.Spec.Template.Spec.Containers {
+func findSvcPort(rsm workloads.ReplicatedStateMachine) int {
+	port := rsm.Spec.Service.Ports[0]
+	for _, c := range rsm.Spec.Template.Spec.Containers {
 		for _, p := range c.Ports {
 			if port.TargetPort.Type == intstr.String && p.Name == port.TargetPort.StrVal ||
 				port.TargetPort.Type == intstr.Int && p.ContainerPort == port.TargetPort.IntVal {
@@ -269,11 +269,11 @@ func findSvcPort(srs workloads.ReplicatedStateMachine) int {
 	return 0
 }
 
-func getActionList(transCtx *SRSTransformContext, actionScenario string) ([]*batchv1.Job, error) {
+func getActionList(transCtx *rsmTransformContext, actionScenario string) ([]*batchv1.Job, error) {
 	var actionList []*batchv1.Job
 	ml := client.MatchingLabels{
-		model.AppInstanceLabelKey: transCtx.srs.Name,
-		model.KBManagedByKey:      kindStatefulReplicaSet,
+		model.AppInstanceLabelKey: transCtx.rsm.Name,
+		model.KBManagedByKey:      kindReplicatedStateMachine,
 		jobScenarioLabel:          actionScenario,
 		jobHandledLabel:           jobHandledFalse,
 	}
@@ -314,20 +314,20 @@ func getPodOrdinal(podName string) (int, error) {
 }
 
 // ordinal is the ordinal of pod which this action apply to
-func createAction(dag *graph.DAG, srs *workloads.ReplicatedStateMachine, action *batchv1.Job) error {
-	if err := intctrlutil.SetOwnership(srs, action, model.GetScheme(), srsFinalizerName); err != nil {
+func createAction(dag *graph.DAG, rsm *workloads.ReplicatedStateMachine, action *batchv1.Job) error {
+	if err := intctrlutil.SetOwnership(rsm, action, model.GetScheme(), rsmFinalizerName); err != nil {
 		return err
 	}
 	model.PrepareCreate(dag, action)
 	return nil
 }
 
-func buildAction(srs *workloads.ReplicatedStateMachine, actionName, actionType, actionScenario string, leader, target string) *batchv1.Job {
-	env := buildActionEnv(srs, leader, target)
-	template := buildActionPodTemplate(srs, env, actionType)
-	return builder.NewJobBuilder(srs.Namespace, actionName).
-		AddLabels(model.AppInstanceLabelKey, srs.Name).
-		AddLabels(model.KBManagedByKey, kindStatefulReplicaSet).
+func buildAction(rsm *workloads.ReplicatedStateMachine, actionName, actionType, actionScenario string, leader, target string) *batchv1.Job {
+	env := buildActionEnv(rsm, leader, target)
+	template := buildActionPodTemplate(rsm, env, actionType)
+	return builder.NewJobBuilder(rsm.Namespace, actionName).
+		AddLabels(model.AppInstanceLabelKey, rsm.Name).
+		AddLabels(model.KBManagedByKey, kindReplicatedStateMachine).
 		AddLabels(jobScenarioLabel, actionScenario).
 		AddLabels(jobTypeLabel, actionType).
 		AddLabels(jobHandledLabel, jobHandledFalse).
@@ -336,8 +336,8 @@ func buildAction(srs *workloads.ReplicatedStateMachine, actionName, actionType, 
 		GetObject()
 }
 
-func buildActionPodTemplate(srs *workloads.ReplicatedStateMachine, env []corev1.EnvVar, actionType string) *corev1.PodTemplateSpec {
-	credential := srs.Spec.Credential
+func buildActionPodTemplate(rsm *workloads.ReplicatedStateMachine, env []corev1.EnvVar, actionType string) *corev1.PodTemplateSpec {
+	credential := rsm.Spec.Credential
 	credentialEnv := make([]corev1.EnvVar, 0)
 	if credential != nil {
 		credentialEnv = append(credentialEnv,
@@ -353,7 +353,7 @@ func buildActionPodTemplate(srs *workloads.ReplicatedStateMachine, env []corev1.
 			})
 	}
 	env = append(env, credentialEnv...)
-	reconfiguration := srs.Spec.MembershipReconfiguration
+	reconfiguration := rsm.Spec.MembershipReconfiguration
 	image := findActionImage(reconfiguration, actionType)
 	command := getActionCommand(reconfiguration, actionType)
 	container := corev1.Container{
@@ -372,11 +372,11 @@ func buildActionPodTemplate(srs *workloads.ReplicatedStateMachine, env []corev1.
 	return template
 }
 
-func buildActionEnv(srs *workloads.ReplicatedStateMachine, leader, target string) []corev1.EnvVar {
-	svcName := getHeadlessSvcName(*srs)
+func buildActionEnv(rsm *workloads.ReplicatedStateMachine, leader, target string) []corev1.EnvVar {
+	svcName := getHeadlessSvcName(*rsm)
 	leaderHost := fmt.Sprintf("%s.%s", leader, svcName)
 	targetHost := fmt.Sprintf("%s.%s", target, svcName)
-	svcPort := findSvcPort(*srs)
+	svcPort := findSvcPort(*rsm)
 	return []corev1.EnvVar{
 		{
 			Name:  leaderHostVarName,
@@ -467,7 +467,7 @@ func doActionCleanup(dag *graph.DAG, action *batchv1.Job) {
 	model.PrepareUpdate(dag, actionOld, actionNew)
 }
 
-func emitEvent(transCtx *SRSTransformContext, action *batchv1.Job) {
+func emitEvent(transCtx *rsmTransformContext, action *batchv1.Job) {
 	switch {
 	case action.Status.Succeeded > 0:
 		emitActionSucceedEvent(transCtx, action.Labels[jobTypeLabel], action.Name)
@@ -476,21 +476,21 @@ func emitEvent(transCtx *SRSTransformContext, action *batchv1.Job) {
 	}
 }
 
-func emitActionSucceedEvent(transCtx *SRSTransformContext, actionType, actionName string) {
+func emitActionSucceedEvent(transCtx *rsmTransformContext, actionType, actionName string) {
 	message := fmt.Sprintf("%s succeed, job name: %s", actionType, actionName)
 	emitActionEvent(transCtx, corev1.EventTypeNormal, actionType, message)
 }
 
-func emitActionFailedEvent(transCtx *SRSTransformContext, actionType, actionName string) {
+func emitActionFailedEvent(transCtx *rsmTransformContext, actionType, actionName string) {
 	message := fmt.Sprintf("%s failed, job name: %s", actionType, actionName)
 	emitActionEvent(transCtx, corev1.EventTypeWarning, actionType, message)
 }
 
-func emitAbnormalEvent(transCtx *SRSTransformContext, actionType, actionName string, err error) {
+func emitAbnormalEvent(transCtx *rsmTransformContext, actionType, actionName string, err error) {
 	message := fmt.Sprintf("%s, job name: %s", err.Error(), actionName)
 	emitActionEvent(transCtx, corev1.EventTypeWarning, actionType, message)
 }
 
-func emitActionEvent(transCtx *SRSTransformContext, eventType, reason, message string) {
-	transCtx.EventRecorder.Event(transCtx.srs, eventType, strings.ToUpper(reason), message)
+func emitActionEvent(transCtx *rsmTransformContext, eventType, reason, message string) {
+	transCtx.EventRecorder.Event(transCtx.rsm, eventType, strings.ToUpper(reason), message)
 }

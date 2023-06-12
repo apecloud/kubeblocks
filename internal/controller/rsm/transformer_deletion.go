@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package statefulreplicaset
+package rsm
 
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,12 +26,12 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
-// SRSDeletionTransformer handles ReplicatedStateMachine deletion
-type SRSDeletionTransformer struct{}
+// ObjectDeletionTransformer handles object and its secondary resources' deletion
+type ObjectDeletionTransformer struct{}
 
-func (t *SRSDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*SRSTransformContext)
-	obj := transCtx.srs
+func (t *ObjectDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*rsmTransformContext)
+	obj := transCtx.rsm
 	if !model.IsObjectDeleting(obj) {
 		return nil
 	}
@@ -57,4 +57,4 @@ func (t *SRSDeletionTransformer) Transform(ctx graph.TransformContext, dag *grap
 	return graph.ErrPrematureStop
 }
 
-var _ graph.Transformer = &SRSDeletionTransformer{}
+var _ graph.Transformer = &ObjectDeletionTransformer{}

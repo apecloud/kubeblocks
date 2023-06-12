@@ -248,8 +248,7 @@ func renderSecret(key componentUniqueKey, username string, labels client.Matchin
 	return secret
 }
 
-func retrieveEndpoints(scope appsv1alpha1.ProvisionScope,
-	svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints) []string {
+func retrieveEndpoints(scope appsv1alpha1.ProvisionScope, svcEP *corev1.Endpoints, headlessEP *corev1.Endpoints) []string {
 	// parse endpoints
 	endpoints := make([]string, 0)
 	if scope == appsv1alpha1.AnyPods {
@@ -306,7 +305,7 @@ func concatSecretName(key componentUniqueKey, username string) string {
 }
 
 func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.PasswordConfig,
-	accountConfig appsv1alpha1.SystemAccountConfig) ([]string, *corev1.Secret) {
+	accountConfig appsv1alpha1.SystemAccountConfig, strategy updateStrategy) ([]string, *corev1.Secret) {
 	// generated password with mixedcases = true
 	passwd, _ := password.Generate((int)(passConfig.Length), (int)(passConfig.NumDigits), (int)(passConfig.NumSymbols), false, false)
 	// refine password to upper or lower cases w.r.t configuration
@@ -322,8 +321,10 @@ func getCreationStmtForAccount(key componentUniqueKey, passConfig appsv1alpha1.P
 	namedVars := getEnvReplacementMapForAccount(userName, passwd)
 
 	execStmts := make([]string, 0)
-	// drop if exists + create if not exists
+
 	statements := accountConfig.ProvisionPolicy.Statements
+	// inPlaceUpdate is not supported for till v0.6.0
+	// drop if exists + create if not exists
 	if len(statements.DeletionStatement) > 0 {
 		stmt := componetutil.ReplaceNamedVars(namedVars, statements.DeletionStatement, -1, true)
 		execStmts = append(execStmts, stmt)

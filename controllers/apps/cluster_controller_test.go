@@ -128,7 +128,7 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.VolumeSnapshotSignature, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 		testapps.ClearResources(&testCtx, generics.BackupToolSignature, ml)
@@ -511,40 +511,79 @@ var _ = Describe("Cluster Controller", func() {
 			return
 		}
 
-		By("Checking Backup created")
+		By(fmt.Sprintf("Checking backup of component %s created", comp.Name))
 		Eventually(testapps.List(&testCtx, generics.BackupSignature,
 			client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: comp.Name,
 			}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(1))
 
-		By("Mocking VolumeSnapshot and set it as ReadyToUse")
-		snapshotKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
+		backupKey := types.NamespacedName{Name: fmt.Sprintf("%s-%s-scaling",
 			clusterKey.Name, comp.Name),
 			Namespace: testCtx.DefaultNamespace}
-		pvcName := getPVCName(comp.Name, 0)
-		volumeSnapshot := &snapshotv1.VolumeSnapshot{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      snapshotKey.Name,
-				Namespace: snapshotKey.Namespace,
-				Labels: map[string]string{
-					constant.KBManagedByKey:         "cluster",
+		By("Mocking backup status to completed")
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dataprotectionv1alpha1.Backup) {
+			backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
+			backup.Status.PersistentVolumeClaimName = "backup-data"
+		})()).Should(Succeed())
+
+		if policy.Type == appsv1alpha1.HScaleDataClonePolicyFromSnapshot {
+			By("Mocking VolumeSnapshot and set it as ReadyToUse")
+			pvcName := getPVCName(comp.Name, 0)
+			volumeSnapshot := &snapshotv1.VolumeSnapshot{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      backupKey.Name,
+					Namespace: backupKey.Namespace,
+					Labels: map[string]string{
+						constant.KBManagedByKey:         "cluster",
+						constant.AppInstanceLabelKey:    clusterKey.Name,
+						constant.KBAppComponentLabelKey: comp.Name,
+					}},
+				Spec: snapshotv1.VolumeSnapshotSpec{
+					Source: snapshotv1.VolumeSnapshotSource{
+						PersistentVolumeClaimName: &pvcName,
+					},
+				},
+			}
+			scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+			Expect(controllerruntime.SetControllerReference(clusterObj, volumeSnapshot, scheme)).Should(Succeed())
+			Expect(testCtx.CreateObj(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
+			readyToUse := true
+			volumeSnapshotStatus := snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
+			volumeSnapshot.Status = &volumeSnapshotStatus
+			Expect(k8sClient.Status().Update(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
+		}
+
+		By("Checking pvc created")
+		Eventually(testapps.List(&testCtx, generics.PersistentVolumeClaimSignature,
+			client.MatchingLabels{
+				constant.AppInstanceLabelKey:    clusterKey.Name,
+				constant.KBAppComponentLabelKey: comp.Name,
+			}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(updatedReplicas))
+
+		if policy.Type == appsv1alpha1.HScaleDataClonePolicyFromBackup {
+			By("Checking restore job created")
+			Eventually(testapps.List(&testCtx, generics.JobSignature,
+				client.MatchingLabels{
 					constant.AppInstanceLabelKey:    clusterKey.Name,
 					constant.KBAppComponentLabelKey: comp.Name,
-				}},
-			Spec: snapshotv1.VolumeSnapshotSpec{
-				Source: snapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: &pvcName,
-				},
-			},
+					constant.KBManagedByKey:         "cluster",
+				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(updatedReplicas - int(comp.Replicas)))
+			By("Mocking job status to succeeded")
+			ml := client.MatchingLabels{
+				constant.AppInstanceLabelKey:    clusterKey.Name,
+				constant.KBAppComponentLabelKey: comp.Name,
+				constant.KBManagedByKey:         "cluster",
+			}
+			jobList := batchv1.JobList{}
+			Expect(testCtx.Cli.List(testCtx.Ctx, &jobList, ml)).Should(Succeed())
+			for _, job := range jobList.Items {
+				key := client.ObjectKeyFromObject(&job)
+				Expect(testapps.GetAndChangeObjStatus(&testCtx, key, func(job *batchv1.Job) {
+					job.Status.Succeeded = 1
+				})()).Should(Succeed())
+			}
 		}
-		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
-		Expect(controllerruntime.SetControllerReference(clusterObj, volumeSnapshot, scheme)).Should(Succeed())
-		Expect(testCtx.CreateObj(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
-		readyToUse := true
-		volumeSnapshotStatus := snapshotv1.VolumeSnapshotStatus{ReadyToUse: &readyToUse}
-		volumeSnapshot.Status = &volumeSnapshotStatus
-		Expect(k8sClient.Status().Update(testCtx.Ctx, volumeSnapshot)).Should(Succeed())
 
 		By("Mock PVCs status to bound")
 		for i := 0; i < updatedReplicas; i++ {
@@ -558,13 +597,22 @@ var _ = Describe("Cluster Controller", func() {
 			})()).ShouldNot(HaveOccurred())
 		}
 
-		By("Check backup job cleanup")
+		By("Checking backup job cleanup")
 		Eventually(testapps.List(&testCtx, generics.BackupSignature,
 			client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: comp.Name,
 			}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
-		Eventually(testapps.CheckObjExists(&testCtx, snapshotKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, backupKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
+
+		if policy.Type == appsv1alpha1.HScaleDataClonePolicyFromBackup {
+			By("Checking restore job cleanup")
+			Eventually(testapps.List(&testCtx, generics.JobSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: comp.Name,
+				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
+		}
 
 		checkUpdatedStsReplicas()
 
@@ -610,13 +658,13 @@ var _ = Describe("Cluster Controller", func() {
 
 	// @argument componentDefsWithHScalePolicy assign ClusterDefinition.spec.componentDefs[].horizontalScalePolicy for
 	// the matching names. If not provided, will set 1st ClusterDefinition.spec.componentDefs[0].horizontalScalePolicy.
-	horizontalScale := func(updatedReplicas int, componentDefsWithHScalePolicy ...string) {
+	horizontalScale := func(updatedReplicas int, policyType appsv1alpha1.HScaleDataClonePolicyType, componentDefsWithHScalePolicy ...string) {
 		viper.Set("VOLUMESNAPSHOT", true)
 		cluster := &appsv1alpha1.Cluster{}
 		Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
 		initialGeneration := int(cluster.Status.ObservedGeneration)
 
-		By("Set HorizontalScalePolicy")
+		By(fmt.Sprintf("Set HorizontalScalePolicy, policyType is %s", policyType))
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 			func(clusterDef *appsv1alpha1.ClusterDefinition) {
 				// assign 1st component
@@ -633,11 +681,40 @@ var _ = Describe("Cluster Controller", func() {
 					By("Checking backup policy created from backup policy template")
 					policyName := DeriveBackupPolicyName(clusterKey.Name, compDef.Name, "")
 					clusterDef.Spec.ComponentDefs[i].HorizontalScalePolicy =
-						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
+						&appsv1alpha1.HorizontalScalePolicy{Type: policyType,
 							BackupPolicyTemplateName: backupPolicyTPLName}
 
 					Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
 						&dataprotectionv1alpha1.BackupPolicy{}, true)).Should(Succeed())
+
+					if policyType == appsv1alpha1.HScaleDataClonePolicyFromBackup {
+						By("creating backup tool if backup policy is backup")
+						backupTool := &dataprotectionv1alpha1.BackupTool{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "test-backup-tool",
+								Namespace: clusterKey.Namespace,
+								Labels: map[string]string{
+									constant.ClusterDefLabelKey: clusterDef.Name,
+								},
+							},
+							Spec: dataprotectionv1alpha1.BackupToolSpec{
+								BackupCommands: []string{""},
+								Image:          "xtrabackup",
+								Env: []corev1.EnvVar{
+									{
+										Name:  "test-name",
+										Value: "test-value",
+									},
+								},
+								Physical: dataprotectionv1alpha1.BackupToolRestoreCommand{
+									RestoreCommands: []string{
+										"echo \"hello world\"",
+									},
+								},
+							},
+						}
+						testapps.CheckedCreateK8sResource(&testCtx, backupTool)
+					}
 				}
 			})()).ShouldNot(HaveOccurred())
 
@@ -669,6 +746,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("Get the latest cluster def")
 		Expect(k8sClient.Get(testCtx.Ctx, client.ObjectKeyFromObject(clusterDefObj), clusterDefObj)).Should(Succeed())
 		for i, comp := range clusterObj.Spec.ComponentSpecs {
+			By(fmt.Sprintf("H-scale component %s with policy %s", comp.Name, hscalePolicy(comp)))
 			horizontalScaleComp(updatedReplicas, &clusterObj.Spec.ComponentSpecs[i], hscalePolicy(comp))
 		}
 
@@ -695,7 +773,7 @@ var _ = Describe("Cluster Controller", func() {
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
 		// REVIEW: this test flow, wait for running phase?
-		horizontalScale(int(updatedReplicas), compDefName)
+		horizontalScale(int(updatedReplicas), appsv1alpha1.HScaleDataClonePolicyFromSnapshot, compDefName)
 	}
 
 	testStorageExpansion := func(compName, compDefName string) {
@@ -1312,33 +1390,23 @@ var _ = Describe("Cluster Controller", func() {
 		changeCompReplicas(clusterKey, updatedReplicas, &clusterObj.Spec.ComponentSpecs[0])
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
 
-		// REVIEW: this test flow, should wait/fake still Running phase?
-		By("Creating backup")
-		backupKey := types.NamespacedName{
-			Namespace: testCtx.DefaultNamespace,
-			Name:      "test-backup",
+		ml := client.MatchingLabels{
+			constant.AppInstanceLabelKey:    clusterKey.Name,
+			constant.KBAppComponentLabelKey: compName,
 		}
-		backup := dataprotectionv1alpha1.Backup{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      backupKey.Name,
-				Namespace: backupKey.Namespace,
-				Labels: map[string]string{
-					constant.AppInstanceLabelKey:    clusterKey.Name,
-					constant.KBAppComponentLabelKey: compName,
-					constant.KBManagedByKey:         "cluster",
-				},
-			},
-			Spec: dataprotectionv1alpha1.BackupSpec{
-				BackupPolicyName: DeriveBackupPolicyName(clusterKey.Name, compDefName, ""),
-				BackupType:       "snapshot",
-			},
-		}
-		Expect(testCtx.Create(ctx, &backup)).Should(Succeed())
+		Eventually(testapps.List(&testCtx, generics.BackupSignature,
+			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(1))
 
-		By("Checking backup status to failed, because pvc not exist")
-		Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, backup *dataprotectionv1alpha1.Backup) {
-			g.Expect(backup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
-		})).Should(Succeed())
+		backupList := dataprotectionv1alpha1.BackupList{}
+		Expect(testCtx.Cli.List(testCtx.Ctx, &backupList, ml)).Should(Succeed())
+		backupKey := types.NamespacedName{
+			Namespace: backupList.Items[0].Namespace,
+			Name:      backupList.Items[0].Name,
+		}
+		By("Mocking backup status to failed")
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dataprotectionv1alpha1.Backup) {
+			backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
+		})()).Should(Succeed())
 
 		By("Set HorizontalScalePolicy")
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
@@ -1541,7 +1609,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 		}
 
-		testMultiCompHScale := func() {
+		testMultiCompHScale := func(policyType appsv1alpha1.HScaleDataClonePolicyType) {
 			compNameNDef := map[string]string{
 				statefulCompName:    statefulCompDefName,
 				consensusCompName:   consensusCompDefName,
@@ -1563,7 +1631,7 @@ var _ = Describe("Cluster Controller", func() {
 			// statefulCompDefName not in componentDefsWithHScalePolicy, for nil backup policy test
 			// REVIEW:
 			//  1. this test flow, wait for running phase?
-			horizontalScale(int(updatedReplicas), consensusCompDefName, replicationCompDefName)
+			horizontalScale(int(updatedReplicas), policyType, consensusCompDefName, replicationCompDefName)
 		}
 
 		It("should create all sub-resources successfully, with terminationPolicy=Halt lifecycle", func() {
@@ -1674,7 +1742,11 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		It("should successfully h-scale with multiple components", func() {
-			testMultiCompHScale()
+			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyFromSnapshot)
+		})
+
+		It("should successfully h-scale with multiple components by backup tool", func() {
+			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyFromBackup)
 		})
 	})
 
@@ -1773,7 +1845,7 @@ var _ = Describe("Cluster Controller", func() {
 			Context(fmt.Sprintf("[comp: %s] with horizontal scale after storage expansion", compName), func() {
 				It("should succeed with horizontal scale to 5 replicas", func() {
 					testStorageExpansion(compName, compDefName)
-					horizontalScale(5, compDefName)
+					horizontalScale(5, appsv1alpha1.HScaleDataClonePolicyFromSnapshot, compDefName)
 				})
 			})
 		}
@@ -1806,12 +1878,6 @@ var _ = Describe("Cluster Controller", func() {
 				SetBackupPolicyName(backupPolicyName).
 				SetBackupType(dataprotectionv1alpha1.BackupTypeDataFile).
 				Create(&testCtx).GetObject()
-
-			By("waiting for backup failed, because no backup policy exists")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup),
-				func(g Gomega, tmpBackup *dataprotectionv1alpha1.Backup) {
-					g.Expect(tmpBackup.Status.Phase).Should(Equal(dataprotectionv1alpha1.BackupFailed))
-				})).Should(Succeed())
 
 			By("mocking backup status completed, we don't need backup reconcile here")
 			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dataprotectionv1alpha1.Backup) {

@@ -18,7 +18,7 @@ But for your better high-availability experience, KubeBlocks creates a Redis Pri
 
 * [Install kbcli](./../../installation/install-kbcli.md).
 * [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-* Make sure the PostgreSQL addon is installed with `kbcli addon list`.
+* Make sure the Redis addon is installed with `kbcli addon list`.
   
   ```bash
   kbcli addon list

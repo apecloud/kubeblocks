@@ -35,7 +35,7 @@ metrics:
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
     repository: apecloud/agamotto
-    tag: 0.0.4
+    tag: 0.1.0-beta.3
     pullPolicy: IfNotPresent
   config:
     extensions:
@@ -49,14 +49,15 @@ metrics:
 
     receivers:
       apecloudmongodb:
-        uri: mongodb://${env:MONGODB_ROOT_USER}:${env:MONGODB_ROOT_PASSWORD}@127.0.0.1:27017/admin?ssl=false&authSource=admin
-        # uri: mongodb://127.0.0.1:27017
-        collect-all: true
+        endpoint: 127.0.0.1:27017
+        username: ${env:MONGODB_ROOT_USER}
+        password: ${env:MONGODB_ROOT_PASSWORD}
+        connect_params: admin?ssl=false&authSource=admin
+        collect_all: true
         collection_interval: 15s
-        direct-connect: true
-        global-conn-pool: false
-        log-level: info
-        compatible-mode: true
+        direct_connect: true
+        global_conn_pool: false
+        compatible_mode: true
 
     processors:
       batch:

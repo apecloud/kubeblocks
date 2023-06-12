@@ -116,7 +116,7 @@ Prepare a clean EKS cluster, and install EBS CSI driver plug-in, with at least o
 6. Configure the automatically created PVC name and storageclass.
 
     ```bash
-    kbcli kubeblocks config --set dataProtection.backupPVCName=backup-data --set dataProtection.backupPVCStorageClassName=csi-s3
+    kbcli kubeblocks config --set dataProtection.backupPVCName=kubeblocks-backup-data --set dataProtection.backupPVCStorageClassName=csi-s3
     ```
 
 7. Enable the log backup and upload it to S3.

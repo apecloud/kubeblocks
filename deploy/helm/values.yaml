@@ -1058,7 +1058,7 @@ prometheus:
                 summary: 'Redis replication broken'
                 description: 'Redis instance lost a slave. (instance: {{ $labels.pod }})'
 
-    mongodb_replicaset_alert_rules.yaml: |-
+    mongodb_alert_rules.yaml: |-
       groups:
         - name: MongodbExporter
           rules:
@@ -1181,7 +1181,7 @@ prometheus:
         - /etc/config/postgresql_alert_rules.yml
         - /etc/config/redis_alert_rules.yml
         - /etc/config/kafka_alert_rules.yml
-        - /etc/config/mongodb_replicaset_alert_rules.yaml
+        - /etc/config/mongodb_alert_rules.yaml
 
       scrape_configs:
         - job_name: prometheus

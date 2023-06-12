@@ -46,14 +46,14 @@ func (t *AssureMetaTransformer) Transform(ctx graph.TransformContext, dag *graph
 	if labels == nil {
 		labels = map[string]string{}
 	}
-	cdLabelName := labels[clusterDefLabelKey]
-	cvLabelName := labels[clusterVersionLabelKey]
+	cdLabelName := labels[constant.ClusterDefLabelKey]
+	cvLabelName := labels[constant.ClusterVerLabelKey]
 	cdName, cvName := cluster.Spec.ClusterDefRef, cluster.Spec.ClusterVersionRef
 	if cdLabelName == cdName && cvLabelName == cvName {
 		return nil
 	}
-	labels[clusterDefLabelKey] = cdName
-	labels[clusterVersionLabelKey] = cvName
+	labels[constant.ClusterDefLabelKey] = cdName
+	labels[constant.ClusterVerLabelKey] = cvName
 	cluster.Labels = labels
 
 	return nil

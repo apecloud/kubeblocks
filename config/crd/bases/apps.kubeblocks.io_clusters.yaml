@@ -555,6 +555,10 @@ spec:
                   - name
                   - replicas
                   type: object
+                  x-kubernetes-validations:
+                  - message: candidateInstance.index cannot be larger than replicas
+                    rule: 'has(self.candidateInstance) ? self.candidateInstance.index
+                      < self.replicas : !has(self.candidateInstance)'
                 minItems: 1
                 type: array
                 x-kubernetes-list-map-keys:

@@ -137,7 +137,7 @@ func doSwitchoverIfNeeded(transCtx *SRSTransformContext, dag *graph.DAG, pods []
 	return false, nil
 }
 
-func createSwitchoverAction(dag *graph.DAG, srs *workloads.StatefulReplicaSet, pods []corev1.Pod) error {
+func createSwitchoverAction(dag *graph.DAG, srs *workloads.ReplicatedStateMachine, pods []corev1.Pod) error {
 	leader := getLeaderPodName(srs.Status.MembersStatus)
 	targetOrdinal := selectSwitchoverTarget(srs, pods)
 	target := getPodName(srs.Name, targetOrdinal)
@@ -150,7 +150,7 @@ func createSwitchoverAction(dag *graph.DAG, srs *workloads.StatefulReplicaSet, p
 	return createAction(dag, srs, action)
 }
 
-func selectSwitchoverTarget(srs *workloads.StatefulReplicaSet, pods []corev1.Pod) int {
+func selectSwitchoverTarget(srs *workloads.ReplicatedStateMachine, pods []corev1.Pod) int {
 	var podUpdated, podUpdatedWithLabel string
 	for _, pod := range pods {
 		if intctrlutil.GetPodRevision(&pod) != srs.Status.UpdateRevision {
@@ -180,7 +180,7 @@ func selectSwitchoverTarget(srs *workloads.StatefulReplicaSet, pods []corev1.Pod
 	return ordinal
 }
 
-func shouldSwitchover(srs *workloads.StatefulReplicaSet, podsToBeUpdated []*corev1.Pod) bool {
+func shouldSwitchover(srs *workloads.ReplicatedStateMachine, podsToBeUpdated []*corev1.Pod) bool {
 	leaderName := getLeaderPodName(srs.Status.MembersStatus)
 	for _, pod := range podsToBeUpdated {
 		if pod.Name == leaderName {

@@ -39,7 +39,7 @@ type updatePlan interface {
 }
 
 type realUpdatePlan struct {
-	srs             workloads.StatefulReplicaSet
+	srs             workloads.ReplicatedStateMachine
 	pods            []corev1.Pod
 	dag             *graph.DAG
 	podsToBeUpdated []*corev1.Pod
@@ -184,7 +184,7 @@ func (p *realUpdatePlan) execute() ([]*corev1.Pod, error) {
 	return p.podsToBeUpdated, nil
 }
 
-func newUpdatePlan(srs workloads.StatefulReplicaSet, pods []corev1.Pod) updatePlan {
+func newUpdatePlan(srs workloads.ReplicatedStateMachine, pods []corev1.Pod) updatePlan {
 	return &realUpdatePlan{
 		srs:  srs,
 		pods: pods,

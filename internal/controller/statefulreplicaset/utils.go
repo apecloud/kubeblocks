@@ -110,7 +110,7 @@ func sortMembers[T any](membersStatus []T,
 }
 
 // composeRolePriorityMap generates a priority map based on roles.
-func composeRolePriorityMap(set workloads.StatefulReplicaSet) map[string]int {
+func composeRolePriorityMap(set workloads.ReplicatedStateMachine) map[string]int {
 	rolePriorityMap := make(map[string]int, 0)
 	rolePriorityMap[""] = emptyPriority
 	for _, role := range set.Spec.Roles {
@@ -138,7 +138,7 @@ func composeRolePriorityMap(set workloads.StatefulReplicaSet) map[string]int {
 // updatePodRoleLabel updates pod role label when internal container role changed
 func updatePodRoleLabel(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
-	set workloads.StatefulReplicaSet,
+	set workloads.ReplicatedStateMachine,
 	pod *corev1.Pod, roleName string) error {
 	ctx := reqCtx.Ctx
 	roleMap := composeRoleMap(set)
@@ -159,7 +159,7 @@ func updatePodRoleLabel(cli client.Client,
 	return cli.Patch(ctx, pod, patch)
 }
 
-func composeRoleMap(set workloads.StatefulReplicaSet) map[string]workloads.ReplicaRole {
+func composeRoleMap(set workloads.ReplicatedStateMachine) map[string]workloads.ReplicaRole {
 	roleMap := make(map[string]workloads.ReplicaRole, 0)
 	for _, role := range set.Spec.Roles {
 		roleMap[strings.ToLower(role.Name)] = role
@@ -167,7 +167,7 @@ func composeRoleMap(set workloads.StatefulReplicaSet) map[string]workloads.Repli
 	return roleMap
 }
 
-func setMembersStatus(set *workloads.StatefulReplicaSet, pods []corev1.Pod) {
+func setMembersStatus(set *workloads.ReplicatedStateMachine, pods []corev1.Pod) {
 	// compose new status
 	newMembersStatus := make([]workloads.MemberStatus, 0)
 	roleMap := composeRoleMap(*set)
@@ -252,11 +252,11 @@ func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsO
 	return pods, nil
 }
 
-func getHeadlessSvcName(set workloads.StatefulReplicaSet) string {
+func getHeadlessSvcName(set workloads.ReplicatedStateMachine) string {
 	return strings.Join([]string{set.Name, "headless"}, "-")
 }
 
-func findSvcPort(srs workloads.StatefulReplicaSet) int {
+func findSvcPort(srs workloads.ReplicatedStateMachine) int {
 	port := srs.Spec.Service.Ports[0]
 	for _, c := range srs.Spec.Template.Spec.Containers {
 		for _, p := range c.Ports {
@@ -314,7 +314,7 @@ func getPodOrdinal(podName string) (int, error) {
 }
 
 // ordinal is the ordinal of pod which this action apply to
-func createAction(dag *graph.DAG, srs *workloads.StatefulReplicaSet, action *batchv1.Job) error {
+func createAction(dag *graph.DAG, srs *workloads.ReplicatedStateMachine, action *batchv1.Job) error {
 	if err := intctrlutil.SetOwnership(srs, action, model.GetScheme(), srsFinalizerName); err != nil {
 		return err
 	}
@@ -322,7 +322,7 @@ func createAction(dag *graph.DAG, srs *workloads.StatefulReplicaSet, action *bat
 	return nil
 }
 
-func buildAction(srs *workloads.StatefulReplicaSet, actionName, actionType, actionScenario string, leader, target string) *batchv1.Job {
+func buildAction(srs *workloads.ReplicatedStateMachine, actionName, actionType, actionScenario string, leader, target string) *batchv1.Job {
 	env := buildActionEnv(srs, leader, target)
 	template := buildActionPodTemplate(srs, env, actionType)
 	return builder.NewJobBuilder(srs.Namespace, actionName).
@@ -336,7 +336,7 @@ func buildAction(srs *workloads.StatefulReplicaSet, actionName, actionType, acti
 		GetObject()
 }
 
-func buildActionPodTemplate(srs *workloads.StatefulReplicaSet, env []corev1.EnvVar, actionType string) *corev1.PodTemplateSpec {
+func buildActionPodTemplate(srs *workloads.ReplicatedStateMachine, env []corev1.EnvVar, actionType string) *corev1.PodTemplateSpec {
 	credential := srs.Spec.Credential
 	credentialEnv := make([]corev1.EnvVar, 0)
 	if credential != nil {
@@ -372,7 +372,7 @@ func buildActionPodTemplate(srs *workloads.StatefulReplicaSet, env []corev1.EnvV
 	return template
 }
 
-func buildActionEnv(srs *workloads.StatefulReplicaSet, leader, target string) []corev1.EnvVar {
+func buildActionEnv(srs *workloads.ReplicatedStateMachine, leader, target string) []corev1.EnvVar {
 	svcName := getHeadlessSvcName(*srs)
 	leaderHost := fmt.Sprintf("%s.%s", leader, svcName)
 	targetHost := fmt.Sprintf("%s.%s", target, svcName)

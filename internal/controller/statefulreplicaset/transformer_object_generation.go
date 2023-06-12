@@ -121,7 +121,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	return nil
 }
 
-func buildSvc(srs workloads.StatefulReplicaSet) *corev1.Service {
+func buildSvc(srs workloads.ReplicatedStateMachine) *corev1.Service {
 	svcBuilder := builder.NewServiceBuilder(srs.Namespace, srs.Name).
 		AddLabels(model.AppInstanceLabelKey, srs.Name).
 		AddLabels(model.KBManagedByKey, kindStatefulReplicaSet).
@@ -138,7 +138,7 @@ func buildSvc(srs workloads.StatefulReplicaSet) *corev1.Service {
 	return svcBuilder.GetObject()
 }
 
-func buildHeadlessSvc(srs workloads.StatefulReplicaSet) *corev1.Service {
+func buildHeadlessSvc(srs workloads.ReplicatedStateMachine) *corev1.Service {
 	hdlBuilder := builder.NewHeadlessServiceBuilder(srs.Namespace, getHeadlessSvcName(srs)).
 		AddLabels(model.AppInstanceLabelKey, srs.Name).
 		AddLabels(model.KBManagedByKey, kindStatefulReplicaSet).
@@ -170,7 +170,7 @@ func buildHeadlessSvc(srs workloads.StatefulReplicaSet) *corev1.Service {
 	return hdlBuilder.GetObject()
 }
 
-func buildSts(srs workloads.StatefulReplicaSet, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
+func buildSts(srs workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
 	stsBuilder := builder.NewStatefulSetBuilder(srs.Namespace, srs.Name)
 	template := buildStsPodTemplate(srs, envConfig)
 	stsBuilder.AddLabels(model.AppInstanceLabelKey, srs.Name).
@@ -186,7 +186,7 @@ func buildSts(srs workloads.StatefulReplicaSet, headlessSvcName string, envConfi
 	return stsBuilder.GetObject()
 }
 
-func buildEnvConfigMap(srs workloads.StatefulReplicaSet) *corev1.ConfigMap {
+func buildEnvConfigMap(srs workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 	envData := buildEnvConfigData(srs)
 	return builder.NewConfigMapBuilder(srs.Namespace, srs.Name+"-env").
 		AddLabels(model.AppInstanceLabelKey, srs.Name).
@@ -194,7 +194,7 @@ func buildEnvConfigMap(srs workloads.StatefulReplicaSet) *corev1.ConfigMap {
 		SetData(envData).GetObject()
 }
 
-func buildStsPodTemplate(srs workloads.StatefulReplicaSet, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
+func buildStsPodTemplate(srs workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
 	template := srs.Spec.Template
 	labels := template.Labels
 	if labels == nil {
@@ -221,7 +221,7 @@ func buildStsPodTemplate(srs workloads.StatefulReplicaSet, envConfig corev1.Conf
 	return &template
 }
 
-func injectRoleObservationContainer(srs workloads.StatefulReplicaSet, template *corev1.PodTemplateSpec) {
+func injectRoleObservationContainer(srs workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec) {
 	roleObservation := srs.Spec.RoleObservation
 	credential := srs.Spec.Credential
 	credentialEnv := make([]corev1.EnvVar, 0)
@@ -277,7 +277,7 @@ func findAllUsedPorts(template *corev1.PodTemplateSpec) []int32 {
 	return allUsedPorts
 }
 
-func injectRoleObserveContainer(srs workloads.StatefulReplicaSet, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
+func injectRoleObserveContainer(srs workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
 	// compute parameters for role observation container
 	roleObservation := srs.Spec.RoleObservation
 	credential := srs.Spec.Credential
@@ -364,7 +364,7 @@ func injectRoleObserveContainer(srs workloads.StatefulReplicaSet, template *core
 	template.Spec.Containers = append(template.Spec.Containers, container)
 }
 
-func injectObservationActionContainer(srs workloads.StatefulReplicaSet, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
+func injectObservationActionContainer(srs workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
 	// inject shared volume
 	agentVolume := corev1.Volume{
 		Name: roleAgentVolumeName,
@@ -419,7 +419,7 @@ func injectObservationActionContainer(srs workloads.StatefulReplicaSet, template
 	}
 }
 
-func buildEnvConfigData(set workloads.StatefulReplicaSet) map[string]string {
+func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string {
 	envData := map[string]string{}
 
 	prefix := constant.KBPrefix + "_SRS_"

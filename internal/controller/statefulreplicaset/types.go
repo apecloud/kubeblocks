@@ -31,7 +31,7 @@ import (
 )
 
 const (
-	kindStatefulReplicaSet = "StatefulReplicaSet"
+	kindStatefulReplicaSet = "ReplicatedStateMachine"
 
 	roleLabelKey          = "kubeblocks.io/role"
 	srsAccessModeLabelKey = "srs.apps.kubeblocks.io/access-mode"
@@ -80,8 +80,8 @@ type SRSTransformContext struct {
 	Client roclient.ReadonlyClient
 	record.EventRecorder
 	logr.Logger
-	srs     *workloads.StatefulReplicaSet
-	srsOrig *workloads.StatefulReplicaSet
+	srs     *workloads.ReplicatedStateMachine
+	srsOrig *workloads.ReplicatedStateMachine
 }
 
 func (c *SRSTransformContext) GetContext() context.Context {

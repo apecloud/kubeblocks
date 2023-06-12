@@ -57,11 +57,11 @@ func init() {
 // PlanBuilder implementation
 
 func (b *srsPlanBuilder) Init() error {
-	srs := &workloads.StatefulReplicaSet{}
+	srs := &workloads.ReplicatedStateMachine{}
 	if err := b.cli.Get(b.transCtx.Context, b.req.NamespacedName, srs); err != nil {
 		return err
 	}
-	b.AddTransformer(&initTransformer{StatefulReplicaSet: srs})
+	b.AddTransformer(&initTransformer{ReplicatedStateMachine: srs})
 	return nil
 }
 

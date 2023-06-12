@@ -28,8 +28,8 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// StatefulReplicaSetSpec defines the desired state of StatefulReplicaSet
-type StatefulReplicaSetSpec struct {
+// ReplicatedStateMachineSpec defines the desired state of ReplicatedStateMachine
+type ReplicatedStateMachineSpec struct {
 	// Replicas defines number of Pods
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=0
@@ -46,7 +46,7 @@ type StatefulReplicaSetSpec struct {
 	Template corev1.PodTemplateSpec `json:"template"`
 
 	// volumeClaimTemplates is a list of claims that pods are allowed to reference.
-	// The StatefulReplicaSet controller is responsible for mapping network identities to
+	// The ReplicatedStateMachine controller is responsible for mapping network identities to
 	// claims in a way that maintains the identity of a pod. Every claim in
 	// this list must have at least one matching (by name) volumeMount in one
 	// container in the template. A claim in this list takes precedence over
@@ -82,8 +82,8 @@ type StatefulReplicaSetSpec struct {
 	Credential *Credential `json:"credential,omitempty"`
 }
 
-// StatefulReplicaSetStatus defines the observed state of StatefulReplicaSet
-type StatefulReplicaSetStatus struct {
+// ReplicatedStateMachineStatus defines the observed state of ReplicatedStateMachine
+type ReplicatedStateMachineStatus struct {
 	appsv1.StatefulSetStatus `json:",inline"`
 
 	// InitReplicas is the number of pods(members) when cluster first initialized
@@ -102,28 +102,28 @@ type StatefulReplicaSetStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks,all},shortName=srs
+// +kubebuilder:resource:categories={kubeblocks,all},shortName=rsm
 // +kubebuilder:printcolumn:name="LEADER",type="string",JSONPath=".status.membersStatus[?(@.role.isLeader==true)].podName",description="leader pod name."
 // +kubebuilder:printcolumn:name="READY",type="string",JSONPath=".status.readyReplicas",description="ready replicas."
 // +kubebuilder:printcolumn:name="REPLICAS",type="string",JSONPath=".status.replicas",description="total replicas."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// StatefulReplicaSet is the Schema for the statefulreplicasets API
-type StatefulReplicaSet struct {
+// ReplicatedStateMachine is the Schema for the replicatedstatemachines API
+type ReplicatedStateMachine struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   StatefulReplicaSetSpec   `json:"spec,omitempty"`
-	Status StatefulReplicaSetStatus `json:"status,omitempty"`
+	Spec   ReplicatedStateMachineSpec   `json:"spec,omitempty"`
+	Status ReplicatedStateMachineStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// StatefulReplicaSetList contains a list of StatefulReplicaSet
-type StatefulReplicaSetList struct {
+// ReplicatedStateMachineList contains a list of ReplicatedStateMachine
+type ReplicatedStateMachineList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []StatefulReplicaSet `json:"items"`
+	Items           []ReplicatedStateMachine `json:"items"`
 }
 
 type ReplicaRole struct {
@@ -175,9 +175,9 @@ type RoleObservation struct {
 	// after all actions done, the final output should be a single string of the role name defined in spec.Roles
 	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured
 	// Environment variables can be used in Command:
-	// - v_KB_SRS_LAST_STDOUT stdout from last action, watch 'v_' prefixed
-	// - KB_SRS_USERNAME username part of credential
-	// - KB_SRS_PASSWORD password part of credential
+	// - v_KB_RSM_LAST_STDOUT stdout from last action, watch 'v_' prefixed
+	// - KB_RSM_USERNAME username part of credential
+	// - KB_RSM_PASSWORD password part of credential
 	// +kubebuilder:validation:Required
 	ObservationActions []Action `json:"observationActions"`
 
@@ -219,12 +219,12 @@ type RoleObservation struct {
 
 type Credential struct {
 	// Username
-	// variable name will be KB_SRS_USERNAME
+	// variable name will be KB_RSM_USERNAME
 	// +kubebuilder:validation:Required
 	Username CredentialVar `json:"username"`
 
 	// Password
-	// variable name will be KB_SRS_PASSWORD
+	// variable name will be KB_RSM_PASSWORD
 	// +kubebuilder:validation:Required
 	Password CredentialVar `json:"password"`
 }
@@ -251,11 +251,11 @@ type CredentialVar struct {
 
 type MembershipReconfiguration struct {
 	// Environment variables can be used in all following Actions:
-	// - KB_SRS_USERNAME username part of credential
-	// - KB_SRS_PASSWORD password part of credential
-	// - KB_SRS_LEADER_HOST leader host
-	// - KB_SRS_TARGET_HOST target host
-	// - KB_SRS_SERVICE_PORT port
+	// - KB_RSM_USERNAME username part of credential
+	// - KB_RSM_PASSWORD password part of credential
+	// - KB_RSM_LEADER_HOST leader host
+	// - KB_RSM_TARGET_HOST target host
+	// - KB_RSM_SERVICE_PORT port
 
 	// SwitchoverAction specifies how to do switchover
 	// latest [BusyBox](https://busybox.net/) image will be used if Image not configured
@@ -303,5 +303,5 @@ type MemberStatus struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&StatefulReplicaSet{}, &StatefulReplicaSetList{})
+	SchemeBuilder.Register(&ReplicatedStateMachine{}, &ReplicatedStateMachineList{})
 }

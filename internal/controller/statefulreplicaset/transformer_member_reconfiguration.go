@@ -139,7 +139,7 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 // srs level 'ready' state:
 // 1. all replicas exist
 // 2. all members have role set
-func isStatefulReplicaSetReady(srs *workloads.StatefulReplicaSet) bool {
+func isStatefulReplicaSetReady(srs *workloads.ReplicatedStateMachine) bool {
 	membersStatus := srs.Status.MembersStatus
 	if len(membersStatus) != int(srs.Spec.Replicas) {
 		return false
@@ -192,7 +192,7 @@ func cleanAction(transCtx *SRSTransformContext, dag *graph.DAG) error {
 	return nil
 }
 
-func isActionDone(srs *workloads.StatefulReplicaSet, action *batchv1.Job) bool {
+func isActionDone(srs *workloads.ReplicatedStateMachine, action *batchv1.Job) bool {
 	ordinal, _ := getActionOrdinal(action.Name)
 	podName := getPodName(srs.Name, ordinal)
 	membersStatus := srs.Status.MembersStatus
@@ -218,7 +218,7 @@ func deleteAction(dag *graph.DAG, action *batchv1.Job) {
 	doActionCleanup(dag, action)
 }
 
-func createNextAction(transCtx *SRSTransformContext, dag *graph.DAG, srs *workloads.StatefulReplicaSet, currentAction *batchv1.Job) error {
+func createNextAction(transCtx *SRSTransformContext, dag *graph.DAG, srs *workloads.ReplicatedStateMachine, currentAction *batchv1.Job) error {
 	actionInfoList := generateActionInfoList(srs)
 
 	if len(actionInfoList) == 0 {
@@ -265,7 +265,7 @@ func createNextAction(transCtx *SRSTransformContext, dag *graph.DAG, srs *worklo
 	return createAction(dag, srs, nextAction)
 }
 
-func generateActionInfoList(srs *workloads.StatefulReplicaSet) []*actionInfo {
+func generateActionInfoList(srs *workloads.ReplicatedStateMachine) []*actionInfo {
 	var actionInfoList []*actionInfo
 	memberReadyReplicas := int32(len(srs.Status.MembersStatus))
 
@@ -304,7 +304,7 @@ func isPreAction(actionType string) bool {
 	return actionType == jobTypeSwitchover || actionType == jobTypeMemberLeaveNotifying
 }
 
-func shouldHaveActions(srs *workloads.StatefulReplicaSet) bool {
+func shouldHaveActions(srs *workloads.ReplicatedStateMachine) bool {
 	currentReplicas := len(srs.Status.MembersStatus)
 	expectedReplicas := int(srs.Spec.Replicas)
 
@@ -323,7 +323,7 @@ func shouldHaveActions(srs *workloads.StatefulReplicaSet) bool {
 	return false
 }
 
-func shouldCreateAction(srs *workloads.StatefulReplicaSet, actionType string, checker conditionChecker) bool {
+func shouldCreateAction(srs *workloads.ReplicatedStateMachine, actionType string, checker conditionChecker) bool {
 	if checker != nil && !checker() {
 		return false
 	}
@@ -370,7 +370,7 @@ func getUnderlyingStsVertex(dag *graph.DAG) (*model.ObjectVertex, error) {
 // all members with ordinal less than action target pod should be in a good replication state:
 // 1. they should be in membersStatus
 // 2. they should have a leader
-func abnormalAnalysis(srs *workloads.StatefulReplicaSet, action *batchv1.Job) error {
+func abnormalAnalysis(srs *workloads.ReplicatedStateMachine, action *batchv1.Job) error {
 	membersStatus := srs.Status.MembersStatus
 	statusMap := make(map[string]workloads.MemberStatus, len(membersStatus))
 	for _, status := range membersStatus {
@@ -411,7 +411,7 @@ func abnormalAnalysis(srs *workloads.StatefulReplicaSet, action *batchv1.Job) er
 	return nil
 }
 
-func generateActionInfos(srs *workloads.StatefulReplicaSet, ordinal int, actionTypeList []string) []*actionInfo {
+func generateActionInfos(srs *workloads.ReplicatedStateMachine, ordinal int, actionTypeList []string) []*actionInfo {
 	var actionInfos []*actionInfo
 	leaderPodName := getLeaderPodName(srs.Status.MembersStatus)
 	podName := getPodName(srs.Name, ordinal)

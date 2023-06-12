@@ -26,7 +26,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
-// SRSDeletionTransformer handles StatefulReplicaSet deletion
+// SRSDeletionTransformer handles ReplicatedStateMachine deletion
 type SRSDeletionTransformer struct{}
 
 func (t *SRSDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {

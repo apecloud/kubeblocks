@@ -51,9 +51,9 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-workloads-kubeblocks-io-v1alpha1-statefulreplicaset
+      path: /mutate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
   failurePolicy: Fail
-  name: mstatefulreplicaset.kb.io
+  name: mreplicatedstatemachine.kb.io
   rules:
   - apiGroups:
     - workloads.kubeblocks.io
@@ -63,7 +63,7 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - statefulreplicasets
+    - replicatedstatemachines
   sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
@@ -158,9 +158,9 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-workloads-kubeblocks-io-v1alpha1-statefulreplicaset
+      path: /validate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
   failurePolicy: Fail
-  name: vstatefulreplicaset.kb.io
+  name: vreplicatedstatemachine.kb.io
   rules:
   - apiGroups:
     - workloads.kubeblocks.io
@@ -170,5 +170,5 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - statefulreplicasets
+    - replicatedstatemachines
   sideEffects: None

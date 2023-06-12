@@ -55,9 +55,9 @@ var _ = Describe("enqueue ancestor", func() {
 	ctx := context.Background()
 	var handler *EnqueueRequestForAncestor
 
-	buildAncestorTree := func() (*workloads.StatefulReplicaSet, *appsv1.StatefulSet, *corev1.Pod) {
+	buildAncestorTree := func() (*workloads.ReplicatedStateMachine, *appsv1.StatefulSet, *corev1.Pod) {
 		ancestorL2APIVersion := "workloads.kubeblocks.io/v1alpha1"
-		ancestorL2Kind := "StatefulReplicaSet"
+		ancestorL2Kind := "ReplicatedStateMachine"
 		ancestorL2Name := "ancestor-level-2"
 		ancestorL1APIVersion := "apps/v1"
 		ancestorL1Kind := "StatefulSet"
@@ -82,7 +82,7 @@ var _ = Describe("enqueue ancestor", func() {
 	BeforeEach(func() {
 		handler = &EnqueueRequestForAncestor{
 			Client:    k8sMock,
-			OwnerType: &workloads.StatefulReplicaSet{},
+			OwnerType: &workloads.ReplicatedStateMachine{},
 			UpToLevel: 2,
 			InTypes:   []runtime.Object{&appsv1.StatefulSet{}},
 		}
@@ -92,7 +92,7 @@ var _ = Describe("enqueue ancestor", func() {
 		It("should work well", func() {
 			Expect(handler.parseOwnerTypeGroupKind(scheme)).Should(Succeed())
 			Expect(handler.groupKind.Group).Should(Equal("workloads.kubeblocks.io"))
-			Expect(handler.groupKind.Kind).Should(Equal("StatefulReplicaSet"))
+			Expect(handler.groupKind.Kind).Should(Equal("ReplicatedStateMachine"))
 		})
 	})
 

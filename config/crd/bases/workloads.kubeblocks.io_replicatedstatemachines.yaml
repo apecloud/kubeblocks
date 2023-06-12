@@ -5,19 +5,19 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.0
   creationTimestamp: null
-  name: statefulreplicasets.workloads.kubeblocks.io
+  name: replicatedstatemachines.workloads.kubeblocks.io
 spec:
   group: workloads.kubeblocks.io
   names:
     categories:
     - kubeblocks
     - all
-    kind: StatefulReplicaSet
-    listKind: StatefulReplicaSetList
-    plural: statefulreplicasets
+    kind: ReplicatedStateMachine
+    listKind: ReplicatedStateMachineList
+    plural: replicatedstatemachines
     shortNames:
-    - srs
-    singular: statefulreplicaset
+    - rsm
+    singular: replicatedstatemachine
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -39,7 +39,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: StatefulReplicaSet is the Schema for the statefulreplicasets
+        description: ReplicatedStateMachine is the Schema for the replicatedstatemachines
           API
         properties:
           apiVersion:
@@ -55,13 +55,13 @@ spec:
           metadata:
             type: object
           spec:
-            description: StatefulReplicaSetSpec defines the desired state of StatefulReplicaSet
+            description: ReplicatedStateMachineSpec defines the desired state of ReplicatedStateMachine
             properties:
               credential:
                 description: Credential used to connect to DB engine
                 properties:
                   password:
-                    description: Password variable name will be KB_SRS_PASSWORD
+                    description: Password variable name will be KB_RSM_PASSWORD
                     properties:
                       value:
                         description: 'Variable references $(VAR_NAME) are expanded
@@ -159,7 +159,7 @@ spec:
                         type: object
                     type: object
                   username:
-                    description: Username variable name will be KB_SRS_USERNAME
+                    description: Username variable name will be KB_RSM_USERNAME
                     properties:
                       value:
                         description: 'Variable references $(VAR_NAME) are expanded
@@ -383,8 +383,8 @@ spec:
                       single string of the role name defined in spec.Roles latest
                       [BusyBox](https://busybox.net/) image will be used if Image
                       not configured Environment variables can be used in Command:
-                      - v_KB_SRS_LAST_STDOUT stdout from last action, watch ''v_''
-                      prefixed - KB_SRS_USERNAME username part of credential - KB_SRS_PASSWORD
+                      - v_KB_RSM_LAST_STDOUT stdout from last action, watch ''v_''
+                      prefixed - KB_RSM_USERNAME username part of credential - KB_RSM_PASSWORD
                       password part of credential'
                     items:
                       properties:
@@ -8158,7 +8158,7 @@ spec:
                 type: string
               volumeClaimTemplates:
                 description: volumeClaimTemplates is a list of claims that pods are
-                  allowed to reference. The StatefulReplicaSet controller is responsible
+                  allowed to reference. The ReplicatedStateMachine controller is responsible
                   for mapping network identities to claims in a way that maintains
                   the identity of a pod. Every claim in this list must have at least
                   one matching (by name) volumeMount in one container in the template.
@@ -8509,7 +8509,8 @@ spec:
             - template
             type: object
           status:
-            description: StatefulReplicaSetStatus defines the observed state of StatefulReplicaSet
+            description: ReplicatedStateMachineStatus defines the observed state of
+              ReplicatedStateMachine
             properties:
               availableReplicas:
                 description: Total number of available pods (ready for at least minReadySeconds)

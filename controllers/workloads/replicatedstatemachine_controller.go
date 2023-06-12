@@ -38,35 +38,35 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// StatefulReplicaSetReconciler reconciles a StatefulReplicaSet object
-type StatefulReplicaSetReconciler struct {
+// ReplicatedStateMachineReconciler reconciles a ReplicatedStateMachine object
+type ReplicatedStateMachineReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=statefulreplicasets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=statefulreplicasets/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=statefulreplicasets/finalizers,verbs=update
+//+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the StatefulReplicaSet object against the actual cluster state, and then
+// the ReplicatedStateMachine object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
-func (r *StatefulReplicaSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithValues("StatefulReplicaSet", req.NamespacedName),
+		Log:      log.FromContext(ctx).WithValues("ReplicatedStateMachine", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
 
-	reqCtx.Log.V(1).Info("reconcile", "StatefulReplicaSet", req.NamespacedName)
+	reqCtx.Log.V(1).Info("reconcile", "ReplicatedStateMachine", req.NamespacedName)
 
 	requeueError := func(err error) (ctrl.Result, error) {
 		if re, ok := err.(model.RequeueError); ok {
@@ -75,7 +75,7 @@ func (r *StatefulReplicaSetReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	// the stateful_replica_set reconciliation loop is a two-phase model: plan Build and plan Execute
+	// the RSM reconciliation loop is a two-phase model: plan Build and plan Execute
 	// Init stage
 	planBuilder := statefulreplicaset.NewSRSPlanBuilder(reqCtx, r.Client, req)
 	if err := planBuilder.Init(); err != nil {
@@ -131,15 +131,15 @@ func (r *StatefulReplicaSetReconciler) Reconcile(ctx context.Context, req ctrl.R
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *StatefulReplicaSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ReplicatedStateMachineReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&workloads.StatefulReplicaSet{}).
+		For(&workloads.ReplicatedStateMachine{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&batchv1.Job{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}},
 			&statefulreplicaset.EnqueueRequestForAncestor{
 				Client:    r.Client,
-				OwnerType: &workloads.StatefulReplicaSet{},
+				OwnerType: &workloads.ReplicatedStateMachine{},
 				UpToLevel: 2,
 				InTypes:   []runtime.Object{&appsv1.StatefulSet{}},
 			}).

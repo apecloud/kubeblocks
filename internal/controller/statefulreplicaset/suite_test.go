@@ -45,7 +45,7 @@ func init() {
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "StatefulReplicaSet Suite")
+	RunSpecs(t, "ReplicatedStateMachine Suite")
 }
 
 var _ = BeforeSuite(func() {

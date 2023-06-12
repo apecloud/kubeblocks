@@ -26,14 +26,14 @@ import (
 )
 
 type StatefulReplicaSetBuilder struct {
-	BaseBuilder[workloads.StatefulReplicaSet, *workloads.StatefulReplicaSet, StatefulReplicaSetBuilder]
+	BaseBuilder[workloads.ReplicatedStateMachine, *workloads.ReplicatedStateMachine, StatefulReplicaSetBuilder]
 }
 
 func NewStatefulReplicaSetBuilder(namespace, name string) *StatefulReplicaSetBuilder {
 	builder := &StatefulReplicaSetBuilder{}
 	builder.init(namespace, name,
-		&workloads.StatefulReplicaSet{
-			Spec: workloads.StatefulReplicaSetSpec{
+		&workloads.ReplicatedStateMachine{
+			Spec: workloads.ReplicatedStateMachineSpec{
 				Replicas: 1,
 				Roles: []workloads.ReplicaRole{
 					{

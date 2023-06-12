@@ -30,9 +30,9 @@ import (
 )
 
 // log is for logging in this package.
-var statefulreplicasetlog = logf.Log.WithName("statefulreplicaset-resource")
+var replicatedstatemachinelog = logf.Log.WithName("replicatedstatemachine-resource")
 
-func (r *StatefulReplicaSet) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (r *ReplicatedStateMachine) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
@@ -40,44 +40,44 @@ func (r *StatefulReplicaSet) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 // TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
-//+kubebuilder:webhook:path=/mutate-workloads-kubeblocks-io-v1alpha1-statefulreplicaset,mutating=true,failurePolicy=fail,sideEffects=None,groups=workloads.kubeblocks.io,resources=statefulreplicasets,verbs=create;update,versions=v1alpha1,name=mstatefulreplicaset.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/mutate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine,mutating=true,failurePolicy=fail,sideEffects=None,groups=workloads.kubeblocks.io,resources=replicatedstatemachines,verbs=create;update,versions=v1alpha1,name=mreplicatedstatemachine.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Defaulter = &StatefulReplicaSet{}
+var _ webhook.Defaulter = &ReplicatedStateMachine{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
-func (r *StatefulReplicaSet) Default() {
-	statefulreplicasetlog.Info("default", "name", r.Name)
+func (r *ReplicatedStateMachine) Default() {
+	replicatedstatemachinelog.Info("default", "name", r.Name)
 
 	// TODO(user): fill in your defaulting logic.
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-workloads-kubeblocks-io-v1alpha1-statefulreplicaset,mutating=false,failurePolicy=fail,sideEffects=None,groups=workloads.kubeblocks.io,resources=statefulreplicasets,verbs=create;update,versions=v1alpha1,name=vstatefulreplicaset.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine,mutating=false,failurePolicy=fail,sideEffects=None,groups=workloads.kubeblocks.io,resources=replicatedstatemachines,verbs=create;update,versions=v1alpha1,name=vreplicatedstatemachine.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Validator = &StatefulReplicaSet{}
+var _ webhook.Validator = &ReplicatedStateMachine{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *StatefulReplicaSet) ValidateCreate() error {
-	statefulreplicasetlog.Info("validate create", "name", r.Name)
+func (r *ReplicatedStateMachine) ValidateCreate() error {
+	replicatedstatemachinelog.Info("validate create", "name", r.Name)
 
 	return r.validate()
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *StatefulReplicaSet) ValidateUpdate(old runtime.Object) error {
-	statefulreplicasetlog.Info("validate update", "name", r.Name)
+func (r *ReplicatedStateMachine) ValidateUpdate(old runtime.Object) error {
+	replicatedstatemachinelog.Info("validate update", "name", r.Name)
 
 	return r.validate()
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *StatefulReplicaSet) ValidateDelete() error {
-	statefulreplicasetlog.Info("validate delete", "name", r.Name)
+func (r *ReplicatedStateMachine) ValidateDelete() error {
+	replicatedstatemachinelog.Info("validate delete", "name", r.Name)
 
 	return r.validate()
 }
 
-func (r *StatefulReplicaSet) validate() error {
+func (r *ReplicatedStateMachine) validate() error {
 	var allErrs field.ErrorList
 
 	// Leader is required
@@ -104,7 +104,7 @@ func (r *StatefulReplicaSet) validate() error {
 		return apierrors.NewInvalid(
 			schema.GroupKind{
 				Group: "workloads.kubeblocks.io/v1alpha1",
-				Kind:  "StatefulReplicaSet",
+				Kind:  "ReplicatedStateMachine",
 			},
 			r.Name, allErrs)
 	}

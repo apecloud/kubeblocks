@@ -118,7 +118,7 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 		return role, nil
 	}
 	name := pod.Labels[constant.AppInstanceLabelKey]
-	srs := &workloads.StatefulReplicaSet{}
+	srs := &workloads.ReplicatedStateMachine{}
 	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: pod.Namespace, Name: name}, srs); err != nil {
 		return "", err
 	}

@@ -47,7 +47,7 @@ var _ = Describe("base builder", func() {
 		owner := NewStatefulReplicaSetBuilder(ns, name).GetObject()
 		owner.UID = "sdfwsedqw-swed-sdswe"
 		ownerAPIVersion := "workloads.kubeblocks.io/v1alpha1"
-		ownerKind := "StatefulReplicaSet"
+		ownerKind := "ReplicatedStateMachine"
 		obj := NewConfigMapBuilder(ns, name).
 			SetUID(uid).
 			AddLabels(labelKey1, labelValue1, labelKey2, labelValue2).

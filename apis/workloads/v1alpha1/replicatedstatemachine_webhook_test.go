@@ -28,18 +28,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var _ = Describe("StatefulReplicaSet Webhook", func() {
+var _ = Describe("ReplicatedStateMachine Webhook", func() {
 	Context("spec validation", func() {
-		const name = "test-stateful-replica-set"
-		var srs *StatefulReplicaSet
+		const name = "test-replicated-state-machine"
+		var rsm *ReplicatedStateMachine
 
 		BeforeEach(func() {
-			srs = &StatefulReplicaSet{
+			rsm = &ReplicatedStateMachine{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: testCtx.DefaultNamespace,
 				},
-				Spec: StatefulReplicaSetSpec{
+				Spec: ReplicatedStateMachineSpec{
 					Replicas: 1,
 					RoleObservation: RoleObservation{
 						ObservationActions: []Action{
@@ -64,48 +64,48 @@ var _ = Describe("StatefulReplicaSet Webhook", func() {
 		})
 
 		It("should return an error if no leader set", func() {
-			srs.Spec.Roles = []ReplicaRole{
+			rsm.Spec.Roles = []ReplicaRole{
 				{
 					Name:       "leader",
 					IsLeader:   false,
 					AccessMode: ReadWriteMode,
 				},
 			}
-			err := k8sClient.Create(ctx, srs)
+			err := k8sClient.Create(ctx, rsm)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("leader is required"))
 		})
 
 		It("should return an error if servicePort not provided", func() {
-			srs.Spec.Roles = []ReplicaRole{
+			rsm.Spec.Roles = []ReplicaRole{
 				{
 					Name:       "leader",
 					IsLeader:   true,
 					AccessMode: ReadWriteMode,
 				},
 			}
-			err := k8sClient.Create(ctx, srs)
+			err := k8sClient.Create(ctx, rsm)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("servicePort must provide"))
 		})
 
 		It("should succeed if spec is well defined", func() {
-			srs.Spec.Roles = []ReplicaRole{
+			rsm.Spec.Roles = []ReplicaRole{
 				{
 					Name:       "leader",
 					IsLeader:   true,
 					AccessMode: ReadWriteMode,
 				},
 			}
-			srs.Spec.Service.Ports = []corev1.ServicePort{
+			rsm.Spec.Service.Ports = []corev1.ServicePort{
 				{
 					Name:     "foo",
 					Protocol: "tcp",
 					Port:     12345,
 				},
 			}
-			Expect(k8sClient.Create(ctx, srs)).Should(Succeed())
-			Expect(k8sClient.Delete(ctx, srs)).Should(Succeed())
+			Expect(k8sClient.Create(ctx, rsm)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, rsm)).Should(Succeed())
 		})
 	})
 })

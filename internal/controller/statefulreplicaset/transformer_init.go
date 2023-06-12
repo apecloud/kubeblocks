@@ -26,13 +26,13 @@ import (
 )
 
 type initTransformer struct {
-	*workloads.StatefulReplicaSet
+	*workloads.ReplicatedStateMachine
 }
 
 func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	// init context
 	transCtx, _ := ctx.(*SRSTransformContext)
-	transCtx.srs, transCtx.srsOrig = t.StatefulReplicaSet, t.StatefulReplicaSet.DeepCopy()
+	transCtx.srs, transCtx.srsOrig = t.ReplicatedStateMachine, t.ReplicatedStateMachine.DeepCopy()
 
 	// init dag
 	model.PrepareStatus(dag, transCtx.srsOrig, transCtx.srs)

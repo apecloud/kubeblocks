@@ -30,7 +30,7 @@ import (
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
-var _ = Describe("StatefulReplicaSet Controller", func() {
+var _ = Describe("ReplicatedStateMachine Controller", func() {
 	Context("reconciliation", func() {
 		It("should reconcile well", func() {
 			name := "test-stateful-replica-set"
@@ -71,12 +71,12 @@ var _ = Describe("StatefulReplicaSet Controller", func() {
 				GetObject()
 			Expect(k8sClient.Create(ctx, srs)).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(srs),
-				func(g Gomega, set *workloads.StatefulReplicaSet) {
+				func(g Gomega, set *workloads.ReplicatedStateMachine) {
 					g.Expect(set.Status.ObservedGeneration).Should(BeEquivalentTo(1))
 				}),
 			).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, srs)).Should(Succeed())
-			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(srs), &workloads.StatefulReplicaSet{}, false)).
+			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(srs), &workloads.ReplicatedStateMachine{}, false)).
 				Should(Succeed())
 		})
 	})

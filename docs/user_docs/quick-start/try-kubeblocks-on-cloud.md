@@ -217,6 +217,12 @@ Make sure you have all the followings prepared.
 
 1. Log in to Alibaba Cloud.
 2. Follow the instructions in [Quick start for first-time users](https://www.alibabacloud.com/help/en/container-service-for-kubernetes/latest/quick-start-for-first-time-users) to check whether you have activated Alibaba Cloud Container Service for Kubernetes (ACK) and assigned roles.
+
+   :::note
+
+   For users who deploy Alibaba Cloud in China Mainland, refer to [the corresponding guide](https://help.aliyun.com/document_detail/161387.htm?spm=a2c4g.85903.0.0.478d2246FdHMGt#task-2470091).
+
+   :::
 3. Click [AliyunOOSLifecycleHook4CSRole](https://ram.console.aliyun.com/role/authorize?spm=5176.2020520152.0.0.5b4716ddI6QevL&request=%7B%22ReturnUrl%22%3A%22https%3A%2F%2Fram.console.aliyun.com%22%2C%22Services%22%3A%5B%7B%22Roles%22%3A%5B%7B%22RoleName%22%3A%22AliyunOOSLifecycleHook4CSRole%22%2C%22TemplateId%22%3A%22AliyunOOSLifecycleHook4CSRole%22%7D%5D%2C%22Service%22%3A%22OOS%22%7D%5D%7D) and click **Agree to Authorization** to create an AliyunOOSLifecycleHook4CSRole role.
 
    This operation grant permissions to access Operation Orchestration Service (OOS) and to access the resources in other cloud products since creating and managing a node pool is required for creating an ACK cluster.
@@ -225,6 +231,7 @@ Make sure you have all the followings prepared.
 4. Create an AccessKey ID and the corresponding AccessKey secret.
 
    1. Go to [Alibaba Cloud Management Console](https://homenew.console.aliyun.com/home/dashboard/ProductAndService). Hover the pointer over your account console and click **AccessKey Management**.
+       ![AccessKey Management](./../../img/quick-start-alibaba-cloud-ak-management.png)
    2. Click **Create AccessKey** to create the AccessKey ID and the corresponding AccessKey secret.
    3. Add the AccessKey ID and AccessKey secret to the environment variable to configure identity authorization information.
 

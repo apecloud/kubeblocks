@@ -34,6 +34,10 @@ type testStruct struct {
 }
 
 func TestUnstructuredObjectWalk(t *testing.T) {
+	var arrayTest [2]string
+	arrayTest[0] = "test a"
+	arrayTest[1] = "test b"
+
 	type args struct {
 		data     string
 		isStruct bool
@@ -61,24 +65,24 @@ func TestUnstructuredObjectWalk(t *testing.T) {
 	}, {
 		name: "test",
 		args: args{
-			data: `{"a": 
-{ "b" : { "e": {
-				"c" : 10,
-				"d" : "abcd"
-			   },
-          "f" : 12.6,
- 		  "z" : [
-					{"x1" : 1,
-					 "x2" : 2
-					},
-					{"x3" : 1,
-					 "x4" : 2
-					}
-			]
-		},
-  "g" : [ "e1","e2","e3"],
-  "x" : [ 20,30] 
-}}`,
+			data: `{"a":
+		{ "b" : { "e": {
+						"c" : 10,
+						"d" : "abcd"
+					   },
+		         "f" : 12.6,
+				  "z" : [
+							{"x1" : 1,
+							 "x2" : 2
+							},
+							{"x3" : 1,
+							 "x4" : 2
+							}
+					]
+				},
+		 "g" : [ "e1","e2","e3"],
+		 "x" : [ 20,30]
+		}}`,
 			expected: []string{"a.b.z.x1", "a.b.e.c", "a.b.e.d", "a.b.f", "a.b.z.x2", "a.b.z.x4", "a.b.z.x3", "a.g", "a.x"},
 			isStruct: false,
 		},
@@ -91,6 +95,95 @@ func TestUnstructuredObjectWalk(t *testing.T) {
 			sdata: testStruct{
 				a: 10,
 				b: "for_test",
+			},
+		},
+		wantErr: true,
+	}, {
+		name: "testNilStruct",
+		args: args{
+			data:     "",
+			isStruct: true,
+			sdata:    nil,
+		},
+	}, {
+		name: "testStructWithFailed",
+		args: args{
+			data:     "",
+			isStruct: true,
+			sdata: map[string]interface{}{
+				"a": testStruct{
+					a: 10,
+				},
+			},
+		},
+		wantErr: true,
+	}, {
+		name: "testValuePoint",
+		args: args{
+			data:     "",
+			isStruct: true,
+			sdata: map[string]interface{}{
+				"a": map[string]interface{}{
+					"b": func(v string) *string { a := &v; return a }("for_test"),
+				},
+			},
+			expected: []string{"a.b"},
+		},
+	}, {
+		name: "testMapPoint",
+		args: args{
+			data:     "",
+			isStruct: true,
+			sdata: map[string]interface{}{
+				"a": &map[string]interface{}{
+					"b": "for_test",
+				},
+			},
+			expected: []string{"a.b"},
+		},
+	}, {
+		name: "testSlicePoint",
+		args: args{
+			data:     "",
+			isStruct: true,
+			sdata: map[string]interface{}{
+				"a": &[]interface{}{
+					"b",
+					10,
+				},
+			},
+			expected: []string{"a"},
+		},
+	}, {
+		name: "testIntTypeMap",
+		args: args{
+			data:     "",
+			isStruct: true,
+			sdata: map[string]interface{}{
+				"a": map[int32]string{
+					10: "abcdef",
+				},
+			},
+		},
+		wantErr: true,
+	}, {
+		name: "testArrayType",
+		args: args{
+			data:     "",
+			isStruct: true,
+			sdata: map[string]interface{}{
+				"a": arrayTest,
+			},
+			expected: []string{"a"},
+		},
+		wantErr: false,
+	}, {
+		name: "testFuncType",
+		args: args{
+			data:     "",
+			isStruct: true,
+			sdata: map[string]interface{}{
+				"a": func() {},
 			},
 		},
 		wantErr: true,

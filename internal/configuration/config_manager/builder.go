@@ -288,8 +288,10 @@ func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.Obj
 
 		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
 		sidecarCM.Data = refCM.Data
-		if fn != nil && fn(&sidecarCM) != nil {
-			return err
+		if fn != nil {
+			if err := fn(&sidecarCM); err != nil {
+				return err
+			}
 		}
 		sidecarCM.SetLabels(refCM.GetLabels())
 		sidecarCM.SetName(scriptCMKey.Name)

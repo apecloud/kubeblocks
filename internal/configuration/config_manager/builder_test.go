@@ -30,212 +30,299 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
-
-	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
+	corev1 "k8s.io/api/core/v1"
 )
 
 var _ = Describe("ConfigManager Test", func() {
+
+	const (
+		scriptsName = "script_cm"
+		scriptsNS   = "default"
+	)
 
 	var mockK8sCli *testutil.K8sClientMockHelper
 
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
 		mockK8sCli = testutil.NewK8sMockClient()
-		mockK8sCli.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructGetResult(&corev1.ConfigMap{
-			Data: map[string]string{
-				"reload.tpl": "{{}}",
-			},
-		})), testutil.WithAnyTimes())
 	})
+
+	syncFn := func(sync bool) *bool { r := sync; return &r }
+
+	newVolumeMounts := func() []corev1.VolumeMount {
+		return []corev1.VolumeMount{
+			{
+				MountPath: "/postgresql/conf",
+				Name:      "pg_config",
+			}}
+	}
+	newVolumeMounts2 := func() []corev1.VolumeMount {
+		return []corev1.VolumeMount{
+			{
+				MountPath: "/postgresql/conf",
+				Name:      "pg_config",
+			},
+			{
+				MountPath: "/postgresql/conf2",
+				Name:      "pg_config",
+			}}
+	}
+	newReloadOptions := func(t appsv1alpha1.CfgReloadType, sync *bool) *appsv1alpha1.ReloadOptions {
+		signalHandle := &appsv1alpha1.UnixSignalTrigger{
+			ProcessName: "postgres",
+			Signal:      appsv1alpha1.SIGHUP,
+		}
+		shellHandle := &appsv1alpha1.ShellTrigger{
+			Command: []string{"pwd"},
+		}
+		scriptHandle := &appsv1alpha1.TPLScriptTrigger{
+			Sync: sync,
+			ScriptConfig: appsv1alpha1.ScriptConfig{
+				ScriptConfigMapRef: "reload-script",
+				Namespace:          scriptsNS,
+			},
+		}
+
+		switch t {
+		default:
+			return nil
+		case appsv1alpha1.UnixSignalType:
+			return &appsv1alpha1.ReloadOptions{
+				UnixSignalTrigger: signalHandle}
+		case appsv1alpha1.ShellType:
+			return &appsv1alpha1.ReloadOptions{
+				ShellTrigger: shellHandle}
+		case appsv1alpha1.TPLScriptType:
+			return &appsv1alpha1.ReloadOptions{
+				TPLScriptTrigger: scriptHandle}
+		}
+	}
+	newConfigSpecMeta := func() []ConfigSpecMeta {
+		return []ConfigSpecMeta{
+			{
+				ConfigSpecInfo: ConfigSpecInfo{
+					ConfigSpec: appsv1alpha1.ComponentConfigSpec{
+						ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+							Name:       "pg_config",
+							VolumeName: "pg_config",
+						},
+					},
+				},
+			},
+		}
+	}
+
+	newCMBuildParams := func(hasScripts bool) *CfgManagerBuildParams {
+		param := &CfgManagerBuildParams{
+			Cluster: &appsv1alpha1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abcd",
+					Namespace: "default",
+				},
+			},
+			Volumes:                newVolumeMounts(),
+			ConfigSpecsBuildParams: newConfigSpecMeta(),
+		}
+		if hasScripts {
+			param.ConfigSpecsBuildParams[0].ScriptConfig = []appsv1alpha1.ScriptConfig{
+				{
+					Namespace:          scriptsNS,
+					ScriptConfigMapRef: scriptsName,
+				},
+			}
+		}
+		return param
+	}
+
+	mockTplScriptCM := func() {
+		mockK8sCli.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
+			&corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "reload-script",
+					Namespace: scriptsNS,
+				},
+				Data: map[string]string{
+					"reload.yaml": `
+scripts: reload.tpl
+fileRegex: my.cnf
+formatterConfig:
+  format: ini
+`,
+				}}}), testutil.WithAnyTimes()))
+		mockK8sCli.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithTimes(1)))
+	}
 
 	AfterEach(func() {
 		DeferCleanup(mockK8sCli.Finish)
 	})
 
-	Context("TestBuildConfigManagerContainerArgs", func() {
-		It("Should success with no error", func() {
-			type args struct {
-				reloadOptions *appsv1alpha1.ReloadOptions
-				volumeDirs    []corev1.VolumeMount
-				cli           client.Client
-				ctx           context.Context
-				param         *CfgManagerBuildParams
+	Context("TestBuildConfigManagerContainer", func() {
+		// It("Should success with no error", func() {
+		//	type args struct {
+		//		reloadOptions *appsv1alpha1.ReloadOptions
+		//		volumeDirs    []corev1.VolumeMount
+		//		cli           client.Client
+		//		ctx           context.Context
+		//		param         *CfgManagerBuildParams
+		//	}
+		//	tests := []struct {
+		//		name         string
+		//		args         args
+		//		expectedArgs []string
+		//		wantErr      bool
+		//	}{
+		//		{
+		//			name: "buildCfgContainerParams",
+		//			args: args{
+		//				reloadOptions: newReloadOptions(appsv1alpha1.UnixSignalType, nil),
+		//				volumeDirs:    newVolumeMounts2(),
+		//			},
+		//			expectedArgs: []string{
+		//				`--volume-dir`, `/postgresql/conf`,
+		//				`--volume-dir`, `/postgresql/conf2`,
+		//			},
+		//		}, {
+		//			name: "buildCfgContainerParams",
+		//			args: args{
+		//				reloadOptions: newReloadOptions(appsv1alpha1.ShellType, nil),
+		//				volumeDirs:    newVolumeMounts(),
+		//			},
+		//			expectedArgs: []string{
+		//				`--volume-dir`, `/postgresql/conf`,
+		//			},
+		//		}, {
+		//			name: "buildCfgContainerParams",
+		//			args: args{
+		//				reloadOptions: newReloadOptions(appsv1alpha1.ShellType, nil),
+		//				volumeDirs: []corev1.VolumeMount{
+		//					{
+		//						MountPath: "/postgresql/conf",
+		//						Name:      "pg_config",
+		//					}},
+		//				cli:   mockK8sCli.Client(),
+		//				ctx:   context.TODO(),
+		//				param: newCMBuildParams(),
+		//			},
+		//			expectedArgs: []string{
+		//				`--volume-dir`, `/postgresql/conf`,
+		//			},
+		//		},
+		//		{
+		//			name: "buildCfgContainerParams",
+		//			args: args{
+		//				reloadOptions: newReloadOptions(appsv1alpha1.TPLScriptType, syncFn(true)),
+		//				volumeDirs:    newVolumeMounts(),
+		//				cli:           mockK8sCli.Client(),
+		//				ctx:           context.TODO(),
+		//				param:         newCMBuildParams(),
+		//			},
+		//			expectedArgs: []string{
+		//				`--operator-update-enable`,
+		//			},
+		//			wantErr: false,
+		//		}, {
+		//			name: "buildCfgContainerParamsWithOutSync",
+		//			args: args{
+		//				reloadOptions: newReloadOptions(appsv1alpha1.TPLScriptType, syncFn(false)),
+		//				volumeDirs:    newVolumeMounts(),
+		//				cli:           mockK8sCli.Client(),
+		//				ctx:           context.TODO(),
+		//				param:         newCMBuildParams(),
+		//			},
+		//			expectedArgs: []string{
+		//				`--volume-dir`, `/postgresql/conf`,
+		//			},
+		//			wantErr: false,
+		//		}}
+		//	for _, tt := range tests {
+		//		param := tt.args.param
+		//		if param == nil {
+		//			param = &CfgManagerBuildParams{}
+		//		}
+		//		for i := range param.ConfigSpecsBuildParams {
+		//			buildParam := &param.ConfigSpecsBuildParams[i]
+		//			buildParam.ReloadOptions = tt.args.reloadOptions
+		//			buildParam.ReloadType = FromReloadTypeConfig(tt.args.reloadOptions)
+		//		}
+		//		err := BuildConfigManagerContainerParams(tt.args.cli, tt.args.ctx, param, tt.args.volumeDirs)
+		//		Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
+		//		if !tt.wantErr {
+		//			for _, arg := range tt.expectedArgs {
+		//				Expect(param.Args).Should(ContainElement(arg))
+		//			}
+		//		}
+		//	}
+		// })
+
+		It("builds unixSignal reloader correctly", func() {
+			param := newCMBuildParams(false)
+			reloadOptions := newReloadOptions(appsv1alpha1.UnixSignalType, nil)
+			for i := range param.ConfigSpecsBuildParams {
+				buildParam := &param.ConfigSpecsBuildParams[i]
+				buildParam.ReloadOptions = reloadOptions
+				buildParam.ReloadType = appsv1alpha1.UnixSignalType
 			}
-			tests := []struct {
-				name         string
-				args         args
-				expectedArgs []string
-				wantErr      bool
-			}{{
-				name: "buildCfgContainerParams",
-				args: args{
-					reloadOptions: &appsv1alpha1.ReloadOptions{
-						UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
-							ProcessName: "postgres",
-							Signal:      appsv1alpha1.SIGHUP,
-						}},
-					volumeDirs: []corev1.VolumeMount{
-						{
-							MountPath: "/postgresql/conf",
-							Name:      "pg_config",
-						},
-						{
-							MountPath: "/postgresql/conf2",
-							Name:      "pg_config",
-						}},
-				},
-				expectedArgs: []string{
-					`--volume-dir`, `/postgresql/conf`,
-					`--volume-dir`, `/postgresql/conf2`,
-				},
-			}, {
-				name: "buildCfgContainerParams",
-				args: args{
-					reloadOptions: &appsv1alpha1.ReloadOptions{
-						ShellTrigger: &appsv1alpha1.ShellTrigger{
-							Command: []string{"pwd"},
-						}},
-					volumeDirs: []corev1.VolumeMount{
-						{
-							MountPath: "/postgresql/conf",
-							Name:      "pg_config",
-						}},
-				},
-				expectedArgs: []string{
-					`--volume-dir`, `/postgresql/conf`,
-				},
-			}, {
-				name: "buildCfgContainerParams",
-				args: args{
-					reloadOptions: &appsv1alpha1.ReloadOptions{
-						ShellTrigger: &appsv1alpha1.ShellTrigger{
-							Command: []string{"pwd"},
-						}},
-					volumeDirs: []corev1.VolumeMount{
-						{
-							MountPath: "/postgresql/conf",
-							Name:      "pg_config",
-						}},
-					cli: mockK8sCli.Client(),
-					ctx: context.TODO(),
-					param: &CfgManagerBuildParams{
-						Cluster: &appsv1alpha1.Cluster{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "abcd",
-								Namespace: "default",
-							},
-						},
-						Volumes: []corev1.VolumeMount{
-							{
-								Name:      "pg_config",
-								MountPath: "/postgresql/conf",
-							},
-						},
-						ConfigSpecsBuildParams: []ConfigSpecMeta{
-							{
-								ConfigSpecInfo: ConfigSpecInfo{
-									ConfigSpec: appsv1alpha1.ComponentConfigSpec{
-										ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-											Name:       "pg_config",
-											VolumeName: "pg_config",
-										},
-									},
-								},
-								ScriptConfig: []appsv1alpha1.ScriptConfig{
-									{
-										Namespace:          "default",
-										ScriptConfigMapRef: "script_cm",
-									},
-								},
-							},
-						},
+			Expect(BuildConfigManagerContainerParams(nil, nil, param, newVolumeMounts2())).Should(Succeed())
+			for _, arg := range []string{`--volume-dir`, `/postgresql/conf`, `--volume-dir`, `/postgresql/conf2`} {
+				Expect(param.Args).Should(ContainElement(arg))
+			}
+		})
+
+		It("builds shellTrigger reloader correctly", func() {
+			mockK8sCli.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      scriptsName,
+						Namespace: scriptsNS,
 					},
 				},
-				expectedArgs: []string{
-					`--volume-dir`, `/postgresql/conf`,
-				},
-			}, {
-				name: "buildCfgContainerParams",
-				args: args{
-					reloadOptions: &appsv1alpha1.ReloadOptions{
-						TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
-							ScriptConfig: appsv1alpha1.ScriptConfig{
-								ScriptConfigMapRef: "script_cm",
-								Namespace:          "default",
-							},
-							Sync: func() *bool { b := true; return &b }()}},
-					volumeDirs: []corev1.VolumeMount{
-						{
-							MountPath: "/postgresql/conf",
-							Name:      "pg_config",
-						}},
-					cli: mockK8sCli.Client(),
-					ctx: context.TODO(),
-					param: &CfgManagerBuildParams{
-						Cluster: &appsv1alpha1.Cluster{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "abcd",
-								Namespace: "default",
-							},
-						},
-					},
-				},
-				expectedArgs: []string{
-					`--operator-update-enable`,
-				},
-				wantErr: false,
-			}, {
-				name: "buildCfgContainerParamsWithOutSync",
-				args: args{
-					reloadOptions: &appsv1alpha1.ReloadOptions{
-						TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
-							ScriptConfig: appsv1alpha1.ScriptConfig{
-								ScriptConfigMapRef: "script_cm",
-								Namespace:          "default",
-							},
-						}},
-					volumeDirs: []corev1.VolumeMount{
-						{
-							MountPath: "/postgresql/conf",
-							Name:      "pg_config",
-						}},
-					cli: mockK8sCli.Client(),
-					ctx: context.TODO(),
-					param: &CfgManagerBuildParams{
-						Cluster: &appsv1alpha1.Cluster{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "abcd",
-								Namespace: "default",
-							},
-						},
-					},
-				},
-				expectedArgs: []string{
-					`--volume-dir`, `/postgresql/conf`,
-				},
-				wantErr: false,
-			}}
-			for _, tt := range tests {
-				param := tt.args.param
-				if param == nil {
-					param = &CfgManagerBuildParams{}
-				}
-				for i := range param.ConfigSpecsBuildParams {
-					buildParam := &param.ConfigSpecsBuildParams[i]
-					buildParam.ReloadOptions = tt.args.reloadOptions
-					buildParam.ReloadType = FromReloadTypeConfig(tt.args.reloadOptions)
-				}
-				err := BuildConfigManagerContainerParams(tt.args.cli, tt.args.ctx, param, tt.args.volumeDirs)
-				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
-				if !tt.wantErr {
-					for _, arg := range tt.expectedArgs {
-						Expect(param.Args).Should(ContainElement(arg))
-					}
-				}
+			}), testutil.WithTimes(2)))
+			mockK8sCli.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithTimes(1)))
+
+			param := newCMBuildParams(true)
+			reloadOptions := newReloadOptions(appsv1alpha1.ShellType, nil)
+			for i := range param.ConfigSpecsBuildParams {
+				buildParam := &param.ConfigSpecsBuildParams[i]
+				buildParam.ReloadOptions = reloadOptions
+				buildParam.ReloadType = appsv1alpha1.ShellType
+			}
+			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
+			for _, arg := range []string{`--volume-dir`, `/postgresql/conf`} {
+				Expect(param.Args).Should(ContainElement(arg))
+			}
+		})
+
+		It("builds tplScriptsTrigger reloader correctly", func() {
+			mockTplScriptCM()
+			param := newCMBuildParams(false)
+			reloadOptions := newReloadOptions(appsv1alpha1.TPLScriptType, syncFn(true))
+			for i := range param.ConfigSpecsBuildParams {
+				buildParam := &param.ConfigSpecsBuildParams[i]
+				buildParam.ReloadOptions = reloadOptions
+				buildParam.ReloadType = appsv1alpha1.TPLScriptType
+			}
+			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
+			for _, arg := range []string{`--operator-update-enable`} {
+				Expect(param.Args).Should(ContainElement(arg))
+			}
+		})
+
+		It("builds tplScriptsTrigger reloader correctly with sync", func() {
+			mockTplScriptCM()
+			param := newCMBuildParams(false)
+			reloadOptions := newReloadOptions(appsv1alpha1.TPLScriptType, syncFn(false))
+			for i := range param.ConfigSpecsBuildParams {
+				buildParam := &param.ConfigSpecsBuildParams[i]
+				buildParam.ReloadOptions = reloadOptions
+				buildParam.ReloadType = appsv1alpha1.TPLScriptType
+			}
+			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
+			for _, arg := range []string{`--volume-dir`, `/postgresql/conf`} {
+				Expect(param.Args).Should(ContainElement(arg))
 			}
 		})
 	})

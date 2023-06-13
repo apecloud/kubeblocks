@@ -2,7 +2,7 @@ name: CICD-PUSH
 
 on:
   push:
-    branches:
+    branches-ignore:
       - '*'
       - '*/*'
     tags-ignore:

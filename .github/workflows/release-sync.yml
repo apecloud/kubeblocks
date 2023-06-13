@@ -1,6 +1,7 @@
 name: RELEASE-SYNC
 
 on:
+  push:
   workflow_dispatch:
   release:
     types: [ released, prereleased ]
@@ -39,32 +40,41 @@ jobs:
           
           echo release_version=$LATEST_RELEASE_TAG >> $GITHUB_OUTPUT
 
-  release-homebrew-tap:
+#  release-homebrew-tap:
+#    needs: update-release-kbcli
+#    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.1
+#    with:
+#      GITHUB_REPO: "apecloud/homebrew-tap"
+#      WORKFLOW_ID: "release.yml"
+#      VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
+#      APECD_REF: "v0.1.1"
+#    secrets: inherit
+
+  release-yum-kbcli:
     needs: update-release-kbcli
-    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.1
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.0
     with:
-      GITHUB_REPO: "apecloud/homebrew-tap"
-      WORKFLOW_ID: "release.yml"
+      GITHUB_REPO: "apecloud/kbcli_yum_repo"
+      WORKFLOW_ID: "push_kbcli_yum_repo.yml"
       VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
-      APECD_REF: "v0.1.1"
     secrets: inherit
 
-  release-winget-kbcli:
-    needs: update-release-kbcli
-    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.1
-    with:
-      GITHUB_REPO: "apecloud/apecloud-cd"
-      WORKFLOW_ID: "publish-kbcli-winget.yml"
-      VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
-      APECD_REF: "v0.1.1"
-    secrets: inherit
-
-  release-scoop-kbcli:
-    needs: update-release-kbcli
-    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.1
-    with:
-      GITHUB_REPO: "apecloud/apecloud-cd"
-      WORKFLOW_ID: "publish-kbcli-scoop.yml"
-      VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
-      APECD_REF: "v0.1.1"
-    secrets: inherit
+#  release-winget-kbcli:
+#    needs: update-release-kbcli
+#    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.1
+#    with:
+#      GITHUB_REPO: "apecloud/apecloud-cd"
+#      WORKFLOW_ID: "publish-kbcli-winget.yml"
+#      VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
+#      APECD_REF: "v0.1.1"
+#    secrets: inherit
+#
+#  release-scoop-kbcli:
+#    needs: update-release-kbcli
+#    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.1
+#    with:
+#      GITHUB_REPO: "apecloud/apecloud-cd"
+#      WORKFLOW_ID: "publish-kbcli-scoop.yml"
+#      VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
+#      APECD_REF: "v0.1.1"
+#    secrets: inherit

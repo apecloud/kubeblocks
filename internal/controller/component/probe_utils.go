@@ -182,10 +182,10 @@ func modifyMainContainerForProbe(component *SynthesizedComponent, probeSvcHTTPPo
 }
 
 func buildProbeServiceContainer(component *SynthesizedComponent, container *corev1.Container) {
-	container.Image = component.ToolsImage
+	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	// logLevel := viper.GetString("PROBE_SERVICE_LOG_LEVEL")
-	container.Command = []string{"/bin/sh", "-c", "while true; do sleep 10; done"}
+	container.Command = []string{"/bin/sh", "-c", "cp -r /bin/sqlctl /bin/probe /config /kubeblocks/; while true; do sleep 10; done"}
 
 	// if len(component.PodSpec.Containers) > 0 && len(component.PodSpec.Containers[0].Ports) > 0 {
 	// 	mainContainer := component.PodSpec.Containers[0]

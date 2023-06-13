@@ -53,13 +53,13 @@ Uninstall `kbcli` if you want to delete `kbcli` after your trial. Use the same o
 <Tabs>
 <TabItem value="macOS" label="macOS" default>
 
-For cURL, run
+For `curl`, run
 
 ```bash
 sudo rm /usr/local/bin/kbcli
 ```
 
-For Homebrew, run
+For `brew`, run
 
 ```bash
 brew uninstall kbcli
@@ -83,6 +83,18 @@ brew uninstall kbcli
       * If you install `kbcli` by script, double-click **Path** in **User variables**.
       * If you customize the installation path, double-click **Path** based on where you created the variable before.
    5. Select `C:\Program Files\kbcli-windows-amd64` or your customized path and delete it. This operation requires double confirmation.
+
+</TabItem>
+
+<TabItem value="Linux" label="Linux">
+
+Uninstall kbcli using the `curl` command.
+
+```bash
+sudo rm /usr/local/bin/kbcli
+```
+
+kbcli creates a hidden folder named `~/.kbcli` under the HOME directory to store configuration information and temporary files. You can delete this folder after uninstalling kbcli.
 
 </TabItem>
 

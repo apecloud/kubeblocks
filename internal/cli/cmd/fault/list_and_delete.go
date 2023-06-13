@@ -36,8 +36,8 @@ var deleteExample = templates.Examples(`
 type ListAndDeleteOptions struct {
 	Factory cmdutil.Factory
 
-	Resources []string
-	Kind      bool
+	ResourceKinds []string
+	Kind          bool
 }
 
 func NewListCmd(f cmdutil.Factory) *cobra.Command {
@@ -70,20 +70,20 @@ func NewDeleteCmd(f cmdutil.Factory) *cobra.Command {
 
 func (o *ListAndDeleteOptions) Complete(args []string) error {
 	if o.Kind {
-		resources, err := getAllChaosResources(o.Factory, GroupVersion)
+		resourceKinds, err := getAllChaosResourceKinds(o.Factory, GroupVersion)
 		if err != nil {
 			return fmt.Errorf("failed to get all chaos resources: %s", err)
 		}
-		for _, resource := range resources {
-			fmt.Println(resource)
+		for _, resourceKind := range resourceKinds {
+			fmt.Println(resourceKind)
 		}
 	}
 
 	var err error
 	if len(args) > 0 {
-		o.Resources = args
+		o.ResourceKinds = args
 	} else {
-		o.Resources, err = getAllChaosResources(o.Factory, GroupVersion)
+		o.ResourceKinds, err = getAllChaosResourceKinds(o.Factory, GroupVersion)
 		if err != nil {
 			return fmt.Errorf("failed to get all chaos resources: %s", err)
 		}
@@ -92,8 +92,8 @@ func (o *ListAndDeleteOptions) Complete(args []string) error {
 }
 
 func (o *ListAndDeleteOptions) RunList() error {
-	for _, resource := range o.Resources {
-		if err := listResources(o.Factory, resource); err != nil {
+	for _, resourceKind := range o.ResourceKinds {
+		if err := listResources(o.Factory, resourceKind); err != nil {
 			return err
 		}
 	}
@@ -101,21 +101,21 @@ func (o *ListAndDeleteOptions) RunList() error {
 }
 
 func (o *ListAndDeleteOptions) RunDelete() error {
-	for _, resource := range o.Resources {
-		if err := deleteResources(o.Factory, resource); err != nil {
+	for _, resourceKind := range o.ResourceKinds {
+		if err := deleteResources(o.Factory, resourceKind); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func listResources(f cmdutil.Factory, resource string) error {
+func listResources(f cmdutil.Factory, resourceKind string) error {
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
 		return fmt.Errorf("failed to create dynamic client: %v", err)
 	}
 
-	gvr := GetGVR(Group, Version, resource)
+	gvr := GetGVR(Group, Version, resourceKind)
 	resourceList, err := dynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		klog.V(1).Info(err)
@@ -123,19 +123,19 @@ func listResources(f cmdutil.Factory, resource string) error {
 	}
 
 	for _, obj := range resourceList.Items {
-		fmt.Println(resource+":", obj.GetName())
+		fmt.Println(resourceKind+":", obj.GetName())
 	}
 
 	return nil
 }
 
-func deleteResources(f cmdutil.Factory, resource string) error {
+func deleteResources(f cmdutil.Factory, resourceKind string) error {
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
 		return fmt.Errorf("failed to create dynamic client: %v", err)
 	}
 
-	gvr := GetGVR(Group, Version, resource)
+	gvr := GetGVR(Group, Version, resourceKind)
 	resourceList, err := dynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		klog.V(1).Info(err)
@@ -153,7 +153,7 @@ func deleteResources(f cmdutil.Factory, resource string) error {
 	return nil
 }
 
-func getAllChaosResources(f cmdutil.Factory, groupVersion string) ([]string, error) {
+func getAllChaosResourceKinds(f cmdutil.Factory, groupVersion string) ([]string, error) {
 	discoveryClient, err := f.ToDiscoveryClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create discovery client: %v", err)
@@ -164,17 +164,21 @@ func getAllChaosResources(f cmdutil.Factory, groupVersion string) ([]string, err
 		return nil, fmt.Errorf("failed to get server resources for %s: %s", groupVersion, err)
 	}
 
-	resourceNames := make([]string, 0)
-	for _, resource := range chaosResources.APIResources {
+	resourceKinds := make([]string, 0)
+	for _, resourceKind := range chaosResources.APIResources {
 		// skip subresources
-		if len(strings.Split(resource.Name, "/")) > 1 {
+		if len(strings.Split(resourceKind.Name, "/")) > 1 {
+			continue
+		}
+		// skip chaos-mesh resources
+		if strings.Contains(resourceKind.Name, "-") {
 			continue
 		}
 		// skip podhttpchaos and podnetworkchaos etc.
-		if resource.Name != "podchaos" && strings.HasPrefix(resource.Name, "pod") {
+		if resourceKind.Name != "podchaos" && strings.HasPrefix(resourceKind.Name, "pod") {
 			continue
 		}
-		resourceNames = append(resourceNames, resource.Name)
+		resourceKinds = append(resourceKinds, resourceKind.Name)
 	}
-	return resourceNames, nil
+	return resourceKinds, nil
 }

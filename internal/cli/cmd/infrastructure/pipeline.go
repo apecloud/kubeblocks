@@ -58,6 +58,7 @@ func NewCreatePipeline(o *createOptions) []module.Module {
 		&kubernetes.ConfigureKubernetesModule{},
 		&filesystem.ChownModule{},
 		&kubernetes.SecurityEnhancementModule{Skip: !o.securityEnhancement},
+		&tasks.AddonsInstaller{Addons: o.Addons},
 	}
 }
 

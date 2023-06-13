@@ -1,0 +1,62 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+package tasks
+
+import (
+	"fmt"
+	"path/filepath"
+
+	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
+	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/connector"
+	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/task"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
+)
+
+type AddonsInstaller struct {
+	common.KubeModule
+	Addons []types.PluginMeta
+}
+
+type KBAddonsInstall struct {
+	common.KubeAction
+	Addons []types.PluginMeta
+}
+
+func (a *AddonsInstaller) Init() {
+	a.Name = "AddonsInstaller"
+	a.Desc = "Install helm addons"
+	a.Tasks = []task.Interface{
+		&task.LocalTask{
+			Name:   "AddonsInstaller",
+			Desc:   "Install helm addons",
+			Action: &KBAddonsInstall{Addons: a.Addons},
+		}}
+}
+
+func (i *KBAddonsInstall) Execute(runtime connector.Runtime) error {
+	kubeConfig := filepath.Join(runtime.GetWorkDir(), fmt.Sprintf("config-%s", runtime.GetObjName()))
+	_ = kubeConfig
+	for _, addon := range i.Addons {
+		_ = addon
+		// TODO install helm install
+	}
+	return nil
+}

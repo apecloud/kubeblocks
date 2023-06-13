@@ -29,6 +29,10 @@ type InfraVersionInfo struct {
 	HelmVersion       string
 }
 
+type PluginMeta struct {
+	Name string `json:"name"`
+}
+
 type Cluster struct {
 	User  ClusterUser   `json:"user"`
 	Nodes []ClusterNode `json:"nodes"`
@@ -36,6 +40,8 @@ type Cluster struct {
 	ETCD   []string `json:"etcd"`
 	Master []string `json:"master"`
 	Worker []string `json:"worker"`
+
+	Addons []PluginMeta `json:"addons"`
 }
 
 type ClusterNode struct {

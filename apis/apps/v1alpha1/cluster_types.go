@@ -310,14 +310,14 @@ type SwitchoverCandidate struct {
 	Operator CandidateOperator `json:"operator"`
 
 	// In some specific scenarios, such as failover and horizontal scaling down, the role information of the instance may change,
-	// roleSync indicates whether to synchronize the results of roleChange to switchoverCandidate.
+	// allowWriteBackIndex indicates whether to synchronize the results of roleChange to switchoverCandidate.
 	// true indicates that the results of the roleChange will be asynchronously synchronized to switchoverCandidate field,
 	// the index will be synchronized with the new primary or leader index, and the operator will be synchronized to Equal.
 	// false indicates that the results of roleChange will not be synchronized to the switchoverCandidate.
 	// At this situation, there may be inconsistencies between the switchoverCandidate and the real primary or leader instance,
 	// If consistency is required, the user needs to manually update the index and operator value.
 	// +kubebuilder:validation:Required
-	RoleSync bool `json:"roleSync"`
+	AllowWriteBackIndex bool `json:"allowWriteBackIndex"`
 }
 
 type ClusterSwitchPolicy struct {

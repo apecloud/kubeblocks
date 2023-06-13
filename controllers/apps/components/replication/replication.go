@@ -244,12 +244,18 @@ func (r *ReplicationSet) asyncReplicationPodRoleLabelAndAnnotations(podList []co
 
 // HandleSwitchover is the implementation of the type Component interface method, which is used to handle the switchover of the Replication workload.
 func (r *ReplicationSet) HandleSwitchover(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
+	if r.Component == nil {
+		return nil, nil
+	}
 	return nil, util.HandleSwitchover(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent(), obj)
 }
 
 // HandleFailover is the implementation of the type Component interface method, which is used to handle the failover of the Replication workload.
 func (r *ReplicationSet) HandleFailover(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	return nil, util.HandleRoleSync(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent())
+	if r.Component == nil {
+		return nil, nil
+	}
+	return nil, util.HandleWriteBackIndex(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent())
 }
 
 // DefaultRole is used to get the default role of the Pod of the Replication workload.

@@ -234,12 +234,12 @@ var _ = Describe("ReplicationSet Util", func() {
 		Expect(err).Should(Succeed())
 	}
 
-	testHandleRoleSync := func() {
+	testHandleWriteBackIndex := func() {
 		By("Creating a cluster with replication workloadType.")
 		switchoverCandidate := &appsv1alpha1.SwitchoverCandidate{
-			Index:    0,
-			Operator: appsv1alpha1.CandidateOpEqual,
-			RoleSync: true,
+			Index:               0,
+			Operator:            appsv1alpha1.CandidateOpEqual,
+			AllowWriteBackIndex: true,
 		}
 		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
@@ -280,18 +280,18 @@ var _ = Describe("ReplicationSet Util", func() {
 			WorkloadType:        clusterDefObj.Spec.ComponentDefs[0].WorkloadType,
 		}
 
-		By("Test HandleRoleSync succeed when switchoverCandidate is consistency with role label.")
-		err := HandleRoleSync(testCtx.Ctx, k8sClient, clusterObj, component)
+		By("Test HandleWriteBackIndex succeed when switchoverCandidate is consistency with role label.")
+		err := HandleWriteBackIndex(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).Should(Succeed())
 
-		By("Test HandleRoleSync succeed when switchoverCandidate is not consistency with role label.")
+		By("Test HandleWriteBackIndex succeed when switchoverCandidate is not consistency with role label.")
 		component.SwitchoverCandidate.Index = 1
 		component.SwitchoverCandidate.Operator = appsv1alpha1.CandidateOpEqual
-		err = HandleRoleSync(testCtx.Ctx, k8sClient, clusterObj, component)
+		err = HandleWriteBackIndex(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).Should(Succeed())
 		Expect(clusterObj.Spec.ComponentSpecs[0].SwitchoverCandidate.Index).Should(Equal(int32(0)))
 		Expect(clusterObj.Spec.ComponentSpecs[0].SwitchoverCandidate.Operator).Should(Equal(appsv1alpha1.CandidateOpEqual))
-		Expect(clusterObj.Spec.ComponentSpecs[0].SwitchoverCandidate.RoleSync).Should(BeTrue())
+		Expect(clusterObj.Spec.ComponentSpecs[0].SwitchoverCandidate.AllowWriteBackIndex).Should(BeTrue())
 	}
 
 	// Scenarios
@@ -335,8 +335,8 @@ var _ = Describe("ReplicationSet Util", func() {
 			testdoSwitchover()
 		})
 
-		It("Test HandleRoleSync when switchoverCandidate is not consistency with role label", func() {
-			testHandleRoleSync()
+		It("Test HandleWriteBackIndex when switchoverCandidate is not consistency with role label", func() {
+			testHandleWriteBackIndex()
 		})
 	})
 })

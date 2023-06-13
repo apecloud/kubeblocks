@@ -90,16 +90,16 @@ func HandleSwitchover(ctx context.Context,
 	return nil
 }
 
-// HandleRoleSync synchronizes the results of roleChange to switchoverCandidate if necessary.
-func HandleRoleSync(ctx context.Context,
+// HandleWriteBackIndex synchronizes the results of roleChange to switchoverCandidate if necessary.
+func HandleWriteBackIndex(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomputil.SynthesizedComponent) error {
 	if component.SwitchoverCandidate == nil {
 		return nil
 	}
-	// if the roleSync is not enabled, we do not sync the roleChange result.
-	if !component.SwitchoverCandidate.RoleSync {
+	// if the allowWriteBackIndex is not enabled, we do not sync the roleChange result.
+	if !component.SwitchoverCandidate.AllowWriteBackIndex {
 		return nil
 	}
 	switchoverCondition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeSwitchoverPrefix+component.Name)
@@ -119,9 +119,9 @@ func HandleRoleSync(ctx context.Context,
 	for index, compSpec := range cluster.Spec.ComponentSpecs {
 		if compSpec.Name == component.Name {
 			cluster.Spec.ComponentSpecs[index].SwitchoverCandidate = &appsv1alpha1.SwitchoverCandidate{
-				Index:    o,
-				Operator: appsv1alpha1.CandidateOpEqual,
-				RoleSync: true,
+				Index:               o,
+				Operator:            appsv1alpha1.CandidateOpEqual,
+				AllowWriteBackIndex: true,
 			}
 		}
 	}
@@ -170,7 +170,7 @@ func needDealWithSwitchover(ctx context.Context,
 			meta.SetStatusCondition(&cluster.Status.Conditions, *oldSwitchoverCondition)
 		}
 		// TODO(xingran): under the current implementation, the following scenarios need to be optimized:
-		// when a failover occurs, and the result of the failover is not synchronized to the switchoverCandidate (eg. switchoverCandidate.roleSync=false),
+		// when a failover occurs, and the result of the failover is not synchronized to the switchoverCandidate (eg. switchoverCandidate.AllowWriteBackIndex=false),
 		// at this time, the information of switchoverCandidate is inconsistent with the current primary or leader,
 		// and the user cannot switch back to the node in the current switchoverCandidate at this time because the switchover condition is not changed.
 		return false, nil

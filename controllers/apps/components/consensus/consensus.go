@@ -293,12 +293,18 @@ func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) 
 
 // HandleSwitchover is the implementation of the type Component interface method, which is used to handle the switchover of the Consensus workload.
 func (r *ConsensusSet) HandleSwitchover(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
+	if r.Component == nil {
+		return nil, nil
+	}
 	return nil, util.HandleSwitchover(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent(), obj)
 }
 
 // HandleFailover is the implementation of the type Component interface method, which is used to handle the failover of the Consensus workload.
 func (r *ConsensusSet) HandleFailover(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	return nil, util.HandleRoleSync(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent())
+	if r.Component == nil {
+		return nil, nil
+	}
+	return nil, util.HandleWriteBackIndex(ctx, r.Cli, r.Cluster, r.Component.GetSynthesizedComponent())
 }
 
 // newConsensusSet is the constructor of the type ConsensusSet.

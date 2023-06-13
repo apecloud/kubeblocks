@@ -94,7 +94,7 @@ kbcli creates a hidden folder named `~/.kbcli` under the HOME directory to store
 
 <TabItem value="Linux" label="Linux">
 
-For cURL, run
+Uninstall kbcli using the `curl` command.
 
 ```bash
 sudo rm /usr/local/bin/kbcli

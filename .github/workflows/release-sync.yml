@@ -1,7 +1,6 @@
 name: RELEASE-SYNC
 
 on:
-  push:
   workflow_dispatch:
   release:
     types: [ released, prereleased ]
@@ -50,16 +49,6 @@ jobs:
       APECD_REF: "v0.1.1"
     secrets: inherit
 
-  release-yum-kbcli:
-    needs: update-release-kbcli
-    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.0
-    with:
-      GITHUB_REPO: "apecloud/kbcli-yum-repo"
-      WORKFLOW_ID: "push_kbcli_yum_repo.yml"
-      VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
-      APECD_REF: "v0.1.1"
-    secrets: inherit
-
     release-winget-kbcli:
       needs: update-release-kbcli
       uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.1
@@ -76,6 +65,16 @@ jobs:
       with:
         GITHUB_REPO: "apecloud/apecloud-cd"
         WORKFLOW_ID: "publish-kbcli-scoop.yml"
+        VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
+        APECD_REF: "v0.1.1"
+      secrets: inherit
+
+    release-yum-kbcli:
+      needs: update-release-kbcli
+      uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.0
+      with:
+        GITHUB_REPO: "apecloud/kbcli-yum-repo"
+        WORKFLOW_ID: "push_kbcli_yum_repo.yml"
         VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
         APECD_REF: "v0.1.1"
       secrets: inherit

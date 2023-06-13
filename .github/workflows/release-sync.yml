@@ -42,7 +42,7 @@ jobs:
 
   release-yum-kbcli:
     needs: update-release-kbcli
-    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.5.1
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.0
     with:
       GITHUB_REPO: "apecloud/kbcli_rpm_test"
       WORKFLOW_ID: "push_kbcli_yum_repo.yml"

@@ -27,7 +27,6 @@ import (
 	"sort"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -452,13 +451,6 @@ func (p *RestoreManager) createDataPVCs(synthesizedComponent *component.Synthesi
 		return intctrlutil.NewNotFound("can not found any PersistentVolumeClaim of data type")
 	}
 
-	sts := &appsv1.StatefulSet{}
-	sts.Labels = map[string]string{
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.AppInstanceLabelKey:    p.Cluster.Name,
-		constant.KBAppComponentLabelKey: synthesizedComponent.Name,
-		constant.AppNameLabelKey:        synthesizedComponent.Name,
-	}
 	snapshotName := ""
 	if backup != nil && backup.Spec.BackupType == dpv1alpha1.BackupTypeSnapshot {
 		snapshotName = backup.Name
@@ -466,7 +458,7 @@ func (p *RestoreManager) createDataPVCs(synthesizedComponent *component.Synthesi
 	for i := int32(0); i < synthesizedComponent.Replicas; i++ {
 		pvcName := fmt.Sprintf("%s-%s-%s-%d", vct.Name, p.Cluster.Name, synthesizedComponent.Name, i)
 		pvcKey := types.NamespacedName{Namespace: p.Cluster.Namespace, Name: pvcName}
-		pvc, err := builder.BuildPVCFromSnapshot(sts, vct, pvcKey, snapshotName, synthesizedComponent)
+		pvc, err := builder.BuildPVC(p.Cluster, synthesizedComponent, &vct, pvcKey, snapshotName)
 		if err != nil {
 			return err
 		}

@@ -487,7 +487,7 @@ func (r *BackupReconciler) doCompletedPhaseAction(
 func (r *BackupReconciler) updateStatusIfFailed(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup, err error) (ctrl.Result, error) {
 	patch := client.MergeFrom(backup.DeepCopy())
-	controllerErr := intctrlutil.ToControllerError(err)
+	controllerErr := intctrlutil.UnwrapControllerError(err)
 	if controllerErr != nil {
 		r.Recorder.Eventf(backup, corev1.EventTypeWarning, string(controllerErr.Type), err.Error())
 	} else {

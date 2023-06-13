@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package redis
+package unstructured
 
 import (
 	"fmt"
@@ -46,7 +46,7 @@ type fsm struct {
 	token []rune
 }
 
-func (f *fsm) Parse(line string) error {
+func (f *fsm) parse(line string) error {
 	f.input = line
 
 	for handle := prepareScan(f); handle != nil; {

@@ -256,7 +256,7 @@ var _ = Describe("SystemAccount Controller", func() {
 					Name:      rootSecretName}, rootSecret)).To(Succeed())
 			}).Should(Succeed())
 		}
-		return
+		return clustersMap
 	}
 	/*
 	 * end of helper functions

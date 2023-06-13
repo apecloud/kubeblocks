@@ -133,7 +133,7 @@ func initEnv(ports []int) {
 	viper.Set("KB_FAILED_EVENT_REPORT_FREQUENCY", "3601")
 	viper.Set("KB_ROLE_OBSERVATION_THRESHOLD", "59")
 	buf, _ := json.Marshal(ports)
-	viper.Set("KB_SRS_ACTION_SVC_LIST", string(buf))
+	viper.Set("KB_RSM_ACTION_SVC_LIST", string(buf))
 }
 
 func initHTTP(roleExpected, path string, port int, good bool) {

@@ -225,10 +225,10 @@ func (r *Cluster) validateSwitchoverCandidate(allErrs *field.ErrorList) {
 		if component.SwitchoverCandidate == nil || component.Replicas == 0 {
 			continue
 		}
-		if component.SwitchoverCandidate.Index > component.Replicas-1 {
+		if component.SwitchoverCandidate.Index >= component.Replicas {
 			path := fmt.Sprintf("spec.components[%d].SwitchoverCandidate.Index", index)
 			*allErrs = append(*allErrs, field.Invalid(field.NewPath(path),
-				component.SwitchoverCandidate.Index, "SwitchoverCandidate.Index cannot be larger than Replicas."))
+				component.SwitchoverCandidate.Index, "switchoverCandidate.Index cannot be larger than Replicas."))
 		}
 	}
 }

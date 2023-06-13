@@ -162,6 +162,7 @@ var _ = Describe("cluster webhook", func() {
 			cluster.Spec.ComponentSpecs[0].SwitchoverCandidate = switchoverCandidate
 			cluster.Spec.ComponentSpecs[0].Replicas = int32(3)
 			Expect(k8sClient.Patch(ctx, cluster, patch)).ShouldNot(Succeed())
+			Expect(k8sClient.Patch(ctx, cluster, patch).Error()).To(ContainSubstring("switchoverCandidate.index cannot be larger than replicas"))
 
 			By("By updating cluster.Spec.ComponentDefs[0].SwitchoverCandidate.Index less than cluster.Spec.ComponentDefs[0].Replicas, expect succeed")
 			patch = client.MergeFrom(cluster.DeepCopy())

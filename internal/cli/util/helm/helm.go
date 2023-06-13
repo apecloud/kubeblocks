@@ -412,6 +412,7 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (*release.Release, e
 	client.WaitForJobs = i.Wait
 	client.Timeout = i.Timeout
 	client.DryRun = *i.DryRun
+	client.SkipCRDs = false
 	if client.Timeout == 0 {
 		client.Timeout = defaultTimeout
 	}
@@ -588,5 +589,6 @@ func GetManifest(release string, cfg *Config) (string, error) {
 	}
 	client := action.NewGet(actionConfig)
 	res, err := client.Run(release)
+	//fmt.Fprintf(os.Stdout, res.Manifest)
 	return res.Manifest, err
 }

@@ -21,6 +21,9 @@ package kubeblocks
 
 import (
 	"fmt"
+	"os"
+	"os/user"
+	"path/filepath"
 	"time"
 
 	"github.com/pkg/errors"
@@ -155,25 +158,27 @@ func (o *InstallOptions) upgradeChart() error {
 
 func (o *InstallOptions) showUpgradeDiff() error {
 	// get kubeblocks current version manifest
+
 	oldManifest, err := helm.GetManifest(types.KubeBlocksReleaseName, o.HelmCfg)
 	if err != nil {
 		return fmt.Errorf("could not get the helm release manifest")
 	}
-	newSpecs, err := helm.Parse(oldManifest, o.Namespace, true)
-	for key, value := range newSpecs {
-		fmt.Printf("key: %s value:%v \n", key, *value)
-	}
-	//old, _ := os.Create("oldManifest.yaml")
-	//defer old.Close()
-	//_, err = old.Write([]byte(oldManifest))
-	//// helm.Get
-	//dryRun := true
-	//helmInstallOps := o.buildChart()
-	//helmInstallOps.DryRun = &dryRun
-	//newManifest, err := helmInstallOps.GetChartManifestByDryRun(o.HelmCfg)
-	//new_, _ := os.Create("newManifest.yaml")
-	//defer new_.Close()
-	//_, err = new_.Write([]byte(newManifest))
+	//newSpecs, err := helm.Parse(oldManifest, o.Namespace, true)
+	//for key, value := range newSpecs {
+	//	fmt.Printf("key: %s value:%v \n", key, *value)
+	//}
+	currentUser, err := user.Current()
+	old, _ := os.Create(filepath.Join(currentUser.HomeDir, "oldManifest.yaml"))
+	defer old.Close()
+	_, err = old.Write([]byte(oldManifest))
+	// helm.Get
+	// todo: add the --include-crd for template
+	dryRun := true
+	helmInstallOps := o.buildChart()
+	helmInstallOps.DryRun = &dryRun
+	newManifest, err := helmInstallOps.GetChartManifestByDryRun(o.HelmCfg)
+	new_, _ := os.Create(filepath.Join(currentUser.HomeDir, "newManifest.yaml"))
+	defer new_.Close()
+	_, err = new_.Write([]byte(newManifest))
 	return err
-	// can get the uninstall version manifest, ues the target chart helm template
 }

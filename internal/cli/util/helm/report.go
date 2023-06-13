@@ -6,8 +6,8 @@ type ReportEntry struct {
 	suppressedKinds []string
 	kind            string
 	context         int
-	diffs           []difflib.DiffRecord
-	changeType      string
+	//diffs           []difflib.DiffRecord
+	changeType string
 }
 
 // ReportTemplateSpec for common template spec

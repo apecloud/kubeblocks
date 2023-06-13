@@ -59,7 +59,7 @@ func (i *InstallOpts) GetChartManifestByDryRun(cfg *Config) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
+	//fmt.Fprintf(os.Stdout,release.Manifest)
 	return release.Manifest, nil
 }
 
@@ -198,5 +198,5 @@ func isHook(metadata metadata, hooks ...string) bool {
 }
 
 func OutputDiff(oldIndex, newIndex map[string]*MappingResult, to io.Writer) bool {
-
+	return true
 }

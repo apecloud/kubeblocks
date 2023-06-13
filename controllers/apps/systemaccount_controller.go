@@ -441,29 +441,25 @@ func (r *SystemAccountReconciler) jobCompletionHander() *handler.Funcs {
 				return
 			}
 
-			if job.DeletionTimestamp != nil || job.Annotations == nil || job.Labels == nil {
+			if job.Annotations == nil || job.Labels == nil {
 				return
 			}
 
-			accountName := job.ObjectMeta.Labels[constant.ClusterAccountLabelKey]
-			clusterName := job.ObjectMeta.Labels[constant.AppInstanceLabelKey]
-			componentName := job.ObjectMeta.Labels[constant.KBAppComponentLabelKey]
+			accountName := job.Labels[constant.ClusterAccountLabelKey]
+			clusterName := job.Labels[constant.AppInstanceLabelKey]
+			componentName := job.Labels[constant.KBAppComponentLabelKey]
 
+			// filter out jobs that are not for system account
 			if len(accountName) == 0 || len(clusterName) == 0 || len(componentName) == 0 {
 				return
 			}
-
-			if containsJobCondition(*job, job.Status.Conditions, batchv1.JobFailed, corev1.ConditionTrue) {
-				logger.V(1).Info("job failed", "job", job.Name)
-				jobTerminated = true
+			// filter out jobs that have not reached completion (either completed or failed) or have been handled
+			if !containsJobCondition(*job, job.Status.Conditions, batchv1.JobFailed, corev1.ConditionTrue) &&
+				!containsJobCondition(*job, job.Status.Conditions, batchv1.JobComplete, corev1.ConditionTrue) ||
+				!controllerutil.ContainsFinalizer(job, constant.DBClusterFinalizerName) {
 				return
 			}
 
-			if !containsJobCondition(*job, job.Status.Conditions, batchv1.JobComplete, corev1.ConditionTrue) {
-				return
-			}
-
-			logger.V(1).Info("job succeeded", "job", job.Name)
 			jobTerminated = true
 			clusterKey := types.NamespacedName{Namespace: job.Namespace, Name: clusterName}
 			cluster := &appsv1alpha1.Cluster{}
@@ -472,12 +468,18 @@ func (r *SystemAccountReconciler) jobCompletionHander() *handler.Funcs {
 				return
 			}
 
+			if containsJobCondition(*job, job.Status.Conditions, batchv1.JobFailed, corev1.ConditionTrue) {
+				logger.V(1).Info("job failed", "job", job.Name)
+				r.Recorder.Eventf(cluster, corev1.EventTypeNormal, SysAcctCreate,
+					"Failed to create accounts for cluster: %s, component: %s, accounts: %s", cluster.Name, componentName, accountName)
+				return
+			}
+
 			compKey := componentUniqueKey{
 				namespace:     job.Namespace,
 				clusterName:   clusterName,
 				componentName: componentName,
 			}
-
 			// get password from job
 			passwd := job.Annotations[systemAccountPasswdAnnotation]
 			secret := renderSecretWithPwd(compKey, accountName, passwd)
@@ -492,7 +494,7 @@ func (r *SystemAccountReconciler) jobCompletionHander() *handler.Funcs {
 			}
 
 			r.Recorder.Eventf(cluster, corev1.EventTypeNormal, SysAcctCreate,
-				"Created Accounts for cluster: %s, component: %s, accounts: %s", cluster.Name, componentName, accountName)
+				"Created accounts for cluster: %s, component: %s, accounts: %s", cluster.Name, componentName, accountName)
 		},
 	}
 }

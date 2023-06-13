@@ -146,7 +146,7 @@ func MergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]s
 	}
 	tmpAnnotations := make(map[string]string, len(originalAnnotations)+len(targetAnnotations))
 	for k, v := range originalAnnotations {
-		if !strings.HasPrefix(k, "prometheus.io") {
+		if !strings.HasPrefix(k, "monitor.kubeblocks.io") {
 			tmpAnnotations[k] = v
 		}
 	}

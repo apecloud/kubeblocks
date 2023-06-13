@@ -213,7 +213,7 @@ func (commands *Commands) RestartDBService() {
 	if commands.AppCMD == nil {
 		return
 	}
-	commands.StopDBService()
+	// commands.StopDBService()
 	commands.AppCMD = getAppCommand(commands.Options)
 	commands.AppErr = nil
 	commands.AppStarted = make(chan bool, 1)
@@ -262,6 +262,7 @@ func (commands *Commands) StartDBService() {
 		return
 	}
 	commands.AppStarted <- true
+	go commands.WaitDBService()
 }
 
 func (commands *Commands) StopSQLChannel() bool {

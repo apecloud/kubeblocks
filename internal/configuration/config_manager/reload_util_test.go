@@ -223,24 +223,9 @@ func mockPatroniTestData(t *testing.T, reloadScript string) string {
 	return tmpDir
 }
 
-func TestScanConfigVolume(t *testing.T) {
-	tmpDir, err := os.MkdirTemp(os.TempDir(), "test-")
-	require.Nil(t, err)
-	defer os.RemoveAll(tmpDir)
+var _ = Describe("ReloadUtil Test", func() {
 
-	MakeTestConfigureDirectory(t, tmpDir, "test.conf", "empty!!!")
-	files, err := ScanConfigVolume(tmpDir)
-	require.Nil(t, err)
-	require.EqualValues(t, 1, len(files))
-	require.EqualValues(t, "test.conf", filepath.Base(files[0]))
-
-	// for test regex filter
-	filter, _ := createFileRegex("test.conf")
-	files2, err := scanConfigFiles([]string{tmpDir}, filter)
-	require.EqualValues(t, files2, files)
-}
-
-var _ = Describe("Handler Util Test", func() {
+	const configFile = "my.cnf"
 
 	var tmpDir string
 
@@ -261,6 +246,33 @@ var _ = Describe("Handler Util Test", func() {
 			Format: appsv1alpha1.Ini,
 		}
 	}
+
+	prepareTestConfig := func(configPath string, config string) {
+		fileInfo, err := os.Stat(configPath)
+		if err != nil {
+			Expect(os.IsNotExist(err)).Should(BeTrue())
+		}
+		if fileInfo == nil {
+			Expect(os.MkdirAll(configPath, fs.ModePerm)).Should(Succeed())
+		}
+		Expect(os.WriteFile(filepath.Join(configPath, configFile), []byte(config), fs.ModePerm)).Should(Succeed())
+	}
+
+	Context("TestScanConfigVolume", func() {
+		It(`test scan config volume`, func() {
+			mockK8sTestConfigureDirectory(tmpDir, "test.conf", "empty!!!")
+			files, err := ScanConfigVolume(tmpDir)
+			Expect(err).Should(Succeed())
+			Expect(1).Should(Equal(len(files)))
+			Expect("test.conf").Should(BeEquivalentTo(filepath.Base(files[0])))
+
+			By("test regex filter")
+			filter, _ := createFileRegex("test.conf")
+			files2, err := scanConfigFiles([]string{tmpDir}, filter)
+			Expect(err).Should(Succeed())
+			Expect(files2).Should(BeEquivalentTo(files))
+		})
+	})
 
 	Context("TestReloadBuiltinFunctions", func() {
 		It("test build-in exec", func() {
@@ -287,19 +299,7 @@ var _ = Describe("Handler Util Test", func() {
 		})
 
 		It("test build-in patchParams", func() {
-			configFile := "my.cnf"
 			baseConfig := "[test]\na = 1\nb = 2\n"
-
-			prepareTestConfig := func(configPath string, config string) {
-				fileInfo, err := os.Stat(configPath)
-				if err != nil {
-					Expect(os.IsNotExist(err)).Should(BeTrue())
-				}
-				if fileInfo == nil {
-					Expect(os.MkdirAll(configPath, fs.ModePerm)).Should(Succeed())
-				}
-				Expect(os.WriteFile(filepath.Join(configPath, configFile), []byte(config), fs.ModePerm)).Should(Succeed())
-			}
 
 			params := map[string]string{
 				"key1": "128M",

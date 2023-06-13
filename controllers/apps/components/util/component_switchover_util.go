@@ -215,6 +215,8 @@ func doSwitchover(ctx context.Context,
 		if err := cli.Create(ctx, switchoverJob); err != nil {
 			return err
 		}
+		
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for switchover %s finished.", key.Name)
 	}
 	// check the current generation switchoverJob whether succeed
 	if err := checkJobSucceed(ctx, cli, cluster, switchoverJob); err != nil {
@@ -244,7 +246,7 @@ func postOpsSwitchover(ctx context.Context,
 		return err
 	}
 	if !ok {
-		return errors.New("pod role label consistency check failed after switchover.")
+		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for component %s role label consistency after switchover.", component.Name)
 	}
 
 	// update status.conditions to SwitchoverSucceed
@@ -560,7 +562,7 @@ func checkJobSucceed(ctx context.Context,
 		case batchv1.JobFailed:
 			return errors.New("job failed, pls check.")
 		default:
-			return errors.New("job unfinished.")
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for job %s finished.", key.Name)
 		}
 	} else {
 		return errors.New("job check conditions status failed")

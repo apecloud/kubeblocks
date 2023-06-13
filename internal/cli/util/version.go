@@ -117,12 +117,9 @@ func GetKubeBlocksDeploy(client kubernetes.Interface) (*appsv1.Deployment, error
 }
 
 // GetDockerVersion get Docker Version
-func GetDockerVersion() string {
+func GetDockerVersion() (string, error) {
 	// exec cmd to get output from docker info --format '{{.ServerVersion}}'
 	cmd := exec.Command("docker", "info", "--format", "{{.ServerVersion}}")
 	out, err := cmd.Output()
-	if err != nil {
-		return ""
-	}
-	return string(out)
+	return string(out), err
 }

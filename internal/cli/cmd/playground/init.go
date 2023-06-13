@@ -142,8 +142,13 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 }
 
 func (o *initOptions) complete() error {
+	var err error
+
 	if o.cloudProvider == cp.Local {
-		o.dockerVersion = util.GetDockerVersion()
+		o.dockerVersion, err = util.GetDockerVersion()
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

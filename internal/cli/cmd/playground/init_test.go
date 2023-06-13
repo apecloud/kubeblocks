@@ -64,6 +64,17 @@ var _ = Describe("playground", func() {
 		Expect(o.createCluster()).Should(HaveOccurred())
 	})
 
+	It("init at local host without docker version", func() {
+		o := &initOptions{
+			clusterDef:     clitesting.ClusterDefName,
+			clusterVersion: clitesting.ClusterVersionName,
+			IOStreams:      streams,
+			cloudProvider:  defaultCloudProvider,
+			helmCfg:        helm.NewConfig("", testKubeConfigPath, "", false),
+		}
+		Expect(o.validate()).Should(HaveOccurred())
+	})
+
 	It("init at remote cloud", func() {
 		o := &initOptions{
 			IOStreams:      streams,

@@ -147,6 +147,9 @@ func updateObjRoleLabel[T generics.Object, PT generics.PObject[T]](
 // patchPodsPrimaryAnnotation patches the primary annotation of the pod.
 func patchPodsPrimaryAnnotation(pods []corev1.Pod, primary string) ([]graph.Vertex, error) {
 	vertexes := make([]graph.Vertex, 0)
+	if primary == "" {
+		return vertexes, nil
+	}
 	for _, pod := range pods {
 		if pod.Annotations == nil {
 			pod.Annotations = map[string]string{}

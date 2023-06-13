@@ -21,6 +21,7 @@ package replication
 
 import (
 	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -212,27 +213,29 @@ func (r *ReplicationSet) asyncReplicationPodRoleLabelAndAnnotations(podList []co
 	// sync pod role label
 	if len(updateRolePodList) > 0 {
 		for _, pod := range updateRolePodList {
+			if pod.Annotations == nil {
+				pod.Annotations = map[string]string{}
+			}
 			// if exists primary Pod, it means that the Pod without a role label is a new secondary Pod created by h-scale.
 			if primary != "" {
 				pod.GetLabels()[constant.RoleLabelKey] = constant.Secondary
-				vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
-					Obj:    &pod,
-					Action: ictrltypes.ActionUpdatePtr(), // update or patch?
-				})
 			} else {
 				// if not exists primary Pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
-				_, o := util.ParseParentNameAndOrdinal(pod.Name)
+				parent, o := util.ParseParentNameAndOrdinal(pod.Name)
 				role := DefaultRole(o)
 				pod.GetLabels()[constant.RoleLabelKey] = role
-				vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
-					Obj:    &pod,
-					Action: ictrltypes.ActionUpdatePtr(), // update or patch?
-				})
+				primary = fmt.Sprintf("%s-%d", parent, 0)
 			}
+			if v, ok := pod.Annotations[constant.PrimaryAnnotationKey]; !ok || v != primary {
+				pod.Annotations[constant.PrimaryAnnotationKey] = primary
+			}
+			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+				Obj:    &pod,
+				Action: ictrltypes.ActionUpdatePtr(), // update or patch?
+			})
 		}
-	}
-	// sync pods primary annotations
-	if primary != "" {
+	} else {
+		// sync pods primary annotations
 		vertexesPatchAnnotation, err := patchPodsPrimaryAnnotation(podList, primary)
 		if err != nil {
 			return nil, err

@@ -1,7 +1,57 @@
+---
+# Source: apecloud-mysql-cluster/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kb-mycluster-apecloud-mysql-cluster
+  labels:
+    app.kubernetes.io/name: apecloud-mysql-cluster
+    app.kubernetes.io/instance: mycluster
+    app.kubernetes.io/version: "8.0.30"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: apecloud-mysql-cluster/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kb-mycluster-apecloud-mysql-cluster
+  namespace: default
+  labels:
+    app.kubernetes.io/name: apecloud-mysql-cluster
+    app.kubernetes.io/instance: mycluster
+    app.kubernetes.io/version: "8.0.30"
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+---
+# Source: apecloud-mysql-cluster/templates/rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kb-mycluster-apecloud-mysql-cluster
+  labels:
+    app.kubernetes.io/name: apecloud-mysql-cluster
+    app.kubernetes.io/instance: mycluster
+    app.kubernetes.io/version: "8.0.30"
+    app.kubernetes.io/managed-by: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kb-mycluster-apecloud-mysql-cluster
+subjects:
+  - kind: ServiceAccount
+    name: kb-mycluster-apecloud-mysql-cluster
+    namespace: default
+---
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mycluster-sbapshot
+  name: mycluster-apecloud-mysql-cluster-snapshot
   annotations:
     kubeblocks.io/restore-from-backup: "{\"mysql\":\"backup-sbapshot-mycluster\"}"
 spec:
@@ -13,6 +63,7 @@ spec:
       componentDefRef: mysql
       monitor: false
       replicas: 1
+      serviceAccountName: kb-mycluster-apecloud-mysql-cluster
       volumeClaimTemplates:
         - name: data
           spec:

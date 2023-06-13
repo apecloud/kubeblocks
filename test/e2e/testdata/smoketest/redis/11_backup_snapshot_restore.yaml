@@ -5,8 +5,8 @@ kind: ServiceAccount
 metadata:
   name: kb-mycluster-redis-cluster
   labels:
-    
-    helm.sh/chart: redis-cluster-0.6.0-alpha.21
+
+    helm.sh/chart: redis-cluster-0.6.0-alpha.16
     app.kubernetes.io/name: redis-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "7.0.6"
@@ -19,8 +19,8 @@ metadata:
   name: kb-mycluster-redis-cluster
   namespace: default
   labels:
-    
-    helm.sh/chart: redis-cluster-0.6.0-alpha.21
+
+    helm.sh/chart: redis-cluster-0.6.0-alpha.16
     app.kubernetes.io/name: redis-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "7.0.6"
@@ -39,8 +39,8 @@ kind: RoleBinding
 metadata:
   name: kb-mycluster-redis-cluster
   labels:
-    
-    helm.sh/chart: redis-cluster-0.6.0-alpha.21
+
+    helm.sh/chart: redis-cluster-0.6.0-alpha.16
     app.kubernetes.io/name: redis-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "7.0.6"
@@ -58,9 +58,9 @@ subjects:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mycluster-redis-cluster
-  labels: 
-    helm.sh/chart: redis-cluster-0.6.0-alpha.21
+  name: mycluster-redis-cluster-snapshot
+  labels:
+    helm.sh/chart: redis-cluster-0.6.0-alpha.16
     app.kubernetes.io/name: redis-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "7.0.6"
@@ -70,7 +70,7 @@ spec:
   clusterVersionRef: redis-7.0.6 # ref clusterVersion.name
   terminationPolicy: Delete
   affinity:
-    topologyKeys: 
+    topologyKeys:
       - kubernetes.io/hostname
   componentSpecs:
     - name: redis # user-defined
@@ -79,6 +79,7 @@ spec:
       enabledLogs:     ["running"]
       replicas: 2
       serviceAccountName: kb-mycluster-redis-cluster
+      primaryIndex: 0
       switchPolicy:
         type: Noop
       resources:

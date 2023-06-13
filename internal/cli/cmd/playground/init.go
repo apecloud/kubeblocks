@@ -163,12 +163,7 @@ func (o *initOptions) validate() error {
 	}
 
 	if o.cloudProvider == cp.Local && o.dockerVersion < version.MinimumDockerVersion {
-		latestVersion, err := util.GetLatestDockerVersion()
-		if err != nil {
-			// if failed to get the latest docker version, just return the minimum version error
-			return fmt.Errorf("your docker version %s is lower than the minimum version %s, please upgrade your docker", o.dockerVersion, version.MinimumDockerVersion)
-		}
-		return fmt.Errorf("your docker version %s is lower than the minimum version %s, please upgrade your docker, the latest version is %s", o.dockerVersion, version.MinimumDockerVersion, latestVersion)
+		return fmt.Errorf("your docker version %s is lower than the minimum version %s, please upgrade your docker", o.dockerVersion, version.MinimumDockerVersion)
 	}
 
 	if err := o.baseOptions.validate(); err != nil {

@@ -22,13 +22,9 @@ package util
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os/exec"
 	"reflect"
-	"regexp"
-	"strings"
 
-	"golang.org/x/net/html"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
@@ -129,65 +125,4 @@ func GetDockerVersion() string {
 		return ""
 	}
 	return string(out)
-}
-
-// GetLatestDockerVersion latest docker version from https://download.docker.com according to operating system
-func GetLatestDockerVersion() (string, error) {
-	var opearatingSystem string
-	var arch string
-
-	// get operating system
-	cmd := exec.Command("uname", "-s")
-	out, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	opearatingSystem = strings.ToLower(string(out))
-	opearatingSystem = strings.TrimSuffix(opearatingSystem, "\n")
-	if opearatingSystem == "darwin" {
-		opearatingSystem = "mac"
-	}
-
-	// get arch
-	cmd = exec.Command("uname", "-m")
-	out, err = cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	arch = string(out)
-	arch = strings.TrimSuffix(arch, "\n")
-
-	// combine url
-	url := fmt.Sprintf("https://download.docker.com/%s/static/stable/%s/", opearatingSystem, arch)
-	resp, err := http.Get(url)
-	if err != nil {
-		return "", err
-	}
-
-	z := html.NewTokenizer(resp.Body)
-	// get the max version
-	dockerVersion := ""
-	for {
-		tt := z.Next()
-		switch {
-		case tt == html.ErrorToken:
-			return dockerVersion, nil
-		case tt == html.StartTagToken:
-			t := z.Token()
-			isAnchor := t.Data == "a"
-			if !isAnchor {
-				continue
-			}
-			// get href attr
-			for _, a := range t.Attr {
-				if a.Key == "href" && strings.Contains(a.Val, "docker-") {
-					// get version using regexp
-					version := regexp.MustCompile(`\d+\.\d+\.\d+`).FindString(a.Val)
-					if version > dockerVersion {
-						dockerVersion = version
-					}
-				}
-			}
-		}
-	}
 }

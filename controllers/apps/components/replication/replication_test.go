@@ -170,23 +170,32 @@ var _ = Describe("Replication Component", func() {
 			primaryPod := podList[0]
 			Expect(replicationComponent.PodIsAvailable(primaryPod, 10)).Should(BeTrue())
 
-			By("Testing component phase when pods not ready")
-			// mock secondary pod is not ready.
-			testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, podList[1].Name, podList[1].Namespace)
+			By("should return empty string if pod of component is only not ready when component is not up running")
+			pod := podList[1]
+			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+				pod.Status.Conditions = []corev1.PodCondition{}
+			})).Should(Succeed())
 			status.AvailableReplicas -= 1
 			testk8s.PatchStatefulSetStatus(&testCtx, replicationSetSts.Name, status)
-			phase, _, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompSpecName)
+			phase, _, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompSpecName, false)
+			Expect(string(phase)).Should(Equal(""))
+
+			By("expect component phase is Abnormal when pod of component is not ready and component is up running")
+			phase, _, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompSpecName, true)
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
-			// mock primary pod label is empty
+			// mock pod label is empty
 			Expect(testapps.ChangeObj(&testCtx, primaryPod, func(lpod *corev1.Pod) {
 				lpod.Labels[constant.RoleLabelKey] = ""
 			})).Should(Succeed())
-			phase, _, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompSpecName)
-			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
-			_, statusMessages, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompSpecName)
+			_, statusMessages, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompSpecName, false)
 			Expect(statusMessages[fmt.Sprintf("%s/%s", primaryPod.Kind, primaryPod.Name)]).
 				Should(ContainSubstring("empty label for pod, please check"))
+
+			// mock primary pod failed
+			testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, primaryPod.Name, primaryPod.Namespace)
+			phase, _, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompSpecName, true)
+			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 
 			By("Checking if the pod is not updated when statefulset is not updated")
 			Expect(testCtx.Cli.Get(testCtx.Ctx, stsObjectKey, replicationSetSts)).Should(Succeed())

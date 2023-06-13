@@ -31,6 +31,7 @@ import (
 	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+	"github.com/apecloud/kubeblocks/version"
 )
 
 var _ = Describe("playground", func() {
@@ -55,6 +56,7 @@ var _ = Describe("playground", func() {
 			IOStreams:      streams,
 			cloudProvider:  defaultCloudProvider,
 			helmCfg:        helm.NewConfig("", testKubeConfigPath, "", false),
+			dockerVersion:  version.MinimumDockerVersion,
 		}
 		Expect(o.validate()).Should(Succeed())
 		Expect(o.run()).Should(HaveOccurred())

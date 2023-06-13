@@ -78,6 +78,12 @@ var _ = Describe("version util", func() {
 		Expect(err).Should(Succeed())
 	})
 
+	It("GetK8sVersion when client is nil", func() {
+		v, err := GetK8sVersion(nil)
+		Expect(v).Should(BeEmpty())
+		Expect(err).Should(Succeed())
+	})
+
 	It("GetK8sVersion", func() {
 		client := testing.FakeClientSet()
 		v, err := GetK8sVersion(client.Discovery())

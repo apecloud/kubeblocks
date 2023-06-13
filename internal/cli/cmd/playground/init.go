@@ -167,6 +167,15 @@ func (o *initOptions) run() error {
 
 // local bootstraps a playground in the local host
 func (o *initOptions) local() error {
+	if util.GetDockerVersion() < version.MinimumDockerVersion {
+		latestVersion, err := util.GetLatestDockerVersion()
+		if err != nil {
+			// if failed to get the latest docker version, just return the minimum version error
+			return fmt.Errorf("docker version should be at least %s", version.MinimumDockerVersion)
+		}
+		return fmt.Errorf("docker version should be at least %s, the latest stable version %s is recommended", version.MinimumDockerVersion, latestVersion)
+	}
+
 	provider, err := cp.New(o.cloudProvider, "", o.Out, o.ErrOut)
 	if err != nil {
 		return err

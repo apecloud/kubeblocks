@@ -84,4 +84,15 @@ var _ = Describe("version util", func() {
 		Expect(v).ShouldNot(BeEmpty())
 		Expect(err).Should(Succeed())
 	})
+
+	It("GetLatestDockerVersion", func() {
+		latest, err := GetLatestDockerVersion()
+		if err != nil {
+			// skip this test if get latest docker version failed
+			// because it may be caused by network issue
+			Skip("GetLatestDockerVersion failed")
+		}
+		Expect(latest).ShouldNot(BeEmpty())
+		Expect(latest).Should(MatchRegexp(`\d+\.\d+\.\d+`))
+	})
 })

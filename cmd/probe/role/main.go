@@ -44,7 +44,7 @@ func main() {
 	var port string
 	var url string
 	flag.StringVar(&port, "port", internal.DefaultPort, "")
-	flag.StringVar(&url, "url", internal.DefaultServiceName, "")
+	flag.StringVar(&url, "url", internal.DefaultQueryUrl, "")
 	flag.Parse()
 
 	server := internal.NewGrpcServer(url)

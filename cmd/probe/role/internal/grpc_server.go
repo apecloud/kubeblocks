@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	DefaultPort        = "7373"
-	DefaultServiceName = ""
+	DefaultPort     = "7373"
+	DefaultQueryUrl = "role"
 )
 
 type GrpcServer struct {

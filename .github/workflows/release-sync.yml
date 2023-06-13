@@ -40,15 +40,6 @@ jobs:
           
           echo release_version=$LATEST_RELEASE_TAG >> $GITHUB_OUTPUT
 
-#  release-homebrew-tap:
-#    needs: update-release-kbcli
-#    uses: apecloud/apecd/.github/workflows/trigger-workflow.yml@v0.5.1
-#    with:
-#      GITHUB_REPO: "apecloud/homebrew-tap"
-#      WORKFLOW_ID: "release.yml"
-#      VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
-#    secrets: inherit
-# d
   release-yum-kbcli:
     needs: update-release-kbcli
     uses: apecloud/apecd/.github/workflows/trigger-workflow.yml@v0.5.1

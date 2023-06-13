@@ -3,7 +3,9 @@ package fault
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,8 +38,9 @@ var deleteExample = templates.Examples(`
 type ListAndDeleteOptions struct {
 	Factory cmdutil.Factory
 
-	ResourceKinds []string
-	Kind          bool
+	ResourceKinds    []string
+	AllResourceKinds []string
+	Kind             bool
 }
 
 func NewListCmd(f cmdutil.Factory) *cobra.Command {
@@ -62,31 +65,45 @@ func NewDeleteCmd(f cmdutil.Factory) *cobra.Command {
 		Short:   "Delete chaos resources.",
 		Example: deleteExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.Validate(args))
 			util.CheckErr(o.Complete(args))
 			util.CheckErr(o.RunDelete())
 		},
 	}
 }
 
-func (o *ListAndDeleteOptions) Complete(args []string) error {
-	if o.Kind {
-		resourceKinds, err := getAllChaosResourceKinds(o.Factory, GroupVersion)
-		if err != nil {
-			return fmt.Errorf("failed to get all chaos resources: %s", err)
-		}
-		for _, resourceKind := range resourceKinds {
-			fmt.Println(resourceKind)
+func (o *ListAndDeleteOptions) Validate(args []string) error {
+	var err error
+	o.AllResourceKinds, err = getAllChaosResourceKinds(o.Factory, GroupVersion)
+	if err != nil {
+		return fmt.Errorf("failed to get all chaos resources: %s", err)
+	}
+
+	kindMap := make(map[string]bool)
+	for _, kind := range o.AllResourceKinds {
+		kindMap[kind] = true
+	}
+	for _, kind := range args {
+		if _, ok := kindMap[kind]; !ok {
+			return fmt.Errorf("invalid chaos resource kind: %s. Use 'kbcli fault list --kind' to list all chaos resource kinds", kind)
 		}
 	}
 
-	var err error
+	return nil
+}
+
+func (o *ListAndDeleteOptions) Complete(args []string) error {
+	if o.Kind {
+		for _, resourceKind := range o.AllResourceKinds {
+			fmt.Println(resourceKind)
+		}
+		return nil
+	}
+
 	if len(args) > 0 {
 		o.ResourceKinds = args
 	} else {
-		o.ResourceKinds, err = getAllChaosResourceKinds(o.Factory, GroupVersion)
-		if err != nil {
-			return fmt.Errorf("failed to get all chaos resources: %s", err)
-		}
+		o.ResourceKinds = o.AllResourceKinds
 	}
 	return nil
 }
@@ -121,6 +138,13 @@ func listResources(f cmdutil.Factory, resourceKind string) error {
 		klog.V(1).Info(err)
 		return fmt.Errorf("failed to list %s: %s", gvr, err)
 	}
+
+	// sort by creation time form old to new
+	sort.Slice(resourceList.Items, func(i, j int) bool {
+		t1, _ := time.Parse(time.RFC3339, resourceList.Items[i].GetCreationTimestamp().String())
+		t2, _ := time.Parse(time.RFC3339, resourceList.Items[j].GetCreationTimestamp().String())
+		return t1.Before(t2)
+	})
 
 	for _, obj := range resourceList.Items {
 		fmt.Println(resourceKind+":", obj.GetName())
@@ -168,10 +192,6 @@ func getAllChaosResourceKinds(f cmdutil.Factory, groupVersion string) ([]string,
 	for _, resourceKind := range chaosResources.APIResources {
 		// skip subresources
 		if len(strings.Split(resourceKind.Name, "/")) > 1 {
-			continue
-		}
-		// skip chaos-mesh resources
-		if strings.Contains(resourceKind.Name, "-") {
 			continue
 		}
 		// skip podhttpchaos and podnetworkchaos etc.

@@ -49,7 +49,7 @@ jobs:
       VERSION: "${{ needs.update-release-kbcli.outputs.release-version }}"
     secrets: inherit
 
-#  release-winget-kbcli:
+#  release-winget-kbcli :
 #    needs: update-release-kbcli
 #    uses: apecloud/apecd/.github/workflows/trigger-workflow.yml@v0.5.1
 #    with:

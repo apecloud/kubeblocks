@@ -59,15 +59,13 @@ func mockSystemAccountsSpec() *appsv1alpha1.SystemAccountSpec {
 	}
 	var account appsv1alpha1.SystemAccountConfig
 	var scope appsv1alpha1.ProvisionScope
-	for _, name := range getAllSysAccounts() {
-		randomToss := rand.Intn(10)
-		if randomToss%2 == 0 {
+	for idx, name := range getAllSysAccounts() {
+		if idx%2 == 0 {
 			scope = appsv1alpha1.AnyPods
 		} else {
 			scope = appsv1alpha1.AllPods
 		}
-
-		if randomToss%3 == 0 {
+		if idx%3 == 0 {
 			account = mockCreateByRefSystemAccount(name, scope)
 		} else {
 			account = mockCreateByStmtSystemAccount(name)
@@ -84,6 +82,7 @@ func mockCreateByStmtSystemAccount(name appsv1alpha1.AccountName) appsv1alpha1.S
 			Type: appsv1alpha1.CreateByStmt,
 			Statements: &appsv1alpha1.ProvisionStatements{
 				CreationStatement: "CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY \"$(PASSWD)\";",
+				// UpdateStatement:   "ALTER USER $(USERNAME) IDENTIFIED BY \"$(PASSWD)\";",
 				DeletionStatement: "DROP USER IF EXISTS $(USERNAME);",
 			},
 		},
@@ -198,7 +197,7 @@ func TestRenderJob(t *testing.T) {
 	for _, acc := range accountsSetting.Accounts {
 		switch acc.ProvisionPolicy.Type {
 		case appsv1alpha1.CreateByStmt:
-			creationStmt, secrets := getCreationStmtForAccount(compKey, accountsSetting.PasswordConfig, acc)
+			creationStmt, secrets := getCreationStmtForAccount(compKey, accountsSetting.PasswordConfig, acc, reCreate)
 			// make sure all variables have been replaced
 			for _, stmt := range creationStmt {
 				assert.False(t, strings.Contains(stmt, "$(USERNAME)"))
@@ -206,16 +205,17 @@ func TestRenderJob(t *testing.T) {
 			}
 			// render job with debug mode off
 			endpoint := "10.0.0.1"
-			job := renderJob(engine, compKey, creationStmt, endpoint)
+			mockJobName := "mock-job" + testCtx.GetRandomStr()
+			job := renderJob(mockJobName, engine, compKey, creationStmt, endpoint)
 			assert.NotNil(t, job)
 			calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			assert.NotNil(t, job.Spec.TTLSecondsAfterFinished)
-			assert.Equal(t, (int32)(0), *job.Spec.TTLSecondsAfterFinished)
+			assert.Equal(t, (int32)(1), *job.Spec.TTLSecondsAfterFinished)
 			envList := job.Spec.Template.Spec.Containers[0].Env
 			assert.GreaterOrEqual(t, len(envList), 1)
 			assert.Equal(t, job.Spec.Template.Spec.Containers[0].Image, cmdExecutorConfig.Image)
 			// render job with debug mode on
-			job = renderJob(engine, compKey, creationStmt, endpoint)
+			job = renderJob(mockJobName, engine, compKey, creationStmt, endpoint)
 			assert.NotNil(t, job)
 			// set debug mode on
 			cluster.Annotations[debugClusterAnnotationKey] = "True"
@@ -228,7 +228,7 @@ func TestRenderJob(t *testing.T) {
 			toleration := make([]corev1.Toleration, 0)
 			toleration = append(toleration, generateToleration())
 			cluster.Spec.Tolerations = toleration
-			job = renderJob(engine, compKey, creationStmt, endpoint)
+			job = renderJob(mockJobName, engine, compKey, creationStmt, endpoint)
 			assert.NotNil(t, job)
 			calibrateJobMetaAndSpec(job, cluster, compKey, acc.Name)
 			jobToleration := job.Spec.Template.Spec.Tolerations
@@ -343,13 +343,17 @@ func TestRenderCreationStmt(t *testing.T) {
 				account.ProvisionPolicy.Statements.DeletionStatement = ""
 			}
 
-			stmts, secret := getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account)
+			stmts, secret := getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account, reCreate)
 			if toss == 1 {
 				assert.Equal(t, 1, len(stmts))
 			} else {
 				assert.Equal(t, 2, len(stmts))
 			}
 			assert.NotNil(t, secret)
+
+			// stmts, secret = getCreationStmtForAccount(compKey, compDef.SystemAccounts.PasswordConfig, account, inPlaceUpdate)
+			// assert.Equal(t, 1, len(stmts))
+			// assert.NotNil(t, secret)
 		}
 	}
 }

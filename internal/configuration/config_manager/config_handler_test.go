@@ -21,89 +21,173 @@ package configmanager
 
 import (
 	"context"
+	"encoding/json"
 	"io/fs"
 	"os"
+	"os/signal"
 	"path/filepath"
-	"testing"
+	"syscall"
+	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/stretchr/testify/require"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
+	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
-func TestCreateSignalHandler(t *testing.T) {
-	_, err := CreateSignalHandler(appsv1alpha1.SIGALRM, "test", "")
-	require.Nil(t, err)
-	_, err = CreateSignalHandler("NOSIGNAL", "test", "")
-	require.ErrorContains(t, err, "not supported unix signal")
-}
+var _ = Describe("Config Handler Test", func() {
 
-func TestCreateExecHandler(t *testing.T) {
-	_, err := CreateExecHandler(nil, "", nil, "")
-	require.ErrorContains(t, err, "invalid command")
-	_, err = CreateExecHandler([]string{}, "", nil, "")
-	require.ErrorContains(t, err, "invalid command")
-	c, err := CreateExecHandler([]string{"go", "version"}, "", nil, "")
-	require.Nil(t, err)
-	require.Nil(t, c.VolumeHandle(context.Background(), fsnotify.Event{}))
-}
+	var tmpWorkDir string
+	var mockK8sCli *testutil.K8sClientMockHelper
 
-func TestCreateTPLScriptHandler(t *testing.T) {
-	tmpDir, err := os.MkdirTemp(os.TempDir(), "gotemplate-sqlhandle-")
-	require.Nil(t, err)
-	defer os.RemoveAll(tmpDir)
+	BeforeEach(func() {
+		// Add any setup steps that needs to be executed before each test
+		mockK8sCli = testutil.NewK8sMockClient()
+		tmpWorkDir, _ = os.MkdirTemp(os.TempDir(), "test-handle-")
+	})
 
-	createTestConfigureDirectory(t, filepath.Join(tmpDir, "config"), "my.cnf", "xxxx")
-	tplFile := filepath.Join(tmpDir, "test.tpl")
-	configFile := filepath.Join(tmpDir, "config.yaml")
-	require.Nil(t, os.WriteFile(tplFile, []byte(``), fs.ModePerm))
+	AfterEach(func() {
+		os.RemoveAll(tmpWorkDir)
+		DeferCleanup(mockK8sCli.Finish)
+	})
 
-	tplConfig := TPLScriptConfig{Scripts: "test.tpl"}
-	b, _ := util.ToYamlConfig(tplConfig)
-	require.Nil(t, os.WriteFile(configFile, b, fs.ModePerm))
+	newConfigSpec := func() appsv1alpha1.ComponentConfigSpec {
+		return appsv1alpha1.ComponentConfigSpec{
+			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+				Name:        "config",
+				TemplateRef: "config-template",
+				VolumeName:  "/opt/config",
+				Namespace:   "default",
+			},
+			ConfigConstraintRef: "config-constraint",
+		}
+	}
 
-	_, err = CreateTPLScriptHandler("", configFile, []string{filepath.Join(tmpDir, "config")}, "")
-	require.Nil(t, err)
-}
+	newUnixSignalConfig := func() string {
+		configInfos := []ConfigSpecInfo{{
+			ReloadOptions: &appsv1alpha1.ReloadOptions{
+				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+					ProcessName: findCurrProcName(),
+					Signal:      appsv1alpha1.SIGHUP,
+				}},
+			ReloadType: appsv1alpha1.UnixSignalType,
+			MountPoint: "/tmp/test",
+			ConfigSpec: newConfigSpec(),
+		}}
+		b, err := json.Marshal(configInfos)
+		Expect(err).Should(Succeed())
+		return string(b)
+	}
 
-func createTestConfigureDirectory(t *testing.T, mockDirectory string, cfgFile, content string) {
+	Context("TestSimpleHandler", func() {
+		It("CreateSignalHandler", func() {
+			_, err := CreateSignalHandler(appsv1alpha1.SIGALRM, "test", "")
+			Expect(err).Should(Succeed())
+			_, err = CreateSignalHandler("NOSIGNAL", "test", "")
+			Expect(err.Error()).To(ContainSubstring("not supported unix signal: NOSIGNAL"))
+		})
+
+		It("CreateShellHandler", func() {
+			_, err := CreateExecHandler(nil, "", nil, "")
+			Expect(err.Error()).To(ContainSubstring("invalid command"))
+			_, err = CreateExecHandler([]string{}, "", nil, "")
+			Expect(err.Error()).To(ContainSubstring("invalid command"))
+			c, err := CreateExecHandler([]string{"go", "version"}, "", nil, "")
+			Expect(err).Should(Succeed())
+			Expect(c.VolumeHandle(context.Background(), fsnotify.Event{})).Should(Succeed())
+		})
+
+		It("CreateTPLScriptHandler", func() {
+			mockK8sTestConfigureDirectory(filepath.Join(tmpWorkDir, "config"), "my.cnf", "xxxx")
+			tplFile := filepath.Join(tmpWorkDir, "test.tpl")
+			configFile := filepath.Join(tmpWorkDir, "config.yaml")
+			Expect(os.WriteFile(tplFile, []byte(``), fs.ModePerm)).Should(Succeed())
+
+			tplConfig := TPLScriptConfig{Scripts: "test.tpl"}
+			b, _ := util.ToYamlConfig(tplConfig)
+			Expect(os.WriteFile(configFile, b, fs.ModePerm)).Should(Succeed())
+
+			_, err := CreateTPLScriptHandler("", configFile, []string{filepath.Join(tmpWorkDir, "config")}, "")
+			Expect(err).Should(Succeed())
+		})
+
+	})
+
+	Context("TestConfigHandler", func() {
+		It("SignalHandler", func() {
+			config := newUnixSignalConfig()
+			handler, err := CreateCombinedHandler(config, filepath.Join(tmpWorkDir, "backup"))
+			Expect(err).Should(Succeed())
+			// Expect(handler.MountPoint()).Should(BeEquivalentTo(""))
+
+			// process unix signal
+			trigger := make(chan bool)
+			ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGHUP)
+			defer stop()
+
+			go func() {
+				select {
+				case <-time.After(10 * time.Second):
+					// not walk here
+					Expect(true).Should(BeFalse())
+				case <-ctx.Done():
+					// prints "context canceled"
+					stop()
+					trigger <- true
+				}
+			}()
+			By("process unix signal")
+			Expect(handler.VolumeHandle(ctx, fsnotify.Event{Name: "/tmp/test"})).Should(Succeed())
+
+			select {
+			case <-time.After(20 * time.Second):
+				logger.Info("failed to watch volume.")
+				Expect(true).Should(BeFalse())
+			case <-trigger:
+				logger.Info("success to watch volume.")
+				Expect(true).To(BeTrue())
+			}
+		})
+
+		It("ShellHandler", func() {
+		})
+
+		It("TplScriptsHandler", func() {
+		})
+
+		It("DownwardAPIsHandler", func() {
+		})
+
+		It("MultiHandler", func() {
+		})
+	})
+})
+
+func mockK8sTestConfigureDirectory(mockDirectory string, cfgFile, content string) {
 	var (
-		tmpVolumeDir   = filepath.Join(mockDirectory, "..2023_02_16_06_06_06.1234567")
+		tmpVolumeDir   = filepath.Join(mockDirectory, "..2023_06_16_06_06_06.1234567")
 		configFilePath = filepath.Join(tmpVolumeDir, cfgFile)
 		tmpDataDir     = filepath.Join(mockDirectory, "..data_tmp")
 		watchedDataDir = filepath.Join(mockDirectory, "..data")
 	)
 
 	// wait inotify ready
-	if err := os.MkdirAll(tmpVolumeDir, fs.ModePerm); err != nil {
-		t.Errorf("failed to create directory: %s", tmpVolumeDir)
-	}
-	if err := os.WriteFile(configFilePath, []byte(content), fs.ModePerm); err != nil {
-		t.Errorf("failed to  write file: %s", configFilePath)
-	}
-	if err := os.Chmod(configFilePath, fs.ModePerm); err != nil {
-		t.Errorf("failed to chmod file: %s", configFilePath)
-	}
+	Expect(os.MkdirAll(tmpVolumeDir, fs.ModePerm)).Should(Succeed())
+	Expect(os.WriteFile(configFilePath, []byte(content), fs.ModePerm)).Should(Succeed())
+	Expect(os.Chmod(configFilePath, fs.ModePerm)).Should(Succeed())
 
 	pwd, err := os.Getwd()
-	if err != nil {
-		t.Errorf("failed to Getwd directory")
-	}
+	Expect(err).Should(Succeed())
 	defer func() {
 		_ = os.Chdir(pwd)
 	}()
-	if err := os.Chdir(mockDirectory); err != nil {
-		t.Errorf("failed to chdir directory: %s", tmpVolumeDir)
-	}
-	if err := os.Symlink(filepath.Base(tmpVolumeDir), filepath.Base(tmpDataDir)); err != nil {
-		t.Errorf("failed to create symbolic link for atomic update: %v", err)
-	}
-	if err := os.Rename(tmpDataDir, watchedDataDir); err != nil {
-		t.Errorf("failed to rename symbolic link for data directory %s: %v", tmpDataDir, err)
-	}
-	if err := os.Symlink(filepath.Join(filepath.Base(watchedDataDir), cfgFile), cfgFile); err != nil {
-		t.Errorf("failed to create symbolic link for atomic update: %v", err)
-	}
+
+	Expect(os.Chdir(mockDirectory))
+	Expect(os.Symlink(filepath.Base(tmpVolumeDir), filepath.Base(tmpDataDir))).Should(Succeed())
+	Expect(os.Rename(tmpDataDir, watchedDataDir)).Should(Succeed())
+	Expect(os.Symlink(filepath.Join(filepath.Base(watchedDataDir), cfgFile), cfgFile)).Should(Succeed())
 }

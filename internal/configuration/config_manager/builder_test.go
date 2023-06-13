@@ -37,7 +37,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-var _ = Describe("ConfigManager Test", func() {
+var _ = Describe("Config Builder Test", func() {
 
 	const (
 		scriptsName = "script_cm"
@@ -51,6 +51,10 @@ var _ = Describe("ConfigManager Test", func() {
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
 		mockK8sCli = testutil.NewK8sMockClient()
+	})
+
+	AfterEach(func() {
+		DeferCleanup(mockK8sCli.Finish)
 	})
 
 	syncFn := func(sync bool) *bool { r := sync; return &r }
@@ -186,10 +190,6 @@ formatterConfig:
 			},
 		}
 	}
-
-	AfterEach(func() {
-		DeferCleanup(mockK8sCli.Finish)
-	})
 
 	Context("TestBuildConfigManagerContainer", func() {
 		It("builds unixSignal reloader correctly", func() {

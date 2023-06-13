@@ -419,13 +419,13 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 		)
 	}
 
+	var h ConfigHandler
 	var handlerMetas []ConfigSpecInfo
 	err := json.Unmarshal([]byte(config), &handlerMetas)
 	if err != nil {
 		return nil, err
 	}
 
-	var h ConfigHandler
 	mHandler := &multiHandler{
 		handlers: make(map[string]ConfigHandler, len(handlerMetas)),
 	}

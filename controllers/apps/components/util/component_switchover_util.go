@@ -215,7 +215,6 @@ func doSwitchover(ctx context.Context,
 		if err := cli.Create(ctx, switchoverJob); err != nil {
 			return err
 		}
-		
 		return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for switchover %s finished.", key.Name)
 	}
 	// check the current generation switchoverJob whether succeed

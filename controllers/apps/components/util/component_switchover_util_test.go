@@ -220,7 +220,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		By("Test doSwitchover failed when switchoverCandidate has changed because controller reconciles many times, and switch job has not finished. .")
 		err := doSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).ShouldNot(Succeed())
-		Expect(err.Error()).Should(ContainSubstring("job check conditions status failed"))
+		Expect(err.Error()).Should(ContainSubstring("requeue to waiting for switchover"))
 
 		By("Test postOpsSwitchover failed because primary pod role label is not consistent with switchoverCandidate.")
 		err = postOpsSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)

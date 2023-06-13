@@ -37,6 +37,7 @@ import (
 )
 
 type regexFilter = func(fileName string) bool
+type DynamicUpdater = func(ctx context.Context, configSpec string, updatedParams map[string]string) error
 
 const (
 	builtInExecFunctionName           = "exec"
@@ -46,7 +47,8 @@ const (
 	buildInFilesObjectName = "Files"
 )
 
-type DynamicUpdater = func(ctx context.Context, configSpec string, updatedParams map[string]string) error
+// for testing
+var newCommandChannel = NewCommandChannel
 
 func OnlineUpdateParamsHandle(tplScriptPath string, formatConfig *appsv1alpha1.FormatterConfig, dataType, dsn string) (DynamicUpdater, error) {
 	tplContent, err := os.ReadFile(tplScriptPath)
@@ -74,7 +76,7 @@ func wrapGoTemplateRun(ctx context.Context, tplScriptPath string, tplContent str
 		commandChannel DynamicParamUpdater
 	)
 
-	if commandChannel, err = NewCommandChannel(ctx, dataType, dsn); err != nil {
+	if commandChannel, err = newCommandChannel(ctx, dataType, dsn); err != nil {
 		return err
 	}
 	defer commandChannel.Close()

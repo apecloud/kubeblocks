@@ -105,11 +105,6 @@ var _ = Describe("Handler Util Test", func() {
 	BeforeEach(func() {
 		// Add any setup steps that needs to be executed before each test
 		mockK8sCli = testutil.NewK8sMockClient()
-
-		mockK8sCli.MockGetMethod(
-			testutil.WithFailed(cfgutil.MakeError("failed to get resource."), testutil.WithTimes(1)),
-			testutil.WithSucceed(testutil.WithTimes(1)),
-		)
 	})
 
 	AfterEach(func() {
@@ -118,6 +113,11 @@ var _ = Describe("Handler Util Test", func() {
 
 	Context("TestValidateReloadOptions", func() {
 		It("Should succeed with no error", func() {
+			mockK8sCli.MockGetMethod(
+				testutil.WithFailed(cfgutil.MakeError("failed to get resource."), testutil.WithTimes(1)),
+				testutil.WithSucceed(testutil.WithTimes(1)),
+			)
+
 			type args struct {
 				reloadOptions *appsv1alpha1.ReloadOptions
 				cli           client.Client
@@ -195,6 +195,26 @@ var _ = Describe("Handler Util Test", func() {
 				err := ValidateReloadOptions(tt.args.reloadOptions, tt.args.cli, tt.args.ctx)
 				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
 			}
+		})
+	})
+
+	Context("TestGetSupportReloadConfigSpecs", func() {
+		It("not support reload", func() {
+			configSpecs, err := GetSupportReloadConfigSpecs([]appsv1alpha1.ComponentConfigSpec{{
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name: "test",
+				}}}, nil, nil)
+			Expect(err).Should(Succeed())
+			Expect(len(configSpecs)).Should(BeEquivalentTo(0))
+		})
+
+		It("not support reload", func() {
+			configSpecs, err := GetSupportReloadConfigSpecs([]appsv1alpha1.ComponentConfigSpec{{
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					Name: "test",
+				}}}, nil, nil)
+			Expect(err).Should(Succeed())
+			Expect(len(configSpecs)).Should(BeEquivalentTo(0))
 		})
 	})
 })

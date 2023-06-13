@@ -21,6 +21,7 @@ package configmanager
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -30,10 +31,14 @@ import (
 	"strings"
 	"testing"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/gotemplate"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -83,10 +88,6 @@ func TestCreateUpdatedParamsPatch(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestConstructReloadBuiltinFuncs(t *testing.T) {
-	require.NotNil(t, constructReloadBuiltinFuncs(ctx, nil, nil))
 }
 
 func prepareTestData(t *testing.T, dir1 string, dir2 string) string {
@@ -221,3 +222,101 @@ func mockPatroniTestData(t *testing.T, reloadScript string) string {
 
 	return tmpDir
 }
+
+func TestScanConfigVolume(t *testing.T) {
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "test-")
+	require.Nil(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	MakeTestConfigureDirectory(t, tmpDir, "test.conf", "empty!!!")
+	files, err := ScanConfigVolume(tmpDir)
+	require.Nil(t, err)
+	require.EqualValues(t, 1, len(files))
+	require.EqualValues(t, "test.conf", filepath.Base(files[0]))
+
+	// for test regex filter
+	filter, _ := createFileRegex("test.conf")
+	files2, err := scanConfigFiles([]string{tmpDir}, filter)
+	require.EqualValues(t, files2, files)
+}
+
+var _ = Describe("Handler Util Test", func() {
+
+	var tmpDir string
+
+	BeforeEach(func() {
+		// Add any setup steps that needs to be executed before each test
+		tmpDir, _ = os.MkdirTemp(os.TempDir(), "test-")
+	})
+
+	AfterEach(func() {
+	})
+
+	createIniFormatter := func(sectionName string) *appsv1alpha1.FormatterConfig {
+		return &appsv1alpha1.FormatterConfig{
+			FormatterOptions: appsv1alpha1.FormatterOptions{
+				IniConfig: &appsv1alpha1.IniConfig{
+					SectionName: sectionName,
+				}},
+			Format: appsv1alpha1.Ini,
+		}
+	}
+
+	Context("TestReloadBuiltinFunctions", func() {
+		It("test build-in exec", func() {
+			engine := gotemplate.NewTplEngine(nil,
+				constructReloadBuiltinFuncs(ctx, &mockCommandChannel{}, createIniFormatter("test")), "for_test", nil, nil)
+			_, err := engine.Render(`{{ exec "sh" "-c" "echo \"hello world\" " }}`)
+			Expect(err).Should(Succeed())
+		})
+
+		It("test build-in execSql", func() {
+			tpl := `
+{{- range $pk, $pv := $.arg0 }}
+	{{- execSql ( printf "SET GLOBAL %s = %d" $pk $pv ) }}
+{{- end }}
+`
+
+			values := gotemplate.ConstructFunctionArgList(map[string]string{
+				"key_buffer_size": "128M",
+			})
+			engine := gotemplate.NewTplEngine(&values, constructReloadBuiltinFuncs(ctx, &mockCommandChannel{}, createIniFormatter("test")), "for_test", nil, nil)
+			_, err := engine.Render(tpl)
+			Expect(err).Should(Succeed())
+
+		})
+
+		It("test build-in patchParams", func() {
+			configFile := "my.cnf"
+			baseConfig := "[test]\na = 1\nb = 2\n"
+
+			prepareTestConfig := func(configPath string, config string) {
+				fileInfo, err := os.Stat(configPath)
+				if err != nil {
+					Expect(os.IsNotExist(err)).Should(BeTrue())
+				}
+				if fileInfo == nil {
+					Expect(os.MkdirAll(configPath, fs.ModePerm)).Should(Succeed())
+				}
+				Expect(os.WriteFile(filepath.Join(configPath, configFile), []byte(config), fs.ModePerm)).Should(Succeed())
+			}
+
+			params := map[string]string{
+				"key1": "128M",
+				"key2": "512M",
+			}
+
+			baseFile := filepath.Join(tmpDir, "config", configFile)
+			targetFile := filepath.Join(tmpDir, "new_config", configFile)
+			prepareTestConfig(filepath.Dir(baseFile), baseConfig)
+			prepareTestConfig(filepath.Dir(targetFile), baseConfig)
+
+			values := gotemplate.ConstructFunctionArgList(params)
+			engine := gotemplate.NewTplEngine(&values, constructReloadBuiltinFuncs(context.TODO(), nil, createIniFormatter("test")), "for_test", nil, nil)
+			_, err := engine.Render(fmt.Sprintf("{{- patchParams $.arg0 \"%s\" \"%s\" }}", baseFile, targetFile))
+			Expect(err).Should(Succeed())
+			b, _ := os.ReadFile(targetFile)
+			Expect("[test]\na=1\nb=2\nkey1=128M\nkey2=512M\n").Should(BeEquivalentTo(string(b)))
+		})
+	})
+})

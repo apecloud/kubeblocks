@@ -27,6 +27,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -110,6 +112,31 @@ var _ = Describe("Handler Util Test", func() {
 	AfterEach(func() {
 		DeferCleanup(mockK8sCli.Finish)
 	})
+
+	mockConfigConstraint := func(ccName string, reloadOptions *appsv1alpha1.ReloadOptions) *appsv1alpha1.ConfigConstraint {
+		return &appsv1alpha1.ConfigConstraint{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: ccName,
+			},
+			Spec: appsv1alpha1.ConfigConstraintSpec{
+				ReloadOptions: reloadOptions,
+				FormatterConfig: &appsv1alpha1.FormatterConfig{
+					Format: appsv1alpha1.Properties,
+				},
+			}}
+	}
+
+	mockConfigSpec := func(ccName string) appsv1alpha1.ComponentConfigSpec {
+		return appsv1alpha1.ComponentConfigSpec{
+			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+				Name:        "test",
+				TemplateRef: "config_template",
+				Namespace:   "default",
+				VolumeName:  "for_test",
+			},
+			ConfigConstraintRef: ccName,
+		}
+	}
 
 	Context("TestValidateReloadOptions", func() {
 		It("Should succeed with no error", func() {
@@ -208,13 +235,140 @@ var _ = Describe("Handler Util Test", func() {
 			Expect(len(configSpecs)).Should(BeEquivalentTo(0))
 		})
 
-		It("not support reload", func() {
+		It("not ConfigConstraint ", func() {
 			configSpecs, err := GetSupportReloadConfigSpecs([]appsv1alpha1.ComponentConfigSpec{{
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-					Name: "test",
+					Name:        "test",
+					TemplateRef: "config_template",
+					Namespace:   "default",
 				}}}, nil, nil)
 			Expect(err).Should(Succeed())
 			Expect(len(configSpecs)).Should(BeEquivalentTo(0))
+		})
+
+		It("not support reload", func() {
+			ccName := "config_constraint"
+			mockK8sCli.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
+				mockConfigConstraint(ccName, nil),
+			}), testutil.WithTimes(1)))
+
+			configSpecs, err := GetSupportReloadConfigSpecs(
+				[]appsv1alpha1.ComponentConfigSpec{mockConfigSpec(ccName)},
+				mockK8sCli.Client(), ctx)
+
+			Expect(err).Should(Succeed())
+			Expect(len(configSpecs)).Should(BeEquivalentTo(0))
+		})
+
+		It("normal test", func() {
+			ccName := "config_constraint"
+			cc := mockConfigConstraint(ccName, &appsv1alpha1.ReloadOptions{
+				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+					ProcessName: "test",
+					Signal:      appsv1alpha1.SIGHUP,
+				},
+			})
+			mockK8sCli.MockGetMethod(testutil.WithGetReturned(
+				testutil.WithConstructSimpleGetResult([]client.Object{cc}),
+				testutil.WithTimes(1)))
+
+			configSpecs, err := GetSupportReloadConfigSpecs(
+				[]appsv1alpha1.ComponentConfigSpec{mockConfigSpec(ccName)},
+				mockK8sCli.Client(), ctx)
+
+			Expect(err).Should(Succeed())
+			Expect(len(configSpecs)).Should(BeEquivalentTo(1))
+			Expect(configSpecs[0].ConfigSpec).Should(BeEquivalentTo(mockConfigSpec(ccName)))
+			Expect(configSpecs[0].ReloadType).Should(BeEquivalentTo(appsv1alpha1.UnixSignalType))
+			Expect(configSpecs[0].FormatterConfig).Should(BeEquivalentTo(*cc.Spec.FormatterConfig))
+		})
+	})
+
+	Context("TestFromReloadTypeConfig", func() {
+		It("TestSignalTrigger", func() {
+			Expect(appsv1alpha1.UnixSignalType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{
+				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+					ProcessName: "test",
+					Signal:      appsv1alpha1.SIGHUP,
+				}})))
+		})
+
+		It("TestShellTrigger", func() {
+			Expect(appsv1alpha1.ShellType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{
+				ShellTrigger: &appsv1alpha1.ShellTrigger{
+					Command: []string{"/bin/true"},
+				}})))
+		})
+
+		It("TestTplScriptsTrigger", func() {
+			Expect(appsv1alpha1.TPLScriptType).Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{
+				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
+					ScriptConfig: appsv1alpha1.ScriptConfig{
+						ScriptConfigMapRef: "test",
+						Namespace:          "default",
+					},
+				}})))
+		})
+
+		It("TestInvalidTrigger", func() {
+			Expect("").Should(BeEquivalentTo(FromReloadTypeConfig(&appsv1alpha1.ReloadOptions{})))
+		})
+	})
+
+	Context("TestValidateReloadOptions", func() {
+		It("TestSignalTrigger", func() {
+			Expect(ValidateReloadOptions(&appsv1alpha1.ReloadOptions{
+				UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
+					ProcessName: "test",
+					Signal:      appsv1alpha1.SIGHUP,
+				}}, nil, nil),
+			).Should(Succeed())
+		})
+
+		It("TestShellTrigger", func() {
+			Expect(ValidateReloadOptions(&appsv1alpha1.ReloadOptions{
+				ShellTrigger: &appsv1alpha1.ShellTrigger{
+					Command: []string{"/bin/true"},
+				}}, nil, nil),
+			).Should(Succeed())
+		})
+
+		It("TestTplScriptsTrigger", func() {
+			ns := "default"
+			testName1 := "test1"
+			testName2 := "not_test1"
+			mockK8sCli.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
+				&corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testName1,
+						Namespace: ns,
+					},
+				},
+			}), testutil.WithTimes(2)))
+
+			By("Test valid")
+			Expect(ValidateReloadOptions(&appsv1alpha1.ReloadOptions{
+				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
+					ScriptConfig: appsv1alpha1.ScriptConfig{
+						ScriptConfigMapRef: testName1,
+						Namespace:          ns,
+					},
+				}}, mockK8sCli.Client(), ctx),
+			).Should(Succeed())
+
+			By("Test invalid")
+			Expect(ValidateReloadOptions(&appsv1alpha1.ReloadOptions{
+				TPLScriptTrigger: &appsv1alpha1.TPLScriptTrigger{
+					ScriptConfig: appsv1alpha1.ScriptConfig{
+						ScriptConfigMapRef: testName2,
+						Namespace:          ns,
+					},
+				}}, mockK8sCli.Client(), ctx),
+			).ShouldNot(Succeed())
+		})
+
+		It("TestInvalidTrigger", func() {
+			Expect(ValidateReloadOptions(&appsv1alpha1.ReloadOptions{}, nil, nil)).ShouldNot(Succeed())
 		})
 	})
 })

@@ -36,8 +36,8 @@ import (
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
-// asyncReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
-func asyncReplicationSetClusterStatus(cluster *appsv1alpha1.Cluster,
+// rebuildReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
+func rebuildReplicationSetClusterStatus(cluster *appsv1alpha1.Cluster,
 	workloadType appsv1alpha1.WorkloadType, compName string, podList []corev1.Pod) error {
 	if len(podList) == 0 {
 		return nil
@@ -49,11 +49,11 @@ func asyncReplicationSetClusterStatus(cluster *appsv1alpha1.Cluster,
 		}
 		replicationStatus = cluster.Status.Components[compName].ReplicationSetStatus
 	}
-	return asyncReplicationSetStatus(replicationStatus, podList)
+	return rebuildReplicationSetStatus(replicationStatus, podList)
 }
 
-// asyncReplicationSetStatus syncs the target pod info in cluster.status.components.
-func asyncReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []corev1.Pod) error {
+// rebuildReplicationSetStatus rebuilds the target pod info in cluster.status.components.
+func rebuildReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []corev1.Pod) error {
 	for _, pod := range podList {
 		role := pod.Labels[constant.RoleLabelKey]
 		if role == "" {
@@ -120,8 +120,8 @@ func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSet
 	return nil
 }
 
-// GetAndCheckReplicationSetPrimaryPod gets and checks the primary Pod of the replication workload.
-func GetAndCheckReplicationSetPrimaryPod(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compSpecName string) (*corev1.Pod, error) {
+// getAndCheckReplicationSetPrimaryPod gets and checks the primary Pod of the replication workload.
+func getAndCheckReplicationSetPrimaryPod(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compSpecName string) (*corev1.Pod, error) {
 	podList, err := util.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, constant.Primary)
 	if err != nil {
 		return nil, err
@@ -186,7 +186,7 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 		return nil
 	}
 
-	oldPrimaryPod, err := GetAndCheckReplicationSetPrimaryPod(reqCtx.Ctx, cli, *cluster, compName)
+	oldPrimaryPod, err := getAndCheckReplicationSetPrimaryPod(reqCtx.Ctx, cli, *cluster, compName)
 	if err != nil {
 		reqCtx.Log.Info("handleReplicationSetRoleChangeEvent gets old primary pod failed", "error", err)
 		return err

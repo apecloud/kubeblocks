@@ -72,18 +72,18 @@ func HandleSwitchover(ctx context.Context,
 	}
 
 	// check if the switchover is needed
-	needSwitchover, err := NeedDealWithSwitchover(ctx, cli, cluster, component)
+	needSwitchover, err := needDealWithSwitchover(ctx, cli, cluster, component)
 	if err != nil {
 		return err
 	}
 	if needSwitchover {
 		// create a job to do switchover and check the result
-		if err := DoSwitchover(ctx, cli, cluster, component); err != nil {
+		if err := doSwitchover(ctx, cli, cluster, component); err != nil {
 			return err
 		}
 	} else {
 		// if the switchover is not needed, it means that the switchover has been completed, and the switchover job can be deleted.
-		if err := PostOpsSwitchover(ctx, cli, cluster, component); err != nil {
+		if err := postOpsSwitchover(ctx, cli, cluster, component); err != nil {
 			return err
 		}
 	}
@@ -98,12 +98,12 @@ func HandleRoleSync(ctx context.Context,
 	if component.SwitchoverCandidate == nil {
 		return nil
 	}
-	// if the failover sync is not enabled, we do not sync the failover result.
+	// if the roleSync is not enabled, we do not sync the roleChange result.
 	if !component.SwitchoverCandidate.RoleSync {
 		return nil
 	}
 	switchoverCondition := meta.FindStatusCondition(cluster.Status.Conditions, appsv1alpha1.ConditionTypeSwitchoverPrefix+component.Name)
-	// if the switchover condition is exist and status is not true, it means that the switchover is not completed, we do not sync the failover result.
+	// if the switchover condition is exist and status is not true, it means that the switchover is not completed, we do not sync the roleChange result.
 	if switchoverCondition != nil && switchoverCondition.Status != metav1.ConditionTrue {
 		return nil
 	}
@@ -128,13 +128,13 @@ func HandleRoleSync(ctx context.Context,
 	return nil
 }
 
-// NeedDealWithSwitchover checks whether we need to handle the switchover process.
-func NeedDealWithSwitchover(ctx context.Context,
+// needDealWithSwitchover checks whether we need to handle the switchover process.
+func needDealWithSwitchover(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomputil.SynthesizedComponent) (bool, error) {
 	// firstly, check whether the switchoverCandidate is changed by comparing with the pod role label
-	changed, _, err := CheckSwitchoverCandidateChanged(ctx, cli, cluster, component.Name)
+	changed, _, err := checkSwitchoverCandidateChanged(ctx, cli, cluster, component.Name)
 	if err != nil {
 		return false, err
 	}
@@ -181,8 +181,8 @@ func NeedDealWithSwitchover(ctx context.Context,
 	return true, nil
 }
 
-// DoSwitchover is used to perform switchover operations.
-func DoSwitchover(ctx context.Context,
+// doSwitchover is used to perform switchover operations.
+func doSwitchover(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomputil.SynthesizedComponent) error {
@@ -196,13 +196,13 @@ func DoSwitchover(ctx context.Context,
 	exists, _ := intctrlutil.CheckResourceExists(ctx, cli, key, &batchv1.Job{})
 	if !exists {
 		// check the previous generation switchoverJob whether exist
-		previousJobs, err := GetJobWithLabels(ctx, cli, cluster, ml)
+		previousJobs, err := getJobWithLabels(ctx, cli, cluster, ml)
 		if err != nil {
 			return err
 		}
 		if len(previousJobs) > 0 {
 			// delete the previous generation switchoverJob
-			if err := CleanJobWithLabels(ctx, cli, cluster, ml); err != nil {
+			if err := cleanJobWithLabels(ctx, cli, cluster, ml); err != nil {
 				return err
 			}
 		}
@@ -217,15 +217,15 @@ func DoSwitchover(ctx context.Context,
 		}
 	}
 	// check the current generation switchoverJob whether succeed
-	if err := CheckJobSucceed(ctx, cli, cluster, switchoverJob); err != nil {
+	if err := checkJobSucceed(ctx, cli, cluster, switchoverJob); err != nil {
 		return err
 	}
 
-	return PostOpsSwitchover(ctx, cli, cluster, component)
+	return postOpsSwitchover(ctx, cli, cluster, component)
 }
 
-// PostOpsSwitchover is used to do some post operations after switchover job execute successfully.
-func PostOpsSwitchover(ctx context.Context,
+// postOpsSwitchover is used to do some post operations after switchover job execute successfully.
+func postOpsSwitchover(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomputil.SynthesizedComponent) error {
@@ -252,14 +252,14 @@ func PostOpsSwitchover(ctx context.Context,
 	meta.SetStatusCondition(&cluster.Status.Conditions, *newSwitchoverCondition)
 
 	// delete the successful job
-	return CleanJobWithLabels(ctx, cli, cluster, ml)
+	return cleanJobWithLabels(ctx, cli, cluster, ml)
 }
 
-// CheckSwitchoverCandidateChanged checks whether switchoverCandidate has changed.
+// checkSwitchoverCandidateChanged checks whether switchoverCandidate has changed.
 // @return bool - true is switchoverCandidate inconsistent
 // @return string - current primary/leader Instance name; "" if error
 // @return error
-func CheckSwitchoverCandidateChanged(ctx context.Context,
+func checkSwitchoverCandidateChanged(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	componentName string) (bool, string, error) {
@@ -506,8 +506,8 @@ func renderSwitchoverCmdJob(ctx context.Context,
 	return job, nil
 }
 
-// GetJobWithLabels gets the job list with the specified labels.
-func GetJobWithLabels(ctx context.Context,
+// getJobWithLabels gets the job list with the specified labels.
+func getJobWithLabels(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	matchLabels client.MatchingLabels) ([]batchv1.Job, error) {
@@ -518,12 +518,12 @@ func GetJobWithLabels(ctx context.Context,
 	return jobList.Items, nil
 }
 
-// CleanJobWithLabels cleans up the job task that execute the switchover commands.
-func CleanJobWithLabels(ctx context.Context,
+// cleanJobWithLabels cleans up the job task that execute the switchover commands.
+func cleanJobWithLabels(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	matchLabels client.MatchingLabels) error {
-	jobList, err := GetJobWithLabels(ctx, cli, cluster, matchLabels)
+	jobList, err := getJobWithLabels(ctx, cli, cluster, matchLabels)
 	if err != nil {
 		return err
 	}
@@ -538,8 +538,8 @@ func CleanJobWithLabels(ctx context.Context,
 	return nil
 }
 
-// CheckJobSucceed checks the result of job execution.
-func CheckJobSucceed(ctx context.Context,
+// checkJobSucceed checks the result of job execution.
+func checkJobSucceed(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	job *batchv1.Job) error {

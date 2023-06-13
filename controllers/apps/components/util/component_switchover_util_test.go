@@ -124,21 +124,21 @@ var _ = Describe("ReplicationSet Util", func() {
 		}
 
 		By("Test cluster.status.Switchover.Condition is nil, switchoverCandidate consistent with pod role label, should not need to deal with switchover.")
-		needSwitchover, err := NeedDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
+		needSwitchover, err := needDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeFalse())
 
 		By("Test cluster.status.Switchover.Condition is nil, switchoverCandidate is not consistent with pod role label, should need to deal with switchover.")
 		component.SwitchoverCandidate.Index = 1
 		component.SwitchoverCandidate.Operator = appsv1alpha1.CandidateOpEqual
-		needSwitchover, err = NeedDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
+		needSwitchover, err = needDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
 
 		By("Test cluster.status.Switchover.Condition is nil, switchoverCandidate is not consistent with pod role label and operator is NotEqual, should need to deal with switchover.")
 		component.SwitchoverCandidate.Index = 0
 		component.SwitchoverCandidate.Operator = appsv1alpha1.CandidateOpNotEqual
-		needSwitchover, err = NeedDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
+		needSwitchover, err = needDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
 
@@ -147,7 +147,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		component.SwitchoverCandidate.Operator = appsv1alpha1.CandidateOpEqual
 		newSwitchoverCondition := initSwitchoverCondition(*component.SwitchoverCandidate, component.Name, metav1.ConditionFalse, ReasonSwitchoverStart, clusterObj.Generation)
 		meta.SetStatusCondition(&clusterObj.Status.Conditions, *newSwitchoverCondition)
-		needSwitchover, err = NeedDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
+		needSwitchover, err = needDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
 
@@ -156,7 +156,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		component.SwitchoverCandidate.Operator = appsv1alpha1.CandidateOpEqual
 		newSwitchoverCondition = initSwitchoverCondition(*component.SwitchoverCandidate, component.Name, metav1.ConditionTrue, ReasonSwitchoverSucceed, clusterObj.Generation)
 		meta.SetStatusCondition(&clusterObj.Status.Conditions, *newSwitchoverCondition)
-		needSwitchover, err = NeedDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
+		needSwitchover, err = needDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeFalse())
 
@@ -167,12 +167,12 @@ var _ = Describe("ReplicationSet Util", func() {
 		meta.SetStatusCondition(&clusterObj.Status.Conditions, *newSwitchoverCondition)
 		component.SwitchoverCandidate.Index = 2
 		component.SwitchoverCandidate.Operator = appsv1alpha1.CandidateOpEqual
-		needSwitchover, err = NeedDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
+		needSwitchover, err = needDealWithSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).Should(Succeed())
 		Expect(needSwitchover).Should(BeTrue())
 	}
 
-	testDoSwitchover := func() {
+	testdoSwitchover := func() {
 		By("Creating a cluster with replication workloadType.")
 		switchoverCandidate := &appsv1alpha1.SwitchoverCandidate{
 			Index:    1,
@@ -217,20 +217,20 @@ var _ = Describe("ReplicationSet Util", func() {
 			WorkloadType:        clusterDefObj.Spec.ComponentDefs[0].WorkloadType,
 		}
 
-		By("Test DoSwitchover failed when switchoverCandidate has changed because controller reconciles many times, and switch job has not finished. .")
-		err := DoSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
+		By("Test doSwitchover failed when switchoverCandidate has changed because controller reconciles many times, and switch job has not finished. .")
+		err := doSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).ShouldNot(Succeed())
 		Expect(err.Error()).Should(ContainSubstring("job check conditions status failed"))
 
-		By("Test PostOpsSwitchover failed because primary pod role label is not consistent with switchoverCandidate.")
-		err = PostOpsSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
+		By("Test postOpsSwitchover failed because primary pod role label is not consistent with switchoverCandidate.")
+		err = postOpsSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).ShouldNot(Succeed())
 		Expect(err.Error()).Should(ContainSubstring("pod role label consistency check failed after switchover"))
 
-		By("Test PostOpsSwitchover succeed because mocks pod role label consistent with switchoverCandidate.")
+		By("Test postOpsSwitchover succeed because mocks pod role label consistent with switchoverCandidate.")
 		component.SwitchoverCandidate.Index = 0
 		component.SwitchoverCandidate.Operator = appsv1alpha1.CandidateOpEqual
-		err = PostOpsSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
+		err = postOpsSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).Should(Succeed())
 	}
 
@@ -331,8 +331,8 @@ var _ = Describe("ReplicationSet Util", func() {
 			testNeedDeaWithSwitchover()
 		})
 
-		It("Test DoSwitchover when switchoverCandidate triggers", func() {
-			testDoSwitchover()
+		It("Test doSwitchover when switchoverCandidate triggers", func() {
+			testdoSwitchover()
 		})
 
 		It("Test HandleRoleSync when switchoverCandidate is not consistency with role label", func() {

@@ -189,8 +189,8 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 	if err != nil {
 		return nil, err
 	}
-	// async cluster.status.components.replicationSet.status
-	if err := asyncReplicationSetClusterStatus(r.Cluster, r.getWorkloadType(), r.getName(), podList); err != nil {
+	// rebuild cluster.status.components.replicationSet.status
+	if err := rebuildReplicationSetClusterStatus(r.Cluster, r.getWorkloadType(), r.getName(), podList); err != nil {
 		return nil, err
 	}
 	return vertexes, nil

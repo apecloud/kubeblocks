@@ -149,7 +149,7 @@ var _ = Describe("ReplicationSet Util", func() {
 				Create(&testCtx).GetObject()
 			podList = append(podList, *pod)
 		}
-		err := asyncReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompSpecName].ReplicationSetStatus, podList)
+		err := rebuildReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompSpecName].ReplicationSetStatus, podList)
 		Expect(err).Should(Succeed())
 		Expect(len(clusterObj.Status.Components[testapps.DefaultRedisCompSpecName].ReplicationSetStatus.Secondaries)).Should(Equal(3))
 

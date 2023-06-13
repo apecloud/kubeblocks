@@ -134,7 +134,7 @@ func needDealWithSwitchover(ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	component *intctrlcomputil.SynthesizedComponent) (bool, error) {
 	// firstly, check whether the switchoverCandidate is changed by comparing with the pod role label
-	changed, _, err := checkSwitchoverCandidateChanged(ctx, cli, cluster, component.Name)
+	changed, err := checkSwitchoverCandidateChanged(ctx, cli, cluster, component.Name)
 	if err != nil {
 		return false, err
 	}
@@ -262,27 +262,27 @@ func postOpsSwitchover(ctx context.Context,
 func checkSwitchoverCandidateChanged(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	componentName string) (bool, string, error) {
+	componentName string) (bool, error) {
 	compSpec := GetClusterComponentSpecByName(*cluster, componentName)
 	if compSpec.SwitchoverCandidate == nil {
-		return false, "", nil
+		return false, nil
 	}
 	// get the Pod object whose current role label is primary or leader
 	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, compSpec.Name, compSpec.ComponentDefRef)
 	if err != nil {
-		return false, "", err
+		return false, err
 	}
 	if pod == nil {
-		return false, "", nil
+		return false, nil
 	}
 	switchoverCandidateName := fmt.Sprintf("%s-%s-%d", cluster.Name, componentName, compSpec.SwitchoverCandidate.Index)
-	if compSpec.SwitchoverCandidate.Operator == appsv1alpha1.CandidateOpEqual {
-		return pod.Name != switchoverCandidateName, pod.Name, nil
+	switch compSpec.SwitchoverCandidate.Operator {
+	case appsv1alpha1.CandidateOpEqual:
+		return pod.Name != switchoverCandidateName, nil
+	case appsv1alpha1.CandidateOpNotEqual:
+		return pod.Name == switchoverCandidateName, nil
 	}
-	if compSpec.SwitchoverCandidate.Operator == appsv1alpha1.CandidateOpNotEqual {
-		return pod.Name == switchoverCandidateName, pod.Name, nil
-	}
-	return false, pod.Name, nil
+	return false, errors.New("invalid switchoverCandidate operator")
 }
 
 // getPrimaryOrLeaderPod returns the leader or primary pod of the component.

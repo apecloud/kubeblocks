@@ -219,16 +219,16 @@ func deleteResources(f cmdutil.Factory, groupVersion string) error {
 
 	dynamicClient, err := f.DynamicClient()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create dynamic client: %v", err)
 	}
 
-	apiResources, err := discoveryClient.ServerResourcesForGroupVersion(groupVersion)
+	chaosResources, err := discoveryClient.ServerResourcesForGroupVersion(groupVersion)
 	if err != nil {
 		klog.V(1).Info(err)
 		return fmt.Errorf("failed to get server resources for %s: %s", groupVersion, err)
 	}
 
-	for _, resource := range apiResources.APIResources {
+	for _, resource := range chaosResources.APIResources {
 		// skip subresources
 		if len(strings.Split(resource.Name, "/")) > 1 {
 			continue

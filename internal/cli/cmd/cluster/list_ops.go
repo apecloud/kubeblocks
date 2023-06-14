@@ -70,11 +70,7 @@ func NewListOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Example:           listOpsExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			// build label selector for listing ops
-			o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
-			// args are the cluster names. we only use the label selector to get ops, so resources names
-			// are not needed.
-			o.Names = nil
+			o.Names = args
 			util.CheckErr(o.Complete())
 			util.CheckErr(o.printOpsList())
 		},
@@ -134,6 +130,11 @@ func (o *opsListOptions) printOpsList() error {
 		if len(o.opsType) != 0 && !o.containsIgnoreCase(o.opsType, opsType) {
 			continue
 		}
+
+		if len(o.Names) != 0 && !o.containsIgnoreCase(o.Names, ops.Spec.ClusterRef) {
+			continue
+		}
+
 		tblPrinter.AddRow(ops.Name, opsType, ops.Spec.ClusterRef, getComponentNameFromOps(ops), phase, ops.Status.Progress, util.TimeFormat(&ops.CreationTimestamp))
 	}
 	if tblPrinter.Tbl.Length() != 0 {

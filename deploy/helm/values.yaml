@@ -1203,7 +1203,7 @@ prometheus:
         # service then set this appropriately.
         # * `monitor.kubeblocks.io/param_<parameter>`: If the metrics endpoint uses parameters
         # then you can set any parameter
-        - job_name: 'kubeblocks-service-endpoints'
+        - job_name: 'kubeblocks-service'
           honor_labels: true
 
           kubernetes_sd_configs:
@@ -1213,6 +1213,9 @@ prometheus:
             - source_labels: [ __meta_kubernetes_service_label_app_kubernetes_io_managed_by ]
               action: keep
               regex: kubeblocks
+            - source_labels: [ __meta_kubernetes_service_label_monitor_kubeblocks_io_managed_by ]
+              action: drop
+              regex: agamotto
             - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scrape ]
               action: keep
               regex: true
@@ -1246,6 +1249,39 @@ prometheus:
             - source_labels: [ __meta_kubernetes_pod_name ]
               action: replace
               target_label: pod
+            - source_labels: [ __meta_kubernetes_pod_phase ]
+              regex: Pending|Succeeded|Failed|Completed
+              action: drop
+
+        - job_name: 'kubeblocks-agamotto'
+          honor_labels: true
+
+          kubernetes_sd_configs:
+            - role: endpoints
+
+          relabel_configs:
+            - source_labels: [ __meta_kubernetes_service_label_monitor_kubeblocks_io_managed_by ]
+              action: keep
+              regex: agamotto
+            - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scrape ]
+              action: keep
+              regex: true
+            - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scheme ]
+              action: replace
+              target_label: __scheme__
+              regex: (https?)
+            - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_path ]
+              action: replace
+              target_label: __metrics_path__
+              regex: (.+)
+            - source_labels: [ __address__, __meta_kubernetes_service_annotation_monitor_kubeblocks_io_port ]
+              action: replace
+              target_label: __address__
+              regex: (.+?)(?::\d+)?;(\d+)
+              replacement: $1:$2
+            - action: labelmap
+              regex: __meta_kubernetes_service_annotation_monitor_kubeblocks_io_param_(.+)
+              replacement: __param_$1
             - source_labels: [ __meta_kubernetes_pod_phase ]
               regex: Pending|Succeeded|Failed|Completed
               action: drop

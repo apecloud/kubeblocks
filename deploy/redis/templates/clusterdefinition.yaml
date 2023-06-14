@@ -7,8 +7,8 @@ metadata:
 spec:
   type: redis
   connectionCredential:
-    username: ""
-    password: ""
+    username: default
+    password: "$(RANDOM_PASSWD)"
     endpoint: "$(SVC_FQDN):$(SVC_PORT_redis)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_redis)"
@@ -105,6 +105,31 @@ spec:
                 mountPath: /scripts
               - name: redis-conf
                 mountPath: /etc/redis
+            env:
+              - name: REDIS_REPL_USER
+                value: "kbreplicator"
+              - name: REDIS_REPL_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: REDIS_DEFAULT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: REDIS_SENTINEL_USER
+                value: "$(REDIS_REPL_USER)-sentinel"
+              - name: REDIS_SENTINEL_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: REDIS_ARGS
+                value: "--requirepass $(REDIS_PASSWORD)"
             command: ["/scripts/redis-start.sh"]
             lifecycle:
               postStart:
@@ -134,11 +159,18 @@ spec:
 # Instead, using a shell script to wrap redis-cli and pass $(KB_ACCOUNT_STATEMENT) to it will do.
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+          env:
+            - name: REDIS_DEFAULT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
           command:
           - sh
           - -c
           args:
-          - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) $(KB_ACCOUNT_STATEMENT) | redis-cli -h $(KB_ACCOUNT_ENDPOINT) acl save "
+          - "redis-cli -h $(KB_ACCOUNT_ENDPOINT) -a $REDIS_DEFAULT_PASSWORD $(KB_ACCOUNT_STATEMENT) | redis-cli -h $(KB_ACCOUNT_ENDPOINT) -a $REDIS_DEFAULT_PASSWORD acl save "
         passwordConfig:
           length: 10
           numDigits: 5
@@ -163,13 +195,6 @@ spec:
                 update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
           - name: kbprobe
             provisionPolicy: *kbReadOnlyAcctRef
-          - name: kbreplicator
-            provisionPolicy:
-              type: CreateByStmt
-              scope: AllPods
-              statements:
-                creation: ACL SETUSER $(USERNAME) ON \>$(PASSWD) +psync +replconf +ping
-                update: ACL SETUSER $(USERNAME) ON \>$(PASSWD)
     - name: redis-sentinel
       workloadType: Stateful
       characterType: redis
@@ -207,6 +232,37 @@ spec:
             - name: scripts
               mountPath: /scripts
           command: [ "/scripts/redis-sentinel-setup.sh" ]
+          env:
+            - name: REDIS_REPL_USER
+              value: "kbreplicator"
+            - name: REDIS_REPL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
+            - name: REDIS_DEFAULT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
+            - name: REDIS_SENTINEL_USER
+              value: "$(REDIS_REPL_USER)-sentinel"
+            - name: REDIS_SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
+            - name: SENTINEL_USER
+              value: "default"
+            - name: SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
         containers:
         - name: redis-sentinel
           imagePullPolicy: IfNotPresent
@@ -222,6 +278,37 @@ spec:
               mountPath: /etc/sentinel
             - name: scripts
               mountPath: /scripts
+          env:
+            - name: REDIS_REPL_USER
+              value: "kbreplicator"
+            - name: REDIS_REPL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
+            - name: REDIS_DEFAULT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
+            - name: REDIS_SENTINEL_USER
+              value: "$(REDIS_REPL_USER)-sentinel"
+            - name: REDIS_SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
+            - name: SENTINEL_USER
+              value: "default"
+            - name: SENTINEL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
           command:
             - /bin/bash
           args:
@@ -229,6 +316,10 @@ spec:
             - |
               set -ex
               /scripts/redis-sentinel-start.sh
+          lifecycle:
+            postStart:
+              exec:
+                command: [ "/scripts/redis-sentinel-post-start.sh" ]
           livenessProbe:
             initialDelaySeconds: 10
             periodSeconds: 5

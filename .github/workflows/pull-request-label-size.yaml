@@ -3,7 +3,7 @@ name: PULL-REQUEST-LABEL-SIZE
 on: [pull_request]
 
 env:
-  GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  GITHUB_TOKEN: ${{ github.token }}
 
 jobs:
   size-label:
@@ -15,5 +15,5 @@ jobs:
       - name: set size label
         run: |
           bash .github/utils/utils.sh --type 15 \
-              --github-token ${{ env.GITHUB_TOKEN }} \
+              --github-token "${{ env.GITHUB_TOKEN }}" \
               --pr-number ${{ github.event.pull_request.number }}

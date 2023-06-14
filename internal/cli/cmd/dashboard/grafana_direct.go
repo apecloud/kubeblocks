@@ -17,24 +17,40 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package internal
+package dashboard
 
 import (
-	"context"
-
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/spf13/viper"
+	"fmt"
+	"strings"
 )
 
-// check volume snapshot available
-func isSnapshotAvailable(cli types2.ReadonlyClient, ctx context.Context) bool {
-	if !viper.GetBool("VOLUMESNAPSHOT") {
-		return false
+var (
+	clusterType string
+	// Todo: availableTypes is hard code, better to do a dynamic query but where the source from?
+	availableTypes = []string{
+		"mysql",
+		"cadvisor",
+		"jmx",
+		"kafka",
+		"mongodb",
+		"node",
+		"postgresql",
+		"redis",
+		"weaviate",
 	}
-	vsList := snapshotv1.VolumeSnapshotList{}
-	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
-	getVSErr := compatClient.List(&vsList)
-	return getVSErr == nil
+)
+
+const supportDirectDashboard = "kubeblocks-grafana"
+
+func buildGrafanaDirectURL(url *string, targetType string) error {
+	if targetType == "" {
+		return nil
+	}
+	for i := range availableTypes {
+		if targetType == availableTypes[i] {
+			*url += "/d/" + availableTypes[i]
+			return nil
+		}
+	}
+	return fmt.Errorf("cluster type is invalid, support %s", strings.Join(availableTypes, ","))
 }

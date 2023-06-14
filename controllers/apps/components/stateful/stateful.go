@@ -90,7 +90,9 @@ func (r *Stateful) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (app
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
-func (r *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
+func (r *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context,
+	componentName string,
+	originPhaseIsUpRunning bool) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	stsList := &appsv1.StatefulSetList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster, componentName, stsList)
 	if err != nil || len(stsList.Items) == 0 {
@@ -100,6 +102,12 @@ func (r *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context, componentName s
 	// if the failed pod is not controlled by the latest revision
 	checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
 		sts := workload.(*appsv1.StatefulSet)
+		// if component is up running but pod is not ready, this pod should be failed.
+		// for example: full disk cause readiness probe failed and serve is not available.
+		// but kubelet only sets the container is not ready and pod is also Running.
+		if originPhaseIsUpRunning {
+			return !intctrlutil.PodIsReady(pod) && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
+		}
 		isFailed, _, message := internal.IsPodFailedAndTimedOut(pod)
 		existLatestRevisionFailedPod := isFailed && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
 		if existLatestRevisionFailedPod {

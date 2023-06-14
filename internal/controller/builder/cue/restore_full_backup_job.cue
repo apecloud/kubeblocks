@@ -54,7 +54,7 @@ job: {
 	metadata: {
 		name:      restoreJobName
 		namespace: backup.metadata.namespace
-		labels: backup.metadata.labels
+		labels:    backup.metadata.labels
 	}
 	spec: {
 		template: {

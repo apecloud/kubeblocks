@@ -75,13 +75,13 @@ func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 		return nil
 	}
 
-	if r.Status.Phase != "" {
+	if r.IsComplete() {
 		return fmt.Errorf("update OpsRequest: %s is forbidden when status.Phase is %s", r.Name, r.Status.Phase)
 	}
 
 	// Keep the cancel consistent between the two opsRequest for comparing the diff.
 	lastOpsRequest.Spec.Cancel = r.Spec.Cancel
-	if !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) {
+	if !reflect.DeepEqual(lastOpsRequest.Spec, r.Spec) && r.Status.Phase != "" {
 		return fmt.Errorf("update OpsRequest: %s is forbidden except for cancel when status.Phase is %s", r.Name, r.Status.Phase)
 	}
 	return r.validateEntry(false)

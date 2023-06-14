@@ -142,11 +142,19 @@ func (o *ListAndDeleteOptions) Complete(args []string) error {
 }
 
 func (o *ListAndDeleteOptions) RunList() error {
+	tbl := printer.NewTablePrinter(o.Out)
+	tbl.Tbl.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 2, WidthMax: 120},
+	})
+	tbl.SetHeader("NAME", "AGE")
+
 	for _, resourceKind := range o.ResourceKinds {
-		if err := o.listResources(resourceKind); err != nil {
+		if err := o.listResources(resourceKind, tbl); err != nil {
 			return err
 		}
 	}
+
+	tbl.Print()
 	return nil
 }
 
@@ -159,11 +167,15 @@ func (o *ListAndDeleteOptions) RunDelete() error {
 	return nil
 }
 
-func (o *ListAndDeleteOptions) listResources(resourceKind string) error {
+func (o *ListAndDeleteOptions) listResources(resourceKind string, tbl *printer.TablePrinter) error {
 	gvr := GetGVR(Group, Version, resourceKind)
 	resourceList, err := o.Dynamic.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list %s: %s", gvr, err)
+	}
+
+	if len(resourceList.Items) == 0 {
+		return nil
 	}
 
 	// sort by creation time from old to new
@@ -173,19 +185,11 @@ func (o *ListAndDeleteOptions) listResources(resourceKind string) error {
 		return t1.Before(t2)
 	})
 
-	tbl := printer.NewTablePrinter(o.Out)
-	tbl.Tbl.SetColumnConfigs([]table.ColumnConfig{
-		{Number: 2, WidthMax: 120},
-	})
-	tbl.SetHeader("NAME", "AGE")
-
 	for _, obj := range resourceList.Items {
 		creationTime := obj.GetCreationTimestamp().Time
 		age := time.Since(creationTime).Round(time.Second).String()
 		tbl.AddRow(obj.GetName(), age)
 	}
-	tbl.Print()
-
 	return nil
 }
 
@@ -194,6 +198,10 @@ func (o *ListAndDeleteOptions) deleteResources(resourceKind string) error {
 	resourceList, err := o.Dynamic.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list %s: %s", gvr, err)
+	}
+
+	if len(resourceList.Items) == 0 {
+		return nil
 	}
 
 	for _, obj := range resourceList.Items {

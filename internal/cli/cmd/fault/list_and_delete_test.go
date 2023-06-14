@@ -20,12 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package fault
 
 import (
-	"context"
-	"fmt"
-	chaosv1alpha1 "github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
+	"net/http"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	"net/http"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 )
@@ -43,8 +42,9 @@ var _ = Describe("Chaos resources list and delete", func() {
 		tf           *cmdtesting.TestFactory
 		namespace    = "test"
 		podChaosName = "testPodChaos"
-		podchaos     = testing.FakePodChaos(podChaosName, namespace)
+		podChaos     = testing.FakePodChaos(podChaosName, namespace)
 	)
+
 	BeforeEach(func() {
 		tf = testing.NewTestFactory(namespace)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -57,37 +57,34 @@ var _ = Describe("Chaos resources list and delete", func() {
 			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				urlPrefix := "/apis/" + GroupVersion + "/namespaces/" + namespace
 				mapping := map[string]*http.Response{
-					urlPrefix + "/podchaos/" + podchaos.Name: httpResp(podchaos),
+					urlPrefix + "/podchaos/" + podChaos.Name: httpResp(podChaos),
 				}
 				return mapping[req.URL.Path], nil
 			}),
 		}
 
 		tf.Client = tf.UnstructuredClient
-		_ = chaosv1alpha1.AddToScheme(scheme.Scheme)
-		//tf.FakeDynamicClient = testing.FakeDynamicClient(podchaos)
-
-		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, podchaos)
-		gvr := GetGVR(Group, Version, "podchaoses")
-		resource, err := tf.FakeDynamicClient.Resource(gvr).Namespace(namespace).Get(context.Background(), podChaosName, metav1.GetOptions{})
-		if err != nil {
-			fmt.Println(err)
-		}
-		if resource == nil {
-			fmt.Println("resource is nil")
-		}
-		fmt.Println("sfa")
-		fmt.Println(resource.GetName())
+		_ = v1alpha1.AddToScheme(scheme.Scheme)
+		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, podChaos)
 	})
 
 	AfterEach(func() {
 		tf.Cleanup()
 	})
-	Context("test fault list", func() {
-		It("fault list", func() {
+
+	Context("test list and delete chaos resources", func() {
+		It("test fault list", func() {
+			args := []string{"podchaoses"}
 			o := &ListAndDeleteOptions{Factory: tf}
-			o.ResourceKinds = []string{"PodChaos"}
+			Expect(o.Complete(args)).Should(Succeed())
 			Expect(o.RunList()).Should(Succeed())
+		})
+
+		It("test fault delete", func() {
+			args := []string{"podchaoses"}
+			o := &ListAndDeleteOptions{Factory: tf}
+			Expect(o.Complete(args)).Should(Succeed())
+			Expect(o.RunDelete()).Should(Succeed())
 		})
 	})
 })

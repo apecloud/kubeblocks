@@ -51,7 +51,7 @@ jobs:
 
   release-winget-kbcli:
     needs: update-release-kbcli
-    if: github.event.action=="released"
+    if: github.event.action== 'released'
     uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.1
     with:
       GITHUB_REPO: "apecloud/apecloud-cd"
@@ -62,7 +62,7 @@ jobs:
 
   release-scoop-kbcli:
     needs: update-release-kbcli
-    if: github.event.action=="released"
+    if: github.event.action== 'released'
     uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.1
     with:
       GITHUB_REPO: "apecloud/apecloud-cd"

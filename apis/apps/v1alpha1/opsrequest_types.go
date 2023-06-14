@@ -71,7 +71,6 @@ type OpsRequestSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
-	// +kubebuilder:validation:XValidation:rule="self.size() == oldSelf.size()",message="forbidden to update spec.volumeExpansion"
 	VolumeExpansionList []VolumeExpansion `json:"volumeExpansion,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// restart the specified component.
@@ -92,7 +91,6 @@ type OpsRequestSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
-	// +kubebuilder:validation:XValidation:rule="self.size() == oldSelf.size()",message="forbidden to update spec.verticalScaling"
 	VerticalScalingList []VerticalScaling `json:"verticalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// reconfigure defines the variables that need to input when updating configuration.

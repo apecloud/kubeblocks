@@ -75,6 +75,21 @@ if [[ -f "$SERVER_PROP_FILE" ]]; then
     unset IFS
 fi
 
+# override SASL settings
+if [[ "true" == "$KB_KAFKA_ENABLE_SASL" ]]; then
+  # bitnami default jaas setting: /opt/bitnami/kafka/config/kafka_jaas.conf
+  if [[ "${KB_KAFKA_SASL_CONFIG_PATH}" ]]; then
+    cp ${KB_KAFKA_SASL_CONFIG_PATH} /opt/bitnami/kafka/config/kafka_jaas.conf
+    echo "do: cp ${KB_KAFKA_SASL_CONFIG_PATH} /opt/bitnami/kafka/config/kafka_jaas.conf "
+  fi
+  export KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,INTERNAL:SASL_PLAINTEXT,CLIENT:SASL_PLAINTEXT
+  echo "KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=$KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP"
+  export KAFKA_CFG_SASL_ENABLED_MECHANISMS="PLAIN"
+  echo "export KAFKA_CFG_SASL_ENABLED_MECHANISMS=${KAFKA_CFG_SASL_ENABLED_MECHANISMS}"
+  export KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL="PLAIN"
+  echo "export KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL=${KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL}"
+fi
+
 if [[ -n "$KAFKA_KRAFT_CLUSTER_ID" ]]; then
     kraft_id_len=${#KAFKA_KRAFT_CLUSTER_ID}
     if [[ kraft_id_len > 22 ]]; then

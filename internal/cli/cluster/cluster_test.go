@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -35,6 +37,19 @@ var _ = Describe("cluster util", func() {
 		testing.FakeSecrets(testing.Namespace, testing.ClusterName),
 		testing.FakeServices(),
 		testing.FakePVCs(),
+	}
+
+	baseObjsWithBackupPods := func() []runtime.Object {
+		podsWithBackup := testing.FakePods(4, testing.Namespace, testing.ClusterName)
+		labels := podsWithBackup.Items[0].GetLabels()
+		labels[constant.BackupTypeLabelKeyKey] = string(dpv1alpha1.BackupTypeLogFile)
+		podsWithBackup.Items[0].SetLabels(labels)
+		return []runtime.Object{
+			podsWithBackup,
+			testing.FakeSecrets(testing.Namespace, testing.ClusterName),
+			testing.FakeServices(),
+			testing.FakePVCs(),
+		}
 	}
 
 	dynamic := testing.FakeDynamicClient(
@@ -89,5 +104,8 @@ var _ = Describe("cluster util", func() {
 		baseObjs = append(baseObjs, testing.FakeNode())
 		testFn(testing.FakeClientSet(baseObjs...))
 		Expect(len(objs.Nodes)).Should(Equal(1))
+
+		By("when pod is back-up created")
+		testFn(testing.FakeClientSet(baseObjsWithBackupPods()...))
 	})
 })

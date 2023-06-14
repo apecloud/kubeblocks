@@ -52,6 +52,11 @@ spec:
           volumeName: scripts
           namespace: {{ .Release.Namespace }}
           defaultMode: 0755
+        - name: kafka-scripts-tools-tpl
+          templateRef: {{ include "kafka.name" . }}-scripts-tools-tpl
+          volumeName: tools
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0755
       service:
         ports:
           - name: kafka-ctrlr
@@ -68,12 +73,6 @@ spec:
           fsGroup: 1001
         containers:
           - name: kafka
-            image: docker.io/bitnami/kafka:3.4.0-debian-11-r22
-            imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
-            securityContext:
-              allowPrivilegeEscalation: false
-              runAsNonRoot: true
-              runAsUser: 1001
             command:
               - /scripts/kafka-server-setup.sh
             env:
@@ -97,7 +96,7 @@ spec:
               - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
                 value: "CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,CLIENT:PLAINTEXT"
               - name: KAFKA_CFG_ADVERTISED_LISTENERS
-                value: "INTERNAL://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9094,CLIENT://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9092"
+                value: "INTERNAL://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9094,CLIENT://$(KB_CLUSTER_COMP_NAME):9092"
                 # value: "INTERNAL://$(KB_POD_FQDN):9094,CLIENT://$(KB_POD_FQDN):9092"
               - name: KAFKA_CFG_INITIAL_BROKER_REGISTRATION_TIMEOUT_MS
                 value: "240000"
@@ -126,12 +125,10 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: kraftClusterID
-              # - name: KAFKA_CERTIFICATE_PASSWORD
-              #   valueFrom:
-              #     secretKeyRef:
-              #       name: $(CONN_CREDENTIAL_SECRET_NAME)
-              #       key: sslCertPassword
-
+              - name: KB_KAFKA_ENABLE_SASL  # enable the SASL with plain mode
+                value: "false"
+              - name: KB_KAFKA_SASL_CONFIG_PATH  # specify the SASL jaas users
+                value: /tools/server-jaas.properties
             ports:
               - name: kafka-client
                 containerPort: 9092
@@ -168,16 +165,14 @@ spec:
               - name: kafka-config
                 mountPath: /scripts/server.properties
                 subPath: server.properties
-              - name: kafka-config
-                mountPath: /scripts/client-ssl.properties
+              - name: tools
+                mountPath: /tools/client-ssl.properties
                 subPath: client-ssl.properties
+              - name: tools
+                mountPath: /tools/server-jaas.properties
+                subPath: server-jaas.properties
 
           - name: jmx-exporter
-            image: docker.io/bitnami/jmx-exporter:0.18.0-debian-11-r20
-            imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
-            securityContext:
-              runAsNonRoot: true
-              runAsUser: 1001
             command:
               - java
             args:
@@ -235,12 +230,6 @@ spec:
           fsGroup: 1001
         containers:
           - name: kafka
-            image: docker.io/bitnami/kafka:3.4.0-debian-11-r22
-            imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
-            securityContext:
-              allowPrivilegeEscalation: false
-              runAsNonRoot: true
-              runAsUser: 1001
             command:
               - /scripts/kafka-server-setup.sh
             env:
@@ -286,12 +275,6 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: kraftClusterID
-              # - name: KAFKA_CERTIFICATE_PASSWORD
-              #   valueFrom:
-              #     secretKeyRef:
-              #       name: $(CONN_CREDENTIAL_SECRET_NAME)
-              #       key: sslCertPassword
-
             ports:
               - name: kafka-ctrlr
                 containerPort: 9093
@@ -328,11 +311,6 @@ spec:
                 mountPath: /opt/bitnami/scripts/kafka-env.sh
                 subPath: kafka-env.sh
           - name: jmx-exporter
-            image: docker.io/bitnami/jmx-exporter:0.18.0-debian-11-r20
-            imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
-            securityContext:
-              runAsNonRoot: true
-              runAsUser: 1001
             command:
               - java
             args:
@@ -375,6 +353,11 @@ spec:
           volumeName: scripts
           namespace: {{ .Release.Namespace }}
           defaultMode: 0755
+        - name: kafka-scripts-tools-tpl
+          templateRef: {{ include "kafka.name" . }}-scripts-tools-tpl
+          volumeName: tools
+          namespace: {{ .Release.Namespace }}
+          defaultMode: 0755
       service:
         ports:
           - name: kafka-client
@@ -386,15 +369,8 @@ spec:
       podSpec:
         securityContext:
           fsGroup: 1001
-          
         containers:
           - name: kafka
-            image: docker.io/bitnami/kafka:3.4.0-debian-11-r22
-            imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
-            securityContext:
-              allowPrivilegeEscalation: false
-              runAsNonRoot: true
-              runAsUser: 1001
             command:
               - /scripts/kafka-server-setup.sh
             env:
@@ -418,7 +394,7 @@ spec:
               - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
                 value: "INTERNAL:PLAINTEXT,CLIENT:PLAINTEXT,CONTROLLER:PLAINTEXT"
               - name: KAFKA_CFG_ADVERTISED_LISTENERS
-                value: "INTERNAL://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9094,CLIENT://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9092"
+                value: "INTERNAL://$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME)-headless.$(KB_NAMESPACE).svc:9094,CLIENT://$(KB_CLUSTER_COMP_NAME):9092"
               - name: KAFKA_CFG_INITIAL_BROKER_REGISTRATION_TIMEOUT_MS
                 value: "240000"
               - name: ALLOW_PLAINTEXT_LISTENER
@@ -446,14 +422,12 @@ spec:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: kraftClusterID
-              # - name: KAFKA_CERTIFICATE_PASSWORD
-              #   valueFrom:
-              #     secretKeyRef:
-              #       name: $(CONN_CREDENTIAL_SECRET_NAME)
-              #       key: sslCertPassword
+              - name: KB_KAFKA_ENABLE_SASL  # enable the SASL with plain mode
+                value: "true"
+              - name: KB_KAFKA_SASL_CONFIG_PATH  # specify the SASL jaas users
+                value: /tools/server-jaas.properties
               - name: BROKER_MIN_NODE_ID
                 value: {{ .Values.kafkaBroker.minNodeId | quote }}
-
             ports:
               - name: kafka-client
                 containerPort: 9092
@@ -486,15 +460,13 @@ spec:
               - name: kafka-config
                 mountPath: /scripts/server.properties
                 subPath: server.properties
-              - name: kafka-config
-                mountPath: /scripts/client-ssl.properties
+              - name: tools
+                mountPath: /tools/client-ssl.properties
                 subPath: client-ssl.properties
+              - name: tools
+                mountPath: /tools/server-jaas.properties
+                subPath: server-jaas.properties
           - name: jmx-exporter
-            image: docker.io/bitnami/jmx-exporter:0.18.0-debian-11-r20
-            imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
-            securityContext:
-              runAsNonRoot: true
-              runAsUser: 1001
             command:
               - java
             args:
@@ -535,11 +507,6 @@ spec:
           fsGroup: 1001
         containers:
           - name: kafka-exporter
-            image: docker.io/bitnami/kafka-exporter:1.6.0-debian-11-r67
-            imagePullPolicy: {{ default .Values.images.pullPolicy "IfNotPresent" }}
-            securityContext:
-              runAsNonRoot: true
-              runAsUser: 1001
             command:
               - /scripts/setup.sh
             ports:

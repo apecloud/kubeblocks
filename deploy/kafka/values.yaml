@@ -23,7 +23,7 @@ images:
     tag: 1.6.0-debian-11-r67
   jmxExporter:
     repository: docker.io/bitnami/jmx-exporter
-    tag: 0.17.2-debian-11-r55
+    tag: 0.18.0-debian-11-r20
 
 
 ## @param debugEnabled enables containers' debug logging

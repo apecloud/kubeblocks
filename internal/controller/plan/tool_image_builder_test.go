@@ -56,7 +56,6 @@ var _ = Describe("ToolImageBuilderTest", func() {
 		By("By assure an clusterDefinition obj")
 		clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
 			AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
-			AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, nil).
 			AddConfigTemplate(configSpecName, configSpecName, configSpecName, testCtx.DefaultNamespace, testapps.ConfVolumeName).
 			GetObject()
 		if needCreate {

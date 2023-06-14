@@ -2,7 +2,7 @@
 Expand the name of the chart.
 */}}
 {{- define "apecloud-mysql-cluster.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- default .Chart.Name .Values.name | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
@@ -11,10 +11,10 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
 If release name contains chart name it will be used as a full name.
 */}}
 {{- define "apecloud-mysql-cluster.fullname" -}}
-{{- if .Values.fullnameOverride }}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- if .Values.name }}
+{{- .Values.name | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
+{{- $name := default .Chart.Name .Values.name }}
 {{- if contains $name .Release.Name }}
 {{- .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -52,11 +52,43 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{- define "clustername" -}}
 {{ include "apecloud-mysql-cluster.fullname" .}}
-{{- end}}
+{{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
 {{- define "apecloud-mysql-cluster.serviceAccountName" -}}
-{{- default (printf "kb-%s" (include "clustername" .)) .Values.serviceAccount.name }}
+{{- printf "kb-sa-%s" (include "clustername" .) }}
+{{- end }}
+
+{{/*
+Define the cluster componnets with proxy
+*/}}
+{{- define "apecloud-mysql-cluster.proxyComponents" }}
+- name: etcd
+  componentDefRef: etcd # ref clusterdefinition componentDefs.name
+  replicas: 1
+- name: vtctld
+  componentDefRef: vtctld # ref clusterdefinition componentDefs.name
+  replicas: 1
+- name: vtconsensus
+  componentDefRef: vtconsensus # ref clusterdefinition componentDefs.name
+  replicas: 1
+- name: vtgate
+  componentDefRef: vtgate # ref clusterdefinition componentDefs.name
+  replicas: 1
+{{- end }}
+
+{{/*
+Define component services
+*/}}
+{{- define "apecloud-mysql-cluster.componentServices" }}
+{{- if .Values.hostNetworkAccessible }}
+- name: vpc
+  serviceType: NodePort
+{{- end }}
+{{- if .Values.publiclyAccessible }}
+- name: public
+  serviceType: LoadBalancer
+{{- end }}
 {{- end }}

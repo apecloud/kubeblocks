@@ -232,6 +232,9 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	// register flag completion func
 	registerFlagCompletionFunc(cmd, f)
 
+	// add all subcommands for supported cluster engine
+	AddEngineSubCmds(cmd, f, streams)
+
 	return cmd
 }
 

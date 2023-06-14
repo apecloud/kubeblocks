@@ -1,0 +1,136 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "properties": {
+    "name": {
+      "title": "Name",
+      "description": "cluster name",
+      "type": "string",
+      "default": "mycluster",
+      "maxLength": 16,
+      "pattern": "^[a-z]([-a-z0-9]*[a-z0-9])?$"
+    },
+    "version": {
+      "title": "Version",
+      "description": "mysql version",
+      "type": "string",
+      "default": "ac-mysql-8.0.30"
+    },
+    "mode": {
+      "title": "Mode",
+      "description": "mysql cluster topology",
+      "type": "string",
+      "default": "standalone",
+      "enum": [
+        "standalone",
+        "replication",
+        "raftGroup"
+      ]
+    },
+    "replicas": {
+      "title": "Replicas",
+      "description": "replicas",
+      "type": "integer",
+      "default": 1,
+      "minimum": 1,
+      "maximum": 10
+    },
+    "cpu": {
+      "title": "CPU",
+      "description": "cpu",
+      "type": "number",
+      "default": 1,
+      "minimum": 0.5,
+      "maximum": 64,
+      "multipleOf": 0.5
+    },
+    "memory": {
+      "title": "Memory(Gi)",
+      "description": "memory, the unit is Gi",
+      "type": "number",
+      "default": 1
+    },
+    "storageSize": {
+      "title": "Storage(Gi)",
+      "description": "storage size, the unit is Gi",
+      "type": "number",
+      "default": 20,
+      "minimum": 20,
+      "maximum": 10000
+    },
+    "terminationPolicy": {
+      "title": "Termination Policy",
+      "description": "The termination policy of cluster",
+      "type": "string",
+      "default": "Delete",
+      "enum": [
+        "DoNotTerminate",
+        "Halt",
+        "Delete",
+        "WipeOut"
+      ]
+    },
+    "monitor": {
+      "title": "Monitor",
+      "description": "Enable monitor or not",
+      "type": "boolean",
+      "default": true
+    },
+    "proxyEnabled": {
+      "title": "Proxy",
+      "description": "Enable proxy or not",
+      "type": "boolean",
+      "default": false
+    },
+    "availablePolicy": {
+      "title": "Available Policy",
+      "description": "The available policy of cluster",
+      "type": "string",
+      "default": "single",
+      "enum": [
+        "single",
+        "zone"
+      ]
+    },
+    "tenancy": {
+      "title": "Tenancy",
+      "description": "The tenancy of cluster",
+      "type": "string",
+      "default": "DedicatedNode",
+      "enum": [
+        "SharedNode",
+        "DedicatedNode"
+      ]
+    },
+    "hostNetworkAccessible": {
+      "title": "Host Network Accessible",
+      "description": "The hostNetworkAccessible of cluster",
+      "type": "boolean",
+      "default": true
+    },
+    "publiclyAccessible": {
+      "title": "Publicly Accessible",
+      "description": "The publiclyAccessible of cluster",
+      "type": "boolean",
+      "default": false
+    },
+    "storageEngine": {
+      "title": "Storage Engine",
+      "description": "The storage engine of cluster",
+      "type": "string",
+      "default": "innodb",
+      "enum": [
+        "innodb",
+        "x-engine"
+      ]
+    },
+    "port": {
+      "title": "Port",
+      "description": "The port of cluster",
+      "type": "integer",
+      "default": 3306,
+      "minimum": 1024,
+      "maximum": 65535
+    }
+  }
+}

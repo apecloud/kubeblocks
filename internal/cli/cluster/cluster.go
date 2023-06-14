@@ -181,8 +181,7 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 
 	// get pods
 	if o.WithPod {
-		objs.Pods, err = corev1.Pods(o.Namespace).List(ctx, listOpts())
-		if err != nil {
+		if objs.Pods, err = corev1.Pods(o.Namespace).List(ctx, listOpts()); err != nil {
 			return nil, err
 		}
 		// get nodes where the pods are located

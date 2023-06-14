@@ -21,7 +21,6 @@ package replication
 
 import (
 	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -87,10 +86,15 @@ var _ = Describe("Replication Component", func() {
 				Create(&testCtx).GetObject()
 
 			By("Creating a cluster with replication workloadType.")
+			switchoverCandidate := &appsv1alpha1.SwitchoverCandidate{
+				Index:    1,
+				Operator: appsv1alpha1.CandidateOpEqual,
+			}
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(testapps.DefaultRedisCompSpecName, testapps.DefaultRedisCompDefName).
 				SetReplicas(testapps.DefaultReplicationReplicas).
+				SetSwitchoverCandidate(switchoverCandidate).
 				Create(&testCtx).GetObject()
 
 			// mock cluster is Running
@@ -128,8 +132,8 @@ var _ = Describe("Replication Component", func() {
 
 			compDefName := clusterObj.Spec.GetComponentDefRefName(testapps.DefaultRedisCompSpecName)
 			componentDef := clusterDefObj.GetComponentDefByName(compDefName)
-			component := clusterObj.Spec.GetComponentByName(testapps.DefaultRedisCompSpecName)
-			replicationComponent := newReplicationSet(k8sClient, clusterObj, component, *componentDef)
+			componentSpec := clusterObj.Spec.GetComponentByName(testapps.DefaultRedisCompSpecName)
+			replicationComponent := newReplicationSet(k8sClient, clusterObj, componentSpec, *componentDef)
 			var podList []*corev1.Pod
 
 			for _, availableReplica := range []int32{0, replicas} {
@@ -185,8 +189,8 @@ var _ = Describe("Replication Component", func() {
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
 			// mock pod label is empty
-			Expect(testapps.ChangeObj(&testCtx, primaryPod, func(lpod *corev1.Pod) {
-				lpod.Labels[constant.RoleLabelKey] = ""
+			Expect(testapps.ChangeObj(&testCtx, primaryPod, func(pod *corev1.Pod) {
+				pod.Labels[constant.RoleLabelKey] = ""
 			})).Should(Succeed())
 			_, statusMessages, _ := replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompSpecName, false)
 			Expect(statusMessages[fmt.Sprintf("%s/%s", primaryPod.Kind, primaryPod.Name)]).
@@ -197,7 +201,7 @@ var _ = Describe("Replication Component", func() {
 			phase, _, _ = replicationComponent.GetPhaseWhenPodsNotReady(ctx, testapps.DefaultRedisCompSpecName, true)
 			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 
-			By("Checking if the pod is not updated when statefulset is not updated")
+			By("Checking if the pod is not updated when statefulSet is not updated")
 			Expect(testCtx.Cli.Get(testCtx.Ctx, stsObjectKey, replicationSetSts)).Should(Succeed())
 			vertexes, err := replicationComponent.HandleRestart(ctx, replicationSetSts)
 			Expect(err).To(Succeed())
@@ -207,7 +211,7 @@ var _ = Describe("Replication Component", func() {
 			Expect(len(pods)).To(Equal(int(replicas)))
 			Expect(util.IsStsAndPodsRevisionConsistent(ctx, k8sClient, replicationSetSts)).Should(BeTrue())
 
-			By("Checking if the pod is deleted when statefulset is updated")
+			By("Checking if the pod is deleted when statefulSet is updated")
 			status.UpdateRevision = "new-mock-revision"
 			testk8s.PatchStatefulSetStatus(&testCtx, replicationSetSts.Name, status)
 			Expect(testCtx.Cli.Get(testCtx.Ctx, stsObjectKey, replicationSetSts)).Should(Succeed())
@@ -215,6 +219,42 @@ var _ = Describe("Replication Component", func() {
 			Expect(err).To(Succeed())
 			Expect(len(vertexes)).To(Equal(int(replicas)))
 			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.DELETE).To(BeTrue())
+
+			By("Test handleRoleChange when statefulSet Pod with role label but without primary annotation")
+			Expect(testapps.ChangeObj(&testCtx, primaryPod, func(pod *corev1.Pod) {
+				pod.Labels[constant.RoleLabelKey] = constant.Primary
+			})).Should(Succeed())
+			status.UpdateRevision = "new-mock-revision-for-role-change"
+			testk8s.PatchStatefulSetStatus(&testCtx, replicationSetSts.Name, status)
+			Expect(testCtx.Cli.Get(testCtx.Ctx, stsObjectKey, replicationSetSts)).Should(Succeed())
+			vertexes, err = replicationComponent.HandleRoleChange(ctx, replicationSetSts)
+			Expect(err).To(Succeed())
+			Expect(len(vertexes)).To(Equal(int(replicas)))
+			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.UPDATE).To(BeTrue())
+
+			By("Test handleRoleChange when statefulSet h-scale out a new Pod with no role label")
+			status.Replicas = 3
+			status.AvailableReplicas = 3
+			status.ReadyReplicas = 3
+			testk8s.PatchStatefulSetStatus(&testCtx, replicationSetSts.Name, status)
+			Expect(testCtx.Cli.Get(testCtx.Ctx, stsObjectKey, replicationSetSts)).Should(Succeed())
+			newPodName := fmt.Sprintf("%s-%d", replicationSetSts.Name, 2)
+			_ = testapps.MockReplicationComponentPod(nil, testCtx, replicationSetSts, clusterObj.Name, testapps.DefaultRedisCompSpecName, newPodName, "")
+			vertexes, err = replicationComponent.HandleRoleChange(ctx, replicationSetSts)
+			Expect(err).To(Succeed())
+			Expect(len(vertexes)).To(Equal(1))
+			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.UPDATE).To(BeTrue())
+
+			// TODO(refactor): replace replicationComponent with the real ReplicationSet and replicationComponent.Component.GetSynthesizedComponent() cannot be nil
+			By("Test HandleFailover")
+			vertexes, err = replicationComponent.HandleFailover(ctx, replicationSetSts)
+			Expect(err).Should(Succeed())
+			Expect(len(vertexes)).To(Equal(0))
+
+			By("Test HandleSwitchover")
+			vertexes, err = replicationComponent.HandleSwitchover(ctx, replicationSetSts)
+			Expect(err).Should(Succeed())
+			Expect(len(vertexes)).To(Equal(0))
 		})
 	})
 })

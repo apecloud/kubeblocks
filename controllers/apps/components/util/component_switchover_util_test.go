@@ -225,7 +225,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		By("Test postOpsSwitchover failed because primary pod role label is not consistent with switchoverCandidate.")
 		err = postOpsSwitchover(testCtx.Ctx, k8sClient, clusterObj, component)
 		Expect(err).ShouldNot(Succeed())
-		Expect(err.Error()).Should(ContainSubstring("pod role label consistency check failed after switchover"))
+		Expect(err.Error()).Should(ContainSubstring("requeue to waiting for component"))
 
 		By("Test postOpsSwitchover succeed because mocks pod role label consistent with switchoverCandidate.")
 		component.SwitchoverCandidate.Index = 0

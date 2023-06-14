@@ -19,7 +19,14 @@ jobs:
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
       matrix: ${{ steps.get_trigger_mode.outputs.matrix }}
+      fail-fast: ${{ steps.get_trigger_mode.outputs.fail_fast }}
     steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          all_but_latest: true
+          access_token: ${{ github.token }}
+
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -38,6 +45,12 @@ jobs:
               --test-pkgs "internal|apis|controllers|cmd" \
               --test-check "manifests|mod-vendor|lint"`
           echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
+          
+          FAIL_FAST=true
+          if [[ "${{ github.ref_name }}" == 'main' ]]; then
+              FAIL_FAST=false
+          fi
+          echo "fail_fast=$FAIL_FAST" >> $GITHUB_OUTPUT
 
       - name: merge releasing to release
         if: ${{ startsWith(github.ref_name, 'releasing-') }}
@@ -92,7 +105,7 @@ jobs:
             libdevmapper-dev
 
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: "${{ env.GO_VERSION }}"
 
@@ -121,7 +134,7 @@ jobs:
     runs-on: ubuntu-latest
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
     strategy:
-      fail-fast: true
+      fail-fast: ${{ fromJSON(needs.trigger-mode.outputs.fail-fast) }}
       matrix: ${{ fromJSON(needs.trigger-mode.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v3
@@ -133,7 +146,7 @@ jobs:
             libdevmapper-dev
 
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
           go-version: "${{ env.GO_VERSION }}"
 
@@ -142,7 +155,8 @@ jobs:
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.51.2
 
-      - name: make test ${{ matrix.ops }}
+      - name: make ${{ matrix.ops }}
+        if: ${{ ! contains(matrix.ops, '/') }}
         run: |
           make ${{ matrix.ops }}
 
@@ -156,7 +170,7 @@ jobs:
               exit 1
           fi
 
-      - name: make ${{ matrix.ops }}
+      - name: make test ${{ matrix.ops }}
         if: ${{ contains(matrix.ops, '/') }}
         run: |
           make test TEST_PACKAGES=./${{ matrix.ops }}/...
@@ -251,7 +265,7 @@ jobs:
             libdevmapper-dev
 
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: "${{ env.GO_VERSION }}"
 

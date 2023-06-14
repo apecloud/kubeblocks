@@ -138,10 +138,10 @@ func composeRolePriorityMap(set workloads.ReplicatedStateMachine) map[string]int
 // updatePodRoleLabel updates pod role label when internal container role changed
 func updatePodRoleLabel(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
-	set workloads.ReplicatedStateMachine,
+	rsm workloads.ReplicatedStateMachine,
 	pod *corev1.Pod, roleName string) error {
 	ctx := reqCtx.Ctx
-	roleMap := composeRoleMap(set)
+	roleMap := composeRoleMap(rsm)
 	// role not defined in CR, ignore it
 	roleName = strings.ToLower(roleName)
 

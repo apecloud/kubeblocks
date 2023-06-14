@@ -41,12 +41,15 @@ var _ = Describe("event builder", func() {
 			Name:       name,
 			UID:        uid,
 		}
+		message := "foo-bar"
 		event := NewEventBuilder(ns, "foo").
 			SetInvolvedObject(objectRef).
+			SetMessage(message).
 			GetObject()
 
 		Expect(event.Name).Should(Equal(name))
 		Expect(event.Namespace).Should(Equal(ns))
 		Expect(event.InvolvedObject).Should(Equal(objectRef))
+		Expect(event.Message).Should(Equal(message))
 	})
 })

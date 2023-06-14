@@ -37,3 +37,8 @@ func (builder *EventBuilder) SetInvolvedObject(objectRef corev1.ObjectReference)
 	builder.get().InvolvedObject = objectRef
 	return builder
 }
+
+func (builder *EventBuilder) SetMessage(message string) *EventBuilder {
+	builder.get().Message = message
+	return builder
+}

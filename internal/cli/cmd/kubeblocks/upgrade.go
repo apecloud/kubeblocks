@@ -22,8 +22,7 @@ package kubeblocks
 import (
 	"bytes"
 	"fmt"
-	"os"
-	"path"
+	"helm.sh/helm/v3/pkg/releaseutil"
 	"strings"
 	"time"
 
@@ -198,7 +197,8 @@ func (o *InstallOptions) showUpgradeDiff(curKBVersion string) error {
 
 	var oldManifests bytes.Buffer
 	fmt.Fprintln(&oldManifests, strings.TrimSpace(currentRelease.Manifest))
-	//oldManifestsKeys := releaseutil.SplitManifests(oldManifests.String())
+	oldManifestsKeys := releaseutil.SplitManifests(oldManifests.String())
+
 	//oldManifestsKeys := make([]string, 0, len(splitManifests))
 	//for k := range splitManifests {
 	//	oldManifestsKeys = append(oldManifestsKeys, k)
@@ -206,21 +206,32 @@ func (o *InstallOptions) showUpgradeDiff(curKBVersion string) error {
 	var newManifests bytes.Buffer
 	fmt.Fprintln(&newManifests, strings.TrimSpace(targetRelease.Manifest))
 	//newManifestsKeys := releaseutil.SplitManifests(newManifests.String())
-	homeDir, _ := os.UserHomeDir()
-	oldfilePath := path.Join(homeDir, "oldManifest.yaml")
-	newfilePath := path.Join(homeDir, "newManifest.yaml")
-	oldFile, err := os.Create(oldfilePath)
-	if err != nil {
-		return err
+	//oldManifestsKeys := make(map[string]*helm.MappingResult, 0)
+	for _, v := range oldManifestsKeys {
+		content, err := helm.ParseContent(v)
+		//content.Name
+		if err != nil {
+			return err
+		}
+		fmt.Println(content)
+		break
 	}
-	defer oldFile.Close()
-	_, err = oldFile.Write(oldManifests.Bytes())
-	newFile, err := os.Create(newfilePath)
-	if err != nil {
-		return err
-	}
-	defer newFile.Close()
-	_, err = newFile.Write(newManifests.Bytes())
+
+	//homeDir, _ := os.UserHomeDir()
+	//oldfilePath := path.Join(homeDir, "oldManifest.yaml")
+	//newfilePath := path.Join(homeDir, "newManifest.yaml")
+	//oldFile, err := os.Create(oldfilePath)
+	//if err != nil {
+	//	return err
+	//}
+	//defer oldFile.Close()
+	//_, err = oldFile.Write(oldManifests.Bytes())
+	//newFile, err := os.Create(newfilePath)
+	//if err != nil {
+	//	return err
+	//}
+	//defer newFile.Close()
+	//_, err = newFile.Write(newManifests.Bytes())
 
 	return nil
 }

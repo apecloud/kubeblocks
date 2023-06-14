@@ -31,7 +31,6 @@ volumeClaimTemplate: {
 	spec: {
 		accessModes: [string]
 		resources: {}
-		serviceAccountName: string
 	}
 }
 snapshot_name: string
@@ -60,7 +59,7 @@ pvc: {
 	spec: {
 		accessModes: volumeClaimTemplate.spec.accessModes
 		resources:   volumeClaimTemplate.spec.resources
-		if len(volumeClaimTemplate.spec.storageClassName) > 0 {
+		if volumeClaimTemplate.spec.storageClassName != _|_ {
 			storageClassName: volumeClaimTemplate.spec.storageClassName
 		}
 		if len(snapshot_name) > 0 {

@@ -61,6 +61,8 @@ const (
 	probeEventRoleInvalid      probeEventType = "roleInvalid"
 )
 
+var roleMessageRegex = regexp.MustCompile(`Readiness probe failed: .*({.*})`)
+
 func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
 	if event.InvolvedObject.FieldPath != roleObservationEventFieldPath {
 		return nil
@@ -130,8 +132,8 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 // parseProbeEventMessage parses probe event message.
 func parseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) *probeMessage {
 	message := &probeMessage{}
-	re := regexp.MustCompile(`Readiness probe failed: ({.*})`)
-	matches := re.FindStringSubmatch(event.Message)
+
+	matches := roleMessageRegex.FindStringSubmatch(event.Message)
 	if len(matches) != 2 {
 		reqCtx.Log.Info("parser Readiness probe event message failed", "message", event.Message)
 		return nil

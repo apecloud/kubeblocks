@@ -555,26 +555,6 @@ func (c *StatefulComponentBase) scaleIn(reqCtx intctrlutil.RequestCtx, cli clien
 }
 
 func (c *StatefulComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
-	//ml := client.MatchingLabels{
-	//	constant.AppInstanceLabelKey:    c.Cluster.GetName(),
-	//	constant.KBAppComponentLabelKey: c.Component.Name,
-	//	constant.AppManagedByLabelKey:   constant.AppName,
-	//}
-	//pvcList := corev1.PersistentVolumeClaimList{}
-	//if err := cli.List(reqCtx.Ctx, &pvcList, ml); err != nil {
-	//	return err
-	//}
-	//// delete unused pvcs
-	//for _, pvc := range pvcList.Items {
-	//	splitPVCName := strings.Split(pvc.Name, "-")
-	//	idx, err := strconv.Atoi(splitPVCName[len(splitPVCName)-1])
-	//	if err != nil {
-	//		return err
-	//	}
-	//	if idx >= int(*c.runningWorkload.Spec.Replicas) {
-	//		c.DeleteResource(&pvc, nil)
-	//	}
-	//}
 	return nil
 }
 

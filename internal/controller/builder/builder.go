@@ -31,7 +31,6 @@ import (
 	"github.com/google/uuid"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -580,22 +579,6 @@ func BuildVolumeSnapshot(snapshotKey types.NamespacedName,
 		return nil, err
 	}
 	return &snapshot, nil
-}
-
-func BuildCronJob(pvcKey types.NamespacedName,
-	schedule string,
-	sts *appsv1.StatefulSet) (*batchv1.CronJob, error) {
-	serviceAccount := viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
-	cronJob := batchv1.CronJob{}
-	if err := buildFromCUE("delete_pvc_cron_job_template.cue", map[string]any{
-		"pvc":                   pvcKey,
-		"cronjob.spec.schedule": schedule,
-		"cronjob.spec.jobTemplate.spec.template.spec.serviceAccount": serviceAccount,
-		"sts": sts,
-	}, "cronjob", &cronJob); err != nil {
-		return nil, err
-	}
-	return &cronJob, nil
 }
 
 func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,

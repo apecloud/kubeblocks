@@ -253,7 +253,7 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 		return cfgcore.WrapError(err, "failed to get clusterdefinition[%s]", cluster.Spec.ClusterDefRef)
 	}
 
-	if err := cfgcore.GetClusterVersionResource(cluster.Spec.ClusterVersionRef, clusterVersion, cli, reqCtx.Ctx); err != nil {
+	if err := getClusterVersionResource(cluster.Spec.ClusterVersionRef, clusterVersion, cli, reqCtx.Ctx); err != nil {
 		return err
 	}
 

@@ -236,3 +236,10 @@ func Contains(left, right []string) bool {
 
 	return true
 }
+
+func TestToString(t *testing.T) {
+	require.EqualValues(t, "-12", toString(reflect.ValueOf(-12), reflect.Int))
+	require.EqualValues(t, "12", toString(reflect.ValueOf(uint32(12)), reflect.Uint32))
+	require.EqualValues(t, "12", toString(reflect.ValueOf("12"), reflect.String))
+	require.EqualValues(t, "", toString(reflect.ValueOf(12.0), reflect.Float32))
+}

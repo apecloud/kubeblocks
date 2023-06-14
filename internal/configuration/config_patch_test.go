@@ -21,8 +21,10 @@ package configuration
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/ghodss/yaml"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -121,4 +123,23 @@ net:
 
 	require.Nil(t, err)
 	require.Equal(t, yb, patch.UpdateConfig["test"])
+}
+
+func TestTransformConfigPatchFromData(t *testing.T) {
+	configFile := "my.cnf"
+	testData := "[mysqld]\nmax_connections = 2000\ngeneral_log = OFF"
+
+	t.Run("testConfigPatch", func(t *testing.T) {
+		got, err := TransformConfigPatchFromData(map[string]string{configFile: testData}, appsv1alpha1.Ini, nil)
+		require.Nil(t, err)
+		require.True(t, got.IsModify)
+		require.NotNil(t, got.UpdateConfig[configFile])
+
+		var r any
+		require.Nil(t, json.Unmarshal(got.UpdateConfig[configFile], &r))
+		maxConnections, _ := util.RetrievalWithJSONPath(r, "$.mysqld.max_connections")
+		generalLog, _ := util.RetrievalWithJSONPath(r, "$.mysqld.general_log")
+		require.EqualValues(t, string(maxConnections), "2000")
+		require.EqualValues(t, string(generalLog), "OFF")
+	})
 }

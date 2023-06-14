@@ -204,3 +204,17 @@ func formatConfigPatchToMessage(configPatch *cfgcore.ConfigPatchInfo, execStatus
 		configPatch.AddConfig,
 		configPatch.DeleteConfig)
 }
+
+func getClusterVersionResource(cvName string, cv *appsv1alpha1.ClusterVersion, cli client.Client, ctx context.Context) error {
+	if cvName == "" {
+		return nil
+	}
+	clusterVersionKey := client.ObjectKey{
+		Namespace: "",
+		Name:      cvName,
+	}
+	if err := cli.Get(ctx, clusterVersionKey, cv); err != nil {
+		return cfgcore.WrapError(err, "failed to get clusterversion[%s]", cvName)
+	}
+	return nil
+}

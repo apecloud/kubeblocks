@@ -189,7 +189,7 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 		for i, pod := range objs.Pods.Items {
 			// filter back-up job pod
 			labels := pod.GetLabels()
-			if labels != nil && labels[constant.BackupTypeLabelKeyKey] != "" {
+			if labels != nil && labels[constant.DataProtectionLabelBackupNameKey] != "" {
 				objs.Pods.Items = append(objs.Pods.Items[:i], objs.Pods.Items[i+1:]...)
 				continue
 			}

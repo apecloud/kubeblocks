@@ -99,6 +99,7 @@ const (
 	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
 	ConsensusSetAccessModeLabelKey         = "cs.apps.kubeblocks.io/access-mode"
 	BackupTypeLabelKeyKey                  = "dataprotection.kubeblocks.io/backup-type"
+	DataProtectionLabelBackupNameKey       = "dataprotection.kubeblocks.io/backup-name"
 	AddonNameLabelKey                      = "extensions.kubeblocks.io/addon-name"
 	OpsRequestTypeLabelKey                 = "ops.kubeblocks.io/ops-type"
 

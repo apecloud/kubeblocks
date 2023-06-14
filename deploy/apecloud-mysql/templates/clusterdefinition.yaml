@@ -211,7 +211,7 @@ spec:
               - name: log-data
                 mountPath: /var/log/kubeblocks
                 readOnly: false
-              - name: agamotto-log-sidecar-config
+              - name: log-manager-config
                 mountPath: /opt/agamotto
                 readOnly: true
             ports:
@@ -236,9 +236,9 @@ spec:
                 path: /
                 port: http-health
         volumes:
-          - name: agamotto-log-sidecar-config
+          - name: log-manager-config
             configMap:
-              name: agamotto-log-sidecar-config
+              name: log-manager-config
           - name: log-data
             hostPath:
               path: /var/log/kubeblocks

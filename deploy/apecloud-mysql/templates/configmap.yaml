@@ -34,7 +34,7 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: agamotto-log-sidecar-config
+  name: log-manager-config
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 data:
@@ -55,7 +55,7 @@ data:
         rotation:
           max_megabytes: 10
           max_days: 3
-          max_backups: 3
+          max_backups: 1
           localtime: true
       apecloudfile/slow:
         path: /var/log/kubeblocks/${env:KB_NAMESPACE}_${env:DB_TYPE}_${env:KB_CLUSTER_NAME}/${env:KB_POD_NAME}/slow.log
@@ -63,7 +63,7 @@ data:
         rotation:
           max_megabytes: 10
           max_days: 3
-          max_backups: 3
+          max_backups: 1
           localtime: true
     extensions:
       health_check:

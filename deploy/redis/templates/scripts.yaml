@@ -5,12 +5,9 @@ metadata:
   labels:
     {{- include "redis.labels" . | nindent 4 }}
 data:
-  setup.sh: |
+  redis-post-start.sh: |
     #!/bin/sh
     set -ex
-    # set default user password and replication user password
-    until redis-cli -h 127.0.0.1 -p 6379 ping; do sleep 1; done
-    redis-cli -h 127.0.0.1 -p 6379 ACL SETUSER default ON \>$REDIS_DEFAULT_PASSWORD allcommands allkeys
     KB_PRIMARY_POD_NAME_PREFIX=${KB_PRIMARY_POD_NAME%%\.*}
     if [ "$KB_PRIMARY_POD_NAME_PREFIX" = "$KB_POD_NAME" ]; then
       echo "primary instance skip create a replication relationship."
@@ -29,7 +26,7 @@ data:
     #!/bin/sh
     set -ex
     # set default user password and replication user password
-    until redis-cli -h 127.0.0.1 -p 26379 ping; do sleep 1; done
+    until redis-cli -h 127.0.0.1 -p 26379 -a $SENTINEL_PASSWORD ping; do sleep 1; done
     redis-cli -h 127.0.0.1 -p 26379 ACL SETUSER $SENTINEL_USER ON \>$SENTINEL_PASSWORD allchannels +@all
   redis-sentinel-ping.sh: |-
     #!/bin/sh

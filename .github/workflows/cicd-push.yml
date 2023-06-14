@@ -18,8 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
-      matrix: ${{ steps.get_trigger_mode.outputs.matrix }}
-      fail-fast: ${{ steps.get_trigger_mode.outputs.fail_fast }}
     steps:
       - name: Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.11.0
@@ -39,18 +37,6 @@ jobs:
           
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
-          
-          TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
-              --trigger-type "$TRIGGER_MODE" \
-              --test-pkgs "internal|apis|controllers|cmd" \
-              --test-check "manifests|mod-vendor|lint"`
-          echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
-          
-          FAIL_FAST=true
-          if [[ "${{ github.ref_name }}" == 'main' ]]; then
-              FAIL_FAST=false
-          fi
-          echo "fail_fast=$FAIL_FAST" >> $GITHUB_OUTPUT
 
       - name: merge releasing to release
         if: ${{ startsWith(github.ref_name, 'releasing-') }}
@@ -131,59 +117,45 @@ jobs:
 
   make-test:
     needs: trigger-mode
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, kubeblocks-runner ]
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
-    strategy:
-      fail-fast: ${{ fromJSON(needs.trigger-mode.outputs.fail-fast) }}
-      matrix: ${{ fromJSON(needs.trigger-mode.outputs.matrix) }}
+    outputs:
+      runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
     steps:
       - uses: actions/checkout@v3
-      - name: install lib
+      - name: make manifests check
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libbtrfs-dev \
-            libdevmapper-dev
+          mkdir -p ./bin
+          cp -r /go/bin/controller-gen ./bin/controller-gen
+          cp -r /go/bin/setup-envtest ./bin/setup-envtest
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: "${{ env.GO_VERSION }}"
-
-      - name: Install golangci-lint
-        if: matrix.ops == 'lint'
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.51.2
-
-      - name: make ${{ matrix.ops }}
-        if: ${{ ! contains(matrix.ops, '/') }}
-        run: |
-          make ${{ matrix.ops }}
-
-      - name: make ${{ matrix.ops }}
-        if: matrix.ops == 'manifests'
-        run: |
+          make manifests
           FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
           if [[ ! -z "$FILE_CHANGES" ]]; then
-              echo $FILE_CHANGES
-              echo "make manifests causes inconsistent files"
-              exit 1
+            echo $FILE_CHANGES
+            echo "make manifests causes inconsistent files"
+            exit 1
           fi
 
-      - name: make test ${{ matrix.ops }}
-        if: ${{ contains(matrix.ops, '/') }}
+      - name: make mod-vendor
         run: |
-          make test TEST_PACKAGES=./${{ matrix.ops }}/...
+          make mod-vendor
+
+      - name: make lint
+        run: |
+          make lint
+
+      - name: make test
+        run: |
+          make test
 
       - name: ignore cover pkgs
-        if: ${{ contains(matrix.ops, '/') }}
         run: |
           bash .github/utils/utils.sh --type 14 \
               --file cover.out \
               --ignore-pkgs "cmd/|internal/cli|internal/controller/consensusset|internal/controller/model|controllers/k8score" 
 
       - name: upload coverage report
-        if: ${{ contains(matrix.ops, '/') }}
         uses: codecov/codecov-action@v3
         continue-on-error: true
         with:
@@ -192,6 +164,25 @@ jobs:
           flags: unittests
           name: codecov-report
           verbose: true
+
+      - name: kill kube-apiserver and etcd
+        id: get_runner_name
+        if: ${{ always() }}
+        run: |
+          echo runner_name=${RUNNER_NAME} >> $GITHUB_OUTPUT
+          bash .github/utils/utils.sh --type 8
+
+  remove-runner:
+    needs: [ trigger-mode, make-test ]
+    runs-on: ubuntu-latest
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && always() }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: remove runner
+        run: |
+          bash .github/utils/utils.sh --type 9 \
+            --github-token "${{ env.GITHUB_TOKEN }}" \
+            --runner-name ${{ needs.make-test.outputs.runner-name }}
 
   check-image:
     needs: trigger-mode

@@ -437,8 +437,8 @@ get_trigger_mode() {
     echo "BASE_COMMIT_ID:$BASE_COMMIT_ID"
     filePaths=$( git diff --name-only HEAD ${BASE_COMMIT_ID} )
     for filePath in $( echo "$filePaths" ); do
-        if [[ "$filePath" == "go."* ]]; then
-            add_trigger_mode "[test]"
+        if [[ "$filePath" == "go."* || "$filePath" == *".go" ]]; then
+            add_trigger_mode "[test][go]"
             continue
         elif [[ "$filePath" != *"/"* ]]; then
             add_trigger_mode "[other]"

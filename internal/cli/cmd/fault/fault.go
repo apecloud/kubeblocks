@@ -81,8 +81,8 @@ func NewFaultCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		NewIOChaosCmd(f, streams),
 		NewStressChaosCmd(f, streams),
 		NewNodeChaosCmd(f, streams),
-		NewListCmd(f),
-		NewDeleteCmd(f),
+		NewListCmd(f, streams),
+		NewDeleteCmd(f, streams),
 	)
 	return cmd
 }

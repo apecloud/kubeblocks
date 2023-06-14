@@ -26,12 +26,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -56,14 +59,17 @@ var deleteExample = templates.Examples(`
 
 type ListAndDeleteOptions struct {
 	Factory cmdutil.Factory
+	Dynamic dynamic.Interface
 
 	ResourceKinds    []string
 	AllResourceKinds []string
 	Kind             bool
+
+	genericclioptions.IOStreams
 }
 
-func NewListCmd(f cmdutil.Factory) *cobra.Command {
-	o := &ListAndDeleteOptions{Factory: f}
+func NewListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &ListAndDeleteOptions{Factory: f, IOStreams: streams}
 	cmd := cobra.Command{
 		Use:     "list",
 		Short:   "List chaos resources.",
@@ -78,8 +84,8 @@ func NewListCmd(f cmdutil.Factory) *cobra.Command {
 	return &cmd
 }
 
-func NewDeleteCmd(f cmdutil.Factory) *cobra.Command {
-	o := &ListAndDeleteOptions{Factory: f}
+func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &ListAndDeleteOptions{Factory: f, IOStreams: streams}
 	return &cobra.Command{
 		Use:     "delete",
 		Short:   "Delete chaos resources.",
@@ -125,13 +131,19 @@ func (o *ListAndDeleteOptions) Complete(args []string) error {
 	} else {
 		o.ResourceKinds = o.AllResourceKinds
 	}
+
+	var err error
+	o.Dynamic, err = o.Factory.DynamicClient()
+	if err != nil {
+		return fmt.Errorf("failed to create dynamic client: %v", err)
+	}
+
 	return nil
 }
 
 func (o *ListAndDeleteOptions) RunList() error {
-	fmt.Printf("%-20s %s\n", "NAME", "AGE")
 	for _, resourceKind := range o.ResourceKinds {
-		if err := listResources(o.Factory, resourceKind); err != nil {
+		if err := o.listResources(resourceKind); err != nil {
 			return err
 		}
 	}
@@ -140,59 +152,53 @@ func (o *ListAndDeleteOptions) RunList() error {
 
 func (o *ListAndDeleteOptions) RunDelete() error {
 	for _, resourceKind := range o.ResourceKinds {
-		if err := deleteResources(o.Factory, resourceKind); err != nil {
+		if err := o.deleteResources(resourceKind); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func listResources(f cmdutil.Factory, resourceKind string) error {
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return fmt.Errorf("failed to create dynamic client: %v", err)
-	}
-
+func (o *ListAndDeleteOptions) listResources(resourceKind string) error {
 	gvr := GetGVR(Group, Version, resourceKind)
-	resourceList, err := dynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
+	resourceList, err := o.Dynamic.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		klog.V(1).Info(err)
 		return fmt.Errorf("failed to list %s: %s", gvr, err)
 	}
 
-	// sort by creation time form old to new
+	// sort by creation time from old to new
 	sort.Slice(resourceList.Items, func(i, j int) bool {
 		t1, _ := time.Parse(time.RFC3339, resourceList.Items[i].GetCreationTimestamp().String())
 		t2, _ := time.Parse(time.RFC3339, resourceList.Items[j].GetCreationTimestamp().String())
 		return t1.Before(t2)
 	})
 
+	tbl := printer.NewTablePrinter(o.Out)
+	tbl.Tbl.SetColumnConfigs([]table.ColumnConfig{
+		{Number: 2, WidthMax: 120},
+	})
+	tbl.SetHeader("NAME", "AGE")
+
 	for _, obj := range resourceList.Items {
 		creationTime := obj.GetCreationTimestamp().Time
 		age := time.Since(creationTime).Round(time.Second).String()
-		fmt.Printf("%-20s %s\n", obj.GetName(), age)
+		tbl.AddRow(obj.GetName(), age)
 	}
+	tbl.Print()
 
 	return nil
 }
 
-func deleteResources(f cmdutil.Factory, resourceKind string) error {
-	dynamicClient, err := f.DynamicClient()
-	if err != nil {
-		return fmt.Errorf("failed to create dynamic client: %v", err)
-	}
-
+func (o *ListAndDeleteOptions) deleteResources(resourceKind string) error {
 	gvr := GetGVR(Group, Version, resourceKind)
-	resourceList, err := dynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
+	resourceList, err := o.Dynamic.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		klog.V(1).Info(err)
 		return fmt.Errorf("failed to list %s: %s", gvr, err)
 	}
 
 	for _, obj := range resourceList.Items {
-		err = dynamicClient.Resource(gvr).Namespace(obj.GetNamespace()).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{})
+		err = o.Dynamic.Resource(gvr).Namespace(obj.GetNamespace()).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{})
 		if err != nil {
-			klog.V(1).Info(err)
 			return fmt.Errorf("failed to delete %s: %s", gvr, err)
 		}
 		fmt.Println("delete resource", obj.GetName())
@@ -207,7 +213,6 @@ func getAllChaosResourceKinds(f cmdutil.Factory, groupVersion string) ([]string,
 	}
 	chaosResources, err := discoveryClient.ServerResourcesForGroupVersion(groupVersion)
 	if err != nil {
-		klog.V(1).Info(err)
 		return nil, fmt.Errorf("failed to get server resources for %s: %s", groupVersion, err)
 	}
 

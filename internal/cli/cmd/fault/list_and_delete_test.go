@@ -28,6 +28,7 @@ import (
 	"github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -40,6 +41,7 @@ import (
 var _ = Describe("Chaos resources list and delete", func() {
 	var (
 		tf           *cmdtesting.TestFactory
+		streams      genericclioptions.IOStreams
 		namespace    = "test"
 		podChaosName = "testPodChaos"
 		podChaos     = testing.FakePodChaos(podChaosName, namespace)
@@ -75,14 +77,14 @@ var _ = Describe("Chaos resources list and delete", func() {
 	Context("test list and delete chaos resources", func() {
 		It("test fault list", func() {
 			args := []string{"podchaoses"}
-			o := &ListAndDeleteOptions{Factory: tf}
+			o := &ListAndDeleteOptions{Factory: tf, IOStreams: streams}
 			Expect(o.Complete(args)).Should(Succeed())
 			Expect(o.RunList()).Should(Succeed())
 		})
 
 		It("test fault delete", func() {
 			args := []string{"podchaoses"}
-			o := &ListAndDeleteOptions{Factory: tf}
+			o := &ListAndDeleteOptions{Factory: tf, IOStreams: streams}
 			Expect(o.Complete(args)).Should(Succeed())
 			Expect(o.RunDelete()).Should(Succeed())
 		})

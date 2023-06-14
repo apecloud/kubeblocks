@@ -343,10 +343,7 @@ func injectRoleObserveContainer(rsm workloads.ReplicatedStateMachine, template *
 			ProbeHandler: corev1.ProbeHandler{
 				Exec: &corev1.ExecAction{
 					Command: []string{
-						"curl", "-X", "POST",
-						"--max-time", "1",
-						"--fail-with-body", "--silent",
-						"-H", "Content-Type: application/json",
+						"/bin/grpc_health_probe",
 						roleObserveURI,
 					},
 				},

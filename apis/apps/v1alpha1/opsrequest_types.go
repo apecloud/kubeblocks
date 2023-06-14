@@ -51,6 +51,8 @@ type OpsRequestSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.upgrade"
 	Upgrade *Upgrade `json:"upgrade,omitempty"`
 
+	// Deprecate: replace by update cluster command
+
 	// horizontalScaling defines what component need to horizontal scale the specified replicas.
 	// +optional
 	// +patchMergeKey=componentName
@@ -60,12 +62,16 @@ type OpsRequestSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.horizontalScaling"
 	HorizontalScalingList []HorizontalScaling `json:"horizontalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
+	// Deprecate: replace by update cluster command.
+	// Note: Quantity struct can not do immutable check by CEL.
+
 	// volumeExpansion defines what component and volumeClaimTemplate need to expand the specified storage.
 	// +optional
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
+	// +kubebuilder:validation:XValidation:rule="self.size() == oldSelf.size()",message="forbidden to update spec.volumeExpansion"
 	VolumeExpansionList []VolumeExpansion `json:"volumeExpansion,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// restart the specified component.
@@ -77,12 +83,16 @@ type OpsRequestSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restart"
 	RestartList []ComponentOps `json:"restart,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
+	// Deprecate: replace by update cluster command.
+	// Note: Quantity struct can not do immutable check by CEL.
+
 	// verticalScaling defines what component need to vertical scale the specified compute resources.
 	// +optional
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
+	// +kubebuilder:validation:XValidation:rule="self.size() == oldSelf.size()",message="forbidden to update spec.verticalScaling"
 	VerticalScalingList []VerticalScaling `json:"verticalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// reconfigure defines the variables that need to input when updating configuration.

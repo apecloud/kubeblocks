@@ -50,6 +50,7 @@ func NewListCmd(f cmdutil.Factory) *cobra.Command {
 		Short:   "List chaos resources.",
 		Example: listExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.Validate(args))
 			util.CheckErr(o.Complete(args))
 			util.CheckErr(o.RunList())
 		},
@@ -85,7 +86,7 @@ func (o *ListAndDeleteOptions) Validate(args []string) error {
 	}
 	for _, kind := range args {
 		if _, ok := kindMap[kind]; !ok {
-			return fmt.Errorf("invalid chaos resource kind: %s. Use 'kbcli fault list --kind' to list all chaos resource kinds", kind)
+			return fmt.Errorf("invalid chaos resource kind: %s\nUse 'kbcli fault list --kind' to list all chaos resource kinds", kind)
 		}
 	}
 
@@ -109,6 +110,7 @@ func (o *ListAndDeleteOptions) Complete(args []string) error {
 }
 
 func (o *ListAndDeleteOptions) RunList() error {
+	fmt.Printf("%-20s %s\n", "NAME", "AGE")
 	for _, resourceKind := range o.ResourceKinds {
 		if err := listResources(o.Factory, resourceKind); err != nil {
 			return err
@@ -147,7 +149,9 @@ func listResources(f cmdutil.Factory, resourceKind string) error {
 	})
 
 	for _, obj := range resourceList.Items {
-		fmt.Println(resourceKind+":", obj.GetName())
+		creationTime := obj.GetCreationTimestamp().Time
+		age := time.Since(creationTime).Round(time.Second).String()
+		fmt.Printf("%-20s %s\n", obj.GetName(), age)
 	}
 
 	return nil

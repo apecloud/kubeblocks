@@ -174,9 +174,11 @@ func (d *baseDataClone) backupVCT() *corev1.PersistentVolumeClaimTemplate {
 	vcts := d.component.VolumeClaimTemplates
 	vct := vcts[0]
 	for _, tmpVct := range vcts {
-		if tmpVct.Name == d.component.HorizontalScalePolicy.VolumeMountsName {
-			vct = tmpVct
-			break
+		for _, volumeType := range d.component.VolumeTypes {
+			if volumeType.Type == appsv1alpha1.VolumeTypeData && volumeType.Name == tmpVct.Name {
+				vct = tmpVct
+				break
+			}
 		}
 	}
 	return &vct
@@ -586,7 +588,7 @@ func (d *backupDataClone) restore(pvcKey types.NamespacedName) ([]client.Object,
 	if len(backupToolList.Items) == 0 {
 		return nil, fmt.Errorf("backuptool not found for clusterdefinition: %s", d.component.ClusterDefName)
 	}
-	pvc, err := builder.BuildPVC(d.cluster, d.component, &d.component.VolumeClaimTemplates[0], pvcKey, "")
+	pvc, err := builder.BuildPVC(d.cluster, d.component, d.backupVCT(), pvcKey, "")
 	if err != nil {
 		return nil, err
 	}

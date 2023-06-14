@@ -663,6 +663,20 @@ var _ = Describe("Cluster Controller", func() {
 
 		scaleInCheck := func() {
 			if updatedReplicas == 0 {
+				Consistently(func(g Gomega) {
+					pvcList := corev1.PersistentVolumeClaimList{}
+					g.Expect(testCtx.Cli.List(testCtx.Ctx, &pvcList, client.MatchingLabels{
+						constant.AppInstanceLabelKey:    clusterKey.Name,
+						constant.KBAppComponentLabelKey: comp.Name,
+					})).Should(Succeed())
+					for _, pvc := range pvcList.Items {
+						ss := strings.Split(pvc.Name, "-")
+						idx, _ := strconv.Atoi(ss[len(ss)-1])
+						if idx >= updatedReplicas && idx < int(comp.Replicas) {
+							g.Expect(pvc.DeletionTimestamp).Should(BeNil())
+						}
+					}
+				})
 				return
 			}
 			checkUpdatedStsReplicas()
@@ -1884,6 +1898,10 @@ var _ = Describe("Cluster Controller", func() {
 
 			It(fmt.Sprintf("[comp: %s] and h-scale in", compName), func() {
 				testHorizontalScale(compName, compDefName, 3, 1)
+			})
+
+			It(fmt.Sprintf("[comp: %s] h-scale to 0 and pvc should not deleted", compName), func() {
+				testHorizontalScale(compName, compDefName, 3, 0)
 			})
 		}
 	})

@@ -186,4 +186,61 @@ max_connections=666
 			Expect(err).ShouldNot(Succeed())
 		})
 	})
+
+	Context("with none Merge", func() {
+		It("test mergerConfigTemplate function", func() {
+			importedTemplate := &appsv1alpha1.SecondaryRenderedTemplateSpec{
+				Namespace:   "default",
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      appsv1alpha1.NoneMergePolicy,
+			}
+
+			tmpCM := baseCMObject.DeepCopy()
+			mergedData, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
+			Expect(err).Should(Succeed())
+			Expect(reflect.DeepEqual(mergedData, updatedCMObject.Data)).Should(BeTrue())
+		})
+	})
+
+	Context("failed test", func() {
+		It("test mergerConfigTemplate function", func() {
+			importedTemplate := &appsv1alpha1.SecondaryRenderedTemplateSpec{
+				Namespace:   "default",
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      "",
+			}
+
+			tmpCM := baseCMObject.DeepCopy()
+			_, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
+			Expect(err).ShouldNot(Succeed())
+		})
+
+		It("not configconstraint", func() {
+			importedTemplate := &appsv1alpha1.SecondaryRenderedTemplateSpec{
+				Namespace:   "default",
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      "none",
+			}
+
+			tmpCM := baseCMObject.DeepCopy()
+			tmpConfigSpec := configSpec.DeepCopy()
+			tmpConfigSpec.ConfigConstraintRef = ""
+			_, err := mergerConfigTemplate(importedTemplate, templateBuilder, *tmpConfigSpec, tmpCM.Data, ctx, mockClient.Client())
+			Expect(err).ShouldNot(Succeed())
+		})
+
+		It("not formatter", func() {
+			importedTemplate := &appsv1alpha1.SecondaryRenderedTemplateSpec{
+				Namespace:   "default",
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      "none",
+			}
+
+			tmpCM := baseCMObject.DeepCopy()
+			tmpConfigSpec := configSpec.DeepCopy()
+			tmpConfigSpec.ConfigConstraintRef = "not_exist"
+			_, err := mergerConfigTemplate(importedTemplate, templateBuilder, *tmpConfigSpec, tmpCM.Data, ctx, mockClient.Client())
+			Expect(err).ShouldNot(Succeed())
+		})
+	})
 })

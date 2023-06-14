@@ -17,6 +17,7 @@ limitations under the License.
 package plan
 
 import (
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 
@@ -41,47 +42,51 @@ func buildConfigToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 	}
 
 	// construct config manager tools volume
-	toolContainers := make(map[string]appsv1alpha1.ToolConfig)
+	toolContainers := make([]appsv1alpha1.ToolConfig, 0)
+	toolSets := cfgutil.NewSet()
 	for _, buildParam := range cfgManagerParams.ConfigSpecsBuildParams {
 		if buildParam.ToolImageSpec == nil {
 			continue
 		}
 		for _, toolConfig := range buildParam.ToolImageSpec.ToolConfigs {
-			if _, ok := toolContainers[toolConfig.Name]; !ok {
+			if !toolSets.InArray(toolConfig.Name) {
 				replaceToolImageHolder(&toolConfig, podSpec, buildParam.ConfigSpec.VolumeName)
-				toolContainers[toolConfig.Name] = toolConfig
+				toolContainers = append(toolContainers, toolConfig)
+				toolSets.Add(toolConfig.Name)
 			}
 		}
 		buildToolsVolumeMount(cfgManagerParams, podSpec, buildParam.ConfigSpec.VolumeName, buildParam.ToolImageSpec.MountPoint)
 	}
 	// Ensure that the order in which iniContainers are generated does not change
-	checkAndInstallToolImageVolume(toolContainers, cfgManagerParams.ConfigSpecsBuildParams)
+	toolContainers = checkAndInstallToolImageVolume(toolContainers, cfgManagerParams.ConfigSpecsBuildParams)
 	if len(toolContainers) != 0 {
 		cfgManagerParams.ToolsContainers = builder.BuildCfgManagerToolsContainer(cfgManagerParams, comp, toolContainers)
 	}
 }
 
-func checkAndInstallToolImageVolume(toolContainers map[string]appsv1alpha1.ToolConfig, buildParams []cfgcm.ConfigSpecMeta) {
+func checkAndInstallToolImageVolume(toolContainers []appsv1alpha1.ToolConfig, buildParams []cfgcm.ConfigSpecMeta) []appsv1alpha1.ToolConfig {
 	for _, buildParam := range buildParams {
 		if buildParam.ToolImageSpec != nil && buildParam.ConfigSpec.SecondaryRenderedConfigSpec != nil {
 			// auto install config_render tool
-			checkAndCreateRenderedInitContainer(toolContainers, buildParam.ToolImageSpec.MountPoint)
+			toolContainers = checkAndCreateRenderedInitContainer(toolContainers, buildParam.ToolImageSpec.MountPoint)
 		}
 	}
+	return toolContainers
 }
 
-func checkAndCreateRenderedInitContainer(toolContainers map[string]appsv1alpha1.ToolConfig, mountPoint string) {
+func checkAndCreateRenderedInitContainer(toolContainers []appsv1alpha1.ToolConfig, mountPoint string) []appsv1alpha1.ToolConfig {
 	kbToolsImage := viper.GetString(constant.KBToolsImage)
-	for name := range toolContainers {
-		if name == initSecRenderedToolContainerName {
-			return
+	for _, container := range toolContainers {
+		if container.Name == initSecRenderedToolContainerName {
+			return nil
 		}
 	}
-	toolContainers[initSecRenderedToolContainerName] = appsv1alpha1.ToolConfig{
+	toolContainers = append(toolContainers, appsv1alpha1.ToolConfig{
 		Name:    initSecRenderedToolContainerName,
 		Image:   kbToolsImage,
 		Command: []string{"cp", tplRenderToolPath, mountPoint},
-	}
+	})
+	return toolContainers
 }
 
 func replaceToolImageHolder(toolConfig *appsv1alpha1.ToolConfig, podSpec *corev1.PodSpec, volumeName string) {

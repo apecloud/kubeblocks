@@ -719,7 +719,7 @@ func BuildRestoreJobForFullBackup(
 	return &job, nil
 }
 
-func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas map[string]appsv1alpha1.ToolConfig) []corev1.Container {
+func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas []appsv1alpha1.ToolConfig) []corev1.Container {
 	toolContainers := make([]corev1.Container, 0, len(toolsMetas))
 	for _, toolConfig := range toolsMetas {
 		toolContainer := corev1.Container{

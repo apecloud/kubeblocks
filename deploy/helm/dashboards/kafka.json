@@ -1748,6 +1748,6 @@
   "timezone": "browser",
   "title": "Kafka",
   "uid": "kafka",
-  "version": 30,
+  "version": 5,
   "weekStart": ""
 }

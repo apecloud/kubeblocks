@@ -279,7 +279,6 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: kraftClusterID
                     optional: false
-
             ports:
               - name: kafka-ctrlr
                 containerPort: 9093

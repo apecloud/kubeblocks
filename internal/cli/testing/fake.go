@@ -813,7 +813,7 @@ func FakeResourceNotFound(versionResource schema.GroupVersionResource, name stri
 	}
 }
 
-func FakePodchaos(name, namespace string) *v1alpha1.PodChaos {
+func FakePodChaos(name, namespace string) *v1alpha1.PodChaos {
 	return &v1alpha1.PodChaos{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PodChaos",

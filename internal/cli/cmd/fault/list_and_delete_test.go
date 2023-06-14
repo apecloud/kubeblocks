@@ -23,17 +23,17 @@ import (
 	"context"
 	"fmt"
 	chaosv1alpha1 "github.com/chaos-mesh/chaos-mesh/api/v1alpha1"
-	"net/http"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	"net/http"
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 )
@@ -43,7 +43,7 @@ var _ = Describe("Chaos resources list and delete", func() {
 		tf           *cmdtesting.TestFactory
 		namespace    = "test"
 		podChaosName = "testPodChaos"
-		podchaos     = testing.FakePodchaos(podChaosName, namespace)
+		podchaos     = testing.FakePodChaos(podChaosName, namespace)
 	)
 	BeforeEach(func() {
 		tf = testing.NewTestFactory(namespace)
@@ -57,7 +57,6 @@ var _ = Describe("Chaos resources list and delete", func() {
 			Client: clientfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				urlPrefix := "/apis/" + GroupVersion + "/namespaces/" + namespace
 				mapping := map[string]*http.Response{
-					urlPrefix + "/podchaos":                  httpResp(podchaos),
 					urlPrefix + "/podchaos/" + podchaos.Name: httpResp(podchaos),
 				}
 				return mapping[req.URL.Path], nil
@@ -66,15 +65,19 @@ var _ = Describe("Chaos resources list and delete", func() {
 
 		tf.Client = tf.UnstructuredClient
 		_ = chaosv1alpha1.AddToScheme(scheme.Scheme)
-		tf.FakeDynamicClient = testing.FakeDynamicClient(podchaos)
+		//tf.FakeDynamicClient = testing.FakeDynamicClient(podchaos)
 
-		gvr := GetGVR(Group, Version, ResourcePodChaos)
-		resourceList, err := tf.FakeDynamicClient.Resource(gvr).Namespace(namespace).Get(context.Background(), podChaosName, metav1.GetOptions{})
+		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(scheme.Scheme, podchaos)
+		gvr := GetGVR(Group, Version, "podchaoses")
+		resource, err := tf.FakeDynamicClient.Resource(gvr).Namespace(namespace).Get(context.Background(), podChaosName, metav1.GetOptions{})
 		if err != nil {
-			fmt.Errorf("failed to list %s: %s", gvr, err)
+			fmt.Println(err)
+		}
+		if resource == nil {
+			fmt.Println("resource is nil")
 		}
 		fmt.Println("sfa")
-		fmt.Println(resourceList.IsList())
+		fmt.Println(resource.GetName())
 	})
 
 	AfterEach(func() {

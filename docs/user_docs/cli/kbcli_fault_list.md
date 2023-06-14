@@ -1,27 +1,31 @@
 ---
-title: kbcli fault delete
+title: kbcli fault list
 ---
 
-Delete chaos resources.
+List chaos resources.
 
 ```
-kbcli fault delete [flags]
+kbcli fault list [flags]
 ```
 
 ### Examples
 
 ```
-  # Delete all chaos resources
-  kbcli fault delete
+  # List all chaos resources
+  kbcli fault list
   
-  # Delete specific chaos resources
-  kbcli fault delete podchaos
+  # List all chaos kind
+  kbcli fault list --kind
+  
+  # List specific chaos resources. Use 'kbcli fault list --kind' to get chaos kind.
+  kbcli fault list podchaos
 ```
 
 ### Options
 
 ```
-  -h, --help   help for delete
+  -h, --help   help for list
+      --kind   Print chaos resource kind.
 ```
 
 ### Options inherited from parent commands

@@ -39,6 +39,7 @@ Inject faults to pod.
 
 * [kbcli fault delete](kbcli_fault_delete.md)	 - Delete chaos resources.
 * [kbcli fault io](kbcli_fault_io.md)	 - IO chaos.
+* [kbcli fault list](kbcli_fault_list.md)	 - List chaos resources.
 * [kbcli fault network](kbcli_fault_network.md)	 - Network chaos.
 * [kbcli fault node](kbcli_fault_node.md)	 - Node chaos.
 * [kbcli fault pod](kbcli_fault_pod.md)	 - Pod chaos.

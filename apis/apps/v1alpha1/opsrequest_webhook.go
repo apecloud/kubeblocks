@@ -75,7 +75,7 @@ func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 		return nil
 	}
 
-	if r.IsComplete() {
+	if r.Status.Phase != "" {
 		return fmt.Errorf("update OpsRequest: %s is forbidden when status.Phase is %s", r.Name, r.Status.Phase)
 	}
 

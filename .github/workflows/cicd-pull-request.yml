@@ -5,10 +5,6 @@ on:
     types: [submitted]
 
 env:
-  GITLAB_GO_CACHE_PROJECT_ID: 98800
-  GO_CACHE: "go-cache"
-  GO_CACHE_DIR: "/root/.cache"
-  GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
 jobs:
@@ -40,9 +36,10 @@ jobs:
           echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
 
   make-test:
+    name: make test
     needs: trigger-mode
-    runs-on: ubuntu-latest
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: true
       matrix: ${{ fromJSON(needs.trigger-mode.outputs.matrix) }}

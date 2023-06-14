@@ -1,9 +1,0 @@
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
-kind: Backup
-metadata:
-  name: backup-default-mongo-20230613172652
-  namespace: default
-spec:
-  backupPolicyName: mongo-mongodb-backup-policy
-  backupType: datafile
-

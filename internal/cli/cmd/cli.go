@@ -25,8 +25,10 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -50,6 +52,16 @@ import (
 const (
 	cliName = "kbcli"
 )
+
+func init() {
+	// when the kubernetes cluster is not ready, the runtime will output the error
+	// message like "couldn't get resource list for", we ignore it
+	utilruntime.ErrorHandlers[0] = func(err error) {
+		if klog.V(2).Enabled() {
+			klog.ErrorDepth(2, err)
+		}
+	}
+}
 
 func NewCliCmd() *cobra.Command {
 	cmd := &cobra.Command{

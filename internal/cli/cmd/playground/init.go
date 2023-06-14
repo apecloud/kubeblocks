@@ -31,7 +31,6 @@ import (
 	"golang.org/x/exp/slices"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -349,14 +348,6 @@ func (o *initOptions) setKubeConfig(info *cp.K8sClusterInfo) error {
 
 func (o *initOptions) installKBAndCluster(info *cp.K8sClusterInfo) error {
 	var err error
-
-	// when the kubernetes cluster is not ready, the runtime will output the error
-	// message like "couldn't get resource list for", we ignore it
-	runtime.ErrorHandlers[0] = func(err error) {
-		if klog.V(1).Enabled() {
-			klog.ErrorDepth(2, err)
-		}
-	}
 
 	// write kubeconfig content to a temporary file and use it
 	if err = writeAndUseKubeConfig(info.KubeConfig, o.kubeConfigPath, o.Out); err != nil {

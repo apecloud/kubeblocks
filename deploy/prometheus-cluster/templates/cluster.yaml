@@ -7,16 +7,17 @@ spec:
   clusterDefinitionRef: prometheus  # ref clusterdefinition.name
   clusterVersionRef: prometheus-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
   terminationPolicy: {{ $.Values.terminationPolicy }}
+  {{- if .Values.tolerations }}
+  tolerations:
+{{ toYaml .Values.tolerations | indent 4 }}
+  {{- end }}
+  {{- if .Values.affinity }}
   affinity:
-    {{- with $.Values.topologyKeys }}
-    topologyKeys: {{ . | toYaml | nindent 6 }}
-    {{- end }}
-  {{- with $.Values.tolerations }}
-  tolerations: {{ . | toYaml | nindent 4 }}
+{{ toYaml .Values.affinity | indent 4 }}
   {{- end }}
   componentSpecs:
     - name: server # user-defined
-      componentDefRef: prometheus-server # ref clusterdefinition components.name
+      componentDefRef: server # ref clusterdefinition components.name
       monitor: {{ .Values.monitor.enabled | default false }}
       replicas: {{ .Values.replicaCount.server | default 1 }}
       serviceAccountName: "prometheus-server"
@@ -54,14 +55,14 @@ spec:
       switchPolicy:
         type: {{ .Values.switchPolicy.type}}
 {{/*      enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}*/}}
-      {{- if .Values.persistence.enabled }}
+{{- if .Values.persistence.enabled }}
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
           spec:
             storageClassName: {{ .Values.persistence.data.storageClassName }}
             accessModes:
-              - ReadWriteOnce
+              {{ toYaml .Values.persistence.accessModes }}
             resources:
               requests:
                 storage: {{ .Values.persistence.data.size }}
-      {{- end }}
+{{- end -}}

@@ -13,65 +13,25 @@ alertmanager:
   ## Defining configMapOverrideName will cause templates/alertmanager-configmap.yaml
   ## to NOT generate a ConfigMap resource
   ##
-  ## TODO:
   configMapOverrideName: "alertmanager-config"
-
-  ## Node tolerations for alertmanager scheduling to nodes with taints
-  ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
-  ##
-  ## TODO:
-  tolerations:
-    - key: kb-controller
-      operator: Equal
-      value: "true"
-      effect: NoSchedule
-
-  ## TODO:
-  affinity:
-    nodeAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          preference:
-            matchExpressions:
-              - key: kb-controller
-                operator: In
-                values:
-                  - "true"
-
-  ## TODO:
-  persistentVolume:
-    ## If true, alertmanager will create/use a Persistent Volume Claim
-    ## If false, use emptyDir
-    ##
-    enabled: false
-
-    ## alertmanager data Persistent Volume size
-    ##
-    size: 1Gi
-
-    ## alertmanager data Persistent Volume Storage Class
-    ## If defined, storageClassName: <storageClass>
-    ## If set to "-", storageClassName: "", which disables dynamic provisioning
-    ## If undefined (the default) or set to null, no storageClassName spec is
-    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
-    ##   GKE, AWS & OpenStack)
-    ##
-    # storageClass: "-"
 
   ## Security context to be added to alertmanager pods
   ##
-  ## TODO:
   securityContext:
     runAsUser: 0
     runAsNonRoot: false
     runAsGroup: 65534
     fsGroup: 65534
 
-  ## TODO:
   containerSecurityContext:
     allowPrivilegeEscalation: false
 
 configmapReload:
+  securityContext:
+    runAsUser: 0
+    runAsNonRoot: false
+    runAsGroup: 65534
+    fsGroup: 65534
   prometheus:
     ## configmap-reload container image
     ##
@@ -80,6 +40,9 @@ configmapReload:
       repository: apecloud/configmap-reload
       pullPolicy: IfNotPresent
       tag: v0.5.0
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+
   alertmanager:
     ## configmap-reload container image
     ##
@@ -88,6 +51,8 @@ configmapReload:
       repository: apecloud/configmap-reload
       pullPolicy: IfNotPresent
       tag: v0.5.0
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
 
 server:
   ## Prometheus server container image
@@ -124,8 +89,9 @@ server:
 
   ## https://prometheus.io/docs/prometheus/latest/configuration/configuration/#remote_write
   ##
-  ## TODO:
   remoteWrite: []
+
+  remoteRead: []
 
   ## Prefix used to register routes, overriding externalUrl route.
   ## Useful for proxies that rewrite URLs.
@@ -133,38 +99,28 @@ server:
   ## TODO:
   routePrefix: /
 
-  ## Node tolerations for server scheduling to nodes with taints
-  ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+  ## Prometheus' data retention period (default if not specified is 15 days)
   ##
-  ## TODO:
-  tolerations:
-    - key: kb-controller
-      operator: Equal
-      value: "true"
-      effect: NoSchedule
 
-  ## TODO:
-  affinity:
-    nodeAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          preference:
-            matchExpressions:
-              - key: kb-controller
-                operator: In
-                values:
-                  - "true"
+  retention: "2d"
 
-  ## TODO:
+  ## Security context to be added to server pods
+  ##
+  securityContext:
+    runAsUser: 0
+    runAsNonRoot: false
+    runAsGroup: 65534
+    fsGroup: 65534
+
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+
+
   persistentVolume:
     ## If true, Prometheus server will create/use a Persistent Volume Claim
     ## If false, use emptyDir
     ##
-    enabled: false
-
-    ## Prometheus server data Persistent Volume size
-    ##
-    size: 20Gi
+    enabled: true
 
     ## Prometheus server data Persistent Volume Storage Class
     ## If defined, storageClassName: <storageClass>
@@ -175,20 +131,19 @@ server:
     ##
     # storageClass: "-"
 
-  ## Prometheus' data retention period (default if not specified is 15 days)
-  ##
+    ## Prometheus server data Persistent Volume Binding Mode
+    ## If defined, volumeBindingMode: <volumeBindingMode>
+    ## If undefined (the default) or set to null, no volumeBindingMode spec is
+    ##   set, choosing the default mode.
+    ##
+    # volumeBindingMode: ""
 
-  retention: "2d"
+    ## Subdirectory of Prometheus server data Persistent Volume to mount
+    ## Useful if the volume's root directory is not empty
+    ##
+    subPath: ""
 
-  ## Security context to be added to server pods
-  ##
-  ## TODO:
-  securityContext:
-    runAsUser: 0
-    runAsNonRoot: false
-    runAsGroup: 65534
-    fsGroup: 65534
-
-  ## TODO:
-  containerSecurityContext:
-    allowPrivilegeEscalation: false
+  emptyDir:
+    ## Prometheus server emptyDir volume size limit
+    ##
+    sizeLimit: ""

@@ -10,7 +10,7 @@ metadata:
 spec:
   clusterDefinitionRef: prometheus
   backupPolicies:
-  - componentDefRef: prometheus-server
+  - componentDefRef: server
     retention:
       ttl: 7d
     schedule:

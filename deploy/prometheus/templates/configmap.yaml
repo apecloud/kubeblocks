@@ -56,5 +56,14 @@ data:
       scrape_timeout: {{ .scrape_timeout }}
       evaluation_interval: {{ .evaluation_interval }}
     {{ end }}
+{{/*    {{ $values.server.global | toYaml | trimSuffix "\n" }}*/}}
+    {{- if $values.server.remoteWrite }}
+      remote_write:
+    {{ $values.server.remoteWrite | toYaml | indent 4 }}
+    {{- end }}
+    {{- if $values.server.remoteRead }}
+      remote_read:
+    {{ $values.server.remoteRead | toYaml | indent 4 }}
+    {{- end }}
   {{- $content | toString | nindent 4 }}
 {{ end }}

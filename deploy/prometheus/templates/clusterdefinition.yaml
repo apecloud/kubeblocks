@@ -3,7 +3,7 @@ kind: ClusterDefinition
 metadata:
   name: prometheus
   labels:
-    {{- include "prometheus.labels" . | nindent 4 }}
+{{- include "prometheus.labels" . | nindent 4 }}
 spec:
   type: prometheus
   componentDefs:
@@ -26,8 +26,10 @@ spec:
           volumeName: config-volume
           defaultMode: 0777
       podSpec:
+        {{- if .Values.server.securityContext }}
         securityContext:
-          runAsUser: 0
+{{ toYaml .Values.server.securityContext | indent 10 }}
+            {{- end }}
         enableServiceLinks: true
         containers:
           - name: configmap-reload
@@ -38,9 +40,12 @@ spec:
               - name: config-volume
                 mountPath: /etc/config
                 readOnly: true
+            securityContext:
+{{- toYaml .Values.configmapReload.prometheus.containerSecurityContext | nindent 14 }}
+
           - name: server
             securityContext:
-              runAsUser: 0
+{{- toYaml .Values.server.containerSecurityContext | nindent 14 }}
             args:
             {{- if .Values.server.retention }}
               - --storage.tsdb.retention.time={{ .Values.server.retention }}
@@ -115,8 +120,10 @@ spec:
           volumeName: config-volume
           defaultMode: 0777
       podSpec:
+        {{- if .Values.alertmanager.securityContext }}
         securityContext:
-          runAsUser: 0
+{{ toYaml .Values.alertmanager.securityContext | indent 10 }}
+        {{- end }}
         containers:
           - name: configmap-reload
             args:
@@ -126,7 +133,12 @@ spec:
               - name: config-volume
                 mountPath: /etc/config
                 readOnly: true
+            securityContext:
+{{- toYaml .Values.configmapReload.alertmanager.containerSecurityContext | nindent 14 }}
+
           - name: alertmanager
+            securityContext:
+{{- toYaml .Values.alertmanager.containerSecurityContext | nindent 14 }}
             env:
               - name: POD_IP
                 valueFrom:

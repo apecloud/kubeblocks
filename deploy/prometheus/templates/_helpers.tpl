@@ -60,3 +60,27 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{- define "prometheus.alertmanager.fullname" -}}
+{{- if .Values.alertmanager.fullnameOverride -}}
+{{- .Values.alertmanager.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- $name := default .Chart.Name .Values.nameOverride -}}
+{{- if contains $name .Release.Name -}}
+{{- printf "%s-%s" .Release.Name .Values.alertmanager.name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s-%s" .Release.Name $name .Values.alertmanager.name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Define the prometheus.namespace template if set with forceNamespace or .Release.Namespace is set
+*/}}
+{{- define "prometheus.namespace" -}}
+{{- if .Values.forceNamespace -}}
+{{ printf "namespace: %s" .Values.forceNamespace }}
+{{- else -}}
+{{ printf "namespace: %s" .Release.Namespace }}
+{{- end -}}
+{{- end -}}

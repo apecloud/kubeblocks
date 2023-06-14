@@ -89,7 +89,7 @@ func run(ctx context.Context, opt *VolumeWatcherOpts) error {
 	if configHandler, err = cfgcore.CreateCombinedHandler(opt.CombConfig, opt.BackupPath); err != nil {
 		return err
 	}
-	if len(opt.VolumeDirs) == 0 {
+	if len(opt.VolumeDirs) > 0 {
 		if volumeWatcher, err = startVolumeWatcher(ctx, opt, configHandler); err != nil {
 			return err
 		}
@@ -121,12 +121,14 @@ func startVolumeWatcher(ctx context.Context, opt *VolumeWatcherOpts, handler cfg
 	eventHandler := func(ctx context.Context, event fsnotify.Event) error {
 		return handler.VolumeHandle(ctx, event)
 	}
+	logger.Info("starting fsnotify VolumeWatcher.")
 	volumeWatcher := cfgcore.NewVolumeWatcher(opt.VolumeDirs, ctx, logger)
 	err := volumeWatcher.AddHandler(eventHandler).Run()
 	if err != nil {
 		logger.Error(err, "failed to handle VolumeWatcher.")
 		return nil, err
 	}
+	logger.Info("fsnotify VolumeWatcher started.")
 	return volumeWatcher, nil
 }
 

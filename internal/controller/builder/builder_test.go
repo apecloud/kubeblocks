@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"testing"
@@ -99,6 +100,15 @@ var _ = Describe("builder", func() {
 		return clusterVersionObj
 	}
 
+	newExtraEnvs := func() map[string]string {
+		jsonStr, _ := json.Marshal(map[string]string{
+			"mock-key": "mock-value",
+		})
+		return map[string]string{
+			constant.ExtraEnvAnnotationKey: string(jsonStr),
+		}
+	}
+
 	newAllFieldsClusterObj := func(
 		clusterDefObj *appsv1alpha1.ClusterDefinition,
 		clusterVersionObj *appsv1alpha1.ClusterVersion,
@@ -114,6 +124,7 @@ var _ = Describe("builder", func() {
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
+			AddAnnotationsInMap(newExtraEnvs()).
 			AddComponent(mysqlCompName, mysqlCompDefName).SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
@@ -282,6 +293,18 @@ var _ = Describe("builder", func() {
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
 			Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(2))
+			// test extra envs
+			Expect(sts.Spec.Template.Spec.Containers).ShouldNot(BeEmpty())
+			for _, container := range sts.Spec.Template.Spec.Containers {
+				isContainEnv := false
+				for _, env := range container.Env {
+					if env.Name == "mock-key" && env.Value == "mock-value" {
+						isContainEnv = true
+						break
+					}
+				}
+				Expect(isContainEnv).Should(BeTrue())
+			}
 		})
 
 		It("builds Deploy correctly", func() {

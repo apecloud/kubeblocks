@@ -117,13 +117,15 @@ func processContainersInjection(reqCtx intctrlutil.RequestCtx,
 		&podSpec.InitContainers,
 	} {
 		for i := range *cc {
-			injectEnvs(cluster, component, envConfigName, &(*cc)[i])
+			if err := injectEnvs(cluster, component, envConfigName, &(*cc)[i]); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string, c *corev1.Container) {
+func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string, c *corev1.Container) error {
 	// can not use map, it is unordered
 	envFieldPathSlice := []struct {
 		name      string
@@ -178,6 +180,22 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 			{Name: "KB_TLS_KEY_FILE", Value: KeyName},
 		}...)
 	}
+
+	if udeValue, ok := cluster.Annotations[constant.ExtraEnvAnnotationKey]; ok {
+		udeMap := make(map[string]string)
+		if err := json.Unmarshal([]byte(udeValue), &udeMap); err != nil {
+			return err
+		}
+		for k, v := range udeMap {
+			if k == "" || v == "" {
+				continue
+			}
+			toInjectEnvs = append(toInjectEnvs, corev1.EnvVar{
+				Name:  k,
+				Value: v,
+			})
+		}
+	}
 	// have injected variables placed at the front of the slice
 	if len(c.Env) == 0 {
 		c.Env = toInjectEnvs
@@ -185,7 +203,7 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 		c.Env = append(toInjectEnvs, c.Env...)
 	}
 	if envConfigName == "" {
-		return
+		return nil
 	}
 	c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
 		ConfigMapRef: &corev1.ConfigMapEnvSource{
@@ -194,6 +212,8 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 			},
 		},
 	})
+
+	return nil
 }
 
 // BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from sts to pvc.

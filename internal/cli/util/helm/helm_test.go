@@ -158,4 +158,26 @@ var _ = Describe("helm util", func() {
 		versions, _ := GetChartVersions(testing.KubeBlocksChartName)
 		Expect(versions).Should(BeNil())
 	})
+
+	It("get manifest", func() {
+		chart := "../../testing/testdata/test-cluster.tgz"
+		testCases := []struct {
+			values   map[string]interface{}
+			expected string
+		}{
+			{
+				nil,
+				"kind: Cluster",
+			},
+			{
+				map[string]interface{}{"version": "test-cluster-cv"},
+				"clusterVersionRef: test-cluster-cv",
+			},
+		}
+		for _, tc := range testCases {
+			manifest, err := GetManifest(chart, "default", "test", tc.values)
+			Expect(err).Should(Succeed())
+			Expect(manifest).Should(ContainSubstring(tc.expected))
+		}
+	})
 })

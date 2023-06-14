@@ -165,7 +165,7 @@ func (i *InstallOpts) GetInstalled(cfg *action.Configuration) (*release.Release,
 }
 
 // Install installs a Chart
-func (i *InstallOpts) Install(cfg *Config) (string, error) {
+func (i *InstallOpts) Install(cfg *Config) (*release.Release, error) {
 	ctx := context.Background()
 	opts := retry.Options{
 		MaxRetry: 1 + i.TryTimes,
@@ -173,30 +173,31 @@ func (i *InstallOpts) Install(cfg *Config) (string, error) {
 
 	actionCfg, err := NewActionConfig(cfg)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	var notes string
-	if err := retry.IfNecessary(ctx, func() error {
+	var rel *release.Release
+	if err = retry.IfNecessary(ctx, func() error {
 		var err1 error
-		if notes, err1 = i.tryInstall(actionCfg); err1 != nil {
+		if rel, err1 = i.tryInstall(actionCfg); err1 != nil {
+			klog.Error(err1)
 			return err1
 		}
 		return nil
 	}, &opts); err != nil {
-		return "", errors.Errorf("install chart %s error: %s", i.Name, err.Error())
+		return nil, errors.Errorf("install chart %s error: %s", i.Name, err.Error())
 	}
 
-	return notes, nil
+	return rel, nil
 }
 
-func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
+func (i *InstallOpts) tryInstall(cfg *action.Configuration) (*release.Release, error) {
 	released, err := i.GetInstalled(cfg)
 	if released != nil {
-		return released.Info.Notes, nil
+		return released, nil
 	}
 	if err != nil && !releaseNotFound(err) {
-		return "", err
+		return nil, err
 	}
 
 	settings := cli.New()
@@ -206,7 +207,7 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	histClient := action.NewHistory(cfg)
 	histClient.Max = 1
 	if _, err := histClient.Run(i.Name); err != nil && err != driver.ErrReleaseNotFound {
-		return "", err
+		return nil, err
 	}
 
 	client := action.NewInstall(cfg)
@@ -230,19 +231,19 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 
 	cp, err := client.ChartPathOptions.LocateChart(i.Chart, settings)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	p := getter.All(settings)
 	vals, err := i.ValueOpts.MergeValues(p)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Check Chart dependencies to make sure all are present in /charts
 	chartRequested, err := loader.Load(cp)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Create context and prepare the handle of SIGTERM
@@ -262,9 +263,9 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 
 	released, err = client.RunWithContext(ctx, chartRequested, vals)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return released.Info.Notes, nil
+	return released, nil
 }
 
 // Uninstall uninstalls a Chart
@@ -645,4 +646,29 @@ func GetValues(release string, cfg *Config) (map[string]interface{}, error) {
 	client := action.NewGetValues(actionConfig)
 	client.AllValues = true
 	return client.Run(release)
+}
+
+func GetManifest(chart string, namespace string, name string, vals map[string]interface{}) (string, error) {
+	dryRun := true
+	valueOpts := values.Options{}
+
+	// set values as helm string values
+	strVals := make([]string, len(vals))
+	for k, v := range vals {
+		strVals = append(strVals, fmt.Sprintf("%s=%v", k, v))
+	}
+	valueOpts.StringValues = strVals
+
+	o := InstallOpts{
+		Name:      name,
+		Chart:     chart,
+		Namespace: namespace,
+		DryRun:    &dryRun,
+		ValueOpts: &valueOpts,
+	}
+	rel, err := o.Install(NewFakeConfig(namespace))
+	if err != nil || rel == nil {
+		return "", err
+	}
+	return rel.Manifest, nil
 }

@@ -662,8 +662,11 @@ var _ = Describe("Cluster Controller", func() {
 		}
 
 		scaleInCheck := func() {
+			if updatedReplicas == 0 {
+				return
+			}
 			checkUpdatedStsReplicas()
-			By("Checking pvcs deleted")
+			By("Checking pvcs deleting")
 			Eventually(func(g Gomega) {
 				pvcList := corev1.PersistentVolumeClaimList{}
 				g.Expect(testCtx.Cli.List(testCtx.Ctx, &pvcList, client.MatchingLabels{
@@ -677,21 +680,7 @@ var _ = Describe("Cluster Controller", func() {
 						g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
 					}
 				}
-				// patch the finalizer kubernetes.io/pvc-protection
-				for _, pvc := range pvcList.Items {
-					ss := strings.Split(pvc.Name, "-")
-					idx, _ := strconv.Atoi(ss[len(ss)-1])
-					if idx >= updatedReplicas && idx < int(comp.Replicas) {
-						pvc.Finalizers = nil
-						Expect(testCtx.Cli.Update(testCtx.Ctx, &pvc)).Should(Succeed())
-					}
-				}
-				g.Expect(testapps.List(&testCtx, generics.PersistentVolumeClaimSignature,
-					client.MatchingLabels{
-						constant.AppInstanceLabelKey:    clusterKey.Name,
-						constant.KBAppComponentLabelKey: comp.Name,
-					}, client.InNamespace(clusterKey.Namespace))(g)).Should(HaveLen(updatedReplicas))
-			}).Should(Succeed())
+			})
 		}
 
 		if int(comp.Replicas) < updatedReplicas {

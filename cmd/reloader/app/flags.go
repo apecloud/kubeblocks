@@ -160,15 +160,15 @@ func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
 	//	"backup-path",
 	//	opt.BackupPath,
 	//	"the config describes backup path.")
-	// flags.StringVar(&opt.LogLevel,
-	//	"log-level",
-	//	opt.LogLevel,
-	//	"the config sets log level. enum: [error, info, debug]")
 	// flags.StringVar(&opt.FileRegex,
 	//	"regex",
 	//	opt.FileRegex,
 	//	"the config sets filter config file.")
 
+	flags.StringVar(&opt.LogLevel,
+		"log-level",
+		opt.LogLevel,
+		"the config sets log level. enum: [error, info, debug]")
 	flags.StringVar(&opt.ServiceOpt.PodIP,
 		"pod-ip",
 		opt.ServiceOpt.PodIP,

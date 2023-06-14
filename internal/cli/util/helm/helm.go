@@ -73,8 +73,9 @@ type InstallOpts struct {
 	DisableHooks    bool
 
 	// for helm template
-	DryRun    *bool
-	OutputDir string
+	DryRun     *bool
+	OutputDir  string
+	IncludeCRD bool
 }
 
 type Option func(*cli.EnvSettings)
@@ -163,7 +164,7 @@ func (i *InstallOpts) GetInstalled(cfg *action.Configuration) (*release.Release,
 }
 
 // Install installs a Chart
-func (i *InstallOpts) Install(cfg *Config) (string, error) {
+func (i *InstallOpts) Install(cfg *Config) (*release.Release, error) {
 	ctx := context.Background()
 	opts := retry.Options{
 		MaxRetry: 1 + i.TryTimes,
@@ -171,32 +172,34 @@ func (i *InstallOpts) Install(cfg *Config) (string, error) {
 
 	actionCfg, err := NewActionConfig(cfg)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	var notes string
+	var rel *release.Release
 	if err := retry.IfNecessary(ctx, func() error {
-		var err1 error
-		if notes, err1 = i.tryInstall(actionCfg); err1 != nil {
+		release, err1 := i.tryInstall(actionCfg)
+		if err1 != nil {
 			return err1
 		}
+		rel = release
 		return nil
 	}, &opts); err != nil {
-		return "", errors.Errorf("install chart %s error: %s", i.Name, err.Error())
+		return nil, errors.Errorf("install chart %s error: %s", i.Name, err.Error())
 	}
 
-	return notes, nil
+	return rel, nil
 }
 
-func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
-	released, err := i.GetInstalled(cfg)
-	if released != nil {
-		return released.Info.Notes, nil
+func (i *InstallOpts) tryInstall(cfg *action.Configuration) (*release.Release, error) {
+	if *i.DryRun != true {
+		released, err := i.GetInstalled(cfg)
+		if released != nil {
+			return released, nil
+		}
+		if err != nil && !releaseNotFound(err) {
+			return nil, err
+		}
 	}
-	if err != nil && !releaseNotFound(err) {
-		return "", err
-	}
-
 	settings := cli.New()
 
 	// TODO: Does not work now
@@ -204,7 +207,7 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	histClient := action.NewHistory(cfg)
 	histClient.Max = 1
 	if _, err := histClient.Run(i.Name); err != nil && err != driver.ErrReleaseNotFound {
-		return "", err
+		return nil, err
 	}
 
 	client := action.NewInstall(cfg)
@@ -216,10 +219,14 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	client.Timeout = i.Timeout
 	client.Version = i.Version
 	client.Atomic = i.Atomic
+
 	// for helm template
 	if i.DryRun != nil {
 		client.DryRun = *i.DryRun
 		client.OutputDir = i.OutputDir
+		client.IncludeCRDs = i.IncludeCRD
+		client.Replace = true
+		client.ClientOnly = true
 	}
 
 	if client.Timeout == 0 {
@@ -228,19 +235,19 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 
 	cp, err := client.ChartPathOptions.LocateChart(i.Chart, settings)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	p := getter.All(settings)
 	vals, err := i.ValueOpts.MergeValues(p)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Check Chart dependencies to make sure all are present in /charts
 	chartRequested, err := loader.Load(cp)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Create context and prepare the handle of SIGTERM
@@ -258,11 +265,11 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 		cancel()
 	}()
 
-	released, err = client.RunWithContext(ctx, chartRequested, vals)
+	released, err := client.RunWithContext(ctx, chartRequested, vals)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return released.Info.Notes, nil
+	return released, nil
 }
 
 // Uninstall uninstalls a Chart
@@ -364,13 +371,16 @@ func fakeActionConfig() *action.Configuration {
 		return nil
 	}
 
-	return &action.Configuration{
+	res := &action.Configuration{
 		Releases:       storage.Init(driver.NewMemory()),
 		KubeClient:     &kubefake.FailingKubeClient{PrintingKubeClient: kubefake.PrintingKubeClient{Out: io.Discard}},
 		Capabilities:   chartutil.DefaultCapabilities,
 		RegistryClient: registryClient,
 		Log:            func(format string, v ...interface{}) {},
 	}
+
+	res.Capabilities.KubeVersion.Version = "v1.22.0"
+	return res
 }
 
 // Upgrade will upgrade a Chart
@@ -581,14 +591,6 @@ func GetValues(release string, cfg *Config) (map[string]interface{}, error) {
 	return client.Run(release)
 }
 
-// GetManifest gives an implementation of 'helm get manifest' for target release
-func GetManifest(release string, cfg *Config) (string, error) {
-	actionConfig, err := NewActionConfig(cfg)
-	if err != nil {
-		return "", err
-	}
-	client := action.NewGet(actionConfig)
-	res, err := client.Run(release)
-	//fmt.Fprintf(os.Stdout, res.Manifest)
-	return res.Manifest, err
+func TemplateManifest(chart string, version string) {
+
 }

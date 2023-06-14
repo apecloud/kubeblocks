@@ -20,10 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package kubeblocks
 
 import (
+	"bytes"
 	"fmt"
 	"os"
-	"os/user"
-	"path/filepath"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -126,7 +127,7 @@ func (o *InstallOptions) Upgrade() error {
 	s.Success()
 
 	if o.diff {
-		return o.showUpgradeDiff()
+		return o.showUpgradeDiff(v.KubeBlocks)
 	}
 
 	// it's time to upgrade
@@ -156,29 +157,70 @@ func (o *InstallOptions) upgradeChart() error {
 	return o.buildChart().Upgrade(o.HelmCfg)
 }
 
-func (o *InstallOptions) showUpgradeDiff() error {
-	// get kubeblocks current version manifest
-
-	oldManifest, err := helm.GetManifest(types.KubeBlocksReleaseName, o.HelmCfg)
-	if err != nil {
-		return fmt.Errorf("could not get the helm release manifest")
+func (o *InstallOptions) showUpgradeDiff(curKBVersion string) error {
+	dryrun := true
+	current := helm.InstallOpts{
+		Name:            types.KubeBlocksChartName,
+		Chart:           types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
+		Wait:            o.Wait,
+		Version:         curKBVersion,
+		Namespace:       "default",
+		ValueOpts:       &o.ValueOpts,
+		TryTimes:        2,
+		CreateNamespace: o.CreateNamespace,
+		Timeout:         o.Timeout,
+		Atomic:          true,
+		DryRun:          &dryrun,
+		IncludeCRD:      true,
 	}
-	//newSpecs, err := helm.Parse(oldManifest, o.Namespace, true)
-	//for key, value := range newSpecs {
-	//	fmt.Printf("key: %s value:%v \n", key, *value)
+	currentRelease, err := current.Install(helm.NewFakeConfig("default"))
+	if err != nil {
+		return err
+	}
+	target := helm.InstallOpts{
+		Name:            types.KubeBlocksChartName,
+		Chart:           types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
+		Wait:            o.Wait,
+		Version:         o.Version,
+		Namespace:       "default",
+		ValueOpts:       &o.ValueOpts,
+		TryTimes:        2,
+		CreateNamespace: o.CreateNamespace,
+		Timeout:         o.Timeout,
+		Atomic:          true,
+		DryRun:          &dryrun,
+		IncludeCRD:      true,
+	}
+	targetRelease, err := target.Install(helm.NewFakeConfig("default"))
+	if err != nil {
+		return err
+	}
+
+	var oldManifests bytes.Buffer
+	fmt.Fprintln(&oldManifests, strings.TrimSpace(currentRelease.Manifest))
+	//oldManifestsKeys := releaseutil.SplitManifests(oldManifests.String())
+	//oldManifestsKeys := make([]string, 0, len(splitManifests))
+	//for k := range splitManifests {
+	//	oldManifestsKeys = append(oldManifestsKeys, k)
 	//}
-	currentUser, err := user.Current()
-	old, _ := os.Create(filepath.Join(currentUser.HomeDir, "oldManifest.yaml"))
-	defer old.Close()
-	_, err = old.Write([]byte(oldManifest))
-	// helm.Get
-	// todo: add the --include-crd for template
-	dryRun := true
-	helmInstallOps := o.buildChart()
-	helmInstallOps.DryRun = &dryRun
-	newManifest, err := helmInstallOps.GetChartManifestByDryRun(o.HelmCfg)
-	new_, _ := os.Create(filepath.Join(currentUser.HomeDir, "newManifest.yaml"))
-	defer new_.Close()
-	_, err = new_.Write([]byte(newManifest))
-	return err
+	var newManifests bytes.Buffer
+	fmt.Fprintln(&newManifests, strings.TrimSpace(targetRelease.Manifest))
+	//newManifestsKeys := releaseutil.SplitManifests(newManifests.String())
+	homeDir, _ := os.UserHomeDir()
+	oldfilePath := path.Join(homeDir, "oldManifest.yaml")
+	newfilePath := path.Join(homeDir, "newManifest.yaml")
+	oldFile, err := os.Create(oldfilePath)
+	if err != nil {
+		return err
+	}
+	defer oldFile.Close()
+	_, err = oldFile.Write(oldManifests.Bytes())
+	newFile, err := os.Create(newfilePath)
+	if err != nil {
+		return err
+	}
+	defer newFile.Close()
+	_, err = newFile.Write(newManifests.Bytes())
+
+	return nil
 }

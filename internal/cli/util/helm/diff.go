@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"gopkg.in/yaml.v2"
-	_ "gopkg.in/yaml.v2"
 	"io"
 	"log"
 	"strings"
+
+	"gopkg.in/yaml.v2"
+	_ "gopkg.in/yaml.v2"
 )
 
 var yamlSeparator = []byte("\n---\n")

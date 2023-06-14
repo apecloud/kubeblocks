@@ -134,7 +134,7 @@ spec:
             lifecycle:
               postStart:
                 exec:
-                  command: ["/scripts/setup.sh"]
+                  command: ["/scripts/redis-post-start.sh"]
           - name: redis-exporter
             image: oliver006/redis_exporter:latest
             imagePullPolicy: IfNotPresent

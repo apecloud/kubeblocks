@@ -43,7 +43,6 @@ var _ = Describe("ToolImageBuilderTest", func() {
 	const clusterVersionName = "test-clusterversion"
 	const clusterName = "test-cluster"
 	const mysqlCompDefName = "replicasets"
-	const scriptConfigName = "test-script-config"
 	const configSpecName = "test-config-spec"
 	const kbToolsImage = "apecloud/kubeblocks-tools:latest"
 

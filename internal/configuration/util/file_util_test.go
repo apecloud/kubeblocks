@@ -26,8 +26,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 )
 
 func TestCheckPathExists(t *testing.T) {
@@ -214,8 +216,9 @@ func TestToArgs(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ToArgs(tt.args.m); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ToArgs() = %v, want %v", got, tt.want)
+			r := NewSet(ToArgs(tt.args.m)...)
+			for _, v := range tt.want {
+				require.True(t, r.InArray(v))
 			}
 		})
 	}

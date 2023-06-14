@@ -105,7 +105,7 @@ If you need to customize the installation path, use the zip file.
 
 </TabItem>
 
-<TabItem value="Linux" label="Linux" default>
+<TabItem value="Linux" label="Linux">
 
 Install kbcli using the `curl` command.
 

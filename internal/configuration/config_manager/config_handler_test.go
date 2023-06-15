@@ -21,7 +21,6 @@ package configmanager
 
 import (
 	"context"
-	"encoding/json"
 	"io/fs"
 	"os"
 	"os/signal"
@@ -164,9 +163,11 @@ var _ = Describe("Config Handler Test", func() {
 	}
 
 	toJSONString := func(v ConfigSpecInfo) string {
-		b, err := json.Marshal([]ConfigSpecInfo{v})
+		b, err := util.ToYamlConfig([]ConfigSpecInfo{v})
 		Expect(err).Should(Succeed())
-		return string(b)
+		configFile := filepath.Join(tmpWorkDir, configManagerConfig)
+		Expect(os.WriteFile(configFile, b, fs.ModePerm)).Should(Succeed())
+		return configFile
 	}
 
 	Context("TestSimpleHandler", func() {

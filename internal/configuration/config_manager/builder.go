@@ -28,6 +28,7 @@ import (
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -51,31 +52,35 @@ const (
 	configManagerConfigVolumeName = "config-manager-config"
 	configManagerConfig           = "config-manager.yaml"
 	configManagerConfigMountPoint = "/opt/config-manager"
+	configManagerCMPrefix         = "sidecar-"
 )
 
-const KBConfigSpecYamlFile = "kb-cm-config.yaml"
+const KBConfigSpecLazyRenderedYamlFile = "lazy-rendered-config.yaml"
 
-func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, cmBuildParams *CfgManagerBuildParams, volumeDirs []corev1.VolumeMount) error {
-	allVolumeMounts := getWatchedVolume(volumeDirs, cmBuildParams.ConfigSpecsBuildParams)
-	for i := range cmBuildParams.ConfigSpecsBuildParams {
-		buildParam := &cmBuildParams.ConfigSpecsBuildParams[i]
-		volumeMount := FindVolumeMount(cmBuildParams.Volumes, buildParam.ConfigSpec.VolumeName)
-		if volumeMount == nil {
+func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, managerParams *CfgManagerBuildParams, volumeDirs []corev1.VolumeMount) error {
+	var volume *corev1.VolumeMount
+	var buildParam *ConfigSpecMeta
+
+	allVolumeMounts := getWatchedVolume(volumeDirs, managerParams.ConfigSpecsBuildParams)
+	for i := range managerParams.ConfigSpecsBuildParams {
+		buildParam = &managerParams.ConfigSpecsBuildParams[i]
+		volume = FindVolumeMount(managerParams.Volumes, buildParam.ConfigSpec.VolumeName)
+		if volume == nil {
 			logger.Info(fmt.Sprintf("volume mount not be use : %s", buildParam.ConfigSpec.VolumeName))
 			continue
 		}
-		buildParam.MountPoint = volumeMount.MountPath
-		if err := buildConfigSpecHandleMeta(cli, ctx, buildParam, cmBuildParams); err != nil {
+		buildParam.MountPoint = volume.MountPath
+		if err := buildConfigSpecHandleMeta(cli, ctx, buildParam, managerParams); err != nil {
 			return err
 		}
-		if err := buildLazyRenderedConfig(cli, ctx, buildParam, cmBuildParams); err != nil {
+		if err := buildLazyRenderedConfig(cli, ctx, buildParam, managerParams); err != nil {
 			return err
 		}
 	}
-	downwardAPIVolumes := buildDownwardAPIVolumes(cmBuildParams)
+	downwardAPIVolumes := buildDownwardAPIVolumes(managerParams)
 	allVolumeMounts = append(allVolumeMounts, downwardAPIVolumes...)
-	cmBuildParams.Volumes = append(cmBuildParams.Volumes, downwardAPIVolumes...)
-	return buildConfigManagerArgs(cmBuildParams, allVolumeMounts, cli, ctx)
+	managerParams.Volumes = append(managerParams.Volumes, downwardAPIVolumes...)
+	return buildConfigManagerArgs(managerParams, allVolumeMounts, cli, ctx)
 }
 
 func getWatchedVolume(volumeDirs []corev1.VolumeMount, buildParams []ConfigSpecMeta) []corev1.VolumeMount {
@@ -114,7 +119,7 @@ func buildLazyRenderedConfig(cli client.Client, ctx context.Context, param *Conf
 		if err != nil {
 			return err
 		}
-		cm.Data[KBConfigSpecYamlFile] = string(b)
+		cm.Data[KBConfigSpecLazyRenderedYamlFile] = string(b)
 		return nil
 	}
 
@@ -128,7 +133,7 @@ func buildLazyRenderedConfig(cli client.Client, ctx context.Context, param *Conf
 	}
 	configCMKey := client.ObjectKey{
 		Namespace: manager.Cluster.GetNamespace(),
-		Name:      fmt.Sprintf("%s-%s", secondaryTemplate.TemplateRef, manager.Cluster.GetName()),
+		Name:      fmt.Sprintf("%s%s-%s", configManagerCMPrefix, secondaryTemplate.TemplateRef, manager.Cluster.GetName()),
 	}
 	if err := checkOrCreateConfigMap(referenceCMKey, configCMKey, cli, ctx, manager.Cluster, processYamlConfig); err != nil {
 		return err
@@ -153,10 +158,6 @@ func buildConfigManagerArgs(params *CfgManagerBuildParams, volumeDirs []corev1.V
 	args = append(args, "--operator-update-enable")
 	args = append(args, "--tcp", viper.GetString(constant.ConfigManagerGPRCPortEnv))
 
-	// b, err := json.Marshal(frmConfigSpecMeta(params.ConfigSpecsBuildParams))
-	// if err != nil {
-	//	return err
-	// }
 	if err := createOrUpdateConfigMap(frmConfigSpecMeta(params.ConfigSpecsBuildParams), params, cli, ctx); err != nil {
 		return err
 	}
@@ -165,15 +166,34 @@ func buildConfigManagerArgs(params *CfgManagerBuildParams, volumeDirs []corev1.V
 	return nil
 }
 
-func buildCMForConfig(params *CfgManagerBuildParams) *corev1.ConfigMap {
-	return nil
+func buildCMForConfig(manager *CfgManagerBuildParams, cmKey client.ObjectKey, config string) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cmKey.Name,
+			Namespace: cmKey.Namespace,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:    manager.Cluster.Name,
+				constant.AppManagedByLabelKey:   constant.AppName,
+				constant.KBAppComponentLabelKey: manager.ComponentName,
+			},
+		},
+		Data: map[string]string{
+			configManagerConfig: config,
+		},
+	}
 }
 
 func createOrUpdateConfigMap(configInfo []ConfigSpecInfo, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context) error {
 	createConfigCM := func(configKey client.ObjectKey, config string) error {
-		cm := buildCMForConfig(manager)
-		cm.Data[configManagerConfig] = config
-		return cli.Create(ctx, cm)
+		scheme, err := appsv1alpha1.SchemeBuilder.Build()
+		if err != nil {
+			return err
+		}
+		cmObj := buildCMForConfig(manager, configKey, config)
+		if err := controllerutil.SetOwnerReference(manager.Cluster, cmObj, scheme); err != nil {
+			return err
+		}
+		return cli.Create(ctx, cmObj)
 	}
 	updateConfigCM := func(cm *corev1.ConfigMap, newConfig string) error {
 		patch := client.MergeFrom(cm.DeepCopy())
@@ -181,24 +201,28 @@ func createOrUpdateConfigMap(configInfo []ConfigSpecInfo, manager *CfgManagerBui
 		return cli.Patch(ctx, cm, patch)
 	}
 
-	configKey := client.ObjectKey{
-		Namespace: manager.Cluster.GetNamespace(),
-		Name:      fmt.Sprintf("%s-%s-cm-config", manager.Cluster.GetName(), manager.ComponentName),
-	}
-
-	cm := &corev1.ConfigMap{}
 	config, err := cfgutil.ToYamlConfig(configInfo)
 	if err != nil {
 		return err
 	}
-	buildReloadScriptVolume(configKey.Name, manager, configManagerConfigMountPoint, configManagerConfigVolumeName)
-	if err := cli.Get(ctx, configKey, cm); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
-		return createConfigCM(configKey, string(config))
+	cmObj := &corev1.ConfigMap{}
+	cmKey := client.ObjectKey{
+		Namespace: manager.Cluster.GetNamespace(),
+		Name:      fmt.Sprintf("%s%s-%s-config-manager-config", configManagerCMPrefix, manager.Cluster.GetName(), manager.ComponentName),
 	}
-	return updateConfigCM(cm, string(config))
+	err = cli.Get(ctx, cmKey, cmObj)
+	switch {
+	default:
+		return err
+	case err == nil:
+		err = updateConfigCM(cmObj, string(config))
+	case apierrors.IsNotFound(err):
+		err = createConfigCM(cmKey, string(config))
+	}
+	if err == nil {
+		buildReloadScriptVolume(cmKey.Name, manager, configManagerConfigMountPoint, configManagerConfigVolumeName)
+	}
+	return err
 }
 
 func frmConfigSpecMeta(metas []ConfigSpecMeta) []ConfigSpecInfo {
@@ -252,7 +276,7 @@ func buildTPLScriptCM(configSpecBuildMeta *ConfigSpecMeta, manager *CfgManagerBu
 	}
 	scriptCMKey := client.ObjectKey{
 		Namespace: manager.Cluster.GetNamespace(),
-		Name:      fmt.Sprintf("%s-%s", options.ScriptConfigMapRef, manager.Cluster.GetName()),
+		Name:      fmt.Sprintf("%s%s-%s", configManagerCMPrefix, options.ScriptConfigMapRef, manager.Cluster.GetName()),
 	}
 	if err := checkOrCreateConfigMap(referenceCMKey, scriptCMKey, cli, ctx, manager.Cluster, reloadYamlFn); err != nil {
 		return err
@@ -381,7 +405,7 @@ func buildCfgManagerScripts(options appsv1alpha1.ScriptConfig, manager *CfgManag
 	}
 	scriptsCMKey := client.ObjectKey{
 		Namespace: manager.Cluster.GetNamespace(),
-		Name:      fmt.Sprintf("%s-%s", options.ScriptConfigMapRef, manager.Cluster.GetName()),
+		Name:      fmt.Sprintf("%s%s-%s", configManagerCMPrefix, options.ScriptConfigMapRef, manager.Cluster.GetName()),
 	}
 	if err := checkOrCreateConfigMap(referenceCMKey, scriptsCMKey, cli, ctx, manager.Cluster, nil); err != nil {
 		return err

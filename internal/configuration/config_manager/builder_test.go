@@ -195,13 +195,14 @@ formatterConfig:
 	Context("TestBuildConfigManagerContainer", func() {
 		It("builds unixSignal reloader correctly", func() {
 			param := newCMBuildParams(false)
+			mockTplScriptCM()
 			reloadOptions := newReloadOptions(appsv1alpha1.UnixSignalType, nil)
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
 				buildParam.ReloadOptions = reloadOptions
 				buildParam.ReloadType = appsv1alpha1.UnixSignalType
 			}
-			Expect(BuildConfigManagerContainerParams(nil, nil, param, newVolumeMounts2())).Should(Succeed())
+			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), ctx, param, newVolumeMounts2())).Should(Succeed())
 			for _, arg := range []string{`--volume-dir`, `/postgresql/conf`, `--volume-dir`, `/postgresql/conf2`} {
 				Expect(param.Args).Should(ContainElement(arg))
 			}
@@ -215,8 +216,8 @@ formatterConfig:
 						Namespace: scriptsNS,
 					},
 				},
-			}), testutil.WithTimes(2)))
-			mockK8sCli.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithTimes(1)))
+			}), testutil.WithTimes(3)))
+			mockK8sCli.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithTimes(2)))
 
 			param := newCMBuildParams(true)
 			reloadOptions := newReloadOptions(appsv1alpha1.ShellType, nil)

@@ -100,7 +100,7 @@ func main() {
 	}
 
 	configRenderMeta := cfgcm.ConfigLazyRenderedMeta{}
-	if err := cfgutil.FromYamlConfig(filepath.Join(lazyRenderedConfig, cfgcm.KBConfigSpecYamlFile), &configRenderMeta); err != nil {
+	if err := cfgutil.FromYamlConfig(filepath.Join(lazyRenderedConfig, cfgcm.KBConfigSpecLazyRenderedYamlFile), &configRenderMeta); err != nil {
 		failed(err, "failed to parse config spec")
 	}
 

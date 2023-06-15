@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -93,6 +94,7 @@ func withMockStatefulSet(replicas int, labels map[string]string) ParamsOps {
 func withClusterComponent(replicas int) ParamsOps {
 	return func(params *reconfigureParams) {
 		params.ClusterComponent = &appsv1alpha1.ClusterComponentSpec{
+			Name:     "test",
 			Replicas: func() int32 { rep := int32(replicas); return rep }(),
 		}
 	}
@@ -174,9 +176,14 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...Pa
 		Restart: true,
 		Client:  cli,
 		Ctx: intctrlutil.RequestCtx{
-			Ctx: ctx,
-			Log: log.FromContext(ctx).WithValues("policy_test", testName),
+			Ctx:      ctx,
+			Log:      log.FromContext(ctx).WithValues("policy_test", testName),
+			Recorder: record.NewFakeRecorder(100),
 		},
+		Cluster: &appsv1alpha1.Cluster{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test",
+			}},
 	}
 	for _, customFn := range paramOps {
 		customFn(&params)

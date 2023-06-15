@@ -1,0 +1,30 @@
+{{- $cc := .Files.Get "config/redis7-config-effect-scope.yaml" | fromYaml }}
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: redis7-demo-sentinel-config-constraints
+  labels:
+    {{- include "redis.labels" . | nindent 4 }}
+spec:
+
+  ## require db instance restart
+  # redis configuration file format
+  formatterConfig:
+    format: dotenv
+
+  #  shared_volume:
+  #    name: redis-config
+  #    mountPath: /etc/redis
+
+  ## for tools
+  reloadOptions:
+    shellTrigger:
+      command:
+        - "redis-replicas-update.sh"
+
+  scriptConfigs:
+    - scriptConfigMapRef: redis-demo-reload-script
+      namespace: {{ .Release.Namespace }}
+
+  staticParameters:
+    - None

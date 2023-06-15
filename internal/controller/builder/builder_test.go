@@ -464,18 +464,46 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds config manager sidecar container correctly", func() {
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:   "cfgmgr",
-				CharacterType: "mysql",
 				SecreteName:   "test-secret",
+				ComponentName: synthesizedComponent.Name,
+				CharacterType: synthesizedComponent.CharacterType,
+				EnvConfigName: cfg.Name,
 				Image:         constant.KBToolsImage,
 				Args:          []string{},
 				Envs:          []corev1.EnvVar{},
 				Volumes:       []corev1.VolumeMount{},
+				Cluster:       cluster,
 			}
-			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
+			Expect(err).Should(BeNil())
+			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
+			Expect(configmap.SecurityContext).Should(BeNil())
+		})
+
+		It("builds config manager sidecar container correctly", func() {
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
+				ManagerName:           "cfgmgr",
+				CharacterType:         "mysql",
+				SecreteName:           "test-secret",
+				Image:                 constant.KBToolsImage,
+				ShareProcessNamespace: true,
+				Args:                  []string{},
+				Envs:                  []corev1.EnvVar{},
+				Volumes:               []corev1.VolumeMount{},
+				Cluster:               cluster,
+			}
+			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, synthesizedComponent)
+			Expect(err).Should(BeNil())
+			Expect(configmap).ShouldNot(BeNil())
+			Expect(configmap.SecurityContext).ShouldNot(BeNil())
+			Expect(configmap.SecurityContext.RunAsUser).ShouldNot(BeNil())
+			Expect(*configmap.SecurityContext.RunAsUser).Should(BeEquivalentTo(int64(0)))
 		})
 
 		It("should build restore job correctly", func() {

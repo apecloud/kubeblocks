@@ -106,3 +106,83 @@ func TestTypeMatch(t *testing.T) {
 		})
 	}
 }
+
+func TestCompareWithConfig(t *testing.T) {
+	type args struct {
+		left   interface{}
+		right  interface{}
+		option CfgOption
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    bool
+		wantErr bool
+	}{{
+		name: "raw_type_test",
+		args: args{
+			left:   []byte("byte"),
+			right:  "string",
+			option: CfgOption{Type: CfgRawType},
+		},
+		wantErr: true,
+	}, {
+		name: "raw_type_test",
+		args: args{
+			left:   []byte("byte"),
+			right:  []byte("test"),
+			option: CfgOption{Type: CfgRawType},
+		},
+		want: false,
+	}, {
+		name: "raw_type_test",
+		args: args{
+			left:   []byte("byte"),
+			right:  []byte("byte"),
+			option: CfgOption{Type: CfgRawType},
+		},
+		want: true,
+	}, {
+		name: "localfile_type_test",
+		args: args{
+			left:   []byte("byte"),
+			right:  "string",
+			option: CfgOption{Type: CfgLocalType},
+		},
+		wantErr: true,
+	}, {
+		name: "localfile_type_test",
+		args: args{
+			left:   "byte",
+			right:  "string",
+			option: CfgOption{Type: CfgLocalType},
+		},
+		want: false,
+	}, {
+		name: "tpl_type_test",
+		args: args{
+			left:   &ConfigResource{},
+			right:  "string",
+			option: CfgOption{Type: CfgCmType},
+		},
+		wantErr: true,
+	}, {
+		name: "tpl_type_test",
+		args: args{
+			option: CfgOption{Type: "not_support"},
+		},
+		wantErr: true,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := compareWithConfig(tt.args.left, tt.args.right, tt.args.option)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("compareWithConfig() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("compareWithConfig() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

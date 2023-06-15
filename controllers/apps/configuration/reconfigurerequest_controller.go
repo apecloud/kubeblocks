@@ -168,6 +168,10 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 	// No parameters updated
 	if !configPatch.IsModify {
+		reqCtx.Recorder.Eventf(config,
+			corev1.EventTypeNormal,
+			appsv1alpha1.ReasonReconfigureRunning,
+			"nothing changed, skip reconfigure")
 		return r.updateConfigCMStatus(reqCtx, config, cfgcore.ReconfigureNoChangeType)
 	}
 
@@ -206,6 +210,10 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	if len(component.ConfigSpecs) == 0 {
+		reqCtx.Recorder.Eventf(config,
+			corev1.EventTypeWarning,
+			appsv1alpha1.ReasonReconfigureFailed,
+			"related component does not have any configSpecs, skip reconfigure")
 		return intctrlutil.Reconciled()
 	}
 
@@ -222,7 +230,10 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	// configmap has never been used
 	sts, containersList := getAssociatedComponentsByConfigmap(&stsLists, configKey, configSpecName)
 	if len(sts) == 0 {
-		reqCtx.Log.Info("configmap is not used by any container.")
+		reqCtx.Recorder.Eventf(config,
+			corev1.EventTypeWarning,
+			appsv1alpha1.ReasonReconfigureFailed,
+			"the configmap is not used by any container, skip reconfigure")
 		return intctrlutil.Reconciled()
 	}
 
@@ -279,6 +290,11 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) 
 	case ESRetry, ESAndRetryFailed:
 		return intctrlutil.RequeueAfter(ConfigReconcileInterval, params.Ctx.Log, "")
 	case ESNone:
+		params.Ctx.Recorder.Eventf(params.ConfigMap,
+			corev1.EventTypeNormal,
+			appsv1alpha1.ReasonReconfigureSucceed,
+			"the reconfigure[%s] request[%s] has been processed successfully",
+			policy.GetPolicyName(), getOpsRequestID(params.ConfigMap))
 		return r.updateConfigCMStatus(params.Ctx, params.ConfigMap, policy.GetPolicyName())
 	case ESFailed:
 		if err := setCfgUpgradeFlag(params.Client, params.Ctx, params.ConfigMap, false); err != nil {
@@ -288,6 +304,13 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) 
 	default:
 		return intctrlutil.Reconciled()
 	}
+}
+
+func getOpsRequestID(cm *corev1.ConfigMap) string {
+	if len(cm.Annotations) != 0 {
+		return cm.Annotations[constant.LastAppliedOpsCRAnnotationKey]
+	}
+	return ""
 }
 
 func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParams, status cfgcore.PolicyExecStatus, err error) error {

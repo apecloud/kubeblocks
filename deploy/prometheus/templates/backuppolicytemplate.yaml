@@ -1,9 +1,9 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: BackupPolicyTemplate
 metadata:
-  name: prometheus-backup-policy-template
+  name: {{ template "prometheus.name" . }}-backup-policy
   labels:
-    clusterdefinition.kubeblocks.io/name: prometheus
+    clusterdefinition.kubeblocks.io/name: {{ template "prometheus.name" . }}
     {{- include "prometheus.labels" . | nindent 4 }}
   annotations:
     dataprotection.kubeblocks.io/is-default-policy-template: "true"

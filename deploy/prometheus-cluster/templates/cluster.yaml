@@ -9,24 +9,31 @@ spec:
   terminationPolicy: {{ $.Values.terminationPolicy }}
   {{- if .Values.tolerations }}
   tolerations:
-    {{- toYaml .Values.tolerations | indent 4 }}
+    {{- toYaml .Values.tolerations | nindent 4 }}
   {{- end }}
   affinity:
     {{- with .Values.topologyKeys }}
-    topologyKeys: {{ . | toYaml | nindent 6 }}
+    topologyKeys:
+      {{- . | toYaml | nindent 6 }}
     {{- end }}
   componentSpecs:
     - name: server # user-defined
       componentDefRef: server # ref clusterdefinition components.name
       replicas: {{ .Values.server.replicaCount | default 1 }}
-      serviceAccountName: prometheus-server
+      serviceAccountName: {{ template "prometheus-cluster.server.fullname" . }}
       resources:
-{{ toYaml .Values.server.resources | indent 8 }}
+        {{- toYaml .Values.server.resources | nindent 8 }}
       {{- if .Values.server.persistence.enabled }}
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
           spec:
+            {{- if .Values.server.persistence.storageClassName }}
+            {{- if (eq "-" .Values.server.persistence.storageClassName) }}
+            storageClassName: ""
+            {{- else }}
             storageClassName: {{ .Values.server.persistence.storageClassName }}
+            {{- end }}
+            {{- end }}
             accessModes:
               - ReadWriteOnce
             resources:
@@ -38,12 +45,18 @@ spec:
       componentDefRef: alertmanager # ref clusterdefinition components.name
       replicas: {{ .Values.alertmanager.replicaCount | default 1 }}
       resources:
-{{ toYaml .Values.server.resources | indent 8 }}
+        {{- toYaml .Values.alertmanager.resources | nindent 8 }}
       {{- if .Values.alertmanager.persistence.enabled }}
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
           spec:
+            {{- if .Values.alertmanager.persistence.storageClassName }}
+            {{- if (eq "-" .Values.alertmanager.persistence.storageClassName) }}
+            storageClassName: ""
+            {{- else }}
             storageClassName: {{ .Values.alertmanager.persistence.storageClassName }}
+            {{- end }}
+            {{- end }}
             accessModes:
               - ReadWriteOnce
             resources:

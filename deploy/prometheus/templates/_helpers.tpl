@@ -50,17 +50,6 @@ app.kubernetes.io/name: {{ include "prometheus.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
-{{/*
-Create the name of the service account to use
-*/}}
-{{- define "prometheus.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "prometheus.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
-{{- end }}
-
 {{- define "prometheus.alertmanager.fullname" -}}
 {{- if .Values.alertmanager.fullnameOverride -}}
 {{- .Values.alertmanager.fullnameOverride | trunc 63 | trimSuffix "-" -}}
@@ -96,8 +85,8 @@ Define the prometheus.namespace template if set with forceNamespace or .Release.
 */}}
 {{- define "prometheus.namespace" -}}
 {{- if .Values.forceNamespace -}}
-{{ printf "namespace: %s" .Values.forceNamespace }}
+{{ printf "%s" .Values.forceNamespace }}
 {{- else -}}
-{{ printf "namespace: %s" .Release.Namespace }}
+{{ printf "%s" .Release.Namespace }}
 {{- end -}}
 {{- end -}}

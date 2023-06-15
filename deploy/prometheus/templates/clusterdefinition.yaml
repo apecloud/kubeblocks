@@ -1,9 +1,9 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: ClusterDefinition
 metadata:
-  name: prometheus
+  name: {{ template "prometheus.name" . }}
   labels:
-{{- include "prometheus.labels" . | nindent 4 }}
+    {{- include "prometheus.labels" . | nindent 4 }}
 spec:
   type: prometheus
   componentDefs:
@@ -19,16 +19,10 @@ spec:
       volumeTypes:
         - name: data
           type: data
-      configSpecs:
-        - name: server-config
-          templateRef: {{ template "prometheus.server.fullname" . }}
-          namespace: {{ .Release.Namespace }}
-          volumeName: config-volume
-          defaultMode: 0777
       podSpec:
         {{- if .Values.server.securityContext }}
         securityContext:
-{{ toYaml .Values.server.securityContext | indent 10 }}
+{{- toYaml .Values.server.securityContext | nindent 10 }}
         {{- end }}
         enableServiceLinks: true
         containers:
@@ -95,7 +89,7 @@ spec:
         volumes:
           - name: config-volume
             configMap:
-              name: {{ template "prometheus.server.fullname" . }}
+              name: {{ template "prometheus.server.fullname" . }}-config
           - name: rule-volume
             configMap:
               name: {{ template "prometheus.server.fullname" . }}-rule
@@ -115,7 +109,7 @@ spec:
       podSpec:
         {{- if .Values.alertmanager.securityContext }}
         securityContext:
-{{ toYaml .Values.alertmanager.securityContext | indent 10 }}
+{{- toYaml .Values.alertmanager.securityContext | nindent 10 }}
         {{- end }}
         containers:
           - name: configmap-reload
@@ -161,4 +155,8 @@ spec:
         volumes:
           - name: config-volume
             configMap:
-              name: {{ if .Values.alertmanager.configMapOverrideName }}{{ .Values.alertmanager.configMapOverrideName }}{{- else }}{{ template "prometheus.alertmanager.fullname" . }}{{- end }}
+              {{- if .Values.alertmanager.configMapOverrideName }}
+              name: {{ .Release.Name }}-{{ .Values.alertmanager.configMapOverrideName }}
+              {{- else }}
+              name: {{ template "prometheus.alertmanager.fullname" . }}-config
+              {{- end }}

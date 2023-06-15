@@ -50,7 +50,7 @@ app.kubernetes.io/name: {{ include "prometheus-cluster.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
-{{- define "prometheus.alertmanager.fullname" -}}
+{{- define "prometheus-cluster.alertmanager.fullname" -}}
 {{- if .Values.alertmanager.fullnameOverride -}}
 {{- .Values.alertmanager.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
@@ -67,7 +67,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Create a fully qualified Prometheus server name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 */}}
-{{- define "prometheus.server.fullname" -}}
+{{- define "prometheus-cluster.server.fullname" -}}
 {{- if .Values.server.fullnameOverride -}}
 {{- .Values.server.fullnameOverride | trunc 63 | trimSuffix "-" -}}
 {{- else -}}
@@ -83,10 +83,10 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
 {{/*
 Define the prometheus.namespace template if set with forceNamespace or .Release.Namespace is set
 */}}
-{{- define "prometheus.namespace" -}}
+{{- define "prometheus-cluster.namespace" -}}
 {{- if .Values.forceNamespace -}}
-{{ printf "namespace: %s" .Values.forceNamespace }}
+{{ printf "%s" .Values.forceNamespace }}
 {{- else -}}
-{{ printf "namespace: %s" .Release.Namespace }}
+{{ printf "%s" .Release.Namespace }}
 {{- end -}}
 {{- end -}}

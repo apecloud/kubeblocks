@@ -1,6 +1,6 @@
 clusterVersionOverride: ""
 nameOverride: ""
-
+fullnameOverride: ""
 
 terminationPolicy: Delete
 
@@ -36,7 +36,6 @@ server:
     ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
     ##   GKE, AWS & OpenStack)
     ##
-    # storageClass: "-"
     storageClassName:
 
     size: 20Gi
@@ -57,14 +56,12 @@ alertmanager:
   persistence:
     enabled: true
 
+    ## If defined, storageClassName: <storageClass>
+    ## If set to "-", storageClassName: "", which disables dynamic provisioning
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
     storageClassName:
 
     size: 1Gi
-
-
-
-
-
-
-
-

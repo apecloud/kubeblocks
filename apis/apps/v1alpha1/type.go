@@ -70,7 +70,7 @@ type ComponentTemplateSpec struct {
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }
 
-type SecondaryRenderedTemplateSpec struct {
+type LazyRenderedTemplateSpec struct {
 	// Specify the name of the referenced the configuration template ConfigMap object.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
@@ -99,9 +99,9 @@ type ComponentConfigSpec struct {
 	// +optional
 	Keys []string `json:"keys,omitempty"`
 
-	// secondaryRenderedConfigSpec is optional: specify the secondary rendered config spec.
+	// lazyRenderedConfigSpec is optional: specify the secondary rendered config spec.
 	// +optional
-	SecondaryRenderedConfigSpec *SecondaryRenderedTemplateSpec `json:"secondaryRenderedConfigSpec,omitempty"`
+	LazyRenderedConfigSpec *LazyRenderedTemplateSpec `json:"lazyRenderedConfigSpec,omitempty"`
 
 	// Specify the name of the referenced the configuration constraints object.
 	// +kubebuilder:validation:MaxLength=63

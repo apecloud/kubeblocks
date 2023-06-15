@@ -71,7 +71,7 @@ spec:
           constraintRef: redis7-demo-config-constraints
           namespace: {{ .Release.Namespace }}
           volumeName: redis-config
-          secondaryRenderedConfigSpec:
+          lazyRenderedConfigSpec:
             templateRef: redis7-demo-config-template-second
             namespace: {{ .Release.Namespace }}
             policy: none

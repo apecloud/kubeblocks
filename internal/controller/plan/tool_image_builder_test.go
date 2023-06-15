@@ -173,10 +173,10 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 						},
 					},
 				}},
-				ConfigSecondaryVolumes: make(map[string]corev1.VolumeMount),
+				ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
 			}
 			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.VolumeName = "data"
-			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.SecondaryRenderedConfigSpec = &appsv1alpha1.SecondaryRenderedTemplateSpec{
+			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.LazyRenderedConfigSpec = &appsv1alpha1.LazyRenderedTemplateSpec{
 				Namespace:   testCtx.DefaultNamespace,
 				TemplateRef: "secondary_template",
 				Policy:      appsv1alpha1.NoneMergePolicy,

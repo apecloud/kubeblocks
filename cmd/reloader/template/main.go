@@ -26,14 +26,14 @@ const (
 )
 
 var configSpecMountPoint string
-var secondaryRenderConfig string
+var lazyRenderedConfig string
 
 // for rendered output
 var outputDir string
 var setParams []string
 
 func installFlags() {
-	pflag.StringVar(&secondaryRenderConfig, "config", "", "specify the config spec to be rendered")
+	pflag.StringVar(&lazyRenderedConfig, "config", "", "specify the config spec to be rendered")
 	pflag.StringVar(&configSpecMountPoint, "config-volume", "", "config volume mount point")
 	pflag.StringVar(&outputDir, "output-dir", "", "secondary rendered output dir")
 	pflag.StringSliceVar(&setParams, "set", nil, "set parameter")
@@ -82,7 +82,7 @@ func main() {
 		failed(cfgcore.MakeError("config volume mount point is empty"), "")
 	}
 
-	if secondaryRenderConfig == "" {
+	if lazyRenderedConfig == "" {
 		failed(cfgcore.MakeError("config spec yaml is empty"), "")
 	}
 
@@ -99,12 +99,12 @@ func main() {
 		failed(err, "failed to create data map")
 	}
 
-	configRenderMeta := cfgcm.ConfigSecondaryRenderMeta{}
-	if err := cfgutil.FromYamlConfig(filepath.Join(secondaryRenderConfig, cfgcm.KBConfigSpecYamlFile), &configRenderMeta); err != nil {
+	configRenderMeta := cfgcm.ConfigLazyRenderedMeta{}
+	if err := cfgutil.FromYamlConfig(filepath.Join(lazyRenderedConfig, cfgcm.KBConfigSpecYamlFile), &configRenderMeta); err != nil {
 		failed(err, "failed to parse config spec")
 	}
 
-	mergePolicy, err := plan.NewTemplateMerger(*configRenderMeta.SecondaryRenderedConfigSpec,
+	mergePolicy, err := plan.NewTemplateMerger(*configRenderMeta.LazyRenderedConfigSpec,
 		context.TODO(), nil, nil, *configRenderMeta.ComponentConfigSpec, &appsv1alpha1.ConfigConstraintSpec{
 			FormatterConfig: &configRenderMeta.FormatterConfig,
 		})
@@ -155,7 +155,7 @@ func secondaryRender(engine *gotemplate.TplEngine, templates []string) (map[stri
 			continue
 		}
 		if !filepath.IsAbs(tpl) {
-			tpl = filepath.Join(secondaryRenderConfig, tpl)
+			tpl = filepath.Join(lazyRenderedConfig, tpl)
 		}
 
 		b, err := os.ReadFile(tpl)

@@ -43,7 +43,7 @@ var _ = Describe("Config Builder Test", func() {
 		scriptsName = "script_cm"
 		scriptsNS   = "default"
 
-		secondaryRenderedTemplateName = "secondary-rendered-template"
+		lazyRenderedTemplateName = "lazy-rendered-template"
 	)
 
 	var mockK8sCli *testutil.K8sClientMockHelper
@@ -130,10 +130,10 @@ var _ = Describe("Config Builder Test", func() {
 					Namespace: "default",
 				},
 			},
-			Volumes:                newVolumeMounts(),
-			ConfigSpecsBuildParams: newConfigSpecMeta(),
-			ConfigSecondaryVolumes: make(map[string]corev1.VolumeMount),
-			DownwardAPIVolumes:     make([]corev1.VolumeMount, 0),
+			Volumes:                   newVolumeMounts(),
+			ConfigSpecsBuildParams:    newConfigSpecMeta(),
+			ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
+			DownwardAPIVolumes:        make([]corev1.VolumeMount, 0),
 		}
 		if hasScripts {
 			param.ConfigSpecsBuildParams[0].ScriptConfig = []appsv1alpha1.ScriptConfig{
@@ -163,7 +163,7 @@ formatterConfig:
 				}},
 			&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      secondaryRenderedTemplateName,
+					Name:      lazyRenderedTemplateName,
 					Namespace: scriptsNS,
 				},
 				Data: map[string]string{
@@ -268,9 +268,9 @@ formatterConfig:
 				buildParam := &param.ConfigSpecsBuildParams[i]
 				buildParam.ReloadOptions = reloadOptions
 				buildParam.ReloadType = appsv1alpha1.TPLScriptType
-				buildParam.ConfigSpec.SecondaryRenderedConfigSpec = &appsv1alpha1.SecondaryRenderedTemplateSpec{
+				buildParam.ConfigSpec.LazyRenderedConfigSpec = &appsv1alpha1.LazyRenderedTemplateSpec{
 					Namespace:   scriptsNS,
-					TemplateRef: secondaryRenderedTemplateName,
+					TemplateRef: lazyRenderedTemplateName,
 				}
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())

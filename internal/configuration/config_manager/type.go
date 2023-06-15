@@ -60,7 +60,7 @@ type TPLScriptConfig struct {
 	FormatterConfig appsv1alpha1.FormatterConfig `json:"formatterConfig"`
 }
 
-type ConfigSecondaryRenderMeta struct {
+type ConfigLazyRenderedMeta struct {
 	*appsv1alpha1.ComponentConfigSpec `json:",inline"`
 
 	// secondary template path

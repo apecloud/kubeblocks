@@ -199,7 +199,7 @@ func updateCfgManagerVolumes(podSpec *corev1.PodSpec, configManager *cfgcm.CfgMa
 	}
 	podSpec.Volumes = podVolumes
 
-	for volumeName, volume := range configManager.ConfigSecondaryVolumes {
+	for volumeName, volume := range configManager.ConfigLazyRenderedVolumes {
 		usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, volumeName)
 		for _, container := range usingContainers {
 			container.VolumeMounts = append(container.VolumeMounts, volume)
@@ -247,15 +247,15 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1a
 
 func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*cfgcm.CfgManagerBuildParams, error) {
 	cfgManagerParams := &cfgcm.CfgManagerBuildParams{
-		ManagerName:            constant.ConfigSidecarName,
-		CharacterType:          comp.CharacterType,
-		SecreteName:            component.GenerateConnCredential(cluster.Name),
-		EnvConfigName:          component.GenerateComponentEnvName(cluster.Name, comp.Name),
-		Image:                  viper.GetString(constant.KBToolsImage),
-		Volumes:                volumeDirs,
-		Cluster:                cluster,
-		ConfigSpecsBuildParams: configSpecBuildParams,
-		ConfigSecondaryVolumes: make(map[string]corev1.VolumeMount),
+		ManagerName:               constant.ConfigSidecarName,
+		CharacterType:             comp.CharacterType,
+		SecreteName:               component.GenerateConnCredential(cluster.Name),
+		EnvConfigName:             component.GenerateComponentEnvName(cluster.Name, comp.Name),
+		Image:                     viper.GetString(constant.KBToolsImage),
+		Volumes:                   volumeDirs,
+		Cluster:                   cluster,
+		ConfigSpecsBuildParams:    configSpecBuildParams,
+		ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
 	}
 
 	if err := cfgcm.BuildConfigManagerContainerParams(cli, ctx, cfgManagerParams, volumeDirs); err != nil {

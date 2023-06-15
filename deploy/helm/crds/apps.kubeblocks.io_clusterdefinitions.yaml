@@ -95,21 +95,9 @@ spec:
                               type: string
                             type: array
                             x-kubernetes-list-type: set
-                          name:
-                            description: Specify the name of configuration template.
-                            maxLength: 63
-                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                            type: string
-                          namespace:
-                            default: default
-                            description: Specify the namespace of the referenced the
-                              configuration template ConfigMap object. An empty namespace
-                              is equivalent to the "default" namespace.
-                            maxLength: 63
-                            type: string
-                          secondaryRenderedConfigSpec:
-                            description: 'secondaryRenderedConfigSpec is optional:
-                              specify the secondary rendered config spec.'
+                          lazyRenderedConfigSpec:
+                            description: 'lazyRenderedConfigSpec is optional: specify
+                              the secondary rendered config spec.'
                             properties:
                               namespace:
                                 default: default
@@ -136,6 +124,18 @@ spec:
                             required:
                             - templateRef
                             type: object
+                          name:
+                            description: Specify the name of configuration template.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          namespace:
+                            default: default
+                            description: Specify the namespace of the referenced the
+                              configuration template ConfigMap object. An empty namespace
+                              is equivalent to the "default" namespace.
+                            maxLength: 63
+                            type: string
                           templateRef:
                             description: Specify the name of the referenced the configuration
                               template ConfigMap object.

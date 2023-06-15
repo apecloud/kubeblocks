@@ -65,7 +65,7 @@ func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, c
 		if err := buildConfigSpecHandleMeta(cli, ctx, buildParam, cmBuildParams); err != nil {
 			return err
 		}
-		if err := buildConfigSpecSecondaryRenderConfig(cli, ctx, buildParam, cmBuildParams); err != nil {
+		if err := buildLazyRenderedConfig(cli, ctx, buildParam, cmBuildParams); err != nil {
 			return err
 		}
 	}
@@ -99,10 +99,10 @@ func getWatchedVolume(volumeDirs []corev1.VolumeMount, buildParams []ConfigSpecM
 	return allVolumeMounts
 }
 
-// buildConfigSpecSecondaryRenderConfig prepare secondary render config and volume
-func buildConfigSpecSecondaryRenderConfig(cli client.Client, ctx context.Context, param *ConfigSpecMeta, manager *CfgManagerBuildParams) error {
+// buildLazyRenderedConfig prepare secondary render config and volume
+func buildLazyRenderedConfig(cli client.Client, ctx context.Context, param *ConfigSpecMeta, manager *CfgManagerBuildParams) error {
 	processYamlConfig := func(cm *corev1.ConfigMap) error {
-		renderMeta := ConfigSecondaryRenderMeta{
+		renderMeta := ConfigLazyRenderedMeta{
 			ComponentConfigSpec: &param.ConfigSpec,
 			Templates:           cfgutil.ToSet(cm.Data).AsSlice(),
 			FormatterConfig:     param.FormatterConfig,
@@ -115,7 +115,7 @@ func buildConfigSpecSecondaryRenderConfig(cli client.Client, ctx context.Context
 		return nil
 	}
 
-	secondaryTemplate := param.ConfigSpec.SecondaryRenderedConfigSpec
+	secondaryTemplate := param.ConfigSpec.LazyRenderedConfigSpec
 	if secondaryTemplate == nil {
 		return nil
 	}
@@ -130,7 +130,7 @@ func buildConfigSpecSecondaryRenderConfig(cli client.Client, ctx context.Context
 	if err := checkOrCreateConfigMap(referenceCMKey, configCMKey, cli, ctx, manager.Cluster, processYamlConfig); err != nil {
 		return err
 	}
-	buildConfigSecondaryRenderVolume(configCMKey.Name, manager, GetConfigMountPoint(param.ConfigSpec), GetConfigVolumeName(param.ConfigSpec), param.ConfigSpec)
+	buildLazyRenderedConfigVolume(configCMKey.Name, manager, GetConfigMountPoint(param.ConfigSpec), GetConfigVolumeName(param.ConfigSpec), param.ConfigSpec)
 	return nil
 }
 
@@ -253,7 +253,7 @@ func buildReloadScriptVolume(scriptCMName string, manager *CfgManagerBuildParams
 	})
 }
 
-func buildConfigSecondaryRenderVolume(cmName string, manager *CfgManagerBuildParams, mountPoint, volumeName string, configSpec appsv1alpha1.ComponentConfigSpec) {
+func buildLazyRenderedConfigVolume(cmName string, manager *CfgManagerBuildParams, mountPoint, volumeName string, configSpec appsv1alpha1.ComponentConfigSpec) {
 	n := len(manager.Volumes)
 	manager.Volumes = append(manager.Volumes, corev1.VolumeMount{
 		Name:      volumeName,
@@ -267,7 +267,7 @@ func buildConfigSecondaryRenderVolume(cmName string, manager *CfgManagerBuildPar
 			},
 		},
 	})
-	manager.ConfigSecondaryVolumes[configSpec.VolumeName] = manager.Volumes[n]
+	manager.ConfigLazyRenderedVolumes[configSpec.VolumeName] = manager.Volumes[n]
 }
 
 func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.ObjectKey, cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, fn func(cm *corev1.ConfigMap) error) error {

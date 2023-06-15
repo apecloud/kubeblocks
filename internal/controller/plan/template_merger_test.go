@@ -124,7 +124,7 @@ max_connections=666
 
 	Context("with patch Merge", func() {
 		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1alpha1.SecondaryRenderedTemplateSpec{
+			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
 				Namespace: "default",
 				// Name:        configSpec.Name,
 				TemplateRef: updatedCMObject.GetName(),
@@ -151,7 +151,7 @@ max_connections=666
 
 	Context("with replace Merge", func() {
 		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1alpha1.SecondaryRenderedTemplateSpec{
+			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
 				Policy:      appsv1alpha1.ReplacePolicy,
@@ -175,7 +175,7 @@ max_connections=666
 
 	Context("with only add Merge", func() {
 		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1alpha1.SecondaryRenderedTemplateSpec{
+			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
 				Policy:      appsv1alpha1.OnlyAddPolicy,
@@ -189,7 +189,7 @@ max_connections=666
 
 	Context("with none Merge", func() {
 		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1alpha1.SecondaryRenderedTemplateSpec{
+			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
 				Policy:      appsv1alpha1.NoneMergePolicy,
@@ -204,7 +204,7 @@ max_connections=666
 
 	Context("failed test", func() {
 		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1alpha1.SecondaryRenderedTemplateSpec{
+			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
 				Policy:      "",
@@ -216,7 +216,7 @@ max_connections=666
 		})
 
 		It("not configconstraint", func() {
-			importedTemplate := &appsv1alpha1.SecondaryRenderedTemplateSpec{
+			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
 				Policy:      "none",
@@ -230,7 +230,7 @@ max_connections=666
 		})
 
 		It("not formatter", func() {
-			importedTemplate := &appsv1alpha1.SecondaryRenderedTemplateSpec{
+			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
 				Policy:      "none",

@@ -18,11 +18,6 @@ topologyKeys:
 server:
   replicaCount: 1
 
-  primaryIndex: 0
-
-  switchPolicy:
-    type: Noop
-
   resources: { }
     # limits:
     #   cpu: 500m
@@ -49,11 +44,6 @@ server:
 
 alertmanager:
   replicaCount: 1
-
-  primaryIndex: 0
-
-  switchPolicy:
-    type: Noop
 
   ## TODO: 未配置
   resources: { }

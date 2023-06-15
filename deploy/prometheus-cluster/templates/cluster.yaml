@@ -20,9 +20,6 @@ spec:
       componentDefRef: server # ref clusterdefinition components.name
       replicas: {{ .Values.server.replicaCount | default 1 }}
       serviceAccountName: "prometheus-server"
-      primaryIndex: {{ .Values.server.primaryIndex | default 0 }}
-      switchPolicy:
-        type: {{ .Values.server.switchPolicy.type}}
       {{- with  .Values.server.resources }}
       resources:
         limits:
@@ -47,9 +44,6 @@ spec:
     - name: alertmanager # user-defined
       componentDefRef: alertmanager # ref clusterdefinition components.name
       replicas: {{ .Values.alertmanager.replicaCount | default 1 }}
-      primaryIndex: {{ .Values.alertmanager.primaryIndex | default 0 }}
-      switchPolicy:
-        type: {{ .Values.alertmanager.switchPolicy.type}}
       {{- if .Values.alertmanager.persistence.enabled }}
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name

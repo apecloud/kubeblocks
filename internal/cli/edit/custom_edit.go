@@ -132,7 +132,7 @@ func (o *CustomEditOptions) Run(originalObj runtime.Object) error {
 	}
 
 	if o.Method == "patched" {
-		diff, err := util.GetUnifiedDiffString(string(original), string(edited))
+		diff, err := util.GetUnifiedDiffString(string(original), string(edited), "Original", "Current")
 		if err != nil {
 			return fmt.Errorf("failed to get diff: %v", err)
 		}

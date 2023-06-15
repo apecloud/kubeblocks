@@ -2,9 +2,36 @@ package helm
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"golang.org/x/exp/maps"
 	"gopkg.in/yaml.v2"
+	"io"
 	"log"
+	"reflect"
+	"sort"
 	"strings"
+)
+
+var (
+	kindBlackList = []string{
+		"ConfigMapList",
+	}
+
+	nameBlackList = []string{
+		"grafana",
+		"prometheus",
+	}
+
+	fieldBlackList = []string{
+		"description",
+		"image",
+		"chartLocationURL",
+	}
+
+	labelBlackList = []string{
+		"helm.sh/chart",
+		"app.kubernetes.io/version",
+	}
 )
 
 // MappingResult to store result of diff
@@ -16,10 +43,10 @@ type MappingResult struct {
 
 type metadata struct {
 	APIVersion string `yaml:"apiVersion"`
-	Kind       string
+	Kind       string `yaml:"kind"`
 	Metadata   struct {
-		Name        string
-		Annotations map[string]string
+		Name   string            `yaml:"name"`
+		Labels map[string]string `yaml:"labels"`
 	}
 }
 
@@ -30,11 +57,6 @@ func (m metadata) String() string {
 		apiBase = strings.Join(sp[:len(sp)-1], "/")
 	}
 	name := m.Metadata.Name
-	if a := m.Metadata.Annotations; a != nil {
-		if baseName, ok := a["helm-diff/base-name"]; ok {
-			name = baseName
-		}
-	}
 	return fmt.Sprintf("%s, %s (%s)", name, m.Kind, apiBase)
 }
 
@@ -46,10 +68,30 @@ func ParseContent(content string) (*MappingResult, error) {
 	if parsedMetadata.APIVersion == "" && parsedMetadata.Kind == "" {
 		return nil, nil
 	}
+	// filter Kind
+	for i := range kindBlackList {
+		if kindBlackList[i] == parsedMetadata.Kind {
+			return nil, nil
+		}
+	}
+	// filter name
+	for i := range nameBlackList {
+		if strings.Contains(parsedMetadata.Metadata.Name, nameBlackList[i]) {
+			return nil, nil
+		}
+	}
 
 	var object map[interface{}]interface{}
 	if err := yaml.Unmarshal([]byte(content), &object); err != nil {
 		log.Fatalf("YAML unmarshal error: %s\nCan't unmarshal %s", err, content)
+	}
+	//filter label
+	for i := range labelBlackList {
+		deleteLabel(&object, labelBlackList[i])
+	}
+	// filter field
+	for i := range fieldBlackList {
+		deleteObjField(&object, fieldBlackList[i])
 	}
 	normalizedContent, err := yaml.Marshal(object)
 	if err != nil {
@@ -62,4 +104,100 @@ func ParseContent(content string) (*MappingResult, error) {
 		Kind:    parsedMetadata.Kind,
 		Content: content,
 	}, nil
+}
+
+func OutPutDiff(newManifestMap, oldManifestMap map[string]*MappingResult, out io.Writer) error {
+	mayRemove := make([]*MappingResult, 0)
+	mayAdd := make([]*MappingResult, 0)
+
+	for _, key := range sortedKeys(oldManifestMap) {
+		oldManifest := oldManifestMap[key]
+		if newManifest, ok := newManifestMap[key]; ok {
+			if oldManifest.Content == newManifest.Content {
+				continue
+			}
+			diffString, err := util.GetUnifiedDiffString(oldManifest.Content, newManifest.Content, oldManifest.Name, newManifest.Name)
+			if err != nil {
+				return err
+			}
+
+			util.DisplayDiffWithColor(out, diffString)
+		} else {
+			mayRemove = append(mayRemove, oldManifest)
+		}
+
+	}
+
+	// Todo: support find Rename chart.yaml between mayRemove and mayAdd
+	for k, v := range newManifestMap {
+		if _, ok := oldManifestMap[k]; !ok {
+			mayAdd = append(mayAdd, v)
+		}
+	}
+
+	for _, elem := range mayAdd {
+		diffString, err := util.GetUnifiedDiffString("", elem.Content, "", elem.Name)
+		if err != nil {
+			return err
+		}
+		util.DisplayDiffWithColor(out, diffString)
+	}
+
+	for _, elem := range mayRemove {
+		diffString, err := util.GetUnifiedDiffString(elem.Content, "", elem.Name, "")
+		if err != nil {
+			return err
+		}
+		util.DisplayDiffWithColor(out, diffString)
+	}
+	return nil
+}
+
+func sortedKeys(manifests map[string]*MappingResult) []string {
+	keys := maps.Keys(manifests)
+	sort.Strings(keys)
+	return keys
+}
+
+func deleteObjField(obj *map[interface{}]interface{}, field string) {
+	ori := *obj
+	_, ok := ori[field]
+	if ok {
+		delete(ori, field)
+	}
+
+	for _, v := range ori {
+		if v == nil {
+			continue
+		}
+		switch reflect.TypeOf(v).Kind() {
+		case reflect.Map:
+			m := v.(map[interface{}]interface{})
+			deleteObjField(&m, field)
+		case reflect.Slice:
+			s := v.([]interface{})
+			for i := range s {
+				if m, ok := s[i].(map[interface{}]interface{}); ok {
+					deleteObjField(&m, field)
+				}
+			}
+		}
+	}
+}
+
+func deleteLabel(object *map[interface{}]interface{}, s string) {
+	obj := *object
+	if _, ok := obj["metadata"]; !ok {
+		return
+	}
+
+	if m, ok := obj["metadata"].(map[interface{}]interface{}); ok {
+		label, ok := m["labels"].(map[interface{}]interface{})
+		if !ok {
+			return
+		}
+		if label[s] != "" {
+			delete(label, s)
+		}
+	}
 }

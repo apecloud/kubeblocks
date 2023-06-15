@@ -205,33 +205,31 @@ func (o *InstallOptions) showUpgradeDiff(curKBVersion string) error {
 	//}
 	var newManifests bytes.Buffer
 	fmt.Fprintln(&newManifests, strings.TrimSpace(targetRelease.Manifest))
-	//newManifestsKeys := releaseutil.SplitManifests(newManifests.String())
+	newManifestsKeys := releaseutil.SplitManifests(newManifests.String())
 	//oldManifestsKeys := make(map[string]*helm.MappingResult, 0)
+	oldManifestsMap := make(map[string]*helm.MappingResult)
 	for _, v := range oldManifestsKeys {
-		content, err := helm.ParseContent(v)
-		//content.Name
+		mapResult, err := helm.ParseContent(v)
 		if err != nil {
 			return err
 		}
-		fmt.Println(content)
-		break
+		if mapResult == nil {
+			continue
+		}
+		oldManifestsMap[mapResult.Name] = mapResult
+	}
+	newManifestsMap := make(map[string]*helm.MappingResult)
+	for _, v := range newManifestsKeys {
+		mapResult, err := helm.ParseContent(v)
+		if err != nil {
+			return err
+		}
+		if mapResult == nil {
+			continue
+		}
+		newManifestsMap[mapResult.Name] = mapResult
 	}
 
-	//homeDir, _ := os.UserHomeDir()
-	//oldfilePath := path.Join(homeDir, "oldManifest.yaml")
-	//newfilePath := path.Join(homeDir, "newManifest.yaml")
-	//oldFile, err := os.Create(oldfilePath)
-	//if err != nil {
-	//	return err
-	//}
-	//defer oldFile.Close()
-	//_, err = oldFile.Write(oldManifests.Bytes())
-	//newFile, err := os.Create(newfilePath)
-	//if err != nil {
-	//	return err
-	//}
-	//defer newFile.Close()
-	//_, err = newFile.Write(newManifests.Bytes())
-
+	helm.OutPutDiff(newManifestsMap, oldManifestsMap, o.Out)
 	return nil
 }

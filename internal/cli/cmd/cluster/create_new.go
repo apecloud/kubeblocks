@@ -27,14 +27,13 @@ import (
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"sigs.k8s.io/yaml"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -124,18 +123,42 @@ func (o *CreateOptionsV1) Validate() error {
 }
 
 func (o *CreateOptionsV1) Run() error {
-	// get cluster manifest
-	manifest, err := cluster.GetManifest(o.Engine, o.Namespace, o.Name, o.Values)
+	// get cluster manifests
+	manifests, err := cluster.GetManifests(o.Engine, o.Namespace, o.Name, o.Values)
 	if err != nil {
 		return err
 	}
 
-	var u unstructured.Unstructured
-	if err = yaml.Unmarshal([]byte(manifest), &u); err != nil {
+	mapper, err := o.Factory.ToRESTMapper()
+	if err != nil {
 		return err
 	}
 
-	// create cluster
-	_, err = o.Dynamic.Resource(types.ClusterGVR()).Create(context.TODO(), &u, metav1.CreateOptions{})
-	return err
+	// create cluster and dependency resources
+	for _, manifest := range manifests {
+		// convert yaml to json
+		jsonData, err := yaml.YAMLToJSON([]byte(manifest))
+		if err != nil {
+			return err
+		}
+
+		// get resource gvk
+		obj, gvk, err := unstructured.UnstructuredJSONScheme.Decode(jsonData, nil, nil)
+		if err != nil {
+			return err
+		}
+
+		// convert gvk to gvr
+		m, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return err
+		}
+
+		// create resource
+		_, err = o.Dynamic.Resource(m.Resource).Namespace(o.Namespace).Create(context.TODO(), obj.(*unstructured.Unstructured), metav1.CreateOptions{})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

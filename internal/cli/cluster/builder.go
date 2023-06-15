@@ -33,6 +33,7 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/releaseutil"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
@@ -46,22 +47,23 @@ var (
 	chartsDir embed.FS
 )
 
-func GetManifest(e EngineType, namespace, name string, values map[string]interface{}) (string, error) {
+// GetManifests gets the cluster manifests
+func GetManifests(e EngineType, namespace, name string, values map[string]interface{}) (map[string]string, error) {
 	chartFS, err := debme.FS(chartsDir, "charts")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// load the chart package to memory from embed tgz file
 	chartRequested, err := loadHelmChart(chartFS, getChartName(e))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// get the helm chart manifest
 	actionCfg, err := helm.NewActionConfig(helm.NewFakeConfig(namespace))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	actionCfg.Log = func(format string, v ...interface{}) {
 		fmt.Printf(format, v...)
@@ -76,9 +78,9 @@ func GetManifest(e EngineType, namespace, name string, values map[string]interfa
 
 	rel, err := client.Run(chartRequested, values)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return rel.Manifest, nil
+	return releaseutil.SplitManifests(rel.Manifest), nil
 }
 
 // GetClusterSchema gets the schema for the given cluster type.

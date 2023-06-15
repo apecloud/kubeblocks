@@ -37,8 +37,8 @@ var _ = Describe("cluster builder", func() {
 	})
 
 	It("get cluster manifest", func() {
-		manifest, err := GetManifest(MySQL, "default", "my", nil)
+		manifests, err := GetManifests(MySQL, "default", "my", nil)
 		Expect(err).Should(Succeed())
-		Expect(manifest).Should(ContainSubstring("kind: Cluster"))
+		Expect(manifests).ShouldNot(BeEmpty())
 	})
 })

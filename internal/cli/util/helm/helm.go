@@ -647,28 +647,3 @@ func GetValues(release string, cfg *Config) (map[string]interface{}, error) {
 	client.AllValues = true
 	return client.Run(release)
 }
-
-func GetManifest(chart string, namespace string, name string, vals map[string]interface{}) (string, error) {
-	dryRun := true
-	valueOpts := values.Options{}
-
-	// set values as helm string values
-	strVals := make([]string, len(vals))
-	for k, v := range vals {
-		strVals = append(strVals, fmt.Sprintf("%s=%v", k, v))
-	}
-	valueOpts.StringValues = strVals
-
-	o := InstallOpts{
-		Name:      name,
-		Chart:     chart,
-		Namespace: namespace,
-		DryRun:    &dryRun,
-		ValueOpts: &valueOpts,
-	}
-	rel, err := o.Install(NewFakeConfig(namespace))
-	if err != nil || rel == nil {
-		return "", err
-	}
-	return rel.Manifest, nil
-}

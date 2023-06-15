@@ -1056,7 +1056,7 @@ func (pgOps *PostgresOperations) readRecoveryParams(ctx context.Context) map[str
 		pgOps.Logger.Errorf("parse query failed, err:%v", err)
 		return nil
 	}
-	primaryInfoStr := result["setting"]
+	primaryInfoStr := result["setting"].(string)
 	primaryInfo := ParsePrimaryConnInfo(primaryInfoStr)
 
 	return primaryInfo

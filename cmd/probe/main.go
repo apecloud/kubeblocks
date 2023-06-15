@@ -23,12 +23,9 @@ import (
 	"flag"
 	"fmt"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/ha"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
-
 	// Register all components
 	bindingsLoader "github.com/dapr/dapr/pkg/components/bindings"
 	configurationLoader "github.com/dapr/dapr/pkg/components/configuration"
@@ -131,12 +128,12 @@ func main() {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	Ha := ha.NewHa()
-	go func() {
-		Ha.HaControl(stopCh)
-	}()
-	time.Sleep(time.Second * 5)
-	Ha.Init()
+	// := ha.NewHa()
+	//go func() {
+	//Ha.HaControl(stopCh)
+	//}()
+	//time.Sleep(time.Second * 5)
+	//Ha.Init()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)

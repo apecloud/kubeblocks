@@ -825,7 +825,7 @@ func (mysqlOps *MysqlOperations) GetOpTime(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 
-	currentLsn, err := strconv.ParseInt(result["Value"], 10, 64)
+	currentLsn, err := strconv.ParseInt(result["Value"].(string), 10, 64)
 	if err != nil {
 		return 0, err
 	}
@@ -895,7 +895,7 @@ func (mysqlOps *MysqlOperations) checkRecoveryConf(ctx context.Context, leader s
 		return true
 	}
 
-	if strings.Split(result["Master_Host"], ".")[0] != leader {
+	if result == nil || strings.Split(result["Master_Host"].(string), ".")[0] != leader {
 		return true
 	}
 
@@ -908,10 +908,9 @@ func (mysqlOps *MysqlOperations) follow(ctx context.Context, podName string, lea
 		leader, mysqlOps.Cs.GetClusterCompName(), os.Getenv("MYSQL_ROOT_USER"), os.Getenv("MYSQL_ROOT_PASSWORD"), os.Getenv("MYSQL_MYSQL_SERVICE_PORT"))
 	startSlave := `start slave;`
 
-	_, err := mysqlOps.Cs.ExecCmdWithPod(ctx, podName, stopSlave+changeMaster+startSlave, mysqlOps.DBType)
+	_, err := mysqlOps.query(ctx, stopSlave+changeMaster+startSlave)
 	if err != nil {
-		mysqlOps.Logger.Errorf("modify primary info failed,err:%v", err)
-		return err
+		mysqlOps.Logger.Errorf("sql query failed, err:%v", err)
 	}
 
 	return nil
@@ -1012,9 +1011,7 @@ func (mysqlOps *MysqlOperations) GetSysID(ctx context.Context) (string, error) {
 
 func (mysqlOps *MysqlOperations) GetTest(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	result := OpsResult{}
-	data, err := mysqlOps.GetRole(ctx, req, resp)
-	result["data"] = data
-	result["err"] = err
+	_ = mysqlOps.checkRecoveryConf(ctx, "")
 
 	return result, nil
 }

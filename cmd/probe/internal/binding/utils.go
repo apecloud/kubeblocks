@@ -467,8 +467,8 @@ func ParsePgLsn(str string) int64 {
 	return prefix*0x100000000 + suffix
 }
 
-func ParseQuery(str string) (map[string]string, error) {
-	result := make(map[string]string)
+func ParseQuery(str string) (map[string]interface{}, error) {
+	result := make(map[string]interface{})
 	str = strings.Trim(str, "[]")
 
 	err := json.Unmarshal([]byte(str), &result)

@@ -269,14 +269,14 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 */
 
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
-	sql := "show slave status"
+	sql := "show slave hosts"
 	data, err := mysqlOps.query(ctx, sql)
 	if err != nil {
 		mysqlOps.Logger.Infof("error executing %s: %v", sql, err)
 		return "", errors.Wrapf(err, "error executing %s", sql)
 	}
 
-	if string(data) == "null" {
+	if string(data) != "null" {
 		return PRIMARY, nil
 	} else {
 		return SECONDARY, nil
@@ -768,7 +768,8 @@ func (mysqlOps *MysqlOperations) priv2Role(priv string) RoleType {
 
 func (mysqlOps *MysqlOperations) Promote(ctx context.Context, podName string) error {
 	stopReadOnly := `set global read_only=off;`
-	resp, err := mysqlOps.exec(ctx, stopReadOnly)
+	stopSlave := `stop slave;`
+	resp, err := mysqlOps.exec(ctx, stopReadOnly+stopSlave)
 	if err != nil {
 		mysqlOps.Logger.Errorf("promote err: %v", err)
 		return err
@@ -908,7 +909,7 @@ func (mysqlOps *MysqlOperations) checkRecoveryConf(ctx context.Context, leader s
 func (mysqlOps *MysqlOperations) follow(ctx context.Context, podName string, leader string) error {
 	stopSlave := `stop slave;`
 	changeMaster := fmt.Sprintf(`change master to master_host='%s.%s-headless',master_user='%s',master_password='%s',master_port=%s,master_auto_position=1;`,
-		leader, mysqlOps.Cs.GetClusterCompName(), os.Getenv("MYSQL_ROOT_USER"), os.Getenv("MYSQL_ROOT_PASSWORD"), os.Getenv("MYSQL_MYSQL_SERVICE_PORT"))
+		leader, mysqlOps.Cs.GetClusterCompName(), os.Getenv("KB_SERVICE_USER"), os.Getenv("KB_SERVICE_PASSWORD"), os.Getenv("KB_SERVICE_PORT"))
 	startSlave := `start slave;`
 
 	_, err := mysqlOps.exec(ctx, stopSlave+changeMaster+startSlave)

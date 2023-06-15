@@ -28,8 +28,8 @@ spec:
       podSpec:
         {{- if .Values.server.securityContext }}
         securityContext:
-{{ toYaml .Values.server.securityContext | indent 10 }}
-            {{- end }}
+{{- toYaml .Values.server.securityContext | indent 10 }}
+        {{- end }}
         enableServiceLinks: true
         containers:
           - name: configmap-reload
@@ -121,7 +121,7 @@ spec:
       podSpec:
         {{- if .Values.alertmanager.securityContext }}
         securityContext:
-{{ toYaml .Values.alertmanager.securityContext | indent 10 }}
+{{- toYaml .Values.alertmanager.securityContext | indent 10 }}
         {{- end }}
         containers:
           - name: configmap-reload

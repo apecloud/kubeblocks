@@ -35,7 +35,7 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: 9187
+          scrapePort: 1234
       logConfigs:
         {{- range $name,$pattern := .Values.logConfigs }}
         - name: {{ $name }}
@@ -61,6 +61,11 @@ spec:
           templateRef: postgresql14-custom-metrics
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-custom-metrics
+          defaultMode: 0777
+        - name: agamotto-configuration
+          templateRef: postgresql-agamotto-configuration
+          namespace: {{ .Release.Namespace }}
+          volumeName: agamotto-configuration
           defaultMode: 0777
       scriptSpecs:
         - name: postgresql-scripts
@@ -271,10 +276,8 @@ spec:
             securityContext:
               runAsUser: 0
             env:
-              {{- $database := "postgres" }}
-              {{- $sslmode := "disable" }}
-              - name: DATA_SOURCE_URI
-                value: {{ printf "127.0.0.1:5432/%s?sslmode=%s" $database $sslmode }}
+              - name: ENDPOINT
+                value: {{ printf "127.0.0.1:5432" }}
               - name: DATA_SOURCE_PASS
                 valueFrom:
                   secretKeyRef:
@@ -288,35 +291,16 @@ spec:
                     key: username
                     optional: false
             command:
-              - "/opt/bitnami/postgres-exporter/bin/postgres_exporter"
-              - "--auto-discover-databases"
-              - "--extend.query-path=/opt/conf/custom-metrics.yaml"
-              - "--exclude-databases=template0,template1"
-              - "--log.level=info"
+              - "/bin/agamotto"
+              - "--config=/opt/agamotto/agamotto-config.yaml"
             ports:
               - name: http-metrics
-                containerPort: 9187
-            livenessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              httpGet:
-                path: /
-                port: http-metrics
-            readinessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              httpGet:
-                path: /
-                port: http-metrics
+                containerPort: 1234
             volumeMounts:
               - name: postgresql-custom-metrics
                 mountPath: /opt/conf
+              - name: agamotto-configuration
+                mountPath: /opt/agamotto
         volumes:
           - name: dshm
             emptyDir:

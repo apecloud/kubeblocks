@@ -917,7 +917,7 @@ func buildBackupLabels(backup *dataprotectionv1alpha1.Backup) map[string]string 
 	if labels == nil {
 		labels = map[string]string{}
 	}
-	labels[dataProtectionLabelBackupNameKey] = backup.Name
+	labels[constant.DataProtectionLabelBackupNameKey] = backup.Name
 	return labels
 }
 

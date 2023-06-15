@@ -334,13 +334,13 @@ var _ = Describe("Component utils test", func() {
 			Expect(MergeServiceAnnotations(nil, targetAnnotations)).To(Equal(targetAnnotations))
 		})
 		It("original annotations have prometheus annotations which should be removed", func() {
-			originalAnnotations := map[string]string{"k1": "v1", "prometheus.io/path": "/metrics"}
+			originalAnnotations := map[string]string{"k1": "v1", "monitor.kubeblocks.io/path": "/metrics"}
 			targetAnnotations := map[string]string{"k2": "v2"}
 			expectAnnotations := map[string]string{"k1": "v1", "k2": "v2"}
 			Expect(MergeServiceAnnotations(originalAnnotations, targetAnnotations)).To(Equal(expectAnnotations))
 		})
 		It("target annotations should override original annotations", func() {
-			originalAnnotations := map[string]string{"k1": "v1", "prometheus.io/path": "/metrics"}
+			originalAnnotations := map[string]string{"k1": "v1", "monitor.kubeblocks.io/path": "/metrics"}
 			targetAnnotations := map[string]string{"k1": "v11"}
 			expectAnnotations := map[string]string{"k1": "v11"}
 			Expect(MergeServiceAnnotations(originalAnnotations, targetAnnotations)).To(Equal(expectAnnotations))

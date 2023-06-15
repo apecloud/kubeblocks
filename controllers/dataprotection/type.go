@@ -38,7 +38,6 @@ const (
 	dataProtectionLabelBackupPolicyKey   = "dataprotection.kubeblocks.io/backup-policy"
 	dataProtectionLabelBackupTypeKey     = "dataprotection.kubeblocks.io/backup-type"
 	dataProtectionLabelAutoBackupKey     = "dataprotection.kubeblocks.io/autobackup"
-	dataProtectionLabelBackupNameKey     = "backups.dataprotection.kubeblocks.io/name"
 	dataProtectionLabelRestoreJobNameKey = "restorejobs.dataprotection.kubeblocks.io/name"
 
 	dataProtectionBackupTargetPodKey          = "dataprotection.kubeblocks.io/target-pod-name"

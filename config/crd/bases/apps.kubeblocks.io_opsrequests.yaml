@@ -385,9 +385,6 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
-                x-kubernetes-validations:
-                - message: forbidden to update spec.verticalScaling
-                  rule: self == oldSelf
               volumeExpansion:
                 description: volumeExpansion defines what component and volumeClaimTemplate
                   need to expand the specified storage.
@@ -430,9 +427,6 @@ spec:
                 x-kubernetes-list-map-keys:
                 - componentName
                 x-kubernetes-list-type: map
-                x-kubernetes-validations:
-                - message: forbidden to update spec.volumeExpansion
-                  rule: self == oldSelf
             required:
             - clusterRef
             - type

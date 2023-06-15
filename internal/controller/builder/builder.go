@@ -31,7 +31,6 @@ import (
 	"github.com/google/uuid"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -118,13 +117,15 @@ func processContainersInjection(reqCtx intctrlutil.RequestCtx,
 		&podSpec.InitContainers,
 	} {
 		for i := range *cc {
-			injectEnvs(cluster, component, envConfigName, &(*cc)[i])
+			if err := injectEnvs(cluster, component, envConfigName, &(*cc)[i]); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string, c *corev1.Container) {
+func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string, c *corev1.Container) error {
 	// can not use map, it is unordered
 	envFieldPathSlice := []struct {
 		name      string
@@ -179,6 +180,22 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 			{Name: "KB_TLS_KEY_FILE", Value: KeyName},
 		}...)
 	}
+
+	if udeValue, ok := cluster.Annotations[constant.ExtraEnvAnnotationKey]; ok {
+		udeMap := make(map[string]string)
+		if err := json.Unmarshal([]byte(udeValue), &udeMap); err != nil {
+			return err
+		}
+		for k, v := range udeMap {
+			if k == "" || v == "" {
+				continue
+			}
+			toInjectEnvs = append(toInjectEnvs, corev1.EnvVar{
+				Name:  k,
+				Value: v,
+			})
+		}
+	}
 	// have injected variables placed at the front of the slice
 	if len(c.Env) == 0 {
 		c.Env = toInjectEnvs
@@ -186,7 +203,7 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 		c.Env = append(toInjectEnvs, c.Env...)
 	}
 	if envConfigName == "" {
-		return
+		return nil
 	}
 	c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
 		ConfigMapRef: &corev1.ConfigMapEnvSource{
@@ -195,6 +212,8 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 			},
 		},
 	})
+
+	return nil
 }
 
 // BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from sts to pvc.
@@ -531,22 +550,6 @@ func BuildVolumeSnapshot(snapshotKey types.NamespacedName,
 		return nil, err
 	}
 	return &snapshot, nil
-}
-
-func BuildCronJob(pvcKey types.NamespacedName,
-	schedule string,
-	sts *appsv1.StatefulSet) (*batchv1.CronJob, error) {
-	serviceAccount := viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
-	cronJob := batchv1.CronJob{}
-	if err := buildFromCUE("delete_pvc_cron_job_template.cue", map[string]any{
-		"pvc":                   pvcKey,
-		"cronjob.spec.schedule": schedule,
-		"cronjob.spec.jobTemplate.spec.template.spec.serviceAccount": serviceAccount,
-		"sts": sts,
-	}, "cronjob", &cronJob); err != nil {
-		return nil, err
-	}
-	return &cronJob, nil
 }
 
 func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,

@@ -17,24 +17,17 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package internal
+package cmd
 
 import (
-	"context"
-
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/spf13/viper"
+	"testing"
 )
 
-// check volume snapshot available
-func isSnapshotAvailable(cli types2.ReadonlyClient, ctx context.Context) bool {
-	if !viper.GetBool("VOLUMESNAPSHOT") {
-		return false
+func TestNewCli(t *testing.T) {
+	cmd := NewCliCmd()
+	if cmd == nil {
+		t.Fatal("command should not be nil")
+	} else {
+		cmd.Run(cmd, []string{"help"})
 	}
-	vsList := snapshotv1.VolumeSnapshotList{}
-	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
-	getVSErr := compatClient.List(&vsList)
-	return getVSErr == nil
 }

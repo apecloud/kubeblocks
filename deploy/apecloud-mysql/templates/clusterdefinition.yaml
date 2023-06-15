@@ -24,7 +24,7 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: 9104
+          scrapePort: 1234
       logConfigs:
         {{- range $name,$pattern := .Values.logConfigs }}
         - name: {{ $name }}
@@ -36,6 +36,11 @@ spec:
           constraintRef: mysql8.0-config-constraints
           volumeName: mysql-config
           namespace: {{ .Release.Namespace }}
+        - name: agamotto-configuration
+          templateRef: apecloud-mysql8-agamotto-configuration
+          namespace: {{ .Release.Namespace }}
+          volumeName: agamotto-configuration
+          defaultMode: 0777
       scriptSpecs:
         - name: apecloud-mysql-scripts
           templateRef: apecloud-mysql-scripts
@@ -156,6 +161,8 @@ spec:
               runAsNonRoot: true
               runAsUser: 1001
             env:
+              - name: ENDPOINT
+                value: {{ printf "localhost:3306" }}
               - name: MYSQL_USER
                 valueFrom:
                   secretKeyRef:
@@ -168,32 +175,15 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
                     optional: false
-              - name: DATA_SOURCE_NAME
-                value: "$(MYSQL_USER):$(MYSQL_PASSWORD)@(localhost:3306)/"
             command:
-              - "/bin/mysqld_exporter"
-              - "--collect.info_schema.wesql_consensus"
+              - "/bin/agamotto"
+              - "--config=/opt/agamotto/agamotto-config.yaml"
             ports:
               - name: http-metrics
-                containerPort: 9104
-            livenessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              httpGet:
-                path: /
-                port: http-metrics
-            readinessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              httpGet:
-                path: /
-                port: http-metrics
+                containerPort: 1234
+            volumeMounts:
+              - name: agamotto-configuration
+                mountPath: /opt/agamotto
         volumes:
           - name: annotations
             downwardAPI:

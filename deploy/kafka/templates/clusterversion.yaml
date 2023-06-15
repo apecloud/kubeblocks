@@ -11,33 +11,64 @@ metadata:
   annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
   {{- end }}
 spec:
-  clusterDefinitionRef: kafka
+  clusterDefinitionRef: {{ include "kafka.name" . }}
   componentVersions:
     - componentDefRef: kafka-server
       versionsContext:
         containers:
           - name: kafka
             image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
+            securityContext:
+              allowPrivilegeEscalation: false
+              runAsNonRoot: true
+              runAsUser: 1001
           - name: jmx-exporter
             image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
-    # - componentDefRef: kafka-controller
-    #   versionsContext:
-    #     containers:
-    #       - name: kafka
-    #         image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
-    #       - name: jmx-exporter
-    #         image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
-    # - componentDefRef: kafka-broker
-    #   versionsContext:
-    #     containers:
-    #       - name: kafka
-    #         image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
-    #       - name: jmx-exporter
-    #         image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001
+    - componentDefRef: kafka-controller
+      versionsContext:
+        containers:
+          - name: kafka
+            image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
+            securityContext:
+              allowPrivilegeEscalation: false
+              runAsNonRoot: true
+              runAsUser: 1001
+          - name: jmx-exporter
+            image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001
+    - componentDefRef: kafka-broker
+      versionsContext:
+        containers:
+          - name: kafka
+            image: {{ .Values.images.kafka.repository }}:{{ default .Chart.AppVersion .Values.images.kafka.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
+            securityContext:
+              allowPrivilegeEscalation: false
+              runAsNonRoot: true
+              runAsUser: 1001
+          - name: jmx-exporter
+            image: {{ .Values.images.jmxExporter.repository }}:{{ .Values.images.jmxExporter.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001
 
     - componentDefRef: kafka-exporter
       versionsContext:
         containers:
           - name: kafka-exporter
             image: {{ .Values.images.kafkaExporter.repository }}:{{ .Values.images.kafkaExporter.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.images.pullPolicy }}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001
 

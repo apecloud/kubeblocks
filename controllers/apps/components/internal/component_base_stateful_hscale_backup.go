@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package internal
 
 import (
@@ -174,9 +193,11 @@ func (d *baseDataClone) backupVCT() *corev1.PersistentVolumeClaimTemplate {
 	vcts := d.component.VolumeClaimTemplates
 	vct := vcts[0]
 	for _, tmpVct := range vcts {
-		if tmpVct.Name == d.component.HorizontalScalePolicy.VolumeMountsName {
-			vct = tmpVct
-			break
+		for _, volumeType := range d.component.VolumeTypes {
+			if volumeType.Type == appsv1alpha1.VolumeTypeData && volumeType.Name == tmpVct.Name {
+				vct = tmpVct
+				break
+			}
 		}
 	}
 	return &vct
@@ -586,7 +607,7 @@ func (d *backupDataClone) restore(pvcKey types.NamespacedName) ([]client.Object,
 	if len(backupToolList.Items) == 0 {
 		return nil, fmt.Errorf("backuptool not found for clusterdefinition: %s", d.component.ClusterDefName)
 	}
-	pvc, err := builder.BuildPVC(d.cluster, d.component, &d.component.VolumeClaimTemplates[0], pvcKey, "")
+	pvc, err := builder.BuildPVC(d.cluster, d.component, d.backupVCT(), pvcKey, "")
 	if err != nil {
 		return nil, err
 	}

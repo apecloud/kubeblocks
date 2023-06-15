@@ -999,7 +999,7 @@ func (mysqlOps *MysqlOperations) Start(ctx context.Context, podName string) erro
 
 	_, err := mysqlOps.Cs.ExecCmdWithPod(ctx, podName, start, mysqlOps.DBType)
 	if err != nil {
-		mysqlOps.Logger.Errorf("touch err: %v", err)
+		mysqlOps.Logger.Errorf("start err: %v", err)
 		return err
 	}
 
@@ -1015,7 +1015,7 @@ func (mysqlOps *MysqlOperations) GetSysID(ctx context.Context) (string, error) {
 
 func (mysqlOps *MysqlOperations) GetTest(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	result := OpsResult{}
-	_ = mysqlOps.checkRecoveryConf(ctx, "")
+	_, _ = mysqlOps.GetRole(ctx, req, resp)
 
 	return result, nil
 }

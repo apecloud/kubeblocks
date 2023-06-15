@@ -1,5 +1,11 @@
-rbac:
-  create: true
+
+## If defined, storageClassName: <storageClass>
+## If set to "-", storageClassName: "", which disables dynamic provisioning
+## If undefined (the default) or set to null, no storageClassName spec is
+##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+##   GKE, AWS & OpenStack)
+##
+# storageClass: "-"
 
 persistence:
   enabled: false
@@ -11,14 +17,27 @@ persistence:
 
 topologyKeys:
   - kubernetes.io/hostname
+
 terminationPolicy: Delete
+
+
+
 tolerations:
   - key: kb-controller
     operator: Equal
     value: "true"
     effect: NoSchedule
 
-affinity: {}
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: kb-controller
+              operator: In
+              values:
+                - "true"
 
 ## Prometheus server resource requests and limits
 ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/
@@ -34,441 +53,14 @@ resources: {}
 replicaCount:
   server: 1
   alertmanager: 1
+
 switchPolicy:
   type: Noop
+
 primaryIndex: 0
 
 monitor:
   enabled: false
 
-podSecurityPolicy:
-  enabled: false
-
 enabledLogs:
   - running
-
-serviceAccount:
-  enabled: true
-  # if enabled is false, the name is required
-
-
-alertmanager:
-  ## If false, alertmanager will not be installed
-  ##
-  enabled: true
-
-  ## alertmanager container name
-  ##
-  name: alertmanager
-
-  ## alertmanager container image
-  ##
-  image:
-    repository: quay.io/prometheus/alertmanager
-    tag: v0.24.0
-    pullPolicy: IfNotPresent
-
-  ## Alertmanager Deployment Strategy type
-  # strategy:
-  #   type: Recreate
-
-  ## Node tolerations for alertmanager scheduling to nodes with taints
-  ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
-  ##
-  ## Node tolerations for alertmanager scheduling to nodes with taints
-  ## Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
-  ##
-  tolerations:
-    - key: kb-controller
-      operator: Equal
-      value: "true"
-      effect: NoSchedule
-
-    # - key: "key"
-    #   operator: "Equal|Exists"
-    #   value: "value"
-    #   effect: "NoSchedule|PreferNoSchedule|NoExecute(1.6 only)"
-
-  ## Node labels for alertmanager pod assignment
-  ## Ref: https://kubernetes.io/docs/user-guide/node-selection/
-  ##
-  nodeSelector: {}
-
-  ## Pod affinity
-  ##
-  affinity:
-    nodeAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          preference:
-            matchExpressions:
-              - key: kb-controller
-                operator: In
-                values:
-                  - "true"
-
-  persistentVolume:
-    ## If true, alertmanager will create/use a Persistent Volume Claim
-    ## If false, use emptyDir
-    ##
-    enabled: true
-
-    ## alertmanager data Persistent Volume access modes
-    ## Must match those of existing PV or dynamic provisioner
-    ## Ref: http://kubernetes.io/docs/user-guide/persistent-volumes/
-    ##
-    accessModes:
-      - ReadWriteOnce
-
-    ## alertmanager data Persistent Volume Claim annotations
-    ##
-    annotations: {}
-
-    ## alertmanager data Persistent Volume existing claim name
-    ## Requires alertmanager.persistentVolume.enabled: true
-    ## If defined, PVC must be created manually before volume will be bound
-    existingClaim: ""
-
-    ## alertmanager data Persistent Volume mount root path
-    ##
-    mountPath: /data
-
-    ## alertmanager data Persistent Volume size
-    ##
-    size: 2Gi
-
-    ## alertmanager data Persistent Volume Storage Class
-    ## If defined, storageClassName: <storageClass>
-    ## If set to "-", storageClassName: "", which disables dynamic provisioning
-    ## If undefined (the default) or set to null, no storageClassName spec is
-    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
-    ##   GKE, AWS & OpenStack)
-    ##
-    # storageClass: "-"
-
-    ## alertmanager data Persistent Volume Binding Mode
-    ## If defined, volumeBindingMode: <volumeBindingMode>
-    ## If undefined (the default) or set to null, no volumeBindingMode spec is
-    ##   set, choosing the default mode.
-    ##
-    # volumeBindingMode: ""
-
-    ## Subdirectory of alertmanager data Persistent Volume to mount
-    ## Useful if the volume's root directory is not empty
-    ##
-    subPath: ""
-
-    ## Persistent Volume Claim Selector
-    ## Useful if Persistent Volumes have been provisioned in advance
-    ## Ref: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#selector
-    ##
-    # selector:
-    #  matchLabels:
-    #    release: "stable"
-    #  matchExpressions:
-    #    - { key: environment, operator: In, values: [ dev ] }
-
-    ## Persistent Volume Name
-    ## Useful if Persistent Volumes have been provisioned in advance and you want to use a specific one
-    ##
-    # volumeName: ""
-
-  emptyDir:
-    ## alertmanager emptyDir volume size limit
-    ##
-    sizeLimit: ""
-
-  ## Annotations to be added to alertmanager pods
-  ##
-  podAnnotations: {}
-    ## Tell prometheus to use a specific set of alertmanager pods
-    ## instead of all alertmanager pods found in the same namespace
-    ## Useful if you deploy multiple releases within the same namespace
-    ##
-    ## prometheus.io/probe: alertmanager-teamA
-
-  ## Labels to be added to Prometheus AlertManager pods
-  ##
-  podLabels: {}
-
-  ## Specify if a Pod Security Policy for node-exporter must be created
-  ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
-  ##
-  podSecurityPolicy:
-    annotations: {}
-      ## Specify pod annotations
-      ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#apparmor
-      ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#seccomp
-      ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#sysctl
-      ##
-      # seccomp.security.alpha.kubernetes.io/allowedProfileNames: '*'
-      # seccomp.security.alpha.kubernetes.io/defaultProfileName: 'docker/default'
-      # apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
-
-  ## Use a StatefulSet if replicaCount needs to be greater than 1 (see below)
-  ##
-  replicaCount: 1
-
-  ## Annotations to be added to deployment
-  ##
-  deploymentAnnotations: {}
-
-  ## alertmanager resource requests and limits
-  ## Ref: http://kubernetes.io/docs/user-guide/compute-resources/
-  ##
-  resources: {}
-    # limits:
-    #   cpu: 10m
-    #   memory: 32Mi
-    # requests:
-    #   cpu: 10m
-    #   memory: 32Mi
-
-  # Custom DNS configuration to be added to alertmanager pods
-  dnsConfig: {}
-    # nameservers:
-    #   - 1.2.3.4
-    # searches:
-    #   - ns1.svc.cluster-domain.example
-    #   - my.dns.search.suffix
-    # options:
-    #   - name: ndots
-    #     value: "2"
-  #   - name: edns0
-
-## Monitors ConfigMap changes and POSTs to a URL
-## Ref: https://github.com/jimmidyson/configmap-reload
-##
-
-server:
-  ## Prometheus server container name
-  ##
-  enabled: true
-
-  ## Use a ClusterRole (and ClusterRoleBinding)
-  ## - If set to false - we define a RoleBinding in the defined namespaces ONLY
-  ##
-  ## NB: because we need a Role with nonResourceURL's ("/metrics") - you must get someone with Cluster-admin privileges to define this role for you, before running with this setting enabled.
-  ##     This makes prometheus work - for users who do not have ClusterAdmin privs, but wants prometheus to operate on their own namespaces, instead of clusterwide.
-  ##
-  ## You MUST also set namespaces to the ones you have access to and want monitored by Prometheus.
-  ##
-  # useExistingClusterRoleName: nameofclusterrole
-
-  ## namespaces to monitor (instead of monitoring all - clusterwide). Needed if you want to run without Cluster-admin privileges.
-  # namespaces:
-  #   - yournamespace
-
-  name: server
-
-  # sidecarContainers - add more containers to prometheus server
-  # Key/Value where Key is the sidecar `- name: <Key>`
-  # Example:
-  #   sidecarContainers:
-  #      webserver:
-  #        image: nginx
-  sidecarContainers: {}
-
-  # sidecarTemplateValues - context to be used in template for sidecarContainers
-  # Example:
-  #   sidecarTemplateValues: *your-custom-globals
-  #   sidecarContainers:
-  #     webserver: |-
-  #       {{ include "webserver-container-template" . }}
-  # Template for `webserver-container-template` might looks like this:
-  #   image: "{{ .Values.server.sidecarTemplateValues.repository }}:{{ .Values.server.sidecarTemplateValues.tag }}"
-  #   ...
-  #
-  sidecarTemplateValues: {}
-
-  ## Prometheus server container image
-  ##
-  image:
-    repository: quay.io/prometheus/prometheus
-    tag: v2.39.1
-    pullPolicy: IfNotPresent
-
-  ## prometheus server priorityClassName
-  ##
-  priorityClassName: ""
-
-  ## EnableServiceLinks indicates whether information about services should be injected
-  ## into pod's environment variables, matching the syntax of Docker links.
-  ## WARNING: the field is unsupported and will be skipped in K8s prior to v1.13.0.
-  ##
-  enableServiceLinks: true
-
-  ## The URL prefix at which the container can be accessed. Useful in the case the '-web.external-url' includes a slug
-  ## so that the various internal URLs are still able to access as they are in the default case.
-  ## (Optional)
-  prefixURL: ""
-
-  ## External URL which can access prometheus
-  ## Maybe same with Ingress host name
-  baseURL: ""
-
-  ## Extra labels for Prometheus server ConfigMap (ConfigMap that holds serverFiles)
-  extraConfigmapLabels: {}
-
-  ## Use an alternate scheduler, e.g. "stork".
-  ## ref: https://kubernetes.io/docs/tasks/administer-cluster/configure-multiple-schedulers/
-  ##
-  # schedulerName:
-
-  ## Annotations to be added to Prometheus server pods
-  ##
-  podAnnotations: {}
-    # iam.amazonaws.com/role: prometheus
-
-  ## Labels to be added to Prometheus server pods
-  ##
-  podLabels: {}
-
-  ## Prometheus AlertManager configuration
-  ##
-  alertmanagers: []
-
-  ## Specify if a Pod Security Policy for node-exporter must be created
-  ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/
-  ##
-  podSecurityPolicy:
-    annotations: {}
-      ## Specify pod annotations
-      ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#apparmor
-      ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#seccomp
-      ## Ref: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#sysctl
-      ##
-      # seccomp.security.alpha.kubernetes.io/allowedProfileNames: '*'
-      # seccomp.security.alpha.kubernetes.io/defaultProfileName: 'docker/default'
-      # apparmor.security.beta.kubernetes.io/defaultProfileName: 'runtime/default'
-
-  ## Use a StatefulSet if replicaCount needs to be greater than 1 (see below)
-  ##
-  replicaCount: 1
-
-  ## Annotations to be added to deployment
-  ##
-  deploymentAnnotations: {}
-
-  ## Prometheus server readiness and liveness probe initial delay and timeout
-  ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
-  ##
-  tcpSocketProbeEnabled: false
-  probeScheme: HTTP
-  readinessProbeInitialDelay: 30
-  readinessProbePeriodSeconds: 5
-  readinessProbeTimeout: 4
-  readinessProbeFailureThreshold: 3
-  readinessProbeSuccessThreshold: 1
-  livenessProbeInitialDelay: 30
-  livenessProbePeriodSeconds: 15
-  livenessProbeTimeout: 10
-  livenessProbeFailureThreshold: 3
-  livenessProbeSuccessThreshold: 1
-  startupProbe:
-    enabled: false
-    periodSeconds: 5
-    failureThreshold: 30
-    timeoutSeconds: 10
-
-  # Required for use in managed kubernetes clusters (such as AWS EKS) with custom CNI (such as calico),
-  # because control-plane managed by AWS cannot communicate with pods' IP CIDR and admission webhooks are not working
-  ##
-  hostNetwork: false
-
-  # When hostNetwork is enabled, this will set to ClusterFirstWithHostNet automatically
-  dnsPolicy: ClusterFirst
-
-  # Use hostPort
-  # hostPort: 9090
-
-  ## Vertical Pod Autoscaler config
-  ## Ref: https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler
-  verticalAutoscaler:
-    ## If true a VPA object will be created for the controller (either StatefulSet or Deployemnt, based on above configs)
-    enabled: false
-    # updateMode: "Auto"
-    # containerPolicies:
-    # - containerName: 'prometheus-server'
-
-  # Custom DNS configuration to be added to prometheus server pods
-  dnsConfig: {}
-    # nameservers:
-    #   - 1.2.3.4
-    # searches:
-    #   - ns1.svc.cluster-domain.example
-    #   - my.dns.search.suffix
-    # options:
-    #   - name: ndots
-    #     value: "2"
-  #   - name: edns0
-
-  ## Prometheus server pod termination grace period
-  ##
-  terminationGracePeriodSeconds: 300
-
-  ## Array of extra Kubernetes manifests, in form of YAML object,
-  ## if you want to deploy
-  extraObjects: []
-  # - apiVersion: v1
-  #   kind: ConfigMap
-  #   metadata:
-  #     name: '{{ template "prometheus.name" . }}-extra-config'
-
-  ## Array of extra Kubernetes manifest, in form of template string,
-  ## if you want to deploy
-  extraTemplates: []
-  # - |
-  #   apiVersion: v1
-  #   kind: ConfigMap
-  #   metadata:
-  #     name: extra-config
-  #     labels:
-  #   {{- include "prometheus.server.labels" . | nindent 4 }}
-
-
-
-# adds additional scrape configs to prometheus.yml
-# must be a string so you have to add a | after extraScrapeConfigs:
-# example adds prometheus-blackbox-exporter scrape config
-extraScrapeConfigs:
-  # - job_name: 'prometheus-blackbox-exporter'
-  #   metrics_path: /probe
-  #   params:
-  #     module: [http_2xx]
-  #   static_configs:
-  #     - targets:
-  #       - https://example.com
-  #   relabel_configs:
-  #     - source_labels: [__address__]
-  #       target_label: __param_target
-  #     - source_labels: [__param_target]
-  #       target_label: instance
-  #     - target_label: __address__
-  #       replacement: prometheus-blackbox-exporter:9115
-
-# Adds option to add alert_relabel_configs to avoid duplicate alerts in alertmanager
-# useful in H/A prometheus with different external labels but the same alerts
-alertRelabelConfigs:
-  # alert_relabel_configs:
-  # - source_labels: [dc]
-  #   regex: (.+)\d+
-  #   target_label: dc
-
-networkPolicy:
-  ## Enable creation of NetworkPolicy resources.
-  ##
-  enabled: false
-
-# Force namespace of namespaced resources
-forceNamespace: null
-
-# Extra manifests to deploy as an array
-extraManifests: []
-  # - apiVersion: v1
-  #   kind: ConfigMap
-  #   metadata:
-  #   labels:
-  #     name: prometheus-extra
-  #   data:
-  #     extra-data: "value"

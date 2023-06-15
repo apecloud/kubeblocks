@@ -199,6 +199,7 @@ func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 	oldMemberSet := sets.KeySet(oldMemberMap)
 	newMemberSet := sets.KeySet(newMemberMap)
 	memberToKeepSet := oldMemberSet.Difference(newMemberSet)
+	// TODO(free6om): handle stale role in memberToKeepSet
 	for podName := range memberToKeepSet {
 		ordinal, _ := getPodOrdinal(podName)
 		// members have left because of scale-in

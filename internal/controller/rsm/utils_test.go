@@ -22,7 +22,6 @@ package rsm
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -139,6 +138,55 @@ var _ = Describe("utils test", func() {
 			for i, status := range membersStatus {
 				Expect(status.PodName).Should(Equal(expectedOrder[i]))
 			}
+		})
+	})
+
+	Context("setMembersStatus function", func() {
+		It("should work well", func() {
+			pods := []corev1.Pod{
+				*builder.NewPodBuilder(namespace, "pod-0").AddLabels(roleLabelKey, "follower").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-1").AddLabels(roleLabelKey, "leader").GetObject(),
+				*builder.NewPodBuilder(namespace, "pod-2").AddLabels(roleLabelKey, "follower").GetObject(),
+			}
+			readyCondition := corev1.PodCondition{
+				Type: corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}
+			pods[0].Status.Conditions = append(pods[0].Status.Conditions, readyCondition)
+			pods[1].Status.Conditions = append(pods[1].Status.Conditions, readyCondition)
+			oldMembersStatus := []workloads.MemberStatus{
+				{
+					PodName: "pod-0",
+					ReplicaRole: workloads.ReplicaRole{Name: "leader"},
+				},
+				{
+					PodName: "pod-1",
+					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+				},
+				{
+					PodName: "pod-2",
+					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+				},
+			}
+			rsm.Spec.Replicas = 3
+			rsm.Status.MembersStatus = oldMembersStatus
+			setMembersStatus(rsm, pods)
+
+			Expect(len(rsm.Status.MembersStatus)).Should(Equal(len(oldMembersStatus)))
+			Expect(rsm.Status.MembersStatus[0].PodName).Should(Equal("pod-1"))
+			Expect(rsm.Status.MembersStatus[0].Name).Should(Equal("leader"))
+			Expect(rsm.Status.MembersStatus[1].PodName).Should(Equal("pod-2"))
+			Expect(rsm.Status.MembersStatus[1].Name).Should(Equal("follower"))
+			Expect(rsm.Status.MembersStatus[2].PodName).Should(Equal("pod-0"))
+			Expect(rsm.Status.MembersStatus[2].Name).Should(Equal("follower"))
+		})
+	})
+
+	Context("getRoleName function", func() {
+		It("should work well", func() {
+			pod := builder.NewPodBuilder(namespace, name).AddLabels(roleLabelKey, "LEADER").GetObject()
+			role := getRoleName(*pod)
+			Expect(role).Should(Equal("leader"))
 		})
 	})
 })

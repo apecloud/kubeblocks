@@ -36,9 +36,9 @@ const (
 	tplRenderToolPath = "/bin/config_render"
 )
 
-func buildConfigToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, podSpec *corev1.PodSpec, comp *component.SynthesizedComponent) {
+func buildConfigToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, podSpec *corev1.PodSpec, comp *component.SynthesizedComponent) error {
 	if len(cfgManagerParams.ConfigSpecsBuildParams) == 0 {
-		return
+		return nil
 	}
 
 	// construct config manager tools volume
@@ -57,11 +57,18 @@ func buildConfigToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 		}
 		buildToolsVolumeMount(cfgManagerParams, podSpec, buildParam.ConfigSpec.VolumeName, buildParam.ToolsImageSpec.MountPoint)
 	}
+
 	// Ensure that the order in which iniContainers are generated does not change
 	toolContainers = checkAndInstallToolsImageVolume(toolContainers, cfgManagerParams.ConfigSpecsBuildParams)
-	if len(toolContainers) != 0 {
-		cfgManagerParams.ToolsContainers = builder.BuildCfgManagerToolsContainer(cfgManagerParams, comp, toolContainers)
+	if len(toolContainers) == 0 {
+		return nil
 	}
+
+	containers, err := builder.BuildCfgManagerToolsContainer(cfgManagerParams, comp, toolContainers)
+	if err == nil {
+		cfgManagerParams.ToolsContainers = containers
+	}
+	return err
 }
 
 func checkAndInstallToolsImageVolume(toolContainers []appsv1alpha1.ToolConfig, buildParams []cfgcm.ConfigSpecMeta) []appsv1alpha1.ToolConfig {

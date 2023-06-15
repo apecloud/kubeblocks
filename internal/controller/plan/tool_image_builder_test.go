@@ -182,7 +182,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 				TemplateRef: "secondary_template",
 				Policy:      appsv1alpha1.NoneMergePolicy,
 			}
-			buildConfigToolsContainer(cfgManagerParams, &sts.Spec.Template.Spec, clusterComponent)
+			Expect(buildConfigToolsContainer(cfgManagerParams, &sts.Spec.Template.Spec, clusterComponent)).Should(Succeed())
 			Expect(4).Should(BeEquivalentTo(len(cfgManagerParams.ToolsContainers)))
 			Expect("test_images").Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[0].Image))
 			Expect(sts.Spec.Template.Spec.Containers[0].Image).Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[1].Image))

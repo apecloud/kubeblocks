@@ -269,6 +269,8 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 	if err := cfgcm.BuildConfigManagerContainerParams(cli, ctx, cfgManagerParams, volumeDirs); err != nil {
 		return nil, err
 	}
-	buildConfigToolsContainer(cfgManagerParams, podSpec, comp)
+	if err := buildConfigToolsContainer(cfgManagerParams, podSpec, comp); err != nil {
+		return nil, err
+	}
 	return cfgManagerParams, nil
 }

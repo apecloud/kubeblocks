@@ -641,7 +641,9 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 		return nil, err
 	}
 
-	injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &container)
+	if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &container); err != nil {
+		return nil, err
+	}
 	return &container, nil
 }
 
@@ -719,7 +721,7 @@ func BuildRestoreJobForFullBackup(
 	return &job, nil
 }
 
-func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas []appsv1alpha1.ToolConfig) []corev1.Container {
+func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas []appsv1alpha1.ToolConfig) ([]corev1.Container, error) {
 	toolContainers := make([]corev1.Container, 0, len(toolsMetas))
 	for _, toolConfig := range toolsMetas {
 		toolContainer := corev1.Container{
@@ -734,7 +736,9 @@ func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildPa
 		toolContainers = append(toolContainers, toolContainer)
 	}
 	for i := range toolContainers {
-		injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &toolContainers[i])
+		if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &toolContainers[i]); err != nil {
+			return nil, err
+		}
 	}
-	return toolContainers
+	return toolContainers, nil
 }

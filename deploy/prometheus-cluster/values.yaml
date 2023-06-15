@@ -1,21 +1,19 @@
+clusterVersionOverride: ""
+nameOverride: ""
+fullnameOverride: ""
+
 terminationPolicy: Delete
 
-tolerations:
-  - key: kb-controller
-    operator: Equal
-    value: "true"
-    effect: NoSchedule
+## @param tolerations define global Tolerations for the cluster all pod's assignment
+## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+##
+tolerations: []
 
-affinity:
-  nodeAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 100
-        preference:
-          matchExpressions:
-            - key: kb-controller
-              operator: In
-              values:
-                - "true"
+## @param topologySpreadConstraints Topology Spread Constraints for pod assignment spread across your cluster among failure-domains. Evaluated as a template
+## Ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/#spread-constraints-for-pods
+##
+topologyKeys:
+  - kubernetes.io/hostname
 
 server:
   replicaCount: 1
@@ -34,6 +32,8 @@ server:
     #   memory: 512Mi
 
   persistence:
+    enabled: true
+
     ## If defined, storageClassName: <storageClass>
     ## If set to "-", storageClassName: "", which disables dynamic provisioning
     ## If undefined (the default) or set to null, no storageClassName spec is
@@ -42,7 +42,7 @@ server:
     ##
     # storageClass: "-"
     # TODO: storageClass参考上面的逻辑处理下
-    storageClass:
+    storageClassName:
 
     size: 20Gi
 
@@ -65,9 +65,11 @@ alertmanager:
     #   memory: 512Mi
 
   persistence:
-    storageClass:
+    enabled: true
 
-    size: 20Gi
+    storageClassName:
+
+    size: 1Gi
 
 
 

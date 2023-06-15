@@ -1,4 +1,6 @@
 clusterVersionOverride: ""
+nameOverride: ""
+fullnameOverride: ""
 
 server:
   ## Prometheus server container image

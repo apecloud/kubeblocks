@@ -9,12 +9,12 @@ spec:
   terminationPolicy: {{ $.Values.terminationPolicy }}
   {{- if .Values.tolerations }}
   tolerations:
-{{ toYaml .Values.tolerations | indent 4 }}
+    {{- toYaml .Values.tolerations | indent 4 }}
   {{- end }}
-  {{- if .Values.affinity }}
   affinity:
-{{ toYaml .Values.affinity | indent 4 }}
-  {{- end }}
+    {{- with .Values.topologyKeys }}
+    topologyKeys: {{ . | toYaml | nindent 6 }}
+    {{- end }}
   componentSpecs:
     - name: server # user-defined
       componentDefRef: server # ref clusterdefinition components.name
@@ -32,15 +32,17 @@ spec:
           cpu: {{ .requests.cpu | quote }}
           memory: {{ .requests.memory | quote }}
       {{- end }}
+      {{- if .Values.server.persistence.enabled }}
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: {{ .Values.server.persistence.storageClass }}
+            storageClassName: {{ .Values.server.persistence.storageClassName }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
                 storage: {{ .Values.server.persistence.size }}
+      {{- end }}
 
     - name: alertmanager # user-defined
       componentDefRef: alertmanager # ref clusterdefinition components.name
@@ -48,12 +50,14 @@ spec:
       primaryIndex: {{ .Values.alertmanager.primaryIndex | default 0 }}
       switchPolicy:
         type: {{ .Values.alertmanager.switchPolicy.type}}
+      {{- if .Values.alertmanager.persistence.enabled }}
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: {{ .Values.alertmanager.persistence.storageClass }}
+            storageClassName: {{ .Values.alertmanager.persistence.storageClassName }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
                 storage: {{ .Values.alertmanager.persistence.size }}
+      {{- end }}

@@ -191,7 +191,7 @@ func (i *InstallOpts) Install(cfg *Config) (*release.Release, error) {
 }
 
 func (i *InstallOpts) tryInstall(cfg *action.Configuration) (*release.Release, error) {
-	if *i.DryRun != true {
+	if !*i.DryRun {
 		released, err := i.GetInstalled(cfg)
 		if released != nil {
 			return released, nil
@@ -591,8 +591,4 @@ func GetValues(release string, cfg *Config) (map[string]interface{}, error) {
 	client := action.NewGetValues(actionConfig)
 	client.AllValues = true
 	return client.Run(release)
-}
-
-func TemplateManifest(chart string, version string) {
-
 }

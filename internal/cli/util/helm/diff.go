@@ -2,14 +2,16 @@ package helm
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"golang.org/x/exp/maps"
-	"gopkg.in/yaml.v2"
 	"io"
 	"log"
 	"reflect"
 	"sort"
 	"strings"
+
+	"golang.org/x/exp/maps"
+	"gopkg.in/yaml.v2"
+
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
@@ -74,7 +76,7 @@ func ParseContent(content string) (*MappingResult, error) {
 			return nil, nil
 		}
 	}
-	// filter name
+	// filter Name
 	for i := range nameBlackList {
 		if strings.Contains(parsedMetadata.Metadata.Name, nameBlackList[i]) {
 			return nil, nil
@@ -85,11 +87,11 @@ func ParseContent(content string) (*MappingResult, error) {
 	if err := yaml.Unmarshal([]byte(content), &object); err != nil {
 		log.Fatalf("YAML unmarshal error: %s\nCan't unmarshal %s", err, content)
 	}
-	//filter label
+	// filter Label
 	for i := range labelBlackList {
 		deleteLabel(&object, labelBlackList[i])
 	}
-	// filter field
+	// filter Field
 	for i := range fieldBlackList {
 		deleteObjField(&object, fieldBlackList[i])
 	}

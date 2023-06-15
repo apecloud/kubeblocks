@@ -22,12 +22,12 @@ package kubeblocks
 import (
 	"bytes"
 	"fmt"
-	"helm.sh/helm/v3/pkg/releaseutil"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"helm.sh/helm/v3/pkg/releaseutil"
 	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -199,14 +199,10 @@ func (o *InstallOptions) showUpgradeDiff(curKBVersion string) error {
 	fmt.Fprintln(&oldManifests, strings.TrimSpace(currentRelease.Manifest))
 	oldManifestsKeys := releaseutil.SplitManifests(oldManifests.String())
 
-	//oldManifestsKeys := make([]string, 0, len(splitManifests))
-	//for k := range splitManifests {
-	//	oldManifestsKeys = append(oldManifestsKeys, k)
-	//}
 	var newManifests bytes.Buffer
 	fmt.Fprintln(&newManifests, strings.TrimSpace(targetRelease.Manifest))
 	newManifestsKeys := releaseutil.SplitManifests(newManifests.String())
-	//oldManifestsKeys := make(map[string]*helm.MappingResult, 0)
+
 	oldManifestsMap := make(map[string]*helm.MappingResult)
 	for _, v := range oldManifestsKeys {
 		mapResult, err := helm.ParseContent(v)
@@ -229,7 +225,5 @@ func (o *InstallOptions) showUpgradeDiff(curKBVersion string) error {
 		}
 		newManifestsMap[mapResult.Name] = mapResult
 	}
-
-	helm.OutPutDiff(newManifestsMap, oldManifestsMap, o.Out)
-	return nil
+	return helm.OutPutDiff(newManifestsMap, oldManifestsMap, o.Out)
 }

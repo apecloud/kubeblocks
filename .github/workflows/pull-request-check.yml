@@ -15,6 +15,7 @@ jobs:
     steps:
       - name: check branch name
         uses: apecloud/check-branch-name@v0.1.0
+        if: github.event.pull_request.head.repo.full_name == github.repository
         with:
           branch_pattern: 'feature/|bugfix/|release/|hotfix/|support/|releasing/|dependabot/'
           comment_for_invalid_branch_name: 'This branch name is not following the standards: feature/|bugfix/|release/|hotfix/|support/|releasing/|dependabot/'

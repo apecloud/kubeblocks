@@ -61,6 +61,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 	cmdget "k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -899,4 +900,37 @@ func AddDirToPath(dir string) error {
 		p = dir + ":" + p
 	}
 	return os.Setenv("PATH", p)
+}
+
+func ListResourceByGVR(ctx context.Context, client dynamic.Interface, namespace string, gvrs []schema.GroupVersionResource, selector []metav1.ListOptions, allErrs *[]error) []*unstructured.UnstructuredList {
+	unstructuredList := make([]*unstructured.UnstructuredList, 0)
+	for _, gvr := range gvrs {
+		for _, labelSelector := range selector {
+			klog.V(1).Infof("listResourceByGVR: namespace=%s, gvr=%v, selector=%v", namespace, gvr, labelSelector)
+			resource, err := client.Resource(gvr).Namespace(namespace).List(ctx, labelSelector)
+			if err != nil {
+				AppendErrIgnoreNotFound(allErrs, err)
+				continue
+			}
+			unstructuredList = append(unstructuredList, resource)
+		}
+	}
+	return unstructuredList
+}
+
+func AppendErrIgnoreNotFound(allErrs *[]error, err error) {
+	if err == nil || apierrors.IsNotFound(err) {
+		return
+	}
+	*allErrs = append(*allErrs, err)
+}
+
+func WritePogStreamingLog(ctx context.Context, client kubernetes.Interface, pod *corev1.Pod, logOptions corev1.PodLogOptions, writer io.Writer) error {
+	request := client.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &logOptions)
+	if data, err := request.DoRaw(ctx); err != nil {
+		return err
+	} else {
+		_, err := writer.Write(data)
+		return err
+	}
 }

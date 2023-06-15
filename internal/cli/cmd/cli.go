@@ -51,6 +51,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/plugin"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/report"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -79,6 +80,7 @@ func init() {
 			klog.ErrorDepth(2, err)
 		}
 	}
+
 }
 
 func NewDefaultCliCmd() *cobra.Command {
@@ -121,13 +123,13 @@ func NewCliCmd() *cobra.Command {
 		Short: "KubeBlocks CLI.",
 		Long: `
 =============================================
- __    __ _______   ______  __       ______ 
+ __    __ _______   ______  __       ______
 |  \  /  \       \ /      \|  \     |      \
 | ▓▓ /  ▓▓ ▓▓▓▓▓▓▓\  ▓▓▓▓▓▓\ ▓▓      \▓▓▓▓▓▓
-| ▓▓/  ▓▓| ▓▓__/ ▓▓ ▓▓   \▓▓ ▓▓       | ▓▓  
-| ▓▓  ▓▓ | ▓▓    ▓▓ ▓▓     | ▓▓       | ▓▓  
-| ▓▓▓▓▓\ | ▓▓▓▓▓▓▓\ ▓▓   __| ▓▓       | ▓▓  
-| ▓▓ \▓▓\| ▓▓__/ ▓▓ ▓▓__/  \ ▓▓_____ _| ▓▓_ 
+| ▓▓/  ▓▓| ▓▓__/ ▓▓ ▓▓   \▓▓ ▓▓       | ▓▓
+| ▓▓  ▓▓ | ▓▓    ▓▓ ▓▓     | ▓▓       | ▓▓
+| ▓▓▓▓▓\ | ▓▓▓▓▓▓▓\ ▓▓   __| ▓▓       | ▓▓
+| ▓▓ \▓▓\| ▓▓__/ ▓▓ ▓▓__/  \ ▓▓_____ _| ▓▓_
 | ▓▓  \▓▓\ ▓▓    ▓▓\▓▓    ▓▓ ▓▓     \   ▓▓ \
  \▓▓   \▓▓\▓▓▓▓▓▓▓  \▓▓▓▓▓▓ \▓▓▓▓▓▓▓▓\▓▓▓▓▓▓
 
@@ -180,6 +182,7 @@ A Command Line Interface for KubeBlocks`,
 		plugin.NewPluginCmd(ioStreams),
 		fault.NewFaultCmd(f, ioStreams),
 		builder.NewBuilderCmd(f, ioStreams),
+		report.NewReportCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

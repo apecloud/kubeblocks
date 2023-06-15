@@ -1,33 +1,51 @@
 ---
-title: kbcli
+title: kbcli report cluster
 ---
 
-KubeBlocks CLI.
-
-### Synopsis
+Report Cluster information
 
 ```
-
-=============================================
- __    __ _______   ______  __       ______
-|  \  /  \       \ /      \|  \     |      \
-| ▓▓ /  ▓▓ ▓▓▓▓▓▓▓\  ▓▓▓▓▓▓\ ▓▓      \▓▓▓▓▓▓
-| ▓▓/  ▓▓| ▓▓__/ ▓▓ ▓▓   \▓▓ ▓▓       | ▓▓
-| ▓▓  ▓▓ | ▓▓    ▓▓ ▓▓     | ▓▓       | ▓▓
-| ▓▓▓▓▓\ | ▓▓▓▓▓▓▓\ ▓▓   __| ▓▓       | ▓▓
-| ▓▓ \▓▓\| ▓▓__/ ▓▓ ▓▓__/  \ ▓▓_____ _| ▓▓_
-| ▓▓  \▓▓\ ▓▓    ▓▓\▓▓    ▓▓ ▓▓     \   ▓▓ \
- \▓▓   \▓▓\▓▓▓▓▓▓▓  \▓▓▓▓▓▓ \▓▓▓▓▓▓▓▓\▓▓▓▓▓▓
-
-=============================================
-A Command Line Interface for KubeBlocks
+kbcli report cluster NAME [-f file] [-with-logs] [-mask] [flags]
 ```
 
+### Examples
+
 ```
-kbcli [flags]
+  # report KubeBlock status
+  kbcli report cluster <mycluster>
+  
+  # report KubeBlock cluster information to file
+  kbcli report cluster <mycluster> -f <filename>
+  
+  # report KubeBlock cluster information with logs
+  kbcli report cluster <mycluster> --with-logs
+  
+  # report KubeBlock cluster information with logs and mask sensitive info
+  kbcli report cluster <mycluster> --with-logs --mask
+  
+  # report KubeBlock cluster information with logs since 1 hour ago
+  kbcli report cluster <mycluster> --with-logs --since 1h
+  
+  # report KubeBlock cluster information with logs since given time
+  kbcli report cluster <mycluster> --with-logs --since-time 2023-05-23T00:00:00Z
+  
+  # report KubeBlock cluster information with logs for all containers
+  kbcli report cluster <mycluster> --with-logs --all-containers
 ```
 
 ### Options
+
+```
+      --all-containers      Get all containers' logs in the pod(s). Byt default, only the main container (the first container) will have logs recorded.
+  -f, --file string         zip file for output
+  -h, --help                help for cluster
+      --mask                mask sensitive info for secrets and configmaps (default true)
+      --since duration      Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used.
+      --since-time string   Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used.
+      --with-logs           include pod logs
+```
+
+### Options inherited from parent commands
 
 ```
       --as string                      Username to impersonate for the operation. User could be a regular user or a service account in a namespace.
@@ -40,7 +58,6 @@ kbcli [flags]
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
-  -h, --help                           help for kbcli
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
@@ -54,23 +71,7 @@ kbcli [flags]
 
 ### SEE ALSO
 
-* [kbcli addon](kbcli_addon.md)	 - Addon command.
-* [kbcli alert](kbcli_alert.md)	 - Manage alert receiver, include add, list and delete receiver.
-* [kbcli bench](kbcli_bench.md)	 - Run a benchmark.
-* [kbcli builder](kbcli_builder.md)	 - builder command.
-* [kbcli class](kbcli_class.md)	 - Manage classes
-* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
-* [kbcli clusterversion](kbcli_clusterversion.md)	 - ClusterVersion command.
-* [kbcli dashboard](kbcli_dashboard.md)	 - List and open the KubeBlocks dashboards.
-* [kbcli fault](kbcli_fault.md)	 - Inject faults to pod.
-* [kbcli kubeblocks](kbcli_kubeblocks.md)	 - KubeBlocks operation commands.
-* [kbcli migration](kbcli_migration.md)	 - Data migration between two data sources.
-* [kbcli options](kbcli_options.md)	 - Print the list of flags inherited by all commands.
-* [kbcli playground](kbcli_playground.md)	 - Bootstrap or destroy a playground KubeBlocks in local host or cloud.
-* [kbcli plugin](kbcli_plugin.md)	 - Provides utilities for interacting with plugins.
 * [kbcli report](kbcli_report.md)	 - report kubeblocks or cluster info.
-* [kbcli version](kbcli_version.md)	 - Print the version information, include kubernetes, KubeBlocks and kbcli version.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

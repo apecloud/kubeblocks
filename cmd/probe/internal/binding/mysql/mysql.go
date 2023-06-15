@@ -768,12 +768,12 @@ func (mysqlOps *MysqlOperations) priv2Role(priv string) RoleType {
 
 func (mysqlOps *MysqlOperations) Promote(ctx context.Context, podName string) error {
 	stopReadOnly := `set global read_only=off;`
-	resp, err := mysqlOps.Cs.ExecCmdWithPod(ctx, podName, stopReadOnly, mysqlOps.DBType)
+	resp, err := mysqlOps.exec(ctx, stopReadOnly)
 	if err != nil {
 		mysqlOps.Logger.Errorf("promote err: %v", err)
 		return err
 	}
-	mysqlOps.Logger.Infof("response: ", resp)
+	mysqlOps.Logger.Infof("promote success, resp:%v", resp)
 
 	return nil
 }
@@ -781,9 +781,9 @@ func (mysqlOps *MysqlOperations) Promote(ctx context.Context, podName string) er
 func (mysqlOps *MysqlOperations) Demote(ctx context.Context, podName string) error {
 	setReadOnly := `set global read_only=on;`
 
-	_, err := mysqlOps.Cs.ExecCmdWithPod(ctx, podName, setReadOnly, mysqlOps.DBType)
+	_, err := mysqlOps.exec(ctx, setReadOnly)
 	if err != nil {
-		mysqlOps.Logger.Errorf("stop err: %v", err)
+		mysqlOps.Logger.Errorf("promote err: %v", err)
 		return err
 	}
 
@@ -851,18 +851,20 @@ func (mysqlOps *MysqlOperations) IsHealthiest(ctx context.Context, podName strin
 		return false
 	}
 
-	requestBody := `{"operation":"getRole"}`
-	for _, m := range mysqlOps.Cs.GetCluster().Members {
-		resp, err := mysqlOps.FetchOtherStatus(m.GetData().GetUrl(), requestBody)
-		if err != nil {
-			mysqlOps.Logger.Errorf("fetch other status err:%v", err)
-			return false
+	/*
+		requestBody := `{"operation":"getRole"}`
+		for _, m := range mysqlOps.Cs.GetCluster().Members {
+			resp, err := mysqlOps.FetchOtherStatus(m.GetData().GetUrl(), requestBody)
+			if err != nil {
+				mysqlOps.Logger.Errorf("fetch other status err:%v", err)
+				return false
+			}
+			if resp["role"] == PRIMARY {
+				mysqlOps.Logger.Errorf("Primary %s is still alive")
+				return false
+			}
 		}
-		if resp["role"] == PRIMARY {
-			mysqlOps.Logger.Errorf("Primary %s is still alive")
-			return false
-		}
-	}
+	*/
 
 	return true
 }
@@ -878,6 +880,7 @@ func (mysqlOps *MysqlOperations) HandleFollow(ctx context.Context, leader *confi
 		return mysqlOps.follow(ctx, podName, leader.GetMember().GetName())
 	}
 
+	mysqlOps.Logger.Infof("no action coz i am still follow the leader")
 	return nil
 }
 
@@ -908,7 +911,7 @@ func (mysqlOps *MysqlOperations) follow(ctx context.Context, podName string, lea
 		leader, mysqlOps.Cs.GetClusterCompName(), os.Getenv("MYSQL_ROOT_USER"), os.Getenv("MYSQL_ROOT_PASSWORD"), os.Getenv("MYSQL_MYSQL_SERVICE_PORT"))
 	startSlave := `start slave;`
 
-	_, err := mysqlOps.query(ctx, stopSlave+changeMaster+startSlave)
+	_, err := mysqlOps.exec(ctx, stopSlave+changeMaster+startSlave)
 	if err != nil {
 		mysqlOps.Logger.Errorf("sql query failed, err:%v", err)
 	}

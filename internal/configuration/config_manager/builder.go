@@ -161,7 +161,7 @@ func buildConfigManagerArgs(params *CfgManagerBuildParams, volumeDirs []corev1.V
 	if err := createOrUpdateConfigMap(frmConfigSpecMeta(params.ConfigSpecsBuildParams), params, cli, ctx); err != nil {
 		return err
 	}
-	args = append(args, "--config", filepath.Join(configManagerConfigVolumeName, configManagerConfig))
+	args = append(args, "--config", filepath.Join(configManagerConfigMountPoint, configManagerConfig))
 	params.Args = args
 	return nil
 }

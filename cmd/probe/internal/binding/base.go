@@ -333,6 +333,17 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 	return opsRes, nil
 }
 
+func (ops *BaseOperations) IsLeader(ctx context.Context) (bool, error) {
+	role, err := ops.GetRole(ctx, &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
+	if err != nil {
+		ops.Logger.Errorf("get role failed, err:%v", err)
+		return false, err
+	}
+	ops.OriRole = role
+
+	return role == PRIMARY, nil
+}
+
 func (ops *BaseOperations) ExecCmd(ctx context.Context, podName, cmd string) (map[string]string, error) {
 	return ops.Cs.ExecCmdWithPod(ctx, podName, cmd, ops.DBType)
 }
@@ -361,4 +372,17 @@ func (ops *BaseOperations) FetchOtherStatus(url string, requestBody string) (map
 	}
 
 	return result, nil
+}
+
+func (ops *BaseOperations) ManualSwitchover(primary, candidate string) error {
+	annotations := map[string]string{
+		LEADER:    primary,
+		CANDIDATE: candidate,
+	}
+	_, err := ops.Cs.CreateConfigMap(ops.Cs.GetClusterCompName()+configuration_store.SwitchoverSuffix, annotations)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

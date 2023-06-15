@@ -67,12 +67,18 @@ func NewHa() *Ha {
 	if ha.DB == nil {
 		panic("unknown db type")
 	}
-	props := map[string]string{
-		"url": "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10",
+	props := map[string]map[string]string{
+		binding.Postgresql: {
+			"url": "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10",
+		},
+		binding.Mysql: {
+			"url":          "root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true",
+			"maxOpenConns": "5",
+		},
 	}
 
 	_ = ha.DB.Init(bindings.Metadata{
-		Base: metadata.Base{Properties: props},
+		Base: metadata.Base{Properties: props[ha.dbType]},
 	})
 
 	for i := 0; i < 3; i++ {

@@ -43,6 +43,7 @@ const (
 	SwitchoverOperation   bindings.OperationKind = "switchover"
 	FailoverOperation     bindings.OperationKind = "failover"
 	CloseOperation        bindings.OperationKind = "close"
+	GetTestOperation      bindings.OperationKind = "getTest"
 
 	// actions for cluster accounts management
 	ListUsersOp          bindings.OperationKind = "listUsers"

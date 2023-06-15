@@ -42,6 +42,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -126,6 +127,10 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	mysqlOps.RegisterOperation(CheckStatusOperation, mysqlOps.CheckStatusOps)
 	mysqlOps.RegisterOperation(ExecOperation, mysqlOps.ExecOps)
 	mysqlOps.RegisterOperation(QueryOperation, mysqlOps.QueryOps)
+	mysqlOps.RegisterOperation(SwitchoverOperation, mysqlOps.SwitchoverOps)
+	mysqlOps.RegisterOperation(FailoverOperation, mysqlOps.FailoverOps)
+
+	mysqlOps.RegisterOperation(GetTestOperation, mysqlOps.GetTest)
 
 	// following are ops for account management
 	mysqlOps.RegisterOperation(ListUsersOp, mysqlOps.listUsersOps)
@@ -225,6 +230,7 @@ func (mysqlOps *MysqlOperations) GetRunningPort() int {
 	return port
 }
 
+/*
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	sql := "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
 
@@ -254,6 +260,22 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 		return role, nil
 	}
 	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
+}
+*/
+
+func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+	sql := "show slave status"
+	data, err := mysqlOps.query(ctx, sql)
+	if err != nil {
+		mysqlOps.Logger.Infof("error executing %s: %v", sql, err)
+		return "", errors.Wrapf(err, "error executing %s", sql)
+	}
+
+	if string(data) == "null" {
+		return PRIMARY, nil
+	} else {
+		return SECONDARY, nil
+	}
 }
 
 func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
@@ -737,4 +759,350 @@ func (mysqlOps *MysqlOperations) priv2Role(priv string) RoleType {
 		return NoPrivileges
 	}
 	return CustomizedRole
+}
+
+func (mysqlOps *MysqlOperations) Promote(ctx context.Context, podName string) error {
+	stopReadOnly := `set global read_only=off;`
+	resp, err := mysqlOps.Cs.ExecCmdWithPod(ctx, podName, stopReadOnly, mysqlOps.DBType)
+	if err != nil {
+		mysqlOps.Logger.Errorf("promote err: %v", err)
+		return err
+	}
+	mysqlOps.Logger.Infof("response: ", resp)
+
+	return nil
+}
+
+func (mysqlOps *MysqlOperations) Demote(ctx context.Context, podName string) error {
+	setReadOnly := `set global read_only=on;`
+
+	_, err := mysqlOps.Cs.ExecCmdWithPod(ctx, podName, setReadOnly, mysqlOps.DBType)
+	if err != nil {
+		mysqlOps.Logger.Errorf("stop err: %v", err)
+		return err
+	}
+
+	opTime, _ := mysqlOps.GetOpTime(ctx)
+	err = mysqlOps.Cs.DeleteLeader(opTime)
+
+	// Give a time to somebody to take the leader lock
+	time.Sleep(time.Second * 5)
+	//TODO:Follow which
+	for i := 0; i < 3; i++ {
+		err = mysqlOps.Cs.GetClusterFromKubernetes()
+		if err == nil && mysqlOps.Cs.GetCluster().Leader != nil {
+			break
+		}
+		time.Sleep(time.Second * 2)
+
+		if i == 2 {
+			return errors.Errorf("get no leader now")
+		}
+	}
+
+	return mysqlOps.follow(ctx, podName, mysqlOps.Cs.GetCluster().Leader.GetMember().GetName())
+}
+
+func (mysqlOps *MysqlOperations) GetExtra(ctx context.Context) (map[string]string, error) {
+	return nil, nil
+}
+
+func (mysqlOps *MysqlOperations) GetOpTime(ctx context.Context) (int64, error) {
+	sql := `show status like '%Innodb_redo_log_current_lsn%';`
+	data, err := mysqlOps.query(ctx, sql)
+	if err != nil {
+		mysqlOps.Logger.Errorf("get engine innodb status failed, err:%v", err)
+		return 0, err
+	}
+
+	result, err := ParseQuery(string(data))
+	if err != nil {
+		return 0, err
+	}
+
+	currentLsn, err := strconv.ParseInt(result["Value"], 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return currentLsn, nil
+}
+
+func (mysqlOps *MysqlOperations) IsRunning(ctx context.Context, podName string) bool {
+	// TODO:后期直接用进程判断
+	return mysqlOps.db.Ping() == nil
+}
+
+func (mysqlOps *MysqlOperations) IsHealthiest(ctx context.Context, podName string) bool {
+	err := mysqlOps.Cs.GetClusterFromKubernetes()
+	if err != nil {
+		mysqlOps.Logger.Errorf("get cluster from k8s failed, err:%v", err)
+	}
+
+	//这部分引擎相关可以扩充
+	lastLsn, _ := mysqlOps.GetOpTime(ctx)
+	if mysqlOps.isLagging(lastLsn) {
+		mysqlOps.Logger.Infof("my lag exceeds max lag")
+		return false
+	}
+
+	requestBody := `{"operation":"getRole"}`
+	for _, m := range mysqlOps.Cs.GetCluster().Members {
+		resp, err := mysqlOps.FetchOtherStatus(m.GetData().GetUrl(), requestBody)
+		if err != nil {
+			mysqlOps.Logger.Errorf("fetch other status err:%v", err)
+			return false
+		}
+		if resp["role"] == PRIMARY {
+			mysqlOps.Logger.Errorf("Primary %s is still alive")
+			return false
+		}
+	}
+
+	return true
+}
+
+func (mysqlOps *MysqlOperations) isLagging(lastLsn int64) bool {
+	lag := mysqlOps.Cs.GetCluster().GetOpTime() - lastLsn
+	return lag > mysqlOps.Cs.GetCluster().Config.GetData().GetMaxLagOnSwitchover()
+}
+
+func (mysqlOps *MysqlOperations) HandleFollow(ctx context.Context, leader *configuration_store.Leader, podName string) error {
+	needChange := mysqlOps.checkRecoveryConf(ctx, leader.GetMember().GetName())
+	if needChange {
+		return mysqlOps.follow(ctx, podName, leader.GetMember().GetName())
+	}
+
+	return nil
+}
+
+func (mysqlOps *MysqlOperations) checkRecoveryConf(ctx context.Context, leader string) bool {
+	sql := "show slave status"
+	data, err := mysqlOps.query(ctx, sql)
+	if err != nil {
+		mysqlOps.Logger.Errorf("error executing %s: %v", sql, err)
+		return true
+	}
+
+	result, err := ParseQuery(string(data))
+	if err != nil {
+		mysqlOps.Logger.Errorf("parse query err:%v", err)
+		return true
+	}
+
+	if strings.Split(result["Master_Host"], ".")[0] != leader {
+		return true
+	}
+
+	return false
+}
+
+func (mysqlOps *MysqlOperations) follow(ctx context.Context, podName string, leader string) error {
+	stopSlave := `stop slave;`
+	changeMaster := fmt.Sprintf(`change master to master_host='%s.%s-headless',master_user='%s',master_password='%s',master_port=%s,master_auto_position=1;`,
+		leader, mysqlOps.Cs.GetClusterCompName(), os.Getenv("MYSQL_ROOT_USER"), os.Getenv("MYSQL_ROOT_PASSWORD"), os.Getenv("MYSQL_MYSQL_SERVICE_PORT"))
+	startSlave := `start slave;`
+
+	_, err := mysqlOps.Cs.ExecCmdWithPod(ctx, podName, stopSlave+changeMaster+startSlave, mysqlOps.DBType)
+	if err != nil {
+		mysqlOps.Logger.Errorf("modify primary info failed,err:%v", err)
+		return err
+	}
+
+	return nil
+}
+
+func (mysqlOps *MysqlOperations) EnforcePrimaryRole(ctx context.Context, podName string) error {
+	if isLeader, err := mysqlOps.IsLeader(ctx); isLeader && err == nil {
+		return nil
+	} else {
+		return mysqlOps.Promote(ctx, podName)
+	}
+}
+
+func (mysqlOps *MysqlOperations) ProcessManualSwitchoverFromLeader(ctx context.Context, podName string) (bool, error) {
+	err := mysqlOps.Cs.GetClusterFromKubernetes()
+	if err != nil {
+		mysqlOps.Logger.Errorf("get cluster from k8s failed, err:%v", err)
+		return false, err
+	}
+
+	switchover := mysqlOps.Cs.GetCluster().Switchover
+	if switchover == nil {
+		return false, nil
+	}
+
+	leader := switchover.GetLeader()
+	candidate := switchover.GetCandidate()
+	if leader == "" || leader == podName {
+		if candidate == "" || candidate != podName {
+			var members []string
+			for _, m := range mysqlOps.Cs.GetCluster().Members {
+				if switchover.GetCandidate() == "" || m.GetName() == candidate {
+					members = append(members, m.GetName())
+				}
+			}
+
+			if mysqlOps.isFailoverPossible(members) {
+				return true, mysqlOps.Demote(ctx, podName)
+			}
+		} else {
+			mysqlOps.Logger.Warnf("manual failover: I am already the leader, no need to failover")
+		}
+	} else {
+		mysqlOps.Logger.Warnf("manual switchover, leader name does not match, %s != %s", switchover.GetLeader(), podName)
+	}
+
+	return false, mysqlOps.Cs.DeleteConfigMap(mysqlOps.Cs.GetClusterCompName() + configuration_store.SwitchoverSuffix)
+}
+
+func (mysqlOps *MysqlOperations) isFailoverPossible(members []string) bool {
+	return true
+}
+
+func (mysqlOps *MysqlOperations) ProcessManualSwitchoverFromNoLeader(ctx context.Context, podName string) bool {
+	err := mysqlOps.Cs.GetClusterFromKubernetes()
+	if err != nil {
+		mysqlOps.Logger.Errorf("get cluster from k8s err:%v", err)
+		return false
+	}
+
+	switchover := mysqlOps.Cs.GetCluster().Switchover
+	if switchover != nil && switchover.GetCandidate() != "" {
+		if switchover.GetCandidate() == podName {
+			return true
+		}
+		member := mysqlOps.Cs.GetCluster().GetMemberWithName(switchover.GetCandidate())
+		requestBody := `{"operation":"checkStatus"}`
+		resp, err := mysqlOps.FetchOtherStatus(member.GetData().GetUrl(), requestBody)
+		if err != nil {
+			mysqlOps.Logger.Errorf("fetch other status err:%v", err)
+		}
+		if resp["event"] == OperationSuccess {
+			return false
+		}
+	}
+
+	return mysqlOps.IsHealthiest(ctx, podName)
+}
+
+func (mysqlOps *MysqlOperations) Start(ctx context.Context, podName string) error {
+	start := `./entrypoint.sh mysqld --defaults-file=/opt/my.cnf &`
+
+	_, err := mysqlOps.Cs.ExecCmdWithPod(ctx, podName, start, mysqlOps.DBType)
+	if err != nil {
+		mysqlOps.Logger.Errorf("touch err: %v", err)
+		return err
+	}
+
+	mysqlOps.OriRole = SECONDARY
+	_ = mysqlOps.InitDelay()
+
+	return nil
+}
+
+func (mysqlOps *MysqlOperations) GetSysID(ctx context.Context) (string, error) {
+	return "", nil
+}
+
+func (mysqlOps *MysqlOperations) GetTest(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	result := OpsResult{}
+	data, err := mysqlOps.GetRole(ctx, req, resp)
+	result["data"] = data
+	result["err"] = err
+
+	return result, nil
+}
+
+func (mysqlOps *MysqlOperations) Stop(ctx context.Context) error {
+	return nil
+}
+
+func (mysqlOps *MysqlOperations) SwitchoverOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	result := OpsResult{}
+	primary, _ := req.Metadata[PRIMARY]
+	candidate, _ := req.Metadata[CANDIDATE]
+	operation := req.Operation
+
+	err := mysqlOps.Cs.GetClusterFromKubernetes()
+	if err != nil {
+		mysqlOps.Logger.Errorf("get cluster err:%v", err)
+		result["event"] = OperationFailed
+		result["message"] = err.Error()
+		return result, nil
+	}
+
+	if can, err := mysqlOps.isSwitchoverPossible(ctx, primary, candidate, operation); !can || err != nil {
+		result["event"] = OperationFailed
+		result["message"] = err.Error()
+		return result, nil
+	}
+
+	if err := mysqlOps.ManualSwitchover(primary, candidate); err != nil {
+		result["event"] = OperationFailed
+		result["message"] = err.Error()
+		return result, nil
+	}
+
+	result["event"] = OperationSuccess
+	if candidate == "" {
+		result["message"] = "Successfully switchover to a healthiest node"
+	} else {
+		result["message"] = fmt.Sprintf("Successfully %s to: %s", string(req.Operation), candidate)
+	}
+
+	return result, nil
+}
+
+func (mysqlOps *MysqlOperations) isSwitchoverPossible(ctx context.Context, primary string, candidate string, operation bindings.OperationKind) (bool, error) {
+	if operation == FailoverOperation && candidate == "" {
+		return false, errors.Errorf("failover need a candidate")
+	} else if operation == SwitchoverOperation && primary == "" {
+		return false, errors.Errorf("switchover need a primary")
+	}
+	if primary != "" && (mysqlOps.Cs.GetCluster().Leader == nil || mysqlOps.Cs.GetCluster().Leader.GetMember().GetName() != primary) {
+		return false, errors.Errorf("leader name does not match")
+	}
+
+	if candidate != "" {
+		if mysqlOps.Cs.GetCluster().Leader != nil && mysqlOps.Cs.GetCluster().Leader.GetMember().GetName() != primary {
+			return false, errors.Errorf("leader name does not match ,leader name: %s, primary: %s", mysqlOps.Cs.GetCluster().Leader.GetMember().GetName(), primary)
+		}
+
+		if !mysqlOps.Cs.GetCluster().HasMember(candidate) {
+			return false, errors.Errorf("candidate does not exist")
+		}
+	} else {
+		hasMemberExceptLeader := false
+		for _, member := range mysqlOps.Cs.GetCluster().Members {
+			if member.GetName() != mysqlOps.Cs.GetCluster().Leader.GetMember().GetName() {
+				hasMemberExceptLeader = true
+			}
+		}
+		if !hasMemberExceptLeader {
+			return false, errors.Errorf("cluster does not have member except leader")
+		}
+	}
+
+	runningMembers := 0
+	requestBody := `{"operation":"checkStatus"}`
+	for _, m := range mysqlOps.Cs.GetCluster().Members {
+		resp, err := mysqlOps.FetchOtherStatus(m.GetData().GetUrl(), requestBody)
+		if err != nil {
+			mysqlOps.Logger.Errorf("fetch other member failed, err:%v", err)
+		}
+		mysqlOps.Logger.Infof("other status:%v", resp)
+		if resp["event"] == OperationSuccess {
+			runningMembers++
+		}
+	}
+	if runningMembers == 0 {
+		return false, errors.Errorf("no running candidates have been found")
+	}
+
+	return true, nil
+}
+
+func (mysqlOps *MysqlOperations) FailoverOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	return mysqlOps.SwitchoverOps(ctx, req, resp)
 }

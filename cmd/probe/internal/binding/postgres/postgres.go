@@ -338,7 +338,7 @@ func (pgOps *PostgresOperations) SwitchoverOps(ctx context.Context, req *binding
 		return result, nil
 	}
 
-	if err := pgOps.manualSwitchover(primary, candidate); err != nil {
+	if err := pgOps.ManualSwitchover(primary, candidate); err != nil {
 		result["event"] = OperationFailed
 		result["message"] = err.Error()
 		return result, nil
@@ -433,19 +433,6 @@ func (pgOps *PostgresOperations) isSwitchoverPossible(ctx context.Context, prima
 	}
 
 	return true, nil
-}
-
-func (pgOps *PostgresOperations) manualSwitchover(primary, candidate string) error {
-	annotations := map[string]string{
-		LEADER:    primary,
-		CANDIDATE: candidate,
-	}
-	_, err := pgOps.Cs.CreateConfigMap(pgOps.Cs.GetClusterCompName()+configuration_store.SwitchoverSuffix, annotations)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (pgOps *PostgresOperations) getSwitchoverResult(oldPrimary, candidate string) (string, error) {
@@ -932,17 +919,6 @@ func (pgOps *PostgresOperations) Demote(ctx context.Context, podName string) err
 
 func (pgOps *PostgresOperations) GetOpTime(ctx context.Context) (int64, error) {
 	return pgOps.getWalPosition(ctx)
-}
-
-func (pgOps *PostgresOperations) IsLeader(ctx context.Context) (bool, error) {
-	role, err := pgOps.GetRole(ctx, &bindings.InvokeRequest{}, &bindings.InvokeResponse{})
-	if err != nil {
-		pgOps.Logger.Errorf("get role failed, err:%v", err)
-		return false, err
-	}
-	pgOps.OriRole = role
-
-	return role == PRIMARY, nil
 }
 
 func (pgOps *PostgresOperations) IsRunning(ctx context.Context, podName string) bool {

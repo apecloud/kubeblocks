@@ -130,6 +130,7 @@ func main() {
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
+
 	Ha := ha.NewHa()
 	go func() {
 		Ha.HaControl(stopCh)

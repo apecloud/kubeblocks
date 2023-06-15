@@ -186,8 +186,9 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		It("Test Reconfigure OpsRequest with restart", func() {
 			opsRes, eventContext := assureMockReconfigureData("simple")
 			reqCtx := intctrlutil.RequestCtx{
-				Ctx: testCtx.Ctx,
-				Log: log.FromContext(ctx).WithValues("Reconfigure"),
+				Ctx:      testCtx.Ctx,
+				Log:      log.FromContext(ctx).WithValues("Reconfigure"),
+				Recorder: opsRes.Recorder,
 			}
 
 			By("mock reconfigure success")
@@ -247,8 +248,9 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		It("Test Reconfigure OpsRequest with autoReload", func() {
 			opsRes, eventContext := assureMockReconfigureData("autoReload")
 			reqCtx := intctrlutil.RequestCtx{
-				Ctx: testCtx.Ctx,
-				Log: log.FromContext(ctx).WithValues("Reconfigure"),
+				Ctx:      testCtx.Ctx,
+				Log:      log.FromContext(ctx).WithValues("Reconfigure"),
+				Recorder: opsRes.Recorder,
 			}
 
 			By("mock reconfigure success")

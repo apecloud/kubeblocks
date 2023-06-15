@@ -527,11 +527,10 @@ ignore_cover_pkgs() {
 }
 
 set_size_label() {
-    pr_changes=$( gh_curl -s $GITHUB_API/repos/$LATEST_REPO/pulls/$PR_NUMBER/files | jq -r '.[].changes' )
-    total_changes=0
-    for changes in $( echo "$pr_changes" ); do
-       total_changes=$(( $total_changes + $changes ))
-    done
+    pr_info=$( gh pr view $PR_NUMBER --repo $LATEST_REPO --json "additions,deletions,labels" )
+    pr_additions=$( echo "$pr_info" | jq -r '.additions' )
+    pr_deletions=$( echo "$pr_info" | jq -r '.deletions' )
+    total_changes=$(( $pr_additions + $pr_deletions ))
     size_label=""
     if [[ $total_changes -lt 10 ]]; then
         size_label="size/XS"
@@ -547,11 +546,10 @@ set_size_label() {
         size_label="size/XXL"
     fi
     echo "size label:$size_label"
-    label_list=$( gh pr view $PR_NUMBER --repo $LATEST_REPO | grep labels: )
+    label_list=$(  echo "$pr_info" | jq -r '.labels[].name' )
     remove_label=""
     add_label=true
     for label in $( echo "$label_list" ); do
-        label=${label/,/}
         case $label in
             $size_label)
                 add_label=false
@@ -566,10 +564,6 @@ set_size_label() {
             ;;
         esac
     done
-    if [[ "$remove_label" == *"," ]]; then
-        echo $remove_label
-        remove_label=${remove_label::-1}
-    fi
 
     if [[ ! -z "$remove_label" ]]; then
         echo "remove label:$remove_label"

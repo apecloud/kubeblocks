@@ -1,6 +1,6 @@
 clusterVersionOverride: ""
 nameOverride: ""
-fullnameOverride: ""
+
 
 terminationPolicy: Delete
 
@@ -16,6 +16,7 @@ topologyKeys:
   - kubernetes.io/hostname
 
 server:
+  name: server
   replicaCount: 1
 
   resources: { }
@@ -36,16 +37,15 @@ server:
     ##   GKE, AWS & OpenStack)
     ##
     # storageClass: "-"
-    # TODO: storageClass参考上面的逻辑处理下
     storageClassName:
 
     size: 20Gi
 
 
 alertmanager:
+  name: alertmanager
   replicaCount: 1
 
-  ## TODO: 未配置
   resources: { }
     # limits:
     #   cpu: 500m

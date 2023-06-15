@@ -1,13 +1,8 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  labels:
-    component: "server"
-    app: prometheus
-    release: my-promethus
-    chart: prometheus-15.16.1
-    heritage: Helm
   name: prometheus-server
+  labels: {{ include "prometheus-cluster.labels" . | nindent 4 }}
 rules:
   - apiGroups:
       - ""

@@ -1,5 +1,6 @@
 ---
 # Source: prometheus/templates/alertmanager/cm.yaml
+{{- if (empty .Values.alertmanager.configMapOverrideName) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -9,13 +10,13 @@ metadata:
     release: my-promethus
     chart: prometheus-15.16.1
     heritage: Helm
-  name: prometheus-alertmanager
-  namespace: default
+  name: {{ template "prometheus.alertmanager.fullname" . }}
 data:
 {{ range $path, $content := .Files.Glob "config/alertmanager/*.yml" }}
   {{ trimPrefix "config/alertmanager/" $path }}: |-
   {{- $content | toString | nindent 4 }}
 {{ end }}
+{{- end }}
 ---
 # Source: prometheus/templates/server/cm.yaml
 apiVersion: v1
@@ -27,8 +28,7 @@ metadata:
     release: my-promethus
     chart: prometheus-15.16.1
     heritage: Helm
-  name: prometheus-rule
-  namespace: default
+  name: {{ template "prometheus.server.fullname" . }}-rule
 data:
 {{ range $path, $content := .Files.Glob "config/server/rulesFiles/*" }}
   {{ trimPrefix "config/server/rulesFiles/" $path }}: |-
@@ -44,8 +44,7 @@ metadata:
     release: my-promethus
     chart: prometheus-15.16.1
     heritage: Helm
-  name: prometheus-server
-  namespace: default
+  name: {{ template "prometheus.server.fullname" . }}
 data:
 {{- $values := .Values }}
 {{ range $path, $content := .Files.Glob "config/server/serverFiles/*" }}

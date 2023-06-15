@@ -19,16 +19,9 @@ spec:
     - name: server # user-defined
       componentDefRef: server # ref clusterdefinition components.name
       replicas: {{ .Values.server.replicaCount | default 1 }}
-      serviceAccountName: "prometheus-server"
-      {{- with  .Values.server.resources }}
+      serviceAccountName: prometheus-server
       resources:
-        limits:
-          cpu: {{ .limits.cpu | quote }}
-          memory: {{ .limits.memory | quote }}
-        requests:
-          cpu: {{ .requests.cpu | quote }}
-          memory: {{ .requests.memory | quote }}
-      {{- end }}
+{{ toYaml .Values.server.resources | indent 8 }}
       {{- if .Values.server.persistence.enabled }}
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
@@ -44,6 +37,8 @@ spec:
     - name: alertmanager # user-defined
       componentDefRef: alertmanager # ref clusterdefinition components.name
       replicas: {{ .Values.alertmanager.replicaCount | default 1 }}
+      resources:
+{{ toYaml .Values.server.resources | indent 8 }}
       {{- if .Values.alertmanager.persistence.enabled }}
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name

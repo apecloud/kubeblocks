@@ -1,18 +1,13 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  labels:
-    component: "server"
-    app: prometheus
-    release: my-promethus
-    chart: prometheus-15.16.1
-    heritage: Helm
   name: prometheus-server
+  labels: {{ include "prometheus-cluster.labels" . | nindent 4 }}
 subjects:
   - kind: ServiceAccount
-    name: prometheus-server
-    namespace: default
+    name: {{ template "prometheus.server.fullname" . }}
+{{ include "prometheus.namespace" . | indent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: prometheus-server
+  name: {{ template "prometheus.server.fullname" . }}

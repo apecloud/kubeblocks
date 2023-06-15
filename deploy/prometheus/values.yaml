@@ -3,6 +3,7 @@ nameOverride: ""
 fullnameOverride: ""
 
 server:
+  name: server
   ## Prometheus server container image
   ##
   image:
@@ -55,6 +56,7 @@ server:
     allowPrivilegeEscalation: false
 
 alertmanager:
+  name: alertmanager
   ## alertmanager container image
   ##
   image:
@@ -67,8 +69,7 @@ alertmanager:
   ## Defining configMapOverrideName will cause templates/alertmanager-configmap.yaml
   ## to NOT generate a ConfigMap resource
   ##
-  ## TODO: 替换默认的config map名字，config/alertmanager/alertmanager.yml不渲染，由外部helm/templates/prometheus/alertmanager.yaml在安装前提供
-  configMapOverrideName: "alertmanager-config"
+#  configMapOverrideName: "alertmanager-config"
 
   ## Security context to be added to alertmanager pods
   ##

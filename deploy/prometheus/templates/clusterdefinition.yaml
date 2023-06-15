@@ -20,15 +20,15 @@ spec:
         - name: data
           type: data
       configSpecs:
-        - name: server-configuration
-          templateRef: prometheus-server
+        - name: server-config
+          templateRef: {{ template "prometheus.server.fullname" . }}
           namespace: {{ .Release.Namespace }}
           volumeName: config-volume
           defaultMode: 0777
       podSpec:
         {{- if .Values.server.securityContext }}
         securityContext:
-{{- toYaml .Values.server.securityContext | indent 10 }}
+{{ toYaml .Values.server.securityContext | indent 10 }}
         {{- end }}
         enableServiceLinks: true
         containers:
@@ -95,10 +95,10 @@ spec:
         volumes:
           - name: config-volume
             configMap:
-              name: prometheus-server
+              name: {{ template "prometheus.server.fullname" . }}
           - name: rule-volume
             configMap:
-              name: prometheus-rule
+              name: {{ template "prometheus.server.fullname" . }}-rule
 
     - name: alertmanager
       workloadType: Stateful
@@ -112,16 +112,10 @@ spec:
       volumeTypes:
         - name: alert
           type: data
-      configSpecs:
-        - name: alertmanager-configuration
-          templateRef: prometheus-alertmanager
-          namespace: {{ .Release.Namespace }}
-          volumeName: config-volume
-          defaultMode: 0777
       podSpec:
         {{- if .Values.alertmanager.securityContext }}
         securityContext:
-{{- toYaml .Values.alertmanager.securityContext | indent 10 }}
+{{ toYaml .Values.alertmanager.securityContext | indent 10 }}
         {{- end }}
         containers:
           - name: configmap-reload
@@ -167,4 +161,4 @@ spec:
         volumes:
           - name: config-volume
             configMap:
-              name: prometheus-alertmanager
+              name: {{ if .Values.alertmanager.configMapOverrideName }}{{ .Values.alertmanager.configMapOverrideName }}{{- else }}{{ template "prometheus.alertmanager.fullname" . }}{{- end }}

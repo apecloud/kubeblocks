@@ -20,43 +20,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-type property struct {
-	Title       string      `json:"title"`
-	Description string      `json:"description"`
-	Type        string      `json:"type"`
-	Default     interface{} `json:"default"`
-	Enum        []string    `json:"enum"`
-}
-
 // addCreateFlags adds the flags for creating a cluster, these flags are built by the cluster schema.
 func addCreateFlags(cmd *cobra.Command, e cluster.EngineType) error {
-	schemaBytes, err := cluster.GetClusterSchema(e)
+	schema, err := cluster.GetSchema(e)
 	if err != nil {
 		return err
 	}
 
-	if schemaBytes == nil {
+	if schema == nil {
 		return fmt.Errorf("failed to find the schema for cluster type %s", e)
 	}
 
-	var schemaMap map[string]interface{}
-	if err = json.Unmarshal(schemaBytes, &schemaMap); err != nil {
-		return err
-	}
-
-	properties := schemaMap["properties"].(map[string]interface{})
-	for k, v := range properties {
-		if err = buildOneFlag(cmd, k, v); err != nil {
+	for k, s := range schema.Properties {
+		if err = buildOneFlag(cmd, k, &s); err != nil {
 			return err
 		}
 	}
@@ -86,32 +72,24 @@ func getValuesFromFlags(fs *flag.FlagSet) map[string]interface{} {
 	return values
 }
 
-func buildOneFlag(cmd *cobra.Command, k string, v interface{}) error {
-	prop := &property{}
-	if err := mapToProperty(v.(map[string]interface{}), prop); err != nil {
-		return err
-	}
-
+func buildOneFlag(cmd *cobra.Command, k string, s *spec.Schema) error {
 	name := util.ToKebabCase(k)
-	switch prop.Type {
-	case "string":
-		cmd.Flags().String(name, prop.Default.(string), prop.Description)
-	case "integer":
-		cmd.Flags().Int32(name, int32(prop.Default.(float64)), prop.Description)
-	case "number":
-		cmd.Flags().Float64(name, prop.Default.(float64), prop.Description)
-	case "boolean":
-		cmd.Flags().Bool(name, prop.Default.(bool), prop.Description)
-	default:
-		return fmt.Errorf("unsupported json schema type %s", prop.Type)
+	tpe := "string"
+	if len(s.Type) > 0 {
+		tpe = s.Type[0]
 	}
-	return nil
-}
 
-func mapToProperty(m map[string]interface{}, prop *property) error {
-	data, _ := json.Marshal(m)
-	if err := json.Unmarshal(data, prop); err != nil {
-		return err
+	switch tpe {
+	case "string":
+		cmd.Flags().String(name, s.Default.(string), s.Description)
+	case "integer":
+		cmd.Flags().Int32(name, int32(s.Default.(float64)), s.Description)
+	case "number":
+		cmd.Flags().Float64(name, s.Default.(float64), s.Description)
+	case "boolean":
+		cmd.Flags().Bool(name, s.Default.(bool), s.Description)
+	default:
+		return fmt.Errorf("unsupported json schema type %s", s.Type)
 	}
 	return nil
 }

@@ -34,6 +34,10 @@ import (
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/releaseutil"
+	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
+	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
@@ -48,7 +52,7 @@ var (
 )
 
 // GetManifests gets the cluster manifests
-func GetManifests(e EngineType, namespace, name string, values map[string]interface{}) (map[string]string, error) {
+func GetManifests(e EngineType, namespace string, values map[string]interface{}) (map[string]string, error) {
 	chartFS, err := debme.FS(chartsDir, "charts")
 	if err != nil {
 		return nil, err
@@ -73,7 +77,7 @@ func GetManifests(e EngineType, namespace, name string, values map[string]interf
 	client.DryRun = true
 	client.Replace = true
 	client.ClientOnly = true
-	client.ReleaseName = name
+	client.ReleaseName = "release-name"
 	client.Namespace = namespace
 
 	rel, err := client.Run(chartRequested, values)
@@ -83,8 +87,8 @@ func GetManifests(e EngineType, namespace, name string, values map[string]interf
 	return releaseutil.SplitManifests(rel.Manifest), nil
 }
 
-// GetClusterSchema gets the schema for the given cluster type.
-func GetClusterSchema(t EngineType) ([]byte, error) {
+// GetSchema gets the schema for the given cluster engine type.
+func GetSchema(t EngineType) (*spec.SchemaProps, error) {
 	chartFS, err := debme.FS(chartsDir, "charts")
 	if err != nil {
 		return nil, err
@@ -118,24 +122,39 @@ func GetClusterSchema(t EngineType) ([]byte, error) {
 		}
 
 		// found the schema file
-		var schema bytes.Buffer
-		if _, err := io.Copy(&schema, tr); err != nil {
+		var buf bytes.Buffer
+		schema := spec.SchemaProps{}
+		if _, err := io.Copy(&buf, tr); err != nil {
 			return nil, err
 		}
-		return schema.Bytes(), nil
+
+		if err = json.Unmarshal(buf.Bytes(), &schema); err != nil {
+			return nil, err
+		}
+		return &schema, nil
 	}
 
 	return nil, nil
 }
 
+func Validate(e EngineType, values map[string]interface{}) error {
+	schema, err := GetSchema(e)
+	if err != nil {
+		return err
+	}
+	specSchema := spec.Schema{SchemaProps: *schema}
+	validator := validate.NewSchemaValidator(&specSchema, nil, "", strfmt.Default)
+	return validator.Validate(values).AsError()
+}
+
 // getChartName gets the chart name for the given cluster engine type.
 func getChartName(e EngineType) string {
-	tStr := strings.ToLower(string(e))
+	eStr := strings.ToLower(string(e))
 	switch e {
 	case MySQL:
-		return "apecloud-" + tStr + "-cluster"
+		return "apecloud-" + eStr + "-cluster"
 	default:
-		return tStr + "-cluster"
+		return eStr + "-cluster"
 	}
 }
 

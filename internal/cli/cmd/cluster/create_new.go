@@ -43,7 +43,6 @@ type CreateOptionsV1 struct {
 	Dynamic   dynamic.Interface
 	Engine    cluster.EngineType
 	Namespace string
-	Name      string
 	SetFile   string
 	Values    map[string]interface{}
 
@@ -74,7 +73,10 @@ func AddEngineSubCmds(parent *cobra.Command, f cmdutil.Factory, streams genericc
 }
 
 func (o *CreateOptionsV1) Complete(cmd *cobra.Command, args []string) error {
-	var err error
+	var (
+		err  error
+		name string
+	)
 	o.Client, err = o.Factory.KubernetesClientSet()
 	if err != nil {
 		return err
@@ -92,20 +94,22 @@ func (o *CreateOptionsV1) Complete(cmd *cobra.Command, args []string) error {
 
 	// if name is not specified, generate a random cluster name
 	if len(args) == 0 {
-		name, err := generateClusterName(o.Dynamic, o.Namespace)
+		name, err = generateClusterName(o.Dynamic, o.Namespace)
 		if err != nil {
 			return err
 		}
 		if name == "" {
 			return fmt.Errorf("failed to generate a random cluster name")
 		}
-		o.Name = name
 	} else {
-		o.Name = args[0]
+		name = args[0]
 	}
 
 	// get values from flags
 	o.Values = getValuesFromFlags(cmd.LocalNonPersistentFlags())
+
+	// set cluster name
+	o.Values[cluster.NameProp.String()] = name
 
 	return nil
 }
@@ -115,16 +119,12 @@ func (o *CreateOptionsV1) Validate() error {
 		return fmt.Errorf("does not support --set and --set-file being specified at the same time")
 	}
 
-	if len(o.Name) > 16 {
-		return fmt.Errorf("cluster name should be less than 16 characters")
-	}
-
-	return nil
+	return cluster.Validate(o.Engine, o.Values)
 }
 
 func (o *CreateOptionsV1) Run() error {
 	// get cluster manifests
-	manifests, err := cluster.GetManifests(o.Engine, o.Namespace, o.Name, o.Values)
+	manifests, err := cluster.GetManifests(o.Engine, o.Namespace, o.Values)
 	if err != nil {
 		return err
 	}

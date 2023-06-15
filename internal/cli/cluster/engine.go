@@ -32,10 +32,23 @@ const (
 	//Spark      EngineType = "Spark"
 )
 
+type SchemaPropName string
+
+// the command schema property name
+const (
+	NameProp              SchemaPropName = "name"
+	VersionProp           SchemaPropName = "version"
+	TerminationPolicyProp SchemaPropName = "terminationPolicy"
+)
+
 func SupportedEngines() []EngineType {
 	return []EngineType{MySQL}
 }
 
 func (e EngineType) String() string {
 	return string(e)
+}
+
+func (s SchemaPropName) String() string {
+	return string(s)
 }

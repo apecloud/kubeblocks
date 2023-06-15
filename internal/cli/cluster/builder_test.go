@@ -31,7 +31,7 @@ var _ = Describe("cluster builder", func() {
 	})
 
 	It("get cluster schema", func() {
-		res, err := GetClusterSchema(MySQL)
+		res, err := GetSchema(MySQL)
 		Expect(err).Should(Succeed())
 		Expect(res).ShouldNot(BeEmpty())
 	})

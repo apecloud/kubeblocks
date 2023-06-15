@@ -103,7 +103,12 @@ var (
 
 // NewMysql returns a new MySQL output binding.
 func NewMysql(logger logger.Logger) bindings.OutputBinding {
-	return &MysqlOperations{BaseOperations: BaseOperations{Logger: logger}}
+	return &MysqlOperations{
+		BaseOperations: BaseOperations{
+			Logger: logger,
+			Cs:     configuration_store.NewConfigurationStore(),
+		},
+	}
 }
 
 // Init initializes the MySQL binding.

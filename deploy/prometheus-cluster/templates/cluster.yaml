@@ -18,14 +18,12 @@ spec:
   componentSpecs:
     - name: server # user-defined
       componentDefRef: server # ref clusterdefinition components.name
-      monitor: {{ .Values.monitor.enabled | default false }}
-      replicas: {{ .Values.replicaCount.server | default 1 }}
+      replicas: {{ .Values.server.replicaCount | default 1 }}
       serviceAccountName: "prometheus-server"
-      primaryIndex: {{ .Values.primaryIndex | default 0 }}
+      primaryIndex: {{ .Values.server.primaryIndex | default 0 }}
       switchPolicy:
-        type: {{ .Values.switchPolicy.type}}
-{{/*      enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}*/}}
-      {{- with  .Values.resources }}
+        type: {{ .Values.server.switchPolicy.type}}
+      {{- with  .Values.server.resources }}
       resources:
         limits:
           cpu: {{ .limits.cpu | quote }}
@@ -34,35 +32,29 @@ spec:
           cpu: {{ .requests.cpu | quote }}
           memory: {{ .requests.memory | quote }}
       {{- end }}
-      {{- if .Values.persistence.enabled }}
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: {{ .Values.persistence.data.storageClassName }}
+            storageClassName: {{ .Values.server.persistence.storageClass }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ .Values.persistence.data.size }}
-      {{- end }}
+                storage: {{ .Values.server.persistence.size }}
 
     - name: alertmanager # user-defined
       componentDefRef: alertmanager # ref clusterdefinition components.name
-      monitor: {{ .Values.monitor.enabled | default false }}
-      replicas: {{ .Values.replicaCount.alertmanager | default 1 }}
+      replicas: {{ .Values.alertmanager.replicaCount | default 1 }}
       serviceAccountName: "prometheus-alertmanager"
-      primaryIndex: {{ .Values.primaryIndex | default 0 }}
+      primaryIndex: {{ .Values.alertmanager.primaryIndex | default 0 }}
       switchPolicy:
-        type: {{ .Values.switchPolicy.type}}
-{{/*      enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}*/}}
-{{- if .Values.persistence.enabled }}
+        type: {{ .Values.alertmanager.switchPolicy.type}}
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: {{ .Values.persistence.data.storageClassName }}
+            storageClassName: {{ .Values.alertmanager.persistence.storageClass }}
             accessModes:
-              {{ toYaml .Values.persistence.accessModes }}
+              - ReadWriteOnce
             resources:
               requests:
-                storage: {{ .Values.persistence.data.size }}
-{{- end -}}
+                storage: {{ .Values.alertmanager.persistence.size }}

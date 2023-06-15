@@ -1,26 +1,4 @@
-
-## If defined, storageClassName: <storageClass>
-## If set to "-", storageClassName: "", which disables dynamic provisioning
-## If undefined (the default) or set to null, no storageClassName spec is
-##   set, choosing the default provisioner.  (gp2 on AWS, standard on
-##   GKE, AWS & OpenStack)
-##
-# storageClass: "-"
-
-persistence:
-  enabled: false
-  accessModes:
-    - ReadWriteOnce
-  data:
-    storageClassName:
-    size: 20Gi
-
-topologyKeys:
-  - kubernetes.io/hostname
-
 terminationPolicy: Delete
-
-
 
 tolerations:
   - key: kb-controller
@@ -39,28 +17,62 @@ affinity:
               values:
                 - "true"
 
-## Prometheus server resource requests and limits
-## Ref: http://kubernetes.io/docs/user-guide/compute-resources/
-##
-resources: {}
-  # limits:
-  #   cpu: 500m
-  #   memory: 512Mi
-  # requests:
-  #   cpu: 500m
-#   memory: 512Mi
+server:
+  replicaCount: 1
 
-replicaCount:
-  server: 1
-  alertmanager: 1
+  primaryIndex: 0
 
-switchPolicy:
-  type: Noop
+  switchPolicy:
+    type: Noop
 
-primaryIndex: 0
+  resources: { }
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 500m
+    #   memory: 512Mi
 
-monitor:
-  enabled: false
+  persistence:
+    ## If defined, storageClassName: <storageClass>
+    ## If set to "-", storageClassName: "", which disables dynamic provisioning
+    ## If undefined (the default) or set to null, no storageClassName spec is
+    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+    ##   GKE, AWS & OpenStack)
+    ##
+    # storageClass: "-"
+    # TODO: storageClass参考上面的逻辑处理下
+    storageClass:
 
-enabledLogs:
-  - running
+    size: 20Gi
+
+
+alertmanager:
+  replicaCount: 1
+
+  primaryIndex: 0
+
+  switchPolicy:
+    type: Noop
+
+  ## TODO: 未配置
+  resources: { }
+    # limits:
+    #   cpu: 500m
+    #   memory: 512Mi
+    # requests:
+    #   cpu: 500m
+    #   memory: 512Mi
+
+  persistence:
+    storageClass:
+
+    size: 20Gi
+
+
+
+
+
+
+
+

@@ -69,7 +69,7 @@ alertmanager:
   ## Defining configMapOverrideName will cause templates/alertmanager-configmap.yaml
   ## to NOT generate a ConfigMap resource
   ##
-#  configMapOverrideName: "alertmanager-config"
+  configMapOverrideName:
 
   ## Security context to be added to alertmanager pods
   ##

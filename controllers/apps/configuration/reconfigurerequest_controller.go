@@ -295,7 +295,6 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) 
 			appsv1alpha1.ReasonReconfigureSucceed,
 			"the reconfigure[%s] request[%s] has been processed successfully",
 			policy.GetPolicyName(), getOpsRequestID(params.ConfigMap))
-		return intctrlutil.Reconciled()
 		return r.updateConfigCMStatus(params.Ctx, params.ConfigMap, policy.GetPolicyName())
 	case ESFailed:
 		if err := setCfgUpgradeFlag(params.Client, params.Ctx, params.ConfigMap, false); err != nil {

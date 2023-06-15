@@ -6,10 +6,7 @@ kind: ConfigMap
 metadata:
   labels:
     component: "alertmanager"
-    app: prometheus
-    release: my-promethus
-    chart: prometheus-15.16.1
-    heritage: Helm
+{{ include "prometheus.labels" . | nindent 4 }}
   name: {{ template "prometheus.alertmanager.fullname" . }}
 data:
 {{ range $path, $content := .Files.Glob "config/alertmanager/*.yml" }}
@@ -24,10 +21,7 @@ kind: ConfigMap
 metadata:
   labels:
     component: "server"
-    app: prometheus
-    release: my-promethus
-    chart: prometheus-15.16.1
-    heritage: Helm
+{{ include "prometheus.labels" . | nindent 4 }}
   name: {{ template "prometheus.server.fullname" . }}-rule
 data:
 {{ range $path, $content := .Files.Glob "config/server/rulesFiles/*" }}
@@ -40,10 +34,7 @@ kind: ConfigMap
 metadata:
   labels:
     component: "server"
-    app: prometheus
-    release: my-promethus
-    chart: prometheus-15.16.1
-    heritage: Helm
+{{ include "prometheus.labels" . | nindent 4 }}
   name: {{ template "prometheus.server.fullname" . }}
 data:
 {{- $values := .Values }}
@@ -55,7 +46,6 @@ data:
       scrape_timeout: {{ .scrape_timeout }}
       evaluation_interval: {{ .evaluation_interval }}
     {{ end }}
-{{/*    {{ $values.server.global | toYaml | trimSuffix "\n" }}*/}}
     {{- if $values.server.remoteWrite }}
       remote_write:
     {{ $values.server.remoteWrite | toYaml | indent 4 }}

@@ -592,3 +592,15 @@ func GetValues(release string, cfg *Config) (map[string]interface{}, error) {
 	client.AllValues = true
 	return client.Run(release)
 }
+
+func GetTemplateInstallOps(name, chart, version, namespace string) *InstallOpts {
+	return &InstallOpts{
+		Name:       name,
+		Chart:      chart,
+		Version:    version,
+		Namespace:  namespace,
+		TryTimes:   2,
+		Atomic:     true,
+		IncludeCRD: true,
+	}
+}

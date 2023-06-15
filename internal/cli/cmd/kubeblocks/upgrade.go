@@ -20,14 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package kubeblocks
 
 import (
-	"bytes"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"helm.sh/helm/v3/pkg/releaseutil"
 	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -71,7 +68,6 @@ func newUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before upgrade")
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for upgrading KubeBlocks, such as --timeout=10m")
 	cmd.Flags().BoolVar(&o.Wait, "wait", true, "Wait for KubeBlocks to be ready. It will wait for a --timeout period")
-	cmd.Flags().BoolVar(&o.diff, "diff", o.diff, "list the difference between the current version and target version. It will stop the upgrade.")
 	helm.AddValueOptionsFlags(cmd.Flags(), &o.ValueOpts)
 
 	return cmd
@@ -124,11 +120,6 @@ func (o *InstallOptions) Upgrade() error {
 		return err
 	}
 	s.Success()
-
-	if o.diff {
-		return o.showUpgradeDiff(v.KubeBlocks)
-	}
-
 	// it's time to upgrade
 	msg := ""
 	if o.Version != "" {
@@ -154,76 +145,4 @@ func (o *InstallOptions) Upgrade() error {
 
 func (o *InstallOptions) upgradeChart() error {
 	return o.buildChart().Upgrade(o.HelmCfg)
-}
-
-func (o *InstallOptions) showUpgradeDiff(curKBVersion string) error {
-	dryrun := true
-	current := helm.InstallOpts{
-		Name:            types.KubeBlocksChartName,
-		Chart:           types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
-		Wait:            o.Wait,
-		Version:         curKBVersion,
-		Namespace:       "default",
-		ValueOpts:       &o.ValueOpts,
-		TryTimes:        2,
-		CreateNamespace: o.CreateNamespace,
-		Timeout:         o.Timeout,
-		Atomic:          true,
-		DryRun:          &dryrun,
-		IncludeCRD:      true,
-	}
-	currentRelease, err := current.Install(helm.NewFakeConfig("default"))
-	if err != nil {
-		return err
-	}
-	target := helm.InstallOpts{
-		Name:            types.KubeBlocksChartName,
-		Chart:           types.KubeBlocksChartName + "/" + types.KubeBlocksChartName,
-		Wait:            o.Wait,
-		Version:         o.Version,
-		Namespace:       "default",
-		ValueOpts:       &o.ValueOpts,
-		TryTimes:        2,
-		CreateNamespace: o.CreateNamespace,
-		Timeout:         o.Timeout,
-		Atomic:          true,
-		DryRun:          &dryrun,
-		IncludeCRD:      true,
-	}
-	targetRelease, err := target.Install(helm.NewFakeConfig("default"))
-	if err != nil {
-		return err
-	}
-
-	var oldManifests bytes.Buffer
-	fmt.Fprintln(&oldManifests, strings.TrimSpace(currentRelease.Manifest))
-	oldManifestsKeys := releaseutil.SplitManifests(oldManifests.String())
-
-	var newManifests bytes.Buffer
-	fmt.Fprintln(&newManifests, strings.TrimSpace(targetRelease.Manifest))
-	newManifestsKeys := releaseutil.SplitManifests(newManifests.String())
-
-	oldManifestsMap := make(map[string]*helm.MappingResult)
-	for _, v := range oldManifestsKeys {
-		mapResult, err := helm.ParseContent(v)
-		if err != nil {
-			return err
-		}
-		if mapResult == nil {
-			continue
-		}
-		oldManifestsMap[mapResult.Name] = mapResult
-	}
-	newManifestsMap := make(map[string]*helm.MappingResult)
-	for _, v := range newManifestsKeys {
-		mapResult, err := helm.ParseContent(v)
-		if err != nil {
-			return err
-		}
-		if mapResult == nil {
-			continue
-		}
-		newManifestsMap[mapResult.Name] = mapResult
-	}
-	return helm.OutPutDiff(newManifestsMap, oldManifestsMap, o.Out)
 }

@@ -20,7 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package helm
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v3/pkg/releaseutil"
 	"io"
 	"log"
 	"reflect"
@@ -29,8 +33,6 @@ import (
 
 	"golang.org/x/exp/maps"
 	"gopkg.in/yaml.v2"
-
-	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
@@ -127,37 +129,45 @@ func ParseContent(content string) (*MappingResult, error) {
 	}, nil
 }
 
-func OutPutDiff(newManifestMap, oldManifestMap map[string]*MappingResult, out io.Writer) error {
+func OutputDiff(releaseA *release.Release, releaseB *release.Release, versionA, versionB string, out io.Writer) error {
+	manifestsMapA, err := buildManifestMapByRelease(releaseA)
+	if err != nil {
+		return err
+	}
+	manifestsMapB, err := buildManifestMapByRelease(releaseB)
+	if err != nil {
+		return err
+	}
+
 	mayRemove := make([]*MappingResult, 0)
 	mayAdd := make([]*MappingResult, 0)
 
-	for _, key := range sortedKeys(oldManifestMap) {
-		oldManifest := oldManifestMap[key]
-		if newManifest, ok := newManifestMap[key]; ok {
-			if oldManifest.Content == newManifest.Content {
+	for _, key := range sortedKeys(manifestsMapA) {
+		manifestA := manifestsMapA[key]
+		if manifestB, ok := manifestsMapB[key]; ok {
+			if manifestA.Content == manifestB.Content {
 				continue
 			}
-			diffString, err := util.GetUnifiedDiffString(oldManifest.Content, newManifest.Content, oldManifest.Name, newManifest.Name)
+			diffString, err := util.GetUnifiedDiffString(manifestA.Content, manifestB.Content, fmt.Sprintf("%s %s", manifestA.Name, versionA), fmt.Sprintf("%s %s", manifestB.Name, versionB))
 			if err != nil {
 				return err
 			}
-
 			util.DisplayDiffWithColor(out, diffString)
 		} else {
-			mayRemove = append(mayRemove, oldManifest)
+			mayRemove = append(mayRemove, manifestA)
 		}
 
 	}
 
 	// Todo: support find Rename chart.yaml between mayRemove and mayAdd
-	for k, v := range newManifestMap {
-		if _, ok := oldManifestMap[k]; !ok {
+	for k, v := range manifestsMapB {
+		if _, ok := manifestsMapA[k]; !ok {
 			mayAdd = append(mayAdd, v)
 		}
 	}
 
 	for _, elem := range mayAdd {
-		diffString, err := util.GetUnifiedDiffString("", elem.Content, "", elem.Name)
+		diffString, err := util.GetUnifiedDiffString("", elem.Content, "", fmt.Sprintf("%s %s", elem.Name, versionB))
 		if err != nil {
 			return err
 		}
@@ -165,7 +175,7 @@ func OutPutDiff(newManifestMap, oldManifestMap map[string]*MappingResult, out io
 	}
 
 	for _, elem := range mayRemove {
-		diffString, err := util.GetUnifiedDiffString(elem.Content, "", elem.Name, "")
+		diffString, err := util.GetUnifiedDiffString(elem.Content, "", fmt.Sprintf("%s %s", elem.Name, versionA), "")
 		if err != nil {
 			return err
 		}
@@ -173,6 +183,71 @@ func OutPutDiff(newManifestMap, oldManifestMap map[string]*MappingResult, out io
 	}
 	return nil
 }
+
+func buildManifestMapByRelease(release *release.Release) (map[string]*MappingResult, error) {
+	var manifests bytes.Buffer
+	fmt.Fprintln(&manifests, strings.TrimSpace(release.Manifest))
+	manifestsKeys := releaseutil.SplitManifests(manifests.String())
+	manifestsMap := make(map[string]*MappingResult)
+	for _, v := range manifestsKeys {
+		mapResult, err := ParseContent(v)
+		if err != nil {
+			return nil, err
+		}
+		if mapResult == nil {
+			continue
+		}
+		manifestsMap[mapResult.Name] = mapResult
+	}
+	return manifestsMap, nil
+}
+
+//func OutPutDiff(newManifestMap, oldManifestMap map[string]*MappingResult, out io.Writer) error {
+//	mayRemove := make([]*MappingResult, 0)
+//	mayAdd := make([]*MappingResult, 0)
+//
+//	for _, key := range sortedKeys(oldManifestMap) {
+//		oldManifest := oldManifestMap[key]
+//		if newManifest, ok := newManifestMap[key]; ok {
+//			if oldManifest.Content == newManifest.Content {
+//				continue
+//			}
+//			diffString, err := util.GetUnifiedDiffString(oldManifest.Content, newManifest.Content, oldManifest.Name, newManifest.Name)
+//			if err != nil {
+//				return err
+//			}
+//
+//			util.DisplayDiffWithColor(out, diffString)
+//		} else {
+//			mayRemove = append(mayRemove, oldManifest)
+//		}
+//
+//	}
+//
+//	// Todo: support find Rename chart.yaml between mayRemove and mayAdd
+//	for k, v := range newManifestMap {
+//		if _, ok := oldManifestMap[k]; !ok {
+//			mayAdd = append(mayAdd, v)
+//		}
+//	}
+//
+//	for _, elem := range mayAdd {
+//		diffString, err := util.GetUnifiedDiffString("", elem.Content, "", elem.Name)
+//		if err != nil {
+//			return err
+//		}
+//		util.DisplayDiffWithColor(out, diffString)
+//	}
+//
+//	for _, elem := range mayRemove {
+//		diffString, err := util.GetUnifiedDiffString(elem.Content, "", elem.Name, "")
+//		if err != nil {
+//			return err
+//		}
+//		util.DisplayDiffWithColor(out, diffString)
+//	}
+//	return nil
+//}
 
 func sortedKeys(manifests map[string]*MappingResult) []string {
 	keys := maps.Keys(manifests)

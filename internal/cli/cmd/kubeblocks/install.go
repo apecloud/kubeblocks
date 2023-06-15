@@ -82,7 +82,6 @@ type InstallOptions struct {
 	Quiet           bool
 	CreateNamespace bool
 	Check           bool
-	diff            bool
 	ValueOpts       values.Options
 
 	// ConfiguredOptions is the options that kubeblocks

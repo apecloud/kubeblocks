@@ -101,6 +101,10 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 	switch phase {
 	case appsv1alpha1.OpsSucceedPhase:
 		// only update the condition of the opsRequest.
+		eventContext.ReqCtx.Recorder.Eventf(opsRequest,
+			corev1.EventTypeNormal,
+			appsv1alpha1.ReasonReconfigureSucceed,
+			"the reconfigure has been processed successfully")
 		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureSucceed,
@@ -108,6 +112,10 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 				formatConfigPatchToMessage(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
 			appsv1alpha1.NewSucceedCondition(opsRequest))
 	case appsv1alpha1.OpsFailedPhase:
+		eventContext.ReqCtx.Recorder.Eventf(opsRequest,
+			corev1.EventTypeWarning,
+			appsv1alpha1.ReasonReconfigureFailed,
+			"failed to process the reconfigure, error: %v", cfgError)
 		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureFailed,
@@ -214,6 +222,10 @@ func (r *reconfigureAction) syncReconfigureOperatorStatus(ctx intctrlutil.Reques
 	}
 
 	if checkFinishedReconfigure(cm, name, ctx.Log) {
+		ctx.Recorder.Eventf(opsRes.OpsRequest,
+			corev1.EventTypeNormal,
+			appsv1alpha1.ReasonReconfigureSucceed,
+			"sync reconfiguring operation phase succeed")
 		return appsv1alpha1.OpsSucceedPhase, nil
 	}
 	return appsv1alpha1.OpsRunningPhase, nil
@@ -369,6 +381,11 @@ func (r *reconfigureAction) doMergeAndPersist(reqCtx intctrlutil.RequestCtx,
 		}, reqCtx.Ctx, cli, resource.OpsRequest.Name)
 		if result.err != nil {
 			return processMergedFailed(resource, result.failed, result.err)
+		} else {
+			reqCtx.Recorder.Eventf(resource.OpsRequest,
+				corev1.EventTypeNormal,
+				appsv1alpha1.ReasonReconfigureMerged,
+				"the reconfiguring operation of component[%s] in cluster[%s] merged successfully", componentName, clusterName)
 		}
 
 		// merged successfully

@@ -1,59 +1,5 @@
 clusterVersionOverride: ""
 
-alertmanager:
-  ## alertmanager container image
-  ##
-  image:
-    registry: registry.cn-hangzhou.aliyuncs.com
-    repository: apecloud/alertmanager
-    pullPolicy: IfNotPresent
-    tag: v0.24.0
-
-  ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.alertmanager.configMapOverrideName}}
-  ## Defining configMapOverrideName will cause templates/alertmanager-configmap.yaml
-  ## to NOT generate a ConfigMap resource
-  ##
-  configMapOverrideName: "alertmanager-config"
-
-  ## Security context to be added to alertmanager pods
-  ##
-  securityContext:
-    runAsUser: 0
-    runAsNonRoot: false
-    runAsGroup: 65534
-    fsGroup: 65534
-
-  containerSecurityContext:
-    allowPrivilegeEscalation: false
-
-configmapReload:
-  securityContext:
-    runAsUser: 0
-    runAsNonRoot: false
-    runAsGroup: 65534
-    fsGroup: 65534
-  prometheus:
-    ## configmap-reload container image
-    ##
-    image:
-      registry: registry.cn-hangzhou.aliyuncs.com
-      repository: apecloud/configmap-reload
-      pullPolicy: IfNotPresent
-      tag: v0.5.0
-    containerSecurityContext:
-      allowPrivilegeEscalation: false
-
-  alertmanager:
-    ## configmap-reload container image
-    ##
-    image:
-      registry: registry.cn-hangzhou.aliyuncs.com
-      repository: apecloud/configmap-reload
-      pullPolicy: IfNotPresent
-      tag: v0.5.0
-    containerSecurityContext:
-      allowPrivilegeEscalation: false
-
 server:
   ## Prometheus server container image
   ##
@@ -91,17 +37,8 @@ server:
   ##
   remoteWrite: []
 
-  remoteRead: []
-
-  ## Prefix used to register routes, overriding externalUrl route.
-  ## Useful for proxies that rewrite URLs.
-  ##
-  ## TODO:
-  routePrefix: /
-
   ## Prometheus' data retention period (default if not specified is 15 days)
   ##
-
   retention: "2d"
 
   ## Security context to be added to server pods
@@ -115,35 +52,54 @@ server:
   containerSecurityContext:
     allowPrivilegeEscalation: false
 
+alertmanager:
+  ## alertmanager container image
+  ##
+  image:
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/alertmanager
+    pullPolicy: IfNotPresent
+    tag: v0.24.0
 
-  persistentVolume:
-    ## If true, Prometheus server will create/use a Persistent Volume Claim
-    ## If false, use emptyDir
-    ##
-    enabled: true
+  ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.alertmanager.configMapOverrideName}}
+  ## Defining configMapOverrideName will cause templates/alertmanager-configmap.yaml
+  ## to NOT generate a ConfigMap resource
+  ##
+  ## TODO: 替换默认的config map名字，config/alertmanager/alertmanager.yml不渲染，由外部helm/templates/prometheus/alertmanager.yaml在安装前提供
+  configMapOverrideName: "alertmanager-config"
 
-    ## Prometheus server data Persistent Volume Storage Class
-    ## If defined, storageClassName: <storageClass>
-    ## If set to "-", storageClassName: "", which disables dynamic provisioning
-    ## If undefined (the default) or set to null, no storageClassName spec is
-    ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
-    ##   GKE, AWS & OpenStack)
-    ##
-    # storageClass: "-"
+  ## Security context to be added to alertmanager pods
+  ##
+  securityContext:
+    runAsUser: 0
+    runAsNonRoot: false
+    runAsGroup: 65534
+    fsGroup: 65534
 
-    ## Prometheus server data Persistent Volume Binding Mode
-    ## If defined, volumeBindingMode: <volumeBindingMode>
-    ## If undefined (the default) or set to null, no volumeBindingMode spec is
-    ##   set, choosing the default mode.
-    ##
-    # volumeBindingMode: ""
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
 
-    ## Subdirectory of Prometheus server data Persistent Volume to mount
-    ## Useful if the volume's root directory is not empty
+configmapReload:
+  prometheus:
+    ## configmap-reload container image
     ##
-    subPath: ""
+    image:
+      registry: registry.cn-hangzhou.aliyuncs.com
+      repository: apecloud/configmap-reload
+      pullPolicy: IfNotPresent
+      tag: v0.5.0
 
-  emptyDir:
-    ## Prometheus server emptyDir volume size limit
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+
+  alertmanager:
+    ## configmap-reload container image
     ##
-    sizeLimit: ""
+    image:
+      registry: registry.cn-hangzhou.aliyuncs.com
+      repository: apecloud/configmap-reload
+      pullPolicy: IfNotPresent
+      tag: v0.5.0
+
+    containerSecurityContext:
+      allowPrivilegeEscalation: false

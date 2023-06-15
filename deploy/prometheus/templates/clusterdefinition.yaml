@@ -87,7 +87,6 @@ spec:
                 mountPath: /etc/config-rule
               - name: data
                 mountPath: /data
-                subPath: ""
             ports:
               - containerPort: 9090
                 name: server
@@ -164,8 +163,7 @@ spec:
               - name: config-volume
                 mountPath: /etc/config
               - name: data
-                mountPath: "/data"
-                subPath: ""
+                mountPath: /data
         volumes:
           - name: config-volume
             configMap:

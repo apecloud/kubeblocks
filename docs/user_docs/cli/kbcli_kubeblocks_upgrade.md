@@ -22,6 +22,7 @@ kbcli kubeblocks upgrade [flags]
 
 ```
       --check                    Check kubernetes environment before upgrade (default true)
+      --diff                     list the difference between the current version and target version. It will stop the upgrade.
   -h, --help                     help for upgrade
       --set stringArray          Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
       --set-file stringArray     Set values from respective files specified via the command line (can specify multiple or separate values with commas: key1=path1,key2=path2)

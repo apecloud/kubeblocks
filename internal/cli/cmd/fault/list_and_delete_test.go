@@ -48,6 +48,7 @@ var _ = Describe("Chaos resources list and delete", func() {
 	)
 
 	BeforeEach(func() {
+		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = testing.NewTestFactory(namespace)
 		codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 		httpResp := func(obj runtime.Object) *http.Response {

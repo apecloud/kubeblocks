@@ -11,5 +11,14 @@ metadata:
   annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
   {{- end }}
 spec:
+  # top level mysql configuration type
+  cfgSchemaTopLevelName: KafkaParameter
+
+  # ConfigurationSchema that impose restrictions on engine parameter's rule
+  configurationSchema:
+    # schema: auto generate from mmmcue scripts
+    cue: |-
+       {{- .Files.Get "config/kafka-server-constraint.cue" | nindent 6 }}
+
   formatterConfig:
     format: properties

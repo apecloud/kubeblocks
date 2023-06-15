@@ -17,6 +17,21 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package mocks
+package builder
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -package mocks -destination k8sclient_mocks.go sigs.k8s.io/controller-runtime/pkg/client Client,StatusWriter
+import corev1 "k8s.io/api/core/v1"
+
+type PVCBuilder struct {
+	BaseBuilder[corev1.PersistentVolumeClaim, *corev1.PersistentVolumeClaim, PVCBuilder]
+}
+
+func NewPVCBuilder(namespace, name string) *PVCBuilder {
+	builder := &PVCBuilder{}
+	builder.init(namespace, name, &corev1.PersistentVolumeClaim{}, builder)
+	return builder
+}
+
+func (builder *PVCBuilder) SetResources(resources corev1.ResourceRequirements) *PVCBuilder {
+	builder.get().Spec.Resources = resources
+	return builder
+}

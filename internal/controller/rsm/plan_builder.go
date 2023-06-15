@@ -159,11 +159,6 @@ func (b *rsmPlanBuilder) buildUpdateObj(vertex *model.ObjectVertex) (client.Obje
 		return origObj, nil
 	}
 
-	handleDeploy := func(origObj, targetObj *appsv1.Deployment) (client.Object, error) {
-		origObj.Spec = targetObj.Spec
-		return origObj, nil
-	}
-
 	handleSvc := func(origObj, targetObj *corev1.Service) (client.Object, error) {
 		origObj.Spec = targetObj.Spec
 		return origObj, nil
@@ -173,6 +168,12 @@ func (b *rsmPlanBuilder) buildUpdateObj(vertex *model.ObjectVertex) (client.Obje
 		if origObj.Spec.Resources.Requests[corev1.ResourceStorage] == targetObj.Spec.Resources.Requests[corev1.ResourceStorage] {
 			return origObj, nil
 		}
+		if targetObj.Spec.Resources.Requests == nil {
+			return origObj, nil
+		}
+		if origObj.Spec.Resources.Requests == nil {
+			origObj.Spec.Resources.Requests = corev1.ResourceList{}
+		}
 		origObj.Spec.Resources.Requests[corev1.ResourceStorage] = targetObj.Spec.Resources.Requests[corev1.ResourceStorage]
 		return origObj, nil
 	}
@@ -181,8 +182,6 @@ func (b *rsmPlanBuilder) buildUpdateObj(vertex *model.ObjectVertex) (client.Obje
 	switch v := vertex.Obj.(type) {
 	case *appsv1.StatefulSet:
 		return handleSts(origObj.(*appsv1.StatefulSet), v)
-	case *appsv1.Deployment:
-		return handleDeploy(origObj.(*appsv1.Deployment), v)
 	case *corev1.Service:
 		return handleSvc(origObj.(*corev1.Service), v)
 	case *corev1.PersistentVolumeClaim:

@@ -17,6 +17,33 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package mocks
+package builder
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -package mocks -destination k8sclient_mocks.go sigs.k8s.io/controller-runtime/pkg/client Client,StatusWriter
+import (
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+)
+
+var _ = Describe("pvc builder", func() {
+	It("should work well", func() {
+		const (
+			name = "foo"
+			ns   = "default"
+		)
+		resources := corev1.ResourceRequirements{
+			Requests: map[corev1.ResourceName]resource.Quantity{
+				"CPU": resource.MustParse("500m"),
+			},
+		}
+		pvc := NewPVCBuilder(ns, name).
+			SetResources(resources).
+			GetObject()
+
+		Expect(pvc.Name).Should(Equal(name))
+		Expect(pvc.Namespace).Should(Equal(ns))
+		Expect(pvc.Spec.Resources).Should(Equal(resources))
+	})
+})

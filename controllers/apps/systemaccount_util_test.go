@@ -61,15 +61,13 @@ func mockSystemAccountsSpec() *appsv1alpha1.SystemAccountSpec {
 
 	var account appsv1alpha1.SystemAccountConfig
 	var scope appsv1alpha1.ProvisionScope
-	for _, name := range getAllSysAccounts() {
-		randomToss := rand.Intn(10)
-		if randomToss%2 == 0 {
+	for idx, name := range getAllSysAccounts() {
+		if idx%2 == 0 {
 			scope = appsv1alpha1.AnyPods
 		} else {
 			scope = appsv1alpha1.AllPods
 		}
-
-		if randomToss%3 == 0 {
+		if idx%3 == 0 {
 			account = mockCreateByRefSystemAccount(name, scope)
 		} else {
 			account = mockCreateByStmtSystemAccount(name)

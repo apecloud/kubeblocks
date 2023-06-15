@@ -38,7 +38,7 @@ import (
 
 const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
-	checkRoleURIFormat    = "http://localhost:%s/v1.0/bindings/%s"
+	checkRoleURIFormat    = "/v1.0/bindings/%s?operation=checkRole"
 	checkRunningURIFormat = "/v1.0/bindings/%s?operation=checkRunning"
 	checkStatusURIFormat  = "/v1.0/bindings/%s?operation=checkStatus"
 )
@@ -188,16 +188,11 @@ func buildRoleProbeContainer(characterType string, roleChangedContainer *corev1.
 	roleChangedContainer.Name = constant.RoleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
 	bindingType := strings.ToLower(characterType)
-	svcPort := strconv.Itoa(probeSvcHTTPPort)
-	roleObserveURI := fmt.Sprintf(checkRoleURIFormat, svcPort, bindingType)
-	probe.Exec.Command = []string{
-		"curl", "-X", "POST",
-		"--max-time", strconv.Itoa(int(probeSetting.TimeoutSeconds)),
-		"--fail-with-body", "--silent",
-		"-H", "Content-ComponentDefRef: application/json",
-		roleObserveURI,
-		"-d", "{\"operation\": \"checkRole\", \"metadata\":{\"sql\":\"\"}}",
-	}
+	httpGet := &corev1.HTTPGetAction{}
+	httpGet.Path = fmt.Sprintf(checkRoleURIFormat, bindingType)
+	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
+	probe.Exec = nil
+	probe.HTTPGet = httpGet
 	probe.PeriodSeconds = probeSetting.PeriodSeconds
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
 	probe.FailureThreshold = probeSetting.FailureThreshold

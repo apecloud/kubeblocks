@@ -21,14 +21,11 @@ package apps
 
 import (
 	"context"
-	"regexp"
 	"time"
 
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -83,16 +80,6 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 
 	pps := []predicateProcessor{
 		{
-			// handle cronjob complete or fail event
-			pred: func() bool {
-				return event.InvolvedObject.Kind == constant.CronJobKind &&
-					event.Reason == "SawCompletedJob"
-			},
-			processor: func() error {
-				return handleDeletePVCCronJobEvent(ctx, cli, recorder, event)
-			},
-		},
-		{
 			pred: func() bool {
 				return event.Type != corev1.EventTypeWarning ||
 					!isTargetKindForEvent(event)
@@ -122,50 +109,6 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 		if pp.pred() {
 			return pp.processor()
 		}
-	}
-	return nil
-}
-
-func handleDeletePVCCronJobEvent(ctx context.Context, cli client.Client, recorder record.EventRecorder, event *corev1.Event) error {
-	re := regexp.MustCompile("status: Failed")
-	var (
-		err    error
-		object client.Object
-	)
-	matches := re.FindStringSubmatch(event.Message)
-	if len(matches) == 0 {
-		// TODO(impl): introduce a one-shot delayed job to delete the pvc object.
-		// delete pvc succeeded, then delete cronjob
-		return checkedDeleteDeletePVCCronJob(ctx, cli, event.InvolvedObject.Name, event.InvolvedObject.Namespace)
-	}
-	// cronjob failed
-	if object, err = getEventInvolvedObject(ctx, cli, event); err != nil {
-		return err
-	}
-	return notifyClusterStatusChange(ctx, cli, recorder, object, event)
-}
-
-func checkedDeleteDeletePVCCronJob(ctx context.Context, cli client.Client, name string, namespace string) error {
-	// label check
-	cronJob := batchv1.CronJob{}
-	if err := cli.Get(ctx, types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}, &cronJob); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-	if cronJob.ObjectMeta.Labels[constant.AppManagedByLabelKey] != constant.AppName {
-		return nil
-	}
-	// check the delete-pvc-cronjob annotation.
-	// the reason for this is that the backup policy also creates cronjobs,
-	// which need to be distinguished by the annotation.
-	if cronJob.ObjectMeta.Annotations[lifecycleAnnotationKey] != lifecycleDeletePVCAnnotation {
-		return nil
-	}
-	// if managed by kubeblocks, then it must be the cronjob used to delete pvc, delete it since it's completed
-	if err := cli.Delete(ctx, &cronJob); err != nil {
-		return client.IgnoreNotFound(err)
 	}
 	return nil
 }

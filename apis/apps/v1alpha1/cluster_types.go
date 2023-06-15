@@ -690,30 +690,12 @@ func (r *ClusterComponentSpec) GetPrimaryIndex() int32 {
 	return *r.PrimaryIndex
 }
 
-// GetClusterTerminalPhases returns Cluster terminal phases.
-func GetClusterTerminalPhases() []ClusterPhase {
-	return []ClusterPhase{
-		RunningClusterPhase,
-		StoppedClusterPhase,
-		FailedClusterPhase,
-		AbnormalClusterPhase,
-	}
-}
-
 // GetClusterUpRunningPhases returns Cluster running or partially running phases.
 func GetClusterUpRunningPhases() []ClusterPhase {
 	return []ClusterPhase{
 		RunningClusterPhase,
 		AbnormalClusterPhase,
 		FailedClusterPhase, // REVIEW/TODO: single component with single pod component are handled as FailedClusterPhase, ought to remove this.
-	}
-}
-
-// GetClusterFailedPhases return Cluster failed or partially failed phases.
-func GetClusterFailedPhases() []ClusterPhase {
-	return []ClusterPhase{
-		FailedClusterPhase,
-		AbnormalClusterPhase,
 	}
 }
 

@@ -1,0 +1,21 @@
+apiVersion: v2
+name: mysql
+description: normal mysql
+
+type: application
+
+version: 0.5.1-beta.0
+
+appVersion: "8.0.30"
+
+home: https://kubeblocks.io/
+icon: https://github.com/apecloud/kubeblocks/raw/main/img/logo.png
+
+
+maintainers:
+- name: ApeCloud
+  url: https://github.com/apecloud/kubeblocks/
+
+
+sources:
+- https://github.com/apecloud/kubeblocks/

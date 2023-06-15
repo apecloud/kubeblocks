@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apecloud-mysql-sc
+  labels:
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+data:
+  setup.sh: |
+    #!/bin/bash
+    cp /opt/mysql/my.cnf /opt/my.cnf
+    sed -i "/^\# gtid/a\\server-id=$RANDOM" /opt/my.cnf
+    exec ./entrypoint.sh mysqld --defaults-file=/opt/my.cnf &
+    sleep 30
+    export prefix=(`echo $KB_PRIMARY_POD_NAME | tr '.' ' '` )
+    echo $prefix
+    export cmd="change master to master_host=\"$KB_PRIMARY_POD_NAME\",master_user=\"$MYSQL_ROOT_USER\",master_password=\"$MYSQL_ROOT_PASSWORD\",master_port="$MYSQL_MYSQL_SERVICE_PORT",master_auto_position=1;start slave;"
+    if [ "$prefix" != "$KB_POD_NAME" ]; then
+      mysql -u"$MYSQL_ROOT_USER" -p"$MYSQL_ROOT_PASSWORD" -e"$cmd"
+    fi
+    while true
+    do
+      sleep 60
+    done

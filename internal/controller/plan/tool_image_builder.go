@@ -45,30 +45,30 @@ func buildConfigToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 	toolContainers := make([]appsv1alpha1.ToolConfig, 0)
 	toolSets := cfgutil.NewSet()
 	for _, buildParam := range cfgManagerParams.ConfigSpecsBuildParams {
-		if buildParam.ToolImageSpec == nil {
+		if buildParam.ToolsImageSpec == nil {
 			continue
 		}
-		for _, toolConfig := range buildParam.ToolImageSpec.ToolConfigs {
+		for _, toolConfig := range buildParam.ToolsImageSpec.ToolConfigs {
 			if !toolSets.InArray(toolConfig.Name) {
-				replaceToolImageHolder(&toolConfig, podSpec, buildParam.ConfigSpec.VolumeName)
+				replaceToolsImageHolder(&toolConfig, podSpec, buildParam.ConfigSpec.VolumeName)
 				toolContainers = append(toolContainers, toolConfig)
 				toolSets.Add(toolConfig.Name)
 			}
 		}
-		buildToolsVolumeMount(cfgManagerParams, podSpec, buildParam.ConfigSpec.VolumeName, buildParam.ToolImageSpec.MountPoint)
+		buildToolsVolumeMount(cfgManagerParams, podSpec, buildParam.ConfigSpec.VolumeName, buildParam.ToolsImageSpec.MountPoint)
 	}
 	// Ensure that the order in which iniContainers are generated does not change
-	toolContainers = checkAndInstallToolImageVolume(toolContainers, cfgManagerParams.ConfigSpecsBuildParams)
+	toolContainers = checkAndInstallToolsImageVolume(toolContainers, cfgManagerParams.ConfigSpecsBuildParams)
 	if len(toolContainers) != 0 {
 		cfgManagerParams.ToolsContainers = builder.BuildCfgManagerToolsContainer(cfgManagerParams, comp, toolContainers)
 	}
 }
 
-func checkAndInstallToolImageVolume(toolContainers []appsv1alpha1.ToolConfig, buildParams []cfgcm.ConfigSpecMeta) []appsv1alpha1.ToolConfig {
+func checkAndInstallToolsImageVolume(toolContainers []appsv1alpha1.ToolConfig, buildParams []cfgcm.ConfigSpecMeta) []appsv1alpha1.ToolConfig {
 	for _, buildParam := range buildParams {
-		if buildParam.ToolImageSpec != nil && buildParam.ConfigSpec.SecondaryRenderedConfigSpec != nil {
+		if buildParam.ToolsImageSpec != nil && buildParam.ConfigSpec.SecondaryRenderedConfigSpec != nil {
 			// auto install config_render tool
-			toolContainers = checkAndCreateRenderedInitContainer(toolContainers, buildParam.ToolImageSpec.MountPoint)
+			toolContainers = checkAndCreateRenderedInitContainer(toolContainers, buildParam.ToolsImageSpec.MountPoint)
 		}
 	}
 	return toolContainers
@@ -89,7 +89,7 @@ func checkAndCreateRenderedInitContainer(toolContainers []appsv1alpha1.ToolConfi
 	return toolContainers
 }
 
-func replaceToolImageHolder(toolConfig *appsv1alpha1.ToolConfig, podSpec *corev1.PodSpec, volumeName string) {
+func replaceToolsImageHolder(toolConfig *appsv1alpha1.ToolConfig, podSpec *corev1.PodSpec, volumeName string) {
 	switch {
 	case toolConfig.Image == constant.KBToolsImagePlaceHolder:
 		toolConfig.Image = viper.GetString(constant.KBToolsImage)

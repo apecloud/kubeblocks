@@ -32,7 +32,7 @@ type ConfigConstraintSpec struct {
 
 	// toolConfig used to config init container.
 	// +optional
-	ToolImageSpec *ToolImageSpec `json:"toolImageSpec,omitempty"`
+	ToolsImageSpec *ToolsImageSpec `json:"toolsImageSpec,omitempty"`
 	// ToolConfigs []ToolConfig `json:"toolConfigs,omitempty"`
 
 	// downwardAPIOptions is used to watch pod fields.
@@ -144,7 +144,7 @@ type UnixSignalTrigger struct {
 	ProcessName string `json:"processName"`
 }
 
-type ToolImageSpec struct {
+type ToolsImageSpec struct {
 	// auto generate
 	// volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.

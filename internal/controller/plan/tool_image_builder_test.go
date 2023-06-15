@@ -37,7 +37,7 @@ import (
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
-var _ = Describe("ToolImageBuilderTest", func() {
+var _ = Describe("ToolsImageBuilderTest", func() {
 
 	const clusterDefName = "test-clusterdef"
 	const clusterVersionName = "test-clusterversion"
@@ -130,7 +130,7 @@ var _ = Describe("ToolImageBuilderTest", func() {
 	AfterEach(func() {
 	})
 
-	Context("ToolImageBuilderTest", func() {
+	Context("ToolsImageBuilderTest", func() {
 		It("TestScriptSpec", func() {
 			sts, err := builder.BuildSts(intctrlutil.RequestCtx{
 				Ctx: testCtx.Ctx,
@@ -152,7 +152,7 @@ var _ = Describe("ToolImageBuilderTest", func() {
 						ReloadType:      appsv1alpha1.TPLScriptType,
 						FormatterConfig: appsv1alpha1.FormatterConfig{},
 					},
-					ToolImageSpec: &appsv1alpha1.ToolImageSpec{
+					ToolsImageSpec: &appsv1alpha1.ToolsImageSpec{
 						MountPoint: "/opt/images",
 						ToolConfigs: []appsv1alpha1.ToolConfig{
 							{

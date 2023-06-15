@@ -370,7 +370,7 @@ spec:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
-              toolImageSpec:
+              toolsImageSpec:
                 description: toolConfig used to config init container.
                 properties:
                   mountPoint:

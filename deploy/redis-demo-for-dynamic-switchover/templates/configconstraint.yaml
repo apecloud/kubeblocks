@@ -51,7 +51,7 @@ spec:
     - scriptConfigMapRef: redis-demo-reload-script
       namespace: {{ .Release.Namespace }}
 
-  toolImageSpec:
+  toolsImageSpec:
     mountPoint: /kb/tools
     toolConfigs:
       - name: init-redis-tools

@@ -47,8 +47,8 @@ type ConfigSpecInfo struct {
 type ConfigSpecMeta struct {
 	ConfigSpecInfo `json:",inline"`
 
-	ScriptConfig  []appsv1alpha1.ScriptConfig
-	ToolImageSpec *appsv1alpha1.ToolImageSpec
+	ScriptConfig   []appsv1alpha1.ScriptConfig
+	ToolsImageSpec *appsv1alpha1.ToolsImageSpec
 }
 
 type TPLScriptConfig struct {

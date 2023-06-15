@@ -158,8 +158,8 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec,
 				DownwardAPIOptions: cc.Spec.DownwardAPIOptions,
 				FormatterConfig:    *cc.Spec.FormatterConfig,
 			},
-			ToolImageSpec: cc.Spec.ToolImageSpec,
-			ScriptConfig:  cc.Spec.ScriptConfigs,
+			ToolsImageSpec: cc.Spec.ToolsImageSpec,
+			ScriptConfig:   cc.Spec.ScriptConfigs,
 		})
 	}
 	return reloadConfigSpecMeta, nil

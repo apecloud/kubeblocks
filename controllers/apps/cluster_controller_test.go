@@ -735,7 +735,7 @@ var _ = Describe("Cluster Controller", func() {
 					Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKey{Name: policyName, Namespace: clusterKey.Namespace},
 						&dataprotectionv1alpha1.BackupPolicy{}, true)).Should(Succeed())
 
-					if policyType == appsv1alpha1.HScaleDataClonePolicyFromBackup {
+					if policyType == appsv1alpha1.HScaleDataClonePolicyCloneVolume {
 						By("creating backup tool if backup policy is backup")
 						backupTool := &dataprotectionv1alpha1.BackupTool{
 							ObjectMeta: metav1.ObjectMeta{
@@ -821,7 +821,7 @@ var _ = Describe("Cluster Controller", func() {
 		// REVIEW: this test flow, wait for running phase?
 		viper.Set("VOLUMESNAPSHOT", true)
 		viper.Set(constant.CfgKeyBackupPVCName, "")
-		horizontalScale(int(updatedReplicas), appsv1alpha1.HScaleDataClonePolicyFromBackup, compDefName)
+		horizontalScale(int(updatedReplicas), appsv1alpha1.HScaleDataClonePolicyCloneVolume, compDefName)
 	}
 
 	testStorageExpansion := func(compName, compDefName string) {
@@ -1417,7 +1417,7 @@ var _ = Describe("Cluster Controller", func() {
 						continue
 					}
 					clusterDef.Spec.ComponentDefs[i].HorizontalScalePolicy =
-						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromBackup,
+						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyCloneVolume,
 							BackupPolicyTemplateName: backupPolicyTPLName}
 				}
 			})()).ShouldNot(HaveOccurred())
@@ -1470,7 +1470,7 @@ var _ = Describe("Cluster Controller", func() {
 						continue
 					}
 					clusterDef.Spec.ComponentDefs[i].HorizontalScalePolicy =
-						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromBackup,
+						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyCloneVolume,
 							BackupPolicyTemplateName: backupPolicyTPLName}
 				}
 			})()).ShouldNot(HaveOccurred())
@@ -1515,7 +1515,7 @@ var _ = Describe("Cluster Controller", func() {
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 			func(clusterDef *appsv1alpha1.ClusterDefinition) {
 				clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
-					&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromBackup,
+					&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyCloneVolume,
 						BackupPolicyTemplateName: backupPolicyTPLName}
 			})()).ShouldNot(HaveOccurred())
 
@@ -1847,13 +1847,13 @@ var _ = Describe("Cluster Controller", func() {
 		It("should successfully h-scale with multiple components", func() {
 			viper.Set("VOLUMESNAPSHOT", true)
 			viper.Set(constant.CfgKeyBackupPVCName, "")
-			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyFromBackup)
+			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})
 
 		It("should successfully h-scale with multiple components by backup tool", func() {
 			viper.Set("VOLUMESNAPSHOT", false)
 			viper.Set(constant.CfgKeyBackupPVCName, "test-backup-pvc")
-			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyFromBackup)
+			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})
 	})
 
@@ -1958,7 +1958,7 @@ var _ = Describe("Cluster Controller", func() {
 					testStorageExpansion(compName, compDefName)
 					viper.Set("VOLUMESNAPSHOT", true)
 					viper.Set(constant.CfgKeyBackupPVCName, "")
-					horizontalScale(5, appsv1alpha1.HScaleDataClonePolicyFromBackup, compDefName)
+					horizontalScale(5, appsv1alpha1.HScaleDataClonePolicyCloneVolume, compDefName)
 				})
 			})
 

@@ -321,7 +321,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompDefName).
 				AddHorizontalScalePolicy(appsv1alpha1.HorizontalScalePolicy{
-					Type:                     appsv1alpha1.HScaleDataClonePolicyFromBackup,
+					Type:                     appsv1alpha1.HScaleDataClonePolicyCloneVolume,
 					BackupPolicyTemplateName: backupPolicyTPLName,
 				}).Create(&testCtx).GetObject()
 
@@ -362,7 +362,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 				func(clusterDef *appsv1alpha1.ClusterDefinition) {
 					clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
-						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromBackup}
+						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyCloneVolume}
 				})()).ShouldNot(HaveOccurred())
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,

@@ -54,7 +54,7 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 	if component == nil || component.HorizontalScalePolicy == nil {
 		return nil, nil
 	}
-	if component.HorizontalScalePolicy.Type == appsv1alpha1.HScaleDataClonePolicyFromBackup {
+	if component.HorizontalScalePolicy.Type == appsv1alpha1.HScaleDataClonePolicyCloneVolume {
 		snapshot := &snapshotDataClone{
 			baseDataClone{
 				reqCtx:    reqCtx,

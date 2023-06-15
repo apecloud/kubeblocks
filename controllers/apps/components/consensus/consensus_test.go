@@ -130,28 +130,38 @@ var _ = Describe("Consensus Component", func() {
 
 			By("test handle probe timed out")
 			mockClusterStatusProbeTimeout(cluster)
-			// mock leader pod is not ready
-			testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, podName, testCtx.DefaultNamespace)
 			testk8s.DeletePodLabelKey(ctx, testCtx, podName, constant.RoleLabelKey)
 			pod := &corev1.Pod{}
 			Expect(testCtx.Cli.Get(ctx, client.ObjectKey{Name: podName, Namespace: testCtx.DefaultNamespace}, pod)).Should(Succeed())
 			phase, _ := consensusComponent.GetPhaseWhenPodsReadyAndProbeTimeout([]*corev1.Pod{pod})
-			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
+			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 
 			By("test component is running")
 			isRunning, _ = consensusComponent.IsRunning(ctx, sts)
 			Expect(isRunning).Should(BeFalse())
 
+			By("should return empty string if pod of component is only not ready when component is not up running")
+			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
+				pod.Status.Conditions = []corev1.PodCondition{}
+			})).Should(Succeed())
+			phase, _, _ = consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName, false)
+			Expect(string(phase)).Should(Equal(""))
+
+			By("expect component phase is Failed when pod of component is not ready and component is up running")
+			phase, _, _ = consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName, true)
+			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
+
 			By("expect component phase is Failed when pod of component is failed")
-			phase, _, _ = consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName)
-			Expect(phase == appsv1alpha1.FailedClusterCompPhase).Should(BeTrue())
+			testk8s.UpdatePodStatusScheduleFailed(ctx, testCtx, podName, testCtx.DefaultNamespace)
+			phase, _, _ = consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName, false)
+			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 
 			By("unready pod is not controlled by latest revision, should return empty string")
 			// mock pod is not controlled by latest revision
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 				sts.Status.UpdateRevision = fmt.Sprintf("%s-%s-%s", clusterName, consensusCompName, "6fdd48d9cd1")
 			})).Should(Succeed())
-			phase, _, _ = consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName)
+			phase, _, _ = consensusComponent.GetPhaseWhenPodsNotReady(ctx, consensusCompName, false)
 			Expect(string(phase)).Should(Equal(""))
 		})
 	})

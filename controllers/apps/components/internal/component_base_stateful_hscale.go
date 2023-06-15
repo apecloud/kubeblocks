@@ -21,49 +21,12 @@ package internal
 
 import (
 	"context"
-	"fmt"
-	"time"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/spf13/viper"
-	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	"github.com/spf13/viper"
 )
-
-// TODO: handle unfinished jobs from previous scale in
-func checkedCreateDeletePVCCronJob(reqCtx intctrlutil.RequestCtx, cli types2.ReadonlyClient,
-	pvcKey types.NamespacedName, stsObj *appsv1.StatefulSet, cluster *appsv1alpha1.Cluster) (client.Object, error) {
-	// hack: delete after 30 minutes
-	utc := time.Now().Add(30 * time.Minute).UTC()
-	schedule := fmt.Sprintf("%d %d %d %d *", utc.Minute(), utc.Hour(), utc.Day(), utc.Month())
-	cronJob, err := builder.BuildCronJob(pvcKey, schedule, stsObj)
-	if err != nil {
-		return nil, err
-	}
-
-	job := &batchv1.CronJob{}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKeyFromObject(cronJob), job); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return nil, err
-		}
-		reqCtx.Recorder.Eventf(cluster,
-			corev1.EventTypeNormal,
-			"CronJobCreate",
-			"create cronjob to delete pvc/%s",
-			pvcKey.Name)
-		return cronJob, nil
-	}
-	return nil, nil
-}
 
 // check volume snapshot available
 func isSnapshotAvailable(cli types2.ReadonlyClient, ctx context.Context) bool {

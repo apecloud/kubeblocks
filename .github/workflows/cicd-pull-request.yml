@@ -5,10 +5,6 @@ on:
     types: [submitted]
 
 env:
-  GITLAB_GO_CACHE_PROJECT_ID: 98800
-  GO_CACHE: "go-cache"
-  GO_CACHE_DIR: "/root/.cache"
-  GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
 jobs:
@@ -18,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
+      matrix: ${{ steps.get_trigger_mode.outputs.matrix }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -30,49 +27,49 @@ jobs:
               --base-commit "${{ github.event.pull_request.base.sha }}"`
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
+          
+          TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
+              --trigger-type "$TRIGGER_MODE" \
+              --test-pkgs "internal|apis|controllers|cmd" \
+              --test-check "mod-vendor|lint"`
+          echo "$TEST_PACKAGES"
+          echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
 
   make-test:
     name: make test
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
-    outputs:
-      runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
-    runs-on: [ self-hosted, kubeblocks-runner ]
-    steps:
-      - uses: actions/checkout@v3
-      - name: make mod-vendor
-        run: |
-          mkdir -p ./bin
-          cp -r /go/bin/controller-gen ./bin/controller-gen
-          cp -r /go/bin/setup-envtest ./bin/setup-envtest
-          make mod-vendor
-
-      - name: make lint
-        run: |
-          make lint
-
-      - name: make test
-        run: |
-          make test
-
-      - name: kill kube-apiserver and etcd
-        id: get_runner_name
-        if: ${{ always() }}
-        run: |
-          echo runner_name=${RUNNER_NAME} >> $GITHUB_OUTPUT
-          bash .github/utils/utils.sh --type 8
-
-  remove-runner:
-    needs: [ trigger-mode, make-test ]
     runs-on: ubuntu-latest
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && always() }}
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJSON(needs.trigger-mode.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v3
-      - name: remove runner
+      - name: install lib
         run: |
-          bash .github/utils/utils.sh --type 9 \
-            --github-token "${{ env.GITHUB_TOKEN }}" \
-            --runner-name ${{ needs.make-test.outputs.runner-name }}
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libbtrfs-dev \
+            libdevmapper-dev
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: "${{ env.GO_VERSION }}"
+
+      - name: Install golangci-lint
+        if: matrix.ops == 'lint'
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.51.2
+
+      - name: make test ${{ matrix.ops }}
+        run: |
+          make ${{ matrix.ops }}
+
+      - name: make ${{ matrix.ops }}
+        if: ${{ contains(matrix.ops, '/') }}
+        run: |
+          make test TEST_PACKAGES=./${{ matrix.ops }}/...
 
   check-image:
     name: check image

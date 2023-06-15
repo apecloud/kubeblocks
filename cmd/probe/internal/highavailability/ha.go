@@ -56,7 +56,7 @@ func (ha *Ha) runCycle() {
 			dcs.UpdateLeader()
 		} else if dbManger.HasOtherHealthyLeader() {
 			logger.Infof("Release leader")
-			dcs.ReleaseLeader()
+			dcs.ReleaseLock()
 		}
 
 	case cluster.SwitchOver.Leader != dbManager.Name && dbManager.IsLeader():

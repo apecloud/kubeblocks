@@ -550,7 +550,7 @@ func (r *ServicePort) toSVCPort() corev1.ServicePort {
 type HorizontalScalePolicy struct {
 	// type controls what kind of data synchronization do when component scale out.
 	// Policy is in enum of {None, Backup}. The default policy is `None`.
-	// None: Default policy, do nothing.
+	// None: Default policy, create empty volume and no data clone.
 	// Backup: Do data clone to newly scaled pods. Prefer to use volume snapshot first,
 	//         and will try backup tool if volume snapshot is not enabled, finally
 	// 	       report error if both above cannot work.

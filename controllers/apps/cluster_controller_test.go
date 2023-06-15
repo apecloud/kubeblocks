@@ -1402,6 +1402,61 @@ var _ = Describe("Cluster Controller", func() {
 			Should(Equal(appsv1alpha1.RunningClusterCompPhase))
 	}
 
+	testHScaleError := func(compName, compDefName string) {
+
+		viper.Set("VOLUMESNAPSHOT", false)
+		viper.Set(constant.CfgKeyBackupPVCName, "")
+		initialReplicas := int32(1)
+		updatedReplicas := int32(3)
+
+		By("Set HorizontalScalePolicy")
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
+			func(clusterDef *appsv1alpha1.ClusterDefinition) {
+				for i, def := range clusterDef.Spec.ComponentDefs {
+					if def.Name != compDefName {
+						continue
+					}
+					clusterDef.Spec.ComponentDefs[i].HorizontalScalePolicy =
+						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromBackup,
+							BackupPolicyTemplateName: backupPolicyTPLName}
+				}
+			})()).ShouldNot(HaveOccurred())
+
+		By("Creating a cluster with VolumeClaimTemplate")
+		pvcSpec := testapps.NewPVCSpec("1Gi")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddComponent(compName, compDefName).
+			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
+			SetReplicas(initialReplicas).
+			Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, compName)
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+
+		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
+		changeCompReplicas(clusterKey, updatedReplicas, &clusterObj.Spec.ComponentSpecs[0])
+
+		By("Checking h-scale failed cluster status failed with backup error")
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			g.Expect(cluster.Status.Conditions).ShouldNot(BeEmpty())
+			var err error
+			for _, cond := range cluster.Status.Conditions {
+				if strings.Contains(cond.Message, "h-scale policy is Backup but neither snapshot nor backup tool is enabled") {
+					err = errors.New("has h-scale error")
+					break
+				}
+			}
+			if err == nil {
+				// this expect is intended for print all cluster.Status.Conditions
+				g.Expect(cluster.Status.Conditions).Should(BeEmpty())
+			}
+			g.Expect(err).Should(HaveOccurred())
+		})).Should(Succeed())
+	}
+
 	testBackupError := func(compName, compDefName string) {
 		initialReplicas := int32(1)
 		updatedReplicas := int32(3)
@@ -1892,6 +1947,10 @@ var _ = Describe("Cluster Controller", func() {
 
 			It(fmt.Sprintf("[comp: %s] should report error if backup error during horizontal scale", compName), func() {
 				testBackupError(compName, compDefName)
+			})
+
+			It(fmt.Sprintf("[comp: %s] should report h-scale error", compName), func() {
+				testHScaleError(compName, compDefName)
 			})
 
 			Context(fmt.Sprintf("[comp: %s] with horizontal scale after storage expansion", compName), func() {

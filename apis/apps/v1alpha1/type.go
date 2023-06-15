@@ -243,13 +243,12 @@ const (
 
 // HScaleDataClonePolicyType defines data clone policy when horizontal scaling.
 // +enum
-// +kubebuilder:validation:Enum={None,Snapshot,Backup}
+// +kubebuilder:validation:Enum={None,Backup}
 type HScaleDataClonePolicyType string
 
 const (
-	HScaleDataClonePolicyNone         HScaleDataClonePolicyType = "None"
-	HScaleDataClonePolicyFromSnapshot HScaleDataClonePolicyType = "Snapshot"
-	HScaleDataClonePolicyFromBackup   HScaleDataClonePolicyType = "Backup"
+	HScaleDataClonePolicyNone       HScaleDataClonePolicyType = "None"
+	HScaleDataClonePolicyFromBackup HScaleDataClonePolicyType = "Backup"
 )
 
 // PodAntiAffinity defines pod anti-affinity strategy.

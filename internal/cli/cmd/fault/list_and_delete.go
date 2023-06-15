@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -102,9 +103,8 @@ func (o *ListAndDeleteOptions) Validate(args []string) error {
 	var err error
 	o.AllResourceKinds, err = getAllChaosResourceKinds(o.Factory, GroupVersion)
 	if err != nil {
-		return fmt.Errorf("failed to get all chaos resources: %s", err)
+		return fmt.Errorf("failed to get all chaos resource kinds: %v", err)
 	}
-
 	kindMap := make(map[string]bool)
 	for _, kind := range o.AllResourceKinds {
 		kindMap[kind] = true
@@ -121,7 +121,7 @@ func (o *ListAndDeleteOptions) Validate(args []string) error {
 func (o *ListAndDeleteOptions) Complete(args []string) error {
 	if o.Kind {
 		for _, resourceKind := range o.AllResourceKinds {
-			fmt.Println(resourceKind)
+			fmt.Fprintf(o.Out, "%s\n", resourceKind)
 		}
 		return nil
 	}
@@ -142,6 +142,10 @@ func (o *ListAndDeleteOptions) Complete(args []string) error {
 }
 
 func (o *ListAndDeleteOptions) RunList() error {
+	if o.Kind {
+		return nil
+	}
+
 	tbl := printer.NewTablePrinter(o.Out)
 	tbl.Tbl.SetColumnConfigs([]table.ColumnConfig{
 		{Number: 2, WidthMax: 120},
@@ -171,7 +175,7 @@ func (o *ListAndDeleteOptions) listResources(resourceKind string, tbl *printer.T
 	gvr := GetGVR(Group, Version, resourceKind)
 	resourceList, err := o.Dynamic.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to list %s: %s", gvr, err)
+		return errors.Wrapf(err, "failed to list %s", gvr)
 	}
 
 	if len(resourceList.Items) == 0 {
@@ -197,7 +201,7 @@ func (o *ListAndDeleteOptions) deleteResources(resourceKind string) error {
 	gvr := GetGVR(Group, Version, resourceKind)
 	resourceList, err := o.Dynamic.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to list %s: %s", gvr, err)
+		return errors.Wrapf(err, "failed to list %s", gvr)
 	}
 
 	if len(resourceList.Items) == 0 {
@@ -207,9 +211,9 @@ func (o *ListAndDeleteOptions) deleteResources(resourceKind string) error {
 	for _, obj := range resourceList.Items {
 		err = o.Dynamic.Resource(gvr).Namespace(obj.GetNamespace()).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to delete %s: %s", gvr, err)
+			return errors.Wrapf(err, "failed to delete %s", gvr)
 		}
-		fmt.Println("delete resource", obj.GetName())
+		fmt.Fprintf(o.Out, "delete resource %s/%s\n", obj.GetNamespace(), obj.GetName())
 	}
 	return nil
 }
@@ -217,11 +221,11 @@ func (o *ListAndDeleteOptions) deleteResources(resourceKind string) error {
 func getAllChaosResourceKinds(f cmdutil.Factory, groupVersion string) ([]string, error) {
 	discoveryClient, err := f.ToDiscoveryClient()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create discovery client: %v", err)
+		return nil, errors.Wrap(err, "failed to create discovery client")
 	}
 	chaosResources, err := discoveryClient.ServerResourcesForGroupVersion(groupVersion)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get server resources for %s: %s", groupVersion, err)
+		return nil, errors.Wrapf(err, "failed to get server resources for %s", groupVersion)
 	}
 
 	resourceKinds := make([]string, 0)

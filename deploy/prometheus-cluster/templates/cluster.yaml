@@ -45,7 +45,6 @@ spec:
     - name: alertmanager # user-defined
       componentDefRef: alertmanager # ref clusterdefinition components.name
       replicas: {{ .Values.alertmanager.replicaCount | default 1 }}
-      serviceAccountName: "prometheus-alertmanager"
       primaryIndex: {{ .Values.alertmanager.primaryIndex | default 0 }}
       switchPolicy:
         type: {{ .Values.alertmanager.switchPolicy.type}}

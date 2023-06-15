@@ -8,4 +8,6 @@ type Cluster interface {
 	HasLock()
 	AttempAcquireLock()
 	ReleaseLock()
+	GetLeader()
+	AddThisMember()
 }

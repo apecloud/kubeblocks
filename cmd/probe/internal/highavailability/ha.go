@@ -2,6 +2,7 @@ package highavailability
 
 import (
 	"context"
+	"time"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
@@ -66,4 +67,14 @@ func (ha *Ha) runCycle() {
 		logger.Infof("Cluster has no leader, attemp to take the leader")
 		dbManager.Premote()
 	}
+}
+
+func (ha *Ha) Start() {
+	for true {
+		ha.runCycle()
+		time.sleep(1 * time.Second)
+	}
+}
+
+func (ha *Ha) ShutdownAndWait() {
 }

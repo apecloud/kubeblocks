@@ -40,6 +40,7 @@ type CfgManagerBuildParams struct {
 	Envs        []corev1.EnvVar `json:"envs"`
 
 	Volumes       []corev1.VolumeMount `json:"volumes"`
+	ComponentName string               `json:"componentName"`
 	CharacterType string               `json:"characterType"`
 	SecreteName   string               `json:"secreteName"`
 	EnvConfigName string               `json:"envConfigName"`

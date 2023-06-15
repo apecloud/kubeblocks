@@ -130,6 +130,7 @@ var _ = Describe("Config Builder Test", func() {
 					Namespace: "default",
 				},
 			},
+			ComponentName:             "test",
 			Volumes:                   newVolumeMounts(),
 			ConfigSpecsBuildParams:    newConfigSpecMeta(),
 			ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),

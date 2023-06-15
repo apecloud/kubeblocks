@@ -18,7 +18,6 @@ package configmanager
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -433,11 +432,10 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 
 	var h ConfigHandler
 	var handlerMetas []ConfigSpecInfo
-	err := json.Unmarshal([]byte(config), &handlerMetas)
+	err := cfgutil.FromYamlConfig(config, &handlerMetas)
 	if err != nil {
 		return nil, err
 	}
-
 	mHandler := &multiHandler{
 		handlers: make(map[string]ConfigHandler, len(handlerMetas)),
 	}

@@ -468,8 +468,9 @@ var _ = Describe("builder", func() {
 			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:   "cfgmgr",
-				CharacterType: "mysql",
 				SecreteName:   "test-secret",
+				ComponentName: synthesizedComponent.Name,
+				CharacterType: synthesizedComponent.CharacterType,
 				EnvConfigName: cfg.Name,
 				Image:         constant.KBToolsImage,
 				Args:          []string{},

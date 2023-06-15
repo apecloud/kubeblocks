@@ -21,7 +21,6 @@ package configmanager
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 
@@ -48,6 +47,10 @@ const (
 	kbConfigVolumePath   = "/opt/kb-tools/config"
 	scriptConfigField    = "scripts"
 	formatterConfigField = "formatterConfig"
+
+	configManagerConfigVolumeName = "config-manager-config"
+	configManagerConfig           = "config-manager.yaml"
+	configManagerConfigMountPoint = "/opt/config-manager"
 )
 
 const KBConfigSpecYamlFile = "kb-cm-config.yaml"
@@ -72,7 +75,7 @@ func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, c
 	downwardAPIVolumes := buildDownwardAPIVolumes(cmBuildParams)
 	allVolumeMounts = append(allVolumeMounts, downwardAPIVolumes...)
 	cmBuildParams.Volumes = append(cmBuildParams.Volumes, downwardAPIVolumes...)
-	return buildConfigManagerArgs(cmBuildParams, allVolumeMounts)
+	return buildConfigManagerArgs(cmBuildParams, allVolumeMounts, cli, ctx)
 }
 
 func getWatchedVolume(volumeDirs []corev1.VolumeMount, buildParams []ConfigSpecMeta) []corev1.VolumeMount {
@@ -145,20 +148,57 @@ func buildDownwardAPIVolumes(params *CfgManagerBuildParams) []corev1.VolumeMount
 	return params.DownwardAPIVolumes
 }
 
-func buildConfigManagerArgs(params *CfgManagerBuildParams, volumeDirs []corev1.VolumeMount) error {
+func buildConfigManagerArgs(params *CfgManagerBuildParams, volumeDirs []corev1.VolumeMount, cli client.Client, ctx context.Context) error {
 	args := buildConfigManagerCommonArgs(volumeDirs)
 	args = append(args, "--operator-update-enable")
-	// args = append(args, "--log-level", viper.GetString(constant.ConfigManagerLogLevel))
 	args = append(args, "--tcp", viper.GetString(constant.ConfigManagerGPRCPortEnv))
-	// args = append(args, "--notify-type", string(appsv1alpha1.MultiType))
 
-	b, err := json.Marshal(frmConfigSpecMeta(params.ConfigSpecsBuildParams))
+	// b, err := json.Marshal(frmConfigSpecMeta(params.ConfigSpecsBuildParams))
+	// if err != nil {
+	//	return err
+	// }
+	if err := createOrUpdateConfigMap(frmConfigSpecMeta(params.ConfigSpecsBuildParams), params, cli, ctx); err != nil {
+		return err
+	}
+	args = append(args, "--config", filepath.Join(configManagerConfigVolumeName, configManagerConfig))
+	params.Args = args
+	return nil
+}
+
+func buildCMForConfig(params *CfgManagerBuildParams) *corev1.ConfigMap {
+	return nil
+}
+
+func createOrUpdateConfigMap(configInfo []ConfigSpecInfo, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context) error {
+	createConfigCM := func(configKey client.ObjectKey, config string) error {
+		cm := buildCMForConfig(manager)
+		cm.Data[configManagerConfig] = config
+		return cli.Create(ctx, cm)
+	}
+	updateConfigCM := func(cm *corev1.ConfigMap, newConfig string) error {
+		patch := client.MergeFrom(cm.DeepCopy())
+		cm.Data[configManagerConfig] = newConfig
+		return cli.Patch(ctx, cm, patch)
+	}
+
+	configKey := client.ObjectKey{
+		Namespace: manager.Cluster.GetNamespace(),
+		Name:      fmt.Sprintf("%s-%s-cm-config", manager.Cluster.GetName(), manager.ComponentName),
+	}
+
+	cm := &corev1.ConfigMap{}
+	config, err := cfgutil.ToYamlConfig(configInfo)
 	if err != nil {
 		return err
 	}
-	args = append(args, "--config", string(b))
-	params.Args = args
-	return nil
+	buildReloadScriptVolume(configKey.Name, manager, configManagerConfigMountPoint, configManagerConfigVolumeName)
+	if err := cli.Get(ctx, configKey, cm); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
+		return createConfigCM(configKey, string(config))
+	}
+	return updateConfigCM(cm, string(config))
 }
 
 func frmConfigSpecMeta(metas []ConfigSpecMeta) []ConfigSpecInfo {

@@ -22,9 +22,6 @@ package helm
 import (
 	"bytes"
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"helm.sh/helm/v3/pkg/release"
-	"helm.sh/helm/v3/pkg/releaseutil"
 	"io"
 	"log"
 	"reflect"
@@ -33,6 +30,10 @@ import (
 
 	"golang.org/x/exp/maps"
 	"gopkg.in/yaml.v2"
+	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v3/pkg/releaseutil"
+
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 var (
@@ -201,53 +202,6 @@ func buildManifestMapByRelease(release *release.Release) (map[string]*MappingRes
 	}
 	return manifestsMap, nil
 }
-
-//func OutPutDiff(newManifestMap, oldManifestMap map[string]*MappingResult, out io.Writer) error {
-//	mayRemove := make([]*MappingResult, 0)
-//	mayAdd := make([]*MappingResult, 0)
-//
-//	for _, key := range sortedKeys(oldManifestMap) {
-//		oldManifest := oldManifestMap[key]
-//		if newManifest, ok := newManifestMap[key]; ok {
-//			if oldManifest.Content == newManifest.Content {
-//				continue
-//			}
-//			diffString, err := util.GetUnifiedDiffString(oldManifest.Content, newManifest.Content, oldManifest.Name, newManifest.Name)
-//			if err != nil {
-//				return err
-//			}
-//
-//			util.DisplayDiffWithColor(out, diffString)
-//		} else {
-//			mayRemove = append(mayRemove, oldManifest)
-//		}
-//
-//	}
-//
-//	// Todo: support find Rename chart.yaml between mayRemove and mayAdd
-//	for k, v := range newManifestMap {
-//		if _, ok := oldManifestMap[k]; !ok {
-//			mayAdd = append(mayAdd, v)
-//		}
-//	}
-//
-//	for _, elem := range mayAdd {
-//		diffString, err := util.GetUnifiedDiffString("", elem.Content, "", elem.Name)
-//		if err != nil {
-//			return err
-//		}
-//		util.DisplayDiffWithColor(out, diffString)
-//	}
-//
-//	for _, elem := range mayRemove {
-//		diffString, err := util.GetUnifiedDiffString(elem.Content, "", elem.Name, "")
-//		if err != nil {
-//			return err
-//		}
-//		util.DisplayDiffWithColor(out, diffString)
-//	}
-//	return nil
-//}
 
 func sortedKeys(manifests map[string]*MappingResult) []string {
 	keys := maps.Keys(manifests)

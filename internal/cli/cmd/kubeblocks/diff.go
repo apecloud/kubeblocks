@@ -21,14 +21,16 @@ package kubeblocks
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
+
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
 var (
@@ -68,9 +70,10 @@ func newDiffCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 }
 
 func (o *InstallOptions) validateCompareVersion(args []string, versionA, versionB *string) error {
-	if len(args) == 0 {
+	switch len(args) {
+	case 0:
 		return fmt.Errorf("need specify at least one version to compare")
-	} else if len(args) == 1 {
+	case 1:
 		v, err := util.GetVersionInfo(o.Client)
 		if err != nil {
 			return err
@@ -79,12 +82,12 @@ func (o *InstallOptions) validateCompareVersion(args []string, versionA, version
 			return fmt.Errorf("KubeBlocks is not exists, please install it first")
 		}
 		if args[0] == v.KubeBlocks {
-			return fmt.Errorf("input version %s is same with the current version, no need to compare.\n", args[0])
+			return fmt.Errorf("input version %s is same with the current version, no need to compare", args[0])
 		}
 		*versionA, *versionB = v.KubeBlocks, args[0]
-	} else {
+	default:
 		if args[0] == args[1] {
-			return fmt.Errorf("input version %s and %s are same, no need to compare.\n", args[0], args[0])
+			return fmt.Errorf("input version %s and %s are same, no need to compare", args[0], args[0])
 		}
 		*versionA, *versionB = args[0], args[1]
 	}
@@ -96,7 +99,7 @@ func (o *InstallOptions) compare(args []string) error {
 	if err := o.validateCompareVersion(args, &versionA, &versionB); err != nil {
 		return err
 	}
-	//update repo
+	// update repo
 	if err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksRepoName, URL: util.GetHelmChartRepoURL()}); err != nil {
 		return err
 	}

@@ -110,10 +110,10 @@ func sortMembers[T any](membersStatus []T,
 }
 
 // composeRolePriorityMap generates a priority map based on roles.
-func composeRolePriorityMap(set workloads.ReplicatedStateMachine) map[string]int {
+func composeRolePriorityMap(rsm workloads.ReplicatedStateMachine) map[string]int {
 	rolePriorityMap := make(map[string]int, 0)
 	rolePriorityMap[""] = emptyPriority
-	for _, role := range set.Spec.Roles {
+	for _, role := range rsm.Spec.Roles {
 		roleName := strings.ToLower(role.Name)
 		switch {
 		case role.IsLeader:
@@ -159,18 +159,18 @@ func updatePodRoleLabel(cli client.Client,
 	return cli.Patch(ctx, pod, patch)
 }
 
-func composeRoleMap(set workloads.ReplicatedStateMachine) map[string]workloads.ReplicaRole {
+func composeRoleMap(rsm workloads.ReplicatedStateMachine) map[string]workloads.ReplicaRole {
 	roleMap := make(map[string]workloads.ReplicaRole, 0)
-	for _, role := range set.Spec.Roles {
+	for _, role := range rsm.Spec.Roles {
 		roleMap[strings.ToLower(role.Name)] = role
 	}
 	return roleMap
 }
 
-func setMembersStatus(set *workloads.ReplicatedStateMachine, pods []corev1.Pod) {
+func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) {
 	// compose new status
 	newMembersStatus := make([]workloads.MemberStatus, 0)
-	roleMap := composeRoleMap(*set)
+	roleMap := composeRoleMap(*rsm)
 	for _, pod := range pods {
 		if !intctrlutil.PodIsReadyWithLabel(pod) {
 			continue
@@ -188,9 +188,9 @@ func setMembersStatus(set *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 	}
 
 	// members(pods) being scheduled should be kept
-	oldMemberMap := make(map[string]*workloads.MemberStatus, len(set.Status.MembersStatus))
-	for i, status := range set.Status.MembersStatus {
-		oldMemberMap[status.PodName] = &set.Status.MembersStatus[i]
+	oldMemberMap := make(map[string]*workloads.MemberStatus, len(rsm.Status.MembersStatus))
+	for i, status := range rsm.Status.MembersStatus {
+		oldMemberMap[status.PodName] = &rsm.Status.MembersStatus[i]
 	}
 	newMemberMap := make(map[string]*workloads.MemberStatus, len(newMembersStatus))
 	for i, status := range newMembersStatus {
@@ -202,15 +202,15 @@ func setMembersStatus(set *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 	for podName := range memberToKeepSet {
 		ordinal, _ := getPodOrdinal(podName)
 		// members have left because of scale-in
-		if ordinal >= int(set.Spec.Replicas) {
+		if ordinal >= int(rsm.Spec.Replicas) {
 			continue
 		}
 		newMembersStatus = append(newMembersStatus, *oldMemberMap[podName])
 	}
 
-	rolePriorityMap := composeRolePriorityMap(*set)
+	rolePriorityMap := composeRolePriorityMap(*rsm)
 	sortMembersStatus(newMembersStatus, rolePriorityMap)
-	set.Status.MembersStatus = newMembersStatus
+	rsm.Status.MembersStatus = newMembersStatus
 }
 
 func getRoleName(pod corev1.Pod) string {
@@ -252,8 +252,8 @@ func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsO
 	return pods, nil
 }
 
-func getHeadlessSvcName(set workloads.ReplicatedStateMachine) string {
-	return strings.Join([]string{set.Name, "headless"}, "-")
+func getHeadlessSvcName(rsm workloads.ReplicatedStateMachine) string {
+	return strings.Join([]string{rsm.Name, "headless"}, "-")
 }
 
 func findSvcPort(rsm workloads.ReplicatedStateMachine) int {

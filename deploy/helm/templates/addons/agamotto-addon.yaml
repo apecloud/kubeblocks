@@ -14,7 +14,7 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/agamotto-0.1.0-beta.2.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/agamotto-0.1.0-beta.4.tgz
     installValues:
       configMapRefs:
         - name: {{ include "addon.agamotto.name" . }}-chart-kubeblocks-values

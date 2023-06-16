@@ -446,7 +446,7 @@ func fakeActionConfig() *action.Configuration {
 		RegistryClient: registryClient,
 		Log:            func(format string, v ...interface{}) {},
 	}
-	// for template the kubeblocks manifest for upgrade diff, dry-run install will check and valida the KubeVersion in Capabilities is bigger than
+	// to template the kubeblocks manifest, dry-run install will check and valida the KubeVersion in Capabilities is bigger than
 	// the KubeVersion in Chart.yaml.
 	// in helm v3.11.1 the DefaultCapabilities KubeVersion is 1.20 which lower than the kubeblocks Chart claimed '>=1.22.0-0'
 	res.Capabilities.KubeVersion.Version = "v99.99.0"

@@ -134,24 +134,13 @@ preflight-manifests: generate ## Generate external Preflight API
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./externalapis/preflight/..." output:crd:artifacts:config=config/crd/preflight
 
 .PHONY: generate
-generate: CODEGEN_GENERATORS=all # deepcopy,defaulter,client,lister,informer or all
-generate: OUTPUT_PACKAGE=github.com/apecloud/kubeblocks/pkg/client
-generate: OUTPUT_DIR=./clientgen_work_temp
-generate: APIS_PACKAGE=github.com/apecloud/kubeblocks/apis
-generate: CODEGEN_GROUP_VERSIONS="apps.kubeblocks.io:v1alpha1 dataprotection.kubeblocks.io:v1alpha1"
-generate: controller-gen client-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	# $(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/..."
-	# $(CLIENT_GEN) --clientset-name versioned --input-base "" --input="./apis/dbaas/v1alpha1" --go-header-file ./hack/boilerplate.go.txt --output-package clientset
-	mkdir -p $(OUTPUT_DIR)
-	bash ./vendor/k8s.io/code-generator/generate-groups.sh $(CODEGEN_GENERATORS) $(OUTPUT_PACKAGE) $(APIS_PACKAGE) "$(CODEGEN_GROUP_VERSIONS)" \
-		--output-base $(OUTPUT_DIR) \
-		--go-header-file ./hack/boilerplate_apache2.go.txt
-	rm -rf ./pkg/client/{clientset,informers,listers}
-	mv "$(OUTPUT_DIR)"/$(OUTPUT_PACKAGE)/* ./pkg/client
-#   echo "Generating clientset for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}"
-#   "${gobin}/client-gen" --clientset-name "${CLIENTSET_NAME_VERSIONED:-versioned}" --input-base "" --input "$(codegen::join , "${FQ_APIS[@]}")" --output-package "${OUTPUT_PKG}/${CLIENTSET_PKG_NAME:-clientset}" "$@"
-
+generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/...;./externalapis/..."
+	$(MAKE) client-gen
+
+.PHONY: client-gen
+client-gen:  ## Generate CRD client code.
+	@./hack/client-gen.sh
 
 .PHONY: manager-go-generate
 manager-go-generate: ## Run go generate against lifecycle manager code.
@@ -453,13 +442,11 @@ $(LOCALBIN):
 ## Tool Binaries
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-CLIENT_GEN ?= $(LOCALBIN)/client-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v4.5.7
 CONTROLLER_TOOLS_VERSION ?= v0.9.0
-CLIENT_GEN_VERSION ?= v0.26.1
 HELM_VERSION ?= v3.9.0
 CUE_VERSION ?= v0.4.3
 
@@ -478,12 +465,6 @@ ifeq (, $(shell ls $(LOCALBIN)/controller-gen 2>/dev/null))
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 endif
 
-.PHONY: client-gen
-client-gen: $(CLIENT_GEN) ## Download client-gen locally if necessary.
-$(CLIENT_GEN): $(LOCALBIN)
-ifeq (, $(shell ls $(LOCALBIN)/client-gen 2>/dev/null))
-	GOBIN=$(LOCALBIN) go install k8s.io/code-generator/cmd/client-gen@$(CLIENT_GEN_VERSION)
-endif
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.

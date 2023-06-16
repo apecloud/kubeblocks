@@ -33,4 +33,4 @@ To address these challenges, and solve the problem of complexity, KubeBlocks int
 
 ## Architecture
 
-![KubeBlocks Architecture](../../img/kubeblocks-structure-new.jpg)
+![KubeBlocks Architecture](../../img/kubeblocks-architecture.png)

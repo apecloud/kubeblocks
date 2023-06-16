@@ -70,6 +70,26 @@ type ComponentTemplateSpec struct {
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }
 
+type LazyRenderedTemplateSpec struct {
+	// Specify the name of the referenced the configuration template ConfigMap object.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	TemplateRef string `json:"templateRef"`
+
+	// Specify the namespace of the referenced the configuration template ConfigMap object.
+	// An empty namespace is equivalent to the "default" namespace.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:default="default"
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// policy defines how to merge external imported templates into component templates.
+	// +kubebuilder:default="patch"
+	// +optional
+	Policy MergedPolicy `json:"policy,omitempty"`
+}
+
 type ComponentConfigSpec struct {
 	ComponentTemplateSpec `json:",inline"`
 
@@ -79,12 +99,28 @@ type ComponentConfigSpec struct {
 	// +optional
 	Keys []string `json:"keys,omitempty"`
 
+	// lazyRenderedConfigSpec is optional: specify the secondary rendered config spec.
+	// +optional
+	LazyRenderedConfigSpec *LazyRenderedTemplateSpec `json:"lazyRenderedConfigSpec,omitempty"`
+
 	// Specify the name of the referenced the configuration constraints object.
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
 }
+
+// MergedPolicy defines how to merge external imported templates into component templates.
+// +enum
+// +kubebuilder:validation:Enum={patch,replace,none}
+type MergedPolicy string
+
+const (
+	PatchPolicy     MergedPolicy = "patch"
+	ReplacePolicy   MergedPolicy = "replace"
+	OnlyAddPolicy   MergedPolicy = "add"
+	NoneMergePolicy MergedPolicy = "none"
+)
 
 // ClusterPhase defines the Cluster CR .status.phase
 // +enum
@@ -243,13 +279,13 @@ const (
 
 // HScaleDataClonePolicyType defines data clone policy when horizontal scaling.
 // +enum
-// +kubebuilder:validation:Enum={None,Snapshot}
+// +kubebuilder:validation:Enum={None,CloneVolume,Snapshot}
 type HScaleDataClonePolicyType string
 
 const (
 	HScaleDataClonePolicyNone         HScaleDataClonePolicyType = "None"
+	HScaleDataClonePolicyCloneVolume  HScaleDataClonePolicyType = "CloneVolume"
 	HScaleDataClonePolicyFromSnapshot HScaleDataClonePolicyType = "Snapshot"
-	HScaleDataClonePolicyFromBackup   HScaleDataClonePolicyType = "Backup"
 )
 
 // PodAntiAffinity defines pod anti-affinity strategy.

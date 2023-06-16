@@ -87,12 +87,6 @@
 	// Vacuum cost amount available before napping, for autovacuum.
 	autovacuum_vacuum_cost_limit?: int & >=-1 & <=10000
 
-	// Number of tuple inserts prior to vacuum as a fraction of reltuples.
-	autovacuum_vacuum_insert_scale_factor?: float & >=0 & <=100
-
-	// Minimum number of tuple inserts prior to vacuum, or -1 to disable insert vacuums.
-	autovacuum_vacuum_insert_threshold?: int & >=-1 & <=2147483647
-
 	// Number of tuple updates or deletes prior to vacuum as a fraction of reltuples.
 	autovacuum_vacuum_scale_factor: float & >=0 & <=100 | *0.1
 
@@ -141,9 +135,6 @@
 	// (s) Enables warnings if checkpoint segments are filled more frequently than this.
 	checkpoint_warning?: int & >=0 & <=2147483647 @timeDurationResource(1s)
 
-	// time between checks for client disconnection while running queries
-	client_connection_check_interval?: int & >=0 & <=2147483647 @timeDurationResource()
-
 	// Sets the clients character set encoding.
 	client_encoding?: string
 
@@ -155,9 +146,6 @@
 
 	// Sets the minimum concurrent open transactions before performing commit_delay.
 	commit_siblings?: int & >=0 & <=1000
-
-	// Enables in-core computation of a query identifier
-	compute_query_id?: string & "on" | "auto"
 
 	// Sets the servers main configuration file.
 	config_file?: string
@@ -222,9 +210,6 @@
 	// Sets the default tablespace to create tables and indexes in.
 	default_tablespace?: string
 
-	// Sets the default TOAST compression method for columns of newly-created tables
-	default_toast_compression?: string & "pglz" | "lz4"
-
 	// Sets the default deferrable status of new transactions.
 	default_transaction_deferrable?: bool & false | true
 
@@ -240,9 +225,6 @@
 	// Number of simultaneous requests that can be handled efficiently by the disk subsystem.
 	effective_io_concurrency?: int & >=0 & <=1000
 
-	// Enables or disables the query planner's use of async-aware append plan types
-	enable_async_append?: bool & false | true
-
 	// Enables the planners use of bitmap-scan plans.
 	enable_bitmapscan?: bool & false | true
 
@@ -255,9 +237,6 @@
 	// Enables the planners use of hash join plans.
 	enable_hashjoin?: bool & false | true
 
-	// Enables the planner's use of incremental sort steps.
-	enable_incremental_sort?: bool & false | true
-
 	// Enables the planner's use of index-only-scan plans.
 	enable_indexonlyscan?: bool & false | true
 
@@ -266,9 +245,6 @@
 
 	// Enables the planners use of materialization.
 	enable_material?: bool & false | true
-
-	// Enables the planner's use of memoization
-	enable_memoize?: bool & false | true
 
 	// Enables the planners use of merge join plans.
 	enable_mergejoin?: bool & false | true
@@ -348,9 +324,6 @@
 	// (kB) Sets the maximum size of the pending list for GIN index.
 	gin_pending_list_limit?: int & >=64 & <=2147483647 @storeResource(1KB)
 
-	// Multiple of work_mem to use for hash tables.
-	hash_mem_multiplier?: float & >=1 & <=1000
-
 	// Sets the servers hba configuration file.
 	hba_file?: string
 
@@ -371,9 +344,6 @@
 
 	// (ms) Sets the maximum allowed duration of any idling transaction.
 	idle_in_transaction_session_timeout: int & >=0 & <=2147483647 | *86400000 @timeDurationResource()
-
-	// Terminate any session that has been idle (that is, waiting for a client query), but not within an open transaction, for longer than the specified amount of time
-	idle_session_timeout?: int & >=0 & <=2147483647 @timeDurationResource()
 
 	// Continues recovery after an invalid pages failure.
 	ignore_invalid_pages: bool & false | true | *false
@@ -453,17 +423,11 @@
 	// Logs the host name in the connection logs.
 	log_hostname?: bool & false | true
 
-	// (kB) Sets the maximum memory to be used for logical decoding.
-	logical_decoding_work_mem?: int & >=64 & <=2147483647 @storeResource(1KB)
-
 	// Controls information prefixed to each log line.
 	log_line_prefix?: string
 
 	// Logs long lock waits.
 	log_lock_waits?: bool & false | true
-
-	// (ms) Sets the minimum execution time above which a sample of statements will be logged. Sampling is determined by log_statement_sample_rate.
-	log_min_duration_sample?: int & >=-1 & <=2147483647 @timeDurationResource()
 
 	// (ms) Sets the minimum execution time above which statements will be logged.
 	log_min_duration_statement?: int & >=-1 & <=2147483647 @timeDurationResource()
@@ -474,20 +438,11 @@
 	// Sets the message levels that are logged.
 	log_min_messages?: string & "debug5" | "debug4" | "debug3" | "debug2" | "debug1" | "info" | "notice" | "warning" | "error" | "log" | "fatal"
 
-	// When logging statements, limit logged parameter values to first N bytes.
-	log_parameter_max_length?: int & >=-1 & <=1073741823
-
-	// When reporting an error, limit logged parameter values to first N bytes.
-	log_parameter_max_length_on_error?: int & >=-1 & <=1073741823
-
 	// Writes parser performance statistics to the server log.
 	log_parser_stats?: bool & false | true
 
 	// Writes planner performance statistics to the server log.
 	log_planner_stats?: bool & false | true
-
-	// Controls whether a log message is produced when the startup process waits longer than deadlock_timeout for recovery conflicts
-	log_recovery_conflict_waits?: bool & false | true
 
 	// Logs each replication command.
 	log_replication_commands?: bool & false | true
@@ -504,9 +459,6 @@
 	// Sets the type of statements logged.
 	log_statement?: string & "none" | "ddl" | "mod" | "all"
 
-	// Fraction of statements exceeding log_min_duration_sample to be logged.
-	log_statement_sample_rate?: float & >=0 & <=1
-
 	// Writes cumulative performance statistics to the server log.
 	log_statement_stats?: bool
 
@@ -521,9 +473,6 @@
 
 	// Truncate existing log files of same name during log rotation.
 	log_truncate_on_rotation: bool & false | true | *false
-
-	// A variant of effective_io_concurrency that is used for maintenance work.
-	maintenance_io_concurrency?: int & >=0 & <=1000
 
 	// (kB) Sets the maximum memory to be used for maintenance operations.
 	maintenance_work_mem?: int & >=1024 & <=2147483647 @storeResource(1KB)
@@ -584,9 +533,6 @@
 
 	// Sets the maximum number of concurrent worker processes.
 	max_worker_processes?: int & >=0 & <=262143
-
-	// Specifies the amount of memory that should be allocated at server startup for use by parallel queries
-	min_dynamic_shared_memory?: int & >=0 & <=715827882 @storeResource(1MB)
 
 	// (8kB) Sets the minimum amount of index data for a parallel scan.
 	min_parallel_index_scan_size?: int & >=0 & <=715827882 @storeResource(8KB)
@@ -885,9 +831,6 @@
 	// When set to fsync, PostgreSQL will recursively open and synchronize all files in the data directory before crash recovery begins
 	recovery_init_sync_method?: string & "fsync" | "syncfs"
 
-	// When set to on, which is the default, PostgreSQL will automatically remove temporary files after a backend crash
-	remove_temp_files_after_crash: float & >=0 & <=1 | *0
-
 	// Reinitialize server after backend crash.
 	restart_after_crash?: bool & false | true
 
@@ -994,9 +937,6 @@
 	// Collects timing statistics on database IO activity.
 	track_io_timing: bool & false | true | *true
 
-	// Enables timing of WAL I/O calls.
-	track_wal_io_timing?: bool & false | true
-
 	// Treats expr=NULL as expr IS NULL.
 	transform_null_equals?: bool & false | true
 
@@ -1030,17 +970,11 @@
 	// Number of transactions by which VACUUM and HOT cleanup should be deferred, if any.
 	vacuum_defer_cleanup_age?: int & >=0 & <=1000000
 
-	// Specifies the maximum age (in transactions) that a table's pg_class.relfrozenxid field can attain before VACUUM takes extraordinary measures to avoid system-wide transaction ID wraparound failure
-	vacuum_failsafe_age: int & >=0 & <=1200000000 | *1200000000
-
 	// Minimum age at which VACUUM should freeze a table row.
 	vacuum_freeze_min_age?: int & >=0 & <=1000000000
 
 	// Age at which VACUUM should scan whole table to freeze tuples.
 	vacuum_freeze_table_age?: int & >=0 & <=2000000000
-
-	// Specifies the maximum age (in transactions) that a table's pg_class.relminmxid field can attain before VACUUM takes extraordinary measures to avoid system-wide multixact ID wraparound failure
-	vacuum_multixact_failsafe_age: int & >=0 & <=1200000000 | *1200000000
 
 	// Minimum age at which VACUUM should freeze a MultiXactId in a table row.
 	vacuum_multixact_freeze_min_age?: int & >=0 & <=1000000000
@@ -1060,9 +994,6 @@
 	// Buffer size for reading ahead in the WAL during recovery. 
 	wal_decode_buffer_size: int & >=65536 & <=1073741823 | *524288 @storeResource()
 
-	// (MB) Sets the size of WAL files held for standby servers.
-	wal_keep_size: int & >=0 & <=2147483647 | *2048 @storeResource(1MB)
-
 	// Sets whether a WAL receiver should create a temporary replication slot if no permanent slot is configured.
 	wal_receiver_create_temp_slot: bool & false | true | *false
 
@@ -1080,9 +1011,6 @@
 
 	// (ms) Sets the maximum time to wait for WAL replication.
 	wal_sender_timeout: int & >=0 & <=3600000 | *30000 @timeDurationResource()
-
-	// (kB) Size of new file to fsync instead of writing WAL.
-	wal_skip_threshold?: int & >=0 & <=2147483647 @storeResource(1KB)
 
 	// Selects the method used for forcing WAL updates to disk.
 	wal_sync_method?: string & "fsync" | "fdatasync" | "open_sync" | "open_datasync"

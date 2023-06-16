@@ -4,6 +4,10 @@ title: kbcli plugin search
 
 Search kbcli or kubectl plugins
 
+### Synopsis
+
+Search kbcli or kubectl plugins by keywords
+
 ```
 kbcli plugin search [flags]
 ```
@@ -11,14 +15,15 @@ kbcli plugin search [flags]
 ### Examples
 
 ```
-  # search a kbcli or kubectl plugin by name
-  kbcli plugin search myplugin
+  # search a kbcli or kubectl plugin with keywords
+  kbcli plugin search keyword1 keyword2
 ```
 
 ### Options
 
 ```
-  -h, --help   help for search
+  -h, --help        help for search
+      --limit int   Limit the number of plugin descriptions to output (default 50)
 ```
 
 ### Options inherited from parent commands

@@ -29,12 +29,11 @@ import (
 	"github.com/spf13/cast"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/unstructured/redis"
 )
 
 type redisConfig struct {
 	name string
-	lex  *redis.Lexer
+	lex  *Lexer
 
 	// parameters map[string]string
 }
@@ -55,20 +54,20 @@ func (r *redisConfig) setString(key string, value string) error {
 	lineNo := math.MaxInt32
 	if v != nil {
 		lineNo = v.LineNo
-		r.lex.RemoveParameter(v)
+		r.lex.removeParameter(v)
 	}
 	keys = append(keys, value)
-	t, err := r.lex.ParseParameter(strings.Join(keys, " "), lineNo)
+	t, err := r.lex.parseParameter(strings.Join(keys, " "), lineNo)
 	if err == nil {
 		if v != nil {
 			t.Comments = v.Comments
 		}
-		r.lex.AppendValidParameter(t, lineNo)
+		r.lex.appendValidParameter(t, lineNo)
 	}
 	return err
 }
 
-func matchSubKeys(keys []string, it redis.Item) bool {
+func matchSubKeys(keys []string, it Item) bool {
 	if len(keys) > len(it.Values) {
 		return false
 	}
@@ -86,8 +85,8 @@ func (r *redisConfig) Get(key string) interface{} {
 	return v
 }
 
-func (r *redisConfig) GetItem(keys []string) *redis.Item {
-	v := r.lex.GetItem(keys[0])
+func (r *redisConfig) GetItem(keys []string) *Item {
+	v := r.lex.getItem(keys[0])
 	if v == nil {
 		return nil
 	}
@@ -116,7 +115,7 @@ func (r *redisConfig) GetString(key string) (string, error) {
 	res := make([]string, 0)
 	for i := len(keys); i < len(item.Values); i++ {
 		v := item.Values[i]
-		if redis.ContainerEscapeString(v) {
+		if ContainerEscapeString(v) {
 			res = append(res, strconv.Quote(v))
 		} else {
 			res = append(res, v)
@@ -127,7 +126,7 @@ func (r *redisConfig) GetString(key string) (string, error) {
 
 func (r *redisConfig) GetAllParameters() map[string]interface{} {
 	params := make(map[string]interface{})
-	for key, param := range r.lex.GetAllParams() {
+	for key, param := range r.lex.getAllParams() {
 		if len(param) == 0 {
 			continue
 		}
@@ -143,7 +142,7 @@ func (r *redisConfig) GetAllParameters() map[string]interface{} {
 	return params
 }
 
-func encodeMultiKeys(it redis.Item, prefix int) string {
+func encodeMultiKeys(it Item, prefix int) string {
 	buffer := &bytes.Buffer{}
 	for i := 0; i < prefix && i < len(it.Values); i++ {
 		if i > 0 {
@@ -154,14 +153,14 @@ func encodeMultiKeys(it redis.Item, prefix int) string {
 	return buffer.String()
 }
 
-func encodeStringValue(param redis.Item, index int) string {
+func encodeStringValue(param Item, index int) string {
 	buffer := &bytes.Buffer{}
 	for i := index; i < len(param.Values); i++ {
 		v := param.Values[i]
 		if i > index {
 			buffer.WriteByte(' ')
 		}
-		if v == "" || redis.ContainerEscapeString(v) {
+		if v == "" || ContainerEscapeString(v) {
 			v = strconv.Quote(v)
 		}
 		buffer.WriteString(v)
@@ -169,7 +168,7 @@ func encodeStringValue(param redis.Item, index int) string {
 	return buffer.String()
 }
 
-func uniqKeysParameters(its []redis.Item) int {
+func uniqKeysParameters(its []Item) int {
 	maxPrefix := len(its[0].Values)
 	for i := 2; i < maxPrefix; i++ {
 		if !hasPrefixKey(its, i) {
@@ -179,7 +178,7 @@ func uniqKeysParameters(its []redis.Item) int {
 	return maxPrefix
 }
 
-func hasPrefixKey(its []redis.Item, prefix int) bool {
+func hasPrefixKey(its []Item, prefix int) bool {
 	keys := set.NewLinkedHashSetString()
 	for _, i := range its {
 		prefixKeys := strings.Join(i.Values[0:prefix], " ")
@@ -196,15 +195,15 @@ func (r *redisConfig) SubConfig(key string) ConfigObject {
 }
 
 func (r *redisConfig) Marshal() (string, error) {
-	if r.lex.Empty() {
+	if r.lex.empty() {
 		return "", nil
 	}
-	if !r.lex.IsUpdated() {
-		return r.lex.ToString(), nil
+	if !r.lex.isUpdated {
+		return r.lex.toString(), nil
 	}
 
 	out := &bytes.Buffer{}
-	for i, param := range r.lex.SortParameters() {
+	for i, param := range r.lex.sortParameters() {
 		if i > 0 {
 			out.WriteByte('\n')
 		}
@@ -215,7 +214,7 @@ func (r *redisConfig) Marshal() (string, error) {
 	return out.String(), nil
 }
 
-func encodeParamItem(param redis.Item, out *bytes.Buffer) error {
+func encodeParamItem(param Item, out *bytes.Buffer) error {
 	for _, co := range param.Comments {
 		out.WriteString(co)
 		out.WriteByte('\n')
@@ -224,7 +223,7 @@ func encodeParamItem(param redis.Item, out *bytes.Buffer) error {
 		if i > 0 {
 			out.WriteByte(' ')
 		}
-		if v == "" || redis.ContainerEscapeString(v) {
+		if v == "" || ContainerEscapeString(v) {
 			v = strconv.Quote(v)
 		}
 		out.WriteString(v)
@@ -233,6 +232,6 @@ func encodeParamItem(param redis.Item, out *bytes.Buffer) error {
 }
 
 func (r *redisConfig) Unmarshal(str string) error {
-	r.lex = &redis.Lexer{}
+	r.lex = &Lexer{}
 	return r.lex.Load(str)
 }

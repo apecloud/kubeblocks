@@ -38,7 +38,7 @@ const (
 	ComponentPhaseTransition = "ComponentPhaseTransition"
 
 	// PodContainerFailedTimeout the timeout for container of pod failures, the component phase will be set to Failed/Abnormal after this time.
-	PodContainerFailedTimeout = time.Minute
+	PodContainerFailedTimeout = 10 * time.Second
 
 	// PodScheduledFailedTimeout timeout for scheduling failure.
 	PodScheduledFailedTimeout = 30 * time.Second
@@ -110,7 +110,7 @@ type ComponentSet interface {
 
 	// GetPhaseWhenPodsNotReady when the pods of component are not ready, calculate the component phase is Failed or Abnormal.
 	// if return an empty phase, means the pods of component are ready and skips it.
-	GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error)
+	GetPhaseWhenPodsNotReady(ctx context.Context, componentName string, originPhaseIsUpRunning bool) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error)
 
 	HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
 

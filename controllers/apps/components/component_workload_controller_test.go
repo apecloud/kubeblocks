@@ -94,7 +94,7 @@ import (
 //			newDeploymentKey := client.ObjectKey{Name: deploy.Name, Namespace: namespace}
 //			Eventually(testapps.CheckObj(&testCtx, newDeploymentKey, func(g Gomega, deploy *appsv1.Deployment) {
 //				g.Expect(deploy.Generation == 1).Should(BeTrue())
-//			})).Should(Succeed())
+//			})).Should(succeed())
 //
 //			By("check stateless component phase is Failed")
 //			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
@@ -115,7 +115,7 @@ import (
 //						},
 //					},
 //				}
-//			})).Should(Succeed())
+//			})).Should(succeed())
 //			// mock failed container timed out
 //			Expect(testapps.ChangeObjStatus(&testCtx, pod, func() {
 //				pod.Status.Conditions = []corev1.PodCondition{
@@ -125,24 +125,24 @@ import (
 //						LastTransitionTime: metav1.NewTime(time.Now().Add(-2 * time.Minute)),
 //					},
 //				}
-//			})).Should(Succeed())
+//			})).Should(succeed())
 //			// mark deployment to reconcile
 //			Expect(testapps.ChangeObj(&testCtx, deploy, func(ldeploy *appsv1.Deployment) {
 //				ldeploy.Annotations = map[string]string{
 //					"reconcile": "1",
 //				}
-//			})).Should(Succeed())
+//			})).Should(succeed())
 //
 //			By("check component.Status.Message contains pod error message")
 //			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
 //				compStatus := tmpCluster.Status.Components[statelessCompName]
 //				g.Expect(compStatus.GetObjectMessage("Pod", pod.Name)).Should(Equal(errMessage))
-//			})).Should(Succeed())
+//			})).Should(succeed())
 //
 //			By("mock deployment is ready")
 //			Expect(testapps.ChangeObjStatus(&testCtx, deploy, func() {
 //				testk8s.MockDeploymentReady(deploy, stateless.NewRSAvailableReason, deploy.Name+"-5847cb795c")
-//			})).Should(Succeed())
+//			})).Should(succeed())
 //
 //			By("waiting for the component to be running")
 //			Eventually(testapps.GetClusterComponentPhase(testCtx, clusterName, statelessCompName)).Should(Equal(appsv1alpha1.RunningClusterCompPhase))

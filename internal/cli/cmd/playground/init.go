@@ -31,7 +31,6 @@ import (
 	"golang.org/x/exp/slices"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -374,14 +373,6 @@ func (o *initOptions) setKubeConfig(info *cp.K8sClusterInfo) error {
 func (o *initOptions) installKBAndCluster(info *cp.K8sClusterInfo) error {
 	var err error
 
-	// when the kubernetes cluster is not ready, the runtime will output the error
-	// message like "couldn't get resource list for", we ignore it
-	runtime.ErrorHandlers[0] = func(err error) {
-		if klog.V(1).Enabled() {
-			klog.ErrorDepth(2, err)
-		}
-	}
-
 	// write kubeconfig content to a temporary file and use it
 	if err = writeAndUseKubeConfig(info.KubeConfig, o.kubeConfigPath, o.Out); err != nil {
 		return err
@@ -469,6 +460,12 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 	}
 
 	if err = insOpts.PreCheck(); err != nil {
+		// if the KubeBlocks has been installed, we ignore the error
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "repeated installation is not supported") {
+			fmt.Fprintf(o.Out, strings.Split(errMsg, ",")[0]+"\n")
+			return nil
+		}
 		return err
 	}
 	return insOpts.Install()

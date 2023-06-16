@@ -64,7 +64,7 @@ func CheckedRequeueWithError(err error, logger logr.Logger, msg string, keysAndV
 
 // RequeueWithErrorAndRecordEvent requeues when an error occurs. if it is an unknown error, triggers an event
 func RequeueWithErrorAndRecordEvent(obj client.Object, recorder record.EventRecorder, err error, logger logr.Logger) (reconcile.Result, error) {
-	if apierrors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) && recorder != nil {
 		recorder.Eventf(obj, corev1.EventTypeWarning, constant.ReasonNotFoundCR, err.Error())
 	}
 	return RequeueWithError(err, logger, "")

@@ -52,7 +52,7 @@ var (
 
 	editConfigExample = templates.Examples(`
 		# update mysql max_connections, cluster name is mycluster
-		kbcli cluster edit-config mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf 
+		kbcli cluster edit-config mycluster
 	`)
 )
 

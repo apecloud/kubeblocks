@@ -38,7 +38,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -318,10 +317,11 @@ var _ = Describe("OpsRequest Controller", func() {
 	Context("with Cluster which has MySQL ConsensusSet", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
+			viper.Set("VOLUMESNAPSHOT", true)
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompDefName).
 				AddHorizontalScalePolicy(appsv1alpha1.HorizontalScalePolicy{
-					Type:                     appsv1alpha1.HScaleDataClonePolicyFromSnapshot,
+					Type:                     appsv1alpha1.HScaleDataClonePolicyCloneVolume,
 					BackupPolicyTemplateName: backupPolicyTPLName,
 				}).Create(&testCtx).GetObject()
 
@@ -358,10 +358,11 @@ var _ = Describe("OpsRequest Controller", func() {
 			createBackupPolicyTpl(clusterDefObj)
 
 			By("set component to horizontal with snapshot policy and create a cluster")
+			viper.Set("VOLUMESNAPSHOT", true)
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj),
 				func(clusterDef *appsv1alpha1.ClusterDefinition) {
 					clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy =
-						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyFromSnapshot}
+						&appsv1alpha1.HorizontalScalePolicy{Type: appsv1alpha1.HScaleDataClonePolicyCloneVolume}
 				})()).ShouldNot(HaveOccurred())
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix,
@@ -445,7 +446,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				condition := meta.FindStatusCondition(fetched.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
 				g.Expect(condition).ShouldNot(BeNil())
 				g.Expect(condition.Status).Should(BeFalse())
-				g.Expect(condition.Reason).Should(Equal(lifecycle.ReasonPreCheckFailed))
+				g.Expect(condition.Reason).Should(Equal(ReasonPreCheckFailed))
 				g.Expect(condition.Message).Should(Equal("HorizontalScaleFailed: volume snapshot not support"))
 			}))
 
@@ -501,6 +502,13 @@ var _ = Describe("OpsRequest Controller", func() {
 				func(g Gomega, sts *appsv1.StatefulSet) {
 					g.Expect(*sts.Spec.Replicas).Should(Equal(replicas))
 				})).Should(Succeed())
+
+			By("Checking pvc created")
+			Eventually(testapps.List(&testCtx, intctrlutil.PersistentVolumeClaimSignature,
+				client.MatchingLabels{
+					constant.AppInstanceLabelKey:    clusterKey.Name,
+					constant.KBAppComponentLabelKey: mysqlCompName,
+				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(int(replicas)))
 
 			By("mock all new PVCs scaled bounded")
 			for i := 0; i < int(replicas); i++ {

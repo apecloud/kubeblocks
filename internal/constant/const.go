@@ -51,6 +51,7 @@ const (
 	KBClusterNamePlaceHolder        = "$(KB_CLUSTER_NAME)"
 	KBClusterCompNamePlaceHolder    = "$(KB_CLUSTER_COMP_NAME)"
 	KBClusterUIDPostfix8PlaceHolder = "$(KB_CLUSTER_UID_POSTFIX_8)"
+	KBToolsImagePlaceHolder         = "$(KUBEBLOCKS_TOOLS_IMAGE)"
 )
 
 const (
@@ -90,6 +91,7 @@ const (
 	WorkloadTypeLabelKey                   = "apps.kubeblocks.io/workload-type"
 	ClassProviderLabelKey                  = "class.kubeblocks.io/provider"
 	ClusterDefLabelKey                     = "clusterdefinition.kubeblocks.io/name"
+	ClusterVerLabelKey                     = "clusterversion.kubeblocks.io/name"
 	CMConfigurationSpecProviderLabelKey    = "config.kubeblocks.io/config-spec"    // CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
 	CMConfigurationCMKeysLabelKey          = "config.kubeblocks.io/configmap-keys" // CMConfigurationCMKeysLabelKey Specify configmap keys
 	CMConfigurationTemplateNameLabelKey    = "config.kubeblocks.io/config-template-name"
@@ -98,6 +100,7 @@ const (
 	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
 	ConsensusSetAccessModeLabelKey         = "cs.apps.kubeblocks.io/access-mode"
 	BackupTypeLabelKeyKey                  = "dataprotection.kubeblocks.io/backup-type"
+	DataProtectionLabelBackupNameKey       = "dataprotection.kubeblocks.io/backup-name"
 	AddonNameLabelKey                      = "extensions.kubeblocks.io/addon-name"
 	OpsRequestTypeLabelKey                 = "ops.kubeblocks.io/ops-type"
 
@@ -129,6 +132,7 @@ const (
 	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
 	KubeBlocksGenerationKey                     = "kubeblocks.io/generation"
+	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
 
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"

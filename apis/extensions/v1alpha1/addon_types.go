@@ -423,7 +423,7 @@ func (r *Addon) GetExtraNames() []string {
 	}
 	switch r.Spec.Type {
 	case HelmType:
-		if r.Spec.Helm == nil {
+		if r.Spec.Helm == nil || len(r.Spec.Helm.ValuesMapping.ExtraItems) == 0 {
 			return nil
 		}
 		// r.Spec.DefaultInstallValues has minItem=1 constraint

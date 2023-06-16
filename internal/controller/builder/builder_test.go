@@ -20,12 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/leaanthony/debme"
 	appsv1 "k8s.io/api/apps/v1"
@@ -36,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -97,6 +100,15 @@ var _ = Describe("builder", func() {
 		return clusterVersionObj
 	}
 
+	newExtraEnvs := func() map[string]string {
+		jsonStr, _ := json.Marshal(map[string]string{
+			"mock-key": "mock-value",
+		})
+		return map[string]string{
+			constant.ExtraEnvAnnotationKey: string(jsonStr),
+		}
+	}
+
 	newAllFieldsClusterObj := func(
 		clusterDefObj *appsv1alpha1.ClusterDefinition,
 		clusterVersionObj *appsv1alpha1.ClusterVersion,
@@ -112,6 +124,7 @@ var _ = Describe("builder", func() {
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
+			AddAnnotationsInMap(newExtraEnvs()).
 			AddComponent(mysqlCompName, mysqlCompDefName).SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
@@ -175,16 +188,17 @@ var _ = Describe("builder", func() {
 		It("builds PVC correctly", func() {
 			snapshotName := "test-snapshot-name"
 			sts := newStsObj()
-			_, _, synthesizedComponent := newClusterObjs(nil)
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			pvcKey := types.NamespacedName{
 				Namespace: "default",
 				Name:      "data-mysql-01-replicasets-0",
 			}
-			pvc, err := BuildPVCFromSnapshot(sts, synthesizedComponent.VolumeClaimTemplates[0], pvcKey, snapshotName, synthesizedComponent)
+			pvc, err := BuildPVC(cluster, synthesizedComponent, &synthesizedComponent.VolumeClaimTemplates[0], pvcKey, snapshotName)
 			Expect(err).Should(BeNil())
 			Expect(pvc).ShouldNot(BeNil())
 			Expect(pvc.Spec.AccessModes).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
 			Expect(pvc.Spec.Resources).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.Resources))
+			Expect(pvc.Spec.StorageClassName).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.StorageClassName))
 			Expect(pvc.Labels[constant.VolumeTypeLabelKey]).ShouldNot(BeEmpty())
 		})
 
@@ -279,6 +293,18 @@ var _ = Describe("builder", func() {
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
 			Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(2))
+			// test extra envs
+			Expect(sts.Spec.Template.Spec.Containers).ShouldNot(BeEmpty())
+			for _, container := range sts.Spec.Template.Spec.Containers {
+				isContainEnv := false
+				for _, env := range container.Env {
+					if env.Name == "mock-key" && env.Value == "mock-value" {
+						isContainEnv = true
+						break
+					}
+				}
+				Expect(isContainEnv).Should(BeTrue())
+			}
 		})
 
 		It("builds Deploy correctly", func() {
@@ -398,13 +424,13 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds BackupJob correctly", func() {
-			sts := newStsObj()
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			backupJobKey := types.NamespacedName{
 				Namespace: "default",
 				Name:      "test-backup-job",
 			}
 			backupPolicyName := "test-backup-policy"
-			backupJob, err := BuildBackup(sts, backupPolicyName, backupJobKey)
+			backupJob, err := BuildBackup(cluster, synthesizedComponent, backupPolicyName, backupJobKey, "snapshot")
 			Expect(err).Should(BeNil())
 			Expect(backupJob).ShouldNot(BeNil())
 		})
@@ -419,18 +445,6 @@ var _ = Describe("builder", func() {
 			vs, err := BuildVolumeSnapshot(snapshotKey, pvcName, sts)
 			Expect(err).Should(BeNil())
 			Expect(vs).ShouldNot(BeNil())
-		})
-
-		It("builds CronJob correctly", func() {
-			sts := newStsObj()
-			pvcKey := types.NamespacedName{
-				Namespace: "default",
-				Name:      "test-pvc",
-			}
-			schedule := "* * * * *"
-			cronJob, err := BuildCronJob(pvcKey, schedule, sts)
-			Expect(err).Should(BeNil())
-			Expect(cronJob).ShouldNot(BeNil())
 		})
 
 		It("builds ConfigMap with template correctly", func() {
@@ -450,18 +464,125 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds config manager sidecar container correctly", func() {
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:   "cfgmgr",
-				CharacterType: "mysql",
 				SecreteName:   "test-secret",
+				ComponentName: synthesizedComponent.Name,
+				CharacterType: synthesizedComponent.CharacterType,
+				EnvConfigName: cfg.Name,
 				Image:         constant.KBToolsImage,
 				Args:          []string{},
 				Envs:          []corev1.EnvVar{},
 				Volumes:       []corev1.VolumeMount{},
+				Cluster:       cluster,
 			}
-			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
+			Expect(err).Should(BeNil())
+			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
+			Expect(configmap.SecurityContext).Should(BeNil())
+		})
+
+		It("builds config manager sidecar container correctly", func() {
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
+				ManagerName:           "cfgmgr",
+				CharacterType:         "mysql",
+				SecreteName:           "test-secret",
+				Image:                 constant.KBToolsImage,
+				ShareProcessNamespace: true,
+				Args:                  []string{},
+				Envs:                  []corev1.EnvVar{},
+				Volumes:               []corev1.VolumeMount{},
+				Cluster:               cluster,
+			}
+			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, synthesizedComponent)
+			Expect(err).Should(BeNil())
+			Expect(configmap).ShouldNot(BeNil())
+			Expect(configmap.SecurityContext).ShouldNot(BeNil())
+			Expect(configmap.SecurityContext.RunAsUser).ShouldNot(BeNil())
+			Expect(*configmap.SecurityContext.RunAsUser).Should(BeEquivalentTo(int64(0)))
+		})
+
+		It("should build restore job correctly", func() {
+			restoreJobKey := types.NamespacedName{
+				Namespace: "default",
+				Name:      "test-restore-job",
+			}
+			component := component.SynthesizedComponent{
+				Name: "component",
+				PodSpec: &corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									"cpu": resource.MustParse("1"),
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "data1",
+									MountPath: "/data/mysql",
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{},
+				},
+				VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
+					{
+						Name: "data1",
+						Type: "data",
+					},
+				},
+				VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "data1",
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{},
+					},
+				},
+			}
+			backup := dataprotectionv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "backup",
+					Namespace: "default",
+					Labels: map[string]string{
+						constant.ClusterDefLabelKey: "test-cluster-def",
+					},
+				},
+				Status: dataprotectionv1alpha1.BackupStatus{
+					PersistentVolumeClaimName: "data-pvc",
+					Manifests: &dataprotectionv1alpha1.ManifestsStatus{
+						BackupTool: &dataprotectionv1alpha1.BackupToolManifestsStatus{
+							FilePath: "/default/mysql-182dee90-4e6b-4b74-97e8-9031ec63db52/mysql/backup-default-mysql-20230523115255",
+						},
+					},
+				},
+			}
+			backupTool := dataprotectionv1alpha1.BackupTool{
+				Spec: dataprotectionv1alpha1.BackupToolSpec{
+					Image: "xtrabackup",
+					Env: []corev1.EnvVar{
+						{
+							Name:  "test-name",
+							Value: "test-value",
+						},
+					},
+					Physical: dataprotectionv1alpha1.BackupToolRestoreCommand{
+						RestoreCommands: []string{
+							"echo \"hello world\"",
+						},
+					},
+				},
+			}
+			podName := "mysql-mysql-0"
+			job, err := BuildRestoreJobForFullBackup(restoreJobKey.Name, &component, &backup, &backupTool, podName)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(job).ShouldNot(BeNil())
 		})
 	})
 

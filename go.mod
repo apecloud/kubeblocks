@@ -9,7 +9,6 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/Shopify/sarama v1.30.0
 	github.com/StudioSol/set v1.0.0
-	github.com/ahmetb/gen-crd-api-reference-docs v0.3.0
 	github.com/authzed/controller-idioms v0.7.0
 	github.com/bhmj/jsonslice v1.1.2
 	github.com/briandowns/spinner v1.23.0
@@ -58,6 +57,7 @@ require (
 	github.com/replicatedhq/termui/v3 v3.1.1-0.20200811145416-f40076d26851
 	github.com/replicatedhq/troubleshoot v0.57.0
 	github.com/russross/blackfriday/v2 v2.1.0
+	github.com/sahilm/fuzzy v0.1.0
 	github.com/sethvargo/go-password v0.2.0
 	github.com/shirou/gopsutil/v3 v3.23.1
 	github.com/sirupsen/logrus v1.9.0

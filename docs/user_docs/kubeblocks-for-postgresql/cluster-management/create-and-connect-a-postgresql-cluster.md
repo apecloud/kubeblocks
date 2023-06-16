@@ -60,9 +60,9 @@ In actual scenarios, you are recommended to create a cluster on nodes with taint
 
 2. Create a PostgreSQL cluster.
 
-   The cluster creation command is simply `kbcli cluster create`. Use tolerances to deploy it on the tainted node. Further, you are recommended to create a cluster with a specified class and customize your cluster settings as demanded.
+   The cluster creation command is simply `kbcli cluster create`. Use tolerances to deploy it on the tainted node. Further, you can customize your cluster resources as demanded.
 
-   Create a cluster with a specified class, you can use `--set` flag and specify your requirement.
+   The following example shows how to use `--set` to create a cluster with customized resources and add all taints on the current node in the `--toleration` flag to tolerate them.
 
    ```bash
    kbcli cluster create pg-cluster --tolerations '"key=taint1name,value=true,operator=Equal,effect=NoSchedule","key=taint2name,value=true,operator=Equal,effect=NoSchedule"' --cluster-definition=postgresql --set cpu=2,memory=2Gi,replicas=2,storage=20Gi,storageClass=<storageclassname> --namespace <name>
@@ -87,6 +87,7 @@ In actual scenarios, you are recommended to create a cluster on nodes with taint
              memory: 2Gi
              storage: 10Gi
    EOF
+   ```
 
 See the table below for the detailed descriptions for customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.
 
@@ -112,9 +113,7 @@ kbcli cluster create pg-cluster --cluster-definition=postgresql --tolerations '"
 
 ### Create a cluster on a node without taints
 
-The cluster creation command is simply `kbcli cluster create`. Further, you are recommended to create a cluster with a specified class and customize your cluster settings as demanded.
-
-To create a cluster with a specified class, you can use the `--set` flag and specify your requirement.
+The cluster creation command is simply `kbcli cluster create`. Further, you can customize your cluster resources as demanded by using the `--set` flag.
 
 ```bash
 kbcli cluster create pg-cluster --cluster-definition=postgresql --namespace <name> --set cpu=2,memory=2Gi,replicas=2,storage=20Gi,storageClass=<storageclassname>
@@ -141,9 +140,9 @@ kbcli cluster create pg-cluster  --cluster-definition=postgresql --namespace <na
 EOF
 ```
 
-See the table below for detailed descriptions of customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended turn on the monitor and enable all logs.
+See the table below for detailed descriptions of customizable parameters, setting the `--termination-policy` is necessary, and you are strongly recommended to turn on the monitor and enable all logs.
 
-📎 Table 1. kbcli cluster create flags description
+📎 Table 2. kbcli cluster create flags description
 
 | Option                 | Description             |
 |:-----------------------|:------------------------|

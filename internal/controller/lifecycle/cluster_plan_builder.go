@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
+	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -327,7 +328,16 @@ func (c *clusterPlanBuilder) buildUpdateObj(node *lifecycleVertex) (client.Objec
 	handleSvc := func(origObj, svcProto *corev1.Service) (client.Object, error) {
 		svcObj := origObj.DeepCopy()
 		svcObj.Spec = svcProto.Spec
-		mergeServiceAnnotations(svcProto.Annotations, &svcObj.Annotations)
+
+		// remove original prometheus.io annotations
+		if len(svcObj.Annotations) > 0 {
+			maps.DeleteFunc(svcObj.Annotations, func(k, v string) bool {
+				return strings.HasPrefix(k, "prometheus.io")
+			})
+		}
+		mergeAnnotations(svcProto.Annotations, &svcObj.Annotations, func(k, v string) bool {
+			return false
+		})
 		return svcObj, nil
 	}
 

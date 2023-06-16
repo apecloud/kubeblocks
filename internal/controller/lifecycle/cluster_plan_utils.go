@@ -19,10 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package lifecycle
 
-import (
-	"strings"
-)
-
 // mergeAnnotations keeps the original annotations.
 // if annotations exist and are replaced.
 func mergeAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string, filters ...func(k, v string) bool) {
@@ -53,13 +49,4 @@ func mergeAnnotations(originalAnnotations map[string]string, targetAnnotations *
 			continue
 		}
 	}
-}
-
-// mergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.
-// if annotations exist and are replaced, the Service will be updated.
-func mergeServiceAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
-	mergeAnnotations(originalAnnotations, targetAnnotations,
-		func(k, v string) bool {
-			return strings.HasPrefix(k, "prometheus.io")
-		})
 }

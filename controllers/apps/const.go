@@ -29,14 +29,14 @@ const (
 	opsRequestFinalizerName     = "opsrequest.kubeblocks.io/finalizer"
 
 	// annotations keys
-	lifecycleAnnotationKey = "cluster.kubeblocks.io/lifecycle"
+	// lifecycleAnnotationKey = "cluster.kubeblocks.io/lifecycle"
 	// debugClusterAnnotationKey is used when one wants to debug the cluster.
 	// If debugClusterAnnotationKey = 'on',
 	// logs will be recorded in more details, and some ephemeral pods (esp. those created by jobs) will retain after execution.
 	debugClusterAnnotationKey = "cluster.kubeblocks.io/debug"
 
 	// annotations values
-	lifecycleDeletePVCAnnotation = "delete-pvc"
+	// lifecycleDeletePVCAnnotation = "delete-pvc"
 )
 
 const (

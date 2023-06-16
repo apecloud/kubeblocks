@@ -59,6 +59,9 @@ pvc: {
 	spec: {
 		accessModes: volumeClaimTemplate.spec.accessModes
 		resources:   volumeClaimTemplate.spec.resources
+		if volumeClaimTemplate.spec.storageClassName != _|_ {
+			storageClassName: volumeClaimTemplate.spec.storageClassName
+		}
 		if len(snapshot_name) > 0 {
 			dataSource: {
 				"name":     snapshot_name

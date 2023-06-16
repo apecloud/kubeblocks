@@ -21,6 +21,7 @@ package configuration
 
 import (
 	"fmt"
+	"strings"
 
 	"cuelang.org/go/cue/errors"
 )
@@ -35,5 +36,5 @@ func WrapError(err error, formatMsg string, args ...interface{}) error {
 	}
 
 	// TODO add log info
-	return MakeError("%v: [%s]", MakeError(formatMsg, args...), errors.Details(err, nil))
+	return MakeError("%v: [%s]", MakeError(formatMsg, args...), strings.TrimSpace(errors.Details(err, nil)))
 }

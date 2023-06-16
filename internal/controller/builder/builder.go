@@ -119,13 +119,15 @@ func processContainersInjection(reqCtx intctrlutil.RequestCtx,
 		&podSpec.InitContainers,
 	} {
 		for i := range *cc {
-			injectEnvs(cluster, component, envConfigName, &(*cc)[i])
+			if err := injectEnvs(cluster, component, envConfigName, &(*cc)[i]); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string, c *corev1.Container) {
+func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string, c *corev1.Container) error {
 	// can not use map, it is unordered
 	envFieldPathSlice := []struct {
 		name      string
@@ -180,6 +182,22 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 			{Name: "KB_TLS_KEY_FILE", Value: KeyName},
 		}...)
 	}
+
+	if udeValue, ok := cluster.Annotations[constant.ExtraEnvAnnotationKey]; ok {
+		udeMap := make(map[string]string)
+		if err := json.Unmarshal([]byte(udeValue), &udeMap); err != nil {
+			return err
+		}
+		for k, v := range udeMap {
+			if k == "" || v == "" {
+				continue
+			}
+			toInjectEnvs = append(toInjectEnvs, corev1.EnvVar{
+				Name:  k,
+				Value: v,
+			})
+		}
+	}
 	// have injected variables placed at the front of the slice
 	if len(c.Env) == 0 {
 		c.Env = toInjectEnvs
@@ -187,7 +205,7 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 		c.Env = append(toInjectEnvs, c.Env...)
 	}
 	if envConfigName == "" {
-		return
+		return nil
 	}
 	c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
 		ConfigMapRef: &corev1.ConfigMapEnvSource{
@@ -196,6 +214,8 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 			},
 		},
 	})
+
+	return nil
 }
 
 // BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from sts to pvc.
@@ -586,7 +606,7 @@ func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 	configs map[string]string,
 	cmName string,
 	configConstraintName string,
-	tplCfg appsv1alpha1.ComponentTemplateSpec) (*corev1.ConfigMap, error) {
+	configTemplateSpec appsv1alpha1.ComponentTemplateSpec) (*corev1.ConfigMap, error) {
 	const tplFile = "config_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
@@ -611,9 +631,9 @@ func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 			"compDefName":           component.CompDefName,
 			"characterType":         component.CharacterType,
 			"configName":            cmName,
-			"templateName":          tplCfg.TemplateRef,
+			"templateName":          configTemplateSpec.TemplateRef,
 			"configConstraintsName": configConstraintName,
-			"configTemplateName":    tplCfg.Name,
+			"configTemplateName":    configTemplateSpec.Name,
 		},
 	}
 	configBytes, err := json.Marshal(configMeta)
@@ -641,7 +661,7 @@ func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 	return &cm, nil
 }
 
-func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams) (*corev1.Container, error) {
+func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent) (*corev1.Container, error) {
 	const tplFile = "config_manager_sidecar.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
@@ -667,6 +687,10 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams)
 	}
 	container := corev1.Container{}
 	if err = json.Unmarshal(containerStrByte, &container); err != nil {
+		return nil, err
+	}
+
+	if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &container); err != nil {
 		return nil, err
 	}
 	return &container, nil
@@ -744,4 +768,26 @@ func BuildRestoreJobForFullBackup(
 		return nil, err
 	}
 	return &job, nil
+}
+
+func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas []appsv1alpha1.ToolConfig) ([]corev1.Container, error) {
+	toolContainers := make([]corev1.Container, 0, len(toolsMetas))
+	for _, toolConfig := range toolsMetas {
+		toolContainer := corev1.Container{
+			Name:            toolConfig.Name,
+			Command:         toolConfig.Command,
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			VolumeMounts:    sidecarRenderedParam.Volumes,
+		}
+		if toolConfig.Image != "" {
+			toolContainer.Image = toolConfig.Image
+		}
+		toolContainers = append(toolContainers, toolContainer)
+	}
+	for i := range toolContainers {
+		if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &toolContainers[i]); err != nil {
+			return nil, err
+		}
+	}
+	return toolContainers, nil
 }

@@ -547,6 +547,10 @@ func (c *StatefulComponentBase) updatePodReplicaLabel4Scaling(reqCtx intctrlutil
 }
 
 func (c *StatefulComponentBase) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
+	// if scale in to 0, do not delete pvcs
+	if c.Component.Replicas == 0 {
+		return nil
+	}
 	for i := c.Component.Replicas; i < *stsObj.Spec.Replicas; i++ {
 		for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{

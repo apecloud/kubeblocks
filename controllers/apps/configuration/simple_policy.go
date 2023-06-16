@@ -21,6 +21,7 @@ package configuration
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -63,7 +64,7 @@ func rollingStatefulSets(param reconfigureParams) (ReturnedStatus, error) {
 	)
 
 	for _, sts := range units {
-		if err := restartStsWithRolling(client, param.Ctx, sts, configKey, newVersion); err != nil {
+		if err := restartStsWithRolling(client, param.Ctx, sts, configKey, newVersion, param.Cluster.Name, param.ClusterComponent.Name); err != nil {
 			param.Ctx.Log.Error(err, "failed to restart statefulSet.", "stsName", sts.GetName())
 			return makeReturnedStatus(ESAndRetryFailed), err
 		}
@@ -82,10 +83,8 @@ func rollingStatefulSets(param reconfigureParams) (ReturnedStatus, error) {
 	return makeReturnedStatus(retStatus, withExpected(int32(len(pods))), withSucceed(progress)), nil
 }
 
-func restartStsWithRolling(cli client.Client, ctx intctrlutil.RequestCtx, sts appsv1.StatefulSet, configKey string, newVersion string) error {
-	// cfgAnnotationKey := fmt.Sprintf("%s-%s", UpgradeRestartAnnotationKey, strings.ReplaceAll(configKey, "_", "-"))
+func restartStsWithRolling(cli client.Client, ctx intctrlutil.RequestCtx, sts appsv1.StatefulSet, configKey string, newVersion string, clusterName, componentName string) error {
 	cfgAnnotationKey := cfgcore.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
-
 	if sts.Spec.Template.Annotations == nil {
 		sts.Spec.Template.Annotations = map[string]string{}
 	}
@@ -100,6 +99,9 @@ func restartStsWithRolling(cli client.Client, ctx intctrlutil.RequestCtx, sts ap
 		return nil
 	}
 
+	ctx.Recorder.Eventf(&sts,
+		corev1.EventTypeNormal, "Restarting",
+		"restarting component[%s] in cluster[%s], version: %s", componentName, clusterName, newVersion)
 	sts.Spec.Template.Annotations[cfgAnnotationKey] = newVersion
 	if err := cli.Update(ctx.Ctx, &sts); err != nil {
 		return err

@@ -96,18 +96,9 @@ metrics:
   ##
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
-    repository: apecloud/postgres-exporter
-    tag: 0.11.1-debian-11-r66
-    digest: ""
+    repository: apecloud/agamotto
+    tag: 0.1.0-beta.4
     pullPolicy: IfNotPresent
-    ## Optionally specify an array of imagePullSecrets.
-    ## Secrets must be manually created in the namespace.
-    ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-    ## Example:
-    ## pullSecrets:
-    ##   - myRegistryKeySecretName
-    ##
-    pullSecrets: [ ]
 
 ## @section pgbouncer Parameters
 pgbouncer:

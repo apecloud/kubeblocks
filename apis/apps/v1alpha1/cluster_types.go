@@ -721,6 +721,16 @@ func GetClusterUpRunningPhases() []ClusterPhase {
 	}
 }
 
+// GetReconfiguringRunningPhases return Cluster running or partially running phases.
+func GetReconfiguringRunningPhases() []ClusterPhase {
+	return []ClusterPhase{
+		RunningClusterPhase,
+		SpecReconcilingClusterPhase, // enable partial running for reconfiguring
+		AbnormalClusterPhase,
+		FailedClusterPhase,
+	}
+}
+
 // GetComponentTerminalPhases return Cluster's component terminal phases.
 func GetComponentTerminalPhases() []ClusterComponentPhase {
 	return []ClusterComponentPhase{

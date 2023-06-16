@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-agamotto-configuration
+  labels:
+      {{- include "postgresql.labels" . | nindent 4 }}
+data:
+  agamotto-config.yaml: |-
+    extensions:
+      memory_ballast:
+        size_mib: 32
+
+    receivers:
+      apecloudpostgresql:
+        endpoint: ${env:ENDPOINT}
+        username: ${env:DATA_SOURCE_USER}
+        password: ${env:DATA_SOURCE_PASS}
+        databases:
+          - postgres
+        exclude_databases:
+          - template0
+          - template1
+        query_path: /opt/conf/custom-metrics.yaml
+        collection_interval: 15s
+        transport: tcp
+        tls:
+          insecure: true
+          insecure_skip_verify: true
+
+    processors:
+      memory_limiter:
+        limit_mib: 128
+        spike_limit_mib: 32
+        check_interval: 10s
+
+    exporters:
+      prometheus:
+        endpoint: 0.0.0.0:1234
+        send_timestamps: false
+        metric_expiration: 20s
+        enable_open_metrics: false
+        resource_to_telemetry_conversion:
+          enabled: true
+
+    service:
+      telemetry:
+        logs:
+          level: info
+      pipelines:
+        metrics:
+          receivers: [ apecloudpostgresql ]
+          processors: [ memory_limiter ]
+          exporters: [ prometheus ]
+      extensions: [ memory_ballast ]

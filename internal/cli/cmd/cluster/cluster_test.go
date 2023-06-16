@@ -312,12 +312,37 @@ var _ = Describe("Cluster", func() {
 			Expect(o.Validate()).Should(HaveOccurred())
 		})
 
-		It("can validate whether the name is not specified and fail to generate a random cluster name when create a new cluster ", func() {
-			Expect(o.Name).ShouldNot(BeEmpty())
-			Expect(o.Validate()).Should(Succeed())
-			o.Name = ""
-			// Expected to generate a random name
-			Expect(o.Validate()).Should(Succeed())
+		It("can validate the cluster name must begin with a letter and can only contain lowercase letters, numbers, and '-'.", func() {
+			type fn func()
+			var succeed = func(name string) fn {
+				return func() {
+					o.Name = name
+					Expect(o.Validate()).Should(Succeed())
+				}
+			}
+			var failed = func(name string) fn {
+				return func() {
+					o.Name = name
+					Expect(o.Validate()).Should(HaveOccurred())
+				}
+			}
+			// more case to add
+			invalidCase := []string{
+				"1abcd", "abcd-", "-abcd", "abc#d", "ABCD", "*&(&%",
+			}
+
+			validCase := []string{
+				"abcd", "abcd1", "a1-2b-3d",
+			}
+
+			for i := range invalidCase {
+				failed(invalidCase[i])
+			}
+
+			for i := range validCase {
+				succeed(validCase[i])
+			}
+
 		})
 
 		It("can validate whether the name is not longer than 16 characters when create a new cluster", func() {

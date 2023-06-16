@@ -332,3 +332,7 @@ func overrideSwitchoverSpecAttr(switchoverSpec *appsv1alpha1.SwitchoverSpec, cvS
 		switchoverSpec.Env = cvSwitchoverSpec.Env
 	}
 }
+
+func GenerateComponentEnvName(clusterName, componentName string) string {
+	return fmt.Sprintf("%s-%s-env", clusterName, componentName)
+}

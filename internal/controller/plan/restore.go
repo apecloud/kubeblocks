@@ -646,7 +646,7 @@ func (p *RestoreManager) buildLogicRestoreJob(synthesizedComponent *component.Sy
 	if err = p.Client.Get(p.Ctx, backupToolKey, &backupTool); err != nil {
 		return nil, err
 	}
-	if len(backupTool.Spec.Logical.RestoreCommands) == 0 {
+	if backupTool.Spec.Logical == nil || len(backupTool.Spec.Logical.RestoreCommands) == 0 {
 		return nil, nil
 	}
 

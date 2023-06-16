@@ -290,13 +290,14 @@ func validateRenderedData(
 	}, configConstraint); err != nil {
 		return cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
 	}
+	return validateRawData(renderedData, configSpec, &configConstraint.Spec)
+}
 
-	configChecker := cfgcore.NewConfigValidator(&configConstraint.Spec, cfgcore.WithKeySelector(configSpec.Keys))
-
+func validateRawData(renderedData map[string]string, configSpec appsv1alpha1.ComponentConfigSpec, cc *appsv1alpha1.ConfigConstraintSpec) error {
+	configChecker := cfgcore.NewConfigValidator(cc, cfgcore.WithKeySelector(configSpec.Keys))
 	// NOTE: It is necessary to verify the correctness of the data
 	if err := configChecker.Validate(renderedData); err != nil {
 		return cfgcore.WrapError(err, "failed to validate configmap")
 	}
-
 	return nil
 }

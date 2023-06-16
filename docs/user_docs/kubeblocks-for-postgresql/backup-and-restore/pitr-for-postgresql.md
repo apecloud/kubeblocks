@@ -80,11 +80,30 @@ Prepare a clean EKS cluster, and install EBS CSI driver plug-in, with at least o
        kubectl patch sc/gp2 -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
        ```
 
-4. Enable S3 storage with `kbcli addon enable csi-s3`.
+4. Enable S3 storage.
 
     ```bash
-    kbcli addon enable csi-s3 --set secret.accessKey=<your-accesskey>,secret.secretKey=<your-secretkey>,secret.endpoint=https://s3.cn-northwest-1.amazonaws.com.cn,secret.region=cn-northwest-1,storageClass.singleBucket=demo
+    helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
+
+    helm install csi-s3  kubeblocks/csi-s3 --version=0.5.2 \
+    --set secret.accessKey=<your_accessKey> \
+    --set secret.secretKey=<your_secretKey> \
+    --set storageClass.singleBucket=<s3_bucket>  \
+    --set secret.endpoint=https://s3.<region>.amazonaws.com.cn \
+    --set secret.region=<region> -n kb-system
+
+    # CSI-S3 installs a daemonSet pod on all nodes and you can set tolerations to install daemonSet pods on the specified nodes
+    --set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
     ```
+
+    :::note
+
+    Endpoint format:
+
+    * China: `https://s3.<region>.amazonaws.com.cn`
+    * Other countries/regions: `https://s3.<region>.amazonaws.com`
+
+    :::
 
 | Parameters                | Description                              |
 | :------------------------ | :--------------------------------------- |

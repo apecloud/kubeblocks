@@ -28,8 +28,9 @@ const (
 
 // GVR
 const (
-	Group   = "chaos-mesh.org"
-	Version = "v1alpha1"
+	Group        = "chaos-mesh.org"
+	Version      = "v1alpha1"
+	GroupVersion = Group + "/" + Version
 
 	ResourcePodChaos     = "podchaos"
 	ResourceNetworkChaos = "networkchaos"

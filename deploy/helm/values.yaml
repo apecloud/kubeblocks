@@ -1194,16 +1194,16 @@ prometheus:
         # The relabeling allows the actual service scrape endpoint to be configured
         # via the following annotations:
         #
-        # * `prometheus.io/scrape`: Only scrape services that have a value of
-        # `true`, except if `prometheus.io/scrape-slow` is set to `true` as well.
-        # * `prometheus.io/scheme`: If the metrics endpoint is secured then you will need
+        # * `monitor.kubeblocks.io/scrape`: Only scrape services that have a value of
+        # `true`.
+        # * `monitor.kubeblocks.io/scheme`: If the metrics endpoint is secured then you will need
         # to set this to `https` & most likely set the `tls_config` of the scrape config.
-        # * `prometheus.io/path`: If the metrics path is not `/metrics` override this.
-        # * `prometheus.io/port`: If the metrics are exposed on a different port to the
+        # * `monitor.kubeblocks.io/path`: If the metrics path is not `/metrics` override this.
+        # * `monitor.kubeblocks.io/port`: If the metrics are exposed on a different port to the
         # service then set this appropriately.
-        # * `prometheus.io/param_<parameter>`: If the metrics endpoint uses parameters
+        # * `monitor.kubeblocks.io/param_<parameter>`: If the metrics endpoint uses parameters
         # then you can set any parameter
-        - job_name: 'kubeblocks-service-endpoints'
+        - job_name: 'kubeblocks-service'
           honor_labels: true
 
           kubernetes_sd_configs:
@@ -1213,27 +1213,27 @@ prometheus:
             - source_labels: [ __meta_kubernetes_service_label_app_kubernetes_io_managed_by ]
               action: keep
               regex: kubeblocks
-            - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_scrape ]
+            - source_labels: [ __meta_kubernetes_service_label_monitor_kubeblocks_io_managed_by ]
+              action: drop
+              regex: agamotto
+            - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scrape ]
               action: keep
               regex: true
-            - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_scrape_slow ]
-              action: drop
-              regex: true
-            - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_scheme ]
+            - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scheme ]
               action: replace
               target_label: __scheme__
               regex: (https?)
-            - source_labels: [ __meta_kubernetes_service_annotation_prometheus_io_path ]
+            - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_path ]
               action: replace
               target_label: __metrics_path__
               regex: (.+)
-            - source_labels: [ __address__, __meta_kubernetes_service_annotation_prometheus_io_port ]
+            - source_labels: [ __address__, __meta_kubernetes_service_annotation_monitor_kubeblocks_io_port ]
               action: replace
               target_label: __address__
               regex: (.+?)(?::\d+)?;(\d+)
               replacement: $1:$2
             - action: labelmap
-              regex: __meta_kubernetes_service_annotation_prometheus_io_param_(.+)
+              regex: __meta_kubernetes_service_annotation_monitor_kubeblocks_io_param_(.+)
               replacement: __param_$1
             - action: labelmap
               regex: __meta_kubernetes_service_label_(.+)
@@ -1249,6 +1249,39 @@ prometheus:
             - source_labels: [ __meta_kubernetes_pod_name ]
               action: replace
               target_label: pod
+            - source_labels: [ __meta_kubernetes_pod_phase ]
+              regex: Pending|Succeeded|Failed|Completed
+              action: drop
+
+        - job_name: 'kubeblocks-agamotto'
+          honor_labels: true
+
+          kubernetes_sd_configs:
+            - role: endpoints
+
+          relabel_configs:
+            - source_labels: [ __meta_kubernetes_service_label_monitor_kubeblocks_io_managed_by ]
+              action: keep
+              regex: agamotto
+            - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scrape ]
+              action: keep
+              regex: true
+            - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scheme ]
+              action: replace
+              target_label: __scheme__
+              regex: (https?)
+            - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_path ]
+              action: replace
+              target_label: __metrics_path__
+              regex: (.+)
+            - source_labels: [ __address__, __meta_kubernetes_service_annotation_monitor_kubeblocks_io_port ]
+              action: replace
+              target_label: __address__
+              regex: (.+?)(?::\d+)?;(\d+)
+              replacement: $1:$2
+            - action: labelmap
+              regex: __meta_kubernetes_service_annotation_monitor_kubeblocks_io_param_(.+)
+              replacement: __param_$1
             - source_labels: [ __meta_kubernetes_pod_phase ]
               regex: Pending|Succeeded|Failed|Completed
               action: drop

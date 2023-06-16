@@ -25,6 +25,7 @@ Usage: $(basename "$0") <options>
                                 13) patch release notes
                                 14) ignore cover pkgs
                                 15) set size label
+                                16) get test packages
     -tn, --tag-name           Release tag name
     -gr, --github-repo        Github Repo
     -gt, --github-token       Github token
@@ -32,13 +33,15 @@ Usage: $(basename "$0") <options>
     -bn, --branch-name        The branch name
     -c, --content             The trigger request content
     -bw, --bot-webhook        The bot webhook
-    -tt, --trigger-type       The trigger type (e.g. release/package)
+    -tt, --trigger-type       The trigger type
     -ru, --run-url            The run url
     -fl, --file               The release notes file
     -ip, --ignore-pkgs        The ignore cover pkgs
     -br, --base-branch        The base branch name
     -bc, --base-commit        The base commit id
     -pn, --pr-number          The pull request number
+    -tp, --test-pkgs          The test packages
+    -tc, --test-check         The test check
 EOF
 }
 
@@ -64,6 +67,9 @@ main() {
     local BASE_COMMIT=""
     local BASE_COMMIT_ID=HEAD^
     local PR_NUMBER=""
+    local TEST_PACKAGES=""
+    local TEST_PKGS=""
+    local TEST_CHECK=""
 
     parse_command_line "$@"
 
@@ -112,6 +118,9 @@ main() {
         ;;
         15)
             set_size_label
+        ;;
+        16)
+            get_test_packages
         ;;
         *)
             show_help
@@ -214,6 +223,18 @@ parse_command_line() {
             -pn|--pr-number)
                 if [[ -n "${2:-}" ]]; then
                     PR_NUMBER="$2"
+                    shift
+                fi
+                ;;
+            -tp|--test-pkgs)
+                if [[ -n "${2:-}" ]]; then
+                    TEST_PKGS="$2"
+                    shift
+                fi
+                ;;
+            -tc|--test-check)
+                if [[ -n "${2:-}" ]]; then
+                    TEST_CHECK="$2"
                     shift
                 fi
                 ;;
@@ -416,8 +437,8 @@ get_trigger_mode() {
     echo "BASE_COMMIT_ID:$BASE_COMMIT_ID"
     filePaths=$( git diff --name-only HEAD ${BASE_COMMIT_ID} )
     for filePath in $( echo "$filePaths" ); do
-        if [[ "$filePath" == "go."* ]]; then
-            add_trigger_mode "[test]"
+        if [[ "$filePath" == "go."* || "$filePath" == *".go" ]]; then
+            add_trigger_mode "[test][go]"
             continue
         elif [[ "$filePath" != *"/"* ]]; then
             add_trigger_mode "[other]"
@@ -506,11 +527,10 @@ ignore_cover_pkgs() {
 }
 
 set_size_label() {
-    pr_changes=$( gh_curl -s $GITHUB_API/repos/$LATEST_REPO/pulls/$PR_NUMBER/files | jq -r '.[].changes' )
-    total_changes=0
-    for changes in $( echo "$pr_changes" ); do
-       total_changes=$(( $total_changes + $changes ))
-    done
+    pr_info=$( gh pr view $PR_NUMBER --repo $LATEST_REPO --json "additions,deletions,labels" )
+    pr_additions=$( echo "$pr_info" | jq -r '.additions' )
+    pr_deletions=$( echo "$pr_info" | jq -r '.deletions' )
+    total_changes=$(( $pr_additions + $pr_deletions ))
     size_label=""
     if [[ $total_changes -lt 10 ]]; then
         size_label="size/XS"
@@ -526,11 +546,10 @@ set_size_label() {
         size_label="size/XXL"
     fi
     echo "size label:$size_label"
-    label_list=$( gh pr view $PR_NUMBER --repo $LATEST_REPO | grep labels: )
+    label_list=$(  echo "$pr_info" | jq -r '.labels[].name' )
     remove_label=""
     add_label=true
     for label in $( echo "$label_list" ); do
-        label=${label/,/}
         case $label in
             $size_label)
                 add_label=false
@@ -545,10 +564,6 @@ set_size_label() {
             ;;
         esac
     done
-    if [[ "$remove_label" == *"," ]]; then
-        echo $remove_label
-        remove_label=${remove_label::-1}
-    fi
 
     if [[ ! -z "$remove_label" ]]; then
         echo "remove label:$remove_label"
@@ -559,6 +574,46 @@ set_size_label() {
         echo "add label:$size_label"
         gh pr edit $PR_NUMBER --repo $LATEST_REPO --add-label "$size_label"
     fi
+}
+
+set_test_packages() {
+    pkgs_dir=$1
+    if ( find $pkgs_dir -maxdepth 1 -type f -name '*_test.go' ) > /dev/null; then
+        if [[ -z "$TEST_PACKAGES" ]]; then
+            TEST_PACKAGES="{\"ops\":\"$pkgs_dir\"}"
+        else
+            TEST_PACKAGES="$TEST_PACKAGES,{\"ops\":\"$pkgs_dir\"}"
+        fi
+    fi
+}
+
+set_test_check() {
+    check=$1
+    if [[ -z "$TEST_PACKAGES" ]]; then
+        TEST_PACKAGES="{\"ops\":\"$check\"}"
+    else
+        TEST_PACKAGES="$TEST_PACKAGES,{\"ops\":\"$check\"}"
+    fi
+}
+
+get_test_packages() {
+    if [[ "$TRIGGER_TYPE" != *"[test]"* ]]; then
+        echo $TEST_PACKAGES
+        return
+    fi
+    for check in $( echo "$TEST_CHECK" | sed 's/|/ /g' ); do
+        set_test_check $check
+    done
+
+    for pkgs in $( echo "$TEST_PKGS" | sed 's/|/ /g' ); do
+        for pkgs_dir in $( find $pkgs -maxdepth 1 -type d ) ; do
+            if [[ "$pkgs" == "$pkgs_dir" ]]; then
+                continue
+            fi
+            set_test_packages $pkgs_dir
+        done
+    done
+    echo $TEST_PACKAGES
 }
 
 main "$@"

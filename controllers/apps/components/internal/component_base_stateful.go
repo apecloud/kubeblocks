@@ -28,7 +28,6 @@ import (
 
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -539,102 +538,49 @@ func (c *StatefulComponentBase) updatePodReplicaLabel4Scaling(reqCtx intctrlutil
 }
 
 func (c *StatefulComponentBase) scaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
+	// if scale in to 0, do not delete pvcs
+	if c.Component.Replicas == 0 {
+		return nil
+	}
 	for i := c.Component.Replicas; i < *stsObj.Spec.Replicas; i++ {
 		for _, vct := range stsObj.Spec.VolumeClaimTemplates {
 			pvcKey := types.NamespacedName{
 				Namespace: stsObj.Namespace,
 				Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 			}
-			// create cronjob to delete pvc after 30 minutes
-			if obj, err := checkedCreateDeletePVCCronJob(reqCtx, cli, pvcKey, stsObj, c.Cluster); err != nil {
+			pvc := corev1.PersistentVolumeClaim{}
+			if err := cli.Get(reqCtx.Ctx, pvcKey, &pvc); err != nil {
 				return err
-			} else if obj != nil {
-				c.CreateResource(obj, nil)
 			}
+			c.DeleteResource(&pvc, nil)
 		}
 	}
 	return nil
 }
 
 func (c *StatefulComponentBase) postScaleIn(reqCtx intctrlutil.RequestCtx, cli client.Client, txn *statusReconciliationTxn) error {
-	hasJobFailed := func(reqCtx intctrlutil.RequestCtx, cli client.Client) (*batchv1.Job, string, error) {
-		jobs, err := util.ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.JobSignature, c.GetNamespace(), c.GetMatchingLabels())
-		if err != nil {
-			return nil, "", err
-		}
-		for _, job := range jobs {
-			// TODO: use a better way to check the delete PVC job.
-			if !strings.HasPrefix(job.Name, "delete-pvc-") {
-				continue
-			}
-			for _, cond := range job.Status.Conditions {
-				if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
-					return job, fmt.Sprintf("%s-%s", cond.Reason, cond.Message), nil
-				}
-			}
-		}
-		return nil, "", nil
-	}
-	if job, msg, err := hasJobFailed(reqCtx, cli); err != nil {
-		return err
-	} else if job != nil {
-		msgKey := fmt.Sprintf("%s/%s", job.GetObjectKind().GroupVersionKind().Kind, job.GetName())
-		statusMessage := appsv1alpha1.ComponentMessageMap{msgKey: msg}
-		// TODO: CT - remove this cronjob later
-		if txn != nil {
-			txn.propose(appsv1alpha1.AbnormalClusterCompPhase, func() {
-				c.SetStatusPhase(appsv1alpha1.AbnormalClusterCompPhase, statusMessage, "PVC deletion job failed")
-			})
-		}
-	}
 	return nil
 }
 
 func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli client.Client, stsObj *appsv1.StatefulSet) error {
 	var (
-		key = client.ObjectKey{
-			Namespace: stsObj.Namespace,
-			Name:      stsObj.Name,
-		}
 		backupKey = types.NamespacedName{
 			Namespace: stsObj.Namespace,
 			Name:      stsObj.Name + "-scaling",
 		}
-
-		cleanCronJobs = func() error {
-			for i := *stsObj.Spec.Replicas; i < c.Component.Replicas; i++ {
-				for _, vct := range stsObj.Spec.VolumeClaimTemplates {
-					pvcKey := types.NamespacedName{
-						Namespace: key.Namespace,
-						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-					}
-					// delete deletion cronjob if exists
-					cronJobKey := pvcKey
-					cronJobKey.Name = "delete-pvc-" + pvcKey.Name
-					cronJob := &batchv1.CronJob{}
-					if err := cli.Get(reqCtx.Ctx, cronJobKey, cronJob); err != nil {
-						return client.IgnoreNotFound(err)
-					}
-					c.DeleteResource(cronJob, c.WorkloadVertex)
-				}
-			}
-			return nil
-		}
 	)
-
-	if err := cleanCronJobs(); err != nil {
-		return err
-	}
 
 	c.WorkloadVertex.Immutable = true
 	stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
-	dataClone := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)
+	d, err := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)
+	if err != nil {
+		return err
+	}
 	var succeed bool
-	var err error
-	if dataClone == nil {
+	if d == nil {
 		succeed = true
 	} else {
-		succeed, err = dataClone.succeed()
+		succeed, err = d.succeed()
 		if err != nil {
 			return err
 		}
@@ -646,7 +592,7 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 	} else {
 		c.WorkloadVertex.Immutable = true
 		// update objs will trigger cluster reconcile, no need to requeue error
-		objs, err := dataClone.cloneData(dataClone)
+		objs, err := d.cloneData(d)
 		if err != nil {
 			return err
 		}
@@ -665,7 +611,11 @@ func (c *StatefulComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli 
 		}
 	)
 
-	if d := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsObj, snapshotKey); d != nil {
+	d, err := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsObj, snapshotKey)
+	if err != nil {
+		return err
+	}
+	if d != nil {
 		// clean backup resources.
 		// there will not be any backup resources other than scale out.
 		tmpObjs, err := d.clearTmpResources()

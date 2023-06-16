@@ -1,6 +1,8 @@
 name: PULL-REQUEST-LABEL-SIZE
 
-on: [pull_request]
+on:
+  pull_request_target:
+    types: [ edited, opened, synchronize ]
 
 env:
   GITHUB_TOKEN: ${{ github.token }}
@@ -8,8 +10,6 @@ env:
 jobs:
   size-label:
     runs-on: ubuntu-latest
-    outputs:
-      size-label: ${{ steps.get_size_label.outputs.size_label }}
     steps:
       - uses: actions/checkout@v3
       - name: set size label

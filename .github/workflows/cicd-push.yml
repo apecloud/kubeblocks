@@ -10,8 +10,8 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
   BASE_BRANCH: origin/main
+  GO_VERSION: "1.20"
 
 jobs:
   trigger-mode:
@@ -19,6 +19,12 @@ jobs:
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
     steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          all_but_latest: true
+          access_token: ${{ github.token }}
+
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -85,9 +91,9 @@ jobs:
             libdevmapper-dev
 
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
-          go-version: "1.20"
+          go-version: "${{ env.GO_VERSION }}"
 
       - name: Check cli doc
         id: check-cli-doc
@@ -250,9 +256,9 @@ jobs:
             libdevmapper-dev
 
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
-          go-version: "1.20"
+          go-version: "${{ env.GO_VERSION }}"
 
       - name: make generate
         run: make generate

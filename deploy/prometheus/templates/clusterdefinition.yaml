@@ -1,0 +1,166 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: {{ template "prometheus.name" . }}
+  labels:
+    {{- include "prometheus.labels" . | nindent 4 }}
+spec:
+  type: prometheus
+  componentDefs:
+    - name: server
+      workloadType: Stateful
+      characterType: prometheus
+      service:
+        ports:
+          - name: http
+            port: 80
+            protocol: TCP
+            targetPort: 9090
+      volumeTypes:
+        - name: data
+          type: data
+      configSpecs:
+        - name: server-config
+          templateRef: {{ template "prometheus.server.fullname" . }}-config
+          constraintRef: {{ template "prometheus.server.fullname" . }}-constraints
+          namespace: {{ .Release.Namespace }}
+          volumeName: config-volume
+          defaultMode: 0777
+      podSpec:
+        {{- if .Values.server.securityContext }}
+        securityContext:
+{{- toYaml .Values.server.securityContext | nindent 10 }}
+        {{- end }}
+        enableServiceLinks: true
+        containers:
+          - name: configmap-reload
+            args:
+              - --volume-dir=/etc/config
+              - --webhook-url=http://127.0.0.1:9090/-/reload
+            volumeMounts:
+              - name: config-volume
+                mountPath: /etc/config
+                readOnly: true
+            securityContext:
+{{- toYaml .Values.configmapReload.prometheus.containerSecurityContext | nindent 14 }}
+
+          - name: server
+            securityContext:
+{{- toYaml .Values.server.containerSecurityContext | nindent 14 }}
+            args:
+            {{- if .Values.server.retention }}
+              - --storage.tsdb.retention.time={{ .Values.server.retention }}
+            {{- end }}
+              - --config.file=/etc/config/prometheus.yml
+              - --storage.tsdb.path=/data
+              - --web.console.libraries=/etc/prometheus/console_libraries
+              - --web.console.templates=/etc/prometheus/consoles
+            {{- range .Values.server.extraFlags }}
+              - --{{ . }}
+            {{- end }}
+            {{- range $key, $value := .Values.server.extraArgs }}
+              - --{{ $key }}={{ $value }}
+            {{- end }}
+            readinessProbe:
+              httpGet:
+                path: /-/ready
+                port: 9090
+                scheme: HTTP
+              initialDelaySeconds: 30
+              periodSeconds: 5
+              timeoutSeconds: 4
+              failureThreshold: 3
+              successThreshold: 1
+            livenessProbe:
+              httpGet:
+                path: /-/healthy
+                port: 9090
+                scheme: HTTP
+              initialDelaySeconds: 30
+              periodSeconds: 15
+              timeoutSeconds: 10
+              failureThreshold: 3
+              successThreshold: 1
+            volumeMounts:
+              - name: config-volume
+                mountPath: /etc/config
+              - name: rule-volume
+                mountPath: /etc/config-rule
+              - name: data
+                mountPath: /data
+            ports:
+              - containerPort: 9090
+                name: server
+        dnsPolicy: ClusterFirst
+        terminationGracePeriodSeconds: 30
+        volumes:
+          - name: rule-volume
+            configMap:
+              name: {{ template "prometheus.server.fullname" . }}-rule
+
+    - name: alertmanager
+      workloadType: Stateful
+      characterType: alertmanager
+      service:
+        ports:
+          - name: http
+            port: 80
+            protocol: TCP
+            targetPort: 9093
+      volumeTypes:
+        - name: alert
+          type: data
+      podSpec:
+        {{- if .Values.alertmanager.securityContext }}
+        securityContext:
+{{- toYaml .Values.alertmanager.securityContext | nindent 10 }}
+        {{- end }}
+        containers:
+          - name: configmap-reload
+            args:
+              - --volume-dir=/etc/config
+              - --webhook-url=http://127.0.0.1:9093/-/reload
+            volumeMounts:
+              - name: config-volume
+                mountPath: /etc/config
+                readOnly: true
+            securityContext:
+{{- toYaml .Values.configmapReload.alertmanager.containerSecurityContext | nindent 14 }}
+
+          - name: alertmanager
+            securityContext:
+{{- toYaml .Values.alertmanager.containerSecurityContext | nindent 14 }}
+            env:
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    apiVersion: v1
+                    fieldPath: status.podIP
+            args:
+              - --config.file=/etc/config/alertmanager.yml
+              - --storage.path=/data
+              - --cluster.advertise-address=[$(POD_IP)]:6783
+              - --cluster.listen-address=0.0.0.0:6783
+              - --web.external-url=http://localhost:9093
+            readinessProbe:
+              httpGet:
+                path: /-/ready
+                port: 9093
+              initialDelaySeconds: 30
+              timeoutSeconds: 30
+            ports:
+              - containerPort: 9093
+                name: alertmanager
+            volumeMounts:
+              - name: config-volume
+                mountPath: /etc/config
+              - name: data
+                mountPath: /data
+        volumes:
+          - name: config-volume
+            configMap:
+              {{- if .Values.alertmanager.configMapOverrideName }}
+              name: {{ .Release.Name }}-{{ .Values.alertmanager.configMapOverrideName }}
+              {{- else }}
+              name: {{ template "prometheus.alertmanager.fullname" . }}-config
+              {{- end }}

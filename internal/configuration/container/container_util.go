@@ -20,35 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package container
 
 import (
-	"bytes"
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"strings"
-
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 const (
 	socketPrefix = "unix://"
 )
-
-func ExecShellCommand(cmd *exec.Cmd) (string, error) {
-	var (
-		errOut bytes.Buffer
-		stdOut bytes.Buffer
-	)
-
-	cmd.Stderr = &errOut
-	cmd.Stdout = &stdOut
-	if err := cmd.Run(); err != nil {
-		return "", cfgcore.WrapError(err, "failed to run command[%s], error output: \n%v", cmd.String(), errOut.String())
-	}
-
-	ret := stdOut.String()
-	return ret, nil
-}
 
 func isSocketFile(file string) bool {
 	info, err := os.Stat(extractSocketPath(file))

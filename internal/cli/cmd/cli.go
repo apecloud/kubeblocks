@@ -26,8 +26,10 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/klog/v2"
 	kccmd "k8s.io/kubectl/pkg/cmd"
 	kcplugin "k8s.io/kubectl/pkg/cmd/plugin"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -68,6 +70,14 @@ func init() {
 	// put the download directory of the plugin into the PATH
 	if err := util.AddDirToPath(fmt.Sprintf("%s/.%s/plugins/bin", os.Getenv("HOME"), cliName)); err != nil {
 		fmt.Println("Failed to add kbcli bin dir to PATH:", err)
+	}
+
+	// when the kubernetes cluster is not ready, the runtime will output the error
+	// message like "couldn't get resource list for", we ignore it
+	utilruntime.ErrorHandlers[0] = func(err error) {
+		if klog.V(2).Enabled() {
+			klog.ErrorDepth(2, err)
+		}
 	}
 }
 

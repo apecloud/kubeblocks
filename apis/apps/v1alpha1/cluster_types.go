@@ -690,16 +690,6 @@ func (r *ClusterComponentSpec) GetPrimaryIndex() int32 {
 	return *r.PrimaryIndex
 }
 
-// GetClusterTerminalPhases returns Cluster terminal phases.
-func GetClusterTerminalPhases() []ClusterPhase {
-	return []ClusterPhase{
-		RunningClusterPhase,
-		StoppedClusterPhase,
-		FailedClusterPhase,
-		AbnormalClusterPhase,
-	}
-}
-
 // GetClusterUpRunningPhases returns Cluster running or partially running phases.
 func GetClusterUpRunningPhases() []ClusterPhase {
 	return []ClusterPhase{
@@ -709,11 +699,13 @@ func GetClusterUpRunningPhases() []ClusterPhase {
 	}
 }
 
-// GetClusterFailedPhases return Cluster failed or partially failed phases.
-func GetClusterFailedPhases() []ClusterPhase {
+// GetReconfiguringRunningPhases return Cluster running or partially running phases.
+func GetReconfiguringRunningPhases() []ClusterPhase {
 	return []ClusterPhase{
-		FailedClusterPhase,
+		RunningClusterPhase,
+		SpecReconcilingClusterPhase, // enable partial running for reconfiguring
 		AbnormalClusterPhase,
+		FailedClusterPhase,
 	}
 }
 

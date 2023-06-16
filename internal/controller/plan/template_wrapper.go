@@ -119,6 +119,11 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 			return err
 		}
 		updateCMConfigSpecLabels(newCMObj, configSpec)
+		if origCMObj == nil {
+			newCMObj.Labels[constant.CMConfigurationNewLabelKey] = "true"
+		} else {
+			newCMObj.Labels[constant.CMConfigurationNewLabelKey] = "false"
+		}
 		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme); err != nil {
 			return err
 		}

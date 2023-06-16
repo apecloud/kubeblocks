@@ -94,10 +94,10 @@ const (
 	CMConfigurationSpecProviderLabelKey    = "config.kubeblocks.io/config-spec"    // CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
 	CMConfigurationCMKeysLabelKey          = "config.kubeblocks.io/configmap-keys" // CMConfigurationCMKeysLabelKey Specify configmap keys
 	CMConfigurationTemplateNameLabelKey    = "config.kubeblocks.io/config-template-name"
-	CMConfigTemplateNameLabelKeyInCue      = "config.kubeblocks.io/template-name" // CMConfigTemplateNameLabelKeyInCue keeps same label key name with config_template.cue file
 	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
 	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
 	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
+	CMConfigurationNewLabelKey             = "config.kubeblocks.io/new-config" // CMConfigurationNewLabelKey indicates whether this configmap is rendered by first time
 	ConsensusSetAccessModeLabelKey         = "cs.apps.kubeblocks.io/access-mode"
 	BackupTypeLabelKeyKey                  = "dataprotection.kubeblocks.io/backup-type"
 	DataProtectionLabelBackupNameKey       = "dataprotection.kubeblocks.io/backup-name"

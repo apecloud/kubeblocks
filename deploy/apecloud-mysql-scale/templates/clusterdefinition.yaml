@@ -17,6 +17,96 @@ spec:
     # independent cluster deployment and will no longer need to be deployed
     # together with ApeCloud MySQL cluster. ApeCloud MySQL-Scale can
     # register vttablets as sidecars to an existing ApeCloud MySQL cluster.
+    - name: vtgate
+      characterType: mysql
+      workloadType: Stateful
+      service:
+        ports:
+          - name: webport
+            port: 15001
+            targetPort: webport
+          - name: grpcport
+            port: 15991
+            targetPort: grpcport
+          - name: serverport
+            port: 15306
+            targetPort: serverport
+          - name: delvedebug
+            port: 40000
+            targetPort: delvedebug
+      podSpec:
+        containers:
+          - name: mysql
+            imagePullPolicy: IfNotPresent
+            ports:
+              - containerPort: 15001
+                name: webport
+              - containerPort: 15991
+                name: grpcport
+              - containerPort: 15306
+                name: serverport
+              - containerPort: 40000
+                name: delvedebug
+            env:
+              - name: MYSQL_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: CELL
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
+              - name: VTGATE_MYSQL_PORT
+                value: "15306"
+              - name: VTGATE_WEB_PORT
+                value: "15001"
+              - name: VTGATE_GRPC_PORT
+                value: "15991"
+              - name: ETCD_SERVER
+                value: "$(KB_CLUSTER_NAME)-etcd-headless"
+              - name: ETCD_PORT
+                value: "2379"
+              - name: TOPOLOGY_FLAGS
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+            command:
+              - /bin/bash
+              - -c
+              - |
+                cell=${CELL:-'zone1'}
+                web_port=${VTGATE_WEB_PORT:-'15001'}
+                grpc_port=${VTGATE_GRPC_PORT:-'15991'}
+                mysql_server_port=${VTGATE_MYSQL_PORT:-'15306'}
+                mysql_server_socket_path="/tmp/mysql.sock"
+
+                echo "starting vtgate."
+                su vitess <<EOF
+                exec vtgate \
+                  $TOPOLOGY_FLAGS \
+                  --alsologtostderr \
+                  --gateway_initial_tablet_timeout 30s \
+                  --healthcheck_timeout 2s \
+                  --srv_topo_timeout 1s \
+                  --grpc_keepalive_time 10s \
+                  --grpc_keepalive_timeout 10s \
+                  --log_dir $VTDATAROOT \
+                  --log_queries_to_file $VTDATAROOT/vtgate_querylog.txt \
+                  --port $web_port \
+                  --grpc_port $grpc_port \
+                  --mysql_server_port $mysql_server_port \
+                  --mysql_server_socket_path $mysql_server_socket_path \
+                  --cell $cell \
+                  --cells_to_watch $cell \
+                  --tablet_types_to_wait PRIMARY,REPLICA \
+                  --service_map 'grpc-vtgateservice' \
+                  --pid_file $VTDATAROOT/vtgate.pid \
+                  --mysql_auth_server_impl none
+                EOF
     - name: mysql
       characterType: mysql
       probes:
@@ -527,94 +617,4 @@ spec:
                   --log_dir ${VTDATAROOT} \
                   --db_username "$MYSQL_ROOT_USER" \
                   --db_password "$MYSQL_ROOT_PASSWORD"
-                EOF
-    - name: vtgate
-      characterType: vtgate
-      workloadType: Stateful
-      service:
-        ports:
-          - name: webport
-            port: 15001
-            targetPort: webport
-          - name: grpcport
-            port: 15991
-            targetPort: grpcport
-          - name: serverport
-            port: 15306
-            targetPort: serverport
-          - name: delvedebug
-            port: 40000
-            targetPort: delvedebug
-      podSpec:
-        containers:
-          - name: vtgate
-            imagePullPolicy: IfNotPresent
-            ports:
-              - containerPort: 15001
-                name: webport
-              - containerPort: 15991
-                name: grpcport
-              - containerPort: 15306
-                name: serverport
-              - containerPort: 40000
-                name: delvedebug
-            env:
-              - name: MYSQL_ROOT_USER
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: username
-                    optional: false
-              - name: MYSQL_ROOT_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: $(CONN_CREDENTIAL_SECRET_NAME)
-                    key: password
-                    optional: false
-              - name: CELL
-                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
-              - name: VTGATE_MYSQL_PORT
-                value: "15306"
-              - name: VTGATE_WEB_PORT
-                value: "15001"
-              - name: VTGATE_GRPC_PORT
-                value: "15991"
-              - name: ETCD_SERVER
-                value: "$(KB_CLUSTER_NAME)-etcd-headless"
-              - name: ETCD_PORT
-                value: "2379" 
-              - name: TOPOLOGY_FLAGS
-                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"                
-            command:
-              - /bin/bash
-              - -c
-              - |
-                cell=${CELL:-'zone1'}
-                web_port=${VTGATE_WEB_PORT:-'15001'}
-                grpc_port=${VTGATE_GRPC_PORT:-'15991'}
-                mysql_server_port=${VTGATE_MYSQL_PORT:-'15306'}
-                mysql_server_socket_path="/tmp/mysql.sock"
-
-                echo "starting vtgate."
-                su vitess <<EOF
-                exec vtgate \
-                  $TOPOLOGY_FLAGS \
-                  --alsologtostderr \
-                  --gateway_initial_tablet_timeout 30s \
-                  --healthcheck_timeout 2s \
-                  --srv_topo_timeout 1s \
-                  --grpc_keepalive_time 10s \
-                  --grpc_keepalive_timeout 10s \
-                  --log_dir $VTDATAROOT \
-                  --log_queries_to_file $VTDATAROOT/vtgate_querylog.txt \
-                  --port $web_port \
-                  --grpc_port $grpc_port \
-                  --mysql_server_port $mysql_server_port \
-                  --mysql_server_socket_path $mysql_server_socket_path \
-                  --cell $cell \
-                  --cells_to_watch $cell \
-                  --tablet_types_to_wait PRIMARY,REPLICA \
-                  --service_map 'grpc-vtgateservice' \
-                  --pid_file $VTDATAROOT/vtgate.pid \
-                  --mysql_auth_server_impl none 
                 EOF

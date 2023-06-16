@@ -23,6 +23,10 @@ set -o pipefail
 
 SCRIPT_ROOT="$(cd "$(dirname $0)/../" && pwd -P)"
 
+if [ -d "${SCRIPT_ROOT}/vendor" ]; then
+  export GOFLAGS="-mod=readonly"
+fi
+
 CODE_GENERATOR_PATH=$(go list -f '{{.Dir}}' -m k8s.io/code-generator)
 
 GENERATORS="all"   # deepcopy,defaulter,client,lister,informer or all
@@ -37,7 +41,7 @@ bash ${CODE_GENERATOR_PATH}/generate-groups.sh \
   "${OUTPUT_PACKAGE}" \
   "${APIS_PACKAGE}" \
   "${GROUP_VERSIONS}" \
-  --go-header-file "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+  --go-header-file "${SCRIPT_ROOT}/hack/boilerplate_apache2.go.txt" \
   --output-base "${OUTPUT_BASE}"
 
 rm -rf "${SCRIPT_ROOT}/pkg/client"

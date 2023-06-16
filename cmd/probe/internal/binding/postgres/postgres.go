@@ -31,6 +31,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/avast/retry-go"
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -433,20 +434,6 @@ func (pgOps *PostgresOperations) isSwitchoverPossible(ctx context.Context, prima
 	}
 
 	return true, nil
-}
-
-func (pgOps *PostgresOperations) getSwitchoverResult(oldPrimary, candidate string) (string, error) {
-	wait := int(pgOps.Cs.GetCluster().Config.GetData().GetTtl())
-	for i := 0; i < wait; i++ {
-		time.Sleep(time.Second)
-		_ = pgOps.Cs.GetClusterFromKubernetes()
-		newPrimary := pgOps.Cs.GetCluster().Leader.GetMember().GetName()
-		if newPrimary == candidate || (newPrimary != oldPrimary && candidate == "") {
-			return newPrimary, nil
-		}
-	}
-
-	return "", errors.New("switchover fail")
 }
 
 func (pgOps *PostgresOperations) FailoverOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
@@ -895,23 +882,26 @@ func (pgOps *PostgresOperations) Demote(ctx context.Context, podName string) err
 		pgOps.Logger.Errorf("stop err: %v", err)
 		return err
 	}
-	// TODO:
+
 	opTime, _ := pgOps.getWalPosition(ctx)
 	err = pgOps.Cs.DeleteLeader(opTime)
 
 	// Give a time to somebody to take the leader lock
 	time.Sleep(time.Second * 5)
-	//TODO:Follow which
-	for i := 0; i < 3; i++ {
-		err = pgOps.Cs.GetClusterFromKubernetes()
-		if err == nil && pgOps.Cs.GetCluster().Leader != nil {
-			break
-		}
-		time.Sleep(time.Second * 2)
-
-		if i == 2 {
-			return errors.Errorf("get no leader now")
-		}
+	err = retry.Do(
+		func() error {
+			err = pgOps.Cs.GetClusterFromKubernetes()
+			if err == nil && pgOps.Cs.GetCluster().Leader != nil {
+				return nil
+			}
+			return errors.Errorf("get cluster error or no leader, can't follow now, err:%v", err)
+		},
+		retry.Delay(time.Second*2),
+		retry.Attempts(4),
+		retry.DelayType(retry.BackOffDelay),
+	)
+	if err != nil {
+		return err
 	}
 
 	return pgOps.Follow(ctx, podName, true, pgOps.Cs.GetCluster().Leader.GetMember().GetName())

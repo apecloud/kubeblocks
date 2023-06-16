@@ -34,6 +34,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/avast/retry-go"
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
 	"github.com/go-sql-driver/mysql"
@@ -134,7 +135,6 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	mysqlOps.RegisterOperation(QueryOperation, mysqlOps.QueryOps)
 	mysqlOps.RegisterOperation(SwitchoverOperation, mysqlOps.SwitchoverOps)
 	mysqlOps.RegisterOperation(FailoverOperation, mysqlOps.FailoverOps)
-
 	mysqlOps.RegisterOperation(GetTestOperation, mysqlOps.GetTest)
 
 	// following are ops for account management
@@ -767,7 +767,7 @@ func (mysqlOps *MysqlOperations) priv2Role(priv string) RoleType {
 }
 
 func (mysqlOps *MysqlOperations) Promote(ctx context.Context, podName string) error {
-	stopReadOnly := `set global read_only=off;`
+	stopReadOnly := `set global read_only=off;set global super_read_only=off;`
 	stopSlave := `stop slave;`
 	resp, err := mysqlOps.exec(ctx, stopReadOnly+stopSlave)
 	if err != nil {
@@ -780,11 +780,11 @@ func (mysqlOps *MysqlOperations) Promote(ctx context.Context, podName string) er
 }
 
 func (mysqlOps *MysqlOperations) Demote(ctx context.Context, podName string) error {
-	setReadOnly := `set global read_only=on;`
+	setReadOnly := `set global read_only=on;set global super_read_only=on;`
 
 	_, err := mysqlOps.exec(ctx, setReadOnly)
 	if err != nil {
-		mysqlOps.Logger.Errorf("promote err: %v", err)
+		mysqlOps.Logger.Errorf("demote err: %v", err)
 		return err
 	}
 
@@ -793,17 +793,20 @@ func (mysqlOps *MysqlOperations) Demote(ctx context.Context, podName string) err
 
 	// Give a time to somebody to take the leader lock
 	time.Sleep(time.Second * 5)
-	//TODO:Follow which
-	for i := 0; i < 3; i++ {
-		err = mysqlOps.Cs.GetClusterFromKubernetes()
-		if err == nil && mysqlOps.Cs.GetCluster().Leader != nil {
-			break
-		}
-		time.Sleep(time.Second * 2)
-
-		if i == 2 {
-			return errors.Errorf("get no leader now")
-		}
+	err = retry.Do(
+		func() error {
+			err = mysqlOps.Cs.GetClusterFromKubernetes()
+			if err == nil && mysqlOps.Cs.GetCluster().Leader != nil {
+				return nil
+			}
+			return errors.Errorf("get cluster error or no leader, can't follow now, err:%v", err)
+		},
+		retry.Delay(time.Second*2),
+		retry.Attempts(4),
+		retry.DelayType(retry.BackOffDelay),
+	)
+	if err != nil {
+		return err
 	}
 
 	return mysqlOps.follow(ctx, podName, mysqlOps.Cs.GetCluster().Leader.GetMember().GetName())

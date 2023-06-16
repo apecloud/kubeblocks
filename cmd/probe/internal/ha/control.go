@@ -1,25 +1,27 @@
 package ha
 
 import (
-	"cuelang.org/go/pkg/strconv"
-	"github.com/dapr/components-contrib/bindings"
-	"github.com/dapr/components-contrib/metadata"
-	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"os"
 	"time"
+
+	"cuelang.org/go/pkg/strconv"
+	"github.com/avast/retry-go"
+	"github.com/dapr/components-contrib/bindings"
+	"github.com/dapr/components-contrib/metadata"
+	"github.com/dapr/kit/logger"
+	"golang.org/x/net/context"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
 	"github.com/apecloud/kubeblocks/cmd/probe/util"
-	"github.com/dapr/kit/logger"
-	"golang.org/x/net/context"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
 )
 
 type Ha struct {
@@ -67,6 +69,7 @@ func NewHa() *Ha {
 	if ha.DB == nil {
 		panic("unknown db type")
 	}
+
 	props := map[string]map[string]string{
 		binding.Postgresql: {
 			"url": "user=postgres password=docker host=localhost port=5432 dbname=postgres pool_min_conns=1 pool_max_conns=10",
@@ -76,24 +79,27 @@ func NewHa() *Ha {
 			"maxOpenConns": "5",
 		},
 	}
-
-	_ = ha.DB.Init(bindings.Metadata{
+	err = ha.DB.Init(bindings.Metadata{
 		Base: metadata.Base{Properties: props[ha.dbType]},
 	})
+	if err != nil {
+		panic(err)
+	}
 
-	for i := 0; i < 3; i++ {
-		err = ha.DB.InitDelay()
-		if err == nil {
-			break
-		}
-		time.Sleep(time.Second * 3)
+	err = retry.Do(
+		ha.DB.InitDelay,
+		retry.Attempts(3),
+		retry.Delay(time.Second*2),
+		retry.DelayType(retry.BackOffDelay),
+	)
+	if err != nil {
+		panic(err)
 	}
 
 	return ha
 }
 
 func (h *Ha) Init() {
-	//TODO:重试包装
 	var (
 		isLeader bool
 		sysid    string
@@ -101,18 +107,21 @@ func (h *Ha) Init() {
 		extra    map[string]string
 		err      error
 	)
-	for i := 0; i < 3; i++ {
-		isLeader, err = h.DB.IsLeader(h.ctx)
-		if err == nil {
-			break
-		}
-		time.Sleep(time.Second * 2)
+
+	err = retry.Do(
+		func() error {
+			isLeader, err = h.DB.IsLeader(h.ctx)
+			return err
+		},
+		retry.Attempts(3),
+		retry.Delay(time.Second*2),
+		retry.DelayType(retry.BackOffDelay),
+	)
+	if err != nil {
+		panic(err)
 	}
-	if isLeader {
-		if !h.DB.IsRunning(h.ctx, h.podName) {
-			panic("db is not running")
-		}
-	} else {
+
+	if !isLeader {
 		err = h.cs.Init(false, "", nil, 0, h.podName)
 		if err != nil {
 			panic(err)
@@ -203,76 +212,14 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 	}
 
 	if h.cs.GetCluster().IsLocked() {
-		if !h.hasLock() {
-			h.setLeader(false)
-			_ = h.follow()
-			return
-		}
-		err = h.updateLockWithRetry(3)
-		if err != nil {
-			h.log.Errorf("update lock err,")
-			if isLeader, err := h.DB.IsLeader(h.ctx); isLeader && err == nil {
-				_ = h.DB.Demote(h.ctx, h.podName)
-			}
-		}
-
-		done, err := h.DB.ProcessManualSwitchoverFromLeader(h.ctx, h.podName)
-		if err != nil {
-			h.log.Errorf("process manual switchover failed, err:%v", err)
-		}
-		if done {
-			return
-		}
-
-		err = h.DB.EnforcePrimaryRole(h.ctx, h.podName)
-		return
-	}
-
-	// Process no leader cluster
-	if h.isHealthiest() {
-		h.log.Warnf("cluster has no leader now")
-		err = h.acquireLeaderLock()
-		if err != nil {
-			h.log.Errorf("acquire leader lock err:%v", err)
-			_ = h.follow()
-		}
-
-		if h.cs.GetCluster().Switchover != nil {
-			err = h.cs.DeleteConfigMap(h.cs.GetClusterCompName() + configuration_store.SwitchoverSuffix)
-			if err != nil {
-				return
-			}
-		}
-
-		err = h.DB.EnforcePrimaryRole(h.ctx, h.podName)
+		h.processClusterWithLeader()
 	} else {
-		// Give a time to somebody to take the leader lock
-		time.Sleep(time.Second * 2)
-		_ = h.follow()
+		h.processClusterWithoutLeader()
 	}
 }
 
 func (h *Ha) hasLock() bool {
 	return h.podName == h.cs.GetCluster().Leader.GetMember().GetName()
-}
-
-func (h *Ha) updateLockWithRetry(retryTimes int) error {
-	opTime, err := h.DB.GetOpTime(h.ctx)
-	if err != nil {
-		opTime = 0
-	}
-	extra, err := h.DB.GetExtra(h.ctx)
-	if err != nil {
-		extra = map[string]string{}
-	}
-	for i := 0; i < retryTimes; i++ {
-		err = h.cs.UpdateLeader(h.podName, opTime, extra)
-		if err == nil {
-			return nil
-		}
-	}
-
-	return err
 }
 
 func (h *Ha) setLeader(shouldSet bool) {
@@ -329,4 +276,71 @@ func (h *Ha) follow() error {
 	}
 
 	return h.DB.HandleFollow(h.ctx, h.cs.GetCluster().Leader, h.podName)
+}
+
+func (h *Ha) processClusterWithLeader() {
+	if !h.hasLock() {
+		h.setLeader(false)
+		err := h.follow()
+		if err != nil {
+			h.log.Errorf("failed to follow with leader but no lock, err%v", err)
+		}
+		return
+	}
+
+	var opTime int64
+	var extra map[string]string
+	err := retry.Do(
+		func() error {
+			opTime, _ = h.DB.GetOpTime(h.ctx)
+			extra, _ = h.DB.GetExtra(h.ctx)
+
+			return h.cs.UpdateLeader(h.podName, opTime, extra)
+		},
+		retry.Attempts(3),
+		retry.Delay(time.Second*2),
+		retry.DelayType(retry.BackOffDelay),
+	)
+	if err != nil {
+		h.log.Warnf("update lock err,")
+		if isLeader, err := h.DB.IsLeader(h.ctx); isLeader && err == nil {
+			_ = h.DB.Demote(h.ctx, h.podName)
+		}
+	}
+
+	done, err := h.DB.ProcessManualSwitchoverFromLeader(h.ctx, h.podName)
+	if err != nil {
+		h.log.Errorf("process manual switchover failed, err:%v", err)
+	}
+	if done {
+		return
+	}
+
+	err = h.DB.EnforcePrimaryRole(h.ctx, h.podName)
+	return
+}
+
+func (h *Ha) processClusterWithoutLeader() {
+	h.log.Warnf("cluster has no leader now")
+
+	if h.isHealthiest() {
+		err := h.acquireLeaderLock()
+		if err != nil {
+			h.log.Errorf("acquire leader lock err:%v", err)
+			_ = h.follow()
+		}
+
+		if h.cs.GetCluster().Switchover != nil {
+			err = h.cs.DeleteConfigMap(h.cs.GetClusterCompName() + configuration_store.SwitchoverSuffix)
+			if err != nil {
+				return
+			}
+		}
+
+		err = h.DB.EnforcePrimaryRole(h.ctx, h.podName)
+	} else {
+		// Give a time to somebody to take the leader lock
+		time.Sleep(time.Second * 2)
+		_ = h.follow()
+	}
 }

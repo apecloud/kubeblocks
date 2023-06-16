@@ -4,17 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/spf13/viper"
-	"k8s.io/client-go/dynamic"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -23,6 +22,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/util"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
 type ConfigurationStore struct {
@@ -421,7 +421,6 @@ func (cs *ConfigurationStore) DeleteLeader(opTime int64) error {
 
 func (cs *ConfigurationStore) AttemptToAcquireLeaderLock(podName string) error {
 	now := time.Now().Unix()
-	//TODO:only 4 para
 	annotation := map[string]string{
 		LEADER:      podName,
 		TTL:         strconv.FormatInt(cs.cluster.Config.data.ttl, 10),

@@ -139,7 +139,7 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 	$(MAKE) client-gen
 
 .PHONY: client-gen
-client-gen:  ## Generate CRD client code.
+client-gen: module  ## Generate CRD client code.
 	@./hack/client-gen.sh
 
 .PHONY: manager-go-generate

@@ -26,29 +26,30 @@ import (
 
 var _ = Describe("cluster plan utils test", func() {
 	Context("test mergeServiceAnnotations", func() {
-		It("original and target annotations are nil", func() {
-			mergeServiceAnnotations(nil, nil)
-		})
 		It("target annotations is nil", func() {
 			originalAnnotations := map[string]string{"k1": "v1"}
-			mergeServiceAnnotations(originalAnnotations, nil)
+			var targetAnnotations map[string]string
+			expectAnnotations := map[string]string{"k1": "v1"}
+			mergeServiceAnnotations(originalAnnotations, &targetAnnotations)
+			Expect(targetAnnotations).To(Equal(expectAnnotations))
 		})
 		It("original annotations is nil", func() {
 			targetAnnotations := map[string]string{"k1": "v1"}
+			expectAnnotations := map[string]string{"k1": "v1"}
 			mergeServiceAnnotations(nil, &targetAnnotations)
-			Expect(targetAnnotations).To(Equal(targetAnnotations))
+			Expect(targetAnnotations).To(Equal(expectAnnotations))
 		})
-		It("original annotations have prometheus annotations which should be removed", func() {
-			originalAnnotations := map[string]string{"k1": "v1", "prometheus.io/path": "/metrics"}
-			targetAnnotations := map[string]string{"k2": "v2"}
+		It("target annotations have prometheus annotations which should be removed", func() {
+			originalAnnotations := map[string]string{"k2": "v2"}
+			targetAnnotations := map[string]string{"k1": "v1", "prometheus.io/path": "/metrics"}
 			expectAnnotations := map[string]string{"k1": "v1", "k2": "v2"}
 			mergeServiceAnnotations(originalAnnotations, &targetAnnotations)
 			Expect(targetAnnotations).To(Equal(expectAnnotations))
 		})
-		It("target annotations should override original annotations", func() {
+		It("original and target annotations both have prometheus annotations", func() {
 			originalAnnotations := map[string]string{"k1": "v1", "prometheus.io/path": "/metrics"}
-			targetAnnotations := map[string]string{"k1": "v11"}
-			expectAnnotations := map[string]string{"k1": "v11"}
+			targetAnnotations := map[string]string{"k1": "v11", "prometheus.io/path": "/metrics2"}
+			expectAnnotations := map[string]string{"k1": "v11", "prometheus.io/path": "/metrics"}
 			mergeServiceAnnotations(originalAnnotations, &targetAnnotations)
 			Expect(targetAnnotations).To(Equal(expectAnnotations))
 		})

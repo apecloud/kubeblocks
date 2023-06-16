@@ -21,6 +21,8 @@ package lifecycle
 
 import (
 	"strings"
+
+	"golang.org/x/exp/maps"
 )
 
 // mergeAnnotations keeps the original annotations.
@@ -55,11 +57,25 @@ func mergeAnnotations(originalAnnotations map[string]string, targetAnnotations *
 	}
 }
 
-// mergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.
+// mergeServiceAnnotations keeps the target annotations except prometheus scrape annotations.
 // if annotations exist and are replaced, the Service will be updated.
+// @targetAnnotations not support nil
 func mergeServiceAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
-	mergeAnnotations(originalAnnotations, targetAnnotations,
-		func(k, v string) bool {
+	if targetAnnotations == nil || len(originalAnnotations) == 0 {
+		return
+	}
+
+	if *targetAnnotations == nil {
+		*targetAnnotations = make(map[string]string)
+	} else {
+		maps.DeleteFunc(*targetAnnotations, func(k, v string) bool {
 			return strings.HasPrefix(k, "prometheus.io")
 		})
+	}
+
+	for k, v := range originalAnnotations {
+		if _, ok := (*targetAnnotations)[k]; !ok {
+			(*targetAnnotations)[k] = v
+		}
+	}
 }

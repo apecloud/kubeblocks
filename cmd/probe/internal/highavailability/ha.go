@@ -2,6 +2,7 @@ package highavailability
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
@@ -15,13 +16,18 @@ type Ha struct {
 }
 
 func NewHa() *Ha {
-	dcs.NewKubernetesStore()
-	ha := &Ha{}
+
+	dcs := dcs.NewKubernetesStore()
+	ha := &Ha{
+		ctx: context.Background(),
+		dcs: dcs,
+	}
 	return ha
 }
 
-func (ha *Ha) runCycle() {
-	//cluster := ha.dcs.GetCluster()
+func (ha *Ha) RunCycle() {
+	cluster, _ := ha.dcs.GetCluster()
+	fmt.Printf("----cluster: %v\n", cluster)
 	//switch {
 	//case !dbManger.IsRunning():
 	//	logger.Infof("DB Service is not running,  wait for sqlctl to start it")
@@ -76,7 +82,7 @@ func (ha *Ha) runCycle() {
 
 func (ha *Ha) Start() {
 	for true {
-		ha.runCycle()
+		ha.RunCycle()
 		time.Sleep(1 * time.Second)
 	}
 }

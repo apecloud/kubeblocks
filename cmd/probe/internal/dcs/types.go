@@ -1,11 +1,12 @@
 package dcs
 
 type Cluster struct {
-	SysID  string
-	Config *HaConfig
+	ClusterCompName string
+	Replicas        int32
+	Config          *HaConfig
 	//Leader     *Leader
 	OpTime     int64
-	Members    []*Member
+	Members    []Member
 	Switchover *Switchover
 	Extra      map[string]string
 }
@@ -22,7 +23,7 @@ func (c *Cluster) HasMember(memberName string) bool {
 func (c *Cluster) GetMemberWithName(name string) *Member {
 	for _, m := range c.Members {
 		if m.name == name {
-			return m
+			return &m
 		}
 	}
 
@@ -61,10 +62,12 @@ func (c *HaConfig) GetMaxLagOnSwitchover() int64 {
 }
 
 type Member struct {
-	index string
-	name  string
-	role  string
-	url   string
+	index          string
+	name           string
+	role           string
+	PodIP          string
+	DBPort         string
+	SQLChannelPort string
 }
 
 func (m *Member) GetName() string {
@@ -76,7 +79,6 @@ func newMember(index string, name string, role string, url string) *Member {
 		index: index,
 		name:  name,
 		role:  role,
-		url:   url,
 	}
 }
 

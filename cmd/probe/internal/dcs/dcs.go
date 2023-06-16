@@ -2,7 +2,7 @@ package dcs
 
 type DCS interface {
 	Initialize()
-	GetCluser() Cluster
+	GetCluster() (*Cluster, error)
 	ResetCluser()
 	DeleteCluser()
 	AttempAcquireLock()

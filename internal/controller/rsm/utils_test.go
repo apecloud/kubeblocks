@@ -20,12 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
 var _ = Describe("utils test", func() {
@@ -39,6 +46,8 @@ var _ = Describe("utils test", func() {
 		rsm         *workloads.ReplicatedStateMachine
 		priorityMap map[string]int
 	)
+
+	ctx := context.Background()
 
 	BeforeEach(func() {
 		roles = []workloads.ReplicaRole{
@@ -149,22 +158,22 @@ var _ = Describe("utils test", func() {
 				*builder.NewPodBuilder(namespace, "pod-2").AddLabels(roleLabelKey, "follower").GetObject(),
 			}
 			readyCondition := corev1.PodCondition{
-				Type: corev1.PodReady,
+				Type:   corev1.PodReady,
 				Status: corev1.ConditionTrue,
 			}
 			pods[0].Status.Conditions = append(pods[0].Status.Conditions, readyCondition)
 			pods[1].Status.Conditions = append(pods[1].Status.Conditions, readyCondition)
 			oldMembersStatus := []workloads.MemberStatus{
 				{
-					PodName: "pod-0",
+					PodName:     "pod-0",
 					ReplicaRole: workloads.ReplicaRole{Name: "leader"},
 				},
 				{
-					PodName: "pod-1",
+					PodName:     "pod-1",
 					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
 				},
 				{
-					PodName: "pod-2",
+					PodName:     "pod-2",
 					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
 				},
 			}
@@ -187,6 +196,166 @@ var _ = Describe("utils test", func() {
 			pod := builder.NewPodBuilder(namespace, name).AddLabels(roleLabelKey, "LEADER").GetObject()
 			role := getRoleName(*pod)
 			Expect(role).Should(Equal("leader"))
+		})
+	})
+
+	Context("getPodsOfStatefulSet function", func() {
+		It("should work well", func() {
+			sts := builder.NewStatefulSetBuilder(namespace, name).
+				AddLabels(model.KBManagedByKey, kindReplicatedStateMachine).
+				AddLabels(model.AppInstanceLabelKey, name).
+				GetObject()
+			pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
+				AddLabels(model.KBManagedByKey, kindReplicatedStateMachine).
+				AddLabels(model.AppInstanceLabelKey, name).
+				GetObject()
+			k8sMock.EXPECT().
+				List(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, podList *corev1.PodList, _ ...client.ListOption) error {
+					Expect(podList).ShouldNot(BeNil())
+					podList.Items = []corev1.Pod{*pod}
+					return nil
+				}).Times(1)
+
+			pods, err := getPodsOfStatefulSet(ctx, k8sMock, sts)
+			Expect(err).Should(BeNil())
+			Expect(len(pods)).Should(Equal(1))
+			Expect(pods[0].Namespace).Should(Equal(pod.Namespace))
+			Expect(pods[0].Name).Should(Equal(pod.Name))
+		})
+	})
+
+	Context("getHeadlessSvcName function", func() {
+		It("should work well", func() {
+			Expect(getHeadlessSvcName(*rsm)).Should(Equal("bar-headless"))
+		})
+	})
+
+	Context("findSvcPort function", func() {
+		It("should work well", func() {
+			By("set port name")
+			rsm.Spec.Service.Ports = []corev1.ServicePort{
+				{
+					Name:       "svc-port",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       12345,
+					TargetPort: intstr.FromString("my-service"),
+				},
+			}
+			containerPort := int32(54321)
+			container := corev1.Container{
+				Name: name,
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          "my-service",
+						Protocol:      corev1.ProtocolTCP,
+						ContainerPort: containerPort,
+					},
+				},
+			}
+			pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
+				SetContainers([]corev1.Container{container}).
+				GetObject()
+			rsm.Spec.Template = corev1.PodTemplateSpec{
+				ObjectMeta: pod.ObjectMeta,
+				Spec:       pod.Spec,
+			}
+			Expect(findSvcPort(*rsm)).Should(BeEquivalentTo(containerPort))
+
+			By("set port number")
+			rsm.Spec.Service.Ports = []corev1.ServicePort{
+				{
+					Name:       "svc-port",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       12345,
+					TargetPort: intstr.FromInt(int(containerPort)),
+				},
+			}
+			Expect(findSvcPort(*rsm)).Should(BeEquivalentTo(containerPort))
+
+			By("set no matched port")
+			rsm.Spec.Service.Ports = []corev1.ServicePort{
+				{
+					Name:       "svc-port",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       12345,
+					TargetPort: intstr.FromInt(int(containerPort - 1)),
+				},
+			}
+			Expect(findSvcPort(*rsm)).Should(BeZero())
+		})
+	})
+
+	Context("getPodName function", func() {
+		It("should work well", func() {
+			Expect(getPodName(name, 1)).Should(Equal("bar-1"))
+		})
+	})
+
+	Context("getActionName function", func() {
+		It("should work well", func() {
+			Expect(getActionName(name, 1, 2, jobTypeSwitchover)).Should(Equal("bar-1-2-switchover"))
+		})
+	})
+
+	Context("getLeaderPodName function", func() {
+		It("should work well", func() {
+			By("set leader")
+			membersStatus := []workloads.MemberStatus{
+				{
+					PodName:     "pod-0",
+					ReplicaRole: workloads.ReplicaRole{Name: "leader", IsLeader: true},
+				},
+				{
+					PodName:     "pod-1",
+					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+				},
+				{
+					PodName:     "pod-2",
+					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
+				},
+			}
+			Expect(getLeaderPodName(membersStatus)).Should(Equal(membersStatus[0].PodName))
+
+			By("set no leader")
+			membersStatus[0].IsLeader = false
+			Expect(getLeaderPodName(membersStatus)).Should(BeZero())
+		})
+	})
+
+	Context("getPodOrdinal function", func() {
+		It("should work well", func() {
+			ordinal, err := getPodOrdinal("pod-5")
+			Expect(err).Should(BeNil())
+			Expect(ordinal).Should(Equal(5))
+
+			ordinal, err = getPodOrdinal("foo-bar")
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("wrong pod name"))
+		})
+	})
+
+	Context("findActionImage function", func() {
+		It("should work well", func() {
+			Expect(findActionImage(&workloads.MembershipReconfiguration{}, jobTypePromote)).Should(Equal(defaultActionImage))
+		})
+	})
+
+	Context("getActionCommand function", func() {
+		It("should work well", func() {
+			reconfiguration := &workloads.MembershipReconfiguration{
+				SwitchoverAction:  &workloads.Action{Command: []string{"switchover"}},
+				MemberJoinAction:  &workloads.Action{Command: []string{"member-join"}},
+				MemberLeaveAction: &workloads.Action{Command: []string{"member-leave"}},
+				LogSyncAction:     &workloads.Action{Command: []string{"log-sync"}},
+				PromoteAction:     &workloads.Action{Command: []string{"promote"}},
+			}
+
+			Expect(getActionCommand(reconfiguration, jobTypeSwitchover)).Should(Equal(reconfiguration.SwitchoverAction.Command))
+			Expect(getActionCommand(reconfiguration, jobTypeMemberJoinNotifying)).Should(Equal(reconfiguration.MemberJoinAction.Command))
+			Expect(getActionCommand(reconfiguration, jobTypeMemberLeaveNotifying)).Should(Equal(reconfiguration.MemberLeaveAction.Command))
+			Expect(getActionCommand(reconfiguration, jobTypeLogSync)).Should(Equal(reconfiguration.LogSyncAction.Command))
+			Expect(getActionCommand(reconfiguration, jobTypePromote)).Should(Equal(reconfiguration.PromoteAction.Command))
 		})
 	})
 })

@@ -45,6 +45,7 @@ zz_generated.*
 .vscode/
 .idea/
 .history/
+.run/
 .vimrc
 *.swp
 *.swo

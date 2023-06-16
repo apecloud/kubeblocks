@@ -904,7 +904,7 @@ func (pgOps *PostgresOperations) Demote(ctx context.Context, podName string) err
 		return err
 	}
 
-	return pgOps.Follow(ctx, podName, true, pgOps.Cs.GetCluster().Leader.GetMember().GetName())
+	return pgOps.follow(ctx, podName, true, pgOps.Cs.GetCluster().Leader.GetMember().GetName())
 }
 
 func (pgOps *PostgresOperations) GetOpTime(ctx context.Context) (int64, error) {
@@ -923,11 +923,6 @@ func (pgOps *PostgresOperations) IsRunning(ctx context.Context, podName string) 
 }
 
 func (pgOps *PostgresOperations) IsHealthiest(ctx context.Context, podName string) bool {
-	err := pgOps.Cs.GetClusterFromKubernetes()
-	if err != nil {
-		pgOps.Logger.Errorf("get cluster from k8s failed, err:%v", err)
-	}
-
 	replicationMode, err := pgOps.getReplicationMode(ctx)
 	if err != nil {
 		pgOps.Logger.Errorf("get db replication mode err:%v", err)
@@ -1002,12 +997,13 @@ func (pgOps *PostgresOperations) HandleFollow(ctx context.Context, leader *confi
 		pgOps.Logger.Errorf("handle rewind err:%v", err)
 	}
 
-	needChange, needRestart := pgOps.checkRecoveryConf(ctx, podName, leader.GetMember().GetName())
+	leaderName := leader.GetMember().GetName()
+	needChange, needRestart := pgOps.checkRecoveryConf(ctx, podName, leaderName)
 	if needChange {
-		return pgOps.Follow(ctx, podName, needRestart, leader.GetMember().GetName())
+		return pgOps.follow(ctx, podName, needRestart, leaderName)
 	}
 
-	pgOps.Logger.Infof("no action coz i am still follow the leader")
+	pgOps.Logger.Infof("no action coz i still follow the leader:%s", leaderName)
 	return nil
 }
 
@@ -1041,7 +1037,7 @@ func (pgOps *PostgresOperations) readRecoveryParams(ctx context.Context) map[str
 		pgOps.Logger.Errorf("get primary conn info failed, err:%v", err)
 		return nil
 	}
-	result, err := ParseQuery(string(resp))
+	result, err := ParseSingleQuery(string(resp))
 	if err != nil {
 		pgOps.Logger.Errorf("parse query failed, err:%v", err)
 		return nil
@@ -1060,7 +1056,12 @@ func (pgOps *PostgresOperations) handleRewind(ctx context.Context, leader *confi
 	return pgOps.executeRewind()
 }
 
-func (pgOps *PostgresOperations) Follow(ctx context.Context, podName string, needRestart bool, leader string) error {
+func (pgOps *PostgresOperations) follow(ctx context.Context, podName string, needRestart bool, leader string) error {
+	if podName == leader {
+		pgOps.Logger.Infof("i get the leader key, don't need to follow")
+		return nil
+	}
+
 	primaryInfo := "host="
 	primaryInfo += leader + "." + pgOps.Cs.GetClusterCompName() + "-headless"
 	primaryInfo += " port=" + os.Getenv("KB_SERVICE_PORT")
@@ -1311,12 +1312,6 @@ func (pgOps *PostgresOperations) setSynchronousStandbyNames() error {
 }
 
 func (pgOps *PostgresOperations) ProcessManualSwitchoverFromLeader(ctx context.Context, podName string) (bool, error) {
-	err := pgOps.Cs.GetClusterFromKubernetes()
-	if err != nil {
-		pgOps.Logger.Errorf("get cluster from k8s failed, err:%v", err)
-		return false, err
-	}
-
 	switchover := pgOps.Cs.GetCluster().Switchover
 	if switchover == nil {
 		return false, nil
@@ -1368,12 +1363,6 @@ func (pgOps *PostgresOperations) isFailoverPossible() bool {
 }
 
 func (pgOps *PostgresOperations) ProcessManualSwitchoverFromNoLeader(ctx context.Context, podName string) bool {
-	err := pgOps.Cs.GetClusterFromKubernetes()
-	if err != nil {
-		pgOps.Logger.Errorf("get cluster from k8s err:%v", err)
-		return false
-	}
-
 	replicationMode, err := pgOps.getReplicationMode(ctx)
 	if err != nil {
 		pgOps.Logger.Errorf("get replication err:%v", err)

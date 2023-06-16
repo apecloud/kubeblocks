@@ -269,18 +269,27 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 */
 
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
-	sql := "show slave hosts"
-	data, err := mysqlOps.query(ctx, sql)
+	getRoleSql := "show slave hosts"
+	data, err := mysqlOps.query(ctx, getRoleSql)
 	if err != nil {
-		mysqlOps.Logger.Infof("error executing %s: %v", sql, err)
-		return "", errors.Wrapf(err, "error executing %s", sql)
+		mysqlOps.Logger.Infof("error executing %s: %v", getRoleSql, err)
+		return "", errors.Wrapf(err, "error executing %s", getRoleSql)
 	}
-
-	if string(data) != "null" {
-		return PRIMARY, nil
-	} else {
+	if string(data) == "null" {
 		return SECONDARY, nil
 	}
+
+	getReadOnlySql := `show global variables like 'read_only';`
+	data, err = mysqlOps.query(ctx, getReadOnlySql)
+	result, err := ParseSingleQuery(string(data))
+	if err != nil {
+		mysqlOps.Logger.Errorf("parse query failed, err%v", err)
+	}
+
+	if result["Value"].(string) != "OFF" {
+		return SECONDARY, nil
+	}
+	return PRIMARY, nil
 }
 
 func (mysqlOps *MysqlOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
@@ -824,7 +833,7 @@ func (mysqlOps *MysqlOperations) GetOpTime(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 
-	result, err := ParseQuery(string(data))
+	result, err := ParseSingleQuery(string(data))
 	if err != nil {
 		return 0, err
 	}
@@ -843,11 +852,6 @@ func (mysqlOps *MysqlOperations) IsRunning(ctx context.Context, podName string) 
 }
 
 func (mysqlOps *MysqlOperations) IsHealthiest(ctx context.Context, podName string) bool {
-	err := mysqlOps.Cs.GetClusterFromKubernetes()
-	if err != nil {
-		mysqlOps.Logger.Errorf("get cluster from k8s failed, err:%v", err)
-	}
-
 	//这部分引擎相关可以扩充
 	lastLsn, _ := mysqlOps.GetOpTime(ctx)
 	if mysqlOps.isLagging(lastLsn) {
@@ -879,12 +883,13 @@ func (mysqlOps *MysqlOperations) isLagging(lastLsn int64) bool {
 }
 
 func (mysqlOps *MysqlOperations) HandleFollow(ctx context.Context, leader *configuration_store.Leader, podName string) error {
-	needChange := mysqlOps.checkRecoveryConf(ctx, leader.GetMember().GetName())
+	leaderName := leader.GetMember().GetName()
+	needChange := mysqlOps.checkRecoveryConf(ctx, leaderName)
 	if needChange {
-		return mysqlOps.follow(ctx, podName, leader.GetMember().GetName())
+		return mysqlOps.follow(ctx, podName, leaderName)
 	}
 
-	mysqlOps.Logger.Infof("no action coz i am still follow the leader")
+	mysqlOps.Logger.Infof("no action coz i still follow the leader:%s", leaderName)
 	return nil
 }
 
@@ -896,7 +901,7 @@ func (mysqlOps *MysqlOperations) checkRecoveryConf(ctx context.Context, leader s
 		return true
 	}
 
-	result, err := ParseQuery(string(data))
+	result, err := ParseSingleQuery(string(data))
 	if err != nil {
 		mysqlOps.Logger.Errorf("parse query err:%v", err)
 		return true
@@ -910,6 +915,11 @@ func (mysqlOps *MysqlOperations) checkRecoveryConf(ctx context.Context, leader s
 }
 
 func (mysqlOps *MysqlOperations) follow(ctx context.Context, podName string, leader string) error {
+	if podName == leader {
+		mysqlOps.Logger.Infof("i get the leader key, don't need to follow")
+		return nil
+	}
+
 	stopSlave := `stop slave;`
 	changeMaster := fmt.Sprintf(`change master to master_host='%s.%s-headless',master_user='%s',master_password='%s',master_port=%s,master_auto_position=1;`,
 		leader, mysqlOps.Cs.GetClusterCompName(), os.Getenv("KB_SERVICE_USER"), os.Getenv("KB_SERVICE_PASSWORD"), os.Getenv("KB_SERVICE_PORT"))
@@ -932,12 +942,6 @@ func (mysqlOps *MysqlOperations) EnforcePrimaryRole(ctx context.Context, podName
 }
 
 func (mysqlOps *MysqlOperations) ProcessManualSwitchoverFromLeader(ctx context.Context, podName string) (bool, error) {
-	err := mysqlOps.Cs.GetClusterFromKubernetes()
-	if err != nil {
-		mysqlOps.Logger.Errorf("get cluster from k8s failed, err:%v", err)
-		return false, err
-	}
-
 	switchover := mysqlOps.Cs.GetCluster().Switchover
 	if switchover == nil {
 		return false, nil
@@ -972,12 +976,6 @@ func (mysqlOps *MysqlOperations) isFailoverPossible(members []string) bool {
 }
 
 func (mysqlOps *MysqlOperations) ProcessManualSwitchoverFromNoLeader(ctx context.Context, podName string) bool {
-	err := mysqlOps.Cs.GetClusterFromKubernetes()
-	if err != nil {
-		mysqlOps.Logger.Errorf("get cluster from k8s err:%v", err)
-		return false
-	}
-
 	switchover := mysqlOps.Cs.GetCluster().Switchover
 	if switchover != nil && switchover.GetCandidate() != "" {
 		if switchover.GetCandidate() == podName {

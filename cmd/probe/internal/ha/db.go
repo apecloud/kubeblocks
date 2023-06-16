@@ -22,6 +22,7 @@ type DB interface {
 	InitDelay() error
 	Init(metadata bindings.Metadata) error
 	Start(ctx context.Context, podName string) error
+	RefreshCluster() error
 
 	DbConn
 	DbTool

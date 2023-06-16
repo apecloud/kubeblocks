@@ -197,6 +197,11 @@ func (h *Ha) clusterControl(oldObj, newObj interface{}) {
 		h.log.Errorf("cluster control get cluster from k8s err:%v", err)
 		return
 	}
+	err = h.DB.RefreshCluster()
+	if err != nil {
+		h.log.Errorf("Refresh cluster failed, err:%v", err)
+		return
+	}
 
 	if !h.DB.IsRunning(h.ctx, h.podName) {
 		h.log.Warnf("in control loop, db is not running now")

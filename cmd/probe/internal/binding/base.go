@@ -385,3 +385,7 @@ func (ops *BaseOperations) ManualSwitchover(primary, candidate string) error {
 
 	return nil
 }
+
+func (ops *BaseOperations) RefreshCluster() error {
+	return ops.Cs.GetClusterFromKubernetes()
+}

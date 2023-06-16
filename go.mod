@@ -92,6 +92,7 @@ require (
 	k8s.io/apimachinery v0.26.1
 	k8s.io/cli-runtime v0.26.1
 	k8s.io/client-go v0.26.1
+	k8s.io/code-generator v0.26.1
 	k8s.io/component-base v0.26.1
 	k8s.io/cri-api v0.25.0
 	k8s.io/gengo v0.0.0-20220913193501-391367153a38

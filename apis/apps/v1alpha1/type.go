@@ -211,6 +211,7 @@ const (
 	VolumeExpansionType   OpsType = "VolumeExpansion"
 	UpgradeType           OpsType = "Upgrade"
 	ReconfiguringType     OpsType = "Reconfiguring"
+	SwitchoverType        OpsType = "Switchover"
 	RestartType           OpsType = "Restart" // RestartType the restart operation is a special case of the rolling update operation.
 	StopType              OpsType = "Stop"    // StopType the stop operation will delete all pods in a cluster concurrently.
 	StartType             OpsType = "Start"   // StartType the start operation will start the pods which is deleted in stop operation.

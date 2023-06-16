@@ -19,6 +19,13 @@ spec:
       volumeTypes:
         - name: data
           type: data
+      configSpecs:
+        - name: server-config
+          templateRef: {{ template "prometheus.server.fullname" . }}-config
+          constraintRef: {{ template "prometheus.server.fullname" . }}-constraints
+          namespace: {{ .Release.Namespace }}
+          volumeName: config-volume
+          defaultMode: 0777
       podSpec:
         {{- if .Values.server.securityContext }}
         securityContext:
@@ -87,9 +94,6 @@ spec:
         dnsPolicy: ClusterFirst
         terminationGracePeriodSeconds: 30
         volumes:
-          - name: config-volume
-            configMap:
-              name: {{ template "prometheus.server.fullname" . }}-config
           - name: rule-volume
             configMap:
               name: {{ template "prometheus.server.fullname" . }}-rule

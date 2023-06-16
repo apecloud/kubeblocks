@@ -80,7 +80,7 @@ func (o *InstallOptions) validateCompareVersion(args []string, versionA, version
 			return err
 		}
 		if v.KubeBlocks == "" {
-			return fmt.Errorf("KubeBlocks is not exists, please install it first")
+			return fmt.Errorf("KubeBlocks does not exist, please install it first")
 		}
 		if args[0] == v.KubeBlocks {
 			return fmt.Errorf("input version %s is same with the current version, no need to compare", args[0])
@@ -121,7 +121,7 @@ func (o *InstallOptions) compare(args []string) error {
 	return o.showDiff(versionA, versionB)
 }
 
-// buildTemplate build `helm template` InstallOpts for KubeBlocks
+// buildTemplate builds `helm template` InstallOpts for KubeBlocks
 func (o *InstallOptions) buildTemplate(version string) *helm.InstallOpts {
 	ops := helm.GetTemplateInstallOps(types.KubeBlocksChartName, fmt.Sprintf("%s/%s", types.KubeBlocksChartName, types.KubeBlocksChartName), version, "default")
 	ops.Wait = o.Wait

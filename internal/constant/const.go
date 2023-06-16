@@ -97,7 +97,6 @@ const (
 	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
 	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
 	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
-	CMConfigurationNewLabelKey             = "config.kubeblocks.io/new-config" // CMConfigurationNewLabelKey indicates whether this configmap is rendered by first time
 	ConsensusSetAccessModeLabelKey         = "cs.apps.kubeblocks.io/access-mode"
 	BackupTypeLabelKeyKey                  = "dataprotection.kubeblocks.io/backup-type"
 	DataProtectionLabelBackupNameKey       = "dataprotection.kubeblocks.io/backup-name"
@@ -130,6 +129,7 @@ const (
 	LastAppliedOpsCRAnnotationKey               = "config.kubeblocks.io/last-applied-ops-name"
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
+	CMConfigurationNewAnnotationKey             = "config.kubeblocks.io/new-config" // CMConfigurationNewAnnotationKey indicates whether this configmap is rendered by first time
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
 	KubeBlocksGenerationKey                     = "kubeblocks.io/generation"
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"

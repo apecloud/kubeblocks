@@ -136,11 +136,11 @@ preflight-manifests: generate ## Generate external Preflight API
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/...;./externalapis/..."
-	$(MAKE) client-gen
+	$(MAKE) client-sdk-gen
 
-.PHONY: client-gen
-client-gen:  ## Generate CRD client code.
-	@./hack/client-gen.sh
+.PHONY: client-sdk-gen
+client-sdk-gen: ## Generate CRD client code.
+	@./hack/client-sdk-gen.sh
 
 .PHONY: manager-go-generate
 manager-go-generate: ## Run go generate against lifecycle manager code.

@@ -3188,7 +3188,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "CAdvisor Exporter",
+  "title": "[Deprecated] CAdvisor Exporter",
   "uid": "cadvisor",
   "version": 1,
   "weekStart": ""

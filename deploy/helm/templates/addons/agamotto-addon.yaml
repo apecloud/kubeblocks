@@ -4,7 +4,7 @@ metadata:
   name: agamotto
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-    "kubeblocks.io/provider": community
+    "kubeblocks.io/provider": apecloud
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep

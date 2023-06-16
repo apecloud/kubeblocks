@@ -26,7 +26,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 11323,
   "graphTooltip": 0,
-  "id": 25,
+  "id": 12,
   "links": [
     {
       "asDropdown": false,
@@ -2127,8 +2127,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2239,8 +2238,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2351,8 +2349,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2463,8 +2460,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2575,8 +2571,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2687,8 +2682,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2813,8 +2807,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2923,8 +2916,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3033,8 +3025,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3143,8 +3134,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3253,8 +3243,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3363,8 +3352,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3473,8 +3461,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3597,8 +3584,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3707,8 +3693,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3817,8 +3802,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -3941,8 +3925,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -4051,8 +4034,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -4161,8 +4143,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -4271,8 +4252,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -4381,8 +4361,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -4522,7 +4501,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 148
+            "y": 36
           },
           "id": 423,
           "links": [],
@@ -4651,7 +4630,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 148
+            "y": 36
           },
           "id": 487,
           "links": [],
@@ -4763,8 +4742,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -4780,7 +4758,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 156
+            "y": 44
           },
           "id": 410,
           "links": [],
@@ -4892,8 +4870,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -4909,7 +4886,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 156
+            "y": 44
           },
           "id": 415,
           "links": [],
@@ -5021,8 +4998,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -5038,7 +5014,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 164
+            "y": 52
           },
           "id": 403,
           "links": [],
@@ -5257,7 +5233,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 173
+            "y": 37
           },
           "id": 499,
           "links": [],
@@ -5367,7 +5343,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 173
+            "y": 37
           },
           "id": 498,
           "links": [],
@@ -5460,8 +5436,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -5477,7 +5452,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 181
+            "y": 45
           },
           "id": 501,
           "links": [],
@@ -5570,8 +5545,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -5612,7 +5586,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 181
+            "y": 45
           },
           "id": 500,
           "links": [],
@@ -5724,8 +5698,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -5741,7 +5714,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 189
+            "y": 53
           },
           "id": 497,
           "links": [],
@@ -5865,7 +5838,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 198
+            "y": 38
           },
           "id": 385,
           "links": [],
@@ -5975,7 +5948,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 198
+            "y": 38
           },
           "id": 505,
           "links": [],
@@ -6085,7 +6058,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 206
+            "y": 46
           },
           "id": 506,
           "links": [],
@@ -6195,7 +6168,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 206
+            "y": 46
           },
           "id": 507,
           "links": [],
@@ -6305,7 +6278,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 214
+            "y": 54
           },
           "id": 508,
           "links": [],
@@ -6434,7 +6407,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 214
+            "y": 54
           },
           "id": 509,
           "links": [],
@@ -6580,7 +6553,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 223
+            "y": 63
           },
           "id": 386,
           "links": [],
@@ -6766,7 +6739,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 223
+            "y": 63
           },
           "id": 504,
           "links": [],
@@ -6876,7 +6849,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 231
+            "y": 71
           },
           "id": 384,
           "links": [],
@@ -7008,7 +6981,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 240
+            "y": 64
           },
           "id": 488,
           "links": [],
@@ -7118,7 +7091,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 240
+            "y": 64
           },
           "id": 409,
           "links": [],
@@ -7228,7 +7201,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 248
+            "y": 72
           },
           "id": 401,
           "links": [],
@@ -7338,7 +7311,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 248
+            "y": 72
           },
           "id": 402,
           "links": [],
@@ -7462,7 +7435,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 241
+            "y": 65
           },
           "id": 418,
           "links": [],
@@ -7586,7 +7559,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 266
+            "y": 66
           },
           "id": 486,
           "links": [],
@@ -7691,7 +7664,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 266
+            "y": 66
           },
           "id": 484,
           "links": [],
@@ -7796,7 +7769,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 274
+            "y": 74
           },
           "id": 483,
           "links": [],
@@ -7898,7 +7871,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 274
+            "y": 74
           },
           "id": 463,
           "options": {
@@ -7995,7 +7968,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 282
+            "y": 82
           },
           "id": 485,
           "links": [],
@@ -8210,9 +8183,9 @@
       },
       {
         "current": {
-          "selected": false,
-          "text": "agamotto",
-          "value": "agamotto"
+          "selected": true,
+          "text": "kubeblocks-service",
+          "value": "kubeblocks-service"
         },
         "hide": 0,
         "includeAll": false,
@@ -8222,11 +8195,16 @@
         "options": [
           {
             "selected": true,
+            "text": "kubeblocks-service",
+            "value": "kubeblocks-service"
+          },
+          {
+            "selected": false,
             "text": "agamotto",
             "value": "agamotto"
           }
         ],
-        "query": "agamotto",
+        "query": "kubeblocks-service,agamotto",
         "queryValue": "",
         "skipUrlSync": false,
         "type": "custom"

@@ -12,7 +12,3 @@ type DCS interface {
 	SetSwitchover()
 	AddThisMember()
 }
-
-type Cluster interface {
-	GetLeader()
-}

@@ -31,6 +31,7 @@ import (
 	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+	"github.com/apecloud/kubeblocks/version"
 )
 
 var _ = Describe("playground", func() {
@@ -55,11 +56,23 @@ var _ = Describe("playground", func() {
 			IOStreams:      streams,
 			cloudProvider:  defaultCloudProvider,
 			helmCfg:        helm.NewConfig("", testKubeConfigPath, "", false),
+			dockerVersion:  version.MinimumDockerVersion,
 		}
 		Expect(o.validate()).Should(Succeed())
 		Expect(o.run()).Should(HaveOccurred())
 		Expect(o.installKubeBlocks("test")).Should(HaveOccurred())
 		Expect(o.createCluster()).Should(HaveOccurred())
+	})
+
+	It("init at local host without docker version", func() {
+		o := &initOptions{
+			clusterDef:     clitesting.ClusterDefName,
+			clusterVersion: clitesting.ClusterVersionName,
+			IOStreams:      streams,
+			cloudProvider:  defaultCloudProvider,
+			helmCfg:        helm.NewConfig("", testKubeConfigPath, "", false),
+		}
+		Expect(o.validate()).Should(HaveOccurred())
 	})
 
 	It("init at remote cloud", func() {

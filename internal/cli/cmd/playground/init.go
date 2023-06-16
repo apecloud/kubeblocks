@@ -102,6 +102,7 @@ type initOptions struct {
 	clusterVersion string
 	cloudProvider  string
 	region         string
+	dockerVersion  string
 	autoApprove    bool
 
 	baseOptions
@@ -118,6 +119,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Long:    initLong,
 		Example: initExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.complete())
 			util.CheckErr(o.validate())
 			util.CheckErr(o.run())
 		},
@@ -139,6 +141,16 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
+func (o *initOptions) complete() error {
+	var err error
+
+	if o.cloudProvider != cp.Local {
+		return nil
+	}
+	o.dockerVersion, err = util.GetDockerVersion()
+	return err
+}
+
 func (o *initOptions) validate() error {
 	if !slices.Contains(supportedCloudProviders, o.cloudProvider) {
 		return fmt.Errorf("cloud provider %s is not supported, only support %v", o.cloudProvider, supportedCloudProviders)
@@ -150,6 +162,10 @@ func (o *initOptions) validate() error {
 
 	if o.clusterDef == "" {
 		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one")
+	}
+
+	if o.cloudProvider == cp.Local && o.dockerVersion < version.MinimumDockerVersion {
+		return fmt.Errorf("your docker version %s is lower than the minimum version %s, please upgrade your docker", o.dockerVersion, version.MinimumDockerVersion)
 	}
 
 	if err := o.baseOptions.validate(); err != nil {
@@ -167,6 +183,9 @@ func (o *initOptions) run() error {
 
 // local bootstraps a playground in the local host
 func (o *initOptions) local() error {
+	// print the system info
+	util.PrintSystemInfo(o.Out)
+
 	provider, err := cp.New(o.cloudProvider, "", o.Out, o.ErrOut)
 	if err != nil {
 		return err

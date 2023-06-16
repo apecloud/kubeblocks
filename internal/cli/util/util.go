@@ -771,13 +771,16 @@ func IsWindows() bool {
 	return runtime.GOOS == types.GoosWindows
 }
 
-func GetUnifiedDiffString(original, edited string, from, to string) (string, error) {
+func GetUnifiedDiffString(original, edited string, from, to string, contextLine int) (string, error) {
+	if contextLine <= 0 {
+		contextLine = 3
+	}
 	diff := difflib.UnifiedDiff{
 		A:        difflib.SplitLines(original),
 		B:        difflib.SplitLines(edited),
 		FromFile: from,
 		ToFile:   to,
-		Context:  3,
+		Context:  contextLine,
 	}
 	return difflib.GetUnifiedDiffString(diff)
 }

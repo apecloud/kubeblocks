@@ -23,7 +23,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"reflect"
 	"sort"
 	"strings"
@@ -37,6 +36,7 @@ import (
 )
 
 var (
+	// four level BlackList to filter useless info between two release, now they are customized for kubeblocks
 	kindBlackList = []string{
 		"ConfigMapList",
 	}
@@ -58,7 +58,7 @@ var (
 	}
 )
 
-// MappingResult to store result of diff
+// MappingResult to store result to diff
 type MappingResult struct {
 	Name    string
 	Kind    string
@@ -87,7 +87,8 @@ func (m metadata) String() string {
 func ParseContent(content string) (*MappingResult, error) {
 	var parsedMetadata metadata
 	if err := yaml.Unmarshal([]byte(content), &parsedMetadata); err != nil {
-		log.Fatalf("YAML unmarshal error: %s\nCan't unmarshal %s", err, content)
+
+		return nil, err
 	}
 	if parsedMetadata.APIVersion == "" && parsedMetadata.Kind == "" {
 		return nil, nil
@@ -107,7 +108,7 @@ func ParseContent(content string) (*MappingResult, error) {
 
 	var object map[interface{}]interface{}
 	if err := yaml.Unmarshal([]byte(content), &object); err != nil {
-		log.Fatalf("YAML unmarshal error: %s\nCan't unmarshal %s", err, content)
+		return nil, err
 	}
 	// filter Label
 	for i := range labelBlackList {
@@ -119,7 +120,7 @@ func ParseContent(content string) (*MappingResult, error) {
 	}
 	normalizedContent, err := yaml.Marshal(object)
 	if err != nil {
-		log.Fatalf("YAML marshal error: %s\nCan't marshal %v", err, object)
+		return nil, err
 	}
 	content = string(normalizedContent)
 	name := parsedMetadata.String()
@@ -130,6 +131,7 @@ func ParseContent(content string) (*MappingResult, error) {
 	}, nil
 }
 
+// OutputDiff output the difference between different version for a chart
 func OutputDiff(releaseA *release.Release, releaseB *release.Release, versionA, versionB string, out io.Writer) error {
 	manifestsMapA, err := buildManifestMapByRelease(releaseA)
 	if err != nil {
@@ -149,7 +151,7 @@ func OutputDiff(releaseA *release.Release, releaseB *release.Release, versionA, 
 			if manifestA.Content == manifestB.Content {
 				continue
 			}
-			diffString, err := util.GetUnifiedDiffString(manifestA.Content, manifestB.Content, fmt.Sprintf("%s %s", manifestA.Name, versionA), fmt.Sprintf("%s %s", manifestB.Name, versionB))
+			diffString, err := util.GetUnifiedDiffString(manifestA.Content, manifestB.Content, fmt.Sprintf("%s %s", manifestA.Name, versionA), fmt.Sprintf("%s %s", manifestB.Name, versionB), 1)
 			if err != nil {
 				return err
 			}
@@ -161,14 +163,15 @@ func OutputDiff(releaseA *release.Release, releaseB *release.Release, versionA, 
 	}
 
 	// Todo: support find Rename chart.yaml between mayRemove and mayAdd
-	for k, v := range manifestsMapB {
-		if _, ok := manifestsMapA[k]; !ok {
-			mayAdd = append(mayAdd, v)
+	for _, key := range sortedKeys(manifestsMapB) {
+		manifestB := manifestsMapB[key]
+		if _, ok := manifestsMapA[key]; !ok {
+			mayAdd = append(mayAdd, manifestB)
 		}
 	}
 
 	for _, elem := range mayAdd {
-		diffString, err := util.GetUnifiedDiffString("", elem.Content, "", fmt.Sprintf("%s %s", elem.Name, versionB))
+		diffString, err := util.GetUnifiedDiffString("", elem.Content, "", fmt.Sprintf("%s %s", elem.Name, versionB), 1)
 		if err != nil {
 			return err
 		}
@@ -176,7 +179,7 @@ func OutputDiff(releaseA *release.Release, releaseB *release.Release, versionA, 
 	}
 
 	for _, elem := range mayRemove {
-		diffString, err := util.GetUnifiedDiffString(elem.Content, "", fmt.Sprintf("%s %s", elem.Name, versionA), "")
+		diffString, err := util.GetUnifiedDiffString(elem.Content, "", fmt.Sprintf("%s %s", elem.Name, versionA), "", 1)
 		if err != nil {
 			return err
 		}
@@ -185,7 +188,12 @@ func OutputDiff(releaseA *release.Release, releaseB *release.Release, versionA, 
 	return nil
 }
 
+// buildManifestMapByRelease parse a helm release manifest, it will get a map which include all k8s resources in
+// the helm release and the map key is generate by metadata.String()
 func buildManifestMapByRelease(release *release.Release) (map[string]*MappingResult, error) {
+	if release == nil {
+		return map[string]*MappingResult{}, nil
+	}
 	var manifests bytes.Buffer
 	fmt.Fprintln(&manifests, strings.TrimSpace(release.Manifest))
 	manifestsKeys := releaseutil.SplitManifests(manifests.String())
@@ -203,12 +211,14 @@ func buildManifestMapByRelease(release *release.Release) (map[string]*MappingRes
 	return manifestsMap, nil
 }
 
+// sortedKeys return sorted keys of manifests
 func sortedKeys(manifests map[string]*MappingResult) []string {
 	keys := maps.Keys(manifests)
 	sort.Strings(keys)
 	return keys
 }
 
+// deleteObjField delete the field in fieldBlackList recursively
 func deleteObjField(obj *map[interface{}]interface{}, field string) {
 	ori := *obj
 	_, ok := ori[field]
@@ -235,12 +245,12 @@ func deleteObjField(obj *map[interface{}]interface{}, field string) {
 	}
 }
 
+// deleteLabel delete the label in labelBlackList
 func deleteLabel(object *map[interface{}]interface{}, s string) {
 	obj := *object
 	if _, ok := obj["metadata"]; !ok {
 		return
 	}
-
 	if m, ok := obj["metadata"].(map[interface{}]interface{}); ok {
 		label, ok := m["labels"].(map[interface{}]interface{})
 		if !ok {

@@ -71,7 +71,7 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		return err
 	}
 
-	diff, err := util.GetUnifiedDiffString(cfgEditContext.original, cfgEditContext.edited, "Original", "Current")
+	diff, err := util.GetUnifiedDiffString(cfgEditContext.original, cfgEditContext.edited, "Original", "Current", 3)
 	if err != nil {
 		return err
 	}

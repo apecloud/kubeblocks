@@ -191,7 +191,7 @@ func (i *InstallOpts) Install(cfg *Config) (*release.Release, error) {
 }
 
 func (i *InstallOpts) tryInstall(cfg *action.Configuration) (*release.Release, error) {
-	if !*i.DryRun {
+	if i.DryRun == nil || !*i.DryRun {
 		released, err := i.GetInstalled(cfg)
 		if released != nil {
 			return released, nil
@@ -423,8 +423,6 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (*release.Release, e
 	client.Wait = i.Wait
 	client.WaitForJobs = i.Wait
 	client.Timeout = i.Timeout
-	client.DryRun = *i.DryRun
-	client.SkipCRDs = false
 	if client.Timeout == 0 {
 		client.Timeout = defaultTimeout
 	}
@@ -593,7 +591,9 @@ func GetValues(release string, cfg *Config) (map[string]interface{}, error) {
 	return client.Run(release)
 }
 
+// GetTemplateInstallOps build a helm InstallOpts with dryrun to implement helm template
 func GetTemplateInstallOps(name, chart, version, namespace string) *InstallOpts {
+	dryrun := true
 	return &InstallOpts{
 		Name:       name,
 		Chart:      chart,
@@ -602,5 +602,6 @@ func GetTemplateInstallOps(name, chart, version, namespace string) *InstallOpts 
 		TryTimes:   2,
 		Atomic:     true,
 		IncludeCRD: true,
+		DryRun:     &dryrun,
 	}
 }

@@ -42,7 +42,7 @@ var (
 	kbcli kubeblocks compare 0.4.0 0.5.0`)
 )
 
-func newDiffCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func newCompareCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &InstallOptions{
 		Options: Options{
 			IOStreams: streams,
@@ -69,6 +69,7 @@ func newDiffCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	return cmd
 }
 
+// validateCompareVersion validate the user inputs version and save the valid value into versionA and versionB
 func (o *InstallOptions) validateCompareVersion(args []string, versionA, versionB *string) error {
 	switch len(args) {
 	case 0:
@@ -117,10 +118,10 @@ func (o *InstallOptions) compare(args []string) error {
 		}
 		return fmt.Errorf("version %s does not exist, please use \"kbcli kubeblocks list-versions --devel\" to show the available versions", versionB)
 	}
-	return o.showUpgradeDiff(versionA, versionB)
+	return o.showDiff(versionA, versionB)
 }
 
-// buildTemplate build kubeblocks helm template command InstallOpts
+// buildTemplate build `helm template` InstallOpts for KubeBlocks
 func (o *InstallOptions) buildTemplate(version string) *helm.InstallOpts {
 	ops := helm.GetTemplateInstallOps(types.KubeBlocksChartName, fmt.Sprintf("%s/%s", types.KubeBlocksChartName, types.KubeBlocksChartName), version, "default")
 	ops.Wait = o.Wait
@@ -130,10 +131,9 @@ func (o *InstallOptions) buildTemplate(version string) *helm.InstallOpts {
 	return ops
 }
 
-func (o *InstallOptions) showUpgradeDiff(version1, version2 string) error {
-	dryrun := true
+func (o *InstallOptions) showDiff(version1, version2 string) error {
+	// use `helm template` get the chart manifest
 	helmInstallOpts := o.buildTemplate(version1)
-	helmInstallOpts.DryRun = &dryrun
 	releaseA, err := helmInstallOpts.Install(helm.NewFakeConfig("default"))
 	if err != nil {
 		return err

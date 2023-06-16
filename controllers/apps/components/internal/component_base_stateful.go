@@ -669,8 +669,10 @@ func (c *StatefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet) bool 
 	stsObjCopy.Spec.Template = stsProto.Spec.Template
 	stsObjCopy.Spec.Replicas = stsProto.Spec.Replicas
 	stsObjCopy.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
+
+	util.ResolvePodSpecDefaultFields(stsObj.Spec.Template.Spec, &stsObjCopy.Spec.Template.Spec)
+
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
-		// TODO(REVIEW): always return true and update component phase to Updating. stsObj.Spec contains default values which set by Kubernetes
 		c.WorkloadVertex.Obj = stsObjCopy
 		c.WorkloadVertex.Action = ictrltypes.ActionPtr(ictrltypes.UPDATE)
 		return true

@@ -1,0 +1,56 @@
+---
+{{- if (empty .Values.alertmanager.configMapOverrideName) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    component: "alertmanager"
+    {{- include "prometheus.labels" . | nindent 4 }}
+  name: {{ template "prometheus.alertmanager.fullname" . }}-config
+data:
+{{- range $path, $content := .Files.Glob "config/alertmanager/*.yml" }}
+  {{ trimPrefix "config/alertmanager/" $path }}: |-
+  {{- $content | toString | nindent 4 }}
+{{- end }}
+{{- end }}
+
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    component: "server"
+    {{- include "prometheus.labels" . | nindent 4 }}
+  name: {{ template "prometheus.server.fullname" . }}-rule
+data:
+{{- range $path, $content := .Files.Glob "config/server/rulesFiles/*" }}
+  {{ trimPrefix "config/server/rulesFiles/" $path }}: |-
+  {{- $content | toString | nindent 4 }}
+{{- end }}
+
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    component: "server"
+    {{- include "prometheus.labels" . | nindent 4 }}
+  name: {{ template "prometheus.server.fullname" . }}-config
+data:
+{{- $values := .Values }}
+{{- range $path, $content := .Files.Glob "config/server/serverFiles/*" }}
+  {{ trimPrefix "config/server/serverFiles/" $path }}: |-
+    global:
+    {{- with $values.server.global }}
+      scrape_interval: {{ .scrape_interval }}
+      scrape_timeout: {{ .scrape_timeout }}
+      evaluation_interval: {{ .evaluation_interval }}
+    {{- end }}
+    {{- if $values.server.remoteWrite }}
+      remote_write:
+        {{- $values.server.remoteWrite | toYaml | nindent 8 }}
+    {{- end }}
+    {{- $content | toString | nindent 4 }}
+{{- end }}

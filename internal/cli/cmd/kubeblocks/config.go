@@ -127,7 +127,7 @@ func NewDescribeConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 			util.CheckErr(describeConfig(o, output, getHelmValues))
 		},
 	}
-	printer.AddOutputFlag(cmd, &output)
+	printer.AddOutputFlag(cmd, &output, false)
 	cmd.Flags().BoolVarP(&showAllConfig, "all", "A", false, "show all kubeblocks configs value")
 	return cmd
 }

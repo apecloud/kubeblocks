@@ -220,14 +220,14 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, or just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 	cmd.Flags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
-	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
-	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
+	cmd.PersistentFlags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
+	cmd.PersistentFlags().Lookup("dry-run").NoOptDefVal = "unchanged"
 
 	// add updatable flags
 	o.UpdatableFlags.addFlags(cmd)
 
 	// add print flags
-	printer.AddOutputFlagForCreate(cmd, &o.Format)
+	printer.AddOutputFlag(cmd, &o.Format, true)
 
 	// register flag completion func
 	registerFlagCompletionFunc(cmd, f)
@@ -598,21 +598,6 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 				clusterVersion = util.CompGetResourceWithLabels(f, cmd, util.GVRToString(types.ClusterVersionGVR()), []string{label}, toComplete)
 			}
 			return clusterVersion, cobra.ShellCompDirectiveNoFileComp
-		}))
-
-	var formatsWithDesc = map[string]string{
-		"JSON": "Output result in JSON format",
-		"YAML": "Output result in YAML format",
-	}
-	util.CheckErr(cmd.RegisterFlagCompletionFunc("output",
-		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			var names []string
-			for format, desc := range formatsWithDesc {
-				if strings.HasPrefix(format, toComplete) {
-					names = append(names, fmt.Sprintf("%s\t%s", format, desc))
-				}
-			}
-			return names, cobra.ShellCompDirectiveNoFileComp
 		}))
 }
 

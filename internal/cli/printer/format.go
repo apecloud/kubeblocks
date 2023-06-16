@@ -78,8 +78,13 @@ func ParseFormat(s string) (out Format, err error) {
 	return
 }
 
-func AddOutputFlag(cmd *cobra.Command, varRef *Format) {
-	cmd.Flags().VarP(newOutputValue(Table, varRef), "output", "o",
+func AddOutputFlag(cmd *cobra.Command, varRef *Format, persistent bool) {
+	fs := cmd.Flags()
+	if persistent {
+		fs = cmd.PersistentFlags()
+	}
+
+	fs.VarP(newOutputValue(Table, varRef), "output", "o",
 		fmt.Sprintf("prints the output in the specified format. Allowed values: %s", strings.Join(Formats(), ", ")))
 	util.CheckErr(cmd.RegisterFlagCompletionFunc("output",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

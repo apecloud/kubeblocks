@@ -25,15 +25,20 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/yaml"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
+	"github.com/apecloud/kubeblocks/internal/cli/create"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -43,8 +48,12 @@ type CreateOptionsV1 struct {
 	Dynamic   dynamic.Interface
 	Engine    cluster.EngineType
 	Namespace string
+	Name      string
 	SetFile   string
 	Values    map[string]interface{}
+	DryRun    create.DryRunStrategy
+
+	ToPrinter func(*meta.RESTMapping, bool) (printers.ResourcePrinterFunc, error)
 
 	genericclioptions.IOStreams
 }
@@ -59,7 +68,7 @@ func AddEngineSubCmds(parent *cobra.Command, f cmdutil.Factory, streams genericc
 
 		cmd := &cobra.Command{
 			Use:   strings.ToLower(e.String()),
-			Short: fmt.Sprintf("Create a %s cluster.", e.String()),
+			Short: fmt.Sprintf("Create a %s cluster.", e),
 			Run: func(cmd *cobra.Command, args []string) {
 				cmdutil.CheckErr(o.Complete(cmd, args))
 				cmdutil.CheckErr(o.Validate())
@@ -67,15 +76,14 @@ func AddEngineSubCmds(parent *cobra.Command, f cmdutil.Factory, streams genericc
 			},
 		}
 
-		util.CheckErr(addCreateFlags(cmd, e))
+		util.CheckErr(addCreateFlags(cmd, f, e))
 		parent.AddCommand(cmd)
 	}
 }
 
 func (o *CreateOptionsV1) Complete(cmd *cobra.Command, args []string) error {
 	var (
-		err  error
-		name string
+		err error
 	)
 	o.Client, err = o.Factory.KubernetesClientSet()
 	if err != nil {
@@ -94,22 +102,46 @@ func (o *CreateOptionsV1) Complete(cmd *cobra.Command, args []string) error {
 
 	// if name is not specified, generate a random cluster name
 	if len(args) == 0 {
-		name, err = generateClusterName(o.Dynamic, o.Namespace)
+		o.Name, err = generateClusterName(o.Dynamic, o.Namespace)
 		if err != nil {
 			return err
 		}
-		if name == "" {
+		if o.Name == "" {
 			return fmt.Errorf("failed to generate a random cluster name")
 		}
 	} else {
-		name = args[0]
+		o.Name = args[0]
 	}
 
 	// get values from flags
 	o.Values = getValuesFromFlags(cmd.LocalNonPersistentFlags())
 
 	// set cluster name
-	o.Values[cluster.NameProp.String()] = name
+	o.Values[cluster.NameProp.String()] = o.Name
+	o.DryRun, err = getDryRunStrategy(cmd.Flags().Lookup("dry-run").Value.String())
+	if err != nil {
+		return err
+	}
+
+	// get output format
+	format := printer.Format(cmd.Flags().Lookup("output").Value.String())
+	o.ToPrinter = func(mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinterFunc, error) {
+		var p printers.ResourcePrinter
+		switch format {
+		case printer.JSON:
+			p = &printers.JSONPrinter{}
+		case printer.YAML:
+			p = &printers.YAMLPrinter{}
+		default:
+			return nil, genericclioptions.NoCompatiblePrinterError{AllowedFormats: []string{"JSON", "YAML"}}
+		}
+
+		p, err = printers.NewTypeSetter(scheme.Scheme).WrapToPrinter(p, nil)
+		if err != nil {
+			return nil, err
+		}
+		return p.PrintObj, nil
+	}
 
 	return nil
 }
@@ -124,7 +156,7 @@ func (o *CreateOptionsV1) Validate() error {
 
 func (o *CreateOptionsV1) Run() error {
 	// get cluster manifests
-	manifests, err := cluster.GetManifests(o.Engine, o.Namespace, o.Values)
+	manifests, err := cluster.GetManifests(o.Engine, o.Namespace, o.Name, o.Values)
 	if err != nil {
 		return err
 	}
@@ -154,9 +186,32 @@ func (o *CreateOptionsV1) Run() error {
 			return err
 		}
 
-		// create resource
-		_, err = o.Dynamic.Resource(m.Resource).Namespace(o.Namespace).Create(context.TODO(), obj.(*unstructured.Unstructured), metav1.CreateOptions{})
+		res := obj.(*unstructured.Unstructured)
+		if o.DryRun != create.DryRunClient {
+			createOptions := metav1.CreateOptions{}
+			if o.DryRun == create.DryRunServer {
+				createOptions.DryRun = []string{metav1.DryRunAll}
+			}
+
+			// create resource
+			res, err = o.Dynamic.Resource(m.Resource).Namespace(o.Namespace).Create(context.TODO(), res, createOptions)
+			if err != nil {
+				return err
+			}
+
+			if o.DryRun != create.DryRunServer {
+				fmt.Fprintf(o.Out, "%s %s created\n", res.GetKind(), res.GetName())
+				continue
+			}
+		}
+
+		p, err := o.ToPrinter(nil, false)
 		if err != nil {
+			return err
+		}
+
+		fmt.Fprintln(o.Out, "---")
+		if err = p.PrintObj(res, o.Out); err != nil {
 			return err
 		}
 	}

@@ -25,13 +25,17 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	utilcomp "k8s.io/kubectl/pkg/util/completion"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
+	"github.com/apecloud/kubeblocks/internal/cli/create"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 // addCreateFlags adds the flags for creating a cluster, these flags are built by the cluster schema.
-func addCreateFlags(cmd *cobra.Command, e cluster.EngineType) error {
+func addCreateFlags(cmd *cobra.Command, f cmdutil.Factory, e cluster.EngineType) error {
 	schema, err := cluster.GetSchema(e)
 	if err != nil {
 		return err
@@ -42,10 +46,11 @@ func addCreateFlags(cmd *cobra.Command, e cluster.EngineType) error {
 	}
 
 	for k, s := range schema.Properties {
-		if err = buildOneFlag(cmd, k, &s); err != nil {
+		if err = buildOneFlag(cmd, f, k, &s); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -60,8 +65,8 @@ func getValuesFromFlags(fs *flag.FlagSet) map[string]interface{} {
 		switch f.Value.Type() {
 		case "bool":
 			val, _ = fs.GetBool(f.Name)
-		case "int32":
-			val, _ = fs.GetInt32(f.Name)
+		case "int":
+			val, _ = fs.GetInt(f.Name)
 		case "float64":
 			val, _ = fs.GetFloat64(f.Name)
 		default:
@@ -72,7 +77,7 @@ func getValuesFromFlags(fs *flag.FlagSet) map[string]interface{} {
 	return values
 }
 
-func buildOneFlag(cmd *cobra.Command, k string, s *spec.Schema) error {
+func buildOneFlag(cmd *cobra.Command, f cmdutil.Factory, k string, s *spec.Schema) error {
 	name := util.ToKebabCase(k)
 	tpe := "string"
 	if len(s.Type) > 0 {
@@ -83,7 +88,7 @@ func buildOneFlag(cmd *cobra.Command, k string, s *spec.Schema) error {
 	case "string":
 		cmd.Flags().String(name, s.Default.(string), s.Description)
 	case "integer":
-		cmd.Flags().Int32(name, int32(s.Default.(float64)), s.Description)
+		cmd.Flags().Int(name, int(s.Default.(float64)), s.Description)
 	case "number":
 		cmd.Flags().Float64(name, s.Default.(float64), s.Description)
 	case "boolean":
@@ -91,5 +96,50 @@ func buildOneFlag(cmd *cobra.Command, k string, s *spec.Schema) error {
 	default:
 		return fmt.Errorf("unsupported json schema type %s", s.Type)
 	}
+
+	registerFlagCompFunc(cmd, f, name, s)
 	return nil
+}
+
+func registerFlagCompFunc(cmd *cobra.Command, f cmdutil.Factory, name string, s *spec.Schema) {
+	// register the enum entry for autocompletion
+	if len(s.Enum) > 0 {
+		var entries []string
+		for _, e := range s.Enum {
+			entries = append(entries, fmt.Sprintf("%s\t", e))
+		}
+		_ = cmd.RegisterFlagCompletionFunc(name, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return entries, cobra.ShellCompDirectiveNoFileComp
+		})
+		return
+	}
+
+	// for general property, register the completion function
+	switch cluster.SchemaPropName(name) {
+	case cluster.VersionProp:
+		// TODO(ldm): gets cluster versions based on the cluster engine type, do not get all
+		// but, now the cluster version does not has any engine type label, we can not get them by label
+		_ = cmd.RegisterFlagCompletionFunc(name,
+			func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+				return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+			})
+	}
+}
+
+func getDryRunStrategy(dryRunOpt string) (create.DryRunStrategy, error) {
+	if dryRunOpt == "" {
+		return create.DryRunNone, nil
+	}
+	switch dryRunOpt {
+	case "client":
+		return create.DryRunClient, nil
+	case "server":
+		return create.DryRunServer, nil
+	case "unchanged":
+		return create.DryRunClient, nil
+	case "none":
+		return create.DryRunNone, nil
+	default:
+		return create.DryRunNone, fmt.Errorf(`invalid dry-run value (%v). Must be "none", "server", or "client"`, dryRunOpt)
+	}
 }

@@ -48,18 +48,18 @@ const (
 
 var (
 	//go:embed charts/*
-	chartsDir embed.FS
+	charts embed.FS
 )
 
 // GetManifests gets the cluster manifests
-func GetManifests(e EngineType, namespace string, values map[string]interface{}) (map[string]string, error) {
-	chartFS, err := debme.FS(chartsDir, "charts")
+func GetManifests(e EngineType, namespace, name string, values map[string]interface{}) (map[string]string, error) {
+	chartsFS, err := debme.FS(charts, "charts")
 	if err != nil {
 		return nil, err
 	}
 
 	// load the chart package to memory from embed tgz file
-	chartRequested, err := loadHelmChart(chartFS, getChartName(e))
+	chartRequested, err := loadHelmChart(chartsFS, getChartName(e))
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func GetManifests(e EngineType, namespace string, values map[string]interface{})
 	client.DryRun = true
 	client.Replace = true
 	client.ClientOnly = true
-	client.ReleaseName = "release-name"
+	client.ReleaseName = name
 	client.Namespace = namespace
 
 	rel, err := client.Run(chartRequested, values)
@@ -89,22 +89,22 @@ func GetManifests(e EngineType, namespace string, values map[string]interface{})
 
 // GetSchema gets the schema for the given cluster engine type.
 func GetSchema(t EngineType) (*spec.SchemaProps, error) {
-	chartFS, err := debme.FS(chartsDir, "charts")
+	chartsFS, err := debme.FS(charts, "charts")
 	if err != nil {
 		return nil, err
 	}
 
 	chartName := getChartName(t)
-	file, err := chartFS.Open(chartName + ".tgz")
+	file, err := chartsFS.Open(chartName + ".tgz")
 	if err != nil {
 		return nil, err
 	}
 
-	// read schema from file
 	gr, err := gzip.NewReader(file)
 	if err != nil {
 		return nil, err
 	}
+	defer gr.Close()
 
 	tr := tar.NewReader(gr)
 	for {
@@ -123,11 +123,11 @@ func GetSchema(t EngineType) (*spec.SchemaProps, error) {
 
 		// found the schema file
 		var buf bytes.Buffer
-		schema := spec.SchemaProps{}
-		if _, err := io.Copy(&buf, tr); err != nil {
+		if _, err = io.Copy(&buf, tr); err != nil {
 			return nil, err
 		}
 
+		schema := spec.SchemaProps{}
 		if err = json.Unmarshal(buf.Bytes(), &schema); err != nil {
 			return nil, err
 		}
@@ -163,6 +163,8 @@ func loadHelmChart(fs debme.Debme, name string) (*chart.Chart, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer file.Close()
+
 	c, err := loader.LoadArchive(file)
 	if err != nil {
 		if err == gzip.ErrHeader {

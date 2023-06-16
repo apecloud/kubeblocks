@@ -19,12 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package lifecycle
 
-import (
-	"strings"
-
-	"golang.org/x/exp/maps"
-)
-
 // mergeAnnotations keeps the original annotations.
 // if annotations exist and are replaced.
 func mergeAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string, filters ...func(k, v string) bool) {
@@ -55,22 +49,4 @@ func mergeAnnotations(originalAnnotations map[string]string, targetAnnotations *
 			continue
 		}
 	}
-}
-
-// mergeServiceAnnotations merge annotations from original to target, and also remove targetAnnotations' Prometheus scrape annotations if found.
-// if annotations exist and are replaced, the Service will be updated.
-// @targetAnnotations cannot be "nil".
-func mergeServiceAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
-	if targetAnnotations == nil || len(originalAnnotations) == 0 {
-		return
-	}
-	if *targetAnnotations == nil {
-		*targetAnnotations = make(map[string]string)
-	}
-	maps.DeleteFunc(*targetAnnotations, func(k, v string) bool {
-		return strings.HasPrefix(k, "prometheus.io")
-	})
-	mergeAnnotations(originalAnnotations, targetAnnotations, func(k, v string) bool {
-		return false
-	})
 }

@@ -29,7 +29,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -136,22 +135,6 @@ func BuildWorkLoadAnnotations(obj client.Object, cluster *appsv1alpha1.Cluster) 
 	// record the cluster generation to check if the sts is latest
 	workloadAnnotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(cluster.Generation, 10)
 	obj.SetAnnotations(workloadAnnotations)
-}
-
-// MergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.
-// if annotations exist and are replaced, the Service will be updated.
-func MergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
-	if len(originalAnnotations) == 0 {
-		return targetAnnotations
-	}
-	tmpAnnotations := make(map[string]string, len(originalAnnotations)+len(targetAnnotations))
-	for k, v := range originalAnnotations {
-		if !strings.HasPrefix(k, "monitor.kubeblocks.io") {
-			tmpAnnotations[k] = v
-		}
-	}
-	maps.Copy(tmpAnnotations, targetAnnotations)
-	return tmpAnnotations
 }
 
 // GetClusterByObject gets cluster by related k8s workloads.

@@ -160,13 +160,13 @@ func doSwitchoverComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 // @return error
 func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (int32, int32, error) {
 	var (
-		expectCount    = len(opsRes.OpsRequest.Spec.SwitchoverList)
+		expectCount    = int32(len(opsRes.OpsRequest.Spec.SwitchoverList))
 		completedCount int32
 	)
 	succeedJobCount := make([]string, 0, len(opsRes.OpsRequest.Spec.SwitchoverList))
 	switchoverMap := opsRes.OpsRequest.Spec.ToSwitchoverListToMap()
 	for compSpecName, switchover := range switchoverMap {
-		switchoverCondition := meta.FindStatusCondition(opsRes.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeSwitchover)
+		switchoverCondition := meta.FindStatusCondition(opsRes.OpsRequest.Status.Conditions, appsv1alpha1.ConditionTypeSwitchover)
 		if switchoverCondition == nil {
 			return 0, 0, errors.New("switchover condition is nil")
 		}
@@ -183,12 +183,15 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		if err != nil {
 			return 0, 0, err
 		}
-		if consistency {
-			completedCount += 1
-			succeedJobCount = append(succeedJobCount, jobName)
-			p := opsRes.OpsRequest.Status.Components[compSpecName]
-			p.Phase = appsv1alpha1.RunningClusterCompPhase
+
+		if !consistency {
+			return expectCount, 0, intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for pod role label consistency.")
 		}
+
+		completedCount += 1
+		succeedJobCount = append(succeedJobCount, jobName)
+		p := opsRes.OpsRequest.Status.Components[compSpecName]
+		p.Phase = appsv1alpha1.RunningClusterCompPhase
 	}
 
 	if completedCount == int32(expectCount) {
@@ -197,5 +200,5 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		}
 	}
 
-	return int32(expectCount), completedCount, nil
+	return expectCount, completedCount, nil
 }

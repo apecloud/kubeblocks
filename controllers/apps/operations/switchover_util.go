@@ -89,7 +89,6 @@ func checkPodRoleLabelConsistency(ctx context.Context,
 	componentDef *appsv1alpha1.ClusterComponentDefinition,
 	switchover *appsv1alpha1.Switchover,
 	switchoverCondition *metav1.Condition) (bool, error) {
-	var consistency = false
 	if switchover == nil || switchoverCondition == nil {
 		return false, nil
 	}
@@ -110,17 +109,18 @@ func checkPodRoleLabelConsistency(ctx context.Context,
 		if switchoverMessage.ComponentName != componentSpec.Name {
 			continue
 		}
-		if switchoverMessage.Switchover.InstanceName == SwitchoverCandidateInstanceForAnyPod {
+		switch switchoverMessage.Switchover.InstanceName {
+		case SwitchoverCandidateInstanceForAnyPod:
 			if pod.Name != switchoverMessage.OldPrimaryOrLeader {
-				consistency = true
+				return true, nil
 			}
-		} else {
+		default:
 			if pod.Name == switchoverMessage.Switchover.InstanceName {
-				consistency = true
+				return true, nil
 			}
 		}
 	}
-	return consistency, nil
+	return false, nil
 }
 
 // renderSwitchoverCmdJob renders and creates the switchover command jobs.

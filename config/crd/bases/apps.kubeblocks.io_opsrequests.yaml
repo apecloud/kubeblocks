@@ -340,6 +340,7 @@ spec:
                 - Start
                 - Stop
                 - Expose
+                - Switchover
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.type

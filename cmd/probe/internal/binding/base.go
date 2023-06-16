@@ -23,8 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
-	"github.com/valyala/fasthttp"
 	"net"
 	"strconv"
 	"strings"
@@ -34,7 +32,9 @@ import (
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"github.com/valyala/fasthttp"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/configuration_store"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -349,7 +349,6 @@ func (ops *BaseOperations) ExecCmd(ctx context.Context, podName, cmd string) (ma
 }
 
 func (ops *BaseOperations) FetchOtherStatus(url string, requestBody string) (map[string]string, error) {
-	//url = `http://localhost:3502/v1.0/bindings/postgresql`
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
 

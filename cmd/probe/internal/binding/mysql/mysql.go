@@ -997,7 +997,7 @@ func (mysqlOps *MysqlOperations) ProcessManualSwitchoverFromNoLeader(ctx context
 func (mysqlOps *MysqlOperations) Start(ctx context.Context, podName string) error {
 	start := `./entrypoint.sh mysqld --defaults-file=/opt/my.cnf &`
 
-	_, err := mysqlOps.Cs.ExecCmdWithPod(ctx, podName, start, mysqlOps.DBType)
+	_, err := mysqlOps.ExecCmd(ctx, podName, start)
 	if err != nil {
 		mysqlOps.Logger.Errorf("start err: %v", err)
 		return err

@@ -868,7 +868,7 @@ func (pgOps *PostgresOperations) Promote(ctx context.Context, podName string) er
 	}
 
 	cmd := "su -c 'pg_ctl promote' postgres"
-	resp, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, cmd, pgOps.DBType)
+	resp, err := pgOps.ExecCmd(ctx, podName, cmd)
 	if err != nil {
 		pgOps.Logger.Errorf("promote err: %v", err)
 		return err
@@ -890,7 +890,7 @@ func (pgOps *PostgresOperations) waitPromote(ctx context.Context) error {
 
 func (pgOps *PostgresOperations) Demote(ctx context.Context, podName string) error {
 	stopCmd := "su -c 'pg_ctl stop -m fast' postgres"
-	_, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, stopCmd, pgOps.DBType)
+	_, err := pgOps.ExecCmd(ctx, podName, stopCmd)
 	if err != nil {
 		pgOps.Logger.Errorf("stop err: %v", err)
 		return err
@@ -923,7 +923,7 @@ func (pgOps *PostgresOperations) GetOpTime(ctx context.Context) (int64, error) {
 
 func (pgOps *PostgresOperations) IsRunning(ctx context.Context, podName string) bool {
 	cmd := `if [ -e "/opt/bitnami/postgresql/tmp/postgresql.pid" ]; then echo "1"; else echo "0"; fi`
-	resp, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, cmd, pgOps.DBType)
+	resp, err := pgOps.ExecCmd(ctx, podName, cmd)
 	if err != nil {
 		pgOps.Logger.Errorf("exec cmd:%s err:%v", cmd, err)
 		return false
@@ -1023,7 +1023,7 @@ func (pgOps *PostgresOperations) HandleFollow(ctx context.Context, leader *confi
 
 func (pgOps *PostgresOperations) checkRecoveryConf(ctx context.Context, podName string, leader string) (bool, bool) {
 	cmd := `if [ -e "postgresql/data/standby.signal" ]; then echo "1"; else echo "0"; fi`
-	resp, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, cmd, pgOps.DBType)
+	resp, err := pgOps.ExecCmd(ctx, podName, cmd)
 	if err != nil {
 		pgOps.Logger.Errorf("exec cmd:%s err:%v", cmd, err)
 	}
@@ -1079,7 +1079,7 @@ func (pgOps *PostgresOperations) Follow(ctx context.Context, podName string, nee
 	primaryInfo += " application_name=" + "my-application"
 
 	cmd := fmt.Sprintf(`echo primary_conninfo = \'%s\' >> /opt/bitnami/postgresql/conf/postgresql.conf`, primaryInfo)
-	_, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, cmd, pgOps.DBType)
+	_, err := pgOps.ExecCmd(ctx, podName, cmd)
 	if err != nil {
 		pgOps.Logger.Errorf("modify primary info failed,err:%v", err)
 		return err
@@ -1087,7 +1087,7 @@ func (pgOps *PostgresOperations) Follow(ctx context.Context, podName string, nee
 
 	if !needRestart {
 		cmd := "su -c 'pg_ctl reload' postgres"
-		_, err = pgOps.Cs.ExecCmdWithPod(ctx, podName, cmd, pgOps.DBType)
+		_, err = pgOps.ExecCmd(ctx, podName, cmd)
 		if err != nil {
 			pgOps.Logger.Errorf("reload failed, err:%v", err)
 			return err
@@ -1101,14 +1101,14 @@ func (pgOps *PostgresOperations) Follow(ctx context.Context, podName string, nee
 func (pgOps *PostgresOperations) Start(ctx context.Context, podName string) error {
 	touchCmd := "touch /postgresql/data/standby.signal"
 
-	_, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, touchCmd, pgOps.DBType)
+	_, err := pgOps.ExecCmd(ctx, podName, touchCmd)
 	if err != nil {
 		pgOps.Logger.Errorf("touch err: %v", err)
 		return err
 	}
 
 	startCmd := "su -c 'postgres -D /postgresql/data --config-file=/opt/bitnami/postgresql/conf/postgresql.conf --external_pid_file=/opt/bitnami/postgresql/tmp/postgresql.pid --hba_file=/opt/bitnami/postgresql/conf/pg_hba.conf' postgres &"
-	resp, err := pgOps.Cs.ExecCmdWithPod(ctx, podName, startCmd, pgOps.DBType)
+	resp, err := pgOps.ExecCmd(ctx, podName, startCmd)
 	if err != nil || resp["stderr"] != "" {
 		pgOps.Logger.Errorf("start err: %v", err)
 		return err

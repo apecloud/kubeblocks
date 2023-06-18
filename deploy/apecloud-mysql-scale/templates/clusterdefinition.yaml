@@ -18,7 +18,7 @@ spec:
     # together with ApeCloud MySQL cluster. ApeCloud MySQL-Scale can
     # register vttablets as sidecars to an existing ApeCloud MySQL cluster.
     - name: vtgate
-      characterType: mysql
+      characterType: wesql
       workloadType: Stateful
       service:
         ports:

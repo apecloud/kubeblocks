@@ -859,20 +859,18 @@ func (mysqlOps *MysqlOperations) IsHealthiest(ctx context.Context, podName strin
 		return false
 	}
 
-	/*
-		requestBody := `{"operation":"getRole"}`
-		for _, m := range mysqlOps.Cs.GetCluster().Members {
-			resp, err := mysqlOps.FetchOtherStatus(m.GetData().GetUrl(), requestBody)
-			if err != nil {
-				mysqlOps.Logger.Errorf("fetch other status err:%v", err)
-				return false
-			}
-			if resp["role"] == PRIMARY {
-				mysqlOps.Logger.Errorf("Primary %s is still alive")
-				return false
-			}
+	requestBody := `{"operation":"getRole"}`
+	for _, m := range mysqlOps.Cs.GetCluster().Members {
+		resp, err := mysqlOps.FetchOtherStatus(m.GetData().GetUrl(), requestBody)
+		if err != nil {
+			mysqlOps.Logger.Errorf("fetch other status err:%v", err)
+			return false
 		}
-	*/
+		if resp["role"] == PRIMARY {
+			mysqlOps.Logger.Errorf("Primary %s is still alive")
+			return false
+		}
+	}
 
 	return true
 }

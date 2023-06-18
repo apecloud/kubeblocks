@@ -24,6 +24,8 @@ options: {
 	typeLower:              string
 	ttlSecondsAfterSucceed: int
 	clusterVersionRef:      string
+	component: 							string
+	instance:							  string
 	componentNames: [...string]
 	cpu:      string
 	memory:   string
@@ -136,6 +138,22 @@ content: {
 					serviceType: svc.serviceType
 					annotations: svc.annotations
 				}]
+			}]
+		}
+		if options.type == "Switchover" {
+			switchover: [{
+				if options.component == "" {
+					componentName: options.componentNames[0]
+				}
+			  if options.component != "" {
+					componentName: options.component
+				}
+				if options.instance == "" {
+					instanceName: "*"
+				}
+				if options.instance != "" {
+					instanceName: options.instance
+				}
 			}]
 		}
 	}

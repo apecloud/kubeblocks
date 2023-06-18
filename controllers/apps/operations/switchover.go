@@ -134,10 +134,11 @@ func doSwitchoverComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 	return nil
 }
 
-// handleSwitchoverProgress handles the component progressDetails when switchover.
-// @return expectCount
-// @return completedCount
-// @return error
+// handleSwitchoverProgress handles the component progressDetails during switchover.
+// Returns:
+// - expectCount: the expected count of switchover operations
+// - completedCount: the number of completed switchover operations
+// - error: any error that occurred during the handling
 func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (int32, int32, error) {
 	var (
 		expectCount         = int32(len(opsRes.OpsRequest.Spec.SwitchoverList))

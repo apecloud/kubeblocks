@@ -36,6 +36,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -89,6 +90,9 @@ func NewCreateCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	cmd.Flags().StringVar(&o.Memory, corev1.ResourceMemory.String(), "", "Specify component memory size")
 
 	cmd.Flags().StringVar(&o.File, "file", "", "Specify file path of class definition YAML")
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, f)
 
 	return cmd
 }
@@ -250,4 +254,70 @@ func (o *CreateOptions) run() error {
 	}
 	_, _ = fmt.Fprintf(o.Out, "Successfully create class [%s].\n", strings.Join(classNames, ","))
 	return nil
+}
+
+func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"cluster-definition",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"type",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			var (
+				componentTypes []string
+				selector       string
+				compTypeLabel  = "apps.kubeblocks.io/component-def-ref"
+			)
+
+			client, err := f.DynamicClient()
+			if err != nil {
+				return componentTypes, cobra.ShellCompDirectiveNoFileComp
+			}
+
+			clusterDefinition, err := cmd.Flags().GetString("cluster-definition")
+			if err == nil && clusterDefinition != "" {
+				selector = fmt.Sprintf("%s=%s,%s", constant.ClusterDefLabelKey, clusterDefinition, types.ClassProviderLabelKey)
+			}
+			objs, err := client.Resource(types.ComponentClassDefinitionGVR()).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+			if err != nil {
+				return componentTypes, cobra.ShellCompDirectiveNoFileComp
+			}
+			var classDefinitionList v1alpha1.ComponentClassDefinitionList
+			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), &classDefinitionList); err != nil {
+				return componentTypes, cobra.ShellCompDirectiveNoFileComp
+			}
+			for _, item := range classDefinitionList.Items {
+				componentType := item.Labels[compTypeLabel]
+				if componentType != "" {
+					componentTypes = append(componentTypes, componentType)
+				}
+			}
+			return componentTypes, cobra.ShellCompDirectiveNoFileComp
+		}))
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"constraint",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			var constraints []string
+			client, err := f.DynamicClient()
+			if err != nil {
+				return constraints, cobra.ShellCompDirectiveNoFileComp
+			}
+
+			objs, err := client.Resource(types.ComponentResourceConstraintGVR()).List(context.Background(), metav1.ListOptions{})
+			if err != nil {
+				return constraints, cobra.ShellCompDirectiveNoFileComp
+			}
+			var constraintList v1alpha1.ComponentResourceConstraintList
+			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), &constraintList); err != nil {
+				return constraints, cobra.ShellCompDirectiveNoFileComp
+			}
+			for _, item := range constraintList.Items {
+				if _, ok := item.GetLabels()[types.ResourceConstraintProviderLabelKey]; ok {
+					constraints = append(constraints, item.GetName())
+				}
+			}
+			return constraints, cobra.ShellCompDirectiveNoFileComp
+		}))
 }

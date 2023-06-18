@@ -164,6 +164,9 @@ spec:
       horizontalScalePolicy:
         type: Snapshot
         backupPolicyTemplateName: apecloud-mysql-scale-backup-policy-template-for-hscale
+      volumeTypes:
+        - name: data
+          type: data
       podSpec:
         containers:
           - name: mysql

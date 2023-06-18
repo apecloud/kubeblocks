@@ -136,6 +136,11 @@ preflight-manifests: generate ## Generate external Preflight API
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/...;./externalapis/..."
+	$(MAKE) client-sdk-gen
+
+.PHONY: client-sdk-gen
+client-sdk-gen: module ## Generate CRD client code.
+	@./hack/client-sdk-gen.sh
 
 .PHONY: manager-go-generate
 manager-go-generate: ## Run go generate against lifecycle manager code.
@@ -459,6 +464,7 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 ifeq (, $(shell ls $(LOCALBIN)/controller-gen 2>/dev/null))
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 endif
+
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.

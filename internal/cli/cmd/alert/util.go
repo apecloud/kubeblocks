@@ -85,6 +85,14 @@ func getRoutesFromData(data map[string]interface{}) []interface{} {
 	return routes.([]interface{})
 }
 
+func getGlobalFromData(data map[string]interface{}) map[string]interface{} {
+	global, ok := data["global"]
+	if !ok || global == nil {
+		global = map[string]interface{}{}
+	}
+	return global.(map[string]interface{})
+}
+
 func getWebhookType(url string) webhookType {
 	if strings.Contains(url, "oapi.dingtalk.com") {
 		return dingtalkWebhookType
@@ -122,4 +130,14 @@ func urlIsValid(urlStr string) (bool, error) {
 
 func getConfigMapName(addon string) string {
 	return fmt.Sprintf("%s-%s", util.BuildAddonReleaseName(addon), addonCMSuffix[addon])
+}
+
+func validEmail(email string) bool {
+	if email == "" {
+		return false
+	}
+	if !strings.Contains(email, "@") {
+		return false
+	}
+	return true
 }

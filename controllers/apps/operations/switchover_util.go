@@ -42,6 +42,8 @@ import (
 
 const (
 	SwitchoverCandidateInstanceForAnyPod = "*"
+	SwitchoverCheckJobKey                = "CheckJob"
+	SwitchoverCheckRoleLabelKey          = "CheckRoleLabel"
 )
 
 // createSwitchoverJob creates a switchover job to do switchover.

@@ -86,7 +86,7 @@ func (y *yamlConfig) Unmarshal(str string) error {
 	if err != nil {
 		return err
 	}
-	y.config = transKeyString(config)
+	y.config = transKeyStringMap(config)
 	return nil
 }
 
@@ -133,14 +133,27 @@ func searchMap(m map[string]any, path []string) any {
 	}
 }
 
-func transKeyString(m map[any]any) map[string]any {
+func transKeyStringMap(m map[any]any) map[string]any {
 	m2 := make(map[string]any, len(m))
 	for k, v := range m {
-		if vi, ok := v.(map[any]any); ok {
-			m2[cast.ToString(k)] = transKeyString(vi)
-		} else {
-			m2[cast.ToString(k)] = v
+		switch k := k.(type) {
+		case string:
+			m2[k] = convert(v)
+		default:
+			m2[cast.ToString(k)] = convert(v)
 		}
 	}
 	return m2
+}
+
+func convert(v any) any {
+	switch t := v.(type) {
+	case map[any]any:
+		return transKeyStringMap(t)
+	case []any:
+		for i, vv := range t {
+			t[i] = convert(vv)
+		}
+	}
+	return v
 }

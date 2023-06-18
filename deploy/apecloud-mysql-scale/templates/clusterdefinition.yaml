@@ -36,7 +36,7 @@ spec:
             targetPort: delvedebug
       podSpec:
         containers:
-          - name: mysql
+          - name: vtgate
             imagePullPolicy: IfNotPresent
             ports:
               - containerPort: 15001
@@ -107,6 +107,7 @@ spec:
                   --pid_file $VTDATAROOT/vtgate.pid \
                   --mysql_auth_server_impl none
                 EOF
+
     - name: mysql
       characterType: mysql
       probes:
@@ -268,7 +269,7 @@ spec:
                 port: http-metrics
           - name: vttablet
             image: {{ .Values.wesqlscale.image.registry | default "docker.io" }}/{{ .Values.wesqlscale.image.repository }}:{{ .Values.wesqlscale.image.tag }}
-            imagePullPolicy: {{ default .Values.wesqlscale.image.pullPolicy "IfNotPresent" }} 
+            imagePullPolicy: {{ default .Values.wesqlscale.image.pullPolicy "IfNotPresent" }}
             ports:
               - containerPort: 15100
                 name: vttabletport
@@ -290,7 +291,7 @@ spec:
               - name: VTTABLET_GRPC_PORT
                 value: "16100"
               - name: VTCTLD_HOST
-                value: "$(KB_CLUSTER_NAME)-vtctld-headless" 
+                value: "$(KB_CLUSTER_NAME)-vtctld-headless"
               - name: VTCTLD_WEB_PORT
                 value: "15000"
               - name: MYSQL_ROOT_USER
@@ -359,32 +360,32 @@ spec:
                 --service_map 'grpc-queryservice,grpc-tabletmanager,grpc-updatestream' \
                 --pid_file $VTDATAROOT/vttablet.pid \
                 --vtctld_addr http://$vtctld_host:$vtctld_web_port/ \
-                --disable_active_reparents 
+                --disable_active_reparents
                 EOF
       systemAccounts:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
           command:
-          - mysql
+            - mysql
           args:
-          - -u$(MYSQL_ROOT_USER)
-          - -p$(MYSQL_ROOT_PASSWORD)
-          - -h$(KB_ACCOUNT_ENDPOINT)
-          - -e
-          - $(KB_ACCOUNT_STATEMENT)
+            - -u$(MYSQL_ROOT_USER)
+            - -p$(MYSQL_ROOT_PASSWORD)
+            - -h$(KB_ACCOUNT_ENDPOINT)
+            - -e
+            - $(KB_ACCOUNT_STATEMENT)
           env:
-          - name: MYSQL_ROOT_USER
-            valueFrom:
-              secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
-                key: username
-                optional: false
-          - name: MYSQL_ROOT_PASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: $(CONN_CREDENTIAL_SECRET_NAME)
-                key: password
-                optional: false
+            - name: MYSQL_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: username
+                  optional: false
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: $(CONN_CREDENTIAL_SECRET_NAME)
+                  key: password
+                  optional: false
         passwordConfig:
           length: 10
           numDigits: 5
@@ -409,23 +410,23 @@ spec:
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
+              statements:
                 creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
-                deletion: DROP USER IF EXISTS $(USERNAME);              
+                deletion: DROP USER IF EXISTS $(USERNAME);
           - name: kbmonitoring
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
+              statements:
                 creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION CLIENT, PROCESS ON *.* TO $(USERNAME); GRANT SELECT ON performance_schema.* TO $(USERNAME);
-                deletion: DROP USER IF EXISTS $(USERNAME);            
+                deletion: DROP USER IF EXISTS $(USERNAME);
           - name: kbreplicator
             provisionPolicy:
               type: CreateByStmt
               scope: AnyPods
-              statements:        
+              statements:
                 creation: CREATE USER IF NOT EXISTS $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION SLAVE ON *.* TO $(USERNAME) WITH GRANT OPTION;
-                deletion: DROP USER IF EXISTS $(USERNAME);                   
+                deletion: DROP USER IF EXISTS $(USERNAME);
     - name: etcd
       characterType: etcd
       workloadType: Stateful
@@ -433,7 +434,7 @@ spec:
         ports:
           - name: client
             port: 2379
-            targetPort: client 
+            targetPort: client
       podSpec:
         containers:
           - name: etcd
@@ -451,11 +452,11 @@ spec:
               - name: ETCD_PORT
                 value: "2379"
               - name: TOPOLOGY_FLAGS
-                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"  
-            command: 
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+            command:
               - /bin/bash
               - -c
-              - |   
+              - |
                 echo "staring etcd."
                 etcd_port=${ETCD_PORT:-'2379'}
                 etcd_server=${ETCD_SERVER:-'127.0.0.1'}
@@ -472,7 +473,7 @@ spec:
                   command:
                     - /bin/bash
                     - -c
-                    - |   
+                    - |
                       etcd_port=${ETCD_PORT:-'2379'}
                       etcd_server=${ETCD_SERVER:-'127.0.0.1'}
 
@@ -526,15 +527,15 @@ spec:
               - name: VTCTLD_SERVER
                 value: "$(KB_CLUSTER_NAME)-vtctld-headless"
               - name: VTCTLD_WEB_PORT
-                value: "15000" 
+                value: "15000"
               - name: VTCTLD_GRPC_PORT
                 value: "15999"
               - name: ETCD_SERVER
                 value: "$(KB_CLUSTER_NAME)-etcd-headless"
               - name: ETCD_PORT
-                value: "2379" 
+                value: "2379"
               - name: TOPOLOGY_FLAGS
-                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"                
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
             command:
               - /bin/bash
               - -c
@@ -556,7 +557,7 @@ spec:
                 --log_dir $VTDATAROOT \
                 --port $vtctld_web_port \
                 --grpc_port $grpc_port \
-                --pid_file $VTDATAROOT/vtctld.pid 
+                --pid_file $VTDATAROOT/vtctld.pid
                 EOF
     - name: vtconsensus
       characterType: vtconsensus
@@ -594,13 +595,13 @@ spec:
                     key: password
                     optional: false
               - name: VTCONSENSUS_PORT
-                value: "16000" 
+                value: "16000"
               - name: ETCD_SERVER
                 value: "$(KB_CLUSTER_NAME)-etcd-headless"
               - name: ETCD_PORT
-                value: "2379" 
+                value: "2379"
               - name: TOPOLOGY_FLAGS
-                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"                
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
             command:
               - /bin/bash
               - -c

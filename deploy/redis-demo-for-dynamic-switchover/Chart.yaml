@@ -11,6 +11,7 @@ appVersion: "7.0.6"
 home: https://redis.io/
 icon: https://bitnami.com/assets/stacks/redis/img/redis-stack-220x234.png
 keywords:
+  - redis
   - redis-demo
   - database
   - nosql

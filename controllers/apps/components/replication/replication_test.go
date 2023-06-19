@@ -87,15 +87,10 @@ var _ = Describe("Replication Component", func() {
 				Create(&testCtx).GetObject()
 
 			By("Creating a cluster with replication workloadType.")
-			switchoverCandidate := &appsv1alpha1.SwitchoverCandidate{
-				Index:    1,
-				Operator: appsv1alpha1.CandidateOpEqual,
-			}
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(testapps.DefaultRedisCompSpecName, testapps.DefaultRedisCompDefName).
 				SetReplicas(testapps.DefaultReplicationReplicas).
-				SetSwitchoverCandidate(switchoverCandidate).
 				Create(&testCtx).GetObject()
 
 			// mock cluster is Running
@@ -245,17 +240,6 @@ var _ = Describe("Replication Component", func() {
 			Expect(err).To(Succeed())
 			Expect(len(vertexes)).To(Equal(1))
 			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.UPDATE).To(BeTrue())
-
-			// TODO(refactor): replace replicationComponent with the real ReplicationSet and replicationComponent.Component.GetSynthesizedComponent() cannot be nil
-			By("Test HandleFailover")
-			vertexes, err = replicationComponent.HandleFailover(ctx, replicationSetSts)
-			Expect(err).Should(Succeed())
-			Expect(len(vertexes)).To(Equal(0))
-
-			By("Test HandleSwitchover")
-			vertexes, err = replicationComponent.HandleSwitchover(ctx, replicationSetSts)
-			Expect(err).Should(Succeed())
-			Expect(len(vertexes)).To(Equal(0))
 		})
 	})
 })

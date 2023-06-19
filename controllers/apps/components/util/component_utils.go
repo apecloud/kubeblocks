@@ -627,3 +627,12 @@ func replaceKBEnvPlaceholderTokens(cluster *appsv1alpha1.Cluster, componentName,
 	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(cluster.Name, string(cluster.UID), componentName)
 	return componentutil.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
 }
+
+// GetRunningPods gets the running pods of the specified statefulSet.
+func GetRunningPods(ctx context.Context, cli client.Client, obj client.Object) ([]corev1.Pod, error) {
+	sts := ConvertToStatefulSet(obj)
+	if sts == nil || sts.Generation != sts.Status.ObservedGeneration {
+		return nil, nil
+	}
+	return GetPodListByStatefulSet(ctx, cli, sts)
+}

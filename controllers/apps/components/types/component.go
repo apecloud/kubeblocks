@@ -116,12 +116,6 @@ type ComponentSet interface {
 
 	// HandleRoleChange handles the role change of component.
 	HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
-
-	// HandleSwitchover handles the switchover of component.
-	HandleSwitchover(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
-
-	// HandleFailover handles the failover of component.
-	HandleFailover(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
 }
 
 // ComponentSetBase is a common component set base struct.

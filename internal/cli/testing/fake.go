@@ -286,6 +286,23 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 					ConfigConstraintRef: "mysql8.0-config-constraints",
 				},
 			},
+			SwitchoverSpec: &appsv1alpha1.SwitchoverSpec{
+				CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
+					Image: "",
+				},
+				WithCandidate: &appsv1alpha1.SwitchoverAction{
+					CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
+						Command: []string{"mysql"},
+						Args:    []string{"-h$(KB_CONSENSUS_LEADER_POD_FQDN)", "-e $(KB_SWITCHOVER_ACTION)"},
+					},
+				},
+				WithoutCandidate: &appsv1alpha1.SwitchoverAction{
+					CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
+						Command: []string{"mysql"},
+						Args:    []string{"-h$(KB_CONSENSUS_LEADER_POD_FQDN)", "-e $(KB_ACCOUNT_STATEMENT)"},
+					},
+				},
+			},
 		},
 	}
 	return clusterDef

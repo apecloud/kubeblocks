@@ -101,7 +101,6 @@ type ClusterStatus struct {
 }
 
 // ClusterComponentSpec defines the cluster component spec.
-// +kubebuilder:validation:XValidation:rule="has(self.switchoverCandidate) ? self.switchoverCandidate.index < self.replicas : !has(self.switchoverCandidate)",message="switchoverCandidate.index cannot be larger than replicas"
 type ClusterComponentSpec struct {
 	// name defines cluster's component name.
 	// +kubebuilder:validation:Required
@@ -163,10 +162,6 @@ type ClusterComponentSpec struct {
 	// Services expose endpoints that can be accessed by clients.
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`
-
-	// switchoverCandidate is used to trigger switchover and describe the information of the candidate primary or leader.
-	// +optional
-	SwitchoverCandidate *SwitchoverCandidate `json:"switchoverCandidate,omitempty"`
 
 	// switchPolicy defines the strategy for switchover and failover when workloadType is Replication.
 	// +optional
@@ -292,32 +287,6 @@ type ReplicationMemberStatus struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=Unknown
 	Pod string `json:"pod"`
-}
-
-type SwitchoverCandidate struct {
-	// index of the candidate instance, 0 <= index <= componentSpecs[x].replicas-1.
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:validation:Required
-	Index int32 `json:"index"`
-
-	// operator represents a relationship to the index value. Valid operators are Equal and NotEqual.
-	// Equal indicates that the user expects that new candidate primary or leader is equal to index,
-	// which is often used in the scenario of specifying the candidate primary or leader for switchover.
-	// NotEqual indicates that the user expects that the value of the new candidate primary or leader is not equal to index,
-	// which is often used in scenarios where the candidate primary or leader is not specified for switchover.
-	// In particular, if operator is NotEqual and the specified index is not the real primary or leader of the current instance, no switchover will be performed.
-	// +kubebuilder:validation:Required
-	Operator CandidateOperator `json:"operator"`
-
-	// In some specific scenarios, such as failover and horizontal scaling down, the role information of the instance may change,
-	// allowWriteBackIndex indicates whether to synchronize the results of roleChange to switchoverCandidate.
-	// true indicates that the results of the roleChange will be asynchronously synchronized to switchoverCandidate field,
-	// the index will be synchronized with the new primary or leader index, and the operator will be synchronized to Equal.
-	// false indicates that the results of roleChange will not be synchronized to the switchoverCandidate.
-	// At this situation, there may be inconsistencies between the switchoverCandidate and the real primary or leader instance,
-	// If consistency is required, the user needs to manually update the index and operator value.
-	// +kubebuilder:validation:Required
-	AllowWriteBackIndex bool `json:"allowWriteBackIndex"`
 }
 
 type ClusterSwitchPolicy struct {

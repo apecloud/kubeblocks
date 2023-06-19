@@ -22,10 +22,11 @@ package internal
 import (
 	"context"
 
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
+
+	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // check volume snapshot available

@@ -319,12 +319,21 @@ func (o *OperationsOptions) Validate() error {
 func (o *OperationsOptions) validatePromote(cluster *appsv1alpha1.Cluster) error {
 	var (
 		clusterDefObj = appsv1alpha1.ClusterDefinition{}
-		compDefObj    = &appsv1alpha1.ClusterComponentDefinition{}
 		podObj        = &corev1.Pod{}
+		componentName string
 	)
-	componentName := o.ComponentNames[0]
+
+	if len(cluster.Spec.ComponentSpecs) == 0 {
+		return fmt.Errorf("cluster.Spec.ComponentSpecs cannot be empty")
+	}
+
 	if o.Component != "" {
 		componentName = o.Component
+	} else {
+		if len(cluster.Spec.ComponentSpecs) > 1 {
+			return fmt.Errorf("there are multiple components in cluster, please use --component to specify the component for promote")
+		}
+		componentName = cluster.Spec.ComponentSpecs[0].Name
 	}
 
 	if o.Instance != "" {
@@ -333,21 +342,18 @@ func (o *OperationsOptions) validatePromote(cluster *appsv1alpha1.Cluster) error
 			Namespace: cluster.Namespace,
 			Name:      o.Instance,
 		}
-		if err := util.GetResourceObjectFromGVR(types.PodGVR(), podKey, o.Dynamic, podObj); err != nil {
-			return err
-		}
-		if podObj == nil {
+		if err := util.GetResourceObjectFromGVR(types.PodGVR(), podKey, o.Dynamic, podObj); err != nil || podObj == nil {
 			return fmt.Errorf("instance %s not found, please check the validity of the instance using \"kbcli cluster list-instances\"", o.Instance)
-		}
-		if !strings.HasPrefix(podObj.Name, fmt.Sprintf("%s-%s", cluster.Name, componentName)) {
-			return fmt.Errorf("instance  %s does not belong to the current component, please check the validity of the instance using \"kbcli cluster list-instances\"", o.Instance)
 		}
 		v, ok := podObj.Labels[constant.RoleLabelKey]
 		if !ok || v == "" {
-			return fmt.Errorf("this instance %s cannot be promoted because it had a invalid role label", o.Instance)
+			return fmt.Errorf("instance %s cannot be promoted because it had a invalid role label", o.Instance)
 		}
 		if v == constant.Primary || v == constant.Leader {
-			return fmt.Errorf("this instance %s cannot be promoted because it is already the primary or leader instance", o.Instance)
+			return fmt.Errorf("instance %s cannot be promoted because it is already the primary or leader instance", o.Instance)
+		}
+		if !strings.HasPrefix(podObj.Name, fmt.Sprintf("%s-%s", cluster.Name, componentName)) {
+			return fmt.Errorf("instance %s does not belong to the current component, please check the validity of the instance using \"kbcli cluster list-instances\"", o.Instance)
 		}
 	}
 
@@ -359,8 +365,10 @@ func (o *OperationsOptions) validatePromote(cluster *appsv1alpha1.Cluster) error
 	if err := util.GetResourceObjectFromGVR(types.ClusterDefGVR(), clusterDefKey, o.Dynamic, &clusterDefObj); err != nil {
 		return err
 	}
+	var compDefObj *appsv1alpha1.ClusterComponentDefinition
+	fmt.Println(clusterDefObj.Spec.ComponentDefs)
 	for _, compDef := range clusterDefObj.Spec.ComponentDefs {
-		if compDef.Name == componentName {
+		if compDef.Name == cluster.Spec.GetComponentDefRefName(componentName) {
 			compDefObj = &compDef
 			break
 		}

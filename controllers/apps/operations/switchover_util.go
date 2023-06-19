@@ -46,6 +46,32 @@ const (
 	SwitchoverCheckRoleLabelKey          = "CheckRoleLabel"
 )
 
+// needDoSwitchover checks whether we need to perform a switchover.
+func needDoSwitchover(ctx context.Context,
+	cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	componentSpec *appsv1alpha1.ClusterComponentSpec,
+	switchover *appsv1alpha1.Switchover) (bool, error) {
+	// get the Pod object whose current role label is primary or leader
+	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, componentSpec.Name, componentSpec.ComponentDefRef)
+	if err != nil {
+		return false, err
+	}
+	if pod == nil {
+		return false, nil
+	}
+	switch switchover.InstanceName {
+	case SwitchoverCandidateInstanceForAnyPod:
+		return true, nil
+	default:
+		// If the current instance is already the primary or leader, then no switchover will be performed.
+		if pod.Name == switchover.InstanceName {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 // createSwitchoverJob creates a switchover job to do switchover.
 func createSwitchoverJob(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -377,31 +403,34 @@ func cleanJobByName(ctx context.Context,
 }
 
 // checkJobSucceed checks the result of job execution.
+// Returns:
+// - bool: whether job exist, true exist
+// - error: any error that occurred during the handling
 func checkJobSucceed(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	jobName string) error {
+	jobName string) (bool, error) {
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
 	currentJob := batchv1.Job{}
 	exists, err := intctrlutil.CheckResourceExists(ctx, cli, key, &currentJob)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if !exists {
-		return errors.New("job not exist, pls check.")
+		return false, nil
 	}
 	jobStatusConditions := currentJob.Status.Conditions
 	if len(jobStatusConditions) > 0 {
 		switch jobStatusConditions[0].Type {
 		case batchv1.JobComplete:
-			return nil
+			return true, nil
 		case batchv1.JobFailed:
-			return errors.New("job failed, pls check.")
+			return true, errors.New("job failed, pls check.")
 		default:
-			return intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for job %s finished.", key.Name)
+			return true, intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for job %s finished.", key.Name)
 		}
 	} else {
-		return errors.New("job check conditions status failed")
+		return true, errors.New("job check conditions status failed")
 	}
 }
 

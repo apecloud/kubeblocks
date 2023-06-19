@@ -24,12 +24,12 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/ghodss/yaml"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
 func TestConfigPatch(t *testing.T) {

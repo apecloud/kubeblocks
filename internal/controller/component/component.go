@@ -103,7 +103,6 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		Issuer:                clusterCompSpec.Issuer,
 		ComponentDef:          clusterCompSpec.ComponentDefRef,
 		ServiceAccountName:    clusterCompSpec.ServiceAccountName,
-		SwitchoverCandidate:   clusterCompSpec.SwitchoverCandidate,
 	}
 
 	if len(clusterCompVers) > 0 && clusterCompVers[0] != nil {

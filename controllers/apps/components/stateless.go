@@ -271,8 +271,10 @@ func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
 	MergeAnnotations(deployObj.Spec.Template.Annotations, &deployProto.Spec.Template.Annotations)
 	BuildWorkLoadAnnotations(deployObjCopy, c.Cluster)
 	deployObjCopy.Spec = deployProto.Spec
+
+	util.ResolvePodSpecDefaultFields(deployObj.Spec.Template.Spec, &deployObjCopy.Spec.Template.Spec)
+
 	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
-		// TODO(REVIEW): always return true and update component phase to Updating. deployObj.Spec contains default values which set by Kubernetes
 		c.WorkloadVertex.Obj = deployObjCopy
 		c.WorkloadVertex.Action = ictrltypes.ActionUpdatePtr()
 		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload updated")

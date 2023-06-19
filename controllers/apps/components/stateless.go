@@ -272,7 +272,7 @@ func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
 	BuildWorkLoadAnnotations(deployObjCopy, c.Cluster)
 	deployObjCopy.Spec = deployProto.Spec
 
-	util.ResolvePodSpecDefaultFields(deployObj.Spec.Template.Spec, &deployObjCopy.Spec.Template.Spec)
+	ResolvePodSpecDefaultFields(deployObj.Spec.Template.Spec, &deployObjCopy.Spec.Template.Spec)
 
 	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
 		c.WorkloadVertex.Obj = deployObjCopy

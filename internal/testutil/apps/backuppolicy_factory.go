@@ -80,10 +80,9 @@ func (factory *MockBackupPolicyFactory) setScheduleField(setField func(scheduleP
 	case dataprotectionv1alpha1.BackupTypeSnapshot:
 		factory.get().Spec.Schedule.Snapshot = &dataprotectionv1alpha1.SchedulePolicy{}
 		schedulePolicy = factory.get().Spec.Schedule.Snapshot
-	// todo: set logfile schedule
 	case dataprotectionv1alpha1.BackupTypeLogFile:
 		factory.get().Spec.Schedule.Logfile = &dataprotectionv1alpha1.SchedulePolicy{}
-		schedulePolicy = factory.get().Spec.Schedule.Snapshot
+		schedulePolicy = factory.get().Spec.Schedule.Logfile
 	}
 	if schedulePolicy == nil {
 		// ignore
@@ -202,6 +201,13 @@ func (factory *MockBackupPolicyFactory) SetPVC(pvcName string) *MockBackupPolicy
 	factory.setCommonPolicyField(func(commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) {
 		commonPolicy.PersistentVolumeClaim.Name = pvcName
 		commonPolicy.PersistentVolumeClaim.InitCapacity = resource.MustParse(constant.DefaultBackupPvcInitCapacity)
+	})
+	return factory
+}
+
+func (factory *MockBackupPolicyFactory) SetBackupStatusUpdates(backupStatusUpdates []dataprotectionv1alpha1.BackupStatusUpdate) *MockBackupPolicyFactory {
+	factory.setBasePolicyField(func(basePolicy *dataprotectionv1alpha1.BasePolicy) {
+		basePolicy.BackupStatusUpdates = backupStatusUpdates
 	})
 	return factory
 }

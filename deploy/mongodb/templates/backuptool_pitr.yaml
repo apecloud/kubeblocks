@@ -4,9 +4,9 @@ metadata:
   name: mongodb-pitr-backup-tool
   labels:
     clusterdefinition.kubeblocks.io/name: mongodb
+    {{- include "mongodb.labels" . | nindent 4 }}
 spec:
   type: pitr
-  image: apecloud/wal-g:mongo-latest
   image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.wal-g.repository }}:{{ .Values.wal-g.tag }}
   deployKind: statefulSet
   env:

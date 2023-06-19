@@ -108,6 +108,7 @@ var _ = Describe("PITR Functions", func() {
 			synthesizedComponent *component.SynthesizedComponent
 			pvc                  *corev1.PersistentVolumeClaim
 			backup               *dpv1alpha1.Backup
+			backupTool           *dpv1alpha1.BackupTool
 		)
 
 		BeforeEach(func() {
@@ -144,6 +145,7 @@ var _ = Describe("PITR Functions", func() {
 				AddAppComponentLabel(mysqlCompName).
 				AddAppManangedByLabel().
 				AddVolume(volume).
+				AddLabels(constant.ConsensusSetAccessModeLabelKey, string(appsv1alpha1.ReadWrite)).
 				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 				AddNodeName("fake-node-name").
 				Create(&testCtx).GetObject()
@@ -154,7 +156,7 @@ var _ = Describe("PITR Functions", func() {
 				constant.BackupToolTypeLabelKey: "pitr",
 				constant.ClusterDefLabelKey:     clusterDefName,
 			})
-			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/pitr_backuptool.yaml",
+			backupTool = testapps.CreateCustomizedObj(&testCtx, "backup/pitr_backuptool.yaml",
 				backupSelfDefineObj, testapps.RandomizedObjName())
 			backupToolName = backupTool.Name
 
@@ -294,6 +296,13 @@ var _ = Describe("PITR Functions", func() {
 				fetched.Status.Phase = appsv1alpha1.RunningClusterPhase
 			})).Should(Succeed())
 			cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
+			err = DoPITR(ctx, testCtx.Cli, cluster, synthesizedComponent, scheme.Scheme)
+			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
+
+			By("mock the podScope is ReadWrite for logic restore")
+			Expect(testapps.ChangeObj(&testCtx, backupTool, func(tool *dpv1alpha1.BackupTool) {
+				tool.Spec.Logical.PodScope = dpv1alpha1.PodRestoreScopeReadWrite
+			})).Should(Succeed())
 			err = DoPITR(ctx, testCtx.Cli, cluster, synthesizedComponent, scheme.Scheme)
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
 

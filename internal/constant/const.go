@@ -238,3 +238,24 @@ const DefaultBackupPvcInitCapacity = "20Gi"
 const (
 	ComponentStatusDefaultPodName = "Unknown"
 )
+
+const (
+	// dataProtection env names
+
+	DP_DB_HOST                = "DB_HOST"                // db host for dataProtection
+	DP_DB_USER                = "DB_USER"                // db user for dataProtection
+	DP_DB_PASSWORD            = "DB_PASSWORD"            // db password for dataProtection
+	DP_BACKUP_DIR             = "BACKUP_DIR"             // the dest directory for backup data
+	DP_BACKUP_NAME            = "BACKUP_NAME"            // backup cr name
+	DP_TTL                    = "TTL"                    // backup time to live, reference the backupPolicy.spec.retention.ttl
+	DP_LOGFILE_TTL            = "LOGFILE_TTL"            // ttl for logfile backup, one more day than backupPolicy.spec.retention.ttl
+	DP_LOGFILE_TTL_SECOND     = "LOGFILE_TTL_SECOND"     // ttl seconds with LOGFILE_TTL, integer format
+	DP_ARCHIVE_INTERVAL       = "ARCHIVE_INTERVAL"       // archive interval for statefulSet deploy kind, trans from the schedule cronExpression for logfile
+	DP_BACKUP_INFO_FILE       = "BACKUP_INFO_FILE"       // the file name which retains the backup.status info
+	DP_TIME_FORMAT            = "TIME_FORMAT"            // golang time format string
+	DP_VOLUME_DATA_DIR        = "VOLUME_DATA_DIR"        //
+	DP_KB_RECOVERY_TIME       = "KB_RECOVERY_TIME"       // recovery time
+	DP_KB_RECOVERY_TIMESTAMP  = "KB_RECOVERY_TIMESTAMP"  // recovery timestamp
+	DP_BACKUP_START_TIME      = "BACKUP_START_TIME"      // backup start time
+	DP_BACKUP_START_TIMESTAMP = "BACKUP_START_TIMESTAMP" // backup start timestamp
+)

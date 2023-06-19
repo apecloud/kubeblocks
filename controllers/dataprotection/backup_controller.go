@@ -553,13 +553,18 @@ func (r *BackupReconciler) checkBackupIsCompletedDuringRunning(reqCtx intctrluti
 	backup *dataprotectionv1alpha1.Backup,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy) (bool, error) {
 	clusterName := backup.Labels[constant.AppInstanceLabelKey]
-	cluster := &appsv1alpha1.Cluster{}
-	existCluster, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, types.NamespacedName{Name: clusterName, Namespace: backup.Namespace}, cluster)
-	if err != nil {
-		return false, err
+	targetClusterExists := true
+	if clusterName != "" {
+		cluster := &appsv1alpha1.Cluster{}
+		var err error
+		targetClusterExists, err = intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, types.NamespacedName{Name: clusterName, Namespace: backup.Namespace}, cluster)
+		if err != nil {
+			return false, err
+		}
 	}
+
 	schedulePolicy := backupPolicy.Spec.GetCommonSchedulePolicy(backup.Spec.BackupType)
-	if schedulePolicy.Enable && existCluster {
+	if schedulePolicy.Enable && targetClusterExists {
 		return false, nil
 	}
 	patch := client.MergeFrom(backup.DeepCopy())
@@ -620,7 +625,7 @@ func (r *BackupReconciler) buildManifestsUpdaterContainer(backup *dataprotection
 		{Name: fmt.Sprintf("backup-%s", commonPolicy.PersistentVolumeClaim.Name), MountPath: backupPathBase},
 	}
 	container.Env = []corev1.EnvVar{
-		{Name: "BACKUP_INFO_FILE", Value: backupPathBase + pathPrefix + "/backup.info"},
+		{Name: constant.DP_BACKUP_INFO_FILE, Value: buildBackupInfoENV(pathPrefix)},
 	}
 	return container, nil
 }
@@ -645,7 +650,7 @@ func (r *BackupReconciler) buildStatefulSpec(reqCtx intctrlutil.RequestCtx,
 	interval := getIntervalSecondsForLogfile(backup.Spec.BackupType, schedulePolicy.CronExpression)
 	if interval != "" {
 		toolPodSpec.Containers[0].Env = append(toolPodSpec.Containers[0].Env, corev1.EnvVar{
-			Name:  "ARCHIVE_INTERVAL",
+			Name:  constant.DP_ARCHIVE_INTERVAL,
 			Value: interval,
 		})
 	}
@@ -1403,7 +1408,7 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 
 	// build pod dns string
 	envDBHost := corev1.EnvVar{
-		Name:  "DB_HOST",
+		Name:  constant.DP_DB_HOST,
 		Value: intctrlutil.BuildPodHostDNS(clusterPod),
 	}
 
@@ -1429,19 +1434,19 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 		RunAsUser:                &runAsUser}
 
 	envBackupName := corev1.EnvVar{
-		Name:  "BACKUP_NAME",
+		Name:  constant.DP_BACKUP_NAME,
 		Value: backup.Name,
 	}
 
 	envBackupDir := corev1.EnvVar{
-		Name:  "BACKUP_DIR",
+		Name:  constant.DP_BACKUP_DIR,
 		Value: backupPathBase + pathPrefix,
 	}
 
 	container.Env = []corev1.EnvVar{envDBHost, envBackupName, envBackupDir}
 	if commonPolicy.Target.Secret != nil {
 		envDBUser := corev1.EnvVar{
-			Name: "DB_USER",
+			Name: constant.DP_DB_USER,
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
@@ -1453,7 +1458,7 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 		}
 
 		envDBPassword := corev1.EnvVar{
-			Name: "DB_PASSWORD",
+			Name: constant.DP_DB_PASSWORD,
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
@@ -1470,17 +1475,17 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	if backupPolicy.Spec.Retention != nil && backupPolicy.Spec.Retention.TTL != nil {
 		ttl := backupPolicy.Spec.Retention.TTL
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  "TTL",
+			Name:  constant.DP_TTL,
 			Value: *ttl,
 		})
 		// one more day than the configured TTL for logfile backup
 		logTTL := dataprotectionv1alpha1.AddTTL(ttl, 24)
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  "LOGFILE_TTL",
+			Name:  constant.DP_LOGFILE_TTL,
 			Value: logTTL,
 		})
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  "LOGFILE_TTL_SECOND",
+			Name:  constant.DP_LOGFILE_TTL_SECOND,
 			Value: strconv.FormatInt(int64(math.Floor(dataprotectionv1alpha1.ToDuration(&logTTL).Seconds())), 10),
 		})
 	}
@@ -1576,7 +1581,7 @@ func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 			"eval kubectl -n %s patch backup %s --subresource=status --type=merge --patch '{\\\"status\\\":${backupInfo}}';"
 		args = fmt.Sprintf(args, backup.Namespace, backup.Name)
 		container.Env = []corev1.EnvVar{
-			{Name: "BACKUP_INFO_FILE", Value: backupPathBase + pathPrefix + "/backup.info"},
+			{Name: "BACKUP_INFO_FILE", Value: buildBackupInfoENV(pathPrefix)},
 		}
 		r.appendBackupVolumeMount(commonPolicy.PersistentVolumeClaim.Name, &podSpec, &container)
 		podSpec.ServiceAccountName = targetPod.Spec.ServiceAccountName

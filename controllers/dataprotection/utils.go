@@ -241,3 +241,7 @@ func cropJobName(jobName string) string {
 	}
 	return jobName
 }
+
+func buildBackupInfoENV(pathPrefix string) string {
+	return backupPathBase + pathPrefix + "/backup.info"
+}

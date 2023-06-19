@@ -860,7 +860,7 @@ func (pgOps *PostgresOperations) Promote(ctx context.Context, podName string) er
 		pgOps.Logger.Errorf("promote err: %v", err)
 		return err
 	}
-	pgOps.Logger.Infof("response: ", resp)
+	pgOps.Logger.Infof("promote success, response:%v", resp["stdout"])
 
 	err = pgOps.waitPromote(ctx)
 	return nil
@@ -1082,6 +1082,8 @@ func (pgOps *PostgresOperations) follow(ctx context.Context, podName string, nee
 			pgOps.Logger.Errorf("reload failed, err:%v", err)
 			return err
 		}
+
+		pgOps.Logger.Infof("successfully follow new leader:%s", leader)
 		return nil
 	}
 

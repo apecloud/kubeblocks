@@ -17,9 +17,10 @@ limitations under the License.
 package plan
 
 import (
-	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
+
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"

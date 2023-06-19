@@ -19,7 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package configuration
 
-import "github.com/apecloud/kubeblocks/internal/configuration/util"
+import (
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
+)
 
 func CreateMergePatch(oldVersion, newVersion interface{}, option CfgOption) (*ConfigPatchInfo, error) {
 
@@ -85,4 +88,16 @@ func difference(base *cfgWrapper, target *cfgWrapper) (*ConfigPatchInfo, error) 
 	}
 
 	return reconfigureInfo, nil
+}
+
+func TransformConfigPatchFromData(data map[string]string, format appsv1alpha1.CfgFileFormat, keys []string) (*ConfigPatchInfo, error) {
+	emptyData := func(m map[string]string) map[string]string {
+		r := make(map[string]string, len(m))
+		for key := range m {
+			r[key] = ""
+		}
+		return r
+	}
+	patch, _, err := CreateConfigPatch(emptyData(data), data, format, keys, false)
+	return patch, err
 }

@@ -150,7 +150,8 @@ func (r *ConsensusSet) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) 
 }
 
 func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
-	componentName string) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
+	componentName string,
+	originPhaseIsUpRunning bool) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	stsList := &appsv1.StatefulSetList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster,
 		componentName, stsList)
@@ -168,6 +169,7 @@ func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 		existLatestRevisionFailedPod bool
 		leaderIsReady                bool
 		consensusSpec                = r.getConsensusSpec()
+		statusMessages               = appsv1alpha1.ComponentMessageMap{}
 	)
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
@@ -179,12 +181,21 @@ func (r *ConsensusSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 			leaderIsReady = true
 			continue
 		}
-		if !intctrlutil.PodIsReady(&v) && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
+		// if component is up running but pod is not ready, this pod should be failed.
+		// for example: full disk cause readiness probe failed and serve is not available.
+		// but kubelet only sets the container is not ready and pod is also Running.
+		if originPhaseIsUpRunning && !intctrlutil.PodIsReady(&v) && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
 			existLatestRevisionFailedPod = true
+			continue
+		}
+		isFailed, _, message := internal.IsPodFailedAndTimedOut(&v)
+		if isFailed && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
+			existLatestRevisionFailedPod = true
+			statusMessages.SetObjectMessage(v.Kind, v.Name, message)
 		}
 	}
 	return util.GetCompPhaseByConditions(existLatestRevisionFailedPod, leaderIsReady,
-		componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas), nil, nil
+		componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas), statusMessages, nil
 }
 
 func (r *ConsensusSet) HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {

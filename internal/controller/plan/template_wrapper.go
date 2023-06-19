@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -119,6 +120,10 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1alpha1.Cluster
 			return err
 		}
 		updateCMConfigSpecLabels(newCMObj, configSpec)
+		if newCMObj.Annotations == nil {
+			newCMObj.Annotations = make(map[string]string)
+		}
+		newCMObj.Annotations[constant.CMConfigurationNewAnnotationKey] = strconv.FormatBool(origCMObj == nil)
 		if err := wrapper.addRenderedObject(configSpec.ComponentTemplateSpec, newCMObj, scheme); err != nil {
 			return err
 		}
@@ -290,13 +295,14 @@ func validateRenderedData(
 	}, configConstraint); err != nil {
 		return cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
 	}
+	return validateRawData(renderedData, configSpec, &configConstraint.Spec)
+}
 
-	configChecker := cfgcore.NewConfigValidator(&configConstraint.Spec, cfgcore.WithKeySelector(configSpec.Keys))
-
+func validateRawData(renderedData map[string]string, configSpec appsv1alpha1.ComponentConfigSpec, cc *appsv1alpha1.ConfigConstraintSpec) error {
+	configChecker := cfgcore.NewConfigValidator(cc, cfgcore.WithKeySelector(configSpec.Keys))
 	// NOTE: It is necessary to verify the correctness of the data
 	if err := configChecker.Validate(renderedData); err != nil {
 		return cfgcore.WrapError(err, "failed to validate configmap")
 	}
-
 	return nil
 }

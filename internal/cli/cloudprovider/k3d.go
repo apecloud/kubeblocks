@@ -204,6 +204,7 @@ func (p *localCloudProvider) GetClusterInfo() (*K8sClusterInfo, error) {
 		ClusterName:   types.K3dClusterName,
 		KubeConfig:    kubeConfig,
 		Region:        "",
+		KbcliVersion:  version.GetVersion(),
 	}, nil
 }
 

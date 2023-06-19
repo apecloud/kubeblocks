@@ -28,6 +28,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -56,6 +57,9 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent) ([]client.Object, error) {
 	resources := make([]client.Object, 0)
+	if cluster.UID == "" {
+		cluster.UID = types.UID("test-uid")
+	}
 	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
 		envConfig, err := builder.BuildEnvConfig(cluster, component)
 		if err != nil {

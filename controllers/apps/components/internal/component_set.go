@@ -54,7 +54,7 @@ type ComponentSet interface {
 
 	// GetPhaseWhenPodsNotReady when the pods of component are not ready, calculate the component phase is Failed or Abnormal.
 	// if return an empty phase, means the pods of component are ready and skips it.
-	GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (v1alpha1.ClusterComponentPhase, v1alpha1.ComponentMessageMap, error)
+	GetPhaseWhenPodsNotReady(ctx context.Context, componentName string, originPhaseIsUpRunning bool) (v1alpha1.ClusterComponentPhase, v1alpha1.ComponentMessageMap, error)
 
 	HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
 

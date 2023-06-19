@@ -49,6 +49,7 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -71,6 +72,7 @@ type InstallOpts struct {
 	Timeout         time.Duration
 	Atomic          bool
 	DisableHooks    bool
+	ForceUninstall  bool
 
 	// for helm template
 	DryRun    *bool
@@ -313,9 +315,75 @@ func (i *InstallOpts) tryUninstall(cfg *action.Configuration) error {
 	}()
 
 	if _, err := client.Run(i.Name); err != nil {
-		return err
+		if i.ForceUninstall {
+			// Remove secrets left over when uninstalling kubeblocks, when addon CRD is uninstalled before kubeblocks.
+			secretCount, errRemove := i.RemoveRemainSecrets(cfg)
+			if secretCount == 0 {
+				return err
+			}
+			if errRemove != nil {
+				errMsg := fmt.Sprintf("failed to remove remain secrets, please remove them manually, %v", errRemove)
+				return errors.Wrap(err, errMsg)
+			}
+		} else {
+			return err
+		}
 	}
 	return nil
+}
+
+func (i *InstallOpts) RemoveRemainSecrets(cfg *action.Configuration) (int, error) {
+	clientSet, err := cfg.KubernetesClientSet()
+	if err != nil {
+		return -1, err
+	}
+
+	labelSelector := metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "name",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{i.Name},
+			},
+			{
+				Key:      "owner",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"helm"},
+			},
+			{
+				Key:      "status",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"uninstalling", "superseded"},
+			},
+		},
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
+	if err != nil {
+		fmt.Printf("Failed to build label selector: %v\n", err)
+		return -1, err
+	}
+	options := metav1.ListOptions{
+		LabelSelector: selector.String(),
+	}
+
+	secrets, err := clientSet.CoreV1().Secrets(i.Namespace).List(context.TODO(), options)
+	if err != nil {
+		return -1, err
+	}
+	secretCount := len(secrets.Items)
+	if secretCount == 0 {
+		return 0, nil
+	}
+
+	for _, secret := range secrets.Items {
+		err := clientSet.CoreV1().Secrets(i.Namespace).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
+		if err != nil {
+			klog.V(1).Info(err)
+			return -1, fmt.Errorf("failed to delete Secret %s: %v", secret.Name, err)
+		}
+	}
+	return secretCount, nil
 }
 
 func NewActionConfig(cfg *Config) (*action.Configuration, error) {
@@ -517,7 +585,7 @@ func GetChartVersions(chartName string) ([]*semver.Version, error) {
 		break
 	}
 
-	// do not find any index file
+	// cannot find any index file
 	if ind == nil {
 		return nil, nil
 	}

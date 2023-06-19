@@ -96,9 +96,9 @@ var _ = Describe("kubeblocks", func() {
 		cmd := newOpenCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 
-		Expect(cmd.Flags().Set(podRunningTimeoutFlag, time.Second.String())).Should(Succeed())
 		By("open options")
 		o := newOpenOptions(tf, streams)
+		Expect(cmd.Flags().Set(podRunningTimeoutFlag, time.Second.String())).Should(Succeed())
 		Expect(o).ShouldNot(BeNil())
 		Expect(o.complete(cmd, []string{})).Should(HaveOccurred())
 		Expect(o.complete(cmd, []string{"kubeblocks-grafana"})).Should(HaveOccurred())

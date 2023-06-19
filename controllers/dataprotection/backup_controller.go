@@ -487,7 +487,7 @@ func (r *BackupReconciler) doCompletedPhaseAction(
 func (r *BackupReconciler) updateStatusIfFailed(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup, err error) (ctrl.Result, error) {
 	patch := client.MergeFrom(backup.DeepCopy())
-	controllerErr := intctrlutil.ToControllerError(err)
+	controllerErr := intctrlutil.UnwrapControllerError(err)
 	if controllerErr != nil {
 		r.Recorder.Eventf(backup, corev1.EventTypeWarning, string(controllerErr.Type), err.Error())
 	} else {
@@ -659,6 +659,23 @@ func (r *BackupReconciler) createVolumeSnapshot(
 	return nil
 }
 
+var configVolumeSnapshotError = []string{
+	"Failed to set default snapshot class with error",
+	"Failed to get snapshot class with error",
+}
+
+func isVolumeSnapshotConfigError(snap *snapshotv1.VolumeSnapshot) bool {
+	if snap.Status == nil || snap.Status.Error == nil || snap.Status.Error.Message == nil {
+		return false
+	}
+	for _, errMsg := range configVolumeSnapshotError {
+		if strings.Contains(*snap.Status.Error.Message, errMsg) {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *BackupReconciler) ensureVolumeSnapshotReady(reqCtx intctrlutil.RequestCtx,
 	key types.NamespacedName) (bool, error) {
 
@@ -671,8 +688,8 @@ func (r *BackupReconciler) ensureVolumeSnapshotReady(reqCtx intctrlutil.RequestC
 	ready := false
 	if exists && snap.Status != nil {
 		// check if snapshot status throws an error, e.g. csi does not support volume snapshot
-		if snap.Status.Error != nil && snap.Status.Error.Message != nil {
-			return ready, errors.New(*snap.Status.Error.Message)
+		if isVolumeSnapshotConfigError(snap) {
+			return false, errors.New(*snap.Status.Error.Message)
 		}
 		if snap.Status.ReadyToUse != nil {
 			ready = *(snap.Status.ReadyToUse)
@@ -917,7 +934,7 @@ func buildBackupLabels(backup *dataprotectionv1alpha1.Backup) map[string]string 
 	if labels == nil {
 		labels = map[string]string{}
 	}
-	labels[dataProtectionLabelBackupNameKey] = backup.Name
+	labels[constant.DataProtectionLabelBackupNameKey] = backup.Name
 	return labels
 }
 

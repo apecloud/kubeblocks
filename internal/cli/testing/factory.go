@@ -122,5 +122,23 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 				},
 			},
 		},
+		{
+			Group: metav1.APIGroup{
+				Name: "chaos-mesh.org",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{GroupVersion: "chaos-mesh.org/v1alpha1", Version: "v1alpha1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{
+					GroupVersion: "chaos-mesh.org/v1alpha1",
+					Version:      "v1alpha1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1alpha1": {
+					{Name: "podchaoses", Namespaced: true, Kind: "PodChaos"},
+					{Name: "networkchaoses", Namespaced: true, Kind: "NetworkChaos"},
+					{Name: "httpchaoses", Namespaced: true, Kind: "HTTPChaos"},
+				},
+			},
+		},
 	}
 }

@@ -31,7 +31,6 @@ import (
 	"golang.org/x/exp/slices"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -103,6 +102,7 @@ type initOptions struct {
 	clusterVersion string
 	cloudProvider  string
 	region         string
+	dockerVersion  string
 	autoApprove    bool
 
 	baseOptions
@@ -119,6 +119,7 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 		Long:    initLong,
 		Example: initExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.complete())
 			util.CheckErr(o.validate())
 			util.CheckErr(o.run())
 		},
@@ -140,6 +141,16 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	return cmd
 }
 
+func (o *initOptions) complete() error {
+	var err error
+
+	if o.cloudProvider != cp.Local {
+		return nil
+	}
+	o.dockerVersion, err = util.GetDockerVersion()
+	return err
+}
+
 func (o *initOptions) validate() error {
 	if !slices.Contains(supportedCloudProviders, o.cloudProvider) {
 		return fmt.Errorf("cloud provider %s is not supported, only support %v", o.cloudProvider, supportedCloudProviders)
@@ -151,6 +162,10 @@ func (o *initOptions) validate() error {
 
 	if o.clusterDef == "" {
 		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one")
+	}
+
+	if o.cloudProvider == cp.Local && o.dockerVersion < version.MinimumDockerVersion {
+		return fmt.Errorf("your docker version %s is lower than the minimum version %s, please upgrade your docker", o.dockerVersion, version.MinimumDockerVersion)
 	}
 
 	if err := o.baseOptions.validate(); err != nil {
@@ -168,6 +183,9 @@ func (o *initOptions) run() error {
 
 // local bootstraps a playground in the local host
 func (o *initOptions) local() error {
+	// print the system info
+	util.PrintSystemInfo(o.Out)
+
 	provider, err := cp.New(o.cloudProvider, "", o.Out, o.ErrOut)
 	if err != nil {
 		return err
@@ -373,14 +391,6 @@ func (o *initOptions) setKubeConfig(info *cp.K8sClusterInfo) error {
 
 func (o *initOptions) installKBAndCluster(info *cp.K8sClusterInfo) error {
 	var err error
-
-	// when the kubernetes cluster is not ready, the runtime will output the error
-	// message like "couldn't get resource list for", we ignore it
-	runtime.ErrorHandlers[0] = func(err error) {
-		if klog.V(1).Enabled() {
-			klog.ErrorDepth(2, err)
-		}
-	}
 
 	// write kubeconfig content to a temporary file and use it
 	if err = writeAndUseKubeConfig(info.KubeConfig, o.kubeConfigPath, o.Out); err != nil {

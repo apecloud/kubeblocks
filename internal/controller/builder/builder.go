@@ -31,7 +31,6 @@ import (
 	"github.com/google/uuid"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -118,13 +117,15 @@ func processContainersInjection(reqCtx intctrlutil.RequestCtx,
 		&podSpec.InitContainers,
 	} {
 		for i := range *cc {
-			injectEnvs(cluster, component, envConfigName, &(*cc)[i])
+			if err := injectEnvs(cluster, component, envConfigName, &(*cc)[i]); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string, c *corev1.Container) {
+func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string, c *corev1.Container) error {
 	// can not use map, it is unordered
 	envFieldPathSlice := []struct {
 		name      string
@@ -179,6 +180,22 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 			{Name: "KB_TLS_KEY_FILE", Value: KeyName},
 		}...)
 	}
+
+	if udeValue, ok := cluster.Annotations[constant.ExtraEnvAnnotationKey]; ok {
+		udeMap := make(map[string]string)
+		if err := json.Unmarshal([]byte(udeValue), &udeMap); err != nil {
+			return err
+		}
+		for k, v := range udeMap {
+			if k == "" || v == "" {
+				continue
+			}
+			toInjectEnvs = append(toInjectEnvs, corev1.EnvVar{
+				Name:  k,
+				Value: v,
+			})
+		}
+	}
 	// have injected variables placed at the front of the slice
 	if len(c.Env) == 0 {
 		c.Env = toInjectEnvs
@@ -186,7 +203,7 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 		c.Env = append(toInjectEnvs, c.Env...)
 	}
 	if envConfigName == "" {
-		return
+		return nil
 	}
 	c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
 		ConfigMapRef: &corev1.ConfigMapEnvSource{
@@ -195,13 +212,15 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 			},
 		},
 	})
+
+	return nil
 }
 
 // BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from sts to pvc.
-func BuildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.PersistentVolumeClaim,
-	component *component.SynthesizedComponent, pvcTplName string) {
+func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent, pvc *corev1.PersistentVolumeClaim,
+	pvcTplName string) {
 	// strict args checking.
-	if sts == nil || pvc == nil || component == nil {
+	if pvc == nil || component == nil {
 		return
 	}
 	if pvc.Labels == nil {
@@ -215,12 +234,6 @@ func BuildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.Persi
 				pvc.Labels[constant.VolumeTypeLabelKey] = string(t.Type)
 				break
 			}
-		}
-	}
-
-	for k, v := range sts.Labels {
-		if _, ok := pvc.Labels[k]; !ok {
-			pvc.Labels[k] = v
 		}
 	}
 }
@@ -290,7 +303,7 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	// update sts.spec.volumeClaimTemplates[].metadata.labels
 	if len(sts.Spec.VolumeClaimTemplates) > 0 && len(sts.GetLabels()) > 0 {
 		for index, vct := range sts.Spec.VolumeClaimTemplates {
-			BuildPersistentVolumeClaimLabels(&sts, &vct, component, vct.Name)
+			BuildPersistentVolumeClaimLabels(component, &vct, vct.Name)
 			sts.Spec.VolumeClaimTemplates[index] = vct
 		}
 	}
@@ -418,21 +431,22 @@ func BuildDeploy(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, c
 	return &deploy, nil
 }
 
-func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
-	vct corev1.PersistentVolumeClaimTemplate,
+func BuildPVC(cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
+	vct *corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
-	snapshotName string,
-	component *component.SynthesizedComponent) (*corev1.PersistentVolumeClaim, error) {
+	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
 	pvc := corev1.PersistentVolumeClaim{}
 	if err := buildFromCUE("pvc_template.cue", map[string]any{
-		"sts":                 sts,
+		"cluster":             cluster,
+		"component":           component,
 		"volumeClaimTemplate": vct,
 		"pvc_key":             pvcKey,
 		"snapshot_name":       snapshotName,
 	}, "pvc", &pvc); err != nil {
 		return nil, err
 	}
-	BuildPersistentVolumeClaimLabels(sts, &pvc, component, vct.Name)
+	BuildPersistentVolumeClaimLabels(component, &pvc, vct.Name)
 	return &pvc, nil
 }
 
@@ -506,15 +520,19 @@ func BuildEnvConfig(cluster *appsv1alpha1.Cluster, component *component.Synthesi
 	return &config, nil
 }
 
-func BuildBackup(sts *appsv1.StatefulSet,
+func BuildBackup(cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
 	backupPolicyName string,
-	backupKey types.NamespacedName) (*dataprotectionv1alpha1.Backup, error) {
+	backupKey types.NamespacedName,
+	backupType string) (*dataprotectionv1alpha1.Backup, error) {
 	backup := dataprotectionv1alpha1.Backup{}
 	if err := buildFromCUE("backup_job_template.cue", map[string]any{
-		"sts":                sts,
-		"backup_policy_name": backupPolicyName,
-		"backup_job_key":     backupKey,
-	}, "backup_job", &backup); err != nil {
+		"cluster":          cluster,
+		"component":        component,
+		"backupPolicyName": backupPolicyName,
+		"backupJobKey":     backupKey,
+		"backupType":       backupType,
+	}, "backupJob", &backup); err != nil {
 		return nil, err
 	}
 	return &backup, nil
@@ -534,28 +552,12 @@ func BuildVolumeSnapshot(snapshotKey types.NamespacedName,
 	return &snapshot, nil
 }
 
-func BuildCronJob(pvcKey types.NamespacedName,
-	schedule string,
-	sts *appsv1.StatefulSet) (*batchv1.CronJob, error) {
-	serviceAccount := viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
-	cronJob := batchv1.CronJob{}
-	if err := buildFromCUE("delete_pvc_cron_job_template.cue", map[string]any{
-		"pvc":                   pvcKey,
-		"cronjob.spec.schedule": schedule,
-		"cronjob.spec.jobTemplate.spec.template.spec.serviceAccount": serviceAccount,
-		"sts": sts,
-	}, "cronjob", &cronJob); err != nil {
-		return nil, err
-	}
-	return &cronJob, nil
-}
-
 func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
 	configs map[string]string,
 	cmName string,
 	configConstraintName string,
-	tplCfg appsv1alpha1.ComponentTemplateSpec) (*corev1.ConfigMap, error) {
+	configTemplateSpec appsv1alpha1.ComponentTemplateSpec) (*corev1.ConfigMap, error) {
 	const tplFile = "config_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
@@ -580,9 +582,9 @@ func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 			"compDefName":           component.CompDefName,
 			"characterType":         component.CharacterType,
 			"configName":            cmName,
-			"templateName":          tplCfg.TemplateRef,
+			"templateName":          configTemplateSpec.TemplateRef,
 			"configConstraintsName": configConstraintName,
-			"configTemplateName":    tplCfg.Name,
+			"configTemplateName":    configTemplateSpec.Name,
 		},
 	}
 	configBytes, err := json.Marshal(configMeta)
@@ -610,7 +612,7 @@ func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 	return &cm, nil
 }
 
-func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams) (*corev1.Container, error) {
+func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent) (*corev1.Container, error) {
 	const tplFile = "config_manager_sidecar.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
@@ -636,6 +638,10 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams)
 	}
 	container := corev1.Container{}
 	if err = json.Unmarshal(containerStrByte, &container); err != nil {
+		return nil, err
+	}
+
+	if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &container); err != nil {
 		return nil, err
 	}
 	return &container, nil
@@ -693,4 +699,46 @@ func BuildRestoreJob(name, namespace string, image string, command []string, arg
 		return nil, err
 	}
 	return job, nil
+}
+
+func BuildRestoreJobForFullBackup(
+	restoreJobName string,
+	component *component.SynthesizedComponent,
+	backup *dataprotectionv1alpha1.Backup,
+	backupTool *dataprotectionv1alpha1.BackupTool,
+	pvcName string) (*batchv1.Job, error) {
+	const tplFile = "restore_full_backup_job.cue"
+	job := batchv1.Job{}
+	if err := buildFromCUE(tplFile, map[string]any{
+		"restoreJobName": restoreJobName,
+		"component":      component,
+		"backup":         backup,
+		"backupTool":     backupTool,
+		"pvcName":        pvcName,
+	}, "job", &job); err != nil {
+		return nil, err
+	}
+	return &job, nil
+}
+
+func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas []appsv1alpha1.ToolConfig) ([]corev1.Container, error) {
+	toolContainers := make([]corev1.Container, 0, len(toolsMetas))
+	for _, toolConfig := range toolsMetas {
+		toolContainer := corev1.Container{
+			Name:            toolConfig.Name,
+			Command:         toolConfig.Command,
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			VolumeMounts:    sidecarRenderedParam.Volumes,
+		}
+		if toolConfig.Image != "" {
+			toolContainer.Image = toolConfig.Image
+		}
+		toolContainers = append(toolContainers, toolContainer)
+	}
+	for i := range toolContainers {
+		if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &toolContainers[i]); err != nil {
+			return nil, err
+		}
+	}
+	return toolContainers, nil
 }

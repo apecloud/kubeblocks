@@ -110,7 +110,8 @@ func (r *ReplicationSet) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod
 // when the pods of replicationSet are not ready, calculate the component phase is Failed or Abnormal.
 // if return an empty phase, means the pods of component are ready and skips it.
 func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
-	componentName string) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
+	componentName string,
+	originPhaseIsUpRunning bool) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	stsList := &appsv1.StatefulSetList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster,
 		componentName, stsList)
@@ -127,7 +128,7 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 	var (
 		existLatestRevisionFailedPod bool
 		primaryIsReady               bool
-		statusMessages               appsv1alpha1.ComponentMessageMap
+		statusMessages               = appsv1alpha1.ComponentMessageMap{}
 	)
 	for _, v := range podList.Items {
 		// if the pod is terminating, ignore it
@@ -140,15 +141,19 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 			continue
 		}
 		if labelValue == "" {
-			// REVIEW: this isn't a get function, where r.Cluster.Status.Components is being updated.
-			// patch abnormal reason to cluster.status.ComponentDefs.
-			if statusMessages == nil {
-				statusMessages = appsv1alpha1.ComponentMessageMap{}
-			}
 			statusMessages.SetObjectMessage(v.Kind, v.Name, "empty label for pod, please check.")
 		}
-		if !intctrlutil.PodIsReady(&v) && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
+		// if component is up running but pod is not ready, this pod should be failed.
+		// for example: full disk cause readiness probe failed and serve is not available.
+		// but kubelet only sets the container is not ready and pod is also Running.
+		if originPhaseIsUpRunning && !intctrlutil.PodIsReady(&v) && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
 			existLatestRevisionFailedPod = true
+			continue
+		}
+		isFailed, _, message := internal.IsPodFailedAndTimedOut(&v)
+		if isFailed && intctrlutil.PodIsControlledByLatestRevision(&v, &stsObj) {
+			existLatestRevisionFailedPod = true
+			statusMessages.SetObjectMessage(v.Kind, v.Name, message)
 		}
 	}
 	return util.GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryIsReady,

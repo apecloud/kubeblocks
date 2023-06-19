@@ -24,6 +24,8 @@ Usage: $(basename "$0") <options>
                                 12) send message
                                 13) patch release notes
                                 14) ignore cover pkgs
+                                15) set size label
+                                16) get test packages
     -tn, --tag-name           Release tag name
     -gr, --github-repo        Github Repo
     -gt, --github-token       Github token
@@ -31,12 +33,15 @@ Usage: $(basename "$0") <options>
     -bn, --branch-name        The branch name
     -c, --content             The trigger request content
     -bw, --bot-webhook        The bot webhook
-    -tt, --trigger-type       The trigger type (e.g. release/package)
+    -tt, --trigger-type       The trigger type
     -ru, --run-url            The run url
     -fl, --file               The release notes file
     -ip, --ignore-pkgs        The ignore cover pkgs
     -br, --base-branch        The base branch name
     -bc, --base-commit        The base commit id
+    -pn, --pr-number          The pull request number
+    -tp, --test-pkgs          The test packages
+    -tc, --test-check         The test check
 EOF
 }
 
@@ -44,10 +49,10 @@ GITHUB_API="https://api.github.com"
 LATEST_REPO=apecloud/kubeblocks
 
 main() {
-    local TYPE
-    local TAG_NAME
-    local GITHUB_REPO
-    local GITHUB_TOKEN
+    local TYPE=""
+    local TAG_NAME=""
+    local GITHUB_REPO=""
+    local GITHUB_TOKEN=""
     local TRIGGER_MODE=""
     local RUNNER_NAME=""
     local BRANCH_NAME=""
@@ -61,6 +66,10 @@ main() {
     local BASE_BRANCH=""
     local BASE_COMMIT=""
     local BASE_COMMIT_ID=HEAD^
+    local PR_NUMBER=""
+    local TEST_PACKAGES=""
+    local TEST_PKGS=""
+    local TEST_CHECK=""
 
     parse_command_line "$@"
 
@@ -106,6 +115,12 @@ main() {
         ;;
         14)
             ignore_cover_pkgs
+        ;;
+        15)
+            set_size_label
+        ;;
+        16)
+            get_test_packages
         ;;
         *)
             show_help
@@ -205,6 +220,24 @@ parse_command_line() {
                     shift
                 fi
                 ;;
+            -pn|--pr-number)
+                if [[ -n "${2:-}" ]]; then
+                    PR_NUMBER="$2"
+                    shift
+                fi
+                ;;
+            -tp|--test-pkgs)
+                if [[ -n "${2:-}" ]]; then
+                    TEST_PKGS="$2"
+                    shift
+                fi
+                ;;
+            -tc|--test-check)
+                if [[ -n "${2:-}" ]]; then
+                    TEST_CHECK="$2"
+                    shift
+                fi
+                ;;
             *)
                 break
                 ;;
@@ -215,9 +248,14 @@ parse_command_line() {
 }
 
 gh_curl() {
-    curl -H "Authorization: token $GITHUB_TOKEN" \
-      -H "Accept: application/vnd.github.v3.raw" \
-      $@
+    if [[ -z "$GITHUB_TOKEN" ]]; then
+        curl -H "Accept: application/vnd.github.v3.raw" \
+            $@
+    else
+        curl -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3.raw" \
+            $@
+    fi
 }
 
 get_upload_url() {
@@ -399,8 +437,8 @@ get_trigger_mode() {
     echo "BASE_COMMIT_ID:$BASE_COMMIT_ID"
     filePaths=$( git diff --name-only HEAD ${BASE_COMMIT_ID} )
     for filePath in $( echo "$filePaths" ); do
-        if [[ "$filePath" == "go."* ]]; then
-            add_trigger_mode "[test]"
+        if [[ "$filePath" == "go."* || "$filePath" == *".go" ]]; then
+            add_trigger_mode "[test][go]"
             continue
         elif [[ "$filePath" != *"/"* ]]; then
             add_trigger_mode "[other]"
@@ -486,6 +524,96 @@ ignore_cover_pkgs() {
         fi
         echo $line >> cover_new.out
     done < ${FILE}
+}
+
+set_size_label() {
+    pr_info=$( gh pr view $PR_NUMBER --repo $LATEST_REPO --json "additions,deletions,labels" )
+    pr_additions=$( echo "$pr_info" | jq -r '.additions' )
+    pr_deletions=$( echo "$pr_info" | jq -r '.deletions' )
+    total_changes=$(( $pr_additions + $pr_deletions ))
+    size_label=""
+    if [[ $total_changes -lt 10 ]]; then
+        size_label="size/XS"
+    elif [[ $total_changes -lt 30 ]]; then
+        size_label="size/S"
+    elif [[ $total_changes -lt 100 ]]; then
+        size_label="size/M"
+    elif [[ $total_changes -lt 500 ]]; then
+        size_label="size/L"
+    elif [[ $total_changes -lt 1000 ]]; then
+        size_label="size/XL"
+    else
+        size_label="size/XXL"
+    fi
+    echo "size label:$size_label"
+    label_list=$(  echo "$pr_info" | jq -r '.labels[].name' )
+    remove_label=""
+    add_label=true
+    for label in $( echo "$label_list" ); do
+        case $label in
+            $size_label)
+                add_label=false
+                continue
+            ;;
+            size/*)
+                if [[ -z "$remove_label" ]]; then
+                    remove_label=$label
+                else
+                    remove_label="$label,$remove_label"
+                fi
+            ;;
+        esac
+    done
+
+    if [[ ! -z "$remove_label" ]]; then
+        echo "remove label:$remove_label"
+        gh pr edit $PR_NUMBER --repo $LATEST_REPO --remove-label "$remove_label"
+    fi
+
+    if [[ $add_label == true ]]; then
+        echo "add label:$size_label"
+        gh pr edit $PR_NUMBER --repo $LATEST_REPO --add-label "$size_label"
+    fi
+}
+
+set_test_packages() {
+    pkgs_dir=$1
+    if ( find $pkgs_dir -maxdepth 1 -type f -name '*_test.go' ) > /dev/null; then
+        if [[ -z "$TEST_PACKAGES" ]]; then
+            TEST_PACKAGES="{\"ops\":\"$pkgs_dir\"}"
+        else
+            TEST_PACKAGES="$TEST_PACKAGES,{\"ops\":\"$pkgs_dir\"}"
+        fi
+    fi
+}
+
+set_test_check() {
+    check=$1
+    if [[ -z "$TEST_PACKAGES" ]]; then
+        TEST_PACKAGES="{\"ops\":\"$check\"}"
+    else
+        TEST_PACKAGES="$TEST_PACKAGES,{\"ops\":\"$check\"}"
+    fi
+}
+
+get_test_packages() {
+    if [[ "$TRIGGER_TYPE" != *"[test]"* ]]; then
+        echo $TEST_PACKAGES
+        return
+    fi
+    for check in $( echo "$TEST_CHECK" | sed 's/|/ /g' ); do
+        set_test_check $check
+    done
+
+    for pkgs in $( echo "$TEST_PKGS" | sed 's/|/ /g' ); do
+        for pkgs_dir in $( find $pkgs -maxdepth 1 -type d ) ; do
+            if [[ "$pkgs" == "$pkgs_dir" ]]; then
+                continue
+            fi
+            set_test_packages $pkgs_dir
+        done
+    done
+    echo $TEST_PACKAGES
 }
 
 main "$@"

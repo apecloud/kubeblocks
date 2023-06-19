@@ -15,19 +15,21 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	k8scomponent "github.com/apecloud/kubeblocks/cmd/probe/internal/component/kubernetes"
+	"github.com/apecloud/kubeblocks/cmd/probe/vendor/github.com/pkg/errors"
 	v1 "github.com/apecloud/kubeblocks/cmd/probe/vendor/k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
 type KubernetesStore struct {
-	ctx             context.Context
-	clusterName     string
-	componentName   string
-	clusterCompName string
-	namespace       string
-	cluster         *Cluster
-	client          *rest.RESTClient
-	clientset       *kubernetes.Clientset
+	ctx               context.Context
+	clusterName       string
+	componentName     string
+	clusterCompName   string
+	currentMemberName string
+	namespace         string
+	cluster           *Cluster
+	client            *rest.RESTClient
+	clientset         *kubernetes.Clientset
 	//LeaderObservedRecord *LeaderRecord
 	LeaderObservedTime int64
 	logger             logger.Logger
@@ -44,18 +46,20 @@ func NewKubernetesStore(logger logger.Logger) (*KubernetesStore, error) {
 		logger.Errorf("restclient init error: %v", err)
 	}
 
-	clusterName := os.Getenv("KB_CLUSTER_NAME")
-	componentName := os.Getenv("KB_COMP_NAME")
-	clusterCompName := os.Getenv("KB_CLUSTER_COMP_NAME")
-	namespace := os.Getenv("KB_NAMESPACE")
-	labelsMap := map[string]string{
-		"app.kubernetes.io/instance":        clusterName,
-		"app.kubernetes.io/managed-by":      "kubeblocks",
-		"apps.kubeblocks.io/component-name": componentName,
-	}
+	return &KubernetesStore{
+		ctx:               ctx,
+		clusterName:       os.Getenv("KB_CLUSTER_NAME"),
+		componentName:     os.Getenv("KB_COMP_NAME"),
+		clusterCompName:   os.Getenv("KB_CLUSTER_COMP_NAME"),
+		currentMemberName: os.Getenv("KB_POD_FQDN"),
+		namespace:         os.Getenv("KB_NAMESPACE"),
+		client:            client,
+		clientset:         clientset,
+		logger:            logger,
+	}, nil
+}
 
-	selector := labels.SelectorFromSet(labelsMap)
-	logger.Infof("pod selector: %s", selector.String())
+func (store *KubernetesStore) Initialize() error {
 	configMap, err := clientset.CoreV1().ConfigMaps(namespace).Get(ctx, clusterCompName+"-haconfig", metav1.GetOptions{})
 	if configMap == nil || err != nil {
 		ttl := os.Getenv("KB_TTL")
@@ -71,23 +75,13 @@ func NewKubernetesStore(logger logger.Logger) (*KubernetesStore, error) {
 				// OwnerReferences: ownerReference,
 			},
 		}, metav1.CreateOptions{}); err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return &KubernetesStore{
-		ctx:             ctx,
-		clusterName:     os.Getenv("KB_CLUSTER_NAME"),
-		componentName:   os.Getenv("KB_COMP_NAME"),
-		clusterCompName: os.Getenv("KB_CLUSTER_COMP_NAME"),
-		namespace:       os.Getenv("KB_NAMESPACE"),
-		client:          client,
-		clientset:       clientset,
-		logger:          logger,
-	}, nil
+	err = store.CreateLock()
+	return err
 }
 
-func (store *KubernetesStore) Initialize() error {
-}
 func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 	clusterResource := &appsv1alpha1.Cluster{}
 	err := store.client.Get().
@@ -115,6 +109,11 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 		store.logger.Errorf("get members error: %v", err)
 	}
 
+	leader, err := store.GetLeader()
+	if err != nil {
+		store.logger.Errorf("get switchover error: %v", err)
+	}
+
 	switchover, err := store.GetSwitchover()
 	if err != nil {
 		store.logger.Errorf("get switchover error: %v", err)
@@ -129,11 +128,13 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 		ClusterCompName: store.clusterCompName,
 		Replicas:        replicas,
 		Members:         members,
+		Leader:          leader,
 		Switchover:      switchover,
 		HaConfig:        haConfig,
-		clusterResource: clusterResource,
+		resource:        clusterResource,
 	}
 
+	store.cluster = cluster
 	return cluster, nil
 }
 
@@ -175,19 +176,18 @@ func (store *KubernetesStore) GetLeaderConfigMap() (*corev1.ConfigMap, error) {
 	return leaderConfigMap, err
 }
 
-func (store *KubernetesStore) IsLeaderExist() (bool, error) {
+func (store *KubernetesStore) IsLockExist() (bool, error) {
 	leaderConfigMap, err := store.GetLeaderConfigMap()
 	return leaderConfigMap != nil, err
 }
 
-func (store *KubernetesStore) CreateLeader() error {
+func (store *KubernetesStore) CreateLock() error {
 	leaderName := os.Getenv("KB_POD_FQDN")
 	acquireTime := time.Now().Unix()
 	renewTime := acquireTime
 	ttl := store.haConfig.TTL
 	isExist, err := store.IsLeaderExist()
 	if isExist || err != nil {
-		store.logger.Errorf("Get Leader failed: %v", err)
 		return err
 	}
 
@@ -204,6 +204,7 @@ func (store *KubernetesStore) CreateLeader() error {
 			},
 		},
 	}, metav1.CreateOptions{}); err != nil {
+		store.logger.Errorf("Create Leader ConfigMap failed: %v", err)
 		return err
 	}
 }
@@ -237,19 +238,49 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 		acquireTime: accquireTime,
 		renewTime:   renewTime,
 		ttl:         ttl,
+		resource:    configmap,
 	}, nil
-
 }
 
 func (store *KubernetesStore) AttempAcquireLock() {}
-func (store *KubernetesStore) HasLock()           {}
-func (store *KubernetesStore) ReleaseLock()       {}
+func (store *KubernetesStore) HasLock() {
+	return store.cluster.Leader != nil && store.cluster.Leader.Name == store.currentMemberName
+}
+
+func (store *KubernetesStore) UpdateLock() error {
+	configMap, err := store.cluster.Leader.(*corev1.ConfigMap)
+	if err != nil {
+		store.logger.Errorf("get leader configmap error: %v", err)
+	}
+
+	annotations := configMap.GetAnnotations()
+	if annotations["leader"] != store.currentMemberName {
+		return errors.Errorf("lost lock")
+	}
+	leaderRecord[RenewTime] = strconv.FormatInt(time.Now().Unix(), 10)
+	configMap.SetAnnotations(leaderRecord)
+
+	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
+	return err
+}
+
+func (store *KubernetesStore) ReleaseLock() error {
+	configMap, err := store.cluster.Leader.(*corev1.ConfigMap)
+	if err != nil {
+		store.logger.Errorf("get leader configmap error: %v", err)
+	}
+
+	configMap.Annotations[LEADER] = ""
+	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
+	// TODO: if response status code is 409, it means operation conflict.
+	return err
+}
 
 func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 	configmapName := store.clusterCompName + "-haconfig"
 	configmap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(context.TODO(), configmapName, metav1.GetOptions{})
 	if err != nil {
-		store.logger.Errorf("get configmap error: %v", err)
+		store.logger.Errorf("get ha configmap error: %v", err)
 	}
 
 	annotations := configmap.Annotations

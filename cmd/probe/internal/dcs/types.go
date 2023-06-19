@@ -1,17 +1,15 @@
 package dcs
 
-import appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-
 type Cluster struct {
 	ClusterCompName string
 	Replicas        int32
 	HaConfig        *HaConfig
-	//Leader     *Leader
+	Leader          *Leader
 	OpTime          int64
 	Members         []Member
 	Switchover      *Switchover
 	Extra           map[string]string
-	clusterResource *appsv1alpha1.Cluster
+	resource        interface{}
 }
 
 func (c *Cluster) HasMember(memberName string) bool {
@@ -70,6 +68,7 @@ type Leader struct {
 	acquireTime int64
 	renewTime   int64
 	ttl         int
+	resource    interface{}
 }
 
 type Member struct {

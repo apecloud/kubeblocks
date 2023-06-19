@@ -56,6 +56,7 @@ import (
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/mysql"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/postgres"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding/redis"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/highavailability"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/middleware/http/probe"
 )
 
@@ -104,6 +105,8 @@ func main() {
 		panic(fmt.Errorf("fatal error config file: %v", err))
 	}
 
+	ha := highavailability.NewHa()
+	ha.RunCycle()
 	secretstoresLoader.DefaultRegistry.Logger = logContrib
 	stateLoader.DefaultRegistry.Logger = logContrib
 	configurationLoader.DefaultRegistry.Logger = logContrib

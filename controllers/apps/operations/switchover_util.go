@@ -250,20 +250,19 @@ func buildSwitchoverCandidateEnv(
 	if switchover == nil {
 		return nil
 	}
-	if switchover.InstanceName != SwitchoverCandidateInstanceForAnyPod {
-		cEnvs := []corev1.EnvVar{
-			{
-				Name:  constant.KBSwitchoverCandidateName,
-				Value: switchover.InstanceName,
-			},
-			{
-				Name:  constant.KBSwitchoverCandidateFqdn,
-				Value: fmt.Sprintf("%s.%s", switchover.InstanceName, svcName),
-			},
-		}
-		return cEnvs
+	if switchover.InstanceName == SwitchoverCandidateInstanceForAnyPod {
+		return nil
 	}
-	return nil
+	return []corev1.EnvVar{
+		{
+			Name:  constant.KBSwitchoverCandidateName,
+			Value: switchover.InstanceName,
+		},
+		{
+			Name:  constant.KBSwitchoverCandidateFqdn,
+			Value: fmt.Sprintf("%s.%s", switchover.InstanceName, svcName),
+		},
+	}
 }
 
 // buildSwitchoverEnvs builds the environment variables for the switchover job.

@@ -24,8 +24,8 @@ options: {
 	typeLower:              string
 	ttlSecondsAfterSucceed: int
 	clusterVersionRef:      string
-	component: 							string
-	instance:							  string
+	component:              string
+	instance:               string
 	componentNames: [...string]
 	cpu:      string
 	memory:   string
@@ -145,7 +145,7 @@ content: {
 				if options.component == "" {
 					componentName: options.componentNames[0]
 				}
-			  if options.component != "" {
+				if options.component != "" {
 					componentName: options.component
 				}
 				if options.instance == "" {

@@ -509,8 +509,9 @@ const (
 )
 
 // SwitchPolicyType defines switchPolicy type.
+// Currently, only Noop is supported. MaximumAvailability and MaximumDataProtection will be supported in the future.
 // +enum
-// +kubebuilder:validation:Enum={MaximumAvailability, MaximumDataProtection, Noop}
+// +kubebuilder:validation:Enum={Noop}
 type SwitchPolicyType string
 
 const (

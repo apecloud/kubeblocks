@@ -28,6 +28,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -168,7 +169,6 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	succeedJobs := make([]string, 0, len(opsRes.OpsRequest.Spec.SwitchoverList))
 	switchoverMap := opsRes.OpsRequest.Spec.ToSwitchoverListToMap()
 	for compSpecName, switchover := range switchoverMap {
-		componentProcessDetails := opsRequest.Status.Components[compSpecName].ProgressDetails
 		switchoverCondition := meta.FindStatusCondition(opsRes.OpsRequest.Status.Conditions, appsv1alpha1.ConditionTypeSwitchover)
 		if switchoverCondition == nil {
 			err = errors.New("switchover condition is nil")
@@ -184,11 +184,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		jobExist, err = checkJobSucceed(reqCtx.Ctx, cli, opsRes.Cluster, jobName)
 		if err != nil {
 			checkJobProcessDetail.Message = fmt.Sprintf("switchover job %s is not succeed", jobName)
-			setComponentStatusProgressDetail(reqCtx.Recorder, opsRequest, &componentProcessDetails, checkJobProcessDetail)
-			opsRes.OpsRequest.Status.Components[compSpecName] = appsv1alpha1.OpsRequestComponentStatus{
-				Phase:           appsv1alpha1.SpecReconcilingClusterCompPhase,
-				ProgressDetails: componentProcessDetails,
-			}
+			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, checkJobProcessDetail, compSpecName)
 			continue
 		}
 		if !jobExist {
@@ -199,26 +195,18 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 			}
 			if !needSwitchover {
 				completedCount += 1
-				opsRes.OpsRequest.Status.Components[compSpecName] = appsv1alpha1.OpsRequestComponentStatus{
-					Phase: appsv1alpha1.SpecReconcilingClusterCompPhase,
-					ProgressDetails: []appsv1alpha1.ProgressStatusDetail{
-						{
-							ObjectKey: getProgressObjectKey(SwitchoverCheckRoleLabelKey, compSpecName),
-							Message:   fmt.Sprintf("current instance %s is already the primary or leader, then no switchover will be performed", switchover.InstanceName),
-							Status:    appsv1alpha1.SucceedProgressStatus,
-						},
-					},
+				skipSwitchoverProcessDetail := appsv1alpha1.ProgressStatusDetail{
+					ObjectKey: getProgressObjectKey(SwitchoverCheckRoleLabelKey, compSpecName),
+					Message:   fmt.Sprintf("current instance %s is already the primary or leader, then no switchover will be performed", switchover.InstanceName),
+					Status:    appsv1alpha1.SucceedProgressStatus,
 				}
+				setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, skipSwitchoverProcessDetail, compSpecName)
 			}
 			continue
 		} else {
 			checkJobProcessDetail.Message = fmt.Sprintf("switchover job %s is succeed", jobName)
 			checkJobProcessDetail.Status = appsv1alpha1.SucceedProgressStatus
-			setComponentStatusProgressDetail(reqCtx.Recorder, opsRequest, &componentProcessDetails, checkJobProcessDetail)
-			opsRes.OpsRequest.Status.Components[compSpecName] = appsv1alpha1.OpsRequestComponentStatus{
-				Phase:           appsv1alpha1.SpecReconcilingClusterCompPhase,
-				ProgressDetails: componentProcessDetails,
-			}
+			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, checkJobProcessDetail, compSpecName)
 		}
 
 		// check the current component pod role label whether correct
@@ -231,39 +219,24 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		if err != nil {
 			checkRoleLabelProcessDetail.Message = fmt.Sprintf("handleSwitchoverProgress get component %s definition failed", compSpecName)
 			checkRoleLabelProcessDetail.Status = appsv1alpha1.FailedProgressStatus
-			setComponentStatusProgressDetail(reqCtx.Recorder, opsRequest, &componentProcessDetails, checkRoleLabelProcessDetail)
-			opsRes.OpsRequest.Status.Components[compSpecName] = appsv1alpha1.OpsRequestComponentStatus{
-				Phase:           appsv1alpha1.SpecReconcilingClusterCompPhase,
-				ProgressDetails: componentProcessDetails,
-			}
+			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, checkRoleLabelProcessDetail, compSpecName)
 			continue
 		}
 		consistency, err = checkPodRoleLabelConsistency(reqCtx.Ctx, cli, opsRes.Cluster, opsRes.Cluster.Spec.GetComponentByName(compSpecName), compDef, &switchover, switchoverCondition)
 		if err != nil {
 			checkRoleLabelProcessDetail.Message = fmt.Sprintf("waiting for component %s pod role label consistency after switchover", compSpecName)
-			setComponentStatusProgressDetail(reqCtx.Recorder, opsRequest, &componentProcessDetails, checkRoleLabelProcessDetail)
-			opsRes.OpsRequest.Status.Components[compSpecName] = appsv1alpha1.OpsRequestComponentStatus{
-				Phase:           appsv1alpha1.SpecReconcilingClusterCompPhase,
-				ProgressDetails: componentProcessDetails,
-			}
+			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, checkRoleLabelProcessDetail, compSpecName)
 			continue
 		}
 
 		if !consistency {
 			err = intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for pod role label consistency.")
-			opsRes.OpsRequest.Status.Components[compSpecName] = appsv1alpha1.OpsRequestComponentStatus{
-				Phase:           appsv1alpha1.SpecReconcilingClusterCompPhase,
-				ProgressDetails: componentProcessDetails,
-			}
+			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, checkRoleLabelProcessDetail, compSpecName)
 			continue
 		} else {
 			checkRoleLabelProcessDetail.Message = fmt.Sprintf("check component %s pod role label consistency after switchover is succeed", compSpecName)
 			checkRoleLabelProcessDetail.Status = appsv1alpha1.SucceedProgressStatus
-			setComponentStatusProgressDetail(reqCtx.Recorder, opsRequest, &componentProcessDetails, checkRoleLabelProcessDetail)
-			opsRes.OpsRequest.Status.Components[compSpecName] = appsv1alpha1.OpsRequestComponentStatus{
-				Phase:           appsv1alpha1.SpecReconcilingClusterCompPhase,
-				ProgressDetails: componentProcessDetails,
-			}
+			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, checkRoleLabelProcessDetail, compSpecName)
 		}
 
 		// component switchover is successful
@@ -274,11 +247,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 			Message:   fmt.Sprintf("switchover job %s is succeed", jobName),
 			Status:    appsv1alpha1.SucceedProgressStatus,
 		}
-		setComponentStatusProgressDetail(reqCtx.Recorder, opsRequest, &componentProcessDetails, componentProcessDetail)
-		opsRes.OpsRequest.Status.Components[compSpecName] = appsv1alpha1.OpsRequestComponentStatus{
-			Phase:           appsv1alpha1.RunningClusterCompPhase,
-			ProgressDetails: componentProcessDetails,
-		}
+		setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.RunningClusterCompPhase, componentProcessDetail, compSpecName)
 	}
 
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedCount, expectCount)
@@ -300,4 +269,18 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	}
 
 	return expectCount, completedCount, nil
+}
+
+// setComponentSwitchoverProgressDetails set component progress details.
+func setComponentSwitchoverProgressDetails(recorder record.EventRecorder,
+	opsRequest *appsv1alpha1.OpsRequest,
+	phase appsv1alpha1.ClusterComponentPhase,
+	processDetail appsv1alpha1.ProgressStatusDetail,
+	componentName string) {
+	componentProcessDetails := opsRequest.Status.Components[componentName].ProgressDetails
+	setComponentStatusProgressDetail(recorder, opsRequest, &componentProcessDetails, processDetail)
+	opsRequest.Status.Components[componentName] = appsv1alpha1.OpsRequestComponentStatus{
+		Phase:           phase,
+		ProgressDetails: componentProcessDetails,
+	}
 }

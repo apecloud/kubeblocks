@@ -2,8 +2,9 @@ package highavailability
 
 import (
 	"context"
-	"fmt"
 	"time"
+
+	"github.com/dapr/kit/logger"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
@@ -13,21 +14,23 @@ type Ha struct {
 	ctx       context.Context
 	dbManager component.DBManager
 	dcs       dcs.DCS
+	logger    logger.Logger
 }
 
-func NewHa() *Ha {
+func NewHa(logger logger.Logger) *Ha {
 
-	dcs := dcs.NewKubernetesStore()
+	dcs, _ := dcs.NewKubernetesStore(logger)
 	ha := &Ha{
-		ctx: context.Background(),
-		dcs: dcs,
+		ctx:    context.Background(),
+		dcs:    dcs,
+		logger: logger,
 	}
 	return ha
 }
 
 func (ha *Ha) RunCycle() {
 	cluster, _ := ha.dcs.GetCluster()
-	fmt.Printf("----cluster: %v\n", cluster)
+	ha.logger.Debugf("cluster: %v", cluster)
 	//switch {
 	//case !dbManger.IsRunning():
 	//	logger.Infof("DB Service is not running,  wait for sqlctl to start it")

@@ -3,7 +3,7 @@ package dcs
 type Cluster struct {
 	ClusterCompName string
 	Replicas        int32
-	Config          *HaConfig
+	HaConfig        *HaConfig
 	//Leader     *Leader
 	OpTime     int64
 	Members    []Member
@@ -49,11 +49,11 @@ func (c *Cluster) GetOpTime() int64 {
 
 type HaConfig struct {
 	index              string
-	ttl                int64
+	ttl                int
 	maxLagOnSwitchover int64
 }
 
-func (c *HaConfig) GetTtl() int64 {
+func (c *HaConfig) GetTtl() int {
 	return c.ttl
 }
 

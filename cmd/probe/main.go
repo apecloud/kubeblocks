@@ -63,6 +63,7 @@ import (
 var (
 	log        = logger.NewLogger("dapr.runtime")
 	logContrib = logger.NewLogger("dapr.contrib")
+	logHa      = logger.NewLogger("sqlchannel.highavailability")
 )
 
 func init() {
@@ -105,7 +106,7 @@ func main() {
 		panic(fmt.Errorf("fatal error config file: %v", err))
 	}
 
-	ha := highavailability.NewHa()
+	ha := highavailability.NewHa(logHa)
 	ha.RunCycle()
 	secretstoresLoader.DefaultRegistry.Logger = logContrib
 	stateLoader.DefaultRegistry.Logger = logContrib

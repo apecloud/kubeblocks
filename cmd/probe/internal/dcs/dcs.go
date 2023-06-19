@@ -9,7 +9,8 @@ type DCS interface {
 	AttempAcquireLock()
 	HasLock()
 	ReleaseLock()
-	GetSwitchover()
+	GetHaConfig() (*HaConfig, error)
+	GetSwitchover() (*Switchover, error)
 	SetSwitchover()
 	AddThisMember()
 }

@@ -165,7 +165,7 @@ func (r *BackupPolicyReconciler) backupDeleteHandler() *handler.Funcs {
 			if backupTool.Spec.DeployKind != dataprotectionv1alpha1.DeployKindStatefulSet {
 				return
 			}
-			r.reconcileForStatefulSetKind(ctx, backupPolicy, backupType, schedulerPolicy.CronExpression)
+			_ = r.reconcileForStatefulSetKind(ctx, backupPolicy, backupType, schedulerPolicy.CronExpression)
 		},
 	}
 }

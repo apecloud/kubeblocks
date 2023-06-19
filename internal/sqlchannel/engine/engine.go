@@ -30,7 +30,6 @@ const (
 	statePostgreSQL = "postgresql"
 	stateRedis      = "redis"
 	stateMongoDB    = "mongodb"
-	stateWesql      = "wesql"
 )
 
 // AuthInfo is the authentication information for the database
@@ -51,6 +50,7 @@ type EngineInfo struct {
 	PasswordEnv string
 	UserEnv     string
 	Database    string
+	Host        string
 }
 
 func New(typeName string) (Interface, error) {
@@ -63,8 +63,6 @@ func New(typeName string) (Interface, error) {
 		return newRedis(), nil
 	case stateMongoDB:
 		return newMongoDB(), nil
-	case stateWesql:
-		return newWesql(), nil
 	default:
 		return nil, fmt.Errorf("unsupported engine type: %s", typeName)
 	}

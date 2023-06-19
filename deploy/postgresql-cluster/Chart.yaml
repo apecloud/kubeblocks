@@ -13,5 +13,5 @@ version: 0.5.1-beta.0
 appVersion: "14.8.0"
 
 annotations:
-  kubeblocks.io/clusterVersions: "14.7.2,12.14.0,12.15.0,14.8.0"
+  kubeblocks.io/clusterVersions: "14.8.0,12.15.0"
   kubeblocks.io/multiCV: "true"

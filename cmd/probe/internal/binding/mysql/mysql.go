@@ -269,18 +269,13 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 */
 
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
-	getRoleSql := "show slave hosts"
-	data, err := mysqlOps.query(ctx, getRoleSql)
+	getReadOnlySql := `show global variables like 'read_only';`
+	data, err := mysqlOps.query(ctx, getReadOnlySql)
 	if err != nil {
-		mysqlOps.Logger.Infof("error executing %s: %v", getRoleSql, err)
-		return "", errors.Wrapf(err, "error executing %s", getRoleSql)
-	}
-	if string(data) == "null" {
-		return SECONDARY, nil
+		mysqlOps.Logger.Infof("error executing %s: %v", getReadOnlySql, err)
+		return "", errors.Wrapf(err, "error executing %s", getReadOnlySql)
 	}
 
-	getReadOnlySql := `show global variables like 'read_only';`
-	data, err = mysqlOps.query(ctx, getReadOnlySql)
 	result, err := ParseSingleQuery(string(data))
 	if err != nil {
 		return "", errors.Errorf("parse query failed, err:%v", err)
@@ -932,6 +927,7 @@ func (mysqlOps *MysqlOperations) follow(ctx context.Context, podName string, lea
 }
 
 func (mysqlOps *MysqlOperations) EnforcePrimaryRole(ctx context.Context, podName string) error {
+	// TODO: promoting status
 	if isLeader, err := mysqlOps.IsLeader(ctx); isLeader && err == nil {
 		return nil
 	} else {

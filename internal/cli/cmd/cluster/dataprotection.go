@@ -481,7 +481,7 @@ func (o *CreateRestoreOptions) validateRestoreTime() error {
 	if o.RestoreTimeStr == "" && o.SourceCluster == "" {
 		return nil
 	}
-	if o.RestoreTimeStr == "" && o.SourceCluster == "" {
+	if o.RestoreTimeStr != "" && o.SourceCluster == "" {
 		return fmt.Errorf("--source-cluster must be specified if specified --restore-to-time")
 	}
 	restoreTime, err := util.TimeParse(o.RestoreTimeStr, time.Second)

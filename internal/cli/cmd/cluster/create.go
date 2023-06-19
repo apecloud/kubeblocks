@@ -30,6 +30,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
@@ -131,6 +132,12 @@ var clusterCreateExample = templates.Examples(`
 
     # Create a cluster, with each pod runs on their own dedicated node
     kbcli cluster create --cluster-definition apecloud-mysql --tenancy=DedicatedNode
+
+    # Create a cluster with backup to restore data
+    kbcli cluster create --backup backup-default-mycluster-20230616190023
+
+    # Create a cluster with time to restore from point in time
+    kbcli cluster create --restore-to-time "Jun 16,2023 18:58:53 UTC+0800" --source-cluster mycluster
 `)
 
 const (
@@ -195,7 +202,10 @@ type CreateOptions struct {
 	shouldCreateDependencies bool `json:"-"`
 
 	// backup name to restore in creation
-	Backup string `json:"backup,omitempty"`
+	Backup        string `json:"backup,omitempty"`
+	RestoreTime   string `json:"restoreTime,omitempty"`
+	SourceCluster string `json:"sourceCluster,omitempty"`
+
 	UpdatableFlags
 	create.CreateOptions `json:"-"`
 }
@@ -220,6 +230,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
 	cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, or just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
+	cmd.Flags().StringVar(&o.RestoreTime, "restore-to-time", "", "Set a time for point in time recovery")
+	cmd.Flags().StringVar(&o.SourceCluster, "source-cluster", "", "Set a source cluster for point in time recovery")
 	cmd.Flags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
 	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
@@ -270,6 +282,80 @@ func getRestoreFromBackupAnnotation(backup *dataprotectionv1alpha1.Backup, compS
 	return restoreFromBackupAnnotation, nil
 }
 
+func getSourceClusterFromBackup(backup *dataprotectionv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
+	sourceCluster := &appsv1alpha1.Cluster{}
+	sourceClusterJSON := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
+	if err := json.Unmarshal([]byte(sourceClusterJSON), sourceCluster); err != nil {
+		return nil, err
+	}
+
+	return sourceCluster, nil
+}
+
+func getBackupObjectFromRestoreArgs(o *CreateOptions, backup *dataprotectionv1alpha1.Backup) error {
+	if o.Backup != "" {
+		if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
+			return err
+		}
+	}
+	if o.RestoreTime != "" {
+		createRestoreOptions := CreateRestoreOptions{
+			SourceCluster:  o.SourceCluster,
+			RestoreTimeStr: o.RestoreTime,
+		}
+		createRestoreOptions.Dynamic = o.Dynamic
+		createRestoreOptions.Namespace = o.Namespace
+		if err := createRestoreOptions.validateRestoreTime(); err != nil {
+			return err
+		}
+		objs, err := o.Dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).
+			List(context.TODO(), metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("%s=%s",
+					constant.AppInstanceLabelKey, o.SourceCluster),
+			})
+		if err != nil {
+			return err
+		}
+		if len(objs.Items) == 0 {
+			return fmt.Errorf("can not found any backup to restore time")
+		}
+
+		return runtime.DefaultUnstructuredConverter.FromUnstructured(objs.Items[0].UnstructuredContent(), backup)
+	}
+	return nil
+}
+
+func fillClusterMetadataFromBackup(o *CreateOptions, cls **appsv1alpha1.Cluster) error {
+	if o.Backup == "" && o.RestoreTime == "" && o.SourceCluster == "" {
+		return nil
+	}
+	backup := &dataprotectionv1alpha1.Backup{}
+	if err := getBackupObjectFromRestoreArgs(o, backup); err != nil {
+		return err
+	}
+	backupCluster, err := getSourceClusterFromBackup(backup)
+	if err != nil {
+		return err
+	}
+	curCluster := *cls
+	if curCluster == nil {
+		curCluster = backupCluster
+	}
+
+	// validate cluster spec
+	if o.ClusterDefRef != "" && o.ClusterDefRef != backupCluster.Spec.ClusterDefRef {
+		return fmt.Errorf("specified cluster definition does not match from backup(expect: %s, actual: %s),"+
+			" please check", backupCluster.Spec.ClusterDefRef, o.ClusterDefRef)
+	}
+	if o.ClusterVersionRef != "" && o.ClusterVersionRef != backupCluster.Spec.ClusterVersionRef {
+		return fmt.Errorf("specified cluster version does not match from backup(expect: %s, actual: %s),"+
+			" please check", backupCluster.Spec.ClusterVersionRef, o.ClusterVersionRef)
+	}
+
+	*cls = curCluster
+	return nil
+}
+
 func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 	backupName := o.Backup
 	if len(backupName) == 0 || len(components) == 0 {
@@ -290,6 +376,23 @@ func setBackup(o *CreateOptions, components []map[string]interface{}) error {
 		o.Annotations = map[string]string{}
 	}
 	o.Annotations[constant.RestoreFromBackUpAnnotationKey] = restoreAnnotation
+	return nil
+}
+
+func setRestoreTime(o *CreateOptions) error {
+	if o.RestoreTime == "" || o.SourceCluster == "" {
+		return nil
+	}
+	if o.Annotations == nil {
+		o.Annotations = map[string]string{}
+	}
+	restoreTime, err := util.TimeParse(o.RestoreTime, time.Second)
+	if err != nil {
+		return err
+	}
+	o.Annotations[constant.RestoreFromTimeAnnotationKey] = restoreTime.Format(time.RFC3339)
+	o.Annotations[constant.RestoreFromSrcClusterAnnotationKey] = o.SourceCluster
+
 	return nil
 }
 
@@ -347,6 +450,13 @@ func (o *CreateOptions) Complete() error {
 			clusterCompSpecs = cls.Spec.ComponentSpecs
 		}
 	}
+	//
+	if err = fillClusterMetadataFromBackup(o, &cls); err != nil {
+		return err
+	}
+	if nil != cls && cls.Spec.ComponentSpecs != nil {
+		clusterCompSpecs = cls.Spec.ComponentSpecs
+	}
 
 	// if name is not specified, generate a random cluster name
 	if o.Name == "" {
@@ -379,6 +489,9 @@ func (o *CreateOptions) Complete() error {
 
 	setMonitor(o.Monitor, components)
 	if err = setBackup(o, components); err != nil {
+		return err
+	}
+	if err = setRestoreTime(o); err != nil {
 		return err
 	}
 	o.ComponentSpecs = components

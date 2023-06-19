@@ -173,6 +173,8 @@ type HorizontalScaling struct {
 	Replicas int32 `json:"replicas"`
 }
 
+// Reconfigure defines the variables that need to input when updating configuration.
+// +kubebuilder:validation:XValidation:rule="self.configurations.size() > 0", message="Value can not be empty"
 type Reconfigure struct {
 	ComponentOps `json:",inline"`
 
@@ -237,7 +239,7 @@ type ParameterConfig struct {
 	// Setting the list of parameters for a single configuration file.
 	// update specified the parameters.
 	// +optional
-	Parameters []ParameterPair `json:"parameters"`
+	Parameters []ParameterPair `json:"parameters,omitempty"`
 
 	// fileContent indicates the configuration file content.
 	// update whole file.

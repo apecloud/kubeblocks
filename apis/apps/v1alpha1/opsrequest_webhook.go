@@ -275,9 +275,6 @@ func (r *OpsRequest) validateReconfigure(cluster *Cluster) error {
 	if reconfigure == nil {
 		return notEmptyError("spec.reconfigure")
 	}
-	if len(reconfigure.Configurations) == 0 {
-		return notEmptyError("spec.reconfigure.configurations[*]")
-	}
 	if cluster.Spec.GetComponentByName(reconfigure.ComponentName) == nil {
 		return fmt.Errorf("component %s not found", reconfigure.ComponentName)
 	}

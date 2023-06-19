@@ -366,7 +366,6 @@ func (o *OperationsOptions) validatePromote(cluster *appsv1alpha1.Cluster) error
 		return err
 	}
 	var compDefObj *appsv1alpha1.ClusterComponentDefinition
-	fmt.Println(clusterDefObj.Spec.ComponentDefs)
 	for _, compDef := range clusterDefObj.Spec.ComponentDefs {
 		if compDef.Name == cluster.Spec.GetComponentDefRefName(componentName) {
 			compDefObj = &compDef

@@ -32,7 +32,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -81,17 +80,14 @@ func (r switchoverOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestC
 	return appsv1alpha1.NewSwitchoveringCondition(opsRes.Cluster.Generation, string(msg)), nil
 }
 
-// Action restarts components by updating StatefulSet.
+// Action to do the switchover operation.
 func (r switchoverOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	if opsRes.OpsRequest.Status.StartTimestamp.IsZero() {
-		return errors.New("status.startTimestamp can not be null")
-	}
 	switchoverMap := opsRes.OpsRequest.Spec.ToSwitchoverListToMap()
 	return doSwitchoverComponents(reqCtx, cli, opsRes, switchoverMap)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
-// the Reconcile function for restart opsRequest.
+// the Reconcile function for switchover opsRequest.
 func (r switchoverOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error) {
 	var (
 		opsRequestPhase = appsv1alpha1.OpsRunningPhase
@@ -169,7 +165,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		}
 	}
 
-	succeedJobCount := make([]string, 0, len(opsRes.OpsRequest.Spec.SwitchoverList))
+	succeedJobs := make([]string, 0, len(opsRes.OpsRequest.Spec.SwitchoverList))
 	switchoverMap := opsRes.OpsRequest.Spec.ToSwitchoverListToMap()
 	for compSpecName, switchover := range switchoverMap {
 		componentProcessDetails := opsRequest.Status.Components[compSpecName].ProgressDetails
@@ -180,9 +176,9 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		}
 
 		// check the current component switchoverJob whether succeed
-		jobName := fmt.Sprintf("%s-%s-%s-%d", constant.KBSwitchoverJobNamePrefix, opsRes.Cluster.Name, compSpecName, switchoverCondition.ObservedGeneration)
+		jobName := genSwitchoverJobName(opsRes.Cluster.Name, compSpecName, switchoverCondition.ObservedGeneration)
 		checkJobProcessDetail := appsv1alpha1.ProgressStatusDetail{
-			ObjectKey: fmt.Sprintf("%s/%s", SwitchoverCheckJobKey, jobName),
+			ObjectKey: getProgressObjectKey(SwitchoverCheckJobKey, jobName),
 			Status:    appsv1alpha1.ProcessingProgressStatus,
 		}
 		jobExist, err = checkJobSucceed(reqCtx.Ctx, cli, opsRes.Cluster, jobName)
@@ -207,7 +203,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 					Phase: appsv1alpha1.SpecReconcilingClusterCompPhase,
 					ProgressDetails: []appsv1alpha1.ProgressStatusDetail{
 						{
-							ObjectKey: fmt.Sprintf("%s/%s", SwitchoverCheckRoleLabelKey, compSpecName),
+							ObjectKey: getProgressObjectKey(SwitchoverCheckRoleLabelKey, compSpecName),
 							Message:   fmt.Sprintf("current instance %s is already the primary or leader, then no switchover will be performed", switchover.InstanceName),
 							Status:    appsv1alpha1.SucceedProgressStatus,
 						},
@@ -225,9 +221,9 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 			}
 		}
 
-		// check the current component roleLabel whether correct
+		// check the current component pod role label whether correct
 		checkRoleLabelProcessDetail := appsv1alpha1.ProgressStatusDetail{
-			ObjectKey: fmt.Sprintf("%s/%s", SwitchoverCheckRoleLabelKey, compSpecName),
+			ObjectKey: getProgressObjectKey(SwitchoverCheckRoleLabelKey, compSpecName),
 			Status:    appsv1alpha1.ProcessingProgressStatus,
 			Message:   fmt.Sprintf("waiting for component %s pod role label consistency after switchover", compSpecName),
 		}
@@ -272,7 +268,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 
 		// component switchover is successful
 		completedCount += 1
-		succeedJobCount = append(succeedJobCount, jobName)
+		succeedJobs = append(succeedJobs, jobName)
 		componentProcessDetail := appsv1alpha1.ProgressStatusDetail{
 			ObjectKey: switchover.ComponentName,
 			Message:   fmt.Sprintf("switchover job %s is succeed", jobName),
@@ -298,7 +294,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	}
 
 	if completedCount == expectCount {
-		for _, jobName := range succeedJobCount {
+		for _, jobName := range succeedJobs {
 			_ = cleanJobByName(reqCtx.Ctx, cli, opsRes.Cluster, jobName)
 		}
 	}

@@ -489,7 +489,7 @@ func BuildEnvConfig(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *a
 	return &config, nil
 }
 
-// buildWorkloadCommonEnv build common env for all workload types.
+// buildWorkloadCommonEnv builds common env for all workload types.
 func buildWorkloadCommonEnv(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) map[string]string {
 	prefix := constant.KBPrefix + "_"
 	cnt := strconv.Itoa(int(component.Replicas))
@@ -522,7 +522,7 @@ func buildWorkloadCommonEnv(cluster *appsv1alpha1.Cluster, component *component.
 	return env
 }
 
-// buildReplicationSetEnv build env for replication workload.
+// buildReplicationSetEnv builds env for replication workload.
 func buildReplicationSetEnv(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
@@ -546,7 +546,7 @@ func buildReplicationSetEnv(reqCtx intctrlutil.RequestCtx,
 	return env
 }
 
-// buildConsensusSetEnv build env for consensus workload.
+// buildConsensusSetEnv builds env for consensus workload.
 func buildConsensusSetEnv(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) map[string]string {
 	env := map[string]string{}
 	prefix := constant.KBPrefix + "_"

@@ -172,7 +172,7 @@ func renderSwitchoverCmdJob(ctx context.Context,
 			return nil, errors.New("switchover action not found")
 		}
 		// jobName named with generation to distinguish different switchover jobs.
-		jobName := fmt.Sprintf("%s-%s-%s-%d", constant.KBSwitchoverJobNamePrefix, cluster.Name, componentSpec.Name, cluster.Generation)
+		jobName := genSwitchoverJobName(cluster.Name, componentSpec.Name, cluster.Generation)
 		job := &batchv1.Job{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cluster.Namespace,
@@ -216,6 +216,11 @@ func renderSwitchoverCmdJob(ctx context.Context,
 		return nil, err
 	}
 	return job, nil
+}
+
+// genSwitchoverJobName generates the switchover job name.
+func genSwitchoverJobName(clusterName, componentName string, generation int64) string {
+	return fmt.Sprintf("%s-%s-%s-%d", constant.KBSwitchoverJobNamePrefix, clusterName, componentName, generation)
 }
 
 // getSupportSwitchoverWorkload returns the kinds that support switchover.

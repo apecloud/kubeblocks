@@ -18,7 +18,7 @@ spec:
     # together with ApeCloud MySQL cluster. ApeCloud MySQL-Scale can
     # register vttablets as sidecars to an existing ApeCloud MySQL cluster.
     - name: vtgate
-      characterType: wesql
+      characterType: mysql
       workloadType: Stateful
       service:
         ports:
@@ -74,6 +74,8 @@ spec:
                 value: "2379"
               - name: TOPOLOGY_FLAGS
                 value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+              - name: MYSQL_UNIX_PORT
+                value: "/tmp/mysql.sock"
             command:
               - /bin/bash
               - -c
@@ -221,9 +223,9 @@ spec:
                 value: {{ if .Values.cluster.dynamicConfig }}{{ .Values.cluster.dynamicConfig }}{{ end }}
               - name: KB_EMBEDDED_WESQL
                 value: {{ .Values.cluster.kbWeSQLImage | default "1" | quote }}
-            command: ["/scripts/setup.sh"]
+            command: [ "/scripts/setup.sh" ]
           - name: metrics
-            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
             securityContext:
               runAsNonRoot: true

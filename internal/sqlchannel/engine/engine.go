@@ -50,7 +50,6 @@ type EngineInfo struct {
 	PasswordEnv string
 	UserEnv     string
 	Database    string
-	Host        string
 }
 
 func New(typeName string) (Interface, error) {

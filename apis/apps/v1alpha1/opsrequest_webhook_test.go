@@ -448,10 +448,10 @@ var _ = Describe("OpsRequest webhook", func() {
 		opsRequest.Spec.Reconfigure = createReconfigureObj(componentName + "-not-exist")
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found"))
 		opsRequest.Spec.Reconfigure = createReconfigureObj(componentName)
-		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("ConfigMap \"for-test\" not found"))
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found"))
 
 		By("By creating a configmap")
-		Expect(testCtx.CheckedCreateObj(ctx, createTestConfigmap("for-test"))).Should(Succeed())
+		Expect(testCtx.CheckedCreateObj(ctx, createTestConfigmap(fmt.Sprintf("%s-%s-%s", opsRequest.Spec.ClusterRef, componentName, "for-test")))).Should(Succeed())
 		opsRequest.Spec.Reconfigure = createReconfigureObj(componentName)
 		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("not found in configmap"))
 

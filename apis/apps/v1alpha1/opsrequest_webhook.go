@@ -279,7 +279,7 @@ func (r *OpsRequest) validateReconfigure(cluster *Cluster) error {
 		return fmt.Errorf("component %s not found", reconfigure.ComponentName)
 	}
 	for _, configuration := range reconfigure.Configurations {
-		cmObj, err := r.getConfigMap(configuration.Name)
+		cmObj, err := r.getConfigMap(fmt.Sprintf("%s-%s-%s", r.Spec.ClusterRef, reconfigure.ComponentName, configuration.Name))
 		if err != nil {
 			return err
 		}

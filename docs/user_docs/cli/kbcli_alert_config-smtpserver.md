@@ -1,44 +1,31 @@
 ---
-title: kbcli alert add-receiver
+title: kbcli alert config-smtpserver
 ---
 
-Add alert receiver, such as email, slack, webhook and so on.
+Set smtp server config
 
 ```
-kbcli alert add-receiver [flags]
+kbcli alert config-smtpserver [flags]
 ```
 
 ### Examples
 
 ```
-  # add webhook receiver without token, for example feishu
-  kbcli alert add-receiver --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo'
-  
-  # add webhook receiver with token, for example feishu
-  kbcli alert add-receiver --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=XXX'
-  
-  # add email receiver
-  kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io'
-  
-  # add email receiver, and only receive alert from cluster mycluster
-  kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster
-  
-  # add email receiver, and only receive alert from cluster mycluster and alert severity is warning
-  kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster --severity=warning
-  
-  # add slack receiver
-  kbcli alert add-receiver --slack api_url=https://hooks.slackConfig.com/services/foo,channel=monitor,username=kubeblocks-alert-bot
+
+	# Set smtp server config
+	kbcli alert config-smtpserver --smtp-from alert-test@apecloud.com --smtp-smarthost smtp.feishu.cn:587 --smtp-auth-username alert-test@apecloud.com --smtp-auth-password 123456abc --smtp-auth-identity alert-test@apecloud.com
+	
 ```
 
 ### Options
 
 ```
-      --cluster stringArray    Cluster name, such as mycluster, more than one cluster can be specified, such as mycluster1,mycluster2
-      --email stringArray      Add email address, such as user@kubeblocks.io, more than one emailConfig can be specified separated by comma
-  -h, --help                   help for add-receiver
-      --severity stringArray   Alert severity level, critical, warning or info, more than one severity level can be specified, such as critical,warning
-      --slack stringArray      Add slack receiver, such as api_url=https://hooks.slackConfig.com/services/foo,channel=monitor,username=kubeblocks-alert-bot
-      --webhook stringArray    Add webhook receiver, such as url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=xxxxx
+  -h, --help                        help for config-smtpserver
+      --smtp-auth-identity string   The identity to authenticate to the smarthost.
+      --smtp-auth-password string   The password to authenticate to the smarthost.
+      --smtp-auth-username string   The username to authenticate to the smarthost.
+      --smtp-from string            The email address to send alert.
+      --smtp-smarthost string       The smtp host to send alert.
 ```
 
 ### Options inherited from parent commands
@@ -51,6 +38,7 @@ kbcli alert add-receiver [flags]
       --certificate-authority string   Path to a cert file for the certificate authority
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
+      --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure

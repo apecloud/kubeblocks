@@ -38,6 +38,7 @@ Manage alert receiver, include add, list and delete receiver.
 
 
 * [kbcli alert add-receiver](kbcli_alert_add-receiver.md)	 - Add alert receiver, such as email, slack, webhook and so on.
+* [kbcli alert config-smtpserver](kbcli_alert_config-smtpserver.md)	 - Set smtp server config
 * [kbcli alert delete-receiver](kbcli_alert_delete-receiver.md)	 - Delete alert receiver.
 * [kbcli alert list-receivers](kbcli_alert_list-receivers.md)	 - List all alert receivers.
 

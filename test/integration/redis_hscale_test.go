@@ -29,8 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -110,21 +109,21 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 		By("Checking statefulSet role label")
 		for _, sts := range stsList.Items {
 			if strings.HasSuffix(sts.Name, strconv.Itoa(testapps.DefaultReplicationPrimaryIndex)) {
-				Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replication.Primary))
+				Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(components.Primary))
 			} else {
-				Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replication.Secondary))
+				Expect(sts.Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(components.Secondary))
 			}
 		}
 
 		By("Checking pods number and role label in StatefulSet")
 		for _, sts := range stsList.Items {
-			podList, err := util.GetPodListByStatefulSet(ctx, k8sClient, &sts)
+			podList, err := components.GetPodListByStatefulSet(ctx, k8sClient, &sts)
 			Expect(err).To(Succeed())
 			Expect(len(podList)).Should(BeEquivalentTo(1))
 			if strings.HasSuffix(sts.Name, strconv.Itoa(testapps.DefaultReplicationPrimaryIndex)) {
-				Expect(podList[0].Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replication.Primary))
+				Expect(podList[0].Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(components.Primary))
 			} else {
-				Expect(podList[0].Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(replication.Secondary))
+				Expect(podList[0].Labels[constant.RoleLabelKey]).Should(BeEquivalentTo(components.Secondary))
 			}
 		}
 
@@ -179,11 +178,11 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 
 			replicationRedisConfigVolumeMounts := []corev1.VolumeMount{
 				{
-					Name:      string(replication.Primary),
+					Name:      string(components.Primary),
 					MountPath: "/etc/conf/primary",
 				},
 				{
-					Name:      string(replication.Secondary),
+					Name:      string(components.Secondary),
 					MountPath: "/etc/conf/secondary",
 				},
 			}
@@ -193,8 +192,8 @@ var _ = Describe("Redis Horizontal Scale function", func() {
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompDefName).
 				AddScriptTemplate(scriptConfigName, scriptConfigName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, &mode).
-				AddConfigTemplate(primaryConfigName, primaryConfigName, "", testCtx.DefaultNamespace, string(replication.Primary)).
-				AddConfigTemplate(secondaryConfigName, secondaryConfigName, "", testCtx.DefaultNamespace, string(replication.Secondary)).
+				AddConfigTemplate(primaryConfigName, primaryConfigName, "", testCtx.DefaultNamespace, string(components.Primary)).
+				AddConfigTemplate(secondaryConfigName, secondaryConfigName, "", testCtx.DefaultNamespace, string(components.Secondary)).
 				AddInitContainerVolumeMounts(testapps.DefaultRedisInitContainerName, replicationRedisConfigVolumeMounts).
 				AddContainerVolumeMounts(testapps.DefaultRedisContainerName, replicationRedisConfigVolumeMounts).
 				Create(&testCtx).GetObject()

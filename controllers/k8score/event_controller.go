@@ -34,9 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
-	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/consensusset"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -181,15 +179,15 @@ func handleRoleChangedEvent(cli client.Client, reqCtx intctrlutil.RequestCtx, re
 		return role, err
 	}
 	reqCtx.Log.V(1).Info("handle role changed event", "cluster", cluster.Name, "pod", pod.Name, "role", role, "originalRole", message.OriginalRole)
-	compName, componentDef, err := componentutil.GetComponentInfoByPod(reqCtx.Ctx, cli, *cluster, pod)
+	compName, componentDef, err := components.GetComponentInfoByPod(reqCtx.Ctx, cli, *cluster, pod)
 	if err != nil {
 		return role, err
 	}
 	switch componentDef.WorkloadType {
 	case appsv1alpha1.Consensus:
-		return role, consensus.UpdateConsensusSetRoleLabel(cli, reqCtx, componentDef, pod, role)
+		return role, components.UpdateConsensusSetRoleLabel(cli, reqCtx, componentDef, pod, role)
 	case appsv1alpha1.Replication:
-		return role, replication.HandleReplicationSetRoleChangeEvent(cli, reqCtx, cluster, compName, pod, role)
+		return role, components.HandleReplicationSetRoleChangeEvent(cli, reqCtx, cluster, compName, pod, role)
 	}
 	return role, nil
 }

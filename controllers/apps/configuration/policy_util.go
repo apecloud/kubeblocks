@@ -29,8 +29,7 @@ import (
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgproto "github.com/apecloud/kubeblocks/internal/configuration/proto"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -90,7 +89,7 @@ func getDeploymentRollingPods(params reconfigureParams) ([]corev1.Pod, error) {
 func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 	var ctx = params.Ctx
 	var cluster = params.Cluster
-	podList, err := util.GetComponentPodList(ctx.Ctx, params.Client, *cluster, params.ClusterComponent.Name)
+	podList, err := components.GetComponentPodList(ctx.Ctx, params.Client, *cluster, params.ClusterComponent.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +100,7 @@ func getReplicationSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
 	for i := range params.ComponentUnits {
-		pods, err := util.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
+		pods, err := components.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, &params.ComponentUnits[i])
 		if err != nil {
 			return nil, err
 		}
@@ -132,7 +131,7 @@ func getStatefulSetPods(params reconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	stsObj := &params.ComponentUnits[0]
-	pods, err := util.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
+	pods, err := components.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
 	if err != nil {
 		return nil, err
 	}
@@ -155,13 +154,13 @@ func getConsensusPods(params reconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	stsObj := &params.ComponentUnits[0]
-	pods, err := util.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
+	pods, err := components.GetPodListByStatefulSet(params.Ctx.Ctx, params.Client, stsObj)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: should resolve the dependency on consensus module
-	util.SortPods(pods, consensus.ComposeRolePriorityMap(params.Component.ConsensusSpec), constant.RoleLabelKey)
+	components.SortPods(pods, components.ComposeRolePriorityMap(params.Component.ConsensusSpec), constant.RoleLabelKey)
 	r := make([]corev1.Pod, 0, len(pods))
 	for i := len(pods); i > 0; i-- {
 		r = append(r, pods[i-1:i]...)

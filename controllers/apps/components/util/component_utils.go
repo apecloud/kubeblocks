@@ -613,6 +613,7 @@ func replaceKBEnvPlaceholderTokens(cluster *appsv1alpha1.Cluster, componentName,
 	return componentutil.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
 }
 
+// ResolvePodSpecDefaultFields set default value for some known fields of proto PodSpec @pobj.
 func ResolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	resolveVolume := func(v corev1.Volume, vv *corev1.Volume) {
 		if vv.DownwardAPI == nil || v.DownwardAPI == nil {
@@ -675,5 +676,17 @@ func ResolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	}
 	if len(pobj.SchedulerName) == 0 {
 		pobj.SchedulerName = obj.SchedulerName
+	}
+	if len(pobj.Tolerations) == 0 {
+		pobj.Tolerations = obj.Tolerations
+	}
+	if pobj.Priority == nil {
+		pobj.Priority = obj.Priority
+	}
+	if pobj.EnableServiceLinks == nil {
+		pobj.EnableServiceLinks = obj.EnableServiceLinks
+	}
+	if pobj.PreemptionPolicy == nil {
+		pobj.PreemptionPolicy = obj.PreemptionPolicy
 	}
 }

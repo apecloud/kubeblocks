@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -366,6 +367,29 @@ var _ = Describe("Component utils test", func() {
 			var nilAnnotations map[string]string
 			MergeAnnotations(originalAnnotations, &nilAnnotations)
 			Expect(nilAnnotations).ShouldNot(BeNil())
+		})
+
+		It("test sync pod spec default values set by k8s", func() {
+			var (
+				clusterName = "cluster"
+				compName    = "component"
+				podName     = "pod"
+				role        = "leader"
+				mode        = "ReadWrite"
+			)
+			pod := testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, compName, podName, role, mode)
+			ppod := testapps.NewPodFactory(testCtx.DefaultNamespace, "pod").
+				SetOwnerReferences("apps/v1", constant.StatefulSetKind, nil).
+				AddAppInstanceLabel(clusterName).
+				AddAppComponentLabel(compName).
+				AddAppManangedByLabel().
+				AddRoleLabel(role).
+				AddConsensusSetAccessModeLabel(mode).
+				AddControllerRevisionHashLabel("").
+				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+				GetObject()
+			ResolvePodSpecDefaultFields(pod.Spec, &ppod.Spec)
+			Expect(reflect.DeepEqual(pod.Spec, ppod.Spec)).Should(BeTrue())
 		})
 	})
 })

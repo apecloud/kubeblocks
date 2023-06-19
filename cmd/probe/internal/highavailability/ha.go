@@ -29,6 +29,7 @@ func NewHa(logger logger.Logger) *Ha {
 }
 
 func (ha *Ha) RunCycle() {
+
 	cluster, _ := ha.dcs.GetCluster()
 	ha.logger.Debugf("cluster: %v", cluster)
 	//switch {
@@ -84,6 +85,25 @@ func (ha *Ha) RunCycle() {
 }
 
 func (ha *Ha) Start() {
+	// for !ha.dbManager.IsInitialized() {
+	// 	ha.logger.Infof("Waiting for the database cluster to be initialized.")
+	// 	// TODO: implement dbmanager initialize to replace pod's entrypoint scripts
+	// 	// if I am the node of index 0, then do initialization
+	// 	// ha.dbManager.Initialize()
+	// 	time.Sleep(1 * time.Second)
+	// }
+
+	isExist, _ := ha.dcs.IsLeaderExist()
+	for !isExist {
+		if dbManager.IAmLeader() {
+			ha.dcs.Initialize()
+			break
+		}
+		ha.logger.Infof("Waiting for the database Leader to be ready.")
+		time.Sleep(1 * time.Second)
+		isExist, _ = ha.dcs.IsLeaderExist()
+	}
+
 	for true {
 		ha.RunCycle()
 		time.Sleep(1 * time.Second)

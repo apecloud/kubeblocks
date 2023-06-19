@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/dapr/kit/logger"
 	corev1 "k8s.io/api/core/v1"
@@ -14,6 +15,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	k8scomponent "github.com/apecloud/kubeblocks/cmd/probe/internal/component/kubernetes"
+	v1 "github.com/apecloud/kubeblocks/cmd/probe/vendor/k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -84,22 +86,24 @@ func NewKubernetesStore(logger logger.Logger) (*KubernetesStore, error) {
 	}, nil
 }
 
+func (store *KubernetesStore) Initialize() error {
+}
 func (store *KubernetesStore) GetCluster() (*Cluster, error) {
-	appsCluster := &appsv1alpha1.Cluster{}
+	clusterResource := &appsv1alpha1.Cluster{}
 	err := store.client.Get().
 		Namespace(store.namespace).
 		Resource("clusters").
 		Name(store.clusterName).
 		VersionedParams(&metav1.GetOptions{}, scheme.ParameterCodec).
 		Do(store.ctx).
-		Into(appsCluster)
-	store.logger.Infof("cluster: %v", appsCluster)
+		Into(clusterResource)
+	store.logger.Infof("cluster: %v", clusterResource)
 	if err != nil {
 		store.logger.Errorf("k8s get cluster error: %v", err)
 	}
 
 	var replicas int32
-	for _, component := range appsCluster.Spec.ComponentSpecs {
+	for _, component := range clusterResource.Spec.ComponentSpecs {
 		if component.Name == store.componentName {
 			replicas = component.Replicas
 			break
@@ -127,6 +131,7 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 		Members:         members,
 		Switchover:      switchover,
 		HaConfig:        haConfig,
+		clusterResource: clusterResource,
 	}
 
 	return cluster, nil
@@ -160,9 +165,82 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 	return members, nil
 }
 
-func (store *KubernetesStore) Initialize()        {}
-func (store *KubernetesStore) ResetCluser()       {}
-func (store *KubernetesStore) DeleteCluser()      {}
+func (store *KubernetesStore) ResetCluser()  {}
+func (store *KubernetesStore) DeleteCluser() {}
+func (store *KubernetesStore) GetLeaderConfigMap() (*corev1.ConfigMap, error) {
+	leaderConfigMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, store.clusterCompName+"-leader", metav1.GetOptions{})
+	if err != nil {
+		store.logger.Errorf("Get Leader configmap failed: %v", err)
+	}
+	return leaderConfigMap, err
+}
+
+func (store *KubernetesStore) IsLeaderExist() (bool, error) {
+	leaderConfigMap, err := store.GetLeaderConfigMap()
+	return leaderConfigMap != nil, err
+}
+
+func (store *KubernetesStore) CreateLeader() error {
+	leaderName := os.Getenv("KB_POD_FQDN")
+	acquireTime := time.Now().Unix()
+	renewTime := acquireTime
+	ttl := store.haConfig.TTL
+	isExist, err := store.IsLeaderExist()
+	if isExist || err != nil {
+		store.logger.Errorf("Get Leader failed: %v", err)
+		return err
+	}
+
+	if _, err = store.clientSet.CoreV1().ConfigMaps(store.namespace).Create(store.ctx, &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      store.clusterCompName + "-leader",
+			Namespace: store.namespace,
+			Annotations: map[string]string{
+				"leader":       leaderName,
+				"acquire-time": strconv.FormatInt(acquireTime, 10),
+				"renew-time":   strconv.FormatInt(renewTime, 10),
+				"ttl":          ttl,
+				"extra":        "",
+			},
+		},
+	}, metav1.CreateOptions{}); err != nil {
+		return err
+	}
+}
+
+func (store *KubernetesStore) GetLeader() (*Leader, error) {
+	configmap, err := store.GetLeaderConfigMap()
+	if err != nil {
+		return nil, err
+	}
+
+	if configmap == nil {
+		return nil, nil
+	}
+
+	annotations := configmap.Annotations
+	acquireTime, err := strconv.ParseInt(annotations["acquire-time"], 10, 64)
+	if err != nil {
+		acquireTime = 0
+	}
+	renewTime, err := strconv.ParseInt(annotations["renew-time"], 10, 64)
+	if err != nil {
+		renewTime = 0
+	}
+	ttl, err := strconv.Atoi(annotations["ttl"])
+	if err != nil {
+		ttl = 0
+	}
+	return &Leader{
+		index:       configmap.ResourceVersion,
+		name:        annotations["leader"],
+		acquireTime: accquireTime,
+		renewTime:   renewTime,
+		ttl:         ttl,
+	}, nil
+
+}
+
 func (store *KubernetesStore) AttempAcquireLock() {}
 func (store *KubernetesStore) HasLock()           {}
 func (store *KubernetesStore) ReleaseLock()       {}

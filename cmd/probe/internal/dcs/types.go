@@ -1,14 +1,17 @@
 package dcs
 
+import appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+
 type Cluster struct {
 	ClusterCompName string
 	Replicas        int32
 	HaConfig        *HaConfig
 	//Leader     *Leader
-	OpTime     int64
-	Members    []Member
-	Switchover *Switchover
-	Extra      map[string]string
+	OpTime          int64
+	Members         []Member
+	Switchover      *Switchover
+	Extra           map[string]string
+	clusterResource *appsv1alpha1.Cluster
 }
 
 func (c *Cluster) HasMember(memberName string) bool {
@@ -59,6 +62,14 @@ func (c *HaConfig) GetTtl() int {
 
 func (c *HaConfig) GetMaxLagOnSwitchover() int64 {
 	return c.maxLagOnSwitchover
+}
+
+type Leader struct {
+	index       string
+	name        string
+	acquireTime int64
+	renewTime   int64
+	ttl         int
 }
 
 type Member struct {

@@ -274,10 +274,20 @@ func (h *Ha) follow() error {
 		h.log.Errorf("get cluster from k8s failed, err:%v")
 		return err
 	}
+	err = h.DB.RefreshCluster()
+	if err != nil {
+		h.log.Errorf("Refresh cluster failed, err:%v", err)
+		return err
+	}
 
 	if isLeader, err := h.DB.IsLeader(h.ctx); isLeader && err == nil {
 		h.log.Infof("demoted %s after trying and failing to obtain lock", h.podName)
 		return h.DB.Demote(h.ctx, h.podName)
+	}
+
+	if h.cs.GetCluster().Leader == nil {
+		h.log.Warnf("no action coz cluster still has no leader")
+		return nil
 	}
 
 	return h.DB.HandleFollow(h.ctx, h.cs.GetCluster().Leader, h.podName)

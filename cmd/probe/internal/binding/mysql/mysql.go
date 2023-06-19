@@ -283,7 +283,7 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 	data, err = mysqlOps.query(ctx, getReadOnlySql)
 	result, err := ParseSingleQuery(string(data))
 	if err != nil {
-		mysqlOps.Logger.Errorf("parse query failed, err%v", err)
+		return "", errors.Errorf("parse query failed, err:%v", err)
 	}
 
 	if result["Value"].(string) != "OFF" {

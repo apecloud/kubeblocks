@@ -202,7 +202,9 @@ func (cs *ConfigurationStore) GetClusterFromKubernetes() error {
 
 	pods := make([]*v1.Pod, 0, len(podList.Items))
 	for i, _ := range podList.Items {
-		pods = append(pods, &podList.Items[i])
+		if strings.HasPrefix(podList.Items[i].Name, cs.clusterCompName) {
+			pods = append(pods, &podList.Items[i])
+		}
 	}
 
 	var config, switchoverConfig, leaderConfig, extraConfig *v1.ConfigMap

@@ -150,8 +150,9 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 
 	// append leader
 	podList = podList[end:]
-	for _, pod := range podList {
-		vertex := &model.ObjectVertex{Obj: &pod}
+	end = len(podList)
+	for i := 0; i < end; i++ {
+		vertex := &model.ObjectVertex{Obj: &podList[i]}
 		p.dag.AddConnect(preVertex, vertex)
 	}
 }
@@ -159,8 +160,8 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 // unknown & empty & leader & followers & learner
 func (p *realUpdatePlan) buildParallelUpdatePlan() {
 	root, _ := model.FindRootVertex(p.dag)
-	for _, pod := range p.pods {
-		vertex := &model.ObjectVertex{Obj: &pod}
+	for i := range p.pods {
+		vertex := &model.ObjectVertex{Obj: &p.pods[i]}
 		p.dag.AddConnect(root, vertex)
 	}
 }
@@ -168,8 +169,8 @@ func (p *realUpdatePlan) buildParallelUpdatePlan() {
 // unknown -> empty -> learner -> followers(none->readonly->readwrite) -> leader
 func (p *realUpdatePlan) buildSerialUpdatePlan() {
 	preVertex, _ := model.FindRootVertex(p.dag)
-	for _, pod := range p.pods {
-		vertex := &model.ObjectVertex{Obj: &pod}
+	for i := range p.pods {
+		vertex := &model.ObjectVertex{Obj: &p.pods[i]}
 		p.dag.AddConnect(preVertex, vertex)
 		preVertex = vertex
 	}

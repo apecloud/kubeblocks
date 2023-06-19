@@ -31,7 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
-var _ = Describe("update plan test", func() {
+var _ = Describe("update plan test.", func() {
 	const (
 		namespace   = "foo"
 		name        = "bar"
@@ -75,7 +75,7 @@ var _ = Describe("update plan test", func() {
 		rsm.Status.UpdateRevision = newRevision
 	})
 
-	Context("plan build and execute", func() {
+	Context("plan build&execute", func() {
 		var pod0, pod1, pod2, pod3, pod4, pod5, pod6 *corev1.Pod
 
 		resetPods := func() {
@@ -127,8 +127,16 @@ var _ = Describe("update plan test", func() {
 		}
 
 		makePodUpdateReady := func(pods ...*corev1.Pod) {
+			readyCondition := corev1.PodCondition{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}
 			for _, pod := range pods {
 				pod.Labels[apps.StatefulSetRevisionLabel] = newRevision
+				if pod.Labels[roleLabelKey] == "" {
+					pod.Labels[roleLabelKey] = "learner"
+				}
+				pod.Status.Conditions = append(pod.Status.Conditions, readyCondition)
 			}
 		}
 
@@ -163,7 +171,7 @@ var _ = Describe("update plan test", func() {
 			resetPods()
 		})
 
-		It("serial plan should work well", func() {
+		It("should work well in a serial plan", func() {
 			By("build a serial plan")
 			expectedPlan := [][]*corev1.Pod{
 				{pod4},
@@ -177,7 +185,7 @@ var _ = Describe("update plan test", func() {
 			checkPlan(expectedPlan)
 		})
 
-		It("parallel plan should work well", func() {
+		It("should work well in a parallel plan", func() {
 			By("build a parallel plan")
 			rsm.Spec.UpdateStrategy = workloads.ParallelUpdateStrategy
 			expectedPlan := [][]*corev1.Pod{
@@ -186,7 +194,7 @@ var _ = Describe("update plan test", func() {
 			checkPlan(expectedPlan)
 		})
 
-		It("best effort parallel should work well", func() {
+		It("should work well in a best effort parallel", func() {
 			By("build a best effort parallel plan")
 			rsm.Spec.UpdateStrategy = workloads.BestEffortParallelUpdateStrategy
 			expectedPlan := [][]*corev1.Pod{

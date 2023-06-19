@@ -866,7 +866,6 @@ func (pgOps *PostgresOperations) Promote(ctx context.Context, podName string) er
 	return nil
 }
 
-// 执行一个脚本
 func (pgOps *PostgresOperations) prePromote(ctx context.Context) error {
 	return nil
 }

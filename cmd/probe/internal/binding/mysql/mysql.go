@@ -923,6 +923,7 @@ func (mysqlOps *MysqlOperations) follow(ctx context.Context, podName string, lea
 		mysqlOps.Logger.Errorf("sql query failed, err:%v", err)
 	}
 
+	mysqlOps.Logger.Infof("successfully follow new leader:%s", leader)
 	return nil
 }
 
@@ -990,7 +991,7 @@ func (mysqlOps *MysqlOperations) ProcessManualSwitchoverFromNoLeader(ctx context
 }
 
 func (mysqlOps *MysqlOperations) Start(ctx context.Context, podName string) error {
-	start := `./entrypoint.sh mysqld --defaults-file=/opt/my.cnf &`
+	start := `./entrypoint.sh mysqld --defaults-file=/opt/my.cnf --read_only=1 --super_read_only=1 &`
 
 	_, err := mysqlOps.ExecCmd(ctx, podName, start)
 	if err != nil {

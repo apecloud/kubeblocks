@@ -67,16 +67,16 @@ func NewCommandChannel(ctx context.Context, dataType, dsn string) (DynamicParamU
 	logger.V(1).Info(fmt.Sprintf("new command channel. [%s]", dataType))
 	switch strings.ToLower(dataType) {
 	case mysql:
-		return NewMysqlConnection(ctx, dsn)
+		return newMysqlConnection(ctx, dsn)
 	case patroni:
-		return NewPGPatroniConnection(dsn)
+		return newPGPatroniConnection(dsn)
 	default:
 		// TODO mock db begin support dapper
 	}
 	return nil, cfgcore.MakeError("not supported type[%s]", dataType)
 }
 
-func NewMysqlConnection(ctx context.Context, dsn string) (DynamicParamUpdater, error) {
+func newMysqlDB(ctx context.Context, dsn string) (*sql.DB, error) {
 	logger.V(1).Info("connecting mysql.")
 	if dsn == "" {
 		dsn = os.Getenv(mysqlDsnEnv)
@@ -84,10 +84,19 @@ func NewMysqlConnection(ctx context.Context, dsn string) (DynamicParamUpdater, e
 	if dsn == "" {
 		return nil, cfgcore.MakeError("require DATA_SOURCE_NAME env.")
 	}
-	db, err := sql.Open(mysql, dsn)
+	return sql.Open(mysql, dsn)
+}
+
+func newMysqlConnection(ctx context.Context, dsn string) (DynamicParamUpdater, error) {
+	db, err := newMysqlDB(ctx, dsn)
 	if err != nil {
 		return nil, cfgcore.WrapError(err, "failed to opening connection to mysql.")
 	}
+	return newDynamicParamUpdater(ctx, db)
+}
+
+func newDynamicParamUpdater(ctx context.Context, db *sql.DB) (DynamicParamUpdater, error) {
+	logger.V(1).Info("connecting mysql.")
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 	// Set max lifetime for a connection.
@@ -153,7 +162,7 @@ func (p *pgPatroniCommandChannel) ExecCommand(ctx context.Context, command strin
 func (p *pgPatroniCommandChannel) Close() {
 }
 
-func NewPGPatroniConnection(hostURL string) (DynamicParamUpdater, error) {
+func newPGPatroniConnection(hostURL string) (DynamicParamUpdater, error) {
 	logger.V(1).Info("connecting patroni.")
 	if hostURL == "" {
 		hostURL = os.Getenv(patroniRestAPIURL)

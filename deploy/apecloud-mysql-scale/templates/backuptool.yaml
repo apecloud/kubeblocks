@@ -13,7 +13,7 @@ spec:
       value: /data/mysql/data
   physical:
     restoreCommands:
-      - >
+      - |
         set -e;
         mkdir -p ${DATA_DIR}
         res=`ls -A ${DATA_DIR}`

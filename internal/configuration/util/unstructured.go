@@ -95,6 +95,12 @@ func (accessor *unstructuredAccessor) visitValueType(v reflect.Value, t reflect.
 }
 
 func (accessor *unstructuredAccessor) visitArray(v reflect.Value, t reflect.Type, parent, cur string) error {
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+	}
 	n := v.Len()
 	for i := 0; i < n; i++ {
 		// index := fmt.Sprintf("%s_%d", parent, i)
@@ -107,6 +113,12 @@ func (accessor *unstructuredAccessor) visitArray(v reflect.Value, t reflect.Type
 
 func (accessor *unstructuredAccessor) visitMap(v reflect.Value, t reflect.Type, parent string) error {
 	// return if empty
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+	}
 	if v.Len() == 0 {
 		return nil
 	}

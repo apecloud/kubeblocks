@@ -28,7 +28,7 @@ kind: ClusterVersion
 metadata:
   name: postgresql-12.14.1
   annotations:
-    kubeblocks.io/is-default-cluster-version: "true"
+    kubeblocks.io/is-default-cluster-version: "false"
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
 spec:
@@ -67,3 +67,70 @@ spec:
       systemAccountSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1
+
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: postgresql-12.15.0
+  annotations:
+    kubeblocks.io/is-default-cluster-version: "false"
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: postgresql
+  componentVersions:
+    - componentDefRef: postgresql
+      configSpecs:
+        # name needs to consistent with the name of the configmap defined in clusterDefinition, and replace the templateRef with postgres v12.14.0 configmap
+        - name: postgresql-configuration
+          templateRef: postgresql12-configuration
+          constraintRef: postgresql12-cc
+          keys:
+            - postgresql.conf
+          namespace: {{ .Release.Namespace }}
+          volumeName: postgresql-config
+          defaultMode: 0777
+        - name: postgresql-custom-metrics
+          templateRef: postgresql12-custom-metrics
+          namespace: {{ .Release.Namespace }}
+          volumeName: postgresql-custom-metrics
+          defaultMode: 0777
+      versionsContext:
+        initContainers:
+          - name: pg-init-container
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.15.0
+        containers:
+          - name: postgresql
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.15.0
+          - name: pgbouncer
+            image: {{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}
+      systemAccountSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.15.0
+
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: postgresql-14.8.0
+  annotations:
+    kubeblocks.io/is-default-cluster-version: "true"
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: postgresql
+  componentVersions:
+    - componentDefRef: postgresql
+      versionsContext:
+        initContainers:
+          - name: pg-init-container
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:14.8.0
+        containers:
+          - name: postgresql
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:14.8.0
+          - name: pgbouncer
+            image: {{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}
+      systemAccountSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:14.8.0

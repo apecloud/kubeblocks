@@ -37,6 +37,9 @@ var K3dVersion = "5.4.4"
 // K3sImageTag is k3s image tag
 var K3sImageTag = "v1.23.8-k3s1"
 
+// MinimumDockerVersion is Minimum Docker version required by KubeBlocks
+var MinimumDockerVersion = "20.10.5"
+
 // DefaultKubeBlocksVersion is the default KubeBlocks version that installed by kbcli
 var DefaultKubeBlocksVersion string
 

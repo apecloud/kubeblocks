@@ -1,0 +1,31 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: {{ template "prometheus.name" . }}-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+      {{- include "prometheus.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: prometheus
+  componentVersions:
+  - componentDefRef: server
+    versionsContext:
+      containers:
+      - name: configmap-reload
+        image: {{ .Values.configmapReload.prometheus.image.registry | default "docker.io" }}/{{ .Values.configmapReload.prometheus.image.repository }}:{{ .Values.configmapReload.prometheus.image.tag }}
+        imagePullPolicy: {{ default .Values.configmapReload.prometheus.image.pullPolicy "IfNotPresent" }}
+
+      - name: server
+        image: {{ .Values.server.image.registry | default "docker.io" }}/{{ .Values.server.image.repository }}:{{ .Values.server.image.tag }}
+        imagePullPolicy: {{ default .Values.server.image.pullPolicy "IfNotPresent" }}
+
+  - componentDefRef: alertmanager
+    versionsContext:
+      containers:
+        - name: configmap-reload
+          image: {{ .Values.configmapReload.alertmanager.image.registry | default "docker.io" }}/{{ .Values.configmapReload.alertmanager.image.repository }}:{{ .Values.configmapReload.alertmanager.image.tag }}
+          imagePullPolicy: {{ default .Values.configmapReload.alertmanager.image.pullPolicy "IfNotPresent" }}
+
+        - name: alertmanager
+          image: {{ .Values.alertmanager.image.registry | default "docker.io" }}/{{ .Values.alertmanager.image.repository }}:{{ .Values.alertmanager.image.tag }}
+          magePullPolicy: {{ default .Values.alertmanager.image.pullPolicy "IfNotPresent" }}
+

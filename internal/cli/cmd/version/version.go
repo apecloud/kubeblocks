@@ -71,4 +71,8 @@ func (o *versionOptions) Run(f cmdutil.Factory) {
 		fmt.Printf("  Compiler: %s\n", runtime.Compiler)
 		fmt.Printf("  Platform: %s/%s\n", runtime.GOOS, runtime.GOARCH)
 	}
+
+	if v.KubeBlocks != "" && v.Cli != v.KubeBlocks {
+		fmt.Printf("WARNING: version difference between kbcli (%s) and kubeblocks (%s) \n", v.Cli, v.KubeBlocks)
+	}
 }

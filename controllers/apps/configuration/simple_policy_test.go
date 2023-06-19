@@ -63,6 +63,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
+				withClusterComponent(2),
 				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 						Name:       "for_test",
@@ -125,6 +126,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
+				withClusterComponent(2),
 				withCDComponent(appsv1alpha1.Replication, []appsv1alpha1.ComponentConfigSpec{{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 						Name:       "for_test",
@@ -162,6 +164,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
+				withClusterComponent(2),
 				withCDComponent(appsv1alpha1.Stateless, []appsv1alpha1.ComponentConfigSpec{{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 						Name:       "for_test",

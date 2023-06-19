@@ -30,7 +30,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 )
 
-var _ = Describe("alter", func() {
+var _ = Describe("alert", func() {
 	var f *cmdtesting.TestFactory
 	var s genericclioptions.IOStreams
 
@@ -51,7 +51,7 @@ var _ = Describe("alter", func() {
 
 	It("run", func() {
 		o := &listReceiversOptions{baseOptions: mockBaseOptions(s)}
-		o.client = testing.FakeClientSet(o.baseOptions.alterConfigMap, o.baseOptions.webhookConfigMap)
+		o.client = testing.FakeClientSet(o.baseOptions.alertConfigMap, o.baseOptions.webhookConfigMap)
 		Expect(o.run()).Should(Succeed())
 	})
 })

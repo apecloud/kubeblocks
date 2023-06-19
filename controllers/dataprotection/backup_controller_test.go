@@ -337,7 +337,7 @@ var _ = Describe("Backup Controller test", func() {
 
 				By("patching volumesnapshot status with error")
 				Eventually(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(tmpVS *snapshotv1.VolumeSnapshot) {
-					msg := "test-error"
+					msg := "Failed to set default snapshot class with error: some error"
 					vsError := snapshotv1.VolumeSnapshotError{
 						Message: &msg,
 					}

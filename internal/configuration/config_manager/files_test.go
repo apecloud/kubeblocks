@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_newFiles(t *testing.T) {
+func TestNewFiles(t *testing.T) {
 	pwd, err := os.Getwd()
 	if err != nil {
 		t.Errorf("failed to Getwd directory")
@@ -35,7 +35,7 @@ func Test_newFiles(t *testing.T) {
 	tmpDir, err := os.MkdirTemp(os.TempDir(), "files-test-")
 	require.Nil(t, err)
 	defer os.RemoveAll(tmpDir)
-	createTestConfigureDirectory(t, tmpDir, "my.test.yaml", "a: b")
+	MakeTestConfigureDirectory(t, tmpDir, "my.test.yaml", "a: b")
 
 	type args struct {
 		basePath string

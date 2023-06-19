@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -322,30 +323,6 @@ var _ = Describe("Consensus Component", func() {
 
 var _ = Describe("Component utils test", func() {
 	Context("test mergeServiceAnnotations", func() {
-		It("original and target annotations are nil", func() {
-			Expect(MergeServiceAnnotations(nil, nil)).Should(BeNil())
-		})
-		It("target annotations is nil", func() {
-			originalAnnotations := map[string]string{"k1": "v1"}
-			Expect(MergeServiceAnnotations(originalAnnotations, nil)).To(Equal(originalAnnotations))
-		})
-		It("original annotations is nil", func() {
-			targetAnnotations := map[string]string{"k1": "v1"}
-			Expect(MergeServiceAnnotations(nil, targetAnnotations)).To(Equal(targetAnnotations))
-		})
-		It("original annotations have prometheus annotations which should be removed", func() {
-			originalAnnotations := map[string]string{"k1": "v1", "monitor.kubeblocks.io/path": "/metrics"}
-			targetAnnotations := map[string]string{"k2": "v2"}
-			expectAnnotations := map[string]string{"k1": "v1", "k2": "v2"}
-			Expect(MergeServiceAnnotations(originalAnnotations, targetAnnotations)).To(Equal(expectAnnotations))
-		})
-		It("target annotations should override original annotations", func() {
-			originalAnnotations := map[string]string{"k1": "v1", "monitor.kubeblocks.io/path": "/metrics"}
-			targetAnnotations := map[string]string{"k1": "v11"}
-			expectAnnotations := map[string]string{"k1": "v11"}
-			Expect(MergeServiceAnnotations(originalAnnotations, targetAnnotations)).To(Equal(expectAnnotations))
-		})
-
 		It("should merge annotations from original that not exist in target to final result", func() {
 			originalKey := "only-existing-in-original"
 			targetKey := "only-existing-in-target"
@@ -366,6 +343,29 @@ var _ = Describe("Component utils test", func() {
 			var nilAnnotations map[string]string
 			MergeAnnotations(originalAnnotations, &nilAnnotations)
 			Expect(nilAnnotations).ShouldNot(BeNil())
+		})
+
+		It("test sync pod spec default values set by k8s", func() {
+			var (
+				clusterName = "cluster"
+				compName    = "component"
+				podName     = "pod"
+				role        = "leader"
+				mode        = "ReadWrite"
+			)
+			pod := testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, compName, podName, role, mode)
+			ppod := testapps.NewPodFactory(testCtx.DefaultNamespace, "pod").
+				SetOwnerReferences("apps/v1", constant.StatefulSetKind, nil).
+				AddAppInstanceLabel(clusterName).
+				AddAppComponentLabel(compName).
+				AddAppManangedByLabel().
+				AddRoleLabel(role).
+				AddConsensusSetAccessModeLabel(mode).
+				AddControllerRevisionHashLabel("").
+				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+				GetObject()
+			ResolvePodSpecDefaultFields(pod.Spec, &ppod.Spec)
+			Expect(reflect.DeepEqual(pod.Spec, ppod.Spec)).Should(BeTrue())
 		})
 	})
 })

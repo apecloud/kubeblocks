@@ -20,55 +20,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
+	"reflect"
 	"testing"
-
-	"github.com/StudioSol/set"
 )
 
 func TestDifference(t *testing.T) {
 	type args struct {
-		left  *set.LinkedHashSetString
-		right *set.LinkedHashSetString
+		left  *Sets
+		right *Sets
 	}
 	tests := []struct {
 		name string
 		args args
-		want *set.LinkedHashSetString
+		want *Sets
 	}{{
 		name: "test1",
 		args: args{
-			left:  set.NewLinkedHashSetString("a", "b", "e", "g"),
-			right: set.NewLinkedHashSetString(),
+			left:  NewSet("a", "b", "e", "g"),
+			right: NewSet(),
 		},
-		want: set.NewLinkedHashSetString("b", "a", "e", "g"),
+		want: NewSet("b", "a", "e", "g"),
 	}, {
 		name: "empty_test",
 		args: args{
-			left:  set.NewLinkedHashSetString(),
-			right: set.NewLinkedHashSetString(),
+			left:  NewSet(),
+			right: NewSet(),
 		},
-		want: set.NewLinkedHashSetString(),
+		want: NewSet(),
 	}, {
 		name: "test2",
 		args: args{
-			left:  set.NewLinkedHashSetString("a", "b", "e", "g"),
-			right: set.NewLinkedHashSetString("a", "g", "x", "z"),
+			left:  NewSet("a", "b", "e", "g"),
+			right: NewSet("a", "g", "x", "z"),
 		},
-		want: set.NewLinkedHashSetString("b", "e"),
+		want: NewSet("b", "e"),
 	}, {
 		name: "test_contained",
 		args: args{
-			left:  set.NewLinkedHashSetString("a", "b", "e", "g"),
-			right: set.NewLinkedHashSetString("a", "g"),
+			left:  NewSet("a", "b", "e", "g"),
+			right: NewSet("a", "g"),
 		},
-		want: set.NewLinkedHashSetString("b", "e"),
+		want: NewSet("b", "e"),
 	}, {
 		name: "test_contained2",
 		args: args{
-			left:  set.NewLinkedHashSetString("a"),
-			right: set.NewLinkedHashSetString("a", "g"),
+			left:  NewSet("a"),
+			right: NewSet("a", "g"),
 		},
-		want: set.NewLinkedHashSetString(),
+		want: NewSet(),
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -87,7 +86,7 @@ func TestMapKeyDifference(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want *set.LinkedHashSetString
+		want *Sets
 	}{{
 		name: "test_map",
 		args: args{
@@ -102,12 +101,66 @@ func TestMapKeyDifference(t *testing.T) {
 				"f": 5,
 			},
 		},
-		want: set.NewLinkedHashSetString("b", "c"),
+		want: NewSet("b", "c"),
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := MapKeyDifference(tt.args.left, tt.args.right); !EqSet(got, tt.want) {
 				t.Errorf("MapKeyDifference() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUnion(t *testing.T) {
+	type args struct {
+		left  *Sets
+		right *Sets
+	}
+	tests := []struct {
+		name string
+		args args
+		want *Sets
+	}{{
+		name: "test1",
+		args: args{
+			left:  NewSet("a", "b", "e", "g"),
+			right: NewSet("a", "g", "x", "z"),
+		},
+		want: NewSet("a", "g"),
+	}, {
+		name: "test2",
+		args: args{
+			left:  NewSet("i", "b", "e", "g"),
+			right: NewSet("a", "f", "x", "z"),
+		},
+		want: NewSet(),
+	}, {
+		name: "test3",
+		args: args{
+			left:  NewSet(),
+			right: NewSet("a", "f", "x", "z"),
+		},
+		want: NewSet(),
+	}, {
+		name: "test4",
+		args: args{
+			left:  NewSet(),
+			right: NewSet(),
+		},
+		want: NewSet(),
+	}, {
+		name: "test5",
+		args: args{
+			left:  NewSet("a", "b", "e", "g"),
+			right: NewSet("a", "b", "e", "g"),
+		},
+		want: NewSet("a", "b", "e", "g"),
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Union(tt.args.left, tt.args.right); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Union() = %v, want %v", got.AsSlice(), tt.want.AsSlice())
 			}
 		})
 	}

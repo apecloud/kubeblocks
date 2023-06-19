@@ -595,13 +595,15 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 
 	c.WorkloadVertex.Immutable = true
 	stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
-	dataClone := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)
+	d, err := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)
+	if err != nil {
+		return err
+	}
 	var succeed bool
-	var err error
-	if dataClone == nil {
+	if d == nil {
 		succeed = true
 	} else {
-		succeed, err = dataClone.succeed()
+		succeed, err = d.succeed()
 		if err != nil {
 			return err
 		}
@@ -613,7 +615,7 @@ func (c *StatefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 	} else {
 		c.WorkloadVertex.Immutable = true
 		// update objs will trigger cluster reconcile, no need to requeue error
-		objs, err := dataClone.cloneData(dataClone)
+		objs, err := d.cloneData(d)
 		if err != nil {
 			return err
 		}
@@ -632,7 +634,11 @@ func (c *StatefulComponentBase) postScaleOut(reqCtx intctrlutil.RequestCtx, cli 
 		}
 	)
 
-	if d := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsObj, snapshotKey); d != nil {
+	d, err := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsObj, snapshotKey)
+	if err != nil {
+		return err
+	}
+	if d != nil {
 		// clean backup resources.
 		// there will not be any backup resources other than scale out.
 		tmpObjs, err := d.clearTmpResources()
@@ -686,8 +692,10 @@ func (c *StatefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet) bool 
 	stsObjCopy.Spec.Template = stsProto.Spec.Template
 	stsObjCopy.Spec.Replicas = stsProto.Spec.Replicas
 	stsObjCopy.Spec.UpdateStrategy = stsProto.Spec.UpdateStrategy
+
+	util.ResolvePodSpecDefaultFields(stsObj.Spec.Template.Spec, &stsObjCopy.Spec.Template.Spec)
+
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
-		// TODO(REVIEW): always return true and update component phase to Updating. stsObj.Spec contains default values which set by Kubernetes
 		c.WorkloadVertex.Obj = stsObjCopy
 		c.WorkloadVertex.Action = ictrltypes.ActionPtr(ictrltypes.UPDATE)
 		return true

@@ -51,6 +51,7 @@ const (
 	KBClusterNamePlaceHolder        = "$(KB_CLUSTER_NAME)"
 	KBClusterCompNamePlaceHolder    = "$(KB_CLUSTER_COMP_NAME)"
 	KBClusterUIDPostfix8PlaceHolder = "$(KB_CLUSTER_UID_POSTFIX_8)"
+	KBToolsImagePlaceHolder         = "$(KUBEBLOCKS_TOOLS_IMAGE)"
 )
 
 const (

@@ -64,6 +64,95 @@ spec:
                       changed parameters through json.
                     x-kubernetes-preserve-unknown-fields: true
                 type: object
+              downwardAPIOptions:
+                description: downwardAPIOptions is used to watch pod fields.
+                items:
+                  properties:
+                    command:
+                      description: command used to execute for downwrad api.
+                      items:
+                        type: string
+                      type: array
+                    items:
+                      description: Items is a list of downward API volume file
+                      items:
+                        description: DownwardAPIVolumeFile represents information
+                          to create the file containing the pod field
+                        properties:
+                          fieldRef:
+                            description: 'Required: Selects a field of the pod: only
+                              annotations, labels, name and namespace are supported.'
+                            properties:
+                              apiVersion:
+                                description: Version of the schema the FieldPath is
+                                  written in terms of, defaults to "v1".
+                                type: string
+                              fieldPath:
+                                description: Path of the field to select in the specified
+                                  API version.
+                                type: string
+                            required:
+                            - fieldPath
+                            type: object
+                          mode:
+                            description: 'Optional: mode bits used to set permissions
+                              on this file, must be an octal value between 0000 and
+                              0777 or a decimal value between 0 and 511. YAML accepts
+                              both octal and decimal values, JSON requires decimal
+                              values for mode bits. If not specified, the volume defaultMode
+                              will be used. This might be in conflict with other options
+                              that affect the file mode, like fsGroup, and the result
+                              can be other mode bits set.'
+                            format: int32
+                            type: integer
+                          path:
+                            description: 'Required: Path is  the relative path name
+                              of the file to be created. Must not be absolute or contain
+                              the ''..'' path. Must be utf-8 encoded. The first item
+                              of the relative path must not start with ''..'''
+                            type: string
+                          resourceFieldRef:
+                            description: 'Selects a resource of the container: only
+                              resources limits and requests (limits.cpu, limits.memory,
+                              requests.cpu and requests.memory) are currently supported.'
+                            properties:
+                              containerName:
+                                description: 'Container name: required for volumes,
+                                  optional for env vars'
+                                type: string
+                              divisor:
+                                anyOf:
+                                - type: integer
+                                - type: string
+                                description: Specifies the output format of the exposed
+                                  resources, defaults to "1"
+                                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                x-kubernetes-int-or-string: true
+                              resource:
+                                description: 'Required: resource to select'
+                                type: string
+                            required:
+                            - resource
+                            type: object
+                        required:
+                        - path
+                        type: object
+                      type: array
+                    mountPoint:
+                      description: mountPoint is the mount point of the scripts file.
+                      maxLength: 128
+                      type: string
+                    name:
+                      description: Specify the name of the field.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                  required:
+                  - items
+                  - mountPoint
+                  - name
+                  type: object
+                type: array
               dynamicParameters:
                 description: dynamicParameters, list of DynamicParameter, modifications
                   of them trigger a config dynamic reload without process restart.
@@ -130,22 +219,13 @@ spec:
                   shellTrigger:
                     description: shellTrigger performs the reload command.
                     properties:
-                      exec:
-                        description: exec used to execute for reload.
-                        type: string
-                      namespace:
-                        default: default
-                        description: Specify the namespace of the referenced the tpl
-                          script ConfigMap object. An empty namespace is equivalent
-                          to the "default" namespace.
-                        maxLength: 63
-                        type: string
-                      scriptConfigMapRef:
-                        description: scriptConfigMapRef used to execute for reload.
-                        type: string
+                      command:
+                        description: command used to execute for reload.
+                        items:
+                          type: string
+                        type: array
                     required:
-                    - exec
-                    - scriptConfigMapRef
+                    - command
                     type: object
                   tplScriptTrigger:
                     description: goTplTrigger performs the reload command.
@@ -216,6 +296,28 @@ spec:
                     - signal
                     type: object
                 type: object
+              scriptConfigs:
+                description: scriptConfigs, list of ScriptConfig, witch these scripts
+                  can be used by volume trigger,downward trigger, or tool image
+                items:
+                  properties:
+                    namespace:
+                      default: default
+                      description: Specify the namespace of the referenced the tpl
+                        script ConfigMap object. An empty namespace is equivalent
+                        to the "default" namespace.
+                      maxLength: 63
+                      type: string
+                    scriptConfigMapRef:
+                      description: scriptConfigMapRef used to execute for reload.
+                      type: string
+                  required:
+                  - scriptConfigMapRef
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - scriptConfigMapRef
+                x-kubernetes-list-type: map
               selector:
                 description: selector is used to match the label on the pod, for example,
                   a pod of the primary is match on the patroni cluster.
@@ -268,6 +370,37 @@ spec:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
+              toolsImageSpec:
+                description: toolConfig used to config init container.
+                properties:
+                  mountPoint:
+                    description: mountPoint is the mount point of the scripts file.
+                    maxLength: 128
+                    type: string
+                  toolConfigs:
+                    description: toolConfig used to config init container.
+                    items:
+                      properties:
+                        command:
+                          description: exec used to execute for init containers.
+                          items:
+                            type: string
+                          type: array
+                        image:
+                          description: tools Container image name.
+                          type: string
+                        name:
+                          description: Specify the name of initContainer.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                      required:
+                      - command
+                      type: object
+                    type: array
+                required:
+                - mountPoint
+                type: object
             required:
             - formatterConfig
             type: object

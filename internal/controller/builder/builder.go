@@ -153,7 +153,8 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 			Name: v.name,
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: v.fieldPath,
+					APIVersion: "v1",
+					FieldPath:  v.fieldPath,
 				},
 			},
 		})

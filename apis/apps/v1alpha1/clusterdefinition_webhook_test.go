@@ -287,6 +287,14 @@ var _ = Describe("clusterDefinition webhook", func() {
 		Expect(k8sClient.Update(ctx, clusterDef)).Should(Succeed())
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)).Should(Succeed())
 		Expect(clusterDef.Spec.ComponentDefs[0].Probes.RoleProbeTimeoutAfterPodsReady).Should(Equal(int32(0)))
+
+		By("set h-scale policy type to Snapshot")
+		clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy = &HorizontalScalePolicy{
+			Type: HScaleDataClonePolicyFromSnapshot,
+		}
+		Expect(k8sClient.Update(ctx, clusterDef)).Should(Succeed())
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)).Should(Succeed())
+		Expect(clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy.Type).Should(Equal(HScaleDataClonePolicyCloneVolume))
 	})
 })
 

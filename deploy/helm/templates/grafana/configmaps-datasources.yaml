@@ -24,7 +24,7 @@ data:
       {{- if .Values.grafana.sidecar.datasources.url }}
       url: {{ .Values.grafana.sidecar.datasources.url }}
       {{- else }}
-      url: http://kb-addon-{{ include "addon.prometheus.name" . }}-server.{{ template "kubeblocks.prometheus.namespace" . }}:{{ .Values.prometheus.server.service.servicePort }}/{{ trimPrefix "/" .Values.prometheus.server.routePrefix }}
+      url: http://kb-addon-{{ include "addon.prometheus.name" . }}-server.{{ template "kubeblocks.namespace" . }}:80/
       {{- end }}
       access: proxy
       isDefault: true
@@ -36,7 +36,7 @@ data:
       {{- if .Values.grafana.sidecar.datasources.url }}
       url: {{ .Values.grafana.sidecar.datasources.url }}
       {{- else }}
-      url: http://kb-addon-{{ include "addon.prometheus.name" . }}-server.{{ template "kubeblocks.prometheus.namespace" . }}:{{ .Values.prometheus.server.service.servicePort }}/{{ trimPrefix "/" .Values.prometheus.server.routePrefix }}
+      url: http://kb-addon-{{ include "addon.prometheus.name" . }}-server.{{ template "kubeblocks.namespace" . }}:80/
       {{- end }}
       access: proxy
       isDefault: false

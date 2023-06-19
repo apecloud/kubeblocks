@@ -1,0 +1,15 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: {{ template "prometheus.server.fullname" . }}-constraints
+  labels:
+    {{- include "prometheus.labels" . | nindent 4 }}
+spec:
+  reloadOptions:
+    shellTrigger:
+      command:
+        - "/bin/true"
+
+  formatterConfig:
+    format: yaml
+

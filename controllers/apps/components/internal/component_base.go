@@ -24,8 +24,10 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -252,7 +254,13 @@ func (c *ComponentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.
 		}); pos < 0 {
 			node.Action = ictrltypes.ActionCreatePtr()
 		} else {
-			svcProto.Annotations = util.MergeServiceAnnotations(svcObjList[pos].Annotations, svcProto.Annotations)
+			// remove original monitor annotations
+			if len(svcObjList[pos].Annotations) > 0 {
+				maps.DeleteFunc(svcObjList[pos].Annotations, func(k, v string) bool {
+					return strings.HasPrefix(k, "monitor.kubeblocks.io")
+				})
+			}
+			util.MergeAnnotations(svcObjList[pos].Annotations, &svcProto.Annotations)
 			node.Action = ictrltypes.ActionUpdatePtr()
 		}
 	}

@@ -379,19 +379,16 @@ spec:
                           default: None
                           description: 'type controls what kind of data synchronization
                             do when component scale out. Policy is in enum of {None,
-                            Snapshot}. The default policy is `None`. None: Default
-                            policy, do nothing. Snapshot: Do native volume snapshot
-                            before scaling and restore to newly scaled pods. Prefer
-                            backup job to create snapshot if can find a backupPolicy
-                            from ''BackupPolicyTemplateName''. Notice that ''Snapshot''
-                            policy will only take snapshot on one volumeMount, default
-                            is the first volumeMount of first container (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
-                            since take multiple snapshots at one time might cause
-                            consistency problem.'
+                            CloneVolume}. The default policy is `None`. None: Default
+                            policy, create empty volume and no data clone. CloneVolume:
+                            Do data clone to newly scaled pods. Prefer to use volume
+                            snapshot first, and will try backup tool if volume snapshot
+                            is not enabled, finally report error if both above cannot
+                            work. Snapshot: Deprecated, alias for CloneVolume.'
                           enum:
                           - None
+                          - CloneVolume
                           - Snapshot
-                          - Backup
                           type: string
                         volumeMountsName:
                           description: volumeMountsName defines which volumeMount

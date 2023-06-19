@@ -29,7 +29,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -113,7 +112,7 @@ func RestartPod(podTemplate *corev1.PodTemplateSpec) error {
 // MergeAnnotations keeps the original annotations.
 // if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
 func MergeAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
-	if targetAnnotations == nil {
+	if targetAnnotations == nil || originalAnnotations == nil {
 		return
 	}
 	if *targetAnnotations == nil {
@@ -136,22 +135,6 @@ func BuildWorkLoadAnnotations(obj client.Object, cluster *appsv1alpha1.Cluster) 
 	// record the cluster generation to check if the sts is latest
 	workloadAnnotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(cluster.Generation, 10)
 	obj.SetAnnotations(workloadAnnotations)
-}
-
-// MergeServiceAnnotations keeps the original annotations except prometheus scrape annotations.
-// if annotations exist and are replaced, the Service will be updated.
-func MergeServiceAnnotations(originalAnnotations, targetAnnotations map[string]string) map[string]string {
-	if len(originalAnnotations) == 0 {
-		return targetAnnotations
-	}
-	tmpAnnotations := make(map[string]string, len(originalAnnotations)+len(targetAnnotations))
-	for k, v := range originalAnnotations {
-		if !strings.HasPrefix(k, "monitor.kubeblocks.io") {
-			tmpAnnotations[k] = v
-		}
-	}
-	maps.Copy(tmpAnnotations, targetAnnotations)
-	return tmpAnnotations
 }
 
 // GetClusterByObject gets cluster by related k8s workloads.
@@ -635,4 +618,82 @@ func GetRunningPods(ctx context.Context, cli client.Client, obj client.Object) (
 		return nil, nil
 	}
 	return GetPodListByStatefulSet(ctx, cli, sts)
+}
+
+// ResolvePodSpecDefaultFields set default value for some known fields of proto PodSpec @pobj.
+func ResolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
+	resolveVolume := func(v corev1.Volume, vv *corev1.Volume) {
+		if vv.DownwardAPI == nil || v.DownwardAPI == nil {
+			return
+		}
+		for i := range vv.DownwardAPI.Items {
+			vf := v.DownwardAPI.Items[i]
+			if vf.FieldRef == nil {
+				continue
+			}
+			vvf := &vv.DownwardAPI.Items[i]
+			if vvf.FieldRef != nil && len(vvf.FieldRef.APIVersion) == 0 {
+				vvf.FieldRef.APIVersion = vf.FieldRef.APIVersion
+			}
+		}
+		if vv.DownwardAPI.DefaultMode == nil {
+			vv.DownwardAPI.DefaultMode = v.DownwardAPI.DefaultMode
+		}
+	}
+	resolveContainer := func(c corev1.Container, cc *corev1.Container) {
+		if len(cc.TerminationMessagePath) == 0 {
+			cc.TerminationMessagePath = c.TerminationMessagePath
+		}
+		if len(cc.TerminationMessagePolicy) == 0 {
+			cc.TerminationMessagePolicy = c.TerminationMessagePolicy
+		}
+		if len(cc.ImagePullPolicy) == 0 {
+			cc.ImagePullPolicy = c.ImagePullPolicy
+		}
+	}
+	min := func(a, b int) int {
+		if a < b {
+			return a
+		}
+		return b
+	}
+	for i := 0; i < min(len(obj.Volumes), len(pobj.Volumes)); i++ {
+		resolveVolume(obj.Volumes[i], &pobj.Volumes[i])
+	}
+	for i := 0; i < min(len(obj.InitContainers), len(pobj.InitContainers)); i++ {
+		resolveContainer(obj.InitContainers[i], &pobj.InitContainers[i])
+	}
+	for i := 0; i < min(len(obj.Containers), len(pobj.Containers)); i++ {
+		resolveContainer(obj.Containers[i], &pobj.Containers[i])
+	}
+	if len(pobj.RestartPolicy) == 0 {
+		pobj.RestartPolicy = obj.RestartPolicy
+	}
+	if pobj.TerminationGracePeriodSeconds == nil {
+		pobj.TerminationGracePeriodSeconds = obj.TerminationGracePeriodSeconds
+	}
+	if len(pobj.DNSPolicy) == 0 {
+		pobj.DNSPolicy = obj.DNSPolicy
+	}
+	if len(pobj.DeprecatedServiceAccount) == 0 {
+		pobj.DeprecatedServiceAccount = obj.DeprecatedServiceAccount
+	}
+	if pobj.SecurityContext == nil {
+		pobj.SecurityContext = obj.SecurityContext
+	}
+	if len(pobj.SchedulerName) == 0 {
+		pobj.SchedulerName = obj.SchedulerName
+	}
+	if len(pobj.Tolerations) == 0 {
+		pobj.Tolerations = obj.Tolerations
+	}
+	if pobj.Priority == nil {
+		pobj.Priority = obj.Priority
+	}
+	if pobj.EnableServiceLinks == nil {
+		pobj.EnableServiceLinks = obj.EnableServiceLinks
+	}
+	if pobj.PreemptionPolicy == nil {
+		pobj.PreemptionPolicy = obj.PreemptionPolicy
+	}
 }

@@ -17,25 +17,26 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package internal
+package util
 
 import (
-	"context"
+	"fmt"
+	"io"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"github.com/spf13/viper"
-
-	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	"github.com/shirou/gopsutil/host"
 )
 
-// check volume snapshot available
-func isSnapshotAvailable(cli types2.ReadonlyClient, ctx context.Context) bool {
-	if !viper.GetBool("VOLUMESNAPSHOT") {
-		return false
+// PrintSystemInfo print system info
+func PrintSystemInfo(w io.Writer) {
+	hostStat, err := host.Info()
+	if err != nil {
+		fmt.Fprintf(w, "get host info failed: %v\n", err)
+		return
 	}
-	vsList := snapshotv1.VolumeSnapshotList{}
-	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: cli, Ctx: ctx}
-	getVSErr := compatClient.List(&vsList)
-	return getVSErr == nil
+	fmt.Fprintf(w, "---- operating system info ----\n")
+	fmt.Fprintf(w, "OS: %s\n", hostStat.OS)
+	fmt.Fprintf(w, "Platform: %s-%s\n", hostStat.Platform, hostStat.PlatformVersion)
+	fmt.Fprintf(w, "KernelVersion: %s\n", hostStat.KernelVersion)
+	fmt.Fprintf(w, "KernelArch: %s\n", hostStat.KernelArch)
+	fmt.Fprintf(w, "--------------------------------\n\n")
 }

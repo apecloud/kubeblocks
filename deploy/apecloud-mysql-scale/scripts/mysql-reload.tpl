@@ -28,8 +28,8 @@
 		{{- end }}
 	{{- end }}
 	{{- if ge $var_int 0 }}
-		{{- exec_sql ( printf "SET GLOBAL %s = %d" $pk $var_int ) }}
+		{{- execSql ( printf "SET GLOBAL %s = %d" $pk $var_int ) }}
 	{{- else }}
-		{{- exec_sql ( printf "SET GLOBAL %s = '%s'" $pk $pv ) }}
+		{{- execSql ( printf "SET GLOBAL %s = '%s'" $pk $pv ) }}
 	{{- end }}
 {{- end }}

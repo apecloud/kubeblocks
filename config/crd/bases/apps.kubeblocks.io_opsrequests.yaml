@@ -230,6 +230,8 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.reconfigure
                   rule: self == oldSelf
+                - message: Value can not be empty
+                  rule: self.configurations.size() > 0
               restart:
                 description: restart the specified component.
                 items:

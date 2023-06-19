@@ -96,6 +96,7 @@ type OpsRequestSpec struct {
 	// reconfigure defines the variables that need to input when updating configuration.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.reconfigure"
+	// +kubebuilder:validation:XValidation:rule="self.configurations.size() > 0", message="Value can not be empty"
 	Reconfigure *Reconfigure `json:"reconfigure,omitempty"`
 
 	// expose defines services the component needs to expose.
@@ -174,7 +175,6 @@ type HorizontalScaling struct {
 }
 
 // Reconfigure defines the variables that need to input when updating configuration.
-// +kubebuilder:validation:XValidation:rule="self.configurations.size() > 0", message="Value can not be empty"
 type Reconfigure struct {
 	ComponentOps `json:",inline"`
 

@@ -51,7 +51,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -144,7 +147,7 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			MaxConcurrentReconciles: viper.GetInt(maxConcurDataProtectionReconKey),
 		}).
 		Owns(&batchv1.Job{}).
-		Owns(&appsv1.StatefulSet{})
+		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterBackupPods))
 
 	if viper.GetBool("VOLUMESNAPSHOT") {
 		if intctrlutil.InVolumeSnapshotV1Beta1() {
@@ -155,6 +158,24 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	return b.Complete(r)
+}
+
+func (r *BackupReconciler) filterBackupPods(obj client.Object) []reconcile.Request {
+	labels := obj.GetLabels()
+	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
+		return []reconcile.Request{}
+	}
+	if _, ok := labels[constant.DataProtectionLabelBackupNameKey]; !ok {
+		return []reconcile.Request{}
+	}
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: obj.GetNamespace(),
+				Name:      labels[constant.DataProtectionLabelBackupNameKey],
+			},
+		},
+	}
 }
 
 func (r *BackupReconciler) getBackupPolicyAndValidate(
@@ -1305,17 +1326,6 @@ func (r *BackupReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx
 // then get the pod from this annotation to ensure that the same pod is picked up in future.
 func (r *BackupReconciler) getTargetPod(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup, labels map[string]string) (*corev1.Pod, error) {
-	if targetPodName, ok := backup.Annotations[dataProtectionBackupTargetPodKey]; ok {
-		targetPod := &corev1.Pod{}
-		targetPodKey := types.NamespacedName{
-			Name:      targetPodName,
-			Namespace: backup.Namespace,
-		}
-		if err := r.Client.Get(reqCtx.Ctx, targetPodKey, targetPod); err != nil {
-			return nil, err
-		}
-		return targetPod, nil
-	}
 	reqCtx.Log.V(1).Info("Get pod from label", "label", labels)
 	targetPod := &corev1.PodList{}
 	if err := r.Client.List(reqCtx.Ctx, targetPod,
@@ -1327,6 +1337,12 @@ func (r *BackupReconciler) getTargetPod(reqCtx intctrlutil.RequestCtx,
 		return nil, errors.New("can not find any pod to backup by labelsSelector")
 	}
 	sort.Sort(intctrlutil.ByPodName(targetPod.Items))
+	targetPodName := backup.Annotations[dataProtectionBackupTargetPodKey]
+	for _, v := range targetPod.Items {
+		if targetPodName == v.Name {
+			return &v, nil
+		}
+	}
 	return &targetPod.Items[0], nil
 }
 

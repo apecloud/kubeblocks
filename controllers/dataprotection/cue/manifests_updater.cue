@@ -15,6 +15,7 @@ container: {
 		"""
 retryTimes=0
 oldBackupInfo=
+trap "echo 'Terminating...' && exit" TERM
 while true; do
   sleep 3;
   if [ ! -f ${BACKUP_INFO_FILE} ]; then

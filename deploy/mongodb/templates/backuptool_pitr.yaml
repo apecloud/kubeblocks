@@ -7,7 +7,7 @@ metadata:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
   type: pitr
-  image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.wal-g.repository }}:{{ .Values.wal-g.tag }}
+  image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.walg.repository }}:{{ .Values.walg.tag }}
   deployKind: statefulSet
   env:
     - name: ARCHIVE_AFTER_SIZE
@@ -51,7 +51,7 @@ spec:
       cat /tmp/wal-g-oplog.log
       retryTimes=0
       purgeCounter=0
-      trap "echo 'Terminating...' && exit 0" TERM
+      trap "echo 'Terminating...' && exit" TERM
       while true; do
         # check wal-g oplog-push process
         ps -p $wal_g_pid >/dev/null

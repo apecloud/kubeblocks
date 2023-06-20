@@ -6,7 +6,7 @@ metadata:
     clusterdefinition.kubeblocks.io/name: mongodb
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
-  image: mongo:5.0.14
+  image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
   deployKind: job
   env:
     - name: DATA_DIR

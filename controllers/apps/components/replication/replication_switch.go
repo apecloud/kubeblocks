@@ -277,7 +277,7 @@ func (s *Switch) decision() bool {
 	}
 
 	// candidate primary role in kernel check
-	if string(*s.SwitchInstance.CandidatePrimaryRole.RoleDetectInfo) != string(appsv1alpha1.ReplicationRoleSecondary) {
+	if string(*s.SwitchInstance.CandidatePrimaryRole.RoleDetectInfo) != string(Secondary) {
 		s.SwitchStatus.SwitchPhaseStatus = SwitchPhaseStatusFailed
 		s.SwitchStatus.Reason = fmt.Sprintf("component %s the role of the candidate primary in the kernel is not secondary", s.SwitchResource.CompSpec.Name)
 		return false
@@ -351,18 +351,18 @@ func (s *Switch) updateRoleLabel() error {
 
 	for _, sts := range stsList.Items {
 		if utils.IsMemberOf(&sts, s.SwitchInstance.OldPrimaryRole.Pod) {
-			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, sts, string(appsv1alpha1.ReplicationRoleSecondary)); err != nil {
+			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, sts, string(Secondary)); err != nil {
 				return err
 			}
-			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, *s.SwitchInstance.OldPrimaryRole.Pod, string(appsv1alpha1.ReplicationRoleSecondary)); err != nil {
+			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, *s.SwitchInstance.OldPrimaryRole.Pod, string(Secondary)); err != nil {
 				return err
 			}
 		}
 		if utils.IsMemberOf(&sts, s.SwitchInstance.CandidatePrimaryRole.Pod) {
-			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, sts, string(appsv1alpha1.ReplicationRolePrimary)); err != nil {
+			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, sts, string(Primary)); err != nil {
 				return err
 			}
-			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, *s.SwitchInstance.CandidatePrimaryRole.Pod, string(appsv1alpha1.ReplicationRolePrimary)); err != nil {
+			if err := updateObjRoleLabel(s.SwitchResource.Ctx, s.SwitchResource.Cli, *s.SwitchInstance.CandidatePrimaryRole.Pod, string(Primary)); err != nil {
 				return err
 			}
 		}

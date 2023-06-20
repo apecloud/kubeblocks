@@ -453,7 +453,7 @@ func (p *RestoreManager) getDataPVCsAndPods(componentName string, podRestoreScop
 			}
 			if podRestoreScope == dpv1alpha1.PodRestoreScopeReadWrite {
 				if targetPod.Labels[constant.ConsensusSetAccessModeLabelKey] == string(appsv1alpha1.ReadWrite) ||
-					targetPod.Labels[constant.RoleLabelKey] == string(appsv1alpha1.ReplicationRolePrimary) {
+					targetPod.Labels[constant.RoleLabelKey] == string(constant.Primary) {
 					dataPVCsAndPodsMap[dataPVC.Name] = targetPod
 					break
 				}

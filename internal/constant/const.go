@@ -227,6 +227,11 @@ const (
 	KBReplicationSetPrimaryPodName = "KB_PRIMARY_POD_NAME"
 )
 
+const (
+	Primary   = "primary"
+	Secondary = "secondary"
+)
+
 // username and password are keys in created secrets for others to refer to.
 const (
 	AccountNameForSecret   = "username"

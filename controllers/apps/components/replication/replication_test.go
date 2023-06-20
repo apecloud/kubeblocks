@@ -141,8 +141,8 @@ var _ = Describe("Replication Component", func() {
 					// Create pods of the statefulset
 					stsPods := testapps.MockReplicationComponentPods(nil, testCtx, replicationSetSts, clusterObj.Name,
 						testapps.DefaultRedisCompName, map[int32]string{
-							0: string(appsv1alpha1.ReplicationRolePrimary),
-							1: string(appsv1alpha1.ReplicationRoleSecondary),
+							0: string(Primary),
+							1: string(Secondary),
 						})
 					podList = append(podList, stsPods...)
 					By("Testing pods are ready")

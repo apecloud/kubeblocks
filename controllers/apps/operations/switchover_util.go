@@ -170,13 +170,13 @@ func renderSwitchoverCmdJob(ctx context.Context,
 		return nil, errors.New("switchover spec not found")
 	}
 	renderJob := func(switchoverSpec *appsv1alpha1.SwitchoverSpec, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
-		var switchoverAction *appsv1alpha1.SwitchoverAction
+		var cmdExecutorConfig *appsv1alpha1.CmdExecutorConfig
 		if switchover.InstanceName == constant.KBSwitchoverCandidateInstanceForAnyPod {
-			switchoverAction = switchoverSpec.WithoutCandidate
+			cmdExecutorConfig = switchoverSpec.WithoutCandidate
 		} else {
-			switchoverAction = switchoverSpec.WithCandidate
+			cmdExecutorConfig = switchoverSpec.WithCandidate
 		}
-		if switchoverAction == nil {
+		if cmdExecutorConfig == nil {
 			return nil, errors.New("switchover action not found")
 		}
 		// jobName named with generation to distinguish different switchover jobs.
@@ -198,10 +198,10 @@ func renderSwitchoverCmdJob(ctx context.Context,
 						Containers: []corev1.Container{
 							{
 								Name:            constant.KBSwitchoverJobContainerName,
-								Image:           switchoverSpec.Image,
+								Image:           cmdExecutorConfig.Image,
 								ImagePullPolicy: corev1.PullIfNotPresent,
-								Command:         switchoverAction.Command,
-								Args:            switchoverAction.Args,
+								Command:         cmdExecutorConfig.Command,
+								Args:            cmdExecutorConfig.Args,
 								Env:             switchoverEnvs,
 							},
 						},
@@ -280,13 +280,22 @@ func buildSwitchoverEnvs(ctx context.Context,
 	componentSpec *appsv1alpha1.ClusterComponentSpec,
 	componentDef *appsv1alpha1.ClusterComponentDefinition,
 	switchover *appsv1alpha1.Switchover) ([]corev1.EnvVar, error) {
-	if componentSpec == nil || switchover == nil {
+	if componentSpec == nil || switchover == nil || componentDef.SwitchoverSpec == nil {
 		return nil, errors.New("switchover spec not found")
 	}
-	var switchoverEnvs []corev1.EnvVar
 	// replace secret env and merge envs defined in SwitchoverSpec
 	replaceSwitchoverConnCredentialEnv(cluster.Name, componentDef.SwitchoverSpec)
-	switchoverEnvs = append(switchoverEnvs, componentDef.SwitchoverSpec.Env...)
+	var switchoverEnvs []corev1.EnvVar
+	switch switchover.InstanceName {
+	case constant.KBSwitchoverCandidateInstanceForAnyPod:
+		if componentDef.SwitchoverSpec.WithoutCandidate != nil {
+			switchoverEnvs = append(switchoverEnvs, componentDef.SwitchoverSpec.WithoutCandidate.Env...)
+		}
+	default:
+		if componentDef.SwitchoverSpec.WithCandidate != nil {
+			switchoverEnvs = append(switchoverEnvs, componentDef.SwitchoverSpec.WithCandidate.Env...)
+		}
+	}
 
 	// inject the old primary info into the environment variable
 	workloadEnvs, err := buildSwitchoverWorkloadEnvs(ctx, cli, cluster, componentSpec, componentDef)
@@ -303,10 +312,17 @@ func buildSwitchoverEnvs(ctx context.Context,
 
 // replaceSwitchoverConnCredentialEnv replaces the connection credential environment variables for the switchover job.
 func replaceSwitchoverConnCredentialEnv(clusterName string, switchoverSpec *appsv1alpha1.SwitchoverSpec) {
-	namedValuesMap := intctrlcomputil.GetEnvReplacementMapForConnCredential(clusterName)
-	if switchoverSpec != nil {
-		switchoverSpec.Env = intctrlcomputil.ReplaceSecretEnvVars(namedValuesMap, switchoverSpec.Env)
+	if switchoverSpec == nil {
+		return
 	}
+	namedValuesMap := intctrlcomputil.GetEnvReplacementMapForConnCredential(clusterName)
+	replaceEnvVars := func(cmdExecutorConfig *appsv1alpha1.CmdExecutorConfig) {
+		if cmdExecutorConfig != nil {
+			cmdExecutorConfig.Env = intctrlcomputil.ReplaceSecretEnvVars(namedValuesMap, cmdExecutorConfig.Env)
+		}
+	}
+	replaceEnvVars(switchoverSpec.WithCandidate)
+	replaceEnvVars(switchoverSpec.WithoutCandidate)
 }
 
 // buildSwitchoverWorkloadEnvs builds the replication or consensus workload environment variables for the switchover job.

@@ -104,7 +104,9 @@ type SystemAccountShortSpec struct {
 
 // SwitchoverShortSpec is a short version of SwitchoverSpec, with only CommandExecutorEnvItem field.
 type SwitchoverShortSpec struct {
-	CommandExecutorEnvItem `json:",inline"`
+	// CmdExecutorConfig is the command executor config.
+	// +kubebuilder:validation:Required
+	CmdExecutorConfig *CommandExecutorEnvItem `json:"cmdExecutorConfig"`
 }
 
 type VersionsContext struct {

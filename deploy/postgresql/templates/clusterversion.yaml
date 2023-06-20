@@ -22,7 +22,8 @@ spec:
       cmdExecutorConfig:
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
     switchoverSpec:
-      image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+      cmdExecutorConfig:
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
 
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -70,7 +71,8 @@ spec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1
       switchoverSpec:
-        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1
 
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -113,7 +115,8 @@ spec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.15.0
       switchoverSpec:
-        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.15.0
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.15.0
 
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -141,4 +144,5 @@ spec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:14.8.0
       switchoverSpec:
-        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:14.8.0
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:14.8.0

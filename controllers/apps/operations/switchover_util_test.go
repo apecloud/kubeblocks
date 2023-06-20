@@ -190,12 +190,13 @@ var _ = Describe("Switchover Util", func() {
 				Args:    []string{},
 			}
 			switchoverSpec := &appsv1alpha1.SwitchoverSpec{
-				CommandExecutorEnvItem: *commandExecutorEnvItem,
-				WithCandidate: &appsv1alpha1.SwitchoverAction{
-					CommandExecutorItem: *commandExecutorItem,
+				WithCandidate: &appsv1alpha1.CmdExecutorConfig{
+					CommandExecutorEnvItem: *commandExecutorEnvItem,
+					CommandExecutorItem:    *commandExecutorItem,
 				},
-				WithoutCandidate: &appsv1alpha1.SwitchoverAction{
-					CommandExecutorItem: *commandExecutorItem,
+				WithoutCandidate: &appsv1alpha1.CmdExecutorConfig{
+					CommandExecutorEnvItem: *commandExecutorEnvItem,
+					CommandExecutorItem:    *commandExecutorItem,
 				},
 			}
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).

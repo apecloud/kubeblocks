@@ -213,6 +213,11 @@ type BackupStatusUpdate struct {
 	// +optional
 	Script string `json:"script,omitempty"`
 
+	// useTargetPodServiceAccount defines whether this job requires the service account of the backup target pod.
+	// if true, will use the service account of the backup target pod. otherwise, will use the system service account.
+	// +optional
+	UseTargetPodServiceAccount bool `json:"useTargetPodServiceAccount,omitempty"`
+
 	// when to update the backup status, pre: before backup, post: after backup
 	// +optional
 	UpdateStage BackupStatusUpdateStage `json:"updateStage,omitempty"`

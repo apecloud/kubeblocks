@@ -89,6 +89,13 @@ spec:
                                 - pre
                                 - post
                                 type: string
+                              useTargetPodServiceAccount:
+                                description: useTargetPodServiceAccount defines whether
+                                  this job requires the service account of the backup
+                                  target pod. if true, will use the service account
+                                  of the backup target pod. otherwise, will use the
+                                  system service account.
+                                type: boolean
                             type: object
                           type: array
                         backupToolName:
@@ -177,6 +184,13 @@ spec:
                                 - pre
                                 - post
                                 type: string
+                              useTargetPodServiceAccount:
+                                description: useTargetPodServiceAccount defines whether
+                                  this job requires the service account of the backup
+                                  target pod. if true, will use the service account
+                                  of the backup target pod. otherwise, will use the
+                                  system service account.
+                                type: boolean
                             type: object
                           type: array
                         backupToolName:
@@ -322,6 +336,13 @@ spec:
                                 - pre
                                 - post
                                 type: string
+                              useTargetPodServiceAccount:
+                                description: useTargetPodServiceAccount defines whether
+                                  this job requires the service account of the backup
+                                  target pod. if true, will use the service account
+                                  of the backup target pod. otherwise, will use the
+                                  system service account.
+                                type: boolean
                             type: object
                           type: array
                         backupsHistoryLimit:

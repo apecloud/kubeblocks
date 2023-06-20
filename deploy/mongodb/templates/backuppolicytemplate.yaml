@@ -24,9 +24,17 @@ spec:
     snapshot:
       target:
         role: primary
-        connectionCredentialKey:
-          passwordKey: password
-          usernameKey: username
+      hooks:
+        containerName: mongodb
+        preCommands:
+        - "touch /data/mongodb/db/mongodb.backup; sync"
+        postCommands:
+        - "rm -f /data/mongodb/db/mongodb.backup; sync"
+      backupStatusUpdates:
+      - path: manifests.backupLog
+        containerName: mongodb
+        script: /scripts/backup-log-collector.sh
+        updateStage: post
     datafile:
       backupToolName: mongodb-physical-backup-tool
       backupsHistoryLimit: 7

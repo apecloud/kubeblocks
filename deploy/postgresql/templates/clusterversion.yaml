@@ -17,7 +17,7 @@ spec:
       - name: postgresql
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
       - name: pgbouncer
-        image: {{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}
+        image: {{ .Values.pgbouncer.image.registry | default "docker.io" }}/{{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}
     systemAccountSpec:
       cmdExecutorConfig:
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
@@ -63,7 +63,7 @@ spec:
           - name: postgresql
             image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1
           - name: pgbouncer
-            image: {{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}
+            image: {{ .Values.pgbouncer.image.registry | default "docker.io" }}/{{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}
       systemAccountSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1
@@ -104,7 +104,7 @@ spec:
           - name: postgresql
             image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.15.0
           - name: pgbouncer
-            image: {{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}
+            image: {{ .Values.pgbouncer.image.registry | default "docker.io" }}/{{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}
       systemAccountSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.15.0
@@ -130,7 +130,7 @@ spec:
           - name: postgresql
             image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:14.8.0
           - name: pgbouncer
-            image: {{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}
+            image: {{ .Values.pgbouncer.image.registry | default "docker.io" }}/{{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}
       systemAccountSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:14.8.0

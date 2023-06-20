@@ -43,10 +43,10 @@ import (
 var (
 	deleteOpsExample = templates.Examples(`
 		# delete all ops belong the specified cluster 
-		kbcli cluster describe-ops mycluster
+		kbcli cluster delete-ops mycluster
 
 		# delete the specified ops belong the specify cluster 
-		kbcli cluster describe-ops mycluster --name=mysql-restart-82zxv
+		kbcli cluster delete-ops --name=mysql-restart-82zxv
 `)
 )
 

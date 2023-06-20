@@ -51,7 +51,7 @@ func needDoSwitchover(ctx context.Context,
 	cluster *appsv1alpha1.Cluster,
 	componentSpec *appsv1alpha1.ClusterComponentSpec,
 	switchover *appsv1alpha1.Switchover) (bool, error) {
-	// get the Pod object whose current role label is primary or leader
+	// get the Pod object whose current role label is primary
 	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, componentSpec.Name, componentSpec.ComponentDefRef)
 	if err != nil {
 		return false, err
@@ -72,7 +72,7 @@ func needDoSwitchover(ctx context.Context,
 		if podParent != siParent || o < 0 || o >= int32(len(podList.Items)) {
 			return false, errors.New("switchover.InstanceName is invalid")
 		}
-		// If the current instance is already the primary or leader, then no switchover will be performed.
+		// If the current instance is already the primary, then no switchover will be performed.
 		if pod.Name == switchover.InstanceName {
 			return false, nil
 		}
@@ -128,7 +128,7 @@ func checkPodRoleLabelConsistency(ctx context.Context,
 	if switchover == nil || switchoverCondition == nil {
 		return false, nil
 	}
-	// get the Pod object whose current role label is primary or leader
+	// get the Pod object whose current role label is primary
 	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, componentSpec.Name, componentDef.Name)
 	if err != nil {
 		return false, err
@@ -147,7 +147,7 @@ func checkPodRoleLabelConsistency(ctx context.Context,
 		}
 		switch switchoverMessage.Switchover.InstanceName {
 		case constant.KBSwitchoverCandidateInstanceForAnyPod:
-			if pod.Name != switchoverMessage.OldPrimaryOrLeader {
+			if pod.Name != switchoverMessage.OldPrimary {
 				return true, nil
 			}
 		default:
@@ -288,7 +288,7 @@ func buildSwitchoverEnvs(ctx context.Context,
 	replaceSwitchoverConnCredentialEnv(cluster.Name, componentDef.SwitchoverSpec)
 	switchoverEnvs = append(switchoverEnvs, componentDef.SwitchoverSpec.Env...)
 
-	// inject the old primary or leader info into the environment variable
+	// inject the old primary info into the environment variable
 	workloadEnvs, err := buildSwitchoverWorkloadEnvs(ctx, cli, cluster, componentSpec, componentDef)
 	if err != nil {
 		return nil, err
@@ -321,7 +321,7 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 		return nil, err
 	}
 	if pod == nil {
-		return nil, errors.New("primary or leader pod not found")
+		return nil, errors.New("primary pod not found")
 	}
 	svcName := strings.Join([]string{cluster.Name, componentSpec.Name, "headless"}, "-")
 	switch componentDef.WorkloadType {
@@ -358,7 +358,7 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 		}
 		workloadEnvs = append(workloadEnvs, csEnvs...)
 	}
-	// add tht first container's environment variables of the primary or leader pod
+	// add tht first container's environment variables of the primary pod
 	workloadEnvs = append(workloadEnvs, pod.Spec.Containers[0].Env...)
 	return workloadEnvs, nil
 }

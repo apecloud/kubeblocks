@@ -43,8 +43,8 @@ var _ OpsHandler = switchoverOpsHandler{}
 // SwitchoverMessage is the OpsRequest.Status.Condition.Message for switchover.
 type SwitchoverMessage struct {
 	appsv1alpha1.Switchover
-	OldPrimaryOrLeader string
-	Cluster            string
+	OldPrimary string
+	Cluster    string
 }
 
 func init() {
@@ -69,9 +69,9 @@ func (r switchoverOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestC
 			return nil, err
 		}
 		switchoverMessageMap[switchover.ComponentName] = SwitchoverMessage{
-			Switchover:         switchover,
-			OldPrimaryOrLeader: pod.Name,
-			Cluster:            opsRes.Cluster.Name,
+			Switchover: switchover,
+			OldPrimary: pod.Name,
+			Cluster:    opsRes.Cluster.Name,
 		}
 	}
 	msg, err := json.Marshal(switchoverMessageMap)
@@ -172,7 +172,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		switchoverCondition := meta.FindStatusCondition(opsRes.OpsRequest.Status.Conditions, appsv1alpha1.ConditionTypeSwitchover)
 		if switchoverCondition == nil {
 			err = errors.New("switchover condition is nil")
-			continue
+			break
 		}
 
 		// check the current component switchoverJob whether succeed
@@ -188,7 +188,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 			continue
 		}
 		if !jobExist {
-			// if the job does not exist, it may not be necessary to perform a switchover because the specified instanceName is already the primary or leader.
+			// if the job does not exist, it may not be necessary to perform a switchover because the specified instanceName is already the primary.
 			needSwitchover, err = needDoSwitchover(reqCtx.Ctx, cli, opsRes.Cluster, opsRes.Cluster.Spec.GetComponentByName(compSpecName), &switchover)
 			if err != nil {
 				continue
@@ -197,7 +197,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 				completedCount += 1
 				skipSwitchoverProcessDetail := appsv1alpha1.ProgressStatusDetail{
 					ObjectKey: getProgressObjectKey(SwitchoverCheckRoleLabelKey, compSpecName),
-					Message:   fmt.Sprintf("current instance %s is already the primary or leader, then no switchover will be performed", switchover.InstanceName),
+					Message:   fmt.Sprintf("current instance %s is already the primary, then no switchover will be performed", switchover.InstanceName),
 					Status:    appsv1alpha1.SucceedProgressStatus,
 				}
 				setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, skipSwitchoverProcessDetail, compSpecName)

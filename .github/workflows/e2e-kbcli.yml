@@ -1,28 +1,6 @@
 name: E2E Test KBCLI
 
 on:
-  workflow_call:
-    inputs:
-      CLUSTER_VERSION:
-        description: 'eks cluster version (e.g. 1.25)'
-        type: string
-        required: false
-        default: '1.25'
-      INSTANCE_TYPE:
-        description: 'node instance types (e.g. amd64/arm64)'
-        type: string
-        required: false
-        default: 'amd64'
-      KB_VERSION:
-        description: 'kubeblocks release version'
-        type: string
-        required: false
-        default: 'latest'
-      BRANCH_NAME:
-        description: 'testinfra branch name'
-        type: string
-        required: false
-        default: 'main'
   workflow_dispatch:
     inputs:
       CLUSTER_VERSION:
@@ -33,7 +11,7 @@ on:
         description: 'node instance types (e.g. amd64/arm64)'
         required: false
         default: 'amd64'
-      KB_VERSION:
+      VERSION:
         description: 'kubeblocks release version'
         required: false
         default: 'latest'
@@ -45,36 +23,12 @@ on:
 run-name: kbcli:${{ inputs.KB_VERSION }} k8s:${{ inputs.CLUSTER_VERSION }}:${{ inputs.INSTANCE_TYPE }}
 
 jobs:
-  release-result:
-    if: ${{ github.event_name == 'push' }}
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        type: [image, kbcli, chart]
-    steps:
-      - name: Restore ${{ matrix.type }} Artifact
-        id: cache-artifact-restore
-        uses: actions/cache/restore@v3
-        with:
-          path: |
-            ${{ inputs.KB_VERSION }}-${{ matrix.type }}
-          key: ${{ inputs.KB_VERSION }}-${{ matrix.type }}
-
-      - name: check release result
-        run: |
-          release_result=$( cat ${{ inputs.KB_VERSION }}-${{ matrix.type }} )
-          if [[ "$release_result" != "success" ]]; then
-              exit 1
-          fi
-
   eks:
-    needs: [ release-result ]
-    if: ${{ ( github.event_name  == 'workflow_dispatch' && always() ) || (github.event_name == 'push' && needs.release-result.result == 'success') }}
     uses: apecloud/apecloud-cd/.github/workflows/kbcli-test-eks.yml@v0.1.3
     with:
       CLUSTER_VERSION: "${{ inputs.KB_VERSION }}"
       INSTANCE_TYPE: "${{ inputs.INSTANCE_TYPE }}"
-      KB_VERSION: "${{ inputs.KB_VERSION }}"
+      KB_VERSION: "${{ inputs.VERSION }}"
       BRANCH_NAME: "${{ inputs.BRANCH_NAME }}"
       APECD_REF: "v0.1.3"
     secrets: inherit

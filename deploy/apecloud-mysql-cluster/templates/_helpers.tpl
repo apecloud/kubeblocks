@@ -19,6 +19,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 
 {{/*
 Define the cluster componnets with proxy
+TODO: calculate the proxy resoruces based on the mysql resources
 */}}
 {{- define "apecloud-mysql-cluster.proxyComponents" }}
 - name: etcd

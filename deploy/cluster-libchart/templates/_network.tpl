@@ -10,5 +10,5 @@ services:
   {{- if .Values.publiclyAccessible }}
   - name: public
     serviceType: LoadBalancer
-{{- end }}
+  {{- end }}
 {{- end }}

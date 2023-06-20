@@ -16,5 +16,5 @@ volumeClaimTemplates:
         - ReadWriteOnce
       resources:
         requests:
-          storage: {{ print .Values.storageSize "Gi" }}
+          storage: {{ print .Values.storage "Gi" }}
 {{- end }}

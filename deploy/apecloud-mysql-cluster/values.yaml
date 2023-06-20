@@ -19,13 +19,17 @@ replicas: 1
 ##
 cpu: 0.5
 
-## @param memory in Gi
+## @param memory, the unit is Gi
 ##
 memory: 1
 
-## @param storageSize in Gi
+## @param storage size, the unit is Gi
 ##
-storageSize: 20
+storage: 20
+
+## @param monitoring interval, 0 is no monitoring
+##
+monitoringInterval: 0
 
 ## @param terminationPolicy
 terminationPolicy: Delete
@@ -36,7 +40,7 @@ proxyEnabled: false
 
 ## @param availablePolicy
 ##
-availabilityPolicy: zone
+availabilityPolicy: none
 
 ## @param tenancy dedicated or shared
 ##
@@ -44,7 +48,7 @@ tenancy: SharedNode
 
 ## @param hostNetworkAccessible if true, expose the vpc service
 ##
-hostNetworkAccessible: true
+hostNetworkAccessible: false
 
 ## @param publiclyAccessible if true, expose the internet service
 ##

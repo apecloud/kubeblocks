@@ -39,8 +39,9 @@ spec:
       {{- $tolerations := .Values.tolerations }}
       {{- $dataPlaneTolerations := .Values.dataPlane.tolerations }}
       {{- $mergedTolerations := concat $tolerations $dataPlaneTolerations }}
-      tolerations:
-        {{- toYaml $mergedTolerations | nindent 8 }}
+      {{- with $mergedTolerations }}
+      tolerations: {{ toJson . | quote }}
+      {{- end }}
 
   installable:
     autoInstall: {{ .Values.agamotto.enabled }}

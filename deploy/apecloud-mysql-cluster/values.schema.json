@@ -40,7 +40,7 @@
       "title": "CPU",
       "description": "CPU cores.",
       "type": "number",
-      "default": 1,
+      "default": 0.5,
       "minimum": 0.5,
       "maximum": 64,
       "multipleOf": 0.5
@@ -112,7 +112,7 @@
       "title": "Host Network Accessible",
       "description": "Specify whether the cluster can be accessed from within the VPC.",
       "type": "boolean",
-      "default": true
+      "default": false
     },
     "publiclyAccessible": {
       "title": "Publicly Accessible",

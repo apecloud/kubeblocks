@@ -25,6 +25,7 @@ import (
 
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
+	"github.com/stoewer/go-strcase"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
@@ -73,13 +74,13 @@ func getValuesFromFlags(fs *flag.FlagSet) map[string]interface{} {
 		default:
 			val, _ = fs.GetString(f.Name)
 		}
-		values[util.ToLowerCamelCase(f.Name)] = val
+		values[strcase.LowerCamelCase(f.Name)] = val
 	})
 	return values
 }
 
 func buildOneFlag(cmd *cobra.Command, f cmdutil.Factory, k string, s *spec.Schema) error {
-	name := util.ToKebabCase(k)
+	name := strcase.KebabCase(k)
 	tpe := "string"
 	if len(s.Type) > 0 {
 		tpe = s.Type[0]
@@ -105,10 +106,14 @@ func buildOneFlag(cmd *cobra.Command, f cmdutil.Factory, k string, s *spec.Schem
 func buildFlagDescription(s *spec.Schema) string {
 	desc := strings.Builder{}
 	desc.WriteString(s.Description)
-	if len(s.Enum) > 0 {
-		desc.WriteString(fmt.Sprintf(" Legal values %v", s.Enum))
-	}
 
+	var legalVals []string
+	for _, e := range s.Enum {
+		legalVals = append(legalVals, fmt.Sprintf("%s", e))
+	}
+	if len(legalVals) > 0 {
+		desc.WriteString(fmt.Sprintf(" Legal values [%s].", strings.Join(legalVals, ", ")))
+	}
 	return desc.String()
 }
 

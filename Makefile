@@ -265,7 +265,7 @@ bin/kbcli.%: test-go-generate ## Cross build bin/kbcli.$(OS).$(ARCH).
 .PHONY: kbcli-fast
 kbcli-fast: OS=$(shell $(GO) env GOOS)
 kbcli-fast: ARCH=$(shell $(GO) env GOARCH)
-kbcli-fast:
+kbcli-fast: build-kbcli-embed-chart
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
 	@mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
 
@@ -288,7 +288,7 @@ build-kbcli-embed-chart: \
 #	build-single-kbcli-embed-chart.weaviate-cluster
 
 .PHONY: kbcli
-kbcli: test-go-generate build-checks build-kbcli-embed-chart kbcli-fast ## Build bin/kbcli.
+kbcli: test-go-generate build-checks kbcli-fast ## Build bin/kbcli.
 
 .PHONY: clean-kbcli
 clean-kbcli: ## Clean bin/kbcli*.

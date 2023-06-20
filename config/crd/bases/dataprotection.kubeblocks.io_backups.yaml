@@ -172,6 +172,7 @@ spec:
                 enum:
                 - New
                 - InProgress
+                - Running
                 - Completed
                 - Failed
                 type: string

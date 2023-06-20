@@ -1,0 +1,96 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupTool
+metadata:
+  name: mongodb-pitr-backup-tool
+  labels:
+    clusterdefinition.kubeblocks.io/name: mongodb
+    {{- include "mongodb.labels" . | nindent 4 }}
+spec:
+  type: pitr
+  image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.walg.repository }}:{{ .Values.walg.tag }}
+  deployKind: statefulSet
+  env:
+    - name: ARCHIVE_AFTER_SIZE
+      value: "20971520"
+  physical:
+    restoreCommands: []
+    incrementalRestoreCommands: []
+  logical:
+    podScope: ReadWrite
+    restoreCommands:
+    - |
+      #!/bin/bash
+      set -e
+      export MONGODB_URI="mongodb://${MONGODB_ROOT_USER}:${MONGODB_ROOT_PASSWORD}@${DB_HOST}:27017/?authSource=admin&replicaSet=${KB_CLUSTER_COMP_NAME}"
+      export WALG_FILE_PREFIX=${BACKUP_DIR}
+      echo "wal-g oplog-replay ${BACKUP_START_TIMESTAMP}.1 ${KB_RECOVERY_TIMESTAMP}.1"
+      wal-g oplog-replay ${BACKUP_START_TIMESTAMP}.1 ${KB_RECOVERY_TIMESTAMP}.1
+    incrementalRestoreCommands: []
+  backupCommands:
+    - |
+      #!/bin/bash
+      set -e
+      mkdir -p ${BACKUP_DIR} && cd ${BACKUP_DIR}
+      # retention 8 days by default
+      retention_minute=11520
+      if [ ! -z ${LOGFILE_TTL_SECOND} ];then
+        retention_minute=$((${LOGFILE_TTL_SECOND}/60))
+      fi
+      export MONGODB_URI="mongodb://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:27017/?authSource=admin"
+      export WALG_FILE_PREFIX=${BACKUP_DIR}
+      export OPLOG_ARCHIVE_TIMEOUT_INTERVAL=${ARCHIVE_INTERVAL}
+      export OPLOG_ARCHIVE_AFTER_SIZE=${ARCHIVE_AFTER_SIZE}
+      # retention time
+      export OPLOG_PITR_DISCOVERY_INTERVAL=168h
+      # TODO log wal-g oplog-push
+      echo "start to archive oplog..."
+      echo "wal-g oplog-push > /tmp/wal-g-oplog.log"
+      wal-g oplog-push >/tmp/wal-g-oplog.log 2>&1 &
+      wal_g_pid=$!
+      sleep 1
+      cat /tmp/wal-g-oplog.log
+      retryTimes=0
+      purgeCounter=0
+      trap "echo 'Terminating...' && exit" TERM
+      while true; do
+        # check wal-g oplog-push process
+        ps -p $wal_g_pid >/dev/null
+        if [ $? -ne 0 ]; then
+          echo 'ERROR: the process "wal-g oplog-push" does not exist!'
+          errorLog=$(cat /tmp/wal-g-oplog.log)
+          echo errorLog && exit 1
+        fi
+        # check role of the connected mongodb
+        isPrimary=$(mongo -u ${DB_USER} -p ${DB_PASSWORD} --port 27017 -host ${DB_HOST} --authenticationDatabase admin  --eval 'db.isMaster().ismaster' --quiet)
+        if [ "${isPrimary}" != "true" ]; then
+          echo "isPrimary: ${isPrimary}"
+          retryTimes=$(($retryTimes+1))
+        else
+          retryTimes=0
+        fi
+        if [ $retryTimes -ge 3 ]; then
+           echo "ERROR: the current mongo instance is not a primary node, 3 attempts have been made!" && exit 1
+        fi
+        sleep 3
+        # purge the expired oplog
+        if [ -d ${BACKUP_DIR}/oplog_005 ];then
+          TOTAL_SIZE=$(du -shx ${BACKUP_DIR}|awk '{print $1}')
+          OLDEST_FILE=$(ls -t ${BACKUP_DIR}/oplog_005 | tail -n 1) && OLDEST_FILE=${OLDEST_FILE#*_} && LOG_START_TIME=${OLDEST_FILE%%.*}
+          LATEST_FILE=$(ls -t ${BACKUP_DIR}/oplog_005 | head -n 1) && LATEST_FILE=${LATEST_FILE##*_} && LOG_STOP_TIME=${LATEST_FILE%%.*}
+          if [ -z $LOG_START_TIME ]; then
+             continue
+          fi
+          START_TIME=$(date -d "@${LOG_START_TIME}" -u '+%Y-%m-%dT%H:%M:%SZ') && STOP_TIME=$(date -d "@${LOG_STOP_TIME}" -u '+%Y-%m-%dT%H:%M:%SZ')
+          echo "{\"totalSize\":\"$TOTAL_SIZE\",\"manifests\":{\"backupLog\":{\"startTime\":\"${START_TIME}\",\"stopTime\":\"${STOP_TIME}\"},\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}" > ${BACKUP_DIR}/backup.info
+          purgeCounter=$((purgeCounter+3))
+          if [ $purgeCounter -ge 60 ]; then
+             purgeCounter=0
+             fileCount=$(find ${BACKUP_DIR}/oplog_005 -mmin +${retention_minute} -name "*.lz4" | wc -l)
+             find ${BACKUP_DIR}/oplog_005 -mmin +${retention_minute} -name "*.lz4" -exec rm -rf {} \;
+             if [ ${fileCount} -gt 0 ]; then
+                echo "clean up expired oplog file successfully, file count: ${fileCount}"
+             fi
+          fi
+        fi
+      done
+  incrementalBackupCommands: []

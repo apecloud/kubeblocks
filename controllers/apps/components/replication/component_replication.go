@@ -49,12 +49,12 @@ func NewReplicationComponent(cli client.Client,
 				Component:      synthesizedComponent,
 				ComponentSet: &ReplicationSet{
 					Stateful: stateful.Stateful{
-						ComponentSetBase: types.ComponentSetBase{
-							Cli:           cli,
-							Cluster:       cluster,
-							ComponentSpec: nil,
-							ComponentDef:  nil,
-							Component:     nil,
+						ComponentSetBase: internal.ComponentSetBase{
+							Cli:                  cli,
+							Cluster:              cluster,
+							SynthesizedComponent: synthesizedComponent,
+							ComponentSpec:        nil,
+							ComponentDef:         nil,
 						},
 					},
 				},
@@ -63,7 +63,6 @@ func NewReplicationComponent(cli client.Client,
 			},
 		},
 	}
-	comp.ComponentSet.SetComponent(comp)
 	return comp
 }
 

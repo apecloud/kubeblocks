@@ -25,6 +25,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 
 	"github.com/spf13/viper"
 	batchv1 "k8s.io/api/batch/v1"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
@@ -64,6 +66,7 @@ var _ = Describe("Backup Policy Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
+		testapps.ClearResources(&testCtx, intctrlutil.ClusterSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
@@ -133,7 +136,7 @@ var _ = Describe("Backup Policy Controller", func() {
 			BeforeEach(func() {
 				By("By creating a backupPolicy from backupTool: " + backupToolName)
 				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
-					AddFullPolicy().
+					AddDataFilePolicy().
 					SetBackupToolName(backupToolName).
 					SetBackupsHistoryLimit(1).
 					SetSchedule(defaultSchedule, true).
@@ -285,7 +288,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				By("By creating a backupPolicy with empty secret")
 				randomSecretName := testCtx.GetRandomStr()
 				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
-					AddFullPolicy().
+					AddDataFilePolicy().
 					SetBackupToolName(backupToolName).
 					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					SetTargetSecretName(randomSecretName).
@@ -309,7 +312,7 @@ var _ = Describe("Backup Policy Controller", func() {
 				viper.SetDefault(constant.CfgKeyBackupPVCName, pvcName)
 				viper.SetDefault(constant.CfgKeyBackupPVCInitCapacity, pvcInitCapacity)
 				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
-					AddFullPolicy().
+					AddDataFilePolicy().
 					SetBackupToolName(backupToolName).
 					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					AddHookPreCommand("touch /data/mysql/.restore;sync").
@@ -323,8 +326,8 @@ var _ = Describe("Backup Policy Controller", func() {
 				})).Should(Succeed())
 			})
 		})
-		Context("creating a logfile backupPolicy", func() {
-			It("with reconfigure config", func() {
+		Context("reconcile a logfile backupPolicy", func() {
+			It("with reconfigure config and job deployKind", func() {
 				By("creating a backupPolicy")
 				pvcName := "backup-data"
 				pvcInitCapacity := "10Gi"
@@ -342,14 +345,15 @@ var _ = Describe("Backup Policy Controller", func() {
 				  }`
 				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 					AddAnnotations(constant.ReconfigureRefAnnotationKey, reconfigureRef).
+					AddLogfilePolicy().
 					SetBackupToolName(backupToolName).
-					AddIncrementalPolicy().
 					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					AddSnapshotPolicy().
 					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 					Create(&testCtx).GetObject()
 				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
+					fmt.Printf("backupPolicy: %v", fetched.Status)
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
 				})).Should(Succeed())
 				By("enable schedule for reconfigure")
@@ -368,6 +372,134 @@ var _ = Describe("Backup Policy Controller", func() {
 					g.Expect(fetched.Annotations[constant.LastAppliedConfigAnnotationKey]).To(Equal(`[{"key":"archive_command","value":"'/bin/true'"}]`))
 				})).Should(Succeed())
 			})
+
+			It("test logfile backup with a statefulSet deployKind", func() {
+				By("init test resources")
+				// mock a cluster
+				testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+					"test-cd", "test-cv").Create(&testCtx)
+				// mock a backupTool
+				backupTool := createStatefulKindBackupTool()
+				// mock a backupPolicy
+				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					AddLogfilePolicy().
+					SetTTL("7d").
+					SetSchedule("*/1 * * * *", false).
+					SetBackupToolName(backupTool.Name).
+					SetPVC(backupRemotePVCName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					Create(&testCtx).GetObject()
+
+				By("enable logfile schedule, expect for backup and statefulSet creation")
+				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(policy *dpv1alpha1.BackupPolicy) {
+					backupPolicy.Spec.Schedule.Logfile.Enable = true
+				})).Should(Succeed())
+				backup := &dpv1alpha1.Backup{}
+				sts := &appsv1.StatefulSet{}
+				backupName := getCreatedCRNameByBackupPolicy(backupPolicyName, testCtx.DefaultNamespace, dpv1alpha1.BackupTypeLogFile)
+				Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{
+					Name:      backupName,
+					Namespace: testCtx.DefaultNamespace,
+				}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
+					backup = tmpBackup
+					g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupRunning))
+				})).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{
+					Name:      backupName,
+					Namespace: testCtx.DefaultNamespace,
+				}, sts, true)).Should(Succeed())
+
+				By("check the container envs which is injected successfully.")
+				expectedEnv := map[string]string{
+					constant.DPArchiveInterval:  "60s",
+					constant.DPTTL:              "7d",
+					constant.DPLogfileTTL:       "192h",
+					constant.DPLogfileTTLSecond: "691200",
+				}
+				checkGenerateENV := func(sts *appsv1.StatefulSet) {
+					mainContainer := sts.Spec.Template.Spec.Containers[0]
+					for k, v := range expectedEnv {
+						for _, env := range mainContainer.Env {
+							if env.Name != k {
+								continue
+							}
+							Expect(env.Value).Should(Equal(v))
+							break
+						}
+					}
+				}
+				checkGenerateENV(sts)
+
+				By("update cronExpression, expect for noticing backup to reconcile")
+				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(policy *dpv1alpha1.BackupPolicy) {
+					backupPolicy.Spec.Schedule.Logfile.CronExpression = "*/2 * * * *"
+					ttl := "2h"
+					backupPolicy.Spec.Retention.TTL = &ttl
+				})).Should(Succeed())
+				// waiting for sts has changed and expect sts env to change to the corresponding value
+				expectedEnv = map[string]string{
+					constant.DPArchiveInterval:  "120s",
+					constant.DPTTL:              "2h",
+					constant.DPLogfileTTL:       "26h",
+					constant.DPLogfileTTLSecond: "93600",
+				}
+				oldStsGeneration := sts.Generation
+				Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{
+					Name:      backupName,
+					Namespace: testCtx.DefaultNamespace,
+				}, func(g Gomega, tmpSts *appsv1.StatefulSet) {
+					g.Expect(tmpSts.Generation).Should(Equal(oldStsGeneration + 1))
+					checkGenerateENV(tmpSts)
+				})).Should(Succeed())
+
+				By("expect to recreate the backup after delete the backup during enable logfile")
+				Expect(testapps.ChangeObj(&testCtx, backup, func(policy *dpv1alpha1.Backup) {
+					backup.Finalizers = []string{}
+				})).Should(Succeed())
+				testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(backup), backup)
+				Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{
+					Name:      backupName,
+					Namespace: testCtx.DefaultNamespace,
+				}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
+					g.Expect(tmpBackup.Generation).Should(Equal(int64(1)))
+				})).Should(Succeed())
+
+				By("disable logfile, expect the backup phase to Completed and sts is deleted")
+				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(policy *dpv1alpha1.BackupPolicy) {
+					backupPolicy.Spec.Schedule.Logfile.Enable = false
+				})).Should(Succeed())
+				Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{
+					Name:      backupName,
+					Namespace: testCtx.DefaultNamespace,
+				}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
+					g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupCompleted))
+				})).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{
+					Name:      backupName,
+					Namespace: testCtx.DefaultNamespace,
+				}, sts, false)).Should(Succeed())
+
+				By("enable logfile schedule, expect to re-create backup ")
+				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(policy *dpv1alpha1.BackupPolicy) {
+					backupPolicy.Spec.Schedule.Logfile.Enable = true
+				})).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{
+					Name:      backupName,
+					Namespace: testCtx.DefaultNamespace,
+				}, sts, true)).Should(Succeed())
+
+				By("delete cluster, expect to backup phase to Completed")
+				testapps.DeleteObject(&testCtx, types.NamespacedName{
+					Name:      clusterName,
+					Namespace: testCtx.DefaultNamespace,
+				}, &appsv1alpha1.Cluster{})
+				Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{
+					Name:      backupName,
+					Namespace: testCtx.DefaultNamespace,
+				}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
+					g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupCompleted))
+				})).Should(Succeed())
+			})
 		})
 	})
 })
@@ -383,4 +515,14 @@ func patchCronJobStatus(key types.NamespacedName) {
 	Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(fetched *batchv1.CronJob) {
 		fetched.Status = batchv1.CronJobStatus{LastSuccessfulTime: &now, LastScheduleTime: &now}
 	})).Should(Succeed())
+}
+
+func createStatefulKindBackupTool() *dpv1alpha1.BackupTool {
+	By("By creating a backupTool")
+	backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/pitr_backuptool.yaml",
+		&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
+	Expect(testapps.ChangeObj(&testCtx, backupTool, func(bt *dpv1alpha1.BackupTool) {
+		bt.Spec.DeployKind = dpv1alpha1.DeployKindStatefulSet
+	})).Should(Succeed())
+	return backupTool
 }

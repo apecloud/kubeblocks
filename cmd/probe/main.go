@@ -106,8 +106,6 @@ func main() {
 		panic(fmt.Errorf("fatal error config file: %v", err))
 	}
 
-	ha := highavailability.NewHa(logHa)
-	ha.RunCycle()
 	secretstoresLoader.DefaultRegistry.Logger = logContrib
 	stateLoader.DefaultRegistry.Logger = logContrib
 	configurationLoader.DefaultRegistry.Logger = logContrib
@@ -131,6 +129,9 @@ func main() {
 		log.Fatalf("fatal error from runtime: %s", err)
 	}
 
+	// ha dependent on dbmanager which is initialized by rt.Run
+	ha := highavailability.NewHa(logHa)
+	go ha.RunCycle()
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
 	<-stop

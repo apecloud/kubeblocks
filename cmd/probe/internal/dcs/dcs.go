@@ -2,14 +2,18 @@ package dcs
 
 type DCS interface {
 	Initialize() error
+
 	GetCluster() (*Cluster, error)
-	GetMembers() ([]Member, error)
 	ResetCluser()
 	DeleteCluser()
+
+	GetMembers() ([]Member, error)
+	AddCurrentMember() error
+
 	GetHaConfig() (*HaConfig, error)
+
 	GetSwitchover() (*Switchover, error)
-	SetSwitchover()
-	AddThisMember()
+	SetSwitchover() error
 
 	AttempAcquireLock() error
 	CreateLock() error
@@ -18,7 +22,5 @@ type DCS interface {
 	ReleaseLock() error
 	UpdateLock() error
 
-	DeleteCluser()
 	GetLeader() (*Leader, error)
-	ResetCluser()
 }

@@ -7,17 +7,16 @@ import (
 	"time"
 
 	"github.com/dapr/kit/logger"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	k8scomponent "github.com/apecloud/kubeblocks/cmd/probe/internal/component/kubernetes"
-	"github.com/apecloud/kubeblocks/cmd/probe/vendor/github.com/pkg/errors"
-	v1 "github.com/apecloud/kubeblocks/cmd/probe/vendor/k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 )
 
 type KubernetesStore struct {
@@ -60,13 +59,19 @@ func NewKubernetesStore(logger logger.Logger) (*KubernetesStore, error) {
 }
 
 func (store *KubernetesStore) Initialize() error {
-	configMap, err := clientset.CoreV1().ConfigMaps(namespace).Get(ctx, clusterCompName+"-haconfig", metav1.GetOptions{})
+	labelsMap := map[string]string{
+		"app.kubernetes.io/instance":        store.clusterName,
+		"app.kubernetes.io/managed-by":      "kubeblocks",
+		"apps.kubeblocks.io/component-name": store.componentName,
+	}
+
+	configMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, store.clusterCompName+"-haconfig", metav1.GetOptions{})
 	if configMap == nil || err != nil {
 		ttl := os.Getenv("KB_TTL")
-		if _, err = clientset.CoreV1().ConfigMaps(namespace).Create(ctx, &corev1.ConfigMap{
+		if _, err = store.clientset.CoreV1().ConfigMaps(store.namespace).Create(store.ctx, &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      clusterCompName + "-haconfig",
-				Namespace: namespace,
+				Name:      store.clusterCompName + "-haconfig",
+				Namespace: store.namespace,
 				Labels:    labelsMap,
 				Annotations: map[string]string{
 					"ttl":                ttl,
@@ -185,13 +190,13 @@ func (store *KubernetesStore) CreateLock() error {
 	leaderName := store.currentMemberName
 	now := time.Now().Unix()
 	nowStr := strconv.FormatInt(now, 10)
-	ttl := store.haConfig.TTL
-	isExist, err := store.IsLeaderExist()
+	ttl := store.cluster.HaConfig.ttl
+	isExist, err := store.IsLockExist()
 	if isExist || err != nil {
 		return err
 	}
 
-	if _, err = store.clientSet.CoreV1().ConfigMaps(store.namespace).Create(store.ctx, &v1.ConfigMap{
+	if _, err = store.clientset.CoreV1().ConfigMaps(store.namespace).Create(store.ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      store.clusterCompName + "-leader",
 			Namespace: store.namespace,
@@ -199,7 +204,7 @@ func (store *KubernetesStore) CreateLock() error {
 				"leader":       leaderName,
 				"acquire-time": nowStr,
 				"renew-time":   nowStr,
-				"ttl":          ttl,
+				"ttl":          strconv.Itoa(ttl),
 				"extra":        "",
 			},
 		},
@@ -207,6 +212,7 @@ func (store *KubernetesStore) CreateLock() error {
 		store.logger.Errorf("Create Leader ConfigMap failed: %v", err)
 		return err
 	}
+	return nil
 }
 
 func (store *KubernetesStore) GetLeader() (*Leader, error) {
@@ -235,64 +241,52 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 	return &Leader{
 		index:       configmap.ResourceVersion,
 		name:        annotations["leader"],
-		acquireTime: accquireTime,
+		acquireTime: acquireTime,
 		renewTime:   renewTime,
 		ttl:         ttl,
 		resource:    configmap,
 	}, nil
 }
 
-func (store *KubernetesStore) AttempAcquireLock() err {
-	now := time.Now().Unix()
-	nowStr := strconv.FormatInt(now, 10)
-	ttl := store.haConfig.TTL
+func (store *KubernetesStore) AttempAcquireLock() error {
+	now := strconv.FormatInt(time.Now().Unix(), 10)
+	ttl := store.cluster.HaConfig.ttl
 	leaderName := store.currentMemberName
 	annotation := map[string]string{
-		LEADER:      leaderName,
-		TTL:         strconv.FormatInt(ttl, 10),
-		RenewTime:   nowStr,
-		AcquireTime: nowStr,
+		"leader":       leaderName,
+		"ttl":          strconv.Itoa(ttl),
+		"renew-time":   now,
+		"acquire-time": now,
 	}
 
-	configMap, err := store.cluster.Leader.resourse.(*corev1.ConfigMap)
-	if err != nil {
-		logger.Errorf("Get leader configmap error: %v", err)
-	} else {
-		configMap.SetAnnotations(annotation)
-		_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
-	}
+	configMap := store.cluster.Leader.resource.(*corev1.ConfigMap)
+	configMap.SetAnnotations(annotation)
+	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 
 	return err
 }
 
 func (store *KubernetesStore) HasLock() bool {
-	return store.cluster.Leader != nil && store.cluster.Leader.Name == store.currentMemberName
+	return store.cluster.Leader != nil && store.cluster.Leader.name == store.currentMemberName
 }
 
 func (store *KubernetesStore) UpdateLock() error {
-	configMap, err := store.cluster.Leader.(*corev1.ConfigMap)
-	if err != nil {
-		store.logger.Errorf("get leader configmap error: %v", err)
-	}
+	configMap := store.cluster.Leader.resource.(*corev1.ConfigMap)
 
 	annotations := configMap.GetAnnotations()
 	if annotations["leader"] != store.currentMemberName {
 		return errors.Errorf("lost lock")
 	}
-	leaderRecord[RenewTime] = strconv.FormatInt(time.Now().Unix(), 10)
-	configMap.SetAnnotations(leaderRecord)
+	annotations["renew-time"] = strconv.FormatInt(time.Now().Unix(), 10)
+	configMap.SetAnnotations(annotations)
 
 	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	return err
 }
 
 func (store *KubernetesStore) ReleaseLock() error {
-	configMap, err := store.cluster.Leader.(*corev1.ConfigMap)
-	if err != nil {
-		store.logger.Errorf("get leader configmap error: %v", err)
-	}
-
-	configMap.Annotations[LEADER] = ""
+	configMap := store.cluster.Leader.resource.(*corev1.ConfigMap)
+	configMap.Annotations["leader"] = ""
 	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	// TODO: if response status code is 409, it means operation conflict.
 	return err
@@ -326,8 +320,13 @@ func (store *KubernetesStore) GetSwitchover() (*Switchover, error) {
 	return nil, nil
 }
 
-func (store *KubernetesStore) SetSwitchover() error    {}
-func (store *KubernetesStore) AddCurrentMember() error {}
+func (store *KubernetesStore) SetSwitchover() error {
+	return nil
+}
+
+func (store *KubernetesStore) AddCurrentMember() error {
+	return nil
+}
 
 // TODO: Use the database instance's character type to determine its port number more precisely
 func getDBPort(pod *corev1.Pod) string {

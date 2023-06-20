@@ -21,7 +21,6 @@ package rsm
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -30,6 +29,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -98,44 +98,19 @@ var _ = Describe("object generation transformer test.", func() {
 		It("should work well", func() {
 			// build transCtx and expected DAG
 			ctx := context.Background()
-			logger := logf.FromContext(ctx).WithValues("pod-role-event-handler", namespace)
+			logger := logf.FromContext(ctx).WithValues("rsm-test", namespace)
 			transCtx := &rsmTransformContext{
 				Context:       ctx,
 				Client:        k8sMock,
 				EventRecorder: nil,
 				Logger:        logger,
-				rsmOrig:       rsm,
-				rsm:           rsm.DeepCopy(),
+				rsmOrig:       rsm.DeepCopy(),
+				rsm:           rsm,
 			}
 			sts := builder.NewStatefulSetBuilder(namespace, name).GetObject()
 			headlessSvc := builder.NewHeadlessServiceBuilder(name, getHeadlessSvcName(*rsm)).GetObject()
 			svc := builder.NewServiceBuilder(name, name).GetObject()
 			env := builder.NewConfigMapBuilder(name, name+"-env").GetObject()
-			kindPriority := func(o client.Object) int {
-				switch o.(type) {
-				case nil:
-					return 0
-				case *apps.StatefulSet:
-					return 1
-				case *corev1.Service:
-					return 2
-				case *corev1.ConfigMap:
-					return 3
-				default:
-					return 4
-				}
-			}
-			less := func(v1, v2 graph.Vertex) bool {
-				o1, _ := v1.(*model.ObjectVertex)
-				o2, _ := v2.(*model.ObjectVertex)
-				p1 := kindPriority(o1.Obj)
-				p2 := kindPriority(o2.Obj)
-				if p1 == p2 {
-					// TODO(free6om): compare each field of same kind
-					return o1.Obj.GetName() < o2.Obj.GetName()
-				}
-				return p1 < p2
-			}
 			k8sMock.EXPECT().
 				List(gomock.Any(), &apps.StatefulSetList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *apps.StatefulSetList, _ ...client.ListOption) error {

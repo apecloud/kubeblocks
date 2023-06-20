@@ -24,7 +24,6 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/go-logr/logr"
 	apps "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 
@@ -289,15 +288,6 @@ func generateActionInfoList(rsm *workloads.ReplicatedStateMachine) []*actionInfo
 	}
 
 	return actionInfoList
-}
-
-// TODO(free6om): remove all printActionList when all testes pass
-func printActionList(logger logr.Logger, actionList []*batchv1.Job) {
-	var actionNameList []string
-	for _, action := range actionList {
-		actionNameList = append(actionNameList, fmt.Sprintf("%s-%v", action.Name, *action.Spec.Suspend))
-	}
-	logger.Info(fmt.Sprintf("action list: %v\n", actionNameList))
 }
 
 func isPreAction(actionType string) bool {

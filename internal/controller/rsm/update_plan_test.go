@@ -126,20 +126,6 @@ var _ = Describe("update plan test.", func() {
 			return list
 		}
 
-		makePodUpdateReady := func(pods ...*corev1.Pod) {
-			readyCondition := corev1.PodCondition{
-				Type:   corev1.PodReady,
-				Status: corev1.ConditionTrue,
-			}
-			for _, pod := range pods {
-				pod.Labels[apps.StatefulSetRevisionLabel] = newRevision
-				if pod.Labels[roleLabelKey] == "" {
-					pod.Labels[roleLabelKey] = "learner"
-				}
-				pod.Status.Conditions = append(pod.Status.Conditions, readyCondition)
-			}
-		}
-
 		equalPodList := func(podList1, podList2 []corev1.Pod) bool {
 			set1 := sets.New[string]()
 			set2 := sets.New[string]()
@@ -155,7 +141,7 @@ var _ = Describe("update plan test.", func() {
 		checkPlan := func(expectedPlan [][]*corev1.Pod) {
 			for i, expectedPods := range expectedPlan {
 				if i > 0 {
-					makePodUpdateReady(expectedPlan[i-1]...)
+					makePodUpdateReady(newRevision, expectedPlan[i-1]...)
 				}
 				pods := buildPodList()
 				plan := newUpdatePlan(*rsm, pods)

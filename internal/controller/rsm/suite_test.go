@@ -26,7 +26,13 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
+	apps "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	"github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
 )
@@ -36,11 +42,51 @@ var (
 	k8sMock    *mocks.MockClient
 )
 
+func kindPriority(o client.Object) int {
+	switch o.(type) {
+	case nil:
+		return 0
+	case *workloads.ReplicatedStateMachine:
+		return 1
+	case *apps.StatefulSet:
+		return 2
+	case *corev1.Service:
+		return 3
+	case *corev1.ConfigMap:
+		return 4
+	default:
+		return 5
+	}
+}
+
+func less(v1, v2 graph.Vertex) bool {
+	o1, _ := v1.(*model.ObjectVertex)
+	o2, _ := v2.(*model.ObjectVertex)
+	p1 := kindPriority(o1.Obj)
+	p2 := kindPriority(o2.Obj)
+	if p1 == p2 {
+		// TODO(free6om): compare each field of same kind
+		return o1.Obj.GetName() < o2.Obj.GetName()
+	}
+	return p1 < p2
+}
+
+func makePodUpdateReady(newRevision string, pods ...*corev1.Pod) {
+	readyCondition := corev1.PodCondition{
+		Type:   corev1.PodReady,
+		Status: corev1.ConditionTrue,
+	}
+	for _, pod := range pods {
+		pod.Labels[apps.StatefulSetRevisionLabel] = newRevision
+		if pod.Labels[roleLabelKey] == "" {
+			pod.Labels[roleLabelKey] = "learner"
+		}
+		pod.Status.Conditions = append(pod.Status.Conditions, readyCondition)
+	}
+}
+
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
-
-func init() {
-}
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)

@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -287,6 +288,15 @@ func getActionList(transCtx *rsmTransformContext, actionScenario string) ([]*bat
 	}
 	printActionList(transCtx.Logger, actionList)
 	return actionList, nil
+}
+
+// TODO(free6om): remove all printActionList when all testes pass
+func printActionList(logger logr.Logger, actionList []*batchv1.Job) {
+	var actionNameList []string
+	for _, action := range actionList {
+		actionNameList = append(actionNameList, fmt.Sprintf("%s-%v", action.Name, *action.Spec.Suspend))
+	}
+	logger.Info(fmt.Sprintf("action list: %v\n", actionNameList))
 }
 
 func getPodName(parent string, ordinal int) string {

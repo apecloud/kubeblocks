@@ -46,7 +46,7 @@ var _ = Describe("pod role label event handler test", func() {
 			cli := k8sMock
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
-				Log: logf.FromContext(ctx).WithValues("pod-role-event-handler", namespace),
+				Log: logf.FromContext(ctx).WithValues("rsm-test", namespace),
 			}
 			pod := builder.NewPodBuilder(namespace, "pod-0").SetUID("12345-54321-12345").GetObject()
 			objectRef := corev1.ObjectReference{

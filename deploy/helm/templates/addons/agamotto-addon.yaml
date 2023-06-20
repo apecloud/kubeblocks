@@ -36,9 +36,11 @@ spec:
 
   defaultInstallValues:
     - enabled: true
-      {{- with .Values.tolerations }}
-      tolerations: {{ toJson . | quote }}
-      {{- end }}
+      {{- $tolerations := .Values.tolerations }}
+      {{- $dataPlaneTolerations := .Values.dataPlane.tolerations }}
+      {{- $mergedTolerations := concat $tolerations $dataPlaneTolerations }}
+      tolerations:
+        {{- toYaml $mergedTolerations | nindent 8 }}
 
   installable:
     autoInstall: {{ .Values.agamotto.enabled }}

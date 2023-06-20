@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"reflect"
 
+	gv "github.com/hashicorp/go-version"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
@@ -117,9 +118,12 @@ func GetKubeBlocksDeploy(client kubernetes.Interface) (*appsv1.Deployment, error
 }
 
 // GetDockerVersion get Docker Version
-func GetDockerVersion() (string, error) {
+func GetDockerVersion() (*gv.Version, error) {
 	// exec cmd to get output from docker info --format '{{.ServerVersion}}'
 	cmd := exec.Command("docker", "info", "--format", "{{.ServerVersion}}")
 	out, err := cmd.Output()
-	return string(out), err
+	if err != nil {
+		return nil, err
+	}
+	return gv.NewVersion(string(out))
 }

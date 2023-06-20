@@ -104,7 +104,6 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 			model.PrepareDelete(dag, oldSnapshot[name])
 		}
 	}
-
 	handleDependencies := func() {
 		model.DependOn(dag, sts, svc, headLessSvc, envConfig)
 	}

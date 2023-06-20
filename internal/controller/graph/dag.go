@@ -22,6 +22,7 @@ package graph
 import (
 	"errors"
 	"fmt"
+	"sort"
 )
 
 type DAG struct {
@@ -148,7 +149,7 @@ func (d *DAG) WalkTopoOrder(walkFunc WalkFunc) error {
 	if err := d.validate(); err != nil {
 		return err
 	}
-	orders := d.topologicalOrder(false)
+	orders := d.topologicalOrder(false, nil)
 	for _, v := range orders {
 		if err := walkFunc(v); err != nil {
 			return err
@@ -162,7 +163,7 @@ func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc) error {
 	if err := d.validate(); err != nil {
 		return err
 	}
-	orders := d.topologicalOrder(true)
+	orders := d.topologicalOrder(true, nil)
 	for _, v := range orders {
 		if err := walkFunc(v); err != nil {
 			return err
@@ -206,6 +207,31 @@ func (d *DAG) WalkBFS(walkFunc WalkFunc) error {
 	}
 
 	return nil
+}
+
+// Equals tells whether two DAGs are equal
+// `less` tells whether vertex 'v1' is less than vertex 'v2'.
+// `less` should return false if 'v1' equals to 'v2'.
+func (d *DAG) Equals(other *DAG, less func(v1, v2 Vertex) bool) bool {
+	if other == nil || less == nil {
+		return false
+	}
+	// sort both DAGs in topology order.
+	// a DAG may have more than one topology order, func 'less' is used to eliminate randomness
+	// and hence only one deterministic order is generated.
+	vertices1 := d.topologicalOrder(false, less)
+	vertices2 := other.topologicalOrder(false, less)
+
+	// compare them
+	if len(vertices1) != len(vertices2) {
+		return false
+	}
+	for i := range vertices1 {
+		if less(vertices1[i], vertices2[i]) {
+			return false
+		}
+	}
+	return true
 }
 
 // Root returns root vertex that has no in adjacent.
@@ -295,7 +321,7 @@ func (d *DAG) validate() error {
 
 // topologicalOrder returns a vertex list that is in topology order
 // 'd' MUST be a legal DAG
-func (d *DAG) topologicalOrder(reverse bool) []Vertex {
+func (d *DAG) topologicalOrder(reverse bool, less func(v1, v2 Vertex) bool) []Vertex {
 	// orders is what we want, a (reverse) topological order of this DAG
 	orders := make([]Vertex, 0)
 
@@ -314,13 +340,24 @@ func (d *DAG) topologicalOrder(reverse bool) []Vertex {
 		} else {
 			adjacent = d.inAdj(v)
 		}
+		if less != nil {
+			sort.SliceStable(adjacent, func(i, j int) bool {
+				return less(adjacent[i], adjacent[j])
+			})
+		}
 		for _, vertex := range adjacent {
 			walk(vertex)
 		}
 		walked[v] = true
 		orders = append(orders, v)
 	}
-	for v := range d.vertices {
+	vertexLst := d.Vertices()
+	if less != nil {
+		sort.SliceStable(vertexLst, func(i, j int) bool {
+			return less(vertexLst[i], vertexLst[j])
+		})
+	}
+	for _, v := range vertexLst {
 		walk(v)
 	}
 	return orders

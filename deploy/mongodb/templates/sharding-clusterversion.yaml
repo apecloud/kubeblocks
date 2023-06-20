@@ -11,19 +11,19 @@ spec:
       versionsContext:
         containers:
           - name: mongos
-            image: {{ include "mongodb.image" . }}
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
     - componentDefRef: configsvr
       versionsContext:
         containers:
           - name: configsvr
-            image: {{ include "mongodb.image" . }}
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
     - componentDefRef: shard
       versionsContext:
         containers:
           - name: shard
-            image: {{ include "mongodb.image" . }}
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
           - name: agent
-            image: {{ include "mongodb.image" . }}
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}

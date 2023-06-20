@@ -75,10 +75,3 @@ Get the password key.
 {{ index (lookup "apps.kubeblocks.io/v1alpha1" "ClusterDefinition" "" "mongodb").spec.connectionCredential "password"}}
 {{- end }}
 {{- end }}
-
-{{/*
-Define image
-*/}}
-{{- define "mongodb.image" -}}
-{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
-{{- end }}

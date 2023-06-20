@@ -11,8 +11,8 @@ spec:
       versionsContext:
         containers:
           - name: mongodb
-            image: {{ include "mongodb.image" . }}
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
       systemAccountSpec:
         cmdExecutorConfig:
-          image: {{ include "mongodb.image" . }}
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}

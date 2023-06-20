@@ -90,7 +90,7 @@ var _ = Describe("RestoreJob Controller", func() {
 		By("By assure an backupPolicy obj")
 		return testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, "backup-policy-").
 			WithRandomName().
-			AddFullPolicy().
+			AddDataFilePolicy().
 			AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 			SetSchedule("0 3 * * *", true).
 			SetTTL("7d").

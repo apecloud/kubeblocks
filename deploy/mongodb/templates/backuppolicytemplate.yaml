@@ -18,6 +18,9 @@ spec:
       datafile:
         enable: false
         cronExpression: "0 18 * * *"
+      logfile:
+        enable: false
+        cronExpression: "*/1 * * * *"
     snapshot:
       target:
         role: primary
@@ -27,5 +30,12 @@ spec:
     datafile:
       backupToolName: mongodb-physical-backup-tool
       backupsHistoryLimit: 7
+      target:
+        role: primary
+      backupStatusUpdates:
+      - updateStage: post
+        useTargetPodServiceAccount: true
+    logfile:
+      backupToolName: mongodb-pitr-backup-tool
       target:
         role: primary

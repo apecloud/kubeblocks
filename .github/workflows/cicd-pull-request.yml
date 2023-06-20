@@ -5,10 +5,6 @@ on:
     types: [submitted]
 
 env:
-  GITLAB_GO_CACHE_PROJECT_ID: 98800
-  GO_CACHE: "go-cache"
-  GO_CACHE_DIR: "/root/.cache"
-  GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
 
 jobs:
@@ -19,13 +15,21 @@ jobs:
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
     steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          all_but_latest: true
+          access_token: ${{ github.token }}
+
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Get trigger mode
         id: get_trigger_mode
         run: |
-          TRIGGER_MODE=`bash .github/utils/utils.sh --type 6`
+          TRIGGER_MODE=`bash .github/utils/utils.sh --type 6 \
+              --branch-name "${{ github.event.pull_request.head.ref }}" \
+              --base-commit "${{ github.event.pull_request.base.sha }}"`
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
 
@@ -72,7 +76,7 @@ jobs:
     name: check image
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.2
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-manager-image"
@@ -80,15 +84,14 @@ jobs:
       VERSION: "check"
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
-      SYNC_ENABLE: false
-      APECD_REF: "v0.1.0"
+      APECD_REF: "v0.1.2"
     secrets: inherit
 
   check-tools-image:
     name: check image
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.2
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-tools-image"
@@ -96,21 +99,19 @@ jobs:
       VERSION: "check"
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
-      SYNC_ENABLE: false
-      APECD_REF: "v0.1.0"
+      APECD_REF: "v0.1.2"
     secrets: inherit
 
   check-helm:
     name: check helm
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]')
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts-check.yml@v0.1.4
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "v0.4.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      PUSH_ENABLE: false
-      DEP_REPO: "helm dep update deploy/delphic"
-      APECD_REF: "v0.1.0"
+      DEP_REPO: "delphic"
+      APECD_REF: "v0.1.4"
     secrets: inherit

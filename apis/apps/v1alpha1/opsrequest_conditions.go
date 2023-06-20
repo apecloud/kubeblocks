@@ -43,22 +43,22 @@ const (
 
 	// condition and event reasons
 
-	ReasonReconfigureMerging   = "ReconfigureMerging"
-	ReasonReconfigureMerged    = "ReconfigureMerged"
-	ReasonReconfigureFailed    = "ReconfigureFailed"
-	ReasonReconfigureNoChanged = "ReconfigureNoChanged"
-	ReasonReconfigureSucceed   = "ReconfigureSucceed"
-	ReasonReconfigureRunning   = "ReconfigureRunning"
-	ReasonSwitchoverRunning    = "SwitchoverRunning"
-	ReasonSwitchoverSucceed    = "SwitchoverSucceed"
-	ReasonClusterPhaseMismatch = "ClusterPhaseMismatch"
-	ReasonOpsTypeNotSupported  = "OpsTypeNotSupported"
-	ReasonValidateFailed       = "ValidateFailed"
-	ReasonClusterNotFound      = "ClusterNotFound"
-	ReasonOpsRequestFailed     = "OpsRequestFailed"
-	ReasonOpsCanceling         = "Canceling"
-	ReasonOpsCancelFailed      = "CancelFailed"
-	ReasonOpsCancelSucceed     = "CancelSucceed"
+	ReasonReconfigureMerging       = "ReconfigureMerging"
+	ReasonReconfigureMerged        = "ReconfigureMerged"
+	ReasonReconfigureFailed        = "ReconfigureFailed"
+	ReasonReconfigureRestartFailed = "ReconfigureRestartFailed"
+	ReasonReconfigureRestart       = "ReconfigureRestarted"
+	ReasonReconfigureNoChanged     = "ReconfigureNoChanged"
+	ReasonReconfigureSucceed       = "ReconfigureSucceed"
+	ReasonReconfigureRunning       = "ReconfigureRunning"
+	ReasonClusterPhaseMismatch     = "ClusterPhaseMismatch"
+	ReasonOpsTypeNotSupported      = "OpsTypeNotSupported"
+	ReasonValidateFailed           = "ValidateFailed"
+	ReasonClusterNotFound          = "ClusterNotFound"
+	ReasonOpsRequestFailed         = "OpsRequestFailed"
+	ReasonOpsCanceling             = "Canceling"
+	ReasonOpsCancelFailed          = "CancelFailed"
+	ReasonOpsCancelSucceed         = "CancelSucceed"
 )
 
 func (r *OpsRequest) SetStatusCondition(condition metav1.Condition) {

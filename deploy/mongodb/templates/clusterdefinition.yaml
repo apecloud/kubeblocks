@@ -36,7 +36,7 @@ spec:
         - name: mongodb-metrics-config-new
           templateRef: mongodb-metrics-config-new
           namespace: {{ .Release.Namespace }}
-          volumeName: mongodb-metrics-config-new
+          volumeName: mongodb-metrics-config
           defaultMode: 0777
       monitor:
         builtIn: false
@@ -140,5 +140,5 @@ spec:
               - name: http-metrics
                 containerPort: 9216
             volumeMounts:
-              - name: mongodb-metrics-config-new
+              - name: mongodb-metrics-config
                 mountPath: /opt/conf

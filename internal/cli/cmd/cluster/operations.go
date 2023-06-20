@@ -187,6 +187,17 @@ func (o *OperationsOptions) validateVolumeExpansion() error {
 	if len(o.Storage) == 0 {
 		return fmt.Errorf("missing storage")
 	}
+	fillStorage := func() (targetStorage resource.Quantity, err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("%v", r)
+			}
+		}()
+		err = nil
+		targetStorage = resource.MustParse(o.Storage)
+		return targetStorage, err
+	}
+
 	for _, cName := range o.ComponentNames {
 		for _, vctName := range o.VCTNames {
 			labels := fmt.Sprintf("%s=%s,%s=%s,%s=%s",
@@ -205,7 +216,10 @@ func (o *OperationsOptions) validateVolumeExpansion() error {
 			pvc := pvcs.Items[0]
 			specStorage := pvc.Spec.Resources.Requests.Storage()
 			statusStorage := pvc.Status.Capacity.Storage()
-			targetStorage := resource.MustParse(o.Storage)
+			targetStorage, err := fillStorage()
+			if err != nil {
+				return err
+			}
 			// determine whether the opsRequest is a recovery action for volume expansion failure
 			if specStorage.Cmp(targetStorage) > 0 &&
 				statusStorage.Cmp(targetStorage) <= 0 {

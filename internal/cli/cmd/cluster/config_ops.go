@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -199,17 +200,36 @@ func (o *configOpsOptions) printConfigureTips() {
 func (o *configOpsOptions) buildReconfigureCommonFlags(cmd *cobra.Command, f cmdutil.Factory) {
 	o.addCommonFlags(cmd, f)
 	cmd.Flags().StringSliceVar(&o.Parameters, "set", nil, "Specify parameters list to be updated. For more details, refer to 'kbcli cluster describe-config'.")
+	cmd.Flags().StringVar(&o.ComponentName, "component", "", "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
 	cmd.Flags().StringVar(&o.CfgTemplateName, "config-spec", "", "Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). "+
 		"For available templates and configs, refer to: 'kbcli cluster describe-config'.")
 	cmd.Flags().StringVar(&o.CfgFile, "config-file", "", "Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). "+
 		"For available templates and configs, refer to: 'kbcli cluster describe-config'.")
+	cmd.Flags().StringSliceVar(&o.ComponentNames, "components", nil, "Component names to this operations")
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"component",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			var components []string
+			if len(args) == 0 {
+				return components, cobra.ShellCompDirectiveNoFileComp
+			}
+			namespace, _, _ := f.ToRawKubeConfigLoader().Namespace()
+			dynamic, _ := f.DynamicClient()
+			cluster, _ := cluster.GetClusterByName(dynamic, args[0], namespace)
+			for _, comp := range cluster.Spec.ComponentSpecs {
+				if strings.HasPrefix(comp.Name, toComplete) {
+					components = append(components, comp.Name)
+				}
+			}
+			return components, cobra.ShellCompDirectiveNoFileComp
+		}))
 }
 
 // NewReconfigureCmd creates a Reconfiguring command
 func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &configOpsOptions{
 		editMode:          false,
-		OperationsOptions: newBaseOperationsOptions(f, streams, appsv1alpha1.ReconfiguringType, true),
+		OperationsOptions: newBaseOperationsOptions(f, streams, appsv1alpha1.ReconfiguringType, false),
 	}
 	cmd := &cobra.Command{
 		Use:               "configure NAME --set key=value[,key=value] [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file]",

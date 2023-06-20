@@ -7,7 +7,7 @@ metadata:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
   type: pitr
-  image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.walg.repository }}:{{ .Values.walg.tag }}
+  image: {{ .Values.image.registry | default "registry.cn-hangzhou.aliyuncs.com" }}/{{ .Values.walg.repository }}:{{ .Values.walg.tag }}
   deployKind: statefulSet
   env:
     - name: ARCHIVE_AFTER_SIZE

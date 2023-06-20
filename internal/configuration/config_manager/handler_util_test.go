@@ -26,6 +26,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -372,3 +373,80 @@ var _ = Describe("Handler Util Test", func() {
 		})
 	})
 })
+
+func TestFilterSubPathVolumeMount(t *testing.T) {
+	createConfigMeta := func(volumeName string, reloadType appsv1alpha1.CfgReloadType) ConfigSpecMeta {
+		return ConfigSpecMeta{ConfigSpecInfo: ConfigSpecInfo{
+			ReloadType: reloadType,
+			ConfigSpec: appsv1alpha1.ComponentConfigSpec{
+				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					VolumeName: volumeName,
+				}}}}
+	}
+
+	type args struct {
+		metas   []ConfigSpecMeta
+		volumes []corev1.VolumeMount
+	}
+	tests := []struct {
+		name string
+		args args
+		want []ConfigSpecMeta
+	}{{
+		name: "test1",
+		args: args{
+			metas: []ConfigSpecMeta{
+				createConfigMeta("test1", appsv1alpha1.UnixSignalType),
+				createConfigMeta("test2", appsv1alpha1.ShellType),
+				createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+			},
+			volumes: []corev1.VolumeMount{
+				{Name: "test1", SubPath: "test1"},
+				{Name: "test2", SubPath: "test2"},
+				{Name: "test3", SubPath: "test3"},
+			},
+		},
+		want: []ConfigSpecMeta{
+			createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+		},
+	}, {
+		name: "test2",
+		args: args{
+			metas: []ConfigSpecMeta{
+				createConfigMeta("test1", appsv1alpha1.UnixSignalType),
+				createConfigMeta("test2", appsv1alpha1.ShellType),
+				createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+			},
+			volumes: []corev1.VolumeMount{
+				{Name: "test1"},
+				{Name: "test2"},
+				{Name: "test3"},
+			},
+		},
+		want: []ConfigSpecMeta{
+			createConfigMeta("test1", appsv1alpha1.UnixSignalType),
+			createConfigMeta("test2", appsv1alpha1.ShellType),
+			createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+		},
+	}, {
+		name: "test3",
+		args: args{
+			metas: []ConfigSpecMeta{
+				createConfigMeta("test1", appsv1alpha1.UnixSignalType),
+				createConfigMeta("test2", appsv1alpha1.ShellType),
+				createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+			},
+			volumes: []corev1.VolumeMount{},
+		},
+		want: []ConfigSpecMeta{
+			createConfigMeta("test1", appsv1alpha1.UnixSignalType),
+			createConfigMeta("test2", appsv1alpha1.ShellType),
+			createConfigMeta("test3", appsv1alpha1.TPLScriptType),
+		},
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, FilterSubPathVolumeMount(tt.args.metas, tt.args.volumes), "FilterSubPathVolumeMount(%v, %v)", tt.args.metas, tt.args.volumes)
+		})
+	}
+}

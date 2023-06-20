@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/StudioSol/set"
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -118,13 +117,8 @@ func updateResourceAnnotationsWithTemplate(obj client.Object, allTemplateAnnotat
 // into PodSpec if configuration reload option is on
 func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []appsv1alpha1.ComponentConfigSpec,
 	ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
-	var (
-		err error
-
-		buildParams *cfgcm.CfgManagerBuildParams
-		// volumeDirs       []corev1.VolumeMount
-		// usingConfigSpecs []appsv1alpha1.ComponentConfigSpec
-	)
+	var err error
+	var buildParams *cfgcm.CfgManagerBuildParams
 
 	volumeDirs, usingConfigSpecs := getUsingVolumesByConfigSpecs(podSpec, configSpecs)
 	if len(volumeDirs) == 0 {
@@ -134,6 +128,9 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 	if err != nil {
 		return err
 	}
+	// Configmap uses subPath case: https://github.com/kubernetes/kubernetes/issues/50345
+	// The files are being updated on the host VM, but can't be updated in the container.
+	configSpecMetas = cfgcm.FilterSubPathVolumeMount(configSpecMetas, volumeDirs)
 	if len(configSpecMetas) == 0 {
 		return nil
 	}
@@ -240,7 +237,7 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1a
 		if !cfgcore.NeedReloadVolume(configSpec) {
 			continue
 		}
-		sets := set.NewLinkedHashSetString()
+		sets := util.NewSet()
 		for _, container := range config2Containers[configSpec.Name] {
 			volume := intctrlutil.GetVolumeMountByVolume(container, configSpec.VolumeName)
 			if volume != nil && !sets.InArray(volume.Name) {

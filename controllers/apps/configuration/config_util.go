@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/StudioSol/set"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/go-logr/logr"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -325,16 +325,15 @@ func validateConfigTemplate(cli client.Client, ctx intctrlutil.RequestCtx, confi
 			logger.Error(err, "failed to get config template cm object!")
 			return nil, err
 		}
-
 		if configSpec.ConfigConstraintRef == "" {
 			return nil, nil
 		}
-
-		configObj := &appsv1alpha1.ConfigConstraint{}
-		if err := cli.Get(ctx.Ctx, client.ObjectKey{
+		configKey := client.ObjectKey{
 			Namespace: "",
 			Name:      configSpec.ConfigConstraintRef,
-		}, configObj); err != nil {
+		}
+		configObj := &appsv1alpha1.ConfigConstraint{}
+		if err := cli.Get(ctx.Ctx, configKey, configObj); err != nil {
 			logger.Error(err, "failed to get template cm object!")
 			return nil, err
 		}
@@ -378,35 +377,62 @@ func updateConfigConstraintStatus(cli client.Client, ctx intctrlutil.RequestCtx,
 	return cli.Status().Patch(ctx.Ctx, configConstraint, patch)
 }
 
-func getAssociatedComponentsByConfigmap(stsList *appv1.StatefulSetList, cfg client.ObjectKey, configSpecName string) ([]appv1.StatefulSet, []string) {
-	managerContainerName := constant.ConfigSidecarName
-	stsLen := len(stsList.Items)
-	if stsLen == 0 {
-		return nil, nil
+func toObjects[T generics.Object, L generics.ObjList[T], PL generics.PObjList[T, L]](compList PL) []T {
+	return reflect.ValueOf(compList).Elem().FieldByName("Items").Interface().([]T)
+}
+
+func toResourceObject(obj any) client.Object {
+	return obj.(client.Object)
+}
+
+func getPodTemplate(obj client.Object) *corev1.PodTemplateSpec {
+	switch v := obj.(type) {
+	default:
+		return nil
+	case *appv1.StatefulSet:
+		return &v.Spec.Template
+	case *appv1.Deployment:
+		return &v.Spec.Template
+	}
+}
+
+func getRelatedComponentsByConfigmap[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](cli client.Client, ctx context.Context, _ func(T, L), cfg client.ObjectKey, configSpecName string, opts ...client.ListOption) ([]T, []string, error) {
+	var objList L
+	if err := cli.List(ctx, PL(&objList), opts...); err != nil {
+		return nil, nil, err
 	}
 
-	sts := make([]appv1.StatefulSet, 0, stsLen)
-	containers := set.NewLinkedHashSetString()
+	objs := make([]T, 0)
+	containers := cfgutil.NewSet()
 	configSpecKey := cfgcore.GenerateTPLUniqLabelKeyWithConfig(configSpecName)
-	for _, s := range stsList.Items {
-		if !usingComponentConfigSpec(s.GetAnnotations(), configSpecKey, cfg.Name) {
+	items := toObjects[T, L, PL](&objList)
+	for i := range items {
+		obj := toResourceObject(&items[i])
+		if objs == nil {
+			return nil, nil, cfgcore.MakeError("failed to convert to resource object")
+		}
+		if !usingComponentConfigSpec(obj.GetAnnotations(), configSpecKey, cfg.Name) {
 			continue
 		}
-		volumeMounted := intctrlutil.GetVolumeMountName(s.Spec.Template.Spec.Volumes, cfg.Name)
+		podTemplate := getPodTemplate(obj)
+		if podTemplate == nil {
+			continue
+		}
+		volumeMounted := intctrlutil.GetVolumeMountName(podTemplate.Spec.Volumes, cfg.Name)
 		if volumeMounted == nil {
 			continue
 		}
 		// filter config manager sidecar container
-		contains := intctrlutil.GetContainersByConfigmap(s.Spec.Template.Spec.Containers,
+		contains := intctrlutil.GetContainersByConfigmap(podTemplate.Spec.Containers,
 			volumeMounted.Name, func(containerName string) bool {
-				return managerContainerName == containerName
+				return constant.ConfigSidecarName == containerName
 			})
 		if len(contains) > 0 {
-			sts = append(sts, s)
+			objs = append(objs, items[i])
 			containers.Add(contains...)
 		}
 	}
-	return sts, containers.AsSlice()
+	return objs, containers.AsSlice(), nil
 }
 
 func createConfigPatch(cfg *corev1.ConfigMap, format appsv1alpha1.CfgFileFormat, cmKeys []string) (*cfgcore.ConfigPatchInfo, bool, error) {

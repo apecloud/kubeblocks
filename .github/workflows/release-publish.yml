@@ -14,6 +14,8 @@ env:
   GITLAB_KBCLI_PROJECT_ID: 85948
   GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
   RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
+  FURY_TOKEN: ${{ secrets.FURY_UPLOAD_TOKEN }}
+  FURY_ACCOUNT: 'huyongqii'
 
 jobs:
   create-release-kbcli:
@@ -39,13 +41,11 @@ jobs:
             --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
 
   upload-release-assert:
-    needs: create-release-kbcli
-    name: Upload ${{ matrix.os }}
+    needs: create-release-${{ env.CLI_NAME }}
+    name: Upload ${{ env.CLI_NAME }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64]
     steps:
       - uses: actions/checkout@v3
       - name: install lib
@@ -60,134 +60,72 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: make generate
-        run: make generate
+#      - name: Import GPG key
+#        id: import_gpg
+#        uses: crazy-max/ghaction-import-gpg@v5
+#        with:
+#          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+#          passphrase: ${{ secrets.PASSPHRASE }}
 
-      - name: Get release
-        id: get_release
-        uses: bruceadams/get-release@v1.3.2
-
-      - name: make build
-        run: |
-          CLI_OS_ARCH=`bash ${{ github.workspace }}/.github/utils/utils.sh \
-            --tag-name ${{ matrix.os }} \
-            --type 2`
-          RELEASE_VERSION=`bash ${{ github.workspace }}/.github/utils/utils.sh \
-            --tag-name ${{ env.TAG_NAME }} \
-            --type 1`    
-          VERSION=$RELEASE_VERSION make bin/${{ env.CLI_NAME }}.$CLI_OS_ARCH
-          mkdir -p ${{ matrix.os }}
-          echo "CLI_OS_ARCH=${CLI_OS_ARCH}" >> $GITHUB_ENV
-          echo "CLI_FILENAME=${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}" >> $GITHUB_ENV
-          echo "CLI_DIR=${{ matrix.os }}" >> $GITHUB_ENV
-
-      - name: make zip
-        if: matrix.os == 'windows-amd64'
-        run: |
-          mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }}.exe 
-          curl -H 'Accept: application/vnd.github.v3.raw' -o ${{ matrix.os }}/README.md https://api.github.com/repos/${{ env.CLI_REPO }}/readme 
-          cp ${{ github.workspace }}/LICENSE ${{ matrix.os }}/  
-          cp ${{ matrix.os }}/${{ env.CLI_NAME }}.exe bin/
-          zip -r -o ${{ env.CLI_FILENAME }}.zip  ${{ env.CLI_DIR }}
-          file ${{ env.CLI_FILENAME }}.zip  # for debug 
-          mkdir -p sha256
-          shasum -a 256 ${{ env.CLI_FILENAME }}.zip > sha256/${{ env.CLI_FILENAME }}.zip.sha256.txt
-          mv ${{ env.CLI_FILENAME }}.zip bin/
-          echo "ASSET_NAME=${{ env.CLI_FILENAME }}.zip" >> $GITHUB_ENV
-          echo "ASSET_CONTENT_TYPE=application/zip" >> $GITHUB_ENV
-          echo "CheckSum=${{ env.CLI_FILENAME }}.zip.sha256.txt" >> $GITHUB_ENV
-
-      - name: make tar
-        if: matrix.os != 'windows-amd64'
-        run: |
-          mv bin/${{ env.CLI_NAME }}.${{ env.CLI_OS_ARCH }} ${{ matrix.os }}/${{ env.CLI_NAME }} 
-          curl -H 'Accept: application/vnd.github.v3.raw' -o ${{ matrix.os }}/README.md  https://api.github.com/repos/${{ env.CLI_REPO }}/readme
-          cp ${{ github.workspace }}/LICENSE ${{ matrix.os }}/
-          tar -zcvf ${{ env.CLI_FILENAME }}.tar.gz  ${{ env.CLI_DIR }}
-          file ${{ env.CLI_FILENAME }}.tar.gz  # for debug 
-          mkdir -p sha256
-          shasum -a 256 ${{ env.CLI_FILENAME }}.tar.gz > sha256/${{ env.CLI_FILENAME }}.tar.gz.sha256.txt
-          mv ${{ env.CLI_FILENAME }}.tar.gz bin/
-          echo "ASSET_NAME=${{ env.CLI_FILENAME }}.tar.gz" >> $GITHUB_ENV
-          echo "ASSET_CONTENT_TYPE=application/gzip" >> $GITHUB_ENV
-          echo "CheckSum=${{ env.CLI_FILENAME }}.tar.gz.sha256.txt" >> $GITHUB_ENV
-
-      - name: upload gitlab kbcli asset ${{ matrix.os }}
+      - uses: goreleaser/goreleaser-action@v4
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --config ${{ github.workspace }}/.goreleaser.yaml --clean
         env:
-          CLI_BINARY: ${{ env.CLI_NAME }}-${{ matrix.os }}-${{ env.TAG_NAME }}.tar.gz
-        run: |
-          bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
-            --type 2 \
-            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
-            --tag-name ${{ env.TAG_NAME }} \
-            --asset-path ./bin/${{ env.ASSET_NAME }} \
-            --asset-name ${{ env.ASSET_NAME }} \
-            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
+#          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
 
-      - name: get release kbcli upload url
+      - name: upload .rpm and .deb to fury.io
+        run: |
+          for file in $(find "${{ github.workspace }}/dist" -type f | grep -E '\.(deb|rpm)$'); do
+            echo "Processing file: $file"
+            curl -F package=@$file https://${{ env.FURY_TOKEN }}@push.fury.io/${{ env.FURY_ACCOUNT }}/
+          done
+
+      - name: get kbcli's release upload url
         run: |
           echo 'UPLOAD_URL='`bash ${{ github.workspace }}/.github/utils/utils.sh \
             --tag-name ${{ env.TAG_NAME }} \
             --type 3 \
             --github-repo ${{ env.CLI_REPO }} \
             --github-token ${{ env.GITHUB_TOKEN }}` >> $GITHUB_ENV
-
-      - name: upload release kbcli asset ${{ matrix.os }}
+      - name: upload kbcli.exe to kbcli's release page for winget
         uses: actions/upload-release-asset@main
         with:
           upload_url: ${{ env.UPLOAD_URL }}
-          asset_path: ./bin/${{ env.ASSET_NAME }}
-          asset_name: ${{ env.ASSET_NAME }}
-          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
-
-      - name: upload kbcli binary release for winget
-        if: matrix.os == 'windows-amd64'
-        uses: actions/upload-release-asset@main
-        with:
-          upload_url: ${{ env.UPLOAD_URL }}
-          asset_path: ./bin/${{ env.CLI_NAME }}.exe
+          asset_path: ${{ github.workspace }}/dist/kbcli_windows_amd64_v1/${{ env.CLI_NAME }}.exe
           asset_name: ${{ env.CLI_NAME }}.exe
           asset_content_type: application/octet-stream
 
-      - name: upload checksum for kbcli assets
-        uses: actions/upload-artifact@v3
-        with:
-          name: sha256
-          path: sha256/
-
-      - name: upload release asset ${{ matrix.os }}
-        continue-on-error: true
-        uses: actions/upload-release-asset@main
-        with:
-          upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./bin/${{ env.ASSET_NAME }}
-          asset_name: ${{ env.ASSET_NAME }}
-          asset_content_type: ${{ env.ASSET_CONTENT_TYPE }}
-
-  generate-kbcli-sha256:
-    runs-on: ubuntu-latest
-    needs: upload-release-assert
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/download-artifact@v3
-        with:
-          name: sha256
-          path: sha256
-      - name: generate kbcli release-notes
+      - name: upload assets to gitlab
         run: |
-          mkdir -p ./docs/release_notes/${{ env.TAG_NAME }}
-          python ./.github/utils/generate_kbcli_sha256.py ${{ env.TAG_NAME }} sha256
-      - name: release kbcli with release notes
-        run: |
-          bash .github/utils/utils.sh --type 13 \
-            --github-repo 'apecloud/kbcli' \
+          for file in $(find "${{ github.workspace }}/dist" -type f | grep -E '\.(gz|zip)$'); do
+            echo "Processing file: $file"
+            filename=$(basename "$file")
+            bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
+            --type 2 \
+            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
             --tag-name ${{ env.TAG_NAME }} \
-            --file "./docs/release_notes/${{ env.TAG_NAME }}/kbcli.md" \
-            --github-token ${{ env.GITHUB_TOKEN }}
-      - name: remove artifact
-        uses: geekyeggo/delete-artifact@v2
+            --asset-path $file \
+            --asset-name $filename \
+            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
+          done
+
+      - name: gather asset to assets directory
+        run: |
+          mkdir dist/assets
+          for file in $(find "${{ github.workspace }}/dist" -type f | grep -E '\.(gz|zip)$'); do
+            echo "Processing file: $file"
+            cp $file ./dist/assets
+          done
+      - name: upload assets to kubeblocks's release
+        uses: Hs1r1us/Release-AIO@v2.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: sha256
+          tag_name: ${{ github.ref }}
+          asset_files: '${{ github.workspace }}/dist/assets'
 
   send-message:
     runs-on: ubuntu-latest

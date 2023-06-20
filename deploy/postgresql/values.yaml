@@ -104,8 +104,8 @@ metrics:
 pgbouncer:
   image:
     # refer: https://hub.docker.com/r/bitnami/pgbouncer
-    registry: hub.docker.com
-    repository: bitnami/pgbouncer
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/pgbouncer
     tag: 1.19.0
     pullPolicy: IfNotPresent
 

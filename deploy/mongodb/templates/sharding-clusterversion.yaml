@@ -11,19 +11,19 @@ spec:
       versionsContext:
         containers:
           - name: mongos
-            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
+            image: {{ include "mongodb.image" . }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
     - componentDefRef: configsvr
       versionsContext:
         containers:
           - name: configsvr
-            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
+            image: {{ include "mongodb.image" . }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
     - componentDefRef: shard
       versionsContext:
         containers:
           - name: shard
-            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
+            image: {{ include "mongodb.image" . }}
           - name: agent
-            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
+            image: {{ include "mongodb.image" . }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}

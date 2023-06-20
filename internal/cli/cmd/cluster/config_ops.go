@@ -21,7 +21,6 @@ package cluster
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -31,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"

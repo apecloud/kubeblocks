@@ -11,23 +11,21 @@ kbcli cluster create mysql [flags]
 ### Options
 
 ```
-      --available-policy string     The available policy of cluster (default "single")
-      --cpu float                   cpu (default 1)
-  -h, --help                        help for mysql
-      --host-network-accessible     The hostNetworkAccessible of cluster (default true)
-      --memory float                memory, the unit is Gi (default 1)
-      --mode string                 mysql cluster topology (default "standalone")
-      --monitor                     Enable monitor or not (default true)
-      --name string                 cluster name (default "mycluster")
-      --port int                    The port of cluster (default 3306)
-      --proxy-enabled               Enable proxy or not
-      --publicly-accessible         The publiclyAccessible of cluster
-      --replicas int                replicas (default 1)
-      --storage-engine string       The storage engine of cluster (default "innodb")
-      --storage-size float          storage size, the unit is Gi (default 20)
-      --tenancy string              The tenancy of cluster (default "DedicatedNode")
-      --termination-policy string   The termination policy of cluster (default "Delete")
-      --version string              mysql version (default "ac-mysql-8.0.30")
+      --availability-policy string   The availability policy of cluster. Legal values [none, node, zone]. (default "none")
+      --cpu float                    CPU cores. (default 0.5)
+  -h, --help                         help for mysql
+      --host-network-accessible      Specify whether the cluster can be accessed from within the VPC.
+      --memory float                 Memory, the unit is Gi. (default 1)
+      --mode string                  Cluster topology. Legal values [standalone, replication, raftGroup]. (default "standalone")
+      --monitoring-interval int      The monitoring interval of cluster, 0 is disabled, the unit is second.
+      --name string                  Cluster name. (default "mycluster")
+      --proxy-enabled                Enable proxy or not.
+      --publicly-accessible          Specify whether the cluster can be accessed from the public Internet.
+      --replicas int                 The number of replicas. (default 1)
+      --storage float                Storage size, the unit is Gi. (default 20)
+      --tenancy string               The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")
+      --termination-policy string    The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")
+      --version string               Cluster version, run "kbcli cv list" to see all versions. (default "ac-mysql-8.0.30")
 ```
 
 ### Options inherited from parent commands

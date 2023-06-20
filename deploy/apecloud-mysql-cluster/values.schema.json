@@ -49,7 +49,9 @@
       "title": "Memory(Gi)",
       "description": "Memory, the unit is Gi.",
       "type": "number",
-      "default": 1
+      "default": 1,
+      "minimum": 0.5,
+      "maximum": 1000
     },
     "storage": {
       "title": "Storage(Gi)",

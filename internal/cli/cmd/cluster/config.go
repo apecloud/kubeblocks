@@ -120,10 +120,10 @@ var (
 )
 
 func (r *reconfigureOptions) addCommonFlags(cmd *cobra.Command, f cmdutil.Factory) {
+	cmd.Flags().StringVar(&r.componentName, "component", "", "Specify the name of Component to describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter.\"")
 	cmd.Flags().StringSliceVar(&r.configSpecs, "config-specs", nil, "Specify the name of the configuration template to describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)")
-	cmd.Flags().StringVar(&r.componentName, "components", "", "Specify the name of Component to describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter.\"")
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
-		"components",
+		"component",
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			var components []string
 			if len(args) == 0 {

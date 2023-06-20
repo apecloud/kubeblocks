@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os/exec"
 	"reflect"
+	"strings"
 
 	gv "github.com/hashicorp/go-version"
 	appsv1 "k8s.io/api/apps/v1"
@@ -125,5 +126,5 @@ func GetDockerVersion() (*gv.Version, error) {
 	if err != nil {
 		return nil, err
 	}
-	return gv.NewVersion(string(out))
+	return gv.NewVersion(strings.TrimSpace(string(out)))
 }

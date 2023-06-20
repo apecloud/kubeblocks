@@ -384,6 +384,10 @@ func (r *BackupPolicyReconciler) buildCronJob(
 	if err != nil {
 		return nil, err
 	}
+	tolerationPodSpec := corev1.PodSpec{}
+	if err = addTolerations(&tolerationPodSpec); err != nil {
+		return nil, err
+	}
 	var ttl metav1.Duration
 	if backupPolicy.Spec.Retention != nil && backupPolicy.Spec.Retention.TTL != nil {
 		ttl = metav1.Duration{Duration: dataprotectionv1alpha1.ToDuration(backupPolicy.Spec.Retention.TTL)}
@@ -403,6 +407,7 @@ func (r *BackupPolicyReconciler) buildCronJob(
 		ServiceAccount:   viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME"),
 		MgrNamespace:     viper.GetString(constant.CfgKeyCtrlrMgrNS),
 		Image:            viper.GetString(constant.KBToolsImage),
+		Tolerations:      &tolerationPodSpec,
 	}
 	backupPolicyOptionsByte, err := json.Marshal(options)
 	if err != nil {

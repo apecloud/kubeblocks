@@ -120,6 +120,12 @@ var _ = Describe("Backup Policy Controller", func() {
 
 		BeforeEach(func() {
 			viper.Set(constant.CfgKeyCtrlrMgrNS, mgrNamespace)
+			viper.Set(constant.CfgKeyCtrlrMgrAffinity,
+				"{\"nodeAffinity\":{\"preferredDuringSchedulingIgnoredDuringExecution\":[{\"preference\":{\"matchExpressions\":[{\"key\":\"kb-controller\",\"operator\":\"In\",\"values\":[\"true\"]}]},\"weight\":100}]}}")
+			viper.Set(constant.CfgKeyCtrlrMgrTolerations,
+				"[{\"key\":\"key1\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]")
+			viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "{\"beta.kubernetes.io/arch\":\"amd64\"}")
+
 			By("By creating a backupTool")
 			backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
 				&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
@@ -128,6 +134,9 @@ var _ = Describe("Backup Policy Controller", func() {
 
 		AfterEach(func() {
 			viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
+			viper.Set(constant.CfgKeyCtrlrMgrAffinity, "")
+			viper.Set(constant.CfgKeyCtrlrMgrTolerations, "")
+			viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "")
 		})
 
 		Context("creates a backup policy", func() {
@@ -155,6 +164,10 @@ var _ = Describe("Backup Policy Controller", func() {
 				})).Should(Succeed())
 				Eventually(testapps.CheckObj(&testCtx, getCronjobKey(dpv1alpha1.BackupTypeDataFile), func(g Gomega, fetched *batchv1.CronJob) {
 					g.Expect(fetched.Spec.Schedule).To(Equal(defaultSchedule))
+					g.Expect(fetched.Spec.JobTemplate.Spec.Template.Spec.Tolerations).ShouldNot(BeEmpty())
+					g.Expect(fetched.Spec.JobTemplate.Spec.Template.Spec.NodeSelector).ShouldNot(BeEmpty())
+					g.Expect(fetched.Spec.JobTemplate.Spec.Template.Spec.Affinity).ShouldNot(BeNil())
+					g.Expect(fetched.Spec.JobTemplate.Spec.Template.Spec.Affinity.NodeAffinity).ShouldNot(BeNil())
 				})).Should(Succeed())
 			})
 			It("limit backups to 1", func() {

@@ -297,8 +297,7 @@ func getBackupObjectFromRestoreArgs(o *CreateOptions, backup *dataprotectionv1al
 		if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
 			return err
 		}
-	}
-	if o.RestoreTime != "" {
+	} else if o.RestoreTime != "" {
 		createRestoreOptions := CreateRestoreOptions{
 			SourceCluster:  o.SourceCluster,
 			RestoreTimeStr: o.RestoreTime,
@@ -325,7 +324,7 @@ func getBackupObjectFromRestoreArgs(o *CreateOptions, backup *dataprotectionv1al
 	return nil
 }
 
-func fillClusterMetadataFromBackup(o *CreateOptions, cls **appsv1alpha1.Cluster) error {
+func fillClusterInfoFromBackup(o *CreateOptions, cls **appsv1alpha1.Cluster) error {
 	if o.Backup == "" && o.RestoreTime == "" && o.SourceCluster == "" {
 		return nil
 	}
@@ -451,7 +450,7 @@ func (o *CreateOptions) Complete() error {
 		}
 	}
 	//
-	if err = fillClusterMetadataFromBackup(o, &cls); err != nil {
+	if err = fillClusterInfoFromBackup(o, &cls); err != nil {
 		return err
 	}
 	if nil != cls && cls.Spec.ComponentSpecs != nil {

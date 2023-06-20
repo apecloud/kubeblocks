@@ -258,6 +258,11 @@ const (
 	KBSwitchoverConsensusLeaderPodFqdn    = "KB_CONSENSUS_LEADER_POD_FQDN"
 )
 
+const (
+	Primary   = "primary"
+	Secondary = "secondary"
+)
+
 // username and password are keys in created secrets for others to refer to.
 const (
 	AccountNameForSecret   = "username"
@@ -268,4 +273,25 @@ const DefaultBackupPvcInitCapacity = "20Gi"
 
 const (
 	ComponentStatusDefaultPodName = "Unknown"
+)
+
+const (
+	// dataProtection env names
+
+	DPDBHost               = "DB_HOST"                // db host for dataProtection
+	DPDBUser               = "DB_USER"                // db user for dataProtection
+	DPDBPassword           = "DB_PASSWORD"            // db password for dataProtection
+	DPBackupDIR            = "BACKUP_DIR"             // the dest directory for backup data
+	DPBackupName           = "BACKUP_NAME"            // backup cr name
+	DPTTL                  = "TTL"                    // backup time to live, reference the backupPolicy.spec.retention.ttl
+	DPLogfileTTL           = "LOGFILE_TTL"            // ttl for logfile backup, one more day than backupPolicy.spec.retention.ttl
+	DPLogfileTTLSecond     = "LOGFILE_TTL_SECOND"     // ttl seconds with LOGFILE_TTL, integer format
+	DPArchiveInterval      = "ARCHIVE_INTERVAL"       // archive interval for statefulSet deploy kind, trans from the schedule cronExpression for logfile
+	DPBackupInfoFile       = "BACKUP_INFO_FILE"       // the file name which retains the backup.status info
+	DPTimeFormat           = "TIME_FORMAT"            // golang time format string
+	DPVolumeDataDIR        = "VOLUME_DATA_DIR"        //
+	DPKBRecoveryTime       = "KB_RECOVERY_TIME"       // recovery time
+	DPKBRecoveryTimestamp  = "KB_RECOVERY_TIMESTAMP"  // recovery timestamp
+	DPBackupStartTime      = "BACKUP_START_TIME"      // backup start time
+	DPBackupStartTimestamp = "BACKUP_START_TIMESTAMP" // backup start timestamp
 )

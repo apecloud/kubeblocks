@@ -18,12 +18,13 @@ package v1alpha1
 
 // BackupPhase The current phase. Valid values are New, InProgress, Completed, Failed.
 // +enum
-// +kubebuilder:validation:Enum={New,InProgress,Completed,Failed}
+// +kubebuilder:validation:Enum={New,InProgress,Running,Completed,Failed}
 type BackupPhase string
 
 const (
 	BackupNew        BackupPhase = "New"
 	BackupInProgress BackupPhase = "InProgress"
+	BackupRunning    BackupPhase = "Running"
 	BackupCompleted  BackupPhase = "Completed"
 	BackupFailed     BackupPhase = "Failed"
 )
@@ -75,4 +76,24 @@ const (
 	RestoreJobInProgressLogic RestoreJobPhase = "InProgressLogic"
 	RestoreJobCompleted       RestoreJobPhase = "Completed"
 	RestoreJobFailed          RestoreJobPhase = "Failed"
+)
+
+// DeployKind which kind for run a backup tool.
+// +enum
+// +kubebuilder:validation:Enum={job,statefulSet}
+type DeployKind string
+
+const (
+	DeployKindJob         DeployKind = "job"
+	DeployKindStatefulSet DeployKind = "statefulSet"
+)
+
+// PodRestoreScope defines the scope pod for restore from backup.
+// +enum
+// +kubebuilder:validation:Enum={All,ReadWrite}
+type PodRestoreScope string
+
+const (
+	PodRestoreScopeAll       = "All"
+	PodRestoreScopeReadWrite = "ReadWrite"
 )

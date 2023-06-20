@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -239,6 +240,11 @@ type BackupStatusUpdate struct {
 	// +optional
 	Script string `json:"script,omitempty"`
 
+	// useTargetPodServiceAccount defines whether this job requires the service account of the backup target pod.
+	// if true, will use the service account of the backup target pod. otherwise, will use the system service account.
+	// +optional
+	UseTargetPodServiceAccount bool `json:"useTargetPodServiceAccount,omitempty"`
+
 	// when to update the backup status, pre: before backup, post: after backup
 	// +optional
 	UpdateStage BackupStatusUpdateStage `json:"updateStage,omitempty"`
@@ -335,4 +341,18 @@ func ToDuration(ttl *string) time.Duration {
 	}
 	hours, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "h", ""))
 	return time.Hour * time.Duration(hours)
+}
+
+// AddTTL adds tll with hours
+func AddTTL(ttl *string, hours int) string {
+	if ttl == nil {
+		return ""
+	}
+	ttlLower := strings.ToLower(*ttl)
+	if strings.HasSuffix(ttlLower, "d") {
+		days, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "d", ""))
+		return fmt.Sprintf("%dh", days*24+hours)
+	}
+	ttlHours, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "h", ""))
+	return fmt.Sprintf("%dh", ttlHours+hours)
 }

@@ -22,6 +22,7 @@ package controllerutil
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 type Error struct {
@@ -121,8 +122,8 @@ func NewBackupPVTemplateNotFound(cmName, cmNamespace string) *Error {
 }
 
 // NewBackupPVCNameIsEmpty returns a new Error with ErrorTypeBackupPVCNameIsEmpty.
-func NewBackupPVCNameIsEmpty(backupPolicyName string) *Error {
-	return NewErrorf(ErrorTypeBackupPVCNameIsEmpty, `the persistentVolumeClaim name of this policy "%s" is empty`, backupPolicyName)
+func NewBackupPVCNameIsEmpty(backupType, backupPolicyName string) *Error {
+	return NewErrorf(ErrorTypeBackupPVCNameIsEmpty, `the persistentVolumeClaim name of spec.%s is empty in BackupPolicy "%s"`, strings.ToLower(backupType), backupPolicyName)
 }
 
 // NewBackupJobFailed returns a new Error with ErrorTypeBackupJobFailed.

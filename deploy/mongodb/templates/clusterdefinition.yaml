@@ -115,7 +115,7 @@ spec:
                 mountPath: /scripts/replicaset-post-start.sh
                 subPath: replicaset-post-start.sh
           - name: metrics
-            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
             securityContext:
               runAsNonRoot: true

@@ -41,6 +41,19 @@ func TestToDuration(t *testing.T) {
 	expectToDuration(t, "12H", 1, 12)
 }
 
+func TestAddTTL(t *testing.T) {
+	ttl := "7d"
+	newTTL := AddTTL(&ttl, 12)
+	if newTTL != "180h" {
+		t.Errorf("expected new ttl is 180h, bur got %s", newTTL)
+	}
+	ttl = "7h"
+	newTTL = AddTTL(&ttl, 12)
+	if newTTL != "19h" {
+		t.Errorf("expected new ttl is 19h, bur got %s", newTTL)
+	}
+}
+
 func TestGetCommonPolicy(t *testing.T) {
 	g := NewGomegaWithT(t)
 

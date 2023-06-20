@@ -387,3 +387,18 @@ func (c ByPodName) Swap(i, j int) {
 func (c ByPodName) Less(i, j int) bool {
 	return c[i].Name < c[j].Name
 }
+
+// BuildPodHostDNS builds the host dns of pod.
+// ref: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
+func BuildPodHostDNS(pod *corev1.Pod) string {
+	// build pod dns string
+	// ref: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
+	hostDNS := []string{pod.Name}
+	if pod.Spec.Hostname != "" {
+		hostDNS[0] = pod.Spec.Hostname
+	}
+	if pod.Spec.Subdomain != "" {
+		hostDNS = append(hostDNS, pod.Spec.Subdomain)
+	}
+	return strings.Join(hostDNS, ".")
+}

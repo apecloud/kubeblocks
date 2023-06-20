@@ -196,13 +196,30 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: send message
+        id: send_message
         run: |
+          release_result="${{ env.TAG_NAME }}-kbcli"
+          touch ${release_result}
+          echo 'release-result='${release_result} >> $GITHUB_OUTPUT
+          
           CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0error"
           if [[ "${{ needs.upload-release-assert.result }}" == "success" ]]; then
               CONTENT="release\u00a0${{ env.TAG_NAME }}\u00a0kbcli\u00a0success"
+              echo "success" > ${release_result}
+          else
+              echo "error" > ${release_result}
           fi
+          
           bash .github/utils/utils.sh --type 12 \
             --tag-name ${{ env.TAG_NAME }} \
             --content "${CONTENT}"\
             --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+      - name: Save Artifact
+        id: cache-artifact-save
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            ${{ steps.send_message.outputs.release-result }}
+          key: ${{ steps.send_message.outputs.release-result }}

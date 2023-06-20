@@ -49,12 +49,12 @@ func NewConsensusComponent(cli client.Client,
 				Component:      synthesizedComponent,
 				ComponentSet: &ConsensusSet{
 					Stateful: stateful.Stateful{
-						ComponentSetBase: types.ComponentSetBase{
-							Cli:           cli,
-							Cluster:       cluster,
-							ComponentSpec: nil,
-							ComponentDef:  nil,
-							Component:     nil,
+						ComponentSetBase: internal.ComponentSetBase{
+							Cli:                  cli,
+							Cluster:              cluster,
+							SynthesizedComponent: synthesizedComponent,
+							ComponentSpec:        nil,
+							ComponentDef:         nil,
 						},
 					},
 				},
@@ -63,7 +63,6 @@ func NewConsensusComponent(cli client.Client,
 			},
 		},
 	}
-	comp.ComponentSet.SetComponent(comp)
 	return comp
 }
 

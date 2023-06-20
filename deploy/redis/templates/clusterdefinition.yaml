@@ -99,7 +99,7 @@ spec:
                 exec:
                   command: ["/scripts/redis-post-start.sh"]
           - name: redis-exporter
-            image: oliver006/redis_exporter:latest
+            image: {{ .Values.exporter.image.registry }}/{{ .Values.exporter.image.repository }}:{{ .Values.exporter.image.tag }}
             imagePullPolicy: IfNotPresent
             resources:
               requests:
@@ -134,7 +134,7 @@ spec:
 # to pass $(KB_ACCOUNT_STATEMENT) to redis-cli without causing parsing error.
 # Instead, using a shell script to wrap redis-cli and pass $(KB_ACCOUNT_STATEMENT) to it will do.
         cmdExecutorConfig:
-          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+          image: {{ include "redis.image" . }}
           env:
             - name: REDIS_DEFAULT_PASSWORD
               valueFrom:

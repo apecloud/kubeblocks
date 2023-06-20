@@ -142,7 +142,12 @@ var _ = Describe("Backup Controller test", func() {
 				SetTargetSecretName(clusterName).
 				AddHookPreCommand("touch /data/mysql/.restore;sync").
 				AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-				AddFullPolicy().
+				AddDataFilePolicy().
+				SetBackupStatusUpdates([]dataprotectionv1alpha1.BackupStatusUpdate{
+					{
+						UpdateStage: dataprotectionv1alpha1.POST,
+					},
+				}).
 				SetBackupToolName(backupTool.Name).
 				AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 				AddMatchLabels(constant.RoleLabelKey, "leader").
@@ -151,7 +156,7 @@ var _ = Describe("Backup Controller test", func() {
 				Create(&testCtx).GetObject()
 		})
 
-		Context("creates a full backup", func() {
+		Context("creates a datafile backup", func() {
 			var backupKey types.NamespacedName
 
 			BeforeEach(func() {
@@ -193,7 +198,7 @@ var _ = Describe("Backup Controller test", func() {
 			})
 		})
 
-		Context("deletes a full backup", func() {
+		Context("deletes a datafile backup", func() {
 			var backupKey types.NamespacedName
 
 			BeforeEach(func() {
@@ -400,7 +405,7 @@ var _ = Describe("Backup Controller test", func() {
 	})
 
 	When("with backupTool resources", func() {
-		Context("creates a full backup", func() {
+		Context("creates a datafile backup", func() {
 			var backupKey types.NamespacedName
 			var backupPolicy *dataprotectionv1alpha1.BackupPolicy
 			var pathPrefix = "/mysql/backup"
@@ -425,7 +430,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("By creating a backupPolicy from backupTool: " + backupTool.Name)
 				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 					AddAnnotations(constant.BackupDataPathPrefixAnnotationKey, pathPrefix).
-					AddFullPolicy().
+					AddDataFilePolicy().
 					SetBackupToolName(backupTool.Name).
 					SetSchedule(defaultSchedule, true).
 					SetTTL(defaultTTL).

@@ -41,9 +41,8 @@ import (
 )
 
 const (
-	SwitchoverCandidateInstanceForAnyPod = "*"
-	SwitchoverCheckJobKey                = "CheckJob"
-	SwitchoverCheckRoleLabelKey          = "CheckRoleLabel"
+	SwitchoverCheckJobKey       = "CheckJob"
+	SwitchoverCheckRoleLabelKey = "CheckRoleLabel"
 )
 
 // needDoSwitchover checks whether we need to perform a switchover.
@@ -61,9 +60,18 @@ func needDoSwitchover(ctx context.Context,
 		return false, nil
 	}
 	switch switchover.InstanceName {
-	case SwitchoverCandidateInstanceForAnyPod:
+	case constant.KBSwitchoverCandidateInstanceForAnyPod:
 		return true, nil
 	default:
+		podList, err := componentutil.GetComponentPodList(ctx, cli, *cluster, componentSpec.Name)
+		if err != nil {
+			return false, err
+		}
+		podParent, _ := componentutil.ParseParentNameAndOrdinal(pod.Name)
+		siParent, o := componentutil.ParseParentNameAndOrdinal(switchover.InstanceName)
+		if podParent != siParent || o < 0 || o >= int32(len(podList.Items)) {
+			return false, errors.New("switchover.InstanceName is invalid")
+		}
 		// If the current instance is already the primary or leader, then no switchover will be performed.
 		if pod.Name == switchover.InstanceName {
 			return false, nil
@@ -138,7 +146,7 @@ func checkPodRoleLabelConsistency(ctx context.Context,
 			continue
 		}
 		switch switchoverMessage.Switchover.InstanceName {
-		case SwitchoverCandidateInstanceForAnyPod:
+		case constant.KBSwitchoverCandidateInstanceForAnyPod:
 			if pod.Name != switchoverMessage.OldPrimaryOrLeader {
 				return true, nil
 			}
@@ -163,7 +171,7 @@ func renderSwitchoverCmdJob(ctx context.Context,
 	}
 	renderJob := func(switchoverSpec *appsv1alpha1.SwitchoverSpec, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
 		var switchoverAction *appsv1alpha1.SwitchoverAction
-		if switchover.InstanceName == SwitchoverCandidateInstanceForAnyPod {
+		if switchover.InstanceName == constant.KBSwitchoverCandidateInstanceForAnyPod {
 			switchoverAction = switchoverSpec.WithoutCandidate
 		} else {
 			switchoverAction = switchoverSpec.WithCandidate
@@ -250,7 +258,7 @@ func buildSwitchoverCandidateEnv(
 	if switchover == nil {
 		return nil
 	}
-	if switchover.InstanceName == SwitchoverCandidateInstanceForAnyPod {
+	if switchover.InstanceName == constant.KBSwitchoverCandidateInstanceForAnyPod {
 		return nil
 	}
 	return []corev1.EnvVar{

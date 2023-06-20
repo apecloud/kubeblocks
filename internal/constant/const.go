@@ -240,7 +240,8 @@ const (
 
 // switchover constants
 const (
-	KBJobTTLSecondsAfterFinished = 5
+	KBJobTTLSecondsAfterFinished           = 5
+	KBSwitchoverCandidateInstanceForAnyPod = "*"
 
 	KBSwitchoverJobLabelKey      = "kubeblocks.io/switchover-job"
 	KBSwitchoverJobLabelValue    = "kb-switchover-job"

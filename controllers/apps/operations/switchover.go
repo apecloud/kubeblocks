@@ -271,7 +271,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 	return expectCount, completedCount, nil
 }
 
-// setComponentSwitchoverProgressDetails set component progress details.
+// setComponentSwitchoverProgressDetails sets component switchover progress details.
 func setComponentSwitchoverProgressDetails(recorder record.EventRecorder,
 	opsRequest *appsv1alpha1.OpsRequest,
 	phase appsv1alpha1.ClusterComponentPhase,

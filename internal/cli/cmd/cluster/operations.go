@@ -791,9 +791,6 @@ func NewCancelCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 }
 
 var promoteExample = templates.Examples(`
-		# The command format is as follows:
-		kbcli cluster promote <cluster-name> [--component=<comp-name>] [--instance <instance-name>] 
-
 		# Promote the instance mycluster-mysql-1 as the new primary or leader.
 		kbcli cluster promote mycluster --instance mycluster-mysql-1
 
@@ -808,7 +805,7 @@ var promoteExample = templates.Examples(`
 func NewPromoteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := newBaseOperationsOptions(f, streams, appsv1alpha1.SwitchoverType, false)
 	cmd := &cobra.Command{
-		Use:               "promote NAME",
+		Use:               "promote NAME [--component=<comp-name>] [--instance <instance-name>]",
 		Short:             "Promote a non-primary or non-leader instance as the new primary or leader of the cluster",
 		Example:           promoteExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),

@@ -1,7 +1,7 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ include "clustername" . }}
+  name: {{ include "cluster-libchart.clusterName" . }}
   labels: {{ include "apecloud-mysql-cluster.labels" . | nindent 4 }}
 spec:
   {{- $withProxy := and (eq .Values.mode "raftGroup") .Values.proxyEnabled -}}
@@ -12,32 +12,17 @@ spec:
   {{- end }}
   clusterVersionRef: {{ .Values.version }}
   terminationPolicy: {{ .Values.terminationPolicy }}
+  {{- include "cluster-libchart.affinity" . | indent 2 }}
   componentSpecs:
     - name: mysql
       componentDefRef: mysql # ref clusterdefinition componentDefs.name
-      monitor: {{ .Values.monitor | default false }}
-      replicas: {{ .Values.replicas | default 3 }}
+      {{- include "apecloud-mysql-cluster.replicaCount" . | indent 6 }}
       enabledLogs:
         - slow
         - error
-      serviceAccountName: {{ include "apecloud-mysql-cluster.serviceAccountName" . }}
-      resources:
-        limits:
-          cpu: {{ .Values.cpu | quote }}
-          memory: {{ .Values.memory | quote }}
-        requests:
-          cpu: {{ .Values.cpu | quote }}
-          memory: {{ .Values.memory | quote }}
-      volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: {{ .Values.storageSize }}
-      services:
-      {{- include "apecloud-mysql-cluster.componentServices" . | indent 8 }}
+      serviceAccountName: {{ include "cluster-libchart.serviceAccountName" . }}
+      {{- include "cluster-libchart.componentResources" . | indent 6 }}
+      {{- include "cluster-libchart.componentServices" . | indent 6 }}
     {{- if $withProxy }}
     {{- include "apecloud-mysql-cluster.proxyComponents" . | indent 4 }}
     {{- end }}

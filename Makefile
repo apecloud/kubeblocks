@@ -269,8 +269,25 @@ kbcli-fast:
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
 	@mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
 
+build-single-kbcli-embed-chart.%: chart=$(word 2,$(subst ., ,$@))
+build-single-kbcli-embed-chart.%:
+	$(HELM) package deploy/$(chart) --version $(VERSION)
+	mv $(chart)-*.tgz internal/cli/cluster/charts/$(chart).tgz
+
+.PHONY: build-kbcli-embed-chart
+build-kbcli-embed-chart: \
+	build-single-kbcli-embed-chart.apecloud-mysql-cluster \
+	build-single-kbcli-embed-chart.postgresql-cluster \
+	build-single-kbcli-embed-chart.clickhouse-cluster \
+	build-single-kbcli-embed-chart.kafka-cluster \
+	build-single-kbcli-embed-chart.mongodb-cluster \
+	build-single-kbcli-embed-chart.redis-cluster \
+	build-single-kbcli-embed-chart.milvus-cluster \
+	build-single-kbcli-embed-chart.qdrant-cluster \
+	build-single-kbcli-embed-chart.weaviate-cluster
+
 .PHONY: kbcli
-kbcli: test-go-generate build-checks kbcli-fast ## Build bin/kbcli.
+kbcli: test-go-generate build-checks build-kbcli-embed-chart kbcli-fast ## Build bin/kbcli.
 
 .PHONY: clean-kbcli
 clean-kbcli: ## Clean bin/kbcli*.

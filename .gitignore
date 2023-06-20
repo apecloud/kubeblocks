@@ -63,3 +63,6 @@ tmp/
 
 # helm dependency charts
 deploy/**/charts
+
+# kbcli embed helm charts
+!internal/cli/cluster/charts/*.tgz

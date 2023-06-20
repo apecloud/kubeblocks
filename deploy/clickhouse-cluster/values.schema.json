@@ -6,9 +6,8 @@
       "title": "Name",
       "description": "Cluster name.",
       "type": "string",
-      "default": "mycluster",
+      "default": "myflink",
       "maxLength": 16,
-      "minLength": 1,
       "pattern": "^[a-z]([-a-z0-9]*[a-z0-9])?$"
     },
     "version": {
@@ -56,7 +55,7 @@
       "description": "Storage size, the unit is Gi.",
       "type": "number",
       "default": 20,
-      "minimum": 1,
+      "minimum": 20,
       "maximum": 10000
     },
     "terminationPolicy": {
@@ -77,14 +76,13 @@
       "type": "boolean",
       "default": false
     },
-    "availabilityPolicy": {
-      "title": "Availability Policy",
-      "description": "The availability policy of cluster.",
+    "availablePolicy": {
+      "title": "Available Policy",
+      "description": "The available policy of cluster.",
       "type": "string",
-      "default": "none",
+      "default": "single",
       "enum": [
-        "none",
-        "node",
+        "single",
         "zone"
       ]
     },
@@ -92,7 +90,7 @@
       "title": "Tenancy",
       "description": "The tenancy of cluster.",
       "type": "string",
-      "default": "SharedNode",
+      "default": "DedicatedNode",
       "enum": [
         "SharedNode",
         "DedicatedNode"
@@ -109,6 +107,16 @@
       "description": "Specify whether the cluster can be accessed from the public Internet.",
       "type": "boolean",
       "default": false
+    },
+    "storageEngine": {
+      "title": "Storage Engine",
+      "description": "The storage engine of cluster.",
+      "type": "string",
+      "default": "innodb",
+      "enum": [
+        "innodb",
+        "x-engine"
+      ]
     }
   }
 }

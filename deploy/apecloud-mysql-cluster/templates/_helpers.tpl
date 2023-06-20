@@ -1,29 +1,4 @@
 {{/*
-Expand the name of the chart.
-*/}}
-{{- define "apecloud-mysql-cluster.name" -}}
-{{- default .Chart.Name .Values.name | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{/*
-Create a default fully qualified app name.
-We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-If release name contains chart name it will be used as a full name.
-*/}}
-{{- define "apecloud-mysql-cluster.fullname" -}}
-{{- if .Values.name }}
-{{- .Values.name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- $name := default .Chart.Name .Values.name }}
-{{- if contains $name .Release.Name }}
-{{- .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
-{{- end }}
-{{- end }}
-{{- end }}
-
-{{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "apecloud-mysql-cluster.chart" -}}
@@ -35,30 +10,11 @@ Common labels
 */}}
 {{- define "apecloud-mysql-cluster.labels" -}}
 helm.sh/chart: {{ include "apecloud-mysql-cluster.chart" . }}
-{{ include "apecloud-mysql-cluster.selectorLabels" . }}
+{{ include "cluster-libchart.clusterLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- end }}
-
-{{/*
-Selector labels
-*/}}
-{{- define "apecloud-mysql-cluster.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "apecloud-mysql-cluster.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
-{{- end }}
-
-{{- define "clustername" -}}
-{{ include "apecloud-mysql-cluster.fullname" .}}
-{{- end }}
-
-{{/*
-Create the name of the service account to use
-*/}}
-{{- define "apecloud-mysql-cluster.serviceAccountName" -}}
-{{- printf "kb-sa-%s" (include "clustername" .) }}
 {{- end }}
 
 {{/*
@@ -80,15 +36,14 @@ Define the cluster componnets with proxy
 {{- end }}
 
 {{/*
-Define component services
+Define replica count
 */}}
-{{- define "apecloud-mysql-cluster.componentServices" }}
-{{- if .Values.hostNetworkAccessible }}
-- name: vpc
-  serviceType: NodePort
+{{- define "apecloud-mysql-cluster.replicaCount" -}}
+{{- if eq .Values.mode "standalone" }}
+replicas: 1
+{{- else if eq .Values.mode "replication" }}
+replicas: {{ max .Values.replicas 2 }}
+{{- else }}
+replicas: {{ max .Values.replicas 3 }}
 {{- end }}
-{{- if .Values.publiclyAccessible }}
-- name: public
-  serviceType: LoadBalancer
-{{- end }}
-{{- end }}
+{{- end -}}

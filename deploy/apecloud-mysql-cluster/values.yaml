@@ -19,20 +19,16 @@ replicas: 1
 ##
 cpu: 0.5
 
-## @param memory in GB
+## @param memory in Gi
 ##
-memory: 0.5
+memory: 1
 
-## @param storageSize in GB
+## @param storageSize in Gi
 ##
 storageSize: 20
 
 ## @param terminationPolicy
 terminationPolicy: Delete
-
-## @param monitor
-##
-monitor: true
 
 ## @param proxyEnabled
 ##
@@ -40,11 +36,11 @@ proxyEnabled: false
 
 ## @param availablePolicy
 ##
-availablePolicy: zone
+availabilityPolicy: zone
 
 ## @param tenancy dedicated or shared
 ##
-tenancy: DedicatedNode
+tenancy: SharedNode
 
 ## @param hostNetworkAccessible if true, expose the vpc service
 ##
@@ -53,11 +49,3 @@ hostNetworkAccessible: true
 ## @param publiclyAccessible if true, expose the internet service
 ##
 publiclyAccessible: false
-
-## @param storageEngine innodb or x-engine
-##
-storageEngine: innodb
-
-## @param port
-##
-port: 3306

@@ -23,26 +23,23 @@ type EngineType string
 
 // the supported cluster engine type
 const (
-	MySQL EngineType = "MySQL"
-	//PostgreSQL EngineType = "PostgreSQL"
-	//Redis      EngineType = "Redis"
-	//MongoDB    EngineType = "MongoDB"
-	//Kafka      EngineType = "Kafka"
-	//Flink      EngineType = "Flink"
-	//Spark      EngineType = "Spark"
+	MySQL      EngineType = "MySQL"
+	PostgreSQL EngineType = "PostgreSQL"
+	Redis      EngineType = "Redis"
+	MongoDB    EngineType = "MongoDB"
+	Kafka      EngineType = "Kafka"
 )
 
 type SchemaPropName string
 
 // the command schema property name
 const (
-	NameProp              SchemaPropName = "name"
-	VersionProp           SchemaPropName = "version"
-	TerminationPolicyProp SchemaPropName = "terminationPolicy"
+	NameProp    SchemaPropName = "name"
+	VersionProp SchemaPropName = "version"
 )
 
 func SupportedEngines() []EngineType {
-	return []EngineType{MySQL}
+	return []EngineType{MySQL, PostgreSQL, Redis, MongoDB, Kafka}
 }
 
 func (e EngineType) String() string {

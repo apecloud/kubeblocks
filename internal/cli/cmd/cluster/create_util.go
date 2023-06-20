@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
@@ -86,19 +87,29 @@ func buildOneFlag(cmd *cobra.Command, f cmdutil.Factory, k string, s *spec.Schem
 
 	switch tpe {
 	case "string":
-		cmd.Flags().String(name, s.Default.(string), s.Description)
+		cmd.Flags().String(name, s.Default.(string), buildFlagDescription(s))
 	case "integer":
-		cmd.Flags().Int(name, int(s.Default.(float64)), s.Description)
+		cmd.Flags().Int(name, int(s.Default.(float64)), buildFlagDescription(s))
 	case "number":
-		cmd.Flags().Float64(name, s.Default.(float64), s.Description)
+		cmd.Flags().Float64(name, s.Default.(float64), buildFlagDescription(s))
 	case "boolean":
-		cmd.Flags().Bool(name, s.Default.(bool), s.Description)
+		cmd.Flags().Bool(name, s.Default.(bool), buildFlagDescription(s))
 	default:
 		return fmt.Errorf("unsupported json schema type %s", s.Type)
 	}
 
 	registerFlagCompFunc(cmd, f, name, s)
 	return nil
+}
+
+func buildFlagDescription(s *spec.Schema) string {
+	desc := strings.Builder{}
+	desc.WriteString(s.Description)
+	if len(s.Enum) > 0 {
+		desc.WriteString(fmt.Sprintf(" Legal values %v", s.Enum))
+	}
+
+	return desc.String()
 }
 
 func registerFlagCompFunc(cmd *cobra.Command, f cmdutil.Factory, name string, s *spec.Schema) {
@@ -108,9 +119,10 @@ func registerFlagCompFunc(cmd *cobra.Command, f cmdutil.Factory, name string, s 
 		for _, e := range s.Enum {
 			entries = append(entries, fmt.Sprintf("%s\t", e))
 		}
-		_ = cmd.RegisterFlagCompletionFunc(name, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return entries, cobra.ShellCompDirectiveNoFileComp
-		})
+		_ = cmd.RegisterFlagCompletionFunc(name,
+			func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+				return entries, cobra.ShellCompDirectiveNoFileComp
+			})
 		return
 	}
 

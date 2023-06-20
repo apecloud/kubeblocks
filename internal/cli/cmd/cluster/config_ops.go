@@ -196,10 +196,9 @@ func (o *configOpsOptions) printConfigureTips() {
 }
 
 // buildReconfigureCommonFlags build common flags for reconfigure command
-func (o *configOpsOptions) buildReconfigureCommonFlags(cmd *cobra.Command) {
-	o.addCommonFlags(cmd)
+func (o *configOpsOptions) buildReconfigureCommonFlags(cmd *cobra.Command, f cmdutil.Factory) {
+	o.addCommonFlags(cmd, f)
 	cmd.Flags().StringSliceVar(&o.Parameters, "set", nil, "Specify parameters list to be updated. For more details, refer to 'kbcli cluster describe-config'.")
-	cmd.Flags().StringVar(&o.ComponentName, "component", "", "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
 	cmd.Flags().StringVar(&o.CfgTemplateName, "config-spec", "", "Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). "+
 		"For available templates and configs, refer to: 'kbcli cluster describe-config'.")
 	cmd.Flags().StringVar(&o.CfgFile, "config-file", "", "Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). "+
@@ -210,7 +209,7 @@ func (o *configOpsOptions) buildReconfigureCommonFlags(cmd *cobra.Command) {
 func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &configOpsOptions{
 		editMode:          false,
-		OperationsOptions: newBaseOperationsOptions(f, streams, appsv1alpha1.ReconfiguringType, false),
+		OperationsOptions: newBaseOperationsOptions(f, streams, appsv1alpha1.ReconfiguringType, true),
 	}
 	cmd := &cobra.Command{
 		Use:               "configure NAME --set key=value[,key=value] [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file]",
@@ -226,7 +225,8 @@ func NewReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	o.buildReconfigureCommonFlags(cmd)
+
+	o.buildReconfigureCommonFlags(cmd, f)
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before reconfiguring the cluster")
 	return cmd
 }

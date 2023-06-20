@@ -230,7 +230,12 @@ func (o *OperationsOptions) validateVScale(cluster *appsv1alpha1.Cluster) error 
 		return err
 	}
 
-	fillClassParams := func(comp *appsv1alpha1.ClusterComponentSpec) {
+	fillClassParams := func(comp *appsv1alpha1.ClusterComponentSpec) (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("%v", r)
+			}
+		}()
 		if o.Class != "" {
 			comp.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: o.Class}
 			comp.Resources = corev1.ResourceRequirements{}
@@ -246,6 +251,7 @@ func (o *OperationsOptions) validateVScale(cluster *appsv1alpha1.Cluster) error 
 			requests.DeepCopyInto(&comp.Resources.Requests)
 			requests.DeepCopyInto(&comp.Resources.Limits)
 		}
+		return nil
 	}
 
 	for _, name := range o.ComponentNames {
@@ -253,7 +259,9 @@ func (o *OperationsOptions) validateVScale(cluster *appsv1alpha1.Cluster) error 
 			if comp.Name != name {
 				continue
 			}
-			fillClassParams(&comp)
+			if err = fillClassParams(&comp); err != nil {
+				return err
+			}
 			if _, err = class.ValidateComponentClass(&comp, componentClasses); err != nil {
 				return err
 			}

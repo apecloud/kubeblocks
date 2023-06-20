@@ -33,7 +33,11 @@ spec:
       backupStatusUpdates:
       - path: manifests.backupLog
         containerName: mongodb
-        script: /scripts/backup-log-collector.sh
+        script: /scripts/backup-log-collector.sh pre
+        updateStage: pre
+      - path: manifests.backupLog
+        containerName: mongodb
+        script: /scripts/backup-log-collector.sh post
         updateStage: post
     datafile:
       backupToolName: mongodb-physical-backup-tool

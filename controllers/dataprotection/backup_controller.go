@@ -777,7 +777,7 @@ func (r *BackupReconciler) createPreCommandJobAndEnsure(reqCtx intctrlutil.Reque
 	}
 
 	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
-	key := types.NamespacedName{Namespace: mgrNS, Name: backup.Name + "-pre"}
+	key := types.NamespacedName{Namespace: mgrNS, Name: generateUniqueJobName(backup, "hook-pre")}
 	if err := r.createHooksCommandJob(reqCtx, backup, snapshotPolicy, key, true); err != nil {
 		return false, err
 	}
@@ -798,7 +798,7 @@ func (r *BackupReconciler) createPostCommandJobAndEnsure(reqCtx intctrlutil.Requ
 	}
 
 	mgrNS := viper.GetString(constant.CfgKeyCtrlrMgrNS)
-	key := types.NamespacedName{Namespace: mgrNS, Name: backup.Name + "-post"}
+	key := types.NamespacedName{Namespace: mgrNS, Name: generateUniqueJobName(backup, "hook-post")}
 	if err = r.createHooksCommandJob(reqCtx, backup, snapshotPolicy, key, false); err != nil {
 		return false, err
 	}
@@ -951,12 +951,7 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 	if updateInfo.UseTargetPodServiceAccount {
 		jobNamespace = backup.Namespace
 	}
-	updatePath := updateInfo.Path
-	if updateInfo.Path == "" {
-		updatePath = "status"
-	}
-	jobName := backup.Name + "-" + strings.ToLower(updatePath)
-	key := types.NamespacedName{Namespace: jobNamespace, Name: cropJobName(jobName)}
+	key := types.NamespacedName{Namespace: jobNamespace, Name: generateUniqueJobName(backup, "status-"+string(updateInfo.UpdateStage))}
 	job := &batchv1.Job{}
 	// check if job is created
 	if exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, key, job); err != nil {

@@ -165,14 +165,25 @@ func (r *BackupReconciler) filterBackupPods(obj client.Object) []reconcile.Reque
 	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
 		return []reconcile.Request{}
 	}
-	if _, ok := labels[constant.DataProtectionLabelBackupNameKey]; !ok {
+	backupName, ok := labels[constant.DataProtectionLabelBackupNameKey]
+	if !ok {
+		return []reconcile.Request{}
+	}
+	var isCreateByStatefulSet bool
+	for _, v := range obj.GetOwnerReferences() {
+		if v.Kind == constant.StatefulSetKind && v.Name == backupName {
+			isCreateByStatefulSet = true
+			break
+		}
+	}
+	if !isCreateByStatefulSet {
 		return []reconcile.Request{}
 	}
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
 				Namespace: obj.GetNamespace(),
-				Name:      labels[constant.DataProtectionLabelBackupNameKey],
+				Name:      backupName,
 			},
 		},
 	}
@@ -936,7 +947,8 @@ func (r *BackupReconciler) createMetadataCollectionJob(reqCtx intctrlutil.Reques
 	pathPrefix string,
 	updateInfo dataprotectionv1alpha1.BackupStatusUpdate) error {
 	jobNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
-	if commonPolicy != nil && strings.TrimSpace(updateInfo.Script) == "" {
+	// if specified to use the service account of target pod, the namespace should be the namespace of backup.
+	if updateInfo.UseTargetPodServiceAccount {
 		jobNamespace = backup.Namespace
 	}
 	updatePath := updateInfo.Path
@@ -1600,7 +1612,6 @@ func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 			{Name: "BACKUP_INFO_FILE", Value: buildBackupInfoENV(pathPrefix)},
 		}
 		r.appendBackupVolumeMount(commonPolicy.PersistentVolumeClaim.Name, &podSpec, &container)
-		podSpec.ServiceAccountName = targetPod.Spec.ServiceAccountName
 	} else {
 		args = "set -o errexit; set -o nounset;" +
 			"OUTPUT=$(kubectl -n %s exec -it pod/%s -c %s -- %s);" +
@@ -1612,9 +1623,12 @@ func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 		patchJSON := generateJSON(statusPath, "$OUTPUT")
 		args = fmt.Sprintf(args, targetPod.Namespace, targetPod.Name, updateInfo.ContainerName,
 			updateInfo.Script, backup.Namespace, backup.Name, patchJSON)
+	}
+	if updateInfo.UseTargetPodServiceAccount {
+		podSpec.ServiceAccountName = targetPod.Spec.ServiceAccountName
+	} else {
 		podSpec.ServiceAccountName = viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
 	}
-
 	container.Args = []string{args}
 	container.Image = viper.GetString(constant.KBToolsImage)
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))

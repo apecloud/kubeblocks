@@ -34,6 +34,7 @@ spec:
         role: primary
       backupStatusUpdates:
       - updateStage: post
+        useTargetPodServiceAccount: true
     logfile:
       backupToolName: mongodb-pitr-backup-tool
       target:

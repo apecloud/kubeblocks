@@ -169,22 +169,23 @@ func getIntervalSecondsForLogfile(backupType dataprotectionv1alpha1.BackupType, 
 		return interval + "s"
 	}
 	fields := strings.Fields(cronExpression)
+loop:
 	for i, v := range fields {
 		switch i {
 		case 0:
 			if strings.HasPrefix(v, "*/") {
 				m, _ := strconv.Atoi(strings.ReplaceAll(v, "*/", ""))
 				interval = strconv.Itoa(m * 60)
-				break
+				break loop
 			}
 		case 1:
 			if strings.HasPrefix(v, "*/") {
 				m, _ := strconv.Atoi(strings.ReplaceAll(v, "*/", ""))
 				interval = strconv.Itoa(m * 60 * 60)
-				break
+				break loop
 			}
 		default:
-			break
+			break loop
 		}
 	}
 	return interval + "s"

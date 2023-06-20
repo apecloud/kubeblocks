@@ -657,7 +657,7 @@ func (r *BackupReconciler) buildManifestsUpdaterContainer(backup *dataprotection
 		{Name: fmt.Sprintf("backup-%s", commonPolicy.PersistentVolumeClaim.Name), MountPath: backupPathBase},
 	}
 	container.Env = []corev1.EnvVar{
-		{Name: constant.DP_BACKUP_INFO_FILE, Value: buildBackupInfoENV(pathPrefix)},
+		{Name: constant.DPBackupInfoFile, Value: buildBackupInfoENV(pathPrefix)},
 	}
 	return container, nil
 }
@@ -682,7 +682,7 @@ func (r *BackupReconciler) buildStatefulSpec(reqCtx intctrlutil.RequestCtx,
 	interval := getIntervalSecondsForLogfile(backup.Spec.BackupType, schedulePolicy.CronExpression)
 	if interval != "" {
 		toolPodSpec.Containers[0].Env = append(toolPodSpec.Containers[0].Env, corev1.EnvVar{
-			Name:  constant.DP_ARCHIVE_INTERVAL,
+			Name:  constant.DPArchiveInterval,
 			Value: interval,
 		})
 	}
@@ -1436,7 +1436,7 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 
 	// build pod dns string
 	envDBHost := corev1.EnvVar{
-		Name:  constant.DP_DB_HOST,
+		Name:  constant.DPDBHost,
 		Value: intctrlutil.BuildPodHostDNS(clusterPod),
 	}
 
@@ -1462,19 +1462,19 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 		RunAsUser:                &runAsUser}
 
 	envBackupName := corev1.EnvVar{
-		Name:  constant.DP_BACKUP_NAME,
+		Name:  constant.DPBackupName,
 		Value: backup.Name,
 	}
 
 	envBackupDir := corev1.EnvVar{
-		Name:  constant.DP_BACKUP_DIR,
+		Name:  constant.DPBackupDIR,
 		Value: backupPathBase + pathPrefix,
 	}
 
 	container.Env = []corev1.EnvVar{envDBHost, envBackupName, envBackupDir}
 	if commonPolicy.Target.Secret != nil {
 		envDBUser := corev1.EnvVar{
-			Name: constant.DP_DB_USER,
+			Name: constant.DPDBUser,
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
@@ -1486,7 +1486,7 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 		}
 
 		envDBPassword := corev1.EnvVar{
-			Name: constant.DP_DB_PASSWORD,
+			Name: constant.DPDBPassword,
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
@@ -1503,17 +1503,17 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	if backupPolicy.Spec.Retention != nil && backupPolicy.Spec.Retention.TTL != nil {
 		ttl := backupPolicy.Spec.Retention.TTL
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  constant.DP_TTL,
+			Name:  constant.DPTTL,
 			Value: *ttl,
 		})
 		// one more day than the configured TTL for logfile backup
 		logTTL := dataprotectionv1alpha1.AddTTL(ttl, 24)
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  constant.DP_LOGFILE_TTL,
+			Name:  constant.DPLogfileTTL,
 			Value: logTTL,
 		})
 		container.Env = append(container.Env, corev1.EnvVar{
-			Name:  constant.DP_LOGFILE_TTL_SECOND,
+			Name:  constant.DPLogfileTTLSecond,
 			Value: strconv.FormatInt(int64(math.Floor(dataprotectionv1alpha1.ToDuration(&logTTL).Seconds())), 10),
 		})
 	}

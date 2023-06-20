@@ -309,7 +309,7 @@ func getVolumeMount(spec *dpv1alpha1.BackupToolSpec) string {
 	dataVolumeMount := "/data"
 	// TODO: hack it because the mount path is not explicitly specified in cluster definition
 	for _, env := range spec.Env {
-		if env.Name == constant.DP_VOLUME_DATA_DIR {
+		if env.Name == constant.DPVolumeDataDIR {
 			dataVolumeMount = env.Value
 			break
 		}
@@ -332,8 +332,8 @@ func (p *RestoreManager) getRecoveryInfo(baseBackup, logfileBackup *dpv1alpha1.B
 		backupDIR = logfileBackup.Status.Manifests.BackupTool.FilePath
 	}
 	headEnv := []corev1.EnvVar{
-		{Name: constant.DP_BACKUP_DIR, Value: backupVolumePATH + "/" + backupDIR},
-		{Name: constant.DP_BACKUP_NAME, Value: logfileBackup.Name},
+		{Name: constant.DPBackupDIR, Value: backupVolumePATH + "/" + backupDIR},
+		{Name: constant.DPBackupName, Value: logfileBackup.Name},
 	}
 	// build env of recovery time
 	spec := &backupTool.Spec
@@ -342,23 +342,23 @@ func (p *RestoreManager) getRecoveryInfo(baseBackup, logfileBackup *dpv1alpha1.B
 	for i, env := range spec.Env {
 		if env.Value == "$KB_RECOVERY_TIME" {
 			envTimeEnvIdx = i
-		} else if env.Name == constant.DP_TIME_FORMAT {
+		} else if env.Name == constant.DPTimeFormat {
 			timeFormat = env.Value
 		}
 	}
 	if envTimeEnvIdx != -1 {
 		spec.Env[envTimeEnvIdx].Value = p.restoreTime.UTC().Format(timeFormat)
 	} else {
-		headEnv = append(headEnv, corev1.EnvVar{Name: constant.DP_KB_RECOVERY_TIME, Value: p.restoreTime.UTC().Format(timeFormat)})
+		headEnv = append(headEnv, corev1.EnvVar{Name: constant.DPKBRecoveryTime, Value: p.restoreTime.UTC().Format(timeFormat)})
 	}
-	headEnv = append(headEnv, corev1.EnvVar{Name: constant.DP_KB_RECOVERY_TIMESTAMP, Value: strconv.FormatInt(p.restoreTime.Unix(), 10)})
+	headEnv = append(headEnv, corev1.EnvVar{Name: constant.DPKBRecoveryTimestamp, Value: strconv.FormatInt(p.restoreTime.Unix(), 10)})
 	// build env of backup startTime and user contexts
 	if baseBackup.Status.Manifests != nil {
 		// inject env for backup startTime
 		backupLog := baseBackup.Status.Manifests.BackupLog
 		if backupLog != nil && backupLog.StartTime != nil {
-			startTimeEnv := corev1.EnvVar{Name: constant.DP_BACKUP_START_TIME, Value: backupLog.StartTime.UTC().Format(timeFormat)}
-			startTimeTimestampEnv := corev1.EnvVar{Name: constant.DP_BACKUP_START_TIMESTAMP, Value: strconv.FormatInt(backupLog.StartTime.Unix(), 10)}
+			startTimeEnv := corev1.EnvVar{Name: constant.DPBackupStartTime, Value: backupLog.StartTime.UTC().Format(timeFormat)}
+			startTimeTimestampEnv := corev1.EnvVar{Name: constant.DPBackupStartTimestamp, Value: strconv.FormatInt(backupLog.StartTime.Unix(), 10)}
 			headEnv = append(headEnv, startTimeEnv, startTimeTimestampEnv)
 		}
 		// inject env for user contexts
@@ -697,7 +697,7 @@ func (p *RestoreManager) buildLogicRestoreJob(synthesizedComponent *component.Sy
 	jobEnv = append(jobEnv, envs...)
 	for pvcName, pod := range pvcsAndPodsMap {
 		podENV := pod.Spec.Containers[0].Env
-		podENV = append(podENV, corev1.EnvVar{Name: constant.DP_DB_HOST, Value: intctrlutil.BuildPodHostDNS(&pod)})
+		podENV = append(podENV, corev1.EnvVar{Name: constant.DPDBHost, Value: intctrlutil.BuildPodHostDNS(&pod)})
 		podENV = append(podENV, jobEnv...)
 		volumes := []corev1.Volume{
 			{Name: "data", VolumeSource: corev1.VolumeSource{

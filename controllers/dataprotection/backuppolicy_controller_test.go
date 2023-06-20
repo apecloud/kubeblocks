@@ -411,10 +411,10 @@ var _ = Describe("Backup Policy Controller", func() {
 
 				By("check the container envs which is injected successfully.")
 				expectedEnv := map[string]string{
-					constant.DP_ARCHIVE_INTERVAL:   "60s",
-					constant.DP_TTL:                "7d",
-					constant.DP_LOGFILE_TTL:        "192h",
-					constant.DP_LOGFILE_TTL_SECOND: "691200",
+					constant.DPArchiveInterval:  "60s",
+					constant.DPTTL:              "7d",
+					constant.DPLogfileTTL:       "192h",
+					constant.DPLogfileTTLSecond: "691200",
 				}
 				checkGenerateENV := func(sts *appsv1.StatefulSet) {
 					mainContainer := sts.Spec.Template.Spec.Containers[0]
@@ -438,10 +438,10 @@ var _ = Describe("Backup Policy Controller", func() {
 				})).Should(Succeed())
 				// waiting for sts has changed and expect sts env to change to the corresponding value
 				expectedEnv = map[string]string{
-					constant.DP_ARCHIVE_INTERVAL:   "120s",
-					constant.DP_TTL:                "2h",
-					constant.DP_LOGFILE_TTL:        "26h",
-					constant.DP_LOGFILE_TTL_SECOND: "93600",
+					constant.DPArchiveInterval:  "120s",
+					constant.DPTTL:              "2h",
+					constant.DPLogfileTTL:       "26h",
+					constant.DPLogfileTTLSecond: "93600",
 				}
 				oldStsGeneration := sts.Generation
 				Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{

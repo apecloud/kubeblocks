@@ -96,10 +96,36 @@ jobs:
             ${{ steps.send_message.outputs.release-result }}
           key: ${{ steps.send_message.outputs.release-result }}
 
-  e2e-kbcli:
+  release-result:
     if: github.event.action == 'published'
-    needs: [ image-tag, send-message ]
-    uses: ./.github/workflows/e2e-kbcli.yml
+    needs: [ send-message ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        type: [image, kbcli, chart]
+    steps:
+      - name: Restore ${{ matrix.type }} Artifact
+        id: cache-artifact-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            ${{ env.RELEASE_VERSION }}-${{ matrix.type }}
+          key: ${{ env.RELEASE_VERSION }}-${{ matrix.type }}
+
+      - name: check release result
+        run: |
+          release_result=$( cat ${{ env.RELEASE_VERSION }}-${{ matrix.type }} )
+          if [[ "$release_result" != "success" ]]; then
+              exit 1
+          fi
+
+  e2e-kbcli:
+    needs: [ image-tag, release-result ]
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.4
     with:
-      KB_VERSION: "${{ needs.image-tag.outputs.tag-name }}"
+      GITHUB_REPO: "apecloud/kubeblocks"
+      BRANCH_NAME: "main"
+      WORKFLOW_ID: "e2e-kbcli.yml"
+      APECD_REF: "v0.1.4"
+      VERSION: "${{ needs.image-tag.outputs.tag-name }}"
     secrets: inherit

@@ -225,7 +225,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 
 	// add required
-	cmd.MarkFlagRequired("cluster-definition")
+	_ = cmd.MarkFlagRequired("cluster-definition")
 	// add updatable flags
 	o.UpdatableFlags.addFlags(cmd)
 

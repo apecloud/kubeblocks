@@ -64,7 +64,7 @@ func NewDeleteOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		},
 	}
 	cmd.Flags().StringSliceVar(&o.Names, "name", []string{}, "OpsRequest names")
-	cmd.RegisterFlagCompletionFunc("name", util.ResourceNameCompletionFunc(f, types.OpsGVR()))
+	_ = cmd.RegisterFlagCompletionFunc("name", util.ResourceNameCompletionFunc(f, types.OpsGVR()))
 	o.AddFlags(cmd)
 	return cmd
 }

@@ -59,6 +59,14 @@
       "minimum": 1,
       "maximum": 10000
     },
+    "monitoringInterval": {
+      "title": "Monitoring Interval",
+      "description": "The monitoring interval of cluster, 0 is disabled, the unit is second.",
+      "type": "integer",
+      "default": 0,
+      "minimum": 0,
+      "maximum": 60
+    },
     "terminationPolicy": {
       "title": "Termination Policy",
       "description": "The termination policy of cluster.",

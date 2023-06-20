@@ -27,6 +27,10 @@ memory: 1
 ##
 storage: 20
 
+## @param monitoring interval, 0 is no monitoring
+##
+monitoringInterval: 0
+
 ## @param terminationPolicy
 terminationPolicy: Delete
 

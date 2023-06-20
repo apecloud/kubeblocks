@@ -2,21 +2,21 @@
 Define the service account name
 */}}
 {{- define "cluster-libchart.serviceAccountName" -}}
-{{- default (printf "kb-sa-%s" (include "cluster-libchart.clusterName" .)) }}
+{{- printf "kb-sa-%s" (include "cluster-libchart.clusterName" .) }}
 {{- end }}
 
 {{/*
 Define the role name
 */}}
 {{- define "cluster-libchart.roleName" -}}
-{{- default (printf "kb-role-%s" (include "cluster-libchart.clusterName" .)) }}
+{{- printf "kb-role-%s" (include "cluster-libchart.clusterName" .) }}
 {{- end }}
 
 {{/*
 Define the rolebinding name
 */}}
 {{- define "cluster-libchart.roleBindingName" -}}
-{{- default (printf "kb-rolebinding-%s" (include "cluster-libchart.clusterName" .)) }}
+{{- printf "kb-rolebinding-%s" (include "cluster-libchart.clusterName" .) }}
 {{- end }}
 
 {{/*

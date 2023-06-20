@@ -3,10 +3,11 @@
 # Declare variables to be passed into your templates.
 
 image:
-  repository: mongo # docker.io/bitnami/mongodb
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/mongo
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: 5.0.14 # 6.0.3-debian-11-r0
+  tag: 5.0.14
 
 clusterVersionOverride: ""
 nameOverride: ""

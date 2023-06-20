@@ -11,8 +11,8 @@ spec:
       versionsContext:
         containers:
           - name: mongodb
-            image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
+            image: {{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
       systemAccountSpec:
         cmdExecutorConfig:
-          image: {{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}
+          image: {{ .Values.image.registry}}/{{ .Values.image.repository }}:{{ default .Chart.AppVersion .Values.image.tag }}

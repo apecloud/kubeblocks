@@ -475,6 +475,7 @@ var _ = Describe("Backup Policy Controller", func() {
 					Namespace: testCtx.DefaultNamespace,
 				}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
 					g.Expect(tmpBackup.Generation).Should(Equal(int64(1)))
+					g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupRunning))
 				})).Should(Succeed())
 
 				By("disable logfile, expect the backup phase to Completed and sts is deleted")
@@ -496,10 +497,12 @@ var _ = Describe("Backup Policy Controller", func() {
 				Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(policy *dpv1alpha1.BackupPolicy) {
 					backupPolicy.Spec.Schedule.Logfile.Enable = true
 				})).Should(Succeed())
-				Eventually(testapps.CheckObjExists(&testCtx, types.NamespacedName{
+				Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{
 					Name:      backupName,
 					Namespace: testCtx.DefaultNamespace,
-				}, sts, true)).Should(Succeed())
+				}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
+					g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupRunning))
+				})).Should(Succeed())
 
 				By("delete cluster, expect to backup phase to Completed")
 				testapps.DeleteObject(&testCtx, types.NamespacedName{

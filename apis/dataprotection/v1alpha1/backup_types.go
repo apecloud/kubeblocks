@@ -84,6 +84,10 @@ type BackupStatus struct {
 	// +optional
 	BackupToolName string `json:"backupToolName,omitempty"`
 
+	// availableReplicas available replicas for statefulSet which created by backup.
+	// +optional
+	AvailableReplicas *int32 `json:"availableReplicas,omitempty"`
+
 	// manifests determines the backup metadata info.
 	// +optional
 	Manifests *ManifestsStatus `json:"manifests,omitempty"`

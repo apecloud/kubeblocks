@@ -331,16 +331,19 @@ func (r *BackupPolicyReconciler) reconcileForStatefulSetKind(
 	if err != nil {
 		return err
 	}
+	patch := client.MergeFrom(backup.DeepCopy())
 	backup.Name = backupName
 	backup.Namespace = backupPolicy.Namespace
+	if backup.Labels == nil {
+		backup.Labels = map[string]string{}
+	}
+	backup.Labels[constant.AppManagedByLabelKey] = constant.AppName
+	backup.Labels[dataProtectionLabelBackupPolicyKey] = backupPolicy.Name
+	backup.Labels[dataProtectionLabelBackupTypeKey] = string(backType)
+	backup.Labels[dataProtectionLabelAutoBackupKey] = "true"
 	if !exists {
 		if cronExpression == "" {
 			return nil
-		}
-		backup.Labels = map[string]string{
-			dataProtectionLabelBackupPolicyKey: backupPolicy.Name,
-			dataProtectionLabelBackupTypeKey:   string(backType),
-			dataProtectionLabelAutoBackupKey:   "true",
 		}
 		backup.Spec.BackupType = backType
 		backup.Spec.BackupPolicyName = backupPolicy.Name
@@ -348,12 +351,12 @@ func (r *BackupPolicyReconciler) reconcileForStatefulSetKind(
 	}
 
 	// notice to reconcile backup CR
-	patch := client.MergeFrom(backup.DeepCopy())
 	if cronExpression != "" && slices.Contains([]dataprotectionv1alpha1.BackupPhase{
 		dataprotectionv1alpha1.BackupCompleted, dataprotectionv1alpha1.BackupFailed},
 		backup.Status.Phase) {
 		// if schedule is enabled and backup already is completed, update phase to running
 		backup.Status.Phase = dataprotectionv1alpha1.BackupRunning
+		backup.Status.FailureReason = ""
 		return r.Client.Status().Patch(ctx, backup, patch)
 	}
 	if backup.Annotations == nil {

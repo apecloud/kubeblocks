@@ -540,15 +540,6 @@ func (r OpsRequestSpec) GetRestartComponentNameSet() ComponentNameSet {
 	return set
 }
 
-// ToSwitchoverListToMap converts OpsRequest.spec.Switchover list to map
-func (r OpsRequestSpec) ToSwitchoverListToMap() map[string]Switchover {
-	switchoverMap := make(map[string]Switchover)
-	for _, v := range r.SwitchoverList {
-		switchoverMap[v.ComponentName] = v
-	}
-	return switchoverMap
-}
-
 // GetSwitchoverComponentNameSet gets the component name map with switchover operation.
 func (r OpsRequestSpec) GetSwitchoverComponentNameSet() ComponentNameSet {
 	set := make(ComponentNameSet)

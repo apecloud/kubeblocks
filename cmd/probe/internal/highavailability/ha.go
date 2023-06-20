@@ -93,7 +93,7 @@ func (ha *Ha) Start() {
 	// 	time.Sleep(1 * time.Second)
 	// }
 
-	isExist, _ := ha.dcs.IsLeaderExist()
+	isExist, _ := ha.dcs.IsLockExist()
 	for !isExist {
 		if dbManager.IAmLeader() {
 			ha.dcs.Initialize()
@@ -101,7 +101,7 @@ func (ha *Ha) Start() {
 		}
 		ha.logger.Infof("Waiting for the database Leader to be ready.")
 		time.Sleep(1 * time.Second)
-		isExist, _ = ha.dcs.IsLeaderExist()
+		isExist, _ = ha.dcs.IsLockExist()
 	}
 
 	for true {

@@ -182,9 +182,9 @@ func (store *KubernetesStore) IsLockExist() (bool, error) {
 }
 
 func (store *KubernetesStore) CreateLock() error {
-	leaderName := os.Getenv("KB_POD_FQDN")
-	acquireTime := time.Now().Unix()
-	renewTime := acquireTime
+	leaderName := store.currentMemberName
+	now := time.Now().Unix()
+	nowStr := strconv.FormatInt(now, 10)
 	ttl := store.haConfig.TTL
 	isExist, err := store.IsLeaderExist()
 	if isExist || err != nil {
@@ -197,8 +197,8 @@ func (store *KubernetesStore) CreateLock() error {
 			Namespace: store.namespace,
 			Annotations: map[string]string{
 				"leader":       leaderName,
-				"acquire-time": strconv.FormatInt(acquireTime, 10),
-				"renew-time":   strconv.FormatInt(renewTime, 10),
+				"acquire-time": nowStr,
+				"renew-time":   nowStr,
 				"ttl":          ttl,
 				"extra":        "",
 			},
@@ -242,8 +242,30 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 	}, nil
 }
 
-func (store *KubernetesStore) AttempAcquireLock() {}
-func (store *KubernetesStore) HasLock() {
+func (store *KubernetesStore) AttempAcquireLock() err {
+	now := time.Now().Unix()
+	nowStr := strconv.FormatInt(now, 10)
+	ttl := store.haConfig.TTL
+	leaderName := store.currentMemberName
+	annotation := map[string]string{
+		LEADER:      leaderName,
+		TTL:         strconv.FormatInt(ttl, 10),
+		RenewTime:   nowStr,
+		AcquireTime: nowStr,
+	}
+
+	configMap, err := store.cluster.Leader.resourse.(*corev1.ConfigMap)
+	if err != nil {
+		logger.Errorf("Get leader configmap error: %v", err)
+	} else {
+		configMap.SetAnnotations(annotation)
+		_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
+	}
+
+	return err
+}
+
+func (store *KubernetesStore) HasLock() bool {
 	return store.cluster.Leader != nil && store.cluster.Leader.Name == store.currentMemberName
 }
 
@@ -304,8 +326,8 @@ func (store *KubernetesStore) GetSwitchover() (*Switchover, error) {
 	return nil, nil
 }
 
-func (store *KubernetesStore) SetSwitchover() {}
-func (store *KubernetesStore) AddThisMember() {}
+func (store *KubernetesStore) SetSwitchover() error    {}
+func (store *KubernetesStore) AddCurrentMember() error {}
 
 // TODO: Use the database instance's character type to determine its port number more precisely
 func getDBPort(pod *corev1.Pod) string {

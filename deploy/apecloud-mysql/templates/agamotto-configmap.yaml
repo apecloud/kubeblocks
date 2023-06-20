@@ -44,4 +44,4 @@ data:
           receivers: [ apecloudmysql ]
           processors: [ memory_limiter ]
           exporters: [ prometheus ]
-      extensions: [ memory_ballast ]
+      extensions: [ ]

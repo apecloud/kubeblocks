@@ -51,4 +51,4 @@ data:
           receivers: [ apecloudpostgresql ]
           processors: [ memory_limiter ]
           exporters: [ prometheus ]
-      extensions: [ memory_ballast ]
+      extensions: [ ]

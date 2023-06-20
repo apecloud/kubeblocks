@@ -329,7 +329,7 @@ var _ = Describe("utils test", func() {
 			Expect(err).Should(BeNil())
 			Expect(ordinal).Should(Equal(5))
 
-			ordinal, err = getPodOrdinal("foo-bar")
+			_, err = getPodOrdinal("foo-bar")
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("wrong pod name"))
 		})

@@ -289,7 +289,8 @@ var _ = Describe("update strategy transformer test.", func() {
 				AddLabelsInMap(map[string]string{
 					model.AppInstanceLabelKey: rsm.Name,
 					model.KBManagedByKey:      kindReplicatedStateMachine,
-					jobScenarioLabel:          jobTypeSwitchover,
+					jobScenarioLabel:          jobScenarioUpdate,
+					jobTypeLabel:              jobTypeSwitchover,
 					jobHandledLabel:           jobHandledFalse,
 				}).
 				SetSuspend(false).

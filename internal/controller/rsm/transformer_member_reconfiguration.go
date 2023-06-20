@@ -52,12 +52,6 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 	}
 	rsm := transCtx.rsm
 
-	// get the underlying sts
-	stsVertex, err := getUnderlyingStsVertex(dag)
-	if err != nil {
-		return err
-	}
-
 	// handle cluster initialization
 	// set initReplicas at creation
 	if rsm.Status.InitReplicas == 0 {
@@ -82,6 +76,12 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 
 	if !shouldHaveActions(rsm) {
 		return nil
+	}
+
+	// get the underlying sts
+	stsVertex, err := getUnderlyingStsVertex(dag)
+	if err != nil {
+		return err
 	}
 
 	// no enough replicas in scale out, tell sts to create them.
@@ -224,29 +224,7 @@ func createNextAction(transCtx *rsmTransformContext, dag *graph.DAG, rsm *worklo
 		return nil
 	}
 
-	var nextActionInfo *actionInfo
-	switch {
-	case currentAction == nil, isSwitchoverAction(currentAction):
-		nextActionInfo = actionInfoList[0]
-	default:
-		nextActionInfo = nil
-		ordinal, _ := getActionOrdinal(currentAction.Name)
-		shortName := buildShortActionName(rsm.Name, ordinal, currentAction.Labels[jobTypeLabel])
-		for i := 0; i < len(actionInfoList); i++ {
-			if actionInfoList[i].shortActionName != shortName {
-				continue
-			}
-			if i+1 < len(actionInfoList) {
-				nextActionInfo = actionInfoList[i+1]
-				break
-			}
-		}
-	}
-
-	if nextActionInfo == nil {
-		return nil
-	}
-
+	nextActionInfo := actionInfoList[0]
 	leader := getLeaderPodName(rsm.Status.MembersStatus)
 	ordinal := nextActionInfo.ordinal
 	if nextActionInfo.actionType == jobTypeSwitchover {

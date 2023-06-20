@@ -80,9 +80,9 @@ var _ = Describe("object generation transformer test.", func() {
 		service := corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Name: "svc",
-					Protocol: corev1.ProtocolTCP,
-					Port: 12345,
+					Name:       "svc",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       12345,
 					TargetPort: intstr.FromString("my-svc"),
 				},
 			},

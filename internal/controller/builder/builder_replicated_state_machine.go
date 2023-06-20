@@ -80,3 +80,8 @@ func (builder *ReplicatedStateMachineBuilder) SetService(service corev1.ServiceS
 	builder.get().Spec.Service = service
 	return builder
 }
+
+func (builder *ReplicatedStateMachineBuilder) SetMembershipReconfiguration(reconfiguration workloads.MembershipReconfiguration) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.MembershipReconfiguration = &reconfiguration
+	return builder
+}

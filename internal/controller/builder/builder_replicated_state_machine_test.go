@@ -42,6 +42,12 @@ var _ = Describe("replicated_state_machine builder", func() {
 			IsLeader:   true,
 			CanVote:    true,
 		}
+		reconfiguration := workloads.MembershipReconfiguration{
+			SwitchoverAction: &workloads.Action{
+				Image:   name,
+				Command: []string{"bar"},
+			},
+		}
 		pod := NewPodBuilder(ns, "foo").
 			AddContainer(corev1.Container{
 				Name:  "foo",
@@ -80,6 +86,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 		rsm := NewReplicatedStateMachineBuilder(ns, name).
 			SetReplicas(replicas).
 			SetRoles([]workloads.ReplicaRole{role}).
+			SetMembershipReconfiguration(reconfiguration).
 			SetTemplate(template).
 			SetObservationActions(actions).
 			AddObservationAction(action).
@@ -91,6 +98,8 @@ var _ = Describe("replicated_state_machine builder", func() {
 		Expect(rsm.Spec.Replicas).Should(Equal(replicas))
 		Expect(len(rsm.Spec.Roles)).Should(Equal(1))
 		Expect(rsm.Spec.Roles[0]).Should(Equal(role))
+		Expect(rsm.Spec.MembershipReconfiguration).ShouldNot(BeNil())
+		Expect(*rsm.Spec.MembershipReconfiguration).Should(Equal(reconfiguration))
 		Expect(rsm.Spec.Template).Should(Equal(template))
 		Expect(len(rsm.Spec.RoleObservation.ObservationActions)).Should(Equal(2))
 		Expect(rsm.Spec.RoleObservation.ObservationActions[0]).Should(Equal(actions[0]))

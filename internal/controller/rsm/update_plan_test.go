@@ -40,8 +40,8 @@ var _ = Describe("update plan test.", func() {
 	)
 
 	var (
-		roles       []workloads.ReplicaRole
-		rsm         *workloads.ReplicatedStateMachine
+		roles []workloads.ReplicaRole
+		rsm   *workloads.ReplicatedStateMachine
 	)
 
 	BeforeEach(func() {

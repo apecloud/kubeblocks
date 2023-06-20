@@ -433,6 +433,16 @@ type OpsRequestComponentStatus struct {
 	// workloadType references workload type of component in ClusterDefinition.
 	// +optional
 	WorkloadType WorkloadType `json:"workloadType,omitempty"`
+
+	// reason describes the reason for the component phase.
+	// +kubebuilder:validation:MaxLength=1024
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
+
+	// message is a human-readable message indicating details about this operation.
+	// +kubebuilder:validation:MaxLength=32768
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
 type ReconfiguringStatus struct {

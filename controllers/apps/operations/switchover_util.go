@@ -43,6 +43,8 @@ import (
 const (
 	SwitchoverCheckJobKey       = "CheckJob"
 	SwitchoverCheckRoleLabelKey = "CheckRoleLabel"
+
+	OpsReasonForSkipSwitchover = "SkipSwitchover"
 )
 
 // needDoSwitchover checks whether we need to perform a switchover.
@@ -437,28 +439,28 @@ func cleanJobByName(ctx context.Context,
 func checkJobSucceed(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	jobName string) (bool, error) {
+	jobName string) error {
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
 	currentJob := batchv1.Job{}
 	exists, err := intctrlutil.CheckResourceExists(ctx, cli, key, &currentJob)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if !exists {
-		return false, nil
+		return errors.New("job not exist, pls check.")
 	}
 	jobStatusConditions := currentJob.Status.Conditions
 	if len(jobStatusConditions) > 0 {
 		switch jobStatusConditions[0].Type {
 		case batchv1.JobComplete:
-			return true, nil
+			return nil
 		case batchv1.JobFailed:
-			return true, errors.New("job failed, pls check.")
+			return errors.New("job failed, pls check.")
 		default:
-			return true, intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for job %s finished.", key.Name)
+			return intctrlutil.NewErrorf(intctrlutil.ErrorWaitCacheRefresh, "requeue to waiting for job %s finished.", key.Name)
 		}
 	} else {
-		return true, errors.New("job check conditions status failed")
+		return errors.New("job check conditions status failed")
 	}
 }
 

@@ -118,6 +118,14 @@ func (r switchoverOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCt
 
 // doSwitchoverComponents creates the switchover job for each component.
 func doSwitchoverComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, switchoverList []appsv1alpha1.Switchover) error {
+	var (
+		opsRequest          = opsRes.OpsRequest
+		oldOpsRequestStatus = opsRequest.Status.DeepCopy()
+	)
+	patch := client.MergeFrom(opsRequest.DeepCopy())
+	if opsRequest.Status.Components == nil {
+		opsRequest.Status.Components = make(map[string]appsv1alpha1.OpsRequestComponentStatus)
+	}
 	for _, switchover := range switchoverList {
 		compDef, err := componentutil.GetComponentDefByCluster(reqCtx.Ctx, cli, *opsRes.Cluster, switchover.ComponentName)
 		if err != nil {
@@ -128,9 +136,25 @@ func doSwitchoverComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 			return err
 		}
 		if !needSwitchover {
+			opsRequest.Status.Components[switchover.ComponentName] = appsv1alpha1.OpsRequestComponentStatus{
+				Phase:           appsv1alpha1.RunningClusterCompPhase,
+				Reason:          OpsReasonForSkipSwitchover,
+				Message:         fmt.Sprintf("This component %s is already in the expected state, skip the switchover operation", switchover.ComponentName),
+				ProgressDetails: []appsv1alpha1.ProgressStatusDetail{},
+			}
 			continue
+		} else {
+			opsRequest.Status.Components[switchover.ComponentName] = appsv1alpha1.OpsRequestComponentStatus{
+				Phase:           appsv1alpha1.SpecReconcilingClusterCompPhase,
+				ProgressDetails: []appsv1alpha1.ProgressStatusDetail{},
+			}
 		}
 		if err := createSwitchoverJob(reqCtx, cli, opsRes.Cluster, opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName), compDef, &switchover); err != nil {
+			return err
+		}
+	}
+	if !reflect.DeepEqual(*oldOpsRequestStatus, opsRequest.Status) {
+		if err := cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
 			return err
 		}
 	}
@@ -149,22 +173,10 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 		opsRequest          = opsRes.OpsRequest
 		oldOpsRequestStatus = opsRequest.Status.DeepCopy()
 		compDef             *appsv1alpha1.ClusterComponentDefinition
-		needSwitchover      bool
 		consistency         bool
-		jobExist            bool
 		err                 error
 	)
 	patch := client.MergeFrom(opsRequest.DeepCopy())
-	if opsRequest.Status.Components == nil {
-		opsRequest.Status.Components = make(map[string]appsv1alpha1.OpsRequestComponentStatus)
-		for _, v := range opsRequest.Spec.SwitchoverList {
-			opsRequest.Status.Components[v.ComponentName] = appsv1alpha1.OpsRequestComponentStatus{
-				Phase:           appsv1alpha1.SpecReconcilingClusterCompPhase,
-				ProgressDetails: []appsv1alpha1.ProgressStatusDetail{},
-			}
-		}
-	}
-
 	succeedJobs := make([]string, 0, len(opsRes.OpsRequest.Spec.SwitchoverList))
 	for _, switchover := range opsRequest.Spec.SwitchoverList {
 		switchoverCondition := meta.FindStatusCondition(opsRes.OpsRequest.Status.Conditions, appsv1alpha1.ConditionTypeSwitchover)
@@ -173,33 +185,22 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 			break
 		}
 
+		// if the component do not need switchover, skip it
+		reason := opsRequest.Status.Components[switchover.ComponentName].Reason
+		if reason == OpsReasonForSkipSwitchover {
+			completedCount += 1
+			continue
+		}
+
 		// check the current component switchoverJob whether succeed
 		jobName := genSwitchoverJobName(opsRes.Cluster.Name, switchover.ComponentName, switchoverCondition.ObservedGeneration)
 		checkJobProcessDetail := appsv1alpha1.ProgressStatusDetail{
 			ObjectKey: getProgressObjectKey(SwitchoverCheckJobKey, jobName),
 			Status:    appsv1alpha1.ProcessingProgressStatus,
 		}
-		jobExist, err = checkJobSucceed(reqCtx.Ctx, cli, opsRes.Cluster, jobName)
-		if err != nil {
+		if err = checkJobSucceed(reqCtx.Ctx, cli, opsRes.Cluster, jobName); err != nil {
 			checkJobProcessDetail.Message = fmt.Sprintf("switchover job %s is not succeed", jobName)
 			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, checkJobProcessDetail, switchover.ComponentName)
-			continue
-		}
-		if !jobExist {
-			// if the job does not exist, it may not be necessary to perform a switchover because the specified instanceName is already the primary.
-			needSwitchover, err = needDoSwitchover(reqCtx.Ctx, cli, opsRes.Cluster, opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName), &switchover)
-			if err != nil {
-				continue
-			}
-			if !needSwitchover {
-				completedCount += 1
-				skipSwitchoverProcessDetail := appsv1alpha1.ProgressStatusDetail{
-					ObjectKey: getProgressObjectKey(SwitchoverCheckRoleLabelKey, switchover.ComponentName),
-					Message:   fmt.Sprintf("current instance %s is already the primary, then no switchover will be performed", switchover.InstanceName),
-					Status:    appsv1alpha1.SucceedProgressStatus,
-				}
-				setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.SpecReconcilingClusterCompPhase, skipSwitchoverProcessDetail, switchover.ComponentName)
-			}
 			continue
 		} else {
 			checkJobProcessDetail.Message = fmt.Sprintf("switchover job %s is succeed", jobName)

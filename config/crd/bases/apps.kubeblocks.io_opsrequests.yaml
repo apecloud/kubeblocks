@@ -490,6 +490,11 @@ spec:
               components:
                 additionalProperties:
                   properties:
+                    message:
+                      description: message is a human-readable message indicating
+                        details about this operation.
+                      maxLength: 32768
+                      type: string
                     phase:
                       description: phase describes the component phase, reference
                         Cluster.status.component.phase.
@@ -541,6 +546,10 @@ spec:
                         - status
                         type: object
                       type: array
+                    reason:
+                      description: reason describes the reason for the component phase.
+                      maxLength: 1024
+                      type: string
                     workloadType:
                       description: workloadType references workload type of component
                         in ClusterDefinition.

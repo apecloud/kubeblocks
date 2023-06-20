@@ -53,7 +53,7 @@ func init() {
 		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
 		OpsHandler:                         switchoverOpsHandler{},
 		MaintainClusterPhaseBySelf:         true,
-		ProcessingReasonInClusterCondition: ProcessingReasonVersionSwitchovering,
+		ProcessingReasonInClusterCondition: ProcessingReasonSwitchovering,
 	}
 
 	opsMgr := GetOpsManager()

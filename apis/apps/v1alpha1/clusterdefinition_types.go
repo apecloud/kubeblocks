@@ -128,7 +128,7 @@ type ProvisionPolicy struct {
 	// type defines the way to provision an account, either `CreateByStmt` or `ReferToExisting`.
 	// +kubebuilder:validation:Required
 	Type ProvisionPolicyType `json:"type"`
-	// scope is the scope to provision account, and the scope could be `AnyPod` or `AllPods`.
+	// scope is the scope to provision account, and the scope could be `AnyPods` or `AllPods`.
 	// +kubebuilder:default=AnyPods
 	Scope ProvisionScope `json:"scope"`
 	// statements will be used when Type is CreateByStmt.

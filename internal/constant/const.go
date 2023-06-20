@@ -258,11 +258,6 @@ const (
 	KBSwitchoverConsensusLeaderPodFqdn    = "KB_CONSENSUS_LEADER_POD_FQDN"
 )
 
-const (
-	Primary   = "primary"
-	Secondary = "secondary"
-)
-
 // username and password are keys in created secrets for others to refer to.
 const (
 	AccountNameForSecret   = "username"

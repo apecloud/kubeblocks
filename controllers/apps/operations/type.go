@@ -114,6 +114,6 @@ const (
 	ProcessingReasonReconfiguring = "Reconfiguring"
 	// ProcessingReasonVersionUpgrading is the reason of the "OpsRequestProcessed" condition for the version upgrade opsRequest processing in cluster.
 	ProcessingReasonVersionUpgrading = "VersionUpgrading"
-	// ProcessingReasonVersionSwitchovering is the reason of the "OpsRequestProcessed" condition for the switchover opsRequest processing in cluster.
-	ProcessingReasonVersionSwitchovering = "Switchovering"
+	// ProcessingReasonSwitchovering is the reason of the "OpsRequestProcessed" condition for the switchover opsRequest processing in cluster.
+	ProcessingReasonSwitchovering = "Switchovering"
 )

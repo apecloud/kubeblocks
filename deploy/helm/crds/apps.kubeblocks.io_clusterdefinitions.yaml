@@ -8762,7 +8762,7 @@ spec:
                                   scope:
                                     default: AnyPods
                                     description: scope is the scope to provision account,
-                                      and the scope could be `AnyPod` or `AllPods`.
+                                      and the scope could be `AnyPods` or `AllPods`.
                                     type: string
                                   secretRef:
                                     description: secretRef will be used when Type

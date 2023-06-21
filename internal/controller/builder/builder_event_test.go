@@ -42,14 +42,20 @@ var _ = Describe("event builder", func() {
 			UID:        uid,
 		}
 		message := "foo-bar"
+		reason := "reason"
+		tp := corev1.EventTypeNormal
 		event := NewEventBuilder(ns, "foo").
 			SetInvolvedObject(objectRef).
 			SetMessage(message).
+			SetReason(reason).
+			SetType(tp).
 			GetObject()
 
 		Expect(event.Name).Should(Equal(name))
 		Expect(event.Namespace).Should(Equal(ns))
 		Expect(event.InvolvedObject).Should(Equal(objectRef))
 		Expect(event.Message).Should(Equal(message))
+		Expect(event.Reason).Should(Equal(reason))
+		Expect(event.Type).Should(Equal(tp))
 	})
 })

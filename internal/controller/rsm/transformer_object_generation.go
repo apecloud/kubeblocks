@@ -65,7 +65,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	// read cache snapshot
-	ml := client.MatchingLabels{model.AppInstanceLabelKey: rsm.Name, model.KBManagedByKey: kindReplicatedStateMachine}
+	ml := client.MatchingLabels{constant.AppInstanceLabelKey: rsm.Name, constant.KBManagedByKey: kindReplicatedStateMachine}
 	oldSnapshot, err := model.ReadCacheSnapshot(ctx, rsm, ml, ownedKinds()...)
 	if err != nil {
 		return err
@@ -122,11 +122,11 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 
 func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	svcBuilder := builder.NewServiceBuilder(rsm.Namespace, rsm.Name).
-		AddLabels(model.AppInstanceLabelKey, rsm.Name).
-		AddLabels(model.KBManagedByKey, kindReplicatedStateMachine).
+		AddLabels(constant.AppInstanceLabelKey, rsm.Name).
+		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
 		// AddAnnotationsInMap(rsm.Annotations).
-		AddSelectors(model.AppInstanceLabelKey, rsm.Name).
-		AddSelectors(model.KBManagedByKey, kindReplicatedStateMachine).
+		AddSelectors(constant.AppInstanceLabelKey, rsm.Name).
+		AddSelectors(constant.KBManagedByKey, kindReplicatedStateMachine).
 		AddPorts(rsm.Spec.Service.Ports...).
 		SetType(rsm.Spec.Service.Type)
 	for _, role := range rsm.Spec.Roles {
@@ -139,10 +139,10 @@ func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 
 func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 	hdlBuilder := builder.NewHeadlessServiceBuilder(rsm.Namespace, getHeadlessSvcName(rsm)).
-		AddLabels(model.AppInstanceLabelKey, rsm.Name).
-		AddLabels(model.KBManagedByKey, kindReplicatedStateMachine).
-		AddSelectors(model.AppInstanceLabelKey, rsm.Name).
-		AddSelectors(model.KBManagedByKey, kindReplicatedStateMachine)
+		AddLabels(constant.AppInstanceLabelKey, rsm.Name).
+		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
+		AddSelectors(constant.AppInstanceLabelKey, rsm.Name).
+		AddSelectors(constant.KBManagedByKey, kindReplicatedStateMachine)
 	//	.AddAnnotations("prometheus.io/scrape", strconv.FormatBool(component.Monitor.Enable))
 	// if component.Monitor.Enable {
 	//	hdBuilder.AddAnnotations("prometheus.io/path", component.Monitor.ScrapePath).
@@ -172,10 +172,10 @@ func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
 	stsBuilder := builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name)
 	template := buildStsPodTemplate(rsm, envConfig)
-	stsBuilder.AddLabels(model.AppInstanceLabelKey, rsm.Name).
-		AddLabels(model.KBManagedByKey, kindReplicatedStateMachine).
-		AddMatchLabel(model.AppInstanceLabelKey, rsm.Name).
-		AddMatchLabel(model.KBManagedByKey, kindReplicatedStateMachine).
+	stsBuilder.AddLabels(constant.AppInstanceLabelKey, rsm.Name).
+		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
+		AddMatchLabel(constant.AppInstanceLabelKey, rsm.Name).
+		AddMatchLabel(constant.KBManagedByKey, kindReplicatedStateMachine).
 		SetServiceName(headlessSvcName).
 		SetReplicas(rsm.Spec.Replicas).
 		SetPodManagementPolicy(apps.OrderedReadyPodManagement).
@@ -188,8 +188,8 @@ func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envC
 func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 	envData := buildEnvConfigData(rsm)
 	return builder.NewConfigMapBuilder(rsm.Namespace, rsm.Name+"-env").
-		AddLabels(model.AppInstanceLabelKey, rsm.Name).
-		AddLabels(model.KBManagedByKey, kindReplicatedStateMachine).
+		AddLabels(constant.AppInstanceLabelKey, rsm.Name).
+		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
 		SetData(envData).GetObject()
 }
 
@@ -199,8 +199,8 @@ func buildStsPodTemplate(rsm workloads.ReplicatedStateMachine, envConfig corev1.
 	if labels == nil {
 		labels = make(map[string]string, 2)
 	}
-	labels[model.AppInstanceLabelKey] = rsm.Name
-	labels[model.KBManagedByKey] = kindReplicatedStateMachine
+	labels[constant.AppInstanceLabelKey] = rsm.Name
+	labels[constant.KBManagedByKey] = kindReplicatedStateMachine
 	template.Labels = labels
 
 	// inject env ConfigMap into workload pods only

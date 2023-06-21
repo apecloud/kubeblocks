@@ -240,8 +240,8 @@ func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsO
 	if err := cli.List(ctx, podList,
 		&client.ListOptions{Namespace: stsObj.Namespace},
 		client.MatchingLabels{
-			model.KBManagedByKey:      stsObj.Labels[model.KBManagedByKey],
-			model.AppInstanceLabelKey: stsObj.Labels[model.AppInstanceLabelKey],
+			constant.KBManagedByKey:      stsObj.Labels[constant.KBManagedByKey],
+			constant.AppInstanceLabelKey: stsObj.Labels[constant.AppInstanceLabelKey],
 		}); err != nil {
 		return nil, err
 	}
@@ -274,10 +274,10 @@ func findSvcPort(rsm workloads.ReplicatedStateMachine) int {
 func getActionList(transCtx *rsmTransformContext, actionScenario string) ([]*batchv1.Job, error) {
 	var actionList []*batchv1.Job
 	ml := client.MatchingLabels{
-		model.AppInstanceLabelKey: transCtx.rsm.Name,
-		model.KBManagedByKey:      kindReplicatedStateMachine,
-		jobScenarioLabel:          actionScenario,
-		jobHandledLabel:           jobHandledFalse,
+		constant.AppInstanceLabelKey: transCtx.rsm.Name,
+		constant.KBManagedByKey:      kindReplicatedStateMachine,
+		jobScenarioLabel:             actionScenario,
+		jobHandledLabel:              jobHandledFalse,
 	}
 	jobList := &batchv1.JobList{}
 	if err := transCtx.Client.List(transCtx.Context, jobList, ml); err != nil {
@@ -337,8 +337,8 @@ func buildAction(rsm *workloads.ReplicatedStateMachine, actionName, actionType, 
 	env := buildActionEnv(rsm, leader, target)
 	template := buildActionPodTemplate(rsm, env, actionType)
 	return builder.NewJobBuilder(rsm.Namespace, actionName).
-		AddLabels(model.AppInstanceLabelKey, rsm.Name).
-		AddLabels(model.KBManagedByKey, kindReplicatedStateMachine).
+		AddLabels(constant.AppInstanceLabelKey, rsm.Name).
+		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
 		AddLabels(jobScenarioLabel, actionScenario).
 		AddLabels(jobTypeLabel, actionType).
 		AddLabels(jobHandledLabel, jobHandledFalse).

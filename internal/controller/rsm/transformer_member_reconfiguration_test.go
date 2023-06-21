@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
@@ -64,11 +65,11 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		actionName := getActionName(rsm.Name, int(rsm.Generation), ordinal, actionType)
 		action := builder.NewJobBuilder(name, actionName).
 			AddLabelsInMap(map[string]string{
-				model.AppInstanceLabelKey: rsm.Name,
-				model.KBManagedByKey:      kindReplicatedStateMachine,
-				jobScenarioLabel:          jobScenarioMembership,
-				jobTypeLabel:              actionType,
-				jobHandledLabel:           jobHandledFalse,
+				constant.AppInstanceLabelKey: rsm.Name,
+				constant.KBManagedByKey:      kindReplicatedStateMachine,
+				jobScenarioLabel:             jobScenarioMembership,
+				jobTypeLabel:                 actionType,
+				jobHandledLabel:              jobHandledFalse,
 			}).
 			SetSuspend(false).
 			GetObject()

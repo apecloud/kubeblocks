@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
 var _ = Describe("utils test", func() {
@@ -165,12 +165,12 @@ var _ = Describe("utils test", func() {
 	Context("getPodsOfStatefulSet function", func() {
 		It("should work well", func() {
 			sts := builder.NewStatefulSetBuilder(namespace, name).
-				AddLabels(model.KBManagedByKey, kindReplicatedStateMachine).
-				AddLabels(model.AppInstanceLabelKey, name).
+				AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
+				AddLabels(constant.AppInstanceLabelKey, name).
 				GetObject()
 			pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
-				AddLabels(model.KBManagedByKey, kindReplicatedStateMachine).
-				AddLabels(model.AppInstanceLabelKey, name).
+				AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
+				AddLabels(constant.AppInstanceLabelKey, name).
 				GetObject()
 			k8sMock.EXPECT().
 				List(gomock.Any(), gomock.Any(), gomock.Any()).

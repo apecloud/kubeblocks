@@ -42,3 +42,13 @@ func (builder *EventBuilder) SetMessage(message string) *EventBuilder {
 	builder.get().Message = message
 	return builder
 }
+
+func (builder *EventBuilder) SetReason(reason string) *EventBuilder {
+	builder.get().Reason = reason
+	return builder
+}
+
+func (builder *EventBuilder) SetType(tp string) *EventBuilder {
+	builder.get().Type = tp
+	return builder
+}

@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
@@ -231,11 +232,11 @@ var _ = Describe("update strategy transformer test.", func() {
 			model.PrepareStatus(dagExpected, transCtx.rsmOrig, transCtx.rsm)
 			action = builder.NewJobBuilder(name, actionName).
 				AddLabelsInMap(map[string]string{
-					model.AppInstanceLabelKey: rsm.Name,
-					model.KBManagedByKey:      kindReplicatedStateMachine,
-					jobScenarioLabel:          jobScenarioUpdate,
-					jobTypeLabel:              jobTypeSwitchover,
-					jobHandledLabel:           jobHandledFalse,
+					constant.AppInstanceLabelKey: rsm.Name,
+					constant.KBManagedByKey:      kindReplicatedStateMachine,
+					jobScenarioLabel:             jobScenarioUpdate,
+					jobTypeLabel:                 jobTypeSwitchover,
+					jobHandledLabel:              jobHandledFalse,
 				}).
 				SetSuspend(false).
 				GetObject()

@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/shirou/gopsutil/host"
+	"github.com/shirou/gopsutil/v3/host"
 )
 
 // PrintSystemInfo print system info

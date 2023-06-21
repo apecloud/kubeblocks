@@ -65,10 +65,9 @@ checksum:
   name_template: '{{ .ProjectName }}-checksums.txt'
   algorithm: sha256
 
-#signs:
-#  - artifacts: checksum
-#    args: ["--batch", "-u", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]
-#
+signs:
+  - artifacts: checksum
+    args: ["--batch", "-u", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]
 
 snapshot:
   name_template: "{{ incpatch .Version }}-next"

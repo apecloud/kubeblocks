@@ -15,7 +15,9 @@ env:
   GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
   RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
   FURY_TOKEN: ${{ secrets.FURY_UPLOAD_TOKEN }}
-  FURY_ACCOUNT: 'huyongqii'
+  FURY_ACCOUNT: ${{ secrets.FURY_ACCOUNT }}
+  GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+  PASSPHRASE: ${{ secrets.PASSPHRASE }}ß
 
 jobs:
   create-release-kbcli:
@@ -41,8 +43,8 @@ jobs:
             --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
 
   upload-release-assert:
-    needs: create-release-${{ env.CLI_NAME }}
-    name: Upload ${{ env.CLI_NAME }}
+    needs: create-release-kbcli
+    name: Upload and release kbcli
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -60,12 +62,12 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-#      - name: Import GPG key
-#        id: import_gpg
-#        uses: crazy-max/ghaction-import-gpg@v5
-#        with:
-#          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-#          passphrase: ${{ secrets.PASSPHRASE }}
+      - name: Import GPG key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@v5
+        with:
+          gpg_private_key: ${{ env.GPG_PRIVATE_KEY }}
+          passphrase: ${{ env.PASSPHRASE }}
 
       - uses: goreleaser/goreleaser-action@v4
         with:
@@ -74,7 +76,7 @@ jobs:
           args: release --config ${{ github.workspace }}/.goreleaser.yaml --clean
         env:
           GITHUB_TOKEN: ${{ env.GITHUB_TOKEN }}
-#          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
 
       - name: upload .rpm and .deb to fury.io
         run: |

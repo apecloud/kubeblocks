@@ -8,9 +8,9 @@ data:
   redis-post-start.sh: |
     #!/bin/sh
     set -ex
-    # first get the primary pod information from the DownwardAPI annotation, if it does not exist, get the primary pod information from env
+    # first get the primary pod information from the DownwardAPI pod-info, if it does not exist, get the primary pod information from env
     primary=`cat /kb-podinfo/primary-pod`
-    echo "downwardAPI gey primary=$primary" >> /etc/redis/.kb_set_up.log
+    echo "downwardAPI get primary=$primary" >> /etc/redis/.kb_set_up.log
     echo "KB_POD_NAME=$KB_POD_NAME" >> /etc/redis/.kb_set_up.log
     if [ -z "$primary" ]; then
       echo "downwardAPI primary info is empty, try to get KB_PRIMARY_POD_NAME env value." >> /etc/redis/.kb_set_up.log

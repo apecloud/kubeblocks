@@ -376,16 +376,16 @@ func (o *OperationsOptions) validatePromote(cluster *appsv1alpha1.Cluster) error
 		return fmt.Errorf("cluster component %s is invalid", componentName)
 	}
 	if compDefObj.SwitchoverSpec == nil {
-		return fmt.Errorf("this cluster component %s does not support switchover", componentName)
+		return fmt.Errorf("cluster component %s does not support switchover", componentName)
 	}
 	switch o.Instance {
 	case "":
 		if compDefObj.SwitchoverSpec.WithoutCandidate == nil {
-			return fmt.Errorf("this cluster component %s does not support promote without specifying an instance. Please specify a specific instance for the promotion", componentName)
+			return fmt.Errorf("cluster component %s does not support promote without specifying an instance. Please specify a specific instance for the promotion", componentName)
 		}
 	default:
 		if compDefObj.SwitchoverSpec.WithCandidate == nil {
-			return fmt.Errorf("this cluster component %s does not support specifying an instance for promote. If you want to perform a promote operation, please do not specify an instance", componentName)
+			return fmt.Errorf("cluster component %s does not support specifying an instance for promote. If you want to perform a promote operation, please do not specify an instance", componentName)
 		}
 	}
 	return nil

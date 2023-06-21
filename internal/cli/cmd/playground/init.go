@@ -184,9 +184,6 @@ func (o *initOptions) run() error {
 
 // local bootstraps a playground in the local host
 func (o *initOptions) local() error {
-	// print the system info
-	util.PrintSystemInfo(o.Out)
-
 	provider, err := cp.New(o.cloudProvider, "", o.Out, o.ErrOut)
 	if err != nil {
 		return err

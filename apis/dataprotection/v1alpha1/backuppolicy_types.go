@@ -247,7 +247,7 @@ type BackupStatusUpdate struct {
 
 	// when to update the backup status, pre: before backup, post: after backup
 	// +kubebuilder:validation:Required
-	UpdateStage BackupStatusUpdateStage `json:"updateStage,omitempty"`
+	UpdateStage BackupStatusUpdateStage `json:"updateStage"`
 }
 
 // BackupPolicyStatus defines the observed state of BackupPolicy

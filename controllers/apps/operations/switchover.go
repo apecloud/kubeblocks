@@ -102,7 +102,7 @@ func (r switchoverOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli
 		opsRequestPhase = appsv1alpha1.OpsSucceedPhase
 	}
 
-	return opsRequestPhase, 5 * time.Second, nil
+	return opsRequestPhase, time.Second, nil
 }
 
 // GetRealAffectedComponentMap gets the real affected component map for the operation
@@ -263,7 +263,10 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 
 	if completedCount == expectCount {
 		for _, jobName := range succeedJobs {
-			_ = cleanJobByName(reqCtx.Ctx, cli, opsRes.Cluster, jobName)
+			if err := cleanJobByName(reqCtx.Ctx, cli, opsRes.Cluster, jobName); err != nil {
+				reqCtx.Log.Error(err, "clean switchover job failed", "jobName", jobName)
+				return expectCount, completedCount, err
+			}
 		}
 	}
 

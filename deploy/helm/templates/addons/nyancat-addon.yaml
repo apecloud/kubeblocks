@@ -15,8 +15,8 @@ spec:
   type: Helm
 
   helm:
-    # chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/nyancat-{{ default .Chart.Version .Values.versionOverride }}.tgz
-    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/nyancat-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    # chartLocationURL: {{ .Values.addonChartLocationBase }}/nyancat-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/nyancat-{{ default .Chart.Version .Values.versionOverride }}.tgz
     valuesMapping:
       valueMap:
         replicaCount: replicaCount

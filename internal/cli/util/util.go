@@ -594,12 +594,11 @@ func GetHelmChartRepoURL() string {
 
 	// if helm repo url is not specified, choose one from GitHub and GitLab based on the IP location
 	// if location is CN, or we can not get location, use GitLab helm chart repo
-	var repo string
+	repo := types.KubeBlocksChartURL
 	location, _ := getIPLocation()
 	if location == "CN" || location == "" {
 		repo = types.GitLabHelmChartRepo
 	}
-	repo = types.KubeBlocksChartURL
 	klog.V(1).Infof("Using helm repo url: %s", repo)
 	return repo
 }

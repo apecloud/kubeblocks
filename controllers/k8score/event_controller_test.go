@@ -21,9 +21,6 @@ package k8score
 
 import (
 	"fmt"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"strings"
 	"time"
 
@@ -32,12 +29,15 @@ import (
 
 	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"

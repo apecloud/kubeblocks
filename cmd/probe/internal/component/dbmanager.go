@@ -24,6 +24,7 @@ type DBManager interface {
 
 type DBManagerBase struct {
 	CurrentMemberName string
+	ClusterCompName   string
 	DataDir           string
 	Logger            logger.Logger
 	DBStartupReady    bool

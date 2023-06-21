@@ -98,13 +98,6 @@ func (mongoOps *MongoDBOperations) Init(metadata bindings.Metadata) error {
 	return nil
 }
 
-// func (mongoOps *MongoDBOperations) Ping() error {
-// 	if err := mongoOps.client.Ping(context.Background(), nil); err != nil {
-// 		return fmt.Errorf("MongoDB binding: error connecting to MongoDB at %s: %s", mongoOps.mongoDBMetadata.host, err)
-// 	}
-// 	return nil
-// }
-//
 // func (mongoOps *MongoDBOperations) initIfNeed() bool {
 // 	if mongoOps.database == nil {
 // 		go func() {
@@ -153,16 +146,6 @@ func (mongoOps *MongoDBOperations) Init(metadata bindings.Metadata) error {
 func (mongoOps *MongoDBOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	return mongoOps.manager.GetMemberState(ctx)
 }
-
-//func (mongoOps *MongoDBOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
-//	role, err := mongoOps.manager.GetMemberState(ctx)
-//	if err != nil {
-//		return nil, err
-//	}
-//	opsRes := OpsResult{}
-//	opsRes["role"] = role
-//	return opsRes, nil
-//}
 
 func (mongoOps *MongoDBOperations) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) (OpsResult, error) {
 	// TODO implement me when proposal is passed

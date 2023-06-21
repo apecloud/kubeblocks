@@ -14,7 +14,7 @@ type Cluster struct {
 
 func (c *Cluster) HasMember(memberName string) bool {
 	for _, member := range c.Members {
-		if memberName == member.name {
+		if memberName == member.Name {
 			return true
 		}
 	}
@@ -23,7 +23,7 @@ func (c *Cluster) HasMember(memberName string) bool {
 
 func (c *Cluster) GetMemberWithName(name string) *Member {
 	for _, m := range c.Members {
-		if m.name == name {
+		if m.Name == name {
 			return &m
 		}
 	}
@@ -34,7 +34,7 @@ func (c *Cluster) GetMemberWithName(name string) *Member {
 func (c *Cluster) GetMemberName() []string {
 	var memberList []string
 	for _, member := range c.Members {
-		memberList = append(memberList, member.name)
+		memberList = append(memberList, member.Name)
 	}
 
 	return memberList
@@ -72,23 +72,23 @@ type Leader struct {
 }
 
 type Member struct {
-	index          string
-	name           string
-	role           string
+	Index          string
+	Name           string
+	Role           string
 	PodIP          string
 	DBPort         string
 	SQLChannelPort string
 }
 
 func (m *Member) GetName() string {
-	return m.name
+	return m.Name
 }
 
 func newMember(index string, name string, role string, url string) *Member {
 	return &Member{
-		index: index,
-		name:  name,
-		role:  role,
+		Index: index,
+		Name:  name,
+		Role:  role,
 	}
 }
 

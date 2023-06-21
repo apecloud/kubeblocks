@@ -2,6 +2,7 @@ package dcs
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -161,8 +162,8 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 	members := make([]Member, len(podList.Items))
 	for i, pod := range podList.Items {
 		member := &members[i]
-		member.name = pod.Name
-		member.role = pod.Labels["app.kubernetes.io/role"]
+		member.Name = fmt.Sprintf("%s.%s-headless.%s.svc", pod.Name, store.clusterCompName, store.namespace)
+		member.Role = pod.Labels["app.kubernetes.io/role"]
 		member.PodIP = pod.Status.PodIP
 		member.DBPort = getDBPort(&pod)
 		member.SQLChannelPort = getSQLChannelPort(&pod)

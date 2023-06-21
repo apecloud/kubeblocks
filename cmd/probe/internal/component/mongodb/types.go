@@ -23,21 +23,21 @@ type ReplsetTags map[string]string
 type ConfigMember struct {
 	ID                 int         `bson:"_id" json:"_id"`
 	Host               string      `bson:"host" json:"host"`
-	ArbiterOnly        bool        `bson:"arbiterOnly" json:"arbiterOnly"`
-	BuildIndexes       bool        `bson:"buildIndexes" json:"buildIndexes"`
-	Hidden             bool        `bson:"hidden" json:"hidden"`
-	Priority           int         `bson:"priority" json:"priority"`
+	ArbiterOnly        *bool       `bson:"arbiterOnly,omitempty" json:"arbiterOnly,omitempty"`
+	BuildIndexes       *bool       `bson:"buildIndexes,omitempty" json:"buildIndexes,omitempty"`
+	Hidden             *bool       `bson:"hidden,omitempty" json:"hidden,omitempty"`
+	Priority           int         `bson:"priority,omitempty" json:"priority,omitempty"`
 	Tags               ReplsetTags `bson:"tags,omitempty" json:"tags,omitempty"`
 	SlaveDelay         *int64      `bson:"slaveDelay,omitempty" json:"slaveDelay,omitempty"`
 	SecondaryDelaySecs *int64      `bson:"secondaryDelaySecs,omitempty" json:"secondaryDelaySecs,omitempty"`
-	Votes              int         `bson:"votes" json:"votes"`
+	Votes              *int        `bson:"votes,omitempty" json:"votes,omitempty"`
 }
 
 type ConfigMembers []ConfigMember
 
 type RSConfig struct {
-	ID                                 string        `bson:"_id" json:"_id"`
-	Version                            int           `bson:"version" json:"version"`
+	ID                                 string        `bson:"_id,omitempty" json:"_id,omitempty"`
+	Version                            *int          `bson:"version,omitempty" json:"version,omitempty"`
 	Members                            ConfigMembers `bson:"members" json:"members"`
 	Configsvr                          bool          `bson:"configsvr,omitempty" json:"configsvr,omitempty"`
 	ProtocolVersion                    int           `bson:"protocolVersion,omitempty" json:"protocolVersion,omitempty"`

@@ -15,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
 type Manager struct {
@@ -55,6 +56,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 	mgr := &Manager{
 		DBManagerBase: component.DBManagerBase{
 			CurrentMemberName: viper.GetString("KB_POD_FQDN"),
+			ClusterCompName:   viper.GetString("KB_CLUSTER_COMP_NAME"),
 			Logger:            logger,
 		},
 		Client:   client,
@@ -131,6 +133,49 @@ func (mgr *Manager) IsLeader(ctx context.Context) (bool, error) {
 
 	return resp.IsMaster, nil
 }
+
+func (mgr *Manager) InitiateCluster(cluster *dcs.Cluster) error {
+	return nil
+}
+
+// InitiateMongoClusterRS is a method to create MongoDB cluster
+func (mgr *Manager) InitiateReplSet(cluster *dcs.Cluster) error {
+	configMembers := make([]ConfigMember, len(cluster.Members))
+
+	for i, member := range cluster.Members {
+		configMembers[i].ID = i
+		configMembers[i].Host = member.Name + ":" + member.DBPort
+		if strings.HasPrefix(member.Name, mgr.CurrentMemberName) {
+			configMembers[i].Priority = 2
+		} else {
+			configMembers[i].Priority = 1
+		}
+	}
+
+	config := RSConfig{
+		ID:      mgr.ClusterCompName,
+		Members: configMembers,
+	}
+
+	response := mgr.Client.Database("admin").RunCommand(context.Background(), bson.M{"replSetInitiate": config})
+	if response.Err() != nil {
+		return response.Err()
+	}
+	return nil
+}
+
+// CheckMongoClusterInitialized is a method to check if cluster is initailized or not
+func (mgr *Manager) IsClusterInitialized() (bool, error) {
+	status, err := mgr.GetReplSetStatus(context.Background())
+	if err != nil {
+		return false, err
+	}
+	if status.OK != 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
 func (mgr *Manager) Initialize()             {}
 func (mgr *Manager) IsInitialized()          {}
 func (mgr *Manager) IsRunning()              {}

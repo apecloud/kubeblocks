@@ -4,7 +4,7 @@ metadata:
   name: agamotto
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-    "kubeblocks.io/provider": community
+    "kubeblocks.io/provider": apecloud
   {{- if .Values.keepAddons }}
   annotations:
     helm.sh/resource-policy: keep
@@ -14,7 +14,7 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/agamotto-0.1.0-beta.4.tgz
+    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/agamotto-0.1.0-beta.5.tgz
     installValues:
       configMapRefs:
         - name: {{ include "addon.agamotto.name" . }}-chart-kubeblocks-values
@@ -36,7 +36,10 @@ spec:
 
   defaultInstallValues:
     - enabled: true
-      {{- with .Values.tolerations }}
+      {{- $tolerations := .Values.tolerations }}
+      {{- $dataPlaneTolerations := .Values.dataPlane.tolerations }}
+      {{- $mergedTolerations := concat $tolerations $dataPlaneTolerations }}
+      {{- with $mergedTolerations }}
       tolerations: {{ toJson . | quote }}
       {{- end }}
 

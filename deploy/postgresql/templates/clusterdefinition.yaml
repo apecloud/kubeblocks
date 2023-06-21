@@ -35,7 +35,7 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: 1234
+          scrapePort: {{ .Values.metrics.service.port }}
       logConfigs:
         {{- range $name,$pattern := .Values.logConfigs }}
         - name: {{ $name }}
@@ -294,7 +294,7 @@ spec:
               - "--config=/opt/agamotto/agamotto-config.yaml"
             ports:
               - name: http-metrics
-                containerPort: 1234
+                containerPort: {{ .Values.metrics.service.port }}
             volumeMounts:
               - name: postgresql-custom-metrics
                 mountPath: /opt/conf

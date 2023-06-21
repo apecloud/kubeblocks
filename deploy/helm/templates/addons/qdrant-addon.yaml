@@ -15,7 +15,7 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/qdrant-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/qdrant-{{ default .Chart.Version .Values.versionOverride }}.tgz
 
   installable:
     autoInstall: false

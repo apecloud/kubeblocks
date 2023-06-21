@@ -1499,8 +1499,6 @@ snapshot-controller:
 
   volumeSnapshotClasses:
     - name: default-vsc
-      annotations:
-        snapshot.storage.kubernetes.io/is-default-class: "true"
       driver: hostpath.csi.k8s.io
       deletionPolicy: Delete
 

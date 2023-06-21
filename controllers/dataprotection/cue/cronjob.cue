@@ -52,9 +52,9 @@ cronjob: {
 		jobTemplate: spec: template: spec: {
 			restartPolicy:      "Never"
 			serviceAccountName: options.serviceAccount
-			affinity: options.tolerations.affinity
-			tolerations: options.tolerations.tolerations
-			nodeSelector: options.tolerations.nodeSelector
+			affinity:           options.tolerations.affinity
+			tolerations:        options.tolerations.tolerations
+			nodeSelector:       options.tolerations.nodeSelector
 			containers: [{
 				name:            "backup-policy"
 				image:           options.image

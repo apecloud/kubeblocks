@@ -51,6 +51,7 @@ var _ = Describe("Backup Controller test", func() {
 	const defaultSchedule = "0 3 * * *"
 	const defaultTTL = "7d"
 	const backupName = "test-backup-job"
+	const storageClassName = "test-storage-class"
 
 	viper.SetDefault(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 
@@ -75,6 +76,7 @@ var _ = Describe("Backup Controller test", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.BackupToolSignature, ml)
+		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 	}
 	var nodeName string
 	var pvcName string
@@ -86,10 +88,14 @@ var _ = Describe("Backup Controller test", func() {
 		testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			"test-cd", "test-cv").Create(&testCtx)
 		podGenerateName := clusterName + "-" + componentName
+		By("By mocking a storage class")
+		_ = testapps.CreateStorageClass(&testCtx, storageClassName, true)
+
 		By("By mocking a pvc belonging to the pod")
 		pvc := testapps.NewPersistentVolumeClaimFactory(
 			testCtx.DefaultNamespace, "data-"+podGenerateName+"-0", clusterName, componentName, "data").
 			SetStorage("1Gi").
+			SetStorageClass(storageClassName).
 			Create(&testCtx).GetObject()
 		pvcName = pvc.Name
 
@@ -97,6 +103,7 @@ var _ = Describe("Backup Controller test", func() {
 		pvc2 := testapps.NewPersistentVolumeClaimFactory(
 			testCtx.DefaultNamespace, "data-"+podGenerateName+"-1", clusterName, componentName, "data").
 			SetStorage("1Gi").
+			SetStorageClass(storageClassName).
 			Create(&testCtx).GetObject()
 
 		By("By mocking a pod belonging to the statefulset")

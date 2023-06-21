@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/utils/strings/slices"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -34,7 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
-var _ = Describe("fix meta transformer test.", func() {
+var _ = Describe("init transformer test.", func() {
 	const (
 		namespace = "foo"
 		name      = "bar"
@@ -44,7 +43,7 @@ var _ = Describe("fix meta transformer test.", func() {
 		rsm         *workloads.ReplicatedStateMachine
 		transCtx    *rsmTransformContext
 		dag         *graph.DAG
-		transformer FixMetaTransformer
+		transformer initTransformer
 	)
 
 	BeforeEach(func() {
@@ -65,27 +64,20 @@ var _ = Describe("fix meta transformer test.", func() {
 		}
 
 		dag = graph.NewDAG()
-		model.PrepareStatus(dag, transCtx.rsmOrig, transCtx.rsm)
-		transformer = FixMetaTransformer{}
+		transformer = initTransformer{}
 	})
 
-	Context("fix meta", func() {
+	Context("dag init", func() {
 		It("should work well", func() {
-			Expect(transformer.Transform(transCtx, dag)).Should(Equal(graph.ErrPrematureStop))
+			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			dagExpected := graph.NewDAG()
 			root := &model.ObjectVertex{
 				Obj: transCtx.rsm,
 				OriObj: transCtx.rsmOrig,
-				Action: model.ActionPtr(model.UPDATE),
+				Action: model.ActionPtr(model.STATUS),
 			}
 			dagExpected.AddVertex(root)
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
-			root, err := model.FindRootVertex(dag)
-			Expect(err).Should(BeNil())
-			rsmNew, ok := root.Obj.(*workloads.ReplicatedStateMachine)
-			Expect(ok).Should(BeTrue())
-			Expect(rsmNew.Finalizers).ShouldNot(BeNil())
-			Expect(slices.Contains(rsmNew.Finalizers, rsmFinalizerName)).Should(BeTrue())
 		})
 	})
 })

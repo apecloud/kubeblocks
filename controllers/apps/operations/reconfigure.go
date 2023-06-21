@@ -131,7 +131,7 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 }
 
 func handleReconfigureStatusProgress(execStatus cfgcore.PolicyExecStatus, phase appsv1alpha1.OpsPhase, opsStatus *appsv1alpha1.OpsRequestStatus) handleReconfigureOpsStatus {
-	return func(cmStatus *appsv1alpha1.ConfigurationStatus) error {
+	return func(cmStatus *appsv1alpha1.ConfigurationItemStatus) error {
 		cmStatus.LastAppliedStatus = execStatus.ExecStatus
 		cmStatus.UpdatePolicy = appsv1alpha1.UpgradePolicy(execStatus.PolicyName)
 		cmStatus.SucceedCount = execStatus.SucceedCount
@@ -152,7 +152,7 @@ func handleReconfigureStatusProgress(execStatus cfgcore.PolicyExecStatus, phase 
 }
 
 func handleNewReconfigureRequest(configPatch *cfgcore.ConfigPatchInfo, lastAppliedConfigs map[string]string) handleReconfigureOpsStatus {
-	return func(cmStatus *appsv1alpha1.ConfigurationStatus) error {
+	return func(cmStatus *appsv1alpha1.ConfigurationItemStatus) error {
 		cmStatus.Status = appsv1alpha1.ReasonReconfigureMerged
 		cmStatus.LastAppliedConfiguration = lastAppliedConfigs
 		cmStatus.UpdatedParameters = appsv1alpha1.UpdatedParameters{

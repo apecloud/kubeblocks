@@ -521,7 +521,7 @@ func (o *opsRequestDiffOptions) complete(args []string) error {
 	return nil
 }
 
-func findTemplateStatusByName(status *appsv1alpha1.ReconfiguringStatus, tplName string) *appsv1alpha1.ConfigurationStatus {
+func findTemplateStatusByName(status *appsv1alpha1.ReconfiguringStatus, tplName string) *appsv1alpha1.ConfigurationItemStatus {
 	if status == nil {
 		return nil
 	}

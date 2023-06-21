@@ -453,10 +453,10 @@ type ReconfiguringStatus struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	ConfigurationStatus []ConfigurationStatus `json:"configurationStatus"`
+	ConfigurationStatus []ConfigurationItemStatus `json:"configurationStatus"`
 }
 
-type ConfigurationStatus struct {
+type ConfigurationItemStatus struct {
 	// name is a config template name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63

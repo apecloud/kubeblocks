@@ -213,9 +213,14 @@ type BackupStatusUpdate struct {
 	// +optional
 	Script string `json:"script,omitempty"`
 
-	// when to update the backup status, pre: before backup, post: after backup
+	// useTargetPodServiceAccount defines whether this job requires the service account of the backup target pod.
+	// if true, will use the service account of the backup target pod. otherwise, will use the system service account.
 	// +optional
-	UpdateStage BackupStatusUpdateStage `json:"updateStage,omitempty"`
+	UseTargetPodServiceAccount bool `json:"useTargetPodServiceAccount,omitempty"`
+
+	// when to update the backup status, pre: before backup, post: after backup
+	// +kubebuilder:validation:Required
+	UpdateStage BackupStatusUpdateStage `json:"updateStage"`
 }
 
 // BackupPolicyTemplateStatus defines the observed state of BackupPolicyTemplate

@@ -187,6 +187,7 @@ func (o *OperationsOptions) validateVolumeExpansion() error {
 	if len(o.Storage) == 0 {
 		return fmt.Errorf("missing storage")
 	}
+
 	for _, cName := range o.ComponentNames {
 		for _, vctName := range o.VCTNames {
 			labels := fmt.Sprintf("%s=%s,%s=%s,%s=%s",
@@ -205,7 +206,10 @@ func (o *OperationsOptions) validateVolumeExpansion() error {
 			pvc := pvcs.Items[0]
 			specStorage := pvc.Spec.Resources.Requests.Storage()
 			statusStorage := pvc.Status.Capacity.Storage()
-			targetStorage := resource.MustParse(o.Storage)
+			targetStorage, err := resource.ParseQuantity(o.Storage)
+			if err != nil {
+				return fmt.Errorf("cannot parse '%v', %v", o.Storage, err)
+			}
 			// determine whether the opsRequest is a recovery action for volume expansion failure
 			if specStorage.Cmp(targetStorage) > 0 &&
 				statusStorage.Cmp(targetStorage) <= 0 {
@@ -230,7 +234,7 @@ func (o *OperationsOptions) validateVScale(cluster *appsv1alpha1.Cluster) error 
 		return err
 	}
 
-	fillClassParams := func(comp *appsv1alpha1.ClusterComponentSpec) {
+	fillClassParams := func(comp *appsv1alpha1.ClusterComponentSpec) error {
 		if o.Class != "" {
 			comp.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: o.Class}
 			comp.Resources = corev1.ResourceRequirements{}
@@ -238,14 +242,23 @@ func (o *OperationsOptions) validateVScale(cluster *appsv1alpha1.Cluster) error 
 			comp.ClassDefRef = &appsv1alpha1.ClassDefRef{}
 			requests := make(corev1.ResourceList)
 			if o.CPU != "" {
-				requests[corev1.ResourceCPU] = resource.MustParse(o.CPU)
+				cpu, err := resource.ParseQuantity(o.CPU)
+				if err != nil {
+					return fmt.Errorf("cannot parse '%v', %v", o.CPU, err)
+				}
+				requests[corev1.ResourceCPU] = cpu
 			}
 			if o.Memory != "" {
-				requests[corev1.ResourceMemory] = resource.MustParse(o.Memory)
+				memory, err := resource.ParseQuantity(o.Memory)
+				if err != nil {
+					return fmt.Errorf("cannot parse '%v', %v", o.Memory, err)
+				}
+				requests[corev1.ResourceMemory] = memory
 			}
 			requests.DeepCopyInto(&comp.Resources.Requests)
 			requests.DeepCopyInto(&comp.Resources.Limits)
 		}
+		return nil
 	}
 
 	for _, name := range o.ComponentNames {
@@ -253,7 +266,9 @@ func (o *OperationsOptions) validateVScale(cluster *appsv1alpha1.Cluster) error 
 			if comp.Name != name {
 				continue
 			}
-			fillClassParams(&comp)
+			if err = fillClassParams(&comp); err != nil {
+				return err
+			}
 			if _, err = class.ValidateComponentClass(&comp, componentClasses); err != nil {
 				return err
 			}

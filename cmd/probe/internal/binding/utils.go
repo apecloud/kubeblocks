@@ -308,7 +308,7 @@ source:
 
 func StartupCheckWraper(manager component.DBManager, operation Operation) Operation {
 	return func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error) {
-		if !manager.StartupReady() {
+		if !manager.IsDBStartupReady() {
 			opsRes := OpsResult{"event": OperationFailed, "message": "db not ready"}
 			return opsRes, nil
 		}

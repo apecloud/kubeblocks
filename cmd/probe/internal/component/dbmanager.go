@@ -12,13 +12,14 @@ type DBManager interface {
 	IsRunning()
 	IsHealthy()
 	IsLeader(context.Context) (bool, error)
-	StartupReady() bool
+	IsDBStartupReady() bool
 	Recover()
 	AddToCluster()
 	Premote()
 	Demote()
 	GetHealthiestMember()
 	HasOtherHealthtyLeader()
+	GetLogger() logger.Logger
 }
 
 type DBManagerBase struct {
@@ -28,6 +29,10 @@ type DBManagerBase struct {
 	DBStartupReady    bool
 }
 
-func (mgr *DBManagerBase) StartupReady() bool {
+func (mgr *DBManagerBase) IsDBStartupReady() bool {
 	return mgr.DBStartupReady
+}
+
+func (mgr *DBManagerBase) GetLogger() logger.Logger {
+	return mgr.Logger
 }

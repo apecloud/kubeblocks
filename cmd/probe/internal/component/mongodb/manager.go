@@ -60,25 +60,25 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		Client:   client,
 		Database: client.Database(config.databaseName),
 	}
-	go mgr.WaitForDBStartupReady()
 	return mgr, nil
 
 }
 
-func (mgr *Manager) WaitForDBStartupReady() {
-	for !mgr.DBStartupReady {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		err := mgr.Client.Ping(ctx, readpref.Primary())
-		if err != nil {
-			mgr.Logger.Infof("DB is not ready: %v", err)
-		} else {
-			mgr.DBStartupReady = true
-		}
-		time.Sleep(1 * time.Second)
+func (mgr *Manager) IsDBStartupReady() bool {
+	if mgr.DBStartupReady {
+		return true
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	err := mgr.Client.Ping(ctx, readpref.Primary())
+	if err != nil {
+		mgr.Logger.Infof("DB is not ready: %v", err)
+		return false
+	}
+	mgr.DBStartupReady = true
 	mgr.Logger.Infof("DB startup ready")
+	return true
 }
 
 func (mgr *Manager) GetMemberState(ctx context.Context) (string, error) {

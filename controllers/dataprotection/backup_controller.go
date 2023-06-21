@@ -147,6 +147,7 @@ func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			MaxConcurrentReconciles: viper.GetInt(maxConcurDataProtectionReconKey),
 		}).
 		Owns(&batchv1.Job{}).
+		Owns(&appsv1.StatefulSet{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterBackupPods))
 
 	if viper.GetBool("VOLUMESNAPSHOT") {
@@ -213,6 +214,24 @@ func (r *BackupReconciler) getBackupPolicyAndValidate(
 	return backupPolicy, nil
 }
 
+func (r *BackupReconciler) validateLogfileBackupLegitimacy(backup *dataprotectionv1alpha1.Backup,
+	backupPolicy *dataprotectionv1alpha1.BackupPolicy) error {
+	backupType := backup.Spec.BackupType
+	if backupType != dataprotectionv1alpha1.BackupTypeLogFile {
+		return nil
+	}
+	if backup.Name != getCreatedCRNameByBackupPolicy(backupPolicy.Name, backupPolicy.Namespace, backupType) {
+		return intctrlutil.NewInvalidLogfileBackupName(backupPolicy.Name)
+	}
+	if backupPolicy.Spec.Schedule.Logfile == nil {
+		return intctrlutil.NewBackupNotSupported(string(backupType), backupPolicy.Name)
+	}
+	if !backupPolicy.Spec.Schedule.Logfile.Enable {
+		return intctrlutil.NewBackupScheduleDisabled(string(backupType), backupPolicy.Name)
+	}
+	return nil
+}
+
 func (r *BackupReconciler) doNewPhaseAction(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup) (ctrl.Result, error) {
@@ -230,6 +249,10 @@ func (r *BackupReconciler) doNewPhaseAction(
 
 	backupPolicy, err := r.getBackupPolicyAndValidate(reqCtx, backup)
 	if err != nil {
+		return r.updateStatusIfFailed(reqCtx, backup, err)
+	}
+
+	if err = r.validateLogfileBackupLegitimacy(backup, backupPolicy); err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
 
@@ -265,7 +288,6 @@ func (r *BackupReconciler) doNewPhaseAction(
 			return r.updateStatusIfFailed(reqCtx, backup, intctrlutil.NewNotFound("backupTool: %s not found", backupToolName))
 		}
 		isStatefulSetKind = backupTool.Spec.DeployKind == dataprotectionv1alpha1.DeployKindStatefulSet
-		// TODO check uniqueness of logfile
 	}
 	// clean cached annotations if in NEW phase
 	backupCopy := backup.DeepCopy()
@@ -576,7 +598,16 @@ func (r *BackupReconciler) doInRunningPhaseAction(
 	}
 	sts.Spec.Template = statefulSetSpec.Template
 	// update the statefulSet
-	return r.Update(reqCtx.Ctx, sts)
+	if err = r.Update(reqCtx.Ctx, sts); err != nil {
+		return err
+	}
+	// if available replicas not changed, return
+	if backup.Status.AvailableReplicas != nil && *backup.Status.AvailableReplicas == sts.Status.AvailableReplicas {
+		return nil
+	}
+	patch := client.MergeFrom(backup.DeepCopy())
+	backup.Status.AvailableReplicas = &sts.Status.AvailableReplicas
+	return r.Status().Patch(reqCtx.Ctx, backup, patch)
 }
 
 // checkBackupIsCompletedDuringRunning checks if backup is completed during it is running.

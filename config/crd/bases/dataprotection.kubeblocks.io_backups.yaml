@@ -79,6 +79,11 @@ spec:
           status:
             description: BackupStatus defines the observed state of Backup.
             properties:
+              availableReplicas:
+                description: availableReplicas available replicas for statefulSet
+                  which created by backup.
+                format: int32
+                type: integer
               backupToolName:
                 description: backupToolName references the backup tool name.
                 type: string

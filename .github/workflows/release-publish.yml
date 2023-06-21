@@ -5,6 +5,9 @@ on:
     types:
       - published
 
+permissions:
+  contents: write
+
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   TAG_NAME: ${{ github.ref_name }}
@@ -17,7 +20,7 @@ env:
   FURY_TOKEN: ${{ secrets.FURY_UPLOAD_TOKEN }}
   FURY_ACCOUNT: ${{ secrets.FURY_ACCOUNT }}
   GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-  PASSPHRASE: ${{ secrets.PASSPHRASE }}ß
+  PASSPHRASE: ${{ secrets.PASSPHRASE }}
 
 jobs:
   create-release-kbcli:

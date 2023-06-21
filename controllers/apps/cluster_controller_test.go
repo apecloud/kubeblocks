@@ -1329,7 +1329,8 @@ var _ = Describe("Cluster Controller", func() {
 				Type:   corev1.PodReady,
 				Status: corev1.ConditionTrue,
 			}}
-			Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
+			// ERROR: the object has been modified; please apply your changes to the latest version and try again
+			Eventually(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
 		}
 
 		By("Creating mock role changed events")

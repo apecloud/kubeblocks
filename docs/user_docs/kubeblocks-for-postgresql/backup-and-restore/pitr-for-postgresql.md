@@ -85,7 +85,7 @@ Prepare a clean EKS cluster, and install EBS CSI driver plug-in, with at least o
     ```bash
     helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
 
-    helm install csi-s3  kubeblocks/csi-s3 --version=0.5.0 \
+    helm install csi-s3  kubeblocks/csi-s3 --version=0.5.2 \
     --set secret.accessKey=<your_accessKey> \
     --set secret.secretKey=<your_secretKey> \
     --set storageClass.singleBucket=<s3_bucket>  \

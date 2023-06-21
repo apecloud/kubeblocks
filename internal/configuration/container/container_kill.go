@@ -127,15 +127,23 @@ func getExistsContainers(ctx context.Context, containerIDs []string, dc dockerap
 
 func (d *dockerContainer) Init(ctx context.Context) error {
 	client, err := createDockerClient(d.dockerEndpoint, d.logger)
-	d.dc = client
-	if err == nil {
-		ping, err := client.Ping(ctx)
-		if err != nil {
-			return err
-		}
-		d.logger.Infof("create docker client succeed, docker info: %v", ping)
+	if err != nil {
+		return err
 	}
-	return err
+	if err := d.ping(ctx, client); err != nil {
+		return err
+	}
+	d.dc = client
+	return nil
+}
+
+func (d *dockerContainer) ping(ctx context.Context, cli *dockerapi.Client) error {
+	ping, err := cli.Ping(ctx)
+	if err != nil {
+		return err
+	}
+	d.logger.Infof("create docker client succeed, docker info: %v", ping)
+	return nil
 }
 
 func createDockerClient(dockerEndpoint string, logger *zap.SugaredLogger) (*dockerapi.Client, error) {

@@ -62,6 +62,7 @@ type ConfigEventContext struct {
 	ClusterComponent *appsv1alpha1.ClusterComponentSpec
 	Component        *appsv1alpha1.ClusterComponentDefinition
 	ComponentUnits   []appv1.StatefulSet
+	DeploymentUnits  []appv1.Deployment
 
 	ConfigSpecName   string
 	ConfigPatch      *ConfigPatchInfo
@@ -143,7 +144,7 @@ func init() {
 				continue
 			}
 			if v, err = unstructured.LoadConfig(fileName, content, option.CfgType); err != nil {
-				return nil, WrapError(err, "failed to load config: filename[%s]", fileName)
+				return nil, WrapError(err, "failed to load config: filename[%s], type[%s]", fileName, option.CfgType)
 			}
 			meta.indexer[fileName] = v
 			meta.v[index] = v

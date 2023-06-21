@@ -28,6 +28,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -56,6 +57,9 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent) ([]client.Object, error) {
 	resources := make([]client.Object, 0)
+	if cluster.UID == "" {
+		cluster.UID = types.UID("test-uid")
+	}
 	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
 		envConfig, err := builder.BuildEnvConfig(cluster, component)
 		if err != nil {
@@ -117,20 +121,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		}()
 
 		// render config template
-		configs, err := RenderConfigNScriptFiles(clusterVer, cluster, component, workload, podSpec, nil, reqCtx.Ctx, cli)
-		if err != nil {
-			return err
-		}
-		if configs != nil {
-			resources = append(resources, configs...)
-		}
-		// end render config
-
-		//// tls certs secret volume and volumeMount
-		// if err := updateTLSVolumeAndVolumeMount(podSpec, cluster.Name, *component); err != nil {
-		//	return err
-		// }
-		return nil
+		return RenderConfigNScriptFiles(clusterVer, cluster, component, workload, podSpec, nil, reqCtx.Ctx, cli)
 	}
 
 	// pre-condition check
@@ -401,7 +392,6 @@ var _ = Describe("Cluster Controller", func() {
 				"Service",
 				"ConfigMap",
 				"Service",
-				"ConfigMap",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
@@ -458,7 +448,6 @@ var _ = Describe("Cluster Controller", func() {
 				"Service",
 				"ConfigMap",
 				"Service",
-				"ConfigMap",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))

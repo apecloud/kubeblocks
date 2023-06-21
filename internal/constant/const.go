@@ -51,6 +51,7 @@ const (
 	KBClusterNamePlaceHolder        = "$(KB_CLUSTER_NAME)"
 	KBClusterCompNamePlaceHolder    = "$(KB_CLUSTER_COMP_NAME)"
 	KBClusterUIDPostfix8PlaceHolder = "$(KB_CLUSTER_UID_POSTFIX_8)"
+	KBToolsImagePlaceHolder         = "$(KUBEBLOCKS_TOOLS_IMAGE)"
 )
 
 const (
@@ -99,6 +100,7 @@ const (
 	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
 	ConsensusSetAccessModeLabelKey         = "cs.apps.kubeblocks.io/access-mode"
 	BackupTypeLabelKeyKey                  = "dataprotection.kubeblocks.io/backup-type"
+	DataProtectionLabelBackupNameKey       = "dataprotection.kubeblocks.io/backup-name"
 	AddonNameLabelKey                      = "extensions.kubeblocks.io/addon-name"
 	OpsRequestTypeLabelKey                 = "ops.kubeblocks.io/ops-type"
 
@@ -128,8 +130,10 @@ const (
 	LastAppliedOpsCRAnnotationKey               = "config.kubeblocks.io/last-applied-ops-name"
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
+	CMConfigurationNewAnnotationKey             = "config.kubeblocks.io/new-config" // CMConfigurationNewAnnotationKey indicates whether this configmap is rendered by first time
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
 	KubeBlocksGenerationKey                     = "kubeblocks.io/generation"
+	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
 
 	// kubeblocks.io well-known finalizers
 	DBClusterFinalizerName             = "cluster.kubeblocks.io/finalizer"
@@ -223,6 +227,11 @@ const (
 	KBReplicationSetPrimaryPodName = "KB_PRIMARY_POD_NAME"
 )
 
+const (
+	Primary   = "primary"
+	Secondary = "secondary"
+)
+
 // username and password are keys in created secrets for others to refer to.
 const (
 	AccountNameForSecret   = "username"
@@ -233,4 +242,25 @@ const DefaultBackupPvcInitCapacity = "20Gi"
 
 const (
 	ComponentStatusDefaultPodName = "Unknown"
+)
+
+const (
+	// dataProtection env names
+
+	DPDBHost               = "DB_HOST"                // db host for dataProtection
+	DPDBUser               = "DB_USER"                // db user for dataProtection
+	DPDBPassword           = "DB_PASSWORD"            // db password for dataProtection
+	DPBackupDIR            = "BACKUP_DIR"             // the dest directory for backup data
+	DPBackupName           = "BACKUP_NAME"            // backup cr name
+	DPTTL                  = "TTL"                    // backup time to live, reference the backupPolicy.spec.retention.ttl
+	DPLogfileTTL           = "LOGFILE_TTL"            // ttl for logfile backup, one more day than backupPolicy.spec.retention.ttl
+	DPLogfileTTLSecond     = "LOGFILE_TTL_SECOND"     // ttl seconds with LOGFILE_TTL, integer format
+	DPArchiveInterval      = "ARCHIVE_INTERVAL"       // archive interval for statefulSet deploy kind, trans from the schedule cronExpression for logfile
+	DPBackupInfoFile       = "BACKUP_INFO_FILE"       // the file name which retains the backup.status info
+	DPTimeFormat           = "TIME_FORMAT"            // golang time format string
+	DPVolumeDataDIR        = "VOLUME_DATA_DIR"        //
+	DPKBRecoveryTime       = "KB_RECOVERY_TIME"       // recovery time
+	DPKBRecoveryTimestamp  = "KB_RECOVERY_TIMESTAMP"  // recovery timestamp
+	DPBackupStartTime      = "BACKUP_START_TIME"      // backup start time
+	DPBackupStartTimestamp = "BACKUP_START_TIMESTAMP" // backup start timestamp
 )

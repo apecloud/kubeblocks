@@ -27,10 +27,9 @@ type BackupToolSpec struct {
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
-	// which kind for run a backup tool.
-	// +kubebuilder:validation:Enum={job,daemon}
+	// which kind for run a backup tool, supported values: job, statefulSet.
 	// +kubebuilder:default=job
-	DeployKind string `json:"deployKind,omitempty"`
+	DeployKind DeployKind `json:"deployKind,omitempty"`
 
 	// the type of backup tool, file or pitr
 	// +kubebuilder:validation:Enum={file,pitr}
@@ -75,7 +74,18 @@ type BackupToolSpec struct {
 
 	// backup tool can support logical restore, in this case, restore NOT RESTART database.
 	// +optional
-	Logical *BackupToolRestoreCommand `json:"logical,omitempty"`
+	Logical *LogicalConfig `json:"logical,omitempty"`
+}
+
+type LogicalConfig struct {
+	BackupToolRestoreCommand `json:",inline"`
+
+	// podScope defines the pod scope for restore from backup, supported values:
+	// - 'All' will exec the restore command on all pods.
+	// - 'ReadWrite' will pick a ReadWrite pod to exec the restore command.
+	// +optional
+	// +kubebuilder:default=All
+	PodScope PodRestoreScope `json:"podScope,omitempty"`
 }
 
 // BackupToolRestoreCommand defines the restore commands of BackupTool

@@ -71,6 +71,11 @@ RUN --mount=type=bind,target=. \
 RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOFLAGS="-mod=mod" go build -ldflags="${LD_FLAGS}" -a -o /out/config_render cmd/reloader/template/*.go
+
+RUN --mount=type=bind,target=. \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOFLAGS="-mod=mod" go build -ldflags="${LD_FLAGS}" -a -o /out/probe cmd/probe/main.go
 
 RUN --mount=type=bind,target=. \
@@ -96,6 +101,7 @@ COPY --from=bin-downloader /workspace/kubernetes/client/bin/kubectl /bin
 COPY config/probe config/probe
 COPY --from=builder /out/killer /bin
 COPY --from=builder /out/reloader /bin
+COPY --from=builder /out/config_render /bin
 COPY --from=builder /out/probe /bin
 COPY --from=builder /out/kbcli /bin
 

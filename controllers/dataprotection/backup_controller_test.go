@@ -21,7 +21,6 @@ package dataprotection
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo/v2"
@@ -142,7 +141,12 @@ var _ = Describe("Backup Controller test", func() {
 				SetTargetSecretName(clusterName).
 				AddHookPreCommand("touch /data/mysql/.restore;sync").
 				AddHookPostCommand("rm -f /data/mysql/.restore;sync").
-				AddFullPolicy().
+				AddDataFilePolicy().
+				SetBackupStatusUpdates([]dataprotectionv1alpha1.BackupStatusUpdate{
+					{
+						UpdateStage: dataprotectionv1alpha1.POST,
+					},
+				}).
 				SetBackupToolName(backupTool.Name).
 				AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 				AddMatchLabels(constant.RoleLabelKey, "leader").
@@ -151,7 +155,7 @@ var _ = Describe("Backup Controller test", func() {
 				Create(&testCtx).GetObject()
 		})
 
-		Context("creates a full backup", func() {
+		Context("creates a datafile backup", func() {
 			var backupKey types.NamespacedName
 
 			BeforeEach(func() {
@@ -193,7 +197,7 @@ var _ = Describe("Backup Controller test", func() {
 			})
 		})
 
-		Context("deletes a full backup", func() {
+		Context("deletes a datafile backup", func() {
 			var backupKey types.NamespacedName
 
 			BeforeEach(func() {
@@ -259,6 +263,7 @@ var _ = Describe("Backup Controller test", func() {
 
 		Context("creates a snapshot backup", func() {
 			var backupKey types.NamespacedName
+			var backup *dataprotectionv1alpha1.Backup
 
 			BeforeEach(func() {
 				viper.Set("VOLUMESNAPSHOT", "true")
@@ -270,7 +275,7 @@ var _ = Describe("Backup Controller test", func() {
 				viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "{\"beta.kubernetes.io/arch\":\"amd64\"}")
 
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
-				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+				backup = testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
 					Create(&testCtx).GetObject()
@@ -288,8 +293,8 @@ var _ = Describe("Backup Controller test", func() {
 				backupPolicyKey := types.NamespacedName{Name: backupPolicyName, Namespace: backupKey.Namespace}
 				patchBackupPolicySpecBackupStatusUpdates(backupPolicyKey)
 
-				preJobKey := types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}
-				postJobKey := types.NamespacedName{Name: backupKey.Name + "-post", Namespace: backupKey.Namespace}
+				preJobKey := types.NamespacedName{Name: generateUniqueJobName(backup, "hook-pre"), Namespace: backupKey.Namespace}
+				postJobKey := types.NamespacedName{Name: generateUniqueJobName(backup, "hook-post"), Namespace: backupKey.Namespace}
 				patchK8sJobStatus(preJobKey, batchv1.JobComplete)
 				By("Check job tolerations")
 				Eventually(testapps.CheckObj(&testCtx, preJobKey, func(g Gomega, fetched *batchv1.Job) {
@@ -302,7 +307,7 @@ var _ = Describe("Backup Controller test", func() {
 				patchVolumeSnapshotStatus(backupKey, true)
 				patchK8sJobStatus(postJobKey, batchv1.JobComplete)
 
-				logJobKey := types.NamespacedName{Name: backupKey.Name + "-" + strings.ToLower("manifests.backupLog"), Namespace: backupKey.Namespace}
+				logJobKey := types.NamespacedName{Name: generateUniqueJobName(backup, "status-post"), Namespace: backupKey.Namespace}
 				patchK8sJobStatus(logJobKey, batchv1.JobComplete)
 
 				By("Check backup job completed")
@@ -321,7 +326,7 @@ var _ = Describe("Backup Controller test", func() {
 			})
 
 			It("should fail after pre-job fails", func() {
-				patchK8sJobStatus(types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}, batchv1.JobFailed)
+				patchK8sJobStatus(types.NamespacedName{Name: generateUniqueJobName(backup, "hook-pre"), Namespace: backupKey.Namespace}, batchv1.JobFailed)
 
 				By("Check backup job failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
@@ -332,12 +337,12 @@ var _ = Describe("Backup Controller test", func() {
 			It("should fail if volumesnapshot reports error", func() {
 
 				By("patching job status to pass check")
-				preJobKey := types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}
+				preJobKey := types.NamespacedName{Name: generateUniqueJobName(backup, "hook-pre"), Namespace: backupKey.Namespace}
 				patchK8sJobStatus(preJobKey, batchv1.JobComplete)
 
 				By("patching volumesnapshot status with error")
 				Eventually(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(tmpVS *snapshotv1.VolumeSnapshot) {
-					msg := "test-error"
+					msg := "Failed to set default snapshot class with error: some error"
 					vsError := snapshotv1.VolumeSnapshotError{
 						Message: &msg,
 					}
@@ -388,7 +393,7 @@ var _ = Describe("Backup Controller test", func() {
 					Create(&testCtx).GetObject()
 				backupKey = client.ObjectKeyFromObject(backup)
 
-				patchK8sJobStatus(types.NamespacedName{Name: backupKey.Name + "-pre", Namespace: backupKey.Namespace}, batchv1.JobComplete)
+				patchK8sJobStatus(types.NamespacedName{Name: generateUniqueJobName(backup, "hook-pre"), Namespace: backupKey.Namespace}, batchv1.JobComplete)
 
 				By("Check backup job failed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dataprotectionv1alpha1.Backup) {
@@ -400,7 +405,7 @@ var _ = Describe("Backup Controller test", func() {
 	})
 
 	When("with backupTool resources", func() {
-		Context("creates a full backup", func() {
+		Context("creates a datafile backup", func() {
 			var backupKey types.NamespacedName
 			var backupPolicy *dataprotectionv1alpha1.BackupPolicy
 			var pathPrefix = "/mysql/backup"
@@ -425,7 +430,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("By creating a backupPolicy from backupTool: " + backupTool.Name)
 				backupPolicy = testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 					AddAnnotations(constant.BackupDataPathPrefixAnnotationKey, pathPrefix).
-					AddFullPolicy().
+					AddDataFilePolicy().
 					SetBackupToolName(backupTool.Name).
 					SetSchedule(defaultSchedule, true).
 					SetTTL(defaultTTL).

@@ -36,8 +36,8 @@ Fill in an access key and run the command below to authenticate the requests.
 
 ```bash
 aws configure
-AWS Access Key ID [None]: AKIAIOSFODNN7EXAMPLE
-AWS Secret Access Key [None]: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+AWS Access Key ID [None]: YOUR_ACCESS_KEY_ID
+AWS Secret Access Key [None]: YOUR_SECRET_ACCESS_KEY
 ```
 
 You can refer to [Quick configuration with aws configure](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html#cli-configure-quickstart-config) for detailed information.
@@ -45,8 +45,8 @@ You can refer to [Quick configuration with aws configure](https://docs.aws.amazo
 **Option 2.** Use environment variables.
 
 ```bash
-export AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
-export AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+export AWS_ACCESS_KEY_ID="YOUR_ACCESS_KEY_ID"
+export AWS_SECRET_ACCESS_KEY="YOUR_SECRET_ACCESS_KEY"
 ```
 
 ### Initialize Playground
@@ -236,8 +236,8 @@ Make sure you have all the followings prepared.
    3. Add the AccessKey ID and AccessKey secret to the environment variable to configure identity authorization information.
 
        ```bash
-       export ALICLOUD_ACCESS_KEY="************"
-       export ALICLOUD_SECRET_KEY="************"
+       export ALICLOUD_ACCESS_KEY="YOUR_ACCESS_KEY"
+       export ALICLOUD_SECRET_KEY="YOUR_SECRET_KEY"
        ```
 
    :::note
@@ -326,7 +326,7 @@ kbcli cluster connect mycluster
 3. Open another terminal tab to connect the database cluster.
 
    ```bash
-   mysql -h 127.0.0.1 -P 3306 -u root -paiImelyt
+   mysql -h 127.0.0.1 -P 3306 -u root -p"******"
    >
    ...
    Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.

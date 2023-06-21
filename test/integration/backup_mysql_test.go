@@ -125,7 +125,7 @@ var _ = Describe("MySQL data protection function", func() {
 		By("By creating a backupPolicy from backupPolicyTemplate: " + backupPolicyTemplateName)
 		backupPolicyObj := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 			WithRandomName().
-			AddFullPolicy().
+			AddDataFilePolicy().
 			SetBackupToolName(backupTool.Name).
 			AddMatchLabels(constant.AppInstanceLabelKey, clusterKey.Name).
 			SetTargetSecretName(component.GenerateConnCredential(clusterKey.Name)).

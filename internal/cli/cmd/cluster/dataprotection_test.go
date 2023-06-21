@@ -215,7 +215,7 @@ var _ = Describe("DataProtection", func() {
 
 		By("restore new cluster from source cluster which is not deleted")
 		// mock backup is ok
-		mockBackupInfo(tf.FakeDynamicClient, backupName, clusterName, nil)
+		mockBackupInfo(tf.FakeDynamicClient, backupName, clusterName, nil, "")
 		cmdRestore := NewCreateRestoreCmd(tf, streams)
 		Expect(cmdRestore != nil).To(BeTrue())
 		_ = cmdRestore.Flags().Set("backup", backupName)
@@ -223,7 +223,7 @@ var _ = Describe("DataProtection", func() {
 
 		By("restore new cluster from source cluster which is deleted")
 		// mock cluster is not lived in kubernetes
-		mockBackupInfo(tf.FakeDynamicClient, backupName, "deleted-cluster", nil)
+		mockBackupInfo(tf.FakeDynamicClient, backupName, "deleted-cluster", nil, "")
 		cmdRestore.Run(nil, []string{newClusterName + "1"})
 
 		By("run restore cmd with cluster spec.affinity=nil")
@@ -277,7 +277,7 @@ var _ = Describe("DataProtection", func() {
 	})
 })
 
-func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string, manifests map[string]any) {
+func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string, manifests map[string]any, backupType string) {
 	clusterString := fmt.Sprintf(`{"metadata":{"name":"deleted-cluster","namespace":"%s"},"spec":{"clusterDefinitionRef":"apecloud-mysql","clusterVersionRef":"ac-mysql-8.0.30","componentSpecs":[{"name":"mysql","componentDefRef":"mysql","replicas":1}]}}`, testing.Namespace)
 	backupStatus := &unstructured.Unstructured{
 		Object: map[string]any{
@@ -294,6 +294,9 @@ func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string, m
 					constant.AppInstanceLabelKey:    clusterName,
 					constant.KBAppComponentLabelKey: "test",
 				},
+			},
+			"spec": map[string]any{
+				"backupType": backupType,
 			},
 		},
 	}

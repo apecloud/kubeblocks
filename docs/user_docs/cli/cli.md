@@ -19,6 +19,7 @@ Addon command.
 Manage alert receiver, include add, list and delete receiver.
 
 * [kbcli alert add-receiver](kbcli_alert_add-receiver.md)	 - Add alert receiver, such as email, slack, webhook and so on.
+* [kbcli alert config-smtpserver](kbcli_alert_config-smtpserver.md)	 - Set smtp server config
 * [kbcli alert delete-receiver](kbcli_alert_delete-receiver.md)	 - Delete alert receiver.
 * [kbcli alert list-receivers](kbcli_alert_list-receivers.md)	 - List all alert receivers.
 
@@ -122,7 +123,9 @@ List and open the KubeBlocks dashboards.
 
 Inject faults to pod.
 
+* [kbcli fault delete](kbcli_fault_delete.md)	 - Delete chaos resources.
 * [kbcli fault io](kbcli_fault_io.md)	 - IO chaos.
+* [kbcli fault list](kbcli_fault_list.md)	 - List chaos resources.
 * [kbcli fault network](kbcli_fault_network.md)	 - Network chaos.
 * [kbcli fault node](kbcli_fault_node.md)	 - Node chaos.
 * [kbcli fault pod](kbcli_fault_pod.md)	 - Pod chaos.

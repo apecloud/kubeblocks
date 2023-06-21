@@ -248,3 +248,62 @@ func TestGetConfigTemplatesFromComponent(t *testing.T) {
 		require.EqualValues(t, got, tt.want)
 	}
 }
+
+func TestIsSupportConfigFileReconfigure(t *testing.T) {
+	mockTemplateSpec := func() appsv1alpha1.ComponentTemplateSpec {
+		return appsv1alpha1.ComponentTemplateSpec{
+			Name:        "tpl",
+			TemplateRef: "config",
+			VolumeName:  "volume",
+		}
+	}
+
+	type args struct {
+		configTemplateSpec appsv1alpha1.ComponentConfigSpec
+		configFileKey      string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{{
+		name: "not_key_test",
+		args: args{
+			configTemplateSpec: appsv1alpha1.ComponentConfigSpec{
+				ConfigConstraintRef:   "cc",
+				ComponentTemplateSpec: mockTemplateSpec(),
+			},
+			configFileKey: "test_config",
+		},
+		want: true,
+	}, {
+		name: "not_exit_key_test",
+		args: args{
+			configTemplateSpec: appsv1alpha1.ComponentConfigSpec{
+				ConfigConstraintRef:   "cc",
+				ComponentTemplateSpec: mockTemplateSpec(),
+				Keys:                  []string{"config1", "config2"},
+			},
+			configFileKey: "test_config",
+		},
+		want: false,
+	}, {
+		name: "exit_key_test",
+		args: args{
+			configTemplateSpec: appsv1alpha1.ComponentConfigSpec{
+				ConfigConstraintRef:   "cc",
+				ComponentTemplateSpec: mockTemplateSpec(),
+				Keys:                  []string{"test_config", "config2"},
+			},
+			configFileKey: "test_config",
+		},
+		want: true,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsSupportConfigFileReconfigure(tt.args.configTemplateSpec, tt.args.configFileKey); got != tt.want {
+				t.Errorf("IsSupportConfigFileReconfigure() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

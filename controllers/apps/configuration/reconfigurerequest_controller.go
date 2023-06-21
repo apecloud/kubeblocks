@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apecloud/kubeblocks/internal/generics"
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -137,7 +138,6 @@ func checkConfigurationObject(object client.Object) bool {
 func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, config *corev1.ConfigMap, tpl *appsv1alpha1.ConfigConstraint) (ctrl.Result, error) {
 
 	var (
-		stsLists   = appv1.StatefulSetList{}
 		cluster    = appsv1alpha1.Cluster{}
 		clusterKey = client.ObjectKey{
 			Namespace: config.GetNamespace(),
@@ -168,6 +168,10 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 
 	// No parameters updated
 	if !configPatch.IsModify {
+		reqCtx.Recorder.Eventf(config,
+			corev1.EventTypeNormal,
+			appsv1alpha1.ReasonReconfigureRunning,
+			"nothing changed, skip reconfigure")
 		return r.updateConfigCMStatus(reqCtx, config, cfgcore.ReconfigureNoChangeType)
 	}
 
@@ -206,23 +210,24 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 	}
 
 	if len(component.ConfigSpecs) == 0 {
+		reqCtx.Recorder.Eventf(config,
+			corev1.EventTypeWarning,
+			appsv1alpha1.ReasonReconfigureFailed,
+			"related component does not have any configSpecs, skip reconfigure")
 		return intctrlutil.Reconciled()
 	}
 
-	// find STS CR
-	if err := r.Client.List(reqCtx.Ctx, &stsLists, client.InNamespace(config.Namespace), client.MatchingLabels(componentLabels)); err != nil {
-		return intctrlutil.RequeueWithErrorAndRecordEvent(config,
-			r.Recorder,
-			cfgcore.WrapError(err,
-				"failed to get component. configmap[%s] label[%s]",
-				reqCtx.Req.NamespacedName, componentLabels),
+	sts, deploys, containersList, err := r.syncRelatedComponents(reqCtx, config, component, componentLabels, configKey, configSpecName)
+	if err != nil {
+		return intctrlutil.RequeueWithErrorAndRecordEvent(config, r.Recorder,
+			cfgcore.WrapError(err, "failed to get component. configmap[%s] label[%s]", reqCtx.Req.NamespacedName, componentLabels),
 			reqCtx.Log)
 	}
-
-	// configmap has never been used
-	sts, containersList := getAssociatedComponentsByConfigmap(&stsLists, configKey, configSpecName)
-	if len(sts) == 0 {
-		reqCtx.Log.Info("configmap is not used by any container.")
+	if len(sts) == 0 && len(deploys) == 0 {
+		reqCtx.Recorder.Eventf(config,
+			corev1.EventTypeWarning,
+			appsv1alpha1.ReasonReconfigureFailed,
+			"the configmap is not used by any container, skip reconfigure")
 		return intctrlutil.Reconciled()
 	}
 
@@ -236,6 +241,7 @@ func (r *ReconfigureRequestReconciler) sync(reqCtx intctrlutil.RequestCtx, confi
 		Cluster:                  &cluster,
 		ContainerNames:           containersList,
 		ComponentUnits:           sts,
+		DeploymentUnits:          deploys,
 		Component:                component,
 		ClusterComponent:         clusterComponent,
 		Restart:                  forceRestart || !cfgcm.IsSupportReload(tpl.Spec.ReloadOptions),
@@ -279,6 +285,11 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) 
 	case ESRetry, ESAndRetryFailed:
 		return intctrlutil.RequeueAfter(ConfigReconcileInterval, params.Ctx.Log, "")
 	case ESNone:
+		params.Ctx.Recorder.Eventf(params.ConfigMap,
+			corev1.EventTypeNormal,
+			appsv1alpha1.ReasonReconfigureSucceed,
+			"the reconfigure[%s] request[%s] has been processed successfully",
+			policy.GetPolicyName(), getOpsRequestID(params.ConfigMap))
 		return r.updateConfigCMStatus(params.Ctx, params.ConfigMap, policy.GetPolicyName())
 	case ESFailed:
 		if err := setCfgUpgradeFlag(params.Client, params.Ctx, params.ConfigMap, false); err != nil {
@@ -288,6 +299,13 @@ func (r *ReconfigureRequestReconciler) performUpgrade(params reconfigureParams) 
 	default:
 		return intctrlutil.Reconciled()
 	}
+}
+
+func getOpsRequestID(cm *corev1.ConfigMap) string {
+	if len(cm.Annotations) != 0 {
+		return cm.Annotations[constant.LastAppliedOpsCRAnnotationKey]
+	}
+	return ""
 }
 
 func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParams, status cfgcore.PolicyExecStatus, err error) error {
@@ -310,6 +328,7 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 		ConfigConstraint: params.ConfigConstraint,
 		ConfigMap:        params.ConfigMap,
 		ComponentUnits:   params.ComponentUnits,
+		DeploymentUnits:  params.DeploymentUnits,
 		PolicyStatus:     status,
 	}
 
@@ -319,6 +338,22 @@ func (r *ReconfigureRequestReconciler) handleConfigEvent(params reconfigureParam
 		}
 	}
 	return nil
+}
+
+func (r *ReconfigureRequestReconciler) syncRelatedComponents(reqCtx intctrlutil.RequestCtx, config *corev1.ConfigMap, component *appsv1alpha1.ClusterComponentDefinition, matchingLabels client.MatchingLabels, configKey client.ObjectKey, configSpecName string) ([]appv1.StatefulSet, []appv1.Deployment, []string, error) {
+	var err error
+	var containers []string
+	var statefuls []appv1.StatefulSet
+	var deploys []appv1.Deployment
+
+	if component.WorkloadType == appsv1alpha1.Stateless {
+		deploys, containers, err = getRelatedComponentsByConfigmap(r.Client, reqCtx.Ctx, generics.DeploymentSignature,
+			configKey, configSpecName, client.InNamespace(config.Namespace), matchingLabels)
+	} else {
+		statefuls, containers, err = getRelatedComponentsByConfigmap(r.Client, reqCtx.Ctx, generics.StatefulSetSignature,
+			configKey, configSpecName, client.InNamespace(config.Namespace), matchingLabels)
+	}
+	return statefuls, deploys, containers, err
 }
 
 func fromReconfigureStatus(status ExecStatus) appsv1alpha1.OpsPhase {

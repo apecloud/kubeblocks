@@ -87,10 +87,34 @@ var _ = Describe("object generation transformer test.", func() {
 				},
 			},
 		}
+		credential := workloads.Credential{
+			Username: workloads.CredentialVar{Value: "foo"},
+			Password: workloads.CredentialVar{Value: "bar"},
+		}
+		pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
+			AddContainer(corev1.Container{
+				Name:  "foo",
+				Image: "bar",
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          "my-svc",
+						Protocol:      corev1.ProtocolTCP,
+						ContainerPort: 12345,
+					},
+				},
+			}).GetObject()
+		template := corev1.PodTemplateSpec{
+			ObjectMeta: pod.ObjectMeta,
+			Spec:       pod.Spec,
+		}
+		observeAction := workloads.Action{Command: []string{"cmd"}}
 		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
 			SetUID("foo-bar-uid").
 			SetRoles(roles).
 			SetService(service).
+			SetCredential(credential).
+			SetTemplate(template).
+			SetObservationActions([]workloads.Action{observeAction}).
 			GetObject()
 	})
 

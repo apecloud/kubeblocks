@@ -31,6 +31,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -59,9 +60,53 @@ var _ = Describe("object deletion transformer test.", func() {
 	}
 
 	BeforeEach(func() {
+		roles := []workloads.ReplicaRole{
+			{
+				Name:       "leader",
+				IsLeader:   true,
+				CanVote:    true,
+				AccessMode: workloads.ReadWriteMode,
+			},
+			{
+				Name:       "follower",
+				IsLeader:   false,
+				CanVote:    true,
+				AccessMode: workloads.ReadonlyMode,
+			},
+			{
+				Name:       "logger",
+				IsLeader:   false,
+				CanVote:    true,
+				AccessMode: workloads.NoneMode,
+			},
+			{
+				Name:       "learner",
+				IsLeader:   false,
+				CanVote:    false,
+				AccessMode: workloads.ReadonlyMode,
+			},
+		}
+		reconfiguration := workloads.MembershipReconfiguration{
+			SwitchoverAction:  &workloads.Action{Command: []string{"cmd"}},
+			MemberJoinAction:  &workloads.Action{Command: []string{"cmd"}},
+			MemberLeaveAction: &workloads.Action{Command: []string{"cmd"}},
+		}
+		service := corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "svc",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       12345,
+					TargetPort: intstr.FromString("my-svc"),
+				},
+			},
+		}
 		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
 			SetUID("foo-bar-uid").
 			SetReplicas(3).
+			SetRoles(roles).
+			SetMembershipReconfiguration(reconfiguration).
+			SetService(service).
 			GetObject()
 
 		ctx := context.Background()
@@ -75,7 +120,8 @@ var _ = Describe("object deletion transformer test.", func() {
 			rsm:           rsm,
 		}
 
-		dag = mockDAG()
+		dag = graph.NewDAG()
+		model.PrepareStatus(dag, transCtx.rsmOrig, transCtx.rsm)
 		transformer = ObjectDeletionTransformer{}
 	})
 

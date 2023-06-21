@@ -85,3 +85,8 @@ func (builder *ReplicatedStateMachineBuilder) SetMembershipReconfiguration(recon
 	builder.get().Spec.MembershipReconfiguration = &reconfiguration
 	return builder
 }
+
+func (builder *ReplicatedStateMachineBuilder) SetCredential(credential workloads.Credential) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.Credential = &credential
+	return builder
+}

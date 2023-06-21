@@ -83,6 +83,10 @@ var _ = Describe("replicated_state_machine builder", func() {
 				},
 			},
 		}
+		credential := workloads.Credential{
+			Username: workloads.CredentialVar{Value: "foo"},
+			Password: workloads.CredentialVar{Value: "bar"},
+		}
 		rsm := NewReplicatedStateMachineBuilder(ns, name).
 			SetReplicas(replicas).
 			SetRoles([]workloads.ReplicaRole{role}).
@@ -91,6 +95,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 			SetObservationActions(actions).
 			AddObservationAction(action).
 			SetService(service).
+			SetCredential(credential).
 			GetObject()
 
 		Expect(rsm.Name).Should(Equal(name))
@@ -105,5 +110,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 		Expect(rsm.Spec.RoleObservation.ObservationActions[0]).Should(Equal(actions[0]))
 		Expect(rsm.Spec.RoleObservation.ObservationActions[1]).Should(Equal(action))
 		Expect(rsm.Spec.Service).Should(Equal(service))
+		Expect(rsm.Spec.Credential).ShouldNot(BeNil())
+		Expect(*rsm.Spec.Credential).Should(Equal(credential))
 	})
 })

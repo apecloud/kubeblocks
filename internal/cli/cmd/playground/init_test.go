@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	gv "github.com/hashicorp/go-version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
@@ -64,7 +65,8 @@ var _ = Describe("playground", func() {
 		Expect(o.createCluster()).Should(HaveOccurred())
 	})
 
-	It("init at local host without docker version", func() {
+	It("init at local host without outdate docker", func() {
+		var err error
 		o := &initOptions{
 			clusterDef:     clitesting.ClusterDefName,
 			clusterVersion: clitesting.ClusterVersionName,
@@ -72,6 +74,8 @@ var _ = Describe("playground", func() {
 			cloudProvider:  defaultCloudProvider,
 			helmCfg:        helm.NewConfig("", testKubeConfigPath, "", false),
 		}
+		o.dockerVersion, err = gv.NewVersion("20.10.0")
+		Expect(err).Should(BeNil())
 		Expect(o.validate()).Should(HaveOccurred())
 	})
 

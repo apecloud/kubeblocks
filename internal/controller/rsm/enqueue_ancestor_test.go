@@ -49,10 +49,7 @@ func init() {
 }
 
 var _ = Describe("enqueue ancestor", func() {
-	const namespace = "foo"
-
 	scheme := model.GetScheme()
-	ctx := context.Background()
 	var handler *EnqueueRequestForAncestor
 
 	buildAncestorTree := func() (*workloads.ReplicatedStateMachine, *appsv1.StatefulSet, *corev1.Pod) {

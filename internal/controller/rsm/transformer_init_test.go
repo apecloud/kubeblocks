@@ -20,40 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm
 
 import (
-	"context"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
 var _ = Describe("init transformer test.", func() {
-	const (
-		namespace = "foo"
-		name      = "bar"
-	)
-
-	var (
-		rsm         *workloads.ReplicatedStateMachine
-		transCtx    *rsmTransformContext
-		dag         *graph.DAG
-		transformer initTransformer
-	)
-
 	BeforeEach(func() {
 		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
-			SetUID("foo-bar-uid").
+			SetUID(uid).
 			SetReplicas(3).
 			GetObject()
 
-		ctx := context.Background()
-		logger := logf.FromContext(ctx).WithValues("rsm-test", namespace)
 		transCtx = &rsmTransformContext{
 			Context:       ctx,
 			Client:        k8sMock,
@@ -64,7 +45,7 @@ var _ = Describe("init transformer test.", func() {
 		}
 
 		dag = graph.NewDAG()
-		transformer = initTransformer{}
+		transformer = &initTransformer{}
 	})
 
 	Context("dag init", func() {
@@ -72,7 +53,7 @@ var _ = Describe("init transformer test.", func() {
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			dagExpected := graph.NewDAG()
 			root := &model.ObjectVertex{
-				Obj: transCtx.rsm,
+				Obj:    transCtx.rsm,
 				OriObj: transCtx.rsmOrig,
 				Action: model.ActionPtr(model.STATUS),
 			}

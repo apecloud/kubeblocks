@@ -36,46 +36,9 @@ import (
 )
 
 var _ = Describe("utils test", func() {
-	const (
-		namespace = "foo"
-		name      = "bar"
-	)
-
-	var (
-		roles       []workloads.ReplicaRole
-		rsm         *workloads.ReplicatedStateMachine
-		priorityMap map[string]int
-	)
-
-	ctx := context.Background()
+	var priorityMap map[string]int
 
 	BeforeEach(func() {
-		roles = []workloads.ReplicaRole{
-			{
-				Name:       "leader",
-				IsLeader:   true,
-				CanVote:    true,
-				AccessMode: workloads.ReadWriteMode,
-			},
-			{
-				Name:       "follower",
-				IsLeader:   false,
-				CanVote:    true,
-				AccessMode: workloads.ReadonlyMode,
-			},
-			{
-				Name:       "logger",
-				IsLeader:   false,
-				CanVote:    true,
-				AccessMode: workloads.NoneMode,
-			},
-			{
-				Name:       "learner",
-				IsLeader:   false,
-				CanVote:    false,
-				AccessMode: workloads.ReadonlyMode,
-			},
-		}
 		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).SetRoles(roles).GetObject()
 		priorityMap = composeRolePriorityMap(*rsm)
 	})

@@ -20,17 +20,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm
 
 import (
+	"context"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/go-logr/logr"
 	"github.com/golang/mock/gomock"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
@@ -38,8 +44,94 @@ import (
 )
 
 var (
-	controller *gomock.Controller
-	k8sMock    *mocks.MockClient
+	controller  *gomock.Controller
+	k8sMock     *mocks.MockClient
+	ctx         context.Context
+	logger      logr.Logger
+	transCtx    *rsmTransformContext
+	dag         *graph.DAG
+	transformer graph.Transformer
+)
+
+const (
+	namespace   = "foo"
+	name        = "bar"
+	oldRevision = "old-revision"
+	newRevision = "new-revision"
+)
+
+var (
+	uid = types.UID("rsm-mock-uid")
+
+	roles = []workloads.ReplicaRole{
+		{
+			Name:       "leader",
+			IsLeader:   true,
+			CanVote:    true,
+			AccessMode: workloads.ReadWriteMode,
+		},
+		{
+			Name:       "follower",
+			IsLeader:   false,
+			CanVote:    true,
+			AccessMode: workloads.ReadonlyMode,
+		},
+		{
+			Name:       "logger",
+			IsLeader:   false,
+			CanVote:    true,
+			AccessMode: workloads.NoneMode,
+		},
+		{
+			Name:       "learner",
+			IsLeader:   false,
+			CanVote:    false,
+			AccessMode: workloads.ReadonlyMode,
+		},
+	}
+
+	reconfiguration = workloads.MembershipReconfiguration{
+		SwitchoverAction:  &workloads.Action{Command: []string{"cmd"}},
+		MemberJoinAction:  &workloads.Action{Command: []string{"cmd"}},
+		MemberLeaveAction: &workloads.Action{Command: []string{"cmd"}},
+	}
+
+	service = corev1.ServiceSpec{
+		Ports: []corev1.ServicePort{
+			{
+				Name:       "svc",
+				Protocol:   corev1.ProtocolTCP,
+				Port:       12345,
+				TargetPort: intstr.FromString("my-svc"),
+			},
+		},
+	}
+
+	credential = workloads.Credential{
+		Username: workloads.CredentialVar{Value: "foo"},
+		Password: workloads.CredentialVar{Value: "bar"},
+	}
+
+	pod = builder.NewPodBuilder(namespace, getPodName(name, 0)).
+		AddContainer(corev1.Container{
+			Name:  "foo",
+			Image: "bar",
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          "my-svc",
+					Protocol:      corev1.ProtocolTCP,
+					ContainerPort: 12345,
+				},
+			},
+		}).GetObject()
+	template = corev1.PodTemplateSpec{
+		ObjectMeta: pod.ObjectMeta,
+		Spec:       pod.Spec,
+	}
+
+	observeActions = []workloads.Action{{Command: []string{"cmd"}}}
+
+	rsm *workloads.ReplicatedStateMachine
 )
 
 func kindPriority(o client.Object) int {
@@ -106,6 +198,12 @@ func mockUnderlyingSts(rsm workloads.ReplicatedStateMachine, generation int64) *
 	return sts
 }
 
+func mockDAG() *graph.DAG {
+	d := graph.NewDAG()
+	model.PrepareStatus(d, transCtx.rsmOrig, transCtx.rsm)
+	return d
+}
+
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
@@ -117,6 +215,9 @@ func TestAPIs(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	controller, k8sMock = testutil.SetupK8sMock()
+	ctx = context.Background()
+	logger = logf.FromContext(ctx).WithValues("rsm-test", namespace)
+
 	go func() {
 		defer GinkgoRecover()
 	}()

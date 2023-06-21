@@ -32,45 +32,7 @@ import (
 )
 
 var _ = Describe("update plan test.", func() {
-	const (
-		namespace   = "foo"
-		name        = "bar"
-		oldRevision = "old-revision"
-		newRevision = "new-revision"
-	)
-
-	var (
-		roles []workloads.ReplicaRole
-		rsm   *workloads.ReplicatedStateMachine
-	)
-
 	BeforeEach(func() {
-		roles = []workloads.ReplicaRole{
-			{
-				Name:       "leader",
-				IsLeader:   true,
-				CanVote:    true,
-				AccessMode: workloads.ReadWriteMode,
-			},
-			{
-				Name:       "follower",
-				IsLeader:   false,
-				CanVote:    true,
-				AccessMode: workloads.ReadonlyMode,
-			},
-			{
-				Name:       "logger",
-				IsLeader:   false,
-				CanVote:    true,
-				AccessMode: workloads.NoneMode,
-			},
-			{
-				Name:       "learner",
-				IsLeader:   false,
-				CanVote:    false,
-				AccessMode: workloads.ReadonlyMode,
-			},
-		}
 		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).SetRoles(roles).GetObject()
 		rsm.Status.UpdateRevision = newRevision
 	})

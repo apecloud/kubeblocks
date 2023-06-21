@@ -38,17 +38,14 @@ import (
 )
 
 var _ = Describe("pod role label event handler test", func() {
-	const namespace = "foo"
-	var ctx = context.Background()
-
 	Context("Handle function", func() {
 		It("should work well", func() {
 			cli := k8sMock
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
-				Log: logf.FromContext(ctx).WithValues("rsm-test", namespace),
+				Log: logger,
 			}
-			pod := builder.NewPodBuilder(namespace, "pod-0").SetUID("12345-54321-12345").GetObject()
+			pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).SetUID(uid).GetObject()
 			objectRef := corev1.ObjectReference{
 				APIVersion: "v1",
 				Kind:       "Pod",
@@ -63,7 +60,6 @@ var _ = Describe("pod role label event handler test", func() {
 				IsLeader:   true,
 				CanVote:    true,
 			}
-			rsmName := "test-rsm"
 
 			By("build an expected message")
 			message := fmt.Sprintf("Readiness probe failed: error: health rpc failed: rpc error: code = Unknown desc = {\"event\":\"Success\",\"originalRole\":\"\",\"role\":\"%s\"}", role.Name)
@@ -79,7 +75,7 @@ var _ = Describe("pod role label event handler test", func() {
 					p.Namespace = objKey.Namespace
 					p.Name = objKey.Name
 					p.UID = pod.UID
-					p.Labels = map[string]string{constant.AppInstanceLabelKey: rsmName}
+					p.Labels = map[string]string{constant.AppInstanceLabelKey: name}
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().

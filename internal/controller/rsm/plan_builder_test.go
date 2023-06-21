@@ -25,44 +25,34 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
+	mockclient "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
 	"github.com/golang/mock/gomock"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-	mockclient "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
 )
 
 var _ = Describe("plan builder test", func() {
-	const (
-		namespace = "foo"
-		rsmName   = "bar"
-	)
-
-	var ctx = context.Background()
-
 	Context("rsmWalkFunc function", func() {
 		var rsmBuilder *rsmPlanBuilder
-		var rsm *workloads.ReplicatedStateMachine
 
 		BeforeEach(func() {
 			cli := k8sMock
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: ctx,
-				Log: logf.FromContext(ctx).WithValues("plan-builder-test", namespace),
+				Log: logger,
 			}
 			req := ctrl.Request{}
 			planBuilder := NewRSMPlanBuilder(reqCtx, cli, req)
 			rsmBuilder, _ = planBuilder.(*rsmPlanBuilder)
 
-			rsm = builder.NewReplicatedStateMachineBuilder(namespace, rsmName).
+			rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
 				AddFinalizers([]string{rsmFinalizerName}).
 				GetObject()
 		})
@@ -85,7 +75,7 @@ var _ = Describe("plan builder test", func() {
 		})
 
 		It("should update sts object", func() {
-			stsOrig := builder.NewStatefulSetBuilder(namespace, rsmName).SetReplicas(3).GetObject()
+			stsOrig := builder.NewStatefulSetBuilder(namespace, name).SetReplicas(3).GetObject()
 			sts := stsOrig.DeepCopy()
 			replicas := int32(5)
 			sts.Spec.Replicas = &replicas
@@ -109,7 +99,7 @@ var _ = Describe("plan builder test", func() {
 		})
 
 		It("should update svc object", func() {
-			svcOrig := builder.NewServiceBuilder(namespace, rsmName).SetType(corev1.ServiceTypeLoadBalancer).GetObject()
+			svcOrig := builder.NewServiceBuilder(namespace, name).SetType(corev1.ServiceTypeLoadBalancer).GetObject()
 			svc := svcOrig.DeepCopy()
 			svc.Spec.Selector = map[string]string{"foo": "bar"}
 			v := &model.ObjectVertex{
@@ -130,7 +120,7 @@ var _ = Describe("plan builder test", func() {
 		})
 
 		It("should update pvc object", func() {
-			pvcOrig := builder.NewPVCBuilder(namespace, rsmName).GetObject()
+			pvcOrig := builder.NewPVCBuilder(namespace, name).GetObject()
 			pvc := pvcOrig.DeepCopy()
 			pvc.Spec.Resources = corev1.ResourceRequirements{
 				Requests: map[corev1.ResourceName]resource.Quantity{

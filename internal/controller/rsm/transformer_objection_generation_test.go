@@ -29,108 +29,36 @@ import (
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
 var _ = Describe("object generation transformer test.", func() {
-	const (
-		namespace = "foo"
-		name      = "bar"
-	)
-
-	var (
-		roles []workloads.ReplicaRole
-		rsm   *workloads.ReplicatedStateMachine
-	)
-
 	BeforeEach(func() {
-		roles = []workloads.ReplicaRole{
-			{
-				Name:       "leader",
-				IsLeader:   true,
-				CanVote:    true,
-				AccessMode: workloads.ReadWriteMode,
-			},
-			{
-				Name:       "follower",
-				IsLeader:   false,
-				CanVote:    true,
-				AccessMode: workloads.ReadonlyMode,
-			},
-			{
-				Name:       "logger",
-				IsLeader:   false,
-				CanVote:    true,
-				AccessMode: workloads.NoneMode,
-			},
-			{
-				Name:       "learner",
-				IsLeader:   false,
-				CanVote:    false,
-				AccessMode: workloads.ReadonlyMode,
-			},
-		}
-		service := corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "svc",
-					Protocol:   corev1.ProtocolTCP,
-					Port:       12345,
-					TargetPort: intstr.FromString("my-svc"),
-				},
-			},
-		}
-		credential := workloads.Credential{
-			Username: workloads.CredentialVar{Value: "foo"},
-			Password: workloads.CredentialVar{Value: "bar"},
-		}
-		pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).
-			AddContainer(corev1.Container{
-				Name:  "foo",
-				Image: "bar",
-				Ports: []corev1.ContainerPort{
-					{
-						Name:          "my-svc",
-						Protocol:      corev1.ProtocolTCP,
-						ContainerPort: 12345,
-					},
-				},
-			}).GetObject()
-		template := corev1.PodTemplateSpec{
-			ObjectMeta: pod.ObjectMeta,
-			Spec:       pod.Spec,
-		}
-		observeAction := workloads.Action{Command: []string{"cmd"}}
 		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
-			SetUID("foo-bar-uid").
+			SetUID(uid).
 			SetRoles(roles).
 			SetService(service).
 			SetCredential(credential).
 			SetTemplate(template).
-			SetObservationActions([]workloads.Action{observeAction}).
+			SetObservationActions(observeActions).
 			GetObject()
+
+		transCtx = &rsmTransformContext{
+			Context:       ctx,
+			Client:        k8sMock,
+			EventRecorder: nil,
+			Logger:        logger,
+			rsmOrig:       rsm.DeepCopy(),
+			rsm:           rsm,
+		}
 	})
 
 	Context("Transform function", func() {
 		It("should work well", func() {
-			// build transCtx and expected DAG
-			ctx := context.Background()
-			logger := logf.FromContext(ctx).WithValues("rsm-test", namespace)
-			transCtx := &rsmTransformContext{
-				Context:       ctx,
-				Client:        k8sMock,
-				EventRecorder: nil,
-				Logger:        logger,
-				rsmOrig:       rsm.DeepCopy(),
-				rsm:           rsm,
-			}
 			sts := builder.NewStatefulSetBuilder(namespace, name).GetObject()
 			headlessSvc := builder.NewHeadlessServiceBuilder(name, getHeadlessSvcName(*rsm)).GetObject()
 			svc := builder.NewServiceBuilder(name, name).GetObject()

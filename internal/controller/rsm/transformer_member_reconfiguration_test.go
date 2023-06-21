@@ -28,10 +28,7 @@ import (
 	"github.com/golang/mock/gomock"
 	apps "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
@@ -40,18 +37,6 @@ import (
 )
 
 var _ = Describe("member reconfiguration transformer test.", func() {
-	const (
-		namespace = "foo"
-		name      = "bar"
-	)
-
-	var (
-		rsm         *workloads.ReplicatedStateMachine
-		transCtx    *rsmTransformContext
-		dag         *graph.DAG
-		transformer MemberReconfigurationTransformer
-	)
-
 	buildMembersStatus := func(replicas int) []workloads.MemberStatus {
 		var membersStatus []workloads.MemberStatus
 		for i := 0; i < replicas; i++ {
@@ -112,57 +97,14 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 	}
 
 	BeforeEach(func() {
-		roles := []workloads.ReplicaRole{
-			{
-				Name:       "leader",
-				IsLeader:   true,
-				CanVote:    true,
-				AccessMode: workloads.ReadWriteMode,
-			},
-			{
-				Name:       "follower",
-				IsLeader:   false,
-				CanVote:    true,
-				AccessMode: workloads.ReadonlyMode,
-			},
-			{
-				Name:       "logger",
-				IsLeader:   false,
-				CanVote:    true,
-				AccessMode: workloads.NoneMode,
-			},
-			{
-				Name:       "learner",
-				IsLeader:   false,
-				CanVote:    false,
-				AccessMode: workloads.ReadonlyMode,
-			},
-		}
-		reconfiguration := workloads.MembershipReconfiguration{
-			SwitchoverAction:  &workloads.Action{Command: []string{"cmd"}},
-			MemberJoinAction:  &workloads.Action{Command: []string{"cmd"}},
-			MemberLeaveAction: &workloads.Action{Command: []string{"cmd"}},
-		}
-		service := corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "svc",
-					Protocol:   corev1.ProtocolTCP,
-					Port:       12345,
-					TargetPort: intstr.FromString("my-svc"),
-				},
-			},
-		}
 		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
-			SetUID("foo-bar-uid").
+			SetUID(uid).
 			SetReplicas(3).
 			SetRoles(roles).
 			SetMembershipReconfiguration(reconfiguration).
 			SetService(service).
 			GetObject()
 
-		ctx := context.Background()
-		logger := logf.FromContext(ctx).WithValues("rsm-test", namespace)
 		transCtx = &rsmTransformContext{
 			Context:       ctx,
 			Client:        k8sMock,
@@ -174,7 +116,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 
 		dag = graph.NewDAG()
 		model.PrepareStatus(dag, transCtx.rsmOrig, transCtx.rsm)
-		transformer = MemberReconfigurationTransformer{}
+		transformer = &MemberReconfigurationTransformer{}
 	})
 
 	Context("cluster initialization", func() {

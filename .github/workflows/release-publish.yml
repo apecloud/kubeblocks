@@ -103,6 +103,15 @@ jobs:
           asset_name: ${{ env.CLI_NAME }}.exe
           asset_content_type: application/octet-stream
 
+      - name: Upload release assets to an existing kubeblocks's release
+        uses: echapmanFromBunnings/upload-release-assets@1.3
+        with:
+          releaseTag: ${{ env.TAG_NAME }}
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            ./dist/*.tar.gz
+            ./dist/*.zip
+
       - name: upload assets to gitlab
         run: |
           for file in $(find "${{ github.workspace }}/dist" -type f | grep -E '\.(gz|zip)$'); do
@@ -116,21 +125,6 @@ jobs:
             --asset-name $filename \
             --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
           done
-
-      - name: gather asset to assets directory
-        run: |
-          mkdir dist/assets
-          for file in $(find "${{ github.workspace }}/dist" -type f | grep -E '\.(gz|zip)$'); do
-            echo "Processing file: $file"
-            cp $file ./dist/assets
-          done
-      - name: upload assets to kubeblocks's release
-        uses: Hs1r1us/Release-AIO@v2.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          asset_files: '${{ github.workspace }}/dist/assets'
 
   send-message:
     runs-on: ubuntu-latest

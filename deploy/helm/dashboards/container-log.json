@@ -21,7 +21,7 @@
       }
     ]
   },
-  "description": "Basic dashboard for Kubernetes Logs from Loki.",
+  "description": "Basic dashboard for Kubernetes Container Logs from Loki.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "gnetId": 18494,
@@ -279,7 +279,7 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {
@@ -294,8 +294,8 @@
     ]
   },
   "timezone": "",
-  "title": "Kubernetes Logs",
-  "uid": "kubernetes-logs",
+  "title": "Container Logs",
+  "uid": "container-logs",
   "version": 1,
   "weekStart": ""
 }

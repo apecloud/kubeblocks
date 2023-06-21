@@ -50,7 +50,7 @@ const (
 	defaultPodExecTimeout = 60 * time.Second
 	grafanaAddonName      = "kubeblocks-grafana"
 	lokiAddonName         = "kubeblocks-loki"
-	lokiGrafanaDirect     = "kubernetes-logs"
+	lokiGrafanaDirect     = "container-logs"
 	localAdd              = "127.0.0.1"
 )
 

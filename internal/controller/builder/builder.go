@@ -743,3 +743,17 @@ func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildPa
 	}
 	return toolContainers, nil
 }
+
+func BuildVolumeSnapshotClass(name string, driver string) (*snapshotv1.VolumeSnapshotClass, error) {
+	const tplFile = "volumesnapshotclass.cue"
+	vsc := &snapshotv1.VolumeSnapshotClass{}
+	if err := buildFromCUE(tplFile,
+		map[string]any{
+			"class.metadata.name": name,
+			"class.driver":        driver,
+		},
+		"class", vsc); err != nil {
+		return nil, err
+	}
+	return vsc, nil
+}

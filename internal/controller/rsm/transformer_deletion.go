@@ -30,6 +30,8 @@ import (
 // ObjectDeletionTransformer handles object and its secondary resources' deletion
 type ObjectDeletionTransformer struct{}
 
+var _ graph.Transformer = &ObjectDeletionTransformer{}
+
 func (t *ObjectDeletionTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*rsmTransformContext)
 	obj := transCtx.rsm
@@ -57,5 +59,3 @@ func (t *ObjectDeletionTransformer) Transform(ctx graph.TransformContext, dag *g
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop
 }
-
-var _ graph.Transformer = &ObjectDeletionTransformer{}

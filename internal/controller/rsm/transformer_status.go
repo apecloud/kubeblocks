@@ -32,6 +32,8 @@ import (
 // 2. read pod role label and update the primary object's status role fields
 type ObjectStatusTransformer struct{}
 
+var _ graph.Transformer = &ObjectStatusTransformer{}
+
 func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*rsmTransformContext)
 	rsm := transCtx.rsm
@@ -75,5 +77,3 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 
 	return nil
 }
-
-var _ graph.Transformer = &ObjectStatusTransformer{}

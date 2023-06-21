@@ -42,6 +42,8 @@ import (
 
 type ObjectGenerationTransformer struct{}
 
+var _ graph.Transformer = &ObjectGenerationTransformer{}
+
 func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*rsmTransformContext)
 	rsm := transCtx.rsm
@@ -454,5 +456,3 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 
 	return envData
 }
-
-var _ graph.Transformer = &ObjectGenerationTransformer{}

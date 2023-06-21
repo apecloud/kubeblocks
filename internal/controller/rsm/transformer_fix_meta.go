@@ -28,6 +28,8 @@ import (
 
 type FixMetaTransformer struct{}
 
+var _ graph.Transformer = &FixMetaTransformer{}
+
 func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*rsmTransformContext)
 	obj := transCtx.rsm
@@ -48,5 +50,3 @@ func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 
 	return graph.ErrPrematureStop
 }
-
-var _ graph.Transformer = &FixMetaTransformer{}

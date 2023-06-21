@@ -36,19 +36,23 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type rsmPlanBuilder struct {
+type PlanBuilder struct {
 	req          ctrl.Request
 	cli          client.Client
 	transCtx     *rsmTransformContext
 	transformers graph.TransformerChain
 }
 
-type rsmPlan struct {
+var _ graph.PlanBuilder = &PlanBuilder{}
+
+type Plan struct {
 	dag      *graph.DAG
 	walkFunc graph.WalkFunc
 	cli      client.Client
 	transCtx *rsmTransformContext
 }
+
+var _ graph.Plan = &Plan{}
 
 func init() {
 	model.AddScheme(workloads.AddToScheme)
@@ -56,7 +60,7 @@ func init() {
 
 // PlanBuilder implementation
 
-func (b *rsmPlanBuilder) Init() error {
+func (b *PlanBuilder) Init() error {
 	rsm := &workloads.ReplicatedStateMachine{}
 	if err := b.cli.Get(b.transCtx.Context, b.req.NamespacedName, rsm); err != nil {
 		return err
@@ -65,17 +69,17 @@ func (b *rsmPlanBuilder) Init() error {
 	return nil
 }
 
-func (b *rsmPlanBuilder) AddTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
+func (b *PlanBuilder) AddTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
 	b.transformers = append(b.transformers, transformer...)
 	return b
 }
 
-func (b *rsmPlanBuilder) AddParallelTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
+func (b *PlanBuilder) AddParallelTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
 	b.transformers = append(b.transformers, &model.ParallelTransformer{Transformers: transformer})
 	return b
 }
 
-func (b *rsmPlanBuilder) Build() (graph.Plan, error) {
+func (b *PlanBuilder) Build() (graph.Plan, error) {
 	var err error
 	// new a DAG and apply chain on it, after that we should get the final Plan
 	dag := graph.NewDAG()
@@ -84,7 +88,7 @@ func (b *rsmPlanBuilder) Build() (graph.Plan, error) {
 	b.transCtx.Logger.Info(fmt.Sprintf("DAG: %s", dag))
 
 	// we got the execution plan
-	plan := &rsmPlan{
+	plan := &Plan{
 		dag:      dag,
 		walkFunc: b.rsmWalkFunc,
 		cli:      b.cli,
@@ -95,13 +99,13 @@ func (b *rsmPlanBuilder) Build() (graph.Plan, error) {
 
 // Plan implementation
 
-func (p *rsmPlan) Execute() error {
+func (p *Plan) Execute() error {
 	return p.dag.WalkReverseTopoOrder(p.walkFunc)
 }
 
 // Do the real works
 
-func (b *rsmPlanBuilder) rsmWalkFunc(v graph.Vertex) error {
+func (b *PlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 	vertex, ok := v.(*model.ObjectVertex)
 	if !ok {
 		return fmt.Errorf("wrong vertex type %v", v)
@@ -151,7 +155,7 @@ func (b *rsmPlanBuilder) rsmWalkFunc(v graph.Vertex) error {
 	return nil
 }
 
-func (b *rsmPlanBuilder) buildUpdateObj(vertex *model.ObjectVertex) (client.Object, error) {
+func (b *PlanBuilder) buildUpdateObj(vertex *model.ObjectVertex) (client.Object, error) {
 	handleSts := func(origObj, targetObj *appsv1.StatefulSet) (client.Object, error) {
 		origObj.Spec.Template = targetObj.Spec.Template
 		origObj.Spec.Replicas = targetObj.Spec.Replicas
@@ -193,9 +197,9 @@ func (b *rsmPlanBuilder) buildUpdateObj(vertex *model.ObjectVertex) (client.Obje
 	return vertex.Obj, nil
 }
 
-// NewRSMPlanBuilder returns a rsmPlanBuilder powered PlanBuilder
+// NewRSMPlanBuilder returns a RSMPlanBuilder powered PlanBuilder
 func NewRSMPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.Request) graph.PlanBuilder {
-	return &rsmPlanBuilder{
+	return &PlanBuilder{
 		req: req,
 		cli: cli,
 		transCtx: &rsmTransformContext{
@@ -206,6 +210,3 @@ func NewRSMPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.R
 		},
 	}
 }
-
-var _ graph.PlanBuilder = &rsmPlanBuilder{}
-var _ graph.Plan = &rsmPlan{}

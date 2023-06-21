@@ -32,6 +32,8 @@ import (
 
 type UpdateStrategyTransformer struct{}
 
+var _ graph.Transformer = &UpdateStrategyTransformer{}
+
 func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*rsmTransformContext)
 	rsm := transCtx.rsm
@@ -190,5 +192,3 @@ func shouldSwitchover(rsm *workloads.ReplicatedStateMachine, podsToBeUpdated []*
 	}
 	return false
 }
-
-var _ graph.Transformer = &UpdateStrategyTransformer{}

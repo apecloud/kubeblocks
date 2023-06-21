@@ -40,7 +40,7 @@ import (
 
 var _ = Describe("plan builder test", func() {
 	Context("rsmWalkFunc function", func() {
-		var rsmBuilder *rsmPlanBuilder
+		var rsmBuilder *PlanBuilder
 
 		BeforeEach(func() {
 			cli := k8sMock
@@ -50,7 +50,7 @@ var _ = Describe("plan builder test", func() {
 			}
 			req := ctrl.Request{}
 			planBuilder := NewRSMPlanBuilder(reqCtx, cli, req)
-			rsmBuilder, _ = planBuilder.(*rsmPlanBuilder)
+			rsmBuilder, _ = planBuilder.(*PlanBuilder)
 
 			rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
 				AddFinalizers([]string{rsmFinalizerName}).

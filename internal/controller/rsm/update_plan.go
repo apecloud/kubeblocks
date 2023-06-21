@@ -45,6 +45,8 @@ type realUpdatePlan struct {
 	podsToBeUpdated []*corev1.Pod
 }
 
+var _ updatePlan = &realUpdatePlan{}
+
 var (
 	ErrContinue error
 	ErrWait     = errors.New("wait")
@@ -192,5 +194,3 @@ func newUpdatePlan(rsm workloads.ReplicatedStateMachine, pods []corev1.Pod) upda
 		dag:  graph.NewDAG(),
 	}
 }
-
-var _ updatePlan = &realUpdatePlan{}

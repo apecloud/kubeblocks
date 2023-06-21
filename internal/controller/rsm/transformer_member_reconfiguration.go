@@ -35,6 +35,8 @@ import (
 // MemberReconfigurationTransformer handles member reconfiguration
 type MemberReconfigurationTransformer struct{}
 
+var _ graph.Transformer = &MemberReconfigurationTransformer{}
+
 type actionInfo struct {
 	shortActionName string
 	ordinal         int
@@ -402,5 +404,3 @@ func generateActionInfos(rsm *workloads.ReplicatedStateMachine, ordinal int, act
 	}
 	return actionInfos
 }
-
-var _ graph.Transformer = &MemberReconfigurationTransformer{}

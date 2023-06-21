@@ -29,6 +29,8 @@ type initTransformer struct {
 	*workloads.ReplicatedStateMachine
 }
 
+var _ graph.Transformer = &initTransformer{}
+
 func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	// init context
 	transCtx, _ := ctx.(*rsmTransformContext)
@@ -38,5 +40,3 @@ func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	model.PrepareStatus(dag, transCtx.rsmOrig, transCtx.rsm)
 	return nil
 }
-
-var _ graph.Transformer = &initTransformer{}

@@ -59,7 +59,6 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0
 	github.com/sahilm/fuzzy v0.1.0
 	github.com/sethvargo/go-password v0.2.0
-	github.com/shirou/gopsutil v3.20.11+incompatible
 	github.com/shirou/gopsutil/v3 v3.23.1
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cast v1.5.0
@@ -125,7 +124,6 @@ require (
 	github.com/ProtonMail/go-crypto v0.0.0-20221026131551-cf6655e29de4 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
-	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
 	github.com/acomagu/bufpipe v1.0.3 // indirect
 	github.com/ahmetalpbalkan/go-cursor v0.0.0-20131010032410-8136607ea412 // indirect
 	github.com/alecthomas/units v0.0.0-20210927113745-59d0afb8317a // indirect

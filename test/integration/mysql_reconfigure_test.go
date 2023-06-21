@@ -93,7 +93,7 @@ var _ = Describe("MySQL Reconfigure function", func() {
 		opsRequest = testapps.NewOpsRequestObj(randomOpsName, testCtx.DefaultNamespace,
 			clusterName, appsv1alpha1.ReconfiguringType)
 		opsRequest.Spec.Reconfigure = &appsv1alpha1.Reconfigure{
-			Configurations: []appsv1alpha1.Configuration{{
+			Configurations: []appsv1alpha1.ConfigurationItem{{
 				Name: configName,
 				Keys: []appsv1alpha1.ParameterConfig{{
 					Key: configFile,

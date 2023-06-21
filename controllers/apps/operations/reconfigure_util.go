@@ -41,7 +41,7 @@ type reconfiguringResult struct {
 }
 
 // updateCfgParams merges parameters of the config into the configmap, and verifies final configuration file.
-func updateCfgParams(config appsv1alpha1.Configuration,
+func updateCfgParams(config appsv1alpha1.ConfigurationItem,
 	tpl appsv1alpha1.ComponentConfigSpec,
 	cmKey client.ObjectKey,
 	ctx context.Context,

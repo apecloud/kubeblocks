@@ -70,7 +70,7 @@ var _ = Describe("Reconfigure util test", func() {
 				},
 				ConfigConstraintRef: "cfg_constraint_obj",
 			}
-			updatedCfg := appsv1alpha1.Configuration{
+			updatedCfg := appsv1alpha1.ConfigurationItem{
 				Keys: []appsv1alpha1.ParameterConfig{{
 					Key: "my.cnf",
 					Parameters: []appsv1alpha1.ParameterPair{
@@ -130,7 +130,7 @@ var _ = Describe("Reconfigure util test", func() {
 
 			By("update validate failed.")
 			// check diff
-			r = updateCfgParams(appsv1alpha1.Configuration{
+			r = updateCfgParams(appsv1alpha1.ConfigurationItem{
 				Keys: []appsv1alpha1.ParameterConfig{{
 					Key: "my.cnf",
 					Parameters: []appsv1alpha1.ParameterPair{

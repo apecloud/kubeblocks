@@ -644,7 +644,7 @@ func (r *BackupPolicyReconciler) reconfigure(reqCtx intctrlutil.RequestCtx,
 				ComponentOps: appsv1alpha1.ComponentOps{
 					ComponentName: basePolicy.Target.LabelsSelector.MatchLabels[constant.KBAppComponentLabelKey],
 				},
-				Configurations: []appsv1alpha1.Configuration{
+				Configurations: []appsv1alpha1.ConfigurationItem{
 					{
 						Name: configRef.Name,
 						Keys: []appsv1alpha1.ParameterConfig{

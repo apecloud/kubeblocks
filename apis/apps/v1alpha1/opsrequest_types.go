@@ -207,7 +207,7 @@ type Reconfigure struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=name
-	Configurations []Configuration `json:"configurations" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+	Configurations []ConfigurationItem `json:"configurations" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// TTL(Time to Live) defines the time period during which changing parameters is valid.
 	// +optional
@@ -225,7 +225,7 @@ type Reconfigure struct {
 	// Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
-type Configuration struct {
+type ConfigurationItem struct {
 	// name is a config template name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63

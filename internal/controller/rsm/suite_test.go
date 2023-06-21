@@ -62,6 +62,15 @@ func kindPriority(o client.Object) int {
 func less(v1, v2 graph.Vertex) bool {
 	o1, _ := v1.(*model.ObjectVertex)
 	o2, _ := v2.(*model.ObjectVertex)
+	switch {
+	case o1.Immutable != o2.Immutable:
+		return false
+	case o1.Action == nil && o2.Action == nil:
+	case o1.Action != nil, o2.Action != nil:
+		return false
+	case *o1.Action != *o2.Action:
+		return false
+	}
 	p1 := kindPriority(o1.Obj)
 	p2 := kindPriority(o2.Obj)
 	if p1 == p2 {

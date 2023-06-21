@@ -246,3 +246,7 @@ func cropJobName(jobName string) string {
 func buildBackupInfoENV(pathPrefix string) string {
 	return backupPathBase + pathPrefix + "/backup.info"
 }
+
+func generateUniqueJobName(backup *dataprotectionv1alpha1.Backup, prefix string) string {
+	return cropJobName(fmt.Sprintf("%s-%s-%s", prefix, backup.UID[:8], backup.Name))
+}

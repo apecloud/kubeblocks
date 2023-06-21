@@ -259,7 +259,9 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 			}
 			backupLogInfo := b.Status.Manifests.BackupLog
 			if backupLogInfo.StartTime != nil {
-				// if base backup exists 'startTime', checks if the 'startTime' greater than or equals 'logfileStartTime'.
+				// due to the fact that stopTime is not the actual completion time,
+				// the log file startTime may be after the actual completion time of the backup.
+				// so if base backup exists 'startTime', checks if the 'startTime' greater than or equals 'logfileStartTime'.
 				if !backupLogInfo.StartTime.Before(&logfileStartTime) {
 					return &b
 				}

@@ -71,7 +71,7 @@ spec:
         if [ $retryTimes -ge 3 ]; then
            echo "ERROR: the current mongo instance is not a primary node, 3 attempts have been made!" && exit 1
         fi
-        sleep 3
+        sleep 1
         # purge the expired oplog
         if [ -d ${BACKUP_DIR}/oplog_005 ];then
           TOTAL_SIZE=$(du -shx ${BACKUP_DIR}|awk '{print $1}')

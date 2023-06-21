@@ -153,7 +153,7 @@ var _ = Describe("plan builder test", func() {
 				Update(gomock.Any(), gomock.Any(), gomock.Any()).
 				DoAndReturn(func(_ context.Context, obj *workloads.ReplicatedStateMachine, _ ...client.UpdateOption) error {
 					Expect(obj).ShouldNot(BeNil())
-					Expect(len(obj.Finalizers)).Should(BeZero())
+					Expect(obj.Finalizers).Should(HaveLen(0))
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().
@@ -162,7 +162,7 @@ var _ = Describe("plan builder test", func() {
 					Expect(obj).ShouldNot(BeNil())
 					Expect(obj.Namespace).Should(Equal(rsm.Namespace))
 					Expect(obj.Name).Should(Equal(rsm.Name))
-					Expect(len(obj.Finalizers)).Should(BeZero())
+					Expect(obj.Finalizers).Should(HaveLen(0))
 					return nil
 				}).Times(1)
 			Expect(rsmBuilder.rsmWalkFunc(v)).Should(Succeed())

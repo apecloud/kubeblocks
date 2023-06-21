@@ -52,7 +52,7 @@ var _ = Describe("utils test", func() {
 				learnerPriority,
 			}
 			Expect(priorityMap).ShouldNot(BeZero())
-			Expect(len(priorityMap)).Should(Equal(len(roles) + 1))
+			Expect(priorityMap).Should(HaveLen(len(roles) + 1))
 			for i, role := range roles {
 				Expect(priorityMap[role.Name]).Should(Equal(priorityList[i]))
 			}
@@ -144,7 +144,7 @@ var _ = Describe("utils test", func() {
 			rsm.Status.MembersStatus = oldMembersStatus
 			setMembersStatus(rsm, pods)
 
-			Expect(len(rsm.Status.MembersStatus)).Should(Equal(len(oldMembersStatus)))
+			Expect(rsm.Status.MembersStatus).Should(HaveLen(len(oldMembersStatus)))
 			Expect(rsm.Status.MembersStatus[0].PodName).Should(Equal("pod-1"))
 			Expect(rsm.Status.MembersStatus[0].Name).Should(Equal("leader"))
 			Expect(rsm.Status.MembersStatus[1].PodName).Should(Equal("pod-2"))
@@ -182,7 +182,7 @@ var _ = Describe("utils test", func() {
 
 			pods, err := getPodsOfStatefulSet(ctx, k8sMock, sts)
 			Expect(err).Should(BeNil())
-			Expect(len(pods)).Should(Equal(1))
+			Expect(pods).Should(HaveLen(1))
 			Expect(pods[0].Namespace).Should(Equal(pod.Namespace))
 			Expect(pods[0].Name).Should(Equal(pod.Name))
 		})

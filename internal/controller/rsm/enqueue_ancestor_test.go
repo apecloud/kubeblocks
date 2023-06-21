@@ -96,7 +96,7 @@ var _ = Describe("enqueue ancestor", func() {
 	Context("parseInTypesGroupKind", func() {
 		It("should work well", func() {
 			Expect(handler.parseInTypesGroupKind(scheme)).Should(Succeed())
-			Expect(len(handler.ancestorGroupKinds)).Should(Equal(1))
+			Expect(handler.ancestorGroupKinds).Should(HaveLen(1))
 			Expect(handler.ancestorGroupKinds[0].Group).Should(Equal("apps"))
 			Expect(handler.ancestorGroupKinds[0].Kind).Should(Equal("StatefulSet"))
 		})
@@ -215,7 +215,7 @@ var _ = Describe("enqueue ancestor", func() {
 			object1 := builder.NewPodBuilder(namespace, name).SetUID(uid).GetObject()
 			objectSrc1, err := handler.getSourceObject(object1)
 			Expect(err).Should(BeNil())
-			Expect(objectSrc1 == object1).Should(BeTrue())
+			Expect(objectSrc1).Should(Equal(object1))
 
 			By("build an event object")
 			handler.InTypes = append(handler.InTypes, &corev1.Pod{})
@@ -269,7 +269,7 @@ var _ = Describe("enqueue ancestor", func() {
 			By("get object with ancestors")
 			result := make(map[reconcile.Request]empty)
 			handler.getOwnerReconcileRequest(object, result)
-			Expect(len(result)).Should(Equal(1))
+			Expect(result).Should(HaveLen(1))
 			for request := range result {
 				Expect(request.Namespace).Should(Equal(ancestorLevel2.Namespace))
 				Expect(request.Name).Should(Equal(ancestorLevel2.Name))
@@ -280,7 +280,7 @@ var _ = Describe("enqueue ancestor", func() {
 			object.OwnerReferences[0].APIVersion = wrongAPIVersion
 			result = make(map[reconcile.Request]empty)
 			handler.getOwnerReconcileRequest(object, result)
-			Expect(len(result)).Should(Equal(0))
+			Expect(result).Should(HaveLen(0))
 
 			By("set level 1 ancestor's owner not exist")
 			object.OwnerReferences[0].APIVersion = ancestorLevel1.APIVersion
@@ -293,7 +293,7 @@ var _ = Describe("enqueue ancestor", func() {
 				}).Times(1)
 			result = make(map[reconcile.Request]empty)
 			handler.getOwnerReconcileRequest(object, result)
-			Expect(len(result)).Should(Equal(0))
+			Expect(result).Should(HaveLen(0))
 		})
 	})
 

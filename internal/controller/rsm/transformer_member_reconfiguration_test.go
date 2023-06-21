@@ -75,17 +75,6 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		rsm.Status.ReadyReplicas = rsm.Status.Replicas
 		rsm.Status.AvailableReplicas = rsm.Status.Replicas
 	}
-	mockUnderlyingSts := func(generation int64) *apps.StatefulSet {
-		headLessSvc := buildHeadlessSvc(*rsm)
-		envConfig := buildEnvConfigMap(*rsm)
-		sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
-		sts.Generation = generation
-		sts.Status.ObservedGeneration = generation
-		sts.Status.Replicas = *sts.Spec.Replicas
-		sts.Status.ReadyReplicas = sts.Status.Replicas
-		sts.Status.AvailableReplicas = sts.Status.ReadyReplicas
-		return sts
-	}
 	mockAction := func(ordinal int, actionType string, succeed bool) *batchv1.Job {
 		actionName := getActionName(rsm.Name, int(rsm.Generation), ordinal, actionType)
 		action := builder.NewJobBuilder(name, actionName).
@@ -219,11 +208,11 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			setRSMStatus(int(rsm.Spec.Replicas))
 			rsm.Generation = 2
 			rsm.Status.ObservedGeneration = 2
-			stsOld := mockUnderlyingSts(rsm.Generation)
+			stsOld := mockUnderlyingSts(*rsm, rsm.Generation)
 			// rsm spec updated
 			rsm.Generation = 3
 			rsm.Spec.Replicas = 5
-			sts := mockUnderlyingSts(rsm.Generation)
+			sts := mockUnderlyingSts(*rsm, rsm.Generation)
 			model.PrepareUpdate(dag, stsOld, sts)
 
 			By("update the underlying sts")
@@ -233,7 +222,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			rsm.Status.ObservedGeneration = rsm.Generation
 
 			By("prepare member 3 joining")
-			sts = mockUnderlyingSts(rsm.Generation)
+			sts = mockUnderlyingSts(*rsm, rsm.Generation)
 			k8sMock.EXPECT().
 				List(gomock.Any(), &batchv1.JobList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *batchv1.JobList, _ ...client.ListOption) error {
@@ -283,11 +272,11 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			setRSMStatus(int(rsm.Spec.Replicas))
 			rsm.Generation = 2
 			rsm.Status.ObservedGeneration = 2
-			stsOld := mockUnderlyingSts(rsm.Generation)
+			stsOld := mockUnderlyingSts(*rsm, rsm.Generation)
 			// rsm spec updated
 			rsm.Generation = 3
 			rsm.Spec.Replicas = 1
-			sts := mockUnderlyingSts(rsm.Generation)
+			sts := mockUnderlyingSts(*rsm, rsm.Generation)
 			model.PrepareUpdate(dag, stsOld, sts)
 
 			By("prepare member 2 leaving")

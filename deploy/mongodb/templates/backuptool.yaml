@@ -13,6 +13,8 @@ spec:
       value: /data/mongodb/db
   physical:
     restoreCommands:
+      - sh
+      - -c
       - |
         set -e
         mkdir -p ${DATA_DIR}
@@ -27,14 +29,16 @@ spec:
     restoreCommands: []
     incrementalRestoreCommands: []
   backupCommands:
+    - sh
+    - -c
     - |
      mkdir -p ${BACKUP_DIR} && cd ${DATA_DIR}
      touch mongodb.backup && sync
-     START_TIME=$(mongo -u ${DB_USER} -p ${DB_PASSWORD} --port 27017 -host ${DB_HOST} --authenticationDatabase admin  --eval 'db.isMaster().lastWrite.lastWriteDate.getTime()/1000' --quiet)
+     START_TIME=$(mongo -u ${DB_USER} -p ${DB_PASSWORD} --port 27017 --host ${DB_HOST} --authenticationDatabase admin  --eval 'db.isMaster().lastWrite.lastWriteDate.getTime()/1000' --quiet)
      START_TIME=$(date -d "@${START_TIME}" -u '+%Y-%m-%dT%H:%M:%SZ')
      tar -czvf ${BACKUP_DIR}/${BACKUP_NAME}.tar.gz ./
      rm -rf mongodb.backup
-     STOP_TIME=$(mongo -u ${DB_USER} -p ${DB_PASSWORD} --port 27017 -host ${DB_HOST} --authenticationDatabase admin  --eval 'db.isMaster().lastWrite.lastWriteDate.getTime()/1000' --quiet)
+     STOP_TIME=$(mongo -u ${DB_USER} -p ${DB_PASSWORD} --port 27017 --host ${DB_HOST} --authenticationDatabase admin  --eval 'db.isMaster().lastWrite.lastWriteDate.getTime()/1000' --quiet)
      STOP_TIME=$(date -d "@${STOP_TIME}" -u '+%Y-%m-%dT%H:%M:%SZ')
      TOTAL_SIZE=$(du -shx ${BACKUP_DIR}|awk '{print $1}')
      echo "{\"totalSize\":\"$TOTAL_SIZE\",\"manifests\":{\"backupLog\":{\"startTime\":\"${START_TIME}\",\"stopTime\":\"${STOP_TIME}\"},\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}" > ${BACKUP_DIR}/backup.info

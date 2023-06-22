@@ -593,8 +593,8 @@ func (p *RestoreManager) buildDatafileRestoreJob(synthesizedComponent *component
 			volumeMounts = append(volumeMounts, volumeMountMap[volume.Name])
 		}
 
-		jobName := fmt.Sprintf("%s-%d", jobNamePrefix, i)
-		job, err := builder.BuildRestoreJob(jobName, p.Cluster.Namespace, backupTool.Spec.Image, []string{"sh", "-c"},
+		jobName := p.buildRestoreJobName(fmt.Sprintf("%s-%d", jobNamePrefix, i))
+		job, err := builder.BuildRestoreJob(jobName, p.Cluster.Namespace, backupTool.Spec.Image,
 			backupTool.Spec.Physical.RestoreCommands, volumes, volumeMounts, env, backupTool.Spec.Resources)
 		if err != nil {
 			return nil, err
@@ -644,8 +644,8 @@ func (p *RestoreManager) buildPITRPhysicalRestoreJob(synthesizedComponent *compo
 			{Name: "log", VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: logfilePVC.GetName()}}},
 		}
-		pitrJobName := fmt.Sprintf("pitr-phy-%s", dataPVC.GetName())
-		pitrJob, err := builder.BuildRestoreJob(pitrJobName, p.namespace, image, []string{"sh", "-c"},
+		pitrJobName := p.buildRestoreJobName(fmt.Sprintf("pitr-phy-%s", dataPVC.GetName()))
+		pitrJob, err := builder.BuildRestoreJob(pitrJobName, p.namespace, image,
 			recoveryInfo.Physical.RestoreCommands, volumes, volumeMounts, recoveryInfo.Env, recoveryInfo.Resources)
 		if err != nil {
 			return objs, err
@@ -705,8 +705,8 @@ func (p *RestoreManager) buildLogicRestoreJob(synthesizedComponent *component.Sy
 			{Name: "backup-data", VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: backup.Status.PersistentVolumeClaimName}}},
 		}
-		logicJobName := fmt.Sprintf("restore-logic-%s", pod.Name)
-		logicJob, err := builder.BuildRestoreJob(logicJobName, p.namespace, image, []string{"sh", "-c"},
+		logicJobName := p.buildRestoreJobName(fmt.Sprintf("restore-logic-%s", pod.Name))
+		logicJob, err := builder.BuildRestoreJob(logicJobName, p.namespace, image,
 			backupTool.Spec.Logical.RestoreCommands, volumes, volumeMounts, podENV, backupTool.Spec.Resources)
 		if err != nil {
 			return objs, err
@@ -788,4 +788,13 @@ func (p *RestoreManager) cleanupClusterAnnotations() error {
 		return p.Client.Patch(p.Ctx, cluster, patch)
 	}
 	return nil
+}
+
+// buildRestoreJobName builds the restore job name.
+func (p *RestoreManager) buildRestoreJobName(jobName string) string {
+	l := len(jobName)
+	if l > 63 {
+		return fmt.Sprintf("%s-%s", jobName[:58], jobName[l-5:l])
+	}
+	return jobName
 }

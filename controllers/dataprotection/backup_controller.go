@@ -1505,8 +1505,7 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 
 	container := corev1.Container{}
 	container.Name = backup.Name
-	container.Command = []string{"sh", "-c"}
-	container.Args = backupTool.Spec.BackupCommands
+	container.Command = backupTool.Spec.BackupCommands
 	container.Image = backupTool.Spec.Image
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	if container.Image == "" {

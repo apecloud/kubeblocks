@@ -17,11 +17,14 @@ FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as bin-downloader
 ARG TARGETOS
 ARG TARGETARCH
 ARG KUBECTL_VERSION=1.26.3
+ARG HELM_VERSION=3.12.1
 
 WORKDIR /workspace
 
 # Download binaries
 RUN curl -fsSL https://dl.k8s.io/v${KUBECTL_VERSION}/kubernetes-client-${TARGETOS}-${TARGETARCH}.tar.gz | tar -zxv
+RUN curl -fsSL https://get.helm.sh/helm-v${HELM_VERSION}-${TARGETOS}-${TARGETARCH}.tar.gz | tar -zxv \
+    && mv ${TARGETOS}-${TARGETARCH}/helm ./
 
 
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as builder
@@ -89,13 +92,14 @@ ARG APK_MIRROR
 #ARG APK_MIRROR="mirrors.aliyun.com"
 
 # install tools via apk
-ENV APK_MIRROR=${APK_MIRROR}
-RUN if [ -n "${APK_MIRROR}" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; fi
-RUN apk add --no-cache curl helm \
-    && rm -rf /var/cache/apk/*
+#ENV APK_MIRROR=${APK_MIRROR}
+#RUN if [ -n "${APK_MIRROR}" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; fi
+#RUN apk add --no-cache curl helm \
+#    && rm -rf /var/cache/apk/*
 
 # use apk to install kubectl in the next alpine version.
 COPY --from=bin-downloader /workspace/kubernetes/client/bin/kubectl /bin
+COPY --from=bin-downloader /workspace/helm /bin
 
 # copy kubeblocks tools
 COPY config/probe config/probe

@@ -84,14 +84,14 @@ RUN --mount=type=bind,target=. \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOFLAGS="-mod=mod" go build -ldflags="${LD_FLAGS}" -a -o /out/kbcli cmd/cli/main.go
 
 # Use alpine
-FROM docker.io/alpine:3.17 as dist
+FROM docker.io/alpine:edge as dist
 ARG APK_MIRROR
 #ARG APK_MIRROR="mirrors.aliyun.com"
 
 # install tools via apk
 ENV APK_MIRROR=${APK_MIRROR}
 RUN if [ -n "${APK_MIRROR}" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; fi
-RUN apk add --no-cache curl helm \
+RUN apk add --no-cache curl helm --allow-untrusted \
     && rm -rf /var/cache/apk/*
 
 # use apk to install kubectl in the next alpine version.

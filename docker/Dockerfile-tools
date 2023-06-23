@@ -53,11 +53,11 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o kbcli cmd/cli/main.go
 
 # Use alpine
-FROM docker.io/alpine:3.17
+FROM docker.io/alpine:edge
 
 # install tools via apk
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
-RUN apk add --no-cache curl helm \
+RUN apk add --no-cache curl helm --allow-untrusted \
     && rm -rf /var/cache/apk/*
 
 # use apk to install kubectl in the next alpine version.

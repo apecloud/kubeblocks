@@ -4,6 +4,10 @@ metadata:
   name: kubeblocks-csi-driver
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  {{- if .Values.keepAddons }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 spec:
   description: 'KubeBlocks CSI driver provides a container storage interface used by Container Orchestrators
     to manage the lifecycle of block storage for cloud vendors.'
@@ -11,7 +15,7 @@ spec:
 
   helm:
     # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/kubeblocks-csi-driver-0.1.0/kubeblocks-csi-driver-0.1.0.tgz
-    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/kubeblocks-csi-driver-0.1.0.tgz
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/kubeblocks-csi-driver-0.1.0.tgz
     valuesMapping:
       valueMap:
         replicaCount: controller.replicaCount

@@ -285,24 +285,30 @@ dataProtection:
   backupPVConfigMapNamespace: ""
 
 ## Addon controller settings, this will require cluster-admin clusterrole.
+##
+## @param addonController.enabled
+## @param addonController.jobTTL - is addon job time-to-live period, this value is time.Duration-parseable string.
+  ## default value is "5m" if not provided.
+## @param addonController.jobImagePullPolicy - addon install job image pull policy.
 addonController:
   enabled: true
-  ## @param jobTTL is addon job time-to-live period, this value is time.Duration-parseable string.
-  ## default value is "5m" if not provided.
-  ##
   jobTTL: "5m"
   jobImagePullPolicy: IfNotPresent
 
+
+## @param keepAddons - keep Addon CR objects when delete this chart.
 keepAddons: false
+
+## @param addonChartLocationBase - KubeBlocks official addon's chart location base, to be released in an air-gapped environment.
+addonChartLocationBase: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts
 
 ## Dashboards settings
 ##
+## @param dashboards.enabled - If false, dashboards will not be installed.
 dashboards:
-  ## If false, dashboards will not be installed
-  ##
   enabled: true
 
-# Sub-charts
+# Sub-charts values (NOTES: following doesn't required @param documentations)
 prometheus:
   ## If false, prometheus sub-chart will not be installed
   ##

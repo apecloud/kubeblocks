@@ -72,7 +72,7 @@ spec:
               failureThreshold: 3
               httpGet:
                 path: /
-                port: 6333
+                port: tcp-qdrant
                 scheme: HTTP
               periodSeconds: 15
               successThreshold: 1
@@ -97,7 +97,7 @@ spec:
               failureThreshold: 18
               httpGet:
                 path: /
-                port: 6333
+                port: tcp-qdrant
                 scheme: HTTP
               periodSeconds: 10
               successThreshold: 1

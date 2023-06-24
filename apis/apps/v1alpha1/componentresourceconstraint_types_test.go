@@ -69,6 +69,37 @@ func init() {
 	}
 }
 
+func TestGetMinimalResources(t *testing.T) {
+	var resources corev1.ResourceList
+	resources = cf.Spec.Constraints[0].GetMinimalResources()
+	resources.Cpu().Equal(resource.MustParse("0.5"))
+	resources.Memory().Equal(resource.MustParse("2Gi"))
+
+	resources = cf.Spec.Constraints[1].GetMinimalResources()
+	resources.Cpu().Equal(resource.MustParse("0.1"))
+	resources.Memory().Equal(resource.MustParse("20Mi"))
+
+	resources = cf.Spec.Constraints[2].GetMinimalResources()
+	resources.Cpu().Equal(resource.MustParse("0.1"))
+	resources.Memory().Equal(resource.MustParse("0.4Gi"))
+}
+
+func TestCompleteResources(t *testing.T) {
+	var resources corev1.ResourceList
+
+	resources = corev1.ResourceList{
+		corev1.ResourceCPU: resource.MustParse("1"),
+	}
+	cf.Spec.Constraints[0].CompleteResources(resources)
+	resources.Memory().Equal(resource.MustParse("4Gi"))
+
+	cf.Spec.Constraints[1].CompleteResources(resources)
+	resources.Memory().Equal(resource.MustParse("200Mi"))
+
+	cf.Spec.Constraints[2].CompleteResources(resources)
+	resources.Memory().Equal(resource.MustParse("4Gi"))
+}
+
 func TestResourceConstraints(t *testing.T) {
 	cases := []struct {
 		desc    string

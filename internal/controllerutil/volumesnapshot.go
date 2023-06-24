@@ -42,41 +42,39 @@ type VolumeSnapshotCompatClient struct {
 	Ctx context.Context
 }
 
-func (c *VolumeSnapshotCompatClient) Create(snapshot *snapshotv1.VolumeSnapshot, opts ...client.CreateOption) error {
+func (c *VolumeSnapshotCompatClient) Create(obj client.Object, opts ...client.CreateOption) error {
 	if InVolumeSnapshotV1Beta1() {
-		snapshotV1Beta1, err := convertV1ToV1beta1(snapshot)
-		if err != nil {
+		objV1Beta1 := typeofV1Beta1(obj).(client.Object)
+		if err := convertObjectBetweenAPIVersion(obj, objV1Beta1); err != nil {
 			return err
 		}
-		return c.Client.Create(c.Ctx, snapshotV1Beta1, opts...)
+		return c.Client.Create(c.Ctx, objV1Beta1, opts...)
 	}
-	return c.Client.Create(c.Ctx, snapshot, opts...)
+	return c.Client.Create(c.Ctx, obj, opts...)
 }
 
-func (c *VolumeSnapshotCompatClient) Get(key client.ObjectKey, snapshot *snapshotv1.VolumeSnapshot, opts ...client.GetOption) error {
+func (c *VolumeSnapshotCompatClient) Get(key client.ObjectKey, snapshot client.Object, opts ...client.GetOption) error {
 	if c.ReadonlyClient == nil {
 		c.ReadonlyClient = c.Client
 	}
 	if InVolumeSnapshotV1Beta1() {
-		snapshotV1Beta1 := &snapshotv1beta1.VolumeSnapshot{}
+		snapshotV1Beta1 := typeofV1Beta1(snapshot).(client.Object)
 		err := c.ReadonlyClient.Get(c.Ctx, key, snapshotV1Beta1, opts...)
 		if err != nil {
 			return err
 		}
-		snap, err := convertV1Beta1ToV1(snapshotV1Beta1)
-		if err != nil {
+		if err = convertObjectBetweenAPIVersion(snapshotV1Beta1, snapshot); err != nil {
 			return err
 		}
-		*snapshot = *snap
 		return nil
 	}
 	return c.ReadonlyClient.Get(c.Ctx, key, snapshot, opts...)
 }
 
-func (c *VolumeSnapshotCompatClient) Delete(snapshot *snapshotv1.VolumeSnapshot, opts ...client.DeleteOption) error {
+func (c *VolumeSnapshotCompatClient) Delete(snapshot client.Object) error {
 	if InVolumeSnapshotV1Beta1() {
-		snapshotV1Beta1, err := convertV1ToV1beta1(snapshot)
-		if err != nil {
+		snapshotV1Beta1 := typeofV1Beta1(snapshot).(client.Object)
+		if err := convertObjectBetweenAPIVersion(snapshot, snapshotV1Beta1); err != nil {
 			return err
 		}
 		return BackgroundDeleteObject(c.Client, c.Ctx, snapshotV1Beta1)
@@ -84,14 +82,14 @@ func (c *VolumeSnapshotCompatClient) Delete(snapshot *snapshotv1.VolumeSnapshot,
 	return BackgroundDeleteObject(c.Client, c.Ctx, snapshot)
 }
 
-func (c *VolumeSnapshotCompatClient) Patch(snapshot *snapshotv1.VolumeSnapshot, deepCopy *snapshotv1.VolumeSnapshot, opts ...client.PatchOption) error {
+func (c *VolumeSnapshotCompatClient) Patch(snapshot client.Object, deepCopy client.Object, opts ...client.PatchOption) error {
 	if InVolumeSnapshotV1Beta1() {
-		snapshotV1Beta1, err := convertV1ToV1beta1(snapshot)
-		if err != nil {
+		snapshotV1Beta1 := typeofV1Beta1(snapshot).(client.Object)
+		if err := convertObjectBetweenAPIVersion(snapshot, snapshotV1Beta1); err != nil {
 			return err
 		}
-		snapshotV1Beta1Patch, err := convertV1ToV1beta1(deepCopy)
-		if err != nil {
+		snapshotV1Beta1Patch := typeofV1Beta1(deepCopy).(client.Object)
+		if err := convertObjectBetweenAPIVersion(deepCopy, snapshotV1Beta1Patch); err != nil {
 			return err
 		}
 		patch := client.MergeFrom(snapshotV1Beta1Patch)
@@ -101,28 +99,26 @@ func (c *VolumeSnapshotCompatClient) Patch(snapshot *snapshotv1.VolumeSnapshot, 
 	return c.Client.Patch(c.Ctx, snapshot, snapPatch, opts...)
 }
 
-func (c *VolumeSnapshotCompatClient) List(snapshotList *snapshotv1.VolumeSnapshotList, opts ...client.ListOption) error {
+func (c *VolumeSnapshotCompatClient) List(objList client.ObjectList, opts ...client.ListOption) error {
 	if c.ReadonlyClient == nil {
 		c.ReadonlyClient = c.Client
 	}
 	if InVolumeSnapshotV1Beta1() {
-		snapshotV1Beta1List := &snapshotv1beta1.VolumeSnapshotList{}
-		err := c.ReadonlyClient.List(c.Ctx, snapshotV1Beta1List, opts...)
+		objV1Beta1List := typeofV1Beta1(objList).(client.ObjectList)
+		err := c.ReadonlyClient.List(c.Ctx, objV1Beta1List, opts...)
 		if err != nil {
 			return err
 		}
-		snaps, err := convertListV1Beta1ToV1(snapshotV1Beta1List)
-		if err != nil {
+		if err = convertObjectBetweenAPIVersion(objV1Beta1List, objList); err != nil {
 			return err
 		}
-		*snapshotList = *snaps
 		return nil
 	}
-	return c.ReadonlyClient.List(c.Ctx, snapshotList, opts...)
+	return c.ReadonlyClient.List(c.Ctx, objList, opts...)
 }
 
 // CheckResourceExists checks whether resource exist or not.
-func (c *VolumeSnapshotCompatClient) CheckResourceExists(key client.ObjectKey, obj *snapshotv1.VolumeSnapshot) (bool, error) {
+func (c *VolumeSnapshotCompatClient) CheckResourceExists(key client.ObjectKey, obj client.Object) (bool, error) {
 	if err := c.Get(key, obj); err != nil {
 		return false, client.IgnoreNotFound(err)
 	}
@@ -130,41 +126,38 @@ func (c *VolumeSnapshotCompatClient) CheckResourceExists(key client.ObjectKey, o
 	return true, nil
 }
 
-func convertV1ToV1beta1(snapshot *snapshotv1.VolumeSnapshot) (*snapshotv1beta1.VolumeSnapshot, error) {
-	v1beta1Snapshot := &snapshotv1beta1.VolumeSnapshot{}
-	snapshotBytes, err := json.Marshal(snapshot)
+func convertObjectBetweenAPIVersion[T1 any, T2 any](from T1, to T2) error {
+	fromJsonBytes, err := json.Marshal(from)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if err := json.Unmarshal(snapshotBytes, v1beta1Snapshot); err != nil {
-		return nil, err
+	if err = json.Unmarshal(fromJsonBytes, to); err != nil {
+		return err
 	}
-
-	return v1beta1Snapshot, nil
+	return nil
 }
 
-func convertV1Beta1ToV1(snapshot *snapshotv1beta1.VolumeSnapshot) (*snapshotv1.VolumeSnapshot, error) {
-	v1Snapshot := &snapshotv1.VolumeSnapshot{}
-	snapshotBytes, err := json.Marshal(snapshot)
-	if err != nil {
-		return nil, err
+func typeofV1Beta1(v any) any {
+	switch v.(type) {
+	// object
+	case *snapshotv1.VolumeSnapshot:
+		return &snapshotv1beta1.VolumeSnapshot{}
+	case *snapshotv1.VolumeSnapshotClass:
+		return &snapshotv1beta1.VolumeSnapshotClass{}
+	case *snapshotv1beta1.VolumeSnapshot:
+		return &snapshotv1.VolumeSnapshot{}
+	case *snapshotv1beta1.VolumeSnapshotClass:
+		return &snapshotv1.VolumeSnapshotClass{}
+	// object list
+	case *snapshotv1.VolumeSnapshotList:
+		return &snapshotv1beta1.VolumeSnapshotList{}
+	case *snapshotv1.VolumeSnapshotClassList:
+		return &snapshotv1beta1.VolumeSnapshotClassList{}
+	case *snapshotv1beta1.VolumeSnapshotList:
+		return &snapshotv1.VolumeSnapshotList{}
+	case *snapshotv1beta1.VolumeSnapshotClassList:
+		return &snapshotv1.VolumeSnapshotClassList{}
+	default:
+		return nil
 	}
-	if err := json.Unmarshal(snapshotBytes, v1Snapshot); err != nil {
-		return nil, err
-	}
-
-	return v1Snapshot, nil
-}
-
-func convertListV1Beta1ToV1(snapshots *snapshotv1beta1.VolumeSnapshotList) (*snapshotv1.VolumeSnapshotList, error) {
-	v1Snapshots := &snapshotv1.VolumeSnapshotList{}
-	snapshotBytes, err := json.Marshal(snapshots)
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(snapshotBytes, v1Snapshots); err != nil {
-		return nil, err
-	}
-
-	return v1Snapshots, nil
 }

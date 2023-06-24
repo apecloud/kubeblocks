@@ -6,13 +6,13 @@ metadata:
     clusterdefinition.kubeblocks.io/name: redis
     {{- include "redis.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: redis
+  clusterDefinitionRef: redis-demo
   backupPolicies:
   - componentDefRef: redis
-    ttl: 7d
+    retention:
+      ttl: 7d
     schedule:
-      baseBackup:
-        type: snapshot
+      snapshot:
         enable: false
         cronExpression: "0 18 * * 0"
     snapshot:

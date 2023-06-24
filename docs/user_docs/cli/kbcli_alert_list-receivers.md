@@ -11,7 +11,7 @@ kbcli alert list-receivers [flags]
 ### Examples
 
 ```
-  # list all alter receivers
+  # list all alert receivers
   kbcli alert list-receivers
 ```
 

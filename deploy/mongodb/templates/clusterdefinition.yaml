@@ -33,8 +33,8 @@ spec:
           keys:
             - mongodb.conf
           defaultMode: 256
-        - name: mongodb-metrics-config
-          templateRef: mongodb-metrics-config
+        - name: mongodb-metrics-config-new
+          templateRef: mongodb-metrics-config-new
           namespace: {{ .Release.Namespace }}
           volumeName: mongodb-metrics-config
           defaultMode: 0777
@@ -114,8 +114,11 @@ spec:
               - name: scripts
                 mountPath: /scripts/replicaset-post-start.sh
                 subPath: replicaset-post-start.sh
+              - name: scripts
+                mountPath: /scripts/backup-log-collector.sh
+                subPath: backup-log-collector.sh
           - name: metrics
-            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
             securityContext:
               runAsNonRoot: true

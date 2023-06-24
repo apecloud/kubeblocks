@@ -1324,12 +1324,14 @@ var _ = Describe("Cluster Controller", func() {
 		for _, pod := range pods {
 			Expect(controllerutil.SetControllerReference(sts, &pod, scheme.Scheme)).Should(Succeed())
 			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
+			patch := client.MergeFrom(pod.DeepCopy())
 			// mock the status to pass the isReady(pod) check in consensus_set
 			pod.Status.Conditions = []corev1.PodCondition{{
 				Type:   corev1.PodReady,
 				Status: corev1.ConditionTrue,
 			}}
-			Expect(k8sClient.Status().Update(ctx, &pod)).Should(Succeed())
+			// ERROR: the object has been modified; please apply your changes to the latest version and try again
+			Eventually(k8sClient.Status().Patch(ctx, &pod, patch)).Should(Succeed())
 		}
 
 		By("Creating mock role changed events")

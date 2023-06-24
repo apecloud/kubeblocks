@@ -62,6 +62,7 @@ type ConfigEventContext struct {
 	ClusterComponent *appsv1alpha1.ClusterComponentSpec
 	Component        *appsv1alpha1.ClusterComponentDefinition
 	ComponentUnits   []appv1.StatefulSet
+	DeploymentUnits  []appv1.Deployment
 
 	ConfigSpecName   string
 	ConfigPatch      *ConfigPatchInfo

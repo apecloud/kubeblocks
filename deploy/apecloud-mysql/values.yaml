@@ -72,5 +72,8 @@ metrics:
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
     repository: apecloud/agamotto
-    tag: 0.1.0-beta.4
+    tag: 0.1.0-beta.5
     pullPolicy: IfNotPresent
+
+  service:
+    port: 9104

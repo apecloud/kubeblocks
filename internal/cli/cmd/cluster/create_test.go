@@ -25,10 +25,10 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -419,7 +419,55 @@ var _ = Describe("create", func() {
 		Expect(setBackup(o, components).Error()).Should(ContainSubstring("is not completed"))
 
 		By("test backup is completed")
-		mockBackupInfo(dynamic, backupName, clusterName, nil)
+		mockBackupInfo(dynamic, backupName, clusterName, nil, "")
 		Expect(setBackup(o, components)).Should(Succeed())
+	})
+
+	It("set restoreTime", func() {
+		o := &CreateOptions{}
+		o.Namespace = testing.Namespace
+		o.RestoreTime = "Jun 16,2023 18:57:01 UTC+0800"
+		o.SourceCluster = testing.ClusterName
+		By("test setRestoreTime")
+		Expect(setRestoreTime(o)).Should(Succeed())
+	})
+
+	It("test fillClusterMetadataFromBackup", func() {
+		baseBackupName := "test-backup"
+		logBackupName := "test-logfile-backup"
+		clusterName := testing.ClusterName
+		baseBackup := testing.FakeBackup(baseBackupName)
+		logfileBackup := testing.FakeBackup(logBackupName)
+		cluster := testing.FakeCluster("clusterName", testing.Namespace)
+		dynamic := testing.FakeDynamicClient(baseBackup, logfileBackup, cluster)
+
+		o := &CreateOptions{}
+		o.Dynamic = dynamic
+		o.Namespace = testing.Namespace
+		o.RestoreTime = "Jun 16,2023 18:57:01 UTC+0800"
+		backupLogTime, _ := util.TimeParse(o.RestoreTime, time.Second)
+		backupLogTimeStr := backupLogTime.Format(time.RFC3339)
+		o.SourceCluster = clusterName
+		manifests := map[string]any{
+			"backupLog": map[string]any{
+				"startTime": backupLogTimeStr,
+				"stopTime":  backupLogTimeStr,
+			},
+		}
+		mockBackupInfo(dynamic, baseBackupName, clusterName, manifests, "snapshot")
+		mockBackupInfo(dynamic, logBackupName, clusterName, manifests, "logfile")
+		By("fill cluster from backup success")
+		Expect(fillClusterInfoFromBackup(o, &cluster)).Should(Succeed())
+		Expect(cluster.Spec.ClusterDefRef).Should(Equal(testing.ClusterDefName))
+		Expect(cluster.Spec.ClusterVersionRef).Should(Equal(testing.ClusterVersionName))
+
+		By("fill cluster definition does not matched")
+		o.ClusterDefRef = "test-not-match-cluster-definition"
+		Expect(fillClusterInfoFromBackup(o, &cluster)).Should(HaveOccurred())
+		o.ClusterDefRef = ""
+
+		By("fill cluster version does not matched")
+		o.ClusterVersionRef = "test-not-match-cluster-version"
+		Expect(fillClusterInfoFromBackup(o, &cluster)).Should(HaveOccurred())
 	})
 })

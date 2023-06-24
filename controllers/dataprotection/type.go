@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -49,6 +50,8 @@ const (
 	hostNameLabelKey = "kubernetes.io/hostname"
 )
 
+const manifestsUpdaterContainerName = "manifests-updater"
+
 var reconcileInterval = time.Second
 
 func init() {
@@ -71,4 +74,5 @@ type backupPolicyOptions struct {
 	TTL              metav1.Duration `json:"ttl,omitempty"`
 	ServiceAccount   string          `json:"serviceAccount"`
 	Image            string          `json:"image"`
+	Tolerations      *corev1.PodSpec `json:"tolerations"`
 }

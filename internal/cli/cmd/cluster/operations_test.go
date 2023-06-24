@@ -199,6 +199,20 @@ var _ = Describe("operations", func() {
 		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).Should(HaveOccurred())
 
+		By("validate invalid resource")
+		o.Class = ""
+		o.CPU = "1g"
+		o.Memory = "100Gi"
+		in.Write([]byte(o.Name + "\n"))
+		Expect(o.Validate()).Should(HaveOccurred())
+
+		By("validate invalid resource")
+		o.Class = ""
+		o.CPU = "1"
+		o.Memory = "100MB"
+		in.Write([]byte(o.Name + "\n"))
+		Expect(o.Validate()).Should(HaveOccurred())
+
 		By("expect to validate success with resource")
 		o.Class = ""
 		o.CPU = "1"

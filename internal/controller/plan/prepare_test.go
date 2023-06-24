@@ -121,20 +121,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		}()
 
 		// render config template
-		configs, err := RenderConfigNScriptFiles(clusterVer, cluster, component, workload, podSpec, nil, reqCtx.Ctx, cli)
-		if err != nil {
-			return err
-		}
-		if configs != nil {
-			resources = append(resources, configs...)
-		}
-		// end render config
-
-		//// tls certs secret volume and volumeMount
-		// if err := updateTLSVolumeAndVolumeMount(podSpec, cluster.Name, *component); err != nil {
-		//	return err
-		// }
-		return nil
+		return RenderConfigNScriptFiles(clusterVer, cluster, component, workload, podSpec, nil, reqCtx.Ctx, cli)
 	}
 
 	// pre-condition check
@@ -405,7 +392,6 @@ var _ = Describe("Cluster Controller", func() {
 				"Service",
 				"ConfigMap",
 				"Service",
-				"ConfigMap",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))
@@ -462,7 +448,6 @@ var _ = Describe("Cluster Controller", func() {
 				"Service",
 				"ConfigMap",
 				"Service",
-				"ConfigMap",
 				"StatefulSet",
 			}
 			Expect(resources).Should(HaveLen(len(expects)))

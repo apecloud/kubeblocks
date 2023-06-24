@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package version
 
+import "github.com/hashicorp/go-version"
+
 // Version is the string that contains version
 var Version = "edge"
 
@@ -38,7 +40,7 @@ var K3dVersion = "5.4.4"
 var K3sImageTag = "v1.23.8-k3s1"
 
 // MinimumDockerVersion is Minimum Docker version required by KubeBlocks
-var MinimumDockerVersion = "20.10.5"
+var MinimumDockerVersion, _ = version.NewVersion("20.10.5")
 
 // DefaultKubeBlocksVersion is the default KubeBlocks version that installed by kbcli
 var DefaultKubeBlocksVersion string

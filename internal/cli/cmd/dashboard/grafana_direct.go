@@ -37,6 +37,7 @@ var (
 		"postgresql",
 		"redis",
 		"weaviate",
+		lokiGrafanaDirect,
 	}
 )
 

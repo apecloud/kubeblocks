@@ -42,5 +42,12 @@ data:
       isDefault: false
       jsonData:
         timeInterval: 15s
+    - name: Loki
+      type: loki
+      uid: loki-kubeblocks
+      access: proxy
+      url: http://loki-gateway:80
+      jsonData:
+        maxLines: 1000
 {{- end }}
 {{- end }}

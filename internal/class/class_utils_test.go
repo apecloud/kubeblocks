@@ -104,6 +104,8 @@ var _ = Describe("utils", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls.CPU.Equal(testapps.Class1c1g.CPU)).Should(BeTrue())
 				Expect(cls.Memory.Equal(testapps.Class1c1g.Memory)).Should(BeTrue())
+				comp.Resources = cls.ToResourceRequirements()
+				Expect(clsMgr.ValidateResources(comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should match minial class with partial classDefRef", func() {
@@ -117,6 +119,8 @@ var _ = Describe("utils", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls.CPU.String()).Should(Equal("100"))
 				Expect(cls.Memory.String()).Should(Equal("200Gi"))
+				comp.Resources = cls.ToResourceRequirements()
+				Expect(clsMgr.ValidateResources(comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should fail with invalid classDefRef", func() {
@@ -139,6 +143,8 @@ var _ = Describe("utils", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls.CPU.Equal(testapps.Class1c1g.CPU)).Should(BeTrue())
 				Expect(cls.Memory.Equal(testapps.Class1c1g.Memory)).Should(BeTrue())
+				comp.Resources = cls.ToResourceRequirements()
+				Expect(clsMgr.ValidateResources(comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should fail with invalid cpu resource", func() {
@@ -171,6 +177,8 @@ var _ = Describe("utils", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls.CPU.String()).Should(Equal("1"))
 				Expect(cls.Memory.String()).Should(Equal("1Gi"))
+				comp.Resources = cls.ToResourceRequirements()
+				Expect(clsMgr.ValidateResources(comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should match minial memory if with only cpu", func() {
@@ -184,6 +192,8 @@ var _ = Describe("utils", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls.CPU.String()).Should(Equal("2"))
 				Expect(cls.Memory.String()).Should(Equal("4Gi"))
+				comp.Resources = cls.ToResourceRequirements()
+				Expect(clsMgr.ValidateResources(comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should match minial cpu if with only memory", func() {
@@ -197,6 +207,8 @@ var _ = Describe("utils", func() {
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls.CPU.String()).Should(Equal("1"))
 				Expect(cls.Memory.String()).Should(Equal("4Gi"))
+				comp.Resources = cls.ToResourceRequirements()
+				Expect(clsMgr.ValidateResources(comp)).ShouldNot(HaveOccurred())
 			})
 		})
 
@@ -208,6 +220,7 @@ var _ = Describe("utils", func() {
 				cls, err := clsMgr.ChooseClass(comp)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls).Should(BeNil())
+				Expect(clsMgr.ValidateResources(comp)).ShouldNot(HaveOccurred())
 			})
 
 			It("should fail with classDefRef", func() {
@@ -217,6 +230,7 @@ var _ = Describe("utils", func() {
 				}
 				_, err := clsMgr.ChooseClass(comp)
 				Expect(err).Should(HaveOccurred())
+				Expect(clsMgr.ValidateResources(comp)).Should(HaveOccurred())
 			})
 
 			It("should succeed without classDefRef", func() {
@@ -229,6 +243,7 @@ var _ = Describe("utils", func() {
 				cls, err := clsMgr.ChooseClass(comp)
 				Expect(err).ShouldNot(HaveOccurred())
 				Expect(cls).Should(BeNil())
+				Expect(clsMgr.ValidateResources(comp)).ShouldNot(HaveOccurred())
 			})
 		})
 	})

@@ -102,24 +102,29 @@ func (r *Manager) ValidateResources(comp *v1alpha1.ClusterComponentSpec) error {
 	}
 
 	for _, constraint := range r.constraints {
-		var constraints []v1alpha1.ResourceConstraint
-		// all volumes should match the constraints
-		for _, volume := range comp.VolumeClaimTemplates {
-			resources := corev1.ResourceList{}
-			for k, v := range comp.Resources.Requests {
-				resources[k] = v
-			}
-			for k, v := range volume.Spec.Resources.Requests {
-				resources[k] = v
-			}
-			result := constraint.FindMatchingConstraints(resources)
-			if len(result) == 0 {
-				break
-			}
-			constraints = append(constraints, result...)
+		resources := corev1.ResourceList{}
+		for k, v := range comp.Resources.Requests {
+			resources[k] = v
 		}
-		if len(constraints) > 0 {
-			return nil
+		// validate cpu and memory
+		result := constraint.FindMatchingConstraints(resources)
+		if len(result) == 0 {
+			continue
+		}
+
+		// validate volume
+		for _, rule := range result {
+			match := true
+			// all volumes should match the constraints
+			for _, volume := range comp.VolumeClaimTemplates {
+				if !rule.ValidateStorage(volume.Spec.Resources.Requests.Storage()) {
+					match = false
+					break
+				}
+			}
+			if match {
+				return nil
+			}
 		}
 	}
 	return ErrInvalidResource

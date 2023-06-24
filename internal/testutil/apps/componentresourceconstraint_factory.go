@@ -46,9 +46,13 @@ const (
   memory:
     sizePerCPU: 2Gi
 - cpu:
-    slots: [2, 4, 8, 16, 24, 32, 48, 64, 96, 128]
+    slots: [1, 2, 4, 8, 16, 24, 32, 48, 64, 96, 128]
   memory:
     sizePerCPU: 4Gi
+- cpu:
+    slots: [100, 500]
+  memory:
+    sizePerCPU: 2Gi
 `
 
 	memoryResourceConstraintTemplate = `

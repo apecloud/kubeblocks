@@ -137,7 +137,7 @@ func TestResourceConstraints(t *testing.T) {
 			cpu:     "1",
 			memory:  "200Mi",
 			expect:  false,
-			storage: "2000Ti",
+			storage: "200Ti",
 		},
 	}
 

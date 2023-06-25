@@ -5,7 +5,17 @@ title: kbcli bench sysbench prepare
 Prepare the data of SysBench for a cluster
 
 ```
-kbcli bench sysbench prepare [NAME] [flags]
+kbcli bench sysbench prepare [ClusterName] [flags]
+```
+
+### Examples
+
+```
+  # sysbench prepare data on a cluster
+  kbcli bench sysbench prepare mycluster --user xxx --password xxx --database mydb
+  
+  # sysbench prepare data on a cluster with specified tables and size
+  kbcli bench sysbench prepare mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
 ```
 
 ### Options

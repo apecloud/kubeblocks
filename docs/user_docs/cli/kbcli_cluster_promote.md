@@ -1,36 +1,37 @@
 ---
-title: kbcli bench sysbench run
+title: kbcli cluster promote
 ---
 
-Run  SysBench on cluster
+Promote a non-primary or non-leader instance as the new primary or leader of the cluster
 
 ```
-kbcli bench sysbench run [ClusterName] [flags]
+kbcli cluster promote NAME [--component=<comp-name>] [--instance <instance-name>] [flags]
 ```
 
 ### Examples
 
 ```
-  # sysbench run on a cluster
-  kbcli bench sysbench run mycluster --user xxx --password xxx --database mydb
+  # Promote the instance mycluster-mysql-1 as the new primary or leader.
+  kbcli cluster promote mycluster --instance mycluster-mysql-1
   
-  # sysbench run on a cluster with different threads
-  kbcli bench sysbench run  mycluster --user xxx --password xxx --database mydb --threads 4,8
+  # Promote a non-primary or non-leader instance as the new primary or leader, the new primary or leader is determined by the system.
+  kbcli cluster promote mycluster
   
-  # sysbench run on a cluster with different type
-  kbcli bench sysbench run mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
-  
-  # sysbench run on a cluster with specified read/write ratio
-  kbcli bench sysbench run  mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 80
-  
-  # sysbench run on a cluster with specified tables and size
-  kbcli bench sysbench run mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
+  # If the cluster has multiple components, you need to specify a component, otherwise an error will be reported.
+  kbcli cluster promote mycluster --component=mysql --instance mycluster-mysql-1
 ```
 
 ### Options
 
 ```
-  -h, --help   help for run
+      --auto-approve                   Skip interactive approval before promote the instance
+      --component string               Specify the component name of the cluster, if the cluster has multiple components, you need to specify a component
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+  -h, --help                           help for promote
+      --instance string                Specify the instance name as the new primary or leader of the cluster, you can get the instance name by running "kbcli cluster list-instances"
+      --name string                    OpsRequest name. if not specified, it will be randomly generated 
+  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```
 
 ### Options inherited from parent commands
@@ -45,34 +46,21 @@ kbcli bench sysbench run [ClusterName] [flags]
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
-      --database string                database name
       --disable-compression            If true, opt-out of response compression for all requests to the server
-      --driver string                  database driver
-      --flag int                       the flag of sysbench, 0(normal), 1(long), 2(three nodes)
-      --host string                    the host of database
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
   -n, --namespace string               If present, the namespace scope for this CLI request
-      --password string                the password of database
-      --port int                       the port of database
-      --read-percent int               the percent of read, only useful when type is oltp_read_write_pct
       --request-timeout string         The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests. (default "0")
   -s, --server string                  The address and port of the Kubernetes API server
-      --size int                       the data size of per table (default 25000)
-      --tables int                     the number of tables (default 10)
-      --threads ints                   the number of threads, you can set multiple values, like 4,8 (default [4])
-      --times int                      the number of test times (default 60)
       --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
       --token string                   Bearer token for authentication to the API server
-      --type strings                   sysbench type, you can set multiple values (default [oltp_read_write])
-      --user string                    the user of database
-      --write-percent int              the percent of write, only useful when type is oltp_read_write_pct
+      --user string                    The name of the kubeconfig user to use
 ```
 
 ### SEE ALSO
 
-* [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

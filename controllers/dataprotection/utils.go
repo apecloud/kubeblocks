@@ -247,6 +247,14 @@ func buildBackupInfoENV(pathPrefix string) string {
 	return backupPathBase + pathPrefix + "/backup.info"
 }
 
+func generateUniqueNameWithBackupPolicy(backupPolicy *dataprotectionv1alpha1.BackupPolicy) string {
+	uniqueName := backupPolicy.Name
+	if len(backupPolicy.OwnerReferences) > 0 {
+		uniqueName = fmt.Sprintf("%s-%s", backupPolicy.OwnerReferences[0].UID[:8], backupPolicy.OwnerReferences[0].Name)
+	}
+	return uniqueName
+}
+
 func generateUniqueJobName(backup *dataprotectionv1alpha1.Backup, prefix string) string {
 	return cropJobName(fmt.Sprintf("%s-%s-%s", prefix, backup.UID[:8], backup.Name))
 }

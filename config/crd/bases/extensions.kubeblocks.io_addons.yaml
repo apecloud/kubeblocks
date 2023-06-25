@@ -221,6 +221,9 @@ spec:
                   chartLocationURL:
                     description: A Helm Chart location URL.
                     type: string
+                  chartRegistry:
+                    description: A Helm Chart registry.
+                    type: string
                   installOptions:
                     additionalProperties:
                       type: string

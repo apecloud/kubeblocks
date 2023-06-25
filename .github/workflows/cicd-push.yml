@@ -10,7 +10,7 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-  BASE_BRANCH: origin/main
+  BASE_BRANCH_ORIGIN: origin/main
   GO_VERSION: "1.20"
 
 jobs:
@@ -34,7 +34,7 @@ jobs:
         run: |
           TRIGGER_MODE=`bash .github/utils/utils.sh --type 6 \
               --branch-name "${{ github.ref_name }}" \
-              --base-branch "${{ env.BASE_BRANCH }}"`
+              --base-branch "${{ env.BASE_BRANCH_ORIGIN }}"`
           
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT

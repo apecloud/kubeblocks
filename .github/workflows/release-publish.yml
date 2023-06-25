@@ -49,8 +49,6 @@ jobs:
     needs: create-release-kbcli
     name: Upload and release kbcli
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
     steps:
       - uses: actions/checkout@v3
       - name: install lib

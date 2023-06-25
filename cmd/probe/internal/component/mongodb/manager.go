@@ -104,15 +104,21 @@ func (mgr *Manager) GetReplSetStatus(ctx context.Context) (*ReplSetStatus, error
 
 	resp := mgr.Client.Database("admin").RunCommand(ctx, bson.D{{Key: "replSetGetStatus", Value: 1}})
 	if resp.Err() != nil {
-		return status, errors.Wrap(resp.Err(), "replSetGetStatus")
+		err := errors.Wrap(resp.Err(), "replSetGetStatus")
+		mgr.Logger.Errorf("get replset status failed: %v", err)
+		return nil, err
 	}
 
 	if err := resp.Decode(status); err != nil {
-		return status, errors.Wrap(err, "failed to decode rs status")
+		err := errors.Wrap(err, "failed to decode rs status")
+		mgr.Logger.Errorf("get replset status failed: %v", err)
+		return nil, err
 	}
 
 	if status.OK != 1 {
-		return status, errors.Errorf("mongo says: %s", status.Errmsg)
+		err := errors.Errorf("mongo says: %s", status.Errmsg)
+		mgr.Logger.Errorf("get replset status failed: %v", err)
+		return nil, err
 	}
 
 	return status, nil

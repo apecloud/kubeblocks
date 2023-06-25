@@ -15,7 +15,16 @@ spec:
   type: Helm
 
   helm:
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/weaviate
+    {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/weaviate-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    {{- end }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: {{ default .Chart.Version .Values.versionOverride }}
+      {{- end }}
 
   installable:
     autoInstall: false

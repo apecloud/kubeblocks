@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
 type ParamPairs struct {
@@ -42,7 +43,7 @@ func MergeAndValidateConfigs(configConstraint appsv1alpha1.ConfigConstraintSpec,
 
 		newCfg         map[string]string
 		configOperator ConfigOperator
-		updatedKeys    = set.NewLinkedHashSetString()
+		updatedKeys    = cfgutil.NewSet()
 	)
 
 	cmKeySet := FromCMKeysSelector(cmKey)

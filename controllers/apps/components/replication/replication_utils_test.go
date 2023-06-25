@@ -149,17 +149,9 @@ var _ = Describe("ReplicationSet Util", func() {
 				Create(&testCtx).GetObject()
 			podList = append(podList, *pod)
 		}
-		err := rebuildReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompSpecName].ReplicationSetStatus, podList)
+		err := genReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompSpecName].ReplicationSetStatus, podList)
 		Expect(err).Should(Succeed())
 		Expect(len(clusterObj.Status.Components[testapps.DefaultRedisCompSpecName].ReplicationSetStatus.Secondaries)).Should(Equal(3))
-
-		By("testing sync cluster status with remove pod")
-		var podRemoveList []*corev1.Pod
-		*sts.Spec.Replicas -= 1
-		podRemoveList = append(podRemoveList, &podList[len(podList)-1])
-		Expect(removeTargetPodsInfoInStatus(clusterObj.Status.Components[testapps.DefaultRedisCompSpecName].ReplicationSetStatus,
-			podRemoveList, clusterObj.Spec.ComponentSpecs[0].Replicas)).Should(Succeed())
-		Expect(clusterObj.Status.Components[testapps.DefaultRedisCompSpecName].ReplicationSetStatus.Secondaries).Should(HaveLen(2))
 	}
 
 	testHandleReplicationSetRoleChangeEvent := func() {

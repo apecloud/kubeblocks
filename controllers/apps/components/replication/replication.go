@@ -201,13 +201,14 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 		if pod.Annotations == nil {
 			pod.Annotations = map[string]string{}
 		}
-		if primary == "" {
-			// if not exists primary Pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
+		switch {
+		// if not exists primary Pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
+		case primary == "":
 			parent, o := util.ParseParentNameAndOrdinal(pod.Name)
 			defaultRole := DefaultRole(o)
 			pod.GetLabels()[constant.RoleLabelKey] = defaultRole
 			pod.Annotations[constant.PrimaryAnnotationKey] = fmt.Sprintf("%s-%d", parent, 0)
-		} else {
+		default:
 			if pod.Name != primary {
 				pod.GetLabels()[constant.RoleLabelKey] = constant.Secondary
 			}
@@ -221,54 +222,6 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 	// rebuild cluster.status.components.replicationSet.status
 	if err := rebuildReplicationSetClusterStatus(r.Cluster, r.getWorkloadType(), r.getName(), podList); err != nil {
 		return nil, err
-	}
-	return vertexes, nil
-}
-
-// asyncReplicationPodRoleLabelAndAnnotations is used to async the role label and annotations of the Pod of the Replication workload.
-func (r *ReplicationSet) asyncReplicationPodRoleLabelAndAnnotations(podList []corev1.Pod) ([]graph.Vertex, error) {
-	primary := ""
-	vertexes := make([]graph.Vertex, 0)
-	var updateRolePodList []corev1.Pod
-	for _, pod := range podList {
-		// if there is no role label on the Pod, it needs to be patch role label.
-		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
-			updateRolePodList = append(updateRolePodList, pod)
-		} else if v == constant.Primary {
-			primary = pod.Name
-		}
-	}
-	// sync pod role label
-	if len(updateRolePodList) > 0 {
-		for _, pod := range updateRolePodList {
-			if pod.Annotations == nil {
-				pod.Annotations = map[string]string{}
-			}
-			// if exists primary Pod, it means that the Pod without a role label is a new secondary Pod created by h-scale.
-			if primary != "" {
-				pod.GetLabels()[constant.RoleLabelKey] = constant.Secondary
-			} else {
-				// if not exists primary Pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
-				parent, o := util.ParseParentNameAndOrdinal(pod.Name)
-				role := DefaultRole(o)
-				pod.GetLabels()[constant.RoleLabelKey] = role
-				primary = fmt.Sprintf("%s-%d", parent, 0)
-			}
-			if v, ok := pod.Annotations[constant.PrimaryAnnotationKey]; !ok || v != primary {
-				pod.Annotations[constant.PrimaryAnnotationKey] = primary
-			}
-			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
-				Obj:    &pod,
-				Action: ictrltypes.ActionUpdatePtr(), // update or patch?
-			})
-		}
-	} else {
-		// sync pods primary annotations
-		vertexesPatchAnnotation, err := patchPodsPrimaryAnnotation(podList, primary)
-		if err != nil {
-			return nil, err
-		}
-		vertexes = append(vertexes, vertexesPatchAnnotation...)
 	}
 	return vertexes, nil
 }

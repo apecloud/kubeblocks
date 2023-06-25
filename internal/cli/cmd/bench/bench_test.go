@@ -115,7 +115,7 @@ var _ = Describe("bench", func() {
 			factory:   tf,
 			IOStreams: streams,
 		}
-		Expect(o.Complete(clusterName)).Should(BeNil())
+		Expect(o.Complete([]string{clusterName})).Should(BeNil())
 		Expect(o.Validate()).Should(BeNil())
 		Expect(o.Run()).Should(BeNil())
 	})

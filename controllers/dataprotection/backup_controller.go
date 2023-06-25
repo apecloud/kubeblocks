@@ -221,7 +221,7 @@ func (r *BackupReconciler) validateLogfileBackupLegitimacy(backup *dataprotectio
 	if backupType != dataprotectionv1alpha1.BackupTypeLogFile {
 		return nil
 	}
-	if backup.Name != getCreatedCRNameByBackupPolicy(backupPolicy.Name, backupPolicy.Namespace, backupType) {
+	if backup.Name != getCreatedCRNameByBackupPolicy(generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace, backupType) {
 		return intctrlutil.NewInvalidLogfileBackupName(backupPolicy.Name)
 	}
 	if backupPolicy.Spec.Schedule.Logfile == nil {
@@ -567,11 +567,8 @@ func (r *BackupReconciler) doBaseBackupInProgressPhaseAction(reqCtx intctrlutil.
 func (r *BackupReconciler) doInRunningPhaseAction(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup) error {
-	backupPolicy, err := r.getBackupPolicyAndValidate(reqCtx, backup)
+	backupPolicy, isCompleted, err := r.checkBackupIsCompletedDuringRunning(reqCtx, backup)
 	if err != nil {
-		return err
-	}
-	if isCompleted, err := r.checkBackupIsCompletedDuringRunning(reqCtx, backup, backupPolicy); err != nil {
 		return err
 	} else if isCompleted {
 		return nil
@@ -614,27 +611,39 @@ func (r *BackupReconciler) doInRunningPhaseAction(
 // checkBackupIsCompletedDuringRunning checks if backup is completed during it is running.
 // it returns ture, if logfile schedule is disabled or cluster is deleted.
 func (r *BackupReconciler) checkBackupIsCompletedDuringRunning(reqCtx intctrlutil.RequestCtx,
-	backup *dataprotectionv1alpha1.Backup,
-	backupPolicy *dataprotectionv1alpha1.BackupPolicy) (bool, error) {
-	clusterName := backup.Labels[constant.AppInstanceLabelKey]
-	targetClusterExists := true
-	if clusterName != "" {
-		cluster := &appsv1alpha1.Cluster{}
-		var err error
-		targetClusterExists, err = intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, types.NamespacedName{Name: clusterName, Namespace: backup.Namespace}, cluster)
-		if err != nil {
-			return false, err
-		}
+	backup *dataprotectionv1alpha1.Backup) (*dataprotectionv1alpha1.BackupPolicy, bool, error) {
+	backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
+	exists, err := intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, types.NamespacedName{
+		Namespace: reqCtx.Req.Namespace,
+		Name:      backup.Spec.BackupPolicyName,
+	}, backupPolicy)
+	if err != nil {
+		return backupPolicy, false, err
 	}
+	if exists {
+		if err = backup.Spec.Validate(backupPolicy); err != nil {
+			return backupPolicy, false, err
+		}
+		clusterName := backup.Labels[constant.AppInstanceLabelKey]
+		targetClusterExists := true
+		if clusterName != "" {
+			cluster := &appsv1alpha1.Cluster{}
+			var err error
+			targetClusterExists, err = intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client, types.NamespacedName{Name: clusterName, Namespace: backup.Namespace}, cluster)
+			if err != nil {
+				return backupPolicy, false, err
+			}
+		}
 
-	schedulePolicy := backupPolicy.Spec.GetCommonSchedulePolicy(backup.Spec.BackupType)
-	if schedulePolicy.Enable && targetClusterExists {
-		return false, nil
+		schedulePolicy := backupPolicy.Spec.GetCommonSchedulePolicy(backup.Spec.BackupType)
+		if schedulePolicy.Enable && targetClusterExists {
+			return backupPolicy, false, nil
+		}
 	}
 	patch := client.MergeFrom(backup.DeepCopy())
 	backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
-	return true, r.Client.Status().Patch(reqCtx.Ctx, backup, patch)
+	return backupPolicy, true, r.Client.Status().Patch(reqCtx.Ctx, backup, patch)
 }
 
 func (r *BackupReconciler) createBackupStatefulSet(reqCtx intctrlutil.RequestCtx,

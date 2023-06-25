@@ -22,7 +22,6 @@ package dataprotection
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"sort"
 	"strings"
@@ -325,7 +324,7 @@ func (r *BackupPolicyReconciler) reconcileForStatefulSetKind(
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
 	backType dataprotectionv1alpha1.BackupType,
 	cronExpression string) error {
-	backupName := getCreatedCRNameByBackupPolicy(backupPolicy.Name, backupPolicy.Namespace, backType)
+	backupName := getCreatedCRNameByBackupPolicy(generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace, backType)
 	backup := &dataprotectionv1alpha1.Backup{}
 	exists, err := intctrlutil.CheckResourceExists(ctx, r.Client, types.NamespacedName{Name: backupName, Namespace: backupPolicy.Namespace}, backup)
 	if err != nil {
@@ -366,14 +365,6 @@ func (r *BackupPolicyReconciler) reconcileForStatefulSetKind(
 	return r.Client.Patch(ctx, backup, patch)
 }
 
-func generateUniqueName(backupPolicy *dataprotectionv1alpha1.BackupPolicy) string {
-	uniqueName := backupPolicy.Name
-	if len(backupPolicy.OwnerReferences) > 0 {
-		uniqueName = fmt.Sprintf("%s-%s", backupPolicy.OwnerReferences[0].UID[:8], backupPolicy.OwnerReferences[0].Name)
-	}
-	return uniqueName
-}
-
 // buildCronJob builds cronjob from backup policy.
 func (r *BackupPolicyReconciler) buildCronJob(
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
@@ -397,7 +388,7 @@ func (r *BackupPolicyReconciler) buildCronJob(
 	}
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 	if cronJobName == "" {
-		cronJobName = getCreatedCRNameByBackupPolicy(generateUniqueName(backupPolicy), backupPolicy.Namespace, backType)
+		cronJobName = getCreatedCRNameByBackupPolicy(generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace, backType)
 	}
 	options := backupPolicyOptions{
 		Name:             cronJobName,

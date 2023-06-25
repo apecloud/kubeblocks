@@ -14,8 +14,18 @@ spec:
   type: Helm
 
   helm:
-    # chartLocationURL: https://github.com/prometheus-community/helm-charts/releases/download/prometheus-15.16.1/prometheus-15.16.1.tgz
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus-cluster-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus
+    {{- else }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    {{- end }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 15.16.1
+      {{- end }}
+
+
     installValues:
       configMapRefs:
         - name: {{ include "addon.prometheus.name" . }}-chart-kubeblocks-values

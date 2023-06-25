@@ -66,6 +66,16 @@ spec:
       horizontalScalePolicy:
         type: CloneVolume
         backupPolicyTemplateName: apecloud-mysql-backup-policy-for-hscale
+      switchoverSpec:
+        withCandidate:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+          command:
+            - mysql
+          args:
+            - -h$(KB_CONSENSUS_LEADER_POD_FQDN)
+            - -u$(MYSQL_ROOT_USER)
+            - -p$(MYSQL_ROOT_PASSWORD)
+            - -e "call dbms_consensus.change_leader('$(KB_SWITCHOVER_CANDIDATE_FQDN):13306');"
       volumeTypes:
         - name: data
           type: data

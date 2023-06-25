@@ -35,11 +35,13 @@ type OpsHandler interface {
 	// Do not patch OpsRequest status in this function with k8s client, just modify the status of ops.
 	// The opsRequest controller will patch it to the k8s apiServer.
 	Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error
+
 	// ReconcileAction loops till the operation is completed.
 	// return OpsRequest.status.phase and requeueAfter time.
 	ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) (appsv1alpha1.OpsPhase, time.Duration, error)
+
 	// ActionStartedCondition appends to OpsRequest.status.conditions when start performing Action function
-	ActionStartedCondition(opsRequest *appsv1alpha1.OpsRequest) *metav1.Condition
+	ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error)
 
 	// SaveLastConfiguration saves last configuration to the OpsRequest.status.lastConfiguration,
 	// and this method will be executed together when opsRequest in running.
@@ -112,4 +114,6 @@ const (
 	ProcessingReasonReconfiguring = "Reconfiguring"
 	// ProcessingReasonVersionUpgrading is the reason of the "OpsRequestProcessed" condition for the version upgrade opsRequest processing in cluster.
 	ProcessingReasonVersionUpgrading = "VersionUpgrading"
+	// ProcessingReasonSwitchovering is the reason of the "OpsRequestProcessed" condition for the switchover opsRequest processing in cluster.
+	ProcessingReasonSwitchovering = "Switchovering"
 )

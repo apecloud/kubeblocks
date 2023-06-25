@@ -8,13 +8,23 @@ data:
   redis-post-start.sh: |
     #!/bin/sh
     set -ex
-    KB_PRIMARY_POD_NAME_PREFIX=${KB_PRIMARY_POD_NAME%%\.*}
-    if [ "$KB_PRIMARY_POD_NAME_PREFIX" = "$KB_POD_NAME" ]; then
+    # first get the primary pod information from the DownwardAPI pod-info, if it does not exist, get the primary pod information from env
+    primary=`cat /kb-podinfo/primary-pod`
+    echo "downwardAPI get primary=$primary" >> /etc/redis/.kb_set_up.log
+    echo "KB_POD_NAME=$KB_POD_NAME" >> /etc/redis/.kb_set_up.log
+    if [ -z "$primary" ]; then
+      echo "downwardAPI primary info is empty, try to get KB_PRIMARY_POD_NAME env value." >> /etc/redis/.kb_set_up.log
+      echo "KB_PRIMARY_POD_NAME=$KB_PRIMARY_POD_NAME" >> /etc/redis/.kb_set_up.log
+      primary=${KB_PRIMARY_POD_NAME%%\.*}
+    fi
+    if [ "$primary" = "$KB_POD_NAME" ]; then
       echo "primary instance skip create a replication relationship."
       exit 0
     else
-      until redis-cli -h $KB_PRIMARY_POD_NAME -p 6379 ping; do sleep 1; done
-      redis-cli -h 127.0.0.1 -p 6379 -a $REDIS_DEFAULT_PASSWORD replicaof $KB_PRIMARY_POD_NAME 6379 || exit 1
+      primary_fqdn="$primary.$KB_CLUSTER_NAME-$KB_COMP_NAME-headless.$KB_NAMESPACE.svc"
+      echo "primary_fqdn=$primary_fqdn" >> /etc/redis/.kb_set_up.log
+      until redis-cli -h $primary_fqdn -p 6379 -a $REDIS_DEFAULT_PASSWORD ping; do sleep 1; done
+      redis-cli -h 127.0.0.1 -p 6379 -a $REDIS_DEFAULT_PASSWORD replicaof $primary_fqdn 6379 || exit 1
     fi
   redis-start.sh: |
     {{- .Files.Get "scripts/redis7-start.sh.tpl" | nindent 4 }}

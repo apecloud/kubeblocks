@@ -37,6 +37,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
@@ -89,6 +90,10 @@ type OperationsOptions struct {
 	ExposeType    string                                 `json:"-"`
 	ExposeEnabled string                                 `json:"-"`
 	Services      []appsv1alpha1.ClusterComponentService `json:"services,omitempty"`
+
+	// Switchover options
+	Component string `json:"component"`
+	Instance  string `json:"instance"`
 }
 
 func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStreams,
@@ -315,9 +320,88 @@ func (o *OperationsOptions) Validate() error {
 		if err = o.validateExpose(); err != nil {
 			return err
 		}
+	case appsv1alpha1.SwitchoverType:
+		if err = o.validatePromote(&cluster); err != nil {
+			return err
+		}
 	}
 	if !o.autoApprove && o.DryRun == "none" {
 		return delete.Confirm([]string{o.Name}, o.In)
+	}
+	return nil
+}
+
+func (o *OperationsOptions) validatePromote(cluster *appsv1alpha1.Cluster) error {
+	var (
+		clusterDefObj = appsv1alpha1.ClusterDefinition{}
+		podObj        = &corev1.Pod{}
+		componentName string
+	)
+
+	if len(cluster.Spec.ComponentSpecs) == 0 {
+		return fmt.Errorf("cluster.Spec.ComponentSpecs cannot be empty")
+	}
+
+	if o.Component != "" {
+		componentName = o.Component
+	} else {
+		if len(cluster.Spec.ComponentSpecs) > 1 {
+			return fmt.Errorf("there are multiple components in cluster, please use --component to specify the component for promote")
+		}
+		componentName = cluster.Spec.ComponentSpecs[0].Name
+	}
+
+	if o.Instance != "" {
+		// checks the validity of the instance whether it belongs to the current component and ensure it is not the primary or leader instance currently.
+		podKey := client.ObjectKey{
+			Namespace: cluster.Namespace,
+			Name:      o.Instance,
+		}
+		if err := util.GetResourceObjectFromGVR(types.PodGVR(), podKey, o.Dynamic, podObj); err != nil || podObj == nil {
+			return fmt.Errorf("instance %s not found, please check the validity of the instance using \"kbcli cluster list-instances\"", o.Instance)
+		}
+		v, ok := podObj.Labels[constant.RoleLabelKey]
+		if !ok || v == "" {
+			return fmt.Errorf("instance %s cannot be promoted because it had a invalid role label", o.Instance)
+		}
+		if v == constant.Primary || v == constant.Leader {
+			return fmt.Errorf("instance %s cannot be promoted because it is already the primary or leader instance", o.Instance)
+		}
+		if !strings.HasPrefix(podObj.Name, fmt.Sprintf("%s-%s", cluster.Name, componentName)) {
+			return fmt.Errorf("instance %s does not belong to the current component, please check the validity of the instance using \"kbcli cluster list-instances\"", o.Instance)
+		}
+	}
+
+	// check clusterDefinition switchoverSpec exist
+	clusterDefKey := client.ObjectKey{
+		Namespace: "",
+		Name:      cluster.Spec.ClusterDefRef,
+	}
+	if err := util.GetResourceObjectFromGVR(types.ClusterDefGVR(), clusterDefKey, o.Dynamic, &clusterDefObj); err != nil {
+		return err
+	}
+	var compDefObj *appsv1alpha1.ClusterComponentDefinition
+	for _, compDef := range clusterDefObj.Spec.ComponentDefs {
+		if compDef.Name == cluster.Spec.GetComponentDefRefName(componentName) {
+			compDefObj = &compDef
+			break
+		}
+	}
+	if compDefObj == nil {
+		return fmt.Errorf("cluster component %s is invalid", componentName)
+	}
+	if compDefObj.SwitchoverSpec == nil {
+		return fmt.Errorf("cluster component %s does not support switchover", componentName)
+	}
+	switch o.Instance {
+	case "":
+		if compDefObj.SwitchoverSpec.WithoutCandidate == nil {
+			return fmt.Errorf("cluster component %s does not support promote without specifying an instance. Please specify a specific instance for the promotion", componentName)
+		}
+	default:
+		if compDefObj.SwitchoverSpec.WithCandidate == nil {
+			return fmt.Errorf("cluster component %s does not support specifying an instance for promote. If you want to perform a promote operation, please do not specify an instance", componentName)
+		}
 	}
 	return nil
 }
@@ -707,7 +791,7 @@ func NewCancelCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o := newBaseOperationsOptions(f, streams, "", false)
 	cmd := &cobra.Command{
 		Use:               "cancel-ops NAME",
-		Short:             "cancel the pending/creating/running OpsRequest which type is vscale or hscale.",
+		Short:             "Cancel the pending/creating/running OpsRequest which type is vscale or hscale.",
 		Example:           cancelExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.OpsGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
@@ -718,5 +802,40 @@ func NewCancelCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		},
 	}
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before cancel the opsRequest")
+	return cmd
+}
+
+var promoteExample = templates.Examples(`
+		# Promote the instance mycluster-mysql-1 as the new primary or leader.
+		kbcli cluster promote mycluster --instance mycluster-mysql-1
+
+		# Promote a non-primary or non-leader instance as the new primary or leader, the new primary or leader is determined by the system.
+		kbcli cluster promote mycluster
+
+		# If the cluster has multiple components, you need to specify a component, otherwise an error will be reported.
+	    kbcli cluster promote mycluster --component=mysql --instance mycluster-mysql-1
+`)
+
+// NewPromoteCmd creates a promote command
+func NewPromoteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := newBaseOperationsOptions(f, streams, appsv1alpha1.SwitchoverType, false)
+	cmd := &cobra.Command{
+		Use:               "promote NAME [--component=<comp-name>] [--instance <instance-name>]",
+		Short:             "Promote a non-primary or non-leader instance as the new primary or leader of the cluster",
+		Example:           promoteExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
+			cmdutil.CheckErr(o.Complete())
+			cmdutil.CheckErr(o.CompleteComponentsFlag())
+			cmdutil.CheckErr(o.Validate())
+			cmdutil.CheckErr(o.Run())
+		},
+	}
+	cmd.Flags().StringVar(&o.Component, "component", "", "Specify the component name of the cluster, if the cluster has multiple components, you need to specify a component")
+	cmd.Flags().StringVar(&o.Instance, "instance", "", "Specify the instance name as the new primary or leader of the cluster, you can get the instance name by running \"kbcli cluster list-instances\"")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before promote the instance")
+	o.addCommonFlags(cmd)
 	return cmd
 }

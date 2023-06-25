@@ -59,8 +59,6 @@ type ComponentSet interface {
 	HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
 
 	HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
-
-	HandleHA(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
 }
 
 // ComponentSetBase is a common component set base struct.

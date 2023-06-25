@@ -2089,7 +2089,6 @@ var _ = Describe("Cluster Controller", func() {
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(compName, compDefName).
-				SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
 				SetReplicas(testapps.DefaultReplicationReplicas).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				Create(&testCtx).GetObject()
@@ -2232,7 +2231,7 @@ var _ = Describe("Cluster Controller", func() {
 func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {
 	By("Creating a BackupPolicyTemplate")
 	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
-		AddLabels(clusterDefLabelKey, clusterDefObj.Name).
+		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
 		SetClusterDefRef(clusterDefObj.Name)
 	for _, v := range clusterDefObj.Spec.ComponentDefs {
 		bpt = bpt.AddBackupPolicy(v.Name).AddSnapshotPolicy()

@@ -21,45 +21,6 @@ spec:
           failureThreshold: 2
           periodSeconds: 2
           timeoutSeconds: 1
-      replicationSpec:
-        switchPolicies:
-          - type: MaximumAvailability
-            switchStatements:
-              demote:
-                - replicaof $KB_NEW_PRIMARY_ROLE_NAME 6379
-              promote:
-                - replicaof no one
-              follow:
-                - replicaof $KB_NEW_PRIMARY_ROLE_NAME 6379
-          - type: MaximumDataProtection
-            switchStatements:
-              demote:
-                - replicaof $KB_NEW_PRIMARY_ROLE_NAME 6379
-              promote:
-                - replicaof no one
-              follow:
-                - replicaof $KB_NEW_PRIMARY_ROLE_NAME 6379
-        switchCmdExecutorConfig:
-          image: {{ .Values.image.registry | default "docker.io" }}/apecloud/redis:7.0.5
-          switchSteps:
-          - role: NewPrimary
-            command:
-              - /bin/sh
-              - -c
-            args:
-              - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_PROMOTE_STATEMENT)
-          - role: Secondaries
-            command:
-              - /bin/sh
-              - -c
-            args:
-              - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_FOLLOW_STATEMENT)
-          - role: OldPrimary
-            command:
-              - /bin/sh
-              - -c
-            args:
-              - redis-cli -h $(KB_SWITCH_ROLE_ENDPOINT) -p 6379 $(KB_SWITCH_DEMOTE_STATEMENT)
       service:
         ports:
           - name: redis
@@ -105,6 +66,8 @@ spec:
                 mountPath: /scripts
               - name: redis-conf
                 mountPath: /etc/redis
+              - name: pod-info
+                mountPath: /kb-podinfo
             env:
               - name: REDIS_REPL_USER
                 value: "kbreplicator"
@@ -153,6 +116,19 @@ spec:
               httpGet:
                 path: /
                 port: metrics
+        volumes:
+          - name: pod-info
+            downwardAPI:
+              items:
+                - path: "pod-role"
+                  fieldRef:
+                    fieldPath: metadata.labels['kubeblocks.io/role']
+                - path: "primary-pod"
+                  fieldRef:
+                    fieldPath: metadata.annotations['rs.apps.kubeblocks.io/primary']
+                - path: "component-replicas"
+                  fieldRef:
+                    fieldPath: metadata.annotations['apps.kubeblocks.io/component-replicas']
       systemAccounts:
 # Seems redis-cli has its own mechanism to parse input tokens and there is no elegent way
 # to pass $(KB_ACCOUNT_STATEMENT) to redis-cli without causing parsing error.

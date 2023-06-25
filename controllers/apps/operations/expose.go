@@ -170,8 +170,8 @@ func (e ExposeOpsHandler) handleComponentServices(reqCtx intctrlutil.RequestCtx,
 	return actualCount, expectCount, nil
 }
 
-func (e ExposeOpsHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRequest) *metav1.Condition {
-	return appsv1alpha1.NewExposingCondition(opsRequest)
+func (e ExposeOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
+	return appsv1alpha1.NewExposingCondition(opsRes.OpsRequest), nil
 }
 
 func (e ExposeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error {

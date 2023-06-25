@@ -35,6 +35,7 @@ const (
 	ConditionTypeHorizontalScaling = "HorizontalScaling"
 	ConditionTypeVolumeExpanding   = "VolumeExpanding"
 	ConditionTypeReconfigure       = "Reconfigure"
+	ConditionTypeSwitchover        = "Switchover"
 	ConditionTypeStop              = "Stopping"
 	ConditionTypeStart             = "Starting"
 	ConditionTypeVersionUpgrading  = "VersionUpgrading"
@@ -171,6 +172,18 @@ func NewRestartingCondition(ops *OpsRequest) *metav1.Condition {
 		Reason:             "RestartStarted",
 		LastTransitionTime: metav1.Now(),
 		Message:            fmt.Sprintf("Start to restart database in Cluster: %s", ops.Spec.ClusterRef),
+	}
+}
+
+// NewSwitchoveringCondition creates a condition that the operation starts to switchover components
+func NewSwitchoveringCondition(generation int64, message string) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeSwitchover,
+		Status:             metav1.ConditionTrue,
+		Reason:             "SwitchoverStarted",
+		LastTransitionTime: metav1.Now(),
+		Message:            message,
+		ObservedGeneration: generation,
 	}
 }
 

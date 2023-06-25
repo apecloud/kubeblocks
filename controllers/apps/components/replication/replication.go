@@ -21,6 +21,7 @@ package replication
 
 import (
 	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -59,13 +60,6 @@ func (r *ReplicationSet) getReplicas() int32 {
 		return r.SynthesizedComponent.Replicas
 	}
 	return r.ComponentSpec.Replicas
-}
-
-func (r *ReplicationSet) getPrimaryIndex() int32 {
-	if r.SynthesizedComponent != nil {
-		return r.SynthesizedComponent.GetPrimaryIndex()
-	}
-	return r.ComponentSpec.GetPrimaryIndex()
 }
 
 // IsRunning is the implementation of the type Component interface method,
@@ -136,7 +130,7 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 			return "", nil, nil
 		}
 		labelValue := v.Labels[constant.RoleLabelKey]
-		if labelValue == string(Primary) && intctrlutil.PodIsReady(&v) {
+		if labelValue == constant.Primary && intctrlutil.PodIsReady(&v) {
 			primaryIsReady = true
 			continue
 		}
@@ -160,6 +154,8 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 		componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas), statusMessages, nil
 }
 
+// HandleRestart is the implementation of the type Component interface method, which is used to handle the restart of the Replication workload.
+// TODO(xingran): handle the restart of the Replication workload with rolling update by Pod role.
 func (r *ReplicationSet) HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
 	sts := util.ConvertToStatefulSet(obj)
 	if sts.Generation != sts.Status.ObservedGeneration {
@@ -180,86 +176,85 @@ func (r *ReplicationSet) HandleRestart(ctx context.Context, obj client.Object) (
 	return vertexes, nil
 }
 
+// HandleRoleChange is the implementation of the type Component interface method, which is used to handle the role change of the Replication workload.
 func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	podList, err := r.getRunningPods(ctx, obj)
+	podList, err := util.GetRunningPods(ctx, r.Cli, obj)
 	if err != nil {
 		return nil, err
 	}
 	if len(podList) == 0 {
 		return nil, nil
 	}
-	vertexes := make([]graph.Vertex, 0)
-	podsToSyncStatus := make([]*corev1.Pod, 0)
-	for i := range podList {
-		pod := &podList[i]
-		// if there is no role label on the Pod, it needs to be updated with statefulSet's role label.
-		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
-			_, o := util.ParseParentNameAndOrdinal(pod.Name)
-			role := string(Secondary)
-			if o == r.getPrimaryIndex() {
-				role = string(Primary)
-			}
-			pod.GetLabels()[constant.RoleLabelKey] = role
-			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
-				Obj:    pod,
-				Action: ictrltypes.ActionUpdatePtr(), // update or patch?
-			})
-		}
-		// else {
-		//	podsToSyncStatus = append(podsToSyncStatus, pod)
-		// }
-		podsToSyncStatus = append(podsToSyncStatus, pod)
-	}
-	// // REVIEW/TODO: (Y-Rookie)
-	// //  1. should employ rolling deletion as default strategy instead of delete them all.
-	// if err := util.DeleteStsPods(ctx, r.Cli, sts); err != nil {
-	// 	return err
-	// }
-	// sync cluster.spec.componentSpecs.[x].primaryIndex when failover occurs and switchPolicy is Noop.
-	// TODO(refactor): syncPrimaryIndex will update cluster spec, resolve it.
-	if err := syncPrimaryIndex(ctx, r.Cli, r.Cluster, r.getName()); err != nil {
+	// sync pod role label and annotations
+	vertexes, err := r.asyncReplicationPodRoleLabelAndAnnotations(podList)
+	if err != nil {
 		return nil, err
 	}
-	// sync cluster.status.components.replicationSet.status
-	if err := syncReplicationSetClusterStatus(r.Cluster, r.getWorkloadType(), r.getName(), podsToSyncStatus); err != nil {
+	// rebuild cluster.status.components.replicationSet.status
+	if err := rebuildReplicationSetClusterStatus(r.Cluster, r.getWorkloadType(), r.getName(), podList); err != nil {
 		return nil, err
 	}
 	return vertexes, nil
 }
 
-// TODO(refactor): imple HandleHA asynchronously
-
-func (r *ReplicationSet) HandleHA(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	pods, err := r.getRunningPods(ctx, obj)
-	if err != nil {
-		return nil, err
-	}
-	if len(pods) == 0 {
-		return nil, nil
-	}
-	// If the Pods already exists, check whether there is a HA switching and the HA process is prioritized to handle.
-	// TODO(xingran) After refactoring, HA switching will be handled in the replicationSet controller.
-	primaryIndexChanged, _, err := CheckPrimaryIndexChanged(ctx, r.Cli, r.Cluster, r.getName(), r.getPrimaryIndex())
-	if err != nil {
-		return nil, err
-	}
-	if primaryIndexChanged {
-		compSpec := util.GetClusterComponentSpecByName(*r.Cluster, r.getName())
-		if err := HandleReplicationSetHASwitch(ctx, r.Cli, r.Cluster, compSpec); err != nil {
-			return nil, err
+// asyncReplicationPodRoleLabelAndAnnotations is used to async the role label and annotations of the Pod of the Replication workload.
+func (r *ReplicationSet) asyncReplicationPodRoleLabelAndAnnotations(podList []corev1.Pod) ([]graph.Vertex, error) {
+	primary := ""
+	vertexes := make([]graph.Vertex, 0)
+	var updateRolePodList []corev1.Pod
+	for _, pod := range podList {
+		// if there is no role label on the Pod, it needs to be patch role label.
+		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
+			updateRolePodList = append(updateRolePodList, pod)
+		} else if v == constant.Primary {
+			primary = pod.Name
 		}
 	}
-	return nil, nil
-}
-
-func (r *ReplicationSet) getRunningPods(ctx context.Context, obj client.Object) ([]corev1.Pod, error) {
-	sts := util.ConvertToStatefulSet(obj)
-	if sts.Generation != sts.Status.ObservedGeneration {
-		return nil, nil
+	// sync pod role label
+	if len(updateRolePodList) > 0 {
+		for _, pod := range updateRolePodList {
+			if pod.Annotations == nil {
+				pod.Annotations = map[string]string{}
+			}
+			// if exists primary Pod, it means that the Pod without a role label is a new secondary Pod created by h-scale.
+			if primary != "" {
+				pod.GetLabels()[constant.RoleLabelKey] = constant.Secondary
+			} else {
+				// if not exists primary Pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
+				parent, o := util.ParseParentNameAndOrdinal(pod.Name)
+				role := DefaultRole(o)
+				pod.GetLabels()[constant.RoleLabelKey] = role
+				primary = fmt.Sprintf("%s-%d", parent, 0)
+			}
+			if v, ok := pod.Annotations[constant.PrimaryAnnotationKey]; !ok || v != primary {
+				pod.Annotations[constant.PrimaryAnnotationKey] = primary
+			}
+			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+				Obj:    &pod,
+				Action: ictrltypes.ActionUpdatePtr(), // update or patch?
+			})
+		}
+	} else {
+		// sync pods primary annotations
+		vertexesPatchAnnotation, err := patchPodsPrimaryAnnotation(podList, primary)
+		if err != nil {
+			return nil, err
+		}
+		vertexes = append(vertexes, vertexesPatchAnnotation...)
 	}
-	return util.GetPodListByStatefulSet(ctx, r.Cli, sts)
+	return vertexes, nil
 }
 
+// DefaultRole is used to get the default role of the Pod of the Replication workload.
+func DefaultRole(i int32) string {
+	role := constant.Secondary
+	if i == 0 {
+		role = constant.Primary
+	}
+	return role
+}
+
+// newReplicationSet is the constructor of the type ReplicationSet.
 func newReplicationSet(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	spec *appsv1alpha1.ClusterComponentSpec,
@@ -275,12 +270,4 @@ func newReplicationSet(cli client.Client,
 			},
 		},
 	}
-}
-
-func DefaultRole(i int32) string {
-	role := string(Secondary)
-	if i == 0 {
-		role = string(Primary)
-	}
-	return role
 }

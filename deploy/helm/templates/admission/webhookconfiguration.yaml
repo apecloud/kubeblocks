@@ -42,30 +42,6 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /mutate-apps-kubeblocks-io-v1alpha1-cluster
-      port: {{ .Values.service.port }}
-    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
-    caBundle: {{ $ca.Cert | b64enc }}
-    {{- end }}
-  failurePolicy: Fail
-  name: mcluster.kb.io
-  rules:
-  - apiGroups:
-    - apps.kubeblocks.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - clusters
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: {{ include "kubeblocks.svcName" . }}
-      namespace: {{ .Release.Namespace }}
       path: /mutate-apps-kubeblocks-io-v1alpha1-clusterdefinition
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}

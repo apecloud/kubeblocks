@@ -182,6 +182,14 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 
+	if vertexes, err := c.ComponentSet.HandleRoleChange(reqCtx.Ctx, c.runningWorkload); err != nil {
+		return err
+	} else {
+		for _, v := range vertexes {
+			c.Dag.AddVertex(v)
+		}
+	}
+
 	// TODO(impl): restart pod if needed, move it to @Update and restart pod directly.
 	if vertexes, err := c.ComponentSet.HandleRestart(reqCtx.Ctx, c.runningWorkload); err != nil {
 		return err
@@ -191,21 +199,6 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 		}
 	}
 
-	if vertexes, err := c.ComponentSet.HandleHA(reqCtx.Ctx, c.runningWorkload); err != nil {
-		return err
-	} else {
-		for _, v := range vertexes {
-			c.Dag.AddVertex(v)
-		}
-	}
-
-	if vertexes, err := c.ComponentSet.HandleRoleChange(reqCtx.Ctx, c.runningWorkload); err != nil {
-		return err
-	} else {
-		for _, v := range vertexes {
-			c.Dag.AddVertex(v)
-		}
-	}
 	var delayedRequeueError error
 	if err := c.StatusWorkload(reqCtx, cli, c.runningWorkload, statusTxn); err != nil {
 		if !intctrlutil.IsDelayedRequeueError(err) {

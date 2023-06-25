@@ -165,15 +165,6 @@ func (factory *MockClusterFactory) SetMonitor(monitor bool) *MockClusterFactory 
 	return factory
 }
 
-func (factory *MockClusterFactory) SetPrimaryIndex(primaryIndex int32) *MockClusterFactory {
-	comps := factory.get().Spec.ComponentSpecs
-	if len(comps) > 0 {
-		comps[len(comps)-1].PrimaryIndex = &primaryIndex
-	}
-	factory.get().Spec.ComponentSpecs = comps
-	return factory
-}
-
 func (factory *MockClusterFactory) SetSwitchPolicy(switchPolicy *appsv1alpha1.ClusterSwitchPolicy) *MockClusterFactory {
 	comps := factory.get().Spec.ComponentSpecs
 	if len(comps) > 0 {

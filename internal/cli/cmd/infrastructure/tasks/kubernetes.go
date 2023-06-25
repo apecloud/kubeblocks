@@ -25,10 +25,6 @@ import (
 	"strings"
 
 	"github.com/StudioSol/set"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/builder"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
-	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	"github.com/apecloud/kubeblocks/internal/gotemplate"
 	kubekeyapiv1alpha2 "github.com/kubesphere/kubekey/v3/cmd/kk/apis/kubekey/v1alpha2"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/bootstrap/os"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/bootstrap/os/templates"
@@ -38,6 +34,12 @@ import (
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/builder"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/constant"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
 type PrepareK8sBinariesModule struct {
@@ -92,7 +94,7 @@ func (c *ConfigureOSModule) Init() {
 			Desc:  "Generate init os script",
 			Hosts: c.Runtime.GetAllHosts(),
 			Action: &builder.Template{
-				Template: ConfigureOSScripts,
+				Template: constant.ConfigureOSScripts,
 				Dst:      filepath.Join(common.KubeScriptDir, "initOS.sh"),
 				Values: gotemplate.TplValues{
 					"Hosts": templates.GenerateHosts(c.Runtime, c.KubeConf),

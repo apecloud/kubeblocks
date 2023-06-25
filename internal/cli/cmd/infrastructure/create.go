@@ -29,6 +29,7 @@ import (
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/constant"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/tasks"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -121,18 +122,18 @@ func NewCreateKubernetesCmd(streams genericclioptions.IOStreams) *cobra.Command 
 func (o *createOptions) buildCreateInfraFlags(cmd *cobra.Command) {
 	buildCommonFlags(cmd, &o.clusterOptions)
 	cmd.Flags().StringVarP(&o.version.KubernetesVersion, "version", "", o.version.KubernetesVersion, fmt.Sprintf("Specify install kubernetes version. default version is %s", o.version.KubernetesVersion))
-	cmd.Flags().StringVarP(&o.sandBoxImage, "sandbox-image", "", tasks.DefaultSandBoxImage, "Specified sandbox-image will not be used by the cri. [option]")
+	cmd.Flags().StringVarP(&o.sandBoxImage, "sandbox-image", "", constant.DefaultSandBoxImage, "Specified sandbox-image will not be used by the cri. [option]")
 	cmd.Flags().StringVarP(&o.criType, "container-runtime", "", string(container.ContainerdType), "Specify kubernetes container runtime. default is containerd")
 	cmd.Flags().BoolVarP(&o.debug, "debug", "", false, "set debug mode")
 	cmd.Flags().StringVarP(&o.outputKubeconfig, "output-kubeconfig", "", tasks.GetDefaultConfig(), "Specified output kubeconfig. [option]")
 }
 
 func (o *createOptions) setDefaultVersion() {
-	o.version.KubernetesVersion = tasks.DefaultK8sVersion
-	o.version.EtcdVersion = tasks.DefaultEtcdVersion
-	o.version.ContainerVersion = tasks.DefaultContainerdVersion
-	o.version.HelmVersion = tasks.DefaultHelmVersion
-	o.version.CRICtlVersion = tasks.DefaultCRICtlVersion
-	o.version.CniVersion = tasks.DefaultCniVersion
-	o.version.RuncVersion = tasks.DefaultRuncVersion
+	o.version.KubernetesVersion = constant.DefaultK8sVersion
+	o.version.EtcdVersion = constant.DefaultEtcdVersion
+	o.version.ContainerVersion = constant.DefaultContainerdVersion
+	o.version.HelmVersion = constant.DefaultHelmVersion
+	o.version.CRICtlVersion = constant.DefaultCRICtlVersion
+	o.version.CniVersion = constant.DefaultCniVersion
+	o.version.RuncVersion = constant.DefaultRuncVersion
 }

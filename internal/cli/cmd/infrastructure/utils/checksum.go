@@ -17,56 +17,26 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package tasks
+package utils
 
 import (
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
 
-	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/common"
-	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/logger"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/util"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/files"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
-func runCommand(cmd *exec.Cmd) error {
-	logger.Log.Messagef(common.LocalHost, "Running: %s", cmd.String())
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	cmd.Stderr = cmd.Stdout
-	if err = cmd.Start(); err != nil {
-		return err
-	}
-
-	// read from stdout
-	for {
-		tmp := make([]byte, 1024)
-		_, err := stdout.Read(tmp)
-		fmt.Print(string(tmp))
-		if errors.Is(err, io.EOF) {
-			break
-		} else if err != nil {
-			logger.Log.Errorln(err)
-			break
-		}
-	}
-	return cmd.Wait()
-}
-
 func getSha256sumFile(binary *files.KubeBinary) string {
 	return fmt.Sprintf("%s.sum.%s", binary.Path(), "sha256")
 }
 
-func checkSha256sum(binary *files.KubeBinary) error {
+func CheckSha256sum(binary *files.KubeBinary) error {
 	checksumFile := getSha256sumFile(binary)
 	if !util.IsExist(checksumFile) {
 		return cfgcore.MakeError("checksum file %s is not exist", checksumFile)
@@ -101,7 +71,7 @@ func calSha256sum(path string) (string, error) {
 	return fmt.Sprintf("%x", sha256.Sum256(data)), nil
 }
 
-func writeSha256sum(binary *files.KubeBinary) error {
+func WriteSha256sum(binary *files.KubeBinary) error {
 	checksumFile := getSha256sumFile(binary)
 	sum, err := calSha256sum(binary.Path())
 	if err != nil {

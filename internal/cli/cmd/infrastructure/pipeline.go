@@ -20,45 +20,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package infrastructure
 
 import (
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/tasks"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/bootstrap/os"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/bootstrap/precheck"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/certs"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/container"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/module"
-	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/etcd"
-	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/filesystem"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/kubernetes"
-	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/plugins/dns"
-	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/plugins/network"
-
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/tasks"
 )
 
 func NewCreatePipeline(o *createOptions) []module.Module {
 	return []module.Module{
-		&precheck.GreetingsModule{},
-		&tasks.CheckNodeArchitectureModule{},
-		&precheck.NodePreCheckModule{},
-		&tasks.InstallDependenciesModule{},
-		&tasks.PrepareK8sBinariesModule{BinaryVersion: o.version},
-		&tasks.ConfigureOSModule{},
+		//&precheck.GreetingsModule{},
+		//&tasks.CheckNodeArchitectureModule{},
+		//&precheck.NodePreCheckModule{},
+		//&tasks.InstallDependenciesModule{},
+		//&tasks.PrepareK8sBinariesModule{BinaryVersion: o.version},
+		//&tasks.ConfigureOSModule{},
+		//&kubernetes.StatusModule{},
+		//&tasks.InstallCRIModule{SandBoxImage: o.sandBoxImage},
+		//&etcd.PreCheckModule{},
+		//&etcd.CertsModule{},
+		//&etcd.InstallETCDBinaryModule{},
+		//&etcd.ConfigureModule{},
+		//&etcd.BackupModule{},
+		//&kubernetes.InstallKubeBinariesModule{},
+		//&kubernetes.InitKubernetesModule{},
+		//&dns.ClusterDNSModule{},
 		&kubernetes.StatusModule{},
-		&tasks.InstallCRIModule{SandBoxImage: o.sandBoxImage},
-		&etcd.PreCheckModule{},
-		&etcd.CertsModule{},
-		&etcd.InstallETCDBinaryModule{},
-		&etcd.ConfigureModule{},
-		&etcd.BackupModule{},
-		&kubernetes.InstallKubeBinariesModule{},
-		&kubernetes.InitKubernetesModule{},
-		&dns.ClusterDNSModule{},
-		&kubernetes.StatusModule{},
-		&tasks.SaveKubeConfigModule{OutputKubeconfig: o.outputKubeconfig},
-		&kubernetes.JoinNodesModule{},
-		&network.DeployNetworkPluginModule{},
-		&kubernetes.ConfigureKubernetesModule{},
-		&filesystem.ChownModule{},
-		&kubernetes.SecurityEnhancementModule{Skip: !o.securityEnhancement},
+		//&tasks.SaveKubeConfigModule{OutputKubeconfig: o.outputKubeconfig},
+		//&kubernetes.JoinNodesModule{},
+		//&network.DeployNetworkPluginModule{},
+		//&kubernetes.ConfigureKubernetesModule{},
+		//&filesystem.ChownModule{},
+		//&kubernetes.SecurityEnhancementModule{Skip: !o.securityEnhancement},
 		&tasks.AddonsInstaller{Addons: o.Addons},
 	}
 }

@@ -30,7 +30,26 @@ type InfraVersionInfo struct {
 }
 
 type PluginMeta struct {
-	Name string `json:"name"`
+	Name      string        `json:"name,omitempty"`
+	Namespace string        `json:"namespace,omitempty"`
+	Sources   PluginSources `json:"sources,omitempty"`
+}
+
+type PluginSources struct {
+	Chart *HelmChart `json:"chart,omitempty"`
+	Yaml  *Yaml      `json:"yaml,omitempty"`
+}
+
+type HelmChart struct {
+	Name    string   `json:"name,omitempty"`
+	Version string   `json:"version,omitempty"`
+	Repo    string   `json:"repo,omitempty"`
+	Path    string   `json:"path,omitempty"`
+	Values  []string `json:"values,omitempty"`
+}
+
+type Yaml struct {
+	Path []string `json:"path,omitempty"`
 }
 
 type Cluster struct {

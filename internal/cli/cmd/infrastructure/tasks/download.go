@@ -30,6 +30,7 @@ import (
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/files"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
+	kbutils "github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/utils"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
@@ -64,7 +65,7 @@ func downloadKubernetesBinaryWithArch(downloadPath string, arch string, binaryVe
 		logger.Log.Messagef(common.LocalHost, "downloading %s %s %s ...", arch, binary.ID, binary.Version)
 		binariesMap[binary.ID] = binary
 		if util.IsExist(binary.Path()) {
-			if err := checkSha256sum(binary); err != nil {
+			if err := kbutils.CheckSha256sum(binary); err != nil {
 				logger.Log.Messagef(common.LocalHost, "failed to check %s sha256, error: %v", binary.ID, err)
 				_ = os.Remove(binary.Path())
 			} else {
@@ -80,8 +81,8 @@ func downloadKubernetesBinaryWithArch(downloadPath string, arch string, binaryVe
 }
 
 func download(binary *files.KubeBinary) error {
-	if err := runCommand(exec.Command("/bin/sh", "-c", binary.GetCmd())); err != nil {
+	if err := kbutils.RunCommand(exec.Command("/bin/sh", "-c", binary.GetCmd())); err != nil {
 		return err
 	}
-	return writeSha256sum(binary)
+	return kbutils.WriteSha256sum(binary)
 }

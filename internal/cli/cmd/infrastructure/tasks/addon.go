@@ -23,11 +23,13 @@ import (
 	"fmt"
 	"path/filepath"
 
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/connector"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/task"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/utils"
 )
 
 type AddonsInstaller struct {
@@ -53,10 +55,19 @@ func (a *AddonsInstaller) Init() {
 
 func (i *KBAddonsInstall) Execute(runtime connector.Runtime) error {
 	kubeConfig := filepath.Join(runtime.GetWorkDir(), fmt.Sprintf("config-%s", runtime.GetObjName()))
-	_ = kubeConfig
+	var installer utils.Installer
 	for _, addon := range i.Addons {
-		_ = addon
-		// TODO install helm install
+		switch {
+		case addon.Sources.Chart != nil:
+			installer = utils.NewHelmInstaller(*addon.Sources.Chart, kubeConfig)
+		case addon.Sources.Yaml != nil:
+			installer = utils.NewYamlInstaller(*addon.Sources.Yaml, kubeConfig)
+		default:
+			return cfgcore.MakeError("addon source not supported: addon: %v", addon)
+		}
+		if err := installer.Install(addon.Name, addon.Namespace); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -33,6 +33,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/builder"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/constant"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
@@ -152,8 +153,8 @@ func (i *InstallCRIModule) Init() {
 			&container.ContainerdExist{Not: true},
 		},
 		Action: &builder.Template{
-			Template: ContainerdService,
-			Dst:      ContainerdServiceInstallPath,
+			Template: constant.ContainerdService,
+			Dst:      constant.ContainerdServiceInstallPath,
 		},
 		Parallel: true,
 	}
@@ -167,8 +168,8 @@ func (i *InstallCRIModule) Init() {
 			&container.ContainerdExist{Not: true},
 		},
 		Action: &builder.Template{
-			Template: ContainerdConfig,
-			Dst:      ContainerdConfigInstallPath,
+			Template: constant.ContainerdConfig,
+			Dst:      constant.ContainerdConfigInstallPath,
 			Values: gotemplate.TplValues{
 				"SandBoxImage": i.SandBoxImage,
 				"DataRoot":     templates.DataRoot(i.KubeConf),
@@ -185,8 +186,8 @@ func (i *InstallCRIModule) Init() {
 			&container.ContainerdExist{Not: true},
 		},
 		Action: &builder.Template{
-			Template: CRICtlConfig,
-			Dst:      CRICtlConfigInstallPath,
+			Template: constant.CRICtlConfig,
+			Dst:      constant.CRICtlConfigInstallPath,
 			Values: gotemplate.TplValues{
 				"Endpoint": i.KubeConf.Cluster.Kubernetes.ContainerRuntimeEndpoint,
 			}},

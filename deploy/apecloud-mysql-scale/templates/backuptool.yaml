@@ -13,6 +13,8 @@ spec:
       value: /data/mysql/data
   physical:
     restoreCommands:
+      - sh
+      - -c
       - |
         set -e;
         mkdir -p ${DATA_DIR}
@@ -35,6 +37,8 @@ spec:
     restoreCommands: []
     incrementalRestoreCommands: []
   backupCommands:
+    - sh
+    - -c
     - |
       set -e
       mkdir -p ${BACKUP_DIR}

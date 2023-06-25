@@ -17,26 +17,26 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package util
+package version
 
 import (
-	"fmt"
-	"io"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
-	"github.com/shirou/gopsutil/v3/host"
+	"github.com/hashicorp/go-version"
 )
 
-// PrintSystemInfo print system info
-func PrintSystemInfo(w io.Writer) {
-	hostStat, err := host.Info()
-	if err != nil {
-		fmt.Fprintf(w, "get host info failed: %v\n", err)
-		return
-	}
-	fmt.Fprintf(w, "---- operating system info ----\n")
-	fmt.Fprintf(w, "OS: %s\n", hostStat.OS)
-	fmt.Fprintf(w, "Platform: %s-%s\n", hostStat.Platform, hostStat.PlatformVersion)
-	fmt.Fprintf(w, "KernelVersion: %s\n", hostStat.KernelVersion)
-	fmt.Fprintf(w, "KernelArch: %s\n", hostStat.KernelArch)
-	fmt.Fprintf(w, "--------------------------------\n\n")
-}
+var _ = Describe("version", func() {
+	It("compare version", func() {
+		v1, err := version.NewVersion("20.10.0")
+		Expect(err).Should(Succeed())
+		v2, err := version.NewVersion("20.10.5")
+		Expect(err).Should(Succeed())
+		v3, err := version.NewVersion("20.10.24")
+		Expect(err).Should(Succeed())
+
+		Expect(v1.LessThan(MinimumDockerVersion)).Should(BeTrue())
+		Expect(v2.LessThan(MinimumDockerVersion)).Should(BeFalse())
+		Expect(v3.LessThan(MinimumDockerVersion)).Should(BeFalse())
+	})
+})

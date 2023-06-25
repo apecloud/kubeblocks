@@ -678,7 +678,7 @@ func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1a
 	return job, nil
 }
 
-func BuildRestoreJob(name, namespace string, image string, command []string, args []string,
+func BuildRestoreJob(name, namespace string, image string, command []string,
 	volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, env []corev1.EnvVar, resources *corev1.ResourceRequirements) (*batchv1.Job, error) {
 	const tplFile = "restore_job_template.cue"
 	job := &batchv1.Job{}
@@ -688,7 +688,6 @@ func BuildRestoreJob(name, namespace string, image string, command []string, arg
 		"job.spec.template.spec.volumes": volumes,
 		"container.image":                image,
 		"container.command":              command,
-		"container.args":                 args,
 		"container.volumeMounts":         volumeMounts,
 		"container.env":                  env,
 	}
@@ -742,4 +741,18 @@ func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildPa
 		}
 	}
 	return toolContainers, nil
+}
+
+func BuildVolumeSnapshotClass(name string, driver string) (*snapshotv1.VolumeSnapshotClass, error) {
+	const tplFile = "volumesnapshotclass.cue"
+	vsc := &snapshotv1.VolumeSnapshotClass{}
+	if err := buildFromCUE(tplFile,
+		map[string]any{
+			"class.metadata.name": name,
+			"class.driver":        driver,
+		},
+		"class", vsc); err != nil {
+		return nil, err
+	}
+	return vsc, nil
 }

@@ -20,6 +20,7 @@ jobs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
     steps:
       - name: Cancel Previous Runs
+        if: github.ref_name != 'main'
         uses: styfle/cancel-workflow-action@0.11.0
         with:
           all_but_latest: true

@@ -17,16 +17,11 @@
 
 // required, command line input options for parameters and flags
 options: {
+	flag: int
+	mode:     string
 	driver:   string
 	database: string
-	host:     string
-	port:     int
-	user:     string
-	password: string
-	mode:     string
-	type:     string
-	tables:   int
-	times:    int
+	value: 		string
 }
 
 // required, k8s api resource content
@@ -35,7 +30,10 @@ content: {
 	kind:       "Pod"
 	metadata: {
 		namespace:    "default"
-		generateName: "test-sysbench-prepare-\(options.driver)-"
+		generateName: "test-sysbench-\(options.mode)-\(options.driver)-"
+		labels: {
+			sysbench: "test-sysbench-\(options.driver)-\(options.database)"
+		}
 	}
 	spec: {
 		containers: [
@@ -49,11 +47,11 @@ content: {
 					},
 					{
 						name:  "FLAG"
-						value: "0"
+						value: "\(options.flag)"
 					},
 					{
 						name:  "CONFIGS"
-						value: "mode:\(options.mode),driver:\(options.driver),host:\(options.host),user:\(options.user),password:\(options.password),port:\(options.port),db:\(options.database),size:\(options.size),tables:\(options.tables),times:\(options.times),type:\(options.type)"
+						value: "\(options.value)"
 					},
 				]
 			},

@@ -38,6 +38,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -889,6 +890,12 @@ func (r *BackupReconciler) createVolumeSnapshot(
 	}
 	for _, target := range targetPVCs {
 		snapshotName := backup.Name
+		vsc := snapshotv1.VolumeSnapshotClass{}
+		if target.Spec.StorageClassName != nil {
+			if err = r.getVolumeSnapshotClassOrCreate(reqCtx.Ctx, *target.Spec.StorageClassName, &vsc); err != nil {
+				return err
+			}
+		}
 		labels := buildBackupWorkloadsLabels(backup)
 		labels[constant.VolumeTypeLabelKey] = target.Labels[constant.VolumeTypeLabelKey]
 		if target.Labels[constant.VolumeTypeLabelKey] == string(appsv1alpha1.VolumeTypeLog) {
@@ -904,6 +911,7 @@ func (r *BackupReconciler) createVolumeSnapshot(
 				Source: snapshotv1.VolumeSnapshotSource{
 					PersistentVolumeClaimName: &target.Name,
 				},
+				VolumeSnapshotClassName: &vsc.Name,
 			},
 		}
 
@@ -919,6 +927,35 @@ func (r *BackupReconciler) createVolumeSnapshot(
 	}
 	msg := fmt.Sprintf("Waiting for the volume snapshot %s creation to complete in backup.", snap.Name)
 	r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatingVolumeSnapshot", msg)
+	return nil
+}
+
+func (r *BackupReconciler) getVolumeSnapshotClassOrCreate(ctx context.Context, storageClassName string, vsc *snapshotv1.VolumeSnapshotClass) error {
+	storageClassObj := storagev1.StorageClass{}
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: storageClassName}, &storageClassObj); err != nil {
+		// ignore if not found storage class, use the default volume snapshot class
+		return client.IgnoreNotFound(err)
+	}
+	vscList := snapshotv1.VolumeSnapshotClassList{}
+	if err := r.snapshotCli.List(&vscList); err != nil {
+		return err
+	}
+	for _, item := range vscList.Items {
+		if item.Driver == storageClassObj.Provisioner {
+			*vsc = item
+			return nil
+		}
+	}
+	// not found matched volume snapshot class, create one
+	vscName := fmt.Sprintf("vsc-%s-%s", storageClassName, storageClassObj.UID[:8])
+	newVSC, err := ctrlbuilder.BuildVolumeSnapshotClass(vscName, storageClassObj.Provisioner)
+	if err != nil {
+		return err
+	}
+	if err = r.snapshotCli.Create(newVSC); err != nil {
+		return err
+	}
+	*vsc = *newVSC
 	return nil
 }
 
@@ -1468,8 +1505,7 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 
 	container := corev1.Container{}
 	container.Name = backup.Name
-	container.Command = []string{"sh", "-c"}
-	container.Args = backupTool.Spec.BackupCommands
+	container.Command = backupTool.Spec.BackupCommands
 	container.Image = backupTool.Spec.Image
 	container.ImagePullPolicy = corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy))
 	if container.Image == "" {

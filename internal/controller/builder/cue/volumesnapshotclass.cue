@@ -15,35 +15,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-container: {
-	name:            "restore"
-	image:           string
-	imagePullPolicy: "IfNotPresent"
-	command: [...]
-	volumeMounts: [...]
-	env: [...]
-	resources: {}
-}
-
-job: {
-	apiVersion: "batch/v1"
-	kind:       "Job"
+class: {
+	apiVersion: "snapshot.storage.k8s.io/v1"
+	kind:       "VolumeSnapshotClass"
 	metadata: {
-		name:      string
-		namespace: string
+		name: string
 		labels: {
 			"app.kubernetes.io/managed-by": "kubeblocks"
 		}
 	}
-	spec: {
-		template: {
-			spec: {
-				containers: [container]
-				volumes: [...]
-				restartPolicy: "OnFailure"
-				securityContext:
-					runAsUser: 0
-			}
-		}
-	}
+	driver:         string
+	deletionPolicy: "Delete"
 }

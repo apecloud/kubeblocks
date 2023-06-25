@@ -14,7 +14,7 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/csi-hostpath-driver-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/csi-hostpath-driver-{{ default .Chart.Version .Values.versionOverride }}.tgz
     installValues:
       configMapRefs:
         - name: csi-hostpath-driver-chart-kubeblocks-values

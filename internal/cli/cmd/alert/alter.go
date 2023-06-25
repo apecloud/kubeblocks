@@ -35,6 +35,7 @@ func NewAlertCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		newDeleteReceiverCmd(f, streams),
 		newListReceiversCmd(f, streams),
 		newConfigSMTPServerCmd(f, streams),
+		newListSMTPServerCmd(f, streams),
 	)
 	return cmd
 }

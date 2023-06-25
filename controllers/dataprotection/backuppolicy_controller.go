@@ -265,9 +265,17 @@ func (r *BackupPolicyReconciler) removeOldestBackups(reqCtx intctrlutil.RequestC
 func (r *BackupPolicyReconciler) getCronJobName(backupPolicyName, backupPolicyNamespace string, backupType dataprotectionv1alpha1.BackupType) string {
 	name := fmt.Sprintf("%s-%s", backupPolicyName, backupPolicyNamespace)
 	if len(name) > 30 {
-		name = name[:30]
+		name = strings.TrimRight(name[:30], "-")
 	}
 	return fmt.Sprintf("%s-%s", name, string(backupType))
+}
+
+func generateUniqueName(backupPolicy *dataprotectionv1alpha1.BackupPolicy) string {
+	uniqueName := backupPolicy.Name
+	if len(backupPolicy.OwnerReferences) > 0 {
+		uniqueName = fmt.Sprintf("%s-%s", backupPolicy.OwnerReferences[0].UID[:8], backupPolicy.OwnerReferences[0].Name)
+	}
+	return uniqueName
 }
 
 // buildCronJob builds cronjob from backup policy.
@@ -275,7 +283,8 @@ func (r *BackupPolicyReconciler) buildCronJob(
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
 	target dataprotectionv1alpha1.TargetCluster,
 	cronExpression string,
-	backType dataprotectionv1alpha1.BackupType) (*batchv1.CronJob, error) {
+	backType dataprotectionv1alpha1.BackupType,
+	cronJobName string) (*batchv1.CronJob, error) {
 	tplFile := "cronjob.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(tplFile))
@@ -291,8 +300,11 @@ func (r *BackupPolicyReconciler) buildCronJob(
 		ttl = metav1.Duration{Duration: dataprotectionv1alpha1.ToDuration(backupPolicy.Spec.Retention.TTL)}
 	}
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
+	if cronJobName == "" {
+		cronJobName = r.getCronJobName(generateUniqueName(backupPolicy), backupPolicy.Namespace, backType)
+	}
 	options := backupPolicyOptions{
-		Name:             r.getCronJobName(backupPolicy.Name, backupPolicy.Namespace, backType),
+		Name:             cronJobName,
 		BackupPolicyName: backupPolicy.Name,
 		Namespace:        backupPolicy.Namespace,
 		Cluster:          target.LabelsSelector.MatchLabels[constant.AppInstanceLabelKey],
@@ -351,26 +363,36 @@ func (r *BackupPolicyReconciler) reconcileCronJob(reqCtx intctrlutil.RequestCtx,
 	basePolicy dataprotectionv1alpha1.BasePolicy,
 	cronExpression string,
 	backType dataprotectionv1alpha1.BackupType) error {
-	cronjobProto, err := r.buildCronJob(backupPolicy, basePolicy.Target, cronExpression, backType)
-	if err != nil {
-		return err
-	}
 	cronJob := &batchv1.CronJob{}
-	if err = r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: cronjobProto.Name,
-		Namespace: cronjobProto.Namespace}, cronJob); err != nil && !apierrors.IsNotFound(err) {
+	cronJobList := &batchv1.CronJobList{}
+	if err := r.Client.List(reqCtx.Ctx, cronJobList,
+		client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS)),
+		client.MatchingLabels{
+			dataProtectionLabelBackupPolicyKey: backupPolicy.Name,
+			dataProtectionLabelBackupTypeKey:   string(backType),
+			constant.AppManagedByLabelKey:      constant.AppName,
+		},
+	); err != nil {
 		return err
+	} else if len(cronJobList.Items) > 0 {
+		cronJob = &cronJobList.Items[0]
 	}
 
 	if len(cronExpression) == 0 {
 		if len(cronJob.Name) != 0 {
 			// delete the old cronjob.
-			if err = r.removeCronJobFinalizer(reqCtx, cronJob); err != nil {
+			if err := r.removeCronJobFinalizer(reqCtx, cronJob); err != nil {
 				return err
 			}
 			return r.Client.Delete(reqCtx.Ctx, cronJob)
 		}
 		// if no cron expression, return
 		return nil
+	}
+
+	cronjobProto, err := r.buildCronJob(backupPolicy, basePolicy.Target, cronExpression, backType, cronJob.Name)
+	if err != nil {
+		return err
 	}
 
 	if len(cronJob.Name) == 0 {

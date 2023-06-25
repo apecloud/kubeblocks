@@ -185,12 +185,106 @@ func (mgr *Manager) IsClusterInitialized() (bool, error) {
 	return false, nil
 }
 
-func (mgr *Manager) Initialize()             {}
-func (mgr *Manager) IsRunning()              {}
-func (mgr *Manager) IsHealthy()              {}
-func (mgr *Manager) Recover()                {}
-func (mgr *Manager) AddToCluster()           {}
-func (mgr *Manager) Premote()                {}
-func (mgr *Manager) Demote()                 {}
+func (mgr *Manager) GetReplSetConfig(ctx context.Context) (*RSConfig, error) {
+	resp := ReplSetGetConfig{}
+	res := mgr.Client.Database("admin").RunCommand(ctx, bson.D{{Key: "replSetGetConfig", Value: 1}})
+	if res.Err() != nil {
+		err := errors.Wrap(res.Err(), "replSetGetConfig")
+		mgr.Logger.Errorf("Get replSet config: %v", err)
+		return nil, err
+	}
+	if err := res.Decode(&resp); err != nil {
+		err := errors.Wrap(err, "failed to decode to replSetGetConfig")
+		mgr.Logger.Errorf("Get replSet config: %v", err)
+		return nil, err
+	}
+
+	if resp.Config == nil {
+		err := errors.Errorf("mongo says: %s", resp.Errmsg)
+		mgr.Logger.Errorf("Get replSet config: %v", err)
+		return nil, err
+	}
+
+	return resp.Config, nil
+}
+
+func (mgr *Manager) SetReplSetConfig(ctx context.Context, rsClient *mongo.Client, cfg *RSConfig) error {
+	resp := OKResponse{}
+
+	mgr.Logger.Infof("Reconfig replSet: %v", cfg)
+
+	res := mgr.Client.Database("admin").RunCommand(ctx, bson.D{{Key: "replSetReconfig", Value: cfg}})
+	if res.Err() != nil {
+		err := errors.Wrap(res.Err(), "replSetReconfig")
+		mgr.Logger.Errorf("ReConfig replSet failed: %v", err)
+		return err
+	}
+
+	if err := res.Decode(&resp); err != nil {
+		err = errors.Wrap(err, "failed to decode to replSetReconfigResponse")
+		mgr.Logger.Errorf("ReConfig replSet failed: %v", err)
+		return err
+	}
+
+	if resp.OK != 1 {
+		err := errors.Errorf("mongo says: %s", resp.Errmsg)
+		mgr.Logger.Errorf("ReConfig replSet failed: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func (mgr *Manager) GetReplSetHosts(rsConfig *RSConfig) []string {
+	if rsConfig != nil {
+		return []string{}
+	}
+
+	hosts := make([]string, len(rsConfig.Members))
+	for i, member := range rsConfig.Members {
+		hosts[i] = member.Host
+	}
+	return hosts
+}
+
+func (mgr *Manager) GetReplSetClient(ctx context.Context, hosts []string) (*mongo.Client, error) {
+	opts := options.Client().
+		SetHosts(hosts).
+		SetReplicaSet(config.replSetName).
+		SetAuth(options.Credential{
+			Password: config.password,
+			Username: config.username,
+		}).
+		SetWriteConcern(writeconcern.New(writeconcern.WMajority(), writeconcern.J(true))).
+		SetReadPreference(readpref.Primary()).
+		SetDirect(false)
+
+	client, err := mongo.Connect(ctx, opts)
+	if err != nil {
+		return nil, errors.Wrap(err, "connect to mongodb")
+	}
+	return client, err
+}
+func (mgr *Manager) Initialize()   {}
+func (mgr *Manager) IsRunning()    {}
+func (mgr *Manager) IsHealthy()    {}
+func (mgr *Manager) Recover()      {}
+func (mgr *Manager) AddToCluster() {}
+func (mgr *Manager) Premote() error {
+	rsConfig, _ := mgr.GetReplSetConfig(context.TODO())
+	hosts := mgr.GetReplSetHosts(rsConfig)
+	client, _ := mgr.GetReplSetClient(context.TODO(), hosts)
+	for i, _ := range rsConfig.Members {
+		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {
+			rsConfig.Members[i].Priority = 3
+		}
+	}
+	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
+}
+
+func (mgr *Manager) Demote() error {
+	return nil
+}
+
 func (mgr *Manager) GetHealthiestMember()    {}
 func (mgr *Manager) HasOtherHealthtyLeader() {}

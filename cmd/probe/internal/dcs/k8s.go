@@ -64,18 +64,21 @@ func NewKubernetesStore(logger logger.Logger) (*KubernetesStore, error) {
 }
 
 func (store *KubernetesStore) Initialize() error {
+	store.logger.Infof("k8s store initializing")
 	labelsMap := map[string]string{
 		"app.kubernetes.io/instance":        store.clusterName,
 		"app.kubernetes.io/managed-by":      "kubeblocks",
 		"apps.kubeblocks.io/component-name": store.componentName,
 	}
 
-	configMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, store.clusterCompName+"-haconfig", metav1.GetOptions{})
+	haName := store.clusterCompName + "-haconfig"
+	store.logger.Infof("k8s store initializing, create Ha ConfigMap: %s", haName)
+	configMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, haName, metav1.GetOptions{})
 	if configMap == nil || err != nil {
 		ttl := os.Getenv("KB_TTL")
 		if _, err = store.clientset.CoreV1().ConfigMaps(store.namespace).Create(store.ctx, &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      store.clusterCompName + "-haconfig",
+				Name:      haName,
 				Namespace: store.namespace,
 				Labels:    labelsMap,
 				Annotations: map[string]string{
@@ -101,7 +104,7 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 		VersionedParams(&metav1.GetOptions{}, scheme.ParameterCodec).
 		Do(store.ctx).
 		Into(clusterResource)
-	store.logger.Infof("cluster: %v", clusterResource)
+	store.logger.Infof("cluster resource: %v", clusterResource)
 	if err != nil {
 		store.logger.Errorf("k8s get cluster error: %v", err)
 	}
@@ -206,6 +209,7 @@ func (store *KubernetesStore) CreateLock() error {
 		return err
 	}
 
+	store.logger.Infof("k8s store initializing, create leader ConfigMap: %s", leaderName)
 	if _, err = store.clientset.CoreV1().ConfigMaps(store.namespace).Create(store.ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      store.clusterCompName + "-leader",

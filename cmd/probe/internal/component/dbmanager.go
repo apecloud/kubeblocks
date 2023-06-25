@@ -15,8 +15,8 @@ type DBManager interface {
 	IsDBStartupReady() bool
 	Recover()
 	AddToCluster()
-	Premote()
-	Demote()
+	Premote() error
+	Demote() error
 	GetHealthiestMember()
 	HasOtherHealthtyLeader()
 	GetLogger() logger.Logger

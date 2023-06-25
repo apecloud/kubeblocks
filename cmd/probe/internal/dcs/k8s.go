@@ -47,7 +47,7 @@ func NewKubernetesStore(logger logger.Logger) (*KubernetesStore, error) {
 		logger.Errorf("restclient init error: %v", err)
 	}
 
-	return &KubernetesStore{
+	store := &KubernetesStore{
 		ctx:               ctx,
 		clusterName:       os.Getenv("KB_CLUSTER_NAME"),
 		componentName:     os.Getenv("KB_COMP_NAME"),
@@ -57,7 +57,10 @@ func NewKubernetesStore(logger logger.Logger) (*KubernetesStore, error) {
 		client:            client,
 		clientset:         clientset,
 		logger:            logger,
-	}, nil
+	}
+	cluster, err := store.GetCluster()
+	store.cluster = cluster
+	return store, err
 }
 
 func (store *KubernetesStore) Initialize() error {
@@ -176,9 +179,11 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 func (store *KubernetesStore) ResetCluser()  {}
 func (store *KubernetesStore) DeleteCluser() {}
 func (store *KubernetesStore) GetLeaderConfigMap() (*corev1.ConfigMap, error) {
-	leaderConfigMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, store.clusterCompName+"-leader", metav1.GetOptions{})
+	leaderName := store.clusterCompName + "-leader"
+	leaderConfigMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, leaderName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
+			store.logger.Errorf("Leader configmap [%s] is not found", leaderName)
 			return nil, nil
 		}
 		store.logger.Errorf("Get Leader configmap failed: %v", err)
@@ -301,7 +306,16 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 	configmapName := store.clusterCompName + "-haconfig"
 	configmap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(context.TODO(), configmapName, metav1.GetOptions{})
 	if err != nil {
-		store.logger.Errorf("get ha configmap error: %v", err)
+		if !apierrors.IsNotFound(err) {
+			store.logger.Errorf("Get ha configmap [%s] error: %v", configmapName, err)
+		} else {
+			err = nil
+		}
+		return &HaConfig{
+			index:              "",
+			ttl:                0,
+			maxLagOnSwitchover: 1048576,
+		}, err
 	}
 
 	annotations := configmap.Annotations

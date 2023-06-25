@@ -1,0 +1,24 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: nebula-{{ default .Chart.AppVersion .Values.nebula.version }}
+  labels:
+    {{- include "nebula.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: nebula
+  componentVersions:
+    - componentDefRef: nebula-graphd
+      versionsContext:
+        containers:
+        - name: nebula-graphd
+          image: {{ .Values.nebula.graphd.image.repository }}:{{ default .Chart.AppVersion .Values.nebula.graphd.image.tag }}
+    - componentDefRef: nebula-storaged
+      versionsContext:
+        containers:
+        - name: nebula-storaged
+          image: {{ .Values.nebula.storaged.image.repository }}:{{ default .Chart.AppVersion .Values.nebula.storaged.image.tag }}
+    - componentDefRef: nebula-metad
+      versionsContext:
+        containers:
+        - name: nebula-metad
+          image: {{ .Values.nebula.metad.image.repository }}:{{ default .Chart.AppVersion .Values.nebula.metad.image.tag }}

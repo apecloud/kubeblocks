@@ -53,7 +53,7 @@ nfpms:
     homepage: kubeblocks.io
     maintainer: ApeCloud Inc.
     description: A CLI tool for kubeblocks
-    license: Apache-2.0
+    license: AGPL-3.0
     release: "1"
     formats:
       - deb

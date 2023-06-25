@@ -48,12 +48,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type componentPathedName struct {
-	Namespace   string `json:"namespace,omitempty"`
-	ClusterName string `json:"clusterName,omitempty"`
-	Name        string `json:"name,omitempty"`
-}
-
 const (
 	VolumeName = "tls"
 	CAName     = "ca.crt"

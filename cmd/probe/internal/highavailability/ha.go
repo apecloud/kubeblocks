@@ -85,13 +85,15 @@ func (ha *Ha) RunCycle() {
 }
 
 func (ha *Ha) Start() {
-	// for !ha.dbManager.IsInitialized() {
-	// 	ha.logger.Infof("Waiting for the database cluster to be initialized.")
-	// 	// TODO: implement dbmanager initialize to replace pod's entrypoint scripts
-	// 	// if I am the node of index 0, then do initialization
-	// 	// ha.dbManager.Initialize()
-	// 	time.Sleep(1 * time.Second)
-	// }
+	isInitialized, _ := ha.dbManager.IsClusterInitialized()
+	for !isInitialized {
+		ha.logger.Infof("Waiting for the database cluster to be initialized.")
+		// TODO: implement dbmanager initialize to replace pod's entrypoint scripts
+		// if I am the node of index 0, then do initialization
+		// ha.dbManager.Initialize()
+		time.Sleep(1 * time.Second)
+		isInitialized, _ = ha.dbManager.IsClusterInitialized()
+	}
 
 	isExist, _ := ha.dcs.IsLockExist()
 	for !isExist {

@@ -8,7 +8,7 @@ import (
 
 type DBManager interface {
 	Initialize()
-	IsInitialized()
+	IsClusterInitialized() (bool, error)
 	IsRunning()
 	IsHealthy()
 	IsLeader(context.Context) (bool, error)

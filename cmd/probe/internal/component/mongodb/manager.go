@@ -177,7 +177,6 @@ func (mgr *Manager) IsClusterInitialized() (bool, error) {
 }
 
 func (mgr *Manager) Initialize()             {}
-func (mgr *Manager) IsInitialized()          {}
 func (mgr *Manager) IsRunning()              {}
 func (mgr *Manager) IsHealthy()              {}
 func (mgr *Manager) Recover()                {}

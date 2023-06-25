@@ -779,6 +779,14 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 	}
 	ttlSec := int32(ttl.Seconds())
 	backoffLimit := int32(3)
+
+	// if registry is specified, prefer using the registry to access the chart,
+	// otherwise use the chartLocationURL
+	chart := addon.Spec.Helm.ChartLocationURL
+	if addon.Spec.Helm.ChartRegistry != "" {
+		chart = fmt.Sprintf("%s/%s", addon.Spec.Helm.ChartRegistry, addon.Name)
+	}
+
 	helmProtoJob := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
@@ -828,7 +836,7 @@ func createHelmJobProto(addon *extensionsv1alpha1.Addon) (*batchv1.Job, error) {
 								},
 								{
 									Name:  "CHART",
-									Value: addon.Spec.Helm.ChartLocationURL,
+									Value: chart,
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{},

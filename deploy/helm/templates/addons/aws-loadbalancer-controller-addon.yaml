@@ -15,6 +15,10 @@ spec:
   helm:
     # origin: https://aws.github.io/eks-charts/aws-load-balancer-controller-1.4.8.tgz
     chartLocationURL: {{ .Values.addonChartLocationBase }}/aws-load-balancer-controller-1.4.8.tgz
+    chartRegistry: {{ .Values.addonChartRegistry }}
+
+    installOptions:
+      version: 1.4.8
 
     installValues:
       configMapRefs:

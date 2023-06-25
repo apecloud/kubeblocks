@@ -119,6 +119,10 @@ type HelmTypeInstallSpec struct {
 	// +kubebuilder:validation:Required
 	ChartLocationURL string `json:"chartLocationURL"`
 
+	// A Helm Chart registry.
+	// +optional
+	ChartRegistry string `json:"chartRegistry,omitempty"`
+
 	// installOptions defines Helm release installation options.
 	// +optional
 	InstallOptions HelmInstallOptions `json:"installOptions,omitempty"`

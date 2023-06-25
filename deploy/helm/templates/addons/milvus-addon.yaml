@@ -16,6 +16,10 @@ spec:
 
   helm:
     chartLocationURL: {{ .Values.addonChartLocationBase }}/milvus-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartRegistry: {{ .Values.addonChartRegistry }}
+
+    installOptions:
+      version: {{ default .Chart.Version .Values.versionOverride }}
 
   installable:
     autoInstall: false

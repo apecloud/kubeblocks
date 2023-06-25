@@ -16,6 +16,11 @@ spec:
   helm:
     # chartLocationURL: https://github.com/prometheus-community/helm-charts/releases/download/prometheus-15.16.1/prometheus-15.16.1.tgz
     chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus-15.16.1.tgz
+    chartRegistry: {{ .Values.addonChartRegistry }}
+
+    installOptions:
+      version: 15.16.1
+
     installValues:
       configMapRefs:
         - name: {{ include "addon.prometheus.name" . }}-chart-kubeblocks-values

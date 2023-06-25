@@ -15,6 +15,11 @@ spec:
 
   helm:
     chartLocationURL: {{ .Values.addonChartLocationBase }}/csi-hostpath-driver-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartRegistry: {{ .Values.addonChartRegistry }}
+
+    installOptions:
+      version: {{ default .Chart.Version .Values.versionOverride }}
+
     installValues:
       configMapRefs:
         - name: csi-hostpath-driver-chart-kubeblocks-values

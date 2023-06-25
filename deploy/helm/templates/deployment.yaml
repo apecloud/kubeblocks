@@ -100,6 +100,8 @@ spec:
             - name: RECOVER_VOLUME_EXPANSION_FAILURE
               value: "true"
             {{- end }}
+            - name: KUBEBLOCKS_ADDON_HELM_INSTALL_OPTIONS
+              value: "--atomic --cleanup-on-fail --wait --insecure-skip-tls-verify --username={{ .Values.addonChartRegistryUsername }} --password={{ .Values.addonChartRegistryPassword }}"
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

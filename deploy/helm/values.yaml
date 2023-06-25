@@ -302,6 +302,15 @@ keepAddons: false
 ## @param addonChartLocationBase - KubeBlocks official addon's chart location base, to be released in an air-gapped environment.
 addonChartLocationBase: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts
 
+## @param addonChartRegistry - KubeBlocks addon's chart registry, to be released in an air-gapped environment.
+addonChartRegistry: ""
+
+## @param addonChartRegistryUsername - KubeBlocks addon's chart registry username.
+addonChartRegistryUsername: ""
+
+## @param addonChartRegistryPassword - KubeBlocks addon's chart registry password.
+addonChartRegistryPassword: ""
+
 ## Dashboards settings
 ##
 ## @param dashboards.enabled - If false, dashboards will not be installed.

@@ -17,6 +17,10 @@ spec:
   helm:
     # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/mongodb-{{ default .Chart.Version .Values.versionOverride }}/mongodb-{{ default .Chart.Version .Values.versionOverride }}.tgz
     chartLocationURL: {{ .Values.addonChartLocationBase }}/mongodb-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartRegistry: {{ .Values.addonChartRegistry }}
+
+    installOptions:
+      version: {{ default .Chart.Version .Values.versionOverride }}
 
   installable:
     autoInstall: true

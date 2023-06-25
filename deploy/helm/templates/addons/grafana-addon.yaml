@@ -16,6 +16,11 @@ spec:
   helm:
     # chartLocationURL: https://github.com/grafana/helm-charts/releases/download/grafana-6.43.5/grafana-6.43.5.tgz
     chartLocationURL: {{ .Values.addonChartLocationBase }}/grafana-6.43.5.tgz
+    chartRegistry: {{ .Values.addonChartRegistry }}
+
+    installOptions:
+      version: 6.43.5
+
     installValues:
       configMapRefs:
         - name: grafana-chart-kubeblocks-values

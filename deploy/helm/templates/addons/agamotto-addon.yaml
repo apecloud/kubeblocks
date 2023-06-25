@@ -14,7 +14,12 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/agamotto-0.1.0-beta.5.tgz
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/agamotto-0.1.0-beta.5.tgz
+    chartRegistry: {{ .Values.addonChartRegistry }}
+
+    installOptions:
+      version: 0.1.0-beta.5
+
     installValues:
       configMapRefs:
         - name: {{ include "addon.agamotto.name" . }}-chart-kubeblocks-values
@@ -45,5 +50,7 @@ spec:
 
   installable:
     autoInstall: {{ .Values.agamotto.enabled }}
-
+15:
+  16:
+    1:
 

@@ -18,6 +18,11 @@ spec:
   helm:
     # chartLocationURL: https://github.com/piraeusdatastore/helm-charts/releases/download/snapshot-controller-1.7.2/snapshot-controller-1.7.2.tgz
     chartLocationURL: {{ .Values.addonChartLocationBase }}/snapshot-controller-1.7.2.tgz
+    chartRegistry: {{ .Values.addonChartRegistry }}
+
+    installOptions:
+      version: 1.7.2
+
     installValues:
       configMapRefs:
         - name: snapshot-controller-chart-kubeblocks-values

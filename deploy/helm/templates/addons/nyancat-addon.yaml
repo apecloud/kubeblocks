@@ -17,6 +17,11 @@ spec:
   helm:
     # chartLocationURL: {{ .Values.addonChartLocationBase }}/nyancat-{{ default .Chart.Version .Values.versionOverride }}.tgz
     chartLocationURL: {{ .Values.addonChartLocationBase }}/nyancat-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartRegistry: {{ .Values.addonChartRegistry }}
+
+    installOptions:
+      version: {{ default .Chart.Version .Values.versionOverride }}
+
     valuesMapping:
       valueMap:
         replicaCount: replicaCount

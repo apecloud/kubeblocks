@@ -17,6 +17,10 @@ spec:
   helm:
     # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/postgresql-{{ default .Chart.Version .Values.versionOverride }}/postgresql-{{ default .Chart.Version .Values.versionOverride }}.tgz
     chartLocationURL: {{ .Values.addonChartLocationBase }}/postgresql-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartRegistry: {{ .Values.addonChartRegistry }}
+
+    installOptions:
+      version: {{ default .Chart.Version .Values.versionOverride }}
 
   installable:
     autoInstall: true

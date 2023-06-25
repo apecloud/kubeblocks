@@ -16,6 +16,10 @@ spec:
 
   helm:
     chartLocationURL: {{ .Values.addonChartLocationBase }}/weaviate-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartRegistry: {{ .Values.addonChartRegistry }}
+
+    installOptions:
+      version: {{ default .Chart.Version .Values.versionOverride }}
 
   installable:
     autoInstall: false

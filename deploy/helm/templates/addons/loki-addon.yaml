@@ -16,6 +16,11 @@ spec:
   helm:
     chartLocationURL: "https://github.com/grafana/helm-charts/releases/download/helm-loki-5.5.8/loki-5.5.8.tgz"
     # chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/...
+    chartRegistry: {{ .Values.addonChartRegistry }}
+
+    installOptions:
+      version: 5.5.8
+
     installValues:
       configMapRefs:
         - name: {{ include "addon.loki.name" . }}-chart-kubeblocks-values

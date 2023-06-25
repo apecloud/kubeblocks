@@ -1088,17 +1088,6 @@ func (r *BackupReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx
 // then get the pod from this annotation to ensure that the same pod is picked in following up .
 func (r *BackupReconciler) getTargetPod(reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup, labels map[string]string) (*corev1.Pod, error) {
-	if targetPodName, ok := backup.Annotations[dataProtectionBackupTargetPodKey]; ok {
-		targetPod := &corev1.Pod{}
-		targetPodKey := types.NamespacedName{
-			Name:      targetPodName,
-			Namespace: backup.Namespace,
-		}
-		if err := r.Client.Get(reqCtx.Ctx, targetPodKey, targetPod); err != nil {
-			return nil, err
-		}
-		return targetPod, nil
-	}
 	reqCtx.Log.V(1).Info("Get pod from label", "label", labels)
 	targetPod := &corev1.PodList{}
 	if err := r.Client.List(reqCtx.Ctx, targetPod,
@@ -1110,6 +1099,12 @@ func (r *BackupReconciler) getTargetPod(reqCtx intctrlutil.RequestCtx,
 		return nil, errors.New("can not find any pod to backup by labelsSelector")
 	}
 	sort.Sort(intctrlutil.ByPodName(targetPod.Items))
+	targetPodName := backup.Annotations[dataProtectionBackupTargetPodKey]
+	for _, v := range targetPod.Items {
+		if targetPodName == v.Name {
+			return &v, nil
+		}
+	}
 	return &targetPod.Items[0], nil
 }
 

@@ -16,8 +16,16 @@ spec:
   type: Helm
 
   helm:
-    # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/apecloud-mysql-{{ default .Chart.Version .Values.versionOverride }}/apecloud-mysql-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/apecloud-mysql
+    {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/apecloud-mysql-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    {{- end }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: {{ default .Chart.Version .Values.versionOverride }}
+      {{- end }}
 
   defaultInstallValues:
     - enabled: true

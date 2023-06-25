@@ -122,3 +122,90 @@ func TestRemoveVertex(t *testing.T) {
 		t.Error("unexpected edges", len(dag.edges))
 	}
 }
+
+func TestEquals(t *testing.T) {
+	d1 := NewDAG()
+	d2 := NewDAG()
+	for i := 0; i < 13; i++ {
+		d1.AddVertex(i)
+		d2.AddVertex(12 - i)
+	}
+	d1.Connect(2, 3)
+	d1.Connect(0, 6)
+	d1.Connect(0, 1)
+	d1.Connect(2, 0)
+	d1.Connect(11, 12)
+	d1.Connect(9, 12)
+	d1.Connect(9, 10)
+	d1.Connect(9, 11)
+	d1.Connect(3, 5)
+	d1.Connect(8, 7)
+	d1.Connect(5, 4)
+	d1.Connect(0, 5)
+	d1.Connect(6, 4)
+	d1.Connect(6, 9)
+	d1.Connect(7, 6)
+	d1.Connect(7, 2)
+	d1.Connect(3, 0)
+	d1.Connect(12, 10)
+	d1.Connect(10, 1)
+	d1.Connect(1, 5)
+
+	// add edges in reverse order
+	d2.Connect(1, 5)
+	d2.Connect(10, 1)
+	d2.Connect(12, 10)
+	d2.Connect(3, 0)
+	d2.Connect(7, 2)
+	d2.Connect(7, 6)
+	d2.Connect(6, 9)
+	d2.Connect(6, 4)
+	d2.Connect(0, 5)
+	d2.Connect(5, 4)
+	d2.Connect(8, 7)
+	d2.Connect(3, 5)
+	d2.Connect(9, 11)
+	d2.Connect(9, 10)
+	d2.Connect(9, 12)
+	d2.Connect(11, 12)
+	d2.Connect(2, 0)
+	d2.Connect(0, 1)
+	d2.Connect(0, 6)
+	d2.Connect(2, 3)
+
+	less := func(v1, v2 Vertex) bool {
+		val1, _ := v1.(int)
+		val2, _ := v2.(int)
+		return val1 < val2
+	}
+	if !d1.Equals(d2, less) {
+		t.Error("equals test failed")
+	}
+
+	d1 = NewDAG()
+	d2 = NewDAG()
+
+	d1.AddVertex(0)
+	d1.AddVertex(1)
+	d1.AddVertex(2)
+	d1.AddVertex(3)
+	d1.AddVertex(4)
+	d2.AddVertex(0)
+	d2.AddVertex(2)
+	d2.AddVertex(3)
+	d2.AddVertex(1)
+	d2.AddVertex(4)
+
+	d1.Connect(0, 1)
+	d1.Connect(0, 2)
+	d1.Connect(0, 3)
+	d1.Connect(0, 4)
+	d2.Connect(0, 2)
+	d2.Connect(0, 3)
+	d2.Connect(0, 4)
+	d2.Connect(0, 1)
+
+	if !d1.Equals(d2, less) {
+		t.Error("equals test failed")
+	}
+}

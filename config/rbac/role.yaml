@@ -682,7 +682,7 @@ rules:
 - apiGroups:
   - workloads.kubeblocks.io
   resources:
-  - consensussets
+  - replicatedstatemachines
   verbs:
   - create
   - delete
@@ -694,13 +694,13 @@ rules:
 - apiGroups:
   - workloads.kubeblocks.io
   resources:
-  - consensussets/finalizers
+  - replicatedstatemachines/finalizers
   verbs:
   - update
 - apiGroups:
   - workloads.kubeblocks.io
   resources:
-  - consensussets/status
+  - replicatedstatemachines/status
   verbs:
   - get
   - patch

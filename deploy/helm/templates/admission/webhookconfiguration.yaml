@@ -60,6 +60,30 @@ webhooks:
     resources:
     - clusterdefinitions
   sideEffects: None
+- admissionReviewVersions:
+    - v1
+  clientConfig:
+    service:
+      name: {{ include "kubeblocks.svcName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
+  failurePolicy: Fail
+  name: mreplicatedstatemachine.kb.io
+  rules:
+    - apiGroups:
+        - workloads.kubeblocks.io
+      apiVersions:
+        - v1alpha1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - replicatedstatemachines
+  sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -163,5 +187,29 @@ webhooks:
     - UPDATE
     resources:
     - opsrequests
+  sideEffects: None
+- admissionReviewVersions:
+    - v1
+  clientConfig:
+    service:
+      name: {{ include "kubeblocks.svcName" . }}
+      namespace: {{ .Release.Namespace }}
+      path: /validate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
+      port: {{ .Values.service.port }}
+    {{- if .Values.admissionWebhooks.createSelfSignedCert }}
+    caBundle: {{ $ca.Cert | b64enc }}
+    {{- end }}
+  failurePolicy: Fail
+  name: vreplicatedstatemachine.kb.io
+  rules:
+    - apiGroups:
+        - workloads.kubeblocks.io
+      apiVersions:
+        - v1alpha1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - replicatedstatemachines
   sideEffects: None
 {{- end }}

@@ -17,6 +17,26 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package mocks
+package rsm
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -package mocks -destination k8sclient_mocks.go sigs.k8s.io/controller-runtime/pkg/client Client,StatusWriter
+import (
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
+)
+
+type initTransformer struct {
+	*workloads.ReplicatedStateMachine
+}
+
+var _ graph.Transformer = &initTransformer{}
+
+func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	// init context
+	transCtx, _ := ctx.(*rsmTransformContext)
+	transCtx.rsm, transCtx.rsmOrig = t.ReplicatedStateMachine, t.ReplicatedStateMachine.DeepCopy()
+
+	// init dag
+	model.PrepareStatus(dag, transCtx.rsmOrig, transCtx.rsm)
+	return nil
+}

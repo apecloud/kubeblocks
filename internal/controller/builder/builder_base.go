@@ -24,6 +24,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
@@ -56,6 +57,11 @@ func (builder *BaseBuilder[T, PT, B]) get() PT {
 
 func (builder *BaseBuilder[T, PT, B]) SetName(name string) *B {
 	builder.object.SetName(name)
+	return builder.concreteBuilder
+}
+
+func (builder *BaseBuilder[T, PT, B]) SetUID(uid types.UID) *B {
+	builder.object.SetUID(uid)
 	return builder.concreteBuilder
 }
 

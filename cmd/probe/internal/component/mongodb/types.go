@@ -125,7 +125,7 @@ type ShardRemoveResp struct {
 type IsMasterResp struct {
 	IsMaster   bool   `bson:"ismaster" json:"ismaster"`
 	IsArbiter  bool   `bson:"arbiterOnly" json:"arbiterOnly"`
-	primary    string `bson:"primary" json:"primary"`
+	Primary    string `bson:"primary" json:"primary"`
 	Me         string `bson:"me" json:"me"`
 	Msg        string `bson:"msg" json:"msg"`
 	OKResponse `bson:",inline"`

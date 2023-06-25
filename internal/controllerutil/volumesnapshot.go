@@ -127,11 +127,11 @@ func (c *VolumeSnapshotCompatClient) CheckResourceExists(key client.ObjectKey, o
 }
 
 func convertObjectBetweenAPIVersion[T1 any, T2 any](from T1, to T2) error {
-	fromJsonBytes, err := json.Marshal(from)
+	fromJSONBytes, err := json.Marshal(from)
 	if err != nil {
 		return err
 	}
-	if err = json.Unmarshal(fromJsonBytes, to); err != nil {
+	if err = json.Unmarshal(fromJSONBytes, to); err != nil {
 		return err
 	}
 	return nil

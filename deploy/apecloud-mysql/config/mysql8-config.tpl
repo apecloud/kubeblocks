@@ -33,7 +33,7 @@ max_connections={{ div ( div $phy_memory 4 ) $single_thread_memory }}
 {{- end}}
 
 # if memory less than 8Gi, disable performance_schema
-{{- if lt $phy_memory 1073741824 }}
+{{- if lt $phy_memory 8589934592 }}
 performance_schema=OFF
 {{- end }}
 

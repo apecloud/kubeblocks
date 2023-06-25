@@ -30,6 +30,7 @@ builds:
 
 archives:
   - format: tar.gz
+    wrap_in_directory: '{{ .Os }}-{{ .Arch }}'
     name_template: >-
       {{- .ProjectName }}-
       {{- .Os }}-

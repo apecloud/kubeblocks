@@ -106,7 +106,7 @@ var _ = Describe("pod role label event handler test", func() {
 			Expect(handler.Handle(cli, reqCtx, nil, event)).Should(Succeed())
 
 			By("build an unexpected message")
-			message = fmt.Sprintf("unexpected message")
+			message = "unexpected message"
 			event = builder.NewEventBuilder(namespace, "foo").
 				SetInvolvedObject(objectRef).
 				SetMessage(message).
@@ -141,7 +141,7 @@ var _ = Describe("pod role label event handler test", func() {
 			Expect(msg.Role).Should(Equal(roleName))
 
 			By("build an error formatted message")
-			message = fmt.Sprintf("Readiness probe failed: error: health rpc failed: rpc error: code = Unknown desc = {\"event\":}")
+			message = "Readiness probe failed: error: health rpc failed: rpc error: code = Unknown desc = {\"event\":}"
 			event.Message = message
 			Expect(parseProbeEventMessage(reqCtx, event)).Should(BeNil())
 		})

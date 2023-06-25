@@ -128,6 +128,7 @@ manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, Clu
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./cmd/manager/...;./apis/...;./controllers/...;./internal/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
+	$(MAKE) client-sdk-gen
 
 .PHONY: preflight-manifests
 preflight-manifests: generate ## Generate external Preflight API
@@ -136,7 +137,6 @@ preflight-manifests: generate ## Generate external Preflight API
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/...;./externalapis/..."
-	$(MAKE) client-sdk-gen
 
 .PHONY: client-sdk-gen
 client-sdk-gen: module ## Generate CRD client code.

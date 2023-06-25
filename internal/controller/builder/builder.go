@@ -697,20 +697,6 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 	return &container, nil
 }
 
-func BuildTLSSecret(namespace, clusterName, componentName string) (*corev1.Secret, error) {
-	const tplFile = "tls_certs_secret_template.cue"
-	secret := &corev1.Secret{}
-	pathedName := componentPathedName{
-		Namespace:   namespace,
-		ClusterName: clusterName,
-		Name:        componentName,
-	}
-	if err := buildFromCUE(tplFile, map[string]any{"pathedName": pathedName}, "secret", secret); err != nil {
-		return nil, err
-	}
-	return secret, nil
-}
-
 func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1alpha1.Backup, podSpec *corev1.PodSpec) (*batchv1.Job, error) {
 	const tplFile = "backup_manifests_template.cue"
 	job := &batchv1.Job{}

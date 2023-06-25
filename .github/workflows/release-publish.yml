@@ -45,7 +45,7 @@ jobs:
             --tag-name ${{ env.TAG_NAME }} \
             --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
 
-  upload-release-assert:
+  gorelease-assert:
     needs: create-release-kbcli
     name: Upload and release kbcli
     runs-on: ubuntu-latest
@@ -110,24 +110,62 @@ jobs:
             ./dist/*.tar.gz
             ./dist/*.zip
 
+      - name: Upload kbcli Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.TAG_NAME }}-kbcli
+          path: |
+            ./dist/*.tar.gz
+            ./dist/*.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  upload-release-assert:
+    needs: gorelease-assert
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [linux-amd64, linux-arm64, darwin-amd64, darwin-arm64, windows-amd64, windows-arm64]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Download kbcli Artifact
+        uses: actions/download-artifact@v3.0.2
+        with:
+          name: ${{ env.TAG_NAME }}-kbcli
+          path: ${{ github.workspace }}/dist
+
       - name: upload assets to gitlab
         run: |
           for file in $(find "${{ github.workspace }}/dist" -type f | grep -E '\.(gz|zip)$'); do
-            echo "Processing file: $file"
-            filename=$(basename "$file")
-            bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
-            --type 2 \
-            --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
-            --tag-name ${{ env.TAG_NAME }} \
-            --asset-path $file \
-            --asset-name $filename \
-            --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
+              if [[ "$file" == *"${{ matrix.os }}"* ]]; then
+                  echo "Processing file: $file"
+                  filename=$(basename "$file")
+                  bash ${{ github.workspace }}/.github/utils/release_gitlab.sh \
+                  --type 2 \
+                  --project-id ${{ env.GITLAB_KBCLI_PROJECT_ID }} \
+                  --tag-name ${{ env.TAG_NAME }} \
+                  --asset-path $file \
+                  --asset-name $filename \
+                  --access-token ${{ env.GITLAB_ACCESS_TOKEN }}
+              fi
           done
+
+  remove-artifact:
+    needs: upload-release-assert
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove kbcli Artifact
+        uses: geekyeggo/delete-artifact@v2
+        with:
+          name: ${{ env.TAG_NAME }}-kbcli
 
   send-message:
     runs-on: ubuntu-latest
     needs: upload-release-assert
-    if: ${{ always() }}
+    outputs:
+      tag-name: ${{ steps.send_message.outputs.tag_name }}
+    if: ${{ always() && github.event.action == 'published' }}
     steps:
       - uses: actions/checkout@v3
       - name: send message
@@ -150,6 +188,8 @@ jobs:
             --content "${CONTENT}"\
             --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          
+          echo tag_name=${{ env.TAG_NAME }} >> $GITHUB_OUTPUT
 
       - name: Save Artifact
         id: cache-artifact-save
@@ -158,3 +198,38 @@ jobs:
           path: |
             ${{ steps.send_message.outputs.release-result }}
           key: ${{ steps.send_message.outputs.release-result }}
+
+  release-result:
+    if: github.event.action == 'published'
+    needs: [ send-message ]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        type: [image, kbcli, chart]
+    steps:
+      - name: Restore ${{ matrix.type }} Artifact
+        id: cache-artifact-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            ${{ env.TAG_NAME }}-${{ matrix.type }}
+          key: ${{ env.TAG_NAME }}-${{ matrix.type }}
+
+      - name: check release result
+        run: |
+          release_result=$( cat ${{ env.TAG_NAME }}-${{ matrix.type }} )
+          if [[ "$release_result" != "success" ]]; then
+              exit 1
+          fi
+
+  e2e-kbcli:
+    needs: [ send-message, release-result ]
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.4
+    with:
+      GITHUB_REPO: "apecloud/kubeblocks"
+      BRANCH_NAME: "main"
+      WORKFLOW_ID: "e2e-kbcli.yml"
+      APECD_REF: "v0.1.4"
+      VERSION: "${{ needs.send-message.outputs.tag-name }}"
+    secrets: inherit
+    

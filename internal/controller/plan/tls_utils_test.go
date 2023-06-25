@@ -28,6 +28,8 @@ import (
 
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -60,8 +62,6 @@ var _ = Describe("TLSUtilsTest", func() {
 	Context("CheckTLSSecretRef function", func() {
 		It("should work well", func() {
 			ctx := context.Background()
-			controller, k8sMock := testutil.SetupK8sMock()
-			defer controller.Finish()
 			name := "bar"
 			secretRef := &appsv1alpha1.TLSSecretRef{
 				Name: name,
@@ -69,6 +69,17 @@ var _ = Describe("TLSUtilsTest", func() {
 				Cert: "certName",
 				Key:  "keyName",
 			}
+			controller, k8sMock := testutil.SetupK8sMock()
+			defer controller.Finish()
+
+			By("secret not found")
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &corev1.Secret{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *corev1.Secret, _ ...client.GetOption) error {
+					return apierrors.NewNotFound(schema.GroupResource{}, obj.Name)
+				}).Times(1)
+			err := CheckTLSSecretRef(ctx, k8sMock, namespace, secretRef)
+			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 
 			By("set stringData to nil")
 			k8sMock.EXPECT().
@@ -79,7 +90,7 @@ var _ = Describe("TLSUtilsTest", func() {
 					obj.Name = objKey.Name
 					return nil
 				}).Times(1)
-			err := CheckTLSSecretRef(ctx, k8sMock, namespace, secretRef)
+			err = CheckTLSSecretRef(ctx, k8sMock, namespace, secretRef)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("tls secret's data field shouldn't be nil"))
 

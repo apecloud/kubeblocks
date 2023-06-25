@@ -95,6 +95,8 @@ spec:
               value: {{ .jobImagePullPolicy | default "IfNotPresent" }}
             - name: KUBEBLOCKS_ADDON_SA_NAME
               value: {{ include "kubeblocks.addonSAName" . }}
+            - name: KUBEBLOCKS_ADDON_HELM_INSTALL_OPTIONS
+              value: {{ .Values.addonHelmInstallOptions }}
             {{- end }}
           {{- with .Values.securityContext }}
           securityContext:

@@ -62,7 +62,6 @@ func init() {
 		"--atomic",
 		"--cleanup-on-fail",
 		"--wait",
-		"--insecure-skip-tls-verify",
 	})
 	viper.SetDefault(addonHelmUninstallOptKey, []string{})
 }

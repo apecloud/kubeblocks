@@ -157,12 +157,6 @@ const (
 	ResourceCustomResourceDefinition   = "customresourcedefinitions"
 )
 
-// Event API group
-const (
-	EventAPIGroup   = "events.k8s.io"
-	EventAPIVersion = "v1"
-	REsourceEvents  = "events"
-)
 const (
 	None = "<none>"
 
@@ -383,8 +377,4 @@ func JobGVR() schema.GroupVersionResource {
 }
 func CronJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: K8SBatchAPIGroup, Version: K8sBatchAPIVersion, Resource: ResourceCronJobs}
-}
-
-func EventGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: EventAPIGroup, Version: EventAPIVersion, Resource: REsourceEvents}
 }

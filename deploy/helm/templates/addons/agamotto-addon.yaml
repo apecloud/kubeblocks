@@ -50,7 +50,4 @@ spec:
 
   installable:
     autoInstall: {{ .Values.agamotto.enabled }}
-15:
-  16:
-    1:
 

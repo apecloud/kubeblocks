@@ -37,11 +37,14 @@ type Cluster struct {
 	User  ClusterUser   `json:"user"`
 	Nodes []ClusterNode `json:"nodes"`
 
+	RoleGroup RoleGroup    `json:"roleGroup"`
+	Addons    []PluginMeta `json:"addons"`
+}
+
+type RoleGroup struct {
 	ETCD   []string `json:"etcd"`
 	Master []string `json:"master"`
 	Worker []string `json:"worker"`
-
-	Addons []PluginMeta `json:"addons"`
 }
 
 type ClusterNode struct {
@@ -58,4 +61,8 @@ type ClusterUser struct {
 	// ssh privateKey
 	PrivateKey     string `json:"privateKey"`
 	PrivateKeyPath string `json:"privateKeyPath"`
+}
+
+func (g RoleGroup) IsValidate() bool {
+	return len(g.ETCD) > 0 && len(g.Master) > 0 && len(g.Worker) > 0
 }

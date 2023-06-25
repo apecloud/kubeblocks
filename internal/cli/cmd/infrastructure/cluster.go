@@ -63,9 +63,9 @@ func buildCommonFlags(cmd *cobra.Command, o *clusterOptions) {
 	cmd.Flags().StringVarP(&o.User.PrivateKey, "private-key", "", "", "The PrimaryKey for ssh to the remote machine. [option]")
 	cmd.Flags().StringVarP(&o.User.PrivateKeyPath, "private-key-path", "", "", "Specify the file PrimaryKeyPath of ssh to the remote machine. default ~/.ssh/id_rsa.")
 
-	cmd.Flags().StringSliceVarP(&o.ETCD, "etcd", "", nil, "Specify etcd nodes")
-	cmd.Flags().StringSliceVarP(&o.Master, "master", "", nil, "Specify master nodes")
-	cmd.Flags().StringSliceVarP(&o.Worker, "worker", "", nil, "Specify worker nodes")
+	cmd.Flags().StringSliceVarP(&o.RoleGroup.ETCD, "etcd", "", nil, "Specify etcd nodes")
+	cmd.Flags().StringSliceVarP(&o.RoleGroup.Master, "master", "", nil, "Specify master nodes")
+	cmd.Flags().StringSliceVarP(&o.RoleGroup.Worker, "worker", "", nil, "Specify worker nodes")
 }
 
 func (o *clusterOptions) Complete() error {
@@ -155,16 +155,16 @@ func (o *clusterOptions) Validate() error {
 		}
 		o.User.PrivateKey = string(b)
 	}
-	if len(o.ETCD) == 0 || len(o.Master) == 0 || len(o.Worker) == 0 {
+	if o.RoleGroup.IsValidate() {
 		return cfgcore.MakeError("etcd, master or worker is empty")
 	}
-	if err := validateNodes(o.ETCD); err != nil {
+	if err := validateNodes(o.RoleGroup.ETCD); err != nil {
 		return err
 	}
-	if err := validateNodes(o.Master); err != nil {
+	if err := validateNodes(o.RoleGroup.Master); err != nil {
 		return err
 	}
-	if err := validateNodes(o.Worker); err != nil {
+	if err := validateNodes(o.RoleGroup.Worker); err != nil {
 		return err
 	}
 	return nil

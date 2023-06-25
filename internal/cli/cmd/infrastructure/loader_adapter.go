@@ -62,9 +62,9 @@ func buildTemplateParams(o *createOptions) *gotemplate.TplValues {
 		builtinHostsObject:          o.Nodes,
 		builtinTimeoutObject:        o.timeout,
 		builtinRoleGroupsObject: gotemplate.TplValues{
-			common.ETCD:   o.ETCD,
-			common.Master: o.Master,
-			common.Worker: o.Worker,
+			common.ETCD:   o.RoleGroup.ETCD,
+			common.Master: o.RoleGroup.Master,
+			common.Worker: o.RoleGroup.Worker,
 		},
 	}
 }

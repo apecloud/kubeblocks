@@ -31,8 +31,49 @@ type ConfigurationSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Configuration. Edit configuration_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// clusterRef references clusterDefinition.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
+	ClusterRef string `json:"clusterRef"`
+
+	// clusterComponentName references clusterDefinition.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
+	ClusterComponentName string `json:"clusterComponentName"`
+
+	// Cluster referencing ClusterDefinition name. This is an immutable attribute.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	ClusterDefRef string `json:"clusterDefinitionRef"`
+
+	// Cluster referencing ClusterVersion name.
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
+
+	// customConfigurationItems describes user-defined config template.
+	// +optional
+	CustomConfigurationItems []CustomConfigurationItem `json:"customConfigurationItems,omitempty"`
+}
+
+type CustomConfigurationItem struct {
+	// Specify the name of configuration template.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// Specify the type of config template.
+	*RenderedConfigTemplateSpec `json:",inline"`
+
+	// +optional
+	ConfigParams map[string]ConfigParams `json:"configParams"`
+}
+
+type ConfigParams struct {
+	// Data holds the configuration keys and values.
+	// This field exists to work around https://github.com/kubernetes-sigs/kubebuilder/issues/528
+	ConfigItem map[string]interface{} `json:"-"`
 }
 
 // ConfigurationStatus defines the observed state of Configuration

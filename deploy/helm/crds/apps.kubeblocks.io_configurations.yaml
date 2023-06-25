@@ -35,10 +35,72 @@ spec:
           spec:
             description: ConfigurationSpec defines the desired state of Configuration
             properties:
-              foo:
-                description: Foo is an example field of Configuration. Edit configuration_types.go
-                  to remove/update
+              clusterComponentName:
+                description: clusterComponentName references clusterDefinition.
                 type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.clusterRef
+                  rule: self == oldSelf
+              clusterDefinitionRef:
+                description: Cluster referencing ClusterDefinition name. This is an
+                  immutable attribute.
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                type: string
+              clusterRef:
+                description: clusterRef references clusterDefinition.
+                type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.clusterRef
+                  rule: self == oldSelf
+              clusterVersionRef:
+                description: Cluster referencing ClusterVersion name.
+                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                type: string
+              customConfigurationItems:
+                description: customConfigurationItems describes user-defined config
+                  template.
+                items:
+                  properties:
+                    configParams:
+                      additionalProperties:
+                        type: object
+                      type: object
+                    name:
+                      description: Specify the name of configuration template.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                    namespace:
+                      default: default
+                      description: Specify the namespace of the referenced the configuration
+                        template ConfigMap object. An empty namespace is equivalent
+                        to the "default" namespace.
+                      maxLength: 63
+                      type: string
+                    policy:
+                      default: none
+                      description: policy defines how to merge external imported templates
+                        into component templates.
+                      enum:
+                      - patch
+                      - replace
+                      - none
+                      type: string
+                    templateRef:
+                      description: Specify the name of the referenced the configuration
+                        template ConfigMap object.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                  required:
+                  - name
+                  - templateRef
+                  type: object
+                type: array
+            required:
+            - clusterComponentName
+            - clusterDefinitionRef
+            - clusterRef
             type: object
           status:
             description: ConfigurationStatus defines the observed state of Configuration

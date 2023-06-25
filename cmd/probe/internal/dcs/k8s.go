@@ -10,6 +10,7 @@ import (
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
@@ -177,6 +178,9 @@ func (store *KubernetesStore) DeleteCluser() {}
 func (store *KubernetesStore) GetLeaderConfigMap() (*corev1.ConfigMap, error) {
 	leaderConfigMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, store.clusterCompName+"-leader", metav1.GetOptions{})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
 		store.logger.Errorf("Get Leader configmap failed: %v", err)
 	}
 	return leaderConfigMap, err

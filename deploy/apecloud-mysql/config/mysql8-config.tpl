@@ -32,7 +32,12 @@ innodb_buffer_pool_size={{ $pool_buffer_size }}
 max_connections={{ div ( div $phy_memory 4 ) $single_thread_memory }}
 {{- end}}
 
-# alias replica_exec_mode. Aliyn slave_exec_mode=STRICT
+# if memory less than 8Gi, disable performance_schema
+{{- if lt $phy_memory 8589934592 }}
+performance_schema=OFF
+{{- end }}
+
+# alias replica_exec_mode. Aliyun slave_exec_mode=STRICT
 slave_exec_mode=IDEMPOTENT
 
 # gtid

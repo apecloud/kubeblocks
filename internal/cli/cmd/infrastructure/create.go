@@ -45,6 +45,7 @@ type createOptions struct {
 	sandBoxImage string
 
 	securityEnhancement bool
+	outputKubeconfig    string
 }
 
 var createExamples = `
@@ -123,6 +124,7 @@ func (o *createOptions) buildCreateInfraFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&o.sandBoxImage, "sandbox-image", "", tasks.DefaultSandBoxImage, "Specified sandbox-image will not be used by the cri. [option]")
 	cmd.Flags().StringVarP(&o.criType, "container-runtime", "", string(container.ContainerdType), "Specify kubernetes container runtime. default is containerd")
 	cmd.Flags().BoolVarP(&o.debug, "debug", "", false, "set debug mode")
+	cmd.Flags().StringVarP(&o.outputKubeconfig, "output-kubeconfig", "", tasks.GetDefaultConfig(), "Specified output kubeconfig. [option]")
 }
 
 func (o *createOptions) setDefaultVersion() {

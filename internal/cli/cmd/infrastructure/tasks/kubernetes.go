@@ -20,18 +20,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package tasks
 
 import (
+	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/StudioSol/set"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/builder"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/gotemplate"
+	kubekeyapiv1alpha2 "github.com/kubesphere/kubekey/v3/cmd/kk/apis/kubekey/v1alpha2"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/bootstrap/os"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/bootstrap/os/templates"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/connector"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/task"
-
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/builder"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
-	"github.com/apecloud/kubeblocks/internal/gotemplate"
+	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
 type PrepareK8sBinariesModule struct {
@@ -43,6 +49,12 @@ type PrepareK8sBinariesModule struct {
 
 type ConfigureOSModule struct {
 	common.KubeModule
+}
+
+type SaveKubeConfigModule struct {
+	common.KubeModule
+
+	OutputKubeconfig string
 }
 
 func (p *PrepareK8sBinariesModule) Init() {
@@ -93,16 +105,19 @@ func (c *ConfigureOSModule) Init() {
 			Hosts:    c.Runtime.GetAllHosts(),
 			Action:   new(os.NodeExecScript),
 			Parallel: true,
-		},
-		&task.RemoteTask{
-			Name:     "ConfigureNtpServer",
-			Desc:     "configure the ntp server for each node",
-			Hosts:    c.Runtime.GetAllHosts(),
-			Prepare:  new(os.NodeConfigureNtpCheck),
-			Action:   new(os.NodeConfigureNtpServer),
-			Parallel: true,
-		},
-	}
+		}}
+}
+
+func (p *SaveKubeConfigModule) Init() {
+	p.Name = "SaveKubeConfigModule"
+	p.Desc = "Save kube config to local file"
+
+	p.Tasks = []task.Interface{
+		&task.LocalTask{
+			Name:   "SaveKubeConfig",
+			Desc:   "Save kube config to local file",
+			Action: &SaveKubeConfig{outputKubeconfig: p.OutputKubeconfig},
+		}}
 }
 
 type DownloadKubernetesBinary struct {
@@ -124,4 +139,47 @@ func (d *DownloadKubernetesBinary) Execute(runtime connector.Runtime) error {
 		d.PipelineCache.Set(common.KubeBinaries+"-"+arch, binariesMap)
 	}
 	return nil
+}
+
+type SaveKubeConfig struct {
+	common.KubeAction
+
+	outputKubeconfig string
+}
+
+func (c *SaveKubeConfig) Execute(runtime connector.Runtime) error {
+	master := runtime.GetHostsByRole(common.Master)[0]
+
+	status, ok := c.PipelineCache.Get(common.ClusterStatus)
+	if !ok {
+		return cfgcore.MakeError("failed to get kubernetes status.")
+	}
+	cluster := status.(*kubernetes.KubernetesStatus)
+	kubeConfigStr := cluster.KubeConfig
+	kc, err := clientcmd.Load([]byte(kubeConfigStr))
+	if err != nil {
+		return err
+	}
+	updateClusterAPIServer(kc, master, c.KubeConf.Cluster.ControlPlaneEndpoint)
+	kcFile := GetDefaultConfig()
+	existingKC, err := kubeconfigLoad(kcFile)
+	if err != nil {
+		return err
+	}
+	if c.outputKubeconfig == "" {
+		c.outputKubeconfig = kcFile
+	}
+	if existingKC != nil {
+		return kubeconfigMerge(kc, existingKC, c.outputKubeconfig)
+	}
+	return kubeconfigWrite(kc, c.outputKubeconfig)
+}
+
+func updateClusterAPIServer(kc *clientcmdapi.Config, master connector.Host, endpoint kubekeyapiv1alpha2.ControlPlaneEndpoint) {
+	cpePrefix := fmt.Sprintf("https://%s:", endpoint.Domain)
+	for _, cluster := range kc.Clusters {
+		if strings.HasPrefix(cluster.Server, cpePrefix) {
+			cluster.Server = fmt.Sprintf("https://%s:%d", master.GetAddress(), endpoint.Port)
+		}
+	}
 }

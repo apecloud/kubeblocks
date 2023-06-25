@@ -185,10 +185,38 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 	if len(podList) == 0 {
 		return nil, nil
 	}
-	// sync pod role label and annotations
-	vertexes, err := r.asyncReplicationPodRoleLabelAndAnnotations(podList)
-	if err != nil {
-		return nil, err
+	primary := ""
+	vertexes := make([]graph.Vertex, 0)
+	for _, pod := range podList {
+		role, ok := pod.Labels[constant.RoleLabelKey]
+		if !ok || role == "" {
+			continue
+		}
+		if role == constant.Primary {
+			primary = pod.Name
+		}
+	}
+
+	for _, pod := range podList {
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+		if primary == "" {
+			// if not exists primary Pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
+			parent, o := util.ParseParentNameAndOrdinal(pod.Name)
+			defaultRole := DefaultRole(o)
+			pod.GetLabels()[constant.RoleLabelKey] = defaultRole
+			pod.Annotations[constant.PrimaryAnnotationKey] = fmt.Sprintf("%s-%d", parent, 0)
+		} else {
+			if pod.Name != primary {
+				pod.GetLabels()[constant.RoleLabelKey] = constant.Secondary
+			}
+			pod.Annotations[constant.PrimaryAnnotationKey] = primary
+		}
+		vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+			Obj:    &pod,
+			Action: ictrltypes.ActionUpdatePtr(),
+		})
 	}
 	// rebuild cluster.status.components.replicationSet.status
 	if err := rebuildReplicationSetClusterStatus(r.Cluster, r.getWorkloadType(), r.getName(), podList); err != nil {

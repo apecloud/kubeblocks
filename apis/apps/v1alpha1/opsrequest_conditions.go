@@ -179,7 +179,7 @@ func NewRestartingCondition(ops *OpsRequest) *metav1.Condition {
 func NewSwitchoveringCondition(generation int64, message string) *metav1.Condition {
 	return &metav1.Condition{
 		Type:               ConditionTypeSwitchover,
-		Status:             metav1.ConditionFalse,
+		Status:             metav1.ConditionTrue,
 		Reason:             "SwitchoverStarted",
 		LastTransitionTime: metav1.Now(),
 		Message:            message,

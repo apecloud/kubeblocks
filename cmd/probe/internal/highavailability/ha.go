@@ -96,6 +96,7 @@ func (ha *Ha) Start() {
 		time.Sleep(1 * time.Second)
 		isInitialized, _ = ha.dbManager.IsClusterInitialized()
 	}
+	ha.logger.Infof("The database cluster is initialized.")
 
 	isExist, _ := ha.dcs.IsLockExist()
 	for !isExist {

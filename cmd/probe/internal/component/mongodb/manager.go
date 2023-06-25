@@ -55,7 +55,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		}
 	}()
 
-	Mgr := &Manager{
+	Mgr = &Manager{
 		DBManagerBase: component.DBManagerBase{
 			CurrentMemberName: viper.GetString("KB_POD_FQDN"),
 			ClusterCompName:   viper.GetString("KB_CLUSTER_COMP_NAME"),

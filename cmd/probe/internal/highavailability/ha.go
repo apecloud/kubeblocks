@@ -7,6 +7,7 @@ import (
 	"github.com/dapr/kit/logger"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mongodb"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
@@ -21,9 +22,10 @@ func NewHa(logger logger.Logger) *Ha {
 
 	dcs, _ := dcs.NewKubernetesStore(logger)
 	ha := &Ha{
-		ctx:    context.Background(),
-		dcs:    dcs,
-		logger: logger,
+		ctx:       context.Background(),
+		dcs:       dcs,
+		logger:    logger,
+		dbManager: mongodb.Mgr,
 	}
 	return ha
 }

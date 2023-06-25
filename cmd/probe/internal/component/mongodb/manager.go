@@ -24,6 +24,8 @@ type Manager struct {
 	Database *mongo.Database
 }
 
+var Mgr *Manager
+
 func NewManager(logger logger.Logger) (*Manager, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -53,7 +55,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		}
 	}()
 
-	mgr := &Manager{
+	Mgr := &Manager{
 		DBManagerBase: component.DBManagerBase{
 			CurrentMemberName: viper.GetString("KB_POD_FQDN"),
 			ClusterCompName:   viper.GetString("KB_CLUSTER_COMP_NAME"),
@@ -62,7 +64,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		Client:   client,
 		Database: client.Database(config.databaseName),
 	}
-	return mgr, nil
+	return Mgr, nil
 
 }
 

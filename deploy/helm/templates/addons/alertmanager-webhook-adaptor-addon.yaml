@@ -14,8 +14,16 @@ spec:
   type: Helm
 
   helm:
-    # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/alertmanager-webhook-adaptor-0.1.4/alertmanager-webhook-adaptor-0.1.4.tgz
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/alertmanager-webhook-adaptor
+    {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/alertmanager-webhook-adaptor-0.1.4.tgz
+    {{- end }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 0.1.4
+      {{- end }}
 
     installValues:
       configMapRefs:

@@ -15,8 +15,16 @@ spec:
   type: Helm
 
   helm:
-    # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/redis-{{ default .Chart.Version .Values.versionOverride }}/redis-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/redis
+    {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/redis-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    {{- end }}
+
+    installOptions:
+     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: {{ default .Chart.Version .Values.versionOverride }}
+     {{- end }}
 
   installable:
     autoInstall: true

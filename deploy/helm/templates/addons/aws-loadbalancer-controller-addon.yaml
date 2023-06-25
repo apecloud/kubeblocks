@@ -13,8 +13,16 @@ spec:
   type: Helm
 
   helm:
-    # origin: https://aws.github.io/eks-charts/aws-load-balancer-controller-1.4.8.tgz
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/aws-load-balancer-controller
+    {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/aws-load-balancer-controller-1.4.8.tgz
+    {{- end }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 1.4.8
+      {{- end }}
 
     installValues:
       configMapRefs:

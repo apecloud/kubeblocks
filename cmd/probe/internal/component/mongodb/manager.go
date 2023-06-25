@@ -172,7 +172,7 @@ func (mgr *Manager) IsClusterInitialized() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	mgr.Logger.Debug("cluster status: %v", status)
+	mgr.Logger.Debugf("cluster status: %v", status)
 	if status.OK != 0 {
 		return true, nil
 	}

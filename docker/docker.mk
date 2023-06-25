@@ -103,7 +103,7 @@ endif
 
 .PHONY: build-tools-image
 build-tools-image: DOCKER_BUILD_ARGS += --cache-to type=gha,mode=max,scope=${GITHUB_REF_NAME}-tools-image --cache-from type=gha,scope=${GITHUB_REF_NAME}-tools-image
-build-tools-image: #install-docker-buildx generate test-go-generate ## Build tools container image.
+build-tools-image: install-docker-buildx generate test-go-generate ## Build tools container image.
 ifneq ($(BUILDX_ENABLED), true)
 	$(DOCKER) build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-tools --tag ${TOOL_IMG}:${VERSION} --tag ${TOOL_IMG}:latest
 else

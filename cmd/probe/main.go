@@ -131,7 +131,7 @@ func main() {
 
 	// ha dependent on dbmanager which is initialized by rt.Run
 	ha := highavailability.NewHa(logHa)
-	go ha.RunCycle()
+	go ha.Start()
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
 	<-stop

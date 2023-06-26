@@ -1,0 +1,89 @@
+project_name: kbcli
+
+release:
+  github:
+    owner: apecloud
+    name: kbcli
+
+before:
+  hooks:
+    - go mod tidy
+    - make test-go-generate
+    - make generate
+
+builds:
+  - main: cmd/cli/main.go
+    id: kbcli
+    binary: kbcli
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - ASSUME_NO_MOVING_GC_UNSAFE_RISK_IT_WITH=go1.20
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X github.com/apecloud/kubeblocks/version.BuildDate={{.Date}} -X github.com/apecloud/kubeblocks/version.GitCommit={{.Commit}} -X github.com/apecloud/kubeblocks/version.Version={{.Tag}}
+
+archives:
+  - format: tar.gz
+    wrap_in_directory: '{{ .Os }}-{{ .Arch }}'
+    name_template: >-
+      {{- .ProjectName }}-
+      {{- .Os }}-
+      {{- if eq .Arch "amd64" }}amd64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}-
+      {{- .Tag }}
+    format_overrides:
+    - goos: windows
+      format:
+        zip
+
+nfpms:
+  -
+    id: kbcli
+    package_name: kbcli
+    file_name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}-{{ .Tag }}"
+    builds:
+      - kbcli
+    vendor: ApeCloud Inc.
+    homepage: kubeblocks.io
+    maintainer: ApeCloud Inc.
+    description: A CLI tool for kubeblocks
+    license: AGPL-3.0
+    release: "1"
+    formats:
+      - deb
+      - rpm
+    dependencies:
+      - git
+      - zsh
+    # Path that the binaries should be installed.
+    bindir: /usr/bin
+
+checksum:
+  name_template: '{{ .ProjectName }}-checksums.txt'
+  algorithm: sha256
+
+signs:
+  - artifacts: checksum
+    args: ["--batch", "-u", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+
+# The lines beneath this are called `modelines`. See `:help modeline`
+# Feel free to remove those if you don't want/use them.
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj

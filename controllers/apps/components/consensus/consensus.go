@@ -244,6 +244,7 @@ func (r *ConsensusSet) HandleRestart(ctx context.Context, obj client.Object) ([]
 	return vertexes, nil
 }
 
+// HandleRoleChange is the implementation of the type Component interface method, which is used to handle the role change of the Consensus workload.
 func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
 	if r.getWorkloadType() != appsv1alpha1.Consensus {
 		return nil, nil
@@ -290,10 +291,7 @@ func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) 
 	return nil, nil
 }
 
-func (r *ConsensusSet) HandleHA(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	return nil, nil
-}
-
+// newConsensusSet is the constructor of the type ConsensusSet.
 func newConsensusSet(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	spec *appsv1alpha1.ClusterComponentSpec,

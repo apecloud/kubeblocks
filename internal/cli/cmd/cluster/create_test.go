@@ -29,7 +29,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -420,7 +419,7 @@ var _ = Describe("create", func() {
 		Expect(setBackup(o, components).Error()).Should(ContainSubstring("is not completed"))
 
 		By("test backup is completed")
-		mockBackupInfo(dynamic, backupName, clusterName, nil)
+		mockBackupInfo(dynamic, backupName, clusterName, nil, "")
 		Expect(setBackup(o, components)).Should(Succeed())
 	})
 
@@ -434,11 +433,14 @@ var _ = Describe("create", func() {
 	})
 
 	It("test fillClusterMetadataFromBackup", func() {
-		backupName := "test-backup"
+		baseBackupName := "test-backup"
+		logBackupName := "test-logfile-backup"
 		clusterName := testing.ClusterName
-		backup := testing.FakeBackup(backupName)
+		baseBackup := testing.FakeBackup(baseBackupName)
+		logfileBackup := testing.FakeBackup(logBackupName)
 		cluster := testing.FakeCluster("clusterName", testing.Namespace)
-		dynamic := testing.FakeDynamicClient(backup, cluster)
+		dynamic := testing.FakeDynamicClient(baseBackup, logfileBackup, cluster)
+
 		o := &CreateOptions{}
 		o.Dynamic = dynamic
 		o.Namespace = testing.Namespace
@@ -452,7 +454,8 @@ var _ = Describe("create", func() {
 				"stopTime":  backupLogTimeStr,
 			},
 		}
-		mockBackupInfo(dynamic, backupName, clusterName, manifests)
+		mockBackupInfo(dynamic, baseBackupName, clusterName, manifests, "snapshot")
+		mockBackupInfo(dynamic, logBackupName, clusterName, manifests, "logfile")
 		By("fill cluster from backup success")
 		Expect(fillClusterInfoFromBackup(o, &cluster)).Should(Succeed())
 		Expect(cluster.Spec.ClusterDefRef).Should(Equal(testing.ClusterDefName))

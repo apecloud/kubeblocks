@@ -178,6 +178,21 @@ func GetComponentPodList(ctx context.Context, cli client.Client, cluster appsv1a
 	return podList, err
 }
 
+// GetComponentPodListWithRole gets the pod list with target role by cluster and componentName
+func GetComponentPodListWithRole(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compSpecName, role string) (*corev1.PodList, error) {
+	matchLabels := client.MatchingLabels{
+		constant.AppInstanceLabelKey:    cluster.Name,
+		constant.KBAppComponentLabelKey: compSpecName,
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.RoleLabelKey:           role,
+	}
+	podList := &corev1.PodList{}
+	if err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace), matchLabels); err != nil {
+		return nil, err
+	}
+	return podList, nil
+}
+
 func GetComponentStatusMessageKey(kind, name string) string {
 	return fmt.Sprintf("%s/%s", kind, name)
 }
@@ -594,6 +609,15 @@ func getObjectListMapOfResourceKind() map[string]client.ObjectList {
 func replaceKBEnvPlaceholderTokens(cluster *appsv1alpha1.Cluster, componentName, strToReplace string) string {
 	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(cluster.Name, string(cluster.UID), componentName)
 	return componentutil.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
+}
+
+// GetRunningPods gets the running pods of the specified statefulSet.
+func GetRunningPods(ctx context.Context, cli client.Client, obj client.Object) ([]corev1.Pod, error) {
+	sts := ConvertToStatefulSet(obj)
+	if sts == nil || sts.Generation != sts.Status.ObservedGeneration {
+		return nil, nil
+	}
+	return GetPodListByStatefulSet(ctx, cli, sts)
 }
 
 // ResolvePodSpecDefaultFields set default value for some known fields of proto PodSpec @pobj.

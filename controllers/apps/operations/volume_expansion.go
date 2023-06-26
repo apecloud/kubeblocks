@@ -59,8 +59,8 @@ func init() {
 }
 
 // ActionStartedCondition the started condition when handle the volume expansion request.
-func (ve volumeExpansionOpsHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRequest) *metav1.Condition {
-	return appsv1alpha1.NewVolumeExpandingCondition(opsRequest)
+func (ve volumeExpansionOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
+	return appsv1alpha1.NewVolumeExpandingCondition(opsRes.OpsRequest), nil
 }
 
 // Action modifies Cluster.spec.components[*].VolumeClaimTemplates[*].spec.resources

@@ -246,8 +246,8 @@ type BackupStatusUpdate struct {
 	UseTargetPodServiceAccount bool `json:"useTargetPodServiceAccount,omitempty"`
 
 	// when to update the backup status, pre: before backup, post: after backup
-	// +optional
-	UpdateStage BackupStatusUpdateStage `json:"updateStage,omitempty"`
+	// +kubebuilder:validation:Required
+	UpdateStage BackupStatusUpdateStage `json:"updateStage"`
 }
 
 // BackupPolicyStatus defines the observed state of BackupPolicy

@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 	"github.com/apecloud/kubeblocks/test/testdata"
@@ -266,7 +267,7 @@ func TestFromUpdatedConfig(t *testing.T) {
 				"key2": "config context2",
 				"key3": "config context2",
 			},
-			sets: set.NewLinkedHashSetString(),
+			sets: cfgutil.NewSet(),
 		},
 		want: map[string]string{},
 	}}

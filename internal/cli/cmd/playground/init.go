@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	gv "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
@@ -102,8 +103,8 @@ type initOptions struct {
 	clusterVersion string
 	cloudProvider  string
 	region         string
-	dockerVersion  string
 	autoApprove    bool
+	dockerVersion  *gv.Version
 
 	baseOptions
 }
@@ -164,7 +165,7 @@ func (o *initOptions) validate() error {
 		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one")
 	}
 
-	if o.cloudProvider == cp.Local && o.dockerVersion < version.MinimumDockerVersion {
+	if o.cloudProvider == cp.Local && o.dockerVersion.LessThan(version.MinimumDockerVersion) {
 		return fmt.Errorf("your docker version %s is lower than the minimum version %s, please upgrade your docker", o.dockerVersion, version.MinimumDockerVersion)
 	}
 
@@ -183,9 +184,6 @@ func (o *initOptions) run() error {
 
 // local bootstraps a playground in the local host
 func (o *initOptions) local() error {
-	// print the system info
-	util.PrintSystemInfo(o.Out)
-
 	provider, err := cp.New(o.cloudProvider, "", o.Out, o.ErrOut)
 	if err != nil {
 		return err

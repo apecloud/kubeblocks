@@ -48,6 +48,10 @@ import (
 const (
 	podRunningTimeoutFlag = "pod-running-timeout"
 	defaultPodExecTimeout = 60 * time.Second
+	grafanaAddonName      = "kubeblocks-grafana"
+	lokiAddonName         = "kubeblocks-loki"
+	lokiGrafanaDirect     = "container-logs"
+	localAdd              = "127.0.0.1"
 )
 
 type dashboard struct {
@@ -83,21 +87,21 @@ var (
 	// we do not use the default port to port-forward to avoid conflict with other services
 	dashboards = [...]*dashboard{
 		{
-			Name:       "kubeblocks-grafana",
+			Name:       grafanaAddonName,
 			AddonName:  "kb-addon-grafana",
 			Label:      "app.kubernetes.io/instance=kb-addon-grafana,app.kubernetes.io/name=grafana",
 			TargetPort: "13000",
 		},
 		{
 			Name:       "kubeblocks-prometheus-alertmanager",
-			AddonName:  "kb-addon-prometheus-alertmanager",
-			Label:      "app=prometheus,component=alertmanager,release=kb-addon-prometheus",
+			AddonName:  "kb-addon-prometheus-playground-alertmanager",
+			Label:      "app.kubernetes.io/instance=kb-addon-prometheus-playground,app.kubernetes.io/managed-by=kubeblocks,apps.kubeblocks.io/component-name=alertmanager",
 			TargetPort: "19093",
 		},
 		{
 			Name:       "kubeblocks-prometheus-server",
-			AddonName:  "kb-addon-prometheus-server",
-			Label:      "app=prometheus,component=server,release=kb-addon-prometheus",
+			AddonName:  "kb-addon-prometheus-playground-server",
+			Label:      "app.kubernetes.io/instance=kb-addon-prometheus-playground,app.kubernetes.io/managed-by=kubeblocks,apps.kubeblocks.io/component-name=server",
 			TargetPort: "19090",
 		},
 		{
@@ -105,6 +109,12 @@ var (
 			AddonName:  "kb-addon-nyancat",
 			Label:      "app.kubernetes.io/instance=kb-addon-nyancat",
 			TargetPort: "8087",
+		},
+		{
+			Name:       lokiAddonName,
+			AddonName:  "kb-addon-loki",
+			Label:      "app.kubernetes.io/instance=kb-addon-loki",
+			TargetPort: "13100",
 		},
 	}
 )
@@ -248,8 +258,12 @@ func (o *openOptions) complete(cmd *cobra.Command, args []string) error {
 	if err = getDashboardInfo(client); err != nil {
 		return err
 	}
-
-	dash := getDashboardByName(o.name)
+	dashName := o.name
+	// opening loki dashboard redirects to grafana dashboard
+	if o.name == lokiAddonName {
+		dashName = grafanaAddonName
+	}
+	dash := getDashboardByName(dashName)
 	if dash == nil {
 		return fmt.Errorf("failed to find dashboard \"%s\", run \"kbcli dashboard list\" to list all dashboards", o.name)
 	}
@@ -257,19 +271,30 @@ func (o *openOptions) complete(cmd *cobra.Command, args []string) error {
 		clusterType = args[1]
 	}
 	if o.localPort == "" {
-		o.localPort = dash.TargetPort
+		if o.name == lokiAddonName {
+			// revert the target port for loki dashboard
+			o.localPort = getDashboardByName(lokiAddonName).TargetPort
+		} else {
+			o.localPort = dash.TargetPort
+		}
 	}
-
 	pfArgs := []string{fmt.Sprintf("svc/%s", dash.AddonName), fmt.Sprintf("%s:%s", o.localPort, dash.Port)}
 	o.portForwardOptions.Namespace = dash.Namespace
-	o.portForwardOptions.Address = []string{"127.0.0.1"}
+	o.portForwardOptions.Address = []string{localAdd}
 	return o.portForwardOptions.Complete(newFactory(dash.Namespace), cmd, pfArgs)
 }
 
 func (o *openOptions) run() error {
-	url := "http://127.0.0.1:" + o.localPort
+	url := fmt.Sprintf("http://%s:%s", localAdd, o.localPort)
 	if o.name == "kubeblocks-grafana" {
 		err := buildGrafanaDirectURL(&url, clusterType)
+		if err != nil {
+			return err
+		}
+	}
+	// customized by loki
+	if o.name == lokiAddonName {
+		err := buildGrafanaDirectURL(&url, lokiGrafanaDirect)
 		if err != nil {
 			return err
 		}
@@ -281,7 +306,6 @@ func (o *openOptions) run() error {
 			fmt.Fprintf(o.ErrOut, "Failed to open browser: %v", err)
 		}
 	}()
-
 	return o.portForwardOptions.RunPortForward()
 }
 

@@ -49,16 +49,6 @@ const (
 	STATUS = Action("STATUS")
 )
 
-const (
-	AppInstanceLabelKey            = "app.kubernetes.io/instance"
-	KBManagedByKey                 = "apps.kubeblocks.io/managed-by"
-	RoleLabelKey                   = "kubeblocks.io/role"
-	ConsensusSetAccessModeLabelKey = "cs.apps.kubeblocks.io/access-mode"
-)
-
-// RequeueDuration default reconcile requeue after duration
-var RequeueDuration = time.Millisecond * 100
-
 type GVKName struct {
 	gvk      schema.GroupVersionKind
 	ns, name string

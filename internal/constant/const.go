@@ -121,6 +121,7 @@ const (
 	HaltRecoveryAllowInconsistentCVAnnotKey     = "clusters.apps.kubeblocks.io/allow-inconsistent-cv"
 	HaltRecoveryAllowInconsistentResAnnotKey    = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"
 	LeaderAnnotationKey                         = "cs.apps.kubeblocks.io/leader"
+	PrimaryAnnotationKey                        = "rs.apps.kubeblocks.io/primary"
 	DefaultBackupPolicyAnnotationKey            = "dataprotection.kubeblocks.io/is-default-policy"          // DefaultBackupPolicyAnnotationKey specifies the default backup policy.
 	DefaultBackupPolicyTemplateAnnotationKey    = "dataprotection.kubeblocks.io/is-default-policy-template" // DefaultBackupPolicyTemplateAnnotationKey specifies the default backup policy template.
 	BackupDataPathPrefixAnnotationKey           = "dataprotection.kubeblocks.io/path-prefix"                // BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
@@ -224,12 +225,32 @@ const (
 )
 
 const (
-	KBReplicationSetPrimaryPodName = "KB_PRIMARY_POD_NAME"
-)
-
-const (
 	Primary   = "primary"
 	Secondary = "secondary"
+
+	Leader   = "leader"
+	Follower = "follower"
+	Learner  = "learner"
+)
+
+// switchover constants
+const (
+	KBJobTTLSecondsAfterFinished           = 5
+	KBSwitchoverCandidateInstanceForAnyPod = "*"
+
+	KBSwitchoverJobLabelKey      = "kubeblocks.io/switchover-job"
+	KBSwitchoverJobLabelValue    = "kb-switchover-job"
+	KBSwitchoverJobNamePrefix    = "kb-switchover-job"
+	KBSwitchoverJobContainerName = "kb-switchover-job-container"
+
+	KBSwitchoverCandidateName             = "KB_SWITCHOVER_CANDIDATE_NAME"
+	KBSwitchoverCandidateFqdn             = "KB_SWITCHOVER_CANDIDATE_FQDN"
+	KBSwitchoverReplicationPrimaryPodIP   = "KB_REPLICATION_PRIMARY_POD_IP"
+	KBSwitchoverReplicationPrimaryPodName = "KB_REPLICATION_PRIMARY_POD_NAME"
+	KBSwitchoverReplicationPrimaryPodFqdn = "KB_REPLICATION_PRIMARY_POD_FQDN"
+	KBSwitchoverConsensusLeaderPodIP      = "KB_CONSENSUS_LEADER_POD_IP"
+	KBSwitchoverConsensusLeaderPodName    = "KB_CONSENSUS_LEADER_POD_NAME"
+	KBSwitchoverConsensusLeaderPodFqdn    = "KB_CONSENSUS_LEADER_POD_FQDN"
 )
 
 // username and password are keys in created secrets for others to refer to.

@@ -85,6 +85,8 @@ spec:
                             pod. if true, will use the service account of the backup
                             target pod. otherwise, will use the system service account.
                           type: boolean
+                      required:
+                      - updateStage
                       type: object
                     type: array
                   backupToolName:
@@ -273,6 +275,8 @@ spec:
                             pod. if true, will use the service account of the backup
                             target pod. otherwise, will use the system service account.
                           type: boolean
+                      required:
+                      - updateStage
                       type: object
                     type: array
                   backupToolName:
@@ -518,6 +522,8 @@ spec:
                             pod. if true, will use the service account of the backup
                             target pod. otherwise, will use the system service account.
                           type: boolean
+                      required:
+                      - updateStage
                       type: object
                     type: array
                   backupsHistoryLimit:

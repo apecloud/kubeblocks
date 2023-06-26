@@ -269,10 +269,11 @@ func (r *BackupPolicyTPLTransformer) convertBasePolicy(bp appsv1alpha1.BasePolic
 		backupStatusUpdates := make([]dataprotectionv1alpha1.BackupStatusUpdate, len(bp.BackupStatusUpdates))
 		for i, v := range bp.BackupStatusUpdates {
 			backupStatusUpdates[i] = dataprotectionv1alpha1.BackupStatusUpdate{
-				Path:          v.Path,
-				ContainerName: v.ContainerName,
-				Script:        v.Script,
-				UpdateStage:   dataprotectionv1alpha1.BackupStatusUpdateStage(v.UpdateStage),
+				Path:                       v.Path,
+				ContainerName:              v.ContainerName,
+				Script:                     v.Script,
+				UseTargetPodServiceAccount: v.UseTargetPodServiceAccount,
+				UpdateStage:                dataprotectionv1alpha1.BackupStatusUpdateStage(v.UpdateStage),
 			}
 		}
 		basePolicy.BackupStatusUpdates = backupStatusUpdates

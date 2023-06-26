@@ -2,7 +2,7 @@
 title: kbcli kubeblocks describe-config
 ---
 
-describe KubeBlocks config.
+Describe KubeBlocks config.
 
 ```
 kbcli kubeblocks describe-config [flags]
@@ -13,12 +13,17 @@ kbcli kubeblocks describe-config [flags]
 ```
   # Describe the KubeBlocks config.
   kbcli kubeblocks describe-config
+  # Describe all the KubeBlocks configs
+  kbcli kubeblocks describe-config --all
+  # Describe the desired KubeBlocks configs by filter conditions
+  kbcli kubeblocks describe-config --filter=addonController,affinity
 ```
 
 ### Options
 
 ```
   -A, --all             show all kubeblocks configs value
+      --filter string   filter the desired kubeblocks configs, multiple filtered strings are comma separated
   -h, --help            help for describe-config
   -o, --output format   prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
 ```

@@ -77,7 +77,7 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 			return nil, err
 		}
 
-		return &ctrl.Result{}, patchOpsRequestToCreating(reqCtx.Ctx, cli, opsRes, opsDeepCopy, opsBehaviour.OpsHandler)
+		return &ctrl.Result{}, patchOpsRequestToCreating(reqCtx, cli, opsRes, opsDeepCopy, opsBehaviour.OpsHandler)
 	}
 	if err = opsBehaviour.OpsHandler.Action(reqCtx, cli, opsRes); err != nil {
 		return nil, err
@@ -106,7 +106,7 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	opsRes.ToClusterPhase = opsBehaviour.ToClusterPhase
 	if opsRequestPhase, requeueAfter, err = opsBehaviour.OpsHandler.ReconcileAction(reqCtx, cli, opsRes); err != nil &&
 		!isOpsRequestFailedPhase(opsRequestPhase) {
-		// if the opsRequest phase is Failed, skipped
+		// if the opsRequest phase is not failed, skipped
 		return requeueAfter, err
 	}
 	switch opsRequestPhase {

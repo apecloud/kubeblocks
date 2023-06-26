@@ -228,7 +228,7 @@ spec:
                 - message: forbidden to update spec.reconfigure
                   rule: self == oldSelf
               restart:
-                description: restart the specified component.
+                description: restart the specified components.
                 items:
                   description: ComponentOps defines the common variables of component
                     scope operations.
@@ -289,6 +289,40 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.restoreFrom
                   rule: self == oldSelf
+              switchover:
+                description: switchover the specified components.
+                items:
+                  properties:
+                    componentName:
+                      description: componentName cluster component name.
+                      type: string
+                    instanceName:
+                      description: instanceName is used to specify the candidate primary
+                        or leader instanceName for switchover. If instanceName is
+                        set to "*", it means that no specific primary or leader is
+                        specified for the switchover, and the switchoverAction defined
+                        in clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate
+                        will be executed, It is required that clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate
+                        is not empty. If instanceName is set to a valid instanceName
+                        other than "*", it means that a specific candidate primary
+                        or leader is specified for the switchover. the value of instanceName
+                        can be obtained using `kbcli cluster list-instances`, any
+                        other value is invalid. In this case, the `switchoverAction`
+                        defined in clusterDefinition.componentDefs[x].switchoverSpec.withCandidate
+                        will be executed, and it is required that clusterDefinition.componentDefs[x].switchoverSpec.withCandidate
+                        is not empty.
+                      type: string
+                  required:
+                  - componentName
+                  - instanceName
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.switchover
+                  rule: self == oldSelf
               ttlSecondsAfterSucceed:
                 description: ttlSecondsAfterSucceed OpsRequest will be deleted after
                   TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.
@@ -306,6 +340,7 @@ spec:
                 - Start
                 - Stop
                 - Expose
+                - Switchover
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.type
@@ -455,6 +490,11 @@ spec:
               components:
                 additionalProperties:
                   properties:
+                    message:
+                      description: message is a human-readable message indicating
+                        details about this operation.
+                      maxLength: 32768
+                      type: string
                     phase:
                       description: phase describes the component phase, reference
                         Cluster.status.component.phase.
@@ -506,6 +546,10 @@ spec:
                         - status
                         type: object
                       type: array
+                    reason:
+                      description: reason describes the reason for the component phase.
+                      maxLength: 1024
+                      type: string
                     workloadType:
                       description: workloadType references workload type of component
                         in ClusterDefinition.

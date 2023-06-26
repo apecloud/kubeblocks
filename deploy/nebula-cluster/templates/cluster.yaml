@@ -1,0 +1,86 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ include "nebula-cluster.name" . }}
+  labels:
+    {{ include "nebula-cluster.labels" . | indent 4 }}
+spec:
+  clusterDefinitionRef: nebula
+  clusterVersionRef: nebula-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  terminationPolicy: {{ .Values.nebula.terminationPolicy }}
+  componentSpecs:
+    - name: nebula-metad
+      componentDefRef: nebula-metad
+      replicas: {{ .Values.nebula.metad.replicas }}
+      {{- with  .Values.nebula.metad.resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+        {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.nebula.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.nebula.metad.dataStorage }}
+    - name: nebula-graphd
+      componentDefRef: nebula-graphd
+      replicas: {{ .Values.nebula.graphd.replicas }}
+      {{- with  .Values.nebula.graphd.resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+        {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.nebula.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.nebula.metad.dataStorage }}
+    - name: nebula-storaged
+      componentDefRef: nebula-storaged
+      replicas: {{ .Values.nebula.storaged.replicas }}
+      {{- with  .Values.nebula.storaged.resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+        {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.nebula.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.nebula.storaged.dataStorage }}

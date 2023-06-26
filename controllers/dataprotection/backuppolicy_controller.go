@@ -22,7 +22,6 @@ package dataprotection
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"sort"
 	"strings"
@@ -325,22 +324,25 @@ func (r *BackupPolicyReconciler) reconcileForStatefulSetKind(
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
 	backType dataprotectionv1alpha1.BackupType,
 	cronExpression string) error {
-	backupName := getCreatedCRNameByBackupPolicy(backupPolicy.Name, backupPolicy.Namespace, backType)
+	backupName := getCreatedCRNameByBackupPolicy(generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace, backType)
 	backup := &dataprotectionv1alpha1.Backup{}
 	exists, err := intctrlutil.CheckResourceExists(ctx, r.Client, types.NamespacedName{Name: backupName, Namespace: backupPolicy.Namespace}, backup)
 	if err != nil {
 		return err
 	}
+	patch := client.MergeFrom(backup.DeepCopy())
 	backup.Name = backupName
 	backup.Namespace = backupPolicy.Namespace
+	if backup.Labels == nil {
+		backup.Labels = map[string]string{}
+	}
+	backup.Labels[constant.AppManagedByLabelKey] = constant.AppName
+	backup.Labels[dataProtectionLabelBackupPolicyKey] = backupPolicy.Name
+	backup.Labels[dataProtectionLabelBackupTypeKey] = string(backType)
+	backup.Labels[dataProtectionLabelAutoBackupKey] = "true"
 	if !exists {
 		if cronExpression == "" {
 			return nil
-		}
-		backup.Labels = map[string]string{
-			dataProtectionLabelBackupPolicyKey: backupPolicy.Name,
-			dataProtectionLabelBackupTypeKey:   string(backType),
-			dataProtectionLabelAutoBackupKey:   "true",
 		}
 		backup.Spec.BackupType = backType
 		backup.Spec.BackupPolicyName = backupPolicy.Name
@@ -348,12 +350,12 @@ func (r *BackupPolicyReconciler) reconcileForStatefulSetKind(
 	}
 
 	// notice to reconcile backup CR
-	patch := client.MergeFrom(backup.DeepCopy())
 	if cronExpression != "" && slices.Contains([]dataprotectionv1alpha1.BackupPhase{
 		dataprotectionv1alpha1.BackupCompleted, dataprotectionv1alpha1.BackupFailed},
 		backup.Status.Phase) {
 		// if schedule is enabled and backup already is completed, update phase to running
 		backup.Status.Phase = dataprotectionv1alpha1.BackupRunning
+		backup.Status.FailureReason = ""
 		return r.Client.Status().Patch(ctx, backup, patch)
 	}
 	if backup.Annotations == nil {
@@ -361,14 +363,6 @@ func (r *BackupPolicyReconciler) reconcileForStatefulSetKind(
 	}
 	backup.Annotations[constant.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
 	return r.Client.Patch(ctx, backup, patch)
-}
-
-func generateUniqueName(backupPolicy *dataprotectionv1alpha1.BackupPolicy) string {
-	uniqueName := backupPolicy.Name
-	if len(backupPolicy.OwnerReferences) > 0 {
-		uniqueName = fmt.Sprintf("%s-%s", backupPolicy.OwnerReferences[0].UID[:8], backupPolicy.OwnerReferences[0].Name)
-	}
-	return uniqueName
 }
 
 // buildCronJob builds cronjob from backup policy.
@@ -384,13 +378,17 @@ func (r *BackupPolicyReconciler) buildCronJob(
 	if err != nil {
 		return nil, err
 	}
+	tolerationPodSpec := corev1.PodSpec{}
+	if err = addTolerations(&tolerationPodSpec); err != nil {
+		return nil, err
+	}
 	var ttl metav1.Duration
 	if backupPolicy.Spec.Retention != nil && backupPolicy.Spec.Retention.TTL != nil {
 		ttl = metav1.Duration{Duration: dataprotectionv1alpha1.ToDuration(backupPolicy.Spec.Retention.TTL)}
 	}
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 	if cronJobName == "" {
-		cronJobName = getCreatedCRNameByBackupPolicy(generateUniqueName(backupPolicy), backupPolicy.Namespace, backType)
+		cronJobName = getCreatedCRNameByBackupPolicy(generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace, backType)
 	}
 	options := backupPolicyOptions{
 		Name:             cronJobName,
@@ -403,6 +401,7 @@ func (r *BackupPolicyReconciler) buildCronJob(
 		ServiceAccount:   viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME"),
 		MgrNamespace:     viper.GetString(constant.CfgKeyCtrlrMgrNS),
 		Image:            viper.GetString(constant.KBToolsImage),
+		Tolerations:      &tolerationPodSpec,
 	}
 	backupPolicyOptionsByte, err := json.Marshal(options)
 	if err != nil {

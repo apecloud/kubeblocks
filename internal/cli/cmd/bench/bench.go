@@ -52,7 +52,7 @@ func (o *BenchBaseOptions) BaseValidate() error {
 	}
 
 	if o.Database == "" {
-		return fmt.Errorf("database is required")
+		return fmt.Errorf("database name should be specified")
 	}
 
 	if o.Host == "" {

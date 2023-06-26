@@ -63,4 +63,5 @@ tmp/
 
 
 # helm dependency charts
+deploy/**/Chart.lock
 deploy/**/charts

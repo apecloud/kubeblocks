@@ -84,6 +84,10 @@ type BackupStatus struct {
 	// +optional
 	BackupToolName string `json:"backupToolName,omitempty"`
 
+	// availableReplicas available replicas for statefulSet which created by backup.
+	// +optional
+	AvailableReplicas *int32 `json:"availableReplicas,omitempty"`
+
 	// manifests determines the backup metadata info.
 	// +optional
 	Manifests *ManifestsStatus `json:"manifests,omitempty"`
@@ -257,17 +261,9 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 				b.Status.Manifests.BackupLog.StopTime == nil {
 				continue
 			}
-			backupLogInfo := b.Status.Manifests.BackupLog
-			if backupLogInfo.StartTime != nil {
-				// if base backup exists 'startTime', checks if the 'startTime' greater than or equals 'logfileStartTime'.
-				if !backupLogInfo.StartTime.Before(&logfileStartTime) {
-					return &b
-				}
-			} else {
-				// if base backup only exists 'stopTime', checks if the 'stopTime' greater than or equals 'logfileStartTime'.
-				if !backupLogInfo.StopTime.Before(&logfileStartTime) {
-					return &b
-				}
+			// checks if the 'stopTime' greater than or equals 'logfileStartTime'.
+			if !b.Status.Manifests.BackupLog.StopTime.Before(&logfileStartTime) {
+				return &b
 			}
 		}
 		return nil

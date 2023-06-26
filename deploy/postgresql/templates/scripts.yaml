@@ -79,14 +79,21 @@ data:
     #!/bin/bash
     set -o errexit
     set -ex
-    # first get the primary pod information from the DownwardAPI annotation, if it does not exist, get the primary pod information from env
-    primary=`cat /kb-podinfo/primary-pod`
-    echo "downwardAPI gey primary=$primary" >> /home/postgres/pgdata/.kb_set_up.log
+
+    # Waiting for primary pod information from the DownwardAPI annotation to be available, with a maximum of 5 attempts
+    attempt=1
+    max_attempts=5
+    while [ $attempt -le $max_attempts ] && [ -z "$(cat /kb-podinfo/primary-pod)" ]; do
+      sleep 5
+      attempt=$((attempt + 1))
+    done
+
+    primary=$(cat /kb-podinfo/primary-pod)
+    echo "DownwardAPI get primary=$primary" >> /home/postgres/pgdata/.kb_set_up.log
     echo "KB_POD_NAME=$KB_POD_NAME" >> /home/postgres/pgdata/.kb_set_up.log
     if [ -z "$primary" ]; then
-      echo "downwardAPI primary info is empty, try to get KB_PRIMARY_POD_NAME env value." >> /home/postgres/pgdata/.kb_set_up.log
-      echo "KB_PRIMARY_POD_NAME=$KB_PRIMARY_POD_NAME" >> /home/postgres/pgdata/.kb_set_up.log
-      primary=${KB_PRIMARY_POD_NAME%%\.*}
+      echo "Primary pod information not available. Exiting..."
+      exit 1
     fi
     if [ "$primary" != "$KB_POD_NAME" ]; then
         # waiting for primary pod to be ready

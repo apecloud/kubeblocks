@@ -185,10 +185,36 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 	if len(podList) == 0 {
 		return nil, nil
 	}
-	// sync pod role label and annotations
-	vertexes, err := r.asyncReplicationPodRoleLabelAndAnnotations(podList)
-	if err != nil {
-		return nil, err
+	primary := ""
+	vertexes := make([]graph.Vertex, 0)
+	for _, pod := range podList {
+		role, ok := pod.Labels[constant.RoleLabelKey]
+		if !ok || role == "" {
+			continue
+		}
+		if role == constant.Primary {
+			primary = pod.Name
+		}
+	}
+
+	for _, pod := range podList {
+		needUpdate := false
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+		switch {
+		case primary == "":
+			// if not exists primary pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
+			needUpdate = handlePrimaryNotExistPod(&pod)
+		default:
+			needUpdate = handlePrimaryExistPod(&pod, primary)
+		}
+		if needUpdate {
+			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+				Obj:    &pod,
+				Action: ictrltypes.ActionUpdatePtr(),
+			})
+		}
 	}
 	// rebuild cluster.status.components.replicationSet.status
 	if err := rebuildReplicationSetClusterStatus(r.Cluster, r.getWorkloadType(), r.getName(), podList); err != nil {
@@ -197,52 +223,31 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 	return vertexes, nil
 }
 
-// asyncReplicationPodRoleLabelAndAnnotations is used to async the role label and annotations of the Pod of the Replication workload.
-func (r *ReplicationSet) asyncReplicationPodRoleLabelAndAnnotations(podList []corev1.Pod) ([]graph.Vertex, error) {
-	primary := ""
-	vertexes := make([]graph.Vertex, 0)
-	var updateRolePodList []corev1.Pod
-	for _, pod := range podList {
-		// if there is no role label on the Pod, it needs to be patch role label.
-		if v, ok := pod.Labels[constant.RoleLabelKey]; !ok || v == "" {
-			updateRolePodList = append(updateRolePodList, pod)
-		} else if v == constant.Primary {
-			primary = pod.Name
+// handlePrimaryNotExistPod is used to handle the pod which is not exists primary pod.
+func handlePrimaryNotExistPod(pod *corev1.Pod) bool {
+	parent, o := util.ParseParentNameAndOrdinal(pod.Name)
+	defaultRole := DefaultRole(o)
+	pod.GetLabels()[constant.RoleLabelKey] = defaultRole
+	pod.Annotations[constant.PrimaryAnnotationKey] = fmt.Sprintf("%s-%d", parent, 0)
+	return true
+}
+
+// handlePrimaryExistPod is used to handle the pod which is exists primary pod.
+func handlePrimaryExistPod(pod *corev1.Pod, primary string) bool {
+	needPatch := false
+	if pod.Name != primary {
+		role, ok := pod.Labels[constant.RoleLabelKey]
+		if !ok || role != constant.Secondary {
+			pod.GetLabels()[constant.RoleLabelKey] = constant.Secondary
+			needPatch = true
 		}
 	}
-	// sync pod role label
-	if len(updateRolePodList) > 0 {
-		for _, pod := range updateRolePodList {
-			if pod.Annotations == nil {
-				pod.Annotations = map[string]string{}
-			}
-			// if exists primary Pod, it means that the Pod without a role label is a new secondary Pod created by h-scale.
-			if primary != "" {
-				pod.GetLabels()[constant.RoleLabelKey] = constant.Secondary
-			} else {
-				// if not exists primary Pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
-				parent, o := util.ParseParentNameAndOrdinal(pod.Name)
-				role := DefaultRole(o)
-				pod.GetLabels()[constant.RoleLabelKey] = role
-				primary = fmt.Sprintf("%s-%d", parent, 0)
-			}
-			if v, ok := pod.Annotations[constant.PrimaryAnnotationKey]; !ok || v != primary {
-				pod.Annotations[constant.PrimaryAnnotationKey] = primary
-			}
-			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
-				Obj:    &pod,
-				Action: ictrltypes.ActionUpdatePtr(), // update or patch?
-			})
-		}
-	} else {
-		// sync pods primary annotations
-		vertexesPatchAnnotation, err := patchPodsPrimaryAnnotation(podList, primary)
-		if err != nil {
-			return nil, err
-		}
-		vertexes = append(vertexes, vertexesPatchAnnotation...)
+	pk, ok := pod.Annotations[constant.PrimaryAnnotationKey]
+	if !ok || pk != primary {
+		pod.Annotations[constant.PrimaryAnnotationKey] = primary
+		needPatch = true
 	}
-	return vertexes, nil
+	return needPatch
 }
 
 // DefaultRole is used to get the default role of the Pod of the Replication workload.

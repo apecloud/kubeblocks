@@ -238,7 +238,7 @@ var _ = Describe("Replication Component", func() {
 			_ = testapps.MockReplicationComponentPod(nil, testCtx, replicationSetSts, clusterObj.Name, testapps.DefaultRedisCompSpecName, newPodName, "")
 			vertexes, err = replicationComponent.HandleRoleChange(ctx, replicationSetSts)
 			Expect(err).To(Succeed())
-			Expect(len(vertexes)).To(Equal(1))
+			Expect(len(vertexes)).To(Equal(3))
 			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.UPDATE).To(BeTrue())
 		})
 	})

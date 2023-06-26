@@ -15,14 +15,14 @@ spec:
 
   helm:
     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus-cluster
     {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus-cluster-{{ default .Chart.Version .Values.versionOverride }}.tgz
     {{- end }}
 
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: 15.16.1
+      version: {{ default .Chart.Version .Values.versionOverride }}
       {{- end }}
 
 

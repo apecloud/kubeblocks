@@ -1,5 +1,6 @@
 {{/*
-Get cloud provider, now support aws, gcp, aliyun and tencentCloud. For azure, we should get it from node.Spec.ProviderID
+Get cloud provider, now support aws, gcp, aliyun and tencentCloud.
+TODO: For azure, we should get provider from node.Spec.ProviderID
 */}}
 {{- define "cluster-libchart.cloudProvider" }}
 {{- $kubeVersion := .Capabilities.KubeVersion.GitVersion }}

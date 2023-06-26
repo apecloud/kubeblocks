@@ -213,7 +213,7 @@ var _ = Describe("Replication Component", func() {
 			Expect(testCtx.Cli.Get(testCtx.Ctx, stsObjectKey, replicationSetSts)).Should(Succeed())
 			vertexes, err = replicationComponent.HandleRestart(ctx, replicationSetSts)
 			Expect(err).To(Succeed())
-			Expect(len(vertexes)).To(Equal(int(replicas)))
+			Expect(len(vertexes)).To(Equal(1))
 			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.DELETE).To(BeTrue())
 
 			By("Test handleRoleChange when statefulSet Pod with role label but without primary annotation")

@@ -5,7 +5,17 @@ title: kbcli bench sysbench cleanup
 Cleanup the data of SysBench for cluster
 
 ```
-kbcli bench sysbench cleanup [NAME] [flags]
+kbcli bench sysbench cleanup [ClusterName] [flags]
+```
+
+### Examples
+
+```
+  # sysbench cleanup data on a cluster
+  kbcli bench sysbench cleanup mycluster --user xxx --password xxx --database mydb
+  
+  # sysbench cleanup data on a cluster with specified tables and size
+  kbcli bench sysbench cleanup mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
 ```
 
 ### Options

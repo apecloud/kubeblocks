@@ -22,6 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -63,6 +64,36 @@ type ClusterSpec struct {
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// +optional
+	Replicas int32 `json:"replicas,omitempty"`
+
+	// +optional
+	Resources ClusterResources `json:"resources,omitempty"`
+
+	// +optional
+	Storage ClusterStorage `json:"storage,omitempty"`
+
+	// +optional
+	Mode ClusterMode `json:"mode,omitempty"`
+
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty"`
+}
+
+type ClusterResources struct {
+
+	// +optional
+	CPU resource.Quantity `json:"cpu,omitempty"`
+
+	// +optional
+	Memory resource.Quantity `json:"memory,omitempty"`
+}
+
+type ClusterStorage struct {
+
+	// +optional
+	Size resource.Quantity `json:"size,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster.

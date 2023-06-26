@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
@@ -128,17 +128,24 @@ func (o *CreateBackupOptions) CompleteBackup() error {
 }
 
 func (o *CreateBackupOptions) Validate() error {
-	// validate
 	if o.Name == "" {
 		return fmt.Errorf("missing cluster name")
 	}
 	if o.BackupPolicy == "" {
-		return o.completeDefaultBackupPolicy()
+		if err := o.completeDefaultBackupPolicy(); err != nil {
+			return err
+		}
+	} else {
+		// check if backup policy exists
+		if _, err := o.Dynamic.Resource(types.BackupPolicyGVR()).Namespace(o.Namespace).Get(context.TODO(), o.BackupPolicy, metav1.GetOptions{}); err != nil {
+			return err
+		}
 	}
-	// check if backup policy exists
-	_, err := o.Dynamic.Resource(types.BackupPolicyGVR()).Namespace(o.Namespace).Get(context.TODO(), o.BackupPolicy, metav1.GetOptions{})
+	if o.BackupType == string(dpv1alpha1.BackupTypeLogFile) {
+		return fmt.Errorf(`can not create logfile backup, you can create it by enabling spec.schedule.logfile in BackupPolicy "%s"`, o.BackupPolicy)
+	}
 	// TODO: check if pvc exists
-	return err
+	return nil
 }
 
 // completeDefaultBackupPolicy completes the default backup policy.
@@ -212,6 +219,7 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.CompleteBackup())
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())
@@ -266,7 +274,7 @@ func printBackupList(o ListBackupOptions) error {
 	tbl := printer.NewTablePrinter(o.Out)
 	tbl.SetHeader("NAME", "CLUSTER", "TYPE", "STATUS", "TOTAL-SIZE", "DURATION", "CREATE-TIME", "COMPLETION-TIME", "EXPIRATION")
 	for _, obj := range backupList.Items {
-		backup := &dataprotectionv1alpha1.Backup{}
+		backup := &dpv1alpha1.Backup{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backup); err != nil {
 			return err
 		}
@@ -278,14 +286,18 @@ func printBackupList(o ListBackupOptions) error {
 		if backup.Status.Duration != nil {
 			durationStr = duration.HumanDuration(backup.Status.Duration.Duration)
 		}
+		statusString := string(backup.Status.Phase)
+		if backup.Status.Phase == dpv1alpha1.BackupRunning && backup.Status.AvailableReplicas != nil {
+			statusString = fmt.Sprintf("%s(AvailablePods: %d)", statusString, *backup.Status.AvailableReplicas)
+		}
 		if len(o.BackupName) > 0 {
 			if o.BackupName == obj.GetName() {
-				tbl.AddRow(backup.Name, clusterName, backup.Spec.BackupType, backup.Status.Phase, backup.Status.TotalSize,
+				tbl.AddRow(backup.Name, clusterName, backup.Spec.BackupType, statusString, backup.Status.TotalSize,
 					durationStr, util.TimeFormat(&backup.CreationTimestamp), util.TimeFormat(backup.Status.CompletionTimestamp))
 			}
 			continue
 		}
-		tbl.AddRow(backup.Name, clusterName, backup.Spec.BackupType, backup.Status.Phase, backup.Status.TotalSize,
+		tbl.AddRow(backup.Name, clusterName, backup.Spec.BackupType, statusString, backup.Status.TotalSize,
 			durationStr, util.TimeFormat(&backup.CreationTimestamp), util.TimeFormat(backup.Status.CompletionTimestamp),
 			util.TimeFormat(backup.Status.Expiration))
 	}
@@ -304,6 +316,7 @@ func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 		Run: func(cmd *cobra.Command, args []string) {
 			o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
 			o.Names = nil
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			util.CheckErr(o.Complete())
 			util.CheckErr(printBackupList(*o))
 		},
@@ -321,6 +334,7 @@ func NewDeleteBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Example:           deleteBackupExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			util.CheckErr(completeForDeleteBackup(o, args))
 			util.CheckErr(o.Run())
 		},
@@ -364,7 +378,7 @@ type CreateRestoreOptions struct {
 	create.CreateOptions `json:"-"`
 }
 
-func (o *CreateRestoreOptions) getClusterObject(backup *dataprotectionv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
+func (o *CreateRestoreOptions) getClusterObject(backup *dpv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
 	clusterName := backup.Labels[constant.AppInstanceLabelKey]
 	clusterObj, err := cluster.GetClusterByName(o.Dynamic, clusterName, o.Namespace)
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -392,11 +406,11 @@ func (o *CreateRestoreOptions) Run() error {
 
 func (o *CreateRestoreOptions) runRestoreFromBackup() error {
 	// get backup
-	backup := &dataprotectionv1alpha1.Backup{}
+	backup := &dpv1alpha1.Backup{}
 	if err := cluster.GetK8SClientObject(o.Dynamic, backup, types.BackupGVR(), o.Namespace, o.Backup); err != nil {
 		return err
 	}
-	if backup.Status.Phase != dataprotectionv1alpha1.BackupCompleted {
+	if backup.Status.Phase != dpv1alpha1.BackupCompleted {
 		return errors.Errorf(`backup "%s" is not completed.`, backup.Name)
 	}
 	if len(backup.Labels[constant.AppInstanceLabelKey]) == 0 {
@@ -450,7 +464,7 @@ func (o *CreateRestoreOptions) runPITR() error {
 	if err != nil {
 		return err
 	}
-	backup := &dataprotectionv1alpha1.Backup{}
+	backup := &dpv1alpha1.Backup{}
 
 	// no need to check items len because it is validated by o.validateRestoreTime().
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(objs.Items[0].Object, backup); err != nil {
@@ -482,7 +496,7 @@ func (o *CreateRestoreOptions) validateRestoreTime() error {
 	if o.RestoreTimeStr == "" && o.SourceCluster == "" {
 		return nil
 	}
-	if o.RestoreTimeStr == "" && o.SourceCluster == "" {
+	if o.RestoreTimeStr != "" && o.SourceCluster == "" {
 		return fmt.Errorf("--source-cluster must be specified if specified --restore-to-time")
 	}
 	restoreTime, err := util.TimeParse(o.RestoreTimeStr, time.Second)
@@ -498,15 +512,15 @@ func (o *CreateRestoreOptions) validateRestoreTime() error {
 	if err != nil {
 		return err
 	}
-	backups := make([]dataprotectionv1alpha1.Backup, 0)
+	backups := make([]dpv1alpha1.Backup, 0)
 	for _, i := range objs.Items {
-		obj := dataprotectionv1alpha1.Backup{}
+		obj := dpv1alpha1.Backup{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(i.Object, &obj); err != nil {
 			return err
 		}
 		backups = append(backups, obj)
 	}
-	recoverableTime := dataprotectionv1alpha1.GetRecoverableTimeRange(backups)
+	recoverableTime := dpv1alpha1.GetRecoverableTimeRange(backups)
 	for _, i := range recoverableTime {
 		if isTimeInRange(restoreTime, i.StartTime.Time, i.StopTime.Time) {
 			return nil
@@ -551,6 +565,7 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Example: createRestoreExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			util.CheckErr(o.Complete())
 			util.CheckErr(o.Validate())
 			util.CheckErr(o.Run())
@@ -573,6 +588,7 @@ func NewListBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStrea
 		Run: func(cmd *cobra.Command, args []string) {
 			o.LabelSelector = util.BuildLabelSelectorByNames(o.LabelSelector, args)
 			o.Names = nil
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			util.CheckErr(o.Complete())
 			util.CheckErr(printBackupPolicyList(*o))
 		},
@@ -604,7 +620,7 @@ func printBackupPolicyList(o list.ListOptions) error {
 	tbl.SetHeader("NAME", "DEFAULT", "CLUSTER", "CREATE-TIME", "STATUS")
 	for _, obj := range backupPolicyList.Items {
 		defaultPolicy, ok := obj.GetAnnotations()[constant.DefaultBackupPolicyAnnotationKey]
-		backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
+		backupPolicy := &dpv1alpha1.BackupPolicy{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backupPolicy); err != nil {
 			return err
 		}
@@ -629,6 +645,7 @@ func NewEditBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStrea
 		Example:               editExample,
 		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, types.BackupPolicyGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
 			cmdutil.CheckErr(o.Complete(cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run())

@@ -4,20 +4,47 @@ title: kbcli bench sysbench
 
 run a SysBench benchmark
 
+```
+kbcli bench sysbench [ClusterName] [flags]
+```
+
+### Examples
+
+```
+  # sysbench on a cluster
+  kbcli bench sysbench mycluster --user xxx --password xxx --database mydb
+  
+  # sysbench on a cluster with different threads
+  kbcli bench sysbench mycluster --user xxx --password xxx --database mydb --threads 4,8
+  
+  # sysbench on a cluster with different type
+  kbcli bench sysbench mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
+  
+  # sysbench on a cluster with specified read/write ratio
+  kbcli bench sysbench mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 80
+  
+  # sysbench on a cluster with specified tables and size
+  kbcli bench sysbench mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
+```
+
 ### Options
 
 ```
-      --database string   database name
-      --driver string     database driver
-  -h, --help              help for sysbench
-      --host string       the host of database
-      --password string   the password of database
-      --port int          the port of database
-      --size int          the data size of per table (default 20000)
-      --tables int        the number of tables (default 10)
-      --times int         the number of test times (default 100)
-      --type string       sysbench type (default "oltp_read_write_pct")
-      --user string       the user of database
+      --database string     database name
+      --driver string       database driver
+      --flag int            the flag of sysbench, 0(normal), 1(long), 2(three nodes)
+  -h, --help                help for sysbench
+      --host string         the host of database
+      --password string     the password of database
+      --port int            the port of database
+      --read-percent int    the percent of read, only useful when type is oltp_read_write_pct
+      --size int            the data size of per table (default 25000)
+      --tables int          the number of tables (default 10)
+      --threads ints        the number of threads, you can set multiple values, like 4,8 (default [4])
+      --times int           the number of test times (default 60)
+      --type strings        sysbench type, you can set multiple values (default [oltp_read_write])
+      --user string         the user of database
+      --write-percent int   the percent of write, only useful when type is oltp_read_write_pct
 ```
 
 ### Options inherited from parent commands

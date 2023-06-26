@@ -108,14 +108,14 @@ var _ = Describe("bench", func() {
 				Password: "test",
 			},
 			Mode:      "prepare",
-			Type:      "oltp_read_write_pct",
+			Type:      []string{"oltp_read_only"},
 			Tables:    1,
 			Size:      100,
 			Times:     1,
 			factory:   tf,
 			IOStreams: streams,
 		}
-		Expect(o.Complete(clusterName)).Should(BeNil())
+		Expect(o.Complete([]string{clusterName})).Should(BeNil())
 		Expect(o.Validate()).Should(BeNil())
 		Expect(o.Run()).Should(BeNil())
 	})

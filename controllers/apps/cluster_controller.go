@@ -185,8 +185,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&OwnershipTransformer{},
 			// make all workload objects depending on credential secret
 			&SecretTransformer{},
-			// make config configmap immutable
-			&ConfigTransformer{},
 			// update cluster status
 			&ClusterStatusTransformer{},
 			// always safe to put your transformer below

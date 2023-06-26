@@ -22,8 +22,8 @@ package replication
 import (
 	"context"
 	"fmt"
-	"reflect"
 
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,136 +35,68 @@ import (
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
-type ReplicationRole string
-
-const (
-	Primary   ReplicationRole = "primary"
-	Secondary ReplicationRole = "secondary"
-)
-
-// syncReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
-func syncReplicationSetClusterStatus(cluster *appsv1alpha1.Cluster,
-	workloadType appsv1alpha1.WorkloadType, compName string, podList []*corev1.Pod) error {
+// rebuildReplicationSetClusterStatus syncs replicationSet pod status to cluster.status.component[componentName].ReplicationStatus.
+func rebuildReplicationSetClusterStatus(cluster *appsv1alpha1.Cluster,
+	workloadType appsv1alpha1.WorkloadType, compName string, podList []corev1.Pod) error {
 	if len(podList) == 0 {
 		return nil
 	}
 
-	replicationStatus := cluster.Status.Components[compName].ReplicationSetStatus
-	if replicationStatus == nil {
+	var oldReplicationStatus *appsv1alpha1.ReplicationSetStatus
+	if v, ok := cluster.Status.Components[compName]; ok {
+		oldReplicationStatus = v.ReplicationSetStatus
+	}
+
+	newReplicationStatus := &appsv1alpha1.ReplicationSetStatus{}
+	if err := genReplicationSetStatus(newReplicationStatus, podList); err != nil {
+		return err
+	}
+	// if status changed, do update
+	if !cmp.Equal(newReplicationStatus, oldReplicationStatus) {
 		if err := util.InitClusterComponentStatusIfNeed(cluster, compName, workloadType); err != nil {
 			return err
 		}
-		replicationStatus = cluster.Status.Components[compName].ReplicationSetStatus
+		componentStatus := cluster.Status.Components[compName]
+		componentStatus.ReplicationSetStatus = newReplicationStatus
+		cluster.Status.SetComponentStatus(compName, componentStatus)
 	}
-	return syncReplicationSetStatus(replicationStatus, podList)
+	return nil
 }
 
-// syncReplicationSetStatus syncs the target pod info in cluster.status.components.
-func syncReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []*corev1.Pod) error {
+// genReplicationSetStatus generates ReplicationSetStatus from podList.
+func genReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []corev1.Pod) error {
 	for _, pod := range podList {
 		role := pod.Labels[constant.RoleLabelKey]
 		if role == "" {
 			return fmt.Errorf("pod %s has no role label", pod.Name)
 		}
-		if role == string(Primary) {
-			if replicationStatus.Primary.Pod == pod.Name {
-				continue
+		switch role {
+		case constant.Primary:
+			if replicationStatus.Primary.Pod != "" {
+				return fmt.Errorf("more than one primary pod found")
 			}
 			replicationStatus.Primary.Pod = pod.Name
-			// if current primary pod in secondary list, it means the primary pod has been switched, remove it.
-			for index, secondary := range replicationStatus.Secondaries {
-				if secondary.Pod == pod.Name {
-					replicationStatus.Secondaries = append(replicationStatus.Secondaries[:index], replicationStatus.Secondaries[index+1:]...)
-					break
-				}
-			}
-		} else {
-			var exist = false
-			for _, secondary := range replicationStatus.Secondaries {
-				if secondary.Pod == pod.Name {
-					exist = true
-					break
-				}
-			}
-			if !exist {
-				replicationStatus.Secondaries = append(replicationStatus.Secondaries, appsv1alpha1.ReplicationMemberStatus{
-					Pod: pod.Name,
-				})
-			}
+		case constant.Secondary:
+			replicationStatus.Secondaries = append(replicationStatus.Secondaries, appsv1alpha1.ReplicationMemberStatus{
+				Pod: pod.Name,
+			})
+		default:
+			return fmt.Errorf("unknown role %s", role)
 		}
 	}
 	return nil
 }
 
-// removeTargetPodsInfoInStatus removes the target pod info from cluster.status.components.
-func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus,
-	targetPodList []*corev1.Pod,
-	componentReplicas int32) error {
-	if replicationStatus == nil {
-		return nil
-	}
-	targetPodNameMap := make(map[string]struct{})
-	for _, pod := range targetPodList {
-		targetPodNameMap[pod.Name] = struct{}{}
-	}
-	if _, ok := targetPodNameMap[replicationStatus.Primary.Pod]; ok {
-		if componentReplicas != 0 {
-			return fmt.Errorf("primary pod cannot be removed")
-		}
-		replicationStatus.Primary = appsv1alpha1.ReplicationMemberStatus{
-			Pod: constant.ComponentStatusDefaultPodName,
-		}
-	}
-	newSecondaries := make([]appsv1alpha1.ReplicationMemberStatus, 0)
-	for _, secondary := range replicationStatus.Secondaries {
-		if _, ok := targetPodNameMap[secondary.Pod]; ok {
-			continue
-		}
-		// add pod that do not need to be removed to newSecondaries slice.
-		newSecondaries = append(newSecondaries, secondary)
-	}
-	replicationStatus.Secondaries = newSecondaries
-	return nil
-}
-
-// checkObjRoleLabelIsPrimary checks whether it is the primary obj(statefulSet or pod) by the label tag on obj.
-func checkObjRoleLabelIsPrimary[T generics.Object, PT generics.PObject[T]](obj PT) (bool, error) {
-	if obj == nil || obj.GetLabels() == nil {
-		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
-		// error type checking (errors.Is)
-		return false, fmt.Errorf("obj %s or obj's labels is nil, pls check", obj.GetName())
-	}
-	if _, ok := obj.GetLabels()[constant.RoleLabelKey]; !ok {
-		// REVIEW/TODO: need avoid using dynamic error string, this is bad for
-		// error type checking (errors.Is)
-		return false, fmt.Errorf("obj %s or obj labels key is nil, pls check", obj.GetName())
-	}
-	return obj.GetLabels()[constant.RoleLabelKey] == string(Primary), nil
-}
-
-// getReplicationSetPrimaryObj gets the primary obj(statefulSet or pod) of the replication workload.
-func getReplicationSetPrimaryObj[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
-	ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, _ func(T, L), compSpecName string) (PT, error) {
-	var (
-		objList L
-	)
-	matchLabels := client.MatchingLabels{
-		constant.AppInstanceLabelKey:    cluster.Name,
-		constant.KBAppComponentLabelKey: compSpecName,
-		constant.AppManagedByLabelKey:   constant.AppName,
-		constant.RoleLabelKey:           string(Primary),
-	}
-	if err := cli.List(ctx, PL(&objList), client.InNamespace(cluster.Namespace), matchLabels); err != nil {
+// getAndCheckReplicationSetPrimaryPod gets and checks the primary Pod of the replication workload.
+func getAndCheckReplicationSetPrimaryPod(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compSpecName string) (*corev1.Pod, error) {
+	podList, err := util.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, constant.Primary)
+	if err != nil {
 		return nil, err
 	}
-	objListItems := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
-	if len(objListItems) != 1 {
-		// TODO:(xingran) Temporary modification to fix the issue where the cluster state cannot reach the final state
-		// due to the update order of the role label. Subsequent PR will immediately reconstruct this part.
-		return nil, nil
-		// return nil, fmt.Errorf("the number of current replicationSet primary obj is not 1, pls check")
+	if len(podList.Items) != 1 {
+		return nil, fmt.Errorf("the number of current replicationSet primary obj is not 1, pls check")
 	}
-	return &objListItems[0], nil
+	return &podList.Items[0], nil
 }
 
 // updateObjRoleLabel updates the value of the role label of the object.
@@ -179,25 +111,6 @@ func updateObjRoleLabel[T generics.Object, PT generics.PObject[T]](
 	return nil
 }
 
-// filterReplicationWorkload filters workload which workloadType is not Replication.
-func filterReplicationWorkload(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	compSpecName string) (*appsv1alpha1.ClusterComponentDefinition, error) {
-	if compSpecName == "" {
-		return nil, fmt.Errorf("cluster's compSpecName is nil, pls check")
-	}
-	compDefName := cluster.Spec.GetComponentDefRefName(compSpecName)
-	compDef, err := util.GetComponentDefByCluster(ctx, cli, *cluster, compDefName)
-	if err != nil {
-		return compDef, err
-	}
-	if compDef == nil || compDef.WorkloadType != appsv1alpha1.Replication {
-		return nil, nil
-	}
-	return compDef, nil
-}
-
 // HandleReplicationSetRoleChangeEvent handles the role change event of the replication workload when switchPolicy is Noop.
 func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
@@ -206,7 +119,7 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	pod *corev1.Pod,
 	newRole string) error {
 	// if newRole is not Primary or Secondary, ignore it.
-	if !slices.Contains([]string{string(Primary), string(Secondary)}, newRole) {
+	if !slices.Contains([]string{constant.Primary, constant.Secondary}, newRole) {
 		reqCtx.Log.Info("replicationSet new role is invalid, please check", "new role", newRole)
 		return nil
 	}
@@ -222,7 +135,7 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 		return nil
 	}
 
-	oldPrimaryPod, err := getReplicationSetPrimaryObj(reqCtx.Ctx, cli, cluster, generics.PodSignature, compName)
+	oldPrimaryPod, err := getAndCheckReplicationSetPrimaryPod(reqCtx.Ctx, cli, *cluster, compName)
 	if err != nil {
 		reqCtx.Log.Info("handleReplicationSetRoleChangeEvent gets old primary pod failed", "error", err)
 		return err
@@ -241,13 +154,16 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	}
 
 	// update old primary pod to secondary
-	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *oldPrimaryPod, string(Secondary)); err != nil {
+	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *oldPrimaryPod, constant.Secondary); err != nil {
 		return err
 	}
+	reqCtx.Log.Info("update old primary pod to secondary success", "old primary podName", oldPrimaryPod.Name)
 
 	// update secondary pod to primary
-	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *pod, string(Primary)); err != nil {
+	if err := updateObjRoleLabel(reqCtx.Ctx, cli, *pod, constant.Primary); err != nil {
 		return err
 	}
+	reqCtx.Log.Info("update secondary pod to primary success", "new primary podName", pod.Name)
+
 	return nil
 }

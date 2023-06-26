@@ -1,0 +1,22 @@
+nebula:
+  ## @param nebula.version, version of nebula-graph
+  ## more info: check https://docs.nebula-graph.io/ for latest and LTS versions
+  version: v3.5.0
+  graphd:
+    ## @param nebula.graphd.image, container image settings
+    image:
+      repository: docker.io/vesoft/nebula-graphd
+      tag: v3.5.0
+      pullPolicy: IfNotPresent
+  metad:
+    ## @param nebula.metad.image, container image settings
+    image:
+      repository: docker.io/vesoft/nebula-metad
+      tag: v3.5.0
+      pullPolicy: IfNotPresent
+  storaged:
+    ## @param nebula.storaged.image, container image settings
+    image:
+      repository: docker.io/vesoft/nebula-storaged
+      tag: v3.5.0
+      pullPolicy: IfNotPresent

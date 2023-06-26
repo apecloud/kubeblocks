@@ -161,7 +161,7 @@ const (
 	ConditionTypeApplyResources            = "ApplyResources"            // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
 	ConditionTypeReplicasReady             = "ReplicasReady"             // ConditionTypeReplicasReady all pods of components are ready
 	ConditionTypeReady                     = "Ready"                     // ConditionTypeReady all components are running
-
+	ConditionTypeSwitchoverPrefix          = "Switchover-"               // ConditionTypeSwitchoverPrefix component status condition of switchover
 )
 
 // Phase defines the ClusterDefinition and ClusterVersion  CR .status.phase
@@ -202,7 +202,7 @@ const (
 
 // OpsType defines operation types.
 // +enum
-// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose}
+// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover}
 type OpsType string
 
 const (
@@ -211,6 +211,7 @@ const (
 	VolumeExpansionType   OpsType = "VolumeExpansion"
 	UpgradeType           OpsType = "Upgrade"
 	ReconfiguringType     OpsType = "Reconfiguring"
+	SwitchoverType        OpsType = "Switchover"
 	RestartType           OpsType = "Restart" // RestartType the restart operation is a special case of the rolling update operation.
 	StopType              OpsType = "Stop"    // StopType the stop operation will delete all pods in a cluster concurrently.
 	StartType             OpsType = "Start"   // StartType the start operation will start the pods which is deleted in stop operation.
@@ -508,8 +509,9 @@ const (
 )
 
 // SwitchPolicyType defines switchPolicy type.
+// Currently, only Noop is supported. MaximumAvailability and MaximumDataProtection will be supported in the future.
 // +enum
-// +kubebuilder:validation:Enum={MaximumAvailability, MaximumDataProtection, Noop}
+// +kubebuilder:validation:Enum={Noop}
 type SwitchPolicyType string
 
 const (

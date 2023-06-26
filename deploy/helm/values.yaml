@@ -285,24 +285,37 @@ dataProtection:
   backupPVConfigMapNamespace: ""
 
 ## Addon controller settings, this will require cluster-admin clusterrole.
+##
+## @param addonController.enabled
+## @param addonController.jobTTL - is addon job time-to-live period, this value is time.Duration-parseable string.
+  ## default value is "5m" if not provided.
+## @param addonController.jobImagePullPolicy - addon install job image pull policy.
 addonController:
   enabled: true
-  ## @param jobTTL is addon job time-to-live period, this value is time.Duration-parseable string.
-  ## default value is "5m" if not provided.
-  ##
   jobTTL: "5m"
   jobImagePullPolicy: IfNotPresent
 
+
+## @param keepAddons - keep Addon CR objects when delete this chart.
 keepAddons: false
+
+## @param addonChartLocationBase - KubeBlocks official addon's chart location base, to be released in an air-gapped environment.
+addonChartLocationBase: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts
+
+## @param addonHelmInstallOptions - addon helm install options.
+addonHelmInstallOptions:
+  - "--atomic"
+  - "--cleanup-on-fail"
+  - "--wait"
+  - "--insecure-skip-tls-verify"
 
 ## Dashboards settings
 ##
+## @param dashboards.enabled - If false, dashboards will not be installed.
 dashboards:
-  ## If false, dashboards will not be installed
-  ##
   enabled: true
 
-# Sub-charts
+# Sub-charts values (NOTES: following doesn't required @param documentations)
 prometheus:
   ## If false, prometheus sub-chart will not be installed
   ##
@@ -834,7 +847,7 @@ prometheus:
             - alert: PostgreSQLTooManySlowQueries
               expr: |
                 max by(namespace,app_kubernetes_io_instance,pod,datname) (
-                  max_over_time(pg_stat_activity_max_tx_duration{datname!~"template.*|postgres"}[2m])
+                  max_over_time(pg_stat_activity_max_tx_duration{datname!~"template.*"}[2m])
                 ) > 60
               for: 2m
               labels:
@@ -845,7 +858,7 @@ prometheus:
 
             - alert: PostgreSQLTooManyConnections
               expr: |
-                sum by (namespace,app_kubernetes_io_instance,pod) (pg_stat_activity_count{datname!~"template.*|postgres"})
+                sum by (namespace,app_kubernetes_io_instance,pod) (pg_stat_activity_count{datname!~"template.*"})
                 > on(namespace,app_kubernetes_io_instance,pod)
                 (pg_settings_max_connections - pg_settings_superuser_reserved_connections) * 0.8
               for: 2m
@@ -856,7 +869,7 @@ prometheus:
                 description: 'PostgreSQL has too many connections and the value is {{ $value | printf "%.2f" }} percent. (instance: {{ $labels.pod }})'
 
             - alert: PostgreSQLDeadLocks
-              expr: 'increase(pg_stat_database_deadlocks{datname!~"template.*|postgres", datname!=""}[2m]) > 5'
+              expr: 'increase(pg_stat_database_deadlocks_total{datname!~"template.*", datname!=""}[2m]) > 5'
               for: 2m
               labels:
                 severity: warning
@@ -866,9 +879,9 @@ prometheus:
 
             - alert: PostgreSQLHighRollbackRate
               expr: |
-                rate(pg_stat_database_xact_rollback{datname!~"template.*|postgres", datname!=""}[2m])
+                rate(pg_stat_database_xact_rollback_total{datname!~"template.*", datname!=""}[2m])
                 /
-                rate(pg_stat_database_xact_commit{datname!~"template.*|postgres", datname!=""}[2m])
+                rate(pg_stat_database_xact_commit_total{datname!~"template.*", datname!=""}[2m])
                 > 0.1
               for: 2m
               labels:
@@ -893,15 +906,15 @@ prometheus:
             - alert: PostgreSQLCacheHitRatio
               expr: |
                 avg by (namespace,app_kubernetes_io_instance,pod,datname) (
-                  rate(pg_stat_database_blks_hit{datname!~"template.*|postgres", datname!=""}[2m])
+                  rate(pg_stat_database_blks_hit_total{datname!~"template.*", datname!=""}[2m])
                   /
                   (
                     rate(
-                      pg_stat_database_blks_hit{datname!~"template.*|postgres", datname!=""}[2m]
+                      pg_stat_database_blks_hit_total{datname!~"template.*", datname!=""}[2m]
                     )
                     +
                     rate(
-                      pg_stat_database_blks_read{datname!~"template.*|postgres", datname!=""}[2m]
+                      pg_stat_database_blks_read_total{datname!~"template.*", datname!=""}[2m]
                     )
                   )
                 ) < 0.9
@@ -923,9 +936,9 @@ prometheus:
 
             - alert: PostgreSQLHighWALFilesArchiveErrorRate
               expr: |
-                rate(pg_stat_archiver_failed_count[2m])
+                rate(pg_stat_archiver_failed_count_total[2m])
                 / (
-                  rate(pg_stat_archiver_archived_count[2m]) + rate(pg_stat_archiver_failed_count[2m])
+                  rate(pg_stat_archiver_archived_count_total[2m]) + rate(pg_stat_archiver_failed_count_total[2m])
                 ) > 0.1
               for: 2m
               labels:
@@ -1499,8 +1512,6 @@ snapshot-controller:
 
   volumeSnapshotClasses:
     - name: default-vsc
-      annotations:
-        snapshot.storage.kubernetes.io/is-default-class: "true"
       driver: hostpath.csi.k8s.io
       deletionPolicy: Delete
 
@@ -1545,21 +1556,10 @@ alertmanager-webhook-adaptor:
   ##
   # enabled: false
 
-  replicaCount: 1
-
   ## Webhook-Adaptor container image
   ##
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
-    repository: apecloud/alertmanager-webhook-adaptor
-    pullPolicy: IfNotPresent
-    tag: "0.1.4"
-
-  tolerations:
-    - key: kb-controller
-      operator: Equal
-      value: "true"
-      effect: NoSchedule
 
   affinity:
     nodeAffinity:
@@ -1575,18 +1575,6 @@ alertmanager-webhook-adaptor:
   ## ConfigMap override where fullname is {{.Release.Name}}-{{.Values.configMapOverrideName}}
   ##
   configMapOverrideName: "config"
-
-  resources: { }
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
 
   ## Webhook-Adaptor ConfigMap Entries
   configFiles:
@@ -1638,9 +1626,7 @@ agamotto:
   enabled: false
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
-    repository: apecloud/agamotto
-    pullPolicy: IfNotPresent
-    tag: 0.1.0-beta.2
+
 
 ## @section KubeBlocks default storageClass Parameters for cloud provider.
 storageClass:

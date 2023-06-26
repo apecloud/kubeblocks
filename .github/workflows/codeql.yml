@@ -5,8 +5,6 @@ on:
     - cron: '0 0 * * *'
   push:
     branches: [ "main", release-*, releasing-* ]
-  pull_request:
-    branches: [ "main", release-*, releasing-* ]
 
 env:
   BASE_BRANCH: origin/main

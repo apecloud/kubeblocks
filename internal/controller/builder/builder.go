@@ -46,12 +46,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type componentPathedName struct {
-	Namespace   string `json:"namespace,omitempty"`
-	ClusterName string `json:"clusterName,omitempty"`
-	Name        string `json:"name,omitempty"`
-}
-
 const (
 	VolumeName = "tls"
 	CAName     = "ca.crt"
@@ -455,60 +449,20 @@ func BuildPVC(cluster *appsv1alpha1.Cluster,
 // envFrom.configMapRef with name of "$(cluster.metadata.name)-$(component.name)-env" pattern.
 func BuildEnvConfig(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*corev1.ConfigMap, error) {
 	const tplFile = "env_config_template.cue"
-	prefix := constant.KBPrefix + "_"
+	envData := map[string]string{}
 
-	svcName := strings.Join([]string{cluster.Name, component.Name, "headless"}, "-")
-	cnt := strconv.Itoa(int(component.Replicas))
-	suffixes := make([]string, 0, 4+component.Replicas)
-	envData := map[string]string{
-		prefix + "REPLICA_COUNT": cnt,
-	}
-
-	for j := 0; j < int(component.Replicas); j++ {
-		toA := strconv.Itoa(j)
-		suffix := toA + "_HOSTNAME"
-		value := fmt.Sprintf("%s.%s", cluster.Name+"-"+component.Name+"-"+toA, svcName)
-		envData[prefix+suffix] = value
-		suffixes = append(suffixes, suffix)
-
-		// build env for replication workload
-		if component.WorkloadType == appsv1alpha1.Replication {
-			envData[constant.KBReplicationSetPrimaryPodName] =
-				fmt.Sprintf("%s-%s-%d.%s", cluster.Name, component.Name, component.GetPrimaryIndex(), svcName)
-		}
+	// build common env
+	commonEnv := buildWorkloadCommonEnv(cluster, component)
+	for k, v := range commonEnv {
+		envData[k] = v
 	}
 
 	// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
 	// build consensus env from cluster.status
-	if v, ok := cluster.Status.Components[component.Name]; ok && v.ConsensusSetStatus != nil {
-		consensusSetStatus := v.ConsensusSetStatus
-		if consensusSetStatus.Leader.Pod != constant.ComponentStatusDefaultPodName {
-			envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
-			suffixes = append(suffixes, "LEADER")
-		}
-		followers := make([]string, 0, len(consensusSetStatus.Followers))
-		for _, follower := range consensusSetStatus.Followers {
-			if follower.Pod == constant.ComponentStatusDefaultPodName {
-				continue
-			}
-			followers = append(followers, follower.Pod)
-		}
-		envData[prefix+"FOLLOWERS"] = strings.Join(followers, ",")
-		suffixes = append(suffixes, "FOLLOWERS")
+	consensusEnv := buildConsensusSetEnv(cluster, component)
+	for k, v := range consensusEnv {
+		envData[k] = v
 	}
-
-	// set cluster uid to let pod know if the cluster is recreated
-	envData[prefix+"CLUSTER_UID"] = string(cluster.UID)
-	suffixes = append(suffixes, "CLUSTER_UID")
-
-	// have backward compatible handling for CM key with 'compDefName' being part of the key name
-	// TODO: need to deprecate 'compDefName' being part of variable name, as it's redundant
-	// and introduce env/cm key naming reference complexity
-	prefixWithCompDefName := prefix + strings.ToUpper(component.CompDefName) + "_"
-	for _, s := range suffixes {
-		envData[prefixWithCompDefName+s] = envData[prefix+s]
-	}
-	envData[prefixWithCompDefName+"N"] = envData[prefix+"REPLICA_COUNT"]
 
 	config := corev1.ConfigMap{}
 	if err := buildFromCUE(tplFile, map[string]any{
@@ -519,6 +473,63 @@ func BuildEnvConfig(cluster *appsv1alpha1.Cluster, component *component.Synthesi
 		return nil, err
 	}
 	return &config, nil
+}
+
+// buildWorkloadCommonEnv builds common env for all workload types.
+func buildWorkloadCommonEnv(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) map[string]string {
+	prefix := constant.KBPrefix + "_"
+	cnt := strconv.Itoa(int(component.Replicas))
+	svcName := strings.Join([]string{cluster.Name, component.Name, "headless"}, "-")
+	suffixes := make([]string, 0, 4+component.Replicas)
+	env := map[string]string{
+		prefix + "REPLICA_COUNT": cnt,
+	}
+
+	for j := 0; j < int(component.Replicas); j++ {
+		toA := strconv.Itoa(j)
+		suffix := toA + "_HOSTNAME"
+		value := fmt.Sprintf("%s.%s", cluster.Name+"-"+component.Name+"-"+toA, svcName)
+		env[prefix+suffix] = value
+		suffixes = append(suffixes, suffix)
+	}
+
+	// set cluster uid to let pod know if the cluster is recreated
+	env[prefix+"CLUSTER_UID"] = string(cluster.UID)
+	suffixes = append(suffixes, "CLUSTER_UID")
+
+	// have backward compatible handling for CM key with 'compDefName' being part of the key name
+	// TODO: need to deprecate 'compDefName' being part of variable name, as it's redundant
+	// and introduce env/cm key naming reference complexity
+	prefixWithCompDefName := prefix + strings.ToUpper(component.CompDefName) + "_"
+	for _, s := range suffixes {
+		env[prefixWithCompDefName+s] = env[prefix+s]
+	}
+	env[prefixWithCompDefName+"N"] = env[prefix+"REPLICA_COUNT"]
+	return env
+}
+
+// buildConsensusSetEnv builds env for consensus workload.
+func buildConsensusSetEnv(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) map[string]string {
+	env := map[string]string{}
+	prefix := constant.KBPrefix + "_"
+	prefixWithCompDefName := prefix + strings.ToUpper(component.CompDefName) + "_"
+	if v, ok := cluster.Status.Components[component.Name]; ok && v.ConsensusSetStatus != nil {
+		consensusSetStatus := v.ConsensusSetStatus
+		if consensusSetStatus.Leader.Pod != constant.ComponentStatusDefaultPodName {
+			env[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
+			env[prefixWithCompDefName+"LEADER"] = env[prefix+"LEADER"]
+		}
+		followers := make([]string, 0, len(consensusSetStatus.Followers))
+		for _, follower := range consensusSetStatus.Followers {
+			if follower.Pod == constant.ComponentStatusDefaultPodName {
+				continue
+			}
+			followers = append(followers, follower.Pod)
+		}
+		env[prefix+"FOLLOWERS"] = strings.Join(followers, ",")
+		env[prefixWithCompDefName+"FOLLOWERS"] = env[prefix+"FOLLOWERS"]
+	}
+	return env
 }
 
 func BuildBackup(cluster *appsv1alpha1.Cluster,
@@ -648,20 +659,6 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 	return &container, nil
 }
 
-func BuildTLSSecret(namespace, clusterName, componentName string) (*corev1.Secret, error) {
-	const tplFile = "tls_certs_secret_template.cue"
-	secret := &corev1.Secret{}
-	pathedName := componentPathedName{
-		Namespace:   namespace,
-		ClusterName: clusterName,
-		Name:        componentName,
-	}
-	if err := buildFromCUE(tplFile, map[string]any{"pathedName": pathedName}, "secret", secret); err != nil {
-		return nil, err
-	}
-	return secret, nil
-}
-
 func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1alpha1.Backup, podSpec *corev1.PodSpec) (*batchv1.Job, error) {
 	const tplFile = "backup_manifests_template.cue"
 	job := &batchv1.Job{}
@@ -678,7 +675,7 @@ func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1a
 	return job, nil
 }
 
-func BuildRestoreJob(name, namespace string, image string, command []string, args []string,
+func BuildRestoreJob(name, namespace string, image string, command []string,
 	volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, env []corev1.EnvVar, resources *corev1.ResourceRequirements) (*batchv1.Job, error) {
 	const tplFile = "restore_job_template.cue"
 	job := &batchv1.Job{}
@@ -688,7 +685,6 @@ func BuildRestoreJob(name, namespace string, image string, command []string, arg
 		"job.spec.template.spec.volumes": volumes,
 		"container.image":                image,
 		"container.command":              command,
-		"container.args":                 args,
 		"container.volumeMounts":         volumeMounts,
 		"container.env":                  env,
 	}
@@ -742,4 +738,18 @@ func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildPa
 		}
 	}
 	return toolContainers, nil
+}
+
+func BuildVolumeSnapshotClass(name string, driver string) (*snapshotv1.VolumeSnapshotClass, error) {
+	const tplFile = "volumesnapshotclass.cue"
+	vsc := &snapshotv1.VolumeSnapshotClass{}
+	if err := buildFromCUE(tplFile,
+		map[string]any{
+			"class.metadata.name": name,
+			"class.driver":        driver,
+		},
+		"class", vsc); err != nil {
+		return nil, err
+	}
+	return vsc, nil
 }

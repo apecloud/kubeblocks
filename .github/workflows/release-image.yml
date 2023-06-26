@@ -68,10 +68,18 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: send message
+        id: send_message
         run: |
+          release_result="${{ env.RELEASE_VERSION }}-image"
+          touch ${release_result}
+          echo 'release-result='${release_result} >> $GITHUB_OUTPUT
+          
           CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0image\u00a0error"
           if [[ "${{ needs.release-image.result }}" == "success" && "${{ needs.release-tools-image.result }}" == "success" ]]; then
               CONTENT="release\u00a0${{ env.RELEASE_VERSION }}\u00a0image\u00a0success"
+              echo "success" > ${release_result}
+          else
+              echo "error" > ${release_result}
           fi
           
           bash .github/utils/utils.sh --type 12 \
@@ -79,3 +87,11 @@ jobs:
             --content "${CONTENT}"\
             --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+      - name: Save Artifact
+        id: cache-artifact-save
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            ${{ steps.send_message.outputs.release-result }}
+          key: ${{ steps.send_message.outputs.release-result }}

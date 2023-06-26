@@ -28,7 +28,7 @@ data:
 
     exporters:
       prometheus:
-        endpoint: 0.0.0.0:1234
+        endpoint: 0.0.0.0:{{ .Values.metrics.service.port }}
         send_timestamps: false
         metric_expiration: 20s
         enable_open_metrics: false
@@ -44,4 +44,4 @@ data:
           receivers: [ apecloudmysql ]
           processors: [ memory_limiter ]
           exporters: [ prometheus ]
-      extensions: [ memory_ballast ]
+      extensions: [ ]

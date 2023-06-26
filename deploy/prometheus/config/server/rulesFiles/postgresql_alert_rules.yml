@@ -36,7 +36,7 @@ groups:
       - alert: PostgreSQLTooManySlowQueries
         expr: |
           max by(namespace,app_kubernetes_io_instance,pod,datname) (
-            max_over_time(pg_stat_activity_max_tx_duration{datname!~"template.*|postgres"}[2m])
+            max_over_time(pg_stat_activity_max_tx_duration{datname!~"template.*"}[2m])
           ) > 60
         for: 2m
         labels:
@@ -47,7 +47,7 @@ groups:
 
       - alert: PostgreSQLTooManyConnections
         expr: |
-          sum by (namespace,app_kubernetes_io_instance,pod) (pg_stat_activity_count{datname!~"template.*|postgres"})
+          sum by (namespace,app_kubernetes_io_instance,pod) (pg_stat_activity_count{datname!~"template.*"})
           > on(namespace,app_kubernetes_io_instance,pod)
           (pg_settings_max_connections - pg_settings_superuser_reserved_connections) * 0.8
         for: 2m
@@ -58,7 +58,7 @@ groups:
           description: 'PostgreSQL has too many connections and the value is {{ $value | printf "%.2f" }} percent. (instance: {{ $labels.pod }})'
 
       - alert: PostgreSQLDeadLocks
-        expr: 'increase(pg_stat_database_deadlocks{datname!~"template.*|postgres", datname!=""}[2m]) > 5'
+        expr: 'increase(pg_stat_database_deadlocks_total{datname!~"template.*", datname!=""}[2m]) > 5'
         for: 2m
         labels:
           severity: warning
@@ -68,9 +68,9 @@ groups:
 
       - alert: PostgreSQLHighRollbackRate
         expr: |
-          rate(pg_stat_database_xact_rollback{datname!~"template.*|postgres", datname!=""}[2m])
+          rate(pg_stat_database_xact_rollback_total{datname!~"template.*", datname!=""}[2m])
           /
-          rate(pg_stat_database_xact_commit{datname!~"template.*|postgres", datname!=""}[2m])
+          rate(pg_stat_database_xact_commit_total{datname!~"template.*", datname!=""}[2m])
           > 0.1
         for: 2m
         labels:
@@ -95,15 +95,15 @@ groups:
       - alert: PostgreSQLCacheHitRatio
         expr: |
           avg by (namespace,app_kubernetes_io_instance,pod,datname) (
-            rate(pg_stat_database_blks_hit{datname!~"template.*|postgres", datname!=""}[2m])
+            rate(pg_stat_database_blks_hit_total{datname!~"template.*", datname!=""}[2m])
             /
             (
               rate(
-                pg_stat_database_blks_hit{datname!~"template.*|postgres", datname!=""}[2m]
+                pg_stat_database_blks_hit_total{datname!~"template.*", datname!=""}[2m]
               )
               +
               rate(
-                pg_stat_database_blks_read{datname!~"template.*|postgres", datname!=""}[2m]
+                pg_stat_database_blks_read_total{datname!~"template.*", datname!=""}[2m]
               )
             )
           ) < 0.9
@@ -125,9 +125,9 @@ groups:
 
       - alert: PostgreSQLHighWALFilesArchiveErrorRate
         expr: |
-          rate(pg_stat_archiver_failed_count[2m])
+          rate(pg_stat_archiver_failed_count_total[2m])
           / (
-            rate(pg_stat_archiver_archived_count[2m]) + rate(pg_stat_archiver_failed_count[2m])
+            rate(pg_stat_archiver_archived_count_total[2m]) + rate(pg_stat_archiver_failed_count_total[2m])
           ) > 0.1
         for: 2m
         labels:

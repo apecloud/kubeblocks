@@ -1,27 +1,17 @@
 ---
-title: kbcli bench sysbench prepare
+title: kbcli bench pgbench cleanup
 ---
 
-Prepare the data of SysBench for a cluster
+Cleanup pgbench test data for a PostgreSQL cluster
 
 ```
-kbcli bench sysbench prepare [ClusterName] [flags]
-```
-
-### Examples
-
-```
-  # sysbench prepare data on a cluster
-  kbcli bench sysbench prepare mycluster --user xxx --password xxx --database mydb
-  
-  # sysbench prepare data on a cluster with specified tables and size
-  kbcli bench sysbench prepare mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
+kbcli bench pgbench cleanup [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for prepare
+  -h, --help   help for cleanup
 ```
 
 ### Options inherited from parent commands
@@ -38,7 +28,6 @@ kbcli bench sysbench prepare [ClusterName] [flags]
       --context string                 The name of the kubeconfig context to use
       --database string                database name
       --disable-compression            If true, opt-out of response compression for all requests to the server
-      --flag int                       the flag of sysbench, 0(normal), 1(long), 2(three nodes)
       --host string                    the host of database
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
@@ -46,23 +35,16 @@ kbcli bench sysbench prepare [ClusterName] [flags]
   -n, --namespace string               If present, the namespace scope for this CLI request
       --password string                the password of database
       --port int                       the port of database
-      --read-percent int               the percent of read, only useful when type is oltp_read_write_pct
       --request-timeout string         The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests. (default "0")
   -s, --server string                  The address and port of the Kubernetes API server
-      --size int                       the data size of per table (default 25000)
-      --tables int                     the number of tables (default 10)
-      --threads ints                   the number of threads, you can set multiple values, like 4,8 (default [4])
-      --times int                      the number of test times (default 60)
       --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
       --token string                   Bearer token for authentication to the API server
-      --type strings                   sysbench type, you can set multiple values (default [oltp_read_write])
       --user string                    the user of database
-      --write-percent int              the percent of write, only useful when type is oltp_read_write_pct
 ```
 
 ### SEE ALSO
 
-* [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
+* [kbcli bench pgbench](kbcli_bench_pgbench.md)	 - Run pgbench against a PostgreSQL cluster
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

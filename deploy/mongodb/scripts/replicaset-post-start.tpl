@@ -17,7 +17,7 @@ INDEX=$(echo $KB_POD_NAME | grep -o "\-[0-9]\+\$");
 INDEX=${INDEX#-};
 if [ $INDEX -ne 0 ]; then exit 0; fi
 
-until mongosh --quiet --port $PORT --eval "print('ready')"; do sleep 1; done
+until mongosh --quiet --port $PORT --eval "print('I am ready')"; do sleep 1; done
 
 RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
 RPL_SET_NAME=${RPL_SET_NAME%-};
@@ -40,8 +40,11 @@ done
 CONFIGSVR=""
 if [ ""$IS_CONFIGSVR = "true" ]; then CONFIGSVR="configsvr: true,"; fi
 
-until is_inited=$(mongosh --quiet --port $PORT --eval "rs.status().ok" -u root --password $MONGODB_ROOT_PASSWORD || mongosh --quiet --port $PORT --eval "try { rs.status().ok } catch (e) { 0 }") ; do sleep 1; done
-if [ $is_inited -ne 1 ]; then
+until is_inited=$(mongosh --quiet --port $PORT --eval "rs.status().set" -u root --password $MONGODB_ROOT_PASSWORD || mongosh --quiet --port $PORT --eval "try { rs.status().set } catch (e) { '' }") ; do sleep 1; done
+
+echo is_inited: $is_inited
+if [ -z $is_inited ]; then
+  echo "initiate replset"
   sleep 10
   set -e
   mongosh --quiet --port $PORT --eval "rs.initiate({_id: \"$RPL_SET_NAME\", $CONFIGSVR members: [$MEMBERS]})";

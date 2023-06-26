@@ -38,11 +38,11 @@ type KubernetesStore struct {
 
 func NewKubernetesStore(logger logger.Logger) (*KubernetesStore, error) {
 	ctx := context.Background()
-	clientset, err := k8scomponent.GetClientSet()
+	clientset, err := k8scomponent.GetClientSet(logger)
 	if err != nil {
 		logger.Errorf("clientset init error: %v", err)
 	}
-	client, err := k8scomponent.GetRESTClient()
+	client, err := k8scomponent.GetRESTClient(logger)
 	if err != nil {
 		logger.Errorf("restclient init error: %v", err)
 	}

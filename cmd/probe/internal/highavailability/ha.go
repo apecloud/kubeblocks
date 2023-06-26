@@ -87,6 +87,7 @@ func (ha *Ha) RunCycle() {
 }
 
 func (ha *Ha) Start() {
+	ha.logger.Info("HA starting")
 	isInitialized, _ := ha.dbManager.IsClusterInitialized()
 	for !isInitialized {
 		ha.logger.Infof("Waiting for the database cluster to be initialized.")

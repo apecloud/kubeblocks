@@ -52,7 +52,7 @@ func NewHelmInstaller(chart types.HelmChart, kubeconfig string) Installer {
 func (h *HelmInstallHelper) buildChart(name, ns string) *helm.InstallOpts {
 	return &helm.InstallOpts{
 		Name:            name,
-		Chart:           h.getChart(),
+		Chart:           h.getChart(name),
 		Wait:            true,
 		Version:         h.Version,
 		Namespace:       ns,
@@ -63,16 +63,18 @@ func (h *HelmInstallHelper) buildChart(name, ns string) *helm.InstallOpts {
 	}
 }
 
-func (h *HelmInstallHelper) getChart() string {
+func (h *HelmInstallHelper) getChart(name string) string {
 	if h.Name == "" {
 		return ""
 	}
 	// install helm package form local path
-	if h.Repo == "" && h.Path != "" {
-		return filepath.Join(h.Path, h.Name)
-	} else {
-		return h.Name
+	if h.Repo != "" {
+		return filepath.Join(h.Name, name)
 	}
+	if h.Path != "" {
+		return filepath.Join(h.Path, name)
+	}
+	return ""
 }
 
 func (h *HelmInstallHelper) addRepo() error {

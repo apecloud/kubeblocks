@@ -20,9 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package tasks
 
 import (
-	"fmt"
-	"path/filepath"
-
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/connector"
@@ -34,12 +31,16 @@ import (
 
 type AddonsInstaller struct {
 	common.KubeModule
-	Addons []types.PluginMeta
+
+	Addons     []types.PluginMeta
+	Kubeconfig string
 }
 
 type KBAddonsInstall struct {
 	common.KubeAction
-	Addons []types.PluginMeta
+
+	Addons     []types.PluginMeta
+	Kubeconfig string
 }
 
 func (a *AddonsInstaller) Init() {
@@ -49,19 +50,18 @@ func (a *AddonsInstaller) Init() {
 		&task.LocalTask{
 			Name:   "AddonsInstaller",
 			Desc:   "Install helm addons",
-			Action: &KBAddonsInstall{Addons: a.Addons},
+			Action: &KBAddonsInstall{Addons: a.Addons, Kubeconfig: a.Kubeconfig},
 		}}
 }
 
 func (i *KBAddonsInstall) Execute(runtime connector.Runtime) error {
-	kubeConfig := filepath.Join(runtime.GetWorkDir(), fmt.Sprintf("config-%s", runtime.GetObjName()))
 	var installer utils.Installer
 	for _, addon := range i.Addons {
 		switch {
 		case addon.Sources.Chart != nil:
-			installer = utils.NewHelmInstaller(*addon.Sources.Chart, kubeConfig)
+			installer = utils.NewHelmInstaller(*addon.Sources.Chart, i.Kubeconfig)
 		case addon.Sources.Yaml != nil:
-			installer = utils.NewYamlInstaller(*addon.Sources.Yaml, kubeConfig)
+			installer = utils.NewYamlInstaller(*addon.Sources.Yaml, i.Kubeconfig)
 		default:
 			return cfgcore.MakeError("addon source not supported: addon: %v", addon)
 		}

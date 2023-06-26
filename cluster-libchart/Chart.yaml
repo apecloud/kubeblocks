@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: 0.1.0
+description: A Library Helm chart for KubeBlocks Cluster
+name: cluster-libchart
+type: library
+version: 0.1.0

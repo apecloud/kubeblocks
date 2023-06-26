@@ -363,7 +363,7 @@ func (store *KubernetesStore) GetSwitchOverConfigMap() (*corev1.ConfigMap, error
 
 func (store *KubernetesStore) GetSwitchover() (*Switchover, error) {
 	switchOverConfigMap, _ := store.GetSwitchOverConfigMap()
-	if switchOverConfigMap != nil {
+	if switchOverConfigMap == nil {
 		return nil, nil
 	}
 	annotations := switchOverConfigMap.Annotations

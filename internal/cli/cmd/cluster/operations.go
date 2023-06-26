@@ -123,7 +123,7 @@ func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStr
 // addCommonFlags adds common flags for operations command
 func (o *OperationsOptions) addCommonFlags(cmd *cobra.Command) {
 	// add print flags
-	printer.AddOutputFlagForCreate(cmd, &o.Format)
+	printer.AddOutputFlagForCreate(cmd, &o.Format, false)
 
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")

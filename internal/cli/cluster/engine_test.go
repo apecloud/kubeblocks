@@ -26,12 +26,12 @@ import (
 
 var _ = Describe("cluster builder", func() {
 	It("get cluster chart name", func() {
-		res := getChartName(MySQL)
+		res := getEngineChartName(MySQL)
 		Expect(res).Should(Equal("apecloud-mysql-cluster"))
 	})
 
 	It("get cluster schema", func() {
-		res, err := GetSchema(MySQL)
+		res, err := GetEngineSchema(MySQL)
 		Expect(err).Should(Succeed())
 		Expect(res).ShouldNot(BeEmpty())
 	})

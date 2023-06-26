@@ -28,7 +28,6 @@ import (
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
-	"github.com/apecloud/kubeblocks/internal/cli/create"
 )
 
 var _ = Describe("cluster create util", func() {
@@ -47,13 +46,16 @@ var _ = Describe("cluster create util", func() {
 			tf = cmdtesting.NewTestFactory().WithNamespace(namespace)
 		})
 
-		It("add create flags for a legal engine type", func() {
-			Expect(addCreateFlags(cmd, tf, cluster.MySQL)).Should(Succeed())
-			Expect(cmd.Flag("version")).ShouldNot(BeNil())
+		It("add create flags for a nil schema", func() {
+			Expect(addEngineFlags(cmd, tf, nil)).Should(Succeed())
 		})
 
-		It("add create flags for an illegal engine type", func() {
-			Expect(addCreateFlags(cmd, tf, "test-engine-type")).Should(HaveOccurred())
+		It("add create flags for a not-nil schema", func() {
+			schema, err := cluster.GetEngineSchema(cluster.MySQL)
+			Expect(err).Should(Succeed())
+			Expect(schema).ShouldNot(BeNil())
+			Expect(addEngineFlags(cmd, tf, schema)).Should(Succeed())
+			Expect(cmd.Flags().GetString("version")).ShouldNot(BeNil())
 		})
 	})
 
@@ -102,48 +104,6 @@ var _ = Describe("cluster create util", func() {
 		values := getValuesFromFlags(fs)
 		for _, f := range flags {
 			Expect(values[f.name]).Should(Equal(f.value))
-		}
-	})
-
-	It("get dry run strategy", func() {
-		testCases := []struct {
-			input    string
-			expected create.DryRunStrategy
-		}{
-			{
-				input:    "",
-				expected: create.DryRunNone,
-			},
-			{
-				input:    "client",
-				expected: create.DryRunClient,
-			},
-			{
-				input:    "server",
-				expected: create.DryRunServer,
-			},
-			{
-				input:    "unchanged",
-				expected: create.DryRunClient,
-			},
-			{
-				input:    "none",
-				expected: create.DryRunNone,
-			},
-			{
-				input:    "unknown",
-				expected: create.DryRunNone,
-			},
-		}
-
-		for _, t := range testCases {
-			res, err := getDryRunStrategy(t.input)
-			Expect(res).Should(Equal(t.expected))
-			if t.input == "unknown" {
-				Expect(err).Should(HaveOccurred())
-			} else {
-				Expect(err).Should(Succeed())
-			}
 		}
 	})
 })

@@ -31,24 +31,22 @@ import (
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
-	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
-// addCreateFlags adds the flags for creating a cluster, these flags are built by the cluster schema.
-func addCreateFlags(cmd *cobra.Command, f cmdutil.Factory, e cluster.EngineType) error {
-	schema, err := cluster.GetSchema(e)
-	if err != nil {
-		return err
-	}
+const (
+	strType = "string"
+)
 
+// addEngineFlags adds the flags for creating a cluster, these flags are built by the cluster schema.
+func addEngineFlags(cmd *cobra.Command, f cmdutil.Factory, schema *spec.Schema) error {
 	if schema == nil {
-		return fmt.Errorf("failed to find the schema for cluster type %s", e)
+		return nil
 	}
 
 	for k, s := range schema.Properties {
-		if err = buildOneFlag(cmd, f, k, &s); err != nil {
+		if err := buildOneFlag(cmd, f, k, &s); err != nil {
 			return err
 		}
 	}
@@ -81,13 +79,19 @@ func getValuesFromFlags(fs *flag.FlagSet) map[string]interface{} {
 
 func buildOneFlag(cmd *cobra.Command, f cmdutil.Factory, k string, s *spec.Schema) error {
 	name := strcase.KebabCase(k)
-	tpe := "string"
+
+	// the cluster name is specified by command argument, so do not build it as a flag.
+	if name == cluster.NameSchemaProp.String() {
+		return nil
+	}
+
+	tpe := strType
 	if len(s.Type) > 0 {
 		tpe = s.Type[0]
 	}
 
 	switch tpe {
-	case "string":
+	case strType:
 		cmd.Flags().String(name, s.Default.(string), buildFlagDescription(s))
 	case "integer":
 		cmd.Flags().Int(name, int(s.Default.(float64)), buildFlagDescription(s))
@@ -133,7 +137,7 @@ func registerFlagCompFunc(cmd *cobra.Command, f cmdutil.Factory, name string, s 
 
 	// for general property, register the completion function
 	switch cluster.SchemaPropName(name) {
-	case cluster.VersionProp:
+	case cluster.VersionSchemaProp:
 		// TODO(ldm): gets cluster versions based on the cluster engine type, do not get all
 		// but, now the cluster version does not has any engine type label, we can not get them by label
 		_ = cmd.RegisterFlagCompletionFunc(name,
@@ -143,20 +147,7 @@ func registerFlagCompFunc(cmd *cobra.Command, f cmdutil.Factory, name string, s 
 	}
 }
 
-func getDryRunStrategy(dryRunOpt string) (create.DryRunStrategy, error) {
-	if dryRunOpt == "" {
-		return create.DryRunNone, nil
-	}
-	switch dryRunOpt {
-	case "client":
-		return create.DryRunClient, nil
-	case "server":
-		return create.DryRunServer, nil
-	case "unchanged":
-		return create.DryRunClient, nil
-	case "none":
-		return create.DryRunNone, nil
-	default:
-		return create.DryRunNone, fmt.Errorf(`invalid dry-run value (%v). Must be "none", "server", or "client"`, dryRunOpt)
-	}
+// buildEngineCreateExamples builds the creation examples for the specified engine type.
+func buildEngineCreateExamples(e cluster.EngineType, schema *spec.SchemaProps) string {
+	return ""
 }

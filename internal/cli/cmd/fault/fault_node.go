@@ -205,7 +205,7 @@ func (o *NodeChaoOptions) AddCommonFlag(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&o.AutoApprove, "auto-approve", false, "Skip interactive approval before create secret.")
 	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = Unchanged
-	printer.AddOutputFlagForCreate(cmd, &o.Format)
+	printer.AddOutputFlagForCreate(cmd, &o.Format, false)
 
 	util.CheckErr(cmd.MarkFlagRequired("cloud-provider"))
 	util.CheckErr(cmd.MarkFlagRequired("region"))

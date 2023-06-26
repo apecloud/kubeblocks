@@ -191,8 +191,6 @@ type CreateOptions struct {
 	SetFile           string                   `json:"-"`
 	Values            []string                 `json:"-"`
 
-	shouldCreateDependencies bool `json:"-"`
-
 	// backup name to restore in creation
 	Backup string `json:"backup,omitempty"`
 	UpdatableFlags
@@ -219,7 +217,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVarP(&o.SetFile, "set-file", "f", "", "Use yaml file, URL, or stdin to set the cluster resource")
 	cmd.Flags().StringArrayVar(&o.Values, "set", []string{}, "Set the cluster resource including cpu, memory, replicas and storage, or just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)")
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
-	cmd.Flags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
+	cmd.PersistentFlags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
 	cmd.PersistentFlags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.PersistentFlags().Lookup("dry-run").NoOptDefVal = "unchanged"
 
@@ -227,13 +225,13 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o.UpdatableFlags.addFlags(cmd)
 
 	// add print flags
-	printer.AddOutputFlag(cmd, &o.Format, true)
+	printer.AddOutputFlagForCreate(cmd, &o.Format, true)
 
 	// register flag completion func
 	registerFlagCompletionFunc(cmd, f)
 
 	// add all subcommands for supported cluster engine
-	AddEngineSubCmds(cmd, f, streams)
+	cmd.AddCommand(BuildEngineCmds(&o.CreateOptions)...)
 
 	return cmd
 }
@@ -347,14 +345,10 @@ func (o *CreateOptions) Complete() error {
 
 	// if name is not specified, generate a random cluster name
 	if o.Name == "" {
-		name, err := generateClusterName(o.Dynamic, o.Namespace)
+		o.Name, err = generateClusterName(o.Dynamic, o.Namespace)
 		if err != nil {
 			return err
 		}
-		if name == "" {
-			return fmt.Errorf("failed to generate a random cluster name")
-		}
-		o.Name = name
 	}
 
 	// build annotation
@@ -470,7 +464,6 @@ func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
 
 	// set component service account name
 	compSpec.ServiceAccountName = saNamePrefix + o.Name
-	o.shouldCreateDependencies = true
 	return nil
 }
 
@@ -480,10 +473,6 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 		roleName        = roleNamePrefix + o.Name
 		roleBindingName = roleBindingNamePrefix + o.Name
 	)
-
-	if !o.shouldCreateDependencies {
-		return nil
-	}
 
 	klog.V(1).Infof("create dependencies for cluster %s", o.Name)
 	// create service account
@@ -916,7 +905,7 @@ func generateClusterName(dynamic dynamic.Interface, namespace string) (string, e
 			return "", err
 		}
 	}
-	return "", nil
+	return "", fmt.Errorf("failed to generate cluster name")
 }
 
 func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {

@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package graph
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 )
@@ -84,11 +83,11 @@ func TestAddNRemoveEdge(t *testing.T) {
 	e2 := RealEdge(v1, v2)
 	added = dag.AddEdge(e1)
 	if !added {
-		t.Error(fmt.Sprintf("edge %v should be added", e1))
+		t.Errorf("edge %v should be added", e1)
 	}
 	added = dag.AddEdge(e2)
 	if !added {
-		t.Error(fmt.Sprintf("edge %v should be added", e2))
+		t.Errorf("edge %v should be added", e2)
 	}
 	if len(dag.edges) != 1 {
 		t.Error("edge add failed")
@@ -99,10 +98,10 @@ func TestAddNRemoveEdge(t *testing.T) {
 
 	removed := dag.RemoveEdge(e2)
 	if !removed {
-		t.Error(fmt.Sprintf("remove edge %v failed", e2))
+		t.Errorf("remove edge %v failed", e2)
 	}
 	if len(dag.edges) != 0 {
-		t.Error(fmt.Sprintf("remove edge %v failed", e2))
+		t.Errorf("remove edge %v failed", e2)
 	}
 }
 
@@ -115,18 +114,18 @@ func TestXConnect(t *testing.T) {
 	}
 	connected = dag.Connect(v1, v2)
 	if !connected {
-		t.Error(fmt.Sprintf("connect %v to %v failed", v1, v2))
+		t.Errorf("connect %v to %v failed", v1, v2)
 	}
 	connected = dag.Connect(v1, v2)
 	if !connected {
-		t.Error(fmt.Sprintf("connect %v to %v failed", v1, v2))
+		t.Errorf("connect %v to %v failed", v1, v2)
 	}
 	if len(dag.edges) != 1 {
 		t.Error("connect failed")
 	}
 	for edge := range dag.edges {
 		if edge.From() != v1 || edge.To() != v2 {
-			t.Error(fmt.Sprintf("edge in dag: %v, edge need: %v", edge, RealEdge(v1, v2)))
+			t.Errorf("edge in dag: %v, edge need: %v", edge, RealEdge(v1, v2))
 		}
 	}
 
@@ -137,17 +136,17 @@ func TestXConnect(t *testing.T) {
 	}
 	connected = dag.AddConnect(v1, v3)
 	if !connected {
-		t.Error(fmt.Sprintf("AddConnect %v to %v should succeed", v1, v3))
+		t.Errorf("AddConnect %v to %v should succeed", v1, v3)
 	}
 	v4 := 9
 	connected = dag.AddConnectRoot(v4)
 	if connected {
-		t.Error(fmt.Sprintf("AddConnectRoot to %v with nil root should failed", v4))
+		t.Errorf("AddConnectRoot to %v with nil root should failed", v4)
 	}
 	dag.AddVertex(v1)
 	connected = dag.AddConnectRoot(v4)
 	if !connected {
-		t.Error(fmt.Sprintf("AddConnectRoot to %v should succeed", v4))
+		t.Errorf("AddConnectRoot to %v should succeed", v4)
 	}
 }
 
@@ -325,7 +324,7 @@ func TestMerge(t *testing.T) {
 
 	dag1.Merge(dag2)
 	if !dag1.Equals(dagExpected, less) {
-		t.Error(fmt.Sprintf("dag merge error, expected: %v, actual: %v", dagExpected, dag1))
+		t.Errorf("dag merge error, expected: %v, actual: %v", dagExpected, dag1)
 	}
 }
 
@@ -335,7 +334,7 @@ func TestString(t *testing.T) {
 	expectedOrder := []string{"|", "4", "5", "1", "10", "12", "11", "9", "6", "0", "3", "2", "7", "8"}
 	expectedStr := strings.Join(expectedOrder, "->")
 	if str != expectedStr {
-		t.Error(fmt.Sprintf("dag string error, expected: %s, actual: %s", expectedStr, str))
+		t.Errorf("dag string error, expected: %s, actual: %s", expectedStr, str)
 	}
 }
 

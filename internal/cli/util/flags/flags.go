@@ -20,10 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package flags
 
 import (
+	"strings"
+
 	"github.com/spf13/cobra"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -36,4 +39,30 @@ func AddClusterDefinitionFlag(f cmdutil.Factory, cmd *cobra.Command, p *string) 
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
+}
+
+func AddComponentsFlag(f cmdutil.Factory, cmd *cobra.Command, isPlural bool, p any) {
+	autoComplete := func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var components []string
+		if len(args) == 0 {
+			return components, cobra.ShellCompDirectiveNoFileComp
+		}
+		namespace, _, _ := f.ToRawKubeConfigLoader().Namespace()
+		dynamic, _ := f.DynamicClient()
+		cluster, _ := cluster.GetClusterByName(dynamic, args[0], namespace)
+		for _, comp := range cluster.Spec.ComponentSpecs {
+			if strings.HasPrefix(comp.Name, toComplete) {
+				components = append(components, comp.Name)
+			}
+		}
+		return components, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	if isPlural {
+		cmd.Flags().StringSliceVar(p.(*[]string), "components", nil, "Component names to this operations")
+		util.CheckErr(cmd.RegisterFlagCompletionFunc("components", autoComplete))
+	} else {
+		cmd.Flags().StringVar(p.(*string), "component", "", "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
+		util.CheckErr(cmd.RegisterFlagCompletionFunc("component", autoComplete))
+	}
 }

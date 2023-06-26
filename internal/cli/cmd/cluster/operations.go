@@ -47,6 +47,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
@@ -129,30 +130,12 @@ func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStr
 func (o *OperationsOptions) addCommonFlags(cmd *cobra.Command, f cmdutil.Factory) {
 	// add print flags
 	printer.AddOutputFlagForCreate(cmd, &o.Format)
-
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
 	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 	if o.HasComponentNamesFlag {
-		cmd.Flags().StringSliceVar(&o.ComponentNames, "components", nil, "Component names to this operations")
-		util.CheckErr(cmd.RegisterFlagCompletionFunc(
-			"components",
-			func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-				var components []string
-				if len(args) == 0 {
-					return components, cobra.ShellCompDirectiveNoFileComp
-				}
-				namespace, _, _ := f.ToRawKubeConfigLoader().Namespace()
-				dynamic, _ := f.DynamicClient()
-				cluster, _ := cluster.GetClusterByName(dynamic, args[0], namespace)
-				for _, comp := range cluster.Spec.ComponentSpecs {
-					if strings.HasPrefix(comp.Name, toComplete) {
-						components = append(components, comp.Name)
-					}
-				}
-				return components, cobra.ShellCompDirectiveNoFileComp
-			}))
+		flags.AddComponentsFlag(f, cmd, true, &o.ComponentNames)
 	}
 }
 
@@ -859,6 +842,6 @@ func NewPromoteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVar(&o.Component, "component", "", "Specify the component name of the cluster, if the cluster has multiple components, you need to specify a component")
 	cmd.Flags().StringVar(&o.Instance, "instance", "", "Specify the instance name as the new primary or leader of the cluster, you can get the instance name by running \"kbcli cluster list-instances\"")
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before promote the instance")
-	o.addCommonFlags(cmd)
+	o.addCommonFlags(cmd, f)
 	return cmd
 }

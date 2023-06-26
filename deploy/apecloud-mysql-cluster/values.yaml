@@ -2,8 +2,6 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-name: mycluster
-
 ## @param version MySQL cluster version
 ##
 version: ac-mysql-8.0.30
@@ -12,7 +10,11 @@ version: ac-mysql-8.0.30
 ##
 mode: standalone
 
-## @param replicas MySQL cluster replicas, for standalone mode, replicas must be 1
+## @param replicas MySQL cluster replicas
+## for standalone mode, replicas can not be changed, it is always 1
+## for replication mode, replicas can not be changed, it is always 2
+## for raftGroup mode, replicas can be changed, the default value is 3
+##
 replicas: 1
 
 ## @param cpu
@@ -34,7 +36,9 @@ monitoringInterval: 0
 ## @param terminationPolicy
 terminationPolicy: Delete
 
-## @param proxyEnabled
+## @param proxyEnabled if true, enable the proxy
+## if mode is standalone or replication, proxyEnabled is always false
+## if mode is raftGroup, proxyEnabled can be true or false
 ##
 proxyEnabled: false
 

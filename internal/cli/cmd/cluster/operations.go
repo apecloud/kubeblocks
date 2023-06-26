@@ -135,7 +135,7 @@ func (o *OperationsOptions) addCommonFlags(cmd *cobra.Command, f cmdutil.Factory
 	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 	if o.HasComponentNamesFlag {
-		flags.AddComponentsFlag(f, cmd, true, &o.ComponentNames)
+		flags.AddComponentsFlag(f, cmd, true, &o.ComponentNames, "Component names to this operations")
 	}
 }
 

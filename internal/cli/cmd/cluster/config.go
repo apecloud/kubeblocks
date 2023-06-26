@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 	"io"
 	"reflect"
 	"sort"
@@ -41,7 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -120,26 +120,8 @@ var (
 )
 
 func (r *reconfigureOptions) addCommonFlags(cmd *cobra.Command, f cmdutil.Factory) {
-	cmd.Flags().StringVar(&r.componentName, "component", "", "Specify the name of Component to describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter.\"")
 	cmd.Flags().StringSliceVar(&r.configSpecs, "config-specs", nil, "Specify the name of the configuration template to describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)")
-	util.CheckErr(cmd.RegisterFlagCompletionFunc(
-		"component",
-		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			var components []string
-			if len(args) == 0 {
-				return components, cobra.ShellCompDirectiveNoFileComp
-			}
-			namespace, _, _ := f.ToRawKubeConfigLoader().Namespace()
-			dynamic, _ := f.DynamicClient()
-			cluster, _ := cluster.GetClusterByName(dynamic, args[0], namespace)
-			for _, comp := range cluster.Spec.ComponentSpecs {
-				if strings.HasPrefix(comp.Name, toComplete) {
-					components = append(components, comp.Name)
-				}
-			}
-			return components, cobra.ShellCompDirectiveNoFileComp
-		}))
-
+	flags.AddComponentsFlag(f, cmd, false, &r.componentName, "Specify the name of Component to describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter.\"")
 }
 
 func (r *reconfigureOptions) validate() error {

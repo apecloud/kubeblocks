@@ -41,7 +41,7 @@ func AddClusterDefinitionFlag(f cmdutil.Factory, cmd *cobra.Command, p *string) 
 		}))
 }
 
-func AddComponentsFlag(f cmdutil.Factory, cmd *cobra.Command, isPlural bool, p any) {
+func AddComponentsFlag(f cmdutil.Factory, cmd *cobra.Command, isPlural bool, p any, usage string) {
 	autoComplete := func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var components []string
 		if len(args) == 0 {
@@ -59,10 +59,10 @@ func AddComponentsFlag(f cmdutil.Factory, cmd *cobra.Command, isPlural bool, p a
 	}
 
 	if isPlural {
-		cmd.Flags().StringSliceVar(p.(*[]string), "components", nil, "Component names to this operations")
+		cmd.Flags().StringSliceVar(p.(*[]string), "components", nil, usage)
 		util.CheckErr(cmd.RegisterFlagCompletionFunc("components", autoComplete))
 	} else {
-		cmd.Flags().StringVar(p.(*string), "component", "", "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
+		cmd.Flags().StringVar(p.(*string), "component", "", usage)
 		util.CheckErr(cmd.RegisterFlagCompletionFunc("component", autoComplete))
 	}
 }

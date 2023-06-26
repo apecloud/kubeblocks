@@ -204,7 +204,7 @@ func (o *configOpsOptions) buildReconfigureCommonFlags(cmd *cobra.Command, f cmd
 		"For available templates and configs, refer to: 'kbcli cluster describe-config'.")
 	cmd.Flags().StringVar(&o.CfgFile, "config-file", "", "Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). "+
 		"For available templates and configs, refer to: 'kbcli cluster describe-config'.")
-	flags.AddComponentsFlag(f, cmd, false, &o.ComponentName)
+	flags.AddComponentsFlag(f, cmd, false, &o.ComponentName, "Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.")
 }
 
 // NewReconfigureCmd creates a Reconfiguring command

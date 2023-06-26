@@ -225,11 +225,6 @@ const (
 )
 
 const (
-	KBReplicationSetPrimaryPodName = "KB_PRIMARY_POD_NAME"
-	KBReplicationSetPrimaryPodFQDN = "KB_PRIMARY_POD_FQDN"
-)
-
-const (
 	Primary   = "primary"
 	Secondary = "secondary"
 

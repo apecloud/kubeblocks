@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"runtime"
 
+	gv "github.com/hashicorp/go-version"
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -72,7 +73,18 @@ func (o *versionOptions) Run(f cmdutil.Factory) {
 		fmt.Printf("  Platform: %s/%s\n", runtime.GOOS, runtime.GOARCH)
 	}
 
-	if v.KubeBlocks != "" && v.Cli != v.KubeBlocks {
+	kbVersion, err := gv.NewVersion(v.KubeBlocks)
+	if err != nil {
+		klog.V(1).Infof("failed to parse KubeBlocks version: %v", err)
+		return
+	}
+	cliVersion, err := gv.NewVersion(v.Cli)
+	if err != nil {
+		klog.V(1).Infof("failed to parse kbcli version: %v", err)
+		return
+	}
+
+	if !kbVersion.Equal(cliVersion) {
 		fmt.Printf("WARNING: version difference between kbcli (%s) and kubeblocks (%s) \n", v.Cli, v.KubeBlocks)
 	}
 }

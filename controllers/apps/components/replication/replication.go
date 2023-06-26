@@ -198,32 +198,56 @@ func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object
 	}
 
 	for _, pod := range podList {
+		var needPatch = false
 		if pod.Annotations == nil {
 			pod.Annotations = map[string]string{}
 		}
 		switch {
-		// if not exists primary Pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
 		case primary == "":
-			parent, o := util.ParseParentNameAndOrdinal(pod.Name)
-			defaultRole := DefaultRole(o)
-			pod.GetLabels()[constant.RoleLabelKey] = defaultRole
-			pod.Annotations[constant.PrimaryAnnotationKey] = fmt.Sprintf("%s-%d", parent, 0)
+			// if not exists primary pod, it means that the component is newly created, and we take the pod with index=0 as the primary by default.
+			needPatch = handlePrimaryNotExistPod(&pod)
 		default:
-			if pod.Name != primary {
-				pod.GetLabels()[constant.RoleLabelKey] = constant.Secondary
-			}
-			pod.Annotations[constant.PrimaryAnnotationKey] = primary
+			needPatch = handlePrimaryExistPod(&pod, primary)
 		}
-		vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
-			Obj:    &pod,
-			Action: ictrltypes.ActionUpdatePtr(),
-		})
+		if needPatch {
+			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+				Obj:    &pod,
+				Action: ictrltypes.ActionUpdatePtr(),
+			})
+		}
 	}
 	// rebuild cluster.status.components.replicationSet.status
 	if err := rebuildReplicationSetClusterStatus(r.Cluster, r.getWorkloadType(), r.getName(), podList); err != nil {
 		return nil, err
 	}
 	return vertexes, nil
+}
+
+// handlePrimaryNotExistPod is used to handle the pod which is not exists primary pod.
+func handlePrimaryNotExistPod(pod *corev1.Pod) bool {
+	parent, o := util.ParseParentNameAndOrdinal(pod.Name)
+	defaultRole := DefaultRole(o)
+	pod.GetLabels()[constant.RoleLabelKey] = defaultRole
+	pod.Annotations[constant.PrimaryAnnotationKey] = fmt.Sprintf("%s-%d", parent, 0)
+	return true
+}
+
+// handlePrimaryExistPod is used to handle the pod which is exists primary pod.
+func handlePrimaryExistPod(pod *corev1.Pod, primary string) bool {
+	needPatch := false
+	if pod.Name != primary {
+		role, ok := pod.Labels[constant.RoleLabelKey]
+		if !ok || role != constant.Secondary {
+			pod.GetLabels()[constant.RoleLabelKey] = constant.Secondary
+			needPatch = true
+		}
+	}
+	pk, ok := pod.Annotations[constant.PrimaryAnnotationKey]
+	if !ok || pk != primary {
+		pod.Annotations[constant.PrimaryAnnotationKey] = primary
+		needPatch = true
+	}
+	return needPatch
 }
 
 // DefaultRole is used to get the default role of the Pod of the Replication workload.

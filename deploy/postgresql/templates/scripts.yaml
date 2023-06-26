@@ -84,7 +84,7 @@ data:
     attempt=1
     max_attempts=5
     while [ $attempt -le $max_attempts ] && [ -z "$(cat /kb-podinfo/primary-pod)" ]; do
-      sleep 3
+      sleep 5
       attempt=$((attempt + 1))
     done
 

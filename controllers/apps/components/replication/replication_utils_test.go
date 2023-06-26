@@ -150,8 +150,12 @@ var _ = Describe("ReplicationSet Util", func() {
 			podList = append(podList, *pod)
 		}
 		err := genReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompSpecName].ReplicationSetStatus, podList)
-		Expect(err).Should(Succeed())
-		Expect(len(clusterObj.Status.Components[testapps.DefaultRedisCompSpecName].ReplicationSetStatus.Secondaries)).Should(Equal(3))
+		Expect(err).ShouldNot(Succeed())
+		Expect(err.Error()).Should(ContainSubstring("more than one primary pod found"))
+
+		newReplicationStatus := &appsv1alpha1.ReplicationSetStatus{}
+		err = genReplicationSetStatus(newReplicationStatus, podList)
+		Expect(len(newReplicationStatus.Secondaries)).Should(Equal(3))
 	}
 
 	testHandleReplicationSetRoleChangeEvent := func() {

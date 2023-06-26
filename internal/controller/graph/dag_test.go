@@ -271,7 +271,6 @@ func TestEquals(t *testing.T) {
 	d2.Connect(0, 6)
 	d2.Connect(2, 3)
 
-
 	if !d1.Equals(d2, less) {
 		t.Error("equals test failed")
 	}
@@ -307,7 +306,7 @@ func TestEquals(t *testing.T) {
 func TestMerge(t *testing.T) {
 	dag1 := NewDAG()
 	dag2 := NewDAG()
-	v1,v2,v3 := 1,2,3
+	v1, v2, v3 := 1, 2, 3
 	dag1.AddVertex(v1)
 	dag1.AddVertex(v2)
 	dag1.Connect(v1, v2)

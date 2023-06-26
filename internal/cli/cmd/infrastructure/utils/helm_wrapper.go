@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package utils
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"helm.sh/helm/v3/pkg/repo"
@@ -39,7 +40,13 @@ func (h *HelmInstallHelper) Install(name, ns string) error {
 		return err
 	}
 	helmConfig := helm.NewConfig(ns, h.kubeconfig, "", klog.V(1).Enabled())
-	return h.buildChart(name, ns).Upgrade(helmConfig)
+	installOpts := h.buildChart(name, ns)
+	output, err := installOpts.Install(helmConfig)
+	if err != nil && helm.ReleaseNotFound(err) {
+		fmt.Println(output)
+		return nil
+	}
+	return err
 }
 
 func NewHelmInstaller(chart types.HelmChart, kubeconfig string) Installer {

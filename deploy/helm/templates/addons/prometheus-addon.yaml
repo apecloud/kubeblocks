@@ -15,15 +15,16 @@ spec:
 
   helm:
     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus-cluster
     {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus-15.16.1.tgz
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/prometheus-cluster-{{ default .Chart.Version .Values.versionOverride }}.tgz
     {{- end }}
 
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: 15.16.1
+      version: {{ default .Chart.Version .Values.versionOverride }}
       {{- end }}
+
 
     installValues:
       configMapRefs:
@@ -33,14 +34,14 @@ spec:
     valuesMapping:
       valueMap:
         replicaCount: server.replicaCount
-        storageClass: server.persistentVolume.storageClass
-        persistentVolumeEnabled: server.persistentVolume.enabled
+        storageClass: server.persistence.storageClass
+        persistentVolumeEnabled: server.persistence.enabled
 
       jsonMap:
-        tolerations: server.tolerations
+        tolerations: tolerations
 
       resources:
-        storage: server.persistentVolume.size
+        storage: server.persistence.size
         cpu:
           requests: server.resources.requests.cpu
           limits: server.resources.limits.cpu
@@ -51,14 +52,14 @@ spec:
         - name: alertmanager
           valueMap:
             replicaCount: alertmanager.replicaCount
-            storageClass: alertmanager.persistentVolume.storageClass
-            persistentVolumeEnabled: alertmanager.persistentVolume.enabled
+            storageClass: alertmanager.persistence.storageClass
+            persistentVolumeEnabled: alertmanager.persistence.enabled
 
           jsonMap:
-            tolerations: alertmanager.tolerations
+            tolerations: tolerations
 
           resources:
-            storage: alertmanager.persistentVolume.size
+            storage: alertmanager.persistence.size
             cpu:
               requests: alertmanager.resources.requests.cpu
               limits: alertmanager.resources.limits.cpu

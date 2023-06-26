@@ -16,7 +16,7 @@ data:
   datasource.yaml: |-
     apiVersion: 1
     datasources:
-{{- $scrapeInterval := default .Values.prometheus.server.global.scrape_interval | default "30s" }}
+{{- $scrapeInterval := default .Values.prometheus.prometheus.server.global.scrape_interval | default "30s" }}
 {{- if .Values.grafana.sidecar.datasources.defaultDatasourceEnabled }}
     - name: Prometheus
       type: prometheus
@@ -24,7 +24,7 @@ data:
       {{- if .Values.grafana.sidecar.datasources.url }}
       url: {{ .Values.grafana.sidecar.datasources.url }}
       {{- else }}
-      url: http://kb-addon-{{ include "addon.prometheus.name" . }}-server.{{ template "kubeblocks.namespace" . }}:80/
+      url: http://kb-addon-{{ include "addon.prometheus.name" . }}-{{ .Values.prometheus.nameOverride }}-server.{{ template "kubeblocks.namespace" . }}:80/
       {{- end }}
       access: proxy
       isDefault: true
@@ -36,7 +36,7 @@ data:
       {{- if .Values.grafana.sidecar.datasources.url }}
       url: {{ .Values.grafana.sidecar.datasources.url }}
       {{- else }}
-      url: http://kb-addon-{{ include "addon.prometheus.name" . }}-server.{{ template "kubeblocks.namespace" . }}:80/
+      url: http://kb-addon-{{ include "addon.prometheus.name" . }}-{{ .Values.prometheus.nameOverride }}-server.{{ template "kubeblocks.namespace" . }}:80/
       {{- end }}
       access: proxy
       isDefault: false

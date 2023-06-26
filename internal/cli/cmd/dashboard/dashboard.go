@@ -94,14 +94,14 @@ var (
 		},
 		{
 			Name:       "kubeblocks-prometheus-alertmanager",
-			AddonName:  "kb-addon-prometheus-alertmanager",
-			Label:      "app=prometheus,component=alertmanager,release=kb-addon-prometheus",
+			AddonName:  "kb-addon-prometheus-playground-alertmanager",
+			Label:      "app.kubernetes.io/instance=kb-addon-prometheus-playground,app.kubernetes.io/managed-by=kubeblocks,apps.kubeblocks.io/component-name=alertmanager",
 			TargetPort: "19093",
 		},
 		{
 			Name:       "kubeblocks-prometheus-server",
-			AddonName:  "kb-addon-prometheus-server",
-			Label:      "app=prometheus,component=server,release=kb-addon-prometheus",
+			AddonName:  "kb-addon-prometheus-playground-server",
+			Label:      "app.kubernetes.io/instance=kb-addon-prometheus-playground,app.kubernetes.io/managed-by=kubeblocks,apps.kubeblocks.io/component-name=server",
 			TargetPort: "19090",
 		},
 		{

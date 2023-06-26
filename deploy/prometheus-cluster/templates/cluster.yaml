@@ -2,7 +2,11 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: {{ include "prometheus-cluster.fullname" . }}
-  labels: {{ include "prometheus-cluster.labels" . | nindent 4 }}
+  labels:
+    {{- include "prometheus-cluster.labels" . | nindent 4 }}
+    {{- with .Values.extraLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   clusterDefinitionRef: prometheus  # ref clusterdefinition.name
   clusterVersionRef: prometheus-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name

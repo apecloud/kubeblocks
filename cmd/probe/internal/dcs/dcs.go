@@ -15,6 +15,7 @@ type DCS interface {
 
 	GetSwitchover() (*Switchover, error)
 	SetSwitchover() error
+	DeleteSwitchover() error
 
 	AttempAcquireLock() error
 	CreateLock() error

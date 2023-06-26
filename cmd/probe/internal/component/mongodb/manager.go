@@ -57,8 +57,9 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 
 	Mgr = &Manager{
 		DBManagerBase: component.DBManagerBase{
-			CurrentMemberName: viper.GetString("KB_POD_FQDN"),
+			CurrentMemberName: viper.GetString("KB_POD_NAME"),
 			ClusterCompName:   viper.GetString("KB_CLUSTER_COMP_NAME"),
+			Namespace:         viper.GetString("KB_NAMESPACE"),
 			Logger:            logger,
 		},
 		Client:   client,
@@ -152,7 +153,7 @@ func (mgr *Manager) InitiateReplSet(cluster *dcs.Cluster) error {
 
 	for i, member := range cluster.Members {
 		configMembers[i].ID = i
-		configMembers[i].Host = member.Name + ":" + member.DBPort
+		configMembers[i].Host = mgr.GetMemberAddr(member.Name) + ":" + member.DBPort
 		if strings.HasPrefix(member.Name, mgr.CurrentMemberName) {
 			configMembers[i].Priority = 2
 		} else {
@@ -286,5 +287,7 @@ func (mgr *Manager) Demote() error {
 	return nil
 }
 
-func (mgr *Manager) GetHealthiestMember()    {}
-func (mgr *Manager) HasOtherHealthtyLeader() {}
+func (mgr *Manager) GetHealthiestMember() {}
+func (mgr *Manager) HasOtherHealthyLeader() *dcs.Member {
+	return nil
+}

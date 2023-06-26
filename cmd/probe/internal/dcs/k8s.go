@@ -2,7 +2,6 @@ package dcs
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -52,7 +51,7 @@ func NewKubernetesStore(logger logger.Logger) (*KubernetesStore, error) {
 		clusterName:       os.Getenv("KB_CLUSTER_NAME"),
 		componentName:     os.Getenv("KB_COMP_NAME"),
 		clusterCompName:   os.Getenv("KB_CLUSTER_COMP_NAME"),
-		currentMemberName: os.Getenv("KB_POD_FQDN"),
+		currentMemberName: os.Getenv("KB_POD_NAME"),
 		namespace:         os.Getenv("KB_NAMESPACE"),
 		client:            client,
 		clientset:         clientset,
@@ -177,7 +176,8 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 	members := make([]Member, len(podList.Items))
 	for i, pod := range podList.Items {
 		member := &members[i]
-		member.Name = fmt.Sprintf("%s.%s-headless.%s.svc", pod.Name, store.clusterCompName, store.namespace)
+		member.Name = pod.Name
+		// member.Name = fmt.Sprintf("%s.%s-headless.%s.svc", pod.Name, store.clusterCompName, store.namespace)
 		member.Role = pod.Labels["app.kubernetes.io/role"]
 		member.PodIP = pod.Status.PodIP
 		member.DBPort = getDBPort(&pod)
@@ -189,6 +189,7 @@ func (store *KubernetesStore) GetMembers() ([]Member, error) {
 
 func (store *KubernetesStore) ResetCluser()  {}
 func (store *KubernetesStore) DeleteCluser() {}
+
 func (store *KubernetesStore) GetLeaderConfigMap() (*corev1.ConfigMap, error) {
 	leaderName := store.clusterCompName + "-leader"
 	leaderConfigMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, leaderName, metav1.GetOptions{})
@@ -261,12 +262,12 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 		ttl = 0
 	}
 	return &Leader{
-		index:       configmap.ResourceVersion,
-		name:        annotations["leader"],
-		acquireTime: acquireTime,
-		renewTime:   renewTime,
-		ttl:         ttl,
-		resource:    configmap,
+		Index:       configmap.ResourceVersion,
+		Name:        annotations["leader"],
+		AcquireTime: acquireTime,
+		RenewTime:   renewTime,
+		Ttl:         ttl,
+		Resource:    configmap,
 	}, nil
 }
 
@@ -281,7 +282,7 @@ func (store *KubernetesStore) AttempAcquireLock() error {
 		"acquire-time": now,
 	}
 
-	configMap := store.cluster.Leader.resource.(*corev1.ConfigMap)
+	configMap := store.cluster.Leader.Resource.(*corev1.ConfigMap)
 	configMap.SetAnnotations(annotation)
 	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 
@@ -289,11 +290,11 @@ func (store *KubernetesStore) AttempAcquireLock() error {
 }
 
 func (store *KubernetesStore) HasLock() bool {
-	return store.cluster.Leader != nil && store.cluster.Leader.name == store.currentMemberName
+	return store.cluster.Leader != nil && store.cluster.Leader.Name == store.currentMemberName
 }
 
 func (store *KubernetesStore) UpdateLock() error {
-	configMap := store.cluster.Leader.resource.(*corev1.ConfigMap)
+	configMap := store.cluster.Leader.Resource.(*corev1.ConfigMap)
 
 	annotations := configMap.GetAnnotations()
 	if annotations["leader"] != store.currentMemberName {
@@ -307,7 +308,7 @@ func (store *KubernetesStore) UpdateLock() error {
 }
 
 func (store *KubernetesStore) ReleaseLock() error {
-	configMap := store.cluster.Leader.resource.(*corev1.ConfigMap)
+	configMap := store.cluster.Leader.Resource.(*corev1.ConfigMap)
 	configMap.Annotations["leader"] = ""
 	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
 	// TODO: if response status code is 409, it means operation conflict.
@@ -347,12 +348,41 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 	}, err
 }
 
+func (store *KubernetesStore) GetSwitchOverConfigMap() (*corev1.ConfigMap, error) {
+	switchOverName := store.clusterCompName + "-switchover"
+	switchOverConfigMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, switchOverName, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			store.logger.Infof("no switchOver [%s] setting", switchOverName)
+			return nil, nil
+		}
+		store.logger.Errorf("Get switchOver configmap failed: %v", err)
+	}
+	return switchOverConfigMap, err
+}
+
 func (store *KubernetesStore) GetSwitchover() (*Switchover, error) {
-	return nil, nil
+	switchOverConfigMap, _ := store.GetSwitchOverConfigMap()
+	if switchOverConfigMap != nil {
+		return nil, nil
+	}
+	annotations := switchOverConfigMap.Annotations
+	scheduledAt, _ := strconv.Atoi(annotations["scheduled-at"])
+	switchOver := newSwitchover(switchOverConfigMap.ResourceVersion, annotations["leader"], annotations["candidate"], int64(scheduledAt))
+	return switchOver, nil
 }
 
 func (store *KubernetesStore) SetSwitchover() error {
 	return nil
+}
+
+func (store *KubernetesStore) DeleteSwitchover() error {
+	switchOverName := store.clusterCompName + "-switchover"
+	err := store.clientset.CoreV1().ConfigMaps(store.namespace).Delete(store.ctx, switchOverName, metav1.DeleteOptions{})
+	if err != nil {
+		store.logger.Errorf("Delete switchOver configmap failed: %v", err)
+	}
+	return err
 }
 
 func (store *KubernetesStore) AddCurrentMember() error {

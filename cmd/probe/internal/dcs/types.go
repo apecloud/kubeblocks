@@ -41,7 +41,7 @@ func (c *Cluster) GetMemberName() []string {
 }
 
 func (c *Cluster) IsLocked() bool {
-	return false //c.Leader != nil && c.Leader.member != nil && c.Leader.member.name != ""
+	return c.Leader != nil && c.Leader.Name != ""
 }
 
 func (c *Cluster) GetOpTime() int64 {
@@ -63,12 +63,12 @@ func (c *HaConfig) GetMaxLagOnSwitchover() int64 {
 }
 
 type Leader struct {
-	index       string
-	name        string
-	acquireTime int64
-	renewTime   int64
-	ttl         int
-	resource    interface{}
+	Index       string
+	Name        string
+	AcquireTime int64
+	RenewTime   int64
+	Ttl         int
+	Resource    interface{}
 }
 
 type Member struct {
@@ -93,25 +93,25 @@ func newMember(index string, name string, role string, url string) *Member {
 }
 
 type Switchover struct {
-	index       string
-	leader      string
-	candidate   string
-	scheduledAt int64
+	Index       string
+	Leader      string
+	Candidate   string
+	ScheduledAt int64
 }
 
 func newSwitchover(index string, leader string, candidate string, scheduledAt int64) *Switchover {
 	return &Switchover{
-		index:       index,
-		leader:      leader,
-		candidate:   candidate,
-		scheduledAt: scheduledAt,
+		Index:       index,
+		Leader:      leader,
+		Candidate:   candidate,
+		ScheduledAt: scheduledAt,
 	}
 }
 
 func (s *Switchover) GetLeader() string {
-	return s.leader
+	return s.Leader
 }
 
 func (s *Switchover) GetCandidate() string {
-	return s.candidate
+	return s.Candidate
 }

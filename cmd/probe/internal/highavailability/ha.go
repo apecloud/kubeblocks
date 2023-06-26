@@ -32,8 +32,13 @@ func NewHa(logger logger.Logger) *Ha {
 }
 
 func (ha *Ha) RunCycle() {
+	cluster, err := ha.dcs.GetCluster()
+	if err != nil {
+		ha.logger.Infof("Get Cluster err: %v.", err)
+		return
+	}
 
-	//switch {
+	switch {
 	//case !dbManger.IsRunning():
 	//	logger.Infof("DB Service is not running,  wait for sqlctl to start it")
 	//	if dcs.HasLock() {
@@ -65,24 +70,24 @@ func (ha *Ha) RunCycle() {
 	//		}
 	//	}
 
-	//case cluster.GetLeader() == dbManager.MemberName:
-	//	logger.Infof("This member is Cluster's leader")
-	//	if dbManager.isLeader() {
-	//		logger.Infof("Refresh leader ttl")
-	//		dcs.UpdateLeader()
-	//	} else if dbManger.HasOtherHealthyLeader() {
-	//		logger.Infof("Release leader")
-	//		dcs.ReleaseLock()
-	//	}
+	case cluster.Leader.Name == ha.dbManager.GetCurrentMemberName():
+		ha.logger.Infof("This member is Cluster's leader")
+		if ha.dbManager.isLeader(context.TODO()) {
+			ha.logger.Infof("Refresh leader ttl")
+			ha.dcs.UpdateLock()
+		} else if ha.dbManager.HasOtherHealthyLeader() != nil {
+			ha.logger.Infof("Release leader")
+			ha.dcs.ReleaseLock()
+		}
 
-	//case cluster.SwitchOver.Leader != dbManager.Name && dbManager.IsLeader():
-	//	logger.Infof("Cluster has no leader, attemp to take the leader")
-	//	dbManager.Demote()
+		//case cluster.SwitchOver.Leader != dbManager.Name && dbManager.IsLeader():
+		//	logger.Infof("Cluster has no leader, attemp to take the leader")
+		//	dbManager.Demote()
 
-	//case cluster.SwitchOver.Leader == dbManager.Name && !dbManager.IsLeader():
-	//	logger.Infof("Cluster has no leader, attemp to take the leader")
-	//	dbManager.Premote()
-	//}
+		//case cluster.SwitchOver.Leader == dbManager.Name && !dbManager.IsLeader():
+		//	logger.Infof("Cluster has no leader, attemp to take the leader")
+		//	dbManager.Premote()
+	}
 }
 
 func (ha *Ha) Start() {

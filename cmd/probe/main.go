@@ -136,4 +136,5 @@ func main() {
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
 	<-stop
 	rt.ShutdownWithWait()
+	ha.ShutdownWithWait()
 }

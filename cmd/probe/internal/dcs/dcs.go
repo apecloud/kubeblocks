@@ -3,6 +3,7 @@ package dcs
 type DCS interface {
 	Initialize() error
 
+	GetClusterName() string
 	GetCluster() (*Cluster, error)
 	ResetCluser()
 	DeleteCluser()

@@ -58,13 +58,16 @@ func NewKubernetesStore(logger logger.Logger) (*KubernetesStore, error) {
 		clientset:         clientset,
 		logger:            logger,
 	}
-	cluster, err := store.GetCluster()
-	store.cluster = cluster
 	return store, err
 }
 
 func (store *KubernetesStore) Initialize() error {
 	store.logger.Infof("k8s store initializing")
+	_, err := store.GetCluster()
+	if err != nil {
+		return err
+	}
+
 	labelsMap := map[string]string{
 		"app.kubernetes.io/instance":        store.clusterName,
 		"app.kubernetes.io/managed-by":      "kubeblocks",
@@ -95,6 +98,10 @@ func (store *KubernetesStore) Initialize() error {
 	return err
 }
 
+func (store *KubernetesStore) GetClusterName() string {
+	return store.clusterName
+}
+
 func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 	clusterResource := &appsv1alpha1.Cluster{}
 	err := store.client.Get().
@@ -107,6 +114,7 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 	store.logger.Infof("cluster resource: %v", clusterResource)
 	if err != nil {
 		store.logger.Errorf("k8s get cluster error: %v", err)
+		return nil, err
 	}
 
 	var replicas int32
@@ -203,7 +211,7 @@ func (store *KubernetesStore) CreateLock() error {
 	leaderName := store.currentMemberName
 	now := time.Now().Unix()
 	nowStr := strconv.FormatInt(now, 10)
-	ttl := store.cluster.HaConfig.ttl
+	ttl := os.Getenv("KB_TTL")
 	isExist, err := store.IsLockExist()
 	if isExist || err != nil {
 		return err
@@ -218,7 +226,7 @@ func (store *KubernetesStore) CreateLock() error {
 				"leader":       leaderName,
 				"acquire-time": nowStr,
 				"renew-time":   nowStr,
-				"ttl":          strconv.Itoa(ttl),
+				"ttl":          ttl,
 				"extra":        "",
 			},
 		},

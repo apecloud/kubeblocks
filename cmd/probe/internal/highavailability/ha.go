@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dapr/kit/logger"
+	"k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mongodb"
@@ -32,8 +33,6 @@ func NewHa(logger logger.Logger) *Ha {
 
 func (ha *Ha) RunCycle() {
 
-	cluster, _ := ha.dcs.GetCluster()
-	ha.logger.Debugf("cluster: %v", cluster)
 	//switch {
 	//case !dbManger.IsRunning():
 	//	logger.Infof("DB Service is not running,  wait for sqlctl to start it")
@@ -88,6 +87,13 @@ func (ha *Ha) RunCycle() {
 
 func (ha *Ha) Start() {
 	ha.logger.Info("HA starting")
+	cluster, err := ha.dcs.GetCluster()
+	if errors.IsNotFound(err) {
+		ha.logger.Infof("Cluster %s is not found, so HA exists.", ha.dcs.GetClusterName())
+		return
+	}
+
+	ha.logger.Debugf("cluster: %v", cluster)
 	isInitialized, _ := ha.dbManager.IsClusterInitialized()
 	for !isInitialized {
 		ha.logger.Infof("Waiting for the database cluster to be initialized.")
@@ -117,5 +123,5 @@ func (ha *Ha) Start() {
 	}
 }
 
-func (ha *Ha) ShutdownAndWait() {
+func (ha *Ha) ShutdownWithWait() {
 }

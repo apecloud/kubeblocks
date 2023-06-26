@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -38,7 +39,6 @@ const (
 	dataProtectionLabelBackupPolicyKey   = "dataprotection.kubeblocks.io/backup-policy"
 	dataProtectionLabelBackupTypeKey     = "dataprotection.kubeblocks.io/backup-type"
 	dataProtectionLabelAutoBackupKey     = "dataprotection.kubeblocks.io/autobackup"
-	dataProtectionLabelBackupNameKey     = "backups.dataprotection.kubeblocks.io/name"
 	dataProtectionLabelRestoreJobNameKey = "restorejobs.dataprotection.kubeblocks.io/name"
 
 	dataProtectionBackupTargetPodKey          = "dataprotection.kubeblocks.io/target-pod-name"
@@ -49,6 +49,8 @@ const (
 
 	hostNameLabelKey = "kubernetes.io/hostname"
 )
+
+const manifestsUpdaterContainerName = "manifests-updater"
 
 var reconcileInterval = time.Second
 
@@ -72,4 +74,5 @@ type backupPolicyOptions struct {
 	TTL              metav1.Duration `json:"ttl,omitempty"`
 	ServiceAccount   string          `json:"serviceAccount"`
 	Image            string          `json:"image"`
+	Tolerations      *corev1.PodSpec `json:"tolerations"`
 }

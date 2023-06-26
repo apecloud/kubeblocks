@@ -655,6 +655,25 @@ rules:
 - apiGroups:
   - snapshot.storage.k8s.io
   resources:
+  - volumesnapshotclasses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshotclasses/finalizers
+  verbs:
+  - patch
+  - update
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
   - volumesnapshots
   verbs:
   - create
@@ -682,7 +701,7 @@ rules:
 - apiGroups:
   - workloads.kubeblocks.io
   resources:
-  - consensussets
+  - replicatedstatemachines
   verbs:
   - create
   - delete
@@ -694,13 +713,13 @@ rules:
 - apiGroups:
   - workloads.kubeblocks.io
   resources:
-  - consensussets/finalizers
+  - replicatedstatemachines/finalizers
   verbs:
   - update
 - apiGroups:
   - workloads.kubeblocks.io
   resources:
-  - consensussets/status
+  - replicatedstatemachines/status
   verbs:
   - get
   - patch

@@ -23,7 +23,6 @@ import (
 	"io/fs"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -98,37 +97,6 @@ func TestIsSocketFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isSocketFile(tt.args); got != tt.want {
 				t.Errorf("isSocketFile() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestExecShellCommand(t *testing.T) {
-	tests := []struct {
-		name    string
-		cmd     *exec.Cmd
-		want    string
-		wantErr bool
-	}{{
-		name:    "go_test",
-		cmd:     exec.Command("go", "env"),
-		want:    "",
-		wantErr: false,
-	}, {
-		name:    "failed_test",
-		cmd:     exec.Command("not_command"),
-		want:    "",
-		wantErr: true,
-	}}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ExecShellCommand(tt.cmd)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ExecShellCommand() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if tt.want != "" && got != tt.want {
-				t.Errorf("ExecShellCommand() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/testutil"
 )
@@ -88,32 +87,4 @@ func MockReplicationComponentPods(
 		pods = append(pods, MockReplicationComponentPod(g, testCtx, sts, clusterName, compName, podName, role))
 	}
 	return pods
-}
-
-// UpdateClusterCompSpecPrimaryIndex updates cluster component spec primaryIndex.
-func UpdateClusterCompSpecPrimaryIndex(testCtx *testutil.TestContext,
-	cluster *appsv1alpha1.Cluster,
-	compName string,
-	primaryIndex *int32) {
-	objectKey := client.ObjectKey{Name: cluster.Name, Namespace: testCtx.DefaultNamespace}
-	gomega.Expect(GetAndChangeObj(testCtx, objectKey, func(newCluster *appsv1alpha1.Cluster) {
-		var index int
-		comps := newCluster.Spec.ComponentSpecs
-		if len(comps) > 0 {
-			for i, compSpec := range newCluster.Spec.ComponentSpecs {
-				if compSpec.Name == compName {
-					index = i
-				}
-			}
-			comps[index].PrimaryIndex = primaryIndex
-		}
-		newCluster.Spec.ComponentSpecs = comps
-	})()).Should(gomega.Succeed())
-	gomega.Eventually(CheckObj(testCtx, objectKey, func(g gomega.Gomega, newCluster *appsv1alpha1.Cluster) {
-		for index, compSpec := range newCluster.Spec.ComponentSpecs {
-			if compSpec.Name == compName {
-				g.Expect(newCluster.Spec.ComponentSpecs[index].PrimaryIndex).Should(gomega.Equal(primaryIndex))
-			}
-		}
-	})).Should(gomega.Succeed())
 }

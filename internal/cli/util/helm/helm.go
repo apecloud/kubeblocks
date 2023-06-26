@@ -586,7 +586,7 @@ func GetChartVersions(chartName string) ([]*semver.Version, error) {
 		break
 	}
 
-	// do not find any index file
+	// cannot find any index file
 	if ind == nil {
 		return nil, nil
 	}

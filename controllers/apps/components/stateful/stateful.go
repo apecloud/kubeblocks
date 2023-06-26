@@ -33,7 +33,6 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -41,20 +40,16 @@ import (
 )
 
 type Stateful struct {
-	types.ComponentSetBase
+	internal.ComponentSetBase
 }
 
-var _ types.ComponentSet = &Stateful{}
+var _ internal.ComponentSet = &Stateful{}
 
 func (r *Stateful) getReplicas() int32 {
-	if r.Component != nil {
-		return r.Component.GetReplicas()
+	if r.SynthesizedComponent != nil {
+		return r.SynthesizedComponent.Replicas
 	}
 	return r.ComponentSpec.Replicas
-}
-
-func (r *Stateful) SetComponent(comp types.Component) {
-	r.Component = comp
 }
 
 func (r *Stateful) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
@@ -125,10 +120,6 @@ func (r *Stateful) HandleRestart(context.Context, client.Object) ([]graph.Vertex
 }
 
 func (r *Stateful) HandleRoleChange(context.Context, client.Object) ([]graph.Vertex, error) {
-	return nil, nil
-}
-
-func (r *Stateful) HandleHA(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
 	return nil, nil
 }
 
@@ -205,12 +196,12 @@ func newStateful(cli client.Client,
 	spec *appsv1alpha1.ClusterComponentSpec,
 	def appsv1alpha1.ClusterComponentDefinition) *Stateful {
 	return &Stateful{
-		ComponentSetBase: types.ComponentSetBase{
-			Cli:           cli,
-			Cluster:       cluster,
-			ComponentSpec: spec,
-			ComponentDef:  &def,
-			Component:     nil,
+		ComponentSetBase: internal.ComponentSetBase{
+			Cli:                  cli,
+			Cluster:              cluster,
+			SynthesizedComponent: nil,
+			ComponentSpec:        spec,
+			ComponentDef:         &def,
 		},
 	}
 }

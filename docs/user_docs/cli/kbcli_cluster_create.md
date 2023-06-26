@@ -79,6 +79,12 @@ kbcli cluster create [NAME] [flags]
   
   # Create a cluster, with each pod runs on their own dedicated node
   kbcli cluster create --cluster-definition apecloud-mysql --tenancy=DedicatedNode
+  
+  # Create a cluster with backup to restore data
+  kbcli cluster create --backup backup-default-mycluster-20230616190023
+  
+  # Create a cluster with time to restore from point in time
+  kbcli cluster create --restore-to-time "Jun 16,2023 18:58:53 UTC+0800" --source-cluster mycluster
 ```
 
 ### Options
@@ -95,8 +101,10 @@ kbcli cluster create [NAME] [flags]
       --node-labels stringToString     Node label selector (default [])
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --pod-anti-affinity string       Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
+      --restore-to-time string         Set a time for point in time recovery
       --set stringArray                Set the cluster resource including cpu, memory, replicas and storage, or just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)
   -f, --set-file string                Use yaml file, URL, or stdin to set the cluster resource
+      --source-cluster string          Set a source cluster for point in time recovery
       --tenancy string                 Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
       --termination-policy string      Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
       --tolerations strings            Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'

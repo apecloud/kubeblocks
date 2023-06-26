@@ -45,6 +45,7 @@ zz_generated.*
 .vscode/
 .idea/
 .history/
+.run/
 .vimrc
 *.swp
 *.swo
@@ -62,6 +63,7 @@ tmp/
 
 
 # helm dependency charts
+deploy/**/Chart.lock
 deploy/**/charts
 
 # kbcli embed helm charts

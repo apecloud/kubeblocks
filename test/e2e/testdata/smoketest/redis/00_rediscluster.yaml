@@ -79,7 +79,6 @@ spec:
       enabledLogs:     ["running"]
       replicas: 2
       serviceAccountName: kb-mycluster-redis-cluster
-      primaryIndex: 0
       switchPolicy:
         type: Noop
       resources:

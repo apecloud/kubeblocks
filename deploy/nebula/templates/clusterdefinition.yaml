@@ -1,0 +1,190 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: nebula
+  labels:
+    {{- include "nebula.labels" . | nindent 4 }}
+spec:
+  connectionCredential:
+    username: root
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-nebula)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tcp-nebula)"
+    accesskey: ""
+    secretkey: ""
+  componentDefs:
+    - name: nebula-metad
+      configSpecs:
+        - name: nebula-metad-config
+          templateRef: nebula-metad-config-template
+          volumeName: nebula-metad
+      scriptSpecs:
+        - name: nebula-metad-scripts
+          templateRef: nebula-metad-scripts-template
+          volumeName: scripts
+          defaultMode: 493
+      workloadType: Stateful
+      characterType: nebula-metad
+      podSpec:
+        containers:
+          - name: nebula-metad
+            command:
+              - /bin/bash
+              - -c
+              - |
+                set -ex
+                /scripts/nebula-metad-start.sh
+            imagePullPolicy: {{default .Values.nebula.metad.image.pullPolicy "IfNotPresent"}}
+            ports:
+            - containerPort: 9559
+              name: thrift
+              protocol: TCP
+            - containerPort: 19559
+              name: http
+              protocol: TCP
+            - containerPort: 19560
+              name: http2
+              protocol: TCP
+            readinessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /status
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 10
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
+              - mountPath: /usr/local/nebula/data
+                name: data
+              - mountPath: /usr/local/nebula/logs
+                name: logs
+              - mountPath: /usr/local/nebula/etc
+                name: nebula-metad
+    - name: nebula-graphd
+      configSpecs:
+        - name: nebula-graphd-config
+          templateRef: nebula-graphd-config-template
+          volumeName: nebula-graphd
+      scriptSpecs:
+        - name: nebula-graphd-scripts
+          templateRef: nebula-graphd-scripts-template
+          volumeName: scripts
+          defaultMode: 493
+      workloadType: Stateful
+      characterType: nebula-graphd
+      service:
+        ports:
+          - name: thrift
+            port: 9669
+            targetPort: thrift
+            protocol: TCP
+          - name: http
+            port: 19669
+            targetPort: http
+            protocol: TCP
+          - name: http2
+            port: 19670
+            targetPort: http2
+            protocol: TCP
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+        containers:
+          - name: nebula-graphd
+            volumeMounts:
+              - mountPath: /usr/local/nebula/data
+                name: data
+              - mountPath: /usr/local/nebula/logs
+                name: logs
+              - mountPath: /usr/local/nebula/etc
+                name: nebula-graphd
+              - name: scripts
+                mountPath: /scripts
+            command:
+              - /bin/bash
+              - -c
+              - |
+                set -ex
+                /scripts/nebula-graphd-start.sh
+            imagePullPolicy: {{default .Values.nebula.graphd.image.pullPolicy "IfNotPresent"}}
+            ports:
+            - containerPort: 9669
+              name: thrift
+              protocol: TCP
+            - containerPort: 19669
+              name: http
+              protocol: TCP
+            - containerPort: 19670
+              name: http2
+              protocol: TCP
+            readinessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /status
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 10
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+    - name: nebula-storaged
+      configSpecs:
+        - name: nebula-storaged-config
+          templateRef: nebula-storaged-config-template
+          volumeName: nebula-storaged
+      scriptSpecs:
+        - name: nebula-storaged-scripts
+          templateRef: nebula-storaged-scripts-template
+          volumeName: scripts
+          defaultMode: 493
+      workloadType: Stateful
+      characterType: nebula-storaged
+      podSpec:
+        securityContext:
+          fsGroup: 1001
+        containers:
+          - name: nebula-storaged
+            command:
+              - /bin/bash
+              - -c
+              - |
+                set -ex
+                /scripts/nebula-storaged-start.sh
+            imagePullPolicy: {{default .Values.nebula.storaged.image.pullPolicy "IfNotPresent"}}
+            ports:
+            - containerPort: 9779
+              name: thrift
+              protocol: TCP
+            - containerPort: 19779
+              name: http
+              protocol: TCP
+            - containerPort: 19780
+              name: http2
+              protocol: TCP
+            - containerPort: 9778
+              name: admin
+              protocol: TCP
+            readinessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /status
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 10
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
+              - mountPath: /usr/local/nebula/etc
+                name: nebula-storaged
+              - mountPath: /usr/local/nebula/data
+                name: data
+              - mountPath: /usr/local/nebula/logs
+                name: logs

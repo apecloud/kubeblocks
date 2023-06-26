@@ -25,6 +25,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 func TestYAMLFormat(t *testing.T) {
@@ -54,4 +56,63 @@ spec:
 
 	assert.Nil(t, yamlConfigObj.Update("spec.my_test", "100"))
 	assert.EqualValues(t, yamlConfigObj.Get("spec.my_test"), "100")
+}
+
+func TestYAMLFormatForBadCase(t *testing.T) {
+	b, err := testdata.GetTestDataFileContent("config_encoding/prometheus.yaml")
+	assert.Nil(t, err)
+
+	yamlConfigObj, err := LoadConfig("yaml_test", string(b), appsv1alpha1.YAML)
+	assert.Nil(t, err)
+	assert.NotNil(t, yamlConfigObj)
+	yamlConfigObj.GetAllParameters()
+	_, err = util.JSONPatch(nil, yamlConfigObj.GetAllParameters())
+	assert.Nil(t, err)
+}
+
+func TestConvert(t *testing.T) {
+	tests := []struct {
+		name string
+		args any
+		want any
+	}{{
+		name: "test",
+		args: 10,
+		want: 10,
+	}, {
+		name: "test",
+		args: map[string]interface{}{
+			"key":   "value",
+			"test2": 100,
+		},
+		want: map[string]interface{}{
+			"key":   "value",
+			"test2": 100,
+		},
+	}, {
+		name: "test",
+		args: []interface{}{
+			"key",
+			"value",
+		},
+		want: []interface{}{
+			"key",
+			"value",
+		},
+	}, {
+		name: "test",
+		args: map[interface{}]interface{}{
+			1: "value",
+			2: 200,
+		},
+		want: map[string]interface{}{
+			"1": "value",
+			"2": 200,
+		},
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, convert(tt.args), "convert(%v)", tt.args)
+		})
+	}
 }

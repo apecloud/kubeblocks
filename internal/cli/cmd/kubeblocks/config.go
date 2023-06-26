@@ -42,6 +42,9 @@ import (
 )
 
 var showAllConfig = false
+var filterConfig = ""
+
+// keyWhiteList is a list of which kubeblocks configs are rolled out by default
 var keyWhiteList = []string{
 	"addonController",
 	"dataProtection",
@@ -84,6 +87,10 @@ var backupConfigExample = templates.Examples(`
 var describeConfigExample = templates.Examples(`
 		# Describe the KubeBlocks config.
 		kbcli kubeblocks describe-config
+		# Describe all the KubeBlocks configs
+		kbcli kubeblocks describe-config --all
+		# Describe the desired KubeBlocks configs by filter conditions
+		kbcli kubeblocks describe-config --filter=addonController,affinity
 `)
 
 // NewConfigCmd creates the config command
@@ -119,7 +126,7 @@ func NewDescribeConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 	var output printer.Format
 	cmd := &cobra.Command{
 		Use:     "describe-config",
-		Short:   "describe KubeBlocks config.",
+		Short:   "Describe KubeBlocks config.",
 		Example: describeConfigExample,
 		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -129,6 +136,7 @@ func NewDescribeConfigCmd(f cmdutil.Factory, streams genericclioptions.IOStreams
 	}
 	printer.AddOutputFlag(cmd, &output, false)
 	cmd.Flags().BoolVarP(&showAllConfig, "all", "A", false, "show all kubeblocks configs value")
+	cmd.Flags().StringVar(&filterConfig, "filter", "", "filter the desired kubeblocks configs, multiple filtered strings are comma separated")
 	return cmd
 }
 
@@ -153,14 +161,22 @@ func getHelmValues(release string, opt *Options) (map[string]interface{}, error)
 	for _, item := range list.Items {
 		delete(values, item.GetName())
 	}
+	return pruningConfigResults(values), nil
+}
+
+// pruningConfigResults prunes the configs results by options
+func pruningConfigResults(configs map[string]interface{}) map[string]interface{} {
 	if showAllConfig {
-		return values, nil
+		return configs
 	}
-	res := make(map[string]interface{})
-	for i := range keyWhiteList {
-		res[keyWhiteList[i]] = values[keyWhiteList[i]]
+	if filterConfig != "" {
+		keyWhiteList = strings.Split(filterConfig, ",")
 	}
-	return res, nil
+	res := make(map[string]interface{}, len(keyWhiteList))
+	for _, whiteKey := range keyWhiteList {
+		res[whiteKey] = configs[whiteKey]
+	}
+	return res
 }
 
 type fn func(release string, opt *Options) (map[string]interface{}, error)

@@ -52,7 +52,7 @@ func TestSendSignal(t *testing.T) {
 		}
 	}
 
-	// for not expect signal
+	// for expect signal
 	{
 		err := sendSignal(PID(os.Getpid()), syscall.SIGUSR1)
 		if err != nil {

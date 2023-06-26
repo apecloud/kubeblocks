@@ -46,10 +46,11 @@ spec:
                 type: array
               deployKind:
                 default: job
-                description: which kind for run a backup tool.
+                description: 'which kind for run a backup tool, supported values:
+                  job, statefulSet.'
                 enum:
                 - job
-                - daemon
+                - statefulSet
                 type: string
               env:
                 description: List of environment variables to set in the container.
@@ -215,6 +216,16 @@ spec:
                     items:
                       type: string
                     type: array
+                  podScope:
+                    default: All
+                    description: 'podScope defines the pod scope for restore from
+                      backup, supported values: - ''All'' will exec the restore command
+                      on all pods. - ''ReadWrite'' will pick a ReadWrite pod to exec
+                      the restore command.'
+                    enum:
+                    - All
+                    - ReadWrite
+                    type: string
                   restoreCommands:
                     description: Array of command that apps can perform database restore.
                       like xtrabackup, that can performs restore mysql from files.

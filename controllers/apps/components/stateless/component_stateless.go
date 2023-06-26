@@ -52,19 +52,18 @@ func NewStatelessComponent(cli client.Client,
 			ClusterVersion: clusterVersion,
 			Component:      synthesizedComponent,
 			ComponentSet: &Stateless{
-				ComponentSetBase: types.ComponentSetBase{
-					Cli:           cli,
-					Cluster:       cluster,
-					ComponentSpec: nil,
-					ComponentDef:  nil,
-					Component:     nil,
+				ComponentSetBase: internal.ComponentSetBase{
+					Cli:                  cli,
+					Cluster:              cluster,
+					SynthesizedComponent: synthesizedComponent,
+					ComponentSpec:        nil,
+					ComponentDef:         nil,
 				},
 			},
 			Dag:            dag,
 			WorkloadVertex: nil,
 		},
 	}
-	comp.ComponentSet.SetComponent(comp)
 	return comp
 }
 
@@ -274,8 +273,10 @@ func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
 	util.MergeAnnotations(deployObj.Spec.Template.Annotations, &deployProto.Spec.Template.Annotations)
 	util.BuildWorkLoadAnnotations(deployObjCopy, c.Cluster)
 	deployObjCopy.Spec = deployProto.Spec
+
+	util.ResolvePodSpecDefaultFields(deployObj.Spec.Template.Spec, &deployObjCopy.Spec.Template.Spec)
+
 	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
-		// TODO(REVIEW): always return true and update component phase to Updating. deployObj.Spec contains default values which set by Kubernetes
 		c.WorkloadVertex.Obj = deployObjCopy
 		c.WorkloadVertex.Action = ictrltypes.ActionUpdatePtr()
 		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload updated")

@@ -1,0 +1,25 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: BackupPolicyTemplate
+metadata:
+  name: {{ template "prometheus.name" . }}-backup-policy
+  labels:
+    clusterdefinition.kubeblocks.io/name: {{ template "prometheus.name" . }}
+    {{- include "prometheus.labels" . | nindent 4 }}
+  annotations:
+    dataprotection.kubeblocks.io/is-default-policy-template: "true"
+spec:
+  clusterDefinitionRef: prometheus
+  backupPolicies:
+  - componentDefRef: server
+    retention:
+      ttl: 7d
+    schedule:
+      snapshot:
+        enable: false
+        cronExpression: "0 18 * * *"
+      datafile:
+        enable: false
+        cronExpression: "0 18 * * *"
+    snapshot:
+      hooks:
+        containerName: prometheus-server

@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
 type ParamPairs struct {
@@ -42,7 +43,7 @@ func MergeAndValidateConfigs(configConstraint appsv1alpha1.ConfigConstraintSpec,
 
 		newCfg         map[string]string
 		configOperator ConfigOperator
-		updatedKeys    = set.NewLinkedHashSetString()
+		updatedKeys    = cfgutil.NewSet()
 	)
 
 	cmKeySet := FromCMKeysSelector(cmKey)
@@ -75,13 +76,13 @@ func MergeAndValidateConfigs(configConstraint appsv1alpha1.ConfigConstraintSpec,
 	if err = NewConfigValidator(&configConstraint, WithKeySelector(cmKey)).Validate(updatedCfg); err != nil {
 		return nil, WrapError(err, "failed to validate updated config")
 	}
-	return mergeUpdatedConfig(baseConfigs, updatedCfg), nil
+	return MergeUpdatedConfig(baseConfigs, updatedCfg), nil
 }
 
-// mergeUpdatedConfig replaces the file content of the changed key.
+// MergeUpdatedConfig replaces the file content of the changed key.
 // baseMap is the original configuration file,
 // updatedMap is the updated configuration file
-func mergeUpdatedConfig(baseMap, updatedMap map[string]string) map[string]string {
+func MergeUpdatedConfig(baseMap, updatedMap map[string]string) map[string]string {
 	r := make(map[string]string)
 	for key, val := range baseMap {
 		r[key] = val

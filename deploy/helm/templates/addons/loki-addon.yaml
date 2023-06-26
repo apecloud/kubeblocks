@@ -14,8 +14,18 @@ spec:
   type: Helm
 
   helm:
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/loki
+    {{- else }}
     chartLocationURL: "https://github.com/grafana/helm-charts/releases/download/helm-loki-5.5.8/loki-5.5.8.tgz"
     # chartLocationURL: https://jihulab.com/api/v4/projects/85949/packages/helm/stable/charts/...
+    {{- end }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 5.5.8
+      {{- end }}
+
     installValues:
       configMapRefs:
         - name: {{ include "addon.loki.name" . }}-chart-kubeblocks-values

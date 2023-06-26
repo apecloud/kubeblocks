@@ -79,10 +79,27 @@ data:
     #!/bin/bash
     set -o errexit
     set -ex
-    KB_PRIMARY_POD_NAME_PREFIX=${KB_PRIMARY_POD_NAME%%\.*}
-    if [ "$KB_PRIMARY_POD_NAME_PREFIX" != "$KB_POD_NAME" ]; then
+
+    # Waiting for primary pod information from the DownwardAPI annotation to be available, with a maximum of 5 attempts
+    attempt=1
+    max_attempts=5
+    while [ $attempt -le $max_attempts ] && [ -z "$(cat /kb-podinfo/primary-pod)" ]; do
+      sleep 5
+      attempt=$((attempt + 1))
+    done
+
+    primary=$(cat /kb-podinfo/primary-pod)
+    echo "DownwardAPI get primary=$primary" >> /home/postgres/pgdata/.kb_set_up.log
+    echo "KB_POD_NAME=$KB_POD_NAME" >> /home/postgres/pgdata/.kb_set_up.log
+    if [ -z "$primary" ]; then
+      echo "Primary pod information not available. Exiting..."
+      exit 1
+    fi
+    if [ "$primary" != "$KB_POD_NAME" ]; then
         # waiting for primary pod to be ready
-        until pg_isready -U {{ default "postgres" | quote }} -h $KB_PRIMARY_POD_NAME -p 5432; do
+        primary_fqdn="$primary.$KB_CLUSTER_NAME-$KB_COMP_NAME-headless.$KB_NAMESPACE.svc"
+        echo "primary_fqdn=$primary_fqdn" >> /home/postgres/pgdata/.kb_set_up.log
+        until pg_isready -U {{ default "postgres" | quote }} -h $primary_fqdn -p 5432; do
             sleep 5
         done
     fi
@@ -91,7 +108,6 @@ data:
     fi
     python3 /kb-scripts/generate_patroni_yaml.py tmp_patroni.yaml
     export SPILO_CONFIGURATION=$(cat tmp_patroni.yaml)
-    # export SCOPE="$KB_CLUSTER_NAME-$KB_CLUSTER_NAME"
     exec /launch.sh init
   pgbouncer_setup.sh: |
     #!/bin/bash

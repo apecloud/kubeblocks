@@ -19,8 +19,10 @@ Addon command.
 Manage alert receiver, include add, list and delete receiver.
 
 * [kbcli alert add-receiver](kbcli_alert_add-receiver.md)	 - Add alert receiver, such as email, slack, webhook and so on.
+* [kbcli alert config-smtpserver](kbcli_alert_config-smtpserver.md)	 - Set smtp server config
 * [kbcli alert delete-receiver](kbcli_alert_delete-receiver.md)	 - Delete alert receiver.
 * [kbcli alert list-receivers](kbcli_alert_list-receivers.md)	 - List all alert receivers.
+* [kbcli alert list-smtpserver](kbcli_alert_list-smtpserver.md)	 - List alert smtp servers config.
 
 
 ## [bench](kbcli_bench.md)
@@ -51,7 +53,7 @@ Manage classes
 Cluster command.
 
 * [kbcli cluster backup](kbcli_cluster_backup.md)	 - Create a backup for the cluster.
-* [kbcli cluster cancel-ops](kbcli_cluster_cancel-ops.md)	 - cancel the pending/creating/running OpsRequest which type is vscale or hscale.
+* [kbcli cluster cancel-ops](kbcli_cluster_cancel-ops.md)	 - Cancel the pending/creating/running OpsRequest which type is vscale or hscale.
 * [kbcli cluster configure](kbcli_cluster_configure.md)	 - Configure parameters with the specified components in the cluster.
 * [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a cluster or instance.
 * [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster.
@@ -82,6 +84,7 @@ Cluster command.
 * [kbcli cluster list-logs](kbcli_cluster_list-logs.md)	 - List supported log files in cluster.
 * [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - List all opsRequests.
 * [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file.
+* [kbcli cluster promote](kbcli_cluster_promote.md)	 - Promote a non-primary or non-leader instance as the new primary or leader of the cluster
 * [kbcli cluster restart](kbcli_cluster_restart.md)	 - Restart the specified components in the cluster.
 * [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup.
 * [kbcli cluster revoke-role](kbcli_cluster_revoke-role.md)	 - Revoke role from account
@@ -122,7 +125,9 @@ List and open the KubeBlocks dashboards.
 
 Inject faults to pod.
 
+* [kbcli fault delete](kbcli_fault_delete.md)	 - Delete chaos resources.
 * [kbcli fault io](kbcli_fault_io.md)	 - IO chaos.
+* [kbcli fault list](kbcli_fault_list.md)	 - List chaos resources.
 * [kbcli fault network](kbcli_fault_network.md)	 - Network chaos.
 * [kbcli fault node](kbcli_fault_node.md)	 - Node chaos.
 * [kbcli fault pod](kbcli_fault_pod.md)	 - Pod chaos.
@@ -135,7 +140,7 @@ Inject faults to pod.
 KubeBlocks operation commands.
 
 * [kbcli kubeblocks config](kbcli_kubeblocks_config.md)	 - KubeBlocks config.
-* [kbcli kubeblocks describe-config](kbcli_kubeblocks_describe-config.md)	 - describe KubeBlocks config.
+* [kbcli kubeblocks describe-config](kbcli_kubeblocks_describe-config.md)	 - Describe KubeBlocks config.
 * [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks.
 * [kbcli kubeblocks list-versions](kbcli_kubeblocks_list-versions.md)	 - List KubeBlocks versions.
 * [kbcli kubeblocks preflight](kbcli_kubeblocks_preflight.md)	 - Run and retrieve preflight checks for KubeBlocks.

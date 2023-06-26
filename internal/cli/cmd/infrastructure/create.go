@@ -67,6 +67,7 @@ func (o *createOptions) Run() error {
 		return cfgcore.MakeError("kubernetes version must be greater than %s", minKubernetesVersion)
 	}
 
+	o.Cluster.Kubernetes.AutoDefaultFill()
 	cluster, err := createClusterWithOptions(buildTemplateParams(o))
 	if err != nil {
 		return err

@@ -68,6 +68,7 @@ func TestCreateClusterWithOptions(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.args.Cluster.Kubernetes.AutoDefaultFill()
 			got, err := createClusterWithOptions(buildTemplateParams(tt.args))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("createClusterWithOptions() error = %v, wantErr %v", err, tt.wantErr)

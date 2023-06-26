@@ -39,3 +39,14 @@ const (
 	DefaultCniVersion        = "v1.3.0"  // https://github.com/containernetworking/plugins/releases
 	DefaultContainerdVersion = "1.7.2"   // https://github.com/containerd/containerd/releases
 )
+
+const (
+	DefaultK8sClusterName = "cluster.local"
+	DefaultK8sDNSDomain   = "cluster.local"
+	DefaultAPIDNSDomain   = "lb.kubeblocks.local"
+	DefaultK8sProxyMode   = "ipvs"
+	DefaultAPIServerPort  = 6443
+
+	DefaultClusterCIDR   = "10.233.64.0/18"
+	DefaultNetworkPlugin = "calico"
+)

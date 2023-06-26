@@ -51,6 +51,7 @@ const (
 	builtinUserObject           = "User"
 	builtinHostsObject          = "Hosts"
 	builtinRoleGroupsObject     = "RoleGroups"
+	builtinKubernetesObject     = "Kubernetes"
 )
 
 func buildTemplateParams(o *createOptions) *gotemplate.TplValues {
@@ -61,6 +62,7 @@ func buildTemplateParams(o *createOptions) *gotemplate.TplValues {
 		builtinUserObject:           o.User,
 		builtinHostsObject:          o.Nodes,
 		builtinTimeoutObject:        o.timeout,
+		builtinKubernetesObject:     o.Cluster.Kubernetes,
 		builtinRoleGroupsObject: gotemplate.TplValues{
 			common.ETCD:   o.RoleGroup.ETCD,
 			common.Master: o.RoleGroup.Master,

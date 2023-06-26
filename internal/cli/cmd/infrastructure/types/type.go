@@ -19,7 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package types
 
-import "helm.sh/helm/v3/pkg/cli/values"
+import (
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/constant"
+	kubekeyapiv1alpha2 "github.com/kubesphere/kubekey/v3/cmd/kk/apis/kubekey/v1alpha2"
+	"helm.sh/helm/v3/pkg/cli/values"
+)
 
 type InfraVersionInfo struct {
 	KubernetesVersion string
@@ -38,16 +42,16 @@ type PluginMeta struct {
 }
 
 type PluginSources struct {
-	Chart *HelmChart `json:"chart,omitempty"`
-	Yaml  *Yaml      `json:"yaml,omitempty"`
+	Chart *HelmChart `json:"chart"`
+	Yaml  *Yaml      `json:"yaml"`
 }
 
 type HelmChart struct {
-	Name         string         `json:"name,omitempty"`
-	Version      string         `json:"version,omitempty"`
-	Repo         string         `json:"repo,omitempty"`
-	Path         string         `json:"path,omitempty"`
-	ValueOptions values.Options `json:"options,omitempty"`
+	Name         string         `json:"name"`
+	Version      string         `json:"version"`
+	Repo         string         `json:"repo"`
+	Path         string         `json:"path"`
+	ValueOptions values.Options `json:"options"`
 }
 
 type Yaml struct {
@@ -60,6 +64,9 @@ type Cluster struct {
 
 	RoleGroup RoleGroup    `json:"roleGroup"`
 	Addons    []PluginMeta `json:"addons"`
+
+	// for kubeadm configuration
+	Kubernetes Kubernetes `json:"kubernetes"`
 }
 
 type RoleGroup struct {
@@ -74,6 +81,54 @@ type ClusterNode struct {
 	InternalAddress string `json:"internalAddress"`
 }
 
+type Kubernetes struct {
+	ClusterName string `json:"clusterName"`
+	DNSDomain   string `json:"dnsDomain"`
+	ProxyMode   string `json:"proxyMode"`
+
+	Networking Networking       `json:"networking"`
+	CRI        ContainerRuntime `json:"cri"`
+
+	ControlPlaneEndpoint ControlPlaneEndpoint `json:"controlPlaneEndpoint"`
+	APIServer            APIServer            `json:"apiServer"`
+	Scheduler            Scheduler            `json:"scheduler"`
+}
+
+type Networking struct {
+	// using network plugin, default is calico
+	Plugin        string `json:"omitempty"`
+	ServiceSubnet string `json:"serviceSubnet"`
+	PodSubnet     string `json:"podSubnet"`
+	DNSDomain     string `json:"dnsDomain"`
+}
+
+type ContainerRuntime struct {
+	ContainerRuntimeType     string `json:"containerRuntimeType"`
+	ContainerRuntimeEndpoint string `json:"containerRuntimeEndpoint"`
+	SandBoxImage             string `json:"sandBoxImage"`
+}
+
+type ControlPlaneComponent struct {
+	// apiserver extra args
+	ExtraArgs map[string]string `json:"extraArgs"`
+}
+
+type APIServer struct {
+	ControlPlaneComponent `json:",inline"`
+}
+
+type Scheduler struct {
+	ControlPlaneComponent `json:",inline"`
+}
+
+type ControlPlaneEndpoint struct {
+	Domain string `json:"domain"`
+	Port   int    `json:"port"`
+
+	// TODO support apiserver loadbalancer
+	LoadBalancer string `json:"loadBalancer"`
+}
+
 type ClusterUser struct {
 	// user name
 	Name string `json:"name"`
@@ -84,6 +139,64 @@ type ClusterUser struct {
 	PrivateKeyPath string `json:"privateKeyPath"`
 }
 
-func (g RoleGroup) IsValidate() bool {
+func (g *RoleGroup) IsValidate() bool {
 	return len(g.ETCD) > 0 && len(g.Master) > 0 && len(g.Worker) > 0
+}
+
+func (k *Kubernetes) AutoDefaultFill() {
+	if k.ClusterName == "" {
+		k.ClusterName = constant.DefaultK8sClusterName
+	}
+	if k.DNSDomain == "" {
+		k.DNSDomain = constant.DefaultK8sDNSDomain
+	}
+	if k.ProxyMode == "" {
+		k.ProxyMode = constant.DefaultK8sProxyMode
+	}
+
+	fillNetworkField(&k.Networking)
+	fillContainerRuntimeField(&k.CRI)
+	fillAPIServerField(&k.APIServer)
+	fillSchedulerField(&k.Scheduler)
+	fillControlPlaneField(&k.ControlPlaneEndpoint)
+}
+
+func fillContainerRuntimeField(c *ContainerRuntime) {
+	if c.ContainerRuntimeType == "" {
+		c.ContainerRuntimeType = kubekeyapiv1alpha2.Conatinerd
+		c.ContainerRuntimeEndpoint = kubekeyapiv1alpha2.DefaultContainerdEndpoint
+	}
+	if c.SandBoxImage == "" {
+		c.SandBoxImage = constant.DefaultSandBoxImage
+	}
+}
+
+func fillControlPlaneField(c *ControlPlaneEndpoint) {
+	if c.Port == 0 {
+		c.Port = constant.DefaultAPIServerPort
+	}
+	if c.Domain == "" {
+		c.Domain = constant.DefaultAPIDNSDomain
+	}
+}
+
+func fillSchedulerField(s *Scheduler) {
+}
+
+func fillAPIServerField(a *APIServer) {
+}
+
+func fillNetworkField(n *Networking) {
+	if n.Plugin == "" {
+		n.Plugin = constant.DefaultNetworkPlugin
+	}
+	if n.DNSDomain == "" {
+		n.DNSDomain = constant.DefaultK8sDNSDomain
+	}
+	if n.ServiceSubnet == "" {
+		n.ServiceSubnet = kubekeyapiv1alpha2.DefaultServiceCIDR
+	}
+	if n.PodSubnet == "" {
+		n.PodSubnet = kubekeyapiv1alpha2.DefaultPodsCIDR
+	}
 }

@@ -23,7 +23,7 @@ spec:
     {{- end }}
   {{- end }}
   controlPlaneEndpoint:
-    domain: lb.apiservice.local
+    domain: {{ $.Kubernetes.ControlPlaneEndpoint.Domain }}
     {{- $address := ""}}
     {{- if hasKey $.RoleGroups "master" }}
         {{- $mName := index (get $.RoleGroups "master") 0 }}
@@ -37,22 +37,17 @@ spec:
         {{- failed "require control address." }}
     {{- end }}
     address: {{ $address }}
-    port: 6443
+    port: {{ $.Kubernetes.ControlPlaneEndpoint.Port }}
   kubernetes:
     nodelocaldns: false
-    dnsDomain: cluster.local
+    dnsDomain: {{ $.Kubernetes.Networking.DNSDomain }}
     version: {{ $.Version }}
-    clusterName: {{ $.Name }}
+    clusterName: {{ $.Kubernetes.ClusterName }}
     {{- $criType := "containerd" }}
     nodeCidrMaskSize: 24
-    proxyMode: ipvs
-    {{- if eq $criType "containerd" }}
-    containerRuntimeEndpoint: "unix:///run/containerd/containerd.sock"
-    {{- end }}
-  {{- if hasKey . "CRIType" }}
-  {{ $criType = $.CRIType }}
-  {{- end }}
-    containerManager: {{ $criType }}
+    proxyMode: {{ $.Kubernetes.ProxyMode }}
+    containerRuntimeEndpoint: {{ $.Kubernetes.CRI.ContainerRuntimeEndpoint }}
+    containerManager: {{ $.Kubernetes.CRI.ContainerRuntimeType }}
   etcd:
     backupDir: /var/backups/kube_etcd
     backupPeriod: 1800
@@ -64,6 +59,6 @@ spec:
     type: kubeadm
     {{- end }}
   network:
-    plugin: cilium
-    kubePodsCIDR: 10.233.64.0/18
-    kubeServiceCIDR: 10.233.0.0/18
+    plugin: {{ $.Kubernetes.Networking.Plugin }}
+    kubePodsCIDR: {{ $.Kubernetes.Networking.PodSubnet }}
+    kubeServiceCIDR: {{ $.Kubernetes.Networking.ServiceSubnet }}

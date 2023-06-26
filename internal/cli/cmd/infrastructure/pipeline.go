@@ -43,7 +43,7 @@ func NewCreatePipeline(o *createOptions) []module.Module {
 		&tasks.PrepareK8sBinariesModule{BinaryVersion: o.version},
 		&tasks.ConfigureOSModule{},
 		&kubernetes.StatusModule{},
-		&tasks.InstallCRIModule{SandBoxImage: o.sandBoxImage},
+		&tasks.InstallCRIModule{SandBoxImage: o.Cluster.Kubernetes.CRI.SandBoxImage},
 		&etcd.PreCheckModule{},
 		&etcd.CertsModule{},
 		&etcd.InstallETCDBinaryModule{},

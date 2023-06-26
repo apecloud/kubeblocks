@@ -40,12 +40,14 @@ type deleteOptions struct {
 }
 
 func (o *deleteOptions) Run() error {
+	o.Cluster.Kubernetes.AutoDefaultFill()
 	cluster, err := createClusterWithOptions(&gotemplate.TplValues{
 		builtinClusterNameObject:    o.clusterName,
 		builtinClusterVersionObject: "0.0.0",
 		builtinUserObject:           o.User,
 		builtinHostsObject:          o.Nodes,
 		builtinTimeoutObject:        o.timeout,
+		builtinKubernetesObject:     o.Cluster.Kubernetes,
 		builtinRoleGroupsObject: gotemplate.TplValues{
 			common.ETCD:   o.RoleGroup.ETCD,
 			common.Master: o.RoleGroup.Master,

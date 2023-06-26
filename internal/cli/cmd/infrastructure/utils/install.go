@@ -19,16 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package utils
 
-import "github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
-
-type YamlInstallHelper struct {
-}
-
-func (y *YamlInstallHelper) Install(name, ns string) error {
-	// TODO implement me
-	panic("implement me")
-}
-
-func NewYamlInstaller(yaml types.Yaml, kubeconfig string) Installer {
-	return &YamlInstallHelper{}
+type Installer interface {
+	Install(name, ns string) error
 }

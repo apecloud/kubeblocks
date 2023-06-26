@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package types
 
+import "helm.sh/helm/v3/pkg/cli/values"
+
 type InfraVersionInfo struct {
 	KubernetesVersion string
 	EtcdVersion       string
@@ -41,11 +43,11 @@ type PluginSources struct {
 }
 
 type HelmChart struct {
-	Name    string   `json:"name,omitempty"`
-	Version string   `json:"version,omitempty"`
-	Repo    string   `json:"repo,omitempty"`
-	Path    string   `json:"path,omitempty"`
-	Values  []string `json:"values,omitempty"`
+	Name         string         `json:"name,omitempty"`
+	Version      string         `json:"version,omitempty"`
+	Repo         string         `json:"repo,omitempty"`
+	Path         string         `json:"path,omitempty"`
+	ValueOptions values.Options `json:"options,omitempty"`
 }
 
 type Yaml struct {

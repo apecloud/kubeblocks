@@ -19,20 +19,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package utils
 
-import "github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
+import (
+	"path/filepath"
 
-type Installer interface {
-	Install(name, ns string) error
-}
+	"helm.sh/helm/v3/pkg/repo"
+	"k8s.io/klog/v2"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+)
 
 type HelmInstallHelper struct {
+	types.HelmChart
+	kubeconfig string
 }
 
 func (h *HelmInstallHelper) Install(name, ns string) error {
-	//TODO implement me
-	panic("implement me")
+	if err := h.addRepo(); err != nil {
+		return err
+	}
+	helmConfig := helm.NewConfig(ns, h.kubeconfig, "", klog.V(1).Enabled())
+	return h.buildChart(name, ns).Upgrade(helmConfig)
 }
 
 func NewHelmInstaller(chart types.HelmChart, kubeconfig string) Installer {
-	return &HelmInstallHelper{}
+	installer := HelmInstallHelper{
+		HelmChart:  chart,
+		kubeconfig: kubeconfig}
+	return &installer
+}
+
+func (h *HelmInstallHelper) buildChart(name, ns string) *helm.InstallOpts {
+	return &helm.InstallOpts{
+		Name:            name,
+		Chart:           h.getChart(),
+		Wait:            true,
+		Version:         h.Version,
+		Namespace:       ns,
+		ValueOpts:       &h.ValueOptions,
+		TryTimes:        3,
+		CreateNamespace: true,
+		Atomic:          true,
+	}
+}
+
+func (h *HelmInstallHelper) getChart() string {
+	if h.Name == "" {
+		return ""
+	}
+	// install helm package form local path
+	if h.Repo == "" && h.Path != "" {
+		return filepath.Join(h.Path, h.Name)
+	} else {
+		return h.Name
+	}
+}
+
+func (h *HelmInstallHelper) addRepo() error {
+	if h.Repo == "" {
+		return nil
+	}
+	return helm.AddRepo(&repo.Entry{Name: h.Name, URL: h.Repo})
 }

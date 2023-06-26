@@ -61,23 +61,30 @@ func downloadKubernetesBinaryWithArch(downloadPath string, arch string, binaryVe
 		if err := binary.CreateBaseDir(); err != nil {
 			return nil, cfgcore.WrapError(err, "failed to create file %s base dir.", binary.FileName)
 		}
-
 		logger.Log.Messagef(common.LocalHost, "downloading %s %s %s ...", arch, binary.ID, binary.Version)
 		binariesMap[binary.ID] = binary
-		if util.IsExist(binary.Path()) {
-			if err := kbutils.CheckSha256sum(binary); err != nil {
-				logger.Log.Messagef(common.LocalHost, "failed to check %s sha256, error: %v", binary.ID, err)
-				_ = os.Remove(binary.Path())
-			} else {
-				logger.Log.Messagef(common.LocalHost, "%s is existed", binary.ID)
-				continue
-			}
+		if checkDownloadBinary(binary) {
+			continue
 		}
 		if err := download(binary); err != nil {
 			return nil, cfgcore.WrapError(err, "failed to download %s binary: %s", binary.ID, binary.GetCmd())
 		}
 	}
 	return binariesMap, nil
+}
+
+func checkDownloadBinary(binary *files.KubeBinary) bool {
+	if !util.IsExist(binary.Path()) {
+		return false
+	}
+	err := kbutils.CheckSha256sum(binary)
+	if err != nil {
+		logger.Log.Messagef(common.LocalHost, "failed to check %s sha256, error: %v", binary.ID, err)
+		_ = os.Remove(binary.Path())
+		return false
+	}
+	logger.Log.Messagef(common.LocalHost, "%s is existed", binary.ID)
+	return true
 }
 
 func download(binary *files.KubeBinary) error {

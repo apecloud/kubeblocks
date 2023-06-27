@@ -227,7 +227,7 @@ func SentProbeEvent(ctx context.Context, opsResult OpsResult, log logger.Logger)
 		return
 	}
 
-	sendEvent(ctx, log, event)
+	_ = sendEvent(ctx, log, event)
 }
 
 func createProbeEvent(opsResult OpsResult) (*corev1.Event, error) {

@@ -8120,6 +8120,50 @@ spec:
                               minimum: 1
                               type: integer
                           type: object
+                        volumeProtectionProbe:
+                          description: 'TODO: we should not provide this option for
+                            user. Probe to monitor the volume space usage and prohibit
+                            the instance from writing if the volume space usage is
+                            over the defined threshold. Reference ClusterDefinition.ClusterComponentDefinition.VolumeProtectionSpec
+                            for the threshold and volumes to monitor.'
+                          properties:
+                            commands:
+                              description: commands used to execute for probe.
+                              properties:
+                                queries:
+                                  description: Read check executed on probe sidecar,
+                                    used to check workload's readonly access.
+                                  items:
+                                    type: string
+                                  type: array
+                                writes:
+                                  description: Write check executed on probe sidecar,
+                                    used to check workload's allow write access.
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
+                            failureThreshold:
+                              default: 3
+                              description: Minimum consecutive failures for the probe
+                                to be considered failed after having succeeded.
+                              format: int32
+                              minimum: 2
+                              type: integer
+                            periodSeconds:
+                              default: 1
+                              description: How often (in seconds) to perform the probe.
+                              format: int32
+                              minimum: 1
+                              type: integer
+                            timeoutSeconds:
+                              default: 1
+                              description: Number of seconds after which the probe
+                                times out. Defaults to 1 second.
+                              format: int32
+                              minimum: 1
+                              type: integer
+                          type: object
                       type: object
                     replicationSpec:
                       description: replicationSpec defines replication related spec
@@ -8999,6 +9043,24 @@ spec:
                       - accounts
                       - cmdExecutorConfig
                       - passwordConfig
+                      type: object
+                    volumeProtectionSpec:
+                      properties:
+                        highWatermark:
+                          default: 90
+                          maximum: 100
+                          minimum: 0
+                          type: integer
+                        lowWatermark:
+                          default: 90
+                          maximum: 100
+                          minimum: 0
+                          type: integer
+                        volumes:
+                          description: Volumes to monitor.
+                          items:
+                            type: string
+                          type: array
                       type: object
                     volumeTypes:
                       description: "volumeTypes is used to describe the purpose of

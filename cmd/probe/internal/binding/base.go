@@ -119,6 +119,7 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 	}
 	ops.Ops = map[bindings.OperationKind]Operation{
 		VolumeProtection: &operationVolumeProtection{
+			Logger:        ops.Logger,
 			BaseOperation: ops,
 		},
 	}
@@ -126,7 +127,8 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 
 	for kind, op := range ops.Ops {
 		if err := op.Init(metadata); err != nil {
-			panic(fmt.Sprintf("init operation %s error: %s", kind, err.Error()))
+			ops.Logger.Warnf("init operation %s error: %s", kind, err.Error())
+			// panic(fmt.Sprintf("init operation %s error: %s", kind, err.Error()))
 		}
 	}
 }

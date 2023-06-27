@@ -70,7 +70,7 @@ func buildCommonFlags(cmd *cobra.Command, o *clusterOptions) {
 }
 
 func (o *clusterOptions) Complete() error {
-	if o.clusterName == "" {
+	if o.clusterName == "" && o.clusterConfig == "" {
 		o.clusterName = "kubeblocks-" + rand.String(6)
 		fmt.Printf("The cluster name is not set, auto generate cluster name: %s\n", o.clusterName)
 	}
@@ -195,6 +195,7 @@ func (o *clusterOptions) fillClusterConfig(configFile string) error {
 		return err
 	}
 	o.Cluster = *c
+	o.clusterName = o.Cluster.Name
 	return nil
 }
 

@@ -47,6 +47,5 @@ const (
 	DefaultK8sProxyMode   = "ipvs"
 	DefaultAPIServerPort  = 6443
 
-	DefaultClusterCIDR   = "10.233.64.0/18"
-	DefaultNetworkPlugin = "calico"
+	DefaultNetworkPlugin = "cilium"
 )

@@ -23,6 +23,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/constant"
 	kubekeyapiv1alpha2 "github.com/kubesphere/kubekey/v3/cmd/kk/apis/kubekey/v1alpha2"
 	"helm.sh/helm/v3/pkg/cli/values"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type InfraVersionInfo struct {
@@ -59,6 +60,9 @@ type Yaml struct {
 }
 
 type Cluster struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
 	User  ClusterUser   `json:"user"`
 	Nodes []ClusterNode `json:"nodes"`
 
@@ -103,7 +107,7 @@ type Kubernetes struct {
 
 type Networking struct {
 	// using network plugin, default is calico
-	Plugin        string `json:"omitempty"`
+	Plugin        string `json:"plugin"`
 	ServiceSubnet string `json:"serviceSubnet"`
 	PodSubnet     string `json:"podSubnet"`
 	DNSDomain     string `json:"dnsDomain"`

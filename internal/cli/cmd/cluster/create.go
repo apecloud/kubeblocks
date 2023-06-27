@@ -1005,6 +1005,11 @@ func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[
 			if err != nil {
 				return nil, err
 			}
+
+			// if the number of component definitions is more than one, default use the first one and output a log
+			if len(cd.Spec.ComponentDefs) > 1 {
+				klog.V(1).Infof("the component is not specified, use the default component \"%s\" in cluster definition \"%s\"", name, cd.Name)
+			}
 			compDefName = name
 		} else {
 			// check the type is a valid component definition name

@@ -49,8 +49,9 @@ type PrepareK8sBinariesModule struct {
 	BinaryVersion types.InfraVersionInfo
 }
 
-type ConfigureOSModule struct {
+type ConfigureNodeOSModule struct {
 	common.KubeModule
+	Nodes []types.ClusterNode
 }
 
 type SaveKubeConfigModule struct {
@@ -71,8 +72,8 @@ func (p *PrepareK8sBinariesModule) Init() {
 		}}
 }
 
-func (c *ConfigureOSModule) Init() {
-	c.Name = "ConfigureOSModule"
+func (c *ConfigureNodeOSModule) Init() {
+	c.Name = "ConfigureNodeOSModule"
 	c.Desc = "Init os dependencies"
 	c.Tasks = []task.Interface{
 		&task.RemoteTask{
@@ -93,12 +94,10 @@ func (c *ConfigureOSModule) Init() {
 			Name:  "GenerateScript",
 			Desc:  "Generate init os script",
 			Hosts: c.Runtime.GetAllHosts(),
-			Action: &builder.Template{
-				Template: constant.ConfigureOSScripts,
-				Dst:      filepath.Join(common.KubeScriptDir, "initOS.sh"),
-				Values: gotemplate.TplValues{
-					"Hosts": templates.GenerateHosts(c.Runtime, c.KubeConf),
-				}},
+			Action: &NodeScriptGenerator{
+				Hosts: templates.GenerateHosts(c.Runtime, c.KubeConf),
+				Nodes: c.Nodes,
+			},
 			Parallel: true,
 		},
 		&task.RemoteTask{
@@ -175,6 +174,37 @@ func (c *SaveKubeConfig) Execute(runtime connector.Runtime) error {
 		return kubeconfigMerge(kc, existingKC, c.outputKubeconfig)
 	}
 	return kubeconfigWrite(kc, c.outputKubeconfig)
+}
+
+type NodeScriptGenerator struct {
+	common.KubeAction
+
+	Nodes []types.ClusterNode
+	Hosts []string
+}
+
+func (c *NodeScriptGenerator) Execute(runtime connector.Runtime) error {
+	foundHostOptions := func(nodes []types.ClusterNode, host connector.Host) types.NodeOptions {
+		for _, node := range nodes {
+			switch {
+			default:
+				return types.NodeOptions{}
+			case node.Name != host.GetName():
+			case node.NodeOptions != nil:
+				return *node.NodeOptions
+			}
+		}
+		return types.NodeOptions{}
+	}
+
+	scriptsTemplate := builder.Template{
+		Template: constant.ConfigureOSScripts,
+		Dst:      filepath.Join(common.KubeScriptDir, "initOS.sh"),
+		Values: gotemplate.TplValues{
+			"Hosts":   c.Hosts,
+			"Options": foundHostOptions(c.Nodes, runtime.RemoteHost()),
+		}}
+	return scriptsTemplate.Execute(runtime)
 }
 
 func updateClusterAPIServer(kc *clientcmdapi.Config, master connector.Host, endpoint kubekeyapiv1alpha2.ControlPlaneEndpoint) {

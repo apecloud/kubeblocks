@@ -71,6 +71,19 @@ function set_network() {
   echo
 }
 
+function install_hugepage() {
+  local -r hugepage="${1:?missing key}"
+
+  echo "install hugepage..."
+  hpg_sz=$(grep Hugepagesize /proc/meminfo | awk '{print $2}')
+  ## convert to KB
+  re_hpg_num=$(echo $hugepage | awk '{sub("GB", "*1024*1024*1024", $1) || sub("MB", "*1024*1024", $1) || sub("KB", "*1024", $1); printf $1 "+"} END {print 0}' | bc)
+  hpg_num=$(echo "$re_hpg_num / ( $hpg_sz * 1024 )" | bc)
+
+  sysctl_set_keyvalue "vm.nr_hugepages" "$hpg_num"
+  echo
+}
+
 function common_os_setting() {
   swap_off
   selinux_off
@@ -127,6 +140,10 @@ EOF
      echo 'nf_conntrack' > /etc/modules-load.d/kube_proxy-ipvs.conf
   fi
 }
+
+{{- if $.Options.HugePageFeature }}
+install_hugepage {{ $.Options.HugePageFeature.HugePageSize }}
+{{- end }}
 
 install_netfilter
 install_ipvs

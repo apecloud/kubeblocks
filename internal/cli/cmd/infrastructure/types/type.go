@@ -76,9 +76,14 @@ type RoleGroup struct {
 }
 
 type ClusterNode struct {
-	Name            string `json:"name"`
-	Address         string `json:"address"`
-	InternalAddress string `json:"internalAddress"`
+	Name            string       `json:"name"`
+	Address         string       `json:"address"`
+	InternalAddress string       `json:"internalAddress"`
+	NodeOptions     *NodeOptions `json:"options"`
+}
+
+type NodeOptions struct {
+	HugePageFeature *HugePageFeature `json:"hugePageFeature"`
 }
 
 type Kubernetes struct {

@@ -25,46 +25,56 @@ jobs:
 
   release-message:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.get_trigger_mode.outputs.matrix }}
     steps:
       - uses: actions/checkout@v3
       - name: release message
+        id: get_trigger_mode
         run: |
           bash .github/utils/utils.sh --type 11 \
             --tag-name "${{ inputs.release_version }}" \
             --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }}
 
+          TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
+              --trigger-type "[test]" \
+              --test-pkgs "internal|apis|controllers|cmd" \
+              --test-check "mod-vendor|lint"`
+          echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
+
   release-test:
     needs: release-message
-    runs-on: [ self-hosted, eks-fargate-runner ]
-    outputs:
-      runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
-    steps:
-      - uses: apecloud/checkout@main
-      - name: vendor lint test
-        run: |
-          mkdir -p ./bin
-          cp -r /go/bin/controller-gen ./bin/controller-gen
-          cp -r /go/bin/setup-envtest ./bin/setup-envtest
-          make mod-vendor lint test
-
-      - name: kill kube-apiserver and etcd
-        id: get_runner_name
-        if: ${{ always() }}
-        run: |
-          echo runner_name=${RUNNER_NAME} >> $GITHUB_OUTPUT
-          bash .github/utils/utils.sh --type 8      
-
-  remove-runner:
-    needs: release-test
     runs-on: ubuntu-latest
-    if: ${{ always() }}
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJSON(needs.release-message.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v3
-      - name: remove runner
+      - name: install lib
         run: |
-          bash .github/utils/utils.sh --type 9 \
-            --github-token ${{ env.GITHUB_TOKEN }} \
-            --runner-name ${{ needs.make-test.outputs.runner-name }}    
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libbtrfs-dev \
+            libdevmapper-dev
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "${{ env.GO_VERSION }}"
+
+      - name: Install golangci-lint
+        if: matrix.ops == 'lint'
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.51.2
+
+      - name: make test ${{ matrix.ops }}
+        run: |
+          make ${{ matrix.ops }}
+
+      - name: make ${{ matrix.ops }}
+        if: ${{ contains(matrix.ops, '/') }}
+        run: |
+          make test TEST_PACKAGES=./${{ matrix.ops }}/...
 
   release-version:
     needs: release-test
@@ -88,6 +98,7 @@ jobs:
       - name: send message
         run: |
           bash .github/utils/utils.sh --type 12 \
+            --tag-name ${{ inputs.release_version }} \
             --content "release\u00a0${{ inputs.release_version }}\u00a0error"\
             --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

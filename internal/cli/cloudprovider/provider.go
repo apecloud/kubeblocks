@@ -24,6 +24,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/apecloud/kubeblocks/version"
 )
 
 type cloudProvider struct {
@@ -59,7 +61,7 @@ func (p *cloudProvider) Name() string {
 	return p.name
 }
 
-// CreateK8sCluster create a kubernetes cluster
+// CreateK8sCluster creates a kubernetes cluster
 func (p *cloudProvider) CreateK8sCluster(clusterInfo *K8sClusterInfo) error {
 	// init terraform
 	fmt.Fprintf(p.stdout, "Check and install terraform... \n")
@@ -101,5 +103,6 @@ func (p *cloudProvider) GetClusterInfo() (*K8sClusterInfo, error) {
 		ClusterName:   vals[0],
 		Region:        vals[1],
 		KubeConfig:    vals[2],
+		KbcliVersion:  version.GetVersion(),
 	}, nil
 }

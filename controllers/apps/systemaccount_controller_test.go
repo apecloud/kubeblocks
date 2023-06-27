@@ -49,7 +49,6 @@ var _ = Describe("SystemAccount Controller", func() {
 		mysqlCompTypeWOSysAcctDefName = "wo-sysacct"
 		mysqlCompName                 = "mysql"
 		mysqlCompNameWOSysAcct        = "wo-sysacct"
-		orphanFinalizerName           = "orphan"
 		clusterEndPointsSize          = 3
 	)
 
@@ -57,7 +56,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		* To test the behavior of system accounts controller, we conduct following tests:
 		* 1. construct two components, one with all accounts set, and one with none.
 		* 2. create two clusters, one cluster for each component, and verify
-	  * a) the number of secrets, jobs, and cached secrets are as expected
+	  * a) the number of secrets, jobs are as expected
 		* b) secret will be created, once corresponding job succeeds.
 		* c) secrets, deleted accidentally, will be re-created during next cluster reconciliation round.
 		*
@@ -68,9 +67,8 @@ var _ = Describe("SystemAccount Controller", func() {
 
 	// sysAcctResourceInfo defines the number of jobs and secrets to be created per account.
 	type sysAcctResourceInfo struct {
-		jobNum           int
-		secretNum        int
-		cachedSecretsNum int
+		jobNum    int
+		secretNum int
 	}
 	// sysAcctTestCase defines the info to setup test env, cluster and their expected result to verify against.
 	type sysAcctTestCase struct {
@@ -87,7 +85,7 @@ var _ = Describe("SystemAccount Controller", func() {
 	)
 
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -99,13 +97,8 @@ var _ = Describe("SystemAccount Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		testapps.ClearResources(&testCtx, intctrlutil.EndpointsSignature, inNS, ml)
-	}
-
-	cleanInternalCache := func() {
-		secretKeys := systemAccountReconciler.SecretMapStore.ListKeys()
-		for _, key := range secretKeys {
-			_ = systemAccountReconciler.SecretMapStore.deleteSecret(key)
-		}
+		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
 	}
 
 	/**
@@ -207,7 +200,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		Expect(clusterDefObj).NotTo(BeNil())
 
 		Expect(len(testCases)).To(BeNumerically(">", 0))
-		// fill the number of secrets, jobs, and cached secrets
+		// fill the number of secrets, jobs
 		for _, testCase := range testCases {
 			compDef := clusterDefObj.GetComponentDefByName(testCase.componentDefRef)
 			Expect(compDef).NotTo(BeNil())
@@ -217,14 +210,13 @@ var _ = Describe("SystemAccount Controller", func() {
 			if testCase.resourceMap == nil {
 				testCase.resourceMap = make(map[appsv1alpha1.AccountName]sysAcctResourceInfo)
 			}
-			var jobNum, secretNum, cachedSecretNum int
+			var jobNum, secretNum int
 			for _, account := range compDef.SystemAccounts.Accounts {
 				name := account.Name
 				policy := account.ProvisionPolicy
 				switch policy.Type {
 				case appsv1alpha1.CreateByStmt:
-					secretNum = 0
-					cachedSecretNum = 1
+					secretNum = 1
 					if policy.Scope == appsv1alpha1.AnyPods {
 						jobNum = 1
 					} else {
@@ -232,13 +224,11 @@ var _ = Describe("SystemAccount Controller", func() {
 					}
 				case appsv1alpha1.ReferToExisting:
 					jobNum = 0
-					cachedSecretNum = 0
 					secretNum = 1
 				}
 				testCase.resourceMap[name] = sysAcctResourceInfo{
-					jobNum:           jobNum,
-					cachedSecretsNum: cachedSecretNum,
-					secretNum:        secretNum,
+					jobNum:    jobNum,
+					secretNum: secretNum,
 				}
 			}
 		}
@@ -264,7 +254,7 @@ var _ = Describe("SystemAccount Controller", func() {
 					Name:      rootSecretName}, rootSecret)).To(Succeed())
 			}).Should(Succeed())
 		}
-		return
+		return clustersMap
 	}
 	/*
 	 * end of helper functions
@@ -280,9 +270,6 @@ var _ = Describe("SystemAccount Controller", func() {
 		BeforeEach(func() {
 			cleanEnv()
 			DeferCleanup(cleanEnv)
-
-			cleanInternalCache()
-			DeferCleanup(cleanInternalCache)
 
 			// setup testcase
 			mysqlTestCases = map[string]*sysAcctTestCase{
@@ -300,13 +287,12 @@ var _ = Describe("SystemAccount Controller", func() {
 			clustersMap = initSysAccountTestsAndCluster(mysqlTestCases)
 		})
 
-		It("Should create jobs and cache secrets as expected for each test case", func() {
+		It("Should create jobs and secrets as expected for each test case", func() {
 			for testName, testCase := range mysqlTestCases {
 				var (
-					acctList        appsv1alpha1.KBAccountType
-					jobsNum         int
-					secretsNum      int
-					cachedSecretNum int
+					acctList   appsv1alpha1.KBAccountType
+					jobsNum    int
+					secretsNum int
 				)
 
 				for _, acc := range testCase.accounts {
@@ -314,7 +300,6 @@ var _ = Describe("SystemAccount Controller", func() {
 					acctList |= acc.GetAccountID()
 					jobsNum += resource.jobNum
 					secretsNum += resource.secretNum
-					cachedSecretNum += resource.cachedSecretsNum
 				}
 
 				clusterKey, ok := clustersMap[testName]
@@ -328,9 +313,9 @@ var _ = Describe("SystemAccount Controller", func() {
 
 				ml := getLabelsForSecretsAndJobs(componentUniqueKey{namespace: cluster.Namespace, clusterName: cluster.Name, componentName: testCase.componentName})
 
-				if secretsNum == 0 && jobsNum == 0 && cachedSecretNum == 0 {
+				if secretsNum == 0 && jobsNum == 0 {
 					By("No accouts should be create for test case: " + testName)
-					// verify nothing will be created or cached till timeout
+					// verify nothing will be created till timeout
 					Consistently(func(g Gomega) {
 						accounts := getAccounts(g, cluster, ml)
 						g.Expect(accounts).To(BeEquivalentTo(acctList))
@@ -343,11 +328,6 @@ var _ = Describe("SystemAccount Controller", func() {
 					accounts := getAccounts(g, cluster, ml)
 					g.Expect(accounts).To(BeEquivalentTo(acctList))
 				}).Should(Succeed())
-
-				By("Assure some secrets have been cached")
-				Eventually(func() int {
-					return len(systemAccountReconciler.SecretMapStore.ListKeys())
-				}).Should(BeEquivalentTo(cachedSecretNum))
 
 				By("Verify all jobs created have their labels set correctly")
 				// get all jobs
@@ -366,13 +346,12 @@ var _ = Describe("SystemAccount Controller", func() {
 			}
 		})
 
-		It("Cached secrets should be created when jobs succeeds", func() {
+		It("Secrets should be created when jobs succeeds", func() {
 			for testName, testCase := range mysqlTestCases {
 				var (
-					acctList        appsv1alpha1.KBAccountType
-					jobsNum         int
-					secretsNum      int
-					cachedSecretNum int
+					acctList   appsv1alpha1.KBAccountType
+					jobsNum    int
+					secretsNum int
 				)
 
 				for _, acc := range testCase.accounts {
@@ -380,10 +359,9 @@ var _ = Describe("SystemAccount Controller", func() {
 					acctList |= acc.GetAccountID()
 					jobsNum += resource.jobNum
 					secretsNum += resource.secretNum
-					cachedSecretNum += resource.cachedSecretsNum
 				}
 
-				if secretsNum == 0 && jobsNum == 0 && cachedSecretNum == 0 {
+				if secretsNum == 0 && jobsNum == 0 {
 					continue
 				}
 				// get a cluster instance from map, created during preparation
@@ -407,6 +385,7 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(accounts).To(BeEquivalentTo(acctList))
 				}).Should(Succeed())
 
+				// wait for a while till all jobs are created
 				By("Check Jobs are created")
 				Eventually(func(g Gomega) {
 					jobs := &batchv1.JobList{}
@@ -414,11 +393,7 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(len(jobs.Items)).To(BeEquivalentTo(jobsNum))
 				}).Should(Succeed())
 
-				By("Verify secrets cached are correct")
-				Eventually(len(systemAccountReconciler.SecretMapStore.ListKeys())).Should(BeEquivalentTo(cachedSecretNum))
-
-				// wait for a while till all jobs are created
-				By("Mock all jobs are completed and deleted")
+				By("Mock all jobs are completed")
 				Eventually(func(g Gomega) {
 					jobs := &batchv1.JobList{}
 					g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
@@ -430,27 +405,14 @@ var _ = Describe("SystemAccount Controller", func() {
 								Status: corev1.ConditionTrue,
 							}}
 						})).To(Succeed())
-						g.Expect(k8sClient.Delete(ctx, &job)).To(Succeed())
 					}
-				}).Should(Succeed())
-
-				// remove 'orphan' finalizers to make sure all jobs can be deleted.
-				Eventually(func(g Gomega) {
-					jobs := &batchv1.JobList{}
-					g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-					for _, job := range jobs.Items {
-						g.Expect(testapps.ChangeObj(&testCtx, &job, func(ljob *batchv1.Job) {
-							controllerutil.RemoveFinalizer(ljob, orphanFinalizerName)
-						})).To(Succeed())
-					}
-					g.Expect(len(jobs.Items)).To(Equal(0), "Verify all jobs completed and deleted")
 				}).Should(Succeed())
 
 				By("Check secrets created")
 				Eventually(func(g Gomega) {
 					secrets := &corev1.SecretList{}
 					g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-					g.Expect(len(secrets.Items)).To(BeEquivalentTo(secretsNum + cachedSecretNum))
+					g.Expect(len(secrets.Items)).To(BeEquivalentTo(secretsNum))
 				}).Should(Succeed())
 
 				By("Verify all secrets created have their finalizer and labels set correctly")
@@ -461,14 +423,12 @@ var _ = Describe("SystemAccount Controller", func() {
 					g.Expect(k8sClient.List(ctx, secretsForAcct, ml)).To(Succeed())
 					for _, secret := range secretsForAcct.Items {
 						// each secret has finalizer
-						g.Expect(controllerutil.ContainsFinalizer(&secret, dbClusterFinalizerName)).To(BeTrue())
+						g.Expect(controllerutil.ContainsFinalizer(&secret, constant.DBClusterFinalizerName)).To(BeTrue())
 						g.Expect(len(secret.ObjectMeta.OwnerReferences)).To(BeEquivalentTo(1))
 						g.Expect(checkOwnerReferenceToObj(secret.OwnerReferences[0], cluster)).To(BeTrue())
 					}
 				}).Should(Succeed())
 			}
-			// all jobs succeeded, and there should be no cached secrets left behind.
-			Expect(len(systemAccountReconciler.SecretMapStore.ListKeys())).To(BeEquivalentTo(0))
 		})
 	}) // end of context
 
@@ -481,9 +441,6 @@ var _ = Describe("SystemAccount Controller", func() {
 		BeforeEach(func() {
 			cleanEnv()
 			DeferCleanup(cleanEnv)
-
-			cleanInternalCache()
-			DeferCleanup(cleanInternalCache)
 
 			// setup testcase
 			mysqlTestCases = map[string]*sysAcctTestCase{
@@ -503,13 +460,12 @@ var _ = Describe("SystemAccount Controller", func() {
 		})
 
 		It("Should clear relevant expectations and secrets after cluster deletion", func() {
-			var totalJobs, totalSecrets, totalCachedSecrets int
+			var totalJobs, totalSecrets int
 			for testName, testCase := range mysqlTestCases {
 				var (
-					acctList        appsv1alpha1.KBAccountType
-					jobsNum         int
-					secretsNum      int
-					cachedSecretNum int
+					acctList   appsv1alpha1.KBAccountType
+					jobsNum    int
+					secretsNum int
 				)
 
 				for _, acc := range testCase.accounts {
@@ -517,11 +473,9 @@ var _ = Describe("SystemAccount Controller", func() {
 					acctList |= acc.GetAccountID()
 					jobsNum += resource.jobNum
 					secretsNum += resource.secretNum
-					cachedSecretNum += resource.cachedSecretsNum
 				}
 				totalJobs += jobsNum
 				totalSecrets += secretsNum
-				totalCachedSecrets += cachedSecretNum
 
 				// get a cluster instance from map, created during preparation
 				clusterKey, ok := clustersMap[testName]
@@ -548,31 +502,22 @@ var _ = Describe("SystemAccount Controller", func() {
 				}).Should(Succeed())
 			}
 
-			By("Verify secrets and jobs size")
-			Eventually(func(g Gomega) {
-				g.Expect(len(systemAccountReconciler.SecretMapStore.ListKeys())).To(BeEquivalentTo(totalCachedSecrets), "before delete, there are %d cached secrets", totalCachedSecrets)
-			}).Should(Succeed())
-
 			clusterKeys := make([]types.NamespacedName, 0, len(clustersMap))
 			for _, v := range clustersMap {
 				clusterKeys = append(clusterKeys, v)
 			}
 
-			By("Delete 0-th cluster from list, there should be no change in cached secrets size")
+			By("Delete 0-th cluster from list, there should be no change in secrets size")
 			cluster := &appsv1alpha1.Cluster{}
 			Expect(k8sClient.Get(ctx, clusterKeys[0], cluster)).To(Succeed())
 			Expect(k8sClient.Delete(ctx, cluster)).To(Succeed())
 
-			By("Delete remaining cluster before jobs are done, all cached secrets should be removed")
+			By("Delete remaining cluster before jobs are done, all secrets should be removed")
 			for i := 1; i < len(clusterKeys); i++ {
 				cluster = &appsv1alpha1.Cluster{}
 				Expect(k8sClient.Get(ctx, clusterKeys[i], cluster)).To(Succeed())
 				Expect(k8sClient.Delete(ctx, cluster)).To(Succeed())
 			}
-
-			Eventually(func(g Gomega) {
-				g.Expect(len(systemAccountReconciler.SecretMapStore.ListKeys())).To(BeEquivalentTo(0))
-			}).Should(Succeed())
 		})
 	}) // end of context
 
@@ -585,9 +530,6 @@ var _ = Describe("SystemAccount Controller", func() {
 		BeforeEach(func() {
 			cleanEnv()
 			DeferCleanup(cleanEnv)
-
-			cleanInternalCache()
-			DeferCleanup(cleanInternalCache)
 
 			// setup testcase
 			mysqlTestCases = map[string]*sysAcctTestCase{
@@ -637,10 +579,6 @@ var _ = Describe("SystemAccount Controller", func() {
 					jobs := &batchv1.JobList{}
 					g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 					g.Expect(len(jobs.Items)).To(BeEquivalentTo(jobsNum))
-
-					secrets := &corev1.SecretList{}
-					g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-					g.Expect(len(secrets.Items)).To(BeEquivalentTo(secretsNum))
 				}).Should(Succeed())
 
 				By("Enable monitor, no more jobs or secrets should be created")
@@ -655,82 +593,61 @@ var _ = Describe("SystemAccount Controller", func() {
 				Eventually(func(g Gomega) {
 					g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 					g.Expect(len(jobs.Items)).To(BeEquivalentTo(jobsNum))
-					// nothing changed since last time updates
-					secrets := &corev1.SecretList{}
-					g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-					g.Expect(len(secrets.Items)).To(BeEquivalentTo(secretsNum))
 				}).Should(Succeed())
 
-				cachedSecretNum := len(systemAccountReconciler.SecretMapStore.ListKeys())
-				By("Mark partial jobs as completed and make sure it cannot be found")
-				// mark one jobs as completed
-				if jobsNum < 2 {
+				if len(jobs.Items) == 0 {
 					continue
 				}
 				// delete one job, but the job IS NOT completed.
 				By("Delete one job directly, the system should not create new secrets.")
 				jobToDelete := jobs.Items[0]
 				jobKey := client.ObjectKeyFromObject(&jobToDelete)
-				Expect(k8sClient.Delete(ctx, &jobToDelete)).To(Succeed())
 
+				tmpJob := &batchv1.Job{}
 				Eventually(func(g Gomega) {
-					tmpJob := &batchv1.Job{}
 					g.Expect(k8sClient.Get(ctx, jobKey, tmpJob)).To(Succeed())
 					g.Expect(len(tmpJob.ObjectMeta.Finalizers)).To(BeEquivalentTo(1))
-					g.Expect(testapps.ChangeObj(&testCtx, tmpJob, func(ljob *batchv1.Job) {
-						controllerutil.RemoveFinalizer(ljob, orphanFinalizerName)
-					})).To(Succeed())
 				}).Should(Succeed())
 
-				By("Verify jobs size decreased and secrets size increased")
-				Eventually(func(g Gomega) {
-					g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-					jobSize2 := len(jobs.Items)
-					g.Expect(jobSize2).To(BeNumerically("<", jobsNum))
+				Expect(testapps.ChangeObjStatus(&testCtx, tmpJob, func() {
+					tmpJob.Status.Conditions = []batchv1.JobCondition{{
+						Type:   batchv1.JobFailed,
+						Status: corev1.ConditionTrue,
+					}}
+				})).To(Succeed())
 
+				By("Verify secrets size does not increase")
+				var secretsLen int
+				Consistently(func(g Gomega) {
 					secrets := &corev1.SecretList{}
 					g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-					secretsSize2 := len(secrets.Items)
-					g.Expect(secretsSize2).To(BeEquivalentTo(secretsNum))
-
-					cachedSecretsSize2 := len(systemAccountReconciler.SecretMapStore.ListKeys())
-					g.Expect(cachedSecretsSize2).To(BeEquivalentTo(cachedSecretNum))
+					secretsLen = len(secrets.Items)
 				}).Should(Succeed())
 
+				if len(jobs.Items) < 1 {
+					continue
+				}
 				// delete one job directly, but the job is completed.
-				By("Delete one job directly, the system should not create new secrets.")
-				jobKey = client.ObjectKeyFromObject(&jobs.Items[0])
+				By("Delete one job and mark it as JobComplete, the system should create new secrets.")
+				jobKey = client.ObjectKeyFromObject(&jobs.Items[1])
+				tmpJob = &batchv1.Job{}
 				Eventually(func(g Gomega) {
-					tmpJob := &batchv1.Job{}
 					g.Expect(k8sClient.Get(ctx, jobKey, tmpJob)).To(Succeed())
-					g.Expect(testapps.ChangeObjStatus(&testCtx, tmpJob, func() {
-						tmpJob.Status.Conditions = []batchv1.JobCondition{{
-							Type:   batchv1.JobComplete,
-							Status: corev1.ConditionTrue,
-						}}
-					})).To(Succeed())
-					g.Expect(k8sClient.Delete(ctx, tmpJob)).To(Succeed())
-				}).Should(Succeed())
-
-				Eventually(func(g Gomega) {
-					tmpJob := &batchv1.Job{}
-					err := k8sClient.Get(ctx, jobKey, tmpJob)
-					g.Expect(err).To(Succeed())
 					g.Expect(len(tmpJob.ObjectMeta.Finalizers)).To(BeEquivalentTo(1))
-					g.Expect(testapps.ChangeObj(&testCtx, tmpJob, func(ljob *batchv1.Job) {
-						controllerutil.RemoveFinalizer(ljob, orphanFinalizerName)
-					})).To(Succeed())
 				}).Should(Succeed())
+				Expect(testapps.ChangeObjStatus(&testCtx, tmpJob, func() {
+					tmpJob.Status.Conditions = []batchv1.JobCondition{{
+						Type:   batchv1.JobComplete,
+						Status: corev1.ConditionTrue,
+					}}
+				})).To(Succeed())
 
 				By("Verify jobs size decreased and secrets size increased")
 				Eventually(func(g Gomega) {
 					secrets := &corev1.SecretList{}
 					g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 					secretsSize2 := len(secrets.Items)
-					g.Expect(secretsSize2).To(BeNumerically(">", secretsNum))
-
-					cachedSecretsSize2 := len(systemAccountReconciler.SecretMapStore.ListKeys())
-					g.Expect(cachedSecretsSize2).To(BeNumerically("<", cachedSecretNum))
+					g.Expect(secretsSize2).To(BeNumerically(">", secretsLen))
 				}).Should(Succeed())
 			}
 		})

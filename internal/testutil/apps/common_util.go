@@ -52,7 +52,7 @@ func ResetToIgnoreFinalizers() {
 		// REVIEW: adding following is a hack, if tests are running as
 		// controller-runtime manager setup.
 		constant.ConfigurationTemplateFinalizerName,
-		"cluster.kubeblocks.io/finalizer",
+		constant.DBClusterFinalizerName,
 	}
 }
 

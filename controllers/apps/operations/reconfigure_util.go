@@ -40,7 +40,7 @@ type reconfiguringResult struct {
 	err                error
 }
 
-// updateCfgParams merge parameters of the config into the configmap, and verify final configuration file.
+// updateCfgParams merges parameters of the config into the configmap, and verifies final configuration file.
 func updateCfgParams(config appsv1alpha1.Configuration,
 	tpl appsv1alpha1.ComponentConfigSpec,
 	cmKey client.ObjectKey,
@@ -95,7 +95,7 @@ func persistCfgCM(cmObj *corev1.ConfigMap, newCfg map[string]string, cli client.
 	if cmObj.Annotations == nil {
 		cmObj.Annotations = make(map[string]string)
 	}
-	cmObj.Annotations[constant.LastAppliedOpsCRAnnotation] = opsCrName
+	cmObj.Annotations[constant.LastAppliedOpsCRAnnotationKey] = opsCrName
 	cfgcore.SetParametersUpdateSource(cmObj, constant.ReconfigureUserSource)
 	return cli.Patch(ctx, cmObj, patch)
 }
@@ -203,4 +203,18 @@ func formatConfigPatchToMessage(configPatch *cfgcore.ConfigPatchInfo, execStatus
 		configPatch.UpdateConfig,
 		configPatch.AddConfig,
 		configPatch.DeleteConfig)
+}
+
+func getClusterVersionResource(cvName string, cv *appsv1alpha1.ClusterVersion, cli client.Client, ctx context.Context) error {
+	if cvName == "" {
+		return nil
+	}
+	clusterVersionKey := client.ObjectKey{
+		Namespace: "",
+		Name:      cvName,
+	}
+	if err := cli.Get(ctx, clusterVersionKey, cv); err != nil {
+		return cfgcore.WrapError(err, "failed to get clusterversion[%s]", cvName)
+	}
+	return nil
 }

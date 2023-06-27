@@ -6,20 +6,15 @@ metadata:
     clusterdefinition.kubeblocks.io/name: mongodb
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
-  image: mongo:5.0.14
+  image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
   deployKind: job
-  resources:
-    limits:
-      cpu: "1"
-      memory: 2Gi
-    requests:
-      cpu: "500m"
-      memory: 128Mi
   env:
     - name: DATA_DIR
       value: /data/mongodb/db
   physical:
     restoreCommands:
+      - sh
+      - -c
       - |
         set -e
         mkdir -p ${DATA_DIR}
@@ -29,30 +24,22 @@ spec:
           exit 1
         fi
         tar -xvf ${BACKUP_DIR}/${BACKUP_NAME}.tar.gz -C ${DATA_DIR}
-        PORT=27017
-        MONGODB_ROOT=/data/mongodb
-        RPL_SET_NAME=$(echo $KB_POD_NAME | grep -o ".*-");
-        RPL_SET_NAME=${RPL_SET_NAME%-};
-        mkdir -p $MONGODB_ROOT/db
-        mkdir -p $MONGODB_ROOT/logs
-        mkdir -p $MONGODB_ROOT/tmp
-        MODE=$1
-        mongod $MODE --bind_ip_all --port $PORT --dbpath $MONGODB_ROOT/db --directoryperdb --logpath $MONGODB_ROOT/logs/mongodb.log  --logappend --pidfilepath $MONGODB_ROOT/tmp/mongodb.pid&
-        until mongosh --quiet --port $PORT --host $host --eval "print('peer is ready')"; do sleep 1; done
-        PID=`cat $MONGODB_ROOT/tmp/mongodb.pid`
-
-        mongosh --quiet --port $PORT local --eval "db.system.replset.deleteOne({})"
-        mongosh --quiet --port $PORT local --eval "db.system.replset.find()"
-        mongosh --quiet --port $PORT admin --eval 'db.dropUser("root", {w: "majority", wtimeout: 4000})' || true
-        kill $PID
-        wait $PID
     incrementalRestoreCommands: []
   logical:
     restoreCommands: []
     incrementalRestoreCommands: []
   backupCommands:
+    - sh
+    - -c
     - |
      mkdir -p ${BACKUP_DIR} && cd ${DATA_DIR}
+     touch mongodb.backup && sync
+     START_TIME=$(mongo -u ${DB_USER} -p ${DB_PASSWORD} --port 27017 --host ${DB_HOST} --authenticationDatabase admin  --eval 'db.isMaster().lastWrite.lastWriteDate.getTime()/1000' --quiet)
+     START_TIME=$(date -d "@${START_TIME}" -u '+%Y-%m-%dT%H:%M:%SZ')
      tar -czvf ${BACKUP_DIR}/${BACKUP_NAME}.tar.gz ./
-     echo $?
+     rm -rf mongodb.backup
+     STOP_TIME=$(mongo -u ${DB_USER} -p ${DB_PASSWORD} --port 27017 --host ${DB_HOST} --authenticationDatabase admin  --eval 'db.isMaster().lastWrite.lastWriteDate.getTime()/1000' --quiet)
+     STOP_TIME=$(date -d "@${STOP_TIME}" -u '+%Y-%m-%dT%H:%M:%SZ')
+     TOTAL_SIZE=$(du -shx ${BACKUP_DIR}|awk '{print $1}')
+     echo "{\"totalSize\":\"$TOTAL_SIZE\",\"manifests\":{\"backupLog\":{\"startTime\":\"${START_TIME}\",\"stopTime\":\"${STOP_TIME}\"},\"backupTool\":{\"uploadTotalSize\":\"${TOTAL_SIZE}\"}}}" > ${BACKUP_DIR}/backup.info
   incrementalBackupCommands: []

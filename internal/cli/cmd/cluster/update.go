@@ -66,6 +66,12 @@ var clusterUpdateExample = templates.Examples(`
 
 	# update cluster tolerations
 	kbcli cluster update mycluster --tolerations='"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
+
+	# edit cluster
+	kbcli cluster update mycluster --edit
+
+	# enable cluster monitor and edit
+    # kbcli cluster update mycluster --monitor=true --edit
 `)
 
 type updateOptions struct {
@@ -165,7 +171,10 @@ func (o *updateOptions) buildPatch(flags []*pflag.Flag) error {
 	}
 
 	buildTolObj := func(obj map[string]interface{}, v pflag.Value, field string) error {
-		tolerations := buildTolerations(o.TolerationsRaw)
+		tolerations, err := util.BuildTolerations(o.TolerationsRaw)
+		if err != nil {
+			return err
+		}
 		return unstructured.SetNestedField(obj, tolerations, field)
 	}
 
@@ -275,7 +284,7 @@ func (o *updateOptions) updateEnabledLog(val string) error {
 	// set --enabled-all-logs at cluster components
 	setEnableAllLogs(o.cluster, cd)
 	if err = o.reconfigureLogVariables(o.cluster, cd); err != nil {
-		return errors.Wrap(err, "reconfigure log variables of target cluster failed")
+		return errors.Wrap(err, "failed to reconfigure log variables of target cluster")
 	}
 	return nil
 }
@@ -285,7 +294,7 @@ const logsTemplateName = "template-logs-block"
 const topTPLLogsObject = "component"
 const defaultSectionName = "default"
 
-// reconfigureLogVariables reconfigures the log variables of db kernel
+// reconfigureLogVariables reconfigures the log variables of cluster
 func (o *updateOptions) reconfigureLogVariables(c *appsv1alpha1.Cluster, cd *appsv1alpha1.ClusterDefinition) error {
 	var (
 		err             error
@@ -340,14 +349,14 @@ func findFirstConfigSpec(
 		return nil, err
 	}
 	if len(configSpecs) == 0 {
-		return nil, errors.Errorf("no config template for component %s", compName)
+		return nil, errors.Errorf("no config templates for component %s", compName)
 	}
 	return &configSpecs[0], nil
 }
 
 func findConfigTemplateInfo(dynamic dynamic.Interface, configSpec *appsv1alpha1.ComponentConfigSpec) (*corev1.ConfigMap, *appsv1alpha1.FormatterConfig, error) {
 	if configSpec == nil {
-		return nil, nil, errors.New("configSpec is nil")
+		return nil, nil, errors.New("configTemplateSpec is nil")
 	}
 	configTemplate, err := cluster.GetConfigMapByName(dynamic, configSpec.Namespace, configSpec.TemplateRef)
 	if err != nil {
@@ -361,7 +370,7 @@ func findConfigTemplateInfo(dynamic dynamic.Interface, configSpec *appsv1alpha1.
 }
 
 func newConfigTemplateEngine() *template.Template {
-	customizedFuncMap := plan.BuiltInCustomFunctions(nil, nil)
+	customizedFuncMap := plan.BuiltInCustomFunctions(nil, nil, nil)
 	engine := gotemplate.NewTplEngine(nil, customizedFuncMap, logsTemplateName, nil, context.TODO())
 	return engine.GetTplEngine()
 }
@@ -382,7 +391,7 @@ func findLogsBlockTPL(confData map[string]string) (string, *template.Template, e
 			return key, logTPL, nil
 		}
 	}
-	return "", nil, errors.New("no logs block template found")
+	return "", nil, errors.New("no logs config template found")
 }
 
 func buildLogsTPLValues(compSpec *appsv1alpha1.ClusterComponentSpec) (*gotemplate.TplValues, error) {

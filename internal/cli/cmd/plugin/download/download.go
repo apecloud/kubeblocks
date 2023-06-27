@@ -180,7 +180,7 @@ func detectMIMEType(at io.ReaderAt) (string, error) {
 		return "", errors.Wrap(err, "failed to read first 512 bytes")
 	}
 	if n < 512 {
-		klog.V(5).Infof("Did only read %d of 512 bytes to determine the file type", n)
+		klog.V(5).Infof("Only read %d of 512 bytes to determine the file type", n)
 	}
 
 	// Cut off mime extra info beginning with ';' i.e:

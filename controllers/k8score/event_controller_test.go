@@ -20,9 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package k8score
 
 import (
-	"bytes"
-	"context"
-	"text/template"
+	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -30,33 +29,29 @@ import (
 
 	"github.com/sethvargo/go-password/password"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	probeutil "github.com/apecloud/kubeblocks/cmd/probe/util"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
+	probeutil "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
-type roleEventValue struct {
-	PodName  string
-	EventSeq string
-	Role     string
-}
-
 var _ = Describe("Event Controller", func() {
-	var ctx = context.Background()
-
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
 		By("clean resources")
+
+		testapps.ClearClusterResources(&testCtx)
 
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -66,27 +61,76 @@ var _ = Describe("Event Controller", func() {
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
 	}
 
+	createRoleChangedEvent := func(podName, role string, podUid types.UID) *corev1.Event {
+		seq, _ := password.Generate(16, 16, 0, true, true)
+		objectRef := corev1.ObjectReference{
+			APIVersion: "v1",
+			Kind:       "Pod",
+			Namespace:  testCtx.DefaultNamespace,
+			Name:       podName,
+			UID:        podUid,
+		}
+		eventName := strings.Join([]string{podName, seq}, ".")
+		return builder.NewEventBuilder(testCtx.DefaultNamespace, eventName).
+			SetInvolvedObject(objectRef).
+			SetMessage(fmt.Sprintf("{\"event\":\"roleChanged\",\"originalRole\":\"secondary\",\"role\":\"%s\"}", role)).
+			SetReason(string(probeutil.CheckRoleOperation)).
+			SetType(corev1.EventTypeNormal).
+			GetObject()
+	}
+
+	createInvolvedPod := func(name, clusterName, componentName string) *corev1.Pod {
+		return builder.NewPodBuilder(testCtx.DefaultNamespace, name).
+			AddLabels(constant.AppInstanceLabelKey, clusterName).
+			AddLabels(constant.KBAppComponentLabelKey, componentName).
+			SetContainers([]corev1.Container{
+				{
+					Image: "foo",
+					Name:  "bar",
+				},
+			}).
+			GetObject()
+	}
+
 	BeforeEach(cleanEnv)
 
 	AfterEach(cleanEnv)
 
 	Context("When receiving role changed event", func() {
 		It("should handle it properly", func() {
+			By("create cluster & clusterDef")
+			clusterDefName := "foo"
+			consensusCompName := "consensus"
+			consensusCompDefName := "consensus"
+			clusterDefObj := testapps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(testapps.ConsensusMySQLComponent, consensusCompDefName).
+				Create(&testCtx).GetObject()
+			clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, "",
+				clusterDefObj.Name, "").WithRandomName().
+				AddComponent(consensusCompName, consensusCompDefName).
+				Create(&testCtx).GetObject()
+			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(clusterObj), &appsv1alpha1.Cluster{}, true)).Should(Succeed())
+
 			By("create involved pod")
+			var uid types.UID
 			podName := "foo"
-			pod := createInvolvedPod(podName)
-			Expect(testCtx.CreateObj(ctx, &pod)).Should(Succeed())
+			pod := createInvolvedPod(podName, clusterObj.Name, consensusCompName)
+			Expect(testCtx.CreateObj(ctx, pod)).Should(Succeed())
 			Eventually(func() error {
 				p := &corev1.Pod{}
+				defer func() {
+					uid = p.UID
+				}()
 				return k8sClient.Get(ctx, types.NamespacedName{
 					Namespace: pod.Namespace,
 					Name:      pod.Name,
 				}, p)
 			}).Should(Succeed())
+			Expect(uid).ShouldNot(BeNil())
 
 			By("send role changed event")
-			sndEvent, err := createRoleChangedEvent(podName, "leader")
-			Expect(err).Should(Succeed())
+			role := "leader"
+			sndEvent := createRoleChangedEvent(podName, role, uid)
 			Expect(testCtx.CreateObj(ctx, sndEvent)).Should(Succeed())
 			Eventually(func() string {
 				event := &corev1.Event{}
@@ -99,82 +143,51 @@ var _ = Describe("Event Controller", func() {
 				return event.InvolvedObject.Name
 			}).Should(Equal(sndEvent.InvolvedObject.Name))
 
-			By("Test parse event message")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pod), func(g Gomega, p *corev1.Pod) {
+				g.Expect(p).ShouldNot(BeNil())
+				g.Expect(p.Labels).ShouldNot(BeNil())
+				g.Expect(p.Labels[constant.RoleLabelKey]).Should(Equal(role))
+			})).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sndEvent), func(g Gomega, e *corev1.Event) {
+				g.Expect(e).ShouldNot(BeNil())
+				g.Expect(e.Annotations).ShouldNot(BeNil())
+				g.Expect(e.Annotations[roleChangedAnnotKey]).Should(Equal(trueStr))
+			})).Should(Succeed())
+
+			By("check whether the duration and number of events reach the threshold")
+			Expect(IsOvertimeEvent(sndEvent, 5*time.Second)).Should(BeFalse())
+		})
+	})
+
+	Context("ParseProbeEventMessage function", func() {
+		It("should work well", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx: testCtx.Ctx,
 				Log: log.FromContext(ctx).WithValues("event", testCtx.DefaultNamespace),
 			}
-			eventMessage := ParseProbeEventMessage(reqCtx, sndEvent)
-			Expect(eventMessage).ShouldNot(BeNil())
+			event := createRoleChangedEvent("foo", "", "bar")
+			event.Message = "not-a-role-message"
+			eventMessage := ParseProbeEventMessage(reqCtx, event)
+			Expect(eventMessage).Should(BeNil())
+		})
+	})
 
-			By("check whether the duration and number of events reach the threshold")
-			IsOvertimeEvent(sndEvent, 5*time.Second)
+	Context("IsOvertimeEvent function", func() {
+		It("should work well", func() {
+			event := createRoleChangedEvent("foo", "", "bar")
+			timeout := 50 * time.Millisecond
+			event.FirstTimestamp = metav1.NewTime(time.Now())
+			event.LastTimestamp = metav1.NewTime(time.Now())
+			Expect(IsOvertimeEvent(event, timeout)).Should(BeFalse())
+			event.LastTimestamp = metav1.NewTime(event.LastTimestamp.Time.Add(2 * timeout))
+			Expect(IsOvertimeEvent(event, timeout)).Should(BeTrue())
+
+			event.EventTime = metav1.NewMicroTime(time.Now())
+			event.Series = &corev1.EventSeries{LastObservedTime: metav1.NewMicroTime(time.Now())}
+			Expect(IsOvertimeEvent(event, timeout)).Should(BeFalse())
+			event.Series = &corev1.EventSeries{LastObservedTime: metav1.NewMicroTime(time.Now().Add(2 * timeout))}
+			Expect(IsOvertimeEvent(event, timeout)).Should(BeTrue())
 		})
 	})
 })
-
-func createRoleChangedEvent(podName, role string) (*corev1.Event, error) {
-	eventTmpl := `
-apiVersion: v1
-kind: Event
-metadata:
-  name: {{ .PodName }}.{{ .EventSeq }}
-  namespace: default
-involvedObject:
-  apiVersion: v1
-  fieldPath: spec.containers{kbprobe-rolechangedcheck}
-  kind: Pod
-  name: {{ .PodName }}
-  namespace: default
-message: "{\"event\":\"roleChanged\",\"originalRole\":\"secondary\",\"role\":\"{{ .Role }}\"}"
-reason: RoleChanged
-type: Normal
-`
-
-	seq, err := password.Generate(16, 16, 0, true, true)
-	if err != nil {
-		return nil, err
-	}
-	roleValue := roleEventValue{
-		PodName:  podName,
-		EventSeq: seq,
-		Role:     role,
-	}
-	tmpl, err := template.New("event-tmpl").Parse(eventTmpl)
-	if err != nil {
-		return nil, err
-	}
-	buf := new(bytes.Buffer)
-	err = tmpl.Execute(buf, roleValue)
-	if err != nil {
-		return nil, err
-	}
-
-	event := &corev1.Event{}
-	_, _, err = scheme.Codecs.UniversalDeserializer().Decode(buf.Bytes(), nil, event)
-	if err != nil {
-		return nil, err
-	}
-	event.Reason = string(probeutil.CheckRoleOperation)
-
-	return event, nil
-}
-
-func createInvolvedPod(name string) corev1.Pod {
-	podYaml := `
-apiVersion: v1
-kind: Pod
-metadata:
-  name: my-name
-  namespace: default
-spec:
-  containers:
-  - image: docker.io/apecloud/apecloud-mysql-server:latest
-    name: mysql
-`
-	pod := corev1.Pod{}
-	Expect(yaml.Unmarshal([]byte(podYaml), &pod)).Should(Succeed())
-	pod.Name = name
-
-	return pod
-}

@@ -1,20 +1,17 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package v1alpha1
@@ -30,10 +27,9 @@ type BackupToolSpec struct {
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
-	// which kind for run a backup tool.
-	// +kubebuilder:validation:Enum={job,daemon}
+	// which kind for run a backup tool, supported values: job, statefulSet.
 	// +kubebuilder:default=job
-	DeployKind string `json:"deployKind,omitempty"`
+	DeployKind DeployKind `json:"deployKind,omitempty"`
 
 	// the type of backup tool, file or pitr
 	// +kubebuilder:validation:Enum={file,pitr}
@@ -78,7 +74,18 @@ type BackupToolSpec struct {
 
 	// backup tool can support logical restore, in this case, restore NOT RESTART database.
 	// +optional
-	Logical *BackupToolRestoreCommand `json:"logical,omitempty"`
+	Logical *LogicalConfig `json:"logical,omitempty"`
+}
+
+type LogicalConfig struct {
+	BackupToolRestoreCommand `json:",inline"`
+
+	// podScope defines the pod scope for restore from backup, supported values:
+	// - 'All' will exec the restore command on all pods.
+	// - 'ReadWrite' will pick a ReadWrite pod to exec the restore command.
+	// +optional
+	// +kubebuilder:default=All
+	PodScope PodRestoreScope `json:"podScope,omitempty"`
 }
 
 // BackupToolRestoreCommand defines the restore commands of BackupTool
@@ -98,6 +105,9 @@ type BackupToolStatus struct {
 	// TODO(dsj): define backup tool status.
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster

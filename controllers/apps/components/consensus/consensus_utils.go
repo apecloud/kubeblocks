@@ -30,6 +30,8 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -138,17 +140,17 @@ func generateConsensusSerialPlan(plan *util.Plan, pods []corev1.Pod, rolePriorit
 }
 
 // ComposeRolePriorityMap generates a priority map based on roles.
-func ComposeRolePriorityMap(componentDef *appsv1alpha1.ClusterComponentDefinition) map[string]int {
-	if componentDef.ConsensusSpec == nil {
-		componentDef.ConsensusSpec = appsv1alpha1.NewConsensusSetSpec()
+func ComposeRolePriorityMap(consensusSpec *appsv1alpha1.ConsensusSetSpec) map[string]int {
+	if consensusSpec == nil {
+		consensusSpec = appsv1alpha1.NewConsensusSetSpec()
 	}
 	rolePriorityMap := make(map[string]int, 0)
 	rolePriorityMap[""] = emptyPriority
-	rolePriorityMap[componentDef.ConsensusSpec.Leader.Name] = leaderPriority
-	if componentDef.ConsensusSpec.Learner != nil {
-		rolePriorityMap[componentDef.ConsensusSpec.Learner.Name] = learnerPriority
+	rolePriorityMap[consensusSpec.Leader.Name] = leaderPriority
+	if consensusSpec.Learner != nil {
+		rolePriorityMap[consensusSpec.Learner.Name] = learnerPriority
 	}
-	for _, follower := range componentDef.ConsensusSpec.Followers {
+	for _, follower := range consensusSpec.Followers {
 		switch follower.AccessMode {
 		case appsv1alpha1.None:
 			rolePriorityMap[follower.Name] = followerNonePriority
@@ -166,11 +168,18 @@ func UpdateConsensusSetRoleLabel(cli client.Client,
 	reqCtx intctrlutil.RequestCtx,
 	componentDef *appsv1alpha1.ClusterComponentDefinition,
 	pod *corev1.Pod, role string) error {
-	ctx := reqCtx.Ctx
 	if componentDef == nil {
 		return nil
 	}
-	roleMap := composeConsensusRoleMap(componentDef)
+	return updateConsensusSetRoleLabel(cli, reqCtx, componentDef.ConsensusSpec, pod, role)
+}
+
+func updateConsensusSetRoleLabel(cli client.Client,
+	reqCtx intctrlutil.RequestCtx,
+	consensusSpec *appsv1alpha1.ConsensusSetSpec,
+	pod *corev1.Pod, role string) error {
+	ctx := reqCtx.Ctx
+	roleMap := composeConsensusRoleMap(consensusSpec)
 	// role not defined in CR, ignore it
 	if _, ok := roleMap[role]; !ok {
 		return nil
@@ -201,25 +210,25 @@ func putConsensusMemberExt(roleMap map[string]consensusMemberExt, name string, r
 	roleMap[name] = memberExt
 }
 
-func composeConsensusRoleMap(componentDef *appsv1alpha1.ClusterComponentDefinition) map[string]consensusMemberExt {
+func composeConsensusRoleMap(consensusSpec *appsv1alpha1.ConsensusSetSpec) map[string]consensusMemberExt {
 	roleMap := make(map[string]consensusMemberExt, 0)
 	putConsensusMemberExt(roleMap,
-		componentDef.ConsensusSpec.Leader.Name,
+		consensusSpec.Leader.Name,
 		roleLeader,
-		componentDef.ConsensusSpec.Leader.AccessMode)
+		consensusSpec.Leader.AccessMode)
 
-	for _, follower := range componentDef.ConsensusSpec.Followers {
+	for _, follower := range consensusSpec.Followers {
 		putConsensusMemberExt(roleMap,
 			follower.Name,
 			roleFollower,
 			follower.AccessMode)
 	}
 
-	if componentDef.ConsensusSpec.Learner != nil {
+	if consensusSpec.Learner != nil {
 		putConsensusMemberExt(roleMap,
-			componentDef.ConsensusSpec.Learner.Name,
+			consensusSpec.Learner.Name,
 			roleLearner,
-			componentDef.ConsensusSpec.Learner.AccessMode)
+			consensusSpec.Learner.AccessMode)
 	}
 
 	return roleMap
@@ -271,7 +280,7 @@ func setConsensusSetStatusLearner(consensusSetStatus *appsv1alpha1.ConsensusSetS
 func resetConsensusSetStatusRole(consensusSetStatus *appsv1alpha1.ConsensusSetStatus, podName string) {
 	// reset leader
 	if consensusSetStatus.Leader.Pod == podName {
-		consensusSetStatus.Leader.Pod = util.ComponentStatusDefaultPodName
+		consensusSetStatus.Leader.Pod = constant.ComponentStatusDefaultPodName
 		consensusSetStatus.Leader.AccessMode = appsv1alpha1.None
 		consensusSetStatus.Leader.Name = ""
 	}
@@ -291,7 +300,7 @@ func resetConsensusSetStatusRole(consensusSetStatus *appsv1alpha1.ConsensusSetSt
 
 func setConsensusSetStatusRoles(
 	consensusSetStatus *appsv1alpha1.ConsensusSetStatus,
-	componentDef *appsv1alpha1.ClusterComponentDefinition,
+	consensusSpec *appsv1alpha1.ConsensusSetSpec,
 	pods []corev1.Pod) {
 	for _, pod := range pods {
 		if !intctrlutil.PodIsReadyWithLabel(pod) {
@@ -299,16 +308,16 @@ func setConsensusSetStatusRoles(
 		}
 
 		role := pod.Labels[constant.RoleLabelKey]
-		_ = setConsensusSetStatusRole(consensusSetStatus, componentDef, role, pod.Name)
+		_ = setConsensusSetStatusRole(consensusSetStatus, consensusSpec, role, pod.Name)
 	}
 }
 
 func setConsensusSetStatusRole(
 	consensusSetStatus *appsv1alpha1.ConsensusSetStatus,
-	componentDef *appsv1alpha1.ClusterComponentDefinition,
+	consensusSpec *appsv1alpha1.ConsensusSetSpec,
 	role, podName string) bool {
 	// mapping role label to consensus member
-	roleMap := composeConsensusRoleMap(componentDef)
+	roleMap := composeConsensusRoleMap(consensusSpec)
 	memberExt, ok := roleMap[role]
 	if !ok {
 		return false
@@ -331,48 +340,53 @@ func setConsensusSetStatusRole(
 func updateConsensusRoleInfo(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	componentDef *appsv1alpha1.ClusterComponentDefinition,
+	consensusSpec *appsv1alpha1.ConsensusSetSpec,
 	componentName string,
-	pods []corev1.Pod) error {
-	leader, followers := composeRoleEnv(componentDef, pods)
-
+	compDefName string,
+	pods []corev1.Pod) ([]graph.Vertex, error) {
+	leader, followers := composeRoleEnv(consensusSpec, pods)
 	ml := client.MatchingLabels{
 		constant.AppInstanceLabelKey:    cluster.GetName(),
 		constant.KBAppComponentLabelKey: componentName,
 		constant.AppConfigTypeLabelKey:  "kubeblocks-env",
 	}
-
 	configList := &corev1.ConfigMapList{}
 	if err := cli.List(ctx, configList, ml); err != nil {
-		return err
+		return nil, err
 	}
 
-	if len(configList.Items) > 0 {
-		for _, config := range configList.Items {
-			patch := client.MergeFrom(config.DeepCopy())
-			config.Data["KB_"+strings.ToUpper(componentDef.Name)+"_LEADER"] = leader
-			config.Data["KB_"+strings.ToUpper(componentDef.Name)+"_FOLLOWERS"] = followers
-			if err := cli.Patch(ctx, &config, patch); err != nil {
-				return err
-			}
-		}
+	vertexes := make([]graph.Vertex, 0)
+	for idx := range configList.Items {
+		config := configList.Items[idx]
+		config.Data["KB_LEADER"] = leader
+		config.Data["KB_FOLLOWERS"] = followers
+		// TODO: need to deprecate 'compDefName' being part of variable name, as it's redundant
+		// and introduce env/cm key naming reference complexity
+		config.Data["KB_"+strings.ToUpper(compDefName)+"_LEADER"] = leader
+		config.Data["KB_"+strings.ToUpper(compDefName)+"_FOLLOWERS"] = followers
+		vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+			Obj:    &config,
+			Action: ictrltypes.ActionUpdatePtr(),
+		})
 	}
+
 	// patch pods' annotations
-	for _, pod := range pods {
-		patch := client.MergeFrom(pod.DeepCopy())
+	for idx := range pods {
+		pod := pods[idx]
 		if pod.Annotations == nil {
 			pod.Annotations = map[string]string{}
 		}
 		pod.Annotations[constant.LeaderAnnotationKey] = leader
-		if err := cli.Patch(ctx, &pod, patch); err != nil {
-			return err
-		}
+		vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+			Obj:    &pod,
+			Action: ictrltypes.ActionUpdatePtr(),
+		})
 	}
 
-	return nil
+	return vertexes, nil
 }
 
-func composeRoleEnv(componentDef *appsv1alpha1.ClusterComponentDefinition, pods []corev1.Pod) (leader, followers string) {
+func composeRoleEnv(consensusSpec *appsv1alpha1.ConsensusSetSpec, pods []corev1.Pod) (leader, followers string) {
 	leader, followers = "", ""
 	for _, pod := range pods {
 		if !intctrlutil.PodIsReadyWithLabel(pod) {
@@ -380,7 +394,7 @@ func composeRoleEnv(componentDef *appsv1alpha1.ClusterComponentDefinition, pods 
 		}
 		role := pod.Labels[constant.RoleLabelKey]
 		// mapping role label to consensus member
-		roleMap := composeConsensusRoleMap(componentDef)
+		roleMap := composeConsensusRoleMap(consensusSpec)
 		memberExt, ok := roleMap[role]
 		if !ok {
 			continue

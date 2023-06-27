@@ -11,7 +11,7 @@ kbcli kubeblocks list-versions [flags]
 ### Examples
 
 ```
-  # list KubeBlocks release version
+  # list KubeBlocks release versions
   kbcli kubeblocks list-versions
   
   # list KubeBlocks versions including development versions, such as alpha, beta and release candidate

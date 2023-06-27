@@ -20,14 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package fault
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/create"
@@ -76,6 +80,9 @@ func NewFaultCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		NewTimeChaosCmd(f, streams),
 		NewIOChaosCmd(f, streams),
 		NewStressChaosCmd(f, streams),
+		NewNodeChaosCmd(f, streams),
+		NewListCmd(f, streams),
+		NewDeleteCmd(f, streams),
 	)
 	return cmd
 }
@@ -107,14 +114,23 @@ func (o *FaultBaseOptions) AddCommonFlag(cmd *cobra.Command) {
 	cmd.Flags().StringToStringVar(&o.NodeLabelSelectors, "node-label", map[string]string{}, `label for node, such as '"kubernetes.io/arch=arm64,kubernetes.io/hostname=minikube-m03,kubernetes.io/os=linux.`)
 	cmd.Flags().StringArrayVar(&o.NodeNameSelectors, "node", []string{}, `Inject faults into pods in the specified node.`)
 	cmd.Flags().StringToStringVar(&o.AnnotationSelectors, "annotation", map[string]string{}, `Select the pod to inject the fault according to Annotation.`)
-
-	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource.`)
+	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = Unchanged
 
 	printer.AddOutputFlagForCreate(cmd, &o.Format)
 }
 
 func (o *FaultBaseOptions) BaseValidate() error {
+	if o.DryRun == "none" {
+		enable, err := o.checkChaosMeshEnable()
+		if err != nil {
+			return err
+		}
+		if !enable {
+			return fmt.Errorf("chaos-mesh is not enabled, use `kbcli addon enable chaos-mesh` to  enable chaos-mesh first")
+		}
+	}
+
 	if ok, err := IsRegularMatch(o.Duration); !ok {
 		return err
 	}
@@ -159,4 +175,28 @@ func IsInteger(str string) (bool, error) {
 
 func GetGVR(group, version, resourceName string) schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: group, Version: version, Resource: resourceName}
+}
+
+func (o *FaultBaseOptions) checkChaosMeshEnable() (bool, error) {
+	config, err := o.Factory.ToRESTConfig()
+	if err != nil {
+		return false, err
+	}
+
+	clientSet, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return false, err
+	}
+	podList, err := clientSet.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
+		LabelSelector: "app.kubernetes.io/part-of=chaos-mesh",
+	})
+	if err != nil {
+		klog.V(1).Info(err)
+		return false, err
+	}
+
+	if len(podList.Items) > 0 {
+		return true, nil
+	}
+	return false, nil
 }

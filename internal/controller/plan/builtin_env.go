@@ -33,7 +33,6 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
@@ -45,18 +44,27 @@ type envWrapper struct {
 	*configTemplateBuilder
 
 	// configmap or secret not yet submitted.
-	localObjects *intctrltypes.ReconcileTask
+	localObjects  []coreclient.Object
+	clusterName   string
+	clusterUID    string
+	componentName string
 	// cache remoted configmap and secret.
 	cache map[schema.GroupVersionKind]map[coreclient.ObjectKey]coreclient.Object
 }
 
 const maxReferenceCount = 10
 
-func wrapGetEnvByName(templateBuilder *configTemplateBuilder, localObjects *intctrltypes.ReconcileTask) envBuildInFunc {
+func wrapGetEnvByName(templateBuilder *configTemplateBuilder, component *component.SynthesizedComponent, localObjs []coreclient.Object) envBuildInFunc {
 	wrapper := &envWrapper{
 		configTemplateBuilder: templateBuilder,
-		localObjects:          localObjects,
+		localObjects:          localObjs,
 		cache:                 make(map[schema.GroupVersionKind]map[coreclient.ObjectKey]coreclient.Object),
+	}
+	// hack for test cases of cli update cmd...
+	if component != nil {
+		wrapper.clusterName = component.ClusterName
+		wrapper.clusterUID = component.ClusterUID
+		wrapper.componentName = component.Name
 	}
 	return func(args interface{}, envName string) (string, error) {
 		container, err := fromJSONObject[corev1.Container](args)
@@ -164,7 +172,7 @@ func (w *envWrapper) secretValue(secretRef *corev1.SecretKeySelector, container 
 
 func (w *envWrapper) configMapValue(configmapRef *corev1.ConfigMapKeySelector, container *corev1.Container) (string, error) {
 	if w.cli == nil {
-		return "", cfgcore.MakeError("not support configmap[%s] value in local mode, cli is nil", configmapRef.Name)
+		return "", cfgcore.MakeError("not supported configmap[%s] value in local mode, cli is nil", configmapRef.Name)
 	}
 
 	cmName, err := w.checkAndReplaceEnv(configmapRef.Name, container)
@@ -189,10 +197,7 @@ func (w *envWrapper) getResourceFromLocal(key coreclient.ObjectKey, gvk schema.G
 	if v, ok := w.cache[gvk][key]; ok {
 		return v
 	}
-	if w.localObjects == nil {
-		return nil
-	}
-	return w.localObjects.GetLocalResourceWithObjectKey(key, gvk)
+	return findMatchedLocalObject(w.localObjects, key, gvk)
 }
 
 var envPlaceHolderRegexp = regexp.MustCompile(`\$\(\w+\)`)
@@ -227,17 +232,19 @@ func (w *envWrapper) checkAndReplaceEnv(value string, container *corev1.Containe
 
 func (w *envWrapper) doEnvReplace(replacedVars *set.LinkedHashSetString, oldValue string, container *corev1.Container) (string, error) {
 	var (
-		componentName = w.localObjects.Component.Name
-		builtInEnvMap = component.GetReplacementMapForBuiltInEnv(w.localObjects.Cluster, componentName)
+		clusterName   = w.clusterName
+		clusterUID    = w.clusterUID
+		componentName = w.componentName
+		builtInEnvMap = component.GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName)
 	)
 
-	builtInEnvMap[constant.ConnCredentialPlaceHolder] = component.GenerateConnCredential(w.localObjects.Cluster.Name)
+	builtInEnvMap[constant.KBConnCredentialPlaceHolder] = component.GenerateConnCredential(clusterName)
 	kbInnerEnvReplaceFn := func(envName string, strToReplace string) string {
 		return strings.ReplaceAll(strToReplace, envName, builtInEnvMap[envName])
 	}
 
 	if !w.incAndCheckReferenceCount() {
-		return "", cfgcore.MakeError("too many reference count, maybe there is a loop reference: [%s] more than %d times ", oldValue, w.referenceCount)
+		return "", cfgcore.MakeError("too many reference count, maybe there is a cycled reference: [%s] more than %d times ", oldValue, w.referenceCount)
 	}
 
 	replacedValue := oldValue
@@ -277,8 +284,10 @@ func (w *envWrapper) incAndCheckReferenceCount() bool {
 func getResourceObject[T generics.Object, PT generics.PObject[T]](w *envWrapper, obj PT, key coreclient.ObjectKey) (PT, error) {
 	gvk := generics.ToGVK(obj)
 	object := w.getResourceFromLocal(key, gvk)
-	if v, ok := object.(PT); ok {
-		return v, nil
+	if object != nil {
+		if v, ok := object.(PT); ok {
+			return v, nil
+		}
 	}
 	if err := w.cli.Get(w.ctx, key, obj); err != nil {
 		return nil, err

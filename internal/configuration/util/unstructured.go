@@ -90,11 +90,17 @@ func (accessor *unstructuredAccessor) visitValueType(v reflect.Value, t reflect.
 	case reflect.Pointer:
 		return accessor.visitValueType(v, t.Elem(), parent, cur, updateFn)
 	default:
-		return fmt.Errorf("not support type: %s", k)
+		return fmt.Errorf("not supported type: %s", k)
 	}
 }
 
 func (accessor *unstructuredAccessor) visitArray(v reflect.Value, t reflect.Type, parent, cur string) error {
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+	}
 	n := v.Len()
 	for i := 0; i < n; i++ {
 		// index := fmt.Sprintf("%s_%d", parent, i)
@@ -107,6 +113,12 @@ func (accessor *unstructuredAccessor) visitArray(v reflect.Value, t reflect.Type
 
 func (accessor *unstructuredAccessor) visitMap(v reflect.Value, t reflect.Type, parent string) error {
 	// return if empty
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+	}
 	if v.Len() == 0 {
 		return nil
 	}
@@ -114,7 +126,7 @@ func (accessor *unstructuredAccessor) visitMap(v reflect.Value, t reflect.Type, 
 	switch k := t.Key().Kind(); k {
 	case reflect.String:
 	default:
-		return fmt.Errorf("not support key type: %s", k)
+		return fmt.Errorf("not supported key type: %s", k)
 	}
 
 	t = t.Elem()
@@ -173,5 +185,5 @@ func joinFieldPath(parent, cur string) string {
 }
 
 func (accessor *unstructuredAccessor) visitStruct(v reflect.Value, parent string) error {
-	return fmt.Errorf("not support struct")
+	return fmt.Errorf("not supported struct")
 }

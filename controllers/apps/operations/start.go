@@ -48,8 +48,8 @@ func init() {
 }
 
 // ActionStartedCondition the started condition when handling the start request.
-func (start StartOpsHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRequest) *metav1.Condition {
-	return appsv1alpha1.NewStartCondition(opsRequest)
+func (start StartOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
+	return appsv1alpha1.NewStartCondition(opsRes.OpsRequest), nil
 }
 
 // Action modifies Cluster.spec.components[*].replicas from the opsRequest
@@ -64,7 +64,7 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		if replicasOfSnapshot == 0 {
 			continue
 		}
-		// only reset the component which replicas number is 0
+		// only reset the component whose replicas number is 0
 		if v.Replicas == 0 {
 			cluster.Spec.ComponentSpecs[i].Replicas = replicasOfSnapshot
 		}

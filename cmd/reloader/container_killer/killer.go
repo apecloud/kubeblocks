@@ -48,15 +48,15 @@ func main() {
 	var containerID []string
 
 	pflag.StringVar((*string)(&containerRuntime),
-		"container-runtime", "auto", "the config set cri runtime type.")
+		"container-runtime", "auto", "the config sets cri runtime type.")
 	pflag.StringVar(&runtimeEndpoint,
-		"runtime-endpoint", runtimeEndpoint, "the config set cri runtime endpoint.")
+		"runtime-endpoint", runtimeEndpoint, "the config sets cri runtime endpoint.")
 	pflag.StringArrayVar(&containerID,
-		"container-id", containerID, "the container-id killed.")
+		"container-id", containerID, "the container-id to be killed.")
 	pflag.Parse()
 
 	if len(containerID) == 0 {
-		fmt.Fprintf(os.Stderr, "require container-id!\n\n")
+		fmt.Fprintf(os.Stderr, " container-id required!\n\n")
 		pflag.Usage()
 		os.Exit(-1)
 	}
@@ -71,7 +71,7 @@ func main() {
 
 	killer, err := cfgutil.NewContainerKiller(containerRuntime, runtimeEndpoint, zapLogger.Sugar())
 	if err != nil {
-		logger.Error(err, "failed to create container killer")
+		logger.Error(err, "failed to create container killing process")
 		os.Exit(-1)
 	}
 

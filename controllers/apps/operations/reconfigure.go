@@ -20,13 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
 	"time"
 
+	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/configuration/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -38,7 +43,7 @@ func init() {
 	opsManager := GetOpsManager()
 	reconfigureBehaviour := OpsBehaviour{
 		// REVIEW: can do opsrequest if not running?
-		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
+		FromClusterPhases: appsv1alpha1.GetReconfiguringRunningPhases(),
 		// TODO: add cluster reconcile Reconfiguring phase.
 		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
 		MaintainClusterPhaseBySelf:         true,
@@ -50,11 +55,10 @@ func init() {
 }
 
 // ActionStartedCondition the started condition when handle the reconfiguring request.
-func (r *reconfigureAction) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRequest) *metav1.Condition {
-	return appsv1alpha1.NewReconfigureCondition(opsRequest)
+func (r *reconfigureAction) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
+	return appsv1alpha1.NewReconfigureCondition(opsRes.OpsRequest), nil
 }
 
-// SaveLastConfiguration this operation can not change in Cluster.spec.
 func (r *reconfigureAction) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	return nil
 }
@@ -97,21 +101,29 @@ func (r *reconfigureAction) Handle(eventContext cfgcore.ConfigEventContext, last
 	switch phase {
 	case appsv1alpha1.OpsSucceedPhase:
 		// only update the condition of the opsRequest.
-		return patchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
+		eventContext.ReqCtx.Recorder.Eventf(opsRequest,
+			corev1.EventTypeNormal,
+			appsv1alpha1.ReasonReconfigureSucceed,
+			"the reconfigure has been processed successfully")
+		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureSucceed,
 				eventContext.ConfigSpecName,
 				formatConfigPatchToMessage(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
 			appsv1alpha1.NewSucceedCondition(opsRequest))
 	case appsv1alpha1.OpsFailedPhase:
-		return patchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
+		eventContext.ReqCtx.Recorder.Eventf(opsRequest,
+			corev1.EventTypeWarning,
+			appsv1alpha1.ReasonReconfigureFailed,
+			"failed to process the reconfigure, error: %v", cfgError)
+		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureFailed,
 				eventContext.ConfigSpecName,
 				formatConfigPatchToMessage(eventContext.ConfigPatch, &eventContext.PolicyStatus)),
 			appsv1alpha1.NewReconfigureFailedCondition(opsRequest, cfgError))
 	default:
-		return patchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
+		return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCopy, appsv1alpha1.OpsRunningPhase,
 			appsv1alpha1.NewReconfigureRunningCondition(opsRequest,
 				appsv1alpha1.ReasonReconfigureRunning,
 				eventContext.ConfigSpecName))
@@ -173,7 +185,65 @@ func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli c
 		}
 		return appsv1alpha1.OpsFailedPhase, 0, nil
 	}
-	return appsv1alpha1.OpsRunningPhase, 30 * time.Second, nil
+	if !isRunningPhase(condition) {
+		return appsv1alpha1.OpsRunningPhase, 30 * time.Second, nil
+	}
+
+	ops := &opsRes.OpsRequest.Spec
+	if ops.Reconfigure == nil || len(ops.Reconfigure.Configurations) == 0 {
+		return appsv1alpha1.OpsFailedPhase, 0, nil
+	}
+	phase, err := r.syncReconfigureOperatorStatus(reqCtx, cli, opsRes)
+	switch {
+	default:
+		return appsv1alpha1.OpsRunningPhase, 30 * time.Second, nil
+	case err != nil:
+		return "", 30 * time.Second, err
+	case phase == appsv1alpha1.OpsSucceedPhase:
+		return appsv1alpha1.OpsSucceedPhase, 0, nil
+	}
+}
+
+func (r *reconfigureAction) syncReconfigureOperatorStatus(ctx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (appsv1alpha1.OpsPhase, error) {
+	var (
+		ops        = &opsRes.OpsRequest.Spec
+		ns         = opsRes.Cluster.Namespace
+		name       = opsRes.OpsRequest.Name
+		configSpec = ops.Reconfigure.Configurations[0]
+	)
+
+	cmKey := client.ObjectKey{
+		Name:      cfgcore.GetComponentCfgName(ops.ClusterRef, ops.Reconfigure.ComponentName, configSpec.Name),
+		Namespace: ns,
+	}
+	cm := &corev1.ConfigMap{}
+	if err := cli.Get(ctx.Ctx, cmKey, cm); err != nil {
+		return appsv1alpha1.OpsRunningPhase, err
+	}
+
+	if checkFinishedReconfigure(cm, name, ctx.Log) {
+		ctx.Recorder.Eventf(opsRes.OpsRequest,
+			corev1.EventTypeNormal,
+			appsv1alpha1.ReasonReconfigureSucceed,
+			"sync reconfiguring operation phase succeed")
+		return appsv1alpha1.OpsSucceedPhase, nil
+	}
+	return appsv1alpha1.OpsRunningPhase, nil
+}
+
+func checkFinishedReconfigure(cm *corev1.ConfigMap, opsRequestName string, logger logr.Logger) bool {
+	labels := cm.GetLabels()
+	annotations := cm.GetAnnotations()
+	if len(annotations) == 0 || len(labels) == 0 {
+		return false
+	}
+
+	hash, _ := util.ComputeHash(cm.Data)
+	logger.V(1).Info(fmt.Sprintf("current opsrqeust: %s, current version: %s, last applied: %s, finish version: %s",
+		opsRequestName, hash,
+		annotations[constant.LastAppliedOpsCRAnnotationKey],
+		labels[constant.CMInsConfigurationHashLabelKey]))
+	return labels[constant.CMInsConfigurationHashLabelKey] == hash
 }
 
 func (r *reconfigureAction) syncReconfigureComponentStatus(reqCtx intctrlutil.RequestCtx,
@@ -236,6 +306,11 @@ func isFailedPhase(condition metav1.Condition) bool {
 	return isExpectedPhase(condition, []string{appsv1alpha1.ConditionTypeFailed, appsv1alpha1.ReasonReconfigureFailed}, metav1.ConditionFalse)
 }
 
+func isRunningPhase(condition metav1.Condition) bool {
+	return isExpectedPhase(condition, []string{appsv1alpha1.ReasonReconfigureRunning, appsv1alpha1.ReasonReconfigureMerged},
+		metav1.ConditionTrue)
+}
+
 func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) error {
 	var (
 		opsRequest        = resource.OpsRequest
@@ -254,7 +329,7 @@ func (r *reconfigureAction) Action(reqCtx intctrlutil.RequestCtx, cli client.Cli
 		return cfgcore.WrapError(err, "failed to get clusterdefinition[%s]", cluster.Spec.ClusterDefRef)
 	}
 
-	if err := cfgcore.GetClusterVersionResource(cluster.Spec.ClusterVersionRef, clusterVersion, cli, reqCtx.Ctx); err != nil {
+	if err := getClusterVersionResource(cluster.Spec.ClusterVersionRef, clusterVersion, cli, reqCtx.Ctx); err != nil {
 		return err
 	}
 
@@ -294,7 +369,7 @@ func (r *reconfigureAction) doMergeAndPersist(reqCtx intctrlutil.RequestCtx,
 		configSpec := foundConfigSpec(config.Name)
 		if configSpec == nil {
 			return processMergedFailed(resource, true,
-				cfgcore.MakeError("failed to reconfigure, not exist config[%s], all configs: %v", config.Name, getConfigSpecName(configSpecs)))
+				cfgcore.MakeError("failed to reconfigure, not existed config[%s], all configs: %v", config.Name, getConfigSpecName(configSpecs)))
 		}
 		if len(configSpec.ConfigConstraintRef) == 0 {
 			return processMergedFailed(resource, true,
@@ -306,6 +381,11 @@ func (r *reconfigureAction) doMergeAndPersist(reqCtx intctrlutil.RequestCtx,
 		}, reqCtx.Ctx, cli, resource.OpsRequest.Name)
 		if result.err != nil {
 			return processMergedFailed(resource, result.failed, result.err)
+		} else {
+			reqCtx.Recorder.Eventf(resource.OpsRequest,
+				corev1.EventTypeNormal,
+				appsv1alpha1.ReasonReconfigureMerged,
+				"the reconfiguring operation of component[%s] in cluster[%s] merged successfully", componentName, clusterName)
 		}
 
 		// merged successfully

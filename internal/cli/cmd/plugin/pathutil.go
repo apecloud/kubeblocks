@@ -89,10 +89,10 @@ func getDirectMove(fromDir, toDir string, fo FileOperation) (move, bool, error) 
 
 	toDir, err = filepath.Abs(toDir)
 	if err != nil {
-		return m, false, errors.Wrap(err, "could not get the relative path for the move src")
+		return m, false, errors.Wrap(err, "could not get the relative path for the move dst")
 	}
 
-	// Check is direct file (not a Glob)
+	// Check file (not a Glob)
 	fromFilePath := filepath.Clean(filepath.Join(fromDir, fo.From))
 	_, err = os.Stat(fromFilePath)
 	if err != nil {
@@ -142,7 +142,7 @@ func moveFiles(fromDir, toDir string, fo FileOperation) error {
 			return errors.Wrapf(err, "could not rename/copy file from %q to %q", m.from, m.to)
 		}
 	}
-	klog.V(4).Infoln("Move operations are complete")
+	klog.V(4).Infoln("Move operations completed")
 	return nil
 }
 
@@ -185,7 +185,7 @@ func moveToInstallDir(srcDir, installDir string, fos []FileOperation) error {
 	return nil
 }
 
-// renameOrCopy will try to rename a dir or file. If rename is not supported, a manual copy will be performed.
+// renameOrCopy tries to rename a dir or file. If rename is not supported, a manual copy will be performed.
 // Existing files at "to" will be deleted.
 func renameOrCopy(from, to string) error {
 	// Try atomic rename (does not work cross partition).
@@ -248,7 +248,7 @@ func copyFile(source, dst string, mode os.FileMode) (err error) {
 	return os.Chmod(dst, mode)
 }
 
-// isCrossDeviceRenameErr determines if a os.Rename error is due to cross-fs/drive/volume copying.
+// isCrossDeviceRenameErr determines if an os.Rename error is due to cross-fs/drive/volume copying.
 func isCrossDeviceRenameErr(err error) bool {
 	le, ok := err.(*os.LinkError)
 	if !ok {
@@ -275,7 +275,7 @@ func IsSubPath(basePath, subPath string) (string, bool) {
 	return extendingPath, true
 }
 
-// ReplaceBase will return a replacement path with replacement as a base of the path instead of the old base. a/b/c, a, d -> d/b/c
+// ReplaceBase returns a replacement path with replacement as a base of the path instead of the old base. a/b/c, a, d -> d/b/c
 func ReplaceBase(path, old, replacement string) (string, error) {
 	extendingPath, ok := IsSubPath(old, path)
 	if !ok {

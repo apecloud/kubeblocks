@@ -74,7 +74,13 @@ var _ = Describe("kubeblocks uninstall", func() {
 				Dynamic:   testing.FakeDynamicClient(testing.FakeVolumeSnapshotClass()),
 			},
 			AutoApprove: true,
+			force:       false,
 		}
 		Expect(o.Uninstall()).Should(Succeed())
+	})
+
+	It("checkResources", func() {
+		fakeDynamic := testing.FakeDynamicClient()
+		Expect(checkResources(fakeDynamic)).Should(Succeed())
 	})
 })

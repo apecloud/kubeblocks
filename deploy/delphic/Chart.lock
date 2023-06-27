@@ -1,9 +1,0 @@
-dependencies:
-- name: pgcluster
-  repository: file://../postgresql-cluster
-  version: 0.5.0-beta.24
-- name: redis-cluster
-  repository: file://../redis-cluster
-  version: 0.5.0-beta.24
-digest: sha256:d0aefa69ab29206d5ba039b8cac7729b518023e66cd5965933ad20ced95f8477
-generated: "2023-05-17T16:57:07.087916+08:00"

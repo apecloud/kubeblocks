@@ -55,7 +55,7 @@ var _ = Describe("alter", func() {
 		}
 	})
 
-	It("remove duplicate string from slice", func() {
+	It("remove duplicated string from slice", func() {
 		slice := []string{"a", "b", "a", "c"}
 		res := removeDuplicateStr(slice)
 		Expect(res).ShouldNot(BeNil())
@@ -78,4 +78,21 @@ var _ = Describe("alter", func() {
 			Expect(res).Should(Equal(tc.expected))
 		}
 	})
+
+	It("email validation", func() {
+		testCases := []struct {
+			email    string
+			expected bool
+		}{
+			{email: "", expected: false},
+			{email: "test.com", expected: false},
+			{email: "test@com", expected: true},
+		}
+		for _, tc := range testCases {
+			By(fmt.Sprintf("email: %s, expected: %t", tc.email, tc.expected))
+			res := validEmail(tc.email)
+			Expect(res).Should(Equal(tc.expected))
+		}
+	})
+
 })

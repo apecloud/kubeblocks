@@ -1,20 +1,17 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package v1alpha1
@@ -28,13 +25,21 @@ import (
 // TODO: @wangyelei could refactor to ops group
 
 // OpsRequestSpec defines the desired state of OpsRequest
+// +kubebuilder:validation:XValidation:rule="has(self.cancel) && self.cancel ? (self.type in ['VerticalScaling', 'HorizontalScaling']) : true",message="forbidden to cancel the opsRequest which type not in ['VerticalScaling','HorizontalScaling']"
 type OpsRequestSpec struct {
 	// clusterRef references clusterDefinition.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
 	ClusterRef string `json:"clusterRef"`
+
+	// cancel defines the action to cancel the Pending/Creating/Running opsRequest, supported types: [VerticalScaling, HorizontalScaling].
+	// once cancel is set to true, this opsRequest will be canceled and modifying this property again will not take effect.
+	// +optional
+	Cancel bool `json:"cancel,omitempty"`
 
 	// type defines the operation type.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.type"
 	Type OpsType `json:"type"`
 
 	// ttlSecondsAfterSucceed OpsRequest will be deleted after TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.
@@ -43,7 +48,10 @@ type OpsRequestSpec struct {
 
 	// upgrade specifies the cluster version by specifying clusterVersionRef.
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.upgrade"
 	Upgrade *Upgrade `json:"upgrade,omitempty"`
+
+	// Deprecate: replace by update cluster command
 
 	// horizontalScaling defines what component need to horizontal scale the specified replicas.
 	// +optional
@@ -51,7 +59,11 @@ type OpsRequestSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.horizontalScaling"
 	HorizontalScalingList []HorizontalScaling `json:"horizontalScaling,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
+	// Deprecate: replace by update cluster command.
+	// Note: Quantity struct can not do immutable check by CEL.
 
 	// volumeExpansion defines what component and volumeClaimTemplate need to expand the specified storage.
 	// +optional
@@ -61,13 +73,26 @@ type OpsRequestSpec struct {
 	// +listMapKey=componentName
 	VolumeExpansionList []VolumeExpansion `json:"volumeExpansion,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
-	// restart the specified component.
+	// restart the specified components.
 	// +optional
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restart"
 	RestartList []ComponentOps `json:"restart,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
+	// switchover the specified components.
+	// +optional
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.switchover"
+	SwitchoverList []Switchover `json:"switchover,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
+	// Deprecate: replace by update cluster command.
+	// Note: Quantity struct can not do immutable check by CEL.
 
 	// verticalScaling defines what component need to vertical scale the specified compute resources.
 	// +optional
@@ -79,6 +104,7 @@ type OpsRequestSpec struct {
 
 	// reconfigure defines the variables that need to input when updating configuration.
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.reconfigure"
 	Reconfigure *Reconfigure `json:"reconfigure,omitempty"`
 
 	// expose defines services the component needs to expose.
@@ -87,10 +113,12 @@ type OpsRequestSpec struct {
 	// +patchStrategy=merge,retainKeys
 	// +listType=map
 	// +listMapKey=componentName
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.expose"
 	ExposeList []Expose `json:"expose,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// cluster RestoreFrom backup or point in time
 	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restoreFrom"
 	RestoreFrom *RestoreFromSpec `json:"restoreFrom,omitempty"`
 }
 
@@ -99,6 +127,21 @@ type ComponentOps struct {
 	// componentName cluster component name.
 	// +kubebuilder:validation:Required
 	ComponentName string `json:"componentName"`
+}
+
+type Switchover struct {
+	ComponentOps `json:",inline"`
+
+	// instanceName is used to specify the candidate primary or leader instanceName for switchover.
+	// If instanceName is set to "*", it means that no specific primary or leader is specified for the switchover,
+	// and the switchoverAction defined in clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate will be executed,
+	// It is required that clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate is not empty.
+	// If instanceName is set to a valid instanceName other than "*", it means that a specific candidate primary or leader is specified for the switchover.
+	// the value of instanceName can be obtained using `kbcli cluster list-instances`, any other value is invalid.
+	// In this case, the `switchoverAction` defined in clusterDefinition.componentDefs[x].switchoverSpec.withCandidate will be executed,
+	// and it is required that clusterDefinition.componentDefs[x].switchoverSpec.withCandidate is not empty.
+	// +kubebuilder:validation:Required
+	InstanceName string `json:"instanceName"`
 }
 
 // Upgrade defines the variables of upgrade operation.
@@ -296,6 +339,10 @@ type OpsRequestStatus struct {
 	// +optional
 	CompletionTimestamp metav1.Time `json:"completionTimestamp,omitempty"`
 
+	// CancelTimestamp defines cancel time.
+	// +optional
+	CancelTimestamp metav1.Time `json:"cancelTimestamp,omitempty"`
+
 	// reconfiguringStatus defines the status information of reconfiguring.
 	// +optional
 	ReconfiguringStatus *ReconfiguringStatus `json:"reconfiguringStatus,omitempty"`
@@ -386,6 +433,16 @@ type OpsRequestComponentStatus struct {
 	// workloadType references workload type of component in ClusterDefinition.
 	// +optional
 	WorkloadType WorkloadType `json:"workloadType,omitempty"`
+
+	// reason describes the reason for the component phase.
+	// +kubebuilder:validation:MaxLength=1024
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
+
+	// message is a human-readable message indicating details about this operation.
+	// +kubebuilder:validation:MaxLength=32768
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
 type ReconfiguringStatus struct {
@@ -451,6 +508,8 @@ type UpdatedParameters struct {
 	UpdatedKeys map[string]string `json:"updatedKeys,omitempty"`
 }
 
+// +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks,all},shortName=ops
@@ -486,6 +545,15 @@ func init() {
 func (r OpsRequestSpec) GetRestartComponentNameSet() ComponentNameSet {
 	set := make(ComponentNameSet)
 	for _, v := range r.RestartList {
+		set[v.ComponentName] = struct{}{}
+	}
+	return set
+}
+
+// GetSwitchoverComponentNameSet gets the component name map with switchover operation.
+func (r OpsRequestSpec) GetSwitchoverComponentNameSet() ComponentNameSet {
+	set := make(ComponentNameSet)
+	for _, v := range r.SwitchoverList {
 		set[v.ComponentName] = struct{}{}
 	}
 	return set
@@ -601,6 +669,8 @@ func (r *OpsRequest) GetComponentNameSet() ComponentNameSet {
 		return r.Spec.GetReconfiguringComponentNameSet()
 	case ExposeType:
 		return r.Spec.GetExposeComponentNameSet()
+	case SwitchoverType:
+		return r.Spec.GetSwitchoverComponentNameSet()
 	default:
 		return nil
 	}

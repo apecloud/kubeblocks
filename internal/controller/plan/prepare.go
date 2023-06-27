@@ -25,220 +25,52 @@ import (
 	"strings"
 
 	"github.com/spf13/viper"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
-	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
-	cfgutil "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// PrepareComponentResources generate all necessary sub-resources objects used in component,
-// like Secret, ConfigMap, Service, StatefulSet, Deployment, Volume, PodDisruptionBudget etc.
-// Generated resources are cached in task.applyObjs.
-func PrepareComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client, task *intctrltypes.ReconcileTask) error {
-	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
-		envConfig, err := builder.BuildEnvConfig(task.GetBuilderParams(), reqCtx, cli)
-		if err != nil {
-			return err
-		}
-		task.AppendResource(envConfig)
-
-		workload, err := customSetup(envConfig)
-		if err != nil {
-			return err
-		}
-
-		defer func() {
-			// workload object should be appended last
-			task.AppendResource(workload)
-		}()
-
-		svc, err := builder.BuildHeadlessSvc(task.GetBuilderParams())
-		if err != nil {
-			return err
-		}
-		task.AppendResource(svc)
-
-		var podSpec *corev1.PodSpec
-		sts, ok := workload.(*appsv1.StatefulSet)
-		if ok {
-			podSpec = &sts.Spec.Template.Spec
-		} else {
-			deploy, ok := workload.(*appsv1.Deployment)
-			if ok {
-				podSpec = &deploy.Spec.Template.Spec
-			}
-		}
-		if podSpec == nil {
-			return nil
-		}
-
-		defer func() {
-			for _, cc := range []*[]corev1.Container{
-				&podSpec.Containers,
-				&podSpec.InitContainers,
-			} {
-				volumes := podSpec.Volumes
-				for _, c := range *cc {
-					for _, v := range c.VolumeMounts {
-						// if persistence is not found, add emptyDir pod.spec.volumes[]
-						volumes, _ = intctrlutil.CreateOrUpdateVolume(volumes, v.Name, func(volumeName string) corev1.Volume {
-							return corev1.Volume{
-								Name: v.Name,
-								VolumeSource: corev1.VolumeSource{
-									EmptyDir: &corev1.EmptyDirVolumeSource{},
-								},
-							}
-						}, nil)
-					}
-				}
-				podSpec.Volumes = volumes
-			}
-		}()
-
-		// render config template
-		configs, err := renderConfigNScriptFiles(task, workload, podSpec, reqCtx.Ctx, cli)
-		if err != nil {
-			return err
-		}
-		if configs != nil {
-			task.AppendResource(configs...)
-		}
-		// end render config
-
-		// tls certs secret volume and volumeMount
-		if err := updateTLSVolumeAndVolumeMount(podSpec, task.Cluster.Name, *task.Component); err != nil {
-			return err
-		}
+// RenderConfigNScriptFiles generates volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
+// and generates configManager sidecar for the reconfigure operation.
+// TODO rename this function, this function name is not very reasonable, but there is no suitable name.
+func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
+	cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
+	obj client.Object,
+	podSpec *corev1.PodSpec,
+	localObjs []client.Object,
+	ctx context.Context,
+	cli client.Client) error {
+	// Need to Merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
+	// ClusterDefinition.Components[*].ConfigTemplateRefs
+	if len(component.ConfigTemplates) == 0 && len(component.ScriptTemplates) == 0 {
 		return nil
 	}
 
-	// pre-condition check
-	if task.Component.WorkloadType == appsv1alpha1.Replication {
-		// get the number of existing pods under the current component
-		var existPodList = &corev1.PodList{}
-		if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, *task.Cluster, existPodList, task.Component.Name); err != nil {
-			return err
-		}
-
-		// If the Pods already exists, check whether there is an HA switching and the HA process is prioritized to handle.
-		// TODO: (xingran) After refactoring, HA switching will be handled in the replicationSet controller.
-		if len(existPodList.Items) > 0 {
-			primaryIndexChanged, _, err := replication.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, task.Cluster,
-				task.Component.Name, task.Component.GetPrimaryIndex())
-			if err != nil {
-				return err
-			}
-			if primaryIndexChanged {
-				if err := replication.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, task.Cluster,
-					componentutil.GetClusterComponentSpecByName(*task.Cluster, task.Component.Name)); err != nil {
-					return err
-				}
-			}
-		}
-
-	}
-
-	// TODO: may add a PDB transform to Create/Update/Delete.
-	// if no these handle, the cluster controller will occur an error during reconciling.
-	// conditional build PodDisruptionBudget
-	if task.Component.MinAvailable != nil {
-		pdb, err := builder.BuildPDB(task.GetBuilderParams())
-		if err != nil {
-			return err
-		}
-		task.AppendResource(pdb)
-	} else {
-		panic("this shouldn't happen")
-	}
-
-	svcList, err := builder.BuildSvcListWithCustomAttributes(task.GetBuilderParams(), func(svc *corev1.Service) {
-		switch task.Component.WorkloadType {
-		case appsv1alpha1.Consensus:
-			addLeaderSelectorLabels(svc, task.Component)
-		case appsv1alpha1.Replication:
-			svc.Spec.Selector[constant.RoleLabelKey] = string(replication.Primary)
-		}
-	})
-	if err != nil {
+	clusterName := cluster.Name
+	namespaceName := cluster.Namespace
+	templateBuilder := newTemplateBuilder(clusterName, namespaceName, cluster, clusterVersion, ctx, cli)
+	// Prepare built-in objects and built-in functions
+	if err := templateBuilder.injectBuiltInObjectsAndFunctions(podSpec, component.ConfigTemplates, component, localObjs); err != nil {
 		return err
 	}
-	for _, svc := range svcList {
-		task.AppendResource(svc)
-	}
 
-	// REVIEW/TODO:
-	// - need higher level abstraction handling
-	// - or move this module to part operator controller handling
-	switch task.Component.WorkloadType {
-	case appsv1alpha1.Stateless:
-		if err := workloadProcessor(
-			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return builder.BuildDeploy(reqCtx, task.GetBuilderParams())
-			}); err != nil {
-			return err
-		}
-	case appsv1alpha1.Stateful, appsv1alpha1.Consensus, appsv1alpha1.Replication:
-		if err := workloadProcessor(
-			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return builder.BuildSts(reqCtx, task.GetBuilderParams(), envConfig.Name)
-			}); err != nil {
-			return err
-		}
+	renderWrapper := newTemplateRenderWrapper(templateBuilder, cluster, ctx, cli)
+	if err := renderWrapper.renderConfigTemplate(cluster, component, localObjs); err != nil {
+		return err
 	}
-
-	return nil
-}
-
-// TODO multi roles with same accessMode support
-func addLeaderSelectorLabels(service *corev1.Service, component *component.SynthesizedComponent) {
-	leader := component.ConsensusSpec.Leader
-	if len(leader.Name) > 0 {
-		service.Spec.Selector[constant.RoleLabelKey] = leader.Name
-	}
-}
-
-// renderConfigNScriptFiles generate volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
-// and generate configManager sidecar for the reconfigure operation.
-// TODO rename this function, this function name is not very reasonable, but there is no suitable name.
-func renderConfigNScriptFiles(task *intctrltypes.ReconcileTask,
-	obj client.Object,
-	podSpec *corev1.PodSpec,
-	ctx context.Context,
-	cli client.Client) ([]client.Object, error) {
-	// Need to merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
-	// ClusterDefinition.Components[*].ConfigTemplateRefs
-	if len(task.Component.ConfigTemplates) == 0 && len(task.Component.ScriptTemplates) == 0 {
-		return nil, nil
-	}
-
-	clusterName := task.Cluster.Name
-	namespaceName := task.Cluster.Namespace
-	// New ConfigTemplateBuilder
-	templateBuilder := newTemplateBuilder(clusterName, namespaceName, task.Cluster, task.ClusterVersion, ctx, cli)
-	// Prepare built-in objects and built-in functions
-	if err := templateBuilder.injectBuiltInObjectsAndFunctions(podSpec, task.Component.ConfigTemplates, task.Component, task); err != nil {
-		return nil, err
-	}
-
-	renderWrapper := newTemplateRenderWrapper(templateBuilder, task.Cluster, task.GetBuilderParams(), ctx, cli)
-	if err := renderWrapper.renderConfigTemplate(task); err != nil {
-		return nil, err
-	}
-	if err := renderWrapper.renderScriptTemplate(task); err != nil {
-		return nil, err
+	if err := renderWrapper.renderScriptTemplate(cluster, component, localObjs); err != nil {
+		return err
 	}
 
 	if len(renderWrapper.templateAnnotations) > 0 {
@@ -247,14 +79,32 @@ func renderConfigNScriptFiles(task *intctrltypes.ReconcileTask,
 
 	// Generate Pod Volumes for ConfigMap objects
 	if err := intctrlutil.CreateOrUpdatePodVolumes(podSpec, renderWrapper.volumes); err != nil {
-		return nil, cfgcore.WrapError(err, "failed to generate pod volume")
+		return cfgcore.WrapError(err, "failed to generate pod volume")
 	}
 
-	if err := updateConfigManagerWithComponent(podSpec, task.Component.ConfigTemplates, ctx, cli, task.GetBuilderParams()); err != nil {
-		return nil, cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
+	if err := buildConfigManagerWithComponent(podSpec, component.ConfigTemplates, ctx, cli, cluster, component); err != nil {
+		return cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
 	}
+	// TODO config resource objects are updated by the operator
+	return createConfigObjects(cli, ctx, renderWrapper.renderedObjs)
+}
 
-	return renderWrapper.renderedObjs, nil
+func createConfigObjects(cli client.Client, ctx context.Context, objs []client.Object) error {
+	for _, obj := range objs {
+		if err := cli.Create(ctx, obj); err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				return err
+			}
+			// for update script cm
+			if cfgcore.IsSchedulableConfigResource(obj) {
+				continue
+			}
+			if err := cli.Update(ctx, obj); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func updateResourceAnnotationsWithTemplate(obj client.Object, allTemplateAnnotations map[string]string) {
@@ -282,115 +132,161 @@ func updateResourceAnnotationsWithTemplate(obj client.Object, allTemplateAnnotat
 	obj.SetAnnotations(annotations)
 }
 
-// updateConfigManagerWithComponent build the configmgr sidecar container and update it
+// buildConfigManagerWithComponent build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
-func updateConfigManagerWithComponent(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ComponentConfigSpec, ctx context.Context, cli client.Client, params builder.BuilderParams) error {
-	var (
-		err error
+func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []appsv1alpha1.ComponentConfigSpec,
+	ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
+	var err error
+	var buildParams *cfgcm.CfgManagerBuildParams
 
-		volumeDirs  []corev1.VolumeMount
-		buildParams *cfgcm.CfgManagerBuildParams
-	)
-
-	if volumeDirs = getUsingVolumesByCfgTemplates(podSpec, cfgTemplates); len(volumeDirs) == 0 {
+	volumeDirs, usingConfigSpecs := getUsingVolumesByConfigSpecs(podSpec, configSpecs)
+	if len(volumeDirs) == 0 {
 		return nil
 	}
-	if buildParams, err = buildConfigManagerParams(cli, ctx, cfgTemplates, volumeDirs, params); err != nil {
+	configSpecMetas, err := cfgcm.GetSupportReloadConfigSpecs(usingConfigSpecs, cli, ctx)
+	if err != nil {
+		return err
+	}
+	// Configmap uses subPath case: https://github.com/kubernetes/kubernetes/issues/50345
+	// The files are being updated on the host VM, but can't be updated in the container.
+	configSpecMetas = cfgcm.FilterSubPathVolumeMount(configSpecMetas, volumeDirs)
+	if len(configSpecMetas) == 0 {
+		return nil
+	}
+	if buildParams, err = buildConfigManagerParams(cli, ctx, cluster, component, configSpecMetas, volumeDirs, podSpec); err != nil {
 		return err
 	}
 	if buildParams == nil {
 		return nil
 	}
 
-	container, err := builder.BuildCfgManagerContainer(buildParams)
+	// This sidecar container will be able to view and signal processes from other containers
+	checkAndUpdateSharProcessNamespace(podSpec, buildParams, configSpecMetas)
+	container, err := builder.BuildCfgManagerContainer(buildParams, component)
 	if err != nil {
 		return err
 	}
-	updateTPLScriptVolume(podSpec, buildParams)
+	updateEnvPath(container, buildParams)
+	updateCfgManagerVolumes(podSpec, buildParams)
 
 	// Add sidecar to podTemplate
 	podSpec.Containers = append(podSpec.Containers, *container)
-
-	// This sidecar container will be able to view and signal processes from other containers
-	podSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
+	if len(buildParams.ToolsContainers) > 0 {
+		podSpec.InitContainers = append(podSpec.InitContainers, buildParams.ToolsContainers...)
+	}
 	return nil
 }
 
-func updateTPLScriptVolume(podSpec *corev1.PodSpec, configManager *cfgcm.CfgManagerBuildParams) {
-	scriptVolume := configManager.ScriptVolume
-	if scriptVolume == nil {
+func checkAndUpdateSharProcessNamespace(podSpec *corev1.PodSpec, buildParams *cfgcm.CfgManagerBuildParams, configSpecMetas []cfgcm.ConfigSpecMeta) {
+	shared := cfgcm.NeedSharedProcessNamespace(configSpecMetas)
+	if shared {
+		podSpec.ShareProcessNamespace = func() *bool { b := true; return &b }()
+	}
+	buildParams.ShareProcessNamespace = shared
+}
+
+func updateEnvPath(container *corev1.Container, params *cfgcm.CfgManagerBuildParams) {
+	if len(params.ScriptVolume) == 0 {
+		return
+	}
+	scriptPath := make([]string, 0, len(params.ScriptVolume))
+	for _, volume := range params.ScriptVolume {
+		if vm := cfgcm.FindVolumeMount(params.Volumes, volume.Name); vm != nil {
+			scriptPath = append(scriptPath, vm.MountPath)
+		}
+	}
+	if len(scriptPath) != 0 {
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name:  "TOOLS_PATH",
+			Value: strings.Join(scriptPath, ":"),
+		})
+	}
+}
+
+func updateCfgManagerVolumes(podSpec *corev1.PodSpec, configManager *cfgcm.CfgManagerBuildParams) {
+	scriptVolumes := configManager.ScriptVolume
+	if len(scriptVolumes) == 0 && len(configManager.CMConfigVolumes) == 0 {
 		return
 	}
 
-	// Ignore useless configtemplate
 	podVolumes := podSpec.Volumes
-	podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, scriptVolume.Name, func(volumeName string) corev1.Volume {
-		return *scriptVolume
-	}, nil)
+	for _, vm := range []*[]corev1.Volume{
+		&configManager.ScriptVolume,
+		&configManager.CMConfigVolumes,
+	} {
+		for i := range *vm {
+			podVolumes, _ = intctrlutil.CreateOrUpdateVolume(podVolumes, (*vm)[i].Name, func(string) corev1.Volume {
+				return (*vm)[i]
+			}, nil)
+		}
+	}
 	podSpec.Volumes = podVolumes
+
+	for volumeName, volume := range configManager.ConfigLazyRenderedVolumes {
+		usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, volumeName)
+		for _, container := range usingContainers {
+			container.VolumeMounts = append(container.VolumeMounts, volume)
+		}
+	}
 }
 
-func getUsingVolumesByCfgTemplates(podSpec *corev1.PodSpec, cfgTemplates []appsv1alpha1.ComponentConfigSpec) []corev1.VolumeMount {
-	var usingContainers []*corev1.Container
-
+func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1alpha1.ComponentConfigSpec) ([]corev1.VolumeMount, []appsv1alpha1.ComponentConfigSpec) {
 	// Ignore useless configTemplate
-	firstCfg := 0
-	for i, tpl := range cfgTemplates {
-		usingContainers = intctrlutil.GetPodContainerWithVolumeMount(podSpec, tpl.VolumeName)
-		if len(usingContainers) > 0 {
-			firstCfg = i
-			break
+	usingConfigSpecs := make([]appsv1alpha1.ComponentConfigSpec, 0, len(configSpecs))
+	config2Containers := make(map[string][]*corev1.Container)
+	for _, configSpec := range configSpecs {
+		usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, configSpec.VolumeName)
+		if len(usingContainers) == 0 {
+			continue
 		}
+		usingConfigSpecs = append(usingConfigSpecs, configSpec)
+		config2Containers[configSpec.Name] = usingContainers
 	}
 
 	// No container using any config template
-	if len(usingContainers) == 0 {
-		log.Log.Info(fmt.Sprintf("tpl config is not used by any container, and pass. tpl configs: %v", cfgTemplates))
-		return nil
-	}
-
-	// Find first container using
-	// Find out which configurations are used by the container
-	volumeDirs := make([]corev1.VolumeMount, 0, len(cfgTemplates)+1)
-	container := usingContainers[0]
-	for i := firstCfg; i < len(cfgTemplates); i++ {
-		tpl := cfgTemplates[i]
-		// Ignore config template, e.g scripts configmap
-		if !cfgutil.NeedReloadVolume(tpl) {
-			continue
-		}
-		volume := intctrlutil.GetVolumeMountByVolume(container, tpl.VolumeName)
-		if volume != nil {
-			volumeDirs = append(volumeDirs, *volume)
-		}
-	}
-	return volumeDirs
-}
-
-func buildConfigManagerParams(cli client.Client, ctx context.Context, configSpec []appsv1alpha1.ComponentConfigSpec, volumeDirs []corev1.VolumeMount, params builder.BuilderParams) (*cfgcm.CfgManagerBuildParams, error) {
-	var (
-		err             error
-		reloadOptions   *appsv1alpha1.ReloadOptions
-		formatterConfig *appsv1alpha1.FormatterConfig
-	)
-
-	configManagerParams := &cfgcm.CfgManagerBuildParams{
-		ManagerName:   constant.ConfigSidecarName,
-		CharacterType: params.Component.CharacterType,
-		SecreteName:   component.GenerateConnCredential(params.Cluster.Name),
-		Image:         viper.GetString(constant.KBToolsImage),
-		Volumes:       volumeDirs,
-		Cluster:       params.Cluster,
-	}
-
-	if reloadOptions, formatterConfig, err = cfgutil.GetReloadOptions(cli, ctx, configSpec); err != nil {
-		return nil, err
-	}
-	if reloadOptions == nil || formatterConfig == nil {
+	if len(usingConfigSpecs) == 0 {
+		log.Log.Info(fmt.Sprintf("configSpec config is not used by any container, and pass. configSpec configs: %v", configSpecs))
 		return nil, nil
 	}
-	if err = cfgcm.BuildConfigManagerContainerArgs(reloadOptions, volumeDirs, cli, ctx, configManagerParams, formatterConfig); err != nil {
+
+	// Find out which configurations are used by the container
+	volumeDirs := make([]corev1.VolumeMount, 0, len(configSpecs)+1)
+	for _, configSpec := range usingConfigSpecs {
+		// Ignore config template, e.g scripts configmap
+		if !cfgcore.NeedReloadVolume(configSpec) {
+			continue
+		}
+		sets := util.NewSet()
+		for _, container := range config2Containers[configSpec.Name] {
+			volume := intctrlutil.GetVolumeMountByVolume(container, configSpec.VolumeName)
+			if volume != nil && !sets.InArray(volume.Name) {
+				volumeDirs = append(volumeDirs, *volume)
+				sets.Add(volume.Name)
+			}
+		}
+	}
+	return volumeDirs, usingConfigSpecs
+}
+
+func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1alpha1.Cluster, comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*cfgcm.CfgManagerBuildParams, error) {
+	cfgManagerParams := &cfgcm.CfgManagerBuildParams{
+		ManagerName:               constant.ConfigSidecarName,
+		CharacterType:             comp.CharacterType,
+		ComponentName:             comp.Name,
+		SecreteName:               component.GenerateConnCredential(cluster.Name),
+		EnvConfigName:             component.GenerateComponentEnvName(cluster.Name, comp.Name),
+		Image:                     viper.GetString(constant.KBToolsImage),
+		Volumes:                   volumeDirs,
+		Cluster:                   cluster,
+		ConfigSpecsBuildParams:    configSpecBuildParams,
+		ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
+	}
+
+	if err := cfgcm.BuildConfigManagerContainerParams(cli, ctx, cfgManagerParams, volumeDirs); err != nil {
 		return nil, err
 	}
-	return configManagerParams, nil
+	if err := buildConfigToolsContainer(cfgManagerParams, podSpec, comp); err != nil {
+		return nil, err
+	}
+	return cfgManagerParams, nil
 }

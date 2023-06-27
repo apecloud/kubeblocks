@@ -5,11 +5,8 @@ on:
     types: [submitted]
 
 env:
-  GITLAB_GO_CACHE_PROJECT_ID: 98800
-  GO_CACHE: "go-cache"
-  GO_CACHE_DIR: "/root/.cache"
-  GITLAB_ACCESS_TOKEN: ${{ secrets.GITLAB_ACCESS_TOKEN }}
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  BASE_BRANCH: origin/main
 
 jobs:
   trigger-mode:
@@ -18,91 +15,123 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
+      matrix: ${{ steps.get_trigger_mode.outputs.matrix }}
     steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          all_but_latest: true
+          access_token: ${{ github.token }}
+
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Get trigger mode
         id: get_trigger_mode
         run: |
-          TRIGGER_MODE=`bash .github/utils/utils.sh --type 6`
+          TRIGGER_MODE=`bash .github/utils/utils.sh --type 6 \
+              --branch-name "origin/${{ github.event.pull_request.head.ref }}" \
+              --base-branch "${{ env.BASE_BRANCH }}"`
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
+          
+          TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
+              --trigger-type "$TRIGGER_MODE" \
+              --test-pkgs "internal|apis|controllers|cmd" \
+              --test-check "mod-vendor|lint"`
+          echo "$TEST_PACKAGES"
+          echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
 
-  make-test:
+  test-parallel:
     name: make test
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
-    outputs:
-      runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
-    runs-on: [ self-hosted, eks-fargate-runner ]
-    steps:
-      - uses: apecloud/checkout@main
-      - name: make mod-vendor and lint
-        run: |
-          mkdir -p ./bin
-          cp -r /go/bin/controller-gen ./bin/controller-gen
-          cp -r /go/bin/setup-envtest ./bin/setup-envtest
-          make mod-vendor lint
-
-      - name: make test
-        run: |
-          make test
-
-      - name: kill kube-apiserver and etcd
-        id: get_runner_name
-        if: ${{ always() }}
-        run: |
-          echo runner_name=${RUNNER_NAME} >> $GITHUB_OUTPUT
-          bash .github/utils/utils.sh --type 8
-
-  remove-runner:
-    needs: [ trigger-mode, make-test ]
     runs-on: ubuntu-latest
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && always() }}
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJSON(needs.trigger-mode.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v3
-      - name: remove runner
+      - name: install lib
         run: |
-          bash .github/utils/utils.sh --type 9 \
-            --github-token ${{ env.GITHUB_TOKEN }} \
-            --runner-name ${{ needs.make-test.outputs.runner-name }}
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libbtrfs-dev \
+            libdevmapper-dev
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "${{ env.GO_VERSION }}"
+
+      - name: Install golangci-lint
+        if: matrix.ops == 'lint'
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.51.2
+
+      - name: make test ${{ matrix.ops }}
+        if: ${{ ! contains(matrix.ops, '/') }}
+        run: |
+          make ${{ matrix.ops }}
+
+      - name: make ${{ matrix.ops }}
+        if: ${{ contains(matrix.ops, '/') }}
+        run: |
+          make test TEST_PACKAGES=./${{ matrix.ops }}/...
+
+  make-test:
+    name: make test
+    needs: [ trigger-mode, test-parallel ]
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: make test check
+        run: |
+          if [[ "${{ needs.test-parallel.result }}" == "failure" || "${{ needs.test-parallel.result }}" == "cancelled" ]]; then
+              echo "make test fail"
+              exit 1
+          fi
 
   check-image:
     name: check image
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
-    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.2
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-manager-image"
       IMG: "apecloud/kubeblocks"
       VERSION: "check"
       GO_VERSION: "1.20"
+      BUILDX_PLATFORMS: "linux/amd64"
+      APECD_REF: "v0.1.2"
     secrets: inherit
 
   check-tools-image:
     name: check image
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
-    uses: apecloud/apecd/.github/workflows/release-image.yml@v0.2.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.2
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-tools-image"
       IMG: "apecloud/kubeblocks-tools"
       VERSION: "check"
       GO_VERSION: "1.20"
+      BUILDX_PLATFORMS: "linux/amd64"
+      APECD_REF: "v0.1.2"
     secrets: inherit
 
   check-helm:
     name: check helm
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]')
-    uses: apecloud/apecd/.github/workflows/release-charts.yml@v0.5.2
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts-check.yml@v0.1.4
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "v0.4.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      PUSH_ENABLE: false
+      DEP_REPO: "delphic|prometheus-cluster"
+      APECD_REF: "v0.1.4"
     secrets: inherit

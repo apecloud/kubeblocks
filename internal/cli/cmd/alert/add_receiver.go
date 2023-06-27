@@ -56,13 +56,13 @@ var (
 		kbcli alert add-receiver --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=XXX'
 
 		# add email receiver
-        kbcli alter add-receiver --email='a@foo.com,b@foo.com'
+        kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io'
 
 		# add email receiver, and only receive alert from cluster mycluster
-		kbcli alter add-receiver --email='a@foo.com,b@foo.com' --cluster=mycluster
+		kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster
 
 		# add email receiver, and only receive alert from cluster mycluster and alert severity is warning
-		kbcli alter add-receiver --email='a@foo.com,b@foo.com' --cluster=mycluster --severity=warning
+		kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster --severity=warning
 
 		# add slack receiver
   		kbcli alert add-receiver --slack api_url=https://hooks.slackConfig.com/services/foo,channel=monitor,username=kubeblocks-alert-bot`)
@@ -70,7 +70,7 @@ var (
 
 type baseOptions struct {
 	genericclioptions.IOStreams
-	alterConfigMap   *corev1.ConfigMap
+	alertConfigMap   *corev1.ConfigMap
 	webhookConfigMap *corev1.ConfigMap
 	client           kubernetes.Interface
 }
@@ -103,11 +103,11 @@ func newAddReceiverCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		},
 	}
 
-	cmd.Flags().StringArrayVar(&o.emails, "email", []string{}, "Add email address, such as bar@foo.com, more than one emailConfig can be specified separated by comma")
+	cmd.Flags().StringArrayVar(&o.emails, "email", []string{}, "Add email address, such as user@kubeblocks.io, more than one emailConfig can be specified separated by comma")
 	cmd.Flags().StringArrayVar(&o.webhooks, "webhook", []string{}, "Add webhook receiver, such as url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=xxxxx")
 	cmd.Flags().StringArrayVar(&o.slacks, "slack", []string{}, "Add slack receiver, such as api_url=https://hooks.slackConfig.com/services/foo,channel=monitor,username=kubeblocks-alert-bot")
-	cmd.Flags().StringArrayVar(&o.clusters, "cluster", []string{}, "Cluster name, such as mycluster, more than one cluster can be specified, such as mycluster,mycluster2")
-	cmd.Flags().StringArrayVar(&o.severities, "severity", []string{}, "Alert severity, critical, warning or info, more than one severity can be specified, such as critical,warning")
+	cmd.Flags().StringArrayVar(&o.clusters, "cluster", []string{}, "Cluster name, such as mycluster, more than one cluster can be specified, such as mycluster1,mycluster2")
+	cmd.Flags().StringArrayVar(&o.severities, "severity", []string{}, "Alert severity level, critical, warning or info, more than one severity level can be specified, such as critical,warning")
 
 	// register completions
 	util.CheckErr(cmd.RegisterFlagCompletionFunc("severity",
@@ -133,7 +133,7 @@ func (o *baseOptions) complete(f cmdutil.Factory) error {
 	}
 
 	// get alertmanager configmap
-	o.alterConfigMap, err = o.client.CoreV1().ConfigMaps(namespace).Get(ctx, alertConfigmapName, metav1.GetOptions{})
+	o.alertConfigMap, err = o.client.CoreV1().ConfigMaps(namespace).Get(ctx, alertConfigmapName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (o *addReceiverOptions) validate(args []string) error {
 		return fmt.Errorf("must specify at least one receiver, such as --email, --webhook or --slack")
 	}
 
-	// if name is not specified, generate a random name
+	// if name is not specified, generate a random one
 	if len(args) == 0 {
 		o.name = generateReceiverName()
 	} else {
@@ -165,7 +165,7 @@ func (o *addReceiverOptions) validate(args []string) error {
 	return nil
 }
 
-// checkSeverities check if severity is valid
+// checkSeverities checks if severity is valid
 func (o *addReceiverOptions) checkSeverities() error {
 	if len(o.severities) == 0 {
 		return nil
@@ -188,14 +188,14 @@ func (o *addReceiverOptions) checkSeverities() error {
 	return nil
 }
 
-// checkEmails check if email SMTP is configured, if not, do not allow to add email receiver
+// checkEmails checks if email SMTP is configured, if not, do not allow to add email receiver
 func (o *addReceiverOptions) checkEmails() error {
 	if len(o.emails) == 0 {
 		return nil
 	}
 
-	errMsg := "SMTP %sis not configured, if you want to add email receiver, please configure it first"
-	data, err := getConfigData(o.alterConfigMap, alertConfigFileName)
+	errMsg := "SMTP %sis not configured, if you want to add email receiver, please use `kbcli alert config-smtpserver` configure it first"
+	data, err := getConfigData(o.alertConfigMap, alertConfigFileName)
 	if err != nil {
 		return err
 	}
@@ -309,7 +309,7 @@ func (o *addReceiverOptions) buildRoute() {
 
 // addReceiver adds receiver to alertmanager config
 func (o *addReceiverOptions) addReceiver() error {
-	data, err := getConfigData(o.alterConfigMap, alertConfigFileName)
+	data, err := getConfigData(o.alertConfigMap, alertConfigFileName)
 	if err != nil {
 		return err
 	}
@@ -329,7 +329,7 @@ func (o *addReceiverOptions) addReceiver() error {
 	data["route"].(map[string]interface{})["routes"] = routes
 
 	// update alertmanager configmap
-	return updateConfig(o.client, o.alterConfigMap, alertConfigFileName, data)
+	return updateConfig(o.client, o.alertConfigMap, alertConfigFileName, data)
 }
 
 func (o *addReceiverOptions) addWebhookReceivers() error {

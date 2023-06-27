@@ -36,6 +36,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -56,15 +57,14 @@ type CreateOptions struct {
 	ClassName     string
 	CPU           string
 	Memory        string
-	Storage       []string
 	File          string
 }
 
 var classCreateExamples = templates.Examples(`
-    # Create a class following constraint kb-resource-constraint-general for component mysql in cluster definition apecloud-mysql, which have 1 cpu core, 1Gi memory and storage is 10Gi
-    kbcli class create custom-1c1g --cluster-definition apecloud-mysql --type mysql --constraint kb-resource-constraint-general --cpu 1 --memory 1Gi --storage name=data,size=10Gi
+    # Create a class with constraint kb-resource-constraint-general for component mysql in cluster definition apecloud-mysql, which has 1 CPU core and 1Gi memory
+    kbcli class create custom-1c1g --cluster-definition apecloud-mysql --type mysql --constraint kb-resource-constraint-general --cpu 1 --memory 1Gi
 
-    # Create classes for component mysql in cluster definition apecloud-mysql, where classes is defined in file
+    # Create classes for component mysql in cluster definition apecloud-mysql, with classes defined in file
     kbcli class create --cluster-definition apecloud-mysql --type mysql --file ./classes.yaml
 `)
 
@@ -80,23 +80,25 @@ func NewCreateCommand(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 			util.CheckErr(o.run())
 		},
 	}
-	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli clusterdefinition list\" to show all available cluster definition")
+	cmd.Flags().StringVar(&o.ClusterDefRef, "cluster-definition", "", "Specify cluster definition, run \"kbcli clusterdefinition list\" to show all available cluster definitions")
 	util.CheckErr(cmd.MarkFlagRequired("cluster-definition"))
 	cmd.Flags().StringVar(&o.ComponentType, "type", "", "Specify component type")
 	util.CheckErr(cmd.MarkFlagRequired("type"))
 
 	cmd.Flags().StringVar(&o.Constraint, "constraint", "", "Specify resource constraint")
-	cmd.Flags().StringVar(&o.CPU, corev1.ResourceCPU.String(), "", "Specify component cpu cores")
+	cmd.Flags().StringVar(&o.CPU, corev1.ResourceCPU.String(), "", "Specify component CPU cores")
 	cmd.Flags().StringVar(&o.Memory, corev1.ResourceMemory.String(), "", "Specify component memory size")
-	cmd.Flags().StringArrayVar(&o.Storage, corev1.ResourceStorage.String(), []string{}, "Specify component storage disks")
 
-	cmd.Flags().StringVar(&o.File, "file", "", "Specify file path which contains YAML definition of class")
+	cmd.Flags().StringVar(&o.File, "file", "", "Specify file path of class definition YAML")
+
+	// register flag completion func
+	registerFlagCompletionFunc(cmd, f)
 
 	return cmd
 }
 
 func (o *CreateOptions) validate(args []string) error {
-	// just validate creating by resource arguments
+	// validate creating by resource arguments
 	if o.File != "" {
 		return nil
 	}
@@ -170,7 +172,7 @@ func (o *CreateOptions) run() error {
 		if _, ok = constraints[o.Constraint]; !ok {
 			return fmt.Errorf("resource constraint %s is not found", o.Constraint)
 		}
-		cls, err := o.buildClass()
+		cls := v1alpha1.ComponentClass{Name: o.ClassName, CPU: resource.MustParse(o.CPU), Memory: resource.MustParse(o.Memory)}
 		if err != nil {
 			return err
 		}
@@ -179,12 +181,12 @@ func (o *CreateOptions) run() error {
 				ResourceConstraintRef: o.Constraint,
 				Series: []v1alpha1.ComponentClassSeries{
 					{
-						Classes: []v1alpha1.ComponentClass{*cls},
+						Classes: []v1alpha1.ComponentClass{cls},
 					},
 				},
 			},
 		}
-		classInstances = append(classInstances, &v1alpha1.ComponentClassInstance{ComponentClass: *cls, ResourceConstraintRef: o.Constraint})
+		classInstances = append(classInstances, &v1alpha1.ComponentClassInstance{ComponentClass: cls, ResourceConstraintRef: o.Constraint})
 	}
 
 	var classNames []string
@@ -250,35 +252,72 @@ func (o *CreateOptions) run() error {
 			return err
 		}
 	}
-	_, _ = fmt.Fprintf(o.Out, "Successfully created class [%s].\n", strings.Join(classNames, ","))
+	_, _ = fmt.Fprintf(o.Out, "Successfully create class [%s].\n", strings.Join(classNames, ","))
 	return nil
 }
 
-func (o *CreateOptions) buildClass() (*v1alpha1.ComponentClass, error) {
-	cls := v1alpha1.ComponentClass{Name: o.ClassName, CPU: resource.MustParse(o.CPU), Memory: resource.MustParse(o.Memory)}
-	for _, item := range o.Storage {
-		kvs := strings.Split(item, ",")
-		volume := v1alpha1.Volume{}
-		for _, kv := range kvs {
-			parts := strings.Split(kv, "=")
-			if len(parts) != 2 {
-				return nil, fmt.Errorf("invalid storage item: %s", item)
+func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"cluster-definition",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterDefGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+		}))
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"type",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			var (
+				componentTypes []string
+				selector       string
+				compTypeLabel  = "apps.kubeblocks.io/component-def-ref"
+			)
+
+			client, err := f.DynamicClient()
+			if err != nil {
+				return componentTypes, cobra.ShellCompDirectiveNoFileComp
 			}
-			switch parts[0] {
-			case "name":
-				volume.Name = parts[1]
-			case "size":
-				volume.Size = resource.MustParse(parts[1])
-			case "class":
-				volume.StorageClassName = &parts[1]
-			default:
-				return nil, fmt.Errorf("invalid storage item: %s", item)
+
+			clusterDefinition, err := cmd.Flags().GetString("cluster-definition")
+			if err == nil && clusterDefinition != "" {
+				selector = fmt.Sprintf("%s=%s,%s", constant.ClusterDefLabelKey, clusterDefinition, types.ClassProviderLabelKey)
 			}
-		}
-		if volume.Name == "" {
-			return nil, fmt.Errorf("invalid item name: %s", item)
-		}
-		cls.Volumes = append(cls.Volumes, volume)
-	}
-	return &cls, nil
+			objs, err := client.Resource(types.ComponentClassDefinitionGVR()).List(context.Background(), metav1.ListOptions{LabelSelector: selector})
+			if err != nil {
+				return componentTypes, cobra.ShellCompDirectiveNoFileComp
+			}
+			var classDefinitionList v1alpha1.ComponentClassDefinitionList
+			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), &classDefinitionList); err != nil {
+				return componentTypes, cobra.ShellCompDirectiveNoFileComp
+			}
+			for _, item := range classDefinitionList.Items {
+				componentType := item.Labels[compTypeLabel]
+				if componentType != "" {
+					componentTypes = append(componentTypes, componentType)
+				}
+			}
+			return componentTypes, cobra.ShellCompDirectiveNoFileComp
+		}))
+	util.CheckErr(cmd.RegisterFlagCompletionFunc(
+		"constraint",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			var constraints []string
+			client, err := f.DynamicClient()
+			if err != nil {
+				return constraints, cobra.ShellCompDirectiveNoFileComp
+			}
+
+			objs, err := client.Resource(types.ComponentResourceConstraintGVR()).List(context.Background(), metav1.ListOptions{})
+			if err != nil {
+				return constraints, cobra.ShellCompDirectiveNoFileComp
+			}
+			var constraintList v1alpha1.ComponentResourceConstraintList
+			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objs.UnstructuredContent(), &constraintList); err != nil {
+				return constraints, cobra.ShellCompDirectiveNoFileComp
+			}
+			for _, item := range constraintList.Items {
+				if _, ok := item.GetLabels()[types.ResourceConstraintProviderLabelKey]; ok {
+					constraints = append(constraints, item.GetName())
+				}
+			}
+			return constraints, cobra.ShellCompDirectiveNoFileComp
+		}))
 }

@@ -75,9 +75,10 @@ type K8sClusterInfo struct {
 	CloudProvider string `json:"cloud_provider"`
 	Region        string `json:"region,omitempty"`
 	KubeConfig    string `json:"kube_config,omitempty"`
+	KbcliVersion  string `json:"kbcli_version,omitempty"`
 }
 
-// IsValid check if kubernetes cluster info is valid
+// IsValid checks if kubernetes cluster info is valid
 func (c *K8sClusterInfo) IsValid() bool {
 	if c.ClusterName == "" || c.CloudProvider == "" || (c.CloudProvider != Local && c.Region == "") {
 		return false

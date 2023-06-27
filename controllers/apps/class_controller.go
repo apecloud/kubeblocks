@@ -33,6 +33,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/class"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -75,7 +76,7 @@ func (r *ComponentClassReconciler) Reconcile(ctx context.Context, req reconcile.
 		constraintsMap[cf.GetName()] = cf
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, classDefinition, dbClusterFinalizerName, func() (*ctrl.Result, error) {
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, classDefinition, constant.DBClusterFinalizerName, func() (*ctrl.Result, error) {
 		// TODO validate if existing cluster reference classes being deleted
 		return nil, nil
 	})

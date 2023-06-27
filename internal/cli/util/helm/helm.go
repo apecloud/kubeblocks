@@ -49,6 +49,7 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -71,11 +72,16 @@ type InstallOpts struct {
 	Timeout         time.Duration
 	Atomic          bool
 	DisableHooks    bool
+	ForceUninstall  bool
+
+	// for helm template
+	DryRun    *bool
+	OutputDir string
 }
 
 type Option func(*cli.EnvSettings)
 
-// AddRepo will add a repo
+// AddRepo adds a repo
 func AddRepo(r *repo.Entry) error {
 	settings := cli.New()
 	repoFile := settings.RepositoryConfig
@@ -97,8 +103,7 @@ func AddRepo(r *repo.Entry) error {
 	if f.Has(r.Name) {
 		existing := f.Get(r.Name)
 		if *r != *existing && r.Name != types.KubeBlocksChartName {
-			// The input coming in for the Name is different from what is already
-			// configured. Return an error.
+			// The input Name is different from the existing one, return an error
 			return errors.Errorf("repository name (%s) already exists, please specify a different name", r.Name)
 		}
 	}
@@ -120,7 +125,7 @@ func AddRepo(r *repo.Entry) error {
 	return nil
 }
 
-// RemoveRepo will remove a repo
+// RemoveRepo removes a repo
 func RemoveRepo(r *repo.Entry) error {
 	settings := cli.New()
 	repoFile := settings.RepositoryConfig
@@ -143,7 +148,7 @@ func RemoveRepo(r *repo.Entry) error {
 	return nil
 }
 
-// GetInstalled get helm package release info if installed.
+// GetInstalled gets helm package release info if installed.
 func (i *InstallOpts) GetInstalled(cfg *action.Configuration) (*release.Release, error) {
 	res, err := action.NewGet(cfg).Run(i.Name)
 	if err != nil {
@@ -159,7 +164,7 @@ func (i *InstallOpts) GetInstalled(cfg *action.Configuration) (*release.Release,
 	return res, nil
 }
 
-// Install will install a Chart
+// Install installs a Chart
 func (i *InstallOpts) Install(cfg *Config) (string, error) {
 	ctx := context.Background()
 	opts := retry.Options{
@@ -213,6 +218,11 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	client.Timeout = i.Timeout
 	client.Version = i.Version
 	client.Atomic = i.Atomic
+	// for helm template
+	if i.DryRun != nil {
+		client.DryRun = *i.DryRun
+		client.OutputDir = i.OutputDir
+	}
 
 	if client.Timeout == 0 {
 		client.Timeout = defaultTimeout
@@ -239,7 +249,7 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	ctx := context.Background()
 	_, cancel := context.WithCancel(ctx)
 
-	// Set up channel on which to send signal notifications.
+	// Set up channel through which to send signal notifications.
 	// We must use a buffered channel or risk missing the signal
 	// if we're not ready to receive when the signal is sent.
 	cSignal := make(chan os.Signal, 2)
@@ -257,7 +267,7 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (string, error) {
 	return released.Info.Notes, nil
 }
 
-// Uninstall will uninstall a Chart
+// Uninstall uninstalls a Chart
 func (i *InstallOpts) Uninstall(cfg *Config) error {
 	ctx := context.Background()
 	opts := retry.Options{
@@ -293,7 +303,7 @@ func (i *InstallOpts) tryUninstall(cfg *action.Configuration) error {
 	ctx := context.Background()
 	_, cancel := context.WithCancel(ctx)
 
-	// Set up channel on which to send signal notifications.
+	// Set up channel through which to send signal notifications.
 	// We must use a buffered channel or risk missing the signal
 	// if we're not ready to receive when the signal is sent.
 	cSignal := make(chan os.Signal, 2)
@@ -305,9 +315,75 @@ func (i *InstallOpts) tryUninstall(cfg *action.Configuration) error {
 	}()
 
 	if _, err := client.Run(i.Name); err != nil {
-		return err
+		if i.ForceUninstall {
+			// Remove secrets left over when uninstalling kubeblocks, when addon CRD is uninstalled before kubeblocks.
+			secretCount, errRemove := i.RemoveRemainSecrets(cfg)
+			if secretCount == 0 {
+				return err
+			}
+			if errRemove != nil {
+				errMsg := fmt.Sprintf("failed to remove remain secrets, please remove them manually, %v", errRemove)
+				return errors.Wrap(err, errMsg)
+			}
+		} else {
+			return err
+		}
 	}
 	return nil
+}
+
+func (i *InstallOpts) RemoveRemainSecrets(cfg *action.Configuration) (int, error) {
+	clientSet, err := cfg.KubernetesClientSet()
+	if err != nil {
+		return -1, err
+	}
+
+	labelSelector := metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "name",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{i.Name},
+			},
+			{
+				Key:      "owner",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"helm"},
+			},
+			{
+				Key:      "status",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"uninstalling", "superseded"},
+			},
+		},
+	}
+
+	selector, err := metav1.LabelSelectorAsSelector(&labelSelector)
+	if err != nil {
+		fmt.Printf("Failed to build label selector: %v\n", err)
+		return -1, err
+	}
+	options := metav1.ListOptions{
+		LabelSelector: selector.String(),
+	}
+
+	secrets, err := clientSet.CoreV1().Secrets(i.Namespace).List(context.TODO(), options)
+	if err != nil {
+		return -1, err
+	}
+	secretCount := len(secrets.Items)
+	if secretCount == 0 {
+		return 0, nil
+	}
+
+	for _, secret := range secrets.Items {
+		err := clientSet.CoreV1().Secrets(i.Namespace).Delete(context.TODO(), secret.Name, metav1.DeleteOptions{})
+		if err != nil {
+			klog.V(1).Info(err)
+			return -1, fmt.Errorf("failed to delete Secret %s: %v", secret.Name, err)
+		}
+	}
+	return secretCount, nil
 }
 
 func NewActionConfig(cfg *Config) (*action.Configuration, error) {
@@ -448,7 +524,7 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 	ctx := context.Background()
 	_, cancel := context.WithCancel(ctx)
 
-	// Set up channel on which to send signal notifications.
+	// Set up channel through which to send signal notifications.
 	// We must use a buffered channel or risk missing the signal
 	// if we're not ready to receive when the signal is sent.
 	cSignal := make(chan os.Signal, 2)
@@ -509,7 +585,7 @@ func GetChartVersions(chartName string) ([]*semver.Version, error) {
 		break
 	}
 
-	// do not find any index file
+	// cannot find any index file
 	if ind == nil {
 		return nil, nil
 	}
@@ -558,4 +634,15 @@ func GetVerboseLog() action.DebugLog {
 	return func(format string, v ...interface{}) {
 		klog.Infof(format+"\n", v...)
 	}
+}
+
+// GetValues gives an implementation of 'helm get values' for target release
+func GetValues(release string, cfg *Config) (map[string]interface{}, error) {
+	actionConfig, err := NewActionConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	client := action.NewGetValues(actionConfig)
+	client.AllValues = true
+	return client.Run(release)
 }

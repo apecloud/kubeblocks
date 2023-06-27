@@ -65,7 +65,7 @@ func NewExecOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *Exe
 	}
 }
 
-// Complete receive exec parameters
+// Complete receives exec parameters
 func (o *ExecOptions) Complete() error {
 	var err error
 	o.Config, err = o.Factory.ToRESTConfig()
@@ -90,7 +90,7 @@ func (o *ExecOptions) Complete() error {
 func (o *ExecOptions) validate() error {
 	var err error
 
-	// pod is not get, try to get it by pod name
+	// pod is not set, try to get it by pod name
 	if o.Pod == nil && len(o.PodName) > 0 {
 		if o.Pod, err = o.Client.CoreV1().Pods(o.Namespace).Get(context.TODO(), o.PodName, metav1.GetOptions{}); err != nil {
 			return err

@@ -11,7 +11,7 @@ kbcli clusterdefinition list [flags]
 ### Examples
 
 ```
-  # list all ClusterDefinition
+  # list all ClusterDefinitions
   kbcli clusterdefinition list
 ```
 

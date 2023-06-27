@@ -119,7 +119,7 @@ func GetK8sProviderFromNodes(nodes *corev1.NodeList) K8sProvider {
 	return UnknownProvider
 }
 
-// GetK8sProviderFromVersion get k8s provider from field GitVersion in cluster server version
+// GetK8sProviderFromVersion gets k8s provider from field GitVersion in cluster server version
 func GetK8sProviderFromVersion(version string) K8sProvider {
 	for provider, reg := range k8sVersionRegex {
 		match, err := regexp.Match(reg, []byte(version))

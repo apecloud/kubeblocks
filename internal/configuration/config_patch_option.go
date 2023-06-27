@@ -42,7 +42,7 @@ func compareWithConfig(left, right interface{}, option CfgOption) (bool, error) 
 		}
 		return left.(*ConfigResource) == right.(*ConfigResource), nil
 	default:
-		return false, MakeError("not support config type compare!")
+		return false, MakeError("not supported config type to compare")
 	}
 }
 

@@ -25,10 +25,10 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -37,6 +37,8 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
 func generateComponents(component appsv1alpha1.ClusterComponentSpec, count int) []map[string]interface{} {
@@ -138,11 +140,11 @@ var _ = Describe("create", func() {
 		})
 	})
 
-	checkComponent := func(comps []*appsv1alpha1.ClusterComponentSpec, storage string, replicas int32, cpu string, memory string, storageClassName string) {
+	checkComponent := func(comps []*appsv1alpha1.ClusterComponentSpec, storage string, replicas int32, cpu string, memory string, storageClassName string, compIndex int) {
 		Expect(comps).ShouldNot(BeNil())
-		Expect(len(comps)).Should(Equal(2))
+		Expect(len(comps)).Should(BeNumerically(">=", compIndex))
 
-		comp := comps[0]
+		comp := comps[compIndex]
 		Expect(getResource(comp.VolumeClaimTemplates[0].Spec.Resources, corev1.ResourceStorage)).Should(Equal(storage))
 		Expect(comp.Replicas).Should(BeEquivalentTo(replicas))
 
@@ -164,19 +166,19 @@ var _ = Describe("create", func() {
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
 		comps, err := buildClusterComp(cd, nil, componentClasses)
 		Expect(err).ShouldNot(HaveOccurred())
-		checkComponent(comps, "20Gi", 1, "1", "1Gi", "")
+		checkComponent(comps, "20Gi", 1, "1", "1Gi", "", 0)
 	})
 
 	It("build default cluster component with environment", func() {
-		viper.Set("CLUSTER_DEFAULT_STORAGE_SIZE", "5Gi")
-		viper.Set("CLUSTER_DEFAULT_REPLICAS", 1)
-		viper.Set("CLUSTER_DEFAULT_CPU", "2000m")
-		viper.Set("CLUSTER_DEFAULT_MEMORY", "2Gi")
+		viper.Set(types.CfgKeyClusterDefaultStorageSize, "5Gi")
+		viper.Set(types.CfgKeyClusterDefaultReplicas, 1)
+		viper.Set(types.CfgKeyClusterDefaultCPU, "2000m")
+		viper.Set(types.CfgKeyClusterDefaultMemory, "2Gi")
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
 		comps, err := buildClusterComp(cd, nil, componentClasses)
 		Expect(err).ShouldNot(HaveOccurred())
-		checkComponent(comps, "5Gi", 1, "2", "2Gi", "")
+		checkComponent(comps, "5Gi", 1, "2", "2Gi", "", 0)
 	})
 
 	It("build cluster component with set values", func() {
@@ -193,8 +195,36 @@ var _ = Describe("create", func() {
 		}
 		comps, err := buildClusterComp(cd, setsMap, componentClasses)
 		Expect(err).Should(Succeed())
-		checkComponent(comps, "10Gi", 10, "10", "2Gi", "test")
+		checkComponent(comps, "10Gi", 10, "10", "2Gi", "test", 0)
 
+		setsMap[testing.ComponentDefName][keySwitchPolicy] = "invalid"
+		cd.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication
+		_, err = buildClusterComp(cd, setsMap, componentClasses)
+		Expect(err).Should(HaveOccurred())
+	})
+
+	It("build multiple cluster component with set values", func() {
+		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
+		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
+		setsMap := map[string]map[setKey]string{
+			testing.ComponentDefName: {
+				keyCPU:          "10",
+				keyMemory:       "2Gi",
+				keyStorage:      "10Gi",
+				keyReplicas:     "10",
+				keyStorageClass: "test",
+			}, testing.ExtraComponentDefName: {
+				keyCPU:          "5",
+				keyMemory:       "1Gi",
+				keyStorage:      "5Gi",
+				keyReplicas:     "5",
+				keyStorageClass: "test-other",
+			},
+		}
+		comps, err := buildClusterComp(cd, setsMap, componentClasses)
+		Expect(err).Should(Succeed())
+		checkComponent(comps, "10Gi", 10, "10", "2Gi", "test", 0)
+		checkComponent(comps, "5Gi", 5, "5", "1Gi", "test-other", 1)
 		setsMap[testing.ComponentDefName][keySwitchPolicy] = "invalid"
 		cd.Spec.ComponentDefs[0].WorkloadType = appsv1alpha1.Replication
 		_, err = buildClusterComp(cd, setsMap, componentClasses)
@@ -359,8 +389,9 @@ var _ = Describe("create", func() {
 	})
 
 	It("build tolerations", func() {
-		raw := []string{"key=engineType,value=mongo,operator=Equal,effect=NoSchedule"}
-		res := buildTolerations(raw)
+		raw := []string{"engineType=mongo:NoSchedule"}
+		res, err := util.BuildTolerations(raw)
+		Expect(err).Should(BeNil())
 		Expect(len(res)).Should(Equal(1))
 	})
 
@@ -389,7 +420,55 @@ var _ = Describe("create", func() {
 		Expect(setBackup(o, components).Error()).Should(ContainSubstring("is not completed"))
 
 		By("test backup is completed")
-		mockBackupInfo(dynamic, backupName, clusterName, nil)
+		mockBackupInfo(dynamic, backupName, clusterName, nil, "")
 		Expect(setBackup(o, components)).Should(Succeed())
+	})
+
+	It("set restoreTime", func() {
+		o := &CreateOptions{}
+		o.Namespace = testing.Namespace
+		o.RestoreTime = "Jun 16,2023 18:57:01 UTC+0800"
+		o.SourceCluster = testing.ClusterName
+		By("test setRestoreTime")
+		Expect(setRestoreTime(o)).Should(Succeed())
+	})
+
+	It("test fillClusterMetadataFromBackup", func() {
+		baseBackupName := "test-backup"
+		logBackupName := "test-logfile-backup"
+		clusterName := testing.ClusterName
+		baseBackup := testing.FakeBackup(baseBackupName)
+		logfileBackup := testing.FakeBackup(logBackupName)
+		cluster := testing.FakeCluster("clusterName", testing.Namespace)
+		dynamic := testing.FakeDynamicClient(baseBackup, logfileBackup, cluster)
+
+		o := &CreateOptions{}
+		o.Dynamic = dynamic
+		o.Namespace = testing.Namespace
+		o.RestoreTime = "Jun 16,2023 18:57:01 UTC+0800"
+		backupLogTime, _ := util.TimeParse(o.RestoreTime, time.Second)
+		backupLogTimeStr := backupLogTime.Format(time.RFC3339)
+		o.SourceCluster = clusterName
+		manifests := map[string]any{
+			"backupLog": map[string]any{
+				"startTime": backupLogTimeStr,
+				"stopTime":  backupLogTimeStr,
+			},
+		}
+		mockBackupInfo(dynamic, baseBackupName, clusterName, manifests, "snapshot")
+		mockBackupInfo(dynamic, logBackupName, clusterName, manifests, "logfile")
+		By("fill cluster from backup success")
+		Expect(fillClusterInfoFromBackup(o, &cluster)).Should(Succeed())
+		Expect(cluster.Spec.ClusterDefRef).Should(Equal(testing.ClusterDefName))
+		Expect(cluster.Spec.ClusterVersionRef).Should(Equal(testing.ClusterVersionName))
+
+		By("fill cluster definition does not matched")
+		o.ClusterDefRef = "test-not-match-cluster-definition"
+		Expect(fillClusterInfoFromBackup(o, &cluster)).Should(HaveOccurred())
+		o.ClusterDefRef = ""
+
+		By("fill cluster version does not matched")
+		o.ClusterVersionRef = "test-not-match-cluster-version"
+		Expect(fillClusterInfoFromBackup(o, &cluster)).Should(HaveOccurred())
 	})
 })

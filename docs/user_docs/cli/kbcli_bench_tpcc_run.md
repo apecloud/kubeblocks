@@ -12,7 +12,7 @@ kbcli bench tpcc run [flags]
 
 ```
   -h, --help                           help for run
-      --max-measure-latency duration   max measure latency in millisecond (default 16s)
+      --max-measure-latency duration   max measure latency in milliseconds (default 16s)
       --wait                           including keying & thinking time described on TPC-C Standard Specification
       --weight ints                    Weight for NewOrder, Payment, OrderStatus, Delivery, StockLevel (default [45,43,4,4,4])
 ```

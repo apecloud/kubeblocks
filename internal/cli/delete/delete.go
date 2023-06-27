@@ -171,7 +171,6 @@ func (o *DeleteOptions) deleteResult(r *resource.Result) error {
 		if err != nil {
 			return err
 		}
-		var runtimeObj runtime.Object
 		deleteInfos = append(deleteInfos, info)
 		found++
 
@@ -182,10 +181,10 @@ func (o *DeleteOptions) deleteResult(r *resource.Result) error {
 		if err = o.preDeleteResource(info); err != nil {
 			return err
 		}
-		if runtimeObj, err = o.deleteResource(info, options); err != nil {
+		if _, err = o.deleteResource(info, options); err != nil {
 			return err
 		}
-		if err = o.postDeleteResource(runtimeObj); err != nil {
+		if err = o.postDeleteResource(info.Object); err != nil {
 			return err
 		}
 		fmt.Fprintf(o.Out, "%s %s deleted\n", info.Mapping.GroupVersionKind.Kind, info.Name)

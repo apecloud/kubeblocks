@@ -36,13 +36,15 @@ type verticalScalingHandler struct{}
 var _ OpsHandler = verticalScalingHandler{}
 
 func init() {
+	vsHandler := verticalScalingHandler{}
 	verticalScalingBehaviour := OpsBehaviour{
 		// if cluster is Abnormal or Failed, new opsRequest may can repair it.
 		// TODO: we should add "force" flag for these opsRequest.
 		FromClusterPhases:                  appsv1alpha1.GetClusterUpRunningPhases(),
 		ToClusterPhase:                     appsv1alpha1.SpecReconcilingClusterPhase,
-		OpsHandler:                         verticalScalingHandler{},
+		OpsHandler:                         vsHandler,
 		ProcessingReasonInClusterCondition: ProcessingReasonVerticalScaling,
+		CancelFunc:                         vsHandler.Cancel,
 	}
 
 	opsMgr := GetOpsManager()
@@ -50,8 +52,8 @@ func init() {
 }
 
 // ActionStartedCondition the started condition when handle the vertical scaling request.
-func (vs verticalScalingHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRequest) *metav1.Condition {
-	return appsv1alpha1.NewVerticalScalingCondition(opsRequest)
+func (vs verticalScalingHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
+	return appsv1alpha1.NewVerticalScalingCondition(opsRes.OpsRequest), nil
 }
 
 // Action modifies cluster component resources according to
@@ -116,4 +118,13 @@ func (vs verticalScalingHandler) GetRealAffectedComponentMap(opsRequest *appsv1a
 		}
 	}
 	return realChangedMap
+}
+
+// Cancel this function defines the cancel verticalScaling action.
+func (vs verticalScalingHandler) Cancel(reqCxt intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	return cancelComponentOps(reqCxt.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec) error {
+		comp.ClassDefRef = &appsv1alpha1.ClassDefRef{Class: lastConfig.Class}
+		comp.Resources = lastConfig.ResourceRequirements
+		return nil
+	})
 }

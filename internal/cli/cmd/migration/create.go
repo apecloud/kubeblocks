@@ -253,7 +253,7 @@ func (o *CreateMigrationOptions) BuildWithRuntimeParams() error {
 		return err
 	}
 
-	// Generate random serverId for MySQL type database.Possible values are between 10001 and 2^32-10001
+	// Generate random serverId for MySQL type database. Possible values are between 10001 and 2^32-10001
 	if template.Spec.Source.DBType == migrationv1.MigrationDBTypeMySQL {
 		o.ServerID = o.generateRandomMySQLServerID()
 	} else {

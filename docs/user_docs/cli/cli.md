@@ -19,15 +19,24 @@ Addon command.
 Manage alert receiver, include add, list and delete receiver.
 
 * [kbcli alert add-receiver](kbcli_alert_add-receiver.md)	 - Add alert receiver, such as email, slack, webhook and so on.
+* [kbcli alert config-smtpserver](kbcli_alert_config-smtpserver.md)	 - Set smtp server config
 * [kbcli alert delete-receiver](kbcli_alert_delete-receiver.md)	 - Delete alert receiver.
 * [kbcli alert list-receivers](kbcli_alert_list-receivers.md)	 - List all alert receivers.
+* [kbcli alert list-smtpserver](kbcli_alert_list-smtpserver.md)	 - List alert smtp servers config.
 
 
 ## [bench](kbcli_bench.md)
 
 Run a benchmark.
 
-* [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run a TPCC benchmark.
+* [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
+
+
+## [builder](kbcli_builder.md)
+
+builder command.
+
+* [kbcli builder template](kbcli_builder_template.md)	 - tpl - a developer tool integrated with KubeBlocks that can help developers quickly generate rendered configurations or scripts based on Helm templates, and discover errors in the template before creating the database cluster.
 
 
 ## [class](kbcli_class.md)
@@ -44,6 +53,8 @@ Manage classes
 Cluster command.
 
 * [kbcli cluster backup](kbcli_cluster_backup.md)	 - Create a backup for the cluster.
+* [kbcli cluster cancel-ops](kbcli_cluster_cancel-ops.md)	 - Cancel the pending/creating/running OpsRequest which type is vscale or hscale.
+* [kbcli cluster configure](kbcli_cluster_configure.md)	 - Configure parameters with the specified components in the cluster.
 * [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a cluster or instance.
 * [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster.
 * [kbcli cluster create-account](kbcli_cluster_create-account.md)	 - Create account for a cluster
@@ -73,7 +84,7 @@ Cluster command.
 * [kbcli cluster list-logs](kbcli_cluster_list-logs.md)	 - List supported log files in cluster.
 * [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - List all opsRequests.
 * [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file.
-* [kbcli cluster reconfigure](kbcli_cluster_reconfigure.md)	 - Reconfigure parameters with the specified components in the cluster.
+* [kbcli cluster promote](kbcli_cluster_promote.md)	 - Promote a non-primary or non-leader instance as the new primary or leader of the cluster
 * [kbcli cluster restart](kbcli_cluster_restart.md)	 - Restart the specified components in the cluster.
 * [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup.
 * [kbcli cluster revoke-role](kbcli_cluster_revoke-role.md)	 - Revoke role from account
@@ -98,6 +109,8 @@ ClusterDefinition command.
 ClusterVersion command.
 
 * [kbcli clusterversion list](kbcli_clusterversion_list.md)	 - List ClusterVersions.
+* [kbcli clusterversion set-default](kbcli_clusterversion_set-default.md)	 - Set the clusterversion to the default clusterversion for its clusterdefinition.
+* [kbcli clusterversion unset-default](kbcli_clusterversion_unset-default.md)	 - Unset the clusterversion if it's default.
 
 
 ## [dashboard](kbcli_dashboard.md)
@@ -112,8 +125,11 @@ List and open the KubeBlocks dashboards.
 
 Inject faults to pod.
 
+* [kbcli fault delete](kbcli_fault_delete.md)	 - Delete chaos resources.
 * [kbcli fault io](kbcli_fault_io.md)	 - IO chaos.
+* [kbcli fault list](kbcli_fault_list.md)	 - List chaos resources.
 * [kbcli fault network](kbcli_fault_network.md)	 - Network chaos.
+* [kbcli fault node](kbcli_fault_node.md)	 - Node chaos.
 * [kbcli fault pod](kbcli_fault_pod.md)	 - Pod chaos.
 * [kbcli fault stress](kbcli_fault_stress.md)	 - Add memory pressure or CPU load to the system.
 * [kbcli fault time](kbcli_fault_time.md)	 - Clock skew failure.
@@ -124,7 +140,7 @@ Inject faults to pod.
 KubeBlocks operation commands.
 
 * [kbcli kubeblocks config](kbcli_kubeblocks_config.md)	 - KubeBlocks config.
-* [kbcli kubeblocks describe-config](kbcli_kubeblocks_describe-config.md)	 - describe KubeBlocks config.
+* [kbcli kubeblocks describe-config](kbcli_kubeblocks_describe-config.md)	 - Describe KubeBlocks config.
 * [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks.
 * [kbcli kubeblocks list-versions](kbcli_kubeblocks_list-versions.md)	 - List KubeBlocks versions.
 * [kbcli kubeblocks preflight](kbcli_kubeblocks_preflight.md)	 - Run and retrieve preflight checks for KubeBlocks.
@@ -153,10 +169,9 @@ Print the list of flags inherited by all commands.
 
 ## [playground](kbcli_playground.md)
 
-Bootstrap a playground KubeBlocks in local host or cloud.
+Bootstrap or destroy a playground KubeBlocks in local host or cloud.
 
-* [kbcli playground destroy](kbcli_playground_destroy.md)	 - Destroy the playground kubernetes cluster.
-* [kbcli playground guide](kbcli_playground_guide.md)	 - Display playground cluster user guide.
+* [kbcli playground destroy](kbcli_playground_destroy.md)	 - Destroy the playground KubeBlocks and kubernetes cluster.
 * [kbcli playground init](kbcli_playground_init.md)	 - Bootstrap a kubernetes cluster and install KubeBlocks for playground.
 
 

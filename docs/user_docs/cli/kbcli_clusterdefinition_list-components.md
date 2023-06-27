@@ -11,7 +11,7 @@ kbcli clusterdefinition list-components [flags]
 ### Examples
 
 ```
-  # List all components belong to the cluster definition.
+  # List all components belonging to the cluster definition.
   kbcli clusterdefinition list-components apecloud-mysql
 ```
 

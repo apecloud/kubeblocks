@@ -26,15 +26,15 @@ kbcli kubeblocks config [flags]
   # replace the init capacity when it is empty in the backup policy.
   dataProtection.backupPVCInitCapacity=100Gi
   
-  # the pvc storage class name. replace the storageClassName when it is nil in the backup policy.
+  # the pvc storage class name. replace the storageClassName when it is unset in the backup policy.
   dataProtection.backupPVCStorageClassName=csi-s3
   
-  # the pvc create policy.
+  # the pvc creation policy.
   # if the storageClass supports dynamic provisioning, recommend "IfNotPresent" policy.
   # otherwise, using "Never" policy. only affect the backupPolicy automatically created by KubeBlocks.
   dataProtection.backupPVCCreatePolicy=Never
   
-  # the configmap name of the pv template. if the csi-driver not support dynamic provisioning,
+  # the configmap name of the pv template. if the csi-driver does not support dynamic provisioning,
   # you can provide a configmap which contains key "persistentVolume" and value of the persistentVolume struct.
   dataProtection.backupPVConfigMapName=pv-template
   

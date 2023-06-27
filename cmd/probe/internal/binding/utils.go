@@ -37,14 +37,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-)
 
-type UserInfo struct {
-	UserName string `json:"userName"`
-	Password string `json:"password,omitempty"`
-	Expired  string `json:"expired,omitempty"`
-	RoleName string `json:"roleName,omitempty"`
-}
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+)
 
 type RedisEntry struct {
 	Key  string `json:"key"`
@@ -234,7 +229,7 @@ func SentProbeEvent(ctx context.Context, opsResult OpsResult, log logger.Logger)
 
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		log.Infof("get k8s client config failed: %v", err)
+		log.Errorf("get k8s client config failed: %v", err)
 		return
 	}
 
@@ -244,12 +239,13 @@ func SentProbeEvent(ctx context.Context, opsResult OpsResult, log logger.Logger)
 		return
 	}
 	namespace := os.Getenv("KB_NAMESPACE")
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 30; i++ {
 		_, err = clientset.CoreV1().Events(namespace).Create(ctx, event, metav1.CreateOptions{})
 		if err == nil {
 			break
 		}
-		log.Infof("send event failed: %v", err)
+		log.Errorf("send event failed: %v", err)
+		time.Sleep(10 * time.Second)
 	}
 }
 

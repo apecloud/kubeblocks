@@ -30,7 +30,7 @@ kbcli kubeblocks upgrade [flags]
       --timeout duration         Time to wait for upgrading KubeBlocks, such as --timeout=10m (default 5m0s)
   -f, --values strings           Specify values in a YAML file or a URL (can specify multiple)
       --version string           Set KubeBlocks version
-      --wait                     Wait for KubeBlocks to be ready. It will wait for as long as --timeout (default true)
+      --wait                     Wait for KubeBlocks to be ready. It will wait for a --timeout period (default true)
 ```
 
 ### Options inherited from parent commands

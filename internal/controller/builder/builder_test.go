@@ -20,9 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
+	"encoding/json"
 	"fmt"
-	"strconv"
-	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -31,12 +30,14 @@ import (
 	"github.com/leaanthony/debme"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -65,6 +66,11 @@ var _ = Describe("builder", func() {
 	const mysqlCompDefName = "replicasets"
 	const mysqlCompName = "mysql"
 	const proxyCompDefName = "proxy"
+	var requiredKeys = []string{
+		"KB_REPLICA_COUNT",
+		"KB_0_HOSTNAME",
+		"KB_CLUSTER_UID",
+	}
 
 	allFieldsClusterDefObj := func(needCreate bool) *appsv1alpha1.ClusterDefinition {
 		By("By assure an clusterDefinition obj")
@@ -93,22 +99,31 @@ var _ = Describe("builder", func() {
 		return clusterVersionObj
 	}
 
+	newExtraEnvs := func() map[string]string {
+		jsonStr, _ := json.Marshal(map[string]string{
+			"mock-key": "mock-value",
+		})
+		return map[string]string{
+			constant.ExtraEnvAnnotationKey: string(jsonStr),
+		}
+	}
+
 	newAllFieldsClusterObj := func(
 		clusterDefObj *appsv1alpha1.ClusterDefinition,
 		clusterVersionObj *appsv1alpha1.ClusterVersion,
 		needCreate bool,
 	) (*appsv1alpha1.Cluster, *appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterVersion, types.NamespacedName) {
-		// setup Cluster obj required default ClusterDefinition and ClusterVersion objects if not provided
+		// setup Cluster obj requires default ClusterDefinition and ClusterVersion objects
 		if clusterDefObj == nil {
 			clusterDefObj = allFieldsClusterDefObj(needCreate)
 		}
 		if clusterVersionObj == nil {
 			clusterVersionObj = allFieldsClusterVersionObj(needCreate)
 		}
-
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 			clusterDefObj.Name, clusterVersionObj.Name).
+			AddAnnotationsInMap(newExtraEnvs()).
 			AddComponent(mysqlCompName, mysqlCompDefName).SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 			AddService(testapps.ServiceVPCName, corev1.ServiceTypeLoadBalancer).
@@ -118,7 +133,6 @@ var _ = Describe("builder", func() {
 		if needCreate {
 			Expect(testCtx.CreateObj(testCtx.Ctx, clusterObj)).Should(Succeed())
 		}
-
 		return clusterObj, clusterDefObj, clusterVersionObj, key
 	}
 
@@ -163,62 +177,50 @@ var _ = Describe("builder", func() {
 		Expect(component).ShouldNot(BeNil())
 		return component
 	}
-	newParams := func() *BuilderParams {
-		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(nil, nil, false)
-		params := BuilderParams{
-			ClusterDefinition: clusterDef,
-			ClusterVersion:    clusterVersion,
-			Cluster:           cluster,
-			Component:         newAllFieldsComponent(clusterDef, clusterVersion),
-		}
-		return &params
-	}
-
-	newParamsWithClusterDef := func(clusterDefObj *appsv1alpha1.ClusterDefinition) *BuilderParams {
+	newClusterObjs := func(clusterDefObj *appsv1alpha1.ClusterDefinition) (*appsv1alpha1.ClusterDefinition, *appsv1alpha1.Cluster, *component.SynthesizedComponent) {
 		cluster, clusterDef, clusterVersion, _ := newAllFieldsClusterObj(clusterDefObj, nil, false)
-		params := BuilderParams{
-			ClusterDefinition: clusterDef,
-			ClusterVersion:    clusterVersion,
-			Cluster:           cluster,
-			Component:         newAllFieldsComponent(clusterDef, clusterVersion),
-		}
-		return &params
+		synthesizedComponent := newAllFieldsComponent(clusterDef, clusterVersion)
+		return clusterDef, cluster, synthesizedComponent
 	}
 
 	Context("has helper function which builds specific object from cue template", func() {
 		It("builds PVC correctly", func() {
 			snapshotName := "test-snapshot-name"
 			sts := newStsObj()
-			params := newParams()
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			pvcKey := types.NamespacedName{
 				Namespace: "default",
 				Name:      "data-mysql-01-replicasets-0",
 			}
-			pvc, err := BuildPVCFromSnapshot(sts, params.Component.VolumeClaimTemplates[0], pvcKey, snapshotName, params.Component)
+			pvc, err := BuildPVC(cluster, synthesizedComponent, &synthesizedComponent.VolumeClaimTemplates[0], pvcKey, snapshotName)
 			Expect(err).Should(BeNil())
 			Expect(pvc).ShouldNot(BeNil())
 			Expect(pvc.Spec.AccessModes).Should(Equal(sts.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
-			Expect(pvc.Spec.Resources).Should(Equal(params.Component.VolumeClaimTemplates[0].Spec.Resources))
+			Expect(pvc.Spec.Resources).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.Resources))
+			Expect(pvc.Spec.StorageClassName).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.StorageClassName))
 			Expect(pvc.Labels[constant.VolumeTypeLabelKey]).ShouldNot(BeEmpty())
 		})
 
 		It("builds Service correctly", func() {
-			params := newParams()
-			svcList, err := BuildSvcListWithCustomAttributes(*params, nil)
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			svcList, err := BuildSvcListWithCustomAttributes(cluster, synthesizedComponent, nil)
 			Expect(err).Should(BeNil())
 			Expect(svcList).ShouldNot(BeEmpty())
 		})
 
 		It("builds Conn. Credential correctly", func() {
-			params := newParamsWithClusterDef(testapps.NewClusterDefFactoryWithConnCredential("conn-cred").GetObject())
-			credential, err := BuildConnCredential(*params)
+			var (
+				clusterDefObj                             = testapps.NewClusterDefFactoryWithConnCredential("conn-cred").GetObject()
+				clusterDef, cluster, synthesizedComponent = newClusterObjs(clusterDefObj)
+			)
+			credential, err := BuildConnCredential(clusterDef, cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(credential).ShouldNot(BeNil())
 			Expect(credential.Labels["apps.kubeblocks.io/cluster-type"]).Should(BeEmpty())
 			By("setting type")
 			characterType := "test-character-type"
-			params.ClusterDefinition.Spec.Type = characterType
-			credential, err = BuildConnCredential(*params)
+			clusterDef.Spec.Type = characterType
+			credential, err = BuildConnCredential(clusterDef, cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(credential).ShouldNot(BeNil())
 			Expect(credential.Labels["apps.kubeblocks.io/cluster-type"]).Should(Equal(characterType))
@@ -246,13 +248,11 @@ var _ = Describe("builder", func() {
 				Expect(credential.StringData[v]).ShouldNot(BeEquivalentTo(fmt.Sprintf("$(%s)", v)))
 			}
 			Expect(credential.StringData["RANDOM_PASSWD"]).Should(HaveLen(8))
-			svcFQDN := fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name,
-				params.Cluster.Namespace)
-			headlessSvcFQDN := fmt.Sprintf("%s-%s-headless.%s.svc", params.Cluster.Name, params.Component.Name,
-				params.Cluster.Namespace)
+			svcFQDN := fmt.Sprintf("%s-%s.%s.svc", cluster.Name, synthesizedComponent.Name, cluster.Namespace)
+			headlessSvcFQDN := fmt.Sprintf("%s-%s-headless.%s.svc", cluster.Name, synthesizedComponent.Name, cluster.Namespace)
 			var mysqlPort corev1.ServicePort
 			var paxosPort corev1.ServicePort
-			for _, s := range params.Component.Services[0].Spec.Ports {
+			for _, s := range synthesizedComponent.Services[0].Spec.Ports {
 				switch s.Name {
 				case "mysql":
 					mysqlPort = s
@@ -269,77 +269,86 @@ var _ = Describe("builder", func() {
 
 		It("builds StatefulSet correctly", func() {
 			reqCtx := newReqCtx()
-			params := newParams()
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			envConfigName := "test-env-config-name"
-			newParams := params
 
-			sts, err := BuildSts(reqCtx, *params, envConfigName)
+			sts, err := BuildSts(reqCtx, cluster, synthesizedComponent, envConfigName)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
 			// test  replicas = 0
-			newComponent := *params.Component
+			newComponent := *synthesizedComponent
 			newComponent.Replicas = 0
-			newParams.Component = &newComponent
-			sts, err = BuildSts(reqCtx, *newParams, envConfigName)
+			sts, err = BuildSts(reqCtx, cluster, &newComponent, envConfigName)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
 			Expect(*sts.Spec.Replicas).Should(Equal(int32(0)))
 			Expect(sts.Spec.VolumeClaimTemplates[0].Labels[constant.VolumeTypeLabelKey]).
 				Should(Equal(string(appsv1alpha1.VolumeTypeData)))
 			// test workload type replication
-			replComponent := *params.Component
+			replComponent := *synthesizedComponent
 			replComponent.Replicas = 2
 			replComponent.WorkloadType = appsv1alpha1.Replication
-			newParams.Component = &replComponent
-			sts, err = BuildSts(reqCtx, *newParams, envConfigName)
+			sts, err = BuildSts(reqCtx, cluster, &replComponent, envConfigName)
 			Expect(err).Should(BeNil())
 			Expect(sts).ShouldNot(BeNil())
 			Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(2))
+			// test extra envs
+			Expect(sts.Spec.Template.Spec.Containers).ShouldNot(BeEmpty())
+			for _, container := range sts.Spec.Template.Spec.Containers {
+				isContainEnv := false
+				for _, env := range container.Env {
+					if env.Name == "mock-key" && env.Value == "mock-value" {
+						isContainEnv = true
+						break
+					}
+				}
+				Expect(isContainEnv).Should(BeTrue())
+			}
 		})
 
 		It("builds Deploy correctly", func() {
 			reqCtx := newReqCtx()
-			params := newParams()
-			deploy, err := BuildDeploy(reqCtx, *params)
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			deploy, err := BuildDeploy(reqCtx, cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(deploy).ShouldNot(BeNil())
 		})
 
 		It("builds PDB correctly", func() {
-			params := newParams()
-			pdb, err := BuildPDB(*params)
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			pdb, err := BuildPDB(cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(pdb).ShouldNot(BeNil())
 		})
 
 		It("builds Env Config correctly", func() {
-			reqCtx := newReqCtx()
-			params := newParams()
-			cfg, err := BuildEnvConfig(*params, reqCtx, k8sClient)
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
-			Expect(len(cfg.Data) == 3).Should(BeTrue())
+			for _, k := range requiredKeys {
+				_, ok := cfg.Data[k]
+				Expect(ok).Should(BeTrue())
+			}
 		})
 
 		It("builds env config with resources recreate", func() {
-			reqCtx := newReqCtx()
-			params := newParams()
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
 
 			uuid := "12345"
 			By("mock a cluster uuid")
-			params.Cluster.UID = types.UID(uuid)
+			cluster.UID = types.UID(uuid)
 
-			cfg, err := BuildEnvConfig(*params, reqCtx, k8sClient)
+			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
-			Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_CLUSTER_UID"]).Should(Equal(uuid))
+			Expect(cfg.Data["KB_CLUSTER_UID"]).Should(Equal(uuid))
 		})
 
 		It("builds Env Config with ConsensusSet status correctly", func() {
-			reqCtx := newReqCtx()
-			params := newParams()
-			params.Cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
-				params.Component.Name: {
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+				synthesizedComponent.Name: {
 					ConsensusSetStatus: &appsv1alpha1.ConsensusSetStatus{
 						Leader: appsv1alpha1.ConsensusMemberStatus{
 							Pod: "pod1",
@@ -351,64 +360,27 @@ var _ = Describe("builder", func() {
 						}},
 					},
 				}}
-			cfg, err := BuildEnvConfig(*params, reqCtx, k8sClient)
+			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
-			Expect(len(cfg.Data) == 5).Should(BeTrue())
-		})
-
-		It("builds Env Config with Replication component correctly", func() {
-			reqCtx := newReqCtx()
-			params := newParams()
-			params.Component.WorkloadType = appsv1alpha1.Replication
-
-			var cfg *corev1.ConfigMap
-			var err error
-
-			checkEnvValues := func() {
-				cfg, err = BuildEnvConfig(*params, reqCtx, k8sClient)
-				Expect(err).Should(BeNil())
-				Expect(cfg).ShouldNot(BeNil())
-				Expect(len(cfg.Data) == int(3+params.Component.Replicas)).Should(BeTrue())
-				Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_N"]).
-					Should(Equal(strconv.Itoa(int(params.Component.Replicas))))
-				stsName := fmt.Sprintf("%s-%s", params.Cluster.Name, params.Component.Name)
-				svcName := fmt.Sprintf("%s-headless", stsName)
-				By("Checking KB_PRIMARY_POD_NAME value be right")
-				Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
-					Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "." + svcName))
-				for i := 0; i < int(params.Component.Replicas); i++ {
-					if i == 0 {
-						By("Checking the 1st replica's hostname should not have suffix '-0'")
-						Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_"+strconv.Itoa(i)+"_HOSTNAME"]).
-							Should(Equal(stsName + "-" + strconv.Itoa(0) + "." + svcName))
-					} else {
-						Expect(cfg.Data["KB_"+strings.ToUpper(params.Component.Type)+"_"+strconv.Itoa(i)+"_HOSTNAME"]).
-							Should(Equal(stsName + "-" + strconv.Itoa(int(params.Component.GetPrimaryIndex())) + "." + svcName))
-					}
-				}
+			toCheckKeys := append(requiredKeys, []string{
+				"KB_LEADER",
+				"KB_FOLLOWERS",
+			}...)
+			for _, k := range toCheckKeys {
+				_, ok := cfg.Data[k]
+				Expect(ok).Should(BeTrue())
 			}
-
-			By("Checking env values with primaryIndex=0 ")
-			var mockPrimaryIndex = int32(testapps.DefaultReplicationPrimaryIndex)
-			params.Component.PrimaryIndex = &mockPrimaryIndex
-			checkEnvValues()
-
-			By("Checking env values with primaryIndex=1 ")
-			params.Component.Replicas = 2
-			var newPrimaryIndex = int32(1)
-			params.Component.PrimaryIndex = &newPrimaryIndex
-			checkEnvValues()
 		})
 
 		It("builds BackupJob correctly", func() {
-			sts := newStsObj()
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			backupJobKey := types.NamespacedName{
 				Namespace: "default",
 				Name:      "test-backup-job",
 			}
 			backupPolicyName := "test-backup-policy"
-			backupJob, err := BuildBackup(sts, backupPolicyName, backupJobKey)
+			backupJob, err := BuildBackup(cluster, synthesizedComponent, backupPolicyName, backupJobKey, "snapshot")
 			Expect(err).Should(BeNil())
 			Expect(backupJob).ShouldNot(BeNil())
 		})
@@ -425,21 +397,9 @@ var _ = Describe("builder", func() {
 			Expect(vs).ShouldNot(BeNil())
 		})
 
-		It("builds CronJob correctly", func() {
-			sts := newStsObj()
-			pvcKey := types.NamespacedName{
-				Namespace: "default",
-				Name:      "test-pvc",
-			}
-			schedule := "* * * * *"
-			cronJob, err := BuildCronJob(pvcKey, schedule, sts)
-			Expect(err).Should(BeNil())
-			Expect(cronJob).ShouldNot(BeNil())
-		})
-
 		It("builds ConfigMap with template correctly", func() {
 			config := map[string]string{}
-			params := newParams()
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			tplCfg := appsv1alpha1.ComponentConfigSpec{
 				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 					Name:        "test-config-tpl",
@@ -447,24 +407,132 @@ var _ = Describe("builder", func() {
 				},
 				ConfigConstraintRef: "test-config-constraint",
 			}
-			configmap, err := BuildConfigMapWithTemplate(config, *params, "test-cm", tplCfg.ConfigConstraintRef, tplCfg.ComponentTemplateSpec)
+			configmap, err := BuildConfigMapWithTemplate(cluster, synthesizedComponent, config,
+				"test-cm", tplCfg.ConfigConstraintRef, tplCfg.ComponentTemplateSpec)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
 		})
 
 		It("builds config manager sidecar container correctly", func() {
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:   "cfgmgr",
-				CharacterType: "mysql",
 				SecreteName:   "test-secret",
+				ComponentName: synthesizedComponent.Name,
+				CharacterType: synthesizedComponent.CharacterType,
+				EnvConfigName: cfg.Name,
 				Image:         constant.KBToolsImage,
 				Args:          []string{},
 				Envs:          []corev1.EnvVar{},
 				Volumes:       []corev1.VolumeMount{},
+				Cluster:       cluster,
 			}
-			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam)
+			Expect(err).Should(BeNil())
+			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(configmap).ShouldNot(BeNil())
+			Expect(configmap.SecurityContext).Should(BeNil())
+		})
+
+		It("builds config manager sidecar container correctly", func() {
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
+				ManagerName:           "cfgmgr",
+				CharacterType:         "mysql",
+				SecreteName:           "test-secret",
+				Image:                 constant.KBToolsImage,
+				ShareProcessNamespace: true,
+				Args:                  []string{},
+				Envs:                  []corev1.EnvVar{},
+				Volumes:               []corev1.VolumeMount{},
+				Cluster:               cluster,
+			}
+			configmap, err := BuildCfgManagerContainer(sidecarRenderedParam, synthesizedComponent)
+			Expect(err).Should(BeNil())
+			Expect(configmap).ShouldNot(BeNil())
+			Expect(configmap.SecurityContext).ShouldNot(BeNil())
+			Expect(configmap.SecurityContext.RunAsUser).ShouldNot(BeNil())
+			Expect(*configmap.SecurityContext.RunAsUser).Should(BeEquivalentTo(int64(0)))
+		})
+
+		It("should build restore job correctly", func() {
+			restoreJobKey := types.NamespacedName{
+				Namespace: "default",
+				Name:      "test-restore-job",
+			}
+			component := component.SynthesizedComponent{
+				Name: "component",
+				PodSpec: &corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									"cpu": resource.MustParse("1"),
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "data1",
+									MountPath: "/data/mysql",
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{},
+				},
+				VolumeTypes: []appsv1alpha1.VolumeTypeSpec{
+					{
+						Name: "data1",
+						Type: "data",
+					},
+				},
+				VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "data1",
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{},
+					},
+				},
+			}
+			backup := dataprotectionv1alpha1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "backup",
+					Namespace: "default",
+					Labels: map[string]string{
+						constant.ClusterDefLabelKey: "test-cluster-def",
+					},
+				},
+				Status: dataprotectionv1alpha1.BackupStatus{
+					PersistentVolumeClaimName: "data-pvc",
+					Manifests: &dataprotectionv1alpha1.ManifestsStatus{
+						BackupTool: &dataprotectionv1alpha1.BackupToolManifestsStatus{
+							FilePath: "/default/mysql-182dee90-4e6b-4b74-97e8-9031ec63db52/mysql/backup-default-mysql-20230523115255",
+						},
+					},
+				},
+			}
+			backupTool := dataprotectionv1alpha1.BackupTool{
+				Spec: dataprotectionv1alpha1.BackupToolSpec{
+					Image: "xtrabackup",
+					Env: []corev1.EnvVar{
+						{
+							Name:  "test-name",
+							Value: "test-value",
+						},
+					},
+					Physical: dataprotectionv1alpha1.BackupToolRestoreCommand{
+						RestoreCommands: []string{
+							"echo \"hello world\"",
+						},
+					},
+				},
+			}
+			podName := "mysql-mysql-0"
+			job, err := BuildRestoreJobForFullBackup(restoreJobKey.Name, &component, &backup, &backupTool, podName)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(job).ShouldNot(BeNil())
 		})
 	})
 

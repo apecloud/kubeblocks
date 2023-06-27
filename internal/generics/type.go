@@ -67,6 +67,7 @@ var EndpointsSignature = func(_ corev1.Endpoints, _ corev1.EndpointsList) {}
 
 var StatefulSetSignature = func(_ appsv1.StatefulSet, _ appsv1.StatefulSetList) {}
 var DeploymentSignature = func(_ appsv1.Deployment, _ appsv1.DeploymentList) {}
+var ReplicaSetSignature = func(_ appsv1.ReplicaSet, _ appsv1.ReplicaSetList) {}
 
 var JobSignature = func(_ batchv1.Job, _ batchv1.JobList) {}
 var CronJobSignature = func(_ batchv1.CronJob, _ batchv1.CronJobList) {}

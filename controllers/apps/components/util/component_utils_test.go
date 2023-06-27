@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package util
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -53,7 +54,7 @@ func TestIsProbeTimeout(t *testing.T) {
 			RoleProbeTimeoutAfterPodsReady: appsv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady,
 		},
 	}
-	if !IsProbeTimeout(compDef, podsReadyTime) {
+	if !IsProbeTimeout(compDef.Probes, podsReadyTime) {
 		t.Error("probe timed out should be true")
 	}
 }
@@ -177,17 +178,17 @@ var _ = Describe("Consensus Component", func() {
 			Expect(newCluster != nil).Should(BeTrue())
 
 			By("test consensusSet InitClusterComponentStatusIfNeed function")
-			err := InitClusterComponentStatusIfNeed(cluster, consensusCompName, *componentDef)
+			err := InitClusterComponentStatusIfNeed(cluster, consensusCompName, componentDef.WorkloadType)
 			Expect(err).Should(Succeed())
 			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus).ShouldNot(BeNil())
-			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus.Leader.Pod).Should(Equal(ComponentStatusDefaultPodName))
+			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus.Leader.Pod).Should(Equal(constant.ComponentStatusDefaultPodName))
 
 			By("test ReplicationSet InitClusterComponentStatusIfNeed function")
 			componentDef.WorkloadType = appsv1alpha1.Replication
-			err = InitClusterComponentStatusIfNeed(cluster, consensusCompName, *componentDef)
+			err = InitClusterComponentStatusIfNeed(cluster, consensusCompName, componentDef.WorkloadType)
 			Expect(err).Should(Succeed())
 			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus).ShouldNot(BeNil())
-			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus.Primary.Pod).Should(Equal(ComponentStatusDefaultPodName))
+			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus.Primary.Pod).Should(Equal(constant.ComponentStatusDefaultPodName))
 
 			By("test GetObjectListByComponentName function")
 			stsList := &appsv1.StatefulSetList{}
@@ -203,16 +204,6 @@ var _ = Describe("Consensus Component", func() {
 			By("test GetClusterComponentSpecByName function")
 			clusterComp := GetClusterComponentSpecByName(*cluster, consensusCompName)
 			Expect(clusterComp).ShouldNot(BeNil())
-
-			By("test ComponentRuntimeReqArgsCheck function")
-			err = ComponentRuntimeReqArgsCheck(k8sClient, cluster, clusterComp)
-			Expect(err).Should(Succeed())
-			By("test ComponentRuntimeReqArgsCheck function when cluster nil")
-			err = ComponentRuntimeReqArgsCheck(k8sClient, nil, clusterComp)
-			Expect(err).ShouldNot(Succeed())
-			By("test ComponentRuntimeReqArgsCheck function when clusterComp nil")
-			err = ComponentRuntimeReqArgsCheck(k8sClient, cluster, nil)
-			Expect(err).ShouldNot(Succeed())
 
 			By("test UpdateObjLabel function")
 			stsObj := stsList.Items[0]
@@ -326,6 +317,55 @@ var _ = Describe("Consensus Component", func() {
 				sts.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision)
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
+		})
+	})
+})
+
+var _ = Describe("Component utils test", func() {
+	Context("test mergeServiceAnnotations", func() {
+		It("should merge annotations from original that not exist in target to final result", func() {
+			originalKey := "only-existing-in-original"
+			targetKey := "only-existing-in-target"
+			updatedKey := "updated-in-target"
+			originalAnnotations := map[string]string{
+				originalKey: "true",
+				updatedKey:  "false",
+			}
+			targetAnnotations := map[string]string{
+				targetKey:  "true",
+				updatedKey: "true",
+			}
+			MergeAnnotations(originalAnnotations, &targetAnnotations)
+			Expect(targetAnnotations[targetKey]).ShouldNot(BeEmpty())
+			Expect(targetAnnotations[originalKey]).ShouldNot(BeEmpty())
+			Expect(targetAnnotations[updatedKey]).Should(Equal("true"))
+			By("merging with target being nil")
+			var nilAnnotations map[string]string
+			MergeAnnotations(originalAnnotations, &nilAnnotations)
+			Expect(nilAnnotations).ShouldNot(BeNil())
+		})
+
+		It("test sync pod spec default values set by k8s", func() {
+			var (
+				clusterName = "cluster"
+				compName    = "component"
+				podName     = "pod"
+				role        = "leader"
+				mode        = "ReadWrite"
+			)
+			pod := testapps.MockConsensusComponentStsPod(&testCtx, nil, clusterName, compName, podName, role, mode)
+			ppod := testapps.NewPodFactory(testCtx.DefaultNamespace, "pod").
+				SetOwnerReferences("apps/v1", constant.StatefulSetKind, nil).
+				AddAppInstanceLabel(clusterName).
+				AddAppComponentLabel(compName).
+				AddAppManangedByLabel().
+				AddRoleLabel(role).
+				AddConsensusSetAccessModeLabel(mode).
+				AddControllerRevisionHashLabel("").
+				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
+				GetObject()
+			ResolvePodSpecDefaultFields(pod.Spec, &ppod.Spec)
+			Expect(reflect.DeepEqual(pod.Spec, ppod.Spec)).Should(BeTrue())
 		})
 	})
 })

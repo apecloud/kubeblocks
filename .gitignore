@@ -22,6 +22,10 @@ bin
 testbin/*
 __debug_bin
 
+output
+helm-output
+
+
 # Test binary, build with `go test -c`
 *.test
 
@@ -41,6 +45,7 @@ zz_generated.*
 .vscode/
 .idea/
 .history/
+.run/
 .vimrc
 *.swp
 *.swo
@@ -58,4 +63,5 @@ tmp/
 
 
 # helm dependency charts
+deploy/**/Chart.lock
 deploy/**/charts

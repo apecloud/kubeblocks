@@ -20,22 +20,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package playground
 
 import (
+	"os"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	gv "github.com/hashicorp/go-version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+	"github.com/apecloud/kubeblocks/version"
 )
 
 var _ = Describe("playground", func() {
+	const (
+		testKubeConfigPath = "./testdata/kubeconfig"
+	)
+
 	var streams genericclioptions.IOStreams
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		Expect(os.Setenv(types.CliHomeEnv, "./testdata")).Should(Succeed())
 	})
 
 	It("init at local host", func() {
@@ -47,12 +56,27 @@ var _ = Describe("playground", func() {
 			clusterVersion: clitesting.ClusterVersionName,
 			IOStreams:      streams,
 			cloudProvider:  defaultCloudProvider,
-			helmCfg:        helm.NewConfig("", util.ConfigPath("config_kb_test"), "", false),
+			helmCfg:        helm.NewConfig("", testKubeConfigPath, "", false),
+			dockerVersion:  version.MinimumDockerVersion,
 		}
 		Expect(o.validate()).Should(Succeed())
 		Expect(o.run()).Should(HaveOccurred())
 		Expect(o.installKubeBlocks("test")).Should(HaveOccurred())
 		Expect(o.createCluster()).Should(HaveOccurred())
+	})
+
+	It("init at local host without outdate docker", func() {
+		var err error
+		o := &initOptions{
+			clusterDef:     clitesting.ClusterDefName,
+			clusterVersion: clitesting.ClusterVersionName,
+			IOStreams:      streams,
+			cloudProvider:  defaultCloudProvider,
+			helmCfg:        helm.NewConfig("", testKubeConfigPath, "", false),
+		}
+		o.dockerVersion, err = gv.NewVersion("20.10.0")
+		Expect(err).Should(BeNil())
+		Expect(o.validate()).Should(HaveOccurred())
 	})
 
 	It("init at remote cloud", func() {
@@ -63,10 +87,5 @@ var _ = Describe("playground", func() {
 			cloudProvider:  cp.AWS,
 		}
 		Expect(o.validate()).Should(HaveOccurred())
-	})
-
-	It("guide", func() {
-		cmd := newGuideCmd()
-		Expect(cmd).ShouldNot(BeNil())
 	})
 })

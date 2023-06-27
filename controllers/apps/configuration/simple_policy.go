@@ -20,13 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	"github.com/apecloud/kubeblocks/internal/constant"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 type simplePolicy struct {
@@ -39,22 +37,34 @@ func init() {
 func (s *simplePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
 	params.Ctx.Log.V(1).Info("simple policy begin....")
 
+	var funcs RollingUpgradeFuncs
+	var compLists []client.Object
+
 	switch params.WorkloadType() {
-	case appsv1alpha1.Stateful, appsv1alpha1.Consensus, appsv1alpha1.Replication:
-		return rollingStatefulSets(params)
 	default:
-		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not support component workload type:[%s]", params.WorkloadType())
+		return makeReturnedStatus(ESNotSupport), cfgcore.MakeError("not supported component workload type:[%s]", params.WorkloadType())
+	case appsv1alpha1.Consensus:
+		funcs = GetConsensusRollingUpgradeFuncs()
+		compLists = fromStatefulSetObjects(params.ComponentUnits)
+	case appsv1alpha1.Stateful:
+		funcs = GetStatefulSetRollingUpgradeFuncs()
+		compLists = fromStatefulSetObjects(params.ComponentUnits)
+	case appsv1alpha1.Replication:
+		funcs = GetReplicationRollingUpgradeFuncs()
+		compLists = fromStatefulSetObjects(params.ComponentUnits)
+	case appsv1alpha1.Stateless:
+		funcs = GetDeploymentRollingUpgradeFuncs()
+		compLists = fromDeploymentObjects(params.DeploymentUnits)
 	}
+	return restartAndCheckComponent(params, funcs, compLists)
 }
 
 func (s *simplePolicy) GetPolicyName() string {
 	return string(appsv1alpha1.NormalPolicy)
 }
 
-func rollingStatefulSets(param reconfigureParams) (ReturnedStatus, error) {
+func restartAndCheckComponent(param reconfigureParams, funcs RollingUpgradeFuncs, objs []client.Object) (ReturnedStatus, error) {
 	var (
-		units      = param.ComponentUnits
-		client     = param.Client
 		newVersion = param.getTargetVersionHash()
 		configKey  = param.getConfigKey()
 
@@ -62,14 +72,19 @@ func rollingStatefulSets(param reconfigureParams) (ReturnedStatus, error) {
 		progress  = cfgcore.NotStarted
 	)
 
-	for _, sts := range units {
-		if err := restartStsWithRolling(client, param.Ctx, sts, configKey, newVersion); err != nil {
-			param.Ctx.Log.Error(err, "failed to restart statefulSet.", "stsName", sts.GetName())
-			return makeReturnedStatus(ESAndRetryFailed), err
-		}
+	recordEvent := func(obj client.Object) {
+		param.Ctx.Recorder.Eventf(obj,
+			corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRestart,
+			"restarting component[%s] in cluster[%s], version: %s", param.ClusterComponent.Name, param.Cluster.Name, newVersion)
+	}
+	if obj, err := funcs.RestartComponent(param.Client, param.Ctx, configKey, newVersion, objs, recordEvent); err != nil {
+		param.Ctx.Recorder.Eventf(obj,
+			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureRestartFailed,
+			"failed to  restart component[%s] in cluster[%s], version: %s", client.ObjectKeyFromObject(obj), param.Cluster.Name, newVersion)
+		return makeReturnedStatus(ESAndRetryFailed), err
 	}
 
-	pods, err := GetComponentPods(param)
+	pods, err := funcs.GetPodsFunc(param)
 	if err != nil {
 		return makeReturnedStatus(ESAndRetryFailed), err
 	}
@@ -80,30 +95,4 @@ func rollingStatefulSets(param reconfigureParams) (ReturnedStatus, error) {
 		retStatus = ESNone
 	}
 	return makeReturnedStatus(retStatus, withExpected(int32(len(pods))), withSucceed(progress)), nil
-}
-
-func restartStsWithRolling(cli client.Client, ctx intctrlutil.RequestCtx, sts appsv1.StatefulSet, configKey string, newVersion string) error {
-	// cfgAnnotationKey := fmt.Sprintf("%s-%s", UpgradeRestartAnnotationKey, strings.ReplaceAll(configKey, "_", "-"))
-	cfgAnnotationKey := cfgcore.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
-
-	if sts.Spec.Template.Annotations == nil {
-		sts.Spec.Template.Annotations = map[string]string{}
-	}
-
-	lastVersion := ""
-	if updatedVersion, ok := sts.Spec.Template.Annotations[cfgAnnotationKey]; ok {
-		lastVersion = updatedVersion
-	}
-
-	// updated UpgradeRestartAnnotationKey
-	if lastVersion == newVersion {
-		return nil
-	}
-
-	sts.Spec.Template.Annotations[cfgAnnotationKey] = newVersion
-	if err := cli.Update(ctx.Ctx, &sts); err != nil {
-		return err
-	}
-
-	return nil
 }

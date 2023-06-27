@@ -26,24 +26,33 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
+	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type StatefulComponent types.ComponentBase
+type Stateful struct {
+	internal.ComponentSetBase
+}
 
-var _ types.Component = &StatefulComponent{}
+var _ internal.ComponentSet = &Stateful{}
 
-func (r *StatefulComponent) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
+func (r *Stateful) getReplicas() int32 {
+	if r.SynthesizedComponent != nil {
+		return r.SynthesizedComponent.Replicas
+	}
+	return r.ComponentSpec.Replicas
+}
+
+func (r *Stateful) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
@@ -52,55 +61,77 @@ func (r *StatefulComponent) IsRunning(ctx context.Context, obj client.Object) (b
 	if err != nil {
 		return false, err
 	}
-	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &r.Component.Replicas), nil
+	targetReplicas := r.getReplicas()
+	return util.StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &targetReplicas), nil
 }
 
-func (r *StatefulComponent) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
+func (r *Stateful) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
 	sts := util.ConvertToStatefulSet(obj)
-	return util.StatefulSetPodsAreReady(sts, r.Component.Replicas), nil
+	return util.StatefulSetPodsAreReady(sts, r.getReplicas()), nil
 }
 
-func (r *StatefulComponent) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+func (r *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	if pod == nil {
 		return false
 	}
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 
-// HandleProbeTimeoutWhenPodsReady the Stateful component has no role detection, empty implementation here.
-func (r *StatefulComponent) HandleProbeTimeoutWhenPodsReady(ctx context.Context, recorder record.EventRecorder) (bool, error) {
-	return false, nil
+func (r *Stateful) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap) {
+	return "", nil
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
-func (r *StatefulComponent) GetPhaseWhenPodsNotReady(ctx context.Context, componentName string) (appsv1alpha1.ClusterComponentPhase, error) {
+func (r *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context,
+	componentName string,
+	originPhaseIsUpRunning bool) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	stsList := &appsv1.StatefulSetList{}
 	podList, err := util.GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster, componentName, stsList)
 	if err != nil || len(stsList.Items) == 0 {
-		return "", err
+		return "", nil, err
 	}
+	statusMessages := appsv1alpha1.ComponentMessageMap{}
 	// if the failed pod is not controlled by the latest revision
 	checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
 		sts := workload.(*appsv1.StatefulSet)
-		return !intctrlutil.PodIsReady(pod) && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
+		// if component is up running but pod is not ready, this pod should be failed.
+		// for example: full disk cause readiness probe failed and serve is not available.
+		// but kubelet only sets the container is not ready and pod is also Running.
+		if originPhaseIsUpRunning {
+			return !intctrlutil.PodIsReady(pod) && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
+		}
+		isFailed, _, message := internal.IsPodFailedAndTimedOut(pod)
+		existLatestRevisionFailedPod := isFailed && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
+		if existLatestRevisionFailedPod {
+			statusMessages.SetObjectMessage(pod.Kind, pod.Name, message)
+		}
+		return existLatestRevisionFailedPod
 	}
 	stsObj := stsList.Items[0]
-	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, r.Component.Replicas,
-		stsObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), nil
+	return util.GetComponentPhaseWhenPodsNotReady(podList, &stsObj, r.getReplicas(),
+		stsObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), statusMessages, nil
 }
 
-// HandleUpdateWithProcessors extended HandleUpdate() with custom processors
+func (r *Stateful) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {
+	return nil, nil
+}
+
+func (r *Stateful) HandleRoleChange(context.Context, client.Object) ([]graph.Vertex, error) {
+	return nil, nil
+}
+
+// HandleUpdateWithStrategy handles the update of component with strategy.
 // REVIEW/TODO: (nashtsai)
 //  1. too many args
-func (r *StatefulComponent) HandleUpdateWithProcessors(ctx context.Context, obj client.Object,
+func (r *Stateful) HandleUpdateWithStrategy(ctx context.Context, obj client.Object,
 	compStatusProcessor func(compDef *appsv1alpha1.ClusterComponentDefinition, pods []corev1.Pod, componentName string) error,
 	priorityMapper func(component *appsv1alpha1.ClusterComponentDefinition) map[string]int,
-	serialStrategyHandler, bestEffortParallelStrategyHandler, parallelStrategyHandler func(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int)) error {
+	serialStrategyHandler, bestEffortParallelStrategyHandler, parallelStrategyHandler func(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int)) ([]graph.Vertex, error) {
 	if r == nil {
-		return nil
+		return nil, nil
 	}
 
 	stsObj := util.ConvertToStatefulSet(obj)
@@ -110,54 +141,82 @@ func (r *StatefulComponent) HandleUpdateWithProcessors(ctx context.Context, obj 
 	// get componentDef from ClusterDefinition by compDefName
 	componentDef, err := util.GetComponentDefByCluster(ctx, r.Cli, *r.Cluster, compDefName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if componentDef == nil || componentDef.IsStatelessWorkload() {
-		return nil
+		return nil, nil
 	}
 	pods, err := util.GetPodListByStatefulSet(ctx, r.Cli, stsObj)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	// update cluster.status.component.consensusSetStatus based on all pods currently exist
+	// update cluster.status.component.consensusSetStatus when all pods currently exist
 	if compStatusProcessor != nil {
 		componentName := stsObj.Labels[constant.KBAppComponentLabelKey]
 		if err = compStatusProcessor(componentDef, pods, componentName); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	// prepare to do pods Deletion, that's the only thing we should do,
-	// the statefulset reconciler will do the others.
-	// to simplify the process, we do pods Deletion after statefulset reconcile done,
+	// the statefulset reconciler will do the rest.
+	// to simplify the process, we do pods Deletion after statefulset reconciliation done,
 	// that is stsObj.Generation == stsObj.Status.ObservedGeneration
 	if stsObj.Generation != stsObj.Status.ObservedGeneration {
-		return nil
+		return nil, nil
 	}
 
-	// then we wait all pods' presence, that is len(pods) == stsObj.Spec.Replicas
-	// only then, we have enough info about the previous pods before delete the current one
+	// then we wait for all pods' presence, that is len(pods) == stsObj.Spec.Replicas
+	// at that point, we have enough info about the previous pods before delete the current one
 	if len(pods) != int(*stsObj.Spec.Replicas) {
-		return nil
+		return nil, nil
 	}
+
+	// we don't check whether pod role label is present: prefer stateful set's Update done than role probing ready
 
 	// generate the pods Deletion plan
-	plan := generateUpdatePlan(ctx, r.Cli, stsObj, pods, componentDef, priorityMapper,
-		serialStrategyHandler, bestEffortParallelStrategyHandler, parallelStrategyHandler)
+	podsToDelete := make([]*corev1.Pod, 0)
+	plan := generateUpdatePlan(stsObj, pods, componentDef, priorityMapper,
+		serialStrategyHandler, bestEffortParallelStrategyHandler, parallelStrategyHandler, &podsToDelete)
 	// execute plan
 	if _, err := plan.WalkOneStep(); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+
+	vertexes := make([]graph.Vertex, 0)
+	for _, pod := range podsToDelete {
+		vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
+			Obj:    pod,
+			Action: ictrltypes.ActionDeletePtr(),
+			Orphan: true,
+		})
+	}
+	return vertexes, nil
+}
+
+func newStateful(cli client.Client,
+	cluster *appsv1alpha1.Cluster,
+	spec *appsv1alpha1.ClusterComponentSpec,
+	def appsv1alpha1.ClusterComponentDefinition) *Stateful {
+	return &Stateful{
+		ComponentSetBase: internal.ComponentSetBase{
+			Cli:                  cli,
+			Cluster:              cluster,
+			SynthesizedComponent: nil,
+			ComponentSpec:        spec,
+			ComponentDef:         &def,
+		},
+	}
 }
 
 // generateConsensusUpdatePlan generates Update plan based on UpdateStrategy
-func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
+func generateUpdatePlan(stsObj *appsv1.StatefulSet, pods []corev1.Pod,
 	componentDef *appsv1alpha1.ClusterComponentDefinition,
 	priorityMapper func(component *appsv1alpha1.ClusterComponentDefinition) map[string]int,
-	serialStrategyHandler, bestEffortParallelStrategyHandler, parallelStrategyHandler func(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int)) *util.Plan {
+	serialStrategyHandler, bestEffortParallelStrategyHandler, parallelStrategyHandler func(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int),
+	podsToDelete *[]*corev1.Pod) *util.Plan {
 	stsWorkload := componentDef.GetStatefulSetWorkload()
 	_, s := stsWorkload.FinalStsUpdateStrategy()
 	switch s.Type {
@@ -185,9 +244,7 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 		}
 
 		// delete the pod to trigger associate StatefulSet to re-create it
-		if err := cli.Delete(ctx, &pod); err != nil && !apierrors.IsNotFound(err) {
-			return false, err
-		}
+		*podsToDelete = append(*podsToDelete, &pod)
 
 		return true, nil
 	}
@@ -216,28 +273,4 @@ func generateUpdatePlan(ctx context.Context, cli client.Client, stsObj *appsv1.S
 		}
 	}
 	return plan
-}
-
-func (r *StatefulComponent) HandleUpdate(ctx context.Context, obj client.Object) error {
-	if r == nil {
-		return nil
-	}
-	return r.HandleUpdateWithProcessors(ctx, obj, nil, nil, nil, nil, nil)
-}
-
-func NewStatefulComponent(
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	component *appsv1alpha1.ClusterComponentSpec,
-	componentDef appsv1alpha1.ClusterComponentDefinition,
-) (types.Component, error) {
-	if err := util.ComponentRuntimeReqArgsCheck(cli, cluster, component); err != nil {
-		return nil, err
-	}
-	return &StatefulComponent{
-		Cli:          cli,
-		Cluster:      cluster,
-		Component:    component,
-		ComponentDef: &componentDef,
-	}, nil
 }

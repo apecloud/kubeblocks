@@ -46,7 +46,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 	)
 
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -182,10 +182,14 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		return opsRes, eventContext
 	}
 
-	Context("Test OpsRequest", func() {
+	Context("Test Reconfigure", func() {
 		It("Test Reconfigure OpsRequest with restart", func() {
 			opsRes, eventContext := assureMockReconfigureData("simple")
-			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx:      testCtx.Ctx,
+				Log:      log.FromContext(ctx).WithValues("Reconfigure"),
+				Recorder: opsRes.Recorder,
+			}
 
 			By("mock reconfigure success")
 			ops := testapps.NewOpsRequestObj("reconfigure-ops-"+randomStr, testCtx.DefaultNamespace,
@@ -243,7 +247,11 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 
 		It("Test Reconfigure OpsRequest with autoReload", func() {
 			opsRes, eventContext := assureMockReconfigureData("autoReload")
-			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx:      testCtx.Ctx,
+				Log:      log.FromContext(ctx).WithValues("Reconfigure"),
+				Recorder: opsRes.Recorder,
+			}
 
 			By("mock reconfigure success")
 			ops := testapps.NewOpsRequestObj("reconfigure-ops-"+randomStr+"-reload", testCtx.DefaultNamespace,

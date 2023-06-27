@@ -27,8 +27,10 @@ import (
 
 	"github.com/golang/mock/gomock"
 	ginkgov2 "github.com/onsi/ginkgo/v2"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	mock_client "github.com/apecloud/kubeblocks/internal/testutil/k8s/mocks"
@@ -41,6 +43,7 @@ type DoReturnedFunction = any
 type HandleGetReturnedObject = func(key client.ObjectKey, obj client.Object) error
 type HandlePatchReturnedObject = func(obj client.Object, patch client.Patch) error
 type HandleListReturnedObject = func(list client.ObjectList) error
+type HandleCreateReturnedObject = func(obj client.Object) error
 
 type CallMockReturnedOptions = func(callHelper *callHelper, call *gomock.Call)
 type CallMockGetReturnedOptions = func(callHelper *callHelper, call *gomock.Call, _ HandleGetReturnedObject) error
@@ -58,6 +61,7 @@ type K8sClientMockHelper struct {
 	k8sClient *mock_client.MockClient
 
 	getCaller    callHelper
+	createCaller callHelper
 	updateCaller callHelper
 	listCaller   callHelper
 	patchCaller  callHelper
@@ -108,6 +112,21 @@ func (helper *K8sClientMockHelper) MockGetMethod(options ...any) {
 		return caller, doAndReturn
 	})
 	helper.mockMethod(&helper.getCaller, options...)
+}
+
+func (helper *K8sClientMockHelper) MockCreateMethod(options ...any) {
+	helper.createCaller.Caller(func() (CallerFunction, DoReturnedFunction) {
+		caller := func() *gomock.Call {
+			return helper.k8sClient.EXPECT().Create(gomock.Any(), gomock.Any())
+		}
+		doAndReturn := func(caller *gomock.Call, fnWrap func(obj client.Object) error) {
+			caller.DoAndReturn(func(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+				return fnWrap(obj)
+			})
+		}
+		return caller, doAndReturn
+	})
+	helper.mockMethod(&helper.createCaller, options...)
 }
 
 func (helper *K8sClientMockHelper) MockUpdateMethod(options ...any) {
@@ -268,7 +287,7 @@ func WithConstructSequenceResult(mockObjs map[client.ObjectKey][]MockGetReturned
 	return func(key client.ObjectKey, obj client.Object) error {
 		accessibleSequence, ok := mockObjs[key]
 		if !ok {
-			return fmt.Errorf("not exist: %v", key)
+			return fmt.Errorf("not existed key: %v", key)
 		}
 		index := sequenceAccessCounter[key]
 		mockReturned := accessibleSequence[index]
@@ -289,6 +308,13 @@ func WithConstructGetResult(mockObj client.Object) HandleGetReturnedObject {
 	}
 }
 
+func WithCreatedSucceedResult() HandleCreateReturnedObject {
+	return func(obj client.Object) error {
+		_ = obj
+		return nil
+	}
+}
+
 func WithConstructSimpleGetResult(mockObjs []client.Object) HandleGetReturnedObject {
 	mockMap := make(map[client.ObjectKey]client.Object, len(mockObjs))
 	for _, obj := range mockObjs {
@@ -299,7 +325,7 @@ func WithConstructSimpleGetResult(mockObjs []client.Object) HandleGetReturnedObj
 			SetGetReturnedObject(obj, mockObj)
 			return nil
 		}
-		return fmt.Errorf("failed to get object: %v", key)
+		return apierrors.NewNotFound(schema.GroupResource{Group: "unknown", Resource: "unknown"}, key.Name)
 	}
 }
 
@@ -332,7 +358,21 @@ func WithGetReturned(action HandleGetReturnedObject, times ...CallMockOptions) C
 			})
 			handleTimes(call, times...)
 		default:
-			panic("not walk here!")
+			panic("impossible dead end!")
+		}
+	}
+}
+
+func WithCreateReturned(action HandleCreateReturnedObject, times ...CallMockOptions) CallMockReturnedOptions {
+	return func(helper *callHelper, call *gomock.Call) {
+		switch fn := helper.doReturnedFn.(type) {
+		case func(_ *gomock.Call, _ HandleCreateReturnedObject):
+			fn(call, func(obj client.Object) error {
+				return action(obj)
+			})
+			handleTimes(call, times...)
+		default:
+			panic("impossible dead end!")
 		}
 	}
 }
@@ -346,7 +386,7 @@ func WithPatchReturned(action HandlePatchReturnedObject, times ...CallMockOption
 			})
 			handleTimes(call, times...)
 		default:
-			panic("not walk here!")
+			panic("impossible dead end!")
 		}
 	}
 }

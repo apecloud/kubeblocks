@@ -47,7 +47,7 @@ func TestConfigMapVolumeWatcherFailed(t *testing.T) {
 	volumeWatcher := NewVolumeWatcher([]string{filepath.Join(tmpDir, "not_exist")}, context.Background(), zapLog.Sugar())
 	defer volumeWatcher.Close()
 
-	require.EqualError(t, volumeWatcher.Run(), "require process event handler.")
+	require.EqualError(t, volumeWatcher.Run(), "required process event handler.")
 	volumeWatcher.AddHandler(func(_ context.Context, event fsnotify.Event) error {
 		return nil
 	})
@@ -94,7 +94,7 @@ func TestConfigMapVolumeWatcher(t *testing.T) {
 	go func() {
 		// wait inotify ready
 		<-started
-		createTestConfigureDirectory(t, mockVolume, "test.conf", "empty!!!")
+		MakeTestConfigureDirectory(t, mockVolume, "test.conf", "empty!!!")
 	}()
 
 	// wait inotify to run...
@@ -106,5 +106,45 @@ func TestConfigMapVolumeWatcher(t *testing.T) {
 		require.True(t, false)
 	case <-trigger:
 		require.True(t, true)
+	}
+}
+
+func MakeTestConfigureDirectory(t *testing.T, mockDirectory string, cfgFile, content string) {
+	var (
+		tmpVolumeDir   = filepath.Join(mockDirectory, "..2023_02_16_06_06_06.1234567")
+		configFilePath = filepath.Join(tmpVolumeDir, cfgFile)
+		tmpDataDir     = filepath.Join(mockDirectory, "..data_tmp")
+		watchedDataDir = filepath.Join(mockDirectory, "..data")
+	)
+
+	// wait inotify ready
+	if err := os.MkdirAll(tmpVolumeDir, fs.ModePerm); err != nil {
+		t.Errorf("failed to create directory: %s", tmpVolumeDir)
+	}
+	if err := os.WriteFile(configFilePath, []byte(content), fs.ModePerm); err != nil {
+		t.Errorf("failed to  write file: %s", configFilePath)
+	}
+	if err := os.Chmod(configFilePath, fs.ModePerm); err != nil {
+		t.Errorf("failed to chmod file: %s", configFilePath)
+	}
+
+	pwd, err := os.Getwd()
+	if err != nil {
+		t.Errorf("failed to Getwd directory")
+	}
+	defer func() {
+		_ = os.Chdir(pwd)
+	}()
+	if err := os.Chdir(mockDirectory); err != nil {
+		t.Errorf("failed to chdir directory: %s", tmpVolumeDir)
+	}
+	if err := os.Symlink(filepath.Base(tmpVolumeDir), filepath.Base(tmpDataDir)); err != nil {
+		t.Errorf("failed to create symbolic link for atomic update: %v", err)
+	}
+	if err := os.Rename(tmpDataDir, watchedDataDir); err != nil {
+		t.Errorf("failed to rename symbolic link for data directory %s: %v", tmpDataDir, err)
+	}
+	if err := os.Symlink(filepath.Join(filepath.Base(watchedDataDir), cfgFile), cfgFile); err != nil {
+		t.Errorf("failed to create symbolic link for atomic update: %v", err)
 	}
 }

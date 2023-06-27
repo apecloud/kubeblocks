@@ -31,7 +31,7 @@ import (
 	v3 "go.etcd.io/etcd/client/v3"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
-	. "github.com/apecloud/kubeblocks/cmd/probe/util"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type Etcd struct {
@@ -67,7 +67,7 @@ func (e *Etcd) initIfNeed() bool {
 	if e.etcd == nil {
 		go func() {
 			err := e.InitDelay()
-			e.Logger.Errorf("MongoDB connection init failed: %v", err)
+			e.Logger.Errorf("Etcd connection init failed: %v", err)
 		}()
 		return true
 	}
@@ -145,6 +145,5 @@ func (e *Etcd) GetRunningPort() int {
 
 func (e *Etcd) StatusCheck(ctx context.Context, cmd string, response *bindings.InvokeResponse) ([]byte, error) {
 	// TODO implement me when proposal is passed
-	// proposal: https://infracreate.feishu.cn/wiki/wikcndch7lMZJneMnRqaTvhQpwb#doxcnOUyQ4Mu0KiUo232dOr5aad
 	return nil, nil
 }

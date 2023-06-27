@@ -1,20 +1,17 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package v1alpha1
@@ -47,18 +44,20 @@ type ClusterDefinitionSpec struct {
 	ComponentDefs []ClusterComponentDefinition `json:"componentDefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Connection credential template used for creating a connection credential
-	// secret for cluster.apps.kubeblocks.io object. Built-in objects are:
-	// `$(RANDOM_PASSWD)` - random 8 characters.
-	// `$(UUID)` - generate a random UUID v4 string.
-	// `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string``.
-	// `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded``.
-	// `$(UUID_HEX)` - generate a random UUID v4 HEX representation``.
-	// `$(HEADLESS_SVC_FQDN)` - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
+	// secret for cluster.apps.kubeblocks.io object.
+	//
+	// Built-in objects are:
+	// - `$(RANDOM_PASSWD)` - random 8 characters.
+	// - `$(UUID)` - generate a random UUID v4 string.
+	// - `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string.
+	// - `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded.
+	// - `$(UUID_HEX)` - generate a random UUID v4 HEX representation.
+	// - `$(HEADLESS_SVC_FQDN)` - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
+	// - `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// `$(SVC_PORT_<PORT-NAME>)` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
-	//    { "name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306 }, and "$(SVC_PORT_mysql)" in the
+	// - `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
+	//    `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and "$(SVC_PORT_mysql)" in the
 	//    connection credential value is 3306.
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
@@ -129,7 +128,7 @@ type ProvisionPolicy struct {
 	// type defines the way to provision an account, either `CreateByStmt` or `ReferToExisting`.
 	// +kubebuilder:validation:Required
 	Type ProvisionPolicyType `json:"type"`
-	// scope is the scope to provision account, and the scope could be `anyPod` or `allPods`.
+	// scope is the scope to provision account, and the scope could be `AnyPods` or `AllPods`.
 	// +kubebuilder:default=AnyPods
 	Scope ProvisionScope `json:"scope"`
 	// statements will be used when Type is CreateByStmt.
@@ -167,7 +166,7 @@ type ProvisionStatements struct {
 
 // ClusterDefinitionStatus defines the observed state of ClusterDefinition
 type ClusterDefinitionStatus struct {
-	// ClusterDefinition phase, valid values are <empty>, Available.
+	// ClusterDefinition phase, valid values are `empty`, `Available`, 'Unavailable`.
 	// Available is ClusterDefinition become available, and can be referenced for co-related objects.
 	Phase Phase `json:"phase,omitempty"`
 
@@ -201,8 +200,8 @@ type ExporterConfig struct {
 
 type MonitorConfig struct {
 	// builtIn is a switch to enable KubeBlocks builtIn monitoring.
+	// If BuiltIn is set to true, monitor metrics will be scraped automatically.
 	// If BuiltIn is set to false, the provider should set ExporterConfig and Sidecar container own.
-	// BuiltIn set to true is not currently supported but will be soon.
 	// +kubebuilder:default=false
 	// +optional
 	BuiltIn bool `json:"builtIn,omitempty"`
@@ -344,8 +343,8 @@ type ClusterComponentDefinition struct {
 	// according to the volumeType.
 	//
 	// For example:
-	//  `{name: data, type: data}` means that the volume named `data` is used to store `data`.
-	//  `{name: binlog, type: log}` means that the volume named `binlog` is used to store `log`.
+	//  `name: data, type: data` means that the volume named `data` is used to store `data`.
+	//  `name: binlog, type: log` means that the volume named `binlog` is used to store `log`.
 	//
 	// NOTE:
 	//   When volumeTypes is not defined, the backup function will not be supported,
@@ -360,6 +359,11 @@ type ClusterComponentDefinition struct {
 	// +listMapKey=key
 	// +optional
 	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
+
+	// switchoverSpec defines command to do switchover.
+	// in particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
+	// +optional
+	SwitchoverSpec *SwitchoverSpec `json:"switchoverSpec,omitempty"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
@@ -552,13 +556,12 @@ func (r *ServicePort) toSVCPort() corev1.ServicePort {
 
 type HorizontalScalePolicy struct {
 	// type controls what kind of data synchronization do when component scale out.
-	// Policy is in enum of {None, Snapshot}. The default policy is `None`.
-	// None: Default policy, do nothing.
-	// Snapshot: Do native volume snapshot before scaling and restore to newly scaled pods.
-	//           Prefer backup job to create snapshot if can find a backupPolicy from 'BackupPolicyTemplateName'.
-	//           Notice that 'Snapshot' policy will only take snapshot on one volumeMount, default is
-	//           the first volumeMount of first container (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
-	//           since take multiple snapshots at one time might cause consistency problem.
+	// Policy is in enum of {None, CloneVolume}. The default policy is `None`.
+	// None: Default policy, create empty volume and no data clone.
+	// CloneVolume: Do data clone to newly scaled pods. Prefer to use volume snapshot first,
+	//         and will try backup tool if volume snapshot is not enabled, finally
+	// 	       report error if both above cannot work.
+	// Snapshot: Deprecated, alias for CloneVolume.
 	// +kubebuilder:default=None
 	// +optional
 	Type HScaleDataClonePolicyType `json:"type,omitempty"`
@@ -793,15 +796,6 @@ type ConsensusMember struct {
 
 type ReplicationSetSpec struct {
 	StatefulSetSpec `json:",inline"`
-
-	// switchPolicies defines a collection of different types of switchPolicy, and each type of switchPolicy is limited to one.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	SwitchPolicies []SwitchPolicy `json:"switchPolicies,omitempty"`
-
-	// switchCmdExecutorConfig configs how to get client SDK and perform switch statements.
-	// +kubebuilder:validation:Required
-	SwitchCmdExecutorConfig *SwitchCmdExecutorConfig `json:"switchCmdExecutorConfig"`
 }
 
 var _ StatefulSetWorkload = &ReplicationSetSpec{}
@@ -817,61 +811,23 @@ func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolic
 	if r == nil {
 		r = &ReplicationSetSpec{}
 	}
-	return r.StatefulSetSpec.finalStsUpdateStrategy()
-	// _, s := r.StatefulSetSpec.finalStsUpdateStrategy()
-	// s.Type = appsv1.OnDeleteStatefulSetStrategyType
-	// return appsv1.ParallelPodManagement, s
+	if r.LLUpdateStrategy != nil {
+		return r.LLPodManagementPolicy, *r.LLUpdateStrategy
+	}
+	_, s := r.StatefulSetSpec.finalStsUpdateStrategy()
+	s.Type = appsv1.OnDeleteStatefulSetStrategyType
+	s.RollingUpdate = nil
+	return appsv1.ParallelPodManagement, s
 }
 
-type SwitchPolicy struct {
-	// switchPolicyType defines type of the switchPolicy.
-	// MaximumAvailability: when the primary is active, do switch if the synchronization delay = 0 in the user-defined lagProbe data delay detection logic, otherwise do not switch. The primary is down, switch immediately.
-	// MaximumDataProtection: when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch.
-	// Noop: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=MaximumAvailability
-	Type SwitchPolicyType `json:"type"`
-
-	// switchStatements defines switching actions according to their respective roles, We divide all pods into three switchStatement role={Promote,Demote,Follow}.
-	// Promote: candidate primary after elected, which to be promoted
-	// Demote: primary before switch, which to be demoted
-	// Follow: the other secondaries that are not selected as the primary, which to follow the new primary
-	// if switchStatements is not set，we will try to use the built-in switchStatements for the database engine with built-in support.
+type SwitchoverSpec struct {
+	// withCandidate corresponds to the switchover of the specified candidate primary or leader instance.
 	// +optional
-	SwitchStatements *SwitchStatements `json:"switchStatements,omitempty"`
-}
+	WithCandidate *CmdExecutorConfig `json:"withCandidate,omitempty"`
 
-type SwitchStatements struct {
-	// promote defines the switching actions for the candidate primary which to be promoted.
+	// withoutCandidate corresponds to a switchover that does not specify a candidate primary or leader instance.
 	// +optional
-	Promote []string `json:"promote,omitempty"`
-
-	// demote defines the switching actions for the old primary which to be demoted.
-	// +optional
-	Demote []string `json:"demote,omitempty"`
-
-	// follow defines the switching actions for the other secondaries which are not selected as the primary.
-	// +optional
-	Follow []string `json:"follow,omitempty"`
-}
-
-type SwitchCmdExecutorConfig struct {
-	CommandExecutorEnvItem `json:",inline"`
-
-	// switchSteps definition, users can customize the switching steps on the provided three roles - NewPrimary, OldPrimary, and Secondaries.
-	// the same role can customize multiple steps in the order of the list, and KubeBlocks will perform switching operations in the defined order.
-	// if switchStep is not set, we will try to use the built-in switchStep for the database engine with built-in support.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +optional
-	SwitchSteps []SwitchStep `json:"switchSteps"`
-}
-
-type SwitchStep struct {
-	CommandExecutorItem `json:",inline"`
-
-	// role determines which role to execute the command on, role is divided into three roles NewPrimary, OldPrimary, and Secondaries.
-	Role SwitchStepRole `json:"role"`
+	WithoutCandidate *CmdExecutorConfig `json:"withoutCandidate,omitempty"`
 }
 
 type CommandExecutorEnvItem struct {
@@ -921,6 +877,9 @@ type GVKResource struct {
 	Selector map[string]string `json:"selector,omitempty"`
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cd

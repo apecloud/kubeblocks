@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// GenerateOpenAPISchema generate openapi schema from cue type Definitions.
+// GenerateOpenAPISchema generates openapi schema from cue type Definitions.
 func GenerateOpenAPISchema(cueTpl string, schemaType string) (*apiextv1.JSONSchemaProps, error) {
 	const (
 		openAPIVersion = "3.1.0"
@@ -96,7 +96,7 @@ func transformOpenAPISchema(cueSchema *openapi.OrderedMap, schemaType string) (*
 
 	typeSchema := foundSchemaFromCueDefines(cueSchema, schemaType)
 	if typeSchema == nil {
-		log.Log.Info(fmt.Sprintf("Cannot found schema. type:[%s], all: %v", schemaType, allSchemaType(cueSchema)))
+		log.Log.Info(fmt.Sprintf("not found schema type:[%s], all: %v", schemaType, allSchemaType(cueSchema)))
 		return nil, nil
 	}
 

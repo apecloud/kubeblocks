@@ -24,23 +24,24 @@ const (
 	maxConcurReconClusterDefKey     = "MAXCONCURRENTRECONCILES_CLUSTERDEF"
 
 	// name of our custom finalizer
-	dbClusterFinalizerName      = "cluster.kubeblocks.io/finalizer"
 	dbClusterDefFinalizerName   = "clusterdefinition.kubeblocks.io/finalizer"
 	clusterVersionFinalizerName = "clusterversion.kubeblocks.io/finalizer"
 	opsRequestFinalizerName     = "opsrequest.kubeblocks.io/finalizer"
 
-	// label keys
-	clusterDefLabelKey         = "clusterdefinition.kubeblocks.io/name"
-	clusterVersionLabelKey     = "clusterversion.kubeblocks.io/name"
-	statefulSetPodNameLabelKey = "statefulset.kubernetes.io/pod-name"
-
 	// annotations keys
-	lifecycleAnnotationKey = "cluster.kubeblocks.io/lifecycle"
+	// lifecycleAnnotationKey = "cluster.kubeblocks.io/lifecycle"
 	// debugClusterAnnotationKey is used when one wants to debug the cluster.
 	// If debugClusterAnnotationKey = 'on',
-	// logs will be recorded in more detail, and some ephemeral pods (esp. those created by jobs) will retain after execution.
+	// logs will be recorded in more details, and some ephemeral pods (esp. those created by jobs) will retain after execution.
 	debugClusterAnnotationKey = "cluster.kubeblocks.io/debug"
 
 	// annotations values
-	lifecycleDeletePVCAnnotation = "delete-pvc"
+	// lifecycleDeletePVCAnnotation = "delete-pvc"
+)
+
+const (
+	reasonOpsCancelActionNotSupported = "CancelActionNotSupported"
+	reasonOpsCancelActionFailed       = "CancelActionFailed"
+	reasonOpsReconcileStatusFailed    = "ReconcileStatusFailed"
+	reasonOpsDoActionFailed           = "DoActionFailed"
 )

@@ -26,12 +26,12 @@ import (
 	"strings"
 	"time"
 
+	gv "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -40,7 +40,6 @@ import (
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	cmdcluster "github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/kubeblocks"
-	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/spinner"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -51,12 +50,18 @@ import (
 )
 
 var (
+	initLong = templates.LongDesc(`Bootstrap a kubernetes cluster and install KubeBlocks for playground.
+
+If no cloud provider is specified, a k3d cluster named kb-playground will be created on local host,
+otherwise a kubernetes cluster will be created on the specified cloud. Then KubeBlocks will be installed
+on the created kubernetes cluster, and an apecloud-mysql cluster named mycluster will be created.`)
+
 	initExample = templates.Examples(`
 		# create a k3d cluster on local host and install KubeBlocks
 		kbcli playground init
 
 		# create an AWS EKS cluster and install KubeBlocks, the region is required
-		kbcli playground init --cloud-provider aws --region cn-northwest-1
+		kbcli playground init --cloud-provider aws --region us-west-1
 
 		# create an Alibaba cloud ACK cluster and install KubeBlocks, the region is required
 		kbcli playground init --cloud-provider alicloud --region cn-hangzhou
@@ -65,7 +70,23 @@ var (
 		kbcli playground init --cloud-provider tencentcloud --region ap-chengdu
 
 		# create a Google cloud GKE cluster and install KubeBlocks, the region is required
-		kbcli playground init --cloud-provider gcp --region us-central1`)
+		kbcli playground init --cloud-provider gcp --region us-east1
+
+		# after init, run the following commands to experience KubeBlocks quickly
+		# list database cluster and check its status
+		kbcli cluster list
+
+		# get cluster information
+		kbcli cluster describe mycluster
+
+		# connect to database
+		kbcli cluster connect mycluster
+
+		# view the Grafana
+		kbcli dashboard open kubeblocks-grafana
+
+		# destroy playground
+		kbcli playground destroy`)
 
 	supportedCloudProviders = []string{cp.Local, cp.AWS, cp.GCP, cp.AliCloud, cp.TencentCloud}
 
@@ -82,6 +103,8 @@ type initOptions struct {
 	clusterVersion string
 	cloudProvider  string
 	region         string
+	autoApprove    bool
+	dockerVersion  *gv.Version
 
 	baseOptions
 }
@@ -94,19 +117,22 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "init",
 		Short:   "Bootstrap a kubernetes cluster and install KubeBlocks for playground.",
+		Long:    initLong,
 		Example: initExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			util.CheckErr(o.complete())
 			util.CheckErr(o.validate())
 			util.CheckErr(o.run())
 		},
 	}
 
-	cmd.Flags().StringVar(&o.clusterDef, "cluster-definition", defaultClusterDef, "Cluster definition")
-	cmd.Flags().StringVar(&o.clusterVersion, "cluster-version", "", "Cluster definition")
+	cmd.Flags().StringVar(&o.clusterDef, "cluster-definition", defaultClusterDef, "Specify the cluster definition, run \"kbcli cd list\" to get the available cluster definitions")
+	cmd.Flags().StringVar(&o.clusterVersion, "cluster-version", "", "Specify the cluster version, run \"kbcli cv list\" to get the available cluster versions")
 	cmd.Flags().StringVar(&o.kbVersion, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().StringVar(&o.cloudProvider, "cloud-provider", defaultCloudProvider, fmt.Sprintf("Cloud provider type, one of %v", supportedCloudProviders))
 	cmd.Flags().StringVar(&o.region, "region", "", "The region to create kubernetes cluster")
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 300*time.Second, "Time to wait for init playground, such as --timeout=10m")
+	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval during the initialization of playground")
 
 	util.CheckErr(cmd.RegisterFlagCompletionFunc(
 		"cloud-provider",
@@ -114,6 +140,16 @@ func newInitCmd(streams genericclioptions.IOStreams) *cobra.Command {
 			return cp.CloudProviders(), cobra.ShellCompDirectiveNoFileComp
 		}))
 	return cmd
+}
+
+func (o *initOptions) complete() error {
+	var err error
+
+	if o.cloudProvider != cp.Local {
+		return nil
+	}
+	o.dockerVersion, err = util.GetDockerVersion()
+	return err
 }
 
 func (o *initOptions) validate() error {
@@ -127,6 +163,10 @@ func (o *initOptions) validate() error {
 
 	if o.clusterDef == "" {
 		return fmt.Errorf("a valid cluster definition is needed, use --cluster-definition to specify one")
+	}
+
+	if o.cloudProvider == cp.Local && o.dockerVersion.LessThan(version.MinimumDockerVersion) {
+		return fmt.Errorf("your docker version %s is lower than the minimum version %s, please upgrade your docker", o.dockerVersion, version.MinimumDockerVersion)
 	}
 
 	if err := o.baseOptions.validate(); err != nil {
@@ -260,14 +300,16 @@ func (o *initOptions) cloud() error {
 	return o.installKBAndCluster(clusterInfo)
 }
 
-// confirmToContinue confirms to continue init or not if there is an existed kubernetes cluster
+// confirmToContinue confirms to continue init process if there is an existed kubernetes cluster
 func (o *initOptions) confirmToContinue() error {
 	clusterName := o.prevCluster.ClusterName
-	printer.Warning(o.Out, "Found an existed cluster %s, do you want to continue to initialize this cluster?\n  Only 'yes' will be accepted to confirm.\n\n", clusterName)
-	entered, _ := prompt.NewPrompt("Enter a value:", nil, o.In).Run()
-	if entered != yesStr {
-		fmt.Fprintf(o.Out, "\nPlayground init cancelled, please destroy the old cluster first.\n")
-		return cmdutil.ErrExit
+	if !o.autoApprove {
+		printer.Warning(o.Out, "Found an existed cluster %s, do you want to continue to initialize this cluster?\n  Only 'yes' will be accepted to confirm.\n\n", clusterName)
+		entered, _ := prompt.NewPrompt("Enter a value:", nil, o.In).Run()
+		if entered != yesStr {
+			fmt.Fprintf(o.Out, "\nPlayground init cancelled, please destroy the old cluster first.\n")
+			return cmdutil.ErrExit
+		}
 	}
 	fmt.Fprintf(o.Out, "Continue to initialize %s %s cluster %s... \n",
 		o.cloudProvider, cp.K8sService(o.cloudProvider), clusterName)
@@ -276,8 +318,7 @@ func (o *initOptions) confirmToContinue() error {
 
 func (o *initOptions) confirmInitNewKubeCluster() error {
 	printer.Warning(o.Out, `This action will create a kubernetes cluster on the cloud that may
-  incur charges. Be sure to delete your infrastructure promptly to avoid
-  additional charges. We are not responsible for any charges you may incur.
+  incur charges. Be sure to delete your infrastructure properly to avoid additional charges. 
 `)
 
 	fmt.Fprintf(o.Out, `
@@ -285,6 +326,9 @@ The whole process will take about %s, please wait patiently,
 if it takes a long time, please check the network environment and try again.
 `, printer.BoldRed("20 minutes"))
 
+	if o.autoApprove {
+		return nil
+	}
 	// confirm to run
 	fmt.Fprintf(o.Out, "\nDo you want to perform this action?\n  Only 'yes' will be accepted to approve.\n\n")
 	entered, _ := prompt.NewPrompt("Enter a value:", nil, o.In).Run()
@@ -293,10 +337,6 @@ if it takes a long time, please check the network environment and try again.
 		return cmdutil.ErrExit
 	}
 	return nil
-}
-
-func printGuide() {
-	fmt.Fprintf(os.Stdout, guideStr, kbClusterName)
 }
 
 // writeStateFile writes cluster info to state file and return the new cluster info with kubeconfig
@@ -350,14 +390,6 @@ func (o *initOptions) setKubeConfig(info *cp.K8sClusterInfo) error {
 func (o *initOptions) installKBAndCluster(info *cp.K8sClusterInfo) error {
 	var err error
 
-	// when the kubernetes cluster is not ready, the runtime will output the error
-	// message like "couldn't get resource list for", we ignore it
-	runtime.ErrorHandlers[0] = func(err error) {
-		if klog.V(1).Enabled() {
-			klog.ErrorDepth(2, err)
-		}
-	}
-
 	// write kubeconfig content to a temporary file and use it
 	if err = writeAndUseKubeConfig(info.KubeConfig, o.kubeConfigPath, o.Out); err != nil {
 		return err
@@ -392,7 +424,7 @@ func (o *initOptions) installKBAndCluster(info *cp.K8sClusterInfo) error {
 		fmt.Fprintf(o.Out, "Elapsed time: %s\n", time.Since(o.startTime).Truncate(time.Second))
 	}
 
-	printGuide()
+	fmt.Fprintf(o.Out, guideStr, kbClusterName)
 	return nil
 }
 
@@ -429,8 +461,8 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 			"csi-hostpath-driver.enabled=true",
 
 			// disable the persistent volume of prometheus, if not, the prometheus
-			// will dependent the hostpath csi driver ready to create persistent
-			// volume, but the order of addon installation is not guaranteed that
+			// will depend on the hostpath csi driver to create persistent
+			// volume, but the order of addon installation is not guaranteed which
 			// will cause the prometheus PVC pending forever.
 			"prometheus.server.persistentVolume.enabled=false",
 			"prometheus.server.statefulSet.enabled=false",
@@ -445,63 +477,62 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 	}
 
 	if err = insOpts.PreCheck(); err != nil {
+		// if the KubeBlocks has been installed, we ignore the error
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "repeated installation is not supported") {
+			fmt.Fprintf(o.Out, strings.Split(errMsg, ",")[0]+"\n")
+			return nil
+		}
 		return err
 	}
 	return insOpts.Install()
 }
 
-// createCluster construct a cluster create options and run
+// createCluster constructs a cluster create options and run
 func (o *initOptions) createCluster() error {
-	options := &cmdcluster.CreateOptions{
-		CreateOptions: create.CreateOptions{
-			Factory:         util.NewFactory(),
-			IOStreams:       genericclioptions.NewTestIOStreamsDiscard(),
-			Namespace:       defaultNamespace,
-			Name:            kbClusterName,
-			CueTemplateName: cmdcluster.CueTemplateName,
-			GVR:             types.ClusterGVR(),
-		},
-		UpdatableFlags: cmdcluster.UpdatableFlags{
-			TerminationPolicy: "WipeOut",
-			Monitor:           true,
-			PodAntiAffinity:   "Preferred",
-			Tenancy:           "SharedNode",
-		},
-		ClusterDefRef:     o.clusterDef,
-		ClusterVersionRef: o.clusterVersion,
+	c := cmdcluster.NewCreateOptions(util.NewFactory(), genericclioptions.NewTestIOStreamsDiscard())
+	c.ClusterDefRef = o.clusterDef
+	c.ClusterVersionRef = o.clusterVersion
+	c.Namespace = defaultNamespace
+	c.Name = kbClusterName
+	c.UpdatableFlags = cmdcluster.UpdatableFlags{
+		TerminationPolicy: "WipeOut",
+		Monitor:           true,
+		PodAntiAffinity:   "Preferred",
+		Tenancy:           "SharedNode",
 	}
-	options.CreateOptions.Options = options
-	options.CreateOptions.PreCreate = options.PreCreate
 
 	// if we are running on local, create cluster with one replica
 	if o.cloudProvider == cp.Local {
-		options.Values = append(options.Values, "replicas=1")
+		c.Values = append(c.Values, "replicas=1")
 	} else {
 		// if we are running on cloud, create cluster with three replicas
-		options.Values = append(options.Values, "replicas=3")
+		c.Values = append(c.Values, "replicas=3")
 	}
 
-	if err := options.CreateOptions.Complete(); err != nil {
+	if err := c.CreateOptions.Complete(); err != nil {
 		return err
 	}
-	if err := options.Validate(); err != nil {
+	if err := c.Validate(); err != nil {
 		return err
 	}
-	if err := options.Complete(); err != nil {
+	if err := c.Complete(); err != nil {
 		return err
 	}
-	return options.Run()
+	return c.Run()
 }
 
-// checkExistedCluster check playground kubernetes cluster exists or not, playground
-// only supports one kubernetes cluster exists at the same time
+// checkExistedCluster checks playground kubernetes cluster exists or not, a kbcli client only
+// support a single playground, they are bound to each other with a hidden context config file,
+// the hidden file ensures that when destroy the playground it always goes with the fixed context,
+// it makes the dangerous operation more safe and prevents from manipulating another context
 func (o *initOptions) checkExistedCluster() error {
 	if o.prevCluster == nil {
 		return nil
 	}
 
-	warningMsg := fmt.Sprintf("playground only supports one kubernetes cluster at the same time,\n  one cluster already existed, please destroy it first.\n%s\n", o.prevCluster.String())
-	// if cloud provider is not same with the exited cluster cloud provider, informer
+	warningMsg := fmt.Sprintf("playground only supports one kubernetes cluster,\n  if a cluster is already existed, please destroy it first.\n%s\n", o.prevCluster.String())
+	// if cloud provider is not same with the existed cluster cloud provider, suggest
 	// user to destroy the previous cluster first
 	if o.prevCluster.CloudProvider != o.cloudProvider {
 		printer.Warning(o.Out, warningMsg)
@@ -513,7 +544,7 @@ func (o *initOptions) checkExistedCluster() error {
 	}
 
 	// previous kubernetes cluster is a cloud provider cluster, check if the region
-	// is same with the new cluster region, if not, informer user to destroy the previous
+	// is same with the new cluster region, if not, suggest user to destroy the previous
 	// cluster first
 	if o.prevCluster.Region != o.region {
 		printer.Warning(o.Out, warningMsg)

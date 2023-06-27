@@ -24,18 +24,23 @@ cluster: {
 component: {
 	name:           string
 	clusterDefName: string
+	compDefName:    string
 }
 
 config: {
 	apiVersion: "v1"
 	kind:       "ConfigMap"
 	metadata: {
+		// this naming pattern has been referenced elsewhere, complete code scan is
+		// required if this naming pattern is going be changed.
 		name:      "\(cluster.metadata.name)-\(component.name)-env"
 		namespace: cluster.metadata.namespace
 		labels: {
 			"app.kubernetes.io/name":       "\(component.clusterDefName)"
 			"app.kubernetes.io/instance":   cluster.metadata.name
 			"app.kubernetes.io/managed-by": "kubeblocks"
+			"app.kubernetes.io/component":  "\(component.compDefName)"
+
 			// configmap selector for env update
 			"apps.kubeblocks.io/config-type":    "kubeblocks-env"
 			"apps.kubeblocks.io/component-name": "\(component.name)"

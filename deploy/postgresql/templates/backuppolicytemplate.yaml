@@ -5,6 +5,18 @@ metadata:
   labels:
     clusterdefinition.kubeblocks.io/name: postgresql
     {{- include "postgresql.labels" . | nindent 4 }}
+  annotations:
+    dataprotection.kubeblocks.io/reconfigure-ref: |
+      {
+        "name": "postgresql-configuration",
+        "key": "postgresql.conf",
+        "enable": {
+          "logfile": [{"key": "archive_command","value": "''"}]
+        },
+        "disable": {
+          "logfile": [{ "key": "archive_command","value": "'/bin/true'"}]
+        }
+      }
 spec:
   clusterDefinitionRef: postgresql
   backupPolicies:
@@ -37,6 +49,14 @@ spec:
           updateStage: post
     datafile:
       backupToolName: postgres-basebackup
+      backupStatusUpdates:
+        - path: manifests.backupLog
+          containerName: postgresql
+          script: /kb-scripts/backup-log-collector.sh true
+          updateStage: post
+        - containerName: postgresql
+          script: /kb-scripts/filesize-collector.sh basebackup.info
+          updateStage: post
     logfile:
       backupToolName: postgres-pitr
       target:
@@ -45,4 +65,7 @@ spec:
         - path: manifests.backupLog
           containerName: postgresql
           script: /kb-scripts/backup-log-collector.sh false
-          updateStage: pre
+          updateStage: post
+        - containerName: postgresql
+          script: /kb-scripts/filesize-collector.sh logfile.info
+          updateStage: post

@@ -23,7 +23,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,6 +35,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -43,10 +46,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
-const (
-	ComponentStatusDefaultPodName = "Unknown"
-)
-
 var (
 	ErrReqCtrlClient              = errors.New("required arg client.Client is nil")
 	ErrReqClusterObj              = errors.New("required arg *appsv1alpha1.Cluster is nil")
@@ -54,19 +53,88 @@ var (
 	ErrReqClusterComponentSpecObj = errors.New("required arg *appsv1alpha1.ClusterComponentSpec is nil")
 )
 
-func ComponentRuntimeReqArgsCheck(cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	component *appsv1alpha1.ClusterComponentSpec) error {
-	if cli == nil {
-		return ErrReqCtrlClient
+func ListObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
+	ctx context.Context, cli client.Client, _ func(T, L), namespace string, labels client.MatchingLabels) ([]PT, error) {
+	var objList L
+	if err := cli.List(ctx, PL(&objList), labels, client.InNamespace(namespace)); err != nil {
+		return nil, err
 	}
-	if cluster == nil {
-		return ErrReqCtrlClient
+
+	objs := make([]PT, 0)
+	items := reflect.ValueOf(&objList).Elem().FieldByName("Items").Interface().([]T)
+	for i := range items {
+		objs = append(objs, &items[i])
 	}
-	if component == nil {
-		return ErrReqClusterComponentSpecObj
+	return objs, nil
+}
+
+func ListStsOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.StatefulSet, error) {
+	return ListObjWithLabelsInNamespace(ctx, cli, generics.StatefulSetSignature, namespace, labels)
+}
+
+func ListDeployOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.Deployment, error) {
+	return ListObjWithLabelsInNamespace(ctx, cli, generics.DeploymentSignature, namespace, labels)
+}
+
+func ListPodOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*corev1.Pod, error) {
+	return ListObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels)
+}
+
+func PodIsAvailable(workloadType appsv1alpha1.WorkloadType, pod *corev1.Pod, minReadySeconds int32) bool {
+	if pod == nil {
+		return false
+	}
+	switch workloadType {
+	case appsv1alpha1.Consensus, appsv1alpha1.Replication:
+		return intctrlutil.PodIsReadyWithLabel(*pod)
+	case appsv1alpha1.Stateful, appsv1alpha1.Stateless:
+		return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
+	default:
+		panic("unknown workload type")
+	}
+}
+
+// RestartPod restarts a Pod through updating the pod's annotation
+func RestartPod(podTemplate *corev1.PodTemplateSpec) error {
+	if podTemplate.Annotations == nil {
+		podTemplate.Annotations = map[string]string{}
+	}
+
+	startTimestamp := time.Now() // TODO(impl): opsRes.OpsRequest.Status.StartTimestamp
+	restartTimestamp := podTemplate.Annotations[constant.RestartAnnotationKey]
+	// if res, _ := time.Parse(time.RFC3339, restartTimestamp); startTimestamp.After(res) {
+	if res, _ := time.Parse(time.RFC3339, restartTimestamp); startTimestamp.Before(res) {
+		podTemplate.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
 	}
 	return nil
+}
+
+// MergeAnnotations keeps the original annotations.
+// if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
+func MergeAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
+	if targetAnnotations == nil || originalAnnotations == nil {
+		return
+	}
+	if *targetAnnotations == nil {
+		*targetAnnotations = map[string]string{}
+	}
+	for k, v := range originalAnnotations {
+		// if the annotation not exist in targetAnnotations, copy it from original.
+		if _, ok := (*targetAnnotations)[k]; !ok {
+			(*targetAnnotations)[k] = v
+		}
+	}
+}
+
+// BuildWorkLoadAnnotations builds the annotations for Deployment/StatefulSet
+func BuildWorkLoadAnnotations(obj client.Object, cluster *appsv1alpha1.Cluster) {
+	workloadAnnotations := obj.GetAnnotations()
+	if workloadAnnotations == nil {
+		workloadAnnotations = map[string]string{}
+	}
+	// record the cluster generation to check if the sts is latest
+	workloadAnnotations[constant.KubeBlocksGenerationKey] = strconv.FormatInt(cluster.Generation, 10)
+	obj.SetAnnotations(workloadAnnotations)
 }
 
 // GetClusterByObject gets cluster by related k8s workloads.
@@ -110,16 +178,30 @@ func GetComponentPodList(ctx context.Context, cli client.Client, cluster appsv1a
 	return podList, err
 }
 
+// GetComponentPodListWithRole gets the pod list with target role by cluster and componentName
+func GetComponentPodListWithRole(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, compSpecName, role string) (*corev1.PodList, error) {
+	matchLabels := client.MatchingLabels{
+		constant.AppInstanceLabelKey:    cluster.Name,
+		constant.KBAppComponentLabelKey: compSpecName,
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.RoleLabelKey:           role,
+	}
+	podList := &corev1.PodList{}
+	if err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace), matchLabels); err != nil {
+		return nil, err
+	}
+	return podList, nil
+}
+
 func GetComponentStatusMessageKey(kind, name string) string {
 	return fmt.Sprintf("%s/%s", kind, name)
 }
 
 // IsProbeTimeout checks if the application of the pod is probe timed out.
-func IsProbeTimeout(componentDef *appsv1alpha1.ClusterComponentDefinition, podsReadyTime *metav1.Time) bool {
+func IsProbeTimeout(probes *appsv1alpha1.ClusterDefinitionProbes, podsReadyTime *metav1.Time) bool {
 	if podsReadyTime == nil {
 		return false
 	}
-	probes := componentDef.Probes
 	if probes == nil || probes.RoleProbe == nil {
 		return false
 	}
@@ -184,7 +266,7 @@ func GetClusterComponentSpecByName(cluster appsv1alpha1.Cluster, compSpecName st
 func InitClusterComponentStatusIfNeed(
 	cluster *appsv1alpha1.Cluster,
 	componentName string,
-	componentDef appsv1alpha1.ClusterComponentDefinition) error {
+	workloadType appsv1alpha1.WorkloadType) error {
 	if cluster == nil {
 		return ErrReqClusterObj
 	}
@@ -196,14 +278,14 @@ func InitClusterComponentStatusIfNeed(
 	// 	})
 	// }
 	componentStatus := cluster.Status.Components[componentName]
-	switch componentDef.WorkloadType {
+	switch workloadType {
 	case appsv1alpha1.Consensus:
 		if componentStatus.ConsensusSetStatus != nil {
 			break
 		}
 		componentStatus.ConsensusSetStatus = &appsv1alpha1.ConsensusSetStatus{
 			Leader: appsv1alpha1.ConsensusMemberStatus{
-				Pod:        ComponentStatusDefaultPodName,
+				Pod:        constant.ComponentStatusDefaultPodName,
 				AccessMode: appsv1alpha1.None,
 				Name:       "",
 			},
@@ -214,7 +296,7 @@ func InitClusterComponentStatusIfNeed(
 		}
 		componentStatus.ReplicationSetStatus = &appsv1alpha1.ReplicationSetStatus{
 			Primary: appsv1alpha1.ReplicationMemberStatus{
-				Pod: ComponentStatusDefaultPodName,
+				Pod: constant.ComponentStatusDefaultPodName,
 			},
 		}
 	}
@@ -525,6 +607,93 @@ func getObjectListMapOfResourceKind() map[string]client.ObjectList {
 
 // replaceKBEnvPlaceholderTokens replaces the placeholder tokens in the string strToReplace with builtInEnvMap and return new string.
 func replaceKBEnvPlaceholderTokens(cluster *appsv1alpha1.Cluster, componentName, strToReplace string) string {
-	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(cluster, componentName)
+	builtInEnvMap := componentutil.GetReplacementMapForBuiltInEnv(cluster.Name, string(cluster.UID), componentName)
 	return componentutil.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
+}
+
+// GetRunningPods gets the running pods of the specified statefulSet.
+func GetRunningPods(ctx context.Context, cli client.Client, obj client.Object) ([]corev1.Pod, error) {
+	sts := ConvertToStatefulSet(obj)
+	if sts == nil || sts.Generation != sts.Status.ObservedGeneration {
+		return nil, nil
+	}
+	return GetPodListByStatefulSet(ctx, cli, sts)
+}
+
+// ResolvePodSpecDefaultFields set default value for some known fields of proto PodSpec @pobj.
+func ResolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
+	resolveVolume := func(v corev1.Volume, vv *corev1.Volume) {
+		if vv.DownwardAPI == nil || v.DownwardAPI == nil {
+			return
+		}
+		for i := range vv.DownwardAPI.Items {
+			vf := v.DownwardAPI.Items[i]
+			if vf.FieldRef == nil {
+				continue
+			}
+			vvf := &vv.DownwardAPI.Items[i]
+			if vvf.FieldRef != nil && len(vvf.FieldRef.APIVersion) == 0 {
+				vvf.FieldRef.APIVersion = vf.FieldRef.APIVersion
+			}
+		}
+		if vv.DownwardAPI.DefaultMode == nil {
+			vv.DownwardAPI.DefaultMode = v.DownwardAPI.DefaultMode
+		}
+	}
+	resolveContainer := func(c corev1.Container, cc *corev1.Container) {
+		if len(cc.TerminationMessagePath) == 0 {
+			cc.TerminationMessagePath = c.TerminationMessagePath
+		}
+		if len(cc.TerminationMessagePolicy) == 0 {
+			cc.TerminationMessagePolicy = c.TerminationMessagePolicy
+		}
+		if len(cc.ImagePullPolicy) == 0 {
+			cc.ImagePullPolicy = c.ImagePullPolicy
+		}
+	}
+	min := func(a, b int) int {
+		if a < b {
+			return a
+		}
+		return b
+	}
+	for i := 0; i < min(len(obj.Volumes), len(pobj.Volumes)); i++ {
+		resolveVolume(obj.Volumes[i], &pobj.Volumes[i])
+	}
+	for i := 0; i < min(len(obj.InitContainers), len(pobj.InitContainers)); i++ {
+		resolveContainer(obj.InitContainers[i], &pobj.InitContainers[i])
+	}
+	for i := 0; i < min(len(obj.Containers), len(pobj.Containers)); i++ {
+		resolveContainer(obj.Containers[i], &pobj.Containers[i])
+	}
+	if len(pobj.RestartPolicy) == 0 {
+		pobj.RestartPolicy = obj.RestartPolicy
+	}
+	if pobj.TerminationGracePeriodSeconds == nil {
+		pobj.TerminationGracePeriodSeconds = obj.TerminationGracePeriodSeconds
+	}
+	if len(pobj.DNSPolicy) == 0 {
+		pobj.DNSPolicy = obj.DNSPolicy
+	}
+	if len(pobj.DeprecatedServiceAccount) == 0 {
+		pobj.DeprecatedServiceAccount = obj.DeprecatedServiceAccount
+	}
+	if pobj.SecurityContext == nil {
+		pobj.SecurityContext = obj.SecurityContext
+	}
+	if len(pobj.SchedulerName) == 0 {
+		pobj.SchedulerName = obj.SchedulerName
+	}
+	if len(pobj.Tolerations) == 0 {
+		pobj.Tolerations = obj.Tolerations
+	}
+	if pobj.Priority == nil {
+		pobj.Priority = obj.Priority
+	}
+	if pobj.EnableServiceLinks == nil {
+		pobj.EnableServiceLinks = obj.EnableServiceLinks
+	}
+	if pobj.PreemptionPolicy == nil {
+		pobj.PreemptionPolicy = obj.PreemptionPolicy
+	}
 }

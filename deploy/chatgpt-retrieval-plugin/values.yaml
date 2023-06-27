@@ -47,8 +47,8 @@ servers:
 website:
   url: https://your-app-url.com/.well-known/openapi.yaml
   logo_url: https://your-app-url.com/.well-known/logo.png
-  contact_email: hello@contact.com
-  legal_info_url: hello@legal.com
+  contact_email: admin@kubeblocks.io
+  legal_info_url: admin@kubeblocks.io
 
 datastore:
   # in list of (pinecone, weaviate, zilliz, milvus, qdrant, redis, llama, chroma, azuresearch, supabase, postgres)

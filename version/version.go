@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package version
 
+import "github.com/hashicorp/go-version"
+
 // Version is the string that contains version
 var Version = "edge"
 
@@ -37,10 +39,13 @@ var K3dVersion = "5.4.4"
 // K3sImageTag is k3s image tag
 var K3sImageTag = "v1.23.8-k3s1"
 
-// DefaultKubeBlocksVersion the default KubeBlocks version that kbcli installed
+// MinimumDockerVersion is Minimum Docker version required by KubeBlocks
+var MinimumDockerVersion, _ = version.NewVersion("20.10.5")
+
+// DefaultKubeBlocksVersion is the default KubeBlocks version that installed by kbcli
 var DefaultKubeBlocksVersion string
 
-// GetVersion returns the version for cli, it gets it from "git describe --tags" or returns "dev" when doing simple go build
+// GetVersion returns the version for cli, either got from "git describe --tags" or "dev" when doing simple go build
 func GetVersion() string {
 	if len(Version) == 0 {
 		return "v1-dev"

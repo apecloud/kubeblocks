@@ -31,13 +31,8 @@ options: {
 
 	abort?: bool
 	delay?: string
-
-	repalceBody?:   bytes
-	replacePath?:   string
-	replaceMethod?: string
-
-	patchBodyValue?: string
-	patchBodyType?:  string
+	replace?: {}
+	patch?: {}
 }
 
 // required, k8s api resource content
@@ -65,31 +60,17 @@ content: {
 		if options.abort != _|_ {
 			abort: options.abort
 		}
+
 		if options.delay != _|_ {
 			delay: options.delay
 		}
-		if options.replaceBody != _|_ || options.replacePath != _|_ || options.replaceMethod != _|_ {
-			replace: {
-				if options.replaceBody != _|_ {
-					body: options.replaceBody
-				}
-				if options.replacePath != _|_ {
-					path: options.replacePath
-				}
-				if options.replaceMethod != _|_ {
-					method: options.replaceMethod
-				}
-			}
+
+		if len(options.replace) != 0 {
+			replace: options.replace
 		}
-		if options.patchBodyValue != _|_ && options.patchBodyType != _|_ {
-			patch: {
-				if options.patchBodyValue != _|_ && options.patchBodyType != _|_ {
-					body: {
-						value: options.patchBodyValue
-						type:  options.patchBodyType
-					}
-				}
-			}
+
+		if len(options.patch["body"]) != 0 {
+			patch: options.patch
 		}
 	}
 }

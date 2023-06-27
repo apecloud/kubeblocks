@@ -14,7 +14,7 @@ spec:
     memory:
       sizePerCPU: 1Gi
   - cpu:
-      min: 2
+      min: "0.5"
       max: 2
     memory:
       sizePerCPU: 2Gi

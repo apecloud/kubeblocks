@@ -12,3 +12,21 @@ rules:
       - events
     verbs:
       - create
+  - apiGroups:
+      - "dataprotection.kubeblocks.io"
+    resources:
+      - backups/status
+    verbs:
+      - get
+      - update
+      - patch
+  - apiGroups:
+      - "dataprotection.kubeblocks.io"
+    resources:
+      - backups
+    verbs:
+      - create
+      - get
+      - list
+      - update
+      - patch

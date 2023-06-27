@@ -30,14 +30,14 @@ import (
 	"github.com/dapr/kit/logger"
 	"github.com/valyala/fasthttp"
 
-	. "github.com/apecloud/kubeblocks/cmd/probe/util"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 const (
 	bindingPath = "/v1.0/bindings"
 
 	// the key is used to bypass the dapr framework and set http status code.
-	// "status-code" is the key defined by probe, but this will changed like this
+	// "status-code" is the key defined by probe, but this will be changed
 	// by dapr framework and http framework in the end.
 	statusCodeHeader = "Metadata.status-Code"
 	bodyFmt          = `{"operation": "%s", "metadata": {"sql" : ""}}`
@@ -48,7 +48,7 @@ func NewProbeMiddleware(log logger.Logger) middleware.Middleware {
 	return &Middleware{logger: log}
 }
 
-// Middleware is an probe middleware.
+// Middleware is a probe middleware.
 type Middleware struct {
 	logger logger.Logger
 }
@@ -94,17 +94,17 @@ func (m *Middleware) GetHandler(metadata middleware.Metadata) (func(next fasthtt
 				}
 			}
 
-			m.logger.Infof("request: %v", ctx.Request.String())
+			m.logger.Debugf("request: %v", ctx.Request.String())
 			next(ctx)
 			code := ctx.Response.Header.Peek(statusCodeHeader)
 			statusCode, err := strconv.Atoi(string(code))
 			if err == nil {
 				// header has a statusCodeHeader
 				ctx.Response.Header.SetStatusCode(statusCode)
-				m.logger.Infof("response abnormal: %v", ctx.Response.String())
+				m.logger.Debugf("response abnormal: %v", ctx.Response.String())
 			} else {
 				// header has no statusCodeHeader
-				m.logger.Infof("response: %v", ctx.Response.String())
+				m.logger.Debugf("response: %v", ctx.Response.String())
 			}
 		}
 	}, nil

@@ -30,15 +30,16 @@ import (
 )
 
 const (
-	DefaultIndexURI   = "https://github.com/kubernetes-sigs/krew-index.git"
+	DefaultIndexURI   = "https://github.com/apecloud/block-index.git"
 	DefaultIndexName  = "default"
+	KrewIndexURI      = "https://github.com/kubernetes-sigs/krew-index.git"
+	KrewIndexName     = "krew"
 	ManifestExtension = ".yaml"
 	PluginKind        = "Plugin"
 )
 
 var SupportAPIVersion = []string{
 	"krew.googlecontainertools.github.com/v1alpha2",
-	"kbcli.googlecontainertools.github.com/v1alpha2",
 }
 
 type Paths struct {
@@ -58,8 +59,15 @@ func (p *Paths) IndexPath(name string) string {
 	return filepath.Join(p.IndexBase(), name)
 }
 
-func (p *Paths) IndexPluginsPath(name string) string {
-	return filepath.Join(p.IndexPath(name), "plugins")
+func (p *Paths) IndexPluginsPath(name string) []string {
+	result := make([]string, 0)
+	if _, err := os.Stat(filepath.Join(p.IndexPath(name), "plugins")); err == nil {
+		result = append(result, filepath.Join(p.IndexPath(name), "plugins"))
+	}
+	if _, err := os.Stat(filepath.Join(p.IndexPath(name), "krew-plugins")); err == nil {
+		result = append(result, filepath.Join(p.IndexPath(name), "krew-plugins"))
+	}
+	return result
 }
 
 func (p *Paths) InstallReceiptsPath() string {

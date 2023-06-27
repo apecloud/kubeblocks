@@ -1,25 +1,23 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package v1alpha1
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -242,9 +240,14 @@ type BackupStatusUpdate struct {
 	// +optional
 	Script string `json:"script,omitempty"`
 
-	// when to update the backup status, pre: before backup, post: after backup
+	// useTargetPodServiceAccount defines whether this job requires the service account of the backup target pod.
+	// if true, will use the service account of the backup target pod. otherwise, will use the system service account.
 	// +optional
-	UpdateStage BackupStatusUpdateStage `json:"updateStage,omitempty"`
+	UseTargetPodServiceAccount bool `json:"useTargetPodServiceAccount,omitempty"`
+
+	// when to update the backup status, pre: before backup, post: after backup
+	// +kubebuilder:validation:Required
+	UpdateStage BackupStatusUpdateStage `json:"updateStage"`
 }
 
 // BackupPolicyStatus defines the observed state of BackupPolicy
@@ -273,6 +276,8 @@ type BackupPolicyStatus struct {
 	LastSuccessfulTime *metav1.Time `json:"lastSuccessfulTime,omitempty"`
 }
 
+// +genclient
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced,shortName=bp
@@ -312,6 +317,18 @@ func (r *BackupPolicySpec) GetCommonPolicy(backupType BackupType) *CommonBackupP
 	return nil
 }
 
+func (r *BackupPolicySpec) GetCommonSchedulePolicy(backupType BackupType) *SchedulePolicy {
+	switch backupType {
+	case BackupTypeSnapshot:
+		return r.Schedule.Snapshot
+	case BackupTypeDataFile:
+		return r.Schedule.Datafile
+	case BackupTypeLogFile:
+		return r.Schedule.Logfile
+	}
+	return nil
+}
+
 // ToDuration converts the ttl string to time.Duration.
 func ToDuration(ttl *string) time.Duration {
 	if ttl == nil {
@@ -324,4 +341,18 @@ func ToDuration(ttl *string) time.Duration {
 	}
 	hours, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "h", ""))
 	return time.Hour * time.Duration(hours)
+}
+
+// AddTTL adds tll with hours
+func AddTTL(ttl *string, hours int) string {
+	if ttl == nil {
+		return ""
+	}
+	ttlLower := strings.ToLower(*ttl)
+	if strings.HasSuffix(ttlLower, "d") {
+		days, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "d", ""))
+		return fmt.Sprintf("%dh", days*24+hours)
+	}
+	ttlHours, _ := strconv.Atoi(strings.ReplaceAll(ttlLower, "h", ""))
+	return fmt.Sprintf("%dh", ttlHours+hours)
 }

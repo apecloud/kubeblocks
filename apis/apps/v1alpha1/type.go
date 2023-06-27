@@ -1,20 +1,17 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 // Package v1alpha1 contains API Schema definitions for the apps v1alpha1 API group
@@ -73,6 +70,26 @@ type ComponentTemplateSpec struct {
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }
 
+type LazyRenderedTemplateSpec struct {
+	// Specify the name of the referenced the configuration template ConfigMap object.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	TemplateRef string `json:"templateRef"`
+
+	// Specify the namespace of the referenced the configuration template ConfigMap object.
+	// An empty namespace is equivalent to the "default" namespace.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:default="default"
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// policy defines how to merge external imported templates into component templates.
+	// +kubebuilder:default="patch"
+	// +optional
+	Policy MergedPolicy `json:"policy,omitempty"`
+}
+
 type ComponentConfigSpec struct {
 	ComponentTemplateSpec `json:",inline"`
 
@@ -82,12 +99,28 @@ type ComponentConfigSpec struct {
 	// +optional
 	Keys []string `json:"keys,omitempty"`
 
+	// lazyRenderedConfigSpec is optional: specify the secondary rendered config spec.
+	// +optional
+	LazyRenderedConfigSpec *LazyRenderedTemplateSpec `json:"lazyRenderedConfigSpec,omitempty"`
+
 	// Specify the name of the referenced the configuration constraints object.
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
 }
+
+// MergedPolicy defines how to merge external imported templates into component templates.
+// +enum
+// +kubebuilder:validation:Enum={patch,replace,none}
+type MergedPolicy string
+
+const (
+	PatchPolicy     MergedPolicy = "patch"
+	ReplacePolicy   MergedPolicy = "replace"
+	OnlyAddPolicy   MergedPolicy = "add"
+	NoneMergePolicy MergedPolicy = "none"
+)
 
 // ClusterPhase defines the Cluster CR .status.phase
 // +enum
@@ -118,25 +151,17 @@ const (
 	SpecReconcilingClusterCompPhase ClusterComponentPhase = "Updating"
 	CreatingClusterCompPhase        ClusterComponentPhase = "Creating"
 	// DeletingClusterCompPhase        ClusterComponentPhase = "Deleting" // DO REVIEW: may merged with  Stopping
-
-	// REVIEW: following are variant of "Updating", why not have "Updating" phase with detail Status.Conditions
-	// VolumeExpandingClusterCompPhase   ClusterComponentPhase = "VolumeExpanding"
-	// HorizontalScalingClusterCompPhase ClusterComponentPhase = "HorizontalScaling"
-	// VerticalScalingClusterCompPhase   ClusterComponentPhase = "VerticalScaling"
-	// VersionUpgradingClusterCompPhase  ClusterComponentPhase = "Upgrading"
-	// ReconfiguringClusterCompPhase     ClusterComponentPhase = "Reconfiguring"
-	// ExposingClusterCompPhase          ClusterComponentPhase = "Exposing"
-	// RollingClusterCompPhase           ClusterComponentPhase = "Rolling" // REVIEW: original value is Rebooting, and why not having stopping -> stopped -> starting -> running
 )
 
 const (
 	// define the cluster condition type
 	ConditionTypeLatestOpsRequestProcessed = "LatestOpsRequestProcessed" // ConditionTypeLatestOpsRequestProcessed describes whether the latest OpsRequest that affect the cluster lifecycle has been processed.
+	ConditionTypeHaltRecovery              = "HaltRecovery"              // ConditionTypeHaltRecovery describe Halt recovery processing stage
 	ConditionTypeProvisioningStarted       = "ProvisioningStarted"       // ConditionTypeProvisioningStarted the operator starts resource provisioning to create or change the cluster
 	ConditionTypeApplyResources            = "ApplyResources"            // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
 	ConditionTypeReplicasReady             = "ReplicasReady"             // ConditionTypeReplicasReady all pods of components are ready
 	ConditionTypeReady                     = "Ready"                     // ConditionTypeReady all components are running
-
+	ConditionTypeSwitchoverPrefix          = "Switchover-"               // ConditionTypeSwitchoverPrefix component status condition of switchover
 )
 
 // Phase defines the ClusterDefinition and ClusterVersion  CR .status.phase
@@ -162,20 +187,22 @@ const (
 
 // OpsPhase defines opsRequest phase.
 // +enum
-// +kubebuilder:validation:Enum={Pending,Creating,Running,Failed,Succeed}
+// +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Failed,Succeed}
 type OpsPhase string
 
 const (
-	OpsPendingPhase  OpsPhase = "Pending"
-	OpsCreatingPhase OpsPhase = "Creating"
-	OpsRunningPhase  OpsPhase = "Running"
-	OpsFailedPhase   OpsPhase = "Failed"
-	OpsSucceedPhase  OpsPhase = "Succeed"
+	OpsPendingPhase    OpsPhase = "Pending"
+	OpsCreatingPhase   OpsPhase = "Creating"
+	OpsRunningPhase    OpsPhase = "Running"
+	OpsCancellingPhase OpsPhase = "Cancelling"
+	OpsSucceedPhase    OpsPhase = "Succeed"
+	OpsCancelledPhase  OpsPhase = "Cancelled"
+	OpsFailedPhase     OpsPhase = "Failed"
 )
 
 // OpsType defines operation types.
 // +enum
-// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose}
+// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover}
 type OpsType string
 
 const (
@@ -184,6 +211,7 @@ const (
 	VolumeExpansionType   OpsType = "VolumeExpansion"
 	UpgradeType           OpsType = "Upgrade"
 	ReconfiguringType     OpsType = "Reconfiguring"
+	SwitchoverType        OpsType = "Switchover"
 	RestartType           OpsType = "Restart" // RestartType the restart operation is a special case of the rolling update operation.
 	StopType              OpsType = "Stop"    // StopType the stop operation will delete all pods in a cluster concurrently.
 	StartType             OpsType = "Start"   // StartType the start operation will start the pods which is deleted in stop operation.
@@ -252,13 +280,13 @@ const (
 
 // HScaleDataClonePolicyType defines data clone policy when horizontal scaling.
 // +enum
-// +kubebuilder:validation:Enum={None,Snapshot}
+// +kubebuilder:validation:Enum={None,CloneVolume,Snapshot}
 type HScaleDataClonePolicyType string
 
 const (
 	HScaleDataClonePolicyNone         HScaleDataClonePolicyType = "None"
+	HScaleDataClonePolicyCloneVolume  HScaleDataClonePolicyType = "CloneVolume"
 	HScaleDataClonePolicyFromSnapshot HScaleDataClonePolicyType = "Snapshot"
-	HScaleDataClonePolicyFromBackup   HScaleDataClonePolicyType = "Backup"
 )
 
 // PodAntiAffinity defines pod anti-affinity strategy.
@@ -481,8 +509,9 @@ const (
 )
 
 // SwitchPolicyType defines switchPolicy type.
+// Currently, only Noop is supported. MaximumAvailability and MaximumDataProtection will be supported in the future.
 // +enum
-// +kubebuilder:validation:Enum={MaximumAvailability, MaximumDataProtection, Noop}
+// +kubebuilder:validation:Enum={Noop}
 type SwitchPolicyType string
 
 const (

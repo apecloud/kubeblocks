@@ -31,36 +31,20 @@ import (
 	"github.com/google/uuid"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/leaanthony/debme"
-	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
-
-type BuilderParams struct {
-	ClusterDefinition *appsv1alpha1.ClusterDefinition
-	ClusterVersion    *appsv1alpha1.ClusterVersion
-	Cluster           *appsv1alpha1.Cluster
-	Component         *component.SynthesizedComponent
-}
-
-type componentPathedName struct {
-	Namespace   string `json:"namespace,omitempty"`
-	ClusterName string `json:"clusterName,omitempty"`
-	Name        string `json:"name,omitempty"`
-}
 
 const (
 	VolumeName = "tls"
@@ -118,7 +102,8 @@ func buildFromCUE(tplName string, fillMap map[string]any, lookupKey string, targ
 }
 
 func processContainersInjection(reqCtx intctrlutil.RequestCtx,
-	params BuilderParams,
+	cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
 	envConfigName string,
 	podSpec *corev1.PodSpec) error {
 	for _, cc := range []*[]corev1.Container{
@@ -126,13 +111,15 @@ func processContainersInjection(reqCtx intctrlutil.RequestCtx,
 		&podSpec.InitContainers,
 	} {
 		for i := range *cc {
-			injectEnvs(params, envConfigName, &(*cc)[i])
+			if err := injectEnvs(cluster, component, envConfigName, &(*cc)[i]); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container) {
+func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string, c *corev1.Container) error {
 	// can not use map, it is unordered
 	envFieldPathSlice := []struct {
 		name      string
@@ -158,34 +145,51 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 			Name: v.name,
 			ValueFrom: &corev1.EnvVarSource{
 				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: v.fieldPath,
+					APIVersion: "v1",
+					FieldPath:  v.fieldPath,
 				},
 			},
 		})
 	}
 
 	var kbClusterPostfix8 string
-	if len(params.Cluster.UID) > 8 {
-		kbClusterPostfix8 = string(params.Cluster.UID)[len(params.Cluster.UID)-8:]
+	if len(cluster.UID) > 8 {
+		kbClusterPostfix8 = string(cluster.UID)[len(cluster.UID)-8:]
 	} else {
-		kbClusterPostfix8 = string(params.Cluster.UID)
+		kbClusterPostfix8 = string(cluster.UID)
 	}
 	toInjectEnvs = append(toInjectEnvs, []corev1.EnvVar{
-		{Name: "KB_CLUSTER_NAME", Value: params.Cluster.Name},
-		{Name: "KB_COMP_NAME", Value: params.Component.Name},
-		{Name: "KB_CLUSTER_COMP_NAME", Value: params.Cluster.Name + "-" + params.Component.Name},
+		{Name: "KB_CLUSTER_NAME", Value: cluster.Name},
+		{Name: "KB_COMP_NAME", Value: component.Name},
+		{Name: "KB_CLUSTER_COMP_NAME", Value: cluster.Name + "-" + component.Name},
 		{Name: "KB_CLUSTER_UID_POSTFIX_8", Value: kbClusterPostfix8},
 		{Name: "KB_POD_FQDN", Value: fmt.Sprintf("%s.%s-headless.%s.svc", "$(KB_POD_NAME)",
 			"$(KB_CLUSTER_COMP_NAME)", "$(KB_NAMESPACE)")},
 	}...)
 
-	if params.Component.TLS {
+	if component.TLS {
 		toInjectEnvs = append(toInjectEnvs, []corev1.EnvVar{
 			{Name: "KB_TLS_CERT_PATH", Value: MountPath},
 			{Name: "KB_TLS_CA_FILE", Value: CAName},
 			{Name: "KB_TLS_CERT_FILE", Value: CertName},
 			{Name: "KB_TLS_KEY_FILE", Value: KeyName},
 		}...)
+	}
+
+	if udeValue, ok := cluster.Annotations[constant.ExtraEnvAnnotationKey]; ok {
+		udeMap := make(map[string]string)
+		if err := json.Unmarshal([]byte(udeValue), &udeMap); err != nil {
+			return err
+		}
+		for k, v := range udeMap {
+			if k == "" || v == "" {
+				continue
+			}
+			toInjectEnvs = append(toInjectEnvs, corev1.EnvVar{
+				Name:  k,
+				Value: v,
+			})
+		}
 	}
 	// have injected variables placed at the front of the slice
 	if len(c.Env) == 0 {
@@ -194,7 +198,7 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 		c.Env = append(toInjectEnvs, c.Env...)
 	}
 	if envConfigName == "" {
-		return
+		return nil
 	}
 	c.EnvFrom = append(c.EnvFrom, corev1.EnvFromSource{
 		ConfigMapRef: &corev1.ConfigMapEnvSource{
@@ -203,13 +207,15 @@ func injectEnvs(params BuilderParams, envConfigName string, c *corev1.Container)
 			},
 		},
 	})
+
+	return nil
 }
 
-// BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels on the sts to the pvc labels.
-func BuildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.PersistentVolumeClaim,
-	component *component.SynthesizedComponent, pvcTplName string) {
+// BuildPersistentVolumeClaimLabels builds a pvc name label, and synchronize the labels from sts to pvc.
+func BuildPersistentVolumeClaimLabels(component *component.SynthesizedComponent, pvc *corev1.PersistentVolumeClaim,
+	pvcTplName string) {
 	// strict args checking.
-	if sts == nil || pvc == nil || component == nil {
+	if pvc == nil || component == nil {
 		return
 	}
 	if pvc.Labels == nil {
@@ -225,73 +231,79 @@ func BuildPersistentVolumeClaimLabels(sts *appsv1.StatefulSet, pvc *corev1.Persi
 			}
 		}
 	}
-
-	for k, v := range sts.Labels {
-		if _, ok := pvc.Labels[k]; !ok {
-			pvc.Labels[k] = v
-		}
-	}
 }
 
-func BuildSvcListWithCustomAttributes(params BuilderParams, customAttributeSetter func(*corev1.Service)) ([]*corev1.Service, error) {
+func BuildSvcListWithCustomAttributes(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent,
+	customAttributeSetter func(*corev1.Service)) ([]*corev1.Service, error) {
+	services, err := BuildSvcList(cluster, component)
+	if err != nil {
+		return nil, err
+	}
+	if customAttributeSetter != nil {
+		for _, svc := range services {
+			customAttributeSetter(svc)
+		}
+	}
+	return services, nil
+}
+
+func BuildSvcList(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) ([]*corev1.Service, error) {
 	const tplFile = "service_template.cue"
-	var result = make([]*corev1.Service, 0, len(params.Component.Services))
-	for _, item := range params.Component.Services {
+	var result = make([]*corev1.Service, 0)
+	for _, item := range component.Services {
 		if len(item.Spec.Ports) == 0 {
 			continue
 		}
 		svc := corev1.Service{}
 		if err := buildFromCUE(tplFile, map[string]any{
-			"cluster":   params.Cluster,
+			"cluster":   cluster,
 			"service":   item,
-			"component": params.Component,
+			"component": component,
 		}, "svc", &svc); err != nil {
 			return nil, err
-		}
-		if customAttributeSetter != nil {
-			customAttributeSetter(&svc)
 		}
 		result = append(result, &svc)
 	}
 	return result, nil
 }
 
-func BuildHeadlessSvc(params BuilderParams) (*corev1.Service, error) {
+func BuildHeadlessSvc(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*corev1.Service, error) {
 	const tplFile = "headless_service_template.cue"
 	service := corev1.Service{}
 	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster":   params.Cluster,
-		"component": params.Component,
+		"cluster":   cluster,
+		"component": component,
 	}, "service", &service); err != nil {
 		return nil, err
 	}
 	return &service, nil
 }
 
-func BuildSts(reqCtx intctrlutil.RequestCtx, params BuilderParams, envConfigName string) (*appsv1.StatefulSet, error) {
+func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent, envConfigName string) (*appsv1.StatefulSet, error) {
 	const tplFile = "statefulset_template.cue"
 
 	sts := appsv1.StatefulSet{}
 	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster":   params.Cluster,
-		"component": params.Component,
+		"cluster":   cluster,
+		"component": component,
 	}, "statefulset", &sts); err != nil {
 		return nil, err
 	}
 
-	if params.Component.StatefulSetWorkload != nil {
-		sts.Spec.PodManagementPolicy, sts.Spec.UpdateStrategy = params.Component.StatefulSetWorkload.FinalStsUpdateStrategy()
+	if component.StatefulSetWorkload != nil {
+		sts.Spec.PodManagementPolicy, sts.Spec.UpdateStrategy = component.StatefulSetWorkload.FinalStsUpdateStrategy()
 	}
 
 	// update sts.spec.volumeClaimTemplates[].metadata.labels
 	if len(sts.Spec.VolumeClaimTemplates) > 0 && len(sts.GetLabels()) > 0 {
 		for index, vct := range sts.Spec.VolumeClaimTemplates {
-			BuildPersistentVolumeClaimLabels(&sts, &vct, params.Component, vct.Name)
+			BuildPersistentVolumeClaimLabels(component, &vct, vct.Name)
 			sts.Spec.VolumeClaimTemplates[index] = vct
 		}
 	}
 
-	if err := processContainersInjection(reqCtx, params, envConfigName, &sts.Spec.Template.Spec); err != nil {
+	if err := processContainersInjection(reqCtx, cluster, component, envConfigName, &sts.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
 	return &sts, nil
@@ -301,13 +313,14 @@ func randomString(length int) string {
 	return rand.String(length)
 }
 
-func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
+func BuildConnCredential(clusterDefiniiton *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent) (*corev1.Secret, error) {
 	const tplFile = "conn_credential_template.cue"
 
 	connCredential := corev1.Secret{}
 	if err := buildFromCUE(tplFile, map[string]any{
-		"clusterdefinition": params.ClusterDefinition,
-		"cluster":           params.Cluster,
+		"clusterdefinition": clusterDefiniiton,
+		"cluster":           cluster,
 	}, "secret", &connCredential); err != nil {
 		return nil, err
 	}
@@ -362,12 +375,12 @@ func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
 		"$(UUID_B64)":             uuidB64,
 		"$(UUID_STR_B64)":         uuidStrB64,
 		"$(UUID_HEX)":             uuidHex,
-		"$(SVC_FQDN)":             fmt.Sprintf("%s-%s.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
-		"$(KB_CLUSTER_COMP_NAME)": params.Cluster.Name + "-" + params.Component.Name,
-		"$(HEADLESS_SVC_FQDN)":    fmt.Sprintf("%s-%s-headless.%s.svc", params.Cluster.Name, params.Component.Name, params.Cluster.Namespace),
+		"$(SVC_FQDN)":             fmt.Sprintf("%s-%s.%s.svc", cluster.Name, component.Name, cluster.Namespace),
+		"$(KB_CLUSTER_COMP_NAME)": cluster.Name + "-" + component.Name,
+		"$(HEADLESS_SVC_FQDN)":    fmt.Sprintf("%s-%s-headless.%s.svc", cluster.Name, component.Name, cluster.Namespace),
 	}
-	if len(params.Component.Services) > 0 {
-		for _, p := range params.Component.Services[0].Spec.Ports {
+	if len(component.Services) > 0 {
+		for _, p := range component.Services[0].Spec.Ports {
 			m[fmt.Sprintf("$(SVC_PORT_%s)", p.Name)] = strconv.Itoa(int(p.Port))
 		}
 	}
@@ -382,108 +395,79 @@ func BuildConnCredential(params BuilderParams) (*corev1.Secret, error) {
 	return &connCredential, nil
 }
 
-func BuildPDB(params BuilderParams) (*policyv1.PodDisruptionBudget, error) {
+func BuildPDB(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*policyv1.PodDisruptionBudget, error) {
 	const tplFile = "pdb_template.cue"
 	pdb := policyv1.PodDisruptionBudget{}
 	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster":   params.Cluster,
-		"component": params.Component,
+		"cluster":   cluster,
+		"component": component,
 	}, "pdb", &pdb); err != nil {
 		return nil, err
 	}
 	return &pdb, nil
 }
 
-func BuildDeploy(reqCtx intctrlutil.RequestCtx, params BuilderParams) (*appsv1.Deployment, error) {
+func BuildDeploy(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*appsv1.Deployment, error) {
 	const tplFile = "deployment_template.cue"
 	deploy := appsv1.Deployment{}
 	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster":   params.Cluster,
-		"component": params.Component,
+		"cluster":   cluster,
+		"component": component,
 	}, "deployment", &deploy); err != nil {
 		return nil, err
 	}
-	if params.Component.StatelessSpec != nil {
-		deploy.Spec.Strategy = params.Component.StatelessSpec.UpdateStrategy
+
+	if component.StatelessSpec != nil {
+		deploy.Spec.Strategy = component.StatelessSpec.UpdateStrategy
 	}
-	if err := processContainersInjection(reqCtx, params, "", &deploy.Spec.Template.Spec); err != nil {
+	if err := processContainersInjection(reqCtx, cluster, component, "", &deploy.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
 	return &deploy, nil
 }
 
-func BuildPVCFromSnapshot(sts *appsv1.StatefulSet,
-	vct corev1.PersistentVolumeClaimTemplate,
+func BuildPVC(cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
+	vct *corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
-	snapshotName string,
-	component *component.SynthesizedComponent) (*corev1.PersistentVolumeClaim, error) {
+	snapshotName string) (*corev1.PersistentVolumeClaim, error) {
 	pvc := corev1.PersistentVolumeClaim{}
 	if err := buildFromCUE("pvc_template.cue", map[string]any{
-		"sts":                 sts,
+		"cluster":             cluster,
+		"component":           component,
 		"volumeClaimTemplate": vct,
 		"pvc_key":             pvcKey,
 		"snapshot_name":       snapshotName,
 	}, "pvc", &pvc); err != nil {
 		return nil, err
 	}
-	BuildPersistentVolumeClaimLabels(sts, &pvc, component, vct.Name)
+	BuildPersistentVolumeClaimLabels(component, &pvc, vct.Name)
 	return &pvc, nil
 }
 
-// BuildEnvConfig build cluster component context ConfigMap object, which is to be used in workload container's
+// BuildEnvConfig builds cluster component context ConfigMap object, which is to be used in workload container's
 // envFrom.configMapRef with name of "$(cluster.metadata.name)-$(component.name)-env" pattern.
-func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli client.Client) (*corev1.ConfigMap, error) {
+func BuildEnvConfig(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*corev1.ConfigMap, error) {
 	const tplFile = "env_config_template.cue"
-	prefix := constant.KBPrefix + "_" + strings.ToUpper(params.Component.Type) + "_"
-	svcName := strings.Join([]string{params.Cluster.Name, params.Component.Name, "headless"}, "-")
 	envData := map[string]string{}
-	envData[prefix+"N"] = strconv.Itoa(int(params.Component.Replicas))
-	for j := 0; j < int(params.Component.Replicas); j++ {
-		hostNameTplKey := prefix + strconv.Itoa(j) + "_HOSTNAME"
-		hostNameTplValue := params.Cluster.Name + "-" + params.Component.Name + "-" + strconv.Itoa(j)
-		envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
 
-		// build env for replication workload
-		if params.Component.WorkloadType == appsv1alpha1.Replication {
-			envData[constant.KBReplicationSetPrimaryPodName] = fmt.Sprintf("%s-%s-%d.%s",
-				params.Cluster.Name,
-				params.Component.Name,
-				params.Component.GetPrimaryIndex(),
-				svcName)
-		}
+	// build common env
+	commonEnv := buildWorkloadCommonEnv(cluster, component)
+	for k, v := range commonEnv {
+		envData[k] = v
 	}
 
 	// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
 	// build consensus env from cluster.status
-	if params.Cluster.Status.Components != nil {
-		if v, ok := params.Cluster.Status.Components[params.Component.Name]; ok {
-			consensusSetStatus := v.ConsensusSetStatus
-			if consensusSetStatus != nil {
-				if consensusSetStatus.Leader.Pod != componentutil.ComponentStatusDefaultPodName {
-					envData[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
-				}
-
-				followers := ""
-				for _, follower := range consensusSetStatus.Followers {
-					if follower.Pod == componentutil.ComponentStatusDefaultPodName {
-						continue
-					}
-					if len(followers) > 0 {
-						followers += ","
-					}
-					followers += follower.Pod
-				}
-				envData[prefix+"FOLLOWERS"] = followers
-			}
-		}
+	consensusEnv := buildConsensusSetEnv(cluster, component)
+	for k, v := range consensusEnv {
+		envData[k] = v
 	}
 
-	// set cluster uid to let pod know if the cluster is recreated
-	envData[prefix+"CLUSTER_UID"] = string(params.Cluster.UID)
 	config := corev1.ConfigMap{}
 	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster":     params.Cluster,
-		"component":   params.Component,
+		"cluster":     cluster,
+		"component":   component,
 		"config.data": envData,
 	}, "config", &config); err != nil {
 		return nil, err
@@ -491,15 +475,76 @@ func BuildEnvConfig(params BuilderParams, reqCtx intctrlutil.RequestCtx, cli cli
 	return &config, nil
 }
 
-func BuildBackup(sts *appsv1.StatefulSet,
+// buildWorkloadCommonEnv builds common env for all workload types.
+func buildWorkloadCommonEnv(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) map[string]string {
+	prefix := constant.KBPrefix + "_"
+	cnt := strconv.Itoa(int(component.Replicas))
+	svcName := strings.Join([]string{cluster.Name, component.Name, "headless"}, "-")
+	suffixes := make([]string, 0, 4+component.Replicas)
+	env := map[string]string{
+		prefix + "REPLICA_COUNT": cnt,
+	}
+
+	for j := 0; j < int(component.Replicas); j++ {
+		toA := strconv.Itoa(j)
+		suffix := toA + "_HOSTNAME"
+		value := fmt.Sprintf("%s.%s", cluster.Name+"-"+component.Name+"-"+toA, svcName)
+		env[prefix+suffix] = value
+		suffixes = append(suffixes, suffix)
+	}
+
+	// set cluster uid to let pod know if the cluster is recreated
+	env[prefix+"CLUSTER_UID"] = string(cluster.UID)
+	suffixes = append(suffixes, "CLUSTER_UID")
+
+	// have backward compatible handling for CM key with 'compDefName' being part of the key name
+	// TODO: need to deprecate 'compDefName' being part of variable name, as it's redundant
+	// and introduce env/cm key naming reference complexity
+	prefixWithCompDefName := prefix + strings.ToUpper(component.CompDefName) + "_"
+	for _, s := range suffixes {
+		env[prefixWithCompDefName+s] = env[prefix+s]
+	}
+	env[prefixWithCompDefName+"N"] = env[prefix+"REPLICA_COUNT"]
+	return env
+}
+
+// buildConsensusSetEnv builds env for consensus workload.
+func buildConsensusSetEnv(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) map[string]string {
+	env := map[string]string{}
+	prefix := constant.KBPrefix + "_"
+	prefixWithCompDefName := prefix + strings.ToUpper(component.CompDefName) + "_"
+	if v, ok := cluster.Status.Components[component.Name]; ok && v.ConsensusSetStatus != nil {
+		consensusSetStatus := v.ConsensusSetStatus
+		if consensusSetStatus.Leader.Pod != constant.ComponentStatusDefaultPodName {
+			env[prefix+"LEADER"] = consensusSetStatus.Leader.Pod
+			env[prefixWithCompDefName+"LEADER"] = env[prefix+"LEADER"]
+		}
+		followers := make([]string, 0, len(consensusSetStatus.Followers))
+		for _, follower := range consensusSetStatus.Followers {
+			if follower.Pod == constant.ComponentStatusDefaultPodName {
+				continue
+			}
+			followers = append(followers, follower.Pod)
+		}
+		env[prefix+"FOLLOWERS"] = strings.Join(followers, ",")
+		env[prefixWithCompDefName+"FOLLOWERS"] = env[prefix+"FOLLOWERS"]
+	}
+	return env
+}
+
+func BuildBackup(cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
 	backupPolicyName string,
-	backupKey types.NamespacedName) (*dataprotectionv1alpha1.Backup, error) {
+	backupKey types.NamespacedName,
+	backupType string) (*dataprotectionv1alpha1.Backup, error) {
 	backup := dataprotectionv1alpha1.Backup{}
 	if err := buildFromCUE("backup_job_template.cue", map[string]any{
-		"sts":                sts,
-		"backup_policy_name": backupPolicyName,
-		"backup_job_key":     backupKey,
-	}, "backup_job", &backup); err != nil {
+		"cluster":          cluster,
+		"component":        component,
+		"backupPolicyName": backupPolicyName,
+		"backupJobKey":     backupKey,
+		"backupType":       backupType,
+	}, "backupJob", &backup); err != nil {
 		return nil, err
 	}
 	return &backup, nil
@@ -519,28 +564,12 @@ func BuildVolumeSnapshot(snapshotKey types.NamespacedName,
 	return &snapshot, nil
 }
 
-func BuildCronJob(pvcKey types.NamespacedName,
-	schedule string,
-	sts *appsv1.StatefulSet) (*batchv1.CronJob, error) {
-	serviceAccount := viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME")
-	cronJob := batchv1.CronJob{}
-	if err := buildFromCUE("delete_pvc_cron_job_template.cue", map[string]any{
-		"pvc":                   pvcKey,
-		"cronjob.spec.schedule": schedule,
-		"cronjob.spec.jobTemplate.spec.template.spec.serviceAccount": serviceAccount,
-		"sts": sts,
-	}, "cronjob", &cronJob); err != nil {
-		return nil, err
-	}
-	return &cronJob, nil
-}
-
-func BuildConfigMapWithTemplate(
+func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent,
 	configs map[string]string,
-	params BuilderParams,
 	cmName string,
 	configConstraintName string,
-	tplCfg appsv1alpha1.ComponentTemplateSpec) (*corev1.ConfigMap, error) {
+	configTemplateSpec appsv1alpha1.ComponentTemplateSpec) (*corev1.ConfigMap, error) {
 	const tplFile = "config_template.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
@@ -554,20 +583,20 @@ func BuildConfigMapWithTemplate(
 	// prepare cue data
 	configMeta := map[string]map[string]string{
 		"clusterDefinition": {
-			"name": params.ClusterDefinition.GetName(),
+			"name": cluster.Spec.ClusterDefRef,
 		},
 		"cluster": {
-			"name":      params.Cluster.GetName(),
-			"namespace": params.Cluster.GetNamespace(),
+			"name":      cluster.GetName(),
+			"namespace": cluster.GetNamespace(),
 		},
 		"component": {
-			"name":                  params.Component.Name,
-			"type":                  params.Component.Type,
-			"characterType":         params.Component.CharacterType,
+			"name":                  component.Name,
+			"compDefName":           component.CompDefName,
+			"characterType":         component.CharacterType,
 			"configName":            cmName,
-			"templateName":          tplCfg.TemplateRef,
+			"templateName":          configTemplateSpec.TemplateRef,
 			"configConstraintsName": configConstraintName,
-			"configTemplateName":    tplCfg.Name,
+			"configTemplateName":    configTemplateSpec.Name,
 		},
 	}
 	configBytes, err := json.Marshal(configMeta)
@@ -575,7 +604,7 @@ func BuildConfigMapWithTemplate(
 		return nil, err
 	}
 
-	// Generate config files context by render cue template
+	// Generate config files context by rendering cue template
 	if err = cueValue.Fill("meta", configBytes); err != nil {
 		return nil, err
 	}
@@ -595,7 +624,7 @@ func BuildConfigMapWithTemplate(
 	return &cm, nil
 }
 
-func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams) (*corev1.Container, error) {
+func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent) (*corev1.Container, error) {
 	const tplFile = "config_manager_sidecar.cue"
 	cueFS, _ := debme.FS(cueTemplates, "cue")
 	cueTpl, err := getCacheCUETplValue(tplFile, func() (*intctrlutil.CUETpl, error) {
@@ -623,21 +652,11 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams)
 	if err = json.Unmarshal(containerStrByte, &container); err != nil {
 		return nil, err
 	}
-	return &container, nil
-}
 
-func BuildTLSSecret(namespace, clusterName, componentName string) (*corev1.Secret, error) {
-	const tplFile = "tls_certs_secret_template.cue"
-	secret := &corev1.Secret{}
-	pathedName := componentPathedName{
-		Namespace:   namespace,
-		ClusterName: clusterName,
-		Name:        componentName,
-	}
-	if err := buildFromCUE(tplFile, map[string]any{"pathedName": pathedName}, "secret", secret); err != nil {
+	if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &container); err != nil {
 		return nil, err
 	}
-	return secret, nil
+	return &container, nil
 }
 
 func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1alpha1.Backup, podSpec *corev1.PodSpec) (*batchv1.Job, error) {
@@ -656,21 +675,81 @@ func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1a
 	return job, nil
 }
 
-func BuildPITRJob(name string, cluster *appsv1alpha1.Cluster, image string, command []string, args []string,
-	volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, env []corev1.EnvVar) (*batchv1.Job, error) {
-	const tplFile = "pitr_job_template.cue"
+func BuildRestoreJob(name, namespace string, image string, command []string,
+	volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, env []corev1.EnvVar, resources *corev1.ResourceRequirements) (*batchv1.Job, error) {
+	const tplFile = "restore_job_template.cue"
 	job := &batchv1.Job{}
-	if err := buildFromCUE(tplFile, map[string]any{
+	fillMaps := map[string]any{
 		"job.metadata.name":              name,
-		"job.metadata.namespace":         cluster.Namespace,
+		"job.metadata.namespace":         namespace,
 		"job.spec.template.spec.volumes": volumes,
 		"container.image":                image,
 		"container.command":              command,
-		"container.args":                 args,
 		"container.volumeMounts":         volumeMounts,
 		"container.env":                  env,
-	}, "job", job); err != nil {
+	}
+	if resources != nil {
+		fillMaps["container.resources"] = *resources
+	}
+
+	if err := buildFromCUE(tplFile, fillMaps, "job", job); err != nil {
 		return nil, err
 	}
 	return job, nil
+}
+
+func BuildRestoreJobForFullBackup(
+	restoreJobName string,
+	component *component.SynthesizedComponent,
+	backup *dataprotectionv1alpha1.Backup,
+	backupTool *dataprotectionv1alpha1.BackupTool,
+	pvcName string) (*batchv1.Job, error) {
+	const tplFile = "restore_full_backup_job.cue"
+	job := batchv1.Job{}
+	if err := buildFromCUE(tplFile, map[string]any{
+		"restoreJobName": restoreJobName,
+		"component":      component,
+		"backup":         backup,
+		"backupTool":     backupTool,
+		"pvcName":        pvcName,
+	}, "job", &job); err != nil {
+		return nil, err
+	}
+	return &job, nil
+}
+
+func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas []appsv1alpha1.ToolConfig) ([]corev1.Container, error) {
+	toolContainers := make([]corev1.Container, 0, len(toolsMetas))
+	for _, toolConfig := range toolsMetas {
+		toolContainer := corev1.Container{
+			Name:            toolConfig.Name,
+			Command:         toolConfig.Command,
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			VolumeMounts:    sidecarRenderedParam.Volumes,
+		}
+		if toolConfig.Image != "" {
+			toolContainer.Image = toolConfig.Image
+		}
+		toolContainers = append(toolContainers, toolContainer)
+	}
+	for i := range toolContainers {
+		if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &toolContainers[i]); err != nil {
+			return nil, err
+		}
+	}
+	return toolContainers, nil
+}
+
+func BuildVolumeSnapshotClass(name string, driver string) (*snapshotv1.VolumeSnapshotClass, error) {
+	const tplFile = "volumesnapshotclass.cue"
+	vsc := &snapshotv1.VolumeSnapshotClass{}
+	if err := buildFromCUE(tplFile,
+		map[string]any{
+			"class.metadata.name": name,
+			"class.driver":        driver,
+		},
+		"class", vsc); err != nil {
+		return nil, err
+	}
+	return vsc, nil
 }

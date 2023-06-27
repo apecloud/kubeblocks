@@ -54,7 +54,7 @@ type testCUEInputBoolOmitEmpty struct {
 	Flag bool `json:"flag,omitempty"`
 }
 
-// This test shows that the omitempty tag should be used with care if the field
+// This test shows that the omitempty tag should be used with much care if the field
 // is used in cue template.
 func TestCUE(t *testing.T) {
 	cueTplIntJSON := `

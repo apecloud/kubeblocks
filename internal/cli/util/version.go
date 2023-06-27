@@ -22,8 +22,11 @@ package util
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"reflect"
+	"strings"
 
+	gv "github.com/hashicorp/go-version"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
@@ -39,29 +42,29 @@ type Version struct {
 	Cli        string
 }
 
-// GetVersionInfo get version include KubeBlocks, CLI and kubernetes
+// GetVersionInfo gets version include KubeBlocks, CLI and kubernetes
 func GetVersionInfo(client kubernetes.Interface) (Version, error) {
 	var err error
-	version := Version{
+	v := Version{
 		Cli: version.GetVersion(),
 	}
 
 	if client == nil || reflect.ValueOf(client).IsNil() {
-		return version, nil
+		return v, nil
 	}
 
-	if version.Kubernetes, err = GetK8sVersion(client.Discovery()); err != nil {
-		return version, err
+	if v.Kubernetes, err = GetK8sVersion(client.Discovery()); err != nil {
+		return v, err
 	}
 
-	if version.KubeBlocks, err = getKubeBlocksVersion(client); err != nil {
-		return version, err
+	if v.KubeBlocks, err = getKubeBlocksVersion(client); err != nil {
+		return v, err
 	}
 
-	return version, nil
+	return v, nil
 }
 
-// getKubeBlocksVersion get KubeBlocks version
+// getKubeBlocksVersion gets KubeBlocks version
 func getKubeBlocksVersion(client kubernetes.Interface) (string, error) {
 	deploy, err := GetKubeBlocksDeploy(client)
 	if err != nil || deploy == nil {
@@ -80,7 +83,7 @@ func getKubeBlocksVersion(client kubernetes.Interface) (string, error) {
 	return v, nil
 }
 
-// GetK8sVersion get k8s server version
+// GetK8sVersion gets k8s server version
 func GetK8sVersion(discoveryClient discovery.DiscoveryInterface) (string, error) {
 	if discoveryClient == nil {
 		return "", nil
@@ -113,4 +116,15 @@ func GetKubeBlocksDeploy(client kubernetes.Interface) (*appsv1.Deployment, error
 		return nil, fmt.Errorf("found multiple KubeBlocks deployments, please check your cluster")
 	}
 	return &deploys.Items[0], nil
+}
+
+// GetDockerVersion get Docker Version
+func GetDockerVersion() (*gv.Version, error) {
+	// exec cmd to get output from docker info --format '{{.ServerVersion}}'
+	cmd := exec.Command("docker", "info", "--format", "{{.ServerVersion}}")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	return gv.NewVersion(strings.TrimSpace(string(out)))
 }

@@ -62,6 +62,14 @@ func TestGetUpdateParameterList(t *testing.T) {
 	require.Nil(t, err)
 	require.True(t, util.EqSet(expected,
 		set.NewLinkedHashSetString(params...)), "param: %v, expected: %v", params, expected.AsSlice())
+
+	// for trim
+	expected = set.NewLinkedHashSetString("msld.cakl", "msld.dg", "cd")
+	params, err = getUpdateParameterList(newCfgDiffMeta(testData, nil, nil), "g")
+	require.Nil(t, err)
+	require.True(t, util.EqSet(expected,
+		set.NewLinkedHashSetString(params...)), "param: %v, expected: %v", params, expected.AsSlice())
+
 }
 
 func newCfgDiffMeta(testData string, add, delete map[string]interface{}) *ConfigPatchInfo {
@@ -236,4 +244,31 @@ func TestIsSchedulableConfigResource(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSetParametersUpdateSource(t *testing.T) {
+	mockConfigMap := func() *corev1.ConfigMap {
+		return &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test",
+				Namespace: "default",
+				Labels:    make(map[string]string),
+			},
+			Data: make(map[string]string),
+		}
+	}
+
+	cm := mockConfigMap()
+	require.False(t, IsParametersUpdateFromManager(cm))
+	require.False(t, IsNotUserReconfigureOperation(cm))
+	SetParametersUpdateSource(cm, constant.ReconfigureManagerSource)
+	require.True(t, IsParametersUpdateFromManager(cm))
+	require.False(t, IsNotUserReconfigureOperation(cm))
+
+	// check user reconfigure
+	cm.Annotations[constant.CMInsEnableRerenderTemplateKey] = "true"
+	require.True(t, IsNotUserReconfigureOperation(cm))
+
+	SetParametersUpdateSource(cm, constant.ReconfigureUserSource)
+	require.False(t, IsNotUserReconfigureOperation(cm))
 }

@@ -38,6 +38,7 @@ const (
 	ShellTool                         // "exec"
 	SQL                               // "sql"
 	TPLScript                         // "tpl"
+	Comb                              // "comb"
 )
 
 const (
@@ -71,7 +72,7 @@ func (f *NotifyEventType) Set(val string) error {
 			return nil
 		}
 	}
-	return cfgcore.MakeError("not support type[%s], require list: [%v]", val, allNotifyType)
+	return cfgcore.MakeError("not supported type[%s], required list: [%v]", val, allNotifyType)
 }
 
 func (f *NotifyEventType) String() string {
@@ -86,9 +87,9 @@ type ReconfigureServiceOptions struct {
 	GrpcPort int
 	PodIP    string
 
-	// EnableRemoteOnlineUpdate enable remote online update
+	// EnableRemoteOnlineUpdate enables remote online update
 	RemoteOnlineUpdateEnable bool
-	// EnableContainerRuntime enable container runtime
+	// EnableContainerRuntime enables container runtime
 	ContainerRuntimeEnable bool
 
 	DebugMode        bool
@@ -99,28 +100,11 @@ type ReconfigureServiceOptions struct {
 type VolumeWatcherOpts struct {
 	VolumeDirs []string
 
-	// fileRegex watch file regex
-	FileRegex string
-
-	// ProcessName: program name
-	ProcessName string
-
-	// Signal is valid for UnixSignal
-	Signal appsv1alpha1.SignalType
-
 	// Exec command for reload
-	Command string
+	BackupPath string
 
-	// Exec command for reload
-	TPLConfig       string
-	BackupPath      string
-	FormatterConfig *appsv1alpha1.FormatterConfig
-	TPLScriptPath   string
-	DataType        string
-	DSN             string
-
-	LogLevel       string
-	NotifyHandType NotifyEventType
+	LogLevel   string
+	CombConfig string
 
 	ServiceOpt ReconfigureServiceOptions
 }
@@ -136,10 +120,7 @@ func NewVolumeWatcherOpts() *VolumeWatcherOpts {
 			ContainerRuntimeEnable:   false,
 			RemoteOnlineUpdateEnable: false,
 		},
-		// for configmap watch
-		NotifyHandType: UnixSignal,
-		Signal:         appsv1alpha1.SIGHUP,
-		LogLevel:       "info",
+		LogLevel: "info",
 	}
 }
 
@@ -147,75 +128,81 @@ func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
 	flags.StringArrayVar(&opt.VolumeDirs,
 		"volume-dir",
 		opt.VolumeDirs,
-		"the config map volume directory to watch for updates; may be used multiple times.")
-	flags.Var(&opt.NotifyHandType,
-		"notify-type",
-		"the config describe how to process notification messages.",
-	)
+		"the config map volume directory to be watched for updates; may be used multiple times.")
 
+	// flags.Var(&opt.NotifyHandType,
+	//	"notify-type",
+	//	"the config describes how to process notification messages.",
+	// )
+	//
 	// for signal handle
-	flags.StringVar(&opt.ProcessName,
-		"process",
-		opt.ProcessName,
-		"the config describe what is db program.")
-	flags.StringVar((*string)(&opt.Signal),
-		"signal",
-		string(opt.Signal),
-		"the config describe reload unix signal.")
-
+	// flags.StringVar(&opt.ProcessName,
+	//	"process",
+	//	opt.ProcessName,
+	//	"the config describes what db program is.")
+	// flags.StringVar((*string)(&opt.Signal),
+	//	"signal",
+	//	string(opt.Signal),
+	//	"the config describes the reload unix signal.")
+	//
 	// for exec handle
-	flags.StringVar(&opt.Command,
-		"command",
-		opt.Command,
-		"the config describe reload command. ")
-
+	// flags.StringVar(&opt.Command,
+	//	"command",
+	//	opt.Command,
+	//	"the config describes reload command. ")
+	//
 	// for exec tpl scripts
-	flags.StringVar(&opt.TPLConfig,
-		"tpl-config",
-		opt.TPLConfig,
-		"the config describe reload by tpl script.")
-	flags.StringVar(&opt.BackupPath,
-		"backup-path",
-		opt.BackupPath,
-		"the config describe.")
+	// flags.StringVar(&opt.TPLConfig,
+	//	"tpl-config",
+	//	opt.TPLConfig,
+	//	"the config describes reload behaviors by tpl script.")
+	// flags.StringVar(&opt.BackupPath,
+	//	"backup-path",
+	//	opt.BackupPath,
+	//	"the config describes backup path.")
+	// flags.StringVar(&opt.FileRegex,
+	//	"regex",
+	//	opt.FileRegex,
+	//	"the config sets filter config file.")
 
 	flags.StringVar(&opt.LogLevel,
 		"log-level",
 		opt.LogLevel,
-		"the config set log level. enum: [error, info, debug]")
-	flags.StringVar(&opt.FileRegex,
-		"regex",
-		opt.FileRegex,
-		"the config set filter config file.")
-
+		"the config sets log level. enum: [error, info, debug]")
 	flags.StringVar(&opt.ServiceOpt.PodIP,
 		"pod-ip",
 		opt.ServiceOpt.PodIP,
-		"the config set pod ip address.")
+		"the config sets pod ip address.")
 	flags.IntVar(&opt.ServiceOpt.GrpcPort,
 		"tcp",
 		opt.ServiceOpt.GrpcPort,
-		"the config set service port.")
+		"the config sets service port.")
 	flags.BoolVar(&opt.ServiceOpt.DebugMode,
 		"debug",
 		opt.ServiceOpt.DebugMode,
-		"the config set debug.")
+		"the config sets debug mode.")
 	flags.StringVar((*string)(&opt.ServiceOpt.ContainerRuntime),
 		"container-runtime",
 		string(opt.ServiceOpt.ContainerRuntime),
-		"the config set cri runtime type.")
+		"the config sets cri runtime type.")
 	flags.StringVar(&opt.ServiceOpt.RuntimeEndpoint,
 		"runtime-endpoint",
 		opt.ServiceOpt.RuntimeEndpoint,
-		"the config set cri runtime endpoint.")
+		"the config sets cri runtime endpoint.")
 
 	flags.BoolVar(&opt.ServiceOpt.ContainerRuntimeEnable,
 		"cri-enable",
 		opt.ServiceOpt.ContainerRuntimeEnable,
-		"the config set enable cri.")
+		"the config sets enable cri.")
 
 	flags.BoolVar(&opt.ServiceOpt.RemoteOnlineUpdateEnable,
 		"operator-update-enable",
 		opt.ServiceOpt.ContainerRuntimeEnable,
-		"the config set enable operator update parameter.")
+		"the config sets enable operator update parameter.")
+
+	// for multi handler
+	flags.StringVar(&opt.CombConfig,
+		"config",
+		"",
+		"the reload config.")
 }

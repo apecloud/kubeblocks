@@ -34,12 +34,12 @@ spec:
       # via YAML contents reside in configMap.data.<key>
       configMapRefs:
 #        - name:
-#          namepsace:
+#          namespace:
 #          key:
       # via YAML contents reside in secret.data.<key>
       secretRefs:
 #        - name:
-#          namepsace:
+#          namespace:
 #          key:
       setValues:
         - "alertmanager.image.repository=registry.cn-hangzhou.aliyuncs.com/apecloud/alertmanager"

@@ -19,13 +19,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package util
 
-import "github.com/StudioSol/set"
+import (
+	"github.com/StudioSol/set"
+)
 
-// Set type Reference c++ set interface to implemented stl set.
-// With generics, it may be more generic.
+// Set type Reference c++ set interface to implement stl set.
 
-func Difference(left, right *set.LinkedHashSetString) *set.LinkedHashSetString {
-	diff := set.NewLinkedHashSetString()
+type Sets = set.LinkedHashSetString
+
+func NewSet(strings ...string) *Sets {
+	return set.NewLinkedHashSetString(strings...)
+}
+
+func Difference(left, right *Sets) *Sets {
+	diff := NewSet()
 	for e := range left.Iter() {
 		if !right.InArray(e) {
 			diff.Add(e)
@@ -34,15 +41,15 @@ func Difference(left, right *set.LinkedHashSetString) *set.LinkedHashSetString {
 	return diff
 }
 
-func ToSet[T interface{}](v map[string]T) *set.LinkedHashSetString {
-	r := set.NewLinkedHashSetString()
+func ToSet[T interface{}](v map[string]T) *Sets {
+	r := NewSet()
 	for k := range v {
 		r.Add(k)
 	}
 	return r
 }
 
-func EqSet(left, right *set.LinkedHashSetString) bool {
+func EqSet(left, right *Sets) bool {
 	if left.Length() != right.Length() {
 		return false
 	}
@@ -54,13 +61,13 @@ func EqSet(left, right *set.LinkedHashSetString) bool {
 	return true
 }
 
-func MapKeyDifference[T interface{}](left, right map[string]T) *set.LinkedHashSetString {
+func MapKeyDifference[T interface{}](left, right map[string]T) *Sets {
 	lSet := ToSet(left)
 	rSet := ToSet(right)
 	return Difference(lSet, rSet)
 }
 
-func Union(left, right *set.LinkedHashSetString) *set.LinkedHashSetString {
+func Union(left, right *Sets) *Sets {
 	deleteSet := Difference(left, right)
 	return Difference(left, deleteSet)
 }

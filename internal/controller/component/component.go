@@ -25,6 +25,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
@@ -32,10 +33,39 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// BuildComponent generates a new Component object, which is a mixture of
+func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	cluster appsv1alpha1.Cluster,
+	clusterDef appsv1alpha1.ClusterDefinition,
+	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
+	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
+) (*SynthesizedComponent, error) {
+	synthesizedComp, err := buildComponent(reqCtx, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+	if err != nil {
+		return nil, err
+	}
+	/*
+		if err := buildRestoreInfoFromBackup(reqCtx, cli, cluster, synthesizedComp); err != nil {
+			return nil, err
+		}
+	*/
+	return synthesizedComp, nil
+}
+
+func BuildComponent(reqCtx intctrlutil.RequestCtx,
+	cluster appsv1alpha1.Cluster,
+	clusterDef appsv1alpha1.ClusterDefinition,
+	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
+	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
+) (*SynthesizedComponent, error) {
+	return buildComponent(reqCtx, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+}
+
+// buildComponent generates a new Component object, which is a mixture of
 // component-related configs from input Cluster, ClusterDef and ClusterVersion.
-func BuildComponent(
-	reqCtx intctrlutil.RequestCtx,
+func buildComponent(reqCtx intctrlutil.RequestCtx,
 	cluster appsv1alpha1.Cluster,
 	clusterDef appsv1alpha1.ClusterDefinition,
 	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
@@ -46,8 +76,10 @@ func BuildComponent(
 	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
 		ClusterDefName:        clusterDef.Name,
+		ClusterName:           cluster.Name,
+		ClusterUID:            string(cluster.UID),
 		Name:                  clusterCompSpec.Name,
-		Type:                  clusterCompDefObj.Name,
+		CompDefName:           clusterCompDefObj.Name,
 		CharacterType:         clusterCompDefObj.CharacterType,
 		WorkloadType:          clusterCompDefObj.WorkloadType,
 		StatelessSpec:         clusterCompDefObj.StatelessSpec,
@@ -62,6 +94,7 @@ func BuildComponent(
 		ScriptTemplates:       clusterCompDefObj.ScriptSpecs,
 		VolumeTypes:           clusterCompDefObj.VolumeTypes,
 		CustomLabelSpecs:      clusterCompDefObj.CustomLabelSpecs,
+		SwitchoverSpec:        clusterCompDefObj.SwitchoverSpec,
 		StatefulSetWorkload:   clusterCompDefObj.GetStatefulSetWorkload(),
 		MinAvailable:          clusterCompSpec.GetMinAvailable(clusterCompDefObj.GetMinAvailable()),
 		Replicas:              clusterCompSpec.Replicas,
@@ -83,6 +116,8 @@ func BuildComponent(
 		for _, c := range clusterCompVer.VersionsCtx.Containers {
 			component.PodSpec.Containers = appendOrOverrideContainerAttr(component.PodSpec.Containers, c)
 		}
+		// override component.SwitchoverSpec
+		overrideSwitchoverSpecAttr(component.SwitchoverSpec, clusterCompVer.SwitchoverSpec)
 	}
 
 	// handle component.PodSpec extra settings
@@ -123,7 +158,6 @@ func BuildComponent(
 			component.Services = append(component.Services, service)
 		}
 	}
-	component.PrimaryIndex = clusterCompSpec.PrimaryIndex
 	// set component.PodSpec.ServiceAccountName
 	component.PodSpec.ServiceAccountName = component.ServiceAccountName
 
@@ -146,7 +180,7 @@ func BuildComponent(
 	return component, nil
 }
 
-// appendOrOverrideContainerAttr is used to append targetContainer to compContainers or override the attributes of compContainers with a given targetContainer,
+// appendOrOverrideContainerAttr appends targetContainer to compContainers or overrides the attributes of compContainers with a given targetContainer,
 // if targetContainer does not exist in compContainers, it will be appended. otherwise it will be updated with the attributes of the target container.
 func appendOrOverrideContainerAttr(compContainers []corev1.Container, targetContainer corev1.Container) []corev1.Container {
 	index, compContainer := intctrlutil.GetContainerByName(compContainers, targetContainer.Name)
@@ -222,7 +256,7 @@ func doContainerAttrOverride(compContainer *corev1.Container, container corev1.C
 // GetEnvReplacementMapForConnCredential gets the replacement map for connect credential
 func GetEnvReplacementMapForConnCredential(clusterName string) map[string]string {
 	return map[string]string{
-		constant.ConnCredentialPlaceHolder: GenerateConnCredential(clusterName),
+		constant.KBConnCredentialPlaceHolder: GenerateConnCredential(clusterName),
 	}
 }
 
@@ -236,16 +270,18 @@ func replaceContainerPlaceholderTokens(component *SynthesizedComponent, namedVal
 }
 
 // GetReplacementMapForBuiltInEnv gets the replacement map for KubeBlocks built-in environment variables.
-func GetReplacementMapForBuiltInEnv(cluster *appsv1alpha1.Cluster, componentName string) map[string]string {
+func GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
+	cc := fmt.Sprintf("%s-%s", clusterName, componentName)
 	replacementMap := map[string]string{
-		constant.KBClusterNamePlaceHolder:     cluster.Name,
+		constant.KBClusterNamePlaceHolder:     clusterName,
 		constant.KBCompNamePlaceHolder:        componentName,
-		constant.KBClusterCompNamePlaceHolder: fmt.Sprintf("%s-%s", cluster.Name, componentName),
+		constant.KBClusterCompNamePlaceHolder: cc,
+		constant.KBComponentEnvCMPlaceHolder:  fmt.Sprintf("%s-env", cc),
 	}
-	if len(cluster.UID) > 8 {
-		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = string(cluster.UID)[len(cluster.UID)-8:]
+	if len(clusterUID) > 8 {
+		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = clusterUID[len(clusterUID)-8:]
 	} else {
-		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = string(cluster.UID)
+		replacementMap[constant.KBClusterUIDPostfix8PlaceHolder] = clusterUID
 	}
 	return replacementMap
 }
@@ -279,22 +315,30 @@ func ReplaceSecretEnvVars(namedValuesMap map[string]string, envs []corev1.EnvVar
 	return newEnvs
 }
 
-func GetClusterDefCompByName(clusterDef appsv1alpha1.ClusterDefinition,
-	cluster appsv1alpha1.Cluster,
-	compName string) *appsv1alpha1.ClusterComponentDefinition {
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		if comp.Name != compName {
-			continue
-		}
-		for _, compDef := range clusterDef.Spec.ComponentDefs {
-			if compDef.Name == comp.ComponentDefRef {
-				return &compDef
-			}
-		}
-	}
-	return nil
-}
-
 func GenerateConnCredential(clusterName string) string {
 	return fmt.Sprintf("%s-conn-credential", clusterName)
+}
+
+// overrideSwitchoverSpecAttr overrides the attributes in switchoverSpec with the attributes of SwitchoverShortSpec in clusterVersion.
+func overrideSwitchoverSpecAttr(switchoverSpec *appsv1alpha1.SwitchoverSpec, cvSwitchoverSpec *appsv1alpha1.SwitchoverShortSpec) {
+	if cvSwitchoverSpec == nil || cvSwitchoverSpec.CmdExecutorConfig == nil {
+		return
+	}
+	applyCmdExecutorConfig := func(cmdExecutorConfig *appsv1alpha1.CmdExecutorConfig) {
+		if cmdExecutorConfig == nil {
+			return
+		}
+		if len(cvSwitchoverSpec.CmdExecutorConfig.Image) > 0 {
+			cmdExecutorConfig.Image = cvSwitchoverSpec.CmdExecutorConfig.Image
+		}
+		if len(cvSwitchoverSpec.CmdExecutorConfig.Env) > 0 {
+			cmdExecutorConfig.Env = cvSwitchoverSpec.CmdExecutorConfig.Env
+		}
+	}
+	applyCmdExecutorConfig(switchoverSpec.WithCandidate)
+	applyCmdExecutorConfig(switchoverSpec.WithoutCandidate)
+}
+
+func GenerateComponentEnvName(clusterName, componentName string) string {
+	return fmt.Sprintf("%s-%s-env", clusterName, componentName)
 }

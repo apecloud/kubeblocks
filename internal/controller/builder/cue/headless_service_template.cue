@@ -23,9 +23,11 @@ cluster: {
 }
 component: {
 	clusterDefName: string
+	compDefName:    string
 	name:           string
 	monitor: {
 		enable:     bool
+		builtIn:    bool
 		scrapePort: int
 		scrapePath: string
 	}
@@ -42,15 +44,25 @@ service: {
 			"app.kubernetes.io/name":       "\(component.clusterDefName)"
 			"app.kubernetes.io/instance":   cluster.metadata.name
 			"app.kubernetes.io/managed-by": "kubeblocks"
+			"app.kubernetes.io/component":  "\(component.compDefName)"
 
 			"apps.kubeblocks.io/component-name": "\(component.name)"
 		}
 		annotations: {
-			"prometheus.io/scrape": "\(component.monitor.enable)"
-			if component.monitor.enable == true {
-				"prometheus.io/path":   component.monitor.scrapePath
-				"prometheus.io/port":   "\(component.monitor.scrapePort)"
-				"prometheus.io/scheme": "http"
+			if component.monitor.enable == false {
+				"monitor.kubeblocks.io/scrape":   "false"
+				"monitor.kubeblocks.io/agamotto": "false"
+			}
+			if component.monitor.enable == true && component.monitor.builtIn == false {
+				"monitor.kubeblocks.io/scrape":   "true"
+				"monitor.kubeblocks.io/path":     component.monitor.scrapePath
+				"monitor.kubeblocks.io/port":     "\(component.monitor.scrapePort)"
+				"monitor.kubeblocks.io/scheme":   "http"
+				"monitor.kubeblocks.io/agamotto": "false"
+			}
+			if component.monitor.enable == true && component.monitor.builtIn == true {
+				"monitor.kubeblocks.io/scrape":   "false"
+				"monitor.kubeblocks.io/agamotto": "true"
 			}
 		}
 	}

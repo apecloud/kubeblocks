@@ -40,7 +40,7 @@ var _ = Describe("Restart OpsRequest", func() {
 	)
 
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -105,7 +105,7 @@ var _ = Describe("Restart OpsRequest", func() {
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("opsRequest kind: Restart is forbidden when Cluster.status.Phase is Stopped"))
+			Expect(err.Error()).Should(ContainSubstring("OpsRequest.spec.type=Restart is forbidden when Cluster.status.phase=Stopped"))
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest),
 				func(g Gomega, fetched *appsv1alpha1.OpsRequest) {
 					g.Expect(fetched.Status.Phase).To(Equal(appsv1alpha1.OpsFailedPhase))

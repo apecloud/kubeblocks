@@ -42,7 +42,7 @@ var _ = Describe("RestoreJob Controller", func() {
 		compName    = "cluster"
 	)
 	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
+		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
@@ -90,7 +90,7 @@ var _ = Describe("RestoreJob Controller", func() {
 		By("By assure an backupPolicy obj")
 		return testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, "backup-policy-").
 			WithRandomName().
-			AddFullPolicy().
+			AddDataFilePolicy().
 			AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
 			SetSchedule("0 3 * * *", true).
 			SetTTL("7d").

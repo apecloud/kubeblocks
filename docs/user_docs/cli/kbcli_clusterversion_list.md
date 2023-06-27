@@ -11,7 +11,7 @@ kbcli clusterversion list [flags]
 ### Examples
 
 ```
-  # list all ClusterVersion
+  # list all ClusterVersions
   kbcli clusterversion list
 ```
 

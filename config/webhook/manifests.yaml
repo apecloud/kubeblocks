@@ -11,26 +11,6 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-apps-kubeblocks-io-v1alpha1-cluster
-  failurePolicy: Fail
-  name: mcluster.kb.io
-  rules:
-  - apiGroups:
-    - apps.kubeblocks.io
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - clusters
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
       path: /mutate-apps-kubeblocks-io-v1alpha1-clusterdefinition
   failurePolicy: Fail
   name: mclusterdefinition.kb.io
@@ -44,6 +24,26 @@ webhooks:
     - UPDATE
     resources:
     - clusterdefinitions
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
+  failurePolicy: Fail
+  name: mreplicatedstatemachine.kb.io
+  rules:
+  - apiGroups:
+    - workloads.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - replicatedstatemachines
   sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
@@ -131,4 +131,24 @@ webhooks:
     - UPDATE
     resources:
     - opsrequests
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-workloads-kubeblocks-io-v1alpha1-replicatedstatemachine
+  failurePolicy: Fail
+  name: vreplicatedstatemachine.kb.io
+  rules:
+  - apiGroups:
+    - workloads.kubeblocks.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - replicatedstatemachines
   sideEffects: None

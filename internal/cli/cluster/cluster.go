@@ -41,7 +41,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
-// ConditionsError cluster will display this status on list cmd when the status of ApplyResources or ProvisioningStarted condition is not "True".
+// ConditionsError cluster displays this status on list cmd when the status of ApplyResources or ProvisioningStarted condition is "False".
 const ConditionsError = "ConditionsError"
 
 type GetOptions struct {
@@ -95,7 +95,7 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 
 	objs := NewClusterObjects()
 	ctx := context.TODO()
-	corev1 := o.Client.CoreV1()
+	client := o.Client.CoreV1()
 	getResource := func(gvr schema.GroupVersionResource, name string, ns string, res interface{}) error {
 		obj, err := o.Dynamic.Resource(gvr).Namespace(ns).Get(ctx, name, metav1.GetOptions{}, "")
 		if err != nil {
@@ -153,37 +153,46 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 
 	// get services
 	if o.WithService {
-		if objs.Services, err = corev1.Services(o.Namespace).List(ctx, listOpts()); err != nil {
+		if objs.Services, err = client.Services(o.Namespace).List(ctx, listOpts()); err != nil {
 			return nil, err
 		}
 	}
 
 	// get secrets
 	if o.WithSecret {
-		if objs.Secrets, err = corev1.Secrets(o.Namespace).List(ctx, listOpts()); err != nil {
+		if objs.Secrets, err = client.Secrets(o.Namespace).List(ctx, listOpts()); err != nil {
 			return nil, err
 		}
 	}
 
 	// get configmaps
 	if o.WithConfigMap {
-		if objs.ConfigMaps, err = corev1.ConfigMaps(o.Namespace).List(ctx, listOpts()); err != nil {
+		if objs.ConfigMaps, err = client.ConfigMaps(o.Namespace).List(ctx, listOpts()); err != nil {
 			return nil, err
 		}
 	}
 
 	// get PVCs
 	if o.WithPVC {
-		if objs.PVCs, err = corev1.PersistentVolumeClaims(o.Namespace).List(ctx, listOpts()); err != nil {
+		if objs.PVCs, err = client.PersistentVolumeClaims(o.Namespace).List(ctx, listOpts()); err != nil {
 			return nil, err
 		}
 	}
 
 	// get pods
 	if o.WithPod {
-		if objs.Pods, err = corev1.Pods(o.Namespace).List(ctx, listOpts()); err != nil {
+		if objs.Pods, err = client.Pods(o.Namespace).List(ctx, listOpts()); err != nil {
 			return nil, err
 		}
+		var podList []corev1.Pod
+		// filter back-up job pod
+		for _, pod := range objs.Pods.Items {
+			labels := pod.GetLabels()
+			if labels[constant.DataProtectionLabelBackupNameKey] == "" {
+				podList = append(podList, pod)
+			}
+		}
+		objs.Pods.Items = podList
 		// get nodes where the pods are located
 	podLoop:
 		for _, pod := range objs.Pods.Items {
@@ -198,7 +207,7 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 				continue
 			}
 
-			node, err := corev1.Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+			node, err := client.Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return nil, err
 			}
@@ -211,14 +220,14 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 
 	// get events
 	if o.WithEvent {
-		// get all events about cluster
-		if objs.Events, err = corev1.Events(o.Namespace).Search(scheme.Scheme, objs.Cluster); err != nil {
+		// get all events of cluster
+		if objs.Events, err = client.Events(o.Namespace).Search(scheme.Scheme, objs.Cluster); err != nil {
 			return nil, err
 		}
 
-		// get all events about pods
+		// get all events of pods
 		for _, pod := range objs.Pods.Items {
-			events, err := corev1.Events(o.Namespace).Search(scheme.Scheme, &pod)
+			events, err := client.Events(o.Namespace).Search(scheme.Scheme, &pod)
 			if err != nil {
 				return nil, err
 			}
@@ -286,7 +295,7 @@ func (o *ClusterObjects) GetComponentInfo() []*ComponentInfo {
 			}
 		}
 
-		// current component has no pod corresponding to it
+		// current component has no derived pods
 		if len(pods) == 0 {
 			continue
 		}

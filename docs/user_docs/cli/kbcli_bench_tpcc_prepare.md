@@ -14,10 +14,10 @@ kbcli bench tpcc prepare [flags]
   -h, --help                      help for prepare
       --no-check                  TPCC prepare check, default false
       --output-dir string         Output directory for generating file if specified
-      --output-type string        Output file type. If empty, then load data to db. Current only support csv
+      --output-type string        Output file type. If not set, database generates the data itself. Current only support csv
       --retry-count int           Retry count when errors occur (default 50)
       --retry-interval duration   The interval for each retry (default 5s)
-      --tables string             Specified tables for generating file, separated by ','. Valid only if output is set. If this flag is not set, generate all tables by default
+      --tables string             Specified tables for generating file, separated by ','. Valid only if output is set. If not set, generate all tables by default
 ```
 
 ### Options inherited from parent commands

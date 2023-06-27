@@ -32,7 +32,12 @@ innodb_buffer_pool_size={{ $pool_buffer_size }}
 max_connections={{ div ( div $phy_memory 4 ) $single_thread_memory }}
 {{- end}}
 
-# alias replica_exec_mode. Aliyn slave_exec_mode=STRICT
+# if memory less than 8Gi, disable performance_schema
+{{- if lt $phy_memory 8589934592 }}
+performance_schema=OFF
+{{- end }}
+
+# alias replica_exec_mode. Aliyun slave_exec_mode=STRICT
 slave_exec_mode=IDEMPOTENT
 
 # gtid
@@ -188,7 +193,7 @@ loose_xengine_dump_memtable_limit_size=0
 loose_xengine_min_write_buffer_number_to_merge=1
 loose_xengine_level0_file_num_compaction_trigger=64
 loose_xengine_level0_layer_num_compaction_trigger=2
-loose_xengine_level1_extent s_major_compaction_trigger=1000
+loose_xengine_level1_extents_major_compaction_trigger=1000
 loose_xengine_level2_usage_percent=70
 loose_xengine_flush_delete_percent=70
 loose_xengine_compaction_delete_percent=50

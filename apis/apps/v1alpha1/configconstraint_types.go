@@ -1,25 +1,23 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -31,6 +29,23 @@ type ConfigConstraintSpec struct {
 	// restart or reload depending on whether any parameters in the StaticParameters have been modified.
 	// +optional
 	ReloadOptions *ReloadOptions `json:"reloadOptions,omitempty"`
+
+	// toolConfig used to config init container.
+	// +optional
+	ToolsImageSpec *ToolsImageSpec `json:"toolsImageSpec,omitempty"`
+	// ToolConfigs []ToolConfig `json:"toolConfigs,omitempty"`
+
+	// downwardAPIOptions is used to watch pod fields.
+	// +optional
+	DownwardAPIOptions []DownwardAPIOption `json:"downwardAPIOptions,omitempty"`
+
+	// scriptConfigs, list of ScriptConfig, witch these scripts can be used by volume trigger,downward trigger, or tool image
+	// +optional
+	// +patchMergeKey=scriptConfigMapRef
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=scriptConfigMapRef
+	ScriptConfigs []ScriptConfig `json:"scriptConfigs,omitempty"`
 
 	// cfgSchemaTopLevelName is cue type name, which generates openapi schema.
 	// +optional
@@ -129,11 +144,62 @@ type UnixSignalTrigger struct {
 	ProcessName string `json:"processName"`
 }
 
-type ShellTrigger struct {
-	// exec used to execute for reload.
+type ToolsImageSpec struct {
+	// auto generate
+	// volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
+	// The volume name must be defined in podSpec.containers[*].volumeMounts.
 	// +kubebuilder:validation:Required
-	Exec string `json:"exec"`
+	// +kubebuilder:validation:MaxLength=32
+	// VolumeName string `json:"volumeName"`
 
+	// mountPoint is the mount point of the scripts file.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
+	MountPoint string `json:"mountPoint"`
+
+	// toolConfig used to config init container.
+	// +optional
+	ToolConfigs []ToolConfig `json:"toolConfigs,omitempty"`
+}
+
+type ToolConfig struct {
+	// Specify the name of initContainer.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name,omitempty"`
+
+	// tools Container image name.
+	// +optional
+	Image string `json:"image,omitempty"`
+
+	// exec used to execute for init containers.
+	// +kubebuilder:validation:Required
+	Command []string `json:"command"`
+}
+
+type DownwardAPIOption struct {
+	// Specify the name of the field.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// mountPoint is the mount point of the scripts file.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=128
+	MountPoint string `json:"mountPoint"`
+
+	// Items is a list of downward API volume file
+	// +kubebuilder:validation:Required
+	Items []corev1.DownwardAPIVolumeFile `json:"items"`
+
+	// command used to execute for downwrad api.
+	// +optional
+	Command []string `json:"command,omitempty"`
+}
+
+type ScriptConfig struct {
 	// scriptConfigMapRef used to execute for reload.
 	// +kubebuilder:validation:Required
 	ScriptConfigMapRef string `json:"scriptConfigMapRef"`
@@ -146,17 +212,14 @@ type ShellTrigger struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
-type TPLScriptTrigger struct {
-	// scriptConfigMapRef used to execute for reload.
+type ShellTrigger struct {
+	// command used to execute for reload.
 	// +kubebuilder:validation:Required
-	ScriptConfigMapRef string `json:"scriptConfigMapRef"`
+	Command []string `json:"command"`
+}
 
-	// Specify the namespace of the referenced the tpl script ConfigMap object.
-	// An empty namespace is equivalent to the "default" namespace.
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:default="default"
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
+type TPLScriptTrigger struct {
+	ScriptConfig `json:",inline"`
 
 	// Specify synchronize updates parameters to the config manager.
 	// +optional
@@ -201,6 +264,9 @@ type IniConfig struct {
 	SectionName string `json:"sectionName,omitempty"`
 }
 
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cc

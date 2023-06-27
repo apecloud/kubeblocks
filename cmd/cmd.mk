@@ -37,30 +37,30 @@ reloader: test-go-generate build-checks ## Build reloader related binaries
 clean-reloader: ## Clean bin/reloader.
 	rm -f bin/reloader
 
-## tpltool cmd
+## config_render cmd
 
-CONFIG_TOOL_LD_FLAGS = "-s -w"
+CONFIG_RENDER_TOOL_LD_FLAGS = "-s -w"
 
-bin/tpltool.%: ## Cross build bin/tpltool.$(OS).$(ARCH) .
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CONFIG_TOOL_LD_FLAGS} -o $@ ./cmd/tpl/main.go
+bin/config_render.%: ## Cross build bin/config_render.$(OS).$(ARCH) .
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CONFIG_RENDER_TOOL_LD_FLAGS} -o $@ ./cmd/reloader/template/*.go
 
-.PHONY: tpltool
-tpltool: OS=$(shell $(GO) env GOOS)
-tpltool: ARCH=$(shell $(GO) env GOARCH)
-tpltool: build-checks ## Build tpltool related binaries
-	$(MAKE) bin/tpltool.${OS}.${ARCH}
-	mv bin/tpltool.${OS}.${ARCH} bin/tpltool
+.PHONY: config_render
+config_render: OS=$(shell $(GO) env GOOS)
+config_render: ARCH=$(shell $(GO) env GOARCH)
+config_render: build-checks ## Build config_render related binaries
+	$(MAKE) bin/config_render.${OS}.${ARCH}
+	mv bin/config_render.${OS}.${ARCH} bin/config_render
 
-.PHONY: clean-tpltool
-clean-tpltool: ## Clean bin/tpltool.
-	rm -f bin/tpltool
+.PHONY: clean-config_render
+clean-config_render: ## Clean bin/tpltool.
+	rm -f bin/config_render
 
 ## cue-helper cmd
 
 CUE_HELPER_LD_FLAGS = "-s -w"
 
 bin/cue-helper.%: ## Cross build bin/cue-helper.$(OS).$(ARCH) .
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CUE_HELPER_LD_FLAGS} -o $@ ./cmd/reloader/tools/cue_auto_generator.go
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) $(GO) build -ldflags=${CUE_HELPER_LD_FLAGS} -o $@ ./cmd/reloader/tools/main.go
 
 .PHONY: cue-helper
 cue-helper: OS=$(shell $(GO) env GOOS)

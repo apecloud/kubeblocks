@@ -40,7 +40,7 @@ type ExposeOpsHandler struct {
 var _ OpsHandler = ExposeOpsHandler{}
 
 func init() {
-	// ToClusterPhase is not defined, because expose not affect the cluster status.
+	// ToClusterPhase is not defined, because 'expose' does not affect the cluster status.
 	exposeBehavior := OpsBehaviour{
 		// REVIEW: can do opsrequest if not running?
 		FromClusterPhases: appsv1alpha1.GetClusterUpRunningPhases(),
@@ -106,7 +106,7 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", actualProgressCount, expectProgressCount)
 
 	// patch OpsRequest.status.components
-	if !reflect.DeepEqual(oldOpsRequestStatus, opsRequest.Status) {
+	if !reflect.DeepEqual(*oldOpsRequestStatus, opsRequest.Status) {
 		if err := cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
 			return opsRequestPhase, 0, err
 		}
@@ -170,8 +170,8 @@ func (e ExposeOpsHandler) handleComponentServices(reqCtx intctrlutil.RequestCtx,
 	return actualCount, expectCount, nil
 }
 
-func (e ExposeOpsHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRequest) *metav1.Condition {
-	return appsv1alpha1.NewExposingCondition(opsRequest)
+func (e ExposeOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
+	return appsv1alpha1.NewExposingCondition(opsRes.OpsRequest), nil
 }
 
 func (e ExposeOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsResource *OpsResource) error {

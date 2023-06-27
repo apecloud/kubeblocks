@@ -1,20 +1,17 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package v1alpha1
@@ -42,33 +39,6 @@ func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
-}
-
-// +kubebuilder:webhook:path=/mutate-apps-kubeblocks-io-v1alpha1-cluster,mutating=true,failurePolicy=fail,sideEffects=None,groups=apps.kubeblocks.io,resources=clusters,verbs=create;update,versions=v1alpha1,name=mcluster.kb.io,admissionReviewVersions=v1
-
-var _ webhook.Defaulter = &Cluster{}
-
-// Default set default value by implements webhook.Defaulter so a webhook will be registered for the type
-func (r *Cluster) Default() {
-	clusterlog.Info("default", "name", r.Name)
-	var (
-		ctx        = context.Background()
-		clusterDef = &ClusterDefinition{}
-	)
-
-	_ = webhookMgr.client.Get(ctx, types.NamespacedName{Name: r.Spec.ClusterDefRef}, clusterDef)
-	for i := range r.Spec.ComponentSpecs {
-		comSpec := &r.Spec.ComponentSpecs[i]
-		if comSpec.PrimaryIndex != nil {
-			continue
-		}
-		for _, compDef := range clusterDef.Spec.ComponentDefs {
-			if compDef.WorkloadType != Replication || comSpec.ComponentDefRef != compDef.Name {
-				continue
-			}
-			comSpec.PrimaryIndex = new(int32)
-		}
-	}
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
@@ -101,20 +71,6 @@ func (r *Cluster) ValidateDelete() error {
 
 	// TODO(user): fill in your validation logic upon object deletion.
 	return nil
-}
-
-// validatePrimaryIndex checks primaryIndex value cannot be larger than replicas.
-func (r *Cluster) validatePrimaryIndex(allErrs *field.ErrorList) {
-	for index, component := range r.Spec.ComponentSpecs {
-		if component.PrimaryIndex == nil || component.Replicas == 0 {
-			continue
-		}
-		if *component.PrimaryIndex > component.Replicas-1 {
-			path := fmt.Sprintf("spec.components[%d].PrimaryIndex", index)
-			*allErrs = append(*allErrs, field.Invalid(field.NewPath(path),
-				*component.PrimaryIndex, "PrimaryIndex cannot be larger than Replicas."))
-		}
-	}
 }
 
 // validateVolumeClaimTemplates volumeClaimTemplates is forbidden modification except for storage size.
@@ -224,8 +180,6 @@ func (r *Cluster) validateComponents(allErrs *field.ErrorList, clusterDef *Clust
 		componentNameMap[v.Name] = struct{}{}
 		r.validateComponentResources(allErrs, v.Resources, i)
 	}
-
-	r.validatePrimaryIndex(allErrs)
 
 	r.validateComponentTLSSettings(allErrs)
 

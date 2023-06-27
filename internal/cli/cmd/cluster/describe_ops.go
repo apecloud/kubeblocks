@@ -412,7 +412,7 @@ func (o *describeOpsOptions) printLastConfiguration(configuration appsv1alpha1.L
 	}
 }
 
-// printLastConfigurationByOpsType the entry function for printing last configuration by ops type.
+// printLastConfigurationByOpsType prints the last configuration by ops type.
 func (o *describeOpsOptions) printLastConfigurationByOpsType(configuration appsv1alpha1.LastConfiguration,
 	headers []interface{},
 	handleOpsObject func(tbl *printer.TablePrinter, cName string, compConf appsv1alpha1.LastComponentConfiguration),

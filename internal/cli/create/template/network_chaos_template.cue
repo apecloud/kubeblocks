@@ -26,26 +26,13 @@ options: {
 
 	direction: string
 	externalTargets?: [...]
+	target?: {}
 
-	targetMode?: string
-	targetValue: string
-	targetNamespaceSelectors: [...string]
-	targetLabelSelectors: {}
-
-	loss?:      string
-	corrupt?:   string
-	duplicate?: string
-
-	latency?: string
-	jitter:   string
-
-	correlation: string
-
-	rate?:    string
-	limit:    uint32
-	buffer:   uint32
-	peakrate: uint32
-	minburst: uint32
+	loss?: {}
+	delay?: {}
+	duplicate?: {}
+	corrupt?: {}
+	bandwidth?: {}
 }
 
 // required, k8s api resource content
@@ -64,55 +51,33 @@ content: {
 		duration: options.duration
 
 		direction: options.direction
+
 		if options.externalTargets != _|_ {
 			externalTargets: options.externalTargets
 		}
-		if options.targetMode != _|_ {
-			target: {
-				mode:  options.targetMode
-				value: options.targetValue
-				selector: {
-					namespaces: options.targetNamespaceSelectors
-					labelSelectors: {
-						options.targetLabelSelectors
-					}
-				}
-			}
+
+		if options.target["mode"] != _|_ || len(options.target["selector"]) != 0 {
+			target: options.target
 		}
-		if options.loss != _|_ {
-			loss: {
-				loss:        options.loss
-				correlation: options.correlation
-			}
+
+		if options.loss["loss"] != _|_ {
+			loss: options.loss
 		}
-		if options.corrupt != _|_ {
-			corrupt: {
-				corrupt:     options.corrupt
-				correlation: options.correlation
-			}
+
+		if options.delay["latency"] != _|_ {
+			delay: options.delay
 		}
-		if options.duplicate != _|_ {
-			duplicate: {
-				duplicate:   options.duplicate
-				correlation: options.correlation
-			}
+
+		if options.corrupt["corrupt"] != _|_ {
+			corrupt: options.corrupt
 		}
-		if options.latency != _|_ {
-			delay: {
-				latency:     options.latency
-				jitter:      options.jitter
-				correlation: options.correlation
-			}
+
+		if options.duplicate["duplicate"] != _|_ {
+			duplicate: options.duplicate
 		}
-		if options.rate != _|_ {
-			bandwidth: {
-				rate:        options.rate
-				limit:       options.limit
-				buffer:      options.buffer
-				peakrate:    options.peakrate
-				minburst:    options.minburst
-				correlation: options.correlation
-			}
+
+		if options.bandwidth["rate"] != _|_ {
+			bandwidth: options.bandwidth
 		}
 	}
 }

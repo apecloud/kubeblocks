@@ -26,9 +26,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/klog/v2"
 	kccmd "k8s.io/kubectl/pkg/cmd"
+	kcplugin "k8s.io/kubectl/pkg/cmd/plugin"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -36,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/addon"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/alert"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/bench"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/builder"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/class"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/clusterdefinition"
@@ -48,6 +52,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/plugin"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -58,6 +63,22 @@ const (
 func init() {
 	if _, err := util.GetCliHomeDir(); err != nil {
 		fmt.Println("Failed to create kbcli home dir:", err)
+	}
+
+	// replace the kubectl plugin filename prefixes with ours
+	kcplugin.ValidPluginFilenamePrefixes = plugin.ValidPluginFilenamePrefixes
+
+	// put the download directory of the plugin into the PATH
+	if err := util.AddDirToPath(fmt.Sprintf("%s/.%s/plugins/bin", os.Getenv("HOME"), cliName)); err != nil {
+		fmt.Println("Failed to add kbcli bin dir to PATH:", err)
+	}
+
+	// when the kubernetes cluster is not ready, the runtime will output the error
+	// message like "couldn't get resource list for", we ignore it
+	utilruntime.ErrorHandlers[0] = func(err error) {
+		if klog.V(2).Enabled() {
+			klog.ErrorDepth(2, err)
+		}
 	}
 }
 
@@ -70,7 +91,7 @@ func NewDefaultCliCmd() *cobra.Command {
 		cmdPathPieces := os.Args[1:]
 
 		// only look for suitable extension executables if
-		// the specified command does not already exist
+		// the specified command does not exist
 		if _, _, err := cmd.Find(cmdPathPieces); err != nil {
 			var cmdName string
 			for _, arg := range cmdPathPieces {
@@ -117,9 +138,15 @@ A Command Line Interface for KubeBlocks`,
 		Run: func(cmd *cobra.Command, args []string) {
 			_ = cmd.Help()
 		},
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Name() == cobra.ShellCompRequestCmd {
+				kcplugin.SetupPluginCompletion(cmd, args)
+			}
+			return nil
+		},
 	}
 
-	// From this point and forward we get warnings on flags that contain "_" separators
+	// Start from this point we get warnings on flags that contain "_" separators
 	// when adding them with hyphen instead of the original name.
 	cmd.SetGlobalNormalizationFunc(cliflag.WarnWordSepNormalizeFunc)
 
@@ -141,7 +168,7 @@ A Command Line Interface for KubeBlocks`,
 	cmd.AddCommand(
 		playground.NewPlaygroundCmd(ioStreams),
 		kubeblocks.NewKubeBlocksCmd(f, ioStreams),
-		bench.NewBenchCmd(),
+		bench.NewBenchCmd(f, ioStreams),
 		options.NewCmdOptions(ioStreams.Out),
 		version.NewVersionCmd(f),
 		dashboard.NewDashboardCmd(f, ioStreams),
@@ -153,6 +180,7 @@ A Command Line Interface for KubeBlocks`,
 		migration.NewMigrationCmd(f, ioStreams),
 		plugin.NewPluginCmd(ioStreams),
 		fault.NewFaultCmd(f, ioStreams),
+		builder.NewBuilderCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}
@@ -161,7 +189,7 @@ A Command Line Interface for KubeBlocks`,
 	helpFunc := cmd.HelpFunc()
 	usageFunc := cmd.UsageFunc()
 
-	// clusterCmd set its own usage and help function and its subcommand will inherit it,
+	// clusterCmd sets its own usage and help function and its subcommand will inherit it,
 	// so we need to set its subcommand's usage and help function back to the root command
 	clusterCmd := cluster.NewClusterCmd(f, ioStreams)
 	registerUsageAndHelpFuncForSubCommand(clusterCmd, helpFunc, usageFunc)
@@ -183,13 +211,12 @@ func initConfig() {
 	viper.AutomaticEnv() // read in environment variables that match
 	viper.SetEnvPrefix(cliName)
 
-	viper.SetDefault("CLUSTER_DEFAULT_STORAGE_SIZE", "20Gi")
-	viper.SetDefault("CLUSTER_DEFAULT_REPLICAS", 1)
-	viper.SetDefault("CLUSTER_DEFAULT_CPU", "1000m")
-	viper.SetDefault("CLUSTER_DEFAULT_MEMORY", "1Gi")
+	viper.SetDefault(types.CfgKeyClusterDefaultStorageSize, "20Gi")
+	viper.SetDefault(types.CfgKeyClusterDefaultReplicas, 1)
+	viper.SetDefault(types.CfgKeyClusterDefaultCPU, "1000m")
+	viper.SetDefault(types.CfgKeyClusterDefaultMemory, "1Gi")
 
-	viper.SetDefault("KB_WAIT_ADDON_TIMES", 60)
-	viper.SetDefault("PLAYGROUND_WAIT_TIMES", 20)
+	viper.SetDefault(types.CfgKeyHelmRepoURL, "")
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {

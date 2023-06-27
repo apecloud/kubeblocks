@@ -22,6 +22,7 @@ package graph
 import (
 	"errors"
 	"fmt"
+	"sort"
 )
 
 type DAG struct {
@@ -54,7 +55,7 @@ func (r *realEdge) To() Vertex {
 	return r.T
 }
 
-// AddVertex put 'v' into 'd'
+// AddVertex puts 'v' into 'd'
 func (d *DAG) AddVertex(v Vertex) bool {
 	if v == nil {
 		return false
@@ -63,7 +64,7 @@ func (d *DAG) AddVertex(v Vertex) bool {
 	return true
 }
 
-// RemoveVertex delete 'v' from 'd'
+// RemoveVertex deletes 'v' from 'd'
 // the in&out edges are also deleted
 func (d *DAG) RemoveVertex(v Vertex) bool {
 	if v == nil {
@@ -78,7 +79,7 @@ func (d *DAG) RemoveVertex(v Vertex) bool {
 	return true
 }
 
-// Vertices return all vertices in 'd'
+// Vertices returns all vertices in 'd'
 func (d *DAG) Vertices() []Vertex {
 	vertices := make([]Vertex, 0)
 	for v := range d.vertices {
@@ -87,7 +88,7 @@ func (d *DAG) Vertices() []Vertex {
 	return vertices
 }
 
-// AddEdge put edge 'e' into 'd'
+// AddEdge puts edge 'e' into 'd'
 func (d *DAG) AddEdge(e Edge) bool {
 	if e.From() == nil || e.To() == nil {
 		return false
@@ -101,7 +102,7 @@ func (d *DAG) AddEdge(e Edge) bool {
 	return true
 }
 
-// RemoveEdge delete edge 'e'
+// RemoveEdge deletes edge 'e'
 func (d *DAG) RemoveEdge(e Edge) bool {
 	for k := range d.edges {
 		if k.From() == e.From() && k.To() == e.To() {
@@ -126,12 +127,29 @@ func (d *DAG) Connect(from, to Vertex) bool {
 	return true
 }
 
-// WalkTopoOrder walk the DAG 'd' in topology order
+// AddConnect add 'to' to the DAG 'd' and connect 'from' to 'to'
+func (d *DAG) AddConnect(from, to Vertex) bool {
+	if !d.AddVertex(to) {
+		return false
+	}
+	return d.Connect(from, to)
+}
+
+// AddConnectRoot add 'v' to the DAG 'd' and connect root to 'v'
+func (d *DAG) AddConnectRoot(v Vertex) bool {
+	root := d.Root()
+	if root == nil {
+		return false
+	}
+	return d.AddConnect(root, v)
+}
+
+// WalkTopoOrder walks the DAG 'd' in topology order
 func (d *DAG) WalkTopoOrder(walkFunc WalkFunc) error {
 	if err := d.validate(); err != nil {
 		return err
 	}
-	orders := d.topologicalOrder(false)
+	orders := d.topologicalOrder(false, nil)
 	for _, v := range orders {
 		if err := walkFunc(v); err != nil {
 			return err
@@ -140,12 +158,12 @@ func (d *DAG) WalkTopoOrder(walkFunc WalkFunc) error {
 	return nil
 }
 
-// WalkReverseTopoOrder walk the DAG 'd' in reverse topology order
+// WalkReverseTopoOrder walks the DAG 'd' in reverse topology order
 func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc) error {
 	if err := d.validate(); err != nil {
 		return err
 	}
-	orders := d.topologicalOrder(true)
+	orders := d.topologicalOrder(true, nil)
 	for _, v := range orders {
 		if err := walkFunc(v); err != nil {
 			return err
@@ -154,7 +172,78 @@ func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc) error {
 	return nil
 }
 
-// Root return root vertex that has no in adjacent.
+// WalkBFS walks the DAG 'd' in breadth-first order
+func (d *DAG) WalkBFS(walkFunc WalkFunc) error {
+	return d.bfs(walkFunc, nil)
+}
+
+func (d *DAG) bfs(walkFunc WalkFunc, less func(v1, v2 Vertex) bool) error {
+	if err := d.validate(); err != nil {
+		return err
+	}
+	queue := make([]Vertex, 0)
+	walked := make(map[Vertex]bool, len(d.Vertices()))
+
+	root := d.Root()
+	queue = append(queue, root)
+	for len(queue) > 0 {
+		var walkErr error
+		for _, vertex := range queue {
+			if err := walkFunc(vertex); err != nil {
+				walkErr = err
+			}
+		}
+		if walkErr != nil {
+			return walkErr
+		}
+
+		nextStep := make([]Vertex, 0)
+		for _, vertex := range queue {
+			adjs := d.outAdj(vertex)
+			if less != nil {
+				sort.SliceStable(adjs, func(i, j int) bool {
+					return less(adjs[i], adjs[j])
+				})
+			}
+			for _, adj := range adjs {
+				if !walked[adj] {
+					nextStep = append(nextStep, adj)
+					walked[adj] = true
+				}
+			}
+		}
+		queue = nextStep
+	}
+
+	return nil
+}
+
+// Equals tells whether two DAGs are equal
+// `less` tells whether vertex 'v1' is less than vertex 'v2'.
+// `less` should return false if 'v1' equals to 'v2'.
+func (d *DAG) Equals(other *DAG, less func(v1, v2 Vertex) bool) bool {
+	if other == nil || less == nil {
+		return false
+	}
+	// sort both DAGs in topology order.
+	// a DAG may have more than one topology order, func 'less' is used to eliminate randomness
+	// and hence only one deterministic order is generated.
+	vertices1 := d.topologicalOrder(false, less)
+	vertices2 := other.topologicalOrder(false, less)
+
+	// compare them
+	if len(vertices1) != len(vertices2) {
+		return false
+	}
+	for i := range vertices1 {
+		if less(vertices1[i], vertices2[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// Root returns root vertex that has no in adjacent.
 // our DAG should have one and only one root vertex
 func (d *DAG) Root() Vertex {
 	roots := make([]Vertex, 0)
@@ -169,7 +258,15 @@ func (d *DAG) Root() Vertex {
 	return roots[0]
 }
 
-// String return a string representation of the DAG in topology order
+func (d *DAG) Merge(subDag *DAG) {
+	for v := range subDag.vertices {
+		if len(d.inAdj(v)) == 0 {
+			d.AddConnectRoot(v)
+		}
+	}
+}
+
+// String returns a string representation of the DAG in topology order
 func (d *DAG) String() string {
 	str := "|"
 	walkFunc := func(v Vertex) error {
@@ -229,9 +326,9 @@ func (d *DAG) validate() error {
 	return nil
 }
 
-// topologicalOrder return a vertex list that is in topology order
+// topologicalOrder returns a vertex list that is in topology order
 // 'd' MUST be a legal DAG
-func (d *DAG) topologicalOrder(reverse bool) []Vertex {
+func (d *DAG) topologicalOrder(reverse bool, less func(v1, v2 Vertex) bool) []Vertex {
 	// orders is what we want, a (reverse) topological order of this DAG
 	orders := make([]Vertex, 0)
 
@@ -250,13 +347,24 @@ func (d *DAG) topologicalOrder(reverse bool) []Vertex {
 		} else {
 			adjacent = d.inAdj(v)
 		}
+		if less != nil {
+			sort.SliceStable(adjacent, func(i, j int) bool {
+				return less(adjacent[i], adjacent[j])
+			})
+		}
 		for _, vertex := range adjacent {
 			walk(vertex)
 		}
 		walked[v] = true
 		orders = append(orders, v)
 	}
-	for v := range d.vertices {
+	vertexLst := d.Vertices()
+	if less != nil {
+		sort.SliceStable(vertexLst, func(i, j int) bool {
+			return less(vertexLst[i], vertexLst[j])
+		})
+	}
+	for _, v := range vertexLst {
 		walk(v)
 	}
 	return orders
@@ -284,7 +392,7 @@ func (d *DAG) inAdj(v Vertex) []Vertex {
 	return vertices
 }
 
-// NewDAG new an empty DAG
+// NewDAG news an empty DAG
 func NewDAG() *DAG {
 	dag := &DAG{
 		vertices: make(map[Vertex]Vertex),

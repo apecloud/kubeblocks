@@ -1,29 +1,192 @@
 /*
 Copyright (C) 2022-2023 ApeCloud Co., Ltd
 
-This file is part of KubeBlocks project
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-This program is distributed in the hope that it will be useful
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package v1alpha1
 
 import (
+	"fmt"
 	"testing"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/yaml"
 )
+
+var _ = Describe("", func() {
+
+	It("test GetMinAvailable", func() {
+		prefer := intstr.IntOrString{}
+		clusterCompSpec := &ClusterComponentSpec{}
+		Expect(clusterCompSpec.GetMinAvailable(nil)).Should(BeNil())
+		clusterCompSpec.NoCreatePDB = false
+		clusterCompSpec.Replicas = 1
+		Expect(clusterCompSpec.GetMinAvailable(&prefer).IntVal).Should(BeEquivalentTo(0))
+		clusterCompSpec.Replicas = 2
+		Expect(clusterCompSpec.GetMinAvailable(&prefer).IntVal).Should(BeEquivalentTo(1))
+		clusterCompSpec.Replicas = 3
+		Expect(clusterCompSpec.GetMinAvailable(&prefer)).Should(BeEquivalentTo(&prefer))
+	})
+
+	It("test toVolumeClaimTemplate", func() {
+		r := ClusterComponentVolumeClaimTemplate{}
+		r.Name = "test-name"
+		Expect(r.toVolumeClaimTemplate().ObjectMeta.Name).Should(BeEquivalentTo(r.Name))
+	})
+
+	It("test ToV1PersistentVolumeClaimSpec", func() {
+		r := PersistentVolumeClaimSpec{}
+		pvcSpec := r.ToV1PersistentVolumeClaimSpec()
+		Expect(pvcSpec.AccessModes).Should(BeEquivalentTo(r.AccessModes))
+		Expect(pvcSpec.Resources).Should(BeEquivalentTo(r.Resources))
+		Expect(pvcSpec.StorageClassName).Should(BeEquivalentTo(r.StorageClassName))
+	})
+
+	It("test GetStorageClassName", func() {
+		preferSC := "prefer-sc"
+		r := PersistentVolumeClaimSpec{}
+		r.StorageClassName = nil
+		Expect(r.GetStorageClassName(preferSC)).Should(BeEquivalentTo(&preferSC))
+		scName := "test-sc"
+		r.StorageClassName = &scName
+		Expect(r.GetStorageClassName(preferSC)).Should(BeEquivalentTo(&scName))
+	})
+
+	It("test IsDeleting", func() {
+		r := Cluster{}
+		Expect(r.IsDeleting()).Should(Equal(false))
+	})
+
+	It("test IsUpdating", func() {
+		r := Cluster{}
+		r.Status = ClusterStatus{
+			ObservedGeneration: int64(0),
+		}
+		r.Generation = 1
+		Expect(r.IsUpdating()).Should(Equal(true))
+	})
+
+	It("test IsStatusUpdating", func() {
+		r := Cluster{}
+		r.Status = ClusterStatus{
+			ObservedGeneration: int64(1),
+		}
+		r.Generation = 1
+		Expect(r.IsStatusUpdating()).Should(Equal(true))
+	})
+
+	It("test GetVolumeClaimNames", func() {
+		r := Cluster{}
+		clusterName := "test-cluster"
+		r.Name = clusterName
+		Expect(r.GetVolumeClaimNames("")).Should(BeNil())
+		compName := "test-comp"
+		comp := ClusterComponentSpec{}
+		comp.Name = compName
+		r.Spec.ComponentSpecs = []ClusterComponentSpec{
+			comp,
+		}
+		Expect(r.GetVolumeClaimNames("")).Should(BeNil())
+		comp.VolumeClaimTemplates = []ClusterComponentVolumeClaimTemplate{
+			{
+				Name: compName,
+				Spec: PersistentVolumeClaimSpec{},
+			},
+		}
+		comp.Replicas = 1
+		r.Spec.ComponentSpecs = []ClusterComponentSpec{
+			comp,
+		}
+		Expect(r.GetVolumeClaimNames(compName)).ShouldNot(BeNil())
+		Expect(r.GetVolumeClaimNames(compName)).Should(ContainElement(fmt.Sprintf("%s-%s-%s-%d", compName, r.Name, compName, 0)))
+	})
+
+	It("test GetDefNameMappingComponents", func() {
+		r := ClusterSpec{}
+		key := "comp-def-ref"
+		comp := ClusterComponentSpec{}
+		comp.ComponentDefRef = key
+		r.ComponentSpecs = []ClusterComponentSpec{comp}
+		Expect(r.GetDefNameMappingComponents()[key]).Should(ContainElement(comp))
+	})
+
+	It("test SetComponentStatus", func() {
+		r := ClusterStatus{}
+		status := ClusterComponentStatus{}
+		compName := "test-comp"
+		r.Components = map[string]ClusterComponentStatus{
+			compName: {
+				Phase:                "",
+				Message:              nil,
+				PodsReady:            nil,
+				PodsReadyTime:        nil,
+				ConsensusSetStatus:   nil,
+				ReplicationSetStatus: nil,
+			},
+		}
+		r.SetComponentStatus(compName, status)
+		Expect(r.Components[compName]).Should(Equal(status))
+	})
+
+	It("test checkedInitComponentsMap", func() {
+		r := ClusterStatus{}
+		r.Components = nil
+		r.checkedInitComponentsMap()
+		Expect(r.Components).ShouldNot(BeNil())
+	})
+
+	It("test ToVolumeClaimTemplates", func() {
+		r := ClusterComponentSpec{}
+		r.VolumeClaimTemplates = []ClusterComponentVolumeClaimTemplate{{
+			Name: "",
+			Spec: PersistentVolumeClaimSpec{},
+		}}
+		Expect(r.ToVolumeClaimTemplates()).Should(HaveLen(1))
+	})
+
+	It("test GetClusterUpRunningPhases", func() {
+		Expect(GetClusterUpRunningPhases()).Should(ContainElements([]ClusterPhase{
+			RunningClusterPhase,
+			AbnormalClusterPhase,
+			FailedClusterPhase,
+		}))
+	})
+
+	It("GetComponentTerminalPhases", func() {
+		Expect(GetComponentTerminalPhases()).Should(ContainElements([]ClusterComponentPhase{
+			RunningClusterCompPhase,
+			StoppedClusterCompPhase,
+			FailedClusterCompPhase,
+			AbnormalClusterCompPhase,
+		}))
+	})
+
+	It("GetComponentUpRunningPhase", func() {
+		Expect(GetComponentUpRunningPhase()).Should(ContainElements([]ClusterComponentPhase{
+			RunningClusterCompPhase,
+			AbnormalClusterCompPhase,
+			FailedClusterCompPhase,
+		}))
+	})
+
+	It("ComponentPodsAreReady", func() {
+		ready := true
+		Expect(ComponentPodsAreReady(&ready)).Should(BeTrue())
+	})
+})
 
 func TestValidateEnabledLogs(t *testing.T) {
 	cluster := &Cluster{}

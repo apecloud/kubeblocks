@@ -33,7 +33,7 @@ var _ Fetcher = HTTPFetcher{}
 // HTTPFetcher is used to get a file from a http:// or https:// schema path.
 type HTTPFetcher struct{}
 
-// Get gets the file and returns an stream to read the file.
+// Get gets the file and returns a stream to read the file.
 func (HTTPFetcher) Get(uri string) (io.ReadCloser, error) {
 	klog.V(2).Infof("Fetching %q", uri)
 	resp, err := http.Get(uri)

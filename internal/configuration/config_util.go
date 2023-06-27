@@ -23,9 +23,11 @@ import (
 	"context"
 
 	"github.com/StudioSol/set"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 )
 
 type ParamPairs struct {
@@ -33,7 +35,7 @@ type ParamPairs struct {
 	UpdatedParams map[string]interface{}
 }
 
-// MergeAndValidateConfigs does merge configuration files and validate
+// MergeAndValidateConfigs merges and validates configuration files
 func MergeAndValidateConfigs(configConstraint appsv1alpha1.ConfigConstraintSpec, baseConfigs map[string]string, cmKey []string, updatedParams []ParamPairs) (map[string]string, error) {
 	var (
 		err error
@@ -41,7 +43,7 @@ func MergeAndValidateConfigs(configConstraint appsv1alpha1.ConfigConstraintSpec,
 
 		newCfg         map[string]string
 		configOperator ConfigOperator
-		updatedKeys    = set.NewLinkedHashSetString()
+		updatedKeys    = cfgutil.NewSet()
 	)
 
 	cmKeySet := FromCMKeysSelector(cmKey)
@@ -67,20 +69,20 @@ func MergeAndValidateConfigs(configConstraint appsv1alpha1.ConfigConstraintSpec,
 		return nil, WrapError(err, "failed to generate config file")
 	}
 
-	// The ToCfgContent interface returns the file contents of all keys, and after the configuration file is encoded and decoded,
-	// the content may be inconsistent, such as comments, blank lines, etc,
-	// in order to minimize the impact on the original configuration file, only update the changed file content.
+	// The ToCfgContent interface returns the file contents of all keys, the configuration file is encoded and decoded into keys,
+	// the content may be different with the original file, such as comments, blank lines, etc,
+	// in order to minimize the impact on the original file, only update the changed part.
 	updatedCfg := fromUpdatedConfig(newCfg, updatedKeys)
 	if err = NewConfigValidator(&configConstraint, WithKeySelector(cmKey)).Validate(updatedCfg); err != nil {
 		return nil, WrapError(err, "failed to validate updated config")
 	}
-	return mergeUpdatedConfig(baseConfigs, updatedCfg), nil
+	return MergeUpdatedConfig(baseConfigs, updatedCfg), nil
 }
 
-// mergeUpdatedConfig replaces the file content of the changed key.
+// MergeUpdatedConfig replaces the file content of the changed key.
 // baseMap is the original configuration file,
 // updatedMap is the updated configuration file
-func mergeUpdatedConfig(baseMap, updatedMap map[string]string) map[string]string {
+func MergeUpdatedConfig(baseMap, updatedMap map[string]string) map[string]string {
 	r := make(map[string]string)
 	for key, val := range baseMap {
 		r[key] = val
@@ -91,7 +93,7 @@ func mergeUpdatedConfig(baseMap, updatedMap map[string]string) map[string]string
 	return r
 }
 
-// fromUpdatedConfig function is to filter out changed file contents.
+// fromUpdatedConfig filters out changed file contents.
 func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[string]string {
 	if sets.Length() == 0 {
 		return map[string]string{}
@@ -134,4 +136,29 @@ func ApplyConfigPatch(baseCfg []byte, updatedParameters map[string]string, forma
 	}
 	mergedConfig := configWrapper.getConfigObject(mergedOptions)
 	return mergedConfig.Marshal()
+}
+
+func NeedReloadVolume(config appsv1alpha1.ComponentConfigSpec) bool {
+	// TODO distinguish between scripts and configuration
+	return config.ConfigConstraintRef != ""
+}
+
+func GetReloadOptions(cli client.Client, ctx context.Context, configSpecs []appsv1alpha1.ComponentConfigSpec) (*appsv1alpha1.ReloadOptions, *appsv1alpha1.FormatterConfig, error) {
+	for _, configSpec := range configSpecs {
+		if !NeedReloadVolume(configSpec) {
+			continue
+		}
+		ccKey := client.ObjectKey{
+			Namespace: "",
+			Name:      configSpec.ConfigConstraintRef,
+		}
+		cfgConst := &appsv1alpha1.ConfigConstraint{}
+		if err := cli.Get(ctx, ccKey, cfgConst); err != nil {
+			return nil, nil, WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
+		}
+		if cfgConst.Spec.ReloadOptions != nil {
+			return cfgConst.Spec.ReloadOptions, cfgConst.Spec.FormatterConfig, nil
+		}
+	}
+	return nil, nil, nil
 }

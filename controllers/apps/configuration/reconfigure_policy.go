@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	appv1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -64,14 +64,14 @@ type reconfigurePolicy interface {
 	// Upgrade is to enable the configuration to take effect.
 	Upgrade(params reconfigureParams) (ReturnedStatus, error)
 
-	// GetPolicyName return name of policy.
+	// GetPolicyName returns name of policy.
 	GetPolicyName() string
 }
 
 type AutoReloadPolicy struct{}
 
 type reconfigureParams struct {
-	// Only support restart pod or container.
+	// Only supports restart pod or container.
 	Restart bool
 
 	// Name is a config template name.
@@ -89,7 +89,7 @@ type reconfigureParams struct {
 	// For grpc factory
 	ReconfigureClientFactory createReconfigureClient
 
-	// List of container, using this config volume.
+	// List of containers using this config volume.
 	ContainerNames []string
 
 	Client client.Client
@@ -102,12 +102,15 @@ type reconfigureParams struct {
 	// Associated component for clusterdefinition.
 	Component *appsv1alpha1.ClusterComponentDefinition
 
-	// List of StatefulSet, using this config template.
-	ComponentUnits []appv1.StatefulSet
+	// List of StatefulSets using this config template.
+	ComponentUnits []appsv1.StatefulSet
+
+	// List of Deployment using this config template.
+	DeploymentUnits []appsv1.Deployment
 }
 
 var (
-	// lazy create grpc connection
+	// lazy creation of grpc connection
 	// TODO support connection pool
 	newGRPCClient = func(addr string) (cfgproto.ReconfigureClient, error) {
 		conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -140,7 +143,7 @@ func (param *reconfigureParams) getConfigKey() string {
 func (param *reconfigureParams) getTargetVersionHash() string {
 	hash, err := util.ComputeHash(param.ConfigMap.Data)
 	if err != nil {
-		param.Ctx.Log.Error(err, "failed to cal configuration version!")
+		param.Ctx.Log.Error(err, "failed to get configuration version!")
 		return ""
 	}
 
@@ -167,7 +170,7 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 	if isPercentage {
 		r = int32(math.Floor(float64(v) * float64(replicas) / 100))
 	} else {
-		r = int32(util.Min(v, param.getTargetReplicas()))
+		r = util.Safe2Int32(util.Min(v, param.getTargetReplicas()))
 	}
 	return util.Max(r, defaultRolling)
 }
@@ -216,7 +219,7 @@ func NewReconfigurePolicy(cc *appsv1alpha1.ConfigConstraintSpec, cfgPatch *cfgco
 	if action, ok := upgradePolicyMap[policy]; ok {
 		return action, nil
 	}
-	return nil, cfgcore.MakeError("not support upgrade policy:[%s]", policy)
+	return nil, cfgcore.MakeError("not supported upgrade policy:[%s]", policy)
 }
 
 func enableAutoDecision(restart bool, policy appsv1alpha1.UpgradePolicy) bool {
@@ -258,4 +261,20 @@ func makeReturnedStatus(status ExecStatus, ops ...func(status *ReturnedStatus)) 
 		o(&ret)
 	}
 	return ret
+}
+
+func fromDeploymentObjects(units []appsv1.Deployment) []client.Object {
+	r := make([]client.Object, len(units))
+	for i, unit := range units {
+		r[i] = &unit
+	}
+	return r
+}
+
+func fromStatefulSetObjects(units []appsv1.StatefulSet) []client.Object {
+	r := make([]client.Object, len(units))
+	for i, unit := range units {
+		r[i] = &unit
+	}
+	return r
 }

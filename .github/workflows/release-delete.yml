@@ -1,6 +1,8 @@
 name: RELEASE-DELETE
 
 on:
+  schedule:
+    - cron: '18 0 * * 1-5'
   workflow_dispatch:
     inputs:
       release-version:
@@ -10,8 +12,16 @@ on:
 
 jobs:
   delete-release:
-    uses: apecloud/apecloud-cd/.github/workflows/release-delete.yml@v0.1.0
+    if: github.event_name != 'schedule'
+    uses: apecloud/apecloud-cd/.github/workflows/release-delete.yml@v0.1.5
     with:
       VERSION: "${{ inputs.release-version }}"
-      APECD_REF: "v0.1.0"
+      APECD_REF: "v0.1.5"
+    secrets: inherit
+
+  delete-release-schedule:
+    if: github.event_name == 'schedule'
+    uses: apecloud/apecloud-cd/.github/workflows/release-delete-schedule.yml@v0.1.5
+    with:
+      APECD_REF: "v0.1.5"
     secrets: inherit

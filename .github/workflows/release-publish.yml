@@ -191,6 +191,11 @@ jobs:
           
           echo tag_name=${{ env.TAG_NAME }} >> $GITHUB_OUTPUT
 
+      - name: delete cache
+        continue-on-error: true
+        run: |
+          bash .github/utils/utils.sh --type 17 --tag-name "${{ steps.send_message.outputs.release-result }}"
+
       - name: Save Artifact
         id: cache-artifact-save
         uses: actions/cache/save@v3
@@ -232,4 +237,15 @@ jobs:
       APECD_REF: "v0.1.4"
       VERSION: "${{ needs.send-message.outputs.tag-name }}"
     secrets: inherit
-    
+
+  delete-cache:
+    needs: e2e-kbcli
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        type: [image, kbcli, chart]
+    steps:
+      - name: delete ${{ matrix.type }} cache
+        continue-on-error: true
+        run: |
+          bash .github/utils/utils.sh --type 17 --tag-name "${{ env.TAG_NAME }}-${{ matrix.type }}"

@@ -31,8 +31,9 @@ then
   wait $PID
   rm $BACKUPFILE
 fi
-  am
+
 trap "echo 'Terminating...' && kill `cat /data/mongodb/tmp/mongodb.pid`" TERM
-mongod  --bind_ip_all --port $PORT --replSet $RPL_SET_NAME  --config /etc/mongodb/mongodb.conf
-  until mongosh --quiet --port $PORT --host $host --eval "print('I am ready')"; do sleep 1; done
-  PID=`cat $MONGODB_ROOT/tmp/mongodb.pid`
+mongod  --bind_ip_all --port $PORT --replSet $RPL_SET_NAME  --config /etc/mongodb/mongodb.conf&
+until mongosh --quiet --port $PORT --host $host --eval "print('I am ready')"; do sleep 1; done
+PID=`cat $MONGODB_ROOT/tmp/mongodb.pid`
+wait $PID

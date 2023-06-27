@@ -70,7 +70,7 @@ func (ha *Ha) RunCycle() {
 			}
 		}
 
-	case cluster.Leader.Name == ha.dbManager.GetCurrentMemberName():
+	case cluster.HasLock():
 		ha.logger.Infof("This member is Cluster's leader")
 		if ok, _ := ha.dbManager.IsLeader(context.TODO()); ok {
 			ha.logger.Infof("Refresh leader ttl")
@@ -78,6 +78,9 @@ func (ha *Ha) RunCycle() {
 		} else if ha.dbManager.HasOtherHealthyLeader() != nil {
 			ha.logger.Infof("Release leader")
 			ha.dcs.ReleaseLock()
+		} else {
+			ha.dbManager.Premote()
+			ha.dcs.UpdateLock()
 		}
 
 	case cluster.SwitchOver != nil && cluster.SwitchOver.Leader == ha.dbManager.GetCurrentMemberName():

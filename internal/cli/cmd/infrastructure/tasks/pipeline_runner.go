@@ -63,10 +63,6 @@ func (w *PipelineWrapper) Do(output io.Writer) error {
 			return cfgcore.WrapError(res.CombineResult, "failed to execute module: %s", getModuleName(m))
 		}
 	}
-
-	if w.SpecHosts != len(w.Runtime.GetAllHosts()) {
-		return cfgcore.MakeError("failed to execute pipeline: there are some error in your spec hosts", w.Name)
-	}
 	fmt.Fprintf(output, "succeed to execute all modules in the pipeline[%s]", w.Name)
 	return nil
 }

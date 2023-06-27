@@ -5,22 +5,22 @@ title: kbcli report kubeblocks
 Report KubeBlocks information, including deployments, events, logs, etc.
 
 ```
-kbcli report kubeblocks [-f file] [-with-logs] [-mask] [flags]
+kbcli report kubeblocks [-f file] [--with-logs] [--mask] [flags]
 ```
 
 ### Examples
 
 ```
-  # report KubeBlock status
+  # report KubeBlocks status
   kbcli report kubeblocks
   
-  # report KubeBlock information to file
-  kbcli report kubeblocks -f <filename>
+  # report KubeBlocks information to file
+  kbcli report kubeblocks -f filename
   
-  # report KubeBlock information with logs
+  # report KubeBlocks information with logs
   kbcli report kubeblocks --with-logs
   
-  # report KubeBlock information with logs and mask sensitive info
+  # report KubeBlocks information with logs and mask sensitive info
   kbcli report kubeblocks --with-logs --mask
 ```
 

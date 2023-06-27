@@ -11,26 +11,26 @@ kbcli report cluster NAME [-f file] [-with-logs] [-mask] [flags]
 ### Examples
 
 ```
-  # report KubeBlock status
-  kbcli report cluster <mycluster>
+  # report KubeBlocks status
+  kbcli report cluster mycluster
   
-  # report KubeBlock cluster information to file
-  kbcli report cluster <mycluster> -f <filename>
+  # report KubeBlocks cluster information to file
+  kbcli report cluster mycluster -f filename
   
-  # report KubeBlock cluster information with logs
-  kbcli report cluster <mycluster> --with-logs
+  # report KubeBlocks cluster information with logs
+  kbcli report cluster mycluster --with-logs
   
-  # report KubeBlock cluster information with logs and mask sensitive info
-  kbcli report cluster <mycluster> --with-logs --mask
+  # report KubeBlocks cluster information with logs and mask sensitive info
+  kbcli report cluster mycluster --with-logs --mask
   
-  # report KubeBlock cluster information with logs since 1 hour ago
-  kbcli report cluster <mycluster> --with-logs --since 1h
+  # report KubeBlocks cluster information with logs since 1 hour ago
+  kbcli report cluster mycluster --with-logs --since 1h
   
-  # report KubeBlock cluster information with logs since given time
-  kbcli report cluster <mycluster> --with-logs --since-time 2023-05-23T00:00:00Z
+  # report KubeBlocks cluster information with logs since given time
+  kbcli report cluster mycluster --with-logs --since-time 2023-05-23T00:00:00Z
   
-  # report KubeBlock cluster information with logs for all containers
-  kbcli report cluster <mycluster> --with-logs --all-containers
+  # report KubeBlocks cluster information with logs for all containers
+  kbcli report cluster mycluster --with-logs --all-containers
 ```
 
 ### Options

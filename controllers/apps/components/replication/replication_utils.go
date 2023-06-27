@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,8 +31,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
@@ -42,81 +41,49 @@ func rebuildReplicationSetClusterStatus(cluster *appsv1alpha1.Cluster,
 	if len(podList) == 0 {
 		return nil
 	}
-	replicationStatus := cluster.Status.Components[compName].ReplicationSetStatus
-	if replicationStatus == nil {
+
+	var oldReplicationStatus *appsv1alpha1.ReplicationSetStatus
+	if v, ok := cluster.Status.Components[compName]; ok {
+		oldReplicationStatus = v.ReplicationSetStatus
+	}
+
+	newReplicationStatus := &appsv1alpha1.ReplicationSetStatus{}
+	if err := genReplicationSetStatus(newReplicationStatus, podList); err != nil {
+		return err
+	}
+	// if status changed, do update
+	if !cmp.Equal(newReplicationStatus, oldReplicationStatus) {
 		if err := util.InitClusterComponentStatusIfNeed(cluster, compName, workloadType); err != nil {
 			return err
 		}
-		replicationStatus = cluster.Status.Components[compName].ReplicationSetStatus
+		componentStatus := cluster.Status.Components[compName]
+		componentStatus.ReplicationSetStatus = newReplicationStatus
+		cluster.Status.SetComponentStatus(compName, componentStatus)
 	}
-	return rebuildReplicationSetStatus(replicationStatus, podList)
+	return nil
 }
 
-// rebuildReplicationSetStatus rebuilds the target pod info in cluster.status.components.
-func rebuildReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []corev1.Pod) error {
+// genReplicationSetStatus generates ReplicationSetStatus from podList.
+func genReplicationSetStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus, podList []corev1.Pod) error {
 	for _, pod := range podList {
 		role := pod.Labels[constant.RoleLabelKey]
 		if role == "" {
 			return fmt.Errorf("pod %s has no role label", pod.Name)
 		}
-		if role == constant.Primary {
-			if replicationStatus.Primary.Pod == pod.Name {
-				continue
+		switch role {
+		case constant.Primary:
+			if replicationStatus.Primary.Pod != "" {
+				return fmt.Errorf("more than one primary pod found")
 			}
 			replicationStatus.Primary.Pod = pod.Name
-			// if current primary pod in secondary list, it means the primary pod has been switched, remove it.
-			for index, secondary := range replicationStatus.Secondaries {
-				if secondary.Pod == pod.Name {
-					replicationStatus.Secondaries = append(replicationStatus.Secondaries[:index], replicationStatus.Secondaries[index+1:]...)
-					break
-				}
-			}
-		} else {
-			var exist = false
-			for _, secondary := range replicationStatus.Secondaries {
-				if secondary.Pod == pod.Name {
-					exist = true
-					break
-				}
-			}
-			if !exist {
-				replicationStatus.Secondaries = append(replicationStatus.Secondaries, appsv1alpha1.ReplicationMemberStatus{
-					Pod: pod.Name,
-				})
-			}
+		case constant.Secondary:
+			replicationStatus.Secondaries = append(replicationStatus.Secondaries, appsv1alpha1.ReplicationMemberStatus{
+				Pod: pod.Name,
+			})
+		default:
+			return fmt.Errorf("unknown role %s", role)
 		}
 	}
-	return nil
-}
-
-// removeTargetPodsInfoInStatus removes the target pod info from cluster.status.components.
-func removeTargetPodsInfoInStatus(replicationStatus *appsv1alpha1.ReplicationSetStatus,
-	targetPodList []*corev1.Pod,
-	componentReplicas int32) error {
-	if replicationStatus == nil {
-		return nil
-	}
-	targetPodNameMap := make(map[string]struct{})
-	for _, pod := range targetPodList {
-		targetPodNameMap[pod.Name] = struct{}{}
-	}
-	if _, ok := targetPodNameMap[replicationStatus.Primary.Pod]; ok {
-		if componentReplicas != 0 {
-			return fmt.Errorf("primary pod cannot be removed")
-		}
-		replicationStatus.Primary = appsv1alpha1.ReplicationMemberStatus{
-			Pod: constant.ComponentStatusDefaultPodName,
-		}
-	}
-	newSecondaries := make([]appsv1alpha1.ReplicationMemberStatus, 0)
-	for _, secondary := range replicationStatus.Secondaries {
-		if _, ok := targetPodNameMap[secondary.Pod]; ok {
-			continue
-		}
-		// add pod that do not need to be removed to newSecondaries slice.
-		newSecondaries = append(newSecondaries, secondary)
-	}
-	replicationStatus.Secondaries = newSecondaries
 	return nil
 }
 
@@ -142,27 +109,6 @@ func updateObjRoleLabel[T generics.Object, PT generics.PObject[T]](
 		return err
 	}
 	return nil
-}
-
-// patchPodsPrimaryAnnotation patches the primary annotation of the pod.
-func patchPodsPrimaryAnnotation(pods []corev1.Pod, primary string) ([]graph.Vertex, error) {
-	vertexes := make([]graph.Vertex, 0)
-	if primary == "" {
-		return vertexes, nil
-	}
-	for _, pod := range pods {
-		if pod.Annotations == nil {
-			pod.Annotations = map[string]string{}
-		}
-		if v, ok := pod.Annotations[constant.PrimaryAnnotationKey]; !ok || v != primary {
-			pod.Annotations[constant.PrimaryAnnotationKey] = primary
-			vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
-				Obj:    &pod,
-				Action: ictrltypes.ActionUpdatePtr(),
-			})
-		}
-	}
-	return vertexes, nil
 }
 
 // HandleReplicationSetRoleChangeEvent handles the role change event of the replication workload when switchPolicy is Noop.
@@ -220,4 +166,93 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	reqCtx.Log.Info("update secondary pod to primary success", "new primary podName", pod.Name)
 
 	return nil
+}
+
+// ComposeReplicationRolePriorityMap generates a priority map based on roles.
+func ComposeReplicationRolePriorityMap() map[string]int {
+	rolePriorityMap := make(map[string]int, 0)
+	rolePriorityMap[""] = emptyPriority
+	rolePriorityMap[constant.Primary] = primaryPriority
+	rolePriorityMap[constant.Secondary] = secondaryPriority
+	return rolePriorityMap
+}
+
+// generateReplicationParallelPlan generates a parallel plan for the replication workload.
+// unknown & empty & secondary & primary
+func generateReplicationParallelPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
+	start := plan.Start
+	for _, pod := range pods {
+		nextStep := &util.Step{}
+		nextStep.Obj = pod
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
+}
+
+// generateReplicationSerialPlan generates a serial plan for the replication workload.
+// unknown -> empty -> secondary -> primary
+func generateReplicationSerialPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
+	start := plan.Start
+	for _, pod := range pods {
+		nextStep := &util.Step{}
+		nextStep.Obj = pod
+		start.NextSteps = append(start.NextSteps, nextStep)
+		start = nextStep
+	}
+}
+
+// generateReplicationBestEffortParallelPlan generates a best effort parallel plan for the replication workload.
+// unknown & empty & 1/2 secondaries -> 1/2 secondaries -> primary
+func generateReplicationBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
+	start := plan.Start
+	// append unknown, empty
+	index := 0
+	for _, pod := range pods {
+		role := pod.Labels[constant.RoleLabelKey]
+		if rolePriorityMap[role] <= emptyPriority {
+			nextStep := &util.Step{}
+			nextStep.Obj = pod
+			start.NextSteps = append(start.NextSteps, nextStep)
+			index++
+		}
+	}
+	if len(start.NextSteps) > 0 {
+		start = start.NextSteps[0]
+	}
+	// append 1/2 secondaries
+	podList := pods[index:]
+	secondaryCount := 0
+	for _, pod := range podList {
+		if rolePriorityMap[pod.Labels[constant.RoleLabelKey]] < primaryPriority {
+			secondaryCount++
+		}
+	}
+	end := secondaryCount / 2
+	for i := 0; i < end; i++ {
+		nextStep := &util.Step{}
+		nextStep.Obj = podList[i]
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
+
+	if len(start.NextSteps) > 0 {
+		start = start.NextSteps[0]
+	}
+	// append the other 1/2 secondaries
+	podList = podList[end:]
+	end = secondaryCount - end
+	for i := 0; i < end; i++ {
+		nextStep := &util.Step{}
+		nextStep.Obj = podList[i]
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
+
+	if len(start.NextSteps) > 0 {
+		start = start.NextSteps[0]
+	}
+	// append primary
+	podList = podList[end:]
+	for _, pod := range podList {
+		nextStep := &util.Step{}
+		nextStep.Obj = pod
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
 }

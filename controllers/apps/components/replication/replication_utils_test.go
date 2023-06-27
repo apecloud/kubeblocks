@@ -149,17 +149,13 @@ var _ = Describe("ReplicationSet Util", func() {
 				Create(&testCtx).GetObject()
 			podList = append(podList, *pod)
 		}
-		err := rebuildReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompSpecName].ReplicationSetStatus, podList)
-		Expect(err).Should(Succeed())
-		Expect(len(clusterObj.Status.Components[testapps.DefaultRedisCompSpecName].ReplicationSetStatus.Secondaries)).Should(Equal(3))
+		err := genReplicationSetStatus(clusterObj.Status.Components[testapps.DefaultRedisCompSpecName].ReplicationSetStatus, podList)
+		Expect(err).ShouldNot(Succeed())
+		Expect(err.Error()).Should(ContainSubstring("more than one primary pod found"))
 
-		By("testing sync cluster status with remove pod")
-		var podRemoveList []*corev1.Pod
-		*sts.Spec.Replicas -= 1
-		podRemoveList = append(podRemoveList, &podList[len(podList)-1])
-		Expect(removeTargetPodsInfoInStatus(clusterObj.Status.Components[testapps.DefaultRedisCompSpecName].ReplicationSetStatus,
-			podRemoveList, clusterObj.Spec.ComponentSpecs[0].Replicas)).Should(Succeed())
-		Expect(clusterObj.Status.Components[testapps.DefaultRedisCompSpecName].ReplicationSetStatus.Secondaries).Should(HaveLen(2))
+		newReplicationStatus := &appsv1alpha1.ReplicationSetStatus{}
+		err = genReplicationSetStatus(newReplicationStatus, podList)
+		Expect(len(newReplicationStatus.Secondaries)).Should(Equal(3))
 	}
 
 	testHandleReplicationSetRoleChangeEvent := func() {

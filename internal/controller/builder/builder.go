@@ -37,11 +37,9 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -449,19 +447,13 @@ func BuildPVC(cluster *appsv1alpha1.Cluster,
 
 // BuildEnvConfig builds cluster component context ConfigMap object, which is to be used in workload container's
 // envFrom.configMapRef with name of "$(cluster.metadata.name)-$(component.name)-env" pattern.
-func BuildEnvConfig(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*corev1.ConfigMap, error) {
+func BuildEnvConfig(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*corev1.ConfigMap, error) {
 	const tplFile = "env_config_template.cue"
 	envData := map[string]string{}
 
 	// build common env
 	commonEnv := buildWorkloadCommonEnv(cluster, component)
 	for k, v := range commonEnv {
-		envData[k] = v
-	}
-
-	// build env for replication workload
-	replicationEnv := buildReplicationSetEnv(reqCtx, cli, cluster, component)
-	for k, v := range replicationEnv {
 		envData[k] = v
 	}
 
@@ -513,30 +505,6 @@ func buildWorkloadCommonEnv(cluster *appsv1alpha1.Cluster, component *component.
 		env[prefixWithCompDefName+s] = env[prefix+s]
 	}
 	env[prefixWithCompDefName+"N"] = env[prefix+"REPLICA_COUNT"]
-	return env
-}
-
-// buildReplicationSetEnv builds env for replication workload.
-func buildReplicationSetEnv(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent) map[string]string {
-	if component.WorkloadType != appsv1alpha1.Replication {
-		return nil
-	}
-	env := map[string]string{}
-	svcName := strings.Join([]string{cluster.Name, component.Name, "headless"}, "-")
-	podList, _ := componentutil.GetComponentPodListWithRole(reqCtx.Ctx, cli, *cluster, component.Name, constant.Primary)
-	if len(podList.Items) > 0 {
-		env[constant.KBReplicationSetPrimaryPodName] = podList.Items[0].Name
-		env[constant.KBReplicationSetPrimaryPodFQDN] = fmt.Sprintf("%s.%s.%s.svc", podList.Items[0].Name, svcName, cluster.Namespace)
-	} else {
-		// If there is no primaryPod in the cluster, it means that the cluster is new created for the first time,
-		// and index=0 is used as the primary pod by default.
-		primaryPodName := fmt.Sprintf("%s-%s-%d", cluster.Name, component.Name, 0)
-		env[constant.KBReplicationSetPrimaryPodName] = primaryPodName
-		env[constant.KBReplicationSetPrimaryPodFQDN] = fmt.Sprintf("%s.%s.%s.svc", primaryPodName, svcName, cluster.Namespace)
-	}
 	return env
 }
 

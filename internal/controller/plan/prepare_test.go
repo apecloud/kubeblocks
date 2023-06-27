@@ -61,7 +61,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		cluster.UID = types.UID("test-uid")
 	}
 	workloadProcessor := func(customSetup func(*corev1.ConfigMap) (client.Object, error)) error {
-		envConfig, err := builder.BuildEnvConfig(reqCtx, cli, cluster, component)
+		envConfig, err := builder.BuildEnvConfig(cluster, component)
 		if err != nil {
 			return err
 		}

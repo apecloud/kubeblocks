@@ -26,11 +26,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/leaanthony/debme"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -322,9 +322,8 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds Env Config correctly", func() {
-			reqCtx := newReqCtx()
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			cfg, err := BuildEnvConfig(reqCtx, k8sClient, cluster, synthesizedComponent)
+			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
 			for _, k := range requiredKeys {
@@ -334,21 +333,19 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds env config with resources recreate", func() {
-			reqCtx := newReqCtx()
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
 
 			uuid := "12345"
 			By("mock a cluster uuid")
 			cluster.UID = types.UID(uuid)
 
-			cfg, err := BuildEnvConfig(reqCtx, k8sClient, cluster, synthesizedComponent)
+			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
 			Expect(cfg.Data["KB_CLUSTER_UID"]).Should(Equal(uuid))
 		})
 
 		It("builds Env Config with ConsensusSet status correctly", func() {
-			reqCtx := newReqCtx()
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
 				synthesizedComponent.Name: {
@@ -363,7 +360,7 @@ var _ = Describe("builder", func() {
 						}},
 					},
 				}}
-			cfg, err := BuildEnvConfig(reqCtx, k8sClient, cluster, synthesizedComponent)
+			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
 			Expect(err).Should(BeNil())
 			Expect(cfg).ShouldNot(BeNil())
 			toCheckKeys := append(requiredKeys, []string{
@@ -418,7 +415,7 @@ var _ = Describe("builder", func() {
 
 		It("builds config manager sidecar container correctly", func() {
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			cfg, err := BuildEnvConfig(newReqCtx(), k8sClient, cluster, synthesizedComponent)
+			cfg, err := BuildEnvConfig(cluster, synthesizedComponent)
 			sidecarRenderedParam := &cfgcm.CfgManagerBuildParams{
 				ManagerName:   "cfgmgr",
 				SecreteName:   "test-secret",

@@ -21,11 +21,9 @@ package consensus
 
 import (
 	"context"
-	"errors"
 	"sort"
 	"strings"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -63,54 +61,6 @@ const (
 	emptyPriority             = 1 << 0
 	// unknownPriority           = 0
 )
-
-// generateRestartPodPlan generates update plan to restart pods based on UpdateStrategy
-func generateRestartPodPlan(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
-	consensusSpec *appsv1alpha1.ConsensusSetSpec, podsToDelete *[]*corev1.Pod) *util.Plan {
-	restartPod := func(obj interface{}) (bool, error) {
-		pod, ok := obj.(corev1.Pod)
-		if !ok {
-			return false, errors.New("wrong type: obj not Pod")
-		}
-		// if DeletionTimestamp is not nil, it is terminating.
-		if pod.DeletionTimestamp != nil {
-			return true, nil
-		}
-		// if pod is the latest version, we do nothing
-		if intctrlutil.GetPodRevision(&pod) == stsObj.Status.UpdateRevision {
-			// wait until ready
-			return !intctrlutil.PodIsReadyWithLabel(pod), nil
-		}
-
-		// delete the pod to trigger associate StatefulSet to re-create it
-		*podsToDelete = append(*podsToDelete, &pod)
-
-		return true, nil
-	}
-	return generateConsensusUpdatePlanLow(ctx, cli, stsObj, pods, consensusSpec, restartPod)
-}
-
-// generateConsensusUpdatePlanLow generates Update plan based on UpdateStrategy
-func generateConsensusUpdatePlanLow(ctx context.Context, cli client.Client, stsObj *appsv1.StatefulSet, pods []corev1.Pod,
-	consensusSpec *appsv1alpha1.ConsensusSetSpec, restartPod func(obj any) (bool, error)) *util.Plan {
-	plan := &util.Plan{}
-	plan.Start = &util.Step{}
-	plan.WalkFunc = restartPod
-
-	rolePriorityMap := ComposeRolePriorityMap(consensusSpec)
-	util.SortPods(pods, rolePriorityMap, constant.RoleLabelKey)
-
-	// generate plan by UpdateStrategy
-	switch consensusSpec.UpdateStrategy {
-	case appsv1alpha1.SerialStrategy:
-		generateConsensusSerialPlan(plan, pods, rolePriorityMap)
-	case appsv1alpha1.ParallelStrategy:
-		generateConsensusParallelPlan(plan, pods, rolePriorityMap)
-	case appsv1alpha1.BestEffortParallelStrategy:
-		generateConsensusBestEffortParallelPlan(plan, pods, rolePriorityMap)
-	}
-	return plan
-}
 
 // unknown & empty & learner & 1/2 followers -> 1/2 followers -> leader
 func generateConsensusBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {

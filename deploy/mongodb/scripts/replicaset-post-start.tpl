@@ -27,7 +27,7 @@ done
 
 echo is_inited: $is_inited
 
-if [ -n $is_inited ]; then
+if [ $is_inited ]; then
   exit 0
 fi
 

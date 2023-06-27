@@ -253,7 +253,7 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 	}
 	getFirstRecoverableBaseBackup := func() *Backup {
 		for _, b := range backups {
-			if !slices.Contains([]BackupType{BackupTypeDataFile, BackupTypeSnapshot}, b.Spec.BackupType) &&
+			if !slices.Contains([]BackupType{BackupTypeDataFile, BackupTypeSnapshot}, b.Spec.BackupType) ||
 				b.Status.Phase != BackupCompleted {
 				continue
 			}

@@ -111,7 +111,7 @@ func (r *realGraphClient) doWrite(dag *graph.DAG, objOld, objNew client.Object, 
 	}
 }
 
-func (r *realGraphClient)findMatchedVertex(dag *graph.DAG, object client.Object) graph.Vertex {
+func (r *realGraphClient) findMatchedVertex(dag *graph.DAG, object client.Object) graph.Vertex {
 	keyLookfor, err := GetGVKName(object)
 	if err != nil {
 		return nil

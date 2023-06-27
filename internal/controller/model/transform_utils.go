@@ -71,8 +71,8 @@ func GetGVKName(object client.Object) (*GVKNObjKey, error) {
 		return nil, err
 	}
 	return &GVKNObjKey{
-		GroupVersionKind:  gvk,
-		ObjectKey: client.ObjectKeyFromObject(object),
+		GroupVersionKind: gvk,
+		ObjectKey:        client.ObjectKeyFromObject(object),
 	}, nil
 }
 

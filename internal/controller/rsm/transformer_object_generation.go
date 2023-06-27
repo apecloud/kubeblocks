@@ -48,7 +48,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	transCtx, _ := ctx.(*rsmTransformContext)
 	rsm := transCtx.rsm
 	rsmOrig := transCtx.rsmOrig
-	cli,_ := transCtx.Client.(model.GraphClient)
+	cli, _ := transCtx.Client.(model.GraphClient)
 
 	if model.IsObjectDeleting(rsmOrig) {
 		return nil

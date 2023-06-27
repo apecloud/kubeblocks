@@ -27,3 +27,13 @@ metadata:
 data:
   nebula-metad-start.sh: |
     {{- .Files.Get "scripts/nebula-metad-start.sh.tpl" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nebula-console-scripts-template
+  labels:
+    {{- include "nebula.labels" . | nindent 4 }}
+data:
+  nebula-console-start.sh: |
+    {{- .Files.Get "scripts/nebula-console-start.sh.tpl" | nindent 4 }}

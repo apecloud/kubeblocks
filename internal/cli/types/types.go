@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 const (
@@ -165,9 +164,6 @@ const (
 )
 
 var (
-	// KubeBlocksName is the name of KubeBlocks project
-	KubeBlocksName = "kubeblocks"
-
 	// KubeBlocksRepoName helm repo name for kubeblocks
 	KubeBlocksRepoName = "kubeblocks"
 
@@ -182,12 +178,6 @@ var (
 
 	// GitLabHelmChartRepo the helm chart repo in GitLab
 	GitLabHelmChartRepo = "https://jihulab.com/api/v4/projects/85949/packages/helm/stable"
-
-	// InstanceLabelSelector app.kubernetes.io/instance=kubeblocks, hit most workloads and configuration
-	InstanceLabelSelector = fmt.Sprintf("%s=%s", constant.AppInstanceLabelKey, KubeBlocksChartName)
-
-	// ReleaseLabelSelector release=kubeblocks, for prometheus-alertmanager and prometheus-server
-	ReleaseLabelSelector = fmt.Sprintf("release=%s", KubeBlocksChartName)
 
 	// KubeBlocksHelmLabel name=kubeblocks,owner-helm, for helm secret
 	KubeBlocksHelmLabel = fmt.Sprintf("%s=%s,%s=%s", "name", KubeBlocksChartName, "owner", "helm")

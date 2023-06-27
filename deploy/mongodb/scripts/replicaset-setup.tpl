@@ -21,7 +21,7 @@ BACKUPFILE=$MONGODB_ROOT/db/mongodb.backup
 if [ -f $BACKUPFILE ]
 then
   mongod --bind_ip_all --port $PORT --dbpath $MONGODB_ROOT/db --directoryperdb --logpath $MONGODB_ROOT/logs/mongodb.log  --logappend --pidfilepath $MONGODB_ROOT/tmp/mongodb.pid&
-  until mongosh --quiet --port $PORT --host $host --eval "print('peer is ready')"; do sleep 1; done
+  until mongosh --quiet --port $PORT --host $host --eval "print('restore process is ready')"; do sleep 1; done
   PID=`cat $MONGODB_ROOT/tmp/mongodb.pid`
 
   mongosh --quiet --port $PORT local --eval "db.system.replset.deleteOne({})"
@@ -31,5 +31,5 @@ then
   wait $PID
   rm $BACKUPFILE
 fi
-  
-mongod  --bind_ip_all --port $PORT --replSet $RPL_SET_NAME  --config /etc/mongodb/mongodb.conf
+
+exec mongod  --bind_ip_all --port $PORT --replSet $RPL_SET_NAME  --config /etc/mongodb/mongodb.conf

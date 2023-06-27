@@ -11,6 +11,10 @@ before:
     - make test-go-generate
     - make generate
 
+env:
+  - K3D_VERSION=5.4.4
+  - K3S_IMG_TAG=v1.23.8-k3s1
+
 builds:
   - main: cmd/cli/main.go
     id: kbcli
@@ -26,7 +30,13 @@ builds:
       - ASSUME_NO_MOVING_GC_UNSAFE_RISK_IT_WITH=go1.20
       - CGO_ENABLED=0
     ldflags:
-      - -s -w -X github.com/apecloud/kubeblocks/version.BuildDate={{.Date}} -X github.com/apecloud/kubeblocks/version.GitCommit={{.Commit}} -X github.com/apecloud/kubeblocks/version.Version={{.Tag}}
+      - -s -w -X github.com/apecloud/kubeblocks/version.BuildDate={{ .Date }}
+      - -s -w -X github.com/apecloud/kubeblocks/version.GitCommit={{ .FullCommit }}
+      - -s -w -X github.com/apecloud/kubeblocks/version.Version={{ .Version }}
+      - -s -w -X github.com/apecloud/kubeblocks/version.DefaultKubeBlocksVersion={{ .Version }}
+      - -s -w -X github.com/apecloud/kubeblocks/version.GitVersion={{ .Tag }}
+      - -s -w -X github.com/apecloud/kubeblocks/version.K3sImageTag={{ .Env.K3S_IMG_TAG }}
+      - -s -w -X github.com/apecloud/kubeblocks/version.K3dVersion={{ .Env.K3D_VERSION }}
 
 archives:
   - format: tar.gz
@@ -39,9 +49,9 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}-
       {{- .Tag }}
     format_overrides:
-    - goos: windows
-      format:
-        zip
+      - goos: windows
+        format:
+          zip
 
 nfpms:
   -
@@ -74,7 +84,7 @@ signs:
     args: ["--batch", "-u", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "${artifact}"]
 
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  name_template: "{{ .Version }}"
 
 changelog:
   sort: asc

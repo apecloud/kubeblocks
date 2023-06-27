@@ -17,26 +17,13 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package cluster
+package types
 
-import (
-	"testing"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/spf13/viper"
-
-	"github.com/apecloud/kubeblocks/internal/cli/types"
+// config keys
+const (
+	CfgKeyClusterDefaultStorageSize = "CLUSTER_DEFAULT_STORAGE_SIZE"
+	CfgKeyClusterDefaultReplicas    = "CLUSTER_DEFAULT_REPLICAS"
+	CfgKeyClusterDefaultCPU         = "CLUSTER_DEFAULT_CPU"
+	CfgKeyClusterDefaultMemory      = "CLUSTER_DEFAULT_MEMORY"
+	CfgKeyHelmRepoURL               = "HELM_REPO_URL"
 )
-
-func TestCluster(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Cluster Suite")
-}
-
-var _ = BeforeSuite(func() {
-	viper.SetDefault(types.CfgKeyClusterDefaultStorageSize, "20Gi")
-	viper.SetDefault(types.CfgKeyClusterDefaultReplicas, 1)
-	viper.SetDefault(types.CfgKeyClusterDefaultCPU, "1000m")
-	viper.SetDefault(types.CfgKeyClusterDefaultMemory, "1Gi")
-})

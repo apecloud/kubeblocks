@@ -238,7 +238,7 @@ var _ = Describe("Replication Component", func() {
 			Expect(len(vertexes)).To(Equal(1))
 			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.DELETE).To(BeTrue())
 
-			By("Checking if the pod is deleted when statefulSet is updated and UpdateStrategy is BestEffortParallelStrategy")
+			By("Checking if the pod is deleted when statefulSet is updated and UpdateStrategy is ParallelStrategy")
 			Expect(testapps.ChangeObj(&testCtx, clusterDefObj, func(clusterDef *appsv1alpha1.ClusterDefinition) {
 				clusterDef.Spec.ComponentDefs[0].ReplicationSpec = &appsv1alpha1.ReplicationSetSpec{
 					StatefulSetSpec: appsv1alpha1.StatefulSetSpec{

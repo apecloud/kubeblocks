@@ -57,8 +57,8 @@ type SchemaPropName string
 
 // the command schema property name
 const (
-	NameSchemaProp    SchemaPropName = "name"
 	VersionSchemaProp SchemaPropName = "version"
+	ModeSchemaProp    SchemaPropName = "mode"
 )
 
 var (

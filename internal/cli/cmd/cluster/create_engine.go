@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	"sigs.k8s.io/yaml"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
@@ -44,7 +43,7 @@ type objectInfo struct {
 	obj *unstructured.Unstructured
 }
 
-type EngineCreateOptions struct {
+type CreateEngineOptions struct {
 	// engine is the type of the engine to create.
 	engine cluster.EngineType
 
@@ -58,14 +57,14 @@ type EngineCreateOptions struct {
 	*create.CreateOptions
 }
 
-func BuildEngineCmds(createOptions *create.CreateOptions) []*cobra.Command {
+func buildCreateEngineCmds(createOptions *create.CreateOptions) []*cobra.Command {
 	var (
 		err  error
 		cmds []*cobra.Command
 	)
 
 	for _, e := range cluster.SupportedEngines() {
-		o := &EngineCreateOptions{
+		o := &CreateEngineOptions{
 			CreateOptions: createOptions,
 			engine:        e,
 		}
@@ -80,9 +79,9 @@ func BuildEngineCmds(createOptions *create.CreateOptions) []*cobra.Command {
 			Run: func(cmd *cobra.Command, args []string) {
 				o.Args = args
 				cmdutil.CheckErr(o.CreateOptions.Complete())
-				cmdutil.CheckErr(o.Complete(cmd, args))
-				cmdutil.CheckErr(o.Validate())
-				cmdutil.CheckErr(o.Run())
+				cmdutil.CheckErr(o.complete(cmd, args))
+				cmdutil.CheckErr(o.validate())
+				cmdutil.CheckErr(o.run())
 			},
 		}
 
@@ -93,7 +92,7 @@ func BuildEngineCmds(createOptions *create.CreateOptions) []*cobra.Command {
 	return cmds
 }
 
-func (o *EngineCreateOptions) Complete(cmd *cobra.Command, args []string) error {
+func (o *CreateEngineOptions) complete(cmd *cobra.Command, args []string) error {
 	var err error
 
 	// if name is not specified, generate a random cluster name
@@ -106,17 +105,14 @@ func (o *EngineCreateOptions) Complete(cmd *cobra.Command, args []string) error 
 
 	// get values from flags
 	o.values = getValuesFromFlags(cmd.LocalNonPersistentFlags())
-
-	// set cluster name
-	o.values[cluster.NameSchemaProp.String()] = o.Name
 	return nil
 }
 
-func (o *EngineCreateOptions) Validate() error {
+func (o *CreateEngineOptions) validate() error {
 	return cluster.ValidateValues(o.schema, o.values)
 }
 
-func (o *EngineCreateOptions) Run() error {
+func (o *CreateEngineOptions) run() error {
 	// get cluster manifests
 	manifests, err := cluster.GetManifests(o.engine, o.Namespace, o.Name, o.values)
 	if err != nil {
@@ -181,7 +177,7 @@ func (o *EngineCreateOptions) Run() error {
 			}
 		}
 
-		// for dryrun, only output cluster resource
+		// for dry-run, only output cluster resource
 		if !isCluster {
 			continue
 		}
@@ -196,39 +192,4 @@ func (o *EngineCreateOptions) Run() error {
 		}
 	}
 	return nil
-}
-
-func getObjectsInfo(f cmdutil.Factory, manifests map[string]string) ([]*objectInfo, error) {
-	mapper, err := f.ToRESTMapper()
-	if err != nil {
-		return nil, err
-	}
-
-	var objects []*objectInfo
-	for _, manifest := range manifests {
-		objInfo := &objectInfo{}
-
-		// convert yaml to json
-		jsonData, err := yaml.YAMLToJSON([]byte(manifest))
-		if err != nil {
-			return nil, err
-		}
-
-		// get resource gvk
-		obj, gvk, err := unstructured.UnstructuredJSONScheme.Decode(jsonData, nil, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		// convert gvk to gvr
-		m, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-		if err != nil {
-			return nil, err
-		}
-
-		objInfo.obj = obj.(*unstructured.Unstructured)
-		objInfo.gvr = m.Resource
-		objects = append(objects, objInfo)
-	}
-	return objects, nil
 }

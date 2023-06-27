@@ -25,18 +25,25 @@ import (
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	"github.com/apecloud/kubeblocks/internal/cli/create"
 )
 
 // write test case to test engine.go
 var _ = Describe("create cluster by engine type", func() {
 	var (
-		tf      *cmdtesting.TestFactory
-		streams genericclioptions.IOStreams
+		tf            *cmdtesting.TestFactory
+		streams       genericclioptions.IOStreams
+		createOptions *create.CreateOptions
 	)
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
 		tf = cmdtesting.NewTestFactory().WithNamespace("default")
+		createOptions = &create.CreateOptions{
+			IOStreams: streams,
+			Factory:   tf,
+		}
 	})
 
 	AfterEach(func() {
@@ -44,7 +51,7 @@ var _ = Describe("create cluster by engine type", func() {
 	})
 
 	It("create engine cmd", func() {
-		cmd := BuildEngineCmds(tf, streams)
+		cmd := buildCreateEngineCmds(createOptions)
 		Expect(cmd).ShouldNot(BeNil())
 	})
 })

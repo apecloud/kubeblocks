@@ -244,7 +244,7 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	registerFlagCompletionFunc(cmd, f)
 
 	// add all subcommands for supported cluster engine
-	cmd.AddCommand(BuildEngineCmds(&o.CreateOptions)...)
+	cmd.AddCommand(buildCreateEngineCmds(&o.CreateOptions)...)
 
 	return cmd
 }

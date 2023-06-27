@@ -26,9 +26,12 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/stoewer/go-strcase"
+	"golang.org/x/exp/slices"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
+	"sigs.k8s.io/yaml"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -40,12 +43,16 @@ const (
 )
 
 // addEngineFlags adds the flags for creating a cluster, these flags are built by the cluster schema.
-func addEngineFlags(cmd *cobra.Command, f cmdutil.Factory, schema *spec.Schema) error {
+func addEngineFlags(cmd *cobra.Command, f cmdutil.Factory, schema *spec.Schema, excludeProps ...string) error {
 	if schema == nil {
 		return nil
 	}
 
 	for k, s := range schema.Properties {
+		// ignore exclude properties
+		if slices.Contains(excludeProps, k) {
+			continue
+		}
 		if err := buildOneFlag(cmd, f, k, &s); err != nil {
 			return err
 		}
@@ -79,12 +86,6 @@ func getValuesFromFlags(fs *flag.FlagSet) map[string]interface{} {
 
 func buildOneFlag(cmd *cobra.Command, f cmdutil.Factory, k string, s *spec.Schema) error {
 	name := strcase.KebabCase(k)
-
-	// the cluster name is specified by command argument, so do not build it as a flag.
-	if name == cluster.NameSchemaProp.String() {
-		return nil
-	}
-
 	tpe := strType
 	if len(s.Type) > 0 {
 		tpe = s.Type[0]
@@ -150,4 +151,40 @@ func registerFlagCompFunc(cmd *cobra.Command, f cmdutil.Factory, name string, s 
 // buildEngineCreateExamples builds the creation examples for the specified engine type.
 func buildEngineCreateExamples(e cluster.EngineType, schema *spec.SchemaProps) string {
 	return ""
+}
+
+// getObjectsInfo gets the objects info from the manifests.
+func getObjectsInfo(f cmdutil.Factory, manifests map[string]string) ([]*objectInfo, error) {
+	mapper, err := f.ToRESTMapper()
+	if err != nil {
+		return nil, err
+	}
+
+	var objects []*objectInfo
+	for _, manifest := range manifests {
+		objInfo := &objectInfo{}
+
+		// convert yaml to json
+		jsonData, err := yaml.YAMLToJSON([]byte(manifest))
+		if err != nil {
+			return nil, err
+		}
+
+		// get resource gvk
+		obj, gvk, err := unstructured.UnstructuredJSONScheme.Decode(jsonData, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		// convert gvk to gvr
+		m, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return nil, err
+		}
+
+		objInfo.obj = obj.(*unstructured.Unstructured)
+		objInfo.gvr = m.Resource
+		objects = append(objects, objInfo)
+	}
+	return objects, nil
 }

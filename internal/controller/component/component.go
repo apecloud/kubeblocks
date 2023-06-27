@@ -35,10 +35,10 @@ import (
 
 func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	cluster appsv1alpha1.Cluster,
-	clusterDef appsv1alpha1.ClusterDefinition,
-	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
-	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
+	cluster *appsv1alpha1.Cluster,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
 	synthesizedComp, err := buildComponent(reqCtx, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
@@ -60,18 +60,52 @@ func BuildComponent(reqCtx intctrlutil.RequestCtx,
 	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
-	return buildComponent(reqCtx, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+	return buildComponent(reqCtx, &cluster, &clusterDef, &clusterCompDef, &clusterCompSpec, clusterCompVers...)
 }
 
 // buildComponent generates a new Component object, which is a mixture of
 // component-related configs from input Cluster, ClusterDef and ClusterVersion.
 func buildComponent(reqCtx intctrlutil.RequestCtx,
-	cluster appsv1alpha1.Cluster,
-	clusterDef appsv1alpha1.ClusterDefinition,
-	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
-	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
+	cluster *appsv1alpha1.Cluster,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
+
+	fillClusterCompSpec := func() {
+		// fill simplified api only to first defined component
+		if len(clusterDef.Spec.ComponentDefs) == 0 ||
+			clusterDef.Spec.ComponentDefs[0].Name != clusterCompDef.Name {
+			return
+		}
+		if clusterCompSpec != nil {
+			return
+		}
+		clusterCompSpec = &appsv1alpha1.ClusterComponentSpec{}
+		clusterCompSpec.Replicas = cluster.Spec.Replicas
+		dataVolumeName := "data"
+		for _, v := range clusterCompDef.VolumeTypes {
+			if v.Type == appsv1alpha1.VolumeTypeData {
+				dataVolumeName = v.Name
+			}
+		}
+		clusterCompSpec.VolumeClaimTemplates = []appsv1alpha1.ClusterComponentVolumeClaimTemplate{
+			{
+				Name: dataVolumeName,
+				Spec: appsv1alpha1.PersistentVolumeClaimSpec{
+					Resources: corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							"storage": cluster.Spec.Storage.Size,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	fillClusterCompSpec()
+
 	var err error
 	clusterCompDefObj := clusterCompDef.DeepCopy()
 	component := &SynthesizedComponent{
@@ -126,12 +160,12 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 	if clusterCompSpec.Affinity != nil {
 		affinity = clusterCompSpec.Affinity
 	}
-	if component.PodSpec.Affinity, err = buildPodAffinity(&cluster, affinity, component); err != nil {
+	if component.PodSpec.Affinity, err = buildPodAffinity(cluster, affinity, component); err != nil {
 		reqCtx.Log.Error(err, "build pod affinity failed.")
 		return nil, err
 	}
-	component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(&cluster, affinity, component)
-	if component.PodSpec.Tolerations, err = BuildTolerations(&cluster, &clusterCompSpec); err != nil {
+	component.PodSpec.TopologySpreadConstraints = buildPodTopologySpreadConstraints(cluster, affinity, component)
+	if component.PodSpec.Tolerations, err = BuildTolerations(cluster, clusterCompSpec); err != nil {
 		reqCtx.Log.Error(err, "build pod tolerations failed.")
 		return nil, err
 	}
@@ -171,12 +205,13 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 	//	 }
 	// }
 
-	buildMonitorConfig(&clusterCompDef, &clusterCompSpec, component)
+	buildMonitorConfig(clusterCompDef, clusterCompSpec, component)
 	if err = buildProbeContainers(reqCtx, component); err != nil {
 		reqCtx.Log.Error(err, "build probe container failed.")
 		return nil, err
 	}
 	replaceContainerPlaceholderTokens(component, GetEnvReplacementMapForConnCredential(cluster.GetName()))
+
 	return component, nil
 }
 

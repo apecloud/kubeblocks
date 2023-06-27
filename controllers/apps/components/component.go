@@ -64,7 +64,7 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
-	if compSpec == nil || compDef == nil {
+	if compDef == nil {
 		return nil, nil
 	}
 
@@ -94,7 +94,7 @@ func composeSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	compDef *appsv1alpha1.ClusterComponentDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec,
 	compVer *appsv1alpha1.ClusterComponentVersion) (*component.SynthesizedComponent, error) {
-	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, cli, *cluster, *clusterDef, *compDef, *compSpec, compVer)
+	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, cli, cluster, clusterDef, compDef, compSpec, compVer)
 	if err != nil {
 		return nil, err
 	}

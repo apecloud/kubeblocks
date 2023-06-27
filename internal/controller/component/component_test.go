@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -126,6 +127,32 @@ var _ = Describe("component module", func() {
 				&clusterVersion.Spec.ComponentVersions[1])
 			Expect(err).Should(Succeed())
 			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
+		})
+
+		It("should auto fill first component if it's empty", func() {
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx: ctx,
+				Log: tlog,
+			}
+			By("fill simplified fields")
+			cluster.Spec.Replicas = 3
+			cluster.Spec.Resources.CPU = resource.MustParse("1000m")
+			cluster.Spec.Resources.Memory = resource.MustParse("2Gi")
+			cluster.Spec.Storage.Size = resource.MustParse("20Gi")
+			By("clear cluster's component spec")
+			cluster.Spec.ComponentSpecs = nil
+			By("call build")
+			component, err := buildComponent(
+				reqCtx,
+				cluster,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				nil,
+				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
+			Expect(component).ShouldNot(BeNil())
+			Expect(component.Replicas).Should(Equal(cluster.Spec.Replicas))
+			Expect(component.VolumeClaimTemplates[0].Spec.Resources.Requests["storage"]).Should(Equal(cluster.Spec.Storage.Size))
 		})
 
 		It("Test replace secretRef env placeholder token", func() {

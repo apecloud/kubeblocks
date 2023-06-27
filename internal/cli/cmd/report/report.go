@@ -60,39 +60,39 @@ const (
 
 var (
 	reportClusterExamples = templates.Examples(`
-	# report KubeBlock status
-	kbcli report cluster <mycluster>
+	# report KubeBlocks status
+	kbcli report cluster mycluster
 
-	# report KubeBlock cluster information to file
-	kbcli report cluster <mycluster> -f <filename>
+	# report KubeBlocks cluster information to file
+	kbcli report cluster mycluster -f filename
 
-	# report KubeBlock cluster information with logs
-	kbcli report cluster <mycluster> --with-logs
+	# report KubeBlocks cluster information with logs
+	kbcli report cluster mycluster --with-logs
 
-	# report KubeBlock cluster information with logs and mask sensitive info
-	kbcli report cluster <mycluster> --with-logs --mask
+	# report KubeBlocks cluster information with logs and mask sensitive info
+	kbcli report cluster mycluster --with-logs --mask
 
-	# report KubeBlock cluster information with logs since 1 hour ago
-	kbcli report cluster <mycluster> --with-logs --since 1h
+	# report KubeBlocks cluster information with logs since 1 hour ago
+	kbcli report cluster mycluster --with-logs --since 1h
 
-	# report KubeBlock cluster information with logs since given time
-	kbcli report cluster <mycluster> --with-logs --since-time 2023-05-23T00:00:00Z
+	# report KubeBlocks cluster information with logs since given time
+	kbcli report cluster mycluster --with-logs --since-time 2023-05-23T00:00:00Z
 
-	# report KubeBlock cluster information with logs for all containers
-	kbcli report cluster <mycluster> --with-logs --all-containers
+	# report KubeBlocks cluster information with logs for all containers
+	kbcli report cluster mycluster --with-logs --all-containers
 	`)
 
 	reportKBExamples = templates.Examples(`
-	# report KubeBlock status
+	# report KubeBlocks status
 	kbcli report kubeblocks
 
-	# report KubeBlock information to file
-	kbcli report kubeblocks -f <filename>
+	# report KubeBlocks information to file
+	kbcli report kubeblocks -f filename
 
-	# report KubeBlock information with logs
+	# report KubeBlocks information with logs
 	kbcli report kubeblocks --with-logs
 
-	# report KubeBlock information with logs and mask sensitive info
+	# report KubeBlocks information with logs and mask sensitive info
 	kbcli report kubeblocks --with-logs --mask
 	`)
 )
@@ -259,7 +259,7 @@ func (o *reportOptions) parsePrinter() (printers.ResourcePrinterFunc, error) {
 func newKubeblocksReportCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := &reportKubeblocksOptions{reportOptions: newReportOptions(streams)}
 	cmd := &cobra.Command{
-		Use:     "kubeblocks [-f file] [-with-logs] [-mask]",
+		Use:     "kubeblocks [-f file] [--with-logs] [--mask]",
 		Aliases: []string{"kb"},
 		Short:   "Report KubeBlocks information, including deployments, events, logs, etc.",
 		Args:    cobra.NoArgs,

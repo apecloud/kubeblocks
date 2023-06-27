@@ -277,13 +277,16 @@ func (mgr *Manager) Premote() error {
 	client, _ := mgr.GetReplSetClient(context.TODO(), hosts)
 	for i, _ := range rsConfig.Members {
 		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {
-			rsConfig.Members[i].Priority = 3
+			rsConfig.Members[i].Priority = 2
+		} else if rsConfig.Members[i].Priority == 2 {
+			rsConfig.Members[i].Priority = 1
 		}
 	}
 	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
 }
 
 func (mgr *Manager) Demote() error {
+	// mongodb do premote and demote in one action, here do nothing.
 	return nil
 }
 

@@ -5,7 +5,7 @@ rule_files:
   - /etc/config-rule/postgresql_alert_rules.yml
   - /etc/config-rule/redis_alert_rules.yml
   - /etc/config-rule/kafka_alert_rules.yml
-  - /etc/config/mongodb_alert_rules.yaml
+  - /etc/config-rule/mongodb_alert_rules.yml
 
 scrape_configs:
   - job_name: prometheus

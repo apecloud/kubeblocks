@@ -396,8 +396,6 @@ bump-chart-ver: \
 	bump-single-chart-appver.helm \
 	bump-single-chart-ver.apecloud-mysql \
 	bump-single-chart-ver.apecloud-mysql-cluster \
-	bump-single-chart-ver.apecloud-mysql-scale \
-	bump-single-chart-ver.apecloud-mysql-scale-cluster \
 	bump-single-chart-ver.clickhouse \
 	bump-single-chart-ver.clickhouse-cluster \
 	bump-single-chart-ver.kafka \

@@ -26,6 +26,7 @@ Usage: $(basename "$0") <options>
                                 14) ignore cover pkgs
                                 15) set size label
                                 16) get test packages
+                                17) delete actions cache
     -tn, --tag-name           Release tag name
     -gr, --github-repo        Github Repo
     -gt, --github-token       Github token
@@ -121,6 +122,9 @@ main() {
         ;;
         16)
             get_test_packages
+        ;;
+        17)
+            delete_actions_cache
         ;;
         *)
             show_help
@@ -614,6 +618,12 @@ get_test_packages() {
         done
     done
     echo $TEST_PACKAGES
+}
+
+delete_actions_cache() {
+    gh extension install actions/gh-actions-cache --force
+
+    gh actions-cache delete --repo $LATEST_REPO $TAG_NAME --confirm
 }
 
 main "$@"

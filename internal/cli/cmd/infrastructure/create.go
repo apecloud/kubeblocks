@@ -21,6 +21,7 @@ package infrastructure
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/connector"
@@ -93,11 +94,20 @@ func (o *createOptions) Run() error {
 		Modules: NewCreatePipeline(o),
 		Runtime: runtime,
 	}
+	checkAndUpdateZone()
 	if err := pipeline.Start(); err != nil {
 		return err
 	}
 	fmt.Fprintf(o.IOStreams.Out, "Kubernetes Installation is complete.\n\n")
 	return nil
+}
+
+func checkAndUpdateZone() {
+	const ZoneName = "KKZONE"
+	if location, _ := util.GetIPLocation(); location == "CN" {
+		os.Setenv(ZoneName, "cn")
+	}
+	fmt.Printf("current zone: %s\n", os.Getenv(ZoneName))
 }
 
 func NewCreateKubernetesCmd(streams genericclioptions.IOStreams) *cobra.Command {

@@ -35,7 +35,10 @@ import (
 )
 
 const (
-	defaultDownloadURL = "curl -L -o %s %s"
+	CurlDownloadURLFormat = "curl -L -o %s %s"
+	WgetDownloadURLFormat = "wget -O %s %s"
+
+	defaultDownloadURL = CurlDownloadURLFormat
 )
 
 func downloadKubernetesBinaryWithArch(downloadPath string, arch string, binaryVersion types.InfraVersionInfo) (map[string]*files.KubeBinary, error) {

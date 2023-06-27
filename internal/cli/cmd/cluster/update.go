@@ -105,9 +105,6 @@ func NewUpdateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o.UpdatableFlags.addFlags(cmd)
 	o.Options.AddFlags(cmd)
 
-	// add engine subcommands
-	cmd.AddCommand(buildUpdateEngineCmds(o.Options)...)
-
 	return cmd
 }
 

@@ -125,18 +125,21 @@ func (o *CreateEngineOptions) run() error {
 		return err
 	}
 
-	getClusterObj := func() *unstructured.Unstructured {
+	getClusterObj := func() (*unstructured.Unstructured, error) {
 		for _, obj := range objs {
 			if obj.gvr == types.ClusterGVR() {
-				return obj.obj
+				return obj.obj, nil
 			}
 		}
-		return nil
+		return nil, fmt.Errorf("failed to find cluster object from manifests rendered from engine %s template", o.engine)
 	}
 
 	// only edits the cluster object, other dependencies object is not allowed to edit
 	if o.EditBeforeCreate {
-		clusterObj := getClusterObj()
+		clusterObj, err := getClusterObj()
+		if err != nil {
+			return err
+		}
 		customEdit := edit.NewCustomEditOptions(o.Factory, o.IOStreams, "create")
 		if err = customEdit.Run(clusterObj); err != nil {
 			return err
@@ -152,6 +155,7 @@ func (o *CreateEngineOptions) run() error {
 	for _, obj := range objs {
 		isCluster := obj.gvr == types.ClusterGVR()
 		resObj := obj.obj
+
 		if dryRun != create.DryRunClient {
 			createOptions := metav1.CreateOptions{}
 			if dryRun == create.DryRunServer {

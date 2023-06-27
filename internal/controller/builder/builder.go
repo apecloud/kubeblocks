@@ -35,6 +35,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 
@@ -114,9 +115,28 @@ func processContainersInjection(reqCtx intctrlutil.RequestCtx,
 			if err := injectEnvs(cluster, component, envConfigName, &(*cc)[i]); err != nil {
 				return err
 			}
+			injectZeroResourcesLimitsIfEmpty(&(*cc)[i])
 		}
 	}
 	return nil
+}
+
+func injectZeroResourcesLimitsIfEmpty(c *corev1.Container) {
+	zeroValue := resource.MustParse("0")
+	if c.Resources.Limits == nil {
+		c.Resources.Limits = corev1.ResourceList{
+			corev1.ResourceCPU:    zeroValue,
+			corev1.ResourceMemory: zeroValue,
+		}
+		return
+	}
+
+	if _, ok := c.Resources.Limits[corev1.ResourceCPU]; !ok {
+		c.Resources.Limits[corev1.ResourceCPU] = zeroValue
+	}
+	if _, ok := c.Resources.Limits[corev1.ResourceMemory]; !ok {
+		c.Resources.Limits[corev1.ResourceMemory] = zeroValue
+	}
 }
 
 func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string, c *corev1.Container) error {
@@ -207,7 +227,6 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 			},
 		},
 	})
-
 	return nil
 }
 
@@ -656,6 +675,7 @@ func BuildCfgManagerContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams,
 	if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &container); err != nil {
 		return nil, err
 	}
+	injectZeroResourcesLimitsIfEmpty(&container)
 	return &container, nil
 }
 
@@ -736,6 +756,7 @@ func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildPa
 		if err := injectEnvs(sidecarRenderedParam.Cluster, component, sidecarRenderedParam.EnvConfigName, &toolContainers[i]); err != nil {
 			return nil, err
 		}
+		injectZeroResourcesLimitsIfEmpty(&toolContainers[i])
 	}
 	return toolContainers, nil
 }

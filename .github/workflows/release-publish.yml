@@ -9,6 +9,7 @@ permissions:
   contents: write
 
 env:
+  GH_TOKEN: ${{ github.token }}
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
   TAG_NAME: ${{ github.ref_name }}
   GO_VERSION: "1.20"
@@ -245,6 +246,7 @@ jobs:
       matrix:
         type: [image, kbcli, chart]
     steps:
+      - uses: actions/checkout@v3
       - name: delete ${{ matrix.type }} cache
         continue-on-error: true
         run: |

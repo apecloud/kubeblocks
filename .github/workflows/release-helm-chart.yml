@@ -12,6 +12,7 @@ on:
       - published
 
 env:
+  GH_TOKEN: ${{ github.token }}
   RELEASE_VERSION: ${{ github.ref_name }}
   RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
 

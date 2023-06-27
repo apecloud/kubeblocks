@@ -59,7 +59,7 @@ func (e *Etcd) Init(metadata bindings.Metadata) error {
 	e.DBType = "etcd"
 	e.InitIfNeed = e.initIfNeed
 	e.DBPort = e.GetRunningPort()
-	e.OperationMap[GetRoleOperation] = e.GetRoleOps
+	e.LegacyOperations[GetRoleOperation] = e.GetRoleOps
 	return nil
 }
 

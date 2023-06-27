@@ -20,31 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package k8score
 
 import (
-	"encoding/json"
-	"time"
-
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/internal/controller/rsm"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-// IsOvertimeEvent checks whether the duration of warning event reaches the threshold.
-func IsOvertimeEvent(event *corev1.Event, timeout time.Duration) bool {
-	if event.Series != nil {
-		return event.Series.LastObservedTime.After(event.EventTime.Add(timeout))
-	}
-	// Note: LastTimestamp/FirstTimestamp/Count/Source of event are deprecated in k8s v1.25
-	return event.LastTimestamp.After(event.FirstTimestamp.Add(timeout))
+type EventHandler interface {
+	Handle(client.Client, intctrlutil.RequestCtx, record.EventRecorder, *corev1.Event) error
 }
 
-// ParseProbeEventMessage parses probe event message.
-func ParseProbeEventMessage(reqCtx intctrlutil.RequestCtx, event *corev1.Event) *ProbeMessage {
-	message := &ProbeMessage{}
-	err := json.Unmarshal([]byte(event.Message), message)
-	if err != nil {
-		// not role related message, ignore it
-		reqCtx.Log.Info("not role message", "message", event.Message, "error", err)
-		return nil
-	}
-	return message
+var EventHandlerMap = map[string]EventHandler{}
+
+func init() {
+	EventHandlerMap["role-change-handler"] = &RoleChangeEventHandler{}
+	EventHandlerMap["rsm-event-handler"] = &rsm.PodRoleEventHandler{}
 }

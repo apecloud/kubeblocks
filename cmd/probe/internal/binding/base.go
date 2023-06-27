@@ -36,9 +36,15 @@ import (
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
-type Operation func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error)
+type LegacyOperation func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error)
 
 type OpsResult map[string]interface{}
+
+type Operation interface {
+	Kind() bindings.OperationKind
+	Init(metadata bindings.Metadata) error
+	Invoke(ctx context.Context, req *bindings.InvokeRequest, rsp *bindings.InvokeResponse) error
+}
 
 // AccessMode defines SVC access mode enums.
 // +enum
@@ -72,7 +78,10 @@ type BaseOperations struct {
 	Metadata               bindings.Metadata
 	InitIfNeed             func() bool
 	GetRole                func(context.Context, *bindings.InvokeRequest, *bindings.InvokeResponse) (string, error)
-	OperationMap           map[bindings.OperationKind]Operation
+	LockInstance           func(ctx context.Context) error
+	UnlockInstance         func(ctx context.Context) error
+	LegacyOperations       map[bindings.OperationKind]LegacyOperation
+	Ops                    map[bindings.OperationKind]Operation
 }
 
 func init() {
@@ -102,26 +111,38 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 		}
 	}
 	ops.Metadata = metadata
-	ops.OperationMap = map[bindings.OperationKind]Operation{
+	ops.LegacyOperations = map[bindings.OperationKind]LegacyOperation{
 		CheckRunningOperation: ops.CheckRunningOps,
 		CheckRoleOperation:    ops.CheckRoleOps,
 		GetRoleOperation:      ops.GetRoleOps,
+		VolumeProtection:      ops.volumeProtection,
+	}
+	ops.Ops = map[bindings.OperationKind]Operation{
+		VolumeProtection: &operationVolumeProtection{
+			BaseOperation: ops,
+		},
 	}
 	ops.DBAddress = ops.getAddress()
+
+	for kind, op := range ops.Ops {
+		if err := op.Init(metadata); err != nil {
+			panic(fmt.Sprintf("init operation %s error: %s", kind, err.Error()))
+		}
+	}
 }
 
-func (ops *BaseOperations) RegisterOperation(opsKind bindings.OperationKind, operation Operation) {
-	if ops.OperationMap == nil {
-		ops.OperationMap = map[bindings.OperationKind]Operation{}
+func (ops *BaseOperations) RegisterOperation(opsKind bindings.OperationKind, operation LegacyOperation) {
+	if ops.LegacyOperations == nil {
+		ops.LegacyOperations = map[bindings.OperationKind]LegacyOperation{}
 	}
-	ops.OperationMap[opsKind] = operation
+	ops.LegacyOperations[opsKind] = operation
 }
 
 // Operations returns list of operations supported by the binding.
 func (ops *BaseOperations) Operations() []bindings.OperationKind {
-	opsKinds := make([]bindings.OperationKind, len(ops.OperationMap))
+	opsKinds := make([]bindings.OperationKind, len(ops.LegacyOperations))
 	i := 0
-	for opsKind := range ops.OperationMap {
+	for opsKind := range ops.LegacyOperations {
 		opsKinds[i] = opsKind
 		i++
 	}
@@ -129,7 +150,7 @@ func (ops *BaseOperations) Operations() []bindings.OperationKind {
 }
 
 // getAddress returns component service address, if component is not listening on
-// 127.0.0.1, the Operation needs to overwrite this function and set ops.DBAddress
+// 127.0.0.1, the LegacyOperation needs to overwrite this function and set ops.DBAddress
 func (ops *BaseOperations) getAddress() string {
 	return "127.0.0.1"
 }
@@ -155,7 +176,7 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 		return resp, nil
 	}
 
-	operation, ok := ops.OperationMap[req.Operation]
+	operation, ok := ops.LegacyOperations[req.Operation]
 	opsRes := OpsResult{}
 	if !ok {
 		message := fmt.Sprintf("%v operation is not implemented for %v", req.Operation, ops.DBType)
@@ -180,8 +201,10 @@ func (ops *BaseOperations) Invoke(ctx context.Context, req *bindings.InvokeReque
 	if err != nil {
 		return nil, err
 	}
-	res, _ := json.Marshal(opsRes)
-	resp.Data = res
+	if opsRes != nil {
+		res, _ := json.Marshal(opsRes)
+		resp.Data = res
+	}
 
 	return updateRespMetadata()
 }
@@ -266,6 +289,21 @@ func (ops *BaseOperations) GetRoleOps(ctx context.Context, req *bindings.InvokeR
 	opsRes["event"] = OperationSuccess
 	opsRes["role"] = role
 	return opsRes, nil
+}
+
+func (ops *BaseOperations) volumeProtection(ctx context.Context, req *bindings.InvokeRequest,
+	rsp *bindings.InvokeResponse) (OpsResult, error) {
+	return ops.fwdLegacyOperationCall(VolumeProtection, ctx, req, rsp)
+}
+
+func (ops *BaseOperations) fwdLegacyOperationCall(kind bindings.OperationKind, ctx context.Context,
+	req *bindings.InvokeRequest, rsp *bindings.InvokeResponse) (OpsResult, error) {
+	op, ok := ops.Ops[kind]
+	if !ok {
+		panic(fmt.Sprintf("unknown operation kind: %s", kind))
+	}
+	// since the rsp.Data has been set properly, it doesn't need to return a OpsResult here.
+	return nil, op.Invoke(ctx, req, rsp)
 }
 
 // Component may have some internal roles that needn't be exposed to end user,

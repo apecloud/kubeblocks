@@ -75,7 +75,7 @@ func TestOperations(t *testing.T) {
 	ops := p.Operations()
 
 	if len(ops) != 4 {
-		t.Errorf("p.OperationMap init failed: %s", p.OriRole)
+		t.Errorf("p.LegacyOperations init failed: %s", p.OriRole)
 	}
 }
 

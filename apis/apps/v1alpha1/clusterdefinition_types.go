@@ -239,6 +239,24 @@ type VolumeTypeSpec struct {
 	Type VolumeType `json:"type,omitempty"`
 }
 
+type VolumeProtectionSpec struct {
+	// +kubebuilder:validation:Maximum=100
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=90
+	// +optional
+	LowWatermark int `json:"lowWatermark,omitempty"`
+
+	// +kubebuilder:validation:Maximum=100
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=90
+	// +optional
+	HighWatermark int `json:"highWatermark,omitempty"`
+
+	// Volumes to monitor.
+	// +optional
+	Volumes []string `json:"volumes,omitempty"`
+}
+
 // ClusterComponentDefinition provides a workload component specification template,
 // with attributes that strongly work with stateful workloads and day-2 operations
 // behaviors.
@@ -364,6 +382,9 @@ type ClusterComponentDefinition struct {
 	// in particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
 	// +optional
 	SwitchoverSpec *SwitchoverSpec `json:"switchoverSpec,omitempty"`
+
+	// +optional
+	VolumeProtectionSpec *VolumeProtectionSpec `json:"volumeProtectionSpec,omitempty"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
@@ -620,6 +641,12 @@ type ClusterDefinitionProbes struct {
 	// Probe for DB role changed check.
 	// +optional
 	RoleProbe *ClusterDefinitionProbe `json:"roleProbe,omitempty"`
+
+	// TODO: we should not provide this option for user.
+	// Probe to monitor the volume space usage and prohibit the instance from writing if the volume space usage is over the defined threshold.
+	// Reference ClusterDefinition.ClusterComponentDefinition.VolumeProtectionSpec for the threshold and volumes to monitor.
+	// +optional
+	VolumeProtectionProbe *ClusterDefinitionProbe `json:"volumeProtectionProbe,omitempty"`
 
 	// roleProbeTimeoutAfterPodsReady(in seconds), when all pods of the component are ready,
 	// it will detect whether the application is available in the pod.

@@ -227,26 +227,7 @@ func SentProbeEvent(ctx context.Context, opsResult OpsResult, log logger.Logger)
 		return
 	}
 
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		log.Errorf("get k8s client config failed: %v", err)
-		return
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Infof("k8s client create failed: %v", err)
-		return
-	}
-	namespace := os.Getenv("KB_NAMESPACE")
-	for i := 0; i < 30; i++ {
-		_, err = clientset.CoreV1().Events(namespace).Create(ctx, event, metav1.CreateOptions{})
-		if err == nil {
-			break
-		}
-		log.Errorf("send event failed: %v", err)
-		time.Sleep(10 * time.Second)
-	}
+	sendEvent(ctx, log, event)
 }
 
 func createProbeEvent(opsResult OpsResult) (*corev1.Event, error) {
@@ -254,13 +235,13 @@ func createProbeEvent(opsResult OpsResult) (*corev1.Event, error) {
 apiVersion: v1
 kind: Event
 metadata:
-  name: {{ .PodName }}.{{ .EventSeq }}
+  name: {{ .Pod }}.{{ .EventSeq }}
   namespace: {{ .Namespace }}
 involvedObject:
   apiVersion: v1
   fieldPath: spec.containers{sqlchannel}
   kind: Pod
-  name: {{ .PodName }}
+  name: {{ .Pod }}
   namespace: {{ .Namespace }}
 reason: RoleChanged
 type: Normal
@@ -276,7 +257,7 @@ source:
 	msg, _ := json.Marshal(opsResult)
 	seq := rand.String(16)
 	roleValue := map[string]string{
-		"PodName":   podName,
+		"Pod":       podName,
 		"Namespace": namespace,
 		"EventSeq":  seq,
 	}
@@ -303,4 +284,28 @@ source:
 	event.LastTimestamp = metav1.Now()
 
 	return event, nil
+}
+
+func sendEvent(ctx context.Context, log logger.Logger, event *corev1.Event) error {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Errorf("get k8s client config failed: %v", err)
+		return err
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Infof("k8s client create failed: %v", err)
+		return err
+	}
+	namespace := os.Getenv("KB_NAMESPACE")
+	for i := 0; i < 30; i++ {
+		_, err = clientset.CoreV1().Events(namespace).Create(ctx, event, metav1.CreateOptions{})
+		if err == nil {
+			break
+		}
+		log.Errorf("send event failed: %v", err)
+		time.Sleep(10 * time.Second)
+	}
+	return err
 }

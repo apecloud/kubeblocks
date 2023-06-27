@@ -78,7 +78,7 @@ func (h *HTTPCustom) Init(metadata bindings.Metadata) error {
 
 	h.BaseOperations.Init(metadata)
 	h.BaseOperations.GetRole = h.GetRole
-	h.OperationMap[CheckRoleOperation] = h.CheckRoleOps
+	h.LegacyOperations[CheckRoleOperation] = h.CheckRoleOps
 
 	return nil
 }

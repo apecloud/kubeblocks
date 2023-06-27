@@ -146,7 +146,7 @@ func (mongoOps *MongoDBOperations) Init(metadata bindings.Metadata) error {
 	mongoOps.InitIfNeed = mongoOps.initIfNeed
 	mongoOps.DBPort = mongoOps.GetRunningPort()
 	mongoOps.BaseOperations.GetRole = mongoOps.GetRole
-	mongoOps.OperationMap[GetRoleOperation] = mongoOps.GetRoleOps
+	mongoOps.LegacyOperations[GetRoleOperation] = mongoOps.GetRoleOps
 	return nil
 }
 

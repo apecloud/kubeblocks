@@ -38,9 +38,10 @@ import (
 
 const (
 	// http://localhost:<port>/v1.0/bindings/<binding_type>
-	checkRoleURIFormat    = "/v1.0/bindings/%s?operation=checkRole"
-	checkRunningURIFormat = "/v1.0/bindings/%s?operation=checkRunning"
-	checkStatusURIFormat  = "/v1.0/bindings/%s?operation=checkStatus"
+	checkRoleURIFormat        = "/v1.0/bindings/%s?operation=checkRole"
+	checkRunningURIFormat     = "/v1.0/bindings/%s?operation=checkRunning"
+	checkStatusURIFormat      = "/v1.0/bindings/%s?operation=checkStatus"
+	volumeProtectionURIFormat = "/v1.0/bindings/%s?operation=volumeProtection"
 )
 
 var (
@@ -87,6 +88,13 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		runningProbeContainer := container.DeepCopy()
 		buildRunningProbeContainer(component.CharacterType, runningProbeContainer, componentProbes.RunningProbe, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *runningProbeContainer)
+	}
+
+	if componentProbes.VolumeProtectionProbe != nil && component.VolumeProtection != nil {
+		c := container.DeepCopy()
+		buildVolumeProtectionProbeContainer(component.CharacterType, c, *componentProbes.VolumeProtectionProbe,
+			*component.VolumeProtection, int(probeSvcHTTPPort))
+		probeContainers = append(probeContainers, *c)
 	}
 
 	if len(probeContainers) >= 1 {
@@ -227,4 +235,29 @@ func buildRunningProbeContainer(characterType string, runningProbeContainer *cor
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
 	probe.FailureThreshold = probeSetting.FailureThreshold
 	runningProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
+}
+
+func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Container,
+	probeSetting appsv1alpha1.ClusterDefinitionProbe, spec appsv1alpha1.VolumeProtectionSpec, probeSvcHTTPPort int) {
+	c.Name = constant.VolumeProtectionProbeContainerName
+	probe := c.ReadinessProbe
+	httpGet := &corev1.HTTPGetAction{}
+	httpGet.Path = fmt.Sprintf(volumeProtectionURIFormat, characterType)
+	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
+	probe.Exec = nil
+	probe.HTTPGet = httpGet
+	probe.PeriodSeconds = probeSetting.PeriodSeconds
+	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
+	probe.FailureThreshold = probeSetting.FailureThreshold
+	c.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
+
+	// pass the volume protection spec to probe container through env.
+	value, err := json.Marshal(spec)
+	if err != nil {
+		panic(fmt.Sprintf("marshal volume protection spec error: %s", err.Error()))
+	}
+	c.Env = append(c.Env, corev1.EnvVar{
+		Name:  "KB_VOLUME_PROTECTION_SPEC",
+		Value: string(value),
+	})
 }

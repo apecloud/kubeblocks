@@ -49,10 +49,10 @@ const (
 	tokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
 	envNamespace      = "KB_NAMESPACE"
-	envHostIp         = "KB_HOST_IP"
+	envHostIP         = "KB_HOST_IP"
 	envNodeName       = "KB_NODENAME"
 	envPodName        = "KB_POD_NAME"
-	envPodUid         = "KB_POD_UID"
+	envPodUID         = "KB_POD_UID"
 	envVolumesToProbe = "KB_VOLUME_PROTECTION_SPEC"
 
 	reasonLock   = "HighVolumeWatermark"
@@ -303,7 +303,7 @@ func (o *operationVolumeProtection) createEvent(reason, msg string) *corev1.Even
 			Kind:      "Pod",
 			Namespace: os.Getenv(envNamespace),
 			Name:      os.Getenv(envPodName),
-			UID:       types.UID(os.Getenv(envPodUid)),
+			UID:       types.UID(os.Getenv(envPodUID)),
 			FieldPath: "spec.containers{sqlchannel}",
 		},
 		Reason:  reason,
@@ -361,7 +361,7 @@ func httpRequest(ctx context.Context) (*http.Request, error) {
 }
 
 func kubeletEndpointHost(ctx context.Context) (string, error) {
-	return os.Getenv(envHostIp), nil
+	return os.Getenv(envHostIP), nil
 }
 
 func kubeletEndpointPort(ctx context.Context) (string, error) {

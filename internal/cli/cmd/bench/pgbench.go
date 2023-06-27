@@ -188,12 +188,7 @@ func (o *PgBenchOptions) Run() error {
 			o.Cmd = append(o.Cmd, "-t", fmt.Sprintf("%d", o.Transactions))
 		}
 	case cleanupOperation:
-		o.Cmd = []string{"psql", "-c", `
-			DROP TABLE IF EXISTS pgbench_accounts;
-			DROP TABLE IF EXISTS pgbench_branches;
-			DROP TABLE IF EXISTS pgbench_history;
-			DROP TABLE IF EXISTS pgbench_tellers;
-		`}
+		o.Cmd = []string{"pgbench", "-i", "-I", "d"}
 	}
 
 	pod := &corev1.Pod{

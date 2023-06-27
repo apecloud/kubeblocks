@@ -19,8 +19,8 @@ type DBManager interface {
 	AddToCluster()
 	Premote() error
 	Demote() error
-	GetHealthiestMember()
-	HasOtherHealthyLeader() *dcs.Member
+	GetHealthiestMember(*dcs.Cluster, string) *dcs.Member
+	HasOtherHealthyLeader(*dcs.Cluster) *dcs.Member
 	GetCurrentMemberName() string
 	GetMemberAddr(string) string
 	GetLogger() logger.Logger

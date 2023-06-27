@@ -57,25 +57,35 @@ func (ha *Ha) RunCycle() {
 	//	dbManager.AddToCluser(cluster)
 	//	cluster.AddThisMember()
 
-	case cluster.IsUnlocked():
-		logger.Infof("Cluster has no leader, attemp to take the leader")
+	case !cluster.IsLocked():
+		ha.logger.Infof("Cluster has no leader, attemp to take the leader")
 		candidate := ""
-		if cluster.SwitchOver != nil && cluster.SwitchOver.Candinate != "" {
-			candiate = cluster.SwitchOver.Candinate
+		if cluster.Switchover != nil && cluster.Switchover.Candidate != "" {
+			candidate = cluster.Switchover.Candidate
 		}
-		healthiestMember := ha.dbManager.GetHealthiesMember(cluster, candinate)
+		healthiestMember := ha.dbManager.GetHealthiestMember(cluster, candidate)
 		if healthiestMember != nil && healthiestMember.Name == ha.dbManager.GetCurrentMemberName() {
-			if dcs.attempAcquireLeader() {
-				dbManager.Premote()
+			if ha.dcs.AttempAcquireLock() == nil {
+				ha.dbManager.Premote()
 			}
 		}
 
-	case cluster.HasLock():
+	case ha.dcs.HasLock():
 		ha.logger.Infof("This member is Cluster's leader")
+		if cluster.Switchover != nil {
+			if cluster.Switchover.Leader == ha.dbManager.GetCurrentMemberName() {
+				ha.dbManager.Demote()
+				ha.dcs.ReleaseLock()
+				break
+			} else if cluster.Switchover.Candidate == "" || cluster.Switchover.Candidate == ha.dbManager.GetCurrentMemberName() {
+				ha.dcs.DeleteSwitchover()
+			}
+		}
+
 		if ok, _ := ha.dbManager.IsLeader(context.TODO()); ok {
 			ha.logger.Infof("Refresh leader ttl")
 			ha.dcs.UpdateLock()
-		} else if ha.dbManager.HasOtherHealthyLeader() != nil {
+		} else if ha.dbManager.HasOtherHealthyLeader(cluster) != nil {
 			ha.logger.Infof("Release leader")
 			ha.dcs.ReleaseLock()
 		} else {
@@ -83,13 +93,24 @@ func (ha *Ha) RunCycle() {
 			ha.dcs.UpdateLock()
 		}
 
-	case cluster.SwitchOver != nil && cluster.SwitchOver.Leader == ha.dbManager.GetCurrentMemberName():
-		logger.Infof("Cluster has no leader, attemp to take the leader")
-		ha.dbManager.Demote()
+	case !ha.dcs.HasLock():
+		if cluster.Switchover != nil {
+			break
+		}
+		if ok, _ := ha.dbManager.IsLeader(context.TODO()); ok {
+			ha.logger.Infof("try to acquire lock")
+			if ha.dcs.AttempAcquireLock() == nil {
+				ha.dbManager.Premote()
+			}
+		}
 
-	case cluster.SwitchOver != nil && cluster.SwitchOver.Candidate == ha.dbManager.GetCurrentMemberName():
-		logger.Infof("Cluster has no leader, attemp to take the leader")
-		ha.dbManager.Premote()
+		// case cluster.SwitchOver != nil && cluster.SwitchOver.Leader == ha.dbManager.GetCurrentMemberName():
+		// 	logger.Infof("Cluster has no leader, attemp to take the leader")
+		// 	ha.dbManager.Demote()
+
+		// case cluster.SwitchOver != nil && cluster.SwitchOver.Candidate == ha.dbManager.GetCurrentMemberName():
+		// 	logger.Infof("Cluster has no leader, attemp to take the leader")
+		// 	ha.dbManager.Premote()
 	}
 }
 

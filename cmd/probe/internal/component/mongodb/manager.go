@@ -2,6 +2,7 @@ package mongodb
 
 import (
 	"context"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -290,7 +291,61 @@ func (mgr *Manager) Demote() error {
 	return nil
 }
 
-func (mgr *Manager) GetHealthiestMember() {}
-func (mgr *Manager) HasOtherHealthyLeader() *dcs.Member {
+func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {
+	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
+	if rsStatus == nil {
+		return nil
+	}
+	healthyMembers := make([]string, 0, len(rsStatus.Members))
+	var leader string
+	for _, member := range rsStatus.Members {
+		if member.Health == 1 {
+			memberName := strings.Split(member.Name, ".")[0]
+			if memberName == candidate {
+				return cluster.GetMemberWithName(candidate)
+			}
+			healthyMembers = append(healthyMembers, memberName)
+			if member.State == 1 {
+				leader = memberName
+			}
+		}
+	}
+
+	if candidate != "" {
+		mgr.Logger.Infof("no health member for candidate: %s", candidate)
+		return nil
+	}
+
+	if leader != "" {
+		return cluster.GetMemberWithName(leader)
+	}
+
+	// TODO: use lag and other info to pick the healthiest member
+	rand.Seed(time.Now().Unix())
+	healthiestMember := healthyMembers[rand.Intn(len(healthyMembers))]
+	return cluster.GetMemberWithName(healthiestMember)
+
+}
+
+func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
+	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
+	if rsStatus == nil {
+		return nil
+	}
+	var otherLeader string
+	for _, member := range rsStatus.Members {
+		if member.State != 1 {
+			continue
+		}
+		memberName := strings.Split(member.Name, ".")[0]
+		if memberName != mgr.CurrentMemberName {
+			otherLeader = memberName
+		}
+	}
+
+	if otherLeader != "" {
+		return cluster.GetMemberWithName(otherLeader)
+	}
+
 	return nil
 }

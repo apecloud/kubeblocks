@@ -69,6 +69,8 @@ func (o *createOptions) Run() error {
 	}
 
 	o.Cluster.Kubernetes.AutoDefaultFill()
+	o.version = o.Version
+	o.checkAndSetDefaultVersion()
 	cluster, err := createClusterWithOptions(buildTemplateParams(o))
 	if err != nil {
 		return err
@@ -115,7 +117,7 @@ func NewCreateKubernetesCmd(streams genericclioptions.IOStreams) *cobra.Command 
 		clusterOptions: clusterOptions{
 			IOStreams: streams,
 		}}
-	o.setDefaultVersion()
+	o.checkAndSetDefaultVersion()
 	cmd := &cobra.Command{
 		Use:     "create",
 		Short:   "create kubernetes cluster.",
@@ -127,6 +129,7 @@ func NewCreateKubernetesCmd(streams genericclioptions.IOStreams) *cobra.Command 
 		},
 	}
 	o.buildCreateInfraFlags(cmd)
+	o.Version = o.version
 	return cmd
 }
 
@@ -139,12 +142,26 @@ func (o *createOptions) buildCreateInfraFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVarP(&o.outputKubeconfig, "output-kubeconfig", "", tasks.GetDefaultConfig(), "Specified output kubeconfig. [option]")
 }
 
-func (o *createOptions) setDefaultVersion() {
-	o.version.KubernetesVersion = constant.DefaultK8sVersion
-	o.version.EtcdVersion = constant.DefaultEtcdVersion
-	o.version.ContainerVersion = constant.DefaultContainerdVersion
-	o.version.HelmVersion = constant.DefaultHelmVersion
-	o.version.CRICtlVersion = constant.DefaultCRICtlVersion
-	o.version.CniVersion = constant.DefaultCniVersion
-	o.version.RuncVersion = constant.DefaultRuncVersion
+func (o *createOptions) checkAndSetDefaultVersion() {
+	if o.version.KubernetesVersion == "" {
+		o.version.KubernetesVersion = constant.DefaultK8sVersion
+	}
+	if o.version.EtcdVersion == "" {
+		o.version.EtcdVersion = constant.DefaultEtcdVersion
+	}
+	if o.version.ContainerVersion == "" {
+		o.version.ContainerVersion = constant.DefaultContainerdVersion
+	}
+	if o.version.HelmVersion == "" {
+		o.version.HelmVersion = constant.DefaultHelmVersion
+	}
+	if o.version.CRICtlVersion == "" {
+		o.version.CRICtlVersion = constant.DefaultCRICtlVersion
+	}
+	if o.version.CniVersion == "" {
+		o.version.CniVersion = constant.DefaultCniVersion
+	}
+	if o.version.RuncVersion == "" {
+		o.version.RuncVersion = constant.DefaultRuncVersion
+	}
 }

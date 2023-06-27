@@ -26,13 +26,13 @@ import (
 )
 
 type InfraVersionInfo struct {
-	KubernetesVersion string
-	EtcdVersion       string
-	ContainerVersion  string
-	CRICtlVersion     string
-	RuncVersion       string
-	CniVersion        string
-	HelmVersion       string
+	KubernetesVersion string `json:"kubernetesVersion"`
+	EtcdVersion       string `json:"etcdVersion"`
+	ContainerVersion  string `json:"containerVersion"`
+	CRICtlVersion     string `json:"crictlVersion"`
+	RuncVersion       string `json:"runcVersion"`
+	CniVersion        string `json:"cniVersion"`
+	HelmVersion       string `json:"helmVersion"`
 }
 
 type PluginMeta struct {
@@ -67,6 +67,8 @@ type Cluster struct {
 
 	// for kubeadm configuration
 	Kubernetes Kubernetes `json:"kubernetes"`
+
+	Version InfraVersionInfo `json:"version"`
 }
 
 type RoleGroup struct {

@@ -27,7 +27,7 @@ spec:
      {{- end }}
 
   installable:
-    autoInstall: true
+    autoInstall: false
 
   defaultInstallValues:
     - enabled: true

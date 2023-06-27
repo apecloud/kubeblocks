@@ -36,7 +36,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
 var _ = Describe("object deletion transformer test.", func() {
@@ -118,10 +117,10 @@ var _ = Describe("object deletion transformer test.", func() {
 
 			Expect(transformer.Transform(transCtx, dag)).Should(Equal(graph.ErrPrematureStop))
 			dagExpected := mockDAG()
-			model.PrepareDelete(dagExpected, action)
-			model.PrepareDelete(dagExpected, envConfig)
-			model.PrepareDelete(dagExpected, headLessSvc)
-			model.PrepareDelete(dagExpected, sts)
+			graphCli.Delete(dagExpected, action)
+			graphCli.Delete(dagExpected, envConfig)
+			graphCli.Delete(dagExpected, headLessSvc)
+			graphCli.Delete(dagExpected, sts)
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 		})
 	})

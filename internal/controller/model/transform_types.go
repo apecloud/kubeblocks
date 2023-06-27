@@ -49,9 +49,9 @@ const (
 	STATUS = Action("STATUS")
 )
 
-type GVKName struct {
-	gvk      schema.GroupVersionKind
-	ns, name string
+type GVKNObjKey struct {
+	schema.GroupVersionKind
+	client.ObjectKey
 }
 
 // ObjectVertex describes expected object spec and how to reach it
@@ -79,7 +79,7 @@ func (v ObjectVertex) String() string {
 		v.Obj, v.Obj.GetName(), v.Immutable, v.IsOrphan, *v.Action)
 }
 
-type ObjectSnapshot map[GVKName]client.Object
+type ObjectSnapshot map[GVKNObjKey]client.Object
 
 type RequeueError interface {
 	RequeueAfter() time.Duration

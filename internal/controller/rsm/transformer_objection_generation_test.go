@@ -32,8 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
 var _ = Describe("object generation transformer test.", func() {
@@ -55,6 +53,8 @@ var _ = Describe("object generation transformer test.", func() {
 			rsmOrig:       rsm.DeepCopy(),
 			rsm:           rsm,
 		}
+
+		transformer = &ObjectGenerationTransformer{}
 	})
 
 	Context("Transform function", func() {
@@ -89,18 +89,15 @@ var _ = Describe("object generation transformer test.", func() {
 					return nil
 				}).Times(1)
 
-			dagExpected := graph.NewDAG()
-			model.PrepareStatus(dagExpected, transCtx.rsmOrig, transCtx.rsm)
-			model.PrepareCreate(dagExpected, sts)
-			model.PrepareCreate(dagExpected, headlessSvc)
-			model.PrepareCreate(dagExpected, svc)
-			model.PrepareCreate(dagExpected, env)
-			model.DependOn(dagExpected, sts, headlessSvc, svc, env)
+			dagExpected := mockDAG()
+			graphCli.Create(dagExpected, sts)
+			graphCli.Create(dagExpected, headlessSvc)
+			graphCli.Create(dagExpected, svc)
+			graphCli.Create(dagExpected, env)
+			graphCli.DependOn(dagExpected, sts, headlessSvc, svc, env)
 
 			// do Transform
-			dag := graph.NewDAG()
-			model.PrepareStatus(dag, transCtx.rsmOrig, transCtx.rsm)
-			transformer := ObjectGenerationTransformer{}
+			dag := mockDAG()
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 
 			// compare DAGs

@@ -46,6 +46,7 @@ import (
 var (
 	controller  *gomock.Controller
 	k8sMock     *mocks.MockClient
+	graphCli    model.GraphClient
 	ctx         context.Context
 	logger      logr.Logger
 	transCtx    *rsmTransformContext
@@ -200,7 +201,7 @@ func mockUnderlyingSts(rsm workloads.ReplicatedStateMachine, generation int64) *
 
 func mockDAG() *graph.DAG {
 	d := graph.NewDAG()
-	model.PrepareStatus(d, transCtx.rsmOrig, transCtx.rsm)
+	graphCli.Root(d, transCtx.rsmOrig, transCtx.rsm)
 	return d
 }
 
@@ -215,6 +216,7 @@ func TestAPIs(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	controller, k8sMock = testutil.SetupK8sMock()
+	graphCli = model.NewGraphClient(k8sMock)
 	ctx = context.Background()
 	logger = logf.FromContext(ctx).WithValues("rsm-test", namespace)
 

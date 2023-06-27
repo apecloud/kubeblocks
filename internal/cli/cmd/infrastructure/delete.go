@@ -88,7 +88,7 @@ func (o *deleteOptions) Run() error {
 func (o *deleteOptions) buildDeleteInfraFlags(cmd *cobra.Command) {
 	buildCommonFlags(cmd, &o.clusterOptions)
 	cmd.Flags().BoolVarP(&o.debug, "debug", "", false, "set debug mode")
-	cmd.Flags().BoolVarP(&o.debug, "delete-cri", "", false, "delete cri")
+	cmd.Flags().BoolVarP(&o.deleteCRI, "delete-cri", "", false, "delete cri")
 }
 
 func NewDeleteKubernetesCmd(streams genericclioptions.IOStreams) *cobra.Command {

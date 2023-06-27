@@ -159,16 +159,11 @@ const (
 	keyUnknown      setKey = "unknown"
 )
 
-type envSet struct {
-	name       string
-	defaultVal string
-}
-
-var setKeyEnvMap = map[setKey]envSet{
-	keyCPU:      {"CLUSTER_DEFAULT_CPU", "1000m"},
-	keyMemory:   {"CLUSTER_DEFAULT_MEMORY", "1Gi"},
-	keyStorage:  {"CLUSTER_DEFAULT_STORAGE_SIZE", "20Gi"},
-	keyReplicas: {"CLUSTER_DEFAULT_REPLICAS", "1"},
+var setKeyCfg = map[setKey]string{
+	keyCPU:      types.CfgKeyClusterDefaultCPU,
+	keyMemory:   types.CfgKeyClusterDefaultMemory,
+	keyStorage:  types.CfgKeyClusterDefaultStorageSize,
+	keyReplicas: types.CfgKeyClusterDefaultReplicas,
 }
 
 // UpdatableFlags is the flags that cat be updated by update command
@@ -856,12 +851,8 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		}
 
 		// get value from environment variables
-		env := setKeyEnvMap[key]
-		val := viper.GetString(env.name)
-		if len(val) == 0 {
-			val = env.defaultVal
-		}
-		return val
+		cfg := setKeyCfg[key]
+		return viper.GetString(cfg)
 	}
 
 	buildSwitchPolicy := func(c *appsv1alpha1.ClusterComponentDefinition, compObj *appsv1alpha1.ClusterComponentSpec, sets map[setKey]string) error {

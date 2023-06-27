@@ -25,7 +25,6 @@ import (
 
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/connector"
-	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/pipeline"
 	"github.com/spf13/cobra"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -89,15 +88,11 @@ func (o *createOptions) Run() error {
 		Cluster:     cluster,
 		ClusterName: o.clusterName,
 	}
-	syncClusterNodeRole(cluster, runtime)
 
-	pipeline := pipeline.Pipeline{
-		Name:    "CreateCluster",
-		Modules: NewCreatePipeline(o),
-		Runtime: runtime,
-	}
+	syncClusterNodeRole(cluster, runtime)
 	checkAndUpdateZone()
-	if err := pipeline.Start(); err != nil {
+	pipelineRunner := tasks.NewPipelineRunner("CreateCluster", NewCreatePipeline(o), runtime)
+	if err := pipelineRunner.Do(o.IOStreams.Out); err != nil {
 		return err
 	}
 	fmt.Fprintf(o.IOStreams.Out, "Kubernetes Installation is complete.\n\n")

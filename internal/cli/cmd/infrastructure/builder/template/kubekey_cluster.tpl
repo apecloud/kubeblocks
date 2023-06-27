@@ -42,7 +42,7 @@ spec:
     nodelocaldns: false
     dnsDomain: {{ $.Kubernetes.Networking.DNSDomain }}
     version: {{ $.Version }}
-    clusterName: {{ $.Kubernetes.ClusterName }}
+    clusterName: {{ $.Name }}
     {{- $criType := "containerd" }}
     nodeCidrMaskSize: 24
     proxyMode: {{ $.Kubernetes.ProxyMode }}

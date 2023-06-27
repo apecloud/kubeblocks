@@ -93,9 +93,9 @@ type NodeOptions struct {
 }
 
 type Kubernetes struct {
-	ClusterName string `json:"clusterName"`
-	DNSDomain   string `json:"dnsDomain"`
-	ProxyMode   string `json:"proxyMode"`
+	// ClusterName string `json:"clusterName"`
+	DNSDomain string `json:"dnsDomain"`
+	ProxyMode string `json:"proxyMode"`
 
 	Networking Networking       `json:"networking"`
 	CRI        ContainerRuntime `json:"cri"`
@@ -155,9 +155,9 @@ func (g *RoleGroup) IsValidate() bool {
 }
 
 func (k *Kubernetes) AutoDefaultFill() {
-	if k.ClusterName == "" {
-		k.ClusterName = constant.DefaultK8sClusterName
-	}
+	// if k.ClusterName == "" {
+	//	k.ClusterName = constant.DefaultK8sClusterName
+	// }
 	if k.DNSDomain == "" {
 		k.DNSDomain = constant.DefaultK8sDNSDomain
 	}

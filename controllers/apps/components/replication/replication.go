@@ -38,9 +38,9 @@ import (
 )
 
 const (
-	primaryPriority   = 1 << 2
-	secondaryPriority = 1 << 1
-	emptyPriority     = 1 << 0
+	emptyPriority = iota
+	secondaryPriority
+	primaryPriority
 )
 
 // ReplicationSet is a component object used by Cluster, ClusterComponentDefinition and ClusterComponentSpec

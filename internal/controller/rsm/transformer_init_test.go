@@ -37,7 +37,7 @@ var _ = Describe("init transformer test.", func() {
 
 		transCtx = &rsmTransformContext{
 			Context:       ctx,
-			Client:        k8sMock,
+			Client:        graphCli,
 			EventRecorder: nil,
 			Logger:        logger,
 			rsmOrig:       rsm.DeepCopy(),

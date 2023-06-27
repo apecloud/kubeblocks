@@ -28,6 +28,11 @@ done
 echo is_inited: $is_inited
 
 if [ $is_inited ]; then
+  if mongosh --quiet --port $PORT --eval "rs.status().set"; then
+    echo "reset password"
+    (until mongosh --quiet --port $PORT --eval "rs.isMaster().isWritablePrimary"|grep true; do sleep 1; done;
+    mongosh --quiet --port $PORT admin --eval "db.createUser({ user: '$MONGODB_ROOT_USER', pwd: '$MONGODB_ROOT_PASSWORD', roles: [{role: 'root', db: 'admin'}] })") </dev/null  >/dev/null 2>&1 &
+  fi
   exit 0
 fi
 

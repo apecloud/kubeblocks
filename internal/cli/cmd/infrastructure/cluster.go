@@ -120,6 +120,9 @@ func (o *clusterOptions) Validate() error {
 	if o.User.Name == "" {
 		return cfgcore.MakeError("user name is empty")
 	}
+	if o.clusterName == "" {
+		return cfgcore.MakeError("kubernetes name is empty")
+	}
 	if err := validateUser(o); err != nil {
 		return err
 	}
@@ -195,7 +198,7 @@ func (o *clusterOptions) fillClusterConfig(configFile string) error {
 		return err
 	}
 	o.Cluster = *c
-	o.clusterName = o.Cluster.Name
+	o.clusterName = c.Name
 	return nil
 }
 

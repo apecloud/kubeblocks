@@ -41,13 +41,6 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-const (
-	all              = "all"
-	prepareOperation = "prepare"
-	runOperation     = "run"
-	cleanupOperation = "cleanup"
-)
-
 var (
 	driverMap = map[string]string{
 		"mysql":      "mysql",
@@ -72,7 +65,7 @@ var sysbenchExample = templates.Examples(`
 		kbcli bench sysbench mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
 `)
 
-var prepareExample = templates.Examples(`
+var sysbenchPrepareExample = templates.Examples(`
 		# sysbench prepare data on a cluster
 		kbcli bench sysbench prepare mycluster --user xxx --password xxx --database mydb
 
@@ -80,7 +73,7 @@ var prepareExample = templates.Examples(`
 		kbcli bench sysbench prepare mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
 `)
 
-var runExample = templates.Examples(`
+var sysbenchRunExample = templates.Examples(`
 		# sysbench run on a cluster
 		kbcli bench sysbench run mycluster --user xxx --password xxx --database mydb
 
@@ -97,7 +90,7 @@ var runExample = templates.Examples(`
 		kbcli bench sysbench run mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
 `)
 
-var cleanupExample = templates.Examples(`
+var sysbenchCleanupExample = templates.Examples(`
 		# sysbench cleanup data on a cluster
 		kbcli bench sysbench cleanup mycluster --user xxx --password xxx --database mydb
 
@@ -317,7 +310,7 @@ func newPrepareCmd(f cmdutil.Factory, o *SysBenchOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "prepare [ClusterName]",
 		Short:             "Prepare the data of SysBench for a cluster",
-		Example:           prepareExample,
+		Example:           sysbenchPrepareExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(executeSysBench(o, args, prepareOperation))
@@ -330,7 +323,7 @@ func newRunCmd(f cmdutil.Factory, o *SysBenchOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "run [ClusterName]",
 		Short:             "Run  SysBench on cluster",
-		Example:           runExample,
+		Example:           sysbenchRunExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(executeSysBench(o, args, runOperation))
@@ -343,7 +336,7 @@ func newCleanCmd(f cmdutil.Factory, o *SysBenchOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "cleanup [ClusterName]",
 		Short:             "Cleanup the data of SysBench for cluster",
-		Example:           cleanupExample,
+		Example:           sysbenchCleanupExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(executeSysBench(o, args, cleanupOperation))

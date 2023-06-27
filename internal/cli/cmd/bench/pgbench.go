@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -39,6 +40,35 @@ import (
 const (
 	pgBenchDriver = "postgresql"
 	pgBenchImage  = "postgres:latest"
+)
+
+var (
+	pgbenchPrepareExample = templates.Examples(`
+		# pgbench prepare data on a cluster
+		kbcli bench pgbench prepare pgcluster --database postgres --user xxx --password xxx --scale 100
+`)
+
+	pgbenchRunExample = templates.Examples(`
+		# pgbench run on a cluster
+		kbcli bench pgbench run pgcluster --database postgres --user xxx --password xxx
+
+		# pgbench run on a cluster with different threads and different client
+		kbcli bench sysbench run  pgcluster --user xxx --password xxx --database xxx --clients 5 --threads 5
+
+		# pgbench run on a cluster with specified transactions
+		kbcli bench pgbench run pgcluster --database postgres --user xxx --password xxx --transactions 1000
+
+		# pgbench run on a cluster with specified times
+		kbcli bench pgbench run pgcluster --database postgres --user xxx --password xxx --times 1000
+
+		# pgbench run on a cluster with select only
+		kbcli bench pgbench run pgcluster --database postgres --user xxx --password xxx --select
+`)
+
+	pgbenchCleanupExample = templates.Examples(`
+		# pgbench cleanup data on a cluster
+		kbcli bench pgbench cleanup pgcluster --database postgres --user xxx --password xxx
+`)
 )
 
 type PgBenchOptions struct {
@@ -241,13 +271,14 @@ func newPgBenchPrepareCmd(f cmdutil.Factory, o *PgBenchOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "prepare [ClusterName]",
 		Short:             "Prepare pgbench test data for a PostgreSQL cluster",
+		Example:           pgbenchPrepareExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(executePgBench(o, args, prepareOperation))
 		},
 	}
 
-	cmd.Flags().IntVar(&o.Scale, "size", 1, "The scale factor to use for pgbench")
+	cmd.Flags().IntVar(&o.Scale, "scale", 1, "The scale factor to use for pgbench")
 
 	return cmd
 }
@@ -257,6 +288,7 @@ func newPgBenchRunCmd(f cmdutil.Factory, o *PgBenchOptions) *cobra.Command {
 		Use:               "run",
 		Short:             "Run pgbench against a PostgreSQL cluster",
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Example:           pgbenchRunExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(executePgBench(o, args, runOperation))
 		},
@@ -274,6 +306,7 @@ func newPgBenchCleanupCmd(f cmdutil.Factory, o *PgBenchOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "cleanup",
 		Short:             "Cleanup pgbench test data for a PostgreSQL cluster",
+		Example:           pgbenchCleanupExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(executePgBench(o, args, cleanupOperation))

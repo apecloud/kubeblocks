@@ -34,6 +34,13 @@ var (
 )
 
 const (
+	all              = "all"
+	prepareOperation = "prepare"
+	runOperation     = "run"
+	cleanupOperation = "cleanup"
+)
+
+const (
 	CueSysBenchTemplateName = "bench_sysbench_template.cue"
 )
 

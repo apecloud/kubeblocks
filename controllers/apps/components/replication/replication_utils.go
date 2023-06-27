@@ -167,3 +167,92 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 
 	return nil
 }
+
+// ComposeReplicationRolePriorityMap generates a priority map based on roles.
+func ComposeReplicationRolePriorityMap() map[string]int {
+	rolePriorityMap := make(map[string]int, 0)
+	rolePriorityMap[""] = emptyPriority
+	rolePriorityMap[constant.Primary] = primaryPriority
+	rolePriorityMap[constant.Secondary] = secondaryPriority
+	return rolePriorityMap
+}
+
+// generateReplicationParallelPlan generates a parallel plan for the replication workload.
+// unknown & empty & secondary & primary
+func generateReplicationParallelPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
+	start := plan.Start
+	for _, pod := range pods {
+		nextStep := &util.Step{}
+		nextStep.Obj = pod
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
+}
+
+// generateReplicationSerialPlan generates a serial plan for the replication workload.
+// unknown -> empty -> secondary -> primary
+func generateReplicationSerialPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
+	start := plan.Start
+	for _, pod := range pods {
+		nextStep := &util.Step{}
+		nextStep.Obj = pod
+		start.NextSteps = append(start.NextSteps, nextStep)
+		start = nextStep
+	}
+}
+
+// generateReplicationBestEffortParallelPlan generates a best effort parallel plan for the replication workload.
+// unknown & empty & 1/2 secondaries -> 1/2 secondaries -> primary
+func generateReplicationBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
+	start := plan.Start
+	// append unknown, empty
+	index := 0
+	for _, pod := range pods {
+		role := pod.Labels[constant.RoleLabelKey]
+		if rolePriorityMap[role] <= emptyPriority {
+			nextStep := &util.Step{}
+			nextStep.Obj = pod
+			start.NextSteps = append(start.NextSteps, nextStep)
+			index++
+		}
+	}
+	if len(start.NextSteps) > 0 {
+		start = start.NextSteps[0]
+	}
+	// append 1/2 secondaries
+	podList := pods[index:]
+	secondaryCount := 0
+	for _, pod := range podList {
+		if rolePriorityMap[pod.Labels[constant.RoleLabelKey]] < primaryPriority {
+			secondaryCount++
+		}
+	}
+	end := secondaryCount / 2
+	for i := 0; i < end; i++ {
+		nextStep := &util.Step{}
+		nextStep.Obj = podList[i]
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
+
+	if len(start.NextSteps) > 0 {
+		start = start.NextSteps[0]
+	}
+	// append the other 1/2 secondaries
+	podList = podList[end:]
+	end = secondaryCount - end
+	for i := 0; i < end; i++ {
+		nextStep := &util.Step{}
+		nextStep.Obj = podList[i]
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
+
+	if len(start.NextSteps) > 0 {
+		start = start.NextSteps[0]
+	}
+	// append primary
+	podList = podList[end:]
+	for _, pod := range podList {
+		nextStep := &util.Step{}
+		nextStep.Obj = pod
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
+}

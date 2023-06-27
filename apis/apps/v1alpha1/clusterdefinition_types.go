@@ -815,7 +815,6 @@ func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolic
 		return r.LLPodManagementPolicy, *r.LLUpdateStrategy
 	}
 	_, s := r.StatefulSetSpec.finalStsUpdateStrategy()
-	// TODO(xingran): The update of the replicationSet needs to generate a plan according to the role
 	s.Type = appsv1.OnDeleteStatefulSetStrategyType
 	s.RollingUpdate = nil
 	return appsv1.ParallelPodManagement, s

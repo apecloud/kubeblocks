@@ -77,3 +77,11 @@ metrics:
 
   service:
     port: 9104
+
+wesqlscale:
+  cell: "zone1"
+  image:
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/apecloud-mysql-scale
+    tag: "latest"
+    pullPolicy: IfNotPresent

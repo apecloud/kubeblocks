@@ -65,3 +65,7 @@ tolerations: [ ]
 # The RBAC permission used by cluster component pod, now include event.create
 serviceAccount:
   name: ""
+
+## @param proxyEnabled Whether to enable proxy or not, if enabled, the proxy component will be deployed
+##
+proxyEnabled: false

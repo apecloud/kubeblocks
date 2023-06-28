@@ -264,3 +264,288 @@ spec:
               statements:
                 creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION SLAVE ON *.* TO $(USERNAME) WITH GRANT OPTION;
                 update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
+    - name: etcd
+      characterType: etcd
+      workloadType: Stateful
+      service:
+        ports:
+          - name: client
+            port: 2379
+            targetPort: client
+      podSpec:
+        containers:
+          - name: etcd
+            imagePullPolicy: IfNotPresent
+            ports:
+              - containerPort: 2379
+                name: client
+            env:
+              - name: CELL
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
+              - name: ETCDCTL_API
+                value: "2"
+              - name: ETCD_SERVER
+                value: "$(KB_CLUSTER_NAME)-etcd-headless"
+              - name: ETCD_PORT
+                value: "2379"
+              - name: TOPOLOGY_FLAGS
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+            command:
+              - /bin/bash
+              - -c
+              - |
+                echo "staring etcd."
+                etcd_port=${ETCD_PORT:-'2379'}
+                etcd_server=${ETCD_SERVER:-'127.0.0.1'}
+
+                cell=${CELL:-'zone1'}
+                export ETCDCTL_API=2
+
+                etcd --enable-v2=true --data-dir "${VTDATAROOT}/etcd/"  \
+                  --listen-client-urls "http://0.0.0.0:${etcd_port}" \
+                  --advertise-client-urls "http://0.0.0.0:${etcd_port}"
+            lifecycle:
+              postStart:
+                exec:
+                  command:
+                    - /bin/bash
+                    - -c
+                    - |
+                      etcd_port=${ETCD_PORT:-'2379'}
+                      etcd_server=${ETCD_SERVER:-'127.0.0.1'}
+
+                      cell=${CELL:-'zone1'}
+                      export ETCDCTL_API=2
+
+                      echo "add /vitess/global"
+                      etcdctl --endpoints "http://127.0.0.1:${etcd_port}" mkdir /vitess/global
+
+                      echo "add /vitess/$cell"
+                      etcdctl --endpoints "http://127.0.0.1:${etcd_port}" mkdir /vitess/$cell
+
+                      # And also add the CellInfo description for the cell.
+                      # If the node already exists, it's fine, means we used existing data.
+                      echo "add $cell CellInfo"
+                      set +e
+                      vtctl --topo_implementation etcd2 \
+                        --topo_global_server_address "127.0.0.1:${etcd_port}" \
+                        --topo_global_root /vitess/global VtctldCommand AddCellInfo \
+                        --root /vitess/$cell \
+                        --server-address "${etcd_server}:${etcd_port}" \
+                        $cell
+    - name: vtctld
+      characterType: vtctld
+      workloadType: Stateful
+      service:
+        ports:
+          - name: webport
+            port: 15000
+            targetPort: webport
+          - name: grpcport
+            port: 15999
+            targetPort: grpcport
+          - name: delvedebug
+            port: 40000
+            targetPort: delvedebug
+      podSpec:
+        containers:
+          - name: vtctld
+            imagePullPolicy: IfNotPresent
+            ports:
+              - containerPort: 15000
+                name: webport
+              - containerPort: 15999
+                name: grpcport
+              - containerPort: 40000
+                name: delvedebug
+            env:
+              - name: CELL
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
+              - name: VTCTLD_SERVER
+                value: "$(KB_CLUSTER_NAME)-vtctld-headless"
+              - name: VTCTLD_WEB_PORT
+                value: "15000"
+              - name: VTCTLD_GRPC_PORT
+                value: "15999"
+              - name: ETCD_SERVER
+                value: "$(KB_CLUSTER_NAME)-etcd-headless"
+              - name: ETCD_PORT
+                value: "2379"
+              - name: TOPOLOGY_FLAGS
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+            command:
+              - /bin/bash
+              - -c
+              - |
+                echo "starting vtctld"
+                cell=${CELL:-'zone1'}
+                grpc_port=${VTCTLD_GRPC_PORT:-'15999'}
+                vtctld_web_port=${VTCTLD_WEB_PORT:-'15000'}
+                topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
+
+                su vitess <<EOF
+                exec vtctld \
+                $topology_fags \
+                --alsologtostderr \
+                --cell $cell \
+                --service_map 'grpc-vtctl,grpc-vtctld' \
+                --backup_storage_implementation file \
+                --file_backup_storage_root $VTDATAROOT/backups \
+                --log_dir $VTDATAROOT \
+                --port $vtctld_web_port \
+                --grpc_port $grpc_port \
+                --pid_file $VTDATAROOT/vtctld.pid
+                EOF
+    - name: vtconsensus
+      characterType: vtconsensus
+      workloadType: Stateful
+      service:
+        ports:
+          - name: port
+            port: 16000
+            targetPort: port
+          - name: delvedebug
+            port: 40000
+            targetPort: delvedebug
+      podSpec:
+        containers:
+          - name: vtconsensus
+            imagePullPolicy: IfNotPresent
+            ports:
+              - containerPort: 16000
+                name: port
+              - containerPort: 40000
+                name: delvedebug
+            env:
+              - name: CELL
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
+              - name: MYSQL_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: VTCONSENSUS_PORT
+                value: "16000"
+              - name: ETCD_SERVER
+                value: "$(KB_CLUSTER_NAME)-etcd-headless"
+              - name: ETCD_PORT
+                value: "2379"
+              - name: TOPOLOGY_FLAGS
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+            command:
+              - /bin/bash
+              - -c
+              - |
+                echo "starting vtconsensus"
+                cell=${CELL:-'zone1'}
+
+                vtconsensusport=${VTCONSENSUS_PORT:-'16000'}
+                topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
+
+                su vitess <<EOF
+                exec vtconsensus \
+                  $topology_fags \
+                  --alsologtostderr \
+                  --refresh_interval 1s \
+                  --scan_repair_timeout 1s \
+                  --log_dir ${VTDATAROOT} \
+                  --db_username "$MYSQL_ROOT_USER" \
+                  --db_password "$MYSQL_ROOT_PASSWORD"
+                EOF
+    - name: vtgate
+      characterType: vtgate
+      workloadType: Stateful
+      service:
+        ports:
+          - name: webport
+            port: 15001
+            targetPort: webport
+          - name: grpcport
+            port: 15991
+            targetPort: grpcport
+          - name: serverport
+            port: 15306
+            targetPort: serverport
+          - name: delvedebug
+            port: 40000
+            targetPort: delvedebug
+      podSpec:
+        containers:
+          - name: vtgate
+            imagePullPolicy: IfNotPresent
+            ports:
+              - containerPort: 15001
+                name: webport
+              - containerPort: 15991
+                name: grpcport
+              - containerPort: 15306
+                name: serverport
+              - containerPort: 40000
+                name: delvedebug
+            env:
+              - name: MYSQL_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: CELL
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
+              - name: VTGATE_MYSQL_PORT
+                value: "15306"
+              - name: VTGATE_WEB_PORT
+                value: "15001"
+              - name: VTGATE_GRPC_PORT
+                value: "15991"
+              - name: ETCD_SERVER
+                value: "$(KB_CLUSTER_NAME)-etcd-headless"
+              - name: ETCD_PORT
+                value: "2379"
+              - name: TOPOLOGY_FLAGS
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+            command:
+              - /bin/bash
+              - -c
+              - |
+                cell=${CELL:-'zone1'}
+                web_port=${VTGATE_WEB_PORT:-'15001'}
+                grpc_port=${VTGATE_GRPC_PORT:-'15991'}
+                mysql_server_port=${VTGATE_MYSQL_PORT:-'15306'}
+                mysql_server_socket_path="/tmp/mysql.sock"
+
+                echo "starting vtgate."
+                su vitess <<EOF
+                exec vtgate \
+                  $TOPOLOGY_FLAGS \
+                  --alsologtostderr \
+                  --gateway_initial_tablet_timeout 30s \
+                  --healthcheck_timeout 2s \
+                  --srv_topo_timeout 1s \
+                  --grpc_keepalive_time 10s \
+                  --grpc_keepalive_timeout 10s \
+                  --log_dir $VTDATAROOT \
+                  --log_queries_to_file $VTDATAROOT/vtgate_querylog.txt \
+                  --port $web_port \
+                  --grpc_port $grpc_port \
+                  --mysql_server_port $mysql_server_port \
+                  --mysql_server_socket_path $mysql_server_socket_path \
+                  --cell $cell \
+                  --cells_to_watch $cell \
+                  --tablet_types_to_wait PRIMARY,REPLICA \
+                  --service_map 'grpc-vtgateservice' \
+                  --pid_file $VTDATAROOT/vtgate.pid \
+                  --mysql_auth_server_impl none
+                EOF

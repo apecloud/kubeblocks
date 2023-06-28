@@ -44,27 +44,21 @@ spec:
           - name: http
             targetPort: http
             port: 8123
-            nodePort: null
           - name: tcp
             targetPort: tcp
             port: 9000
-            nodePort: null
           - name: tcp-mysql
             targetPort: tcp-mysql
             port: 9004
-            nodePort: null
           - name: tcp-postgresql
             targetPort: tcp-postgresql
             port: 9005
-            nodePort: null
           - name: http-intersrv
             targetPort: http-intersrv
             port: 9009
-            nodePort: null
           - name: http-metrics
             targetPort: http-metrics
             port: 8001
-            nodePort: null
       podSpec:
         securityContext:
           fsGroup: 1001

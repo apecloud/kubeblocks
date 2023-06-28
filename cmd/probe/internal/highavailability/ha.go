@@ -50,7 +50,7 @@ func (ha *Ha) RunCycle() {
 	//	dbManager.AddToCluser(cluster)
 	//	cluster.AddThisMember()
 
-	case !ha.dbManger.IsHealthy():
+	case !ha.dbManager.IsCurrentMemberHealthy():
 		ha.logger.Infof("DB Service is not healthy,  do some recover")
 		if ha.dcs.HasLock() {
 			ha.dcs.ReleaseLock()
@@ -59,12 +59,7 @@ func (ha *Ha) RunCycle() {
 
 	case !cluster.IsLocked():
 		ha.logger.Infof("Cluster has no leader, attemp to take the leader")
-		candidate := ""
-		if cluster.Switchover != nil && cluster.Switchover.Candidate != "" {
-			candidate = cluster.Switchover.Candidate
-		}
-		healthiestMember := ha.dbManager.GetHealthiestMember(cluster, candidate)
-		if healthiestMember != nil && healthiestMember.Name == ha.dbManager.GetCurrentMemberName() {
+		if ha.IsHealthiestMember(cluster) {
 			if ha.dcs.AttempAcquireLock() == nil {
 				ha.dbManager.Premote()
 			}
@@ -150,6 +145,32 @@ func (ha *Ha) Start() {
 		time.Sleep(1 * time.Second)
 		return
 	}
+}
+
+func (ha *Ha) IsHealthiestMember(cluster *dcs.Cluster) bool {
+	if cluster.Switchover != nil {
+		switchover := cluster.Switchover
+		candidate := switchover.Candidate
+		if candidate == ha.dbManager.GetCurrentMemberName() {
+			return true
+		}
+		if candidate != "" && ha.dbManager.IsMemberHealthy(candidate) {
+			ha.logger.Infof("manual switchover to new leader: %s", candidate)
+			return false
+		}
+
+		if switchover.Leader == ha.dbManager.GetCurrentMemberName() && len(ha.dbManager.HasOtherHealthyMembers(cluster)) > 0 {
+			ha.logger.Infof("manual switchover to other member")
+			return false
+		}
+	}
+
+	if member := ha.dbManager.HasOtherHealthyLeader(cluster); member != nil {
+		ha.logger.Infof("there is a healthy leader exists: %s", member.Name)
+		return false
+	}
+
+	return true
 }
 
 func (ha *Ha) ShutdownWithWait() {

@@ -12,7 +12,8 @@ type DBManager interface {
 	Initialize()
 	IsClusterInitialized() (bool, error)
 	IsRunning()
-	IsHealthy() bool
+	IsCurrentMemberHealthy() bool
+	IsMemberHealthy(string) bool
 	IsLeader(context.Context) (bool, error)
 	IsDBStartupReady() bool
 	Recover()
@@ -20,7 +21,9 @@ type DBManager interface {
 	Premote() error
 	Demote() error
 	GetHealthiestMember(*dcs.Cluster, string) *dcs.Member
+	// IsHealthiestMember(*dcs.Cluster) bool
 	HasOtherHealthyLeader(*dcs.Cluster) *dcs.Member
+	HasOtherHealthyMembers(*dcs.Cluster) []*dcs.Member
 	GetCurrentMemberName() string
 	GetMemberAddr(string) string
 	GetLogger() logger.Logger

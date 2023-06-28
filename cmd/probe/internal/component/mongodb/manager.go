@@ -270,13 +270,18 @@ func (mgr *Manager) GetReplSetClient(ctx context.Context, hosts []string) (*mong
 func (mgr *Manager) Initialize() {}
 func (mgr *Manager) IsRunning()  {}
 
-func (mgr *Manager) IsHealthy() bool {
+func (mgr *Manager) IsCurrentMemberHealthy() bool {
+	return mgr.IsMemberHealthy(mgr.CurrentMemberName)
+}
+
+func (mgr *Manager) IsMemberHealthy(memberName string) bool {
 	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
 	if rsStatus == nil {
-		return nil
+		return false
 	}
+
 	for _, member := range rsStatus.Members {
-		if strings.HasPrefix(member.Name, mgr.CurrentMemberName) && member.Health == 1 {
+		if strings.HasPrefix(member.Name, memberName) && member.Health == 1 {
 			return true
 		}
 	}
@@ -361,4 +366,28 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 	}
 
 	return nil
+}
+
+func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster) []*dcs.Member {
+	members := make([]*dcs.Member, 0)
+	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
+	if rsStatus == nil {
+		return members
+	}
+
+	for _, member := range rsStatus.Members {
+		if member.State != 1 {
+			continue
+		}
+		memberName := strings.Split(member.Name, ".")[0]
+		if memberName == mgr.CurrentMemberName {
+			continue
+		}
+		member := cluster.GetMemberWithName(memberName)
+		if member != nil {
+			members = append(members, member)
+		}
+	}
+
+	return members
 }

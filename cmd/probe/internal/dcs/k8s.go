@@ -261,9 +261,9 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 	if err != nil {
 		ttl = 0
 	}
-	leader := annotation["leader"]
+	leader := annotations["leader"]
 
-	if ttl > 0 && time.Now().Unix()-renewTime > ttl {
+	if ttl > 0 && time.Now().Unix()-renewTime > int64(ttl) {
 		leader = ""
 	}
 

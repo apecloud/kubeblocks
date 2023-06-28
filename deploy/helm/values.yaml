@@ -309,12 +309,6 @@ addonHelmInstallOptions:
   - "--wait"
   - "--insecure-skip-tls-verify"
 
-## Dashboards settings
-##
-## @param dashboards.enabled - If false, dashboards will not be installed.
-dashboards:
-  enabled: true
-
 ## Prometheus Addon
 ##
 prometheus:

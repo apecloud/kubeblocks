@@ -4,8 +4,8 @@ description: A demo application for showing database cluster availability.
 
 type: application
 
-version: 0.6.0-alpha.21
+version: 0.6.0-alpha.28
 
-appVersion: 0.6.0-alpha.21
+appVersion: 0.6.0-alpha.28
 
 kubeVersion: '>=1.22.0-0'

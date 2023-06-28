@@ -45,17 +45,6 @@ func FindAll[T interface{}](dag *graph.DAG) []graph.Vertex {
 	return vertices
 }
 
-func FindAllNot[T interface{}](dag *graph.DAG) []graph.Vertex {
-	vertices := make([]graph.Vertex, 0)
-	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*ObjectVertex)
-		if _, ok := v.Obj.(T); !ok {
-			vertices = append(vertices, vertex)
-		}
-	}
-	return vertices
-}
-
 func FindRootVertex(dag *graph.DAG) (*ObjectVertex, error) {
 	root := dag.Root()
 	if root == nil {
@@ -187,4 +176,38 @@ func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, ml c
 	}
 
 	return snapshot, nil
+}
+
+func DefaultLess(v1, v2 graph.Vertex) bool {
+	o1, ok1 := v1.(*ObjectVertex)
+	o2, ok2 := v2.(*ObjectVertex)
+	if !ok1 || !ok2 {
+		return false
+	}
+	switch {
+	case o1.Immutable != o2.Immutable:
+		return false
+	case o1.Action == nil && o2.Action == nil:
+	case o1.Action != nil, o2.Action != nil:
+		return false
+	case *o1.Action != *o2.Action:
+		return false
+	}
+	gvk1, err1 := apiutil.GVKForObject(o1.Obj, scheme)
+	gvk2, err2 := apiutil.GVKForObject(o2.Obj, scheme)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	gvkStr := func(gvk schema.GroupVersionKind) string {
+		return fmt.Sprintf("%s-%s-%s", gvk.Group, gvk.Version, gvk.Kind)
+	}
+	objKeyStr := func(obj client.Object) string {
+		return fmt.Sprintf("%s-%s", obj.GetNamespace(), obj.GetName())
+	}
+	switch {
+	case gvk1 != gvk2:
+		return gvkStr(gvk1) < gvkStr(gvk2)
+	default:
+		return objKeyStr(o1.Obj) < objKeyStr(o2.Obj)
+	}
 }

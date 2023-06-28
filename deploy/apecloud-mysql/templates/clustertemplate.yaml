@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-cluster-template
+  labels:
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+data:
+  clusterTpl: |-
+  {{- .Files.Get "cluster/cluster.tpl" | nindent 4 }}
+

@@ -239,7 +239,7 @@ func createComponentObjects(w *templateRenderWorkflow, ctx intctrlutil.RequestCt
 		return nil, err
 	}
 	clusterVersionObj := GetTypedResourceObjectBySignature(w.localObjects, generics.ClusterVersionSignature)
-	component, err := components.NewComponent(ctx, cli, w.clusterDefObj, clusterVersionObj, cluster, compName, nil)
+	component, err := components.NewComponent(ctx, cli, w.clusterDefObj, clusterVersionObj, cluster, nil, compName, nil)
 	if err != nil {
 		return nil, err
 	}

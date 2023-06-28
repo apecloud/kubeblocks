@@ -112,10 +112,11 @@ var _ = Describe("TemplateWrapperTest", func() {
 				Ctx: testCtx.Ctx,
 				Log: logger,
 			},
-			*cluster,
-			*clusterDef,
-			clusterDef.Spec.ComponentDefs[0],
-			cluster.Spec.ComponentSpecs[0],
+			cluster,
+			nil,
+			clusterDef,
+			&clusterDef.Spec.ComponentDefs[0],
+			&cluster.Spec.ComponentSpecs[0],
 			&clusterVersion.Spec.ComponentVersions[0])
 		Expect(err).Should(Succeed())
 		Expect(component).ShouldNot(BeNil())

@@ -36,12 +36,13 @@ import (
 func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
+	clusterTpl *appsv1alpha1.Cluster,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
-	synthesizedComp, err := buildComponent(reqCtx, cluster, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
+	synthesizedComp, err := buildComponent(reqCtx, cluster, clusterTpl, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
 	if err != nil {
 		return nil, err
 	}
@@ -54,32 +55,41 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 }
 
 func BuildComponent(reqCtx intctrlutil.RequestCtx,
-	cluster appsv1alpha1.Cluster,
-	clusterDef appsv1alpha1.ClusterDefinition,
-	clusterCompDef appsv1alpha1.ClusterComponentDefinition,
-	clusterCompSpec appsv1alpha1.ClusterComponentSpec,
+	cluster *appsv1alpha1.Cluster,
+	clusterTpl *appsv1alpha1.Cluster,
+	clusterDef *appsv1alpha1.ClusterDefinition,
+	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
+	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
-	return buildComponent(reqCtx, &cluster, &clusterDef, &clusterCompDef, &clusterCompSpec, clusterCompVers...)
+	return buildComponent(reqCtx, cluster, clusterTpl, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
 }
 
 // buildComponent generates a new Component object, which is a mixture of
 // component-related configs from input Cluster, ClusterDef and ClusterVersion.
 func buildComponent(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
+	clusterTpl *appsv1alpha1.Cluster,
 	clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
 	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
 
+	//renderClusterTpl := func() {
+	//	if clusterTpl == nil {
+	//		return
+	//	}
+	//}
+
+	// priority: cluster.spec.componentSpecs > simplified api (e.g. cluster.spec.storage etc.) > cluster template
 	fillClusterCompSpec := func() {
+		if clusterCompSpec != nil {
+			return
+		}
 		// fill simplified api only to first defined component
 		if len(clusterDef.Spec.ComponentDefs) == 0 ||
 			clusterDef.Spec.ComponentDefs[0].Name != clusterCompDef.Name {
-			return
-		}
-		if clusterCompSpec != nil {
 			return
 		}
 		clusterCompSpec = &appsv1alpha1.ClusterComponentSpec{}

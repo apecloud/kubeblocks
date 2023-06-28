@@ -85,10 +85,11 @@ var _ = Describe("component module", func() {
 			}
 			component, err := BuildComponent(
 				reqCtx,
-				*cluster,
-				*clusterDef,
-				clusterDef.Spec.ComponentDefs[0],
-				cluster.Spec.ComponentSpecs[0],
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
@@ -98,10 +99,11 @@ var _ = Describe("component module", func() {
 			clusterVersion.Spec.ComponentVersions[0].VersionsCtx.InitContainers = nil
 			component, err = BuildComponent(
 				reqCtx,
-				*cluster,
-				*clusterDef,
-				clusterDef.Spec.ComponentDefs[0],
-				cluster.Spec.ComponentSpecs[0],
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
@@ -109,10 +111,11 @@ var _ = Describe("component module", func() {
 			By("new container in clusterVersion not in clusterDefinition")
 			component, err = BuildComponent(
 				reqCtx,
-				*cluster,
-				*clusterDef,
-				clusterDef.Spec.ComponentDefs[0],
-				cluster.Spec.ComponentSpecs[0],
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[1])
 			Expect(err).Should(Succeed())
 			Expect(len(component.PodSpec.Containers)).Should(Equal(2))
@@ -120,10 +123,11 @@ var _ = Describe("component module", func() {
 			By("new init container in clusterVersion not in clusterDefinition")
 			component, err = BuildComponent(
 				reqCtx,
-				*cluster,
-				*clusterDef,
-				clusterDef.Spec.ComponentDefs[0],
-				cluster.Spec.ComponentSpecs[0],
+				cluster,
+				nil,
+				clusterDef,
+				&clusterDef.Spec.ComponentDefs[0],
+				&cluster.Spec.ComponentSpecs[0],
 				&clusterVersion.Spec.ComponentVersions[1])
 			Expect(err).Should(Succeed())
 			Expect(len(component.PodSpec.InitContainers)).Should(Equal(1))
@@ -134,6 +138,8 @@ var _ = Describe("component module", func() {
 				Ctx: ctx,
 				Log: tlog,
 			}
+			//clusterTpl := corev1.ConfigMap{}
+			//Expect(yaml.Unmarshal([]byte(tplStr), &clusterTpl)).Should(Succeed())
 			By("fill simplified fields")
 			cluster.Spec.Replicas = 3
 			cluster.Spec.Resources.CPU = resource.MustParse("1000m")
@@ -145,6 +151,7 @@ var _ = Describe("component module", func() {
 			component, err := buildComponent(
 				reqCtx,
 				cluster,
+				nil,
 				clusterDef,
 				&clusterDef.Spec.ComponentDefs[0],
 				nil,

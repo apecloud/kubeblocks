@@ -3,4 +3,4 @@ dependencies:
   repository: file://../cluster-libchart
   version: 0.1.0
 digest: sha256:db6767813b4a50f4e13040ba3d51586c257b8a7f3a8ef7fa5455807b31de1a7d
-generated: "2023-06-20T08:34:41.939892+08:00"
+generated: "2023-06-28T15:46:02.338152+08:00"

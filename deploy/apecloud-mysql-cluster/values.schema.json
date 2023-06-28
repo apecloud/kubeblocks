@@ -30,7 +30,7 @@
     "cpu": {
       "title": "CPU",
       "description": "CPU cores.",
-      "type": "number",
+      "type": ["number","string"],
       "default": 1,
       "minimum": 0.5,
       "maximum": 64,
@@ -39,7 +39,7 @@
     "memory": {
       "title": "Memory(Gi)",
       "description": "Memory, the unit is Gi.",
-      "type": "number",
+      "type": ["number","string"],
       "default": 1,
       "minimum": 0.5,
       "maximum": 1000
@@ -47,7 +47,7 @@
     "storage": {
       "title": "Storage(Gi)",
       "description": "Storage size, the unit is Gi.",
-      "type": "number",
+      "type": ["number","string"],
       "default": 20,
       "minimum": 1,
       "maximum": 10000

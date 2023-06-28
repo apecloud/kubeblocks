@@ -61,6 +61,7 @@ func (ha *Ha) RunCycle() {
 		ha.logger.Infof("Cluster has no leader, attemp to take the leader")
 		if ha.IsHealthiestMember(cluster) {
 			if ha.dcs.AttempAcquireLock() == nil {
+				ha.logger.Infof("Take the leader success!")
 				ha.dbManager.Premote()
 			}
 		}
@@ -68,7 +69,8 @@ func (ha *Ha) RunCycle() {
 	case ha.dcs.HasLock():
 		ha.logger.Infof("This member is Cluster's leader")
 		if cluster.Switchover != nil {
-			if cluster.Switchover.Leader == ha.dbManager.GetCurrentMemberName() {
+			if cluster.Switchover.Leader == ha.dbManager.GetCurrentMemberName() ||
+				(cluster.Switchover.Candidate != "" && cluster.Switchover.Candidate != ha.dbManager.GetCurrentMemberName()) {
 				ha.dbManager.Demote()
 				ha.dcs.ReleaseLock()
 				break
@@ -93,10 +95,13 @@ func (ha *Ha) RunCycle() {
 			break
 		}
 		if ok, _ := ha.dbManager.IsLeader(context.TODO()); ok {
-			ha.logger.Infof("try to acquire lock")
+			ha.logger.Infof("leader changed, try to acquire lock")
 			if ha.dcs.AttempAcquireLock() == nil {
 				ha.dbManager.Premote()
 			}
+		} else {
+			// make sure sync source is leader when role changed
+			ha.dbManager.Demote()
 		}
 
 		// case cluster.SwitchOver != nil && cluster.SwitchOver.Leader == ha.dbManager.GetCurrentMemberName():

@@ -238,7 +238,7 @@ func (mgr *Manager) SetReplSetConfig(ctx context.Context, rsClient *mongo.Client
 }
 
 func (mgr *Manager) GetReplSetHosts(rsConfig *RSConfig) []string {
-	if rsConfig != nil {
+	if rsConfig == nil {
 		return []string{}
 	}
 
@@ -291,7 +291,12 @@ func (mgr *Manager) IsMemberHealthy(memberName string) bool {
 func (mgr *Manager) Recover()      {}
 func (mgr *Manager) AddToCluster() {}
 func (mgr *Manager) Premote() error {
-	rsConfig, _ := mgr.GetReplSetConfig(context.TODO())
+	rsConfig, err := mgr.GetReplSetConfig(context.TODO())
+	if rsConfig == nil {
+		mgr.Logger.Errorf("Get replSet config failed: %v", err)
+		return err
+	}
+
 	hosts := mgr.GetReplSetHosts(rsConfig)
 	client, _ := mgr.GetReplSetClient(context.TODO(), hosts)
 	for i, _ := range rsConfig.Members {
@@ -301,6 +306,7 @@ func (mgr *Manager) Premote() error {
 			rsConfig.Members[i].Priority = 1
 		}
 	}
+
 	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
 }
 

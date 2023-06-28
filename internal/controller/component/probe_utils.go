@@ -92,8 +92,7 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 
 	if componentProbes.VolumeProtectionProbe != nil && component.VolumeProtection != nil {
 		c := container.DeepCopy()
-		buildVolumeProtectionProbeContainer(component.CharacterType, c, *componentProbes.VolumeProtectionProbe,
-			*component.VolumeProtection, int(probeSvcHTTPPort))
+		buildVolumeProtectionProbeContainer(component.CharacterType, c, *componentProbes.VolumeProtectionProbe, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *c)
 	}
 
@@ -162,16 +161,20 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 		ValueFrom: nil,
 	})
 
-	container.Ports = []corev1.ContainerPort{{
-		ContainerPort: int32(probeSvcHTTPPort),
-		Name:          constant.ProbeHTTPPortName,
-		Protocol:      "TCP",
-	},
+	container.Ports = []corev1.ContainerPort{
+		{
+			ContainerPort: int32(probeSvcHTTPPort),
+			Name:          constant.ProbeHTTPPortName,
+			Protocol:      "TCP",
+		},
 		{
 			ContainerPort: int32(probeSvcGRPCPort),
 			Name:          constant.ProbeGRPCPortName,
 			Protocol:      "TCP",
 		}}
+
+	// pass the volume protection spec to probe container through env.
+	container.Env = append(container.Env, env4VolumeProtection(*component.VolumeProtection))
 }
 
 func getComponentRoles(component *SynthesizedComponent) map[string]string {
@@ -238,7 +241,7 @@ func buildRunningProbeContainer(characterType string, runningProbeContainer *cor
 }
 
 func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Container,
-	probeSetting appsv1alpha1.ClusterDefinitionProbe, spec appsv1alpha1.VolumeProtectionSpec, probeSvcHTTPPort int) {
+	probeSetting appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
 	c.Name = constant.VolumeProtectionProbeContainerName
 	probe := c.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
@@ -250,14 +253,15 @@ func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Contain
 	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
 	probe.FailureThreshold = probeSetting.FailureThreshold
 	c.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
+}
 
-	// pass the volume protection spec to probe container through env.
+func env4VolumeProtection(spec appsv1alpha1.VolumeProtectionSpec) corev1.EnvVar {
 	value, err := json.Marshal(spec)
 	if err != nil {
 		panic(fmt.Sprintf("marshal volume protection spec error: %s", err.Error()))
 	}
-	c.Env = append(c.Env, corev1.EnvVar{
+	return corev1.EnvVar{
 		Name:  "KB_VOLUME_PROTECTION_SPEC",
 		Value: string(value),
-	})
+	}
 }

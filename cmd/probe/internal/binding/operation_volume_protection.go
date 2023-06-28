@@ -28,6 +28,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
@@ -92,13 +94,17 @@ func (o *operationVolumeProtection) Init(metadata bindings.Metadata) error {
 		o.Logger.Warnf("init volumes to monitor error: %s", err.Error())
 		return err
 	}
+	o.Logger.Infof("succeed to init %s operation, pod: %s, low watermark: %d, high watermark: %d, volumes: %s",
+		o.Kind(), o.Pod, o.VolumeProtectionSpec.LowWatermark, o.VolumeProtectionSpec.HighWatermark,
+		strings.Join(o.VolumeProtectionSpec.Volumes, ","))
 	return nil
 }
 
 func (o *operationVolumeProtection) initVolumes() error {
 	spec := &o.VolumeProtectionSpec
-	if err := json.Unmarshal([]byte(os.Getenv(envVolumesToProbe)), spec); err != nil {
-		o.Logger.Warnf("unmarshal volume protection spec error: %s", err.Error())
+	raw := os.Getenv(envVolumesToProbe)
+	if err := json.Unmarshal([]byte(raw), spec); err != nil {
+		o.Logger.Warnf("unmarshal volume protection spec error: %s, raw spec: %s", err.Error(), raw)
 		return err
 	}
 	normalizeWatermarks(&o.VolumeProtectionSpec.LowWatermark, &o.VolumeProtectionSpec.HighWatermark)
@@ -116,6 +122,7 @@ func (o *operationVolumeProtection) initVolumes() error {
 
 func (o *operationVolumeProtection) Invoke(ctx context.Context, req *bindings.InvokeRequest, rsp *bindings.InvokeResponse) error {
 	if o.disabled() {
+		o.Logger.Infof("The operation %s is disabled", o.Kind())
 		return nil
 	}
 	if o.Client == nil {
@@ -141,8 +148,11 @@ func (o *operationVolumeProtection) Invoke(ctx context.Context, req *bindings.In
 		return err
 	}
 
-	// TODO: fillin the @rsp.
-	return o.checkUsage(ctx)
+	msg, err := o.checkUsage(ctx)
+	if err == nil {
+		rsp.Data = []byte(msg)
+	}
+	return err
 }
 
 func (o *operationVolumeProtection) disabled() bool {
@@ -190,7 +200,7 @@ func (o *operationVolumeProtection) updateVolumeStats(payload []byte) error {
 	return nil
 }
 
-func (o *operationVolumeProtection) checkUsage(ctx context.Context) error {
+func (o *operationVolumeProtection) checkUsage(ctx context.Context) (string, error) {
 	lower := make([]string, 0)
 	higher := make([]string, 0)
 	for name, stats := range o.VolumeStats {
@@ -205,20 +215,27 @@ func (o *operationVolumeProtection) checkUsage(ctx context.Context) error {
 		}
 	}
 
+	var msg string
 	readonly := o.Readonly
 	// the instance is running normally and there have volume(s) over the space usage threshold.
 	if !readonly && len(higher) > 0 {
-		if err := o.highWatermark(ctx, higher); err != nil {
-			return err
+		msg = o.buildEventMsg(higher)
+		if err := o.highWatermark(ctx, msg); err != nil {
+			return "", err
 		}
 	}
 	// the instance is protected in RO mode, and all volumes' space usage are under the threshold.
 	if readonly && len(lower) == len(o.VolumeStats) {
-		if err := o.lowWatermark(ctx, lower); err != nil {
-			return err
+		msg = o.buildEventMsg(lower)
+		if err := o.lowWatermark(ctx, msg); err != nil {
+			return "", err
 		}
 	}
-	return nil
+
+	if len(msg) == 0 {
+		msg = o.buildEventMsg(o.VolumeProtectionSpec.Volumes)
+	}
+	return msg, nil
 }
 
 func (o *operationVolumeProtection) checkVolumeWatermark(stats statsv1alpha1.VolumeStats) int {
@@ -237,11 +254,10 @@ func (o *operationVolumeProtection) checkVolumeWatermark(stats statsv1alpha1.Vol
 	return 0
 }
 
-func (o *operationVolumeProtection) highWatermark(ctx context.Context, volumes []string) error {
+func (o *operationVolumeProtection) highWatermark(ctx context.Context, msg string) error {
 	if o.Readonly { // double check
 		return nil
 	}
-	msg := o.buildEventMsg(volumes)
 	if err := o.lockInstance(ctx); err != nil {
 		o.Logger.Warnf("set instance to read-only error: %s, volumes: %s", err.Error(), msg)
 		return err
@@ -255,11 +271,10 @@ func (o *operationVolumeProtection) highWatermark(ctx context.Context, volumes [
 	return nil
 }
 
-func (o *operationVolumeProtection) lowWatermark(ctx context.Context, volumes []string) error {
+func (o *operationVolumeProtection) lowWatermark(ctx context.Context, msg string) error {
 	if !o.Readonly { // double check
 		return nil
 	}
-	msg := o.buildEventMsg(volumes)
 	if err := o.unlockInstance(ctx); err != nil {
 		o.Logger.Warnf("reset instance to read-write error: %s, volumes: %s", err.Error(), msg)
 		return err
@@ -285,7 +300,11 @@ func (o *operationVolumeProtection) buildEventMsg(volumes []string) string {
 	usages := make(map[string]string)
 	for _, v := range volumes {
 		stats := o.VolumeStats[v]
-		usages[v] = fmt.Sprintf("%d%%", int(*stats.UsedBytes*100 / *stats.AvailableBytes))
+		if stats.UsedBytes != nil && stats.AvailableBytes != nil {
+			usages[v] = fmt.Sprintf("%d%%", int(*stats.UsedBytes*100 / *stats.AvailableBytes))
+		} else {
+			usages[v] = "<nil>"
+		}
 	}
 	msg, _ := json.Marshal(usages)
 	return string(msg)
@@ -328,7 +347,8 @@ func httpClient() (*http.Client, error) {
 	return &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				RootCAs: certPool,
+				RootCAs:            certPool,
+				InsecureSkipVerify: true,
 			},
 		},
 	}, nil
@@ -369,16 +389,15 @@ func kubeletEndpointPort(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	cliset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return "", err
 	}
 	node, err := cliset.CoreV1().Nodes().Get(ctx, os.Getenv(envNodeName), metav1.GetOptions{})
-	if err == nil {
+	if err != nil {
 		return "", err
 	}
-	return string(node.Status.DaemonEndpoints.KubeletEndpoint.Port), nil
+	return strconv.Itoa(int(node.Status.DaemonEndpoints.KubeletEndpoint.Port)), nil
 }
 
 func normalizeWatermarks(low, high *int) {

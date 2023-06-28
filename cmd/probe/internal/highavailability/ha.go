@@ -148,7 +148,6 @@ func (ha *Ha) Start() {
 	for true {
 		ha.RunCycle()
 		time.Sleep(1 * time.Second)
-		return
 	}
 }
 

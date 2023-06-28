@@ -20,3 +20,9 @@ nebula:
       repository: docker.io/vesoft/nebula-storaged
       tag: v3.5.0
       pullPolicy: IfNotPresent
+  console:
+    ## @param nebula.console.image, container image settings
+    image:
+      repository: docker.io/vesoft/nebula-console
+      tag: v3.5.0
+      pullPolicy: IfNotPresent

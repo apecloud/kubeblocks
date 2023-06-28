@@ -343,9 +343,32 @@ get_next_available_tag() {
     RELEASE_VERSION="${tag_type}${index}"
 }
 
+check_release_version(){
+    TMP_TAG_NAME=""
+    for content in $(echo "$CONTENT"); do
+        if [[ "$content" == "v"*"."* || "$content" == *"."* ]]; then
+            TMP_TAG_NAME=$content
+        fi
+        if [[ -n "$TMP_TAG_NAME" ]]; then
+            TMP_BRANCH_NAME="release-${TMP_TAG_NAME/v/}"
+            branch_url=$GITHUB_API/repos/$LATEST_REPO/branches/$TMP_BRANCH_NAME
+            branch_info=$( gh_curl -s $branch_url | (grep  $TMP_BRANCH_NAME || true) )
+            if [[ -n "$branch_info" ]]; then
+                BRANCH_NAME=$TMP_BRANCH_NAME
+                TAG_NAME=$TMP_TAG_NAME
+            fi
+            break
+        fi
+    done
+}
+
 release_next_available_tag() {
+    check_release_version
     dispatches_url=$1
-    v_major_minor="v$TAG_NAME"
+    v_major_minor="$TAG_NAME"
+    if [[ "$TAG_NAME" != "v"* ]]; then
+        v_major_minor="v$TAG_NAME"
+    fi
     stable_type="$v_major_minor."
     get_next_available_tag $stable_type
     v_number=$RELEASE_VERSION
@@ -371,7 +394,7 @@ release_next_available_tag() {
 
 usage_message() {
     curl -H "Content-Type: application/json" -X POST $BOT_WEBHOOK \
-        -d '{"msg_type":"post","content":{"post":{"zh_cn":{"title":"Usage:","content":[[{"tag":"text","text":"please enter the correct format\n"},{"tag":"text","text":"1. do <alpha|beta|rc|stable> release\n"},{"tag":"text","text":"2. {\"ref\":\"<ref_branch>\",\"inputs\":{\"release_version\":\"<release_version>\"}}"}]]}}}}'
+        -d '{"msg_type":"post","content":{"post":{"zh_cn":{"title":"Usage:","content":[[{"tag":"text","text":"please enter the correct format\n"},{"tag":"text","text":"1. do [v*.*] <alpha|beta|rc> release\n"},{"tag":"text","text":"2. {\"ref\":\"<ref_branch>\",\"inputs\":{\"release_version\":\"<release_version>\"}}"}]]}}}}'
 }
 
 trigger_release() {

@@ -511,6 +511,9 @@ var _ = Describe("Cluster Controller", func() {
 		}
 
 		scaleOutCheck := func() {
+			if comp.Replicas == 0 {
+				return
+			}
 			if policy == nil {
 				checkUpdatedStsReplicas()
 				return
@@ -1970,6 +1973,10 @@ var _ = Describe("Cluster Controller", func() {
 
 			It(fmt.Sprintf("[comp: %s] h-scale to 0 and pvc should not deleted", compName), func() {
 				testHorizontalScale(compName, compDefName, 3, 0)
+			})
+
+			It(fmt.Sprintf("[comp: %s] h-scale from 0 and should work", compName), func() {
+				testHorizontalScale(compName, compDefName, 0, 3)
 			})
 		}
 	})

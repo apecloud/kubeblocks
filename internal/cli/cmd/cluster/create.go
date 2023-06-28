@@ -950,6 +950,13 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 			return nil, err
 		}
 		comps = append(comps, compObj)
+
+		// HACK: for apecloud-mysql cluster definition, if setsMap is empty, user
+		// does not specify any set, so we only build the first component.
+		// TODO(ldm): remove this hack and use helm chart to render the cluster.
+		if len(setsMap) == 0 && cd.Name == "apecloud-mysql" {
+			break
+		}
 	}
 	return comps, nil
 }
@@ -958,9 +965,8 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 // specified in the set, use the cluster definition default component name.
 func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
 	allSets := map[string]map[setKey]string{}
-	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas), string(keyClass), string(keyStorageClass), string(keySwitchPolicy)}
 	parseKey := func(key string) setKey {
-		for _, k := range keys {
+		for _, k := range setKeys() {
 			if strings.EqualFold(k, key) {
 				return setKey(k)
 			}
@@ -978,7 +984,7 @@ func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[
 			// only record the supported key
 			k := parseKey(kv[0])
 			if k == keyUnknown {
-				return nil, fmt.Errorf("unknown set key \"%s\", should be one of [%s]", kv[0], strings.Join(keys, ","))
+				return nil, fmt.Errorf("unknown set key \"%s\", should be one of [%s]", kv[0], strings.Join(setKeys(), ","))
 			}
 			res[k] = kv[1]
 		}
@@ -1274,4 +1280,17 @@ func parseClusterComponentSpec(compByte []byte) ([]appsv1alpha1.ClusterComponent
 	}
 
 	return compSpecs, nil
+}
+
+func setKeys() []string {
+	return []string{
+		string(keyCPU),
+		string(keyType),
+		string(keyStorage),
+		string(keyMemory),
+		string(keyReplicas),
+		string(keyClass),
+		string(keyStorageClass),
+		string(keySwitchPolicy),
+	}
 }

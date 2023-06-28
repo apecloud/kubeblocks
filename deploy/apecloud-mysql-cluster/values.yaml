@@ -12,8 +12,8 @@ mode: standalone
 
 ## @param replicas MySQL cluster replicas
 ## for standalone mode, replicas can not be changed, it is always 1
-## for replication mode, replicas can not be changed, it is always 2
-## for raftGroup mode, replicas can be changed, the default value is 3
+## for replication mode, replicas should greater than or equal to 2, the default value is 2
+## for raftGroup mode, replicas should greater than or equal to 3, the default value is 3
 ##
 replicas: 1
 

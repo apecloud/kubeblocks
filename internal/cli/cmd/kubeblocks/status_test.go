@@ -44,6 +44,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
@@ -164,7 +165,7 @@ var _ = Describe("kubeblocks status", func() {
 		By("check deployment can be hit by selector")
 		allErrs := make([]error, 0)
 		o.buildSelectorList(ctx, &allErrs)
-		unstructuredList := listResourceByGVR(ctx, o.dynamic, namespace, kubeBlocksWorkloads, o.selectorList, &allErrs)
+		unstructuredList := util.ListResourceByGVR(ctx, o.dynamic, namespace, kubeBlocksWorkloads, o.selectorList, &allErrs)
 		// will list update to five types of worklaods
 		Expect(len(unstructuredList)).Should(BeEquivalentTo(5))
 		for _, list := range unstructuredList {

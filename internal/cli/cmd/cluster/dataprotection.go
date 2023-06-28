@@ -20,31 +20,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/dapr/kit/cron"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/util/jsonpath"
+	"k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/cmd/util/editor"
 	"k8s.io/kubectl/pkg/util/templates"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
-	"github.com/apecloud/kubeblocks/internal/cli/edit"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
@@ -63,6 +71,9 @@ var (
 	editExample = templates.Examples(`
 		# edit backup policy
 		kbcli cluster edit-backup-policy <backup-policy-name>
+
+        # enable pitr 
+		kbcli cluster edit-backup-policy <backup-policy-name> --set schedule.logfile.enable=true
 
 	    # using short cmd to edit backup policy 
         kbcli cluster edit-bp <backup-policy-name>
@@ -635,8 +646,35 @@ func printBackupPolicyList(o list.ListOptions) error {
 	return nil
 }
 
+type updateBackupPolicyFieldFunc func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error
+
+type editBackupPolicyOptions struct {
+	namespace string
+	name      string
+	dynamic   dynamic.Interface
+	Factory   cmdutil.Factory
+
+	GVR schema.GroupVersionResource
+	genericclioptions.IOStreams
+	editContent       []editorRow
+	editContentKeyMap map[string]updateBackupPolicyFieldFunc
+	original          string
+	target            string
+	values            []string
+	isTest            bool
+}
+
+type editorRow struct {
+	// key content key (required).
+	key string
+	// value jsonpath for backupPolicy.spec.
+	jsonpath string
+	// updateFunc applies the modified value to backupPolicy (required).
+	updateFunc updateBackupPolicyFieldFunc
+}
+
 func NewEditBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := edit.NewEditOptions(f, streams, types.BackupPolicyGVR())
+	o := editBackupPolicyOptions{Factory: f, IOStreams: streams, GVR: types.BackupPolicyGVR()}
 	cmd := &cobra.Command{
 		Use:                   "edit-backup-policy",
 		DisableFlagsInUseLine: true,
@@ -646,11 +684,286 @@ func NewEditBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStrea
 		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, types.BackupPolicyGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
-			cmdutil.CheckErr(o.Complete(cmd, args))
-			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.Run())
+			cmdutil.CheckErr(o.complete(args))
+			cmdutil.CheckErr(o.runEditBackupPolicy())
 		},
 	}
-	o.AddFlags(cmd)
+	cmd.Flags().StringArrayVar(&o.values, "set", []string{}, "Backup name")
 	return cmd
+}
+
+func (o *editBackupPolicyOptions) complete(args []string) error {
+	var err error
+	if len(args) == 0 {
+		return fmt.Errorf("missing backupPolicy name")
+	}
+	if len(args) > 1 {
+		return fmt.Errorf("only support to update one backupPolicy or quote cronExpression")
+	}
+	o.name = args[0]
+	if o.namespace, _, err = o.Factory.ToRawKubeConfigLoader().Namespace(); err != nil {
+		return err
+	}
+	if o.dynamic, err = o.Factory.DynamicClient(); err != nil {
+		return err
+	}
+	updateSchedulePolicyEnable := func(schedulePolicy *dpv1alpha1.SchedulePolicy, targetVal string) error {
+		if schedulePolicy != nil {
+			enable, err := strconv.ParseBool(targetVal)
+			if err != nil {
+				return err
+			}
+			schedulePolicy.Enable = enable
+		}
+		return nil
+	}
+	updateSchedulePolicyCronExpression := func(schedulePolicy *dpv1alpha1.SchedulePolicy, targetVal string) error {
+		if targetVal != "" {
+			if _, err = cron.ParseStandard(targetVal); err != nil {
+				return err
+			}
+		}
+		if schedulePolicy != nil {
+			schedulePolicy.CronExpression = targetVal
+		}
+		return nil
+	}
+	updatePVCName := func(commonPolicy *dpv1alpha1.CommonBackupPolicy, targetVal string) error {
+		if commonPolicy != nil {
+			commonPolicy.PersistentVolumeClaim.Name = targetVal
+		}
+		return nil
+	}
+	updatePVCStorageClass := func(commonPolicy *dpv1alpha1.CommonBackupPolicy, targetVal string) error {
+		if commonPolicy != nil {
+			commonPolicy.PersistentVolumeClaim.StorageClassName = &targetVal
+		}
+		return nil
+	}
+	o.editContent = []editorRow{
+		{
+			key:      "retention.ttl",
+			jsonpath: "retention.ttl",
+			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
+				backupPolicy.Spec.Retention.TTL = &targetVal
+				return nil
+			},
+		},
+		{
+			key:      "schedule.datafile.enable",
+			jsonpath: "schedule.datafile.enable",
+			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
+				return updateSchedulePolicyEnable(backupPolicy.Spec.Schedule.Datafile, targetVal)
+			},
+		},
+		{
+			key:      "schedule.datafile.cronExpression",
+			jsonpath: "schedule.datafile.cronExpression",
+			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
+				return updateSchedulePolicyCronExpression(backupPolicy.Spec.Schedule.Datafile, targetVal)
+			},
+		},
+		{
+			key:      "schedule.snapshot.enable",
+			jsonpath: "schedule.snapshot.enable",
+			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
+				return updateSchedulePolicyEnable(backupPolicy.Spec.Schedule.Snapshot, targetVal)
+			},
+		},
+		{
+			key:      "schedule.snapshot.cronExpression",
+			jsonpath: "schedule.snapshot.cronExpression",
+			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
+				return updateSchedulePolicyCronExpression(backupPolicy.Spec.Schedule.Snapshot, targetVal)
+			},
+		},
+		{
+			key:      "schedule.logfile.enable",
+			jsonpath: "schedule.logfile.enable",
+			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
+				return updateSchedulePolicyEnable(backupPolicy.Spec.Schedule.Logfile, targetVal)
+			},
+		},
+		{
+			key:      "schedule.logfile.cronExpression",
+			jsonpath: "schedule.logfile.cronExpression", updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
+				return updateSchedulePolicyCronExpression(backupPolicy.Spec.Schedule.Logfile, targetVal)
+			},
+		},
+		{
+			key:      "datafile.pvc.name",
+			jsonpath: "datafile.persistentVolumeClaim.name",
+			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
+				return updatePVCName(backupPolicy.Spec.Datafile, targetVal)
+			},
+		},
+		{
+			key:      "datafile.pvc.storageClassName",
+			jsonpath: "datafile.persistentVolumeClaim.storageClassName",
+			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
+				return updatePVCStorageClass(backupPolicy.Spec.Datafile, targetVal)
+			},
+		},
+		{
+			key:      "logfile.pvc.name",
+			jsonpath: "logfile.persistentVolumeClaim.name",
+			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
+				return updatePVCName(backupPolicy.Spec.Logfile, targetVal)
+			},
+		},
+		{
+			key:      "logfile.pvc.storageClassName",
+			jsonpath: "logfile.persistentVolumeClaim.storageClassName",
+			updateFunc: func(backupPolicy *dpv1alpha1.BackupPolicy, targetVal string) error {
+				return updatePVCStorageClass(backupPolicy.Spec.Logfile, targetVal)
+			},
+		},
+	}
+	o.editContentKeyMap = map[string]updateBackupPolicyFieldFunc{}
+	for _, v := range o.editContent {
+		if v.updateFunc == nil {
+			return fmt.Errorf("updateFunc can not be nil")
+		}
+		o.editContentKeyMap[v.key] = v.updateFunc
+	}
+	return nil
+}
+
+func (o *editBackupPolicyOptions) runEditBackupPolicy() error {
+	backupPolicy := &dpv1alpha1.BackupPolicy{}
+	key := client.ObjectKey{
+		Name:      o.name,
+		Namespace: o.namespace,
+	}
+	err := util.GetResourceObjectFromGVR(types.BackupPolicyGVR(), key, o.dynamic, &backupPolicy)
+	if err != nil {
+		return err
+	}
+	if len(o.values) == 0 {
+		edited, err := o.runWithEditor(backupPolicy)
+		if err != nil {
+			return err
+		}
+		o.values = strings.Split(edited, "\n")
+	}
+	return o.applyChanges(backupPolicy)
+}
+
+func (o *editBackupPolicyOptions) runWithEditor(backupPolicy *dpv1alpha1.BackupPolicy) (string, error) {
+	editor := editor.NewDefaultEditor([]string{
+		"KUBE_EDITOR",
+		"EDITOR",
+	})
+	contents, err := o.buildEditorContent(backupPolicy)
+	if err != nil {
+		return "", err
+	}
+	addHeader := func() string {
+		return fmt.Sprintf(`# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+#
+%s
+`, *contents)
+	}
+	if o.isTest {
+		// only for testing
+		return "", nil
+	}
+	edited, _, err := editor.LaunchTempFile(fmt.Sprintf("%s-edit-", backupPolicy.Name), "", bytes.NewBufferString(addHeader()))
+	if err != nil {
+		return "", err
+	}
+	return string(edited), nil
+}
+
+// buildEditorContent builds the editor content.
+func (o *editBackupPolicyOptions) buildEditorContent(backPolicy *dpv1alpha1.BackupPolicy) (*string, error) {
+	var contents []string
+	for _, v := range o.editContent {
+		// get the value with jsonpath
+		val, err := o.getValueWithJsonpath(backPolicy.Spec, v.jsonpath)
+		if err != nil {
+			return nil, err
+		}
+		if val == nil {
+			continue
+		}
+		row := fmt.Sprintf("%s=%s", v.key, *val)
+		o.original += row
+		contents = append(contents, row)
+	}
+	result := strings.Join(contents, "\n")
+	return &result, nil
+}
+
+// getValueWithJsonpath gets the value with jsonpath.
+func (o *editBackupPolicyOptions) getValueWithJsonpath(spec dpv1alpha1.BackupPolicySpec, path string) (*string, error) {
+	parser := jsonpath.New("edit-backup-policy").AllowMissingKeys(true)
+	pathExpression, err := get.RelaxedJSONPathExpression(path)
+	if err != nil {
+		return nil, err
+	}
+	if err = parser.Parse(pathExpression); err != nil {
+		return nil, err
+	}
+	values, err := parser.FindResults(spec)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range values {
+		if len(v) == 0 {
+			continue
+		}
+		v1 := v[0]
+		if v1.Kind() != reflect.Ptr {
+			val := fmt.Sprintf("%v", v1.Interface())
+			return &val, nil
+		}
+		if v1.IsNil() {
+			return nil, nil
+		}
+		val := fmt.Sprintf("%v", v1.Elem())
+		return &val, nil
+	}
+	return nil, nil
+}
+
+// applyChanges applies the changes of backupPolicy.
+func (o *editBackupPolicyOptions) applyChanges(backupPolicy *dpv1alpha1.BackupPolicy) error {
+	for _, v := range o.values {
+		row := strings.TrimSpace(v)
+		if strings.HasPrefix(row, "#") || row == "" {
+			continue
+		}
+		o.target += row
+		arr := strings.Split(row, "=")
+		if len(arr) != 2 {
+			return fmt.Errorf(`invalid row: %s, format should be "key=value"`, v)
+		}
+		updateFn, ok := o.editContentKeyMap[arr[0]]
+		if !ok {
+			return fmt.Errorf(`invalid key: %s`, arr[0])
+		}
+		arr[1] = strings.Trim(arr[1], `"`)
+		arr[1] = strings.Trim(arr[1], `'`)
+		if err := updateFn(backupPolicy, arr[1]); err != nil {
+			return err
+		}
+	}
+	// if no changes, return.
+	if o.original == o.target {
+		fmt.Fprintln(o.Out, "updated (no change)")
+		return nil
+	}
+	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(backupPolicy)
+	if err != nil {
+		return err
+	}
+	if _, err = o.dynamic.Resource(types.BackupPolicyGVR()).Namespace(backupPolicy.Namespace).Update(context.TODO(),
+		&unstructured.Unstructured{Object: obj}, metav1.UpdateOptions{}); err != nil {
+		return err
+	}
+	fmt.Fprintln(o.Out, "updated")
+	return nil
 }

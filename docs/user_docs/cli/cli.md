@@ -190,6 +190,14 @@ Provides utilities for interacting with plugins.
 * [kbcli plugin upgrade](kbcli_plugin_upgrade.md)	 - Upgrade kbcli or kubectl plugins
 
 
+## [report](kbcli_report.md)
+
+report kubeblocks or cluster info.
+
+* [kbcli report cluster](kbcli_report_cluster.md)	 - Report Cluster information
+* [kbcli report kubeblocks](kbcli_report_kubeblocks.md)	 - Report KubeBlocks information, including deployments, events, logs, etc.
+
+
 ## [version](kbcli_version.md)
 
 Print the version information, include kubernetes, KubeBlocks and kbcli version.

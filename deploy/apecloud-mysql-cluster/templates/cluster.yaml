@@ -61,4 +61,17 @@ spec:
                 storage: {{ .Values.persistence.log.size }}
         {{- end }}
       {{- end }}
-
+    {{- if .Values.proxyEnabled }}
+    - name: etcd
+      componentDefRef: etcd # ref clusterdefinition componentDefs.name
+      replicas: 1
+    - name: vtctld
+      componentDefRef: vtctld # ref clusterdefinition componentDefs.name
+      replicas: 1
+    - name: vtconsensus
+      componentDefRef: vtconsensus # ref clusterdefinition componentDefs.name
+      replicas: 1
+    - name: vtgate
+      componentDefRef: vtgate # ref clusterdefinition componentDefs.name
+      replicas: 1
+    {{- end }}

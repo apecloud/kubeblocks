@@ -51,6 +51,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/options"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/plugin"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/report"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
@@ -181,6 +182,7 @@ A Command Line Interface for KubeBlocks`,
 		plugin.NewPluginCmd(ioStreams),
 		fault.NewFaultCmd(f, ioStreams),
 		builder.NewBuilderCmd(f, ioStreams),
+		report.NewReportCmd(f, ioStreams),
 	)
 
 	filters := []string{"options"}

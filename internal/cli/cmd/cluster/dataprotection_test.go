@@ -99,6 +99,35 @@ var _ = Describe("DataProtection", func() {
 			Expect(len(strings.Split(strings.Trim(out.String(), "\n"), "\n"))).Should(Equal(3))
 		})
 
+		It("edit-backup-policy", func() {
+			By("fake client")
+			defaultBackupPolicy := testing.FakeBackupPolicy(policyName, testing.ClusterName)
+			tf.FakeDynamicClient = testing.FakeDynamicClient(defaultBackupPolicy)
+
+			By("test edit backup policy function")
+			o := editBackupPolicyOptions{Factory: tf, IOStreams: streams, GVR: types.BackupPolicyGVR()}
+			Expect(o.complete([]string{policyName})).Should(Succeed())
+			o.values = []string{"schedule.datafile.enable=false", `schedule.datafile.cronExpression="0 17 * * *"`,
+				"schedule.logfile.enable=false", `schedule.logfile.cronExpression="* */1 * * *"`,
+				"schedule.snapshot.enable=false", `schedule.snapshot.cronExpression="0 17 * * *"`,
+				"logfile.pvc.name=test1", "logfile.pvc.storageClassName=t1",
+				"datafile.pvc.name=test1", "datafile.pvc.storageClassName=t1"}
+			Expect(o.runEditBackupPolicy()).Should(Succeed())
+
+			By("test invalid key")
+			o.values = []string{"schedule.datafile.enable1=false"}
+			Expect(o.runEditBackupPolicy().Error()).Should(ContainSubstring("invalid key: schedule.datafile.enable1"))
+
+			By("test invalid value")
+			o.values = []string{"schedule.datafile.enable=false="}
+			Expect(o.runEditBackupPolicy().Error()).Should(ContainSubstring("invalid row"))
+
+			By("test with vim editor")
+			o.values = []string{}
+			o.isTest = true
+			Expect(o.runEditBackupPolicy()).Should(Succeed())
+		})
+
 		It("validate create backup", func() {
 			By("without cluster name")
 			o := &CreateBackupOptions{

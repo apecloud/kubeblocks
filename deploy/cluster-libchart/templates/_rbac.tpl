@@ -71,3 +71,15 @@ subjects:
     name: {{ include "cluster-libchart.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}
 {{- end }}
+
+{{/*
+Define the whole rbac
+*/}}
+{{- define "cluster-libchart.rbac" -}}
+---
+{{- include "cluster-libchart.serviceAccount" . }}
+---
+{{- include "cluster-libchart.role" . }}
+---
+{{- include "cluster-libchart.roleBinding" . }}
+{{- end }}

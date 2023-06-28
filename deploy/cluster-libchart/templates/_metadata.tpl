@@ -3,7 +3,7 @@ Define the cluster name.
 We truncate at 15 chars because KubeBlocks will concatenate the names of other resources with cluster name
 */}}
 {{- define "cluster-libchart.clusterName" }}
-{{- default (.Release.Name | trunc 15 | trimSuffix "-") "mycluster" }}
+{{- (.Release.Name | trunc 15 | trimSuffix "-") | default "mycluster" }}
 {{- end }}
 
 {{/*

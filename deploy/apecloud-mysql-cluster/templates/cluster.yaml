@@ -1,18 +1,5 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: {{ include "cluster-libchart.clusterName" . }}
-  labels: {{ include "cluster-libchart.clusterLabels" . | nindent 4 }}
-spec:
-  {{- $withProxy := and (eq .Values.mode "raftGroup") .Values.proxyEnabled -}}
-  {{- if $withProxy }}
-  clusterDefinitionRef: apecloud-mysql-scale  # ref clusterdefinition.name
-  {{- else }}
-  clusterDefinitionRef: apecloud-mysql        # ref clusterdefinition.name
-  {{- end }}
-  clusterVersionRef: {{ .Values.version }}
-  terminationPolicy: {{ .Values.terminationPolicy }}
-  {{- include "cluster-libchart.affinity" . | indent 2 }}
+{{- include "cluster-libchart.clusterCommon" . }}
+  clusterDefinitionRef: apecloud-mysql # ref clusterdefinition.name
   componentSpecs:
     - name: mysql
       componentDefRef: mysql # ref clusterdefinition componentDefs.name
@@ -24,6 +11,6 @@ spec:
       serviceAccountName: {{ include "cluster-libchart.serviceAccountName" . }}
       {{- include "cluster-libchart.componentResources" . | indent 6 }}
       {{- include "cluster-libchart.componentServices" . | indent 6 }}
-    {{- if $withProxy }}
+    {{- if and (eq .Values.mode "raftGroup") .Values.proxyEnabled }}
     {{- include "apecloud-mysql-cluster.proxyComponents" . | indent 4 }}
     {{- end }}

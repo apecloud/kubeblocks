@@ -14,14 +14,38 @@ spec:
     accesskey: ""
     secretkey: ""
   componentDefs:
+    - name: nebula-console
+      workloadType: Stateless
+      characterType: nebula-console
+      scriptSpecs:
+        - name: nebula-console-scripts
+          templateRef: nebula-console-scripts-template
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
+      podSpec:
+        containers:
+          - name: nebula-console
+            imagePullPolicy: {{default .Values.nebula.metad.image.pullPolicy "IfNotPresent"}}
+            command: ["/bin/sh"]
+            args: ["-c", "exec /bin/sh -c 'trap : TERM INT; sleep infinity & wait'"]
+            lifecycle:
+              postStart:
+                exec:
+                  command: ["/bin/sh", "-c", "/scripts/nebula-console-start.sh"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
     - name: nebula-metad
       configSpecs:
         - name: nebula-metad-config
           templateRef: nebula-metad-config-template
+          namespace: {{ .Release.Namespace }}
           volumeName: nebula-metad
       scriptSpecs:
         - name: nebula-metad-scripts
           templateRef: nebula-metad-scripts-template
+          namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 493
       workloadType: Stateful
@@ -69,10 +93,12 @@ spec:
       configSpecs:
         - name: nebula-graphd-config
           templateRef: nebula-graphd-config-template
+          namespace: {{ .Release.Namespace }}
           volumeName: nebula-graphd
       scriptSpecs:
         - name: nebula-graphd-scripts
           templateRef: nebula-graphd-scripts-template
+          namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 493
       workloadType: Stateful
@@ -136,10 +162,12 @@ spec:
       configSpecs:
         - name: nebula-storaged-config
           templateRef: nebula-storaged-config-template
+          namespace: {{ .Release.Namespace }}
           volumeName: nebula-storaged
       scriptSpecs:
         - name: nebula-storaged-scripts
           templateRef: nebula-storaged-scripts-template
+          namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 493
       workloadType: Stateful

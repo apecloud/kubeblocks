@@ -52,6 +52,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/playground"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/plugin"
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/version"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -210,13 +211,12 @@ func initConfig() {
 	viper.AutomaticEnv() // read in environment variables that match
 	viper.SetEnvPrefix(cliName)
 
-	viper.SetDefault("CLUSTER_DEFAULT_STORAGE_SIZE", "20Gi")
-	viper.SetDefault("CLUSTER_DEFAULT_REPLICAS", 1)
-	viper.SetDefault("CLUSTER_DEFAULT_CPU", "1000m")
-	viper.SetDefault("CLUSTER_DEFAULT_MEMORY", "1Gi")
+	viper.SetDefault(types.CfgKeyClusterDefaultStorageSize, "20Gi")
+	viper.SetDefault(types.CfgKeyClusterDefaultReplicas, 1)
+	viper.SetDefault(types.CfgKeyClusterDefaultCPU, "1000m")
+	viper.SetDefault(types.CfgKeyClusterDefaultMemory, "1Gi")
 
-	viper.SetDefault("KB_WAIT_ADDON_TIMES", 60)
-	viper.SetDefault("PLAYGROUND_WAIT_TIMES", 20)
+	viper.SetDefault(types.CfgKeyHelmRepoURL, "")
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {

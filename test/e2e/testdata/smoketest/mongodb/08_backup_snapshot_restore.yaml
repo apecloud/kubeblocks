@@ -3,10 +3,10 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: kb-mycluster-mongodb-cluster
+  name: kb-mycluster-mongodb-cluster-restore
   labels:
-    
-    helm.sh/chart: mongodb-cluster-0.6.0-alpha.21
+
+    helm.sh/chart: mongodb-cluster-0.6.0-alpha.19
     app.kubernetes.io/name: mongodb-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"
@@ -16,11 +16,11 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: kb-mycluster-mongodb-cluster
+  name: kb-mycluster-mongodb-cluster-restore
   namespace: default
   labels:
-    
-    helm.sh/chart: mongodb-cluster-0.6.0-alpha.21
+
+    helm.sh/chart: mongodb-cluster-0.6.0-alpha.19
     app.kubernetes.io/name: mongodb-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"
@@ -32,33 +32,15 @@ rules:
       - events
     verbs:
       - create
-  - apiGroups:
-      - "dataprotection.kubeblocks.io"
-    resources:
-      - backups/status
-    verbs:
-      - get
-      - update
-      - patch
-  - apiGroups:
-      - "dataprotection.kubeblocks.io"
-    resources:
-      - backups
-    verbs:
-      - create
-      - get
-      - list
-      - update
-      - patch
 ---
 # Source: mongodb-cluster/templates/rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: kb-mycluster-mongodb-cluster
+  name: kb-mycluster-mongodb-cluster-restore
   labels:
-    
-    helm.sh/chart: mongodb-cluster-0.6.0-alpha.21
+
+    helm.sh/chart: mongodb-cluster-0.6.0-alpha.19
     app.kubernetes.io/name: mongodb-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"
@@ -76,9 +58,9 @@ subjects:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mycluster
+  name: mycluster-snapshot
   labels:
-    helm.sh/chart: mongodb-cluster-0.6.0-alpha.21
+    helm.sh/chart: mongodb-cluster-0.6.0-alpha.16
     app.kubernetes.io/name: mongodb-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"
@@ -88,18 +70,18 @@ spec:
   clusterVersionRef: mongodb-5.0.14
   terminationPolicy: Halt
   affinity:
-    topologyKeys: 
+    topologyKeys:
       - kubernetes.io/hostname
   componentSpecs:
     - name: mongodb
       componentDefRef: mongodb
       monitor: false
       replicas: 3
-      serviceAccountName: kb-mycluster-mongodb-cluster
+      serviceAccountName: kb-mycluster-mongodb-cluster-restore
       volumeClaimTemplates:
         - name: data # ref clusterdefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: 
+            storageClassName:
             accessModes:
               - ReadWriteOnce
             resources:

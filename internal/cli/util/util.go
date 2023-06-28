@@ -45,6 +45,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/pmezard/go-difflib/difflib"
+	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -61,6 +62,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 	cmdget "k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -583,12 +585,22 @@ func GetHelmChartRepoURL() string {
 		return testing.KubeBlocksChartURL
 	}
 
-	location, _ := getIPLocation()
-	// if location is CN, or we can not get location, use GitLab helm chart repo
-	if location == "CN" || location == "" {
-		return types.GitLabHelmChartRepo
+	// if helm repo url is specified by config or environment, use it
+	url := viper.GetString(types.CfgKeyHelmRepoURL)
+	if url != "" {
+		klog.V(1).Infof("Using helm repo url set by config or environment: %s", url)
+		return url
 	}
-	return types.KubeBlocksChartURL
+
+	// if helm repo url is not specified, choose one from GitHub and GitLab based on the IP location
+	// if location is CN, or we can not get location, use GitLab helm chart repo
+	repo := types.KubeBlocksChartURL
+	location, _ := getIPLocation()
+	if location == "CN" || location == "" {
+		repo = types.GitLabHelmChartRepo
+	}
+	klog.V(1).Infof("Using helm repo url: %s", repo)
+	return repo
 }
 
 // GetKubeBlocksNamespace gets namespace of KubeBlocks installation, infer namespace from helm secrets

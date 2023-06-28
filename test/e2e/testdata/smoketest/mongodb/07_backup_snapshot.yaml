@@ -4,7 +4,7 @@ metadata:
   labels:
     app.kubernetes.io/instance: mycluster
     dataprotection.kubeblocks.io/backup-type: snapshot
-  name: backup-snapshot-mycluster
+  name: backup-snapshot-mycluster-mongodb
 spec:
-  backupPolicyName: mycluster-apecloud-mysql-cluster-mysql-backup-policy
+  backupPolicyName: mycluster-mongodb-backup-policy
   backupType: snapshot

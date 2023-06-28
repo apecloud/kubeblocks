@@ -13,17 +13,6 @@
 
 ARG GO_VERSION=1.20
 
-FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as bin-downloader
-ARG TARGETOS
-ARG TARGETARCH
-ARG KUBECTL_VERSION=1.26.3
-
-WORKDIR /workspace
-
-# Download binaries
-RUN curl -fsSL https://dl.k8s.io/v${KUBECTL_VERSION}/kubernetes-client-${TARGETOS}-${TARGETARCH}.tar.gz | tar -zxv
-
-
 FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION} as builder
 ARG TARGETOS
 ARG TARGETARCH
@@ -83,19 +72,15 @@ RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/go/pkg \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOFLAGS="-mod=mod" go build -ldflags="${LD_FLAGS}" -a -o /out/kbcli cmd/cli/main.go
 
-# Use alpine
-FROM docker.io/alpine:3.17 as dist
+# Use alpine with tag 20230329 is corresponding to "edge" tag (latest release to date is 3.18) as of 20230625
+FROM docker.io/alpine:edge as dist
 ARG APK_MIRROR
-#ARG APK_MIRROR="mirrors.aliyun.com"
 
 # install tools via apk
 ENV APK_MIRROR=${APK_MIRROR}
-RUN if [ -n "${APK_MIRROR}" ]; then sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories; fi
-RUN apk add --no-cache curl helm \
+RUN if [ -n "${APK_MIRROR}" ]; then sed -i "s/dl-cdn.alpinelinux.org/${APK_MIRROR}/g" /etc/apk/repositories; fi
+RUN apk add --no-cache curl kubectl helm --allow-untrusted \
     && rm -rf /var/cache/apk/*
-
-# use apk to install kubectl in the next alpine version.
-COPY --from=bin-downloader /workspace/kubernetes/client/bin/kubectl /bin
 
 # copy kubeblocks tools
 COPY config/probe config/probe

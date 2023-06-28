@@ -37,6 +37,12 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+const (
+	emptyPriority = iota
+	secondaryPriority
+	primaryPriority
+)
+
 // ReplicationSet is a component object used by Cluster, ClusterComponentDefinition and ClusterComponentSpec
 type ReplicationSet struct {
 	stateful.Stateful
@@ -155,25 +161,14 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 }
 
 // HandleRestart is the implementation of the type Component interface method, which is used to handle the restart of the Replication workload.
-// TODO(xingran): handle the restart of the Replication workload with rolling update by Pod role.
 func (r *ReplicationSet) HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	sts := util.ConvertToStatefulSet(obj)
-	if sts.Generation != sts.Status.ObservedGeneration {
+	if r.getWorkloadType() != appsv1alpha1.Replication {
 		return nil, nil
 	}
-	vertexes := make([]graph.Vertex, 0)
-	pods, err := util.GetPods4Delete(ctx, r.Cli, sts)
-	if err != nil {
-		return nil, err
+	priorityMapperFn := func(component *appsv1alpha1.ClusterComponentDefinition) map[string]int {
+		return ComposeReplicationRolePriorityMap()
 	}
-	for _, pod := range pods {
-		vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
-			Obj:    pod,
-			Action: ictrltypes.ActionDeletePtr(),
-			Orphan: true,
-		})
-	}
-	return vertexes, nil
+	return r.HandleUpdateWithStrategy(ctx, obj, nil, priorityMapperFn, generateReplicationSerialPlan, generateReplicationBestEffortParallelPlan, generateReplicationParallelPlan)
 }
 
 // HandleRoleChange is the implementation of the type Component interface method, which is used to handle the role change of the Replication workload.

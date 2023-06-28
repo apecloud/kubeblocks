@@ -89,7 +89,7 @@ data:
           exit 1
       fi
       echo "Switchover to new primary: $CANDIDATE_HOST"
-      mongosh --quiet --eval "conf=rs.config();conf.members.forEach(member => member.priority = 3);const candidateHost = '$CANDIDATE_HOST';const member = conf.members.find(member => member.host === candidateHost);if (member) {member.priority = 4;};rs.reconfig(conf)" "$URI" --username "$USERNAME" --password "$PASSWORD"
+      mongosh --quiet --eval "conf=rs.config();conf.members.forEach(member => member.priority = 1);const candidateHost = '$CANDIDATE_HOST';const member = conf.members.find(member => member.host === candidateHost);if (member) {member.priority = 2;};rs.reconfig(conf)" "$URI" --username "$USERNAME" --password "$PASSWORD"
       echo "Checking candidate instance role after switchover..."
       verify
     }
@@ -120,7 +120,7 @@ data:
           exit 1
       fi
       echo "Switchover to new primary: $CANDIDATE_HOST"
-      mongosh --quiet --eval "conf=rs.config();conf.members.forEach(member => member.priority = 3);const candidateHost = '$CANDIDATE_HOST';const member = conf.members.find(member => member.host === candidateHost);if (member) {member.priority = 4;};rs.reconfig(conf)" "$URI" --username "$USERNAME" --password "$PASSWORD"
+      mongosh --quiet --eval "conf=rs.config();conf.members.forEach(member => member.priority = 1);const candidateHost = '$CANDIDATE_HOST';const member = conf.members.find(member => member.host === candidateHost);if (member) {member.priority = 2;};rs.reconfig(conf)" "$URI" --username "$USERNAME" --password "$PASSWORD"
       echo "Checking candidate instance role after switchover..."
       verify
     }

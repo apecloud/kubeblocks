@@ -215,7 +215,7 @@ func (mgr *Manager) SetReplSetConfig(ctx context.Context, rsClient *mongo.Client
 
 	mgr.Logger.Infof("Reconfig replSet: %v", cfg)
 
-	res := mgr.Client.Database("admin").RunCommand(ctx, bson.D{{Key: "replSetReconfig", Value: cfg}})
+	res := rsClient.Database("admin").RunCommand(ctx, bson.D{{Key: "replSetReconfig", Value: cfg}})
 	if res.Err() != nil {
 		err := errors.Wrap(res.Err(), "replSetReconfig")
 		mgr.Logger.Errorf("ReConfig replSet failed: %v", err)

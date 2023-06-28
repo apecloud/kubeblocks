@@ -61,8 +61,12 @@ func (ha *Ha) RunCycle() {
 		ha.logger.Infof("Cluster has no leader, attemp to take the leader")
 		if ha.IsHealthiestMember(cluster) {
 			if ha.dcs.AttempAcquireLock() == nil {
-				ha.logger.Infof("Take the leader success!")
-				ha.dbManager.Premote()
+				err := ha.dbManager.Premote()
+				if err != nil {
+					ha.logger.Infof("Take the leader failed: %v", err)
+				} else {
+					ha.logger.Infof("Take the leader success!")
+				}
 			}
 		}
 

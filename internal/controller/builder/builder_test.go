@@ -525,6 +525,8 @@ var _ = Describe("builder", func() {
 					Physical: dataprotectionv1alpha1.BackupToolRestoreCommand{
 						RestoreCommands: []string{
 							"echo \"hello world\"",
+							"echo \"hello world\"",
+							"echo \"hello world\"",
 						},
 					},
 				},

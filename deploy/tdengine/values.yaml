@@ -5,12 +5,20 @@
 replicaCount: 1
 
 image:
-  repository: nginx
+  registry: docker.io
+  repository: tdengine/tdengine
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: "3.0.5.0"
 
 imagePullSecrets: []
+
+## Common override values:
+##
+## @param clusterVersionOverride
+## @param nameOverride
+## @param fullnameOverride
+clusterVersionOverride: ""
 nameOverride: ""
 fullnameOverride: ""
 
@@ -80,3 +88,15 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+
+metrics:
+  image:
+    registry:
+    repository: apecloud/taoskeeper  #没找到镜像，要自己打一个
+    tag: 0.0.5
+    pullPolicy: IfNotPresent
+  service:
+    port: 6043
+
+

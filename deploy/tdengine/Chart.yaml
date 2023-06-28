@@ -1,5 +1,12 @@
 apiVersion: v2
+
 name: tdengine
+
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates, including the app version.
+# Versions are expected to follow Semantic Versioning (https://semver.org/)
+version: 0.1.0
+
 description: A Specific Implementation of TDengine Cluster Chart for Kubernetes, and provides by KubeBlocks' ClusterDefinition API manifests.
 
 # A chart can be either an 'application' or a 'library' chart.
@@ -12,21 +19,6 @@ description: A Specific Implementation of TDengine Cluster Chart for Kubernetes,
 # pipeline. Library charts do not define any templates and therefore cannot be deployed.
 type: application
 
-# This is the chart version. This version number should be incremented each time you make changes
-# to the chart and its templates, including the app version.
-# Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 0.1.0
-
-# This is the version number of the application being deployed. This version number should be
-# incremented each time you make changes to the application. Versions are not expected to
-# follow Semantic Versioning. They should reflect the version the application is using.
-# It is recommended to use it with quotes.
-appVersion: "3.0.5.1"
-
-home: https://github.com/taosdata/TDengine
-
-icon: https://github.com/taosdata/TDengine/blob/main/docs/assets/TDengine-logo-trans-small.png
-
 keywords:
   - iot
   - tsdb
@@ -35,10 +27,26 @@ keywords:
   - metrics
   - monitoring
 
+home: https://github.com/taosdata/TDengine
+
+sources:
+  - https://github.com/taosdata/TDengine
+
+dependencies: []
+
 maintainers:
 - name: ApeCloud
   url: https://github.com/apecloud/kubeblocks/deploy
 
+icon: "https://www.taosdata.com/images/taosdata-logo.png"
+
+# This is the version number of the application being deployed. This version number should be
+# incremented each time you make changes to the application. Versions are not expected to
+# follow Semantic Versioning. They should reflect the version the application is using.
+# It is recommended to use it with quotes.
+appVersion: "3.0.5.0"
+
+deprecated: false
+
 annotations:
-  category: Infrastructure
-  licenses: Apache-2.0
+  category: Infrastructure for IoT

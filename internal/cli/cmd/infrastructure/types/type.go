@@ -94,7 +94,7 @@ type NodeOptions struct {
 
 type Kubernetes struct {
 	// ClusterName string `json:"clusterName"`
-	DNSDomain string `json:"dnsDomain"`
+	// DNSDomain string `json:"dnsDomain"`
 	ProxyMode string `json:"proxyMode"`
 
 	Networking Networking       `json:"networking"`
@@ -107,7 +107,9 @@ type Kubernetes struct {
 
 type Networking struct {
 	// using network plugin, default is calico
-	Plugin        string `json:"plugin"`
+	Plugin string `json:"plugin"`
+
+	// apis/kubeadm/types.Networking
 	ServiceSubnet string `json:"serviceSubnet"`
 	PodSubnet     string `json:"podSubnet"`
 	DNSDomain     string `json:"dnsDomain"`
@@ -158,9 +160,9 @@ func (k *Kubernetes) AutoDefaultFill() {
 	// if k.ClusterName == "" {
 	//	k.ClusterName = constant.DefaultK8sClusterName
 	// }
-	if k.DNSDomain == "" {
-		k.DNSDomain = constant.DefaultK8sDNSDomain
-	}
+	// if k.DNSDomain == "" {
+	//	k.DNSDomain = constant.DefaultK8sDNSDomain
+	// }
 	if k.ProxyMode == "" {
 		k.ProxyMode = constant.DefaultK8sProxyMode
 	}

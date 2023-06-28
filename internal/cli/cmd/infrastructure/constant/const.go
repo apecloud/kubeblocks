@@ -41,11 +41,10 @@ const (
 )
 
 const (
-	DefaultK8sClusterName = "cluster.local"
-	DefaultK8sDNSDomain   = "cluster.local"
-	DefaultAPIDNSDomain   = "lb.kubeblocks.local"
-	DefaultK8sProxyMode   = "ipvs"
-	DefaultAPIServerPort  = 6443
+	DefaultK8sDNSDomain  = "cluster.local"
+	DefaultAPIDNSDomain  = "lb.kubeblocks.local"
+	DefaultK8sProxyMode  = "ipvs"
+	DefaultAPIServerPort = 6443
 
 	DefaultNetworkPlugin = "cilium"
 )

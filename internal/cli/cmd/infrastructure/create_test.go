@@ -20,21 +20,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package infrastructure
 
 import (
+	"os"
+	"path/filepath"
+
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
-var _ = Describe("reconfigure test", func() {
+var _ = Describe("infra create test", func() {
+
+	var (
+		tf      *cmdtesting.TestFactory
+		streams genericclioptions.IOStreams
+	)
 
 	BeforeEach(func() {
+		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+		tf = cmdtesting.NewTestFactory().WithNamespace(testing.Namespace)
 	})
 
 	AfterEach(func() {
+		tf.Cleanup()
 	})
 
-	It("check params for creating infra", func() {
-		By("Create cluster with config file")
+	mockPrivateKeyFile := func(tmpDir string) string {
+		privateKeyFile := filepath.Join(tmpDir, "id_rsa.pem")
+		Expect(os.WriteFile(privateKeyFile, []byte("private key"), os.ModePerm)).Should(Succeed())
+		return privateKeyFile
+	}
 
-		By("Create cluster with args")
+	It("test create k8s cluster with config file", func() {
+		tmpDir, _ := os.MkdirTemp(os.TempDir(), "test-")
+		defer os.RemoveAll(tmpDir)
+
+		By("Create cluster with config file")
+		o := &createOptions{
+			clusterOptions: clusterOptions{
+				IOStreams: streams,
+			}}
+		o.checkAndSetDefaultVersion()
+		o.clusterConfig = testdata.SubTestDataPath("infrastructure/infra-cluster.yaml")
+		Expect(o.Complete()).To(Succeed())
+		o.Cluster.User.PrivateKeyPath = mockPrivateKeyFile(tmpDir)
+		Expect(o.Validate()).To(Succeed())
+	})
+
+	It("test create k8s cluster with params", func() {
+		tmpDir, _ := os.MkdirTemp(os.TempDir(), "test-")
+		defer os.RemoveAll(tmpDir)
+
+		By("Create cluster with config file")
+		o := &createOptions{
+			clusterOptions: clusterOptions{
+				IOStreams: streams,
+			}}
+		o.checkAndSetDefaultVersion()
+
+		o.nodes = []string{
+			"node0:1.1.1.1:10.128.0.1",
+			"node1:1.1.1.2:10.128.0.2",
+			"node2:1.1.1.3:10.128.0.3",
+		}
+		o.Cluster.User.PrivateKeyPath = mockPrivateKeyFile(tmpDir)
+		Expect(o.Complete()).Should(Succeed())
+		Expect(o.Validate()).ShouldNot(Succeed())
+
+		o.Cluster.RoleGroup.Master = []string{"node0"}
+		o.Cluster.RoleGroup.ETCD = []string{"node0"}
+		o.Cluster.RoleGroup.Worker = []string{"node1", "node2"}
+		Expect(o.Validate()).Should(Succeed())
 	})
 
 })

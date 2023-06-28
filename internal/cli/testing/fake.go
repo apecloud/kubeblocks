@@ -534,7 +534,12 @@ func FakeVolumeSnapshotClass() *snapshotv1.VolumeSnapshotClass {
 }
 
 func FakeKBDeploy(version string) *appsv1.Deployment {
-	deploy := &appsv1.Deployment{}
+	deploy := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+	}
 	deploy.SetLabels(map[string]string{
 		"app.kubernetes.io/name": types.KubeBlocksChartName,
 	})
@@ -886,6 +891,22 @@ func FakePodChaos(name, namespace string) *chaosmeshv1alpha1.PodChaos {
 				},
 			},
 			Action: chaosmeshv1alpha1.PodKillAction,
+		},
+	}
+}
+
+func FakeEventForObject(name string, namespace string, object string) *corev1.Event {
+	return &corev1.Event{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Event",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		InvolvedObject: corev1.ObjectReference{
+			Name: object,
 		},
 	}
 }

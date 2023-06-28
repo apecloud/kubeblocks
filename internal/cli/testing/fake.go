@@ -336,6 +336,7 @@ func FakeBackupTool() *dpv1alpha1.BackupTool {
 }
 
 func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPolicy {
+	ttl := "7d"
 	template := &dpv1alpha1.BackupPolicy{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
@@ -349,6 +350,46 @@ func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPo
 			},
 			Annotations: map[string]string{
 				constant.DefaultBackupPolicyAnnotationKey: "true",
+			},
+		},
+		Spec: dpv1alpha1.BackupPolicySpec{
+			Snapshot: &dpv1alpha1.SnapshotPolicy{
+				BasePolicy: dpv1alpha1.BasePolicy{
+					BackupsHistoryLimit: 1,
+				},
+			},
+			Datafile: &dpv1alpha1.CommonBackupPolicy{
+				BasePolicy: dpv1alpha1.BasePolicy{
+					BackupsHistoryLimit: 1,
+				},
+				PersistentVolumeClaim: dpv1alpha1.PersistentVolumeClaim{
+					Name: "test1",
+				},
+			},
+			Logfile: &dpv1alpha1.CommonBackupPolicy{
+				BasePolicy: dpv1alpha1.BasePolicy{
+					BackupsHistoryLimit: 1,
+				},
+				PersistentVolumeClaim: dpv1alpha1.PersistentVolumeClaim{
+					Name: "test1",
+				},
+			},
+			Schedule: dpv1alpha1.Schedule{
+				Snapshot: &dpv1alpha1.SchedulePolicy{
+					Enable:         false,
+					CronExpression: "0 18 * * *",
+				},
+				Datafile: &dpv1alpha1.SchedulePolicy{
+					Enable:         false,
+					CronExpression: "0 18 * * *",
+				},
+				Logfile: &dpv1alpha1.SchedulePolicy{
+					Enable:         false,
+					CronExpression: "* */1 * * *",
+				},
+			},
+			Retention: &dpv1alpha1.RetentionSpec{
+				TTL: &ttl,
 			},
 		},
 		Status: dpv1alpha1.BackupPolicyStatus{

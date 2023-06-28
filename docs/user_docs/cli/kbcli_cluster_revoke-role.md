@@ -26,7 +26,7 @@ kbcli cluster revoke-role [flags]
   -h, --help               help for revoke-role
   -i, --instance string    Specify the name of instance to be connected.
       --name string        Required user name, please specify it.
-  -r, --role string        Role name should be one of {SUPERUSER, READWRITE, READONLY}
+  -r, --role string        Role name should be one of [SUPERUSER, READWRITE, READONLY].
 ```
 
 ### Options inherited from parent commands

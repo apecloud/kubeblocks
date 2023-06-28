@@ -290,7 +290,12 @@ func (store *KubernetesStore) AttempAcquireLock() error {
 
 	configMap := store.cluster.Leader.Resource.(*corev1.ConfigMap)
 	configMap.SetAnnotations(annotation)
-	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
+	cm, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
+	if err != nil {
+		store.logger.Errorf("Acquire lock failed: %v", err)
+	} else {
+		store.cluster.Leader.Resource = cm
+	}
 
 	return err
 }
@@ -317,6 +322,9 @@ func (store *KubernetesStore) ReleaseLock() error {
 	configMap := store.cluster.Leader.Resource.(*corev1.ConfigMap)
 	configMap.Annotations["leader"] = ""
 	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})
+	if err != nil {
+		store.logger.Errorf("release lock failed: %v", err)
+	}
 	// TODO: if response status code is 409, it means operation conflict.
 	return err
 }

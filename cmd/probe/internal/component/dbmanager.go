@@ -12,7 +12,7 @@ type DBManager interface {
 	Initialize()
 	IsClusterInitialized() (bool, error)
 	IsRunning()
-	IsHealthy()
+	IsHealthy() bool
 	IsLeader(context.Context) (bool, error)
 	IsDBStartupReady() bool
 	Recover()

@@ -267,9 +267,22 @@ func (mgr *Manager) GetReplSetClient(ctx context.Context, hosts []string) (*mong
 	}
 	return client, err
 }
-func (mgr *Manager) Initialize()   {}
-func (mgr *Manager) IsRunning()    {}
-func (mgr *Manager) IsHealthy()    {}
+func (mgr *Manager) Initialize() {}
+func (mgr *Manager) IsRunning()  {}
+
+func (mgr *Manager) IsHealthy() bool {
+	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
+	if rsStatus == nil {
+		return nil
+	}
+	for _, member := range rsStatus.Members {
+		if strings.HasPrefix(member.Name, mgr.CurrentMemberName) && member.Health == 1 {
+			return true
+		}
+	}
+	return false
+}
+
 func (mgr *Manager) Recover()      {}
 func (mgr *Manager) AddToCluster() {}
 func (mgr *Manager) Premote() error {

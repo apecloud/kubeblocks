@@ -261,9 +261,15 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 	if err != nil {
 		ttl = 0
 	}
+	leader := annotation["leader"]
+
+	if ttl > 0 && time.Now().Unix()-renewTime > ttl {
+		leader = ""
+	}
+
 	return &Leader{
 		Index:       configmap.ResourceVersion,
-		Name:        annotations["leader"],
+		Name:        leader,
 		AcquireTime: acquireTime,
 		RenewTime:   renewTime,
 		Ttl:         ttl,

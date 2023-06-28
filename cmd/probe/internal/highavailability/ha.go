@@ -45,17 +45,17 @@ func (ha *Ha) RunCycle() {
 	//		dcs.ReleaseLock()
 	//	}
 
-	//case !dbManger.IsHealthy():
-	//	logger.Infof("DB Service is not healthy,  do some recover")
-	//	if dcs.HasLock() {
-	//		dcs.ReleaseLock()
-	//	}
-	//	dbManager.Recover()
-
 	//case !cluster.HasThisMember():
 	//	logger.Infof("Current node is not in cluster, add it to cluster")
 	//	dbManager.AddToCluser(cluster)
 	//	cluster.AddThisMember()
+
+	case !ha.dbManger.IsHealthy():
+		ha.logger.Infof("DB Service is not healthy,  do some recover")
+		if ha.dcs.HasLock() {
+			ha.dcs.ReleaseLock()
+		}
+	//	dbManager.Recover()
 
 	case !cluster.IsLocked():
 		ha.logger.Infof("Cluster has no leader, attemp to take the leader")

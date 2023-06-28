@@ -1,1 +1,1 @@
-A chart for TDengine by ApeCloud 
+A chart to support CD&CV resource for TDengine by ApeCloud 

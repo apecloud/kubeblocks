@@ -1,6 +1,8 @@
 apiVersion: v2
+
 name: tdengine-cluster
-description: A Helm chart for Kubernetes
+
+description: A Helm chart to create a cluster for TDengine in Kubeblocks.
 
 # A chart can be either an 'application' or a 'library' chart.
 #

@@ -7,8 +7,8 @@ metadata:
 spec:
   type: tdengine
   connectionCredential:
-    username: root
-    password: "taosdata"
+    username: {{ .Values.defaultAuth.username }}
+    password: {{ .Values.defaultAuth.password }}
     endpoint: "$(SVC_FQDN):$(SVC_PORT_tdengine)"
     host: "$(SVC_FQDN)"
     port: "$(SVC_PORT_tdengine)"
@@ -42,6 +42,12 @@ spec:
           namespace: {{ .Release.Namespace }}
           volumeName: metrics-configuration
           defaultMode: 0777
+      scriptSpecs:
+        - name: taos-adapter-scripts
+          templateRef: taos-adapter-scripts-template
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
       podSpec:
         containers:
           - name: tdengine
@@ -52,26 +58,20 @@ spec:
               - name: taos-adapter
                 containerPort: 6041
             env:
-              - name: POD_NAME
-                valueFrom:
-                  fieldRef:
-                    fieldPath: metadata.name
-              - name: SERVICE_NAME
-                value: taosd
-              - name: STS_NAME
-                value: tdengine
-              - name: STS_NAMESPACE
-                valueFrom:
-                  fieldRef:
-                    fieldPath: metadata.namespace
-              - name: TZ
-                value: Asia/Shanghai
-              - name: TAOS_SERVER_PORT
+              - name: SVC_PORT
                 value: "6030"
-              - name: TAOS_FIRST_EP
-                value: "$(KB_0_HOSTNAME).$(STS_NAMESPACE).svc.cluster.local:$(TAOS_SERVER_PORT)"
+              - name: TAOS_ADAPTER_PORT
+                value: "6041"
+              - name: TZ
+                value: {{ .Values.timeZone }}
               - name: TAOS_FQDN
                 value: "$(KB_POD_FQDN).cluster.local"
+              - name: TAOS_FIRST_EP
+                value: "$(KB_0_HOSTNAME).$(KB_NAMESPACE).svc.cluster.local:$(SVC_PORT)"
+            lifecycle:
+              postStart:
+                exec:
+                  command: ["/bin/sh", "-c", "/scripts/taos-adapter-check.sh"]
             volumeMounts:
               - name: taos-config
                 mountPath: /etc/taos
@@ -86,13 +86,13 @@ spec:
               runAsNonRoot: true
               runAsUser: 1001
             env:
-              - name: TAOS_USER
+              - name: TAOS_KEEPER_TDENGINE_USERNAME
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: username
                     optional: false
-              - name: TAOS_PASSWORD
+              - name: TAOS_KEEPER_TDENGINE_PASSWORD
                 valueFrom:
                   secretKeyRef:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)

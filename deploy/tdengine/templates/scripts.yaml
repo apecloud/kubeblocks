@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: taos-adapter-scripts-template
+  labels:
+    {{- include "tdengine.labels" . | nindent 4 }}
+data:
+  taos-adapter-check.sh: |
+    {{- .Files.Get "scripts/taos-adapter-check.sh.tpl" | nindent 4 }}

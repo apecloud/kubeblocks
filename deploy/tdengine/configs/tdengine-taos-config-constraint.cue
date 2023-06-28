@@ -17,11 +17,9 @@
 
 #TaosParameter: {
 
-	// reference aws rds params: https://console.amazonaws.cn/rds/home?region=cn-north-1#parameter-groups-detail:ids=default.mysql8.0;type=DbParameterGroup;editing=false
 	// auto generate by cue_generate.go
-
 	// other parameters
-	// reference mysql parameters
+	// reference taos parameters
 	...
 }
 

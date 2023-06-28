@@ -2,7 +2,7 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: {{ include "cluster-libchart.clusterName" . }}
-  labels: {{ include "apecloud-mysql-cluster.labels" . | nindent 4 }}
+  labels: {{ include "cluster-libchart.clusterLabels" . | nindent 4 }}
 spec:
   {{- $withProxy := and (eq .Values.mode "raftGroup") .Values.proxyEnabled -}}
   {{- if $withProxy }}

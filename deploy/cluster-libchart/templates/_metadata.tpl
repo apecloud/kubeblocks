@@ -14,8 +14,17 @@ We truncate at 15 chars because KubeBlocks will concatenate the names of other r
 {{- end }}
 
 {{/*
+Create chart name and version as used by the chart label.
+*/}}
+{{- define "cluster-libchart.chart" -}}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
 Define cluster labels
 */}}
 {{- define "cluster-libchart.clusterLabels" -}}
+helm.sh/chart: {{ include "cluster-libchart.chart" . }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/instance: {{ include "cluster-libchart.clusterName" . }}
 {{- end }}

@@ -63,9 +63,11 @@ var _ = Describe("graph client test.", func() {
 			dagExpected.Connect(v1, v2)
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 
-			By("update&delete object")
+			By("update&delete&status object")
+			graphCli.Status(dag, obj0, obj0.DeepCopy())
 			graphCli.Update(dag, obj1, obj1.DeepCopy())
 			graphCli.Delete(dag, obj2)
+			v0.Action = ActionPtr(STATUS)
 			v1.Action = ActionPtr(UPDATE)
 			v2.Action = ActionPtr(DELETE)
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())

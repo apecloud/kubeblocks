@@ -188,7 +188,7 @@ func DefaultLess(v1, v2 graph.Vertex) bool {
 	case o1.Immutable != o2.Immutable:
 		return false
 	case o1.Action == nil && o2.Action == nil:
-	case o1.Action != nil, o2.Action != nil:
+	case o1.Action == nil, o2.Action == nil:
 		return false
 	case *o1.Action != *o2.Action:
 		return false

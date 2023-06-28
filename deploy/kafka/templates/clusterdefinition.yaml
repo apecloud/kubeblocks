@@ -15,7 +15,7 @@ spec:
   connectionCredential:
     superusers: "User:admin"
     endpoint: "$(SVC_FQDN):$(SVC_PORT_kafka-ctrlr)"
-    kraftClusterID: "$(UUID_STR_B64)" 
+    kraftClusterID: "$(UUID_STR_B64)"
     sslCertPassword: "$(RANDOM_PASSWD)"
 
   componentDefs:
@@ -29,8 +29,6 @@ spec:
         deployment environments.
       workloadType: Stateful # Consensus
       characterType: kafka
-      maxUnavailable: 49%
-      probes:
       monitor:
         builtIn: false
         exporterConfig:
@@ -68,9 +66,17 @@ spec:
           - name: metrics
             targetPort: metrics
             port: 5556
+      componentRef:
+        - componentDefName: kafka-server
+          headlessServiceRef:
+            - portName: kafka-ctrlr
+              containerName: kafka
+              envName: KAFKA_SERVER_HOSTS
+              format: '{{`{{ .Ordinal }}@{{ .FQDN }}.cluster.local:{{ .Port }}`}}'
+              joinWith: ","
       podSpec:
-        securityContext:
-          fsGroup: 1001
+        # securityContext:
+        #   fsGroup: 1001
         containers:
           - name: kafka
             command:
@@ -155,7 +161,7 @@ spec:
               tcpSocket:
                 port: kafka-ctrlr
             volumeMounts:
-              - name: metadadata
+              - name: metadata
                 mountPath: /bitnami/kafka/metadata
               - name: data
                 mountPath: /bitnami/kafka
@@ -197,7 +203,7 @@ spec:
         Kafka controller that act as controllers (kraft) only server.
       workloadType: Stateful # Consensus
       characterType: kafka
-      maxUnavailable: 49%
+      # maxUnavailable: 49%
       probes:
       monitor:
         builtIn: false
@@ -227,9 +233,17 @@ spec:
           - name: metrics
             targetPort: metrics
             port: 5556
+      componentRef:
+        - componentDefName: kafka-controller
+          headlessServiceRef:
+            - portName: kafka-ctrlr
+              containerName: kafka
+              envName: KAFKA_SERVER_HOSTS
+              format: '{{`{{ .Ordinal }}@{{ .FQDN }}.cluster.local:{{ .Port }}`}}'
+              joinWith: ","
       podSpec:
-        securityContext:
-          fsGroup: 1001
+        # securityContext:
+          # fsGroup: 1001
         containers:
           - name: kafka
             command:
@@ -299,10 +313,10 @@ spec:
               tcpSocket:
                 port: kafka-ctrlr
             volumeMounts:
-              - name: metadadata
+              - name: metadata
                 mountPath: /bitnami/kafka/metadata
-              # - name: data
-              #   mountPath: /bitnami/kafka
+              - name: data
+                mountPath: /bitnami/kafka
               - name: logs
                 mountPath: /opt/bitnami/kafka/logs
               - name: kafka-config
@@ -370,9 +384,17 @@ spec:
           - name: metrics
             targetPort: metrics
             port: 5556
+      componentRef:
+        - componentDefName: kafka-controller
+          headlessServiceRef:
+            - portName: kafka-ctrlr
+              containerName: kafka
+              envName: KAFKA_SERVER_HOSTS
+              format: '{{`{{ .Ordinal }}@{{ .FQDN }}.cluster.local:{{ .Port }}`}}'
+              joinWith: ","
       podSpec:
-        securityContext:
-          fsGroup: 1001
+        # securityContext:
+          # fsGroup: 1001
         containers:
           - name: kafka
             command:
@@ -456,6 +478,8 @@ spec:
               tcpSocket:
                 port: kafka-client
             volumeMounts:
+              - name: metadata
+                mountPath: /bitnami/kafka/metadata
               - name: data
                 mountPath: /bitnami/kafka
               - name: logs
@@ -488,7 +512,6 @@ spec:
             volumeMounts:
               - name: jmx-config
                 mountPath: /etc/jmx-kafka
-
     - name: kafka-exporter
       workloadType: Stateless
       scriptSpecs:
@@ -508,13 +531,28 @@ spec:
           - name: metrics
             targetPort: metrics
             port: 9308
+      componentRef:
+        - componentDefName: kafka-server
+          serviceRef:
+            - name: kafka-client
+              envName: KAFKA_SVC
+        - componentDefName: kafka-broker
+          fieldRefs:
+            - envName: KAFKA_TLS
+              fieldPath: TLS
+          serviceRef:
+            - name: kafka-client
+              envName: KAFKA_SVC
       podSpec:
-        securityContext:
-          fsGroup: 1001
+        # securityContext:
+        #   fsGroup: 1001
         containers:
           - name: kafka-exporter
             command:
-              - /scripts/setup.sh
+              # - /scripts/setup.sh
+              - /bin/bash
+              - -c
+              - sleep infinity
             ports:
               - name: metrics
                 containerPort: 9308

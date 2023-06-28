@@ -40,7 +40,7 @@ spec:
       {{- with $.Values.persistence }}
         {{- if .enabled }}
       volumeClaimTemplates:
-        - name: metadata 
+        - name: metadata
           spec:
             {{- with .metadata.storageClassName }}
             storageClassName: {{ . }}
@@ -50,7 +50,7 @@ spec:
             resources:
               requests:
                 storage: {{ .metadata.size }}
-        - name: data 
+        - name: data
           spec:
             {{- with .data.storageClassName }}
             storageClassName: {{ . }}
@@ -61,7 +61,7 @@ spec:
               requests:
                 storage: {{ .data.size }}
           {{- if .log.enabled }}
-        - name: log 
+        - name: logs
           spec:
             {{- with .log.storageClassName }}
             storageClassName: {{ . }}
@@ -99,7 +99,17 @@ spec:
       {{- with $.Values.persistence }}
         {{- if .enabled }}
       volumeClaimTemplates:
-        - name: metadata 
+        - name: data
+          spec:
+            {{- with .data.storageClassName }}
+            storageClassName: {{ . }}
+            {{- end }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .data.size }}
+        - name: metadata
           spec:
             {{- with .metadata.storageClassName }}
             storageClassName: {{ . }}
@@ -110,7 +120,7 @@ spec:
               requests:
                 storage: {{ .metadata.size }}
           {{- if .log.enabled }}
-        - name: log 
+        - name: logs
           spec:
             {{- with .log.storageClassName }}
             storageClassName: {{ . }}
@@ -147,7 +157,7 @@ spec:
       {{- with $.Values.persistence }}
         {{- if .enabled }}
       volumeClaimTemplates:
-        - name: data 
+        - name: data
           spec:
             {{- with .data.storageClassName }}
             storageClassName: {{ . }}
@@ -158,7 +168,7 @@ spec:
               requests:
                 storage: {{ .data.size }}
           {{- if .log.enabled }}
-        - name: log 
+        - name: logs
           spec:
             {{- with .log.storageClassName }}
             storageClassName: {{ . }}

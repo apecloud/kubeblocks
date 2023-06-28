@@ -26,6 +26,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/spf13/viper"
 
 	"github.com/leaanthony/debme"
 	appsv1 "k8s.io/api/apps/v1"
@@ -534,6 +535,71 @@ var _ = Describe("builder", func() {
 			job, err := BuildRestoreJobForFullBackup(restoreJobKey.Name, &component, &backup, &backupTool, podName)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(job).ShouldNot(BeNil())
+		})
+
+		It("builds backup manifests job correctly", func() {
+			backup := &dataprotectionv1alpha1.Backup{}
+			podSpec := &corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Command: []string{"sh"},
+					},
+				},
+			}
+			key := types.NamespacedName{Name: "backup", Namespace: "default"}
+			job, err := BuildBackupManifestsJob(key, backup, podSpec)
+			Expect(err).Should(BeNil())
+			Expect(job).ShouldNot(BeNil())
+			Expect(job.Name).Should(Equal(key.Name))
+		})
+
+		It("builds restore job correctly", func() {
+			key := types.NamespacedName{Name: "restore", Namespace: "default"}
+			volumes := []corev1.Volume{}
+			volumeMounts := []corev1.VolumeMount{}
+			env := []corev1.EnvVar{}
+			job, err := BuildRestoreJob(key.Name, key.Namespace, "", []string{"sh"}, volumes, volumeMounts, env, nil)
+			Expect(err).Should(BeNil())
+			Expect(job).ShouldNot(BeNil())
+			Expect(job.Name).Should(Equal(key.Name))
+		})
+
+		It("builds volume snapshot class correctly", func() {
+			className := "vsc-test"
+			driverName := "csi-driver-test"
+			obj, err := BuildVolumeSnapshotClass(className, driverName)
+			Expect(err).Should(BeNil())
+			Expect(obj).ShouldNot(BeNil())
+			Expect(obj.Name).Should(Equal(className))
+			Expect(obj.Driver).Should(Equal(driverName))
+		})
+
+		It("builds headless svc correctly", func() {
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			expectSvcName := fmt.Sprintf("%s-%s-headless", cluster.Name, synthesizedComponent.Name)
+			obj, err := BuildHeadlessSvc(cluster, synthesizedComponent)
+			Expect(err).Should(BeNil())
+			Expect(obj).ShouldNot(BeNil())
+			Expect(obj.Name).Should(Equal(expectSvcName))
+		})
+
+		It("builds cfg manager tools  correctly", func() {
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
+				ManagerName:               constant.ConfigSidecarName,
+				SecreteName:               component.GenerateConnCredential(cluster.Name),
+				EnvConfigName:             component.GenerateComponentEnvName(cluster.Name, synthesizedComponent.Name),
+				Image:                     viper.GetString(constant.KBToolsImage),
+				Cluster:                   cluster,
+				ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
+			}
+			toolContainers := []appsv1alpha1.ToolConfig{
+				{Name: "test-tool", Image: "test-image", Command: []string{"sh"}},
+			}
+
+			obj, err := BuildCfgManagerToolsContainer(cfgManagerParams, synthesizedComponent, toolContainers)
+			Expect(err).Should(BeNil())
+			Expect(obj).ShouldNot(BeEmpty())
 		})
 	})
 

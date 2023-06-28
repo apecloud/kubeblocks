@@ -275,23 +275,18 @@ func printBackupList(o ListBackupOptions) error {
 		return nil
 	}
 
-	clusterNameMap, err := getClusterNameMap(dynamic, o.ListOptions)
-	if err != nil {
-		return err
-	}
-
 	// sort the unstructured objects with the creationTimestamp in positive order
 	sort.Sort(unstructuredList(backupList.Items))
 	tbl := printer.NewTablePrinter(o.Out)
-	tbl.SetHeader("NAME", "CLUSTER", "TYPE", "STATUS", "TOTAL-SIZE", "DURATION", "CREATE-TIME", "COMPLETION-TIME", "EXPIRATION")
+	tbl.SetHeader("NAME", "SOURCE-CLUSTER", "TYPE", "STATUS", "TOTAL-SIZE", "DURATION", "CREATE-TIME", "COMPLETION-TIME", "EXPIRATION")
 	for _, obj := range backupList.Items {
 		backup := &dpv1alpha1.Backup{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backup); err != nil {
 			return err
 		}
-		clusterName := backup.Labels[constant.AppInstanceLabelKey]
-		if _, ok := clusterNameMap[clusterName]; !ok {
-			clusterName = fmt.Sprintf("%s (deleted)", clusterName)
+		sourceCluster := backup.Status.SourceCluster
+		if sourceCluster == "" {
+			sourceCluster = backup.Labels[constant.AppInstanceLabelKey]
 		}
 		durationStr := ""
 		if backup.Status.Duration != nil {
@@ -303,12 +298,12 @@ func printBackupList(o ListBackupOptions) error {
 		}
 		if len(o.BackupName) > 0 {
 			if o.BackupName == obj.GetName() {
-				tbl.AddRow(backup.Name, clusterName, backup.Spec.BackupType, statusString, backup.Status.TotalSize,
+				tbl.AddRow(backup.Name, sourceCluster, backup.Spec.BackupType, statusString, backup.Status.TotalSize,
 					durationStr, util.TimeFormat(&backup.CreationTimestamp), util.TimeFormat(backup.Status.CompletionTimestamp))
 			}
 			continue
 		}
-		tbl.AddRow(backup.Name, clusterName, backup.Spec.BackupType, statusString, backup.Status.TotalSize,
+		tbl.AddRow(backup.Name, sourceCluster, backup.Spec.BackupType, statusString, backup.Status.TotalSize,
 			durationStr, util.TimeFormat(&backup.CreationTimestamp), util.TimeFormat(backup.Status.CompletionTimestamp),
 			util.TimeFormat(backup.Status.Expiration))
 	}
@@ -522,18 +517,24 @@ func (o *CreateRestoreOptions) validateRestoreTime() error {
 	if err != nil {
 		return err
 	}
-	backups := make([]dpv1alpha1.Backup, 0)
+	backupMap := map[string][]dpv1alpha1.Backup{}
 	for _, i := range objs.Items {
 		obj := dpv1alpha1.Backup{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(i.Object, &obj); err != nil {
 			return err
 		}
-		backups = append(backups, obj)
+		uid := obj.Labels[constant.DataProtectionLabelClusterUIDKey]
+		if backupMap[uid] == nil {
+			backupMap[uid] = make([]dpv1alpha1.Backup, 0)
+		}
+		backupMap[uid] = append(backupMap[uid], obj)
 	}
-	recoverableTime := dpv1alpha1.GetRecoverableTimeRange(backups)
-	for _, i := range recoverableTime {
-		if isTimeInRange(restoreTime, i.StartTime.Time, i.StopTime.Time) {
-			return nil
+	for _, v := range backupMap {
+		recoverableTime := dpv1alpha1.GetRecoverableTimeRange(v)
+		for _, i := range recoverableTime {
+			if isTimeInRange(restoreTime, i.StartTime.Time, i.StopTime.Time) {
+				return nil
+			}
 		}
 	}
 	return fmt.Errorf("restore-to-time is out of time range, you can view the recoverable time: \n"+
@@ -916,15 +917,17 @@ func (o *editBackupPolicyOptions) getValueWithJsonpath(spec dpv1alpha1.BackupPol
 			continue
 		}
 		v1 := v[0]
-		if v1.Kind() != reflect.Ptr {
+		switch v1.Kind() {
+		case reflect.Ptr, reflect.Interface:
+			if v1.IsNil() {
+				return nil, nil
+			}
+			val := fmt.Sprintf("%v", v1.Elem())
+			return &val, nil
+		default:
 			val := fmt.Sprintf("%v", v1.Interface())
 			return &val, nil
 		}
-		if v1.IsNil() {
-			return nil, nil
-		}
-		val := fmt.Sprintf("%v", v1.Elem())
-		return &val, nil
 	}
 	return nil, nil
 }

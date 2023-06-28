@@ -29,8 +29,9 @@ jobs:
       - name: Get trigger mode
         id: get_trigger_mode
         run: |
+          git checkout -b ${{ github.event.pull_request.head.ref }} --track origin/${{ github.event.pull_request.head.ref }}
           TRIGGER_MODE=`bash .github/utils/utils.sh --type 6 \
-              --branch-name "origin/${{ github.event.pull_request.head.ref }}" \
+              --branch-name "${{ github.event.pull_request.head.ref }}" \
               --base-branch "${{ env.BASE_BRANCH }}"`
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT

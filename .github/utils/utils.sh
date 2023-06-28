@@ -27,6 +27,7 @@ Usage: $(basename "$0") <options>
                                 15) set size label
                                 16) get test packages
                                 17) delete actions cache
+                                18) check release tag
     -tn, --tag-name           Release tag name
     -gr, --github-repo        Github Repo
     -gt, --github-token       Github token
@@ -125,6 +126,9 @@ main() {
         ;;
         17)
             delete_actions_cache
+        ;;
+        18)
+            check_release_tag
         ;;
         *)
             show_help
@@ -647,6 +651,23 @@ delete_actions_cache() {
     gh extension install actions/gh-actions-cache --force
 
     gh actions-cache delete --repo $LATEST_REPO $TAG_NAME --confirm
+}
+
+check_release_tag(){
+    if [[ "$TAG_NAME" == "latest" ]]; then
+        echo "$TAG_NAME"
+        return
+    fi
+    release_list=$( gh release list --repo $LATEST_REPO --limit 100 )
+    for tag in $( echo "$release_list"); do
+        if [[ "$tag" == "$TAG_NAME" ]]; then
+            echo "$TAG_NAME"
+            break
+        elif [[ "$tag" == "v$TAG_NAME" ]]; then
+            echo "v$TAG_NAME"
+            break
+        fi
+    done
 }
 
 main "$@"

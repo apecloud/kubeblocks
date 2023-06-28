@@ -282,9 +282,9 @@ var _ = Describe("Backup Controller test", func() {
 				viper.Set(constant.CfgKeyCtrlrMgrTolerations,
 					"[{\"key\":\"key1\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]")
 				viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "{\"beta.kubernetes.io/arch\":\"amd64\"}")
-
+				snapshotBackupName := "backup-default-postgres-cluster-20230628104804"
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
-				backup = testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+				backup = testapps.NewBackupFactory(testCtx.DefaultNamespace, snapshotBackupName).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dpv1alpha1.BackupTypeSnapshot).
 					Create(&testCtx).GetObject()

@@ -235,10 +235,10 @@ func generateJSON(path string, value string) string {
 	return jsonString
 }
 
-// cropJobName job name cannot exceed 64 characters.
+// cropJobName job name cannot exceed 63 characters for label name limit.
 func cropJobName(jobName string) string {
 	if len(jobName) > 63 {
-		return jobName[:64]
+		return jobName[:63]
 	}
 	return jobName
 }

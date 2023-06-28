@@ -20,4 +20,4 @@ spec:
       target:
         role: leader
     datafile:
-      backupToolName: xtrabackup-for-apecloud-mysql
+      backupToolName: xtrabackup-for-apecloud-mysql-for-hscale

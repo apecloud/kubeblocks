@@ -37,6 +37,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
 
@@ -169,10 +170,10 @@ var _ = Describe("create", func() {
 	})
 
 	It("build default cluster component with environment", func() {
-		viper.Set("CLUSTER_DEFAULT_STORAGE_SIZE", "5Gi")
-		viper.Set("CLUSTER_DEFAULT_REPLICAS", 1)
-		viper.Set("CLUSTER_DEFAULT_CPU", "2000m")
-		viper.Set("CLUSTER_DEFAULT_MEMORY", "2Gi")
+		viper.Set(types.CfgKeyClusterDefaultStorageSize, "5Gi")
+		viper.Set(types.CfgKeyClusterDefaultReplicas, 1)
+		viper.Set(types.CfgKeyClusterDefaultCPU, "2000m")
+		viper.Set(types.CfgKeyClusterDefaultMemory, "2Gi")
 		dynamic := testing.FakeDynamicClient(testing.FakeClusterDef())
 		cd, _ := cluster.GetClusterDefByName(dynamic, testing.ClusterDefName)
 		comps, err := buildClusterComp(cd, nil, componentClasses)

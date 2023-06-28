@@ -7,6 +7,11 @@ metadata:
 spec:
   clusterDefinitionRef: nebula
   componentVersions:
+    - componentDefRef: nebula-console
+      versionsContext:
+        containers:
+        - name: nebula-console
+          image: {{ .Values.nebula.console.image.repository }}:{{ default .Chart.AppVersion .Values.nebula.console.image.tag }}
     - componentDefRef: nebula-graphd
       versionsContext:
         containers:

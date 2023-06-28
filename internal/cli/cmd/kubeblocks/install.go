@@ -34,7 +34,6 @@ import (
 	"github.com/spf13/pflag"
 	"golang.org/x/exp/maps"
 	"helm.sh/helm/v3/pkg/cli/values"
-	"helm.sh/helm/v3/pkg/repo"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -270,7 +269,7 @@ func (o *InstallOptions) Install() error {
 	s := spinner.New(o.Out, spinnerMsg("Add and update repo "+types.KubeBlocksRepoName))
 	defer s.Fail()
 	// Add repo, if exists, will update it
-	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksRepoName, URL: util.GetHelmChartRepoURL()}); err != nil {
+	if err = helm.AddRepo(newHelmRepoEntry()); err != nil {
 		return err
 	}
 	s.Success()
@@ -401,7 +400,7 @@ func (o *InstallOptions) checkVersion(v util.Version) error {
 		if err != nil {
 			klog.V(1).Infof(err.Error())
 		}
-		return fmt.Errorf("version %s does not exist, please use \"kbcli kubeblocks list-versions --devel\" to show the available versions", o.Version)
+		return errors.Wrapf(err, "version %s does not exist, please use \"kbcli kubeblocks list-versions --devel\" to show the available versions", o.Version)
 	}
 
 	versionErr := fmt.Errorf("failed to get kubernetes version")

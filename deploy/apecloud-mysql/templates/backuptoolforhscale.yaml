@@ -1,7 +1,7 @@
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupTool
 metadata:
-  name: xtrabackup-for-apecloud-mysql-scale
+  name: xtrabackup-for-apecloud-mysql-for-hscale
   labels:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
@@ -29,7 +29,7 @@ spec:
         xtrabackup --prepare --target-dir=/tmp/data/
         find . -name "*.qp"|xargs rm -f
         xtrabackup --move-back --target-dir=/tmp/data/ --datadir=${DATA_DIR}/
-        touch ${DATA_DIR}/.xtrabackup_restore_new_cluster
+        touch ${DATA_DIR}/.xtrabackup_restore
         rm -rf /tmp/data/
         chmod -R 0777 ${DATA_DIR}
     incrementalRestoreCommands: []

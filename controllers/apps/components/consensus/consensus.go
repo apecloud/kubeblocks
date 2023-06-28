@@ -33,7 +33,6 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -202,46 +201,10 @@ func (r *ConsensusSet) HandleRestart(ctx context.Context, obj client.Object) ([]
 	if r.getWorkloadType() != appsv1alpha1.Consensus {
 		return nil, nil
 	}
-
-	stsObj := util.ConvertToStatefulSet(obj)
-	pods, err := util.GetPodListByStatefulSet(ctx, r.Cli, stsObj)
-	if err != nil {
-		return nil, err
+	priorityMapperFn := func(component *appsv1alpha1.ClusterComponentDefinition) map[string]int {
+		return ComposeRolePriorityMap(component.ConsensusSpec)
 	}
-
-	// prepare to do pods Deletion, that's the only thing we should do,
-	// the statefulset reconciler will do the rest.
-	// to simplify the process, we do pods Deletion after statefulset reconciliation done,
-	// it is when stsObj.Generation == stsObj.Status.ObservedGeneration
-	if stsObj.Generation != stsObj.Status.ObservedGeneration {
-		return nil, nil
-	}
-
-	// then we wait for all pods' presence when len(pods) == stsObj.Spec.Replicas
-	// at that point, we have enough info about the previous pods before deleting the current one
-	if len(pods) != int(*stsObj.Spec.Replicas) {
-		return nil, nil
-	}
-
-	// we don't check whether pod role label is present: prefer stateful set's Update done than role probing ready
-
-	// generate the pods Deletion plan
-	podsToDelete := make([]*corev1.Pod, 0)
-	plan := generateRestartPodPlan(ctx, r.Cli, stsObj, pods, r.getConsensusSpec(), &podsToDelete)
-	// execute plan
-	if _, err := plan.WalkOneStep(); err != nil {
-		return nil, err
-	}
-
-	vertexes := make([]graph.Vertex, 0)
-	for _, pod := range podsToDelete {
-		vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
-			Obj:    pod,
-			Action: ictrltypes.ActionDeletePtr(),
-			Orphan: true,
-		})
-	}
-	return vertexes, nil
+	return r.HandleUpdateWithStrategy(ctx, obj, nil, priorityMapperFn, generateConsensusSerialPlan, generateConsensusBestEffortParallelPlan, generateConsensusParallelPlan)
 }
 
 // HandleRoleChange is the implementation of the type Component interface method, which is used to handle the role change of the Consensus workload.

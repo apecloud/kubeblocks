@@ -209,6 +209,18 @@ spec:
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 493
+      componentRef:
+        - componentDefName: redis
+          headlessServiceRef:
+            - portName: redis
+              containerName: redis
+              envName: REDIS_PRIMAY_HOST
+              format: '{{`{{ .FQDN }}`}}'
+              top: 1
+        - componentDefName: redis
+          serviceRef:
+            - name: redis
+              envName: REDIS_SVC
       volumeTypes:
         - name: data
           type: data

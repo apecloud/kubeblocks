@@ -71,19 +71,10 @@ spec:
                         description: ComponentRef is used to select the component
                           and its fields to be referenced.
                         properties:
-                          componentSelector:
-                            description: componentSelector is the selector of the
-                              component.
-                            properties:
-                              componentDefName:
-                                description: componentDefName is the name of the componentDef
-                                  to select.
-                                type: string
-                              componentName:
-                                description: componentName is the name of the component
-                                  to select.
-                                type: string
-                            type: object
+                          componentDefName:
+                            description: componentDefName is the name of the componentDef
+                              to select.
+                            type: string
                           failurePolicy:
                             description: failurePolicy is the failure policy of the
                               component. If failed to find the component, the failure
@@ -108,6 +99,44 @@ spec:
                               required:
                               - envName
                               - fieldPath
+                              type: object
+                            type: array
+                          headlessServiceRef:
+                            description: headlessServiceFieldRef is the field of the
+                              headless service to select.
+                            items:
+                              properties:
+                                containerName:
+                                  description: containerName is the name of the container
+                                    to select.
+                                  type: string
+                                envName:
+                                  description: envNamePrefix is the prefix of the
+                                    env to be injected.
+                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
+                                  type: string
+                                format:
+                                  description: 'format is the format of the values
+                                    to be organized. there are four build-int values:
+                                    {{.Hostname}}, {{.Port}}, {{.FQDN}}, {{.Ordinal}}.'
+                                  type: string
+                                joinWith:
+                                  description: joinWith is the string to join the
+                                    values.
+                                  type: string
+                                portName:
+                                  description: PortName is the name of the port to
+                                    select.
+                                  type: string
+                                top:
+                                  description: top is the number of the top elements
+                                    to select. 0 for all elements.
+                                  format: int32
+                                  type: integer
+                              required:
+                              - containerName
+                              - envName
+                              - portName
                               type: object
                             type: array
                           resourceFieldRefs:
@@ -138,29 +167,27 @@ spec:
                               - resource
                               type: object
                             type: array
-                          serviceFieldRefs:
+                          serviceRef:
                             description: serviceFieldRef is the field of the service
                               to select.
                             items:
                               description: ComponentServiceRef is used to select service
                                 to be referenced.
                               properties:
-                                envNamePrefix:
+                                envName:
                                   description: envNamePrefix is the prefix of the
                                     env to be injected.
                                   pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
                                   type: string
-                                serviceName:
+                                name:
                                   description: serviceName is the name of the service
                                     to select.
                                   type: string
                               required:
-                              - envNamePrefix
-                              - serviceName
+                              - envName
+                              - name
                               type: object
                             type: array
-                        required:
-                        - componentSelector
                         type: object
                       type: array
                     configSpecs:

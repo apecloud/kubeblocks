@@ -40,14 +40,6 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 	const mysqlCompName = "mysql"
 	const referredCompName = "maxscale"
 
-	// var clusterDefObj *appsv1alpha1.ClusterDefinition
-	// var component *SynthesizedComponent
-	// var clusterCompSpec *appsv1alpha1.ClusterComponentSpec
-	// var clusterCompDef *appsv1alpha1.ClusterComponentDefinition
-	int32Ptr := func(i int32) *int32 {
-		return &i
-	}
-
 	Context("test getReferredComponent", func() {
 		var clusterDefBuilder *testapps.MockClusterDefFactory
 		var clusterBuilder *testapps.MockClusterFactory
@@ -68,7 +60,7 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 			clusterDef := clusterDefBuilder.GetObject()
 			cluster := clusterBuilder.GetObject()
 			Expect(cluster.Spec.ComponentSpecs).To(BeEmpty())
-			selector := appsv1alpha1.ComponentSelector{ComponentDefName: "", ComponentName: referredCompName}
+			selector := ""
 			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
 			Expect(err).NotTo(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("not found"))
@@ -81,7 +73,7 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 			cluster := clusterBuilder.AddComponent(mysqlCompDefName, mysqlCompDefName).GetObject()
 			Expect(cluster.Spec.ComponentSpecs).To(HaveLen(1))
 
-			selector := appsv1alpha1.ComponentSelector{ComponentDefName: "", ComponentName: "some-invalid-name"}
+			selector := ""
 			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
 			Expect(err).NotTo(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("not found"))
@@ -94,7 +86,7 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 			cluster := clusterBuilder.AddComponent(mysqlCompName, mysqlCompDefName).
 				AddComponent(referredCompName, referredCompDefName).GetObject()
 			Expect(cluster.Spec.ComponentSpecs).To(HaveLen(2))
-			selector := appsv1alpha1.ComponentSelector{ComponentDefName: "", ComponentName: referredCompName}
+			selector := ""
 			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
 			Expect(err).To(BeNil())
 			Expect(compSpec).NotTo(BeNil())
@@ -108,7 +100,7 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 			cluster := clusterBuilder.AddComponent(mysqlCompName, mysqlCompDefName).
 				AddComponent(referredCompName, referredCompDefName).GetObject()
 			Expect(cluster.Spec.ComponentSpecs).To(HaveLen(2))
-			selector := appsv1alpha1.ComponentSelector{ComponentDefName: "some-invalid-comp", ComponentName: ""}
+			selector := "some-invalid-comp"
 			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
 			Expect(err).NotTo(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("not found"))
@@ -122,7 +114,7 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 				AddComponent(referredCompName, referredCompDefName).GetObject()
 			Expect(cluster.Spec.ComponentSpecs).To(HaveLen(2))
 
-			selector := appsv1alpha1.ComponentSelector{ComponentDefName: referredCompDefName, ComponentName: ""}
+			selector := referredCompDefName
 			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
 			Expect(err).To(BeNil())
 			Expect(compSpec).NotTo(BeNil())
@@ -136,7 +128,7 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 			cluster := clusterBuilder.AddComponent(mysqlCompName, mysqlCompDefName).
 				AddComponent(referredCompName, referredCompDefName).GetObject()
 			Expect(cluster.Spec.ComponentSpecs).To(HaveLen(2))
-			selector := appsv1alpha1.ComponentSelector{ComponentDefName: referredCompDefName, ComponentName: mysqlCompName}
+			selector := referredCompDefName
 			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
 			Expect(err).NotTo(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("not match"))
@@ -150,7 +142,7 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 				AddComponent(referredCompName, referredCompDefName).GetObject()
 			Expect(cluster.Spec.ComponentSpecs).To(HaveLen(2))
 
-			selector := appsv1alpha1.ComponentSelector{ComponentDefName: referredCompDefName, ComponentName: referredCompName}
+			selector := referredCompDefName
 			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
 			Expect(err).To(BeNil())
 			Expect(compSpec).NotTo(BeNil())
@@ -167,7 +159,7 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 				AddComponent("some-dup-comp", referredCompDefName).GetObject()
 			Expect(cluster.Spec.ComponentSpecs).To(HaveLen(3))
 
-			selector := appsv1alpha1.ComponentSelector{ComponentDefName: referredCompDefName, ComponentName: ""}
+			selector := referredCompDefName
 			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
 			Expect(err).NotTo(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("found multiple components"))
@@ -180,7 +172,7 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 			cluster := clusterBuilder.AddComponent(mysqlCompName, mysqlCompDefName).
 				AddComponent(referredCompName, referredCompDefName).GetObject()
 
-			selector := appsv1alpha1.ComponentSelector{ComponentDefName: "", ComponentName: ""}
+			selector := ""
 			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
 			Expect(err).NotTo(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("must specify either componentName or componentDefName"))
@@ -226,14 +218,8 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 			Expect(err).NotTo(BeNil())
 			Expect(err.Error()).To(ContainSubstring("primaryIndex not set"))
 
-			By("get primary index 0, should pass")
-			compSpec.PrimaryIndex = int32Ptr(0)
-			path, err := extractFieldPathAsString(compSpec, "primaryIndex")
-			Expect(err).To(BeNil())
-			Expect(path).To(Equal("0"))
-
 			By("get replicas, should pass")
-			path, err = extractFieldPathAsString(compSpec, "replicas")
+			path, err := extractFieldPathAsString(compSpec, "replicas")
 			Expect(err).To(BeNil())
 			Expect(path).To(Equal("0"))
 
@@ -255,9 +241,8 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 		BeforeEach(func() {
 			// prepare component spec
 			comp = &appsv1alpha1.ClusterComponentSpec{
-				PrimaryIndex: int32Ptr(0),
-				Replicas:     3,
-				Name:         "test-name",
+				Replicas: 3,
+				Name:     "test-name",
 			}
 		})
 
@@ -376,9 +361,9 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 			})
 
 			componentRef = &appsv1alpha1.ComponentRef{
-				ComponentSelector: appsv1alpha1.ComponentSelector{
-					ComponentDefName: referredCompDefName,
-				},
+
+				ComponentDefName: referredCompDefName,
+
 				FieldRefs: []*appsv1alpha1.ComponentFieldRef{
 					{
 						EnvName:   "MAXSCALE_REPLICAS",
@@ -391,8 +376,8 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 				},
 				ServiceRefs: []*appsv1alpha1.ComponentServiceRef{
 					{
-						EnvNamePrefix: "MAXSCALE_SVC",
-						ServiceName:   "maxscale",
+						EnvName:     "MAXSCALE_SVC",
+						ServiceName: "maxscale",
 					},
 				},
 				ResourceFieldRefs: []*appsv1alpha1.ComponentResourceFieldRef{

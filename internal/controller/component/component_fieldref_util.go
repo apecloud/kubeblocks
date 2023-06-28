@@ -20,13 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"bytes"
 	"fmt"
+	"html/template"
+	"reflect"
 	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	klog "k8s.io/klog/v2"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func buildComponentRef(clusterDef *appsv1alpha1.ClusterDefinition,
@@ -36,49 +41,51 @@ func buildComponentRef(clusterDef *appsv1alpha1.ClusterDefinition,
 	component *SynthesizedComponent) error {
 
 	compRef := clusterCompDef.ComponentRef
-	if clusterComp.ComponentRef != nil {
-		compRef = clusterComp.ComponentRef
-	}
-
 	if len(compRef) == 0 {
 		return nil
 	}
 
-	envs := make([]corev1.EnvVar, 0)
-
+	component.ComponentRefEnvs = make([]corev1.EnvVar, 0)
 	for _, compRef := range compRef {
 		if compRef == nil {
 			continue
 		}
-		selector := compRef.ComponentSelector
+		selector := compRef.ComponentDefName
 		// get referenced component by componentDefName and componentName
 		referredComponent, referredComponentDef, err := getReferredComponent(clusterDef, cluster, selector)
 		if err != nil {
-			if compRef.FailurePolicy == appsv1alpha1.FailurePolicyIgnore {
-				klog.Errorf("ComponentSelector: %s/%s failes to match,", selector.ComponentDefName, selector.ComponentName)
+			if compRef.FailurePolicy == appsv1alpha1.FailurePolicyFail {
+				return err
+			} else {
+				klog.Errorf("ComponentSelector: %s failes to match,", selector)
 				continue
 			}
-			return err
 		}
 
-		if fieldEnvs, err := resolveFieldRefs(compRef.FieldRefs, referredComponent); err != nil {
+		if envs, err := resolveFieldRefs(compRef.FieldRefs, referredComponent); err != nil {
 			return err
-		} else if len(fieldEnvs) > 0 {
-			envs = append(envs, fieldEnvs...)
+		} else {
+			component.ComponentRefEnvs = append(component.ComponentRefEnvs, envs...)
 		}
 
-		if serviceEnvs, err := resolveServiceFieldRefs(compRef.ServiceRefs, cluster, referredComponent, referredComponentDef); err != nil {
+		if envs, err := resolveServiceFieldRefs(compRef.ServiceRefs, cluster, referredComponent, referredComponentDef); err != nil {
 			return err
-		} else if len(serviceEnvs) > 0 {
-			envs = append(envs, serviceEnvs...)
+		} else {
+			component.ComponentRefEnvs = append(component.ComponentRefEnvs, envs...)
 		}
-		if resourceEnvs, err := resolveResourceFieldRefs(compRef.ResourceFieldRefs, referredComponent); err != nil {
+
+		if envs, err := resolveHeadlessServiceFieldRefs(compRef.HeadlessServiceRefs, cluster, referredComponent, referredComponentDef); err != nil {
 			return err
-		} else if len(resourceEnvs) > 0 {
-			envs = append(envs, resourceEnvs...)
+		} else {
+			component.ComponentRefEnvs = append(component.ComponentRefEnvs, envs...)
+		}
+
+		if envs, err := resolveResourceFieldRefs(compRef.ResourceFieldRefs, referredComponent); err != nil {
+			return err
+		} else {
+			component.ComponentRefEnvs = append(component.ComponentRefEnvs, envs...)
 		}
 	}
-	component.ComponentRefEnvs = envs
 	return nil
 }
 
@@ -111,20 +118,72 @@ func resolveServiceFieldRefs(serviceRefs []*appsv1alpha1.ComponentServiceRef,
 
 	envs := make([]corev1.EnvVar, 0)
 	for _, svcref := range serviceRefs {
-		envNamePrefix := svcref.EnvNamePrefix
+		envNamePrefix := svcref.EnvName
 		serviceName := svcref.ServiceName
 		svcPort, err := getServicePort(referredComponentDef.Service, serviceName)
 		if err != nil {
 			return nil, err
 		}
-
 		// append component svc name
 		envs = append(envs, corev1.EnvVar{Name: envNamePrefix + "_NAME", Value: fmt.Sprintf("%s-%s", cluster.Name, referredComponent.Name)})
 		// append component svc port
 		envs = append(envs, corev1.EnvVar{Name: envNamePrefix + "_PORT", Value: strconv.Itoa(int(svcPort.Port))})
-		// append component subdomain
-		envs = append(envs, corev1.EnvVar{Name: envNamePrefix + "_DOMAIN_SUFFIX", Value: fmt.Sprintf("%s-%s-headless.%s.svc", cluster.Name,
-			referredComponent.Name, cluster.Namespace)})
+	}
+	return envs, nil
+}
+
+type headlessSvc struct {
+	Hostname string `json:"hostname"`
+	FQDN     string `json:"fqdn"`
+	Port     int32  `json:"port"`
+	Ordinal  int32  `json:"ordinal"`
+}
+
+func resolveHeadlessServiceFieldRefs(serviceRefs []*appsv1alpha1.ComponentHeadlessServiceRef,
+	cluster *appsv1alpha1.Cluster,
+	referredComponent *appsv1alpha1.ClusterComponentSpec,
+	referredComponentDef *appsv1alpha1.ClusterComponentDefinition) ([]corev1.EnvVar, error) {
+	if len(serviceRefs) == 0 {
+		return nil, nil
+	}
+
+	envs := make([]corev1.EnvVar, 0)
+	hosts := make([]string, 0)
+	for _, svcref := range serviceRefs {
+		envNamePrefix := svcref.EnvName
+		portName := svcref.PortName
+		containerName := svcref.ContainerName
+
+		port, err := getContainerPort(referredComponentDef, containerName, portName)
+		if err != nil {
+			return nil, err
+		}
+
+		for i := int32(0); i < referredComponent.Replicas; i++ {
+			if svcref.Top != nil && *svcref.Top != 0 && i >= *svcref.Top {
+				break
+			}
+
+			headlessSvc := headlessSvc{
+				Hostname: fmt.Sprintf("%s-%s-%d", cluster.Name, referredComponent.Name, i),
+				FQDN:     fmt.Sprintf("%s-%s-%d.%s-%s-headless.%s.svc", cluster.Name, referredComponent.Name, i, cluster.Name, referredComponent.Name, cluster.Namespace),
+				Port:     port.ContainerPort,
+				Ordinal:  i,
+			}
+
+			tmpl, err := template.New("headlessSvc").Parse(svcref.Format)
+			if err != nil {
+				return nil, err
+			}
+
+			var buf bytes.Buffer
+			if err = tmpl.Execute(&buf, headlessSvc); err != nil {
+				return nil, err
+			} else {
+				hosts = append(hosts, buf.String())
+			}
+		}
+		envs = append(envs, corev1.EnvVar{Name: envNamePrefix, Value: strings.Join(hosts, svcref.JoinWith)})
 	}
 	return envs, nil
 }
@@ -146,22 +205,7 @@ func resolveResourceFieldRefs(resourceFieldRefs []*appsv1alpha1.ComponentResourc
 	return envs, nil
 }
 
-func getReferredComponent(clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
-	selector appsv1alpha1.ComponentSelector) (*appsv1alpha1.ClusterComponentSpec, *appsv1alpha1.ClusterComponentDefinition, error) {
-	compName := selector.ComponentName
-	compDefName := selector.ComponentDefName
-	if len(compName) > 0 {
-		// get component by name
-		comp := cluster.Spec.GetComponentByName(compName)
-		if comp == nil {
-			return nil, nil, fmt.Errorf("component %s not found", compName)
-		}
-		if len(compDefName) > 0 && comp.ComponentDefRef != compDefName {
-			return nil, nil, fmt.Errorf("component %s componentDef %s not match", compName, compDefName)
-		}
-		return comp, clusterDef.GetComponentDefByName(comp.ComponentDefRef), nil
-	}
-
+func getReferredComponent(clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster, compDefName string) (*appsv1alpha1.ClusterComponentSpec, *appsv1alpha1.ClusterComponentDefinition, error) {
 	if len(compDefName) > 0 {
 		mapping := cluster.Spec.GetDefNameMappingComponents()
 		if comps, ok := mapping[compDefName]; ok {
@@ -188,19 +232,40 @@ func getServicePort(serviceSpec *appsv1alpha1.ServiceSpec, serviceName string) (
 	return nil, fmt.Errorf("service %s not found", serviceName)
 }
 
+func getContainerPort(referredComponentDef *appsv1alpha1.ClusterComponentDefinition,
+	containerName, portName string) (*corev1.ContainerPort, error) {
+	if referredComponentDef == nil {
+		return nil, fmt.Errorf("referredComponentDef is nil")
+	}
+	idx, container := intctrlutil.GetContainerByName(referredComponentDef.PodSpec.Containers, containerName)
+	if idx < 0 {
+		return nil, fmt.Errorf("container %s not found", containerName)
+	}
+	for _, port := range container.Ports {
+		if port.Name == portName {
+			return &port, nil
+		}
+	}
+	return nil, fmt.Errorf("port %s not found", portName)
+}
+
 // extractFieldPathAsString extracts fieldPath value from referredComponent
 func extractFieldPathAsString(object *appsv1alpha1.ClusterComponentSpec, fieldPath string) (string, error) {
-	switch fieldPath {
-	case "primaryIndex":
-		if object.PrimaryIndex == nil {
-			return "", fmt.Errorf("primaryIndex not set")
-		} else {
-			return strconv.Itoa(int(*object.PrimaryIndex)), nil
-		}
-	case "replicas":
-		return strconv.Itoa(int(object.Replicas)), nil
-	case "name":
-		return object.Name, nil
+	// get field value by fieldPath
+	value := reflect.ValueOf(*object).FieldByName(fieldPath)
+	if !value.IsValid() {
+		return "", fmt.Errorf("fieldPath %s not found", fieldPath)
 	}
-	return "", fmt.Errorf("fieldPath %s not supported", fieldPath)
+	switch value.Kind() {
+	case reflect.Bool:
+		return strconv.FormatBool(value.Bool()), nil
+	case reflect.String:
+		return value.String(), nil
+	case reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return strconv.Itoa(int(value.Int())), nil
+	case reflect.Float32, reflect.Float64:
+		return strconv.FormatFloat(value.Float(), 'f', -1, 64), nil
+	default:
+		return "", fmt.Errorf("fieldPath %s is not string, int32 or bool", fieldPath)
+	}
 }

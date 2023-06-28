@@ -84,7 +84,7 @@ type BackupStatus struct {
 	// +optional
 	BackupToolName string `json:"backupToolName,omitempty"`
 
-	// sourceCluster records the source cluster information for this backup. format is "UID[:8]-<clusterName>"
+	// sourceCluster records the source cluster information for this backup.
 	SourceCluster string `json:"sourceCluster,omitempty"`
 
 	// availableReplicas available replicas for statefulSet which created by backup.

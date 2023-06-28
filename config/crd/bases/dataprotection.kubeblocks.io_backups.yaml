@@ -186,7 +186,7 @@ spec:
                 type: string
               sourceCluster:
                 description: sourceCluster records the source cluster information
-                  for this backup. format is "UID[:8]-<clusterName>"
+                  for this backup.
                 type: string
               startTimestamp:
                 description: Date/time when the backup started being processed.

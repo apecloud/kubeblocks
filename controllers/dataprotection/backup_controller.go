@@ -792,7 +792,6 @@ func (r *BackupReconciler) getCluster(
 		return nil
 	}
 	cluster := &appsv1alpha1.Cluster{}
-	// cluster snapshot is optional, so we don't return error if it doesn't exist.
 	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
 		Namespace: targetPod.Namespace,
 		Name:      clusterName,

@@ -2,13 +2,15 @@ name: RELEASE-DELETE
 
 on:
   schedule:
-    - cron: '18 0 * * 1-5'
+    - cron: '0 17 * * 1-5'
   workflow_dispatch:
     inputs:
       release-version:
         description: 'The version of KubeBlocks release'
         required: true
         default: ''
+
+run-name: Delete Release:${{ inputs.release-version }}
 
 jobs:
   delete-release:
@@ -21,7 +23,7 @@ jobs:
 
   delete-release-schedule:
     if: github.event_name == 'schedule'
-    uses: apecloud/apecloud-cd/.github/workflows/release-delete-schedule.yml@v0.1.5
+    uses: apecloud/apecloud-cd/.github/workflows/release-delete-schedule.yml@v0.1.6
     with:
-      APECD_REF: "v0.1.5"
+      APECD_REF: "v0.1.6"
     secrets: inherit

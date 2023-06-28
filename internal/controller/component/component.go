@@ -76,23 +76,34 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
 ) (*SynthesizedComponent, error) {
 
-	//renderClusterTpl := func() {
-	//	if clusterTpl == nil {
-	//		return
-	//	}
-	//}
+	renderClusterTpl := func() {
+		if clusterCompSpec != nil {
+			return
+		}
+		if clusterTpl == nil || len(clusterTpl.Spec.ComponentSpecs) == 0 {
+			return
+		}
+		for _, compSpecTpl := range clusterTpl.Spec.ComponentSpecs {
+			if compSpecTpl.ComponentDefRef == clusterCompDef.Name {
+				clusterCompSpec = &compSpecTpl
+			}
+		}
+	}
 
 	// priority: cluster.spec.componentSpecs > simplified api (e.g. cluster.spec.storage etc.) > cluster template
 	fillClusterCompSpec := func() {
 		if clusterCompSpec != nil {
 			return
 		}
+		renderClusterTpl()
 		// fill simplified api only to first defined component
 		if len(clusterDef.Spec.ComponentDefs) == 0 ||
 			clusterDef.Spec.ComponentDefs[0].Name != clusterCompDef.Name {
 			return
 		}
-		clusterCompSpec = &appsv1alpha1.ClusterComponentSpec{}
+		if clusterCompSpec == nil {
+			clusterCompSpec = &appsv1alpha1.ClusterComponentSpec{}
+		}
 		clusterCompSpec.Replicas = cluster.Spec.Replicas
 		dataVolumeName := "data"
 		for _, v := range clusterCompDef.VolumeTypes {

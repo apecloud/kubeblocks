@@ -794,7 +794,7 @@ func (p *RestoreManager) cleanupClusterAnnotations() error {
 func (p *RestoreManager) buildRestoreJobName(jobName string) string {
 	l := len(jobName)
 	if l > 63 {
-		return fmt.Sprintf("%s-%s", jobName[:58], jobName[l-5:l])
+		return fmt.Sprintf("%s-%s", jobName[:57], jobName[l-5:l])
 	}
 	return jobName
 }

@@ -32,7 +32,7 @@ nebula:
     image: docker.io/vesoft/nebula-metad:v3.5.0
     ## @param nebula.metad.replicas, number of nebula-graph instances
     ## in a nebula-graph cluter, nebula-metad instances form a raft group
-    replicas: 1
+    replicas: 3
     ## @param nebula.metad.resources
     ## resource management
     ## more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
@@ -52,7 +52,7 @@ nebula:
     image: docker.io/vesoft/nebula-storaged:v3.5.0
     ## @param nebula.storaged.replicas, number of nebula-graph instances
     ## in a nebula-graph cluter, nebula-storaged instances form a raft group
-    replicas: 1
+    replicas: 3
     ## @param nebula.storaged.resources
     ## resource management
     ## more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/

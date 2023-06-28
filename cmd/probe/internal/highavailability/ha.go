@@ -64,6 +64,7 @@ func (ha *Ha) RunCycle() {
 				err := ha.dbManager.Premote()
 				if err != nil {
 					ha.logger.Infof("Take the leader failed: %v", err)
+					ha.dcs.ReleaseLock()
 				} else {
 					ha.logger.Infof("Take the leader success!")
 				}

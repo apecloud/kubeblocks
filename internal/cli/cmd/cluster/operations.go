@@ -47,6 +47,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
@@ -126,16 +127,15 @@ func newBaseOperationsOptions(f cmdutil.Factory, streams genericclioptions.IOStr
 }
 
 // addCommonFlags adds common flags for operations command
-func (o *OperationsOptions) addCommonFlags(cmd *cobra.Command) {
+func (o *OperationsOptions) addCommonFlags(cmd *cobra.Command, f cmdutil.Factory) {
 	// add print flags
 	printer.AddOutputFlagForCreate(cmd, &o.Format)
-
 	cmd.Flags().StringVar(&o.OpsRequestName, "name", "", "OpsRequest name. if not specified, it will be randomly generated ")
 	cmd.Flags().IntVar(&o.TTLSecondsAfterSucceed, "ttlSecondsAfterSucceed", 0, "Time to live after the OpsRequest succeed")
 	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 	if o.HasComponentNamesFlag {
-		cmd.Flags().StringSliceVar(&o.ComponentNames, "components", nil, "Component names to this operations")
+		flags.AddComponentsFlag(f, cmd, true, &o.ComponentNames, "Component names to this operations")
 	}
 }
 
@@ -517,7 +517,7 @@ func NewRestartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	o.addCommonFlags(cmd)
+	o.addCommonFlags(cmd, f)
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before restarting the cluster")
 	return cmd
 }
@@ -543,9 +543,10 @@ func NewUpgradeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	o.addCommonFlags(cmd)
+	o.addCommonFlags(cmd, f)
 	cmd.Flags().StringVar(&o.ClusterVersionRef, "cluster-version", "", "Reference cluster version (required)")
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before upgrading the cluster")
+	_ = cmd.MarkFlagRequired("cluster-version")
 	return cmd
 }
 
@@ -574,11 +575,12 @@ func NewVerticalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	o.addCommonFlags(cmd)
+	o.addCommonFlags(cmd, f)
 	cmd.Flags().StringVar(&o.CPU, "cpu", "", "Request and limit size of component cpu")
 	cmd.Flags().StringVar(&o.Memory, "memory", "", "Request and limit size of component memory")
 	cmd.Flags().StringVar(&o.Class, "class", "", "Component class")
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before vertically scaling the cluster")
+	_ = cmd.MarkFlagRequired("components")
 	return cmd
 }
 
@@ -605,10 +607,11 @@ func NewHorizontalScalingCmd(f cmdutil.Factory, streams genericclioptions.IOStre
 		},
 	}
 
-	o.addCommonFlags(cmd)
+	o.addCommonFlags(cmd, f)
 	cmd.Flags().IntVar(&o.Replicas, "replicas", o.Replicas, "Replicas with the specified components")
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before horizontally scaling the cluster")
 	_ = cmd.MarkFlagRequired("replicas")
+	_ = cmd.MarkFlagRequired("components")
 	return cmd
 }
 
@@ -634,10 +637,13 @@ func NewVolumeExpansionCmd(f cmdutil.Factory, streams genericclioptions.IOStream
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	o.addCommonFlags(cmd)
+	o.addCommonFlags(cmd, f)
 	cmd.Flags().StringSliceVarP(&o.VCTNames, "volume-claim-templates", "t", nil, "VolumeClaimTemplate names in components (required)")
 	cmd.Flags().StringVar(&o.Storage, "storage", "", "Volume storage size (required)")
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before expanding the cluster volume")
+	_ = cmd.MarkFlagRequired("volume-claim-templates")
+	_ = cmd.MarkFlagRequired("storage")
+	_ = cmd.MarkFlagRequired("components")
 	return cmd
 }
 
@@ -671,7 +677,7 @@ func NewExposeCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	o.addCommonFlags(cmd)
+	o.addCommonFlags(cmd, f)
 	cmd.Flags().StringVar(&o.ExposeType, "type", "", "Expose type, currently supported types are 'vpc', 'internet'")
 	cmd.Flags().StringVar(&o.ExposeEnabled, "enable", "", "Enable or disable the expose, values can be true or false")
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before exposing the cluster")
@@ -708,7 +714,7 @@ func NewStopCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	o.addCommonFlags(cmd)
+	o.addCommonFlags(cmd, f)
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before stopping the cluster")
 	return cmd
 }
@@ -735,7 +741,7 @@ func NewStartCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 			cmdutil.CheckErr(o.Run())
 		},
 	}
-	o.addCommonFlags(cmd)
+	o.addCommonFlags(cmd, f)
 	return cmd
 }
 
@@ -836,6 +842,6 @@ func NewPromoteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVar(&o.Component, "component", "", "Specify the component name of the cluster, if the cluster has multiple components, you need to specify a component")
 	cmd.Flags().StringVar(&o.Instance, "instance", "", "Specify the instance name as the new primary or leader of the cluster, you can get the instance name by running \"kbcli cluster list-instances\"")
 	cmd.Flags().BoolVar(&o.autoApprove, "auto-approve", false, "Skip interactive approval before promote the instance")
-	o.addCommonFlags(cmd)
+	o.addCommonFlags(cmd, f)
 	return cmd
 }

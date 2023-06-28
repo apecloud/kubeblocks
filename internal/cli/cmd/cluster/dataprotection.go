@@ -351,6 +351,7 @@ func NewDeleteBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		},
 	}
 	cmd.Flags().StringSliceVar(&o.Names, "name", []string{}, "Backup names")
+	_ = cmd.MarkFlagRequired("name")
 	o.AddFlags(cmd)
 	return cmd
 }
@@ -570,10 +571,9 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	}
 
 	cmd := &cobra.Command{
-		Use:               "restore",
-		Short:             "Restore a new cluster from backup.",
-		Example:           createRestoreExample,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Use:     "restore",
+		Short:   "Restore a new cluster from backup.",
+		Example: createRestoreExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
 			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)

@@ -156,6 +156,10 @@ spec:
                         description: Backup upload total size. A string with capacity
                           units in the form of "1Gi", "1Mi", "1Ki".
                         type: string
+                      volumeName:
+                        description: volumeName records volume name of backup data
+                          pvc.
+                        type: string
                     type: object
                   target:
                     description: target records the target cluster metadata string,
@@ -183,6 +187,7 @@ spec:
                 - Running
                 - Completed
                 - Failed
+                - Deleting
                 type: string
               sourceCluster:
                 description: sourceCluster records the source cluster information

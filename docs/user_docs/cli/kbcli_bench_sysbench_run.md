@@ -47,7 +47,6 @@ kbcli bench sysbench run [ClusterName] [flags]
       --context string                 The name of the kubeconfig context to use
       --database string                database name
       --disable-compression            If true, opt-out of response compression for all requests to the server
-      --driver string                  database driver
       --flag int                       the flag of sysbench, 0(normal), 1(long), 2(three nodes)
       --host string                    the host of database
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure

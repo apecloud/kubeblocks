@@ -63,6 +63,15 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 		if version != nil {
 			compVer = version.Spec.GetDefNameMappingComponents()[compSpec.ComponentDefRef]
 		}
+	} else {
+		compDef = definition.GetComponentDefByName(compName)
+		if compDef == nil {
+			return nil, fmt.Errorf("referenced component definition does not exist, cluster: %s, component: %s, component definition ref:%s",
+				cluster.Name, compSpec.Name, compSpec.ComponentDefRef)
+		}
+		if version != nil {
+			compVer = version.Spec.GetDefNameMappingComponents()[compName]
+		}
 	}
 
 	if compDef == nil {
@@ -72,6 +81,9 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 	synthesizedComp, err := composeSynthesizedComponent(reqCtx, cli, cluster, clusterTpl, definition, compDef, compSpec, compVer)
 	if err != nil {
 		return nil, err
+	}
+	if synthesizedComp == nil {
+		return nil, nil
 	}
 
 	switch compDef.WorkloadType {
@@ -96,7 +108,7 @@ func composeSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	compDef *appsv1alpha1.ClusterComponentDefinition,
 	compSpec *appsv1alpha1.ClusterComponentSpec,
 	compVer *appsv1alpha1.ClusterComponentVersion) (*component.SynthesizedComponent, error) {
-	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, cli, cluster, clusterTpl, clusterDef, compDef, compSpec, compVer)
+	synthesizedComp, err := component.BuildComponent(reqCtx, cluster, clusterTpl, clusterDef, compDef, compSpec, compVer)
 	if err != nil {
 		return nil, err
 	}

@@ -110,6 +110,9 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 		if err != nil {
 			return err
 		}
+		if comp == nil {
+			continue
+		}
 		if err := comp.Create(reqCtx, c.Client); err != nil {
 			return err
 		}

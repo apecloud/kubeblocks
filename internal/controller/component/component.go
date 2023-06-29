@@ -25,34 +25,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
-
-func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	clusterTpl *appsv1alpha1.Cluster,
-	clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterCompDef *appsv1alpha1.ClusterComponentDefinition,
-	clusterCompSpec *appsv1alpha1.ClusterComponentSpec,
-	clusterCompVers ...*appsv1alpha1.ClusterComponentVersion,
-) (*SynthesizedComponent, error) {
-	synthesizedComp, err := buildComponent(reqCtx, cluster, clusterTpl, clusterDef, clusterCompDef, clusterCompSpec, clusterCompVers...)
-	if err != nil {
-		return nil, err
-	}
-	/*
-		if err := buildRestoreInfoFromBackup(reqCtx, cli, cluster, synthesizedComp); err != nil {
-			return nil, err
-		}
-	*/
-	return synthesizedComp, nil
-}
 
 func BuildComponent(reqCtx intctrlutil.RequestCtx,
 	cluster *appsv1alpha1.Cluster,
@@ -103,6 +81,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		}
 		if clusterCompSpec == nil {
 			clusterCompSpec = &appsv1alpha1.ClusterComponentSpec{}
+			clusterCompSpec.Name = clusterCompDef.Name
 		}
 		clusterCompSpec.Replicas = cluster.Spec.Replicas
 		dataVolumeName := "data"
@@ -115,6 +94,9 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 			{
 				Name: dataVolumeName,
 				Spec: appsv1alpha1.PersistentVolumeClaimSpec{
+					AccessModes: []corev1.PersistentVolumeAccessMode{
+						corev1.ReadWriteOnce,
+					},
 					Resources: corev1.ResourceRequirements{
 						Requests: corev1.ResourceList{
 							"storage": cluster.Spec.Storage.Size,
@@ -126,6 +108,9 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 	}
 
 	fillClusterCompSpec()
+	if clusterCompSpec == nil {
+		return nil, nil
+	}
 
 	var err error
 	clusterCompDefObj := clusterCompDef.DeepCopy()

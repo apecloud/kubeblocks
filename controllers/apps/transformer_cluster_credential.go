@@ -21,11 +21,13 @@ package apps
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ClusterCredentialTransformer creates the connection credential secret
@@ -51,13 +53,21 @@ func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag
 		if compDef.Service == nil {
 			continue
 		}
+		reqCtx := intctrlutil.RequestCtx{
+			Ctx: transCtx.Context,
+			Log: log.Log.WithName("cluster"),
+		}
 		comps := compSpecMap[compDef.Name]
 		if len(comps) > 0 {
 			synthesizedComponent = &component.SynthesizedComponent{
 				Name: comps[0].Name,
-				Services: []corev1.Service{
-					{Spec: compDef.Service.ToSVCSpec()},
-				},
+			}
+		} else {
+			synthesizedComponent, err = component.BuildComponent(reqCtx, cluster, transCtx.ClusterTemplate, transCtx.ClusterDef, &compDef, nil)
+		}
+		if synthesizedComponent != nil {
+			synthesizedComponent.Services = []corev1.Service{
+				{Spec: compDef.Service.ToSVCSpec()},
 			}
 			break
 		}

@@ -196,7 +196,7 @@ func (r *BackupReconciler) handleBackupDeleting(reqCtx intctrlutil.RequestCtx, b
 	deleteBackup := func() error {
 		// remove backup finalizers to delete it
 		patch := client.MergeFrom(backup.DeepCopy())
-		backup.Finalizers = []string{}
+		controllerutil.RemoveFinalizer(backup, dataProtectionFinalizerName)
 		return r.Patch(reqCtx.Ctx, backup, patch)
 	}
 	// if deleteFileJob is nil, do not to delete backup files

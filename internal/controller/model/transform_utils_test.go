@@ -154,11 +154,11 @@ var _ = Describe("transform utils test", func() {
 				List(gomock.Any(), &corev1.PodList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *corev1.PodList, _ ...client.ListOption) error {
 					Expect(list).ShouldNot(BeNil())
-					list.Items=[]corev1.Pod{*obj0, *obj1, *obj2}
+					list.Items = []corev1.Pod{*obj0, *obj1, *obj2}
 					return nil
 				}).Times(1)
 			transCtx := &testTransCtx{
-				Context: context.Background(),
+				Context:     context.Background(),
 				GraphClient: NewGraphClient(k8sMock),
 			}
 			snapshot, err := ReadCacheSnapshot(transCtx, root, nil, &corev1.PodList{})
@@ -194,11 +194,11 @@ func (t *testTransCtx) GetClient() roclient.ReadonlyClient {
 }
 
 func (t *testTransCtx) GetRecorder() record.EventRecorder {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (t *testTransCtx) GetLogger() logr.Logger {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }

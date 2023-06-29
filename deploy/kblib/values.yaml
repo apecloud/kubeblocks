@@ -1,0 +1,24 @@
+# Common values for cluster charts
+
+## @param monitoring interval, 0 is no monitoring
+##
+monitoringInterval: 0
+
+## @param terminationPolicy
+terminationPolicy: Delete
+
+## @param availablePolicy
+##
+availabilityPolicy: none
+
+## @param tenancy dedicated or shared
+##
+tenancy: SharedNode
+
+## @param hostNetworkAccessible if true, expose the vpc service
+##
+hostNetworkAccessible: false
+
+## @param publiclyAccessible if true, expose the internet service
+##
+publiclyAccessible: false

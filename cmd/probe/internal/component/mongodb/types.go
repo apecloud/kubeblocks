@@ -37,7 +37,7 @@ type ConfigMembers []ConfigMember
 
 type RSConfig struct {
 	ID                                 string        `bson:"_id,omitempty" json:"_id,omitempty"`
-	Version                            *int          `bson:"version,omitempty" json:"version,omitempty"`
+	Version                            int           `bson:"version,omitempty" json:"version,omitempty"`
 	Members                            ConfigMembers `bson:"members" json:"members"`
 	Configsvr                          bool          `bson:"configsvr,omitempty" json:"configsvr,omitempty"`
 	ProtocolVersion                    int           `bson:"protocolVersion,omitempty" json:"protocolVersion,omitempty"`

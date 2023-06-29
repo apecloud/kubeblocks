@@ -307,6 +307,7 @@ func (mgr *Manager) Premote() error {
 		}
 	}
 
+	rsConfig.Version++
 	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
 }
 

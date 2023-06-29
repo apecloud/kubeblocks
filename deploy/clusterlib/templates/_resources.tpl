@@ -11,7 +11,7 @@ Define component resources, including cpu, memory and storage
 {{- if or (lt $memory 0.5) (gt $memory 1000.0) }}
 {{- fail (print "memory must be between 0.5 and 1000, got " $memory) }}
 {{- end }}
-{{- if or (lt $storage 10) (gt $storage 10000.0) }}
+{{- if or (lt $storage 10.0 ) (gt $storage 10000.0) }}
 {{- fail (print "storage must be between 10 and 1000, got " $storage) }}
 {{- end }}
 resources:

@@ -1,11 +1,11 @@
-{{- if .Values.replicas }}
-  {{- if and (eq .Values.mode "standalone") (gt (int .Values.replicas) 1) }}
+{{- if .Values.clusterlib.replicas }}
+  {{- if and (eq .Values.mode "standalone") (gt (int .Values.clusterlib.replicas) 1) }}
     {{ fail "ApeCloud MySQL cluster with standalone mode does not support running with more than one replica." }}
   {{- end }}
-  {{- if and (eq .Values.mode "raftGroup") (ne (mod (int .Values.replicas) 2) 1) }}
+  {{- if and (eq .Values.mode "raftGroup") (ne (mod (int .Values.clusterlib.replicas) 2) 1) }}
     {{ fail "ApeCloud MySQL cluster with raftGroup mode does not support running with even number replicas." }}
   {{- end }}
-  {{- if and (eq .Values.mode "replication") (lt (int .Values.replicas) 2) }}
+  {{- if and (eq .Values.mode "replication") (lt (int .Values.clusterlib.replicas) 2) }}
     {{ fail "ApeCloud MySQL cluster with replication mode does not support running with less than two replicas." }}
   {{- end }}
 {{- end }}

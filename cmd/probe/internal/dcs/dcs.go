@@ -1,5 +1,7 @@
 package dcs
 
+import "github.com/spf13/viper"
+
 type DCS interface {
 	Initialize() error
 
@@ -25,4 +27,8 @@ type DCS interface {
 	UpdateLock() error
 
 	GetLeader() (*Leader, error)
+}
+
+func init() {
+	viper.SetDefault("KB_TTL", 30)
 }

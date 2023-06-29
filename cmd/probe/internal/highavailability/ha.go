@@ -99,23 +99,18 @@ func (ha *Ha) RunCycle() {
 		if cluster.Switchover != nil {
 			break
 		}
+		// TODO: In the event that the database service and SQL channel both go down concurrently, eg. Pod deleted,
+		// there is no healthy leader node and the lock remains unreleased, attempt to acquire the leader lock.
+
 		if ok, _ := ha.dbManager.IsLeader(context.TODO()); ok {
-			ha.logger.Infof("leader changed, try to acquire lock")
-			if ha.dcs.AttempAcquireLock() == nil {
-				ha.dbManager.Premote()
-			}
+			ha.logger.Infof("I am the real leader, wait for lock released")
+			// if ha.dcs.AttempAcquireLock() == nil {
+			// 	ha.dbManager.Premote()
+			// }
 		} else {
 			// make sure sync source is leader when role changed
 			ha.dbManager.Demote()
 		}
-
-		// case cluster.SwitchOver != nil && cluster.SwitchOver.Leader == ha.dbManager.GetCurrentMemberName():
-		// 	logger.Infof("Cluster has no leader, attemp to take the leader")
-		// 	ha.dbManager.Demote()
-
-		// case cluster.SwitchOver != nil && cluster.SwitchOver.Candidate == ha.dbManager.GetCurrentMemberName():
-		// 	logger.Infof("Cluster has no leader, attemp to take the leader")
-		// 	ha.dbManager.Premote()
 	}
 }
 

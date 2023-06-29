@@ -8,6 +8,7 @@ import (
 
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,7 +78,7 @@ func (store *KubernetesStore) Initialize() error {
 	store.logger.Infof("k8s store initializing, create Ha ConfigMap: %s", haName)
 	configMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, haName, metav1.GetOptions{})
 	if configMap == nil || err != nil {
-		ttl := os.Getenv("KB_TTL")
+		ttl := viper.GetString("KB_TTL")
 		if _, err = store.clientset.CoreV1().ConfigMaps(store.namespace).Create(store.ctx, &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      haName,
@@ -212,7 +213,7 @@ func (store *KubernetesStore) CreateLock() error {
 	leaderName := store.currentMemberName
 	now := time.Now().Unix()
 	nowStr := strconv.FormatInt(now, 10)
-	ttl := os.Getenv("KB_TTL")
+	ttl := viper.GetString("KB_TTL")
 	isExist, err := store.IsLockExist()
 	if isExist || err != nil {
 		return err
@@ -259,7 +260,7 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 	}
 	ttl, err := strconv.Atoi(annotations["ttl"])
 	if err != nil {
-		ttl = 0
+		ttl = viper.GetInt("KB_TTL")
 	}
 	leader := annotations["leader"]
 
@@ -311,6 +312,8 @@ func (store *KubernetesStore) UpdateLock() error {
 	if annotations["leader"] != store.currentMemberName {
 		return errors.Errorf("lost lock")
 	}
+	ttl := store.cluster.HaConfig.ttl
+	annotations["ttl"] = strconv.Itoa(ttl)
 	annotations["renew-time"] = strconv.FormatInt(time.Now().Unix(), 10)
 	configMap.SetAnnotations(annotations)
 
@@ -340,7 +343,7 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 		}
 		return &HaConfig{
 			index:              "",
-			ttl:                0,
+			ttl:                viper.GetInt("KB_TTL"),
 			maxLagOnSwitchover: 1048576,
 		}, err
 	}
@@ -348,7 +351,7 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 	annotations := configmap.Annotations
 	ttl, err := strconv.Atoi(annotations["ttl"])
 	if err != nil {
-		ttl = 0
+		ttl = viper.GetInt("KB_TTL")
 	}
 	maxLagOnSwitchover, err := strconv.Atoi(annotations["MaxLagOnSwitchover"])
 	if err != nil {

@@ -1,1 +1,1 @@
-{{- include "cluster-libchart.rbac" . }}
+{{- include "kblib.rbac" . }}

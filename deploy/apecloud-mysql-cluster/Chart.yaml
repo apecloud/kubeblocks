@@ -13,6 +13,7 @@ version: 0.6.0-alpha.21
 appVersion: "8.0.30"
 
 dependencies:
-  - name: clusterlib
+  - name: kblib
     version: 0.1.0
-    repository: file://../clusterlib
+    repository: file://../kblib
+    alias: extra

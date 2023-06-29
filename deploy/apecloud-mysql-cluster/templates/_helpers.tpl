@@ -3,7 +3,7 @@ Define the cluster componnets with proxy.
 The proxy cpu cores is 1/6 of the cluster total cpu cores.
 */}}
 {{- define "apecloud-mysql-cluster.proxyComponents" }}
-{{- $proxyCPU := (int (ceil (div (mul .Values.clusterlib.replicas .Values.clusterlib.cpu) 6))) }}
+{{- $proxyCPU := (int (ceil (div (mul .Values.replicas .Values.cpu) 6))) }}
 {{- if lt $proxyCPU 2 }}
 {{- $proxyCPU = 2 }}
 {{- end }}
@@ -42,8 +42,8 @@ raftGroup mode: 3 or more
 {{- if eq .Values.mode "standalone" }}
 replicas: 1
 {{- else if eq .Values.mode "replication" }}
-replicas: {{ max .Values.clusterlib.replicas 2 }}
+replicas: {{ max .Values.replicas 2 }}
 {{- else }}
-replicas: {{ max .Values.clusterlib.replicas 3 }}
+replicas: {{ max .Values.replicas 3 }}
 {{- end }}
 {{- end -}}

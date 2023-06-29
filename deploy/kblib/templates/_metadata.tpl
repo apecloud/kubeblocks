@@ -2,7 +2,7 @@
 Define the cluster name.
 We truncate at 15 chars because KubeBlocks will concatenate the names of other resources with cluster name
 */}}
-{{- define "cluster-libchart.clusterName" }}
+{{- define "kblib.clusterName" }}
 {{- $name := .Release.Name }}
 {{- if not (regexMatch "^[a-z]([-a-z0-9]*[a-z0-9])?$" $name) }}
 {{ fail (printf "Release name %q is invalid. It must match the regex %q." $name "^[a-z]([-a-z0-9]*[a-z0-9])?$") }}
@@ -16,15 +16,15 @@ We truncate at 15 chars because KubeBlocks will concatenate the names of other r
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "cluster-libchart.chart" -}}
+{{- define "kblib.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Define cluster labels
 */}}
-{{- define "cluster-libchart.clusterLabels" -}}
-helm.sh/chart: {{ include "cluster-libchart.chart" . }}
+{{- define "kblib.clusterLabels" -}}
+helm.sh/chart: {{ include "kblib.chart" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-app.kubernetes.io/instance: {{ include "cluster-libchart.clusterName" . }}
+app.kubernetes.io/instance: {{ include "kblib.clusterName" . }}
 {{- end }}

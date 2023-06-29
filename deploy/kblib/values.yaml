@@ -1,20 +1,4 @@
-# Default values for cluster charts
-
-## @param replicas specify cluster replicas
-##
-replicas: 1
-
-## @param cpu
-##
-cpu: 0.5
-
-## @param memory, the unit is Gi
-##
-memory: 1
-
-## @param storage size, the unit is Gi
-##
-storage: 20
+# Common values for cluster charts
 
 ## @param monitoring interval, 0 is no monitoring
 ##

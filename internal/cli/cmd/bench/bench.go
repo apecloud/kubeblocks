@@ -34,6 +34,13 @@ var (
 )
 
 const (
+	all              = "all"
+	prepareOperation = "prepare"
+	runOperation     = "run"
+	cleanupOperation = "cleanup"
+)
+
+const (
 	CueSysBenchTemplateName = "bench_sysbench_template.cue"
 )
 
@@ -75,7 +82,6 @@ func (o *BenchBaseOptions) BaseValidate() error {
 }
 
 func (o *BenchBaseOptions) AddFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().StringVar(&o.Driver, "driver", "", "database driver")
 	cmd.PersistentFlags().StringVar(&o.Database, "database", "", "database name")
 	cmd.PersistentFlags().StringVar(&o.Host, "host", "", "the host of database")
 	cmd.PersistentFlags().StringVar(&o.User, "user", "", "the user of database")
@@ -93,6 +99,7 @@ func NewBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	// add subcommands
 	cmd.AddCommand(
 		NewSysBenchCmd(f, streams),
+		NewPgBenchCmd(f, streams),
 	)
 
 	return cmd

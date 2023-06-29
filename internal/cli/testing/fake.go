@@ -77,6 +77,7 @@ func GetRandomStr() string {
 
 func FakeCluster(name, namespace string, conditions ...metav1.Condition) *appsv1alpha1.Cluster {
 	var replicas int32 = 1
+
 	return &appsv1alpha1.Cluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       types.KindCluster,
@@ -85,6 +86,7 @@ func FakeCluster(name, namespace string, conditions ...metav1.Condition) *appsv1
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
+			UID:       "b262b889-a27f-42d8-b066-2978561c8167",
 		},
 		Status: appsv1alpha1.ClusterStatus{
 			Phase: appsv1alpha1.RunningClusterPhase,
@@ -408,6 +410,25 @@ func FakeBackup(backupName string) *dpv1alpha1.Backup {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      backupName,
 			Namespace: Namespace,
+		},
+	}
+	backup.SetCreationTimestamp(metav1.Now())
+	return backup
+}
+
+func FakeBackupWithCluster(cluster *appsv1alpha1.Cluster, backupName string) *dpv1alpha1.Backup {
+	backup := &dpv1alpha1.Backup{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
+			Kind:       types.KindBackup,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      backupName,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:              cluster.Name,
+				constant.DataProtectionLabelClusterUIDKey: string(cluster.UID),
+			},
 		},
 	}
 	backup.SetCreationTimestamp(metav1.Now())

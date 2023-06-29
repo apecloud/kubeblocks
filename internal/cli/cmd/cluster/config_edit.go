@@ -186,7 +186,7 @@ func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 			}))
 		},
 	}
-	o.buildReconfigureCommonFlags(cmd)
+	o.buildReconfigureCommonFlags(cmd, f)
 	cmd.Flags().BoolVar(&o.replaceFile, "replace", false, "Boolean flag to enable replacing config file. Default with false.")
 	return cmd
 }

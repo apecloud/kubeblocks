@@ -24,6 +24,9 @@ spec:
     - jsonPath: .status.phase
       name: STATUS
       type: string
+    - jsonPath: .status.sourceCluster
+      name: SOURCE-CLUSTER
+      type: string
     - jsonPath: .status.totalSize
       name: TOTAL-SIZE
       type: string
@@ -180,6 +183,10 @@ spec:
                 - Running
                 - Completed
                 - Failed
+                type: string
+              sourceCluster:
+                description: sourceCluster records the source cluster information
+                  for this backup.
                 type: string
               startTimestamp:
                 description: Date/time when the backup started being processed.

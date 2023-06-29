@@ -231,6 +231,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 
+	// add required
+	_ = cmd.MarkFlagRequired("cluster-definition")
 	// add updatable flags
 	o.UpdatableFlags.addFlags(cmd)
 
@@ -816,10 +818,8 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 	// true if the value is from environment variables
 	getVal := func(c *appsv1alpha1.ClusterComponentDefinition, key setKey, sets map[setKey]string) string {
 		// get value from set values
-		if sets != nil {
-			if v := sets[key]; len(v) > 0 {
-				return v
-			}
+		if v := sets[key]; len(v) > 0 {
+			return v
 		}
 
 		// HACK: if user does not set by command flag, for replicationSet workload,
@@ -877,10 +877,14 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 	}
 
 	var comps []*appsv1alpha1.ClusterComponentSpec
-	for _, c := range cd.Spec.ComponentDefs {
-		sets := map[setKey]string{}
-		if setsMap != nil {
-			sets = setsMap[c.Name]
+	for i, c := range cd.Spec.ComponentDefs {
+		sets := setsMap[c.Name]
+
+		// HACK: for apecloud-mysql cluster definition, if setsMap is empty, user
+		// does not specify any set, so we only build the first component.
+		// TODO(ldm): remove this hack and use helm chart to render the cluster.
+		if i > 0 && len(sets) == 0 && cd.Name == "apecloud-mysql" {
+			continue
 		}
 
 		// get replicas
@@ -950,13 +954,6 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 			return nil, err
 		}
 		comps = append(comps, compObj)
-
-		// HACK: for apecloud-mysql cluster definition, if setsMap is empty, user
-		// does not specify any set, so we only build the first component.
-		// TODO(ldm): remove this hack and use helm chart to render the cluster.
-		if len(setsMap) == 0 && cd.Name == "apecloud-mysql" {
-			break
-		}
 	}
 	return comps, nil
 }

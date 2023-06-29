@@ -84,6 +84,9 @@ type BackupStatus struct {
 	// +optional
 	BackupToolName string `json:"backupToolName,omitempty"`
 
+	// sourceCluster records the source cluster information for this backup.
+	SourceCluster string `json:"sourceCluster,omitempty"`
+
 	// availableReplicas available replicas for statefulSet which created by backup.
 	// +optional
 	AvailableReplicas *int32 `json:"availableReplicas,omitempty"`
@@ -164,6 +167,7 @@ type BackupToolManifestsStatus struct {
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
 // +kubebuilder:printcolumn:name="TYPE",type=string,JSONPath=`.spec.backupType`
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="SOURCE-CLUSTER",type=string,JSONPath=`.status.sourceCluster`
 // +kubebuilder:printcolumn:name="TOTAL-SIZE",type=string,JSONPath=`.status.totalSize`
 // +kubebuilder:printcolumn:name="DURATION",type=string,JSONPath=`.status.duration`
 // +kubebuilder:printcolumn:name="CREATE-TIME",type=string,JSONPath=".metadata.creationTimestamp"

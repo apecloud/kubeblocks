@@ -302,7 +302,8 @@ func (r *BackupReconciler) doNewPhaseAction(
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	}
 
-	if hasPatch, err := r.patchBackupLabelsAndAnnotations(reqCtx, backup, target); err != nil {
+	cluster := r.getCluster(reqCtx, target)
+	if hasPatch, err := r.patchBackupLabelsAndAnnotations(reqCtx, backup, target, cluster); err != nil {
 		return r.updateStatusIfFailed(reqCtx, backup, err)
 	} else if hasPatch {
 		return intctrlutil.Reconciled()
@@ -321,6 +322,9 @@ func (r *BackupReconciler) doNewPhaseAction(
 		}
 	}
 
+	if cluster != nil {
+		backup.Status.SourceCluster = cluster.Name
+	}
 	if err = r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -645,6 +649,9 @@ func (r *BackupReconciler) checkBackupIsCompletedDuringRunning(reqCtx intctrluti
 	patch := client.MergeFrom(backup.DeepCopy())
 	backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+	// round the duration to a multiple of seconds.
+	duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
+	backup.Status.Duration = &metav1.Duration{Duration: duration}
 	return backupPolicy, true, r.Client.Status().Patch(reqCtx.Ctx, backup, patch)
 }
 
@@ -776,20 +783,40 @@ func (r *BackupReconciler) updateStatusIfFailed(reqCtx intctrlutil.RequestCtx,
 	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 }
 
+// getCluster gets the cluster and will ignore the error.
+func (r *BackupReconciler) getCluster(
+	reqCtx intctrlutil.RequestCtx,
+	targetPod *corev1.Pod) *appsv1alpha1.Cluster {
+	clusterName := targetPod.Labels[constant.AppInstanceLabelKey]
+	if len(clusterName) == 0 {
+		return nil
+	}
+	cluster := &appsv1alpha1.Cluster{}
+	if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{
+		Namespace: targetPod.Namespace,
+		Name:      clusterName,
+	}, cluster); err != nil {
+		// should not affect the backup status
+		return nil
+	}
+	return cluster
+}
+
 // patchBackupLabelsAndAnnotations patches backup labels and the annotations include cluster snapshot.
 func (r *BackupReconciler) patchBackupLabelsAndAnnotations(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dataprotectionv1alpha1.Backup,
-	targetPod *corev1.Pod) (bool, error) {
-	oldBackup := backup.DeepCopy()
-	clusterName := targetPod.Labels[constant.AppInstanceLabelKey]
-	if len(clusterName) > 0 {
-		if err := r.setClusterSnapshotAnnotation(reqCtx, backup, types.NamespacedName{Name: clusterName, Namespace: backup.Namespace}); err != nil {
-			return false, err
-		}
-	}
+	targetPod *corev1.Pod,
+	cluster *appsv1alpha1.Cluster) (bool, error) {
 	if backup.Labels == nil {
 		backup.Labels = make(map[string]string)
+	}
+	oldBackup := backup.DeepCopy()
+	if cluster != nil {
+		if err := r.setClusterSnapshotAnnotation(backup, cluster); err != nil {
+			return false, err
+		}
+		backup.Labels[constant.DataProtectionLabelClusterUIDKey] = string(cluster.UID)
 	}
 	for _, v := range getClusterLabelKeys() {
 		backup.Labels[v] = targetPod.Labels[v]
@@ -1714,12 +1741,7 @@ func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 }
 
 // getClusterObjectString gets the cluster object and convert it to string.
-func (r *BackupReconciler) getClusterObjectString(reqCtx intctrlutil.RequestCtx, name types.NamespacedName) (*string, error) {
-	cluster := &appsv1alpha1.Cluster{}
-	// cluster snapshot is optional, so we don't return error if it doesn't exist.
-	if err := r.Client.Get(reqCtx.Ctx, name, cluster); err != nil {
-		return nil, nil
-	}
+func (r *BackupReconciler) getClusterObjectString(cluster *appsv1alpha1.Cluster) (*string, error) {
 	// maintain only the cluster's spec and name/namespace.
 	newCluster := &appsv1alpha1.Cluster{
 		Spec: cluster.Spec,
@@ -1738,8 +1760,8 @@ func (r *BackupReconciler) getClusterObjectString(reqCtx intctrlutil.RequestCtx,
 }
 
 // setClusterSnapshotAnnotation sets the snapshot of cluster to the backup's annotations.
-func (r *BackupReconciler) setClusterSnapshotAnnotation(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup, name types.NamespacedName) error {
-	clusterString, err := r.getClusterObjectString(reqCtx, name)
+func (r *BackupReconciler) setClusterSnapshotAnnotation(backup *dataprotectionv1alpha1.Backup, cluster *appsv1alpha1.Cluster) error {
+	clusterString, err := r.getClusterObjectString(cluster)
 	if err != nil {
 		return err
 	}

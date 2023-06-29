@@ -100,7 +100,7 @@ var _ = Describe("bench", func() {
 	It("test sysbench run", func() {
 		o := &SysBenchOptions{
 			BenchBaseOptions: BenchBaseOptions{
-				Driver:   "test",
+				Driver:   "mysql",
 				Database: "test",
 				Host:     "svc-1",
 				Port:     3306,
@@ -113,9 +113,39 @@ var _ = Describe("bench", func() {
 			Size:      100,
 			Times:     1,
 			factory:   tf,
+			namespace: namespace,
 			IOStreams: streams,
 		}
-		Expect(o.Complete([]string{clusterName})).Should(BeNil())
+		o.dynamic, _ = tf.DynamicClient()
+		o.client, _ = tf.KubernetesClientSet()
+		Expect(o.Validate()).Should(BeNil())
+		Expect(o.Run()).Should(BeNil())
+	})
+
+	It("pgbench command", func() {
+		cmd := NewPgBenchCmd(tf, streams)
+		Expect(cmd != nil).Should(BeTrue())
+		Expect(cmd.HasSubCommands()).Should(BeTrue())
+	})
+
+	It("test pgbench run", func() {
+		o := &PgBenchOptions{
+			BenchBaseOptions: BenchBaseOptions{
+				Driver:   pgBenchDriver,
+				Database: "test",
+				Host:     "svc-1",
+				Port:     3306,
+				User:     "test",
+				Password: "test",
+			},
+			Mode:      "prepare",
+			Scale:     100,
+			factory:   tf,
+			namespace: namespace,
+			IOStreams: streams,
+		}
+		o.dynamic, _ = tf.DynamicClient()
+		o.client, _ = tf.KubernetesClientSet()
 		Expect(o.Validate()).Should(BeNil())
 		Expect(o.Run()).Should(BeNil())
 	})

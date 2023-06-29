@@ -75,7 +75,12 @@ spec:
             - -h$(KB_CONSENSUS_LEADER_POD_FQDN)
             - -u$(MYSQL_ROOT_USER)
             - -p$(MYSQL_ROOT_PASSWORD)
-            - -e "call dbms_consensus.change_leader('$(KB_SWITCHOVER_CANDIDATE_FQDN):13306');"
+            - -e
+            - "call dbms_consensus.change_leader('$(KB_SWITCHOVER_CANDIDATE_FQDN):13306');"
+        withoutCandidate:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+          command:
+            - /scripts/switchover-without-candidate.sh
       volumeTypes:
         - name: data
           type: data

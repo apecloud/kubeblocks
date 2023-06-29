@@ -244,19 +244,6 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	return cmd
 }
 
-// getClusterNameMap get cluster list by namespace and convert to map.
-func getClusterNameMap(dClient dynamic.Interface, o *list.ListOptions) (map[string]struct{}, error) {
-	clusterList, err := dClient.Resource(types.ClusterGVR()).Namespace(o.Namespace).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	clusterMap := make(map[string]struct{})
-	for _, v := range clusterList.Items {
-		clusterMap[v.GetName()] = struct{}{}
-	}
-	return clusterMap, nil
-}
-
 func printBackupList(o ListBackupOptions) error {
 	dynamic, err := o.Factory.DynamicClient()
 	if err != nil {

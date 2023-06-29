@@ -570,9 +570,18 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 }
 
 const (
-	saNamePrefix          = "kb-sa-"
-	roleNamePrefix        = "kb-role-"
-	roleBindingNamePrefix = "kb-rolebinding-"
+	saNamePrefix                 = "kb-sa-"
+	roleNamePrefix               = "kb-role-"
+	roleBindingNamePrefix        = "kb-rolebinding-"
+	clusterRoleNamePrefix        = "kb-clusterrole-"
+	clusterRoleBindingNamePrefix = "kb-clusterrolebinding-"
+)
+
+var (
+	saKind              = "ServiceAccount"
+	rbacRoleKind        = "Role"
+	rbacClusterRoleKind = "ClusterRole"
+	rbacAPIGroup        = "rbac.authorization.k8s.io"
 )
 
 // buildDependenciesFn creates dependencies function for components, e.g. postgresql depends on
@@ -657,9 +666,6 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 	}
 
 	// create role binding
-	rbacAPIGroup := "rbac.authorization.k8s.io"
-	rbacKind := "Role"
-	saKind := "ServiceAccount"
 	roleBinding := rbacv1ac.RoleBinding(roleBindingName, o.Namespace).WithLabels(labels).
 		WithSubjects([]*rbacv1ac.SubjectApplyConfiguration{
 			{
@@ -670,11 +676,51 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 		}...).
 		WithRoleRef(&rbacv1ac.RoleRefApplyConfiguration{
 			APIGroup: &rbacAPIGroup,
-			Kind:     &rbacKind,
+			Kind:     &rbacRoleKind,
 			Name:     &roleName,
 		})
 	klog.V(1).Infof("create role binding %s", roleBindingName)
-	_, err := o.Client.RbacV1().RoleBindings(o.Namespace).Apply(context.TODO(), roleBinding, applyOptions)
+	if _, err := o.Client.RbacV1().RoleBindings(o.Namespace).Apply(context.TODO(), roleBinding, applyOptions); err != nil {
+		return err
+	}
+
+	return o.createClusterRoleAndBinding(saName, labels, applyOptions)
+}
+
+func (o *CreateOptions) createClusterRoleAndBinding(saName string, labels map[string]string, opts metav1.ApplyOptions) error {
+	var (
+		clusterRoleName        = clusterRoleNamePrefix + o.Name
+		clusterRoleBindingName = clusterRoleBindingNamePrefix + o.Name
+	)
+	// create cluster role
+	klog.V(1).Infof("create cluster role %s", clusterRoleName)
+	clusterRole := rbacv1ac.ClusterRole(clusterRoleName).WithRules([]*rbacv1ac.PolicyRuleApplyConfiguration{
+		{
+			APIGroups: []string{""},
+			Resources: []string{"nodes", "nodes/stats"},
+			Verbs:     []string{"get", "list"},
+		},
+	}...).WithLabels(labels)
+	if _, err := o.Client.RbacV1().ClusterRoles().Apply(context.TODO(), clusterRole, opts); err != nil {
+		return err
+	}
+
+	// create cluster role binding
+	clusterRoleBinding := rbacv1ac.ClusterRoleBinding(clusterRoleBindingName).WithLabels(labels).
+		WithSubjects([]*rbacv1ac.SubjectApplyConfiguration{
+			{
+				Kind:      &saKind,
+				Name:      &saName,
+				Namespace: &o.Namespace,
+			},
+		}...).
+		WithRoleRef(&rbacv1ac.RoleRefApplyConfiguration{
+			APIGroup: &rbacAPIGroup,
+			Kind:     &rbacClusterRoleKind,
+			Name:     &clusterRoleName,
+		})
+	klog.V(1).Infof("create cluster role binding %s", clusterRoleBindingName)
+	_, err := o.Client.RbacV1().ClusterRoleBindings().Apply(context.TODO(), clusterRoleBinding, opts)
 	return err
 }
 

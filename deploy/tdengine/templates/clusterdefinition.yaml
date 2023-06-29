@@ -84,6 +84,16 @@ spec:
               postStart:
                 exec:
                   command: ["/bin/sh", "-c", "/scripts/taos-adapter-check.sh"]
+            readinessProbe:
+              tcpSocket:
+                port: 6030
+              initialDelaySeconds: 5
+              timeoutSeconds: 60
+            livenessProbe:
+              tcpSocket:
+                port: 6030
+              initialDelaySeconds: 15
+              periodSeconds: 20
             volumeMounts:
               - name: taos-config
                 mountPath: /etc/taos

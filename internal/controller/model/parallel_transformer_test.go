@@ -17,46 +17,44 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm
+package model
 
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
-var _ = Describe("init transformer test.", func() {
-	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
-			SetUID(uid).
-			SetReplicas(3).
-			GetObject()
-
-		transCtx = &rsmTransformContext{
-			Context:       ctx,
-			Client:        graphCli,
-			EventRecorder: nil,
-			Logger:        logger,
-		}
-
-		dag = graph.NewDAG()
-		transformer = &initTransformer{ReplicatedStateMachine: rsm}
-	})
-
-	Context("dag init", func() {
+var _ = Describe("parallel transformer test", func() {
+	Context("Transform function", func() {
 		It("should work well", func() {
-			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-			dagExpected := graph.NewDAG()
-			root := &model.ObjectVertex{
-				Obj:    rsm,
-				OriObj: rsm.DeepCopy(),
-				Action: model.ActionPtr(model.STATUS),
+			id1, id2 := 1, 2
+			transformer := &ParallelTransformer{
+				Transformers: []graph.Transformer{
+					&testTransformer{id: id1},
+					&testTransformer{id: id2},
+				},
 			}
-			dagExpected.AddVertex(root)
-			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
+			dag := graph.NewDAG()
+			Expect(transformer.Transform(nil, dag)).Should(Succeed())
+			dag.Connect(id1, id2)
+			dagExpected := graph.NewDAG()
+			dagExpected.AddVertex(id1)
+			dagExpected.AddVertex(id2)
+			dagExpected.Connect(id1, id2)
+			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 		})
 	})
 })
+
+type testTransformer struct {
+	id int
+}
+
+var _ graph.Transformer = &testTransformer{}
+
+func (t *testTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	dag.AddVertex(t.id)
+	return nil
+}

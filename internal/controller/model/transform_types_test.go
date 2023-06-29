@@ -17,46 +17,28 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package rsm
+package model
 
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
-var _ = Describe("init transformer test.", func() {
-	BeforeEach(func() {
-		rsm = builder.NewReplicatedStateMachineBuilder(namespace, name).
-			SetUID(uid).
-			SetReplicas(3).
-			GetObject()
+var _ = Describe("transform types test", func() {
+	const (
+		namespace = "foo"
+		name      = "bar"
+	)
 
-		transCtx = &rsmTransformContext{
-			Context:       ctx,
-			Client:        graphCli,
-			EventRecorder: nil,
-			Logger:        logger,
-		}
-
-		dag = graph.NewDAG()
-		transformer = &initTransformer{ReplicatedStateMachine: rsm}
-	})
-
-	Context("dag init", func() {
+	Context("FindX function", func() {
 		It("should work well", func() {
-			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
-			dagExpected := graph.NewDAG()
-			root := &model.ObjectVertex{
-				Obj:    rsm,
-				OriObj: rsm.DeepCopy(),
-				Action: model.ActionPtr(model.STATUS),
-			}
-			dagExpected.AddVertex(root)
-			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
+			root := builder.NewStatefulSetBuilder(namespace, name).GetObject()
+			vertex := &ObjectVertex{Obj: root}
+			Expect(vertex.String()).Should(Equal("{obj:*v1.StatefulSet, name: bar, immutable: false, orphan: false, action: nil}"))
+			vertex.Action = ActionPtr(CREATE)
+			Expect(vertex.String()).Should(Equal("{obj:*v1.StatefulSet, name: bar, immutable: false, orphan: false, action: CREATE}"))
 		})
 	})
 })

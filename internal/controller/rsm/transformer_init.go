@@ -35,8 +35,9 @@ func (t *initTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	// init context
 	transCtx, _ := ctx.(*rsmTransformContext)
 	transCtx.rsm, transCtx.rsmOrig = t.ReplicatedStateMachine, t.ReplicatedStateMachine.DeepCopy()
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 
 	// init dag
-	model.PrepareStatus(dag, transCtx.rsmOrig, transCtx.rsm)
+	graphCli.Root(dag, transCtx.rsmOrig, transCtx.rsm)
 	return nil
 }

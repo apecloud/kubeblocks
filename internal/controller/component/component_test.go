@@ -204,6 +204,7 @@ spec:
 				&clusterDef.Spec.ComponentDefs[1],
 				nil,
 				&clusterVersion.Spec.ComponentVersions[0])
+			Expect(err).Should(Succeed())
 			Expect(component.Name).Should(Equal("vtgate"))
 			Expect(component.ComponentDef).Should(Equal("proxy"))
 		})

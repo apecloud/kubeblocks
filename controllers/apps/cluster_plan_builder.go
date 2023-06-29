@@ -139,7 +139,9 @@ func (c *clusterPlanBuilder) renderClusterTemplate() error {
 	}
 	var buf strings.Builder
 	t := template.Must(template.New("clusterTpl").Parse(tplStr))
-	t.Execute(&buf, args)
+	if err := t.Execute(&buf, args); err != nil {
+		return err
+	}
 	clusterStr := buf.String()
 	// render template
 	if err := yaml.Unmarshal([]byte(clusterStr), &clusterTpl); err != nil {

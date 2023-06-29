@@ -64,6 +64,9 @@ func (c *ClusterCredentialTransformer) Transform(ctx graph.TransformContext, dag
 			}
 		} else {
 			synthesizedComponent, err = component.BuildComponent(reqCtx, cluster, transCtx.ClusterTemplate, transCtx.ClusterDef, &compDef, nil)
+			if err != nil {
+				return err
+			}
 		}
 		if synthesizedComponent != nil {
 			synthesizedComponent.Services = []corev1.Service{

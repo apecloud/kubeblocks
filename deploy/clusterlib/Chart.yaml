@@ -1,5 +1,5 @@
 apiVersion: v2
-name: cluster-libchart
+name: clusterlib
 description: A Library Helm chart for KubeBlocks Cluster
 type: library
 version: 0.1.0

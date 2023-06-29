@@ -36,6 +36,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	statsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
@@ -215,39 +216,33 @@ func (o *operationVolumeProtection) checkUsage(ctx context.Context) (string, err
 		}
 	}
 
-	var msg string
+	msg := o.buildEventMsg()
 	readonly := o.Readonly
 	// the instance is running normally and there have volume(s) over the space usage threshold.
 	if !readonly && len(higher) > 0 {
-		msg = o.buildEventMsg(higher)
 		if err := o.highWatermark(ctx, msg); err != nil {
 			return "", err
 		}
 	}
 	// the instance is protected in RO mode, and all volumes' space usage are under the threshold.
 	if readonly && len(lower) == len(o.VolumeStats) {
-		msg = o.buildEventMsg(lower)
 		if err := o.lowWatermark(ctx, msg); err != nil {
 			return "", err
 		}
-	}
-
-	if len(msg) == 0 {
-		msg = o.buildEventMsg(o.VolumeProtectionSpec.Volumes)
 	}
 	return msg, nil
 }
 
 func (o *operationVolumeProtection) checkVolumeWatermark(stats statsv1alpha1.VolumeStats) int {
-	if stats.AvailableBytes == nil || stats.UsedBytes == nil {
+	if stats.CapacityBytes == nil || stats.UsedBytes == nil {
 		return 0
 	}
 
-	lowThresholdBytes := *stats.AvailableBytes / 100 * uint64(o.VolumeProtectionSpec.LowWatermark)
+	lowThresholdBytes := *stats.CapacityBytes / 100 * uint64(o.VolumeProtectionSpec.LowWatermark)
 	if *stats.UsedBytes < lowThresholdBytes {
 		return -1
 	}
-	highThresholdBytes := *stats.AvailableBytes / 100 * uint64(o.VolumeProtectionSpec.HighWatermark)
+	highThresholdBytes := *stats.CapacityBytes / 100 * uint64(o.VolumeProtectionSpec.HighWatermark)
 	if *stats.UsedBytes > highThresholdBytes {
 		return 1
 	}
@@ -296,14 +291,17 @@ func (o *operationVolumeProtection) unlockInstance(ctx context.Context) error {
 	return o.BaseOperation.UnlockInstance(ctx)
 }
 
-func (o *operationVolumeProtection) buildEventMsg(volumes []string) string {
-	usages := make(map[string]string)
-	for _, v := range volumes {
+func (o *operationVolumeProtection) buildEventMsg() string {
+	usages := map[string]string{
+		"lowWatermark":  fmt.Sprintf("%d", o.VolumeProtectionSpec.LowWatermark),
+		"highWatermark": fmt.Sprintf("%d", o.VolumeProtectionSpec.HighWatermark),
+	}
+	for _, v := range o.VolumeProtectionSpec.Volumes {
 		stats := o.VolumeStats[v]
-		if stats.UsedBytes != nil && stats.AvailableBytes != nil {
-			usages[v] = fmt.Sprintf("%d%%", int(*stats.UsedBytes*100 / *stats.AvailableBytes))
-		} else {
+		if stats.UsedBytes == nil || stats.CapacityBytes == nil {
 			usages[v] = "<nil>"
+		} else {
+			usages[v] = fmt.Sprintf("%d%%", int(*stats.UsedBytes*100 / *stats.CapacityBytes))
 		}
 	}
 	msg, _ := json.Marshal(usages)
@@ -316,8 +314,10 @@ func (o *operationVolumeProtection) sendEvent(ctx context.Context, reason, msg s
 
 func (o *operationVolumeProtection) createEvent(reason, msg string) *corev1.Event {
 	return &corev1.Event{
-		//Name: "",
-		//Namespace: ","
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s.%s", os.Getenv(envPodName), rand.String(16)),
+			Namespace: os.Getenv(envNamespace),
+		},
 		InvolvedObject: corev1.ObjectReference{
 			Kind:      "Pod",
 			Namespace: os.Getenv(envNamespace),

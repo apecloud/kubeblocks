@@ -65,10 +65,6 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 		}
 	} else {
 		compDef = definition.GetComponentDefByName(compName)
-		if compDef == nil {
-			return nil, fmt.Errorf("referenced component definition does not exist, cluster: %s, component: %s, component definition ref:%s",
-				cluster.Name, compSpec.Name, compSpec.ComponentDefRef)
-		}
 		if version != nil {
 			compVer = version.Spec.GetDefNameMappingComponents()[compName]
 		}

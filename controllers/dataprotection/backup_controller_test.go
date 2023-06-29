@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -80,13 +81,14 @@ var _ = Describe("Backup Controller test", func() {
 	}
 	var nodeName string
 	var pvcName string
+	var cluster *appsv1alpha1.Cluster
 
 	BeforeEach(func() {
 		cleanEnv()
 		viper.Set(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 		By("mock a cluster")
-		testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			"test-cd", "test-cv").Create(&testCtx)
+		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			"test-cd", "test-cv").Create(&testCtx).GetObject()
 		podGenerateName := clusterName + "-" + componentName
 		By("By mocking a storage class")
 		_ = testapps.CreateStorageClass(&testCtx, storageClassName, true)
@@ -187,6 +189,8 @@ var _ = Describe("Backup Controller test", func() {
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					g.Expect(fetched.Status.SourceCluster).Should(Equal(clusterName))
+					g.Expect(fetched.Labels[constant.DataProtectionLabelClusterUIDKey]).Should(Equal(string(cluster.UID)))
 					g.Expect(fetched.Labels[constant.AppInstanceLabelKey]).Should(Equal(clusterName))
 					g.Expect(fetched.Labels[constant.KBAppComponentLabelKey]).Should(Equal(componentName))
 					g.Expect(fetched.Annotations[constant.ClusterSnapshotAnnotationKey]).ShouldNot(BeEmpty())

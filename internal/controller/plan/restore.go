@@ -163,8 +163,8 @@ func DoPITR(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluste
 		}
 		jobs = append(jobs, dataFilejobs...)
 	}
-
-	logfileBackup, err := pitrMgr.getLogfileBackup(component.Name)
+	sourceClusterUID := baseBackup.Labels[constant.DataProtectionLabelClusterUIDKey]
+	logfileBackup, err := pitrMgr.getLogfileBackup(component.Name, sourceClusterUID)
 	if err != nil {
 		return err
 	}
@@ -175,7 +175,7 @@ func DoPITR(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluste
 	}
 	pitrJobs := make([]client.Object, 0)
 	if len(recoveryInfo.Physical.RestoreCommands) != 0 {
-		pitrJobs, err = pitrMgr.buildPITRPhysicalRestoreJob(component, recoveryInfo)
+		pitrJobs, err = pitrMgr.buildPITRPhysicalRestoreJob(component, recoveryInfo, logfileBackup)
 		if err != nil {
 			return err
 		}
@@ -226,12 +226,8 @@ func (p *RestoreManager) listCompletedBackups(componentName string) (backupItems
 	return backupItems, nil
 }
 
-// getSortedBackups sorts by StopTime
-func (p *RestoreManager) getSortedBackups(componentName string, reverse bool) ([]dpv1alpha1.Backup, error) {
-	backups, err := p.listCompletedBackups(componentName)
-	if err != nil {
-		return backups, err
-	}
+// sortBackups sorts by StopTime
+func (p *RestoreManager) sortBackups(backups []dpv1alpha1.Backup, reverse bool) []dpv1alpha1.Backup {
 	sort.Slice(backups, func(i, j int) bool {
 		if reverse {
 			i, j = j, i
@@ -247,16 +243,17 @@ func (p *RestoreManager) getSortedBackups(componentName string, reverse bool) ([
 		}
 		return backups[i].Status.Manifests.BackupLog.StopTime.Before(backups[j].Status.Manifests.BackupLog.StopTime)
 	})
-	return backups, nil
+	return backups
 }
 
 // getLatestBaseBackup gets the latest baseBackup
 func (p *RestoreManager) getLatestBaseBackup(componentName string) (*dpv1alpha1.Backup, error) {
 	// 1. sorts reverse backups
-	backups, err := p.getSortedBackups(componentName, true)
+	backups, err := p.listCompletedBackups(componentName)
 	if err != nil {
 		return nil, err
 	}
+	backups = p.sortBackups(backups, true)
 
 	// 2. gets the latest backup object
 	var latestBackup *dpv1alpha1.Backup
@@ -332,7 +329,7 @@ func (p *RestoreManager) getRecoveryInfo(baseBackup, logfileBackup *dpv1alpha1.B
 		backupDIR = logfileBackup.Status.Manifests.BackupTool.FilePath
 	}
 	headEnv := []corev1.EnvVar{
-		{Name: constant.DPBackupDIR, Value: backupVolumePATH + "/" + backupDIR},
+		{Name: constant.DPBackupDIR, Value: backupVolumePATH + backupDIR},
 		{Name: constant.DPBackupName, Value: logfileBackup.Name},
 	}
 	// build env of recovery time
@@ -371,9 +368,9 @@ func (p *RestoreManager) getRecoveryInfo(baseBackup, logfileBackup *dpv1alpha1.B
 	return spec, nil
 }
 
-func (p *RestoreManager) getLogfileBackup(componentName string) (*dpv1alpha1.Backup, error) {
-	incrementalBackupList := dpv1alpha1.BackupList{}
-	if err := p.Client.List(p.Ctx, &incrementalBackupList,
+func (p *RestoreManager) getLogfileBackup(componentName string, sourceClusterUID string) (*dpv1alpha1.Backup, error) {
+	logfileBackupList := dpv1alpha1.BackupList{}
+	if err := p.Client.List(p.Ctx, &logfileBackupList,
 		client.MatchingLabels{
 			constant.AppInstanceLabelKey:    p.sourceCluster,
 			constant.KBAppComponentLabelKey: componentName,
@@ -381,17 +378,21 @@ func (p *RestoreManager) getLogfileBackup(componentName string) (*dpv1alpha1.Bac
 		}); err != nil {
 		return nil, err
 	}
-	if len(incrementalBackupList.Items) == 0 {
+	if len(logfileBackupList.Items) == 0 {
 		return nil, errors.New("not found logfile backups")
 	}
-	return &incrementalBackupList.Items[0], nil
+	backups := p.sortBackups(logfileBackupList.Items, true)
+	for _, v := range backups {
+		// filter backups with cluster uid for excluding same cluster name
+		if v.Labels[constant.DataProtectionLabelClusterUIDKey] == sourceClusterUID {
+			return &v, nil
+		}
+	}
+	// TODO: return an error if logfile backup is not found after v0.7.0, return the first logfile for compatibility with version v0.5.0.
+	return &logfileBackupList.Items[0], nil
 }
 
-func (p *RestoreManager) getLogfilePVC(componentName string) (*corev1.PersistentVolumeClaim, error) {
-	logfileBackup, err := p.getLogfileBackup(componentName)
-	if err != nil {
-		return nil, err
-	}
+func (p *RestoreManager) getLogfilePVC(logfileBackup *dpv1alpha1.Backup) (*corev1.PersistentVolumeClaim, error) {
 	pvcKey := types.NamespacedName{
 		Name:      logfileBackup.Status.PersistentVolumeClaimName,
 		Namespace: logfileBackup.Namespace,
@@ -608,7 +609,8 @@ func (p *RestoreManager) buildDatafileRestoreJob(synthesizedComponent *component
 }
 
 func (p *RestoreManager) buildPITRPhysicalRestoreJob(synthesizedComponent *component.SynthesizedComponent,
-	recoveryInfo *dpv1alpha1.BackupToolSpec) (objs []client.Object, err error) {
+	recoveryInfo *dpv1alpha1.BackupToolSpec,
+	logfileBackup *dpv1alpha1.Backup) (objs []client.Object, err error) {
 	commonLabels := map[string]string{
 		constant.AppManagedByLabelKey:   constant.AppName,
 		constant.AppInstanceLabelKey:    p.Cluster.Name,
@@ -627,7 +629,7 @@ func (p *RestoreManager) buildPITRPhysicalRestoreJob(synthesizedComponent *compo
 	if image == "" {
 		image = synthesizedComponent.PodSpec.Containers[0].Image
 	}
-	logfilePVC, err := p.getLogfilePVC(synthesizedComponent.Name)
+	logfilePVC, err := p.getLogfilePVC(logfileBackup)
 	if err != nil {
 		return objs, err
 	}

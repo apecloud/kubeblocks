@@ -124,19 +124,18 @@ func processContainersInjection(reqCtx intctrlutil.RequestCtx,
 func injectZeroResourcesLimitsIfEmpty(c *corev1.Container) {
 	zeroValue := resource.MustParse("0")
 	if c.Resources.Limits == nil {
-		c.Resources.Limits = corev1.ResourceList{
-			corev1.ResourceCPU:    zeroValue,
-			corev1.ResourceMemory: zeroValue,
-		}
-		return
+		c.Resources.Limits = corev1.ResourceList{}
 	}
 
-	if _, ok := c.Resources.Limits[corev1.ResourceCPU]; !ok {
-		c.Resources.Limits[corev1.ResourceCPU] = zeroValue
+	safeSetLimitValue := func(name corev1.ResourceName) {
+		if _, ok := c.Resources.Requests[name]; !ok {
+			if _, ok = c.Resources.Limits[name]; !ok {
+				c.Resources.Limits[name] = zeroValue
+			}
+		}
 	}
-	if _, ok := c.Resources.Limits[corev1.ResourceMemory]; !ok {
-		c.Resources.Limits[corev1.ResourceMemory] = zeroValue
-	}
+	safeSetLimitValue(corev1.ResourceCPU)
+	safeSetLimitValue(corev1.ResourceMemory)
 }
 
 func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string, c *corev1.Container) error {

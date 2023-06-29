@@ -21,16 +21,27 @@ package controllerutil
 
 import (
 	"context"
+	"testing"
 
-	"github.com/go-logr/logr"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// RequestCtx wrapper for reconcile procedure context parameters
-type RequestCtx struct {
-	Ctx      context.Context
-	Req      ctrl.Request
-	Log      logr.Logger
-	Recorder record.EventRecorder
+func TestGetUncachedObjects(t *testing.T) {
+	GetUncachedObjects()
+}
+
+func TestRequestCtxMisc(t *testing.T) {
+	itFuncs := func(reqCtx *RequestCtx) {
+		reqCtx.Event(nil, "type", "reason", "msg")
+		reqCtx.Eventf(nil, "type", "reason", "%s", "arg")
+		if reqCtx != nil {
+			reqCtx.UpdateCtxValue("key", "value")
+			reqCtx.WithValue("key", "value")
+		}
+	}
+	itFuncs(nil)
+	itFuncs(&RequestCtx{
+		Ctx:      context.Background(),
+		Recorder: record.NewFakeRecorder(100),
+	})
 }

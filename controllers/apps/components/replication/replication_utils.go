@@ -204,9 +204,10 @@ func generateReplicationSerialPlan(plan *util.Plan, pods []corev1.Pod, rolePrior
 // unknown & empty & 1/2 secondaries -> 1/2 secondaries -> primary
 func generateReplicationBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
 	start := plan.Start
-	unknownEmptySteps := make([]*util.Step, 0)
-	secondarySteps := make([]*util.Step, 0)
-	primarySteps := make([]*util.Step, 0)
+	l := len(pods)
+	unknownEmptySteps := make([]*util.Step, 0, l)
+	secondarySteps := make([]*util.Step, 0, l)
+	primarySteps := make([]*util.Step, 0, l)
 
 	for _, pod := range pods {
 		role := pod.Labels[constant.RoleLabelKey]

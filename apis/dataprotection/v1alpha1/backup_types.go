@@ -146,6 +146,10 @@ type BackupToolManifestsStatus struct {
 	// +optional
 	FilePath string `json:"filePath,omitempty"`
 
+	// volumeName records volume name of backup data pvc.
+	// +optional
+	VolumeName string `json:"volumeName,omitempty"`
+
 	// Backup upload total size.
 	// A string with capacity units in the form of "1Gi", "1Mi", "1Ki".
 	// +optional

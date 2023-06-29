@@ -258,3 +258,11 @@ func generateUniqueNameWithBackupPolicy(backupPolicy *dataprotectionv1alpha1.Bac
 func generateUniqueJobName(backup *dataprotectionv1alpha1.Backup, prefix string) string {
 	return cropJobName(fmt.Sprintf("%s-%s-%s", prefix, backup.UID[:8], backup.Name))
 }
+
+func buildDeleteBackupFilesJobNamespacedName(backup *dataprotectionv1alpha1.Backup) types.NamespacedName {
+	jobName := fmt.Sprintf("%s-%s%s", backup.UID[:8], deleteBackupFilesJobNamePrefix, backup.Name)
+	if len(jobName) > 63 {
+		jobName = jobName[:63]
+	}
+	return types.NamespacedName{Namespace: backup.Namespace, Name: jobName}
+}

@@ -70,7 +70,7 @@ type ObjectVertex struct {
 	Action    *Action
 }
 
-func (v ObjectVertex) String() string {
+func (v *ObjectVertex) String() string {
 	if v.Action == nil {
 		return fmt.Sprintf("{obj:%T, name: %s, immutable: %v, orphan: %v, action: nil}",
 			v.Obj, v.Obj.GetName(), v.Immutable, v.IsOrphan)

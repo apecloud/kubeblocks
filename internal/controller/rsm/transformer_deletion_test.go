@@ -117,6 +117,7 @@ var _ = Describe("object deletion transformer test.", func() {
 
 			Expect(transformer.Transform(transCtx, dag)).Should(Equal(graph.ErrPrematureStop))
 			dagExpected := mockDAG()
+			graphCli.Delete(dagExpected, transCtx.rsm)
 			graphCli.Delete(dagExpected, action)
 			graphCli.Delete(dagExpected, envConfig)
 			graphCli.Delete(dagExpected, headLessSvc)

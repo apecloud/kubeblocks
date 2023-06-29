@@ -258,6 +258,14 @@ func getClusterNameMap(dClient dynamic.Interface, o *list.ListOptions) (map[stri
 }
 
 func printBackupList(o ListBackupOptions) error {
+	// if format is JSON or YAML, use default printer to output the result.
+	if o.Format == printer.JSON || o.Format == printer.YAML {
+		if o.BackupName != "" {
+			o.Names = []string{o.BackupName}
+		}
+		_, err := o.Run()
+		return err
+	}
 	dynamic, err := o.Factory.DynamicClient()
 	if err != nil {
 		return err
@@ -611,6 +619,11 @@ func NewListBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStrea
 
 // printBackupPolicyList prints the backup policy list.
 func printBackupPolicyList(o list.ListOptions) error {
+	// if format is JSON or YAML, use default printer to output the result.
+	if o.Format == printer.JSON || o.Format == printer.YAML {
+		_, err := o.Run()
+		return err
+	}
 	dynamic, err := o.Factory.DynamicClient()
 	if err != nil {
 		return err

@@ -90,6 +90,10 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 				dataVolumeName = v.Name
 			}
 		}
+		clusterCompSpec.Resources.Limits = corev1.ResourceList{
+			"cpu":    cluster.Spec.Resources.CPU,
+			"memory": cluster.Spec.Resources.Memory,
+		}
 		clusterCompSpec.VolumeClaimTemplates = []appsv1alpha1.ClusterComponentVolumeClaimTemplate{
 			{
 				Name: dataVolumeName,

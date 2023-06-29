@@ -58,6 +58,7 @@ pkg/resources/static/k3d/
 
 # Distribution directories
 _dist/
+dist/
 bin/
 tmp/
 

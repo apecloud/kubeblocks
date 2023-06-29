@@ -127,6 +127,7 @@ const (
 	DefaultBackupPolicyTemplateAnnotationKey    = "dataprotection.kubeblocks.io/is-default-policy-template" // DefaultBackupPolicyTemplateAnnotationKey specifies the default backup policy template.
 	BackupDataPathPrefixAnnotationKey           = "dataprotection.kubeblocks.io/path-prefix"                // BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
 	ReconfigureRefAnnotationKey                 = "dataprotection.kubeblocks.io/reconfigure-ref"
+	DataProtectionLabelClusterUIDKey            = "dataprotection.kubeblocks.io/cluster-uid"
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
 	LastAppliedConfigAnnotationKey              = "config.kubeblocks.io/last-applied-configuration"
 	LastAppliedOpsCRAnnotationKey               = "config.kubeblocks.io/last-applied-ops-name"

@@ -29,6 +29,10 @@ on:
         description: 'testinfra branch name'
         required: false
         default: 'main'
+      ARGS:
+        description: 'kbcli test args'
+        required: false
+        default: ''
 
 run-name: kbcli:${{ inputs.VERSION }} k8s:${{ inputs.CLUSTER_VERSION }}:${{ inputs.INSTANCE_TYPE }}
 
@@ -57,11 +61,12 @@ jobs:
 
   eks:
     needs: check
-    uses: apecloud/apecloud-cd/.github/workflows/kbcli-test-eks.yml@v0.1.3
+    uses: apecloud/apecloud-cd/.github/workflows/kbcli-test-eks.yml@v0.1.7
     with:
       CLUSTER_VERSION: "${{ inputs.CLUSTER_VERSION }}"
       INSTANCE_TYPE: "${{ inputs.INSTANCE_TYPE }}"
       KB_VERSION: "${{ needs.check.outputs.release-version }}"
       BRANCH_NAME: "${{ inputs.BRANCH_NAME }}"
-      APECD_REF: "v0.1.3"
+      APECD_REF: "v0.1.7"
+      ARGS: "${{ inputs.ARGS }}"
     secrets: inherit

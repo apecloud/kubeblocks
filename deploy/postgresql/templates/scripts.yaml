@@ -95,14 +95,29 @@ data:
       echo "Primary pod information not available. Exiting..."
       exit 1
     fi
+
+    # usage: retry <command>
+    # e.g. retry pg_isready -U postgres -h $primary_fqdn -p 5432
+    function retry {
+      local max_attempts=10
+      local attempt=1
+      until "$@" || [ $attempt -eq $max_attempts ]; do
+        echo "Command '$*' failed. Attempt $attempt of $max_attempts. Retrying in 5 seconds..."
+        attempt=$((attempt + 1))
+        sleep 5
+      done
+      if [ $attempt -eq $max_attempts ]; then
+        echo "Command '$*' failed after $max_attempts attempts. Exiting..."
+        exit 1
+      fi
+    }
     if [ "$primary" != "$KB_POD_NAME" ]; then
-        # waiting for primary pod to be ready
         primary_fqdn="$primary.$KB_CLUSTER_NAME-$KB_COMP_NAME-headless.$KB_NAMESPACE.svc"
         echo "primary_fqdn=$primary_fqdn" >> /home/postgres/pgdata/.kb_set_up.log
-        until pg_isready -U {{ default "postgres" | quote }} -h $primary_fqdn -p 5432; do
-            sleep 5
-        done
+        # waiting for the primary to be ready, if the wait time exceeds the maximum number of retries, then the script will fail and exit.
+        retry pg_isready -U {{ default "postgres" | quote }} -h $primary_fqdn -p 5432
     fi
+
     if [ -f ${RESTORE_DATA_DIR}/kb_restore.signal ]; then
         chown -R postgres ${RESTORE_DATA_DIR}
     fi

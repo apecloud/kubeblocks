@@ -55,6 +55,10 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+const (
+	trueVal = "true"
+)
+
 // BackupRepoReconciler reconciles a BackupRepo object
 type BackupRepoReconciler struct {
 	client.Client
@@ -443,7 +447,7 @@ func (r *BackupRepoReconciler) checkAssociatedBackups(
 	var retErr error
 	for _, backup := range backupList.Items {
 		val := backup.Annotations[dataProtectionPVCCreatedAnnotationKey]
-		if val == "true" {
+		if val == trueVal {
 			continue
 		}
 		if err := r.checkOrCreatePVC(reqCtx, repo, backup.Namespace); err != nil {
@@ -455,7 +459,7 @@ func (r *BackupRepoReconciler) checkAssociatedBackups(
 		if backup.Annotations == nil {
 			backup.Annotations = make(map[string]string)
 		}
-		backup.Annotations[dataProtectionPVCCreatedAnnotationKey] = "true"
+		backup.Annotations[dataProtectionPVCCreatedAnnotationKey] = trueVal
 		if err = r.Client.Patch(reqCtx.Ctx, &backup, patch); err != nil {
 			reqCtx.Log.Error(err, "failed to patch backup",
 				"backup", client.ObjectKeyFromObject(&backup))
@@ -661,7 +665,7 @@ func (r *BackupRepoReconciler) mapBackupToRepo(obj client.Object) []ctrl.Request
 	if !ok {
 		return nil
 	}
-	if val := obj.GetAnnotations()[dataProtectionPVCCreatedAnnotationKey]; val == "true" {
+	if val := obj.GetAnnotations()[dataProtectionPVCCreatedAnnotationKey]; val == trueVal {
 		return nil
 	}
 	return []ctrl.Request{{

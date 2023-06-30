@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/dapr/kit/logger"
-	"k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mongodb"
@@ -47,8 +46,8 @@ func (ha *Ha) RunCycle() {
 	//		dcs.ReleaseLock()
 	//	}
 
-	case !ha.dbManager.IsClusterHealthy(cluster):
-		ha.logger.Errorf("The cluster is not healthy, wait..." )
+	case !ha.dbManager.IsClusterHealthy(context.TODO(), cluster):
+		ha.logger.Errorf("The cluster is not healthy, wait...")
 
 	case !ha.dbManager.IsCurrentMemberInCluster(cluster) && int(cluster.Replicas) == len(ha.dbManager.GetMemberAddrs()):
 		ha.logger.Infof("Current member is not in cluster, add it to cluster")
@@ -125,20 +124,20 @@ func (ha *Ha) RunCycle() {
 func (ha *Ha) Start() {
 	ha.logger.Info("HA starting")
 	cluster, err := ha.dcs.GetCluster()
-	if errors.IsNotFound(err) {
-		ha.logger.Infof("Cluster %s is not found, so HA exists.", ha.dcs.GetClusterName())
+	if cluster == nil {
+		ha.logger.Errorf("Get Cluster %s error: %v, so HA exists.", ha.dcs.GetClusterName(), err)
 		return
 	}
 
 	ha.logger.Debugf("cluster: %v", cluster)
-	isInitialized, _ := ha.dbManager.IsClusterInitialized()
+	isInitialized, _ := ha.dbManager.IsClusterInitialized(context.TODO(), cluster)
 	for !isInitialized {
 		ha.logger.Infof("Waiting for the database cluster to be initialized.")
 		// TODO: implement dbmanager initialize to replace pod's entrypoint scripts
 		// if I am the node of index 0, then do initialization
 		// ha.dbManager.Initialize()
 		time.Sleep(1 * time.Second)
-		isInitialized, _ = ha.dbManager.IsClusterInitialized()
+		isInitialized, _ = ha.dbManager.IsClusterInitialized(context.TODO(), cluster)
 	}
 	ha.logger.Infof("The database cluster is initialized.")
 

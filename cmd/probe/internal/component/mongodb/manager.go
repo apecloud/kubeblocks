@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"strings"
 	"time"
+	"fmt"
 
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
@@ -102,9 +103,13 @@ func (mgr *Manager) GetMemberState(ctx context.Context) (string, error) {
 }
 
 func (mgr *Manager) GetReplSetStatus(ctx context.Context) (*ReplSetStatus, error) {
+	return mgr.GetReplSetStatusWithClient(ctx, mgr.Client)
+}
+
+func (mgr *Manager) GetReplSetStatusWithClient(ctx context.Context, client *mongo.Client) (*ReplSetStatus, error) {
 	status := &ReplSetStatus{}
 
-	resp := mgr.Client.Database("admin").RunCommand(ctx, bson.D{{Key: "replSetGetStatus", Value: 1}})
+	resp := client.Database("admin").RunCommand(ctx, bson.D{{Key: "replSetGetStatus", Value: 1}})
 	if resp.Err() != nil {
 		err := errors.Wrap(resp.Err(), "replSetGetStatus")
 		mgr.Logger.Errorf("get replset status failed: %v", err)
@@ -172,19 +177,6 @@ func (mgr *Manager) InitiateReplSet(cluster *dcs.Cluster) error {
 		return response.Err()
 	}
 	return nil
-}
-
-// CheckMongoClusterInitialized is a method to check if cluster is initailized or not
-func (mgr *Manager) IsClusterInitialized() (bool, error) {
-	status, err := mgr.GetReplSetStatus(context.Background())
-	if err != nil {
-		return false, err
-	}
-	mgr.Logger.Debugf("cluster status: %v", status)
-	if status.OK != 0 {
-		return true, nil
-	}
-	return false, nil
 }
 
 func (mgr *Manager) GetReplSetConfig(ctx context.Context) (*RSConfig, error) {
@@ -263,7 +255,22 @@ func (mgr *Manager) GetMemberAddrsFromRSConfig(rsConfig *RSConfig) []string {
 	return hosts
 }
 
-func (mgr *Manager) GetReplSetClient(ctx context.Context, hosts []string) (*mongo.Client, error) {
+func (mgr *Manager) GetReplSetClient(ctx context.Context, cluster *dcs.Cluster) (*mongo.Client, error) {
+	hosts := cluster.GetMemberAddrs()
+	return  mgr.GetReplSetClientWithHosts(context.TODO(), hosts)
+}
+
+func (mgr *Manager) GetLeaderClient(ctx context.Context, cluster *dcs.Cluster) (*mongo.Client, error) {
+	if cluster.Leader == nil || cluster.Leader.Name=="" {
+		return nil, fmt.Errorf("cluster has no leader")
+	}
+
+	leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
+	host := cluster.GetMemberAddr(*leaderMember)
+	return  mgr.GetReplSetClientWithHosts(context.TODO(), []string{host})
+}
+
+func (mgr *Manager) GetReplSetClientWithHosts(ctx context.Context, hosts []string) (*mongo.Client, error) {
 	if len(hosts) == 0 {
 		mgr.Logger.Errorf("Get replset client whitout hosts")
 		return nil, errors.New("Get replset client whitout hosts")
@@ -291,8 +298,11 @@ func (mgr *Manager) Initialize() {}
 func (mgr *Manager) IsRunning()  {}
 
 func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
-	hosts := cluster.GetMemberAddrs()
-	client, _ := mgr.GetReplSetClient(context.TODO(), hosts)
+	client, err := mgr.GetReplSetClient(context.TODO(), cluster)
+	if err != nil {
+		return true
+	}
+
 	defer client.Disconnect(context.TODO())
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
 	if rsConfig == nil {
@@ -331,11 +341,14 @@ func (mgr *Manager) IsMemberHealthy(memberName string) bool {
 func (mgr *Manager) Recover() {}
 
 func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
-	hosts := cluster.GetMemberAddrs()
+	client, err := mgr.GetReplSetClient(context.TODO(), cluster)
+	if err != nil {
+		return err
+	}
+
+	defer client.Disconnect(context.TODO())
 	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
 	currentHost := cluster.GetMemberAddr(*currentMember)
-	client, _ := mgr.GetReplSetClient(context.TODO(), hosts)
-	defer client.Disconnect(context.TODO())
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
@@ -359,8 +372,11 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 }
 
 func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) error {
-	hosts := cluster.GetMemberAddrs()
-	client, _ := mgr.GetReplSetClient(context.TODO(), hosts)
+	client, err := mgr.GetReplSetClient(context.TODO(), cluster)
+	if err != nil {
+		return err
+	}
+
 	defer client.Disconnect(context.TODO())
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
 	if rsConfig == nil {
@@ -381,16 +397,37 @@ func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) e
 	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
 }
 
-func (mgr *Manager) IsClusterHealthy(cluster *dcs.Cluster) bool {
-	hosts := cluster.GetMemberAddrs()
-	client, _ := mgr.GetReplSetClient(context.TODO(), hosts)
-	defer client.Disconnect(context.TODO())
-	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
-	if rsConfig == nil {
-		mgr.Logger.Errorf("Get replSet config failed: %v", err)
+func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
+	client, err:= mgr.GetLeaderClient(ctx, cluster)
+	if err != nil {
 		return false
 	}
-	return rsConfig.ID != ""
+	defer client.Disconnect(ctx)
+	status, err := mgr.GetReplSetStatusWithClient(ctx, client)
+	if err != nil {
+		return false
+	}
+	mgr.Logger.Debugf("cluster status: %v", status)
+	if status.OK != 0 {
+		return true
+	}
+	return false
+}
+
+// IsClusterInitialized is a method to check if cluster is initailized or not
+func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	client, err := mgr.GetLeaderClient(ctx, cluster)
+	if err != nil {
+		return true, err
+	}
+
+	defer client.Disconnect(ctx)
+	rsConfig, err := mgr.GetReplSetConfigWithClient(ctx, client)
+	if rsConfig == nil {
+		mgr.Logger.Errorf("Get replSet config failed: %v", err)
+		return false, err
+	}
+	return rsConfig.ID != "", nil
 }
 
 func (mgr *Manager) Premote() error {
@@ -401,7 +438,7 @@ func (mgr *Manager) Premote() error {
 	}
 
 	hosts := mgr.GetMemberAddrsFromRSConfig(rsConfig)
-	client, _ := mgr.GetReplSetClient(context.TODO(), hosts)
+	client, _ := mgr.GetReplSetClientWithHosts(context.TODO(), hosts)
 	defer client.Disconnect(context.TODO())
 	for i, _ := range rsConfig.Members {
 		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {

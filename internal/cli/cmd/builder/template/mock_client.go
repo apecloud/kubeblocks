@@ -32,16 +32,30 @@ import (
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
+type ResourceMatcher = func(obj runtime.Object) bool
+type Handler = func(obj runtime.Object) error
+
+type ResourceHandler struct {
+	Matcher []ResourceMatcher
+	Handler Handler
+}
+
 type mockClient struct {
 	objects        map[client.ObjectKey]client.Object
 	kindObjectList map[string][]runtime.Object
+
+	hander *ResourceHandler
 }
 
-func newMockClient(objs []client.Object) client.Client {
+func newMockClient(objs []client.Object) *mockClient {
 	return &mockClient{
 		objects:        fromObjects(objs),
 		kindObjectList: splitRuntimeObject(objs),
 	}
+}
+
+func (m *mockClient) SetResourceHandler(resourceHandler *ResourceHandler) {
+	m.hander = resourceHandler
 }
 
 func fromObjects(objs []client.Object) map[client.ObjectKey]client.Object {
@@ -52,6 +66,14 @@ func fromObjects(objs []client.Object) map[client.ObjectKey]client.Object {
 		}
 	}
 	return r
+}
+
+func (m *mockClient) AppendMockObjects(obj client.Object) {
+	objKey := client.ObjectKeyFromObject(obj)
+	if _, ok := m.objects[objKey]; ok {
+		return
+	}
+	m.objects[objKey] = obj
 }
 
 func splitRuntimeObject(objects []client.Object) map[string][]runtime.Object {
@@ -88,38 +110,47 @@ func (m *mockClient) List(ctx context.Context, list client.ObjectList, opts ...c
 	return nil
 }
 
-func (m mockClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+func (m *mockClient) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
+	if m.hander == nil || len(m.hander.Matcher) == 0 {
+		return nil
+	}
+
+	for _, matcher := range m.hander.Matcher {
+		if !matcher(obj) {
+			return nil
+		}
+	}
+	return m.hander.Handler(obj)
+}
+
+func (m *mockClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	return nil
 }
 
-func (m mockClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
+func (m *mockClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
 	return nil
 }
 
-func (m mockClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
+func (m *mockClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
 	return nil
 }
 
-func (m mockClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-	return nil
-}
-
-func (m mockClient) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
+func (m *mockClient) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
 	return cfgcore.MakeError("not support")
 }
 
-func (m mockClient) Status() client.SubResourceWriter {
+func (m *mockClient) Status() client.SubResourceWriter {
 	panic("implement me")
 }
 
-func (m mockClient) SubResource(subResource string) client.SubResourceClient {
+func (m *mockClient) SubResource(subResource string) client.SubResourceClient {
 	panic("implement me")
 }
 
-func (m mockClient) Scheme() *runtime.Scheme {
+func (m *mockClient) Scheme() *runtime.Scheme {
 	panic("implement me")
 }
 
-func (m mockClient) RESTMapper() meta.RESTMapper {
+func (m *mockClient) RESTMapper() meta.RESTMapper {
 	panic("implement me")
 }

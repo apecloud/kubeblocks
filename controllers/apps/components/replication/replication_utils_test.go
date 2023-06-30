@@ -154,7 +154,7 @@ var _ = Describe("ReplicationSet Util", func() {
 		Expect(err.Error()).Should(ContainSubstring("more than one primary pod found"))
 
 		newReplicationStatus := &appsv1alpha1.ReplicationSetStatus{}
-		err = genReplicationSetStatus(newReplicationStatus, podList)
+		Expect(genReplicationSetStatus(newReplicationStatus, podList)).Should(Succeed())
 		Expect(len(newReplicationStatus.Secondaries)).Should(Equal(3))
 	}
 

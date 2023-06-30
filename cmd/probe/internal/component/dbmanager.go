@@ -14,6 +14,7 @@ type DBManager interface {
 	IsCurrentMemberInCluster(*dcs.Cluster) bool
 	IsCurrentMemberHealthy() bool
 	IsMemberHealthy(string) bool
+	IsClusterHealthy(*dcs.Cluster) bool
 	IsLeader(context.Context) (bool, error)
 	IsDBStartupReady() bool
 	Recover()

@@ -297,7 +297,8 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
-		return false
+		// 
+		return true
 	}
 
 	for _, member := range rsConfig.Members {
@@ -378,6 +379,18 @@ func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) e
 	rsConfig.Members = configMembers
 	rsConfig.Version++
 	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
+}
+
+func (mgr *Manager) IsClusterHealthy(cluster *dcs.Cluster) bool {
+	hosts := cluster.GetMemberAddrs()
+	client, _ := mgr.GetReplSetClient(context.TODO(), hosts)
+	defer client.Disconnect(context.TODO())
+	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
+	if rsConfig == nil {
+		mgr.Logger.Errorf("Get replSet config failed: %v", err)
+		return false
+	}
+	return rsConfig.ID != ""
 }
 
 func (mgr *Manager) Premote() error {

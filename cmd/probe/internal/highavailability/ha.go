@@ -47,6 +47,9 @@ func (ha *Ha) RunCycle() {
 	//		dcs.ReleaseLock()
 	//	}
 
+	case !ha.dbManager.IsClusterHealthy(cluster):
+		ha.logger.Errorf("The cluster is not healthy, wait..." )
+
 	case !ha.dbManager.IsCurrentMemberInCluster(cluster) && int(cluster.Replicas) == len(ha.dbManager.GetMemberAddrs()):
 		ha.logger.Infof("Current member is not in cluster, add it to cluster")
 		ha.dbManager.AddCurrentMemberToCluster(cluster)

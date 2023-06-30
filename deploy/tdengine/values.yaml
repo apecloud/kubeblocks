@@ -41,7 +41,7 @@ securityContext: {}
 
 metrics:
   image:
-    registry: docker.io
+    registry: registry.cn-hangzhou.aliyuncs.com
     repository: apecloud/taoskeeper
     tag: 0.0.5
     pullPolicy: IfNotPresent

@@ -1,29 +1,28 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ include "cluster-libchart.clusterName" . }}
-  labels: {{ include "apecloud-mysql-cluster.labels" . | nindent 4 }}
-spec:
-  {{- $withProxy := and (eq .Values.mode "raftGroup") .Values.proxyEnabled -}}
-  {{- if $withProxy }}
-  clusterDefinitionRef: apecloud-mysql-scale  # ref clusterdefinition.name
-  {{- else }}
-  clusterDefinitionRef: apecloud-mysql        # ref clusterdefinition.name
+  name: {{ include "kblib.clusterName" . }}
+  labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
+  {{- if and (eq .Values.mode "raftGroup") .Values.proxyEnabled }}
+  annotations:
+    kubeblocks.io/extra-env: '{"KB_PROXY_ENABLED":"on"}'
   {{- end }}
+spec:
   clusterVersionRef: {{ .Values.version }}
-  terminationPolicy: {{ .Values.terminationPolicy }}
-  {{- include "cluster-libchart.affinity" . | indent 2 }}
+  terminationPolicy: {{ .Values.extra.terminationPolicy }}
+  {{- include "kblib.affinity" . | indent 2 }}
+  clusterDefinitionRef: apecloud-mysql # ref clusterdefinition.name
   componentSpecs:
     - name: mysql
       componentDefRef: mysql # ref clusterdefinition componentDefs.name
-      {{- include "cluster-libchart.componentMonitor" . | indent 6 }}
+      {{- include "kblib.componentMonitor" . | indent 6 }}
       {{- include "apecloud-mysql-cluster.replicaCount" . | indent 6 }}
       enabledLogs:
         - slow
         - error
-      serviceAccountName: {{ include "cluster-libchart.serviceAccountName" . }}
-      {{- include "cluster-libchart.componentResources" . | indent 6 }}
-      {{- include "cluster-libchart.componentServices" . | indent 6 }}
-    {{- if $withProxy }}
+      serviceAccountName: {{ include "kblib.serviceAccountName" . }}
+      {{- include "kblib.componentResources" . | indent 6 }}
+      {{- include "kblib.componentServices" . | indent 6 }}
+    {{- if and (eq .Values.mode "raftGroup") .Values.proxyEnabled }}
     {{- include "apecloud-mysql-cluster.proxyComponents" . | indent 4 }}
     {{- end }}

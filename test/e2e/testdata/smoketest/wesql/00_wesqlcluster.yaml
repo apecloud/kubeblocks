@@ -6,7 +6,7 @@ metadata:
   name: kb-mycluster-apecloud-mysql-cluster
   labels:
     
-    helm.sh/chart: apecloud-mysql-cluster-0.5.1-beta.0
+    helm.sh/chart: apecloud-mysql-cluster-0.6.0-alpha.21
     app.kubernetes.io/name: apecloud-mysql-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "8.0.30"
@@ -20,7 +20,7 @@ metadata:
   namespace: default
   labels:
     
-    helm.sh/chart: apecloud-mysql-cluster-0.5.1-beta.0
+    helm.sh/chart: apecloud-mysql-cluster-0.6.0-alpha.21
     app.kubernetes.io/name: apecloud-mysql-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "8.0.30"
@@ -40,7 +40,7 @@ metadata:
   name: kb-mycluster-apecloud-mysql-cluster
   labels:
     
-    helm.sh/chart: apecloud-mysql-cluster-0.5.1-beta.0
+    helm.sh/chart: apecloud-mysql-cluster-0.6.0-alpha.21
     app.kubernetes.io/name: apecloud-mysql-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "8.0.30"
@@ -60,7 +60,7 @@ kind: Cluster
 metadata:
   name: mycluster-apecloud-mysql-cluster
   labels: 
-    helm.sh/chart: apecloud-mysql-cluster-0.5.1-beta.0
+    helm.sh/chart: apecloud-mysql-cluster-0.6.0-alpha.21
     app.kubernetes.io/name: apecloud-mysql-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "8.0.30"

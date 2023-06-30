@@ -40,14 +40,14 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/internal/unstructured"
-
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/unstructured"
 )
 
 type reconfigureOptions struct {
@@ -119,9 +119,9 @@ var (
 		kbcli cluster diff-config opsrequest1 opsrequest2`)
 )
 
-func (r *reconfigureOptions) addCommonFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&r.componentName, "component", "", "Specify the name of Component to describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter.\"")
+func (r *reconfigureOptions) addCommonFlags(cmd *cobra.Command, f cmdutil.Factory) {
 	cmd.Flags().StringSliceVar(&r.configSpecs, "config-specs", nil, "Specify the name of the configuration template to describe. (e.g. for apecloud-mysql: --config-specs=mysql-3node-tpl)")
+	flags.AddComponentsFlag(f, cmd, false, &r.componentName, "Specify the name of Component to describe (e.g. for apecloud-mysql: --component=mysql). If the cluster has only one component, unset the parameter.\"")
 }
 
 func (r *reconfigureOptions) validate() error {
@@ -279,10 +279,15 @@ func (r *reconfigureOptions) printExplainConfigure(tplName string) error {
 	}
 
 	confSpec := configConstraint.Spec
+	if confSpec.ConfigurationSchema == nil {
+		fmt.Printf("\n%s\n", fmt.Sprintf(notConfigSchemaPrompt, printer.BoldYellow(tplName)))
+		return nil
+	}
+
 	schema := confSpec.ConfigurationSchema.DeepCopy()
 	if schema.Schema == nil {
 		if schema.CUE == "" {
-			fmt.Printf("\n%s\n", notCueSchemaPrompt)
+			fmt.Printf("\n%s\n", fmt.Sprintf(notConfigSchemaPrompt, printer.BoldYellow(tplName)))
 			return nil
 		}
 		apiSchema, err := cfgcore.GenerateOpenAPISchema(schema.CUE, "")
@@ -830,7 +835,7 @@ func NewDescribeReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOSt
 			util.CheckErr(o.printDescribeReconfigure())
 		},
 	}
-	o.addCommonFlags(cmd)
+	o.addCommonFlags(cmd, f)
 	cmd.Flags().BoolVar(&o.showDetail, "show-detail", o.showDetail, "If true, the content of the files specified by config-file will be printed.")
 	cmd.Flags().StringSliceVar(&o.keys, "config-file", nil, "Specify the name of the configuration file to be describe (e.g. for mysql: --config-file=my.cnf). If unset, all files.")
 	return cmd
@@ -856,7 +861,7 @@ func NewExplainReconfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStr
 			util.CheckErr(o.printAllExplainConfigure())
 		},
 	}
-	o.addCommonFlags(cmd)
+	o.addCommonFlags(cmd, f)
 	cmd.Flags().BoolVar(&o.truncEnum, "trunc-enum", o.truncEnum, "If the value list length of the parameter is greater than 20, it will be truncated.")
 	cmd.Flags().BoolVar(&o.truncDocument, "trunc-document", o.truncDocument, "If the document length of the parameter is greater than 100, it will be truncated.")
 	cmd.Flags().StringVar(&o.paramName, "param", o.paramName, "Specify the name of parameter to be query. It clearly display the details of the parameter.")
@@ -871,7 +876,7 @@ func NewDiffConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Short:             "Show the difference in parameters between the two submitted OpsRequest.",
 		Aliases:           []string{"diff"},
 		Example:           diffConfigureExample,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.OpsGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(args))
 			util.CheckErr(o.validate())

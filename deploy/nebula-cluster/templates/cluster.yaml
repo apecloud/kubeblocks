@@ -9,6 +9,22 @@ spec:
   clusterVersionRef: nebula-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   terminationPolicy: {{ .Values.nebula.terminationPolicy }}
   componentSpecs:
+    - name: nebula-console
+      componentDefRef: nebula-console
+      replicas: 1
+      {{- with  .Values.nebula.metad.resources }}
+      resources:
+        {{- with .limits }}
+        limits:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+        {{- with .requests }}
+        requests:
+          cpu: {{ .cpu | quote }}
+          memory: {{ .memory | quote }}
+        {{- end }}
+      {{- end }}
     - name: nebula-metad
       componentDefRef: nebula-metad
       replicas: {{ .Values.nebula.metad.replicas }}

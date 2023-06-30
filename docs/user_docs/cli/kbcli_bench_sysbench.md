@@ -31,7 +31,6 @@ kbcli bench sysbench [ClusterName] [flags]
 
 ```
       --database string     database name
-      --driver string       database driver
       --flag int            the flag of sysbench, 0(normal), 1(long), 2(three nodes)
   -h, --help                help for sysbench
       --host string         the host of database

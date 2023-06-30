@@ -204,7 +204,7 @@ func NewRSMPlanBuilder(ctx intctrlutil.RequestCtx, cli client.Client, req ctrl.R
 		cli: cli,
 		transCtx: &rsmTransformContext{
 			Context:       ctx.Ctx,
-			Client:        cli,
+			Client:        model.NewGraphClient(cli),
 			EventRecorder: ctx.Recorder,
 			Logger:        ctx.Log,
 		},

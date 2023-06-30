@@ -35,8 +35,7 @@ import (
 )
 
 type RenderedOptions struct {
-	ConfigSpec     string
-	AllConfigSpecs bool
+	ConfigSpec string
 
 	// mock cluster object
 	Name      string
@@ -113,4 +112,19 @@ func helmTemplate(helmPath string, helmOutput string) error {
 	}
 	_, err := o.Install(helm.NewFakeConfig("default"))
 	return err
+}
+
+func checkAndFillPortProtocol(clusterDefComponents []appsv1alpha1.ClusterComponentDefinition) {
+	// set a default protocol with 'TCP' to avoid failure in BuildHeadlessSvc
+	for i := range clusterDefComponents {
+		for j := range clusterDefComponents[i].PodSpec.Containers {
+			container := &clusterDefComponents[i].PodSpec.Containers[j]
+			for k := range container.Ports {
+				port := &container.Ports[k]
+				if port.Protocol == "" {
+					port.Protocol = corev1.ProtocolTCP
+				}
+			}
+		}
+	}
 }

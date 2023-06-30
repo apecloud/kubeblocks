@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package kubeblocks
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -86,12 +84,10 @@ var _ = Describe("kubeblocks install", func() {
 				Dynamic:   testing.FakeDynamicClient(),
 			},
 			Version:         version.DefaultKubeBlocksVersion,
-			Monitor:         true,
 			CreateNamespace: true,
 		}
 		Expect(o.Install()).Should(HaveOccurred())
-		Expect(o.ValueOpts.Values).Should(HaveLen(1))
-		Expect(o.ValueOpts.Values[0]).To(Equal(fmt.Sprintf(kMonitorParam, true)))
+		Expect(o.ValueOpts.Values).Should(HaveLen(0))
 		Expect(o.installChart()).Should(HaveOccurred())
 		o.printNotes()
 	})

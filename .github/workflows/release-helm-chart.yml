@@ -12,6 +12,7 @@ on:
       - published
 
 env:
+  GH_TOKEN: ${{ github.token }}
   RELEASE_VERSION: ${{ github.ref_name }}
   RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
 
@@ -40,7 +41,7 @@ jobs:
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
       DEP_CHART_DIR: "deploy/helm/depend-charts"
-      DEP_REPO: "delphic|prometheus-cluster"
+      DEP_REPO: "delphic|prometheus-cluster|apecloud-mysql-cluster"
       APECD_REF: "v0.1.4"
     secrets: inherit
 
@@ -70,6 +71,11 @@ jobs:
             --content "${CONTENT}"\
             --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+      - name: delete cache
+        continue-on-error: true
+        run: |
+          bash .github/utils/utils.sh --type 17 --tag-name "${{ steps.send_message.outputs.release-result }}"
 
       - name: Save Artifact
         id: cache-artifact-save

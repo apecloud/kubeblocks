@@ -142,4 +142,8 @@ var _ = Describe("kubeblocks", func() {
 			Expect(out.String()).To(ContainSubstring(c.expected))
 		}
 	})
+
+	It("newHelmRepoEntry", func() {
+		Expect(newHelmRepoEntry()).ShouldNot(BeNil())
+	})
 })

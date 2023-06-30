@@ -167,3 +167,82 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 
 	return nil
 }
+
+// ComposeReplicationRolePriorityMap generates a priority map based on roles.
+func ComposeReplicationRolePriorityMap() map[string]int {
+	return map[string]int{
+		"":                 emptyPriority,
+		constant.Primary:   primaryPriority,
+		constant.Secondary: secondaryPriority,
+	}
+}
+
+// generateReplicationParallelPlan generates a parallel plan for the replication workload.
+// unknown & empty & secondary & primary
+func generateReplicationParallelPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
+	start := plan.Start
+	for _, pod := range pods {
+		nextStep := &util.Step{}
+		nextStep.Obj = pod
+		start.NextSteps = append(start.NextSteps, nextStep)
+	}
+}
+
+// generateReplicationSerialPlan generates a serial plan for the replication workload.
+// unknown -> empty -> secondary -> primary
+func generateReplicationSerialPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
+	start := plan.Start
+	for _, pod := range pods {
+		nextStep := &util.Step{}
+		nextStep.Obj = pod
+		start.NextSteps = append(start.NextSteps, nextStep)
+		start = nextStep
+	}
+}
+
+// generateReplicationBestEffortParallelPlan generates a best effort parallel plan for the replication workload.
+// unknown & empty & 1/2 secondaries -> 1/2 secondaries -> primary
+func generateReplicationBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
+	start := plan.Start
+	l := len(pods)
+	unknownEmptySteps := make([]*util.Step, 0, l)
+	secondarySteps := make([]*util.Step, 0, l)
+	primarySteps := make([]*util.Step, 0, l)
+
+	for _, pod := range pods {
+		role := pod.Labels[constant.RoleLabelKey]
+		nextStep := &util.Step{Obj: pod}
+		switch {
+		case rolePriorityMap[role] <= emptyPriority:
+			unknownEmptySteps = append(unknownEmptySteps, nextStep)
+		case rolePriorityMap[role] < primaryPriority:
+			secondarySteps = append(secondarySteps, nextStep)
+		default:
+			primarySteps = append(primarySteps, nextStep)
+		}
+	}
+
+	// append unknown, empty
+	if len(unknownEmptySteps) > 0 {
+		start.NextSteps = append(start.NextSteps, unknownEmptySteps...)
+		start = start.NextSteps[0]
+	}
+
+	//  append 1/2 secondaries
+	end := len(secondarySteps) / 2
+	if end > 0 {
+		start.NextSteps = append(start.NextSteps, secondarySteps[:end]...)
+		start = start.NextSteps[0]
+	}
+
+	// append the other 1/2 secondaries
+	if len(secondarySteps) > end {
+		start.NextSteps = append(start.NextSteps, secondarySteps[end:]...)
+		start = start.NextSteps[0]
+	}
+
+	// append primary
+	if len(primarySteps) > 0 {
+		start.NextSteps = append(start.NextSteps, primarySteps...)
+	}
+}

@@ -10,10 +10,7 @@ version: ac-mysql-8.0.30
 ##
 mode: standalone
 
-## @param replicas MySQL cluster replicas
-## for standalone mode, replicas can not be changed, it is always 1
-## for replication mode, replicas can not be changed, it is always 2
-## for raftGroup mode, replicas can be changed, the default value is 3
+## @param replicas specify cluster replicas
 ##
 replicas: 1
 
@@ -25,35 +22,19 @@ cpu: 0.5
 ##
 memory: 1
 
+## @param requests.cpu if not set, use cpu
+## @param requests.memory, if not set, use memory
+##
+requests:
+#  cpu:
+#  memory:
+
 ## @param storage size, the unit is Gi
 ##
 storage: 20
-
-## @param monitoring interval, 0 is no monitoring
-##
-monitoringInterval: 0
-
-## @param terminationPolicy
-terminationPolicy: Delete
 
 ## @param proxyEnabled if true, enable the proxy
 ## if mode is standalone or replication, proxyEnabled is always false
 ## if mode is raftGroup, proxyEnabled can be true or false
 ##
 proxyEnabled: false
-
-## @param availablePolicy
-##
-availabilityPolicy: none
-
-## @param tenancy dedicated or shared
-##
-tenancy: SharedNode
-
-## @param hostNetworkAccessible if true, expose the vpc service
-##
-hostNetworkAccessible: false
-
-## @param publiclyAccessible if true, expose the internet service
-##
-publiclyAccessible: false

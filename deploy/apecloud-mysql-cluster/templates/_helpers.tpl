@@ -1,27 +1,18 @@
 {{/*
-Create chart name and version as used by the chart label.
-*/}}
-{{- define "apecloud-mysql-cluster.chart" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{/*
-Common labels
-*/}}
-{{- define "apecloud-mysql-cluster.labels" -}}
-helm.sh/chart: {{ include "apecloud-mysql-cluster.chart" . }}
-{{ include "cluster-libchart.clusterLabels" . }}
-{{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-{{- end }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- end }}
-
-{{/*
-Define the cluster componnets with proxy
-TODO: calculate the proxy resoruces based on the mysql resources
+Define the cluster componnets with proxy.
+The proxy cpu cores is 1/6 of the cluster total cpu cores.
 */}}
 {{- define "apecloud-mysql-cluster.proxyComponents" }}
+{{- $proxyCPU := (int (ceil (div (mul .Values.replicas .Values.cpu) 6))) }}
+{{- if lt $proxyCPU 2 }}
+{{- $proxyCPU = 2 }}
+{{- end }}
+{{- if gt $proxyCPU 64 }}
+{{- $proxyCPU = 64 }}
+{{- end }}
+{{- if eq (mod $proxyCPU 2) 1 }}
+{{- $proxyCPU = add $proxyCPU 1 }}
+{{- end }}
 - name: etcd
   componentDefRef: etcd # ref clusterdefinition componentDefs.name
   replicas: 1
@@ -34,6 +25,11 @@ TODO: calculate the proxy resoruces based on the mysql resources
 - name: vtgate
   componentDefRef: vtgate # ref clusterdefinition componentDefs.name
   replicas: 1
+  resources:
+    requests:
+      cpu: {{ $proxyCPU }}
+    limits:
+      cpu: {{ $proxyCPU }}
 {{- end }}
 
 {{/*
@@ -46,7 +42,7 @@ raftGroup mode: 3 or more
 {{- if eq .Values.mode "standalone" }}
 replicas: 1
 {{- else if eq .Values.mode "replication" }}
-replicas: 2
+replicas: {{ max .Values.replicas 2 }}
 {{- else }}
 replicas: {{ max .Values.replicas 3 }}
 {{- end }}

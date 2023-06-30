@@ -171,6 +171,13 @@ func renderSwitchoverCmdJob(ctx context.Context,
 	if componentDef.SwitchoverSpec == nil || switchover == nil {
 		return nil, errors.New("switchover spec not found")
 	}
+	pod, err := getPrimaryOrLeaderPod(ctx, cli, *cluster, componentSpec.Name, componentDef.Name)
+	if err != nil {
+		return nil, err
+	}
+	if pod == nil {
+		return nil, errors.New("primary pod not found")
+	}
 	renderJob := func(switchoverSpec *appsv1alpha1.SwitchoverSpec, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
 		var cmdExecutorConfig *appsv1alpha1.CmdExecutorConfig
 		if switchover.InstanceName == constant.KBSwitchoverCandidateInstanceForAnyPod {
@@ -205,8 +212,10 @@ func renderSwitchoverCmdJob(ctx context.Context,
 								Command:         cmdExecutorConfig.Command,
 								Args:            cmdExecutorConfig.Args,
 								Env:             switchoverEnvs,
+								VolumeMounts:    pod.Spec.Containers[0].VolumeMounts,
 							},
 						},
+						Volumes: pod.Spec.Volumes,
 					},
 				},
 			},
@@ -481,7 +490,7 @@ func getPrimaryOrLeaderPod(ctx context.Context, cli client.Client, cluster appsv
 	case appsv1alpha1.Replication:
 		podList, err = componentutil.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, constant.Primary)
 	case appsv1alpha1.Consensus:
-		podList, err = componentutil.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, constant.Leader)
+		podList, err = componentutil.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, compDef.ConsensusSpec.Leader.Name)
 	}
 	if err != nil {
 		return nil, err

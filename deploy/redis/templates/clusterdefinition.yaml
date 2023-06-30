@@ -101,10 +101,6 @@ spec:
           - name: redis-exporter
             image: {{ .Values.exporter.image.registry }}/{{ .Values.exporter.image.repository }}:{{ .Values.exporter.image.tag }}
             imagePullPolicy: IfNotPresent
-            resources:
-              requests:
-                cpu: 100m
-                memory: 100Mi
             ports:
               - name: metrics
                 containerPort: 9121

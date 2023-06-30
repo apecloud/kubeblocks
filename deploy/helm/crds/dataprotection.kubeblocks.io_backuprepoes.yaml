@@ -9,6 +9,8 @@ metadata:
 spec:
   group: dataprotection.kubeblocks.io
   names:
+    categories:
+    - kubeblocks
     kind: BackupRepo
     listKind: BackupRepoList
     plural: backuprepoes

@@ -133,11 +133,10 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 	if !meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeStorageProviderReady) {
 		// update status phase to failed
-		err := r.updateStatusPhase(reqCtx, repo)
-		if err != nil {
+		if err := r.updateStatusPhase(reqCtx, repo); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "update status phase failed")
 		}
-		// will reconcile again after storage provider becomes ready
+		// will reconcile again after the storage provider becomes ready
 		return intctrlutil.Reconciled()
 	}
 

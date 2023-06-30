@@ -180,7 +180,7 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
-	// noCreatePDB defines the PodDistruptionBudget creation behavior and is set to true if creation of PodDistruptionBudget
+	// noCreatePDB defines the PodDisruptionBudget creation behavior and is set to true if creation of PodDisruptionBudget
 	// for this component is not needed. It defaults to false.
 	// +kubebuilder:default=false
 	// +optional

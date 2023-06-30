@@ -177,7 +177,7 @@ var _ = Describe("StorageProvider controller", func() {
 			deleteCSIDriverObject("csi2")
 			By("checking status.phase, it should become NotReady")
 			Eventually(func(g Gomega) {
-				shouldReady(g, getProvider(g))
+				shouldNotReady(g, getProvider(g))
 			}).Should(Succeed())
 		})
 

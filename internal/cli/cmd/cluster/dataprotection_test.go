@@ -338,6 +338,11 @@ var _ = Describe("DataProtection", func() {
 		_ = cmdRestore.Flags().Set("source-cluster", clusterName)
 		cmdRestore.Run(nil, []string{})
 
+		// test with RFC3339 format
+		_ = cmdRestore.Flags().Set("restore-to-time", now.Format(time.RFC3339))
+		_ = cmdRestore.Flags().Set("source-cluster", clusterName)
+		cmdRestore.Run(nil, []string{"new-cluster"})
+
 		By("restore should be failed when backups belong to different source clusters")
 		o := &CreateRestoreOptions{CreateOptions: create.CreateOptions{
 			IOStreams: streams,

@@ -447,16 +447,20 @@ var _ = Describe("create", func() {
 		o.Namespace = testing.Namespace
 		o.RestoreTime = "Jun 16,2023 18:57:01 UTC+0800"
 		backupLogTime, _ := util.TimeParse(o.RestoreTime, time.Second)
-		backupLogTimeStr := backupLogTime.Format(time.RFC3339)
 		o.SourceCluster = clusterName
-		manifests := map[string]any{
-			"backupLog": map[string]any{
-				"startTime": backupLogTimeStr,
-				"stopTime":  backupLogTimeStr,
-			},
+		buildBackupLogTime := func(d time.Duration) string {
+			return backupLogTime.Add(d).Format(time.RFC3339)
 		}
-		mockBackupInfo(dynamic, baseBackupName, clusterName, manifests, "snapshot")
-		mockBackupInfo(dynamic, logBackupName, clusterName, manifests, "logfile")
+		buildManifests := func(startTime, stopTime string) map[string]any {
+			return map[string]any{
+				"backupLog": map[string]any{
+					"startTime": startTime,
+					"stopTime":  stopTime,
+				},
+			}
+		}
+		mockBackupInfo(dynamic, baseBackupName, clusterName, buildManifests(buildBackupLogTime(-30*time.Second), buildBackupLogTime(-10*time.Second)), "snapshot")
+		mockBackupInfo(dynamic, logBackupName, clusterName, buildManifests(buildBackupLogTime(-1*time.Minute), buildBackupLogTime(time.Minute)), "logfile")
 		By("fill cluster from backup success")
 		Expect(fillClusterInfoFromBackup(o, &cluster)).Should(Succeed())
 		Expect(cluster.Spec.ClusterDefRef).Should(Equal(testing.ClusterDefName))

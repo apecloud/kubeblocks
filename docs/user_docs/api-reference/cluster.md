@@ -2345,7 +2345,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>noCreatePDB defines the PodDistruptionBudget creation behavior and is set to true if creation of PodDistruptionBudget<br />for this component is not needed. It defaults to false.</p><br />
+<p>noCreatePDB defines the PodDisruptionBudget creation behavior and is set to true if creation of PodDisruptionBudget<br />for this component is not needed. It defaults to false.</p><br />
 </td>
 </tr>
 </tbody>

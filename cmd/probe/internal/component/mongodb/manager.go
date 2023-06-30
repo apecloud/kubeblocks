@@ -399,7 +399,7 @@ func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) e
 }
 
 func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
-	client, err := mgr.GetLeaderClient(ctx, cluster)
+	client, err := mgr.GetReplSetClient(ctx, cluster)
 	if err != nil {
 		mgr.Logger.Debugf("Get leader client failed: %v", err)
 		return false

@@ -199,6 +199,49 @@ spec:
             volumeMounts:
               - name: agamotto-configuration
                 mountPath: /opt/agamotto
+          - name: vttablet
+            image: {{ .Values.wesqlscale.image.registry | default "docker.io" }}/{{ .Values.wesqlscale.image.repository }}:{{ .Values.wesqlscale.image.tag }}
+            imagePullPolicy: {{ default .Values.wesqlscale.image.pullPolicy "IfNotPresent" }}
+            ports:
+              - containerPort: 15100
+                name: vttabletport
+              - containerPort: 16100
+                name: vttabletgrpc
+              - containerPort: 40000
+                name: delvedebug
+            env:
+              - name: CELL
+                value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
+              - name: ETCD_SERVER
+                value: "$(KB_CLUSTER_NAME)-etcd-headless"
+              - name: ETCD_PORT
+                value: "2379"
+              - name: TOPOLOGY_FLAGS
+                value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+              - name: VTTABLET_PORT
+                value: "15100"
+              - name: VTTABLET_GRPC_PORT
+                value: "16100"
+              - name: VTCTLD_HOST
+                value: "$(KB_CLUSTER_NAME)-vtctld-headless"
+              - name: VTCTLD_WEB_PORT
+                value: "15000"
+              - name: MYSQL_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+            command: ["/scripts/vttablet.sh"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
         volumes:
           - name: annotations
             downwardAPI:

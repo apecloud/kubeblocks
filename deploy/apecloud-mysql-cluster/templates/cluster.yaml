@@ -1,4 +1,16 @@
-{{- include "kblib.clusterCommon" . }}
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ include "kblib.clusterName" . }}
+  labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
+  {{- if and (eq .Values.mode "raftGroup") .Values.proxyEnabled }}
+  annotations:
+    kubeblocks.io/extra-env: '{"KB_PROXY_ENABLED":"on"}'
+  {{- end }}
+spec:
+  clusterVersionRef: {{ .Values.version }}
+  terminationPolicy: {{ .Values.extra.terminationPolicy }}
+  {{- include "kblib.affinity" . | indent 2 }}
   clusterDefinitionRef: apecloud-mysql # ref clusterdefinition.name
   componentSpecs:
     - name: mysql

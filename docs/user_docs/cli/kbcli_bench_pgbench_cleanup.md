@@ -8,6 +8,13 @@ Cleanup pgbench test data for a PostgreSQL cluster
 kbcli bench pgbench cleanup [flags]
 ```
 
+### Examples
+
+```
+  # pgbench cleanup data on a cluster
+  kbcli bench pgbench cleanup pgcluster --database postgres --user xxx --password xxx
+```
+
 ### Options
 
 ```

@@ -255,8 +255,8 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 		return startTime, stopTime
 	}
 	logfileStartTime, logfileStopTime := getLogfileStartTimeAndStopTime()
-	// if not exists the start time of the first log file, return
-	if logfileStartTime.IsZero() {
+	// if not exists the startTime/stopTime of the first log file, return
+	if logfileStartTime.IsZero() || logfileStopTime.IsZero() {
 		return nil
 	}
 	getFirstRecoverableBaseBackup := func() *Backup {
@@ -269,8 +269,9 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 				b.Status.Manifests.BackupLog.StopTime == nil {
 				continue
 			}
-			// checks if the 'stopTime' greater than or equals 'logfileStartTime'.
-			if !b.Status.Manifests.BackupLog.StopTime.Before(&logfileStartTime) {
+			// checks if the baseBackup stop time is between logfileStartTime and logfileStopTime.
+			if !b.Status.Manifests.BackupLog.StopTime.Before(&logfileStartTime) &&
+				b.Status.Manifests.BackupLog.StopTime.Before(&logfileStopTime) {
 				return &b
 			}
 		}

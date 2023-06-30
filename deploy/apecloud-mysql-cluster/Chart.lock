@@ -1,6 +1,0 @@
-dependencies:
-- name: cluster-libchart
-  repository: file://../cluster-libchart
-  version: 0.1.0
-digest: sha256:db6767813b4a50f4e13040ba3d51586c257b8a7f3a8ef7fa5455807b31de1a7d
-generated: "2023-06-19T18:27:00.65571+08:00"

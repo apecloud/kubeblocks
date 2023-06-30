@@ -27,7 +27,7 @@ type DBManager interface {
 	HasOtherHealthyLeader(*dcs.Cluster) *dcs.Member
 	HasOtherHealthyMembers(*dcs.Cluster) []*dcs.Member
 	GetCurrentMemberName() string
-	GetMemberAddrs() []string
+	GetMemberAddrs(*dcs.Cluster) []string
 	GetLogger() logger.Logger
 }
 

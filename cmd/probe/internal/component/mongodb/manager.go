@@ -233,8 +233,15 @@ func (mgr *Manager) SetReplSetConfig(ctx context.Context, rsClient *mongo.Client
 	return nil
 }
 
-func (mgr *Manager) GetMemberAddrs() []string {
-	rsConfig, err := mgr.GetReplSetConfig(context.TODO())
+func (mgr *Manager) GetMemberAddrs(cluster *dcs.Cluster) []string {
+	client, err := mgr.GetReplSetClient(context.TODO(), cluster)
+	if err != nil {
+		mgr.Logger.Errorf("Get replSet client failed: %v", err)
+		return nil
+	}
+
+	defer client.Disconnect(context.TODO())
+	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
 		return nil

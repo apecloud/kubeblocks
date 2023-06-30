@@ -55,6 +55,9 @@ import (
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 
+	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
+	storagecontrollers "github.com/apecloud/kubeblocks/controllers/storage"
+
 	// +kubebuilder:scaffold:imports
 
 	discoverycli "k8s.io/client-go/discovery"
@@ -86,6 +89,7 @@ func init() {
 	utilruntime.Must(snapshotv1beta1.AddToScheme(scheme))
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(workloadsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(storagev1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
@@ -363,6 +367,15 @@ func main() {
 		Recorder: mgr.GetEventRecorderFor("replicated-state-machine-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ReplicatedStateMachine")
+		os.Exit(1)
+	}
+
+	if err = (&storagecontrollers.StorageProviderReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("storage-provider-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "StorageProvider")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

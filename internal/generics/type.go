@@ -34,6 +34,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 )
 
 // Object a generic representation of various resource object types
@@ -76,6 +77,7 @@ var PodDisruptionBudgetSignature = func(_ policyv1.PodDisruptionBudget, _ policy
 }
 
 var StorageClassSignature = func(_ storagev1.StorageClass, _ storagev1.StorageClassList) {}
+var CSIDriverSignature = func(_ storagev1.CSIDriver, _ storagev1.CSIDriverList) {}
 
 var VolumeSnapshotSignature = func(_ snapshotv1.VolumeSnapshot, _ snapshotv1.VolumeSnapshotList) {}
 
@@ -101,6 +103,8 @@ var AddonSignature = func(_ extensionsv1alpha1.Addon, _ extensionsv1alpha1.Addon
 }
 var ComponentResourceConstraintSignature = func(_ appsv1alpha1.ComponentResourceConstraint, _ appsv1alpha1.ComponentResourceConstraintList) {}
 var ComponentClassDefinitionSignature = func(_ appsv1alpha1.ComponentClassDefinition, _ appsv1alpha1.ComponentClassDefinitionList) {}
+
+var StorageProviderSignature = func(_ storagev1alpha1.StorageProvider, _ storagev1alpha1.StorageProviderList) {}
 
 func ToGVK(object client.Object) schema.GroupVersionKind {
 	t := reflect.TypeOf(object)

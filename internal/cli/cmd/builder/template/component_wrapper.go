@@ -161,7 +161,7 @@ func (w *templateRenderWorkflow) dumpRenderedTemplates(outputDir string, objects
 		}
 		comName, _ := w.getComponentName(componentDef.Name, cluster)
 		cfgName := cfgcore.GetComponentCfgName(cluster.Name, comName, template.Name)
-		if err := renderTemplates(template, outputDir, objects, componentDef.Name, cfgName); err != nil {
+		if err := dumpTemplate(template, outputDir, objects, componentDef.Name, cfgName); err != nil {
 			return err
 		}
 	}
@@ -174,7 +174,6 @@ func getClusterDefComponents(clusterDefObj *appsv1alpha1.ClusterDefinition, comp
 	}
 	component := clusterDefObj.GetComponentDefByName(componentName)
 	if component == nil {
-		//return nil, cfgcore.MakeError("component[%s] is not defined in cluster definition", componentName)
 		return nil
 	}
 	return []appsv1alpha1.ClusterComponentDefinition{*component}
@@ -241,7 +240,7 @@ func NewWorkflowTemplateRender(helmTemplateDir string, opts RenderedOptions, clu
 	}, nil
 }
 
-func renderTemplates(configSpec appsv1alpha1.ComponentTemplateSpec, outputDir string, objects []client.Object, componentDefName string, cfgName string) error {
+func dumpTemplate(configSpec appsv1alpha1.ComponentTemplateSpec, outputDir string, objects []client.Object, componentDefName string, cfgName string) error {
 	output := filepath.Join(outputDir, cfgName)
 	fmt.Printf("dump rendering template spec: %s, output directory: %s\n",
 		printer.BoldYellow(fmt.Sprintf("%s.%s", componentDefName, configSpec.Name)), output)

@@ -154,7 +154,7 @@ func (mgr *Manager) InitiateReplSet(cluster *dcs.Cluster) error {
 
 	for i, member := range cluster.Members {
 		configMembers[i].ID = i
-		configMembers[i].Host = mgr.GetMemberAddr(member.Name) + ":" + member.DBPort
+		configMembers[i].Host = cluster.GetMemberAddr(member)
 		if strings.HasPrefix(member.Name, mgr.CurrentMemberName) {
 			configMembers[i].Priority = 2
 		} else {
@@ -188,8 +188,12 @@ func (mgr *Manager) IsClusterInitialized() (bool, error) {
 }
 
 func (mgr *Manager) GetReplSetConfig(ctx context.Context) (*RSConfig, error) {
+	return mgr.GetReplSetConfigWithClient(ctx, mgr.Client)
+}
+
+func (mgr *Manager) GetReplSetConfigWithClient(ctx context.Context, client *mongo.Client) (*RSConfig, error) {
 	resp := ReplSetGetConfig{}
-	res := mgr.Client.Database("admin").RunCommand(ctx, bson.D{{Key: "replSetGetConfig", Value: 1}})
+	res := client.Database("admin").RunCommand(ctx, bson.D{{Key: "replSetGetConfig", Value: 1}})
 	if res.Err() != nil {
 		err := errors.Wrap(res.Err(), "replSetGetConfig")
 		mgr.Logger.Errorf("Get replSet config: %v", err)
@@ -237,7 +241,17 @@ func (mgr *Manager) SetReplSetConfig(ctx context.Context, rsClient *mongo.Client
 	return nil
 }
 
-func (mgr *Manager) GetReplSetHosts(rsConfig *RSConfig) []string {
+func (mgr *Manager) GetMemberAddrs() []string {
+	rsConfig, err := mgr.GetReplSetConfig(context.TODO())
+	if rsConfig == nil {
+		mgr.Logger.Errorf("Get replSet config failed: %v", err)
+		return nil
+	}
+
+	return mgr.GetMemberAddrsFromRSConfig(rsConfig)
+}
+
+func (mgr *Manager) GetMemberAddrsFromRSConfig(rsConfig *RSConfig) []string {
 	if rsConfig == nil {
 		return []string{}
 	}
@@ -250,6 +264,11 @@ func (mgr *Manager) GetReplSetHosts(rsConfig *RSConfig) []string {
 }
 
 func (mgr *Manager) GetReplSetClient(ctx context.Context, hosts []string) (*mongo.Client, error) {
+	if len(hosts) == 0 {
+		mgr.Logger.Errorf("Get replset client whitout hosts")
+		return nil, errors.New("Get replset client whitout hosts")
+	}
+
 	opts := options.Client().
 		SetHosts(hosts).
 		SetReplicaSet(config.replSetName).
@@ -267,8 +286,28 @@ func (mgr *Manager) GetReplSetClient(ctx context.Context, hosts []string) (*mong
 	}
 	return client, err
 }
+
 func (mgr *Manager) Initialize() {}
 func (mgr *Manager) IsRunning()  {}
+
+func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
+	hosts := cluster.GetMemberAddrs()
+	client, _ := mgr.GetReplSetClient(context.TODO(), hosts)
+	defer client.Disconnect(context.TODO())
+	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
+	if rsConfig == nil {
+		mgr.Logger.Errorf("Get replSet config failed: %v", err)
+		return false
+	}
+
+	for _, member := range rsConfig.Members {
+		if strings.HasPrefix(member.Host, mgr.GetCurrentMemberName()) {
+			return true
+		}
+	}
+
+	return false
+}
 
 func (mgr *Manager) IsCurrentMemberHealthy() bool {
 	return mgr.IsMemberHealthy(mgr.CurrentMemberName)
@@ -288,8 +327,59 @@ func (mgr *Manager) IsMemberHealthy(memberName string) bool {
 	return false
 }
 
-func (mgr *Manager) Recover()      {}
-func (mgr *Manager) AddToCluster() {}
+func (mgr *Manager) Recover() {}
+
+func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
+	hosts := cluster.GetMemberAddrs()
+	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
+	currentHost := cluster.GetMemberAddr(*currentMember)
+	client, _ := mgr.GetReplSetClient(context.TODO(), hosts)
+	defer client.Disconnect(context.TODO())
+	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
+	if rsConfig == nil {
+		mgr.Logger.Errorf("Get replSet config failed: %v", err)
+		return err
+	}
+
+	var lastId int
+	var configMember ConfigMember
+	for _, configMember = range rsConfig.Members {
+		if configMember.ID > lastId {
+			lastId = configMember.ID
+		}
+	}
+	configMember.ID = lastId + 1
+	configMember.Host = currentHost
+	configMember.Priority = 1
+	rsConfig.Members = append(rsConfig.Members, configMember)
+
+	rsConfig.Version++
+	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
+}
+
+func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) error {
+	hosts := cluster.GetMemberAddrs()
+	client, _ := mgr.GetReplSetClient(context.TODO(), hosts)
+	defer client.Disconnect(context.TODO())
+	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
+	if rsConfig == nil {
+		mgr.Logger.Errorf("Get replSet config failed: %v", err)
+		return err
+	}
+
+	mgr.Logger.Infof("Delete member: %s", host)
+	configMembers := make([]ConfigMember, 0, len(rsConfig.Members)-1)
+	for _, configMember := range rsConfig.Members {
+		if configMember.Host != host {
+			configMembers = append(configMembers, configMember)
+		}
+	}
+
+	rsConfig.Members = configMembers
+	rsConfig.Version++
+	return mgr.SetReplSetConfig(context.TODO(), client, rsConfig)
+}
+
 func (mgr *Manager) Premote() error {
 	rsConfig, err := mgr.GetReplSetConfig(context.TODO())
 	if rsConfig == nil {
@@ -297,7 +387,7 @@ func (mgr *Manager) Premote() error {
 		return err
 	}
 
-	hosts := mgr.GetReplSetHosts(rsConfig)
+	hosts := mgr.GetMemberAddrsFromRSConfig(rsConfig)
 	client, _ := mgr.GetReplSetClient(context.TODO(), hosts)
 	defer client.Disconnect(context.TODO())
 	for i, _ := range rsConfig.Members {

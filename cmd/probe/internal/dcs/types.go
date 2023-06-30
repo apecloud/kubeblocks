@@ -1,7 +1,10 @@
 package dcs
 
+import "fmt"
+
 type Cluster struct {
 	ClusterCompName string
+	Namespace       string
 	Replicas        int32
 	HaConfig        *HaConfig
 	Leader          *Leader
@@ -46,6 +49,18 @@ func (c *Cluster) IsLocked() bool {
 
 func (c *Cluster) GetOpTime() int64 {
 	return c.OpTime
+}
+
+func (c *Cluster) GetMemberAddr(member Member) string {
+	return fmt.Sprintf("%s.%s-headless.%s.svc:%s", member.Name, c.ClusterCompName, c.Namespace, member.DBPort)
+}
+
+func (c *Cluster) GetMemberAddrs() []string {
+	hosts := make([]string, len(c.Members))
+	for i, member := range c.Members {
+		hosts[i] = c.GetMemberAddr(member)
+	}
+	return hosts
 }
 
 type HaConfig struct {

@@ -2,6 +2,8 @@ package highavailability
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/dapr/kit/logger"
@@ -45,10 +47,9 @@ func (ha *Ha) RunCycle() {
 	//		dcs.ReleaseLock()
 	//	}
 
-	//case !cluster.HasThisMember():
-	//	logger.Infof("Current node is not in cluster, add it to cluster")
-	//	dbManager.AddToCluser(cluster)
-	//	cluster.AddThisMember()
+	case !ha.dbManager.IsCurrentMemberInCluster(cluster) && int(cluster.Replicas) == len(ha.dbManager.GetMemberAddrs()):
+		ha.logger.Infof("Current member is not in cluster, add it to cluster")
+		ha.dbManager.AddCurrentMemberToCluster(cluster)
 
 	case !ha.dbManager.IsCurrentMemberHealthy():
 		ha.logger.Infof("DB Service is not healthy,  do some recover")
@@ -87,6 +88,10 @@ func (ha *Ha) RunCycle() {
 		if ok, _ := ha.dbManager.IsLeader(context.TODO()); ok {
 			ha.logger.Infof("Refresh leader ttl")
 			ha.dcs.UpdateLock()
+			if int(cluster.Replicas) < len(ha.dbManager.GetMemberAddrs()) {
+				ha.DecreaseClusterReplicas(cluster)
+			}
+
 		} else if ha.dbManager.HasOtherHealthyLeader(cluster) != nil {
 			ha.logger.Infof("Release leader")
 			ha.dcs.ReleaseLock()
@@ -149,6 +154,24 @@ func (ha *Ha) Start() {
 		ha.RunCycle()
 		time.Sleep(1 * time.Second)
 	}
+}
+
+func (ha *Ha) DecreaseClusterReplicas(cluster *dcs.Cluster) {
+	hosts := ha.dbManager.GetMemberAddrs()
+	sort.Strings(hosts)
+	deleteHost := hosts[len(hosts)-1]
+	ha.logger.Infof("Delete member: %s", deleteHost)
+	// The pods in the cluster are managed by a StatefulSet. If the replica count is decreased,
+	// then the last pod will be removed first.
+	//
+	if strings.HasPrefix(deleteHost, ha.dbManager.GetCurrentMemberName()) {
+		ha.logger.Infof("The last pod %s is the primary member and cannot be deleted. waiting "+
+			"for The controller to perform a switchover to a new primary member before this pod can be removed. ", deleteHost)
+		ha.dbManager.Demote()
+		ha.dcs.ReleaseLock()
+		return
+	}
+	ha.dbManager.DeleteMemberFromCluster(cluster, deleteHost)
 }
 
 func (ha *Ha) IsHealthiestMember(cluster *dcs.Cluster) bool {

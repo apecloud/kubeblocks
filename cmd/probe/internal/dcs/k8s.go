@@ -147,6 +147,7 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 
 	cluster := &Cluster{
 		ClusterCompName: store.clusterCompName,
+		Namespace:       store.namespace,
 		Replicas:        replicas,
 		Members:         members,
 		Leader:          leader,

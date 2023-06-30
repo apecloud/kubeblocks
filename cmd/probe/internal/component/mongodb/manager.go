@@ -2,10 +2,10 @@ package mongodb
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
-	"fmt"
 
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
@@ -257,17 +257,17 @@ func (mgr *Manager) GetMemberAddrsFromRSConfig(rsConfig *RSConfig) []string {
 
 func (mgr *Manager) GetReplSetClient(ctx context.Context, cluster *dcs.Cluster) (*mongo.Client, error) {
 	hosts := cluster.GetMemberAddrs()
-	return  mgr.GetReplSetClientWithHosts(context.TODO(), hosts)
+	return mgr.GetReplSetClientWithHosts(context.TODO(), hosts)
 }
 
 func (mgr *Manager) GetLeaderClient(ctx context.Context, cluster *dcs.Cluster) (*mongo.Client, error) {
-	if cluster.Leader == nil || cluster.Leader.Name=="" {
+	if cluster.Leader == nil || cluster.Leader.Name == "" {
 		return nil, fmt.Errorf("cluster has no leader")
 	}
 
 	leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
 	host := cluster.GetMemberAddr(*leaderMember)
-	return  mgr.GetReplSetClientWithHosts(context.TODO(), []string{host})
+	return mgr.GetReplSetClientWithHosts(context.TODO(), []string{host})
 }
 
 func (mgr *Manager) GetReplSetClientWithHosts(ctx context.Context, hosts []string) (*mongo.Client, error) {
@@ -300,6 +300,7 @@ func (mgr *Manager) IsRunning()  {}
 func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 	client, err := mgr.GetReplSetClient(context.TODO(), cluster)
 	if err != nil {
+		mgr.Logger.Errorf("Get replSet client failed: %v", err)
 		return true
 	}
 
@@ -307,7 +308,7 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
-		// 
+		//
 		return true
 	}
 
@@ -398,8 +399,9 @@ func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) e
 }
 
 func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
-	client, err:= mgr.GetLeaderClient(ctx, cluster)
+	client, err := mgr.GetLeaderClient(ctx, cluster)
 	if err != nil {
+		mgr.Logger.Debugf("Get leader client failed: %v", err)
 		return false
 	}
 	defer client.Disconnect(ctx)

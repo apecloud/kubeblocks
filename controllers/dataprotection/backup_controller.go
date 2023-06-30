@@ -738,9 +738,11 @@ func (r *BackupReconciler) checkBackupIsCompletedDuringRunning(reqCtx intctrluti
 	patch := client.MergeFrom(backup.DeepCopy())
 	backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
-	// round the duration to a multiple of seconds.
-	duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
-	backup.Status.Duration = &metav1.Duration{Duration: duration}
+	if !backup.Status.StartTimestamp.IsZero() {
+		// round the duration to a multiple of seconds.
+		duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
+		backup.Status.Duration = &metav1.Duration{Duration: duration}
+	}
 	return backupPolicy, true, r.Client.Status().Patch(reqCtx.Ctx, backup, patch)
 }
 

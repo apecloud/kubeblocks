@@ -193,7 +193,7 @@ func (o *PgBenchOptions) Run() error {
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace:    "default",
+			Namespace:    o.namespace,
 			GenerateName: fmt.Sprintf("test-pgbench-%s-", o.Mode),
 			Labels: map[string]string{
 				"pgbench": fmt.Sprintf("test-pgbench-%s", o.Database),

@@ -98,3 +98,15 @@ const (
 	PodRestoreScopeAll       = "All"
 	PodRestoreScopeReadWrite = "ReadWrite"
 )
+
+// BackupRepoPhase defines phases for BackupRepo CR.
+// +enum
+// +kubebuilder:validation:Enum={PreChecking,Failed,Ready,Deleting}
+type BackupRepoPhase string
+
+const (
+	BackupRepoPreChecking BackupRepoPhase = "PreChecking"
+	BackupRepoFailed      BackupRepoPhase = "Failed"
+	BackupRepoReady       BackupRepoPhase = "Ready"
+	BackupRepoDeleting    BackupRepoPhase = "Deleting"
+)

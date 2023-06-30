@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -265,4 +267,91 @@ func buildDeleteBackupFilesJobNamespacedName(backup *dataprotectionv1alpha1.Back
 		jobName = jobName[:63]
 	}
 	return types.NamespacedName{Namespace: backup.Namespace, Name: jobName}
+}
+
+// ============================================================================
+// refObjectMapper
+// ============================================================================
+
+type refObjectMapper struct {
+	mu     sync.Mutex
+	once   sync.Once
+	ref    map[string]string   // key is the referent, value is the referenced object.
+	invert map[string][]string // invert map, key is the referenced object, value is the list of referent.
+}
+
+func (r *refObjectMapper) init() {
+	r.once.Do(func() {
+		r.ref = make(map[string]string)
+		r.invert = make(map[string][]string)
+	})
+}
+
+func (r *refObjectMapper) setRef(referent client.Object, referencedKey types.NamespacedName) {
+	r.init()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	left := toFlattenName(client.ObjectKeyFromObject(referent))
+	right := toFlattenName(referencedKey)
+	if oldRight, ok := r.ref[left]; ok {
+		r.removeInvertLocked(left, oldRight)
+	}
+	r.addInvertLocked(left, right)
+	r.ref[left] = right
+}
+
+func (r *refObjectMapper) removeRef(referent client.Object) {
+	r.init()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	left := toFlattenName(client.ObjectKeyFromObject(referent))
+	if right, ok := r.ref[left]; ok {
+		r.removeInvertLocked(left, right)
+		delete(r.ref, left)
+	}
+}
+
+func (r *refObjectMapper) mapToRequests(referenced client.Object) []ctrl.Request {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	right := toFlattenName(client.ObjectKeyFromObject(referenced))
+	l := r.invert[right]
+	var ret []ctrl.Request
+	for _, v := range l {
+		name, namespace := fromFlattenName(v)
+		ret = append(ret, ctrl.Request{NamespacedName: client.ObjectKey{Namespace: namespace, Name: name}})
+	}
+	return ret
+}
+
+func (r *refObjectMapper) addInvertLocked(left string, right string) {
+	// no duplicated item in the list
+	l := r.invert[right]
+	r.invert[right] = append(l, left)
+}
+
+func (r *refObjectMapper) removeInvertLocked(left string, right string) {
+	l := r.invert[right]
+	for i, v := range l {
+		if v == left {
+			l[i] = l[len(l)-1]
+			r.invert[right] = l[:len(l)-1]
+			return
+		}
+	}
+}
+
+func toFlattenName(key types.NamespacedName) string {
+	return key.Namespace + "/" + key.Name
+}
+
+func fromFlattenName(flatten string) (name string, namespace string) {
+	parts := strings.SplitN(flatten, "/", 2)
+	if len(parts) == 2 {
+		namespace = parts[0]
+		name = parts[1]
+	} else {
+		name = flatten
+	}
+	return
 }

@@ -99,6 +99,8 @@ var BackupToolSignature = func(_ dataprotectionv1alpha1.BackupTool, _ dataprotec
 }
 var RestoreJobSignature = func(_ dataprotectionv1alpha1.RestoreJob, _ dataprotectionv1alpha1.RestoreJobList) {
 }
+var BackupRepoSignature = func(_ dataprotectionv1alpha1.BackupRepo, _ dataprotectionv1alpha1.BackupRepoList) {
+}
 var AddonSignature = func(_ extensionsv1alpha1.Addon, _ extensionsv1alpha1.AddonList) {
 }
 var ComponentResourceConstraintSignature = func(_ appsv1alpha1.ComponentResourceConstraint, _ appsv1alpha1.ComponentResourceConstraintList) {}

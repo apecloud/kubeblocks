@@ -175,16 +175,12 @@ func (r *StorageProviderReconciler) removeDependency(provider *storagev1alpha1.S
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	list := r.driverDependencies[provider.Spec.CSIDriverName]
-	found := false
 	for i, x := range list {
 		if x == provider.Name {
 			list[i] = list[len(list)-1]
-			found = true
-			break
+			r.driverDependencies[provider.Spec.CSIDriverName] = list[:len(list)-1]
+			return
 		}
-	}
-	if found {
-		r.driverDependencies[provider.Spec.CSIDriverName] = list[:len(list)-1]
 	}
 }
 

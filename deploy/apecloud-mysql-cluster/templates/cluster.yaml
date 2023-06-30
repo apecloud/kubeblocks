@@ -1,77 +1,16 @@
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: {{ include "clustername" . }}
-  labels: {{ include "apecloud-mysql-cluster.labels" . | nindent 4 }}
-spec:
-  clusterDefinitionRef: apecloud-mysql  # ref clusterdefinition.name
-  clusterVersionRef: ac-mysql-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
-  terminationPolicy: {{ .Values.terminationPolicy }}
-  affinity:
-    {{- with .Values.topologyKeys }}
-    topologyKeys: {{ . | toYaml | nindent 6 }}
-    {{- end }}
-  {{- with $.Values.tolerations }}
-  tolerations: {{ . | toYaml | nindent 4 }}
-  {{- end }}
+{{- include "kblib.clusterCommon" . }}
+  clusterDefinitionRef: apecloud-mysql # ref clusterdefinition.name
   componentSpecs:
-    - name: mysql # user-defined
+    - name: mysql
       componentDefRef: mysql # ref clusterdefinition componentDefs.name
-      monitor: {{ .Values.monitor.enabled | default false }}
-      replicas: {{ .Values.replicaCount | default 3 }}
-      serviceAccountName: {{ include "apecloud-mysql-cluster.serviceAccountName" . }}
-      enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}
-      {{- with  .Values.resources }}
-      resources:
-        limits:
-          cpu: {{ .limits.cpu | quote }}
-          memory: {{ .limits.memory | quote }}
-        requests:
-          cpu: {{ .requests.cpu | quote }}
-          memory: {{ .requests.memory | quote }}
-      {{- end }}
-      {{- if .Values.persistence.enabled }}
-      volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
-          spec:
-            storageClassName: {{ .Values.persistence.data.storageClassName }}
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: {{ .Values.persistence.data.size }}
-        {{- if .Values.persistence.wal.enabled }}
-        - name: wallog
-          spec:
-            storageClassName: {{ .Values.persistence.wal.storageClassName }}
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: {{ .Values.persistence.wal.size }}
-        {{- end }}
-        {{- if  .Values.persistence.log.enabled }}
-        - name: log
-          spec:
-            storageClassName: {{ .Values.persistence.log.storageClassName }}
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: {{ .Values.persistence.log.size }}
-        {{- end }}
-      {{- end }}
-    {{- if .Values.proxyEnabled }}
-    - name: etcd
-      componentDefRef: etcd # ref clusterdefinition componentDefs.name
-      replicas: 1
-    - name: vtctld
-      componentDefRef: vtctld # ref clusterdefinition componentDefs.name
-      replicas: 1
-    - name: vtconsensus
-      componentDefRef: vtconsensus # ref clusterdefinition componentDefs.name
-      replicas: 1
-    - name: vtgate
-      componentDefRef: vtgate # ref clusterdefinition componentDefs.name
-      replicas: 1
+      {{- include "kblib.componentMonitor" . | indent 6 }}
+      {{- include "apecloud-mysql-cluster.replicaCount" . | indent 6 }}
+      enabledLogs:
+        - slow
+        - error
+      serviceAccountName: {{ include "kblib.serviceAccountName" . }}
+      {{- include "kblib.componentResources" . | indent 6 }}
+      {{- include "kblib.componentServices" . | indent 6 }}
+    {{- if and (eq .Values.mode "raftGroup") .Values.proxyEnabled }}
+    {{- include "apecloud-mysql-cluster.proxyComponents" . | indent 4 }}
     {{- end }}

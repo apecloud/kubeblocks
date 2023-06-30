@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -33,7 +34,9 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
@@ -86,16 +89,17 @@ func (w *templateRenderWorkflow) Do(outputDir string) error {
 		if err != nil {
 			return err
 		}
+		cfgName := cfgcore.GetComponentCfgName(cluster.Name, compName, configSpec.configSpec.Name)
 		objects, ok := cache[configSpec.component]
 		if !ok {
-			objs, err := createComponentObjects(w, ctx, cli, configSpec.component, cluster)
+			objs, err := generateComponentObjects(w, ctx, cli, configSpec.component, cluster)
 			if err != nil {
 				return err
 			}
 			cache[configSpec.component] = objs
 			objects = objs
 		}
-		if err := renderTemplates(configSpec.configSpec, outputDir, cluster.Name, compName, objects, configSpec.component); err != nil {
+		if err := renderTemplates(configSpec.configSpec, outputDir, objects, configSpec.component, cfgName); err != nil {
 			return err
 		}
 	}
@@ -206,8 +210,7 @@ func checkAndFillPortProtocol(clusterDefComponents []appsv1alpha1.ClusterCompone
 	}
 }
 
-func renderTemplates(configSpec appsv1alpha1.ComponentTemplateSpec, outputDir, clusterName, compName string, objects []client.Object, componentDefName string) error {
-	cfgName := cfgcore.GetComponentCfgName(clusterName, compName, configSpec.Name)
+func renderTemplates(configSpec appsv1alpha1.ComponentTemplateSpec, outputDir string, objects []client.Object, componentDefName string, cfgName string) error {
 	output := filepath.Join(outputDir, cfgName)
 	fmt.Printf("dump rendering template spec: %s, output directory: %s\n",
 		printer.BoldYellow(fmt.Sprintf("%s.%s", componentDefName, configSpec.Name)), output)
@@ -232,30 +235,40 @@ func renderTemplates(configSpec appsv1alpha1.ComponentTemplateSpec, outputDir, c
 	return nil
 }
 
-func createComponentObjects(w *templateRenderWorkflow, ctx intctrlutil.RequestCtx, cli client.Client,
+func generateComponentObjects(w *templateRenderWorkflow, ctx intctrlutil.RequestCtx, cli *mockClient,
 	componentType string, cluster *appsv1alpha1.Cluster) ([]client.Object, error) {
+	cmGVK := generics.ToGVK(&corev1.ConfigMap{})
+
+	objs := make([]client.Object, 0)
+	cli.SetResourceHandler(&ResourceHandler{
+		Matcher: []ResourceMatcher{func(obj runtime.Object) bool {
+			res := obj.(client.Object)
+			return generics.ToGVK(res) == cmGVK &&
+				res.GetLabels() != nil &&
+				res.GetLabels()[constant.CMTemplateNameLabelKey] != ""
+		}},
+		Handler: func(obj runtime.Object) error {
+			objs = append(objs, obj.(client.Object))
+			return nil
+		},
+	})
+
 	compName, err := w.getComponentName(componentType, cluster)
 	if err != nil {
 		return nil, err
 	}
 	clusterVersionObj := GetTypedResourceObjectBySignature(w.localObjects, generics.ClusterVersionSignature)
-	component, err := components.NewComponent(ctx, cli, w.clusterDefObj, clusterVersionObj, cluster, compName, nil)
+	component, err := components.NewComponent(ctx, cli, w.clusterDefObj, clusterVersionObj, cluster, compName, graph.NewDAG())
 	if err != nil {
 		return nil, err
 	}
-
-	objs := make([]client.Object, 0)
 	secret, err := builder.BuildConnCredential(w.clusterDefObj, cluster, component.GetSynthesizedComponent())
 	if err != nil {
 		return nil, err
 	}
-	objs = append(objs, secret)
-
-	compObjs, err := component.GetBuiltObjects(ctx, cli)
-	if err != nil {
+	cli.AppendMockObjects(secret)
+	if err = component.Create(ctx, cli); err != nil {
 		return nil, err
 	}
-	objs = append(objs, compObjs...)
-
 	return objs, nil
 }

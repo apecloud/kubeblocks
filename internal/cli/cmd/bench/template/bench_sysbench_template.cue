@@ -17,11 +17,11 @@
 
 // required, command line input options for parameters and flags
 options: {
-	flag: int
+	flag:     int
 	mode:     string
 	driver:   string
 	database: string
-	value: 		string
+	value:    string
 }
 
 // required, k8s api resource content

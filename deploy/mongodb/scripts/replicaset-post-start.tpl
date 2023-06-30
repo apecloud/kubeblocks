@@ -21,7 +21,8 @@ fi
 
 until mongosh --quiet --port $PORT --eval "print('I am ready')"; do sleep 1; done
 
-until is_inited=$(mongosh --quiet --port $PORT --eval "rs.status().set" -u root --password $MONGODB_ROOT_PASSWORD || mongosh --quiet --port $PORT --eval "try { rs.status().set } catch (e) { '' }") ; do
+until is_inited=$(mongosh --quiet --port $PORT --eval "rs.status().set" -u root --password $MONGODB_ROOT_PASSWORD || \
+mongosh --quiet --port $PORT --eval "try { rs.status().set } catch (e) { if (e.codeName=='NotYetInitialized') {print('')} else {exit(1)} }") ; do 
   sleep 1;
 done
 

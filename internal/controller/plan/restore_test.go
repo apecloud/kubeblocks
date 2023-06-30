@@ -196,9 +196,10 @@ var _ = Describe("PITR Functions", func() {
 
 			By("By creating base backup: ")
 			backupLabels := map[string]string{
-				constant.AppInstanceLabelKey:    sourceCluster,
-				constant.KBAppComponentLabelKey: mysqlCompName,
-				constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeDataFile),
+				constant.AppInstanceLabelKey:              sourceCluster,
+				constant.KBAppComponentLabelKey:           mysqlCompName,
+				constant.BackupTypeLabelKeyKey:            string(dpv1alpha1.BackupTypeDataFile),
+				constant.DataProtectionLabelClusterUIDKey: string(cluster.UID),
 			}
 			backup = testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 				WithRandomName().SetLabels(backupLabels).
@@ -212,6 +213,7 @@ var _ = Describe("PITR Functions", func() {
 				StartTimestamp:            baseStartTime,
 				CompletionTimestamp:       baseStopTime,
 				BackupToolName:            backupToolName,
+				SourceCluster:             clusterName,
 				PersistentVolumeClaimName: remotePVC.Name,
 				Manifests: &dpv1alpha1.ManifestsStatus{
 					BackupLog: &dpv1alpha1.BackupLogStatus{
@@ -223,15 +225,16 @@ var _ = Describe("PITR Functions", func() {
 			patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backup))
 
 			By("By creating incremental backup: ")
-			incrBackupLabels := map[string]string{
-				constant.AppInstanceLabelKey:    sourceCluster,
-				constant.KBAppComponentLabelKey: mysqlCompName,
-				constant.BackupTypeLabelKeyKey:  string(dpv1alpha1.BackupTypeLogFile),
+			logfileBackupLabels := map[string]string{
+				constant.AppInstanceLabelKey:              sourceCluster,
+				constant.KBAppComponentLabelKey:           mysqlCompName,
+				constant.BackupTypeLabelKeyKey:            string(dpv1alpha1.BackupTypeLogFile),
+				constant.DataProtectionLabelClusterUIDKey: string(cluster.UID),
 			}
 			incrStartTime := &startTime
 			incrStopTime := &stopTime
-			backupIncr := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-				WithRandomName().SetLabels(incrBackupLabels).
+			logfileBackup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+				WithRandomName().SetLabels(logfileBackupLabels).
 				SetBackupPolicyName("test-fake").
 				SetBackupType(dpv1alpha1.BackupTypeLogFile).
 				Create(&testCtx).GetObject()
@@ -239,6 +242,7 @@ var _ = Describe("PITR Functions", func() {
 				Phase:                     dpv1alpha1.BackupCompleted,
 				StartTimestamp:            incrStartTime,
 				CompletionTimestamp:       incrStopTime,
+				SourceCluster:             clusterName,
 				PersistentVolumeClaimName: remotePVC.Name,
 				BackupToolName:            backupToolName,
 				Manifests: &dpv1alpha1.ManifestsStatus{
@@ -248,7 +252,7 @@ var _ = Describe("PITR Functions", func() {
 					},
 				},
 			}
-			patchBackupStatus(backupStatus, client.ObjectKeyFromObject(backupIncr))
+			patchBackupStatus(backupStatus, client.ObjectKeyFromObject(logfileBackup))
 		})
 
 		It("Test restore", func() {

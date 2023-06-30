@@ -37,15 +37,13 @@ var _ = Describe("init transformer test.", func() {
 
 		transCtx = &rsmTransformContext{
 			Context:       ctx,
-			Client:        k8sMock,
+			Client:        graphCli,
 			EventRecorder: nil,
 			Logger:        logger,
-			rsmOrig:       rsm.DeepCopy(),
-			rsm:           rsm,
 		}
 
 		dag = graph.NewDAG()
-		transformer = &initTransformer{}
+		transformer = &initTransformer{ReplicatedStateMachine: rsm}
 	})
 
 	Context("dag init", func() {
@@ -53,8 +51,8 @@ var _ = Describe("init transformer test.", func() {
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			dagExpected := graph.NewDAG()
 			root := &model.ObjectVertex{
-				Obj:    transCtx.rsm,
-				OriObj: transCtx.rsmOrig,
+				Obj:    rsm,
+				OriObj: rsm.DeepCopy(),
 				Action: model.ActionPtr(model.STATUS),
 			}
 			dagExpected.AddVertex(root)

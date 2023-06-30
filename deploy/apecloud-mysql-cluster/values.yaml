@@ -2,70 +2,39 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-replicaCount: 3
-
-terminationPolicy: Delete
-
-clusterVersionOverride: ""
-nameOverride: ""
-fullnameOverride: ""
-
-monitor:
-  enabled: false
-
-resources: { }
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-
-  # limits:
-  #   cpu: 500m
-  #   memory: 2Gi
-  # requests:
-  #   cpu: 100m
-  #   memory: 1Gi 
-
-
-logVolume:
-  # Provide sizeLimit to emptyDir volume.
-  sizeLimit:
-  # Provide a medium for emptyDir volumes.
-  medium:
-
-persistence:
-  enabled: true
-  data:
-    storageClassName:
-    size: 1Gi
-  # separate log volume for WAL log
-  wal:
-    enabled: false
-    storageClassName:
-    size: 1Gi
-  # separate log volume for app log
-  log:
-    # If enabled, log emptyDir volume will be superseded.
-    enabled: false
-    storageClassName:
-    size: 1Gi
-
-enabledLogs:
-  - slow
-  - error
-
-topologyKeys:
-  - kubernetes.io/hostname
-
-## @param tolerations
-## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+## @param version MySQL cluster version
 ##
-tolerations: [ ]
+version: ac-mysql-8.0.30
 
-# The RBAC permission used by cluster component pod, now include event.create
-serviceAccount:
-  name: ""
+## @param mode MySQL cluster topology mode, standalone, replication or raftGroup
+##
+mode: standalone
 
-## @param proxyEnabled Whether to enable proxy or not, if enabled, the proxy component will be deployed
+## @param replicas specify cluster replicas
+##
+replicas: 1
+
+## @param cpu
+##
+cpu: 0.5
+
+## @param memory, the unit is Gi
+##
+memory: 1
+
+## @param requests.cpu if not set, use cpu
+## @param requests.memory, if not set, use memory
+##
+requests:
+#  cpu:
+#  memory:
+
+## @param storage size, the unit is Gi
+##
+storage: 20
+
+## @param proxyEnabled if true, enable the proxy
+## if mode is standalone or replication, proxyEnabled is always false
+## if mode is raftGroup, proxyEnabled can be true or false
 ##
 proxyEnabled: false

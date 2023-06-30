@@ -222,7 +222,7 @@ jobs:
       VERSION: "v0.4.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      DEP_REPO: "delphic|prometheus-cluster"
+      DEP_REPO: "delphic|prometheus-cluster|apecloud-mysql-cluster"
       APECD_REF: "v0.1.4"
     secrets: inherit
 

@@ -34,7 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
 var _ = Describe("member reconfiguration transformer test.", func() {
@@ -87,8 +86,8 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 	}
 	mockDAG := func(stsOld, stsNew *apps.StatefulSet) *graph.DAG {
 		d := graph.NewDAG()
-		model.PrepareStatus(d, transCtx.rsmOrig, transCtx.rsm)
-		model.PrepareUpdate(d, stsOld, stsNew)
+		graphCli.Root(d, transCtx.rsmOrig, transCtx.rsm)
+		graphCli.Update(d, stsOld, stsNew)
 		return d
 	}
 	expectStsImmutable := func(d *graph.DAG, immutable bool) {
@@ -108,7 +107,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 
 		transCtx = &rsmTransformContext{
 			Context:       ctx,
-			Client:        k8sMock,
+			Client:        graphCli,
 			EventRecorder: nil,
 			Logger:        logger,
 			rsmOrig:       rsm.DeepCopy(),
@@ -116,7 +115,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 		}
 
 		dag = graph.NewDAG()
-		model.PrepareStatus(dag, transCtx.rsmOrig, transCtx.rsm)
+		graphCli.Root(dag, transCtx.rsmOrig, transCtx.rsm)
 		transformer = &MemberReconfigurationTransformer{}
 	})
 
@@ -156,7 +155,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			rsm.Generation = 3
 			rsm.Spec.Replicas = 5
 			sts := mockUnderlyingSts(*rsm, rsm.Generation)
-			model.PrepareUpdate(dag, stsOld, sts)
+			graphCli.Update(dag, stsOld, sts)
 
 			By("update the underlying sts")
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
@@ -176,7 +175,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			expectStsImmutable(dag, true)
 			dagExpected := mockDAG(sts, sts)
 			action := mockAction(3, jobTypeMemberJoinNotifying, false)
-			model.PrepareCreate(dagExpected, action)
+			graphCli.Create(dagExpected, action)
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 
 			By("make member 3 joining successfully and prepare member 4 joining")
@@ -186,9 +185,9 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			expectStsImmutable(dag, true)
 			dagExpected = mockDAG(sts, sts)
-			model.PrepareUpdate(dagExpected, action, action)
+			graphCli.Update(dagExpected, action, action)
 			action = mockAction(4, jobTypeMemberJoinNotifying, false)
-			model.PrepareCreate(dagExpected, action)
+			graphCli.Create(dagExpected, action)
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 
 			By("make member 4 joining successfully and cleanup")
@@ -198,7 +197,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			expectStsImmutable(dag, false)
 			dagExpected = mockDAG(sts, sts)
-			model.PrepareUpdate(dagExpected, action, action)
+			graphCli.Update(dagExpected, action, action)
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 		})
 	})
@@ -220,7 +219,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			rsm.Generation = 3
 			rsm.Spec.Replicas = 1
 			sts := mockUnderlyingSts(*rsm, rsm.Generation)
-			model.PrepareUpdate(dag, stsOld, sts)
+			graphCli.Update(dag, stsOld, sts)
 
 			By("prepare member 2 leaving")
 			k8sMock.EXPECT().
@@ -232,7 +231,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			expectStsImmutable(dag, true)
 			dagExpected := mockDAG(stsOld, sts)
 			action := mockAction(2, jobTypeMemberLeaveNotifying, false)
-			model.PrepareCreate(dagExpected, action)
+			graphCli.Create(dagExpected, action)
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 
 			By("make member 2 leaving successfully and prepare member 1 switchover")
@@ -242,9 +241,9 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			expectStsImmutable(dag, true)
 			dagExpected = mockDAG(stsOld, sts)
-			model.PrepareUpdate(dagExpected, action, action)
+			graphCli.Update(dagExpected, action, action)
 			action = mockAction(1, jobTypeSwitchover, false)
-			model.PrepareCreate(dagExpected, action)
+			graphCli.Create(dagExpected, action)
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 
 			By("make member 1 switchover successfully and prepare member 1 leaving")
@@ -264,9 +263,9 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			expectStsImmutable(dag, true)
 			dagExpected = mockDAG(stsOld, sts)
-			model.PrepareUpdate(dagExpected, action, action)
+			graphCli.Update(dagExpected, action, action)
 			action = mockAction(1, jobTypeMemberLeaveNotifying, false)
-			model.PrepareCreate(dagExpected, action)
+			graphCli.Create(dagExpected, action)
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 
 			By("make member 1 leaving successfully and cleanup")
@@ -276,7 +275,7 @@ var _ = Describe("member reconfiguration transformer test.", func() {
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			expectStsImmutable(dag, false)
 			dagExpected = mockDAG(stsOld, sts)
-			model.PrepareUpdate(dagExpected, action, action)
+			graphCli.Update(dagExpected, action, action)
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 		})
 	})

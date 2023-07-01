@@ -92,6 +92,7 @@ spec:
                   backupToolName:
                     description: which backup tool to perform database backup, only
                       support one tool.
+                    maxLength: 63
                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                     type: string
                   backupsHistoryLimit:
@@ -131,6 +132,8 @@ spec:
                         x-kubernetes-int-or-string: true
                       name:
                         description: the name of the PersistentVolumeClaim.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                       persistentVolumeConfigMap:
                         description: 'persistentVolumeConfigMap references the configmap
@@ -144,9 +147,13 @@ spec:
                         properties:
                           name:
                             description: the name of the persistentVolume ConfigMap.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           namespace:
                             description: the namespace of the persistentVolume ConfigMap.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                         required:
                         - name
@@ -155,6 +162,8 @@ spec:
                       storageClassName:
                         description: storageClassName is the name of the StorageClass
                           required by the claim.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                     required:
                     - name
@@ -218,6 +227,7 @@ spec:
                         properties:
                           name:
                             description: the secret name
+                            maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           passwordKey:
@@ -282,6 +292,7 @@ spec:
                   backupToolName:
                     description: which backup tool to perform database backup, only
                       support one tool.
+                    maxLength: 63
                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                     type: string
                   backupsHistoryLimit:
@@ -321,6 +332,8 @@ spec:
                         x-kubernetes-int-or-string: true
                       name:
                         description: the name of the PersistentVolumeClaim.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                       persistentVolumeConfigMap:
                         description: 'persistentVolumeConfigMap references the configmap
@@ -334,9 +347,13 @@ spec:
                         properties:
                           name:
                             description: the name of the persistentVolume ConfigMap.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           namespace:
                             description: the namespace of the persistentVolume ConfigMap.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                         required:
                         - name
@@ -345,6 +362,8 @@ spec:
                       storageClassName:
                         description: storageClassName is the name of the StorageClass
                           required by the claim.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                     required:
                     - name
@@ -408,6 +427,7 @@ spec:
                         properties:
                           name:
                             description: the secret name
+                            maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           passwordKey:
@@ -616,6 +636,7 @@ spec:
                         properties:
                           name:
                             description: the secret name
+                            maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           passwordKey:

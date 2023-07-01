@@ -56,8 +56,8 @@ spec:
                     componentDefRef:
                       description: componentDefRef references componentDef defined
                         in ClusterDefinition spec.
-                      maxLength: 63
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      maxLength: 22
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     datafile:
                       description: the policy for datafile backup.
@@ -103,6 +103,7 @@ spec:
                         backupToolName:
                           description: which backup tool to perform database backup,
                             only support one tool.
+                          maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         backupsHistoryLimit:
@@ -200,6 +201,7 @@ spec:
                         backupToolName:
                           description: which backup tool to perform database backup,
                             only support one tool.
+                          maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         backupsHistoryLimit:

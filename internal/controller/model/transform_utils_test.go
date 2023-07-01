@@ -26,7 +26,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/go-logr/logr"
 	"github.com/golang/mock/gomock"
 	apps "k8s.io/api/apps/v1"
@@ -36,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	roclient "github.com/apecloud/kubeblocks/internal/controller/client"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	testutil "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )

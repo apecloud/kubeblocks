@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -731,20 +730,4 @@ func (c *StatefulComponentBase) getRunningVolumes(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 	return matchedPVCs, nil
-}
-
-// getClusterBackupSourceMap gets the backup source map from cluster.annotations
-func (c *StatefulComponentBase) getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string, error) {
-	compBackupMapString := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
-	if len(compBackupMapString) == 0 {
-		return nil, nil
-	}
-	compBackupMap := map[string]string{}
-	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
-	for k := range compBackupMap {
-		if cluster.Spec.GetComponentByName(k) == nil {
-			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNotFound, "restore: not found componentSpecs[*].name %s", k)
-		}
-	}
-	return compBackupMap, err
 }

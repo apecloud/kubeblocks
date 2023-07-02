@@ -367,7 +367,6 @@ var _ = Describe("Backup Policy Controller", func() {
 					Create(&testCtx).GetObject()
 				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-					fmt.Printf("backupPolicy: %v", fetched.Status)
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
 				})).Should(Succeed())
 				By("enable schedule for reconfigure")

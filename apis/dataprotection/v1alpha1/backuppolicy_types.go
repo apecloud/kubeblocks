@@ -105,6 +105,7 @@ type CommonBackupPolicy struct {
 
 type PersistentVolumeClaim struct {
 	// the name of the PersistentVolumeClaim.
+	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
@@ -125,7 +126,7 @@ type PersistentVolumeClaim struct {
 	// - IfNotPresent: create the PersistentVolumeClaim if not present and the accessModes only contains 'ReadWriteMany'.
 	// +kubebuilder:default=IfNotPresent
 	// +optional
-	CreatePolicy CreatePVCPolicy `json:"createPolicy"`
+	CreatePolicy CreatePVCPolicy `json:"createPolicy,omitempty"`
 
 	// persistentVolumeConfigMap references the configmap which contains a persistentVolume template.
 	// key must be "persistentVolume" and value is the "PersistentVolume" struct.

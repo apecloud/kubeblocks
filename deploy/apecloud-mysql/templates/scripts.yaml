@@ -13,6 +13,22 @@ data:
     printf "-"
     done
     echo -e "  >> $1 has started"
+  set_config_variables.sh: |
+    #!/bin/bash
+    function set_config_variables(){
+      echo "set config variables [$1]"
+      config_file="/conf/my.cnf"
+      config_content=$(sed -n '/\['$1'\]/,/\[/ { /\['$1'\]/d; /\[/q; p; }' $config_file)
+      while read line
+      do
+        if [[ $line =~ ^[a-zA-Z_][a-zA-Z0-9_]*=[a-zA-Z0-9_]*$ ]]; then
+          echo $line
+          eval "export $line"
+        elif ! [[ $line =~ ^[[:space:]]*# ]]; then 
+          echo "bad format: $line"
+        fi
+      done <<< "$(echo -e "$config_content")"
+    }
   setup.sh: |
     #!/bin/bash
     exec docker-entrypoint.sh
@@ -162,6 +178,10 @@ data:
     do
       sleep 60
     done
+
+    . /scripts/set_config_variables.sh
+    set_config_variables vttablet
+
     cell=${CELL:-'zone1'}
     uid="${KB_POD_NAME##*-}"
     mysql_root=${MYSQL_ROOT_USER:-'root'}
@@ -190,10 +210,10 @@ data:
     --tablet-path $alias \
     --tablet_hostname "$tablet_hostname" \
     --init_tablet_type $tablet_type \
-    --health_check_interval 1s \
-    --shard_sync_retry_delay 1s \
-    --remote_operation_timeout 1s \
-    --db_connect_timeout_ms 500 \
+    --health_check_interval $health_check_interval \
+    --shard_sync_retry_delay $shard_sync_retry_delay \
+    --remote_operation_timeout $remote_operation_timeout \
+    --db_connect_timeout_ms $db_connect_timeout_ms \
     --enable_replication_reporter \
     --backup_storage_implementation file \
     --file_backup_storage_root $VTDATAROOT/backups \
@@ -273,6 +293,9 @@ data:
     EOF
   vtconsensus.sh: |-
     #!/bin/bash
+    . /scripts/set_config_variables.sh
+    set_config_variables vtconsensus
+
     echo "starting vtconsensus"
     cell=${CELL:-'zone1'}
 
@@ -283,14 +306,17 @@ data:
     exec vtconsensus \
       $topology_fags \
       --alsologtostderr \
-      --refresh_interval 1s \
-      --scan_repair_timeout 1s \
+      --refresh_interval $refresh_interval \
+      --scan_repair_timeout $scan_repair_timeout \
       --log_dir ${VTDATAROOT} \
       --db_username "$MYSQL_ROOT_USER" \
       --db_password "$MYSQL_ROOT_PASSWORD"
     EOF
   vtgate.sh: |-
     #!/bin/bash
+    . /scripts/set_config_variables.sh
+    set_config_variables vtgate
+
     cell=${CELL:-'zone1'}
     web_port=${VTGATE_WEB_PORT:-'15001'}
     grpc_port=${VTGATE_GRPC_PORT:-'15991'}
@@ -302,11 +328,11 @@ data:
     exec vtgate \
       $TOPOLOGY_FLAGS \
       --alsologtostderr \
-      --gateway_initial_tablet_timeout 30s \
-      --healthcheck_timeout 2s \
-      --srv_topo_timeout 1s \
-      --grpc_keepalive_time 10s \
-      --grpc_keepalive_timeout 10s \
+      --gateway_initial_tablet_timeout $gateway_initial_tablet_timeout \
+      --healthcheck_timeout $healthcheck_timeout \
+      --srv_topo_timeout $srv_topo_timeout \
+      --grpc_keepalive_time $grpc_keepalive_time \
+      --grpc_keepalive_timeout $grpc_keepalive_timeout \
       --log_dir $VTDATAROOT \
       --log_queries_to_file $VTDATAROOT/vtgate_querylog.txt \
       --port $web_port \
@@ -316,6 +342,7 @@ data:
       --cell $cell \
       --cells_to_watch $cell \
       --tablet_types_to_wait PRIMARY,REPLICA \
+      --tablet_refresh_interval $tablet_refresh_interval \
       --service_map 'grpc-vtgateservice' \
       --pid_file $VTDATAROOT/vtgate.pid \
       --mysql_auth_server_impl none

@@ -57,3 +57,51 @@ spec:
     format: ini
     iniConfig:
       sectionName: mysqld
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: mysql-scale-vttablet-config-constraints
+  labels:
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+spec:
+  configurationSchema:
+    cue: ""
+
+  # mysql-scale configuration file format
+  formatterConfig:
+    format: ini
+    iniConfig:
+      sectionName: vttablet
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: mysql-scale-vtconsensus-config-constraints
+  labels:
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+spec:
+  configurationSchema:
+    cue: ""
+
+  # mysql-scale configuration file format
+  formatterConfig:
+    format: ini
+    iniConfig:
+      sectionName: vtconsensus
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: mysql-scale-vtgate-config-constraints
+  labels:
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+spec:
+  configurationSchema:
+    cue: ""
+
+  # mysql-scale configuration file format
+  formatterConfig:
+    format: ini
+    iniConfig:
+      sectionName: vtgate

@@ -41,6 +41,11 @@ spec:
           namespace: {{ .Release.Namespace }}
           volumeName: agamotto-configuration
           defaultMode: 0777
+        - name: mysql-scale-config
+          templateRef: mysql-scale-config-template
+          constraintRef: mysql-scale-vttablet-config-constraints
+          volumeName: mysql-scale-config
+          namespace: {{ .Release.Namespace }}
       scriptSpecs:
         - name: apecloud-mysql-scripts
           templateRef: apecloud-mysql-scripts
@@ -242,6 +247,8 @@ spec:
             volumeMounts:
               - name: scripts
                 mountPath: /scripts
+              - name: mysql-scale-config
+                mountPath: /conf
         volumes:
           - name: annotations
             downwardAPI:
@@ -354,7 +361,7 @@ spec:
                   command: ["/scripts/etcd-post-start.sh"]
     - name: vtctld
       characterType: vtctld
-      workloadType: Stateful
+      workloadType: Stateless
       scriptSpecs:
         - name: apecloud-mysql-scripts
           templateRef: apecloud-mysql-scripts
@@ -417,13 +424,19 @@ spec:
                 mountPath: /scripts 
     - name: vtconsensus
       characterType: vtconsensus
-      workloadType: Stateful
+      workloadType: Stateless
       scriptSpecs:
         - name: apecloud-mysql-scripts
           templateRef: apecloud-mysql-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 493
+      configSpecs:
+        - name: mysql-scale-config
+          templateRef: mysql-scale-config-template
+          constraintRef: mysql-scale-vtconsensus-config-constraints
+          volumeName: mysql-scale-config
+          namespace: {{ .Release.Namespace }}
       service:
         ports:
           - name: port
@@ -481,15 +494,23 @@ spec:
             volumeMounts:
               - name: scripts
                 mountPath: /scripts
+              - name: mysql-scale-config
+                mountPath: /conf
     - name: vtgate
       characterType: vtgate
-      workloadType: Stateful
+      workloadType: Stateless
       scriptSpecs:
         - name: apecloud-mysql-scripts
           templateRef: apecloud-mysql-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 493
+      configSpecs:
+        - name: mysql-scale-config
+          templateRef: mysql-scale-config-template
+          constraintRef: mysql-scale-vtgate-config-constraints
+          volumeName: mysql-scale-config
+          namespace: {{ .Release.Namespace }}
       service:
         ports:
           - name: webport
@@ -561,3 +582,5 @@ spec:
             volumeMounts:
               - name: scripts
                 mountPath: /scripts
+              - name: mysql-scale-config
+                mountPath: /conf

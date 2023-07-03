@@ -273,6 +273,13 @@ func buildDeleteBackupFilesJobNamespacedName(backup *dataprotectionv1alpha1.Back
 // refObjectMapper
 // ============================================================================
 
+// refObjectMapper is a helper struct that maintains the mapping between referent objects and referenced objects.
+// A referent object is an object that has a reference to another object in its spec.
+// A referenced object is an object that is referred by one or more referent objects.
+// It is mainly used in the controller Watcher() to trigger the reconciliation of the
+// objects that have references to other objects when those objects change.
+// For example, if object A has a reference to object B, and object B changes,
+// the refObjectMapper can generate a request for object A to be reconciled.
 type refObjectMapper struct {
 	mu     sync.Mutex
 	once   sync.Once
@@ -280,6 +287,7 @@ type refObjectMapper struct {
 	invert map[string][]string // invert map, key is the referenced object, value is the list of referent.
 }
 
+// init initializes the ref and invert maps lazily if they are nil.
 func (r *refObjectMapper) init() {
 	r.once.Do(func() {
 		r.ref = make(map[string]string)
@@ -287,6 +295,7 @@ func (r *refObjectMapper) init() {
 	})
 }
 
+// setRef sets or updates the mapping between a referent object and a referenced object.
 func (r *refObjectMapper) setRef(referent client.Object, referencedKey types.NamespacedName) {
 	r.init()
 	r.mu.Lock()
@@ -300,6 +309,7 @@ func (r *refObjectMapper) setRef(referent client.Object, referencedKey types.Nam
 	r.ref[left] = right
 }
 
+// removeRef removes the mapping for a given referent object.
 func (r *refObjectMapper) removeRef(referent client.Object) {
 	r.init()
 	r.mu.Lock()
@@ -311,6 +321,7 @@ func (r *refObjectMapper) removeRef(referent client.Object) {
 	}
 }
 
+// mapToRequests returns a list of requests for the referent objects that have a reference to a given referenced object.
 func (r *refObjectMapper) mapToRequests(referenced client.Object) []ctrl.Request {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -324,12 +335,16 @@ func (r *refObjectMapper) mapToRequests(referenced client.Object) []ctrl.Request
 	return ret
 }
 
+// addInvertLocked adds a pair of referent and referenced objects to the invert map.
+// It assumes the lock is already held by the caller.
 func (r *refObjectMapper) addInvertLocked(left string, right string) {
 	// no duplicated item in the list
 	l := r.invert[right]
 	r.invert[right] = append(l, left)
 }
 
+// removeInvertLocked removes a pair of referent and referenced objects from the invert map.
+// It assumes the lock is already held by the caller.
 func (r *refObjectMapper) removeInvertLocked(left string, right string) {
 	l := r.invert[right]
 	for i, v := range l {

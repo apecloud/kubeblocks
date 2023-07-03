@@ -35,6 +35,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -772,4 +773,41 @@ func BuildVolumeSnapshotClass(name string, driver string) (*snapshotv1.VolumeSna
 		return nil, err
 	}
 	return vsc, nil
+}
+
+func BuildServiceAccount(cluster *appsv1alpha1.Cluster) (*corev1.ServiceAccount, error) {
+	const tplFile = "rbac_template.cue"
+
+	sa := &corev1.ServiceAccount{}
+	if err := buildFromCUE(tplFile, map[string]any{
+		"cluster": cluster,
+	}, "serviceaccount", sa); err != nil {
+		return nil, err
+	}
+	return sa, nil
+}
+
+func BuildRole(cluster *appsv1alpha1.Cluster) (*rbacv1.Role, error) {
+	const tplFile = "rbac_template.cue"
+
+	role := &rbacv1.Role{}
+	if err := buildFromCUE(tplFile, map[string]any{
+		"cluster": cluster,
+	}, "role", role); err != nil {
+		return nil, err
+	}
+	return role, nil
+}
+
+func BuildRoleBinding(cluster *appsv1alpha1.Cluster) (*rbacv1.RoleBinding, error) {
+	const tplFile = "rbac_template.cue"
+
+	rb := &rbacv1.RoleBinding{}
+	if err := buildFromCUE(tplFile, map[string]any{
+		"cluster": cluster,
+	}, "rolebinding", rb); err != nil {
+		return nil, err
+	}
+
+	return rb, nil
 }

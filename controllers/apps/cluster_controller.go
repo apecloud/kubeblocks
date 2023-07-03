@@ -175,6 +175,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&FillClassTransformer{},
 			// create cluster connection credential secret object
 			&ClusterCredentialTransformer{},
+			// handle rbac for pod
+			&RBACTransformer{},
 			// handle restore
 			&RestoreTransformer{Client: r.Client},
 			// create all components objects

@@ -55,7 +55,8 @@ spec:
                   properties:
                     componentDefRef:
                       description: componentDefRef references componentDef defined
-                        in ClusterDefinition spec.
+                        in ClusterDefinition spec. Need to comply with IANA Service
+                        Naming rule.
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string

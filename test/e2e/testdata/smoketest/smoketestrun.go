@@ -20,6 +20,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -127,23 +128,36 @@ func SmokeTest() {
 }
 
 func runTestCases(files []string) {
+	var clusterName string
 	for _, file := range files {
 		By("test " + file)
-
 		b := e2eutil.OpsYaml(file, "create")
+		if strings.Contains(file, "00") || strings.Contains(file, "restore") {
+			clusterName = e2eutil.GetName(file)
+			log.Println("clusterName is " + clusterName)
+		}
 		Expect(b).Should(BeTrue())
-		Eventually(func(g Gomega) {
-			e2eutil.WaitTime(100000)
-			podStatusResult := e2eutil.CheckPodStatus()
-			for _, result := range podStatusResult {
-				g.Expect(result).Should(BeTrue())
-			}
-		}, time.Second*180, time.Second*1).Should(Succeed())
-		Eventually(func(g Gomega) {
-			clusterStatusResult := e2eutil.CheckClusterStatus()
-			g.Expect(clusterStatusResult).Should(BeTrue())
-		}, time.Second*300, time.Second*1).Should(Succeed())
-
+		if !strings.Contains(file, "stop") {
+			Eventually(func(g Gomega) {
+				e2eutil.WaitTime(1000000)
+				podStatusResult := e2eutil.CheckPodStatus(clusterName)
+				for _, result := range podStatusResult {
+					g.Expect(result).Should(BeTrue())
+				}
+			}, time.Second*300, time.Second*1).Should(Succeed())
+			Eventually(func(g Gomega) {
+				clusterStatusResult := e2eutil.CheckClusterStatus(clusterName)
+				g.Expect(clusterStatusResult).Should(BeTrue())
+			}, time.Second*300, time.Second*1).Should(Succeed())
+		} else {
+			cmd := " kubectl get cluster " + clusterName + "-n default | grep mycluster | awk '{print $5}'"
+			clusterStatus := e2eutil.ExecCommand(cmd)
+			Eventually(func(g Gomega) {
+				e2eutil.WaitTime(10000000)
+				g.Expect(strings.TrimSpace(clusterStatus)).Should(Equal("Stopped"))
+			}, time.Second*300, time.Second*1)
+			time.Sleep(time.Second * 50)
+		}
 	}
 	if len(files) > 0 {
 		file := e2eutil.GetClusterCreateYaml(files)

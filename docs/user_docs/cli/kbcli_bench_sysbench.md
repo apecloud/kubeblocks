@@ -5,14 +5,32 @@ title: kbcli bench sysbench
 run a SysBench benchmark
 
 ```
-kbcli bench sysbench [flags]
+kbcli bench sysbench [ClusterName] [flags]
+```
+
+### Examples
+
+```
+  # sysbench on a cluster
+  kbcli bench sysbench mycluster --user xxx --password xxx --database mydb
+  
+  # sysbench on a cluster with different threads
+  kbcli bench sysbench mycluster --user xxx --password xxx --database mydb --threads 4,8
+  
+  # sysbench on a cluster with different type
+  kbcli bench sysbench mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
+  
+  # sysbench on a cluster with specified read/write ratio
+  kbcli bench sysbench mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 80
+  
+  # sysbench on a cluster with specified tables and size
+  kbcli bench sysbench mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
 ```
 
 ### Options
 
 ```
       --database string     database name
-      --driver string       database driver
       --flag int            the flag of sysbench, 0(normal), 1(long), 2(three nodes)
   -h, --help                help for sysbench
       --host string         the host of database

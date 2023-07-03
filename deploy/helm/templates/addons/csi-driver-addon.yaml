@@ -14,8 +14,17 @@ spec:
   type: Helm
 
   helm:
-    # chartLocationURL: https://github.com/apecloud/helm-charts/releases/download/kubeblocks-csi-driver-0.1.0/kubeblocks-csi-driver-0.1.0.tgz
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/kubeblocks-csi-driver
+    {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/kubeblocks-csi-driver-0.1.0.tgz
+    {{- end }}
+
+    installOptions:
+     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 0.1.0
+     {{- end }}
+
     valuesMapping:
       valueMap:
         replicaCount: controller.replicaCount

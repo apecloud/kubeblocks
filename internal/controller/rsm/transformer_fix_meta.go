@@ -37,6 +37,7 @@ func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		return nil
 	}
 
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 	// The object is not being deleted, so if it does not have our finalizer,
 	// then lets add the finalizer and update the object. This is equivalent
 	// registering our finalizer.
@@ -44,9 +45,7 @@ func (t *FixMetaTransformer) Transform(ctx graph.TransformContext, dag *graph.DA
 		return nil
 	}
 	controllerutil.AddFinalizer(obj, rsmFinalizerName)
-	if err := model.PrepareRootUpdate(dag); err != nil {
-		return err
-	}
+	graphCli.Update(dag, transCtx.rsmOrig, obj)
 
 	return graph.ErrPrematureStop
 }

@@ -41,3 +41,89 @@ data:
     mongosh --quiet --host $MONGOS_HOST --port $MONGOS_PORT --eval "sh.addShard(\"$SHARD_CONFIG\")"
 
     trap : TERM INT; (while true; do sleep 1000; done) & wait
+  switchover-check-role.sh: |-
+    #!/bin/sh
+    check_role() {
+      local role=$(mongosh --quiet --eval "rs.isMaster().ismaster" "$1" --username "$USERNAME" --password "$PASSWORD")
+      if [ "${role}" = "true" ]; then
+        echo "Primary"
+      else
+        echo "Secondary"
+      fi
+    }
+  switchover-verify.sh: |-
+    #!/bin/sh
+    verify() {
+      count=0
+      while true; do
+        local candidate_role_after_switchover=$(check_role "$CANDIDATE_URI")
+        if [ "${candidate_role_after_switchover}" = "Primary" ]; then
+          echo "switchover successfully."
+          break
+        else
+          count=$((count+1))
+          if [ ${count} -ge 10 ]; then
+            echo "Failed to switch over to primary after 10 attempts"
+            break
+          else
+            echo "Attempt $count: $candidate_role_after_switchover"
+            sleep 3
+          fi
+        fi
+      done
+    }
+  switchover-with-candidate.sh: |-
+    #!/bin/sh
+    URI="mongodb://$KB_CONSENSUS_LEADER_POD_FQDN:27017"
+    CANDIDATE_URI="mongodb://$KB_SWITCHOVER_CANDIDATE_FQDN:27017"
+    USERNAME=$MONGODB_ROOT_USER
+    PASSWORD=$MONGODB_ROOT_PASSWORD
+    CANDIDATE_HOST="$KB_SWITCHOVER_CANDIDATE_FQDN.$KB_NAMESPACE.svc.cluster.local:27017"
+    . /scripts/switchover-check-role.sh
+    . /scripts/switchover-verify.sh
+    switchover() {
+      echo "Checking current role..."
+      local current_leader_role=$(check_role "$URI")
+      if [ "${current_leader_role}" = "Secondary" ]; then
+          echo "Current instance role is not the primary, can not do switchover"
+          exit 1
+      fi
+      echo "Switchover to new primary: $CANDIDATE_HOST"
+      mongosh --quiet --eval "conf=rs.config();conf.members.forEach(member => member.priority = 1);const candidateHost = '$CANDIDATE_HOST';const member = conf.members.find(member => member.host === candidateHost);if (member) {member.priority = 2;};rs.reconfig(conf)" "$URI" --username "$USERNAME" --password "$PASSWORD"
+      echo "Checking candidate instance role after switchover..."
+      verify
+    }
+
+    switchover
+    echo "Switchover complete"
+  switchover-without-candidate.sh: |-
+    #!/bin/sh
+
+    URI="mongodb://$KB_CONSENSUS_LEADER_POD_FQDN:27017"
+    USERNAME=$MONGODB_ROOT_USER
+    PASSWORD=$MONGODB_ROOT_PASSWORD
+    OLD_LEADER_HOST="$KB_CONSENSUS_LEADER_POD_FQDN.$KB_NAMESPACE.svc.cluster.local:27017"
+    . /scripts/switchover-check-role.sh
+    . /scripts/switchover-verify.sh
+    switchover() {
+      echo "Checking current role..."
+      local current_leader_role=$(check_role "$URI")
+      if [ "${current_leader_role}" = "Secondary" ]; then
+          echo "Current instance role is not the primary, can not do switchover"
+          exit 1
+      fi
+      echo "Switchover without candidate, try to select a new primary randomly ..."
+      local CANDIDATE_HOST=$(mongosh --quiet --eval "conf=rs.config();const candidateHost = '$OLD_LEADER_HOST';const member=conf.members.find(member => member.host !== candidateHost);if (member) {console.log(member.host)}" "$URI" --username "$USERNAME" --password "$PASSWORD")
+      local CANDIDATE_URI="mongodb://$CANDIDATE_HOST"
+      if [ -z "$CANDIDATE_HOST" ]; then
+          echo "Failed to select a new candidate primary, exit"
+          exit 1
+      fi
+      echo "Switchover to new primary: $CANDIDATE_HOST"
+      mongosh --quiet --eval "conf=rs.config();conf.members.forEach(member => member.priority = 1);const candidateHost = '$CANDIDATE_HOST';const member = conf.members.find(member => member.host === candidateHost);if (member) {member.priority = 2;};rs.reconfig(conf)" "$URI" --username "$USERNAME" --password "$PASSWORD"
+      echo "Checking candidate instance role after switchover..."
+      verify
+    }
+
+    switchover
+    echo "Switchover without candidate complete"

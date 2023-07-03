@@ -32,7 +32,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
@@ -46,6 +45,7 @@ import (
 var (
 	controller  *gomock.Controller
 	k8sMock     *mocks.MockClient
+	graphCli    model.GraphClient
 	ctx         context.Context
 	logger      logr.Logger
 	transCtx    *rsmTransformContext
@@ -134,42 +134,8 @@ var (
 	rsm *workloads.ReplicatedStateMachine
 )
 
-func kindPriority(o client.Object) int {
-	switch o.(type) {
-	case nil:
-		return 0
-	case *workloads.ReplicatedStateMachine:
-		return 1
-	case *apps.StatefulSet:
-		return 2
-	case *corev1.Service:
-		return 3
-	case *corev1.ConfigMap:
-		return 4
-	default:
-		return 5
-	}
-}
-
 func less(v1, v2 graph.Vertex) bool {
-	o1, _ := v1.(*model.ObjectVertex)
-	o2, _ := v2.(*model.ObjectVertex)
-	switch {
-	case o1.Immutable != o2.Immutable:
-		return false
-	case o1.Action == nil && o2.Action == nil:
-	case o1.Action != nil, o2.Action != nil:
-		return false
-	case *o1.Action != *o2.Action:
-		return false
-	}
-	p1 := kindPriority(o1.Obj)
-	p2 := kindPriority(o2.Obj)
-	if p1 == p2 {
-		// TODO(free6om): compare each field of same kind
-		return o1.Obj.GetName() < o2.Obj.GetName()
-	}
-	return p1 < p2
+	return model.DefaultLess(v1, v2)
 }
 
 func makePodUpdateReady(newRevision string, pods ...*corev1.Pod) {
@@ -200,8 +166,12 @@ func mockUnderlyingSts(rsm workloads.ReplicatedStateMachine, generation int64) *
 
 func mockDAG() *graph.DAG {
 	d := graph.NewDAG()
-	model.PrepareStatus(d, transCtx.rsmOrig, transCtx.rsm)
+	graphCli.Root(d, transCtx.rsmOrig, transCtx.rsm)
 	return d
+}
+
+func init() {
+	model.AddScheme(workloads.AddToScheme)
 }
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -215,6 +185,7 @@ func TestAPIs(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	controller, k8sMock = testutil.SetupK8sMock()
+	graphCli = model.NewGraphClient(k8sMock)
 	ctx = context.Background()
 	logger = logf.FromContext(ctx).WithValues("rsm-test", namespace)
 

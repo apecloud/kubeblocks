@@ -95,6 +95,7 @@ const (
 	CMConfigurationSpecProviderLabelKey    = "config.kubeblocks.io/config-spec"    // CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
 	CMConfigurationCMKeysLabelKey          = "config.kubeblocks.io/configmap-keys" // CMConfigurationCMKeysLabelKey Specify configmap keys
 	CMConfigurationTemplateNameLabelKey    = "config.kubeblocks.io/config-template-name"
+	CMTemplateNameLabelKey                 = "config.kubeblocks.io/template-name"
 	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
 	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
 	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
@@ -126,6 +127,7 @@ const (
 	DefaultBackupPolicyTemplateAnnotationKey    = "dataprotection.kubeblocks.io/is-default-policy-template" // DefaultBackupPolicyTemplateAnnotationKey specifies the default backup policy template.
 	BackupDataPathPrefixAnnotationKey           = "dataprotection.kubeblocks.io/path-prefix"                // BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
 	ReconfigureRefAnnotationKey                 = "dataprotection.kubeblocks.io/reconfigure-ref"
+	DataProtectionLabelClusterUIDKey            = "dataprotection.kubeblocks.io/cluster-uid"
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
 	LastAppliedConfigAnnotationKey              = "config.kubeblocks.io/last-applied-configuration"
 	LastAppliedOpsCRAnnotationKey               = "config.kubeblocks.io/last-applied-ops-name"
@@ -222,11 +224,6 @@ const (
 	ReconfigureManagerSource  = "manager"
 	ReconfigureUserSource     = "ops"
 	ReconfigureTemplateSource = "external-template"
-)
-
-const (
-	KBReplicationSetPrimaryPodName = "KB_PRIMARY_POD_NAME"
-	KBReplicationSetPrimaryPodFQDN = "KB_PRIMARY_POD_FQDN"
 )
 
 const (

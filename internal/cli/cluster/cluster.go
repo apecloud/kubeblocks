@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubectl/pkg/util/resource"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -247,8 +248,16 @@ func (o *ObjectsGetter) Get() (*ClusterObjects, error) {
 		if err = listResources(o.Dynamic, types.BackupPolicyGVR(), o.Namespace, dpListOpts, &objs.BackupPolicies); err != nil {
 			return nil, err
 		}
-		if err = listResources(o.Dynamic, types.BackupGVR(), o.Namespace, dpListOpts, &objs.Backups); err != nil {
+		var backups []dpv1alpha1.Backup
+		if err = listResources(o.Dynamic, types.BackupGVR(), o.Namespace, dpListOpts, &backups); err != nil {
 			return nil, err
+		}
+		// filter backups with cluster uid for excluding same cluster name
+		for _, v := range backups {
+			sourceClusterUID := v.Labels[constant.DataProtectionLabelClusterUIDKey]
+			if sourceClusterUID == "" || sourceClusterUID == string(objs.Cluster.UID) {
+				objs.Backups = append(objs.Backups, v)
+			}
 		}
 	}
 	return objs, nil

@@ -63,6 +63,15 @@ spec:
           failureThreshold: {{ .Values.roleProbe.failureThreshold }}
           periodSeconds: {{ .Values.roleProbe.periodSeconds }}
           timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
+      switchoverSpec:
+        withCandidate:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+          command:
+            - /scripts/switchover-with-candidate.sh
+        withoutCandidate:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+          command:
+            - /scripts/switchover-without-candidate.sh
       service:
         ports:
           - name: mongodb
@@ -109,14 +118,7 @@ spec:
                 name: mongodb-config
                 subPath: keyfile
               - name: scripts
-                mountPath: /scripts/replicaset-setup.sh
-                subPath: replicaset-setup.sh
-              - name: scripts
-                mountPath: /scripts/replicaset-post-start.sh
-                subPath: replicaset-post-start.sh
-              - name: scripts
-                mountPath: /scripts/backup-log-collector.sh
-                subPath: backup-log-collector.sh
+                mountPath: /scripts
           - name: metrics
             image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}

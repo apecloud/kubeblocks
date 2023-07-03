@@ -5,7 +5,26 @@ title: kbcli bench sysbench run
 Run  SysBench on cluster
 
 ```
-kbcli bench sysbench run [NAME] [flags]
+kbcli bench sysbench run [ClusterName] [flags]
+```
+
+### Examples
+
+```
+  # sysbench run on a cluster
+  kbcli bench sysbench run mycluster --user xxx --password xxx --database mydb
+  
+  # sysbench run on a cluster with different threads
+  kbcli bench sysbench run  mycluster --user xxx --password xxx --database mydb --threads 4,8
+  
+  # sysbench run on a cluster with different type
+  kbcli bench sysbench run mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
+  
+  # sysbench run on a cluster with specified read/write ratio
+  kbcli bench sysbench run  mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 80
+  
+  # sysbench run on a cluster with specified tables and size
+  kbcli bench sysbench run mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
 ```
 
 ### Options
@@ -28,7 +47,6 @@ kbcli bench sysbench run [NAME] [flags]
       --context string                 The name of the kubeconfig context to use
       --database string                database name
       --disable-compression            If true, opt-out of response compression for all requests to the server
-      --driver string                  database driver
       --flag int                       the flag of sysbench, 0(normal), 1(long), 2(three nodes)
       --host string                    the host of database
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure

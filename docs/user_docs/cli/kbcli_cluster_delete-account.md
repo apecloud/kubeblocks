@@ -26,7 +26,7 @@ kbcli cluster delete-account [flags]
       --component string   Specify the name of component to be connected. If not specified, pick the first one.
   -h, --help               help for delete-account
   -i, --instance string    Specify the name of instance to be connected.
-      --name string        Required user name, please specify it
+      --name string        Required user name, please specify it.
 ```
 
 ### Options inherited from parent commands

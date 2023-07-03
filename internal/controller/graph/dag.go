@@ -174,6 +174,10 @@ func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc) error {
 
 // WalkBFS walks the DAG 'd' in breadth-first order
 func (d *DAG) WalkBFS(walkFunc WalkFunc) error {
+	return d.bfs(walkFunc, nil)
+}
+
+func (d *DAG) bfs(walkFunc WalkFunc, less func(v1, v2 Vertex) bool) error {
 	if err := d.validate(); err != nil {
 		return err
 	}
@@ -196,6 +200,11 @@ func (d *DAG) WalkBFS(walkFunc WalkFunc) error {
 		nextStep := make([]Vertex, 0)
 		for _, vertex := range queue {
 			adjs := d.outAdj(vertex)
+			if less != nil {
+				sort.SliceStable(adjs, func(i, j int) bool {
+					return less(adjs[i], adjs[j])
+				})
+			}
 			for _, adj := range adjs {
 				if !walked[adj] {
 					nextStep = append(nextStep, adj)
@@ -250,11 +259,9 @@ func (d *DAG) Root() Vertex {
 }
 
 func (d *DAG) Merge(subDag *DAG) {
-	root := d.Root()
 	for v := range subDag.vertices {
 		if len(d.inAdj(v)) == 0 {
-			d.AddVertex(v)
-			d.Connect(root, v)
+			d.AddConnectRoot(v)
 		}
 	}
 }

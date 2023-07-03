@@ -88,11 +88,19 @@ func NewListOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 }
 
 func (o *opsListOptions) printOpsList() error {
+	// if format is JSON or YAML, use default printer to output the result.
+	if o.Format == printer.JSON || o.Format == printer.YAML {
+		if o.opsRequestName != "" {
+			o.Names = []string{o.opsRequestName}
+		}
+		_, err := o.Run()
+		return err
+	}
+
 	dynamic, err := o.Factory.DynamicClient()
 	if err != nil {
 		return err
 	}
-
 	listOptions := metav1.ListOptions{
 		LabelSelector: o.LabelSelector,
 		FieldSelector: o.FieldSelector,

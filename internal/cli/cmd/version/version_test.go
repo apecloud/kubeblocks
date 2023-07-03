@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	gv "github.com/hashicorp/go-version"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
@@ -38,5 +39,23 @@ var _ = Describe("version", func() {
 		By("testing run")
 		o := &versionOptions{}
 		o.Run(tf)
+	})
+
+	It("version comparison", func() {
+		kbVersion, _ := gv.NewVersion("0.6.0-alpha.23")
+		cliVersion, _ := gv.NewVersion("v0.6.0-alpha.23")
+		Expect(kbVersion.Equal(cliVersion)).Should(BeTrue())
+
+		kbVersion, _ = gv.NewVersion("0.6.0-alpha.23")
+		cliVersion, _ = gv.NewVersion("v0.6.23")
+		Expect(kbVersion.Equal(cliVersion)).Should(BeFalse())
+
+		kbVersion, _ = gv.NewVersion("0.6.0-alpha.23")
+		cliVersion, _ = gv.NewVersion("0.6.0-beta.23")
+		Expect(kbVersion.Equal(cliVersion)).Should(BeFalse())
+
+		kbVersion, _ = gv.NewVersion("0.6.3")
+		cliVersion, _ = gv.NewVersion("v0.6.3")
+		Expect(kbVersion.Equal(cliVersion)).Should(BeTrue())
 	})
 })

@@ -26,14 +26,15 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
 	"github.com/golang/mock/gomock"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
+	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
 var _ = Describe("object status transformer test.", func() {
@@ -48,7 +49,7 @@ var _ = Describe("object status transformer test.", func() {
 
 		transCtx = &rsmTransformContext{
 			Context:       ctx,
-			Client:        k8sMock,
+			Client:        graphCli,
 			EventRecorder: nil,
 			Logger:        logger,
 			rsmOrig:       rsm.DeepCopy(),

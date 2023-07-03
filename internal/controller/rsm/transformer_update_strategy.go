@@ -88,8 +88,9 @@ func (t *UpdateStrategyTransformer) Transform(ctx graph.TransformContext, dag *g
 		return nil
 	}
 
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for _, pod := range podsToBeUpdated {
-		model.PrepareDelete(dag, pod)
+		graphCli.Delete(dag, pod)
 	}
 
 	return nil
@@ -106,12 +107,13 @@ func doSwitchoverIfNeeded(transCtx *rsmTransformContext, dag *graph.DAG, pods []
 		return false, nil
 	}
 
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 	actionList, err := getActionList(transCtx, jobScenarioUpdate)
 	if err != nil {
 		return true, err
 	}
 	if len(actionList) == 0 {
-		return true, createSwitchoverAction(dag, rsm, pods)
+		return true, createSwitchoverAction(dag, graphCli, rsm, pods)
 	}
 
 	// switch status if found:
@@ -135,12 +137,12 @@ func doSwitchoverIfNeeded(transCtx *rsmTransformContext, dag *graph.DAG, pods []
 		fallthrough
 	case action.Status.Succeeded > 0:
 		// clean up the action
-		doActionCleanup(dag, action)
+		doActionCleanup(dag, graphCli, action)
 	}
 	return false, nil
 }
 
-func createSwitchoverAction(dag *graph.DAG, rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) error {
+func createSwitchoverAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) error {
 	leader := getLeaderPodName(rsm.Status.MembersStatus)
 	targetOrdinal := selectSwitchoverTarget(rsm, pods)
 	target := getPodName(rsm.Name, targetOrdinal)
@@ -150,7 +152,7 @@ func createSwitchoverAction(dag *graph.DAG, rsm *workloads.ReplicatedStateMachin
 	action := buildAction(rsm, actionName, actionType, jobScenarioUpdate, leader, target)
 
 	// don't do cluster abnormal status analysis, prefer faster update process
-	return createAction(dag, rsm, action)
+	return createAction(dag, cli, rsm, action)
 }
 
 func selectSwitchoverTarget(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) int {

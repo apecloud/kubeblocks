@@ -14,6 +14,7 @@ on:
       - published
 
 env:
+  GH_TOKEN: ${{ github.token }}
   RELEASE_VERSION: ${{ github.ref_name }}
   RELEASE_BOT_WEBHOOK: ${{ secrets.RELEASE_BOT_WEBHOOK }}
 
@@ -88,6 +89,11 @@ jobs:
             --bot-webhook ${{ env.RELEASE_BOT_WEBHOOK }} \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
 
+      - name: delete cache
+        continue-on-error: true
+        run: |
+          bash .github/utils/utils.sh --type 17 --tag-name "${{ steps.send_message.outputs.release-result }}"
+
       - name: Save Artifact
         id: cache-artifact-save
         uses: actions/cache/save@v3
@@ -95,37 +101,3 @@ jobs:
           path: |
             ${{ steps.send_message.outputs.release-result }}
           key: ${{ steps.send_message.outputs.release-result }}
-
-  release-result:
-    if: github.event.action == 'published'
-    needs: [ send-message ]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        type: [image, kbcli, chart]
-    steps:
-      - name: Restore ${{ matrix.type }} Artifact
-        id: cache-artifact-restore
-        uses: actions/cache/restore@v3
-        with:
-          path: |
-            ${{ env.RELEASE_VERSION }}-${{ matrix.type }}
-          key: ${{ env.RELEASE_VERSION }}-${{ matrix.type }}
-
-      - name: check release result
-        run: |
-          release_result=$( cat ${{ env.RELEASE_VERSION }}-${{ matrix.type }} )
-          if [[ "$release_result" != "success" ]]; then
-              exit 1
-          fi
-
-  e2e-kbcli:
-    needs: [ image-tag, release-result ]
-    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.4
-    with:
-      GITHUB_REPO: "apecloud/kubeblocks"
-      BRANCH_NAME: "main"
-      WORKFLOW_ID: "e2e-kbcli.yml"
-      APECD_REF: "v0.1.4"
-      VERSION: "${{ needs.image-tag.outputs.tag-name }}"
-    secrets: inherit

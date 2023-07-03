@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package bench
 
 import (
-	"embed"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -28,13 +27,11 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-var (
-	//go:embed template/*
-	cueTemplate embed.FS
-)
-
 const (
-	CueSysBenchTemplateName = "bench_sysbench_template.cue"
+	all              = "all"
+	prepareOperation = "prepare"
+	runOperation     = "run"
+	cleanupOperation = "cleanup"
 )
 
 type BenchBaseOptions struct {
@@ -52,7 +49,7 @@ func (o *BenchBaseOptions) BaseValidate() error {
 	}
 
 	if o.Database == "" {
-		return fmt.Errorf("database is required")
+		return fmt.Errorf("database name should be specified")
 	}
 
 	if o.Host == "" {
@@ -75,7 +72,6 @@ func (o *BenchBaseOptions) BaseValidate() error {
 }
 
 func (o *BenchBaseOptions) AddFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().StringVar(&o.Driver, "driver", "", "database driver")
 	cmd.PersistentFlags().StringVar(&o.Database, "database", "", "database name")
 	cmd.PersistentFlags().StringVar(&o.Host, "host", "", "the host of database")
 	cmd.PersistentFlags().StringVar(&o.User, "user", "", "the user of database")
@@ -93,6 +89,7 @@ func NewBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	// add subcommands
 	cmd.AddCommand(
 		NewSysBenchCmd(f, streams),
+		NewPgBenchCmd(f, streams),
 	)
 
 	return cmd

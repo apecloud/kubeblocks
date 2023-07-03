@@ -106,7 +106,7 @@ spec:
       # create oplog push process
       do_oplog_push
       # trap term signal
-      trap "echo 'Terminating...' && exit" TERM
+      trap "echo 'Terminating...' && kill $wal_g_pid" TERM
       while true; do
         check_oplog_push_process
         sleep 1

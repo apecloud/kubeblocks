@@ -21,35 +21,21 @@ package bench
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net"
-	"strconv"
 	"strings"
 
-	"github.com/leaanthony/debme"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
-)
-
-const (
-	all              = "all"
-	prepareOperation = "prepare"
-	runOperation     = "run"
-	cleanupOperation = "cleanup"
 )
 
 var (
@@ -58,6 +44,56 @@ var (
 		"postgresql": "pgsql",
 	}
 )
+
+var sysbenchExample = templates.Examples(`
+		# sysbench on a cluster
+		kbcli bench sysbench mycluster --user xxx --password xxx --database mydb
+
+		# sysbench on a cluster with different threads
+		kbcli bench sysbench mycluster --user xxx --password xxx --database mydb --threads 4,8
+
+		# sysbench on a cluster with different type
+		kbcli bench sysbench mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
+
+		# sysbench on a cluster with specified read/write ratio
+		kbcli bench sysbench mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 80
+
+		# sysbench on a cluster with specified tables and size
+		kbcli bench sysbench mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
+`)
+
+var sysbenchPrepareExample = templates.Examples(`
+		# sysbench prepare data on a cluster
+		kbcli bench sysbench prepare mycluster --user xxx --password xxx --database mydb
+
+		# sysbench prepare data on a cluster with specified tables and size
+		kbcli bench sysbench prepare mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
+`)
+
+var sysbenchRunExample = templates.Examples(`
+		# sysbench run on a cluster
+		kbcli bench sysbench run mycluster --user xxx --password xxx --database mydb
+
+		# sysbench run on a cluster with different threads
+		kbcli bench sysbench run  mycluster --user xxx --password xxx --database mydb --threads 4,8
+
+		# sysbench run on a cluster with different type
+		kbcli bench sysbench run mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
+
+		# sysbench run on a cluster with specified read/write ratio
+		kbcli bench sysbench run  mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 80
+
+		# sysbench run on a cluster with specified tables and size
+		kbcli bench sysbench run mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
+`)
+
+var sysbenchCleanupExample = templates.Examples(`
+		# sysbench cleanup data on a cluster
+		kbcli bench sysbench cleanup mycluster --user xxx --password xxx --database mydb
+
+		# sysbench cleanup data on a cluster with specified tables and size
+		kbcli bench sysbench cleanup mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
+`)
 
 type SysBenchOptions struct {
 	factory   cmdutil.Factory
@@ -81,8 +117,19 @@ type SysBenchOptions struct {
 	genericclioptions.IOStreams `json:"-"`
 }
 
-func (o *SysBenchOptions) Complete(name string) error {
+func (o *SysBenchOptions) Complete(args []string) error {
 	var err error
+	var host string
+	var port int
+
+	if len(args) == 0 {
+		return fmt.Errorf("cluster name should be specified")
+	}
+	if len(args) > 1 {
+		return fmt.Errorf("only support to sysbench one cluster")
+	}
+	clusterName := args[0]
+
 	o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
@@ -96,33 +143,36 @@ func (o *SysBenchOptions) Complete(name string) error {
 		return err
 	}
 
-	if o.Driver == "" || o.Host == "" || o.Port == 0 {
-		clusterGetter := cluster.ObjectsGetter{
-			Client:    o.client,
-			Dynamic:   o.dynamic,
-			Name:      name,
-			Namespace: o.namespace,
-			GetOptions: cluster.GetOptions{
-				WithClusterDef:     true,
-				WithService:        true,
-				WithPod:            true,
-				WithEvent:          true,
-				WithPVC:            true,
-				WithDataProtection: true,
-			},
-		}
-		if o.ClusterObjects, err = clusterGetter.Get(); err != nil {
-			return err
-		}
-		o.Driver, o.Host, o.Port, err = getDriverAndHostAndPort(o.Cluster, o.Services)
-		if err != nil {
-			return err
-		}
-		if driver, ok := driverMap[o.Driver]; ok {
-			o.Driver = driver
-		} else {
-			return fmt.Errorf("unsupported driver %s", o.Driver)
-		}
+	clusterGetter := cluster.ObjectsGetter{
+		Client:    o.client,
+		Dynamic:   o.dynamic,
+		Name:      clusterName,
+		Namespace: o.namespace,
+		GetOptions: cluster.GetOptions{
+			WithClusterDef:     true,
+			WithService:        true,
+			WithPod:            true,
+			WithEvent:          true,
+			WithPVC:            true,
+			WithDataProtection: true,
+		},
+	}
+	if o.ClusterObjects, err = clusterGetter.Get(); err != nil {
+		return err
+	}
+	o.Driver, host, port, err = getDriverAndHostAndPort(o.Cluster, o.Services)
+	if err != nil {
+		return err
+	}
+	if driver, ok := driverMap[o.Driver]; ok {
+		o.Driver = driver
+	} else {
+		return fmt.Errorf("unsupported driver %s", o.Driver)
+	}
+
+	if o.Host == "" || o.Port == 0 {
+		o.Host = host
+		o.Port = port
 	}
 
 	// if user just give readPercent or writePercent, we will calculate the other one
@@ -167,27 +217,7 @@ func (o *SysBenchOptions) Validate() error {
 	return nil
 }
 
-func (o *SysBenchOptions) PreCreate(obj *unstructured.Unstructured) error {
-	p := &corev1.Pod{}
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, p); err != nil {
-		return err
-	}
-
-	data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(p)
-	if err != nil {
-		return err
-	}
-	obj.SetUnstructuredContent(data)
-	return nil
-}
-
 func (o *SysBenchOptions) Run() error {
-	var (
-		err            error
-		unstructureObj *unstructured.Unstructured
-		optionsByte    []byte
-	)
-
 	o.Value = fmt.Sprintf("mode:%s", o.Mode)
 	o.Value = fmt.Sprintf("%s,driver:%s", o.Value, o.Driver)
 	o.Value = fmt.Sprintf("%s,host:%s", o.Value, o.Host)
@@ -212,26 +242,45 @@ func (o *SysBenchOptions) Run() error {
 		o.Value = fmt.Sprintf("%s,others:--read-percent=%d --write-percent=%d", o.Value, o.ReadPercent, o.WritePercent)
 	}
 
-	if optionsByte, err = json.Marshal(o); err != nil {
-		return err
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:    o.namespace,
+			GenerateName: fmt.Sprintf("test-sysbench-%s-", o.Mode),
+			Labels: map[string]string{
+				"sysbench": fmt.Sprintf("test-sysbench-%s", o.Database),
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "test-sysbench",
+					Image: "registry.cn-hangzhou.aliyuncs.com/apecloud/customsuites:latest",
+					Env: []corev1.EnvVar{
+						{
+							Name:  "TYPE",
+							Value: "2",
+						},
+						{
+							Name:  "FLAG",
+							Value: fmt.Sprintf("%d", o.Flag),
+						},
+						{
+							Name:  "CONFIGS",
+							Value: o.Value,
+						},
+					},
+				},
+			},
+			RestartPolicy: corev1.RestartPolicyNever,
+		},
 	}
 
-	cueFS, _ := debme.FS(cueTemplate, "template")
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(CueSysBenchTemplateName))
+	pod, err := o.client.CoreV1().Pods(o.namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
+		fmt.Fprintf(o.ErrOut, "failed to create pod: %v\n", err)
 		return err
 	}
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-	if err := cueValue.Fill("options", optionsByte); err != nil {
-		return err
-	}
-	if unstructureObj, err = cueValue.ConvertContentToUnstructured("content"); err != nil {
-		return err
-	}
-
-	if _, err := o.dynamic.Resource(types.PodGVR()).Namespace(o.namespace).Create(context.Background(), unstructureObj, metav1.CreateOptions{}); err != nil {
-		return err
-	}
+	fmt.Fprintf(o.Out, "pod/%s created\n", pod.Name)
 
 	return nil
 }
@@ -243,12 +292,12 @@ func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 	}
 
 	cmd := &cobra.Command{
-		Use:               "sysbench",
+		Use:               "sysbench [ClusterName]",
 		Short:             "run a SysBench benchmark",
-		Args:              cobra.ExactArgs(1),
+		Example:           sysbenchExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(executeSysBench(o, args[0], all))
+			cmdutil.CheckErr(executeSysBench(o, args, all))
 		},
 	}
 
@@ -269,12 +318,12 @@ func NewSysBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cob
 
 func newPrepareCmd(f cmdutil.Factory, o *SysBenchOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "prepare [NAME]",
+		Use:               "prepare [ClusterName]",
 		Short:             "Prepare the data of SysBench for a cluster",
-		Args:              cobra.ExactArgs(1),
+		Example:           sysbenchPrepareExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(executeSysBench(o, args[0], prepareOperation))
+			cmdutil.CheckErr(executeSysBench(o, args, prepareOperation))
 		},
 	}
 	return cmd
@@ -282,12 +331,12 @@ func newPrepareCmd(f cmdutil.Factory, o *SysBenchOptions) *cobra.Command {
 
 func newRunCmd(f cmdutil.Factory, o *SysBenchOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "run [NAME]",
+		Use:               "run [ClusterName]",
 		Short:             "Run  SysBench on cluster",
-		Args:              cobra.ExactArgs(1),
+		Example:           sysbenchRunExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(executeSysBench(o, args[0], runOperation))
+			cmdutil.CheckErr(executeSysBench(o, args, runOperation))
 		},
 	}
 	return cmd
@@ -295,20 +344,20 @@ func newRunCmd(f cmdutil.Factory, o *SysBenchOptions) *cobra.Command {
 
 func newCleanCmd(f cmdutil.Factory, o *SysBenchOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:               "cleanup [NAME]",
+		Use:               "cleanup [ClusterName]",
 		Short:             "Cleanup the data of SysBench for cluster",
-		Args:              cobra.ExactArgs(1),
+		Example:           sysbenchCleanupExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(executeSysBench(o, args[0], cleanupOperation))
+			cmdutil.CheckErr(executeSysBench(o, args, cleanupOperation))
 		},
 	}
 	return cmd
 }
 
-func executeSysBench(o *SysBenchOptions, name string, mode string) error {
+func executeSysBench(o *SysBenchOptions, args []string, mode string) error {
 	o.Mode = mode
-	if err := o.Complete(name); err != nil {
+	if err := o.Complete(args); err != nil {
 		return err
 	}
 	if err := o.Validate(); err != nil {
@@ -318,43 +367,4 @@ func executeSysBench(o *SysBenchOptions, name string, mode string) error {
 		return err
 	}
 	return nil
-}
-
-func getDriverAndHostAndPort(c *appsv1alpha1.Cluster, svcList *corev1.ServiceList) (driver string, host string, port int, err error) {
-	var internalEndpoints []string
-	var externalEndpoints []string
-
-	if c == nil {
-		return "", "", 0, fmt.Errorf("cluster is nil")
-	}
-
-	for _, comp := range c.Spec.ComponentSpecs {
-		driver = comp.Name
-		internalEndpoints, externalEndpoints = cluster.GetComponentEndpoints(svcList, &comp)
-		if len(internalEndpoints) > 0 || len(externalEndpoints) > 0 {
-			break
-		}
-	}
-	switch {
-	case len(internalEndpoints) > 0:
-		host, port, err = parseHostAndPort(internalEndpoints[0])
-	case len(externalEndpoints) > 0:
-		host, port, err = parseHostAndPort(externalEndpoints[0])
-	default:
-		err = fmt.Errorf("no endpoints found")
-	}
-
-	return
-}
-
-func parseHostAndPort(s string) (string, int, error) {
-	host, port, err := net.SplitHostPort(s)
-	if err != nil {
-		return "", 0, err
-	}
-	portInt, err := strconv.Atoi(port)
-	if err != nil {
-		return "", 0, err
-	}
-	return host, portInt, nil
 }

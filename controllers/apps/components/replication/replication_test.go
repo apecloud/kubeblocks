@@ -77,8 +77,14 @@ var _ = Describe("Replication Component", func() {
 		It("Replication Component test", func() {
 
 			By("Create a clusterDefinition obj with replication workloadType.")
+			replicationSpec := &appsv1alpha1.ReplicationSetSpec{
+				StatefulSetSpec: appsv1alpha1.StatefulSetSpec{
+					UpdateStrategy: appsv1alpha1.SerialStrategy,
+				},
+			}
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.ReplicationRedisComponent, testapps.DefaultRedisCompDefName).
+				AddReplicationSpec(replicationSpec).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj with replication workloadType.")
@@ -207,13 +213,45 @@ var _ = Describe("Replication Component", func() {
 			Expect(len(pods)).To(Equal(int(replicas)))
 			Expect(util.IsStsAndPodsRevisionConsistent(ctx, k8sClient, replicationSetSts)).Should(BeTrue())
 
-			By("Checking if the pod is deleted when statefulSet is updated")
+			By("Checking if the pod is deleted when statefulSet is updated and UpdateStrategy is SerialStrategy")
 			status.UpdateRevision = "new-mock-revision"
 			testk8s.PatchStatefulSetStatus(&testCtx, replicationSetSts.Name, status)
 			Expect(testCtx.Cli.Get(testCtx.Ctx, stsObjectKey, replicationSetSts)).Should(Succeed())
 			vertexes, err = replicationComponent.HandleRestart(ctx, replicationSetSts)
 			Expect(err).To(Succeed())
-			Expect(len(vertexes)).To(Equal(int(replicas)))
+			Expect(len(vertexes)).To(Equal(1))
+			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.DELETE).To(BeTrue())
+
+			By("Checking if the pod is deleted when statefulSet is updated and UpdateStrategy is BestEffortParallelStrategy")
+			Expect(testapps.ChangeObj(&testCtx, clusterDefObj, func(clusterDef *appsv1alpha1.ClusterDefinition) {
+				clusterDef.Spec.ComponentDefs[0].ReplicationSpec = &appsv1alpha1.ReplicationSetSpec{
+					StatefulSetSpec: appsv1alpha1.StatefulSetSpec{
+						UpdateStrategy: appsv1alpha1.BestEffortParallelStrategy,
+					},
+				}
+			})).Should(Succeed())
+			status.UpdateRevision = "new-mock-revision-2"
+			testk8s.PatchStatefulSetStatus(&testCtx, replicationSetSts.Name, status)
+			Expect(testCtx.Cli.Get(testCtx.Ctx, stsObjectKey, replicationSetSts)).Should(Succeed())
+			vertexes, err = replicationComponent.HandleRestart(ctx, replicationSetSts)
+			Expect(err).To(Succeed())
+			Expect(len(vertexes)).To(Equal(1))
+			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.DELETE).To(BeTrue())
+
+			By("Checking if the pod is deleted when statefulSet is updated and UpdateStrategy is ParallelStrategy")
+			Expect(testapps.ChangeObj(&testCtx, clusterDefObj, func(clusterDef *appsv1alpha1.ClusterDefinition) {
+				clusterDef.Spec.ComponentDefs[0].ReplicationSpec = &appsv1alpha1.ReplicationSetSpec{
+					StatefulSetSpec: appsv1alpha1.StatefulSetSpec{
+						UpdateStrategy: appsv1alpha1.ParallelStrategy,
+					},
+				}
+			})).Should(Succeed())
+			status.UpdateRevision = "new-mock-revision-2"
+			testk8s.PatchStatefulSetStatus(&testCtx, replicationSetSts.Name, status)
+			Expect(testCtx.Cli.Get(testCtx.Ctx, stsObjectKey, replicationSetSts)).Should(Succeed())
+			vertexes, err = replicationComponent.HandleRestart(ctx, replicationSetSts)
+			Expect(err).To(Succeed())
+			Expect(len(vertexes)).To(Equal(2))
 			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.DELETE).To(BeTrue())
 
 			By("Test handleRoleChange when statefulSet Pod with role label but without primary annotation")
@@ -238,7 +276,7 @@ var _ = Describe("Replication Component", func() {
 			_ = testapps.MockReplicationComponentPod(nil, testCtx, replicationSetSts, clusterObj.Name, testapps.DefaultRedisCompSpecName, newPodName, "")
 			vertexes, err = replicationComponent.HandleRoleChange(ctx, replicationSetSts)
 			Expect(err).To(Succeed())
-			Expect(len(vertexes)).To(Equal(1))
+			Expect(len(vertexes)).To(Equal(3))
 			Expect(*vertexes[0].(*ictrltypes.LifecycleVertex).Action == ictrltypes.UPDATE).To(BeTrue())
 		})
 	})

@@ -26,7 +26,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 )
 
-// ParallelTransformer executes a group of transformers parallely.
+// ParallelTransformer executes a group of transformers in parallel.
 // TODO: make DAG thread-safe if ParallelTransformer called.
 type ParallelTransformer struct {
 	Transformers []graph.Transformer

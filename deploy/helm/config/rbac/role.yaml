@@ -73,43 +73,6 @@ rules:
   - statefulsets/finalizers
   verbs:
   - update
-
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - role
-  - roles
-  - rolebinding
-  - rolebindings
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - role/finalizers
-  - rolebinding/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - serviceaccount
-  - serviceaccounts
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-- apiGroups:
-  - ""
-  resources:
-  - serviceaccount/finalizers
-  verbs:
-  - update
-
 - apiGroups:
   - apps
   resources:
@@ -516,6 +479,32 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
   - services
   verbs:
   - create
@@ -688,6 +677,58 @@ rules:
   resources:
   - poddisruptionbudgets/finalizers
   verbs:
+  - update
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - rolebindings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - rolebindings/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - rolebindings/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles/status
+  verbs:
+  - get
+  - patch
   - update
 - apiGroups:
   - snapshot.storage.k8s.io

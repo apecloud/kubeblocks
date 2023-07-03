@@ -111,6 +111,15 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 
+	buildAffinity := func() *appsv1alpha1.Affinity {
+		affinity := cluster.Spec.Affinity
+		if clusterCompSpec.Affinity != nil {
+			affinity = clusterCompSpec.Affinity
+		}
+		if
+		return affinity
+	}
+
 	fillClusterCompSpec()
 	if clusterCompSpec == nil {
 		return nil, nil
@@ -166,10 +175,7 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 
 	// handle component.PodSpec extra settings
 	// set affinity and tolerations
-	affinity := cluster.Spec.Affinity
-	if clusterCompSpec.Affinity != nil {
-		affinity = clusterCompSpec.Affinity
-	}
+	affinity := buildAffinity()
 	if component.PodSpec.Affinity, err = buildPodAffinity(cluster, affinity, component); err != nil {
 		reqCtx.Log.Error(err, "build pod affinity failed.")
 		return nil, err

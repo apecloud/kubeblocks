@@ -113,6 +113,12 @@ func GetKubeBlocksDeploy(client kubernetes.Interface) (*appsv1.Deployment, error
 		return nil, nil
 	}
 	if len(deploys.Items) > 1 {
+		// for compatibility with older versions, filter here instead of LabelSelector
+		for _, i := range deploys.Items {
+			if _, ok := i.Labels["app.kubernetes.io/component"]; ok {
+				return &i, nil
+			}
+		}
 		return nil, fmt.Errorf("found multiple KubeBlocks deployments, please check your cluster")
 	}
 	return &deploys.Items[0], nil

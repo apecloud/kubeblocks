@@ -25,20 +25,16 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
-	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var showAllConfig = false
@@ -207,26 +203,7 @@ func markKubeBlocksPodsToLoadConfigMap(client kubernetes.Interface) error {
 	if err != nil {
 		return err
 	}
-	if len(pods.Items) == 0 {
-		return nil
-	}
-	condition := deploymentutil.GetDeploymentCondition(deploy.Status, appsv1.DeploymentProgressing)
-	if condition == nil {
-		return nil
-	}
-	podBelongToKubeBlocks := func(pod corev1.Pod) bool {
-		for _, v := range pod.OwnerReferences {
-			if v.Kind == constant.ReplicaSetKind && strings.Contains(condition.Message, v.Name) {
-				return true
-			}
-		}
-		return false
-	}
 	for _, pod := range pods.Items {
-		belongToKubeBlocks := podBelongToKubeBlocks(pod)
-		if !belongToKubeBlocks {
-			continue
-		}
 		// mark the pod to load configmap
 		if pod.Annotations == nil {
 			pod.Annotations = map[string]string{}

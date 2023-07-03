@@ -377,6 +377,28 @@ func (d *snapshotDataClone) checkRestoreStatus(pvcKey types.NamespacedName) (bac
 	return backupStatusReadyToUse, nil
 }
 
+func (d *snapshotDataClone) listVolumeSnapshotByLabels(vsList *snapshotv1.VolumeSnapshotList, ml client.MatchingLabels) error {
+	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: d.cli, Ctx: d.reqCtx.Ctx}
+	if err := compatClient.List(vsList, ml); err != nil {
+		return err
+	}
+	if len(vsList.Items) > 0 {
+		// found it, fast return.
+		return nil
+	}
+	// if not found direct volume snapshot created by hscale, get it from backup.
+	backupList := dataprotectionv1alpha1.BackupList{}
+	if err := d.cli.List(d.reqCtx.Ctx, &backupList, ml); err != nil {
+		return err
+	} else if len(backupList.Items) == 0 {
+		// ignore not found
+		return nil
+	}
+	return compatClient.List(vsList, client.MatchingLabels{
+		constant.DataProtectionLabelBackupNameKey: backupList.Items[0].Name,
+	})
+}
+
 // check snapshot existence
 func (d *snapshotDataClone) isVolumeSnapshotExists() (bool, error) {
 	ml := d.getBackupMatchingLabels()
@@ -426,8 +448,7 @@ func (d *snapshotDataClone) checkedCreatePVCFromSnapshot(pvcKey types.Namespaced
 		}
 		ml := d.getBackupMatchingLabels()
 		vsList := snapshotv1.VolumeSnapshotList{}
-		compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: d.cli, Ctx: d.reqCtx.Ctx}
-		if err := compatClient.List(&vsList, ml); err != nil {
+		if err = d.listVolumeSnapshotByLabels(&vsList, ml); err != nil {
 			return nil, err
 		}
 		if len(vsList.Items) == 0 {

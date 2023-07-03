@@ -101,10 +101,12 @@ spec:
               clusterDefinitionRef:
                 description: Cluster referencing ClusterDefinition name. This is an
                   immutable attribute.
+                maxLength: 63
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               clusterVersionRef:
                 description: Cluster referencing ClusterVersion name.
+                maxLength: 63
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               componentSpecs:
@@ -166,15 +168,18 @@ spec:
                           type: string
                         name:
                           description: Name refers to the name of the ComponentClassDefinition.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                       required:
                       - class
                       type: object
                     componentDefRef:
-                      description: componentDefRef references the componentDef defined
-                        in ClusterDefinition spec.
-                      maxLength: 63
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      description: componentDefRef references componentDef defined
+                        in ClusterDefinition spec. Need to comply with IANA Service
+                        Naming rule.
+                      maxLength: 22
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     enabledLogs:
                       description: enabledLogs indicates which log file takes effect
@@ -232,9 +237,11 @@ spec:
                         and export metrics to Time Series Database.
                       type: boolean
                     name:
-                      description: name defines cluster's component name.
-                      maxLength: 15
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      description: name defines cluster's component name, this name
+                        is also part of Service DNS name, so this name will comply
+                        with IANA Service Naming rule.
+                      maxLength: 22
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     noCreatePDB:
                       default: false

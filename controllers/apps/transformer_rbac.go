@@ -21,7 +21,9 @@ package apps
 
 import (
 	appsv1 "k8s.io/api/apps/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
@@ -29,6 +31,8 @@ import (
 
 // RBACTransformer puts the rbac at the beginning of the DAG
 type RBACTransformer struct{}
+
+const PGTYPE = "postgresql"
 
 var _ graph.Transformer = &RBACTransformer{}
 
@@ -54,6 +58,8 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	if err != nil {
 		return err
 	}
+
+	completeRoleRules(transCtx, role)
 	roleVertex := ictrltypes.LifecycleObjectCreate(dag, role, root)
 
 	roleBinding, err := builder.BuildRoleBinding(cluster)
@@ -76,4 +82,67 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 		dag.Connect(deploymentVertex, rbVertex)
 	}
 	return nil
+}
+
+func completeRoleRules(transCtx *ClusterTransformContext, role *rbacv1.Role) {
+	rules := []rbacv1.PolicyRule{
+		{
+			APIGroups: []string{""},
+			Resources: []string{"events"},
+			Verbs:     []string{"create"},
+		},
+		{
+			APIGroups: []string{"dataprotection.kubeblocks.io"},
+			Resources: []string{"backups/status"},
+			Verbs:     []string{"get", "update", "patch"},
+		},
+		{
+			APIGroups: []string{"dataprotection.kubeblocks.io"},
+			Resources: []string{"backups"},
+			Verbs:     []string{"create", "get", "list", "update", "patch"},
+		},
+	}
+
+	// postgresql need more rules for patroni
+	if isPostgresqlCluster(transCtx) {
+		rules = append(rules, []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"configmaps"},
+				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"endpoints"},
+				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+				Verbs:     []string{"get", "list", "patch", "update", "watch"},
+			},
+		}...)
+	}
+	role.Rules = append(role.Rules, rules...)
+}
+
+func isPostgresqlCluster(transCtx *ClusterTransformContext) bool {
+	cd := transCtx.ClusterDef
+	cluster := transCtx.Cluster
+
+	if cd.Spec.Type != PGTYPE {
+		return false
+	}
+
+	var compDef *appsv1alpha1.ClusterComponentDefinition
+
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		for _, def := range cd.Spec.ComponentDefs {
+			if def.Name == compSpec.ComponentDefRef && compDef.CharacterType == PGTYPE {
+				return true
+			}
+		}
+	}
+
+	return false
 }

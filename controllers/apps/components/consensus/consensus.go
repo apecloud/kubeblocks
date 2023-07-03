@@ -30,11 +30,9 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -42,52 +40,45 @@ type ConsensusSet struct {
 	stateful.Stateful
 }
 
-var _ types.ComponentSet = &ConsensusSet{}
+var _ internal.ComponentSet = &ConsensusSet{}
 
 func (r *ConsensusSet) getName() string {
-	if r.Component != nil {
-		return r.Component.GetName()
+	if r.SynthesizedComponent != nil {
+		return r.SynthesizedComponent.Name
 	}
 	return r.ComponentSpec.Name
 }
 
 func (r *ConsensusSet) getDefName() string {
-	if r.Component != nil {
-		return r.Component.GetDefinitionName()
+	if r.SynthesizedComponent != nil {
+		return r.SynthesizedComponent.ComponentDef
 	}
 	return r.ComponentDef.Name
 }
 
 func (r *ConsensusSet) getWorkloadType() appsv1alpha1.WorkloadType {
-	if r.Component != nil {
-		return r.Component.GetWorkloadType()
-	}
-	return r.ComponentDef.WorkloadType
+	return appsv1alpha1.Consensus
 }
 
 func (r *ConsensusSet) getReplicas() int32 {
-	if r.Component != nil {
-		return r.Component.GetReplicas()
+	if r.SynthesizedComponent != nil {
+		return r.SynthesizedComponent.Replicas
 	}
 	return r.ComponentSpec.Replicas
 }
 
 func (r *ConsensusSet) getConsensusSpec() *appsv1alpha1.ConsensusSetSpec {
-	if r.Component != nil {
-		return r.Component.GetConsensusSpec()
+	if r.SynthesizedComponent != nil {
+		return r.SynthesizedComponent.ConsensusSpec
 	}
 	return r.ComponentDef.ConsensusSpec
 }
 
 func (r *ConsensusSet) getProbes() *appsv1alpha1.ClusterDefinitionProbes {
-	if r.Component != nil {
-		return r.Component.GetSynthesizedComponent().Probes
+	if r.SynthesizedComponent != nil {
+		return r.SynthesizedComponent.Probes
 	}
 	return r.ComponentDef.Probes
-}
-
-func (r *ConsensusSet) SetComponent(comp types.Component) {
-	r.Component = comp
 }
 
 func (r *ConsensusSet) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
@@ -210,48 +201,13 @@ func (r *ConsensusSet) HandleRestart(ctx context.Context, obj client.Object) ([]
 	if r.getWorkloadType() != appsv1alpha1.Consensus {
 		return nil, nil
 	}
-
-	stsObj := util.ConvertToStatefulSet(obj)
-	pods, err := util.GetPodListByStatefulSet(ctx, r.Cli, stsObj)
-	if err != nil {
-		return nil, err
+	priorityMapperFn := func(component *appsv1alpha1.ClusterComponentDefinition) map[string]int {
+		return ComposeRolePriorityMap(component.ConsensusSpec)
 	}
-
-	// prepare to do pods Deletion, that's the only thing we should do,
-	// the statefulset reconciler will do the rest.
-	// to simplify the process, we do pods Deletion after statefulset reconciliation done,
-	// it is when stsObj.Generation == stsObj.Status.ObservedGeneration
-	if stsObj.Generation != stsObj.Status.ObservedGeneration {
-		return nil, nil
-	}
-
-	// then we wait for all pods' presence when len(pods) == stsObj.Spec.Replicas
-	// at that point, we have enough info about the previous pods before deleting the current one
-	if len(pods) != int(*stsObj.Spec.Replicas) {
-		return nil, nil
-	}
-
-	// we don't check whether pod role label is present: prefer stateful set's Update done than role probing ready
-
-	// generate the pods Deletion plan
-	podsToDelete := make([]*corev1.Pod, 0)
-	plan := generateRestartPodPlan(ctx, r.Cli, stsObj, pods, r.getConsensusSpec(), &podsToDelete)
-	// execute plan
-	if _, err := plan.WalkOneStep(); err != nil {
-		return nil, err
-	}
-
-	vertexes := make([]graph.Vertex, 0)
-	for _, pod := range podsToDelete {
-		vertexes = append(vertexes, &ictrltypes.LifecycleVertex{
-			Obj:    pod,
-			Action: ictrltypes.ActionDeletePtr(),
-			Orphan: true,
-		})
-	}
-	return vertexes, nil
+	return r.HandleUpdateWithStrategy(ctx, obj, nil, priorityMapperFn, generateConsensusSerialPlan, generateConsensusBestEffortParallelPlan, generateConsensusParallelPlan)
 }
 
+// HandleRoleChange is the implementation of the type Component interface method, which is used to handle the role change of the Consensus workload.
 func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
 	if r.getWorkloadType() != appsv1alpha1.Consensus {
 		return nil, nil
@@ -298,22 +254,19 @@ func (r *ConsensusSet) HandleRoleChange(ctx context.Context, obj client.Object) 
 	return nil, nil
 }
 
-func (r *ConsensusSet) HandleHA(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	return nil, nil
-}
-
+// newConsensusSet is the constructor of the type ConsensusSet.
 func newConsensusSet(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	spec *appsv1alpha1.ClusterComponentSpec,
 	def appsv1alpha1.ClusterComponentDefinition) *ConsensusSet {
 	return &ConsensusSet{
 		Stateful: stateful.Stateful{
-			ComponentSetBase: types.ComponentSetBase{
-				Cli:           cli,
-				Cluster:       cluster,
-				ComponentSpec: spec,
-				ComponentDef:  &def,
-				Component:     nil,
+			ComponentSetBase: internal.ComponentSetBase{
+				Cli:                  cli,
+				Cluster:              cluster,
+				SynthesizedComponent: nil,
+				ComponentSpec:        spec,
+				ComponentDef:         &def,
 			},
 		},
 	}

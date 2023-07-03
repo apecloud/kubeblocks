@@ -1,0 +1,11 @@
+## staticParameters, list of StaticParameter, modifications of them trigger a process restart.
+## dynamicParameters, list of DynamicParameter, modifications of them trigger a config dynamic reload without process restart.
+## staticParameters and dynamicParameters determine the behavior of parameter changes:
+## if any of the modified parameters is in the staticParameters list, this operation will trigger a process restart.
+## if all the changed parameters are in the dynamicParameters list, this change executes reload without process restart.
+## if the above two conditions are not met, by default, parameter change operation follow the rule for using staticParameters.
+staticParameters: []
+
+dynamicParameters: []
+
+immutableParameters: []

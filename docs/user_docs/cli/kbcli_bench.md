@@ -37,6 +37,7 @@ Run a benchmark.
 ### SEE ALSO
 
 
+* [kbcli bench pgbench](kbcli_bench_pgbench.md)	 - Run pgbench against a PostgreSQL cluster
 * [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
 
 #### Go Back to [CLI Overview](cli.md) Homepage.

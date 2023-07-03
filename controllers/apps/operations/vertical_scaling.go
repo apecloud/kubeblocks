@@ -52,8 +52,8 @@ func init() {
 }
 
 // ActionStartedCondition the started condition when handle the vertical scaling request.
-func (vs verticalScalingHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRequest) *metav1.Condition {
-	return appsv1alpha1.NewVerticalScalingCondition(opsRequest)
+func (vs verticalScalingHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
+	return appsv1alpha1.NewVerticalScalingCondition(opsRes.OpsRequest), nil
 }
 
 // Action modifies cluster component resources according to

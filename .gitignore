@@ -58,9 +58,11 @@ pkg/resources/static/k3d/
 
 # Distribution directories
 _dist/
+dist/
 bin/
 tmp/
 
 
 # helm dependency charts
+deploy/**/Chart.lock
 deploy/**/charts

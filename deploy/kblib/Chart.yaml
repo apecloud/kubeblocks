@@ -1,0 +1,17 @@
+# This is a library helm chart for KubeBlocks. It is not intended to be installed on its own.
+# This chart is used to define common templates, values and values json schema that can be used by other charts.
+
+# NOTE:
+# The chart that uses this library chart must have a dependency on this chart and must specify the alias as 'extra'.
+# The template files in this chart should use the alias to reference the values in this chart.
+# For example: # {{ .Values.extra.terminationPolicy }}
+#
+# This chart uses format like {{ .Values.version }} to reference the values in the parent chart.
+#
+
+apiVersion: v2
+name: kblib
+description: A Library Helm chart for KubeBlocks.
+type: library
+version: 0.1.0
+appVersion: "0.1.0"

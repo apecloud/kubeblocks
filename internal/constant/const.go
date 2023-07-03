@@ -95,6 +95,7 @@ const (
 	CMConfigurationSpecProviderLabelKey    = "config.kubeblocks.io/config-spec"    // CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
 	CMConfigurationCMKeysLabelKey          = "config.kubeblocks.io/configmap-keys" // CMConfigurationCMKeysLabelKey Specify configmap keys
 	CMConfigurationTemplateNameLabelKey    = "config.kubeblocks.io/config-template-name"
+	CMTemplateNameLabelKey                 = "config.kubeblocks.io/template-name"
 	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
 	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
 	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"
@@ -121,15 +122,18 @@ const (
 	HaltRecoveryAllowInconsistentCVAnnotKey     = "clusters.apps.kubeblocks.io/allow-inconsistent-cv"
 	HaltRecoveryAllowInconsistentResAnnotKey    = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"
 	LeaderAnnotationKey                         = "cs.apps.kubeblocks.io/leader"
+	PrimaryAnnotationKey                        = "rs.apps.kubeblocks.io/primary"
 	DefaultBackupPolicyAnnotationKey            = "dataprotection.kubeblocks.io/is-default-policy"          // DefaultBackupPolicyAnnotationKey specifies the default backup policy.
 	DefaultBackupPolicyTemplateAnnotationKey    = "dataprotection.kubeblocks.io/is-default-policy-template" // DefaultBackupPolicyTemplateAnnotationKey specifies the default backup policy template.
 	BackupDataPathPrefixAnnotationKey           = "dataprotection.kubeblocks.io/path-prefix"                // BackupDataPathPrefixAnnotationKey specifies the backup data path prefix.
 	ReconfigureRefAnnotationKey                 = "dataprotection.kubeblocks.io/reconfigure-ref"
+	DataProtectionLabelClusterUIDKey            = "dataprotection.kubeblocks.io/cluster-uid"
 	DisableUpgradeInsConfigurationAnnotationKey = "config.kubeblocks.io/disable-reconfigure"
 	LastAppliedConfigAnnotationKey              = "config.kubeblocks.io/last-applied-configuration"
 	LastAppliedOpsCRAnnotationKey               = "config.kubeblocks.io/last-applied-ops-name"
 	UpgradePolicyAnnotationKey                  = "config.kubeblocks.io/reconfigure-policy"
 	KBParameterUpdateSourceAnnotationKey        = "config.kubeblocks.io/reconfigure-source"
+	CMConfigurationNewAnnotationKey             = "config.kubeblocks.io/new-config" // CMConfigurationNewAnnotationKey indicates whether this configmap is rendered by first time
 	UpgradeRestartAnnotationKey                 = "config.kubeblocks.io/restart"
 	KubeBlocksGenerationKey                     = "kubeblocks.io/generation"
 	ExtraEnvAnnotationKey                       = "kubeblocks.io/extra-env"
@@ -223,7 +227,32 @@ const (
 )
 
 const (
-	KBReplicationSetPrimaryPodName = "KB_PRIMARY_POD_NAME"
+	Primary   = "primary"
+	Secondary = "secondary"
+
+	Leader   = "leader"
+	Follower = "follower"
+	Learner  = "learner"
+)
+
+// switchover constants
+const (
+	KBJobTTLSecondsAfterFinished           = 5
+	KBSwitchoverCandidateInstanceForAnyPod = "*"
+
+	KBSwitchoverJobLabelKey      = "kubeblocks.io/switchover-job"
+	KBSwitchoverJobLabelValue    = "kb-switchover-job"
+	KBSwitchoverJobNamePrefix    = "kb-switchover-job"
+	KBSwitchoverJobContainerName = "kb-switchover-job-container"
+
+	KBSwitchoverCandidateName             = "KB_SWITCHOVER_CANDIDATE_NAME"
+	KBSwitchoverCandidateFqdn             = "KB_SWITCHOVER_CANDIDATE_FQDN"
+	KBSwitchoverReplicationPrimaryPodIP   = "KB_REPLICATION_PRIMARY_POD_IP"
+	KBSwitchoverReplicationPrimaryPodName = "KB_REPLICATION_PRIMARY_POD_NAME"
+	KBSwitchoverReplicationPrimaryPodFqdn = "KB_REPLICATION_PRIMARY_POD_FQDN"
+	KBSwitchoverConsensusLeaderPodIP      = "KB_CONSENSUS_LEADER_POD_IP"
+	KBSwitchoverConsensusLeaderPodName    = "KB_CONSENSUS_LEADER_POD_NAME"
+	KBSwitchoverConsensusLeaderPodFqdn    = "KB_CONSENSUS_LEADER_POD_FQDN"
 )
 
 // username and password are keys in created secrets for others to refer to.
@@ -236,4 +265,25 @@ const DefaultBackupPvcInitCapacity = "20Gi"
 
 const (
 	ComponentStatusDefaultPodName = "Unknown"
+)
+
+const (
+	// dataProtection env names
+
+	DPDBHost               = "DB_HOST"                // db host for dataProtection
+	DPDBUser               = "DB_USER"                // db user for dataProtection
+	DPDBPassword           = "DB_PASSWORD"            // db password for dataProtection
+	DPBackupDIR            = "BACKUP_DIR"             // the dest directory for backup data
+	DPBackupName           = "BACKUP_NAME"            // backup cr name
+	DPTTL                  = "TTL"                    // backup time to live, reference the backupPolicy.spec.retention.ttl
+	DPLogfileTTL           = "LOGFILE_TTL"            // ttl for logfile backup, one more day than backupPolicy.spec.retention.ttl
+	DPLogfileTTLSecond     = "LOGFILE_TTL_SECOND"     // ttl seconds with LOGFILE_TTL, integer format
+	DPArchiveInterval      = "ARCHIVE_INTERVAL"       // archive interval for statefulSet deploy kind, trans from the schedule cronExpression for logfile
+	DPBackupInfoFile       = "BACKUP_INFO_FILE"       // the file name which retains the backup.status info
+	DPTimeFormat           = "TIME_FORMAT"            // golang time format string
+	DPVolumeDataDIR        = "VOLUME_DATA_DIR"        //
+	DPKBRecoveryTime       = "KB_RECOVERY_TIME"       // recovery time
+	DPKBRecoveryTimestamp  = "KB_RECOVERY_TIMESTAMP"  // recovery timestamp
+	DPBackupStartTime      = "BACKUP_START_TIME"      // backup start time
+	DPBackupStartTimestamp = "BACKUP_START_TIMESTAMP" // backup start timestamp
 )

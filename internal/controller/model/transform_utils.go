@@ -45,17 +45,6 @@ func FindAll[T interface{}](dag *graph.DAG) []graph.Vertex {
 	return vertices
 }
 
-func FindAllNot[T interface{}](dag *graph.DAG) []graph.Vertex {
-	vertices := make([]graph.Vertex, 0)
-	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*ObjectVertex)
-		if _, ok := v.Obj.(T); !ok {
-			vertices = append(vertices, vertex)
-		}
-	}
-	return vertices
-}
-
 func FindRootVertex(dag *graph.DAG) (*ObjectVertex, error) {
 	root := dag.Root()
 	if root == nil {
@@ -65,15 +54,14 @@ func FindRootVertex(dag *graph.DAG) (*ObjectVertex, error) {
 	return rootVertex, nil
 }
 
-func GetGVKName(object client.Object) (*GVKName, error) {
+func GetGVKName(object client.Object) (*GVKNObjKey, error) {
 	gvk, err := apiutil.GVKForObject(object, scheme)
 	if err != nil {
 		return nil, err
 	}
-	return &GVKName{
-		gvk:  gvk,
-		ns:   object.GetNamespace(),
-		name: object.GetName(),
+	return &GVKNObjKey{
+		GroupVersionKind: gvk,
+		ObjectKey:        client.ObjectKeyFromObject(object),
 	}, nil
 }
 
@@ -190,87 +178,11 @@ func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, ml c
 	return snapshot, nil
 }
 
-func PrepareCreate(dag *graph.DAG, object client.Object) {
-	vertex := &ObjectVertex{
-		Obj:    object,
-		Action: ActionPtr(CREATE),
+func DefaultLess(v1, v2 graph.Vertex) bool {
+	o1, ok1 := v1.(*ObjectVertex)
+	o2, ok2 := v2.(*ObjectVertex)
+	if !ok1 || !ok2 {
+		return false
 	}
-	dag.AddConnectRoot(vertex)
-}
-
-func PrepareUpdate(dag *graph.DAG, objectOld, objectNew client.Object) {
-	vertex := &ObjectVertex{
-		Obj:    objectNew,
-		OriObj: objectOld,
-		Action: ActionPtr(UPDATE),
-	}
-	dag.AddConnectRoot(vertex)
-}
-
-func PrepareDelete(dag *graph.DAG, object client.Object) {
-	vertex := &ObjectVertex{
-		Obj:    object,
-		Action: ActionPtr(DELETE),
-	}
-	dag.AddConnectRoot(vertex)
-}
-
-func PrepareStatus(dag *graph.DAG, objectOld, objectNew client.Object) {
-	vertex := &ObjectVertex{
-		Obj:    objectNew,
-		OriObj: objectOld,
-		Action: ActionPtr(STATUS),
-	}
-	dag.AddVertex(vertex)
-}
-
-func PrepareRootUpdate(dag *graph.DAG) error {
-	root, err := FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
-	root.Action = ActionPtr(UPDATE)
-	return nil
-}
-
-func PrepareRootDelete(dag *graph.DAG) error {
-	root, err := FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
-	root.Action = ActionPtr(DELETE)
-	return nil
-}
-
-func PrepareRootStatus(dag *graph.DAG) error {
-	root, err := FindRootVertex(dag)
-	if err != nil {
-		return err
-	}
-	root.Action = ActionPtr(STATUS)
-	return nil
-}
-
-func DependOn(dag *graph.DAG, object client.Object, dependency ...client.Object) {
-	objectVertex := findMatchedVertex(dag, object)
-	if objectVertex == nil {
-		return
-	}
-	for _, d := range dependency {
-		v := findMatchedVertex(dag, d)
-		if v != nil {
-			dag.Connect(objectVertex, v)
-		}
-	}
-}
-
-func findMatchedVertex(dag *graph.DAG, object client.Object) graph.Vertex {
-	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*ObjectVertex)
-		if v.Obj == object || v.OriObj == object {
-			return vertex
-		}
-		// TODO(free6om): compare by type and objectKey
-	}
-	return nil
+	return o1.String() < o2.String()
 }

@@ -21,7 +21,6 @@ spec:
       enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}
       replicas: {{ .Values.replicaCount | default 2 }}
       serviceAccountName: {{ include "redis-cluster.serviceAccountName" . }}
-      primaryIndex: {{ .Values.primaryIndex | default 0 }}
       switchPolicy:
         type: {{ .Values.switchPolicy.type}}
       {{- with  .Values.resources }}

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"sort"
 
+	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -83,6 +84,13 @@ type BackupStatus struct {
 	// +optional
 	BackupToolName string `json:"backupToolName,omitempty"`
 
+	// sourceCluster records the source cluster information for this backup.
+	SourceCluster string `json:"sourceCluster,omitempty"`
+
+	// availableReplicas available replicas for statefulSet which created by backup.
+	// +optional
+	AvailableReplicas *int32 `json:"availableReplicas,omitempty"`
+
 	// manifests determines the backup metadata info.
 	// +optional
 	Manifests *ManifestsStatus `json:"manifests,omitempty"`
@@ -138,6 +146,10 @@ type BackupToolManifestsStatus struct {
 	// +optional
 	FilePath string `json:"filePath,omitempty"`
 
+	// volumeName records volume name of backup data pvc.
+	// +optional
+	VolumeName string `json:"volumeName,omitempty"`
+
 	// Backup upload total size.
 	// A string with capacity units in the form of "1Gi", "1Mi", "1Ki".
 	// +optional
@@ -159,6 +171,7 @@ type BackupToolManifestsStatus struct {
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
 // +kubebuilder:printcolumn:name="TYPE",type=string,JSONPath=`.spec.backupType`
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="SOURCE-CLUSTER",type=string,JSONPath=`.status.sourceCluster`
 // +kubebuilder:printcolumn:name="TOTAL-SIZE",type=string,JSONPath=`.status.totalSize`
 // +kubebuilder:printcolumn:name="DURATION",type=string,JSONPath=`.status.duration`
 // +kubebuilder:printcolumn:name="CREATE-TIME",type=string,JSONPath=".metadata.creationTimestamp"
@@ -208,23 +221,6 @@ func (r *BackupSpec) Validate(backupPolicy *BackupPolicy) error {
 
 // GetRecoverableTimeRange returns the recoverable time range array.
 func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
-	// filter backups with backupLog
-	baseBackups := make([]Backup, 0)
-	var incrementalBackup *Backup
-	for _, b := range backups {
-		if b.Status.Manifests == nil || b.Status.Manifests.BackupLog == nil ||
-			b.Status.Manifests.BackupLog.StopTime == nil {
-			continue
-		}
-		if b.Spec.BackupType == BackupTypeLogFile {
-			incrementalBackup = b.DeepCopy()
-		} else if b.Spec.BackupType != BackupTypeLogFile && b.Status.Phase == BackupCompleted {
-			baseBackups = append(baseBackups, b)
-		}
-	}
-	if len(baseBackups) == 0 {
-		return nil
-	}
 	sort.Slice(backups, func(i, j int) bool {
 		if backups[i].Status.StartTimestamp == nil && backups[j].Status.StartTimestamp != nil {
 			return false
@@ -237,10 +233,55 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 		}
 		return backups[i].Status.StartTimestamp.Before(backups[j].Status.StartTimestamp)
 	})
-	result := make([]BackupLogStatus, 0)
-	start, end := baseBackups[0].Status.Manifests.BackupLog.StopTime, baseBackups[0].Status.Manifests.BackupLog.StopTime
-	if incrementalBackup != nil && start.Before(incrementalBackup.Status.Manifests.BackupLog.StopTime) {
-		end = incrementalBackup.Status.Manifests.BackupLog.StopTime
+	getLogfileStartTimeAndStopTime := func() (metav1.Time, metav1.Time) {
+		var (
+			startTime metav1.Time
+			stopTime  metav1.Time
+		)
+		for _, b := range backups {
+			if b.Status.Manifests == nil || b.Status.Manifests.BackupLog == nil ||
+				b.Status.Manifests.BackupLog.StopTime == nil ||
+				b.Status.Manifests.BackupLog.StartTime == nil {
+				continue
+			}
+			if b.Spec.BackupType != BackupTypeLogFile {
+				continue
+			}
+			if startTime.IsZero() {
+				startTime = *b.Status.Manifests.BackupLog.StartTime
+			}
+			stopTime = *b.Status.Manifests.BackupLog.StopTime
+		}
+		return startTime, stopTime
 	}
-	return append(result, BackupLogStatus{StartTime: start, StopTime: end})
+	logfileStartTime, logfileStopTime := getLogfileStartTimeAndStopTime()
+	// if not exists the startTime/stopTime of the first log file, return
+	if logfileStartTime.IsZero() || logfileStopTime.IsZero() {
+		return nil
+	}
+	getFirstRecoverableBaseBackup := func() *Backup {
+		for _, b := range backups {
+			if !slices.Contains([]BackupType{BackupTypeDataFile, BackupTypeSnapshot}, b.Spec.BackupType) ||
+				b.Status.Phase != BackupCompleted {
+				continue
+			}
+			if b.Status.Manifests == nil || b.Status.Manifests.BackupLog == nil ||
+				b.Status.Manifests.BackupLog.StopTime == nil {
+				continue
+			}
+			// checks if the baseBackup stop time is between logfileStartTime and logfileStopTime.
+			if !b.Status.Manifests.BackupLog.StopTime.Before(&logfileStartTime) &&
+				b.Status.Manifests.BackupLog.StopTime.Before(&logfileStopTime) {
+				return &b
+			}
+		}
+		return nil
+	}
+	firstRecoverableBaseBackup := getFirstRecoverableBaseBackup()
+	if firstRecoverableBaseBackup == nil {
+		return nil
+	}
+	// range of recoverable time
+	return []BackupLogStatus{{StopTime: &logfileStopTime,
+		StartTime: firstRecoverableBaseBackup.Status.Manifests.BackupLog.StopTime}}
 }

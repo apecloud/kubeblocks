@@ -1,0 +1,5 @@
+{{- if .Values.replicaCount }}
+  {{- if lt (int .Values.replicaCount) 1 }}
+    {{ fail "TDengine cluster does not support running with less than one replicas." }}
+  {{- end }}
+{{- end }}

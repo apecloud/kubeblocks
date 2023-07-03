@@ -40,7 +40,7 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
-	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
@@ -67,7 +67,7 @@ var _ = Describe("DataProtection", func() {
 	})
 
 	Context("backup", func() {
-		initClient := func(policies ...*dataprotectionv1alpha1.BackupPolicy) {
+		initClient := func(policies ...*dpv1alpha1.BackupPolicy) {
 			clusterDef := testing.FakeClusterDef()
 			cluster := testing.FakeCluster(testing.ClusterName, testing.Namespace)
 			clusterDefLabel := map[string]string{
@@ -97,6 +97,35 @@ var _ = Describe("DataProtection", func() {
 			Expect(out.String()).Should(ContainSubstring(defaultBackupPolicy.Name))
 			Expect(out.String()).Should(ContainSubstring("true"))
 			Expect(len(strings.Split(strings.Trim(out.String(), "\n"), "\n"))).Should(Equal(3))
+		})
+
+		It("edit-backup-policy", func() {
+			By("fake client")
+			defaultBackupPolicy := testing.FakeBackupPolicy(policyName, testing.ClusterName)
+			tf.FakeDynamicClient = testing.FakeDynamicClient(defaultBackupPolicy)
+
+			By("test edit backup policy function")
+			o := editBackupPolicyOptions{Factory: tf, IOStreams: streams, GVR: types.BackupPolicyGVR()}
+			Expect(o.complete([]string{policyName})).Should(Succeed())
+			o.values = []string{"schedule.datafile.enable=false", `schedule.datafile.cronExpression="0 17 * * *"`,
+				"schedule.logfile.enable=false", `schedule.logfile.cronExpression="* */1 * * *"`,
+				"schedule.snapshot.enable=false", `schedule.snapshot.cronExpression="0 17 * * *"`,
+				"logfile.pvc.name=test1", "logfile.pvc.storageClassName=t1",
+				"datafile.pvc.name=test1", "datafile.pvc.storageClassName=t1"}
+			Expect(o.runEditBackupPolicy()).Should(Succeed())
+
+			By("test invalid key")
+			o.values = []string{"schedule.datafile.enable1=false"}
+			Expect(o.runEditBackupPolicy().Error()).Should(ContainSubstring("invalid key: schedule.datafile.enable1"))
+
+			By("test invalid value")
+			o.values = []string{"schedule.datafile.enable=false="}
+			Expect(o.runEditBackupPolicy().Error()).Should(ContainSubstring("invalid row"))
+
+			By("test with vim editor")
+			o.values = []string{}
+			o.isTest = true
+			Expect(o.runEditBackupPolicy()).Should(Succeed())
 		})
 
 		It("validate create backup", func() {
@@ -138,6 +167,23 @@ var _ = Describe("DataProtection", func() {
 			// must succeed otherwise exit 1 and make test fails
 			_ = cmd.Flags().Set("backup-policy", defaultBackupPolicy.Name)
 			cmd.Run(cmd, []string{testing.ClusterName})
+
+			By("test with logfile type")
+			o := &CreateBackupOptions{
+				CreateOptions: create.CreateOptions{
+					IOStreams:       streams,
+					Factory:         tf,
+					GVR:             types.BackupGVR(),
+					CueTemplateName: "backup_template.cue",
+					Name:            testing.ClusterName,
+				},
+				BackupPolicy: defaultBackupPolicy.Name,
+				BackupType:   string(dpv1alpha1.BackupTypeLogFile),
+			}
+			Expect(o.CompleteBackup()).Should(Succeed())
+			err := o.Validate()
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("can not create logfile backup, you can create it by enabling spec.schedule.logfile in BackupPolicy"))
 		})
 	})
 
@@ -180,10 +226,14 @@ var _ = Describe("DataProtection", func() {
 		backup1.Labels = map[string]string{
 			constant.AppInstanceLabelKey: "apecloud-mysql",
 		}
+		AvailableReplicas := int32(1)
+		backup1.Status.Phase = dpv1alpha1.BackupRunning
+		backup1.Status.AvailableReplicas = &AvailableReplicas
 		tf.FakeDynamicClient = testing.FakeDynamicClient(backup1)
 		Expect(printBackupList(o)).Should(Succeed())
 		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("test1"))
-		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("apecloud-mysql (deleted)"))
+		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("apecloud-mysql"))
+		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("(AvailablePods: 1)"))
 	})
 
 	It("restore", func() {
@@ -215,7 +265,7 @@ var _ = Describe("DataProtection", func() {
 
 		By("restore new cluster from source cluster which is not deleted")
 		// mock backup is ok
-		mockBackupInfo(tf.FakeDynamicClient, backupName, clusterName, nil)
+		mockBackupInfo(tf.FakeDynamicClient, backupName, clusterName, nil, "")
 		cmdRestore := NewCreateRestoreCmd(tf, streams)
 		Expect(cmdRestore != nil).To(BeTrue())
 		_ = cmdRestore.Flags().Set("backup", backupName)
@@ -223,7 +273,7 @@ var _ = Describe("DataProtection", func() {
 
 		By("restore new cluster from source cluster which is deleted")
 		// mock cluster is not lived in kubernetes
-		mockBackupInfo(tf.FakeDynamicClient, backupName, "deleted-cluster", nil)
+		mockBackupInfo(tf.FakeDynamicClient, backupName, "deleted-cluster", nil, "")
 		cmdRestore.Run(nil, []string{newClusterName + "1"})
 
 		By("run restore cmd with cluster spec.affinity=nil")
@@ -236,6 +286,7 @@ var _ = Describe("DataProtection", func() {
 	It("restore-to-time", func() {
 		timestamp := time.Now().Format("20060102150405")
 		backupName := "backup-test-" + timestamp
+		backupName1 := backupName + "1"
 		clusterName := "source-cluster-" + timestamp
 		secrets := testing.FakeSecrets(testing.Namespace, clusterName)
 		clusterDef := testing.FakeClusterDef()
@@ -247,25 +298,37 @@ var _ = Describe("DataProtection", func() {
 		backupPolicy := testing.FakeBackupPolicy("backPolicy", cluster.Name)
 		backupTypeMeta := testing.FakeBackup("backup-none").TypeMeta
 		backupLabels := map[string]string{
-			constant.AppInstanceLabelKey:    clusterName,
-			constant.KBAppComponentLabelKey: "test",
+			constant.AppInstanceLabelKey:              clusterName,
+			constant.KBAppComponentLabelKey:           "test",
+			constant.DataProtectionLabelClusterUIDKey: string(cluster.UID),
 		}
 		now := metav1.Now()
 		baseBackup := testapps.NewBackupFactory(testing.Namespace, "backup-base").
-			SetBackupType(dataprotectionv1alpha1.BackupTypeSnapshot).
+			SetBackupType(dpv1alpha1.BackupTypeSnapshot).
 			SetBackLog(now.Add(-time.Minute), now.Add(-time.Second)).
 			SetLabels(backupLabels).GetObject()
 		baseBackup.TypeMeta = backupTypeMeta
-		baseBackup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
-		incrBackup := testapps.NewBackupFactory(testing.Namespace, backupName).
-			SetBackupType(dataprotectionv1alpha1.BackupTypeLogFile).
+		baseBackup.Status.Phase = dpv1alpha1.BackupCompleted
+		logfileBackup := testapps.NewBackupFactory(testing.Namespace, backupName).
+			SetBackupType(dpv1alpha1.BackupTypeLogFile).
 			SetBackLog(now.Add(-time.Minute), now.Add(time.Minute)).
 			SetLabels(backupLabels).GetObject()
-		incrBackup.TypeMeta = backupTypeMeta
+		logfileBackup.TypeMeta = backupTypeMeta
+
+		logfileBackup1 := testapps.NewBackupFactory(testing.Namespace, backupName1).
+			SetBackupType(dpv1alpha1.BackupTypeLogFile).
+			SetBackLog(now.Add(-time.Minute), now.Add(2*time.Minute)).GetObject()
+		uid := string(cluster.UID)
+		logfileBackup1.Labels = map[string]string{
+			constant.AppInstanceLabelKey:              clusterName,
+			constant.KBAppComponentLabelKey:           "test",
+			constant.DataProtectionLabelClusterUIDKey: uid[:30] + "00",
+		}
+		logfileBackup1.TypeMeta = backupTypeMeta
 
 		pods := testing.FakePods(1, testing.Namespace, clusterName)
 		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
-			scheme.Scheme, &secrets.Items[0], &pods.Items[0], cluster, backupPolicy, baseBackup, incrBackup)
+			scheme.Scheme, &secrets.Items[0], &pods.Items[0], cluster, backupPolicy, baseBackup, logfileBackup, logfileBackup1)
 		tf.Client = &clientfake.RESTClient{}
 
 		By("restore new cluster from source cluster which is not deleted")
@@ -274,10 +337,26 @@ var _ = Describe("DataProtection", func() {
 		_ = cmdRestore.Flags().Set("restore-to-time", util.TimeFormatWithDuration(&now, time.Second))
 		_ = cmdRestore.Flags().Set("source-cluster", clusterName)
 		cmdRestore.Run(nil, []string{})
+
+		// test with RFC3339 format
+		_ = cmdRestore.Flags().Set("restore-to-time", now.Format(time.RFC3339))
+		_ = cmdRestore.Flags().Set("source-cluster", clusterName)
+		cmdRestore.Run(nil, []string{"new-cluster"})
+
+		By("restore should be failed when backups belong to different source clusters")
+		o := &CreateRestoreOptions{CreateOptions: create.CreateOptions{
+			IOStreams: streams,
+			Factory:   tf,
+		}}
+		restoreTime := time.Now().Add(90 * time.Second)
+		o.RestoreTimeStr = util.TimeFormatWithDuration(&metav1.Time{Time: restoreTime}, time.Second)
+		o.SourceCluster = clusterName
+		Expect(o.Complete()).Should(Succeed())
+		Expect(o.validateRestoreTime().Error()).Should(ContainSubstring("restore-to-time is out of time range"))
 	})
 })
 
-func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string, manifests map[string]any) {
+func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string, manifests map[string]any, backupType string) {
 	clusterString := fmt.Sprintf(`{"metadata":{"name":"deleted-cluster","namespace":"%s"},"spec":{"clusterDefinitionRef":"apecloud-mysql","clusterVersionRef":"ac-mysql-8.0.30","componentSpecs":[{"name":"mysql","componentDefRef":"mysql","replicas":1}]}}`, testing.Namespace)
 	backupStatus := &unstructured.Unstructured{
 		Object: map[string]any{
@@ -294,6 +373,9 @@ func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string, m
 					constant.AppInstanceLabelKey:    clusterName,
 					constant.KBAppComponentLabelKey: "test",
 				},
+			},
+			"spec": map[string]any{
+				"backupType": backupType,
 			},
 		},
 	}

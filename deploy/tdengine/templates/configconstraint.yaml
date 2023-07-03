@@ -1,0 +1,55 @@
+{{- $cc := .Files.Get "config/tdengine-taos-config-effect-scope.yaml" | fromYaml }}
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: tdengine-taos-config-constraints
+  labels:
+    {{- include "tdengine.labels" . | nindent 4 }}
+spec:
+  # configmap reference
+  reloadOptions:
+    tplScriptTrigger:
+      sync: true
+      scriptConfigMapRef: tdengine-reload-script
+      namespace: {{ .Release.Namespace }}
+
+  # top level mysql configuration type
+  cfgSchemaTopLevelName: TaosParameter
+
+  # ConfigurationSchema that impose restrictions on engine parameter's rule
+  configurationSchema:
+    # schema: auto generate from mmmcue scripts
+    cue: |-
+      {{- .Files.Get "config/tdengine-taos-config-constraint.cue" | nindent 6 }}
+
+  ## define static parameter list
+  {{- if hasKey $cc "staticParameters" }}
+  staticParameters:
+    {{- $params := get $cc "staticParameters" }}
+    {{- range $params }}
+    - {{ . }}
+    {{- end }}
+  {{- end}}
+
+  ## define dynamic parameter list
+  {{- if hasKey $cc "dynamicParameters" }}
+  dynamicParameters:
+   {{- $params := get $cc "dynamicParameters" }}
+   {{- range $params }}
+    - {{ . }}
+   {{- end }}
+ {{- end}}
+
+ ## define immutable parameter list, this feature is not currently supported.
+ {{- if hasKey $cc "immutableParameters" }}
+  immutableParameters:
+   {{- $params := get $cc "immutableParameters" }}
+   {{- range $params }}
+    - {{ . }}
+   {{- end }}
+ {{- end}}
+
+
+  # mysql configuration file format
+  formatterConfig:
+    format: redis

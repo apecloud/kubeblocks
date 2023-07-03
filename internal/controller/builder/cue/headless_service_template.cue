@@ -50,18 +50,18 @@ service: {
 		}
 		annotations: {
 			if component.monitor.enable == false {
-				"monitor.kubeblocks.io/scrape":  "false"
+				"monitor.kubeblocks.io/scrape":   "false"
 				"monitor.kubeblocks.io/agamotto": "false"
 			}
 			if component.monitor.enable == true && component.monitor.builtIn == false {
-				"monitor.kubeblocks.io/scrape":  "true"
-				"monitor.kubeblocks.io/path":    component.monitor.scrapePath
-				"monitor.kubeblocks.io/port":    "\(component.monitor.scrapePort)"
-				"monitor.kubeblocks.io/scheme":  "http"
+				"monitor.kubeblocks.io/scrape":   "true"
+				"monitor.kubeblocks.io/path":     component.monitor.scrapePath
+				"monitor.kubeblocks.io/port":     "\(component.monitor.scrapePort)"
+				"monitor.kubeblocks.io/scheme":   "http"
 				"monitor.kubeblocks.io/agamotto": "false"
 			}
 			if component.monitor.enable == true && component.monitor.builtIn == true {
-				"monitor.kubeblocks.io/scrape":  "false"
+				"monitor.kubeblocks.io/scrape":   "false"
 				"monitor.kubeblocks.io/agamotto": "true"
 			}
 		}

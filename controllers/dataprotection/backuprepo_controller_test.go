@@ -206,7 +206,8 @@ parameters:
 			obj.GenerateName = "backup-"
 			obj.Namespace = testCtx.DefaultNamespace
 			obj.Labels = map[string]string{
-				dataProtectionBackupRepoKey: repoKey.Name,
+				dataProtectionBackupRepoKey:  repoKey.Name,
+				dataProtectionNeedRepoPVCKey: "true",
 			}
 			obj.Spec.BackupType = dpv1alpha1.BackupTypeSnapshot
 			obj.Spec.BackupPolicyName = "default"
@@ -505,6 +506,10 @@ parameters:
 			backup = createBackupSpec(func(backup *dpv1alpha1.Backup) {
 				backup.Namespace = namespace
 			})
+			By("updating the status of the Backup to completed")
+			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dpv1alpha1.Backup) {
+				backup.Status.Phase = dpv1alpha1.BackupCompleted
+			})).Should(Succeed())
 			By("checking the PVC is created in the namespace")
 			pvcKey := types.NamespacedName{
 				Name:      pvcName,

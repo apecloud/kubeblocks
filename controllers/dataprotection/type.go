@@ -44,10 +44,11 @@ const (
 	dataProtectionBackupTargetPodKey          = "dataprotection.kubeblocks.io/target-pod-name"
 	dataProtectionAnnotationCreateByPolicyKey = "dataprotection.kubeblocks.io/created-by-policy"
 
-	dataProtectionBackupRepoKey = "dataprotection.kubeblocks.io/backup-repo-name"
+	dataProtectionBackupRepoKey  = "dataprotection.kubeblocks.io/backup-repo-name"
+	dataProtectionNeedRepoPVCKey = "dataprotection.kubeblocks.io/need-repo-pvc"
 
 	// annotation keys
-	dataProtectionPVCCreatedAnnotationKey        = "dataprotection.kubeblocks.io/pvc-created"
+	dataProtectionRepoPVCNameAnnotationKey       = "dataprotection.kubeblocks.io/repo-pvc-name"
 	dataProtectionSecretTemplateMD5AnnotationKey = "dataprotection.kubeblocks.io/secret-template-md5"
 	dataProtectionTemplateValuesMD5AnnotationKey = "dataprotection.kubeblocks.io/template-values-md5"
 

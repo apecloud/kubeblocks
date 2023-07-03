@@ -26,6 +26,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"html/template"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -243,8 +244,8 @@ func (r *BackupRepoReconciler) createStorageClassAndSecret(
 	renderCtx := renderContext{
 		Parameters: parameters,
 	}
-	patch := client.MergeFrom(repo.DeepCopy())
-	updated := false
+	oldRepo := repo.DeepCopy()
+	patch := client.MergeFrom(oldRepo)
 
 	// create secret for the CSI driver if it's not exist,
 	// or update the secret if the template or values are updated
@@ -254,44 +255,35 @@ func (r *BackupRepoReconciler) createStorageClassAndSecret(
 				Name:      randomNameForDerivedObject(repo, "secret"),
 				Namespace: viper.GetString(constant.CfgKeyCtrlrMgrNS),
 			}
-			updated = true
 		}
 		renderCtx.CSIDriverSecretRef = *repo.Status.GeneratedCSIDriverSecret
 		// create secret if it's not exist
-		if created, err := r.createSecretForCSIDriver(reqCtx, renderCtx, repo, provider); err != nil {
+		if _, err := r.createSecretForCSIDriver(reqCtx, renderCtx, repo, provider); err != nil {
 			return err
-		} else if created {
-			updated = true
 		}
 	}
 
 	// create storage class if it's not exist
 	if repo.Status.GeneratedStorageClassName == "" {
 		repo.Status.GeneratedStorageClassName = randomNameForDerivedObject(repo, "sc")
-		updated = true
 	}
-	if created, err := r.createStorageClass(reqCtx, renderCtx, repo, provider); err != nil {
+	if _, err := r.createStorageClass(reqCtx, renderCtx, repo, provider); err != nil {
 		return err
-	} else if created {
-		updated = true
 	}
 
 	// update other fields
 	if repo.Status.BackupPVCName == "" {
 		repo.Status.BackupPVCName = randomNameForDerivedObject(repo, "pvc")
-		updated = true
 	}
 	if repo.Status.ObservedGeneration != repo.Generation {
 		repo.Status.ObservedGeneration = repo.Generation
-		updated = true
 	}
 	if !meta.IsStatusConditionTrue(repo.Status.Conditions, ConditionTypeStorageClassCreated) {
 		setCondition(repo, ConditionTypeStorageClassCreated,
 			metav1.ConditionTrue, ReasonStorageClassCreated, "")
-		updated = true
 	}
 
-	if updated {
+	if !reflect.DeepEqual(oldRepo.Status, repo.Status) {
 		err := r.Client.Status().Patch(reqCtx.Ctx, repo, patch)
 		if err != nil {
 			return fmt.Errorf("failed to patch backup repo: %w", err)
@@ -427,28 +419,32 @@ func (r *BackupRepoReconciler) createStorageClass(
 }
 
 func (r *BackupRepoReconciler) listAssociatedBackups(
-	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) (*dpv1alpha1.BackupList, error) {
+	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) ([]*dpv1alpha1.Backup, error) {
 	// list backups associated with the repo
 	backupList := &dpv1alpha1.BackupList{}
 	err := r.Client.List(reqCtx.Ctx, backupList, client.MatchingLabels{
-		dataProtectionBackupRepoKey: repo.Name,
+		dataProtectionBackupRepoKey:  repo.Name,
+		dataProtectionNeedRepoPVCKey: trueVal,
 	})
-	return backupList, err
+	var filtered []*dpv1alpha1.Backup
+	for _, backup := range backupList.Items {
+		if backup.Status.Phase == dpv1alpha1.BackupFailed {
+			continue
+		}
+		filtered = append(filtered, &backup)
+	}
+	return filtered, err
 }
 
 func (r *BackupRepoReconciler) checkAssociatedBackups(
 	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) error {
-	backupList, err := r.listAssociatedBackups(reqCtx, repo)
+	backups, err := r.listAssociatedBackups(reqCtx, repo)
 	if err != nil {
 		return err
 	}
 	// return any error to reconcile the repo
 	var retErr error
-	for _, backup := range backupList.Items {
-		val := backup.Annotations[dataProtectionPVCCreatedAnnotationKey]
-		if val == trueVal {
-			continue
-		}
+	for _, backup := range backups {
 		if err := r.checkOrCreatePVC(reqCtx, repo, backup.Namespace); err != nil {
 			reqCtx.Log.Error(err, "failed to check or create PVC", "namespace", backup.Namespace)
 			retErr = err
@@ -458,10 +454,10 @@ func (r *BackupRepoReconciler) checkAssociatedBackups(
 		if backup.Annotations == nil {
 			backup.Annotations = make(map[string]string)
 		}
-		backup.Annotations[dataProtectionPVCCreatedAnnotationKey] = trueVal
-		if err = r.Client.Patch(reqCtx.Ctx, &backup, patch); err != nil {
+		backup.Annotations[dataProtectionRepoPVCNameAnnotationKey] = repo.Status.BackupPVCName
+		if err = r.Client.Patch(reqCtx.Ctx, backup, patch); err != nil {
 			reqCtx.Log.Error(err, "failed to patch backup",
-				"backup", client.ObjectKeyFromObject(&backup))
+				"backup", client.ObjectKeyFromObject(backup))
 			retErr = err
 			continue
 		}
@@ -541,9 +537,9 @@ func (r *BackupRepoReconciler) deleteExternalResources(
 	// TODO: block deletion if any BackupPolicy is referencing to this repo
 
 	// check if the repo is still being used by any backup
-	if backupList, err := r.listAssociatedBackups(reqCtx, repo); err != nil {
+	if backups, err := r.listAssociatedBackups(reqCtx, repo); err != nil {
 		return err
-	} else if len(backupList.Items) > 0 {
+	} else if len(backups) > 0 {
 		_ = updateCondition(reqCtx.Ctx, r.Client, repo, ConditionTypeDerivedObjectsDeleted,
 			metav1.ConditionFalse, ReasonHaveAssociatedBackups,
 			"some backups still refer to this repo")
@@ -664,7 +660,12 @@ func (r *BackupRepoReconciler) mapBackupToRepo(obj client.Object) []ctrl.Request
 	if !ok {
 		return nil
 	}
-	if val := obj.GetAnnotations()[dataProtectionPVCCreatedAnnotationKey]; val == trueVal {
+	// ignore backups that doesn't need to create PVC (yet)
+	if obj.GetLabels()[dataProtectionNeedRepoPVCKey] != trueVal {
+		return nil
+	}
+	// ignore failed backups
+	if obj.(*dpv1alpha1.Backup).Status.Phase == dpv1alpha1.BackupFailed {
 		return nil
 	}
 	return []ctrl.Request{{

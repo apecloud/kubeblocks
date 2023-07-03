@@ -277,7 +277,7 @@ admissionWebhooks:
 ## @param dataProtection.backupPVConfigMapNamespace - set the default configmap namespace of pv template.
 dataProtection:
   enableVolumeSnapshot: false
-  backupPVCName: ""
+  backupPVCName: kb-backup-data
   backupPVCInitCapacity: ""
   backupPVCStorageClassName: ""
   backupPVCCreatePolicy: ""

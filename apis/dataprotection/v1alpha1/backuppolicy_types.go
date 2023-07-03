@@ -104,10 +104,11 @@ type CommonBackupPolicy struct {
 }
 
 type PersistentVolumeClaim struct {
-	// the name of the PersistentVolumeClaim.
+	// the name of PersistentVolumeClaim to store backup data.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:default=kb-backup-data
 	Name string `json:"name"`
 
 	// storageClassName is the name of the StorageClass required by the claim.
@@ -131,7 +132,7 @@ type PersistentVolumeClaim struct {
 	// persistentVolumeConfigMap references the configmap which contains a persistentVolume template.
 	// key must be "persistentVolume" and value is the "PersistentVolume" struct.
 	// support the following built-in Objects:
-	// - $(GENERATE_NAME): generate a specific format "pvcName-pvcNamespace".
+	// - $(GENERATE_NAME): generate a specific format "<PVC NAME>-<PVC NAMESPACE>".
 	// if the PersistentVolumeClaim not exists and CreatePolicy is "IfNotPresent", the controller
 	// will create it by this template. this is a mutually exclusive setting with "storageClassName".
 	// +optional

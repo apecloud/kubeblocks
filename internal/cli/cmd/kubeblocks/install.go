@@ -54,9 +54,10 @@ import (
 )
 
 const (
-	kNodeAffinity    = "affinity.nodeAffinity=%s"
-	kPodAntiAffinity = "affinity.podAntiAffinity=%s"
-	kTolerations     = "tolerations=%s"
+	kNodeAffinity                     = "affinity.nodeAffinity=%s"
+	kPodAntiAffinity                  = "affinity.podAntiAffinity=%s"
+	kTolerations                      = "tolerations=%s"
+	defaultTolerationsForInstallation = "kb-controller=true:NoSchedule"
 )
 
 type Options struct {
@@ -247,18 +248,17 @@ func (o *InstallOptions) Install() error {
 		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kNodeAffinity, string(nodeLabelsJSON)))
 	}
 
-	// parse tolerations and add to values
-	if len(o.TolerationsRaw) > 0 {
-		tolerations, err := util.BuildTolerations(o.TolerationsRaw)
-		if err != nil {
-			return err
-		}
-		tolerationsJSON, err := json.Marshal(tolerations)
-		if err != nil {
-			return err
-		}
-		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kTolerations, string(tolerationsJSON)))
+	// parse tolerations and add to values, the default tolerations are defined in var defaultTolerationsForInstallation
+	o.TolerationsRaw = append(o.TolerationsRaw, defaultTolerationsForInstallation)
+	tolerations, err := util.BuildTolerations(o.TolerationsRaw)
+	if err != nil {
+		return err
 	}
+	tolerationsJSON, err := json.Marshal(tolerations)
+	if err != nil {
+		return err
+	}
+	o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kTolerations, string(tolerationsJSON)))
 
 	// add helm repo
 	s := spinner.New(o.Out, spinnerMsg("Add and update repo "+types.KubeBlocksRepoName))

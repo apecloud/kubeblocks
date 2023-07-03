@@ -87,6 +87,7 @@ var _ = Describe("kubeblocks install", func() {
 			CreateNamespace: true,
 		}
 		Expect(o.Install()).Should(HaveOccurred())
+		Expect(o.TolerationsRaw).Should(Equal([]string{defaultTolerationsForInstallation}))
 		Expect(o.ValueOpts.Values).Should(HaveLen(0))
 		Expect(o.installChart()).Should(HaveOccurred())
 		o.printNotes()

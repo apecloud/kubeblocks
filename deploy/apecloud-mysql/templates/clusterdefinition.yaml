@@ -315,6 +315,12 @@ spec:
     - name: etcd
       characterType: etcd
       workloadType: Stateful
+      scriptSpecs:
+        - name: apecloud-mysql-scripts
+          templateRef: apecloud-mysql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
       service:
         ports:
           - name: client
@@ -338,52 +344,23 @@ spec:
                 value: "2379"
               - name: TOPOLOGY_FLAGS
                 value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
-            command:
-              - /bin/bash
-              - -c
-              - |
-                echo "staring etcd."
-                etcd_port=${ETCD_PORT:-'2379'}
-                etcd_server=${ETCD_SERVER:-'127.0.0.1'}
-
-                cell=${CELL:-'zone1'}
-                export ETCDCTL_API=2
-
-                etcd --enable-v2=true --data-dir "${VTDATAROOT}/etcd/"  \
-                  --listen-client-urls "http://0.0.0.0:${etcd_port}" \
-                  --advertise-client-urls "http://0.0.0.0:${etcd_port}"
+            command: ["/scripts/etcd.sh"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
             lifecycle:
               postStart:
                 exec:
-                  command:
-                    - /bin/bash
-                    - -c
-                    - |
-                      etcd_port=${ETCD_PORT:-'2379'}
-                      etcd_server=${ETCD_SERVER:-'127.0.0.1'}
-
-                      cell=${CELL:-'zone1'}
-                      export ETCDCTL_API=2
-
-                      echo "add /vitess/global"
-                      etcdctl --endpoints "http://127.0.0.1:${etcd_port}" mkdir /vitess/global
-
-                      echo "add /vitess/$cell"
-                      etcdctl --endpoints "http://127.0.0.1:${etcd_port}" mkdir /vitess/$cell
-
-                      # And also add the CellInfo description for the cell.
-                      # If the node already exists, it's fine, means we used existing data.
-                      echo "add $cell CellInfo"
-                      set +e
-                      vtctl --topo_implementation etcd2 \
-                        --topo_global_server_address "127.0.0.1:${etcd_port}" \
-                        --topo_global_root /vitess/global VtctldCommand AddCellInfo \
-                        --root /vitess/$cell \
-                        --server-address "${etcd_server}:${etcd_port}" \
-                        $cell
+                  command: ["/scripts/etcd-post-start.sh"]
     - name: vtctld
       characterType: vtctld
       workloadType: Stateful
+      scriptSpecs:
+        - name: apecloud-mysql-scripts
+          templateRef: apecloud-mysql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
       service:
         ports:
           - name: webport
@@ -421,32 +398,19 @@ spec:
                 value: "2379"
               - name: TOPOLOGY_FLAGS
                 value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
-            command:
-              - /bin/bash
-              - -c
-              - |
-                echo "starting vtctld"
-                cell=${CELL:-'zone1'}
-                grpc_port=${VTCTLD_GRPC_PORT:-'15999'}
-                vtctld_web_port=${VTCTLD_WEB_PORT:-'15000'}
-                topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
-
-                su vitess <<EOF
-                exec vtctld \
-                $topology_fags \
-                --alsologtostderr \
-                --cell $cell \
-                --service_map 'grpc-vtctl,grpc-vtctld' \
-                --backup_storage_implementation file \
-                --file_backup_storage_root $VTDATAROOT/backups \
-                --log_dir $VTDATAROOT \
-                --port $vtctld_web_port \
-                --grpc_port $grpc_port \
-                --pid_file $VTDATAROOT/vtctld.pid
-                EOF
+            command: ["/scripts/vtctld.sh"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts 
     - name: vtconsensus
       characterType: vtconsensus
       workloadType: Stateful
+      scriptSpecs:
+        - name: apecloud-mysql-scripts
+          templateRef: apecloud-mysql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
       service:
         ports:
           - name: port
@@ -487,29 +451,19 @@ spec:
                 value: "2379"
               - name: TOPOLOGY_FLAGS
                 value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
-            command:
-              - /bin/bash
-              - -c
-              - |
-                echo "starting vtconsensus"
-                cell=${CELL:-'zone1'}
-
-                vtconsensusport=${VTCONSENSUS_PORT:-'16000'}
-                topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
-
-                su vitess <<EOF
-                exec vtconsensus \
-                  $topology_fags \
-                  --alsologtostderr \
-                  --refresh_interval 1s \
-                  --scan_repair_timeout 1s \
-                  --log_dir ${VTDATAROOT} \
-                  --db_username "$MYSQL_ROOT_USER" \
-                  --db_password "$MYSQL_ROOT_PASSWORD"
-                EOF
+            command: ["/scripts/vtconsensus.sh"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
     - name: vtgate
       characterType: vtgate
       workloadType: Stateful
+      scriptSpecs:
+        - name: apecloud-mysql-scripts
+          templateRef: apecloud-mysql-scripts
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
       service:
         ports:
           - name: webport
@@ -564,36 +518,7 @@ spec:
                 value: "2379"
               - name: TOPOLOGY_FLAGS
                 value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
-            command:
-              - /bin/bash
-              - -c
-              - |
-                cell=${CELL:-'zone1'}
-                web_port=${VTGATE_WEB_PORT:-'15001'}
-                grpc_port=${VTGATE_GRPC_PORT:-'15991'}
-                mysql_server_port=${VTGATE_MYSQL_PORT:-'15306'}
-                mysql_server_socket_path="/tmp/mysql.sock"
-
-                echo "starting vtgate."
-                su vitess <<EOF
-                exec vtgate \
-                  $TOPOLOGY_FLAGS \
-                  --alsologtostderr \
-                  --gateway_initial_tablet_timeout 30s \
-                  --healthcheck_timeout 2s \
-                  --srv_topo_timeout 1s \
-                  --grpc_keepalive_time 10s \
-                  --grpc_keepalive_timeout 10s \
-                  --log_dir $VTDATAROOT \
-                  --log_queries_to_file $VTDATAROOT/vtgate_querylog.txt \
-                  --port $web_port \
-                  --grpc_port $grpc_port \
-                  --mysql_server_port $mysql_server_port \
-                  --mysql_server_socket_path $mysql_server_socket_path \
-                  --cell $cell \
-                  --cells_to_watch $cell \
-                  --tablet_types_to_wait PRIMARY,REPLICA \
-                  --service_map 'grpc-vtgateservice' \
-                  --pid_file $VTDATAROOT/vtgate.pid \
-                  --mysql_auth_server_impl none
-                EOF
+            command: ["/scripts/vtgate.sh"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts

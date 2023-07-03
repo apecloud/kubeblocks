@@ -94,16 +94,8 @@ type RenderedConfigTemplateSpec struct {
 	Policy MergedPolicy `json:"policy,omitempty"`
 }
 
-type LazyRenderedTemplateSpec struct {
+type LegacyRenderedTemplateSpec struct {
 	RenderedConfigTemplateSpec `json:",inline"`
-}
-
-type InnerTemplateItem struct {
-	// +optional
-	ConfigSpecs []ComponentConfigSpec
-
-	// +optional
-	ScriptsSpecs []ComponentTemplateSpec
 }
 
 type ComponentConfigSpec struct {
@@ -115,9 +107,9 @@ type ComponentConfigSpec struct {
 	// +optional
 	Keys []string `json:"keys,omitempty"`
 
-	// lazyRenderedConfigSpec is optional: specify the secondary rendered config spec.
+	// legacyRenderedConfigSpec is optional: specify the secondary rendered config spec.
 	// +optional
-	LegacyRenderedConfigSpec *LazyRenderedTemplateSpec `json:"legacyRenderedConfigSpec,omitempty"`
+	LegacyRenderedConfigSpec *LegacyRenderedTemplateSpec `json:"legacyRenderedConfigSpec,omitempty"`
 
 	// Specify the name of the referenced the configuration constraints object.
 	// +kubebuilder:validation:MaxLength=63

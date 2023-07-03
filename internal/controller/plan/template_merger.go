@@ -35,7 +35,7 @@ type TemplateMerger interface {
 }
 
 type mergeContext struct {
-	template   appsv1alpha1.LazyRenderedTemplateSpec
+	template   appsv1alpha1.LegacyRenderedTemplateSpec
 	configSpec appsv1alpha1.ComponentConfigSpec
 	ccSpec     *appsv1alpha1.ConfigConstraintSpec
 
@@ -115,7 +115,7 @@ func (c *configOnlyAddMerger) Merge(baseData map[string]string, updatedData map[
 	return nil, cfgcore.MakeError("not implemented")
 }
 
-func NewTemplateMerger(template appsv1alpha1.LazyRenderedTemplateSpec, ctx context.Context, cli client.Client, builder *configTemplateBuilder, configSpec appsv1alpha1.ComponentConfigSpec, ccSpec *appsv1alpha1.ConfigConstraintSpec) (TemplateMerger, error) {
+func NewTemplateMerger(template appsv1alpha1.LegacyRenderedTemplateSpec, ctx context.Context, cli client.Client, builder *configTemplateBuilder, configSpec appsv1alpha1.ComponentConfigSpec, ccSpec *appsv1alpha1.ConfigConstraintSpec) (TemplateMerger, error) {
 	templateData := &mergeContext{
 		configSpec: configSpec,
 		template:   template,
@@ -141,7 +141,7 @@ func NewTemplateMerger(template appsv1alpha1.LazyRenderedTemplateSpec, ctx conte
 	return merger, nil
 }
 
-func mergerConfigTemplate(template *appsv1alpha1.LazyRenderedTemplateSpec,
+func mergerConfigTemplate(template *appsv1alpha1.LegacyRenderedTemplateSpec,
 	builder *configTemplateBuilder,
 	configSpec appsv1alpha1.ComponentConfigSpec,
 	baseData map[string]string,

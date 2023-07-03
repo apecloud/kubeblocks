@@ -177,7 +177,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 				ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
 			}
 			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.VolumeName = "data"
-			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.LegacyRenderedConfigSpec = &appsv1alpha1.LazyRenderedTemplateSpec{
+			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.LegacyRenderedConfigSpec = &appsv1alpha1.LegacyRenderedTemplateSpec{
 				RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
 					Namespace:   testCtx.DefaultNamespace,
 					TemplateRef: "secondary_template",

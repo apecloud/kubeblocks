@@ -124,7 +124,7 @@ max_connections=666
 
 	Context("with patch Merge", func() {
 		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
+			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
 				RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
 					Namespace: "default",
 					// Name:        configSpec.Name,
@@ -152,7 +152,7 @@ max_connections=666
 
 	Context("with replace Merge", func() {
 		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
+			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
 				RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
 					Namespace:   "default",
 					TemplateRef: updatedCMObject.GetName(),
@@ -177,7 +177,7 @@ max_connections=666
 
 	Context("with only add Merge", func() {
 		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
+			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
 				RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
 					Namespace:   "default",
 					TemplateRef: updatedCMObject.GetName(),
@@ -192,7 +192,7 @@ max_connections=666
 
 	Context("with none Merge", func() {
 		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
+			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
 				RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
 					Namespace:   "default",
 					TemplateRef: updatedCMObject.GetName(),
@@ -208,7 +208,7 @@ max_connections=666
 
 	Context("failed test", func() {
 		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
+			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
 				RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
 					Namespace:   "default",
 					TemplateRef: updatedCMObject.GetName(),
@@ -221,7 +221,7 @@ max_connections=666
 		})
 
 		It("not configconstraint", func() {
-			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
+			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
 				RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
 					Namespace:   "default",
 					TemplateRef: updatedCMObject.GetName(),
@@ -236,7 +236,7 @@ max_connections=666
 		})
 
 		It("not formatter", func() {
-			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
+			importedTemplate := &appsv1alpha1.LegacyRenderedTemplateSpec{
 				RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
 					Namespace:   "default",
 					TemplateRef: updatedCMObject.GetName(),

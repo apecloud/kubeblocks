@@ -270,7 +270,7 @@ formatterConfig:
 				buildParam := &param.ConfigSpecsBuildParams[i]
 				buildParam.ReloadOptions = reloadOptions
 				buildParam.ReloadType = appsv1alpha1.TPLScriptType
-				buildParam.ConfigSpec.LegacyRenderedConfigSpec = &appsv1alpha1.LazyRenderedTemplateSpec{
+				buildParam.ConfigSpec.LegacyRenderedConfigSpec = &appsv1alpha1.LegacyRenderedTemplateSpec{
 					RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
 						Namespace:   scriptsNS,
 						TemplateRef: lazyRenderedTemplateName,

@@ -196,7 +196,7 @@ spec:
                             type: array
                             x-kubernetes-list-type: set
                           legacyRenderedConfigSpec:
-                            description: 'lazyRenderedConfigSpec is optional: specify
+                            description: 'legacyRenderedConfigSpec is optional: specify
                               the secondary rendered config spec.'
                             properties:
                               namespace:

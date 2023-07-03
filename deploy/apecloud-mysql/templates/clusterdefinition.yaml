@@ -373,6 +373,19 @@ spec:
             port: 40000
             targetPort: delvedebug
       podSpec:
+        initContainers:
+          - name: wait-etcd-ready
+            imagePullPolicy: IfNotPresent
+            image: busybox:1.35
+            env:
+              - name: ETCD_SERVER
+                value: "$(KB_CLUSTER_NAME)-etcd-headless"
+              - name: ETCD_PORT
+                value: "2379"
+            command: ["/scripts/wait-for-service.sh", "etcd", "$(ETCD_SERVER)", "$(ETCD_PORT)"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
         containers:
           - name: vtctld
             imagePullPolicy: IfNotPresent
@@ -420,6 +433,19 @@ spec:
             port: 40000
             targetPort: delvedebug
       podSpec:
+        initContainers:
+          - name: wait-vtctld-ready
+            imagePullPolicy: IfNotPresent
+            image: busybox:1.35
+            env:
+              - name: VTCTLD_HOST
+                value: "$(KB_CLUSTER_NAME)-vtctld-headless" 
+              - name: VTCTLD_GRPC_PORT
+                value: "15999"
+            command: ["/scripts/wait-for-service.sh", "vtctld", "$(VTCTLD_HOST)", "$(VTCTLD_GRPC_PORT)"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
         containers:
           - name: vtconsensus
             imagePullPolicy: IfNotPresent
@@ -479,6 +505,19 @@ spec:
             port: 40000
             targetPort: delvedebug
       podSpec:
+        initContainers:
+          - name: wait-vtctld-ready
+            imagePullPolicy: IfNotPresent
+            image: busybox:1.35
+            env:
+              - name: VTCTLD_HOST
+                value: "$(KB_CLUSTER_NAME)-vtctld-headless" 
+              - name: VTCTLD_GRPC_PORT
+                value: "15999"
+            command: ["/scripts/wait-for-service.sh", "vtctld", "$(VTCTLD_HOST)", "$(VTCTLD_GRPC_PORT)"]
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
         containers:
           - name: vtgate
             imagePullPolicy: IfNotPresent

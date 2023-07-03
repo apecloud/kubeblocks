@@ -276,6 +276,7 @@ admissionWebhooks:
 ## @param dataProtection.backupPVConfigMapName - set the default configmap name which contains key "persistentVolume" and value of the persistentVolume struct.
 ## @param dataProtection.backupPVConfigMapNamespace - set the default configmap namespace of pv template.
 dataProtection:
+  enabled: true
   enableVolumeSnapshot: false
   backupPVCName: kb-backup-data
   backupPVCInitCapacity: ""

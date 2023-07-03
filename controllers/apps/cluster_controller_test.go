@@ -543,9 +543,7 @@ var _ = Describe("Cluster Controller", func() {
 						Name:      backupKey.Name,
 						Namespace: backupKey.Namespace,
 						Labels: map[string]string{
-							constant.KBManagedByKey:         "cluster",
-							constant.AppInstanceLabelKey:    clusterKey.Name,
-							constant.KBAppComponentLabelKey: comp.Name,
+							constant.DataProtectionLabelBackupNameKey: backupKey.Name,
 						}},
 					Spec: snapshotv1.VolumeSnapshotSpec{
 						Source: snapshotv1.VolumeSnapshotSource{

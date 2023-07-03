@@ -211,7 +211,9 @@ func (o *ConnectOptions) complete() error {
 
 	// 2.2 fill component name, use the first component by default
 	if len(o.componentName) == 0 {
-		o.component = &o.targetCluster.Spec.ComponentSpecs[0]
+		if o.component, err = o.getConnectComponent(); err != nil {
+			return err
+		}
 		o.componentName = o.component.Name
 	} else {
 		// verify component
@@ -441,4 +443,24 @@ func getOneHeadlessEndpoint(clusterDef *appsv1alpha1.ClusterDefinition, secrets 
 		return ""
 	}
 	return string(val)
+}
+
+// getConnectComponent return the cluster connect endpoint component
+func (o *ConnectOptions) getConnectComponent() (*appsv1alpha1.ClusterComponentSpec, error) {
+	if o.targetCluster.Spec.ComponentSpecs == nil || len(o.targetCluster.Spec.ComponentSpecs) == 0 {
+		return nil, fmt.Errorf("cluster %s doesn't have a component, please cheeckout the resourse", o.clusterName)
+	}
+	res := &o.targetCluster.Spec.ComponentSpecs[0]
+	already := false
+	for i := range o.targetCluster.Spec.ComponentSpecs {
+		if o.targetCluster.Spec.ComponentSpecs[i].IsConnAgent {
+			if !already {
+				res = &o.targetCluster.Spec.ComponentSpecs[i]
+				already = true
+			} else {
+				return nil, fmt.Errorf("cluster %s have two connection endpoints, please checkout the resourse", o.clusterName)
+			}
+		}
+	}
+	return res, nil
 }

@@ -508,7 +508,7 @@ spec:
                   --db_password "$MYSQL_ROOT_PASSWORD"
                 EOF
     - name: vtgate
-      characterType: vtgate
+      characterType: mysql
       workloadType: Stateful
       service:
         ports:
@@ -564,6 +564,8 @@ spec:
                 value: "2379"
               - name: TOPOLOGY_FLAGS
                 value: "--topo_implementation etcd2 --topo_global_server_address $(ETCD_SERVER):$(ETCD_PORT) --topo_global_root /vitess/global"
+              - name: MYSQL_UNIX_PORT
+                value: "/tmp/mysql.sock"
             command:
               - /bin/bash
               - -c
@@ -597,3 +599,4 @@ spec:
                   --pid_file $VTDATAROOT/vtgate.pid \
                   --mysql_auth_server_impl none
                 EOF
+=

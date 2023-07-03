@@ -31,6 +31,7 @@ type ClusterSpec struct {
 	// Cluster referencing ClusterDefinition name. This is an immutable attribute.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDefinitionRef is immutable"
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
 	// Cluster referencing ClusterVersion name.

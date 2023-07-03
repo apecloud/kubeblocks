@@ -507,9 +507,22 @@ parameters:
 				backup.Namespace = namespace
 			})
 			By("updating the status of the Backup to completed")
-			Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dpv1alpha1.Backup) {
-				backup.Status.Phase = dpv1alpha1.BackupCompleted
-			})).Should(Succeed())
+			Eventually(func(g Gomega) {
+				obj := &dpv1alpha1.Backup{}
+				err := testCtx.Cli.Get(testCtx.Ctx, client.ObjectKeyFromObject(backup), obj)
+				g.Expect(err).ShouldNot(HaveOccurred())
+				if obj.Status.Phase == dpv1alpha1.BackupFailed {
+					// the controller will set the status to failed because
+					// essential objects (e.g. backup policy) are missed.
+					// we set the status to completed after that, to avoid conflict.
+					obj.Status.Phase = dpv1alpha1.BackupCompleted
+					err = testCtx.Cli.Status().Update(testCtx.Ctx, obj)
+					g.Expect(err).ShouldNot(HaveOccurred())
+				} else {
+					// check again
+					g.Expect(false).Should(BeTrue())
+				}
+			}).Should(Succeed())
 			By("checking the PVC is created in the namespace")
 			pvcKey := types.NamespacedName{
 				Name:      pvcName,

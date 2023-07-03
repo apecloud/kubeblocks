@@ -642,12 +642,6 @@ type ClusterDefinitionProbes struct {
 	// +optional
 	RoleProbe *ClusterDefinitionProbe `json:"roleProbe,omitempty"`
 
-	// TODO: we should not provide this option for user.
-	// Probe to monitor the volume space usage and prohibit the instance from writing if the volume space usage is over the defined threshold.
-	// Reference ClusterDefinition.ClusterComponentDefinition.VolumeProtectionSpec for the threshold and volumes to monitor.
-	// +optional
-	VolumeProtectionProbe *ClusterDefinitionProbe `json:"volumeProtectionProbe,omitempty"`
-
 	// roleProbeTimeoutAfterPodsReady(in seconds), when all pods of the component are ready,
 	// it will detect whether the application is available in the pod.
 	// if pods exceed the InitializationTimeoutSeconds time without a role label,

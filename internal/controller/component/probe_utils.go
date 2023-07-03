@@ -47,6 +47,13 @@ const (
 var (
 	//go:embed cue/*
 	cueTemplates embed.FS
+
+	// default probe setting for volume protection.
+	defaultVolumeProtectionProbe = appsv1alpha1.ClusterDefinitionProbe{
+		PeriodSeconds:    60,
+		TimeoutSeconds:   5,
+		FailureThreshold: 3,
+	}
 )
 
 func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedComponent) error {
@@ -90,9 +97,9 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		probeContainers = append(probeContainers, *runningProbeContainer)
 	}
 
-	if componentProbes.VolumeProtectionProbe != nil && component.VolumeProtection != nil {
+	if component.VolumeProtection != nil {
 		c := container.DeepCopy()
-		buildVolumeProtectionProbeContainer(component.CharacterType, c, *componentProbes.VolumeProtectionProbe, int(probeSvcHTTPPort))
+		buildVolumeProtectionProbeContainer(component.CharacterType, c, int(probeSvcHTTPPort))
 		probeContainers = append(probeContainers, *c)
 	}
 
@@ -240,8 +247,7 @@ func buildRunningProbeContainer(characterType string, runningProbeContainer *cor
 	runningProbeContainer.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 
-func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Container,
-	probeSetting appsv1alpha1.ClusterDefinitionProbe, probeSvcHTTPPort int) {
+func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Container, probeSvcHTTPPort int) {
 	c.Name = constant.VolumeProtectionProbeContainerName
 	probe := c.ReadinessProbe
 	httpGet := &corev1.HTTPGetAction{}
@@ -249,9 +255,9 @@ func buildVolumeProtectionProbeContainer(characterType string, c *corev1.Contain
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)
 	probe.Exec = nil
 	probe.HTTPGet = httpGet
-	probe.PeriodSeconds = probeSetting.PeriodSeconds
-	probe.TimeoutSeconds = probeSetting.TimeoutSeconds
-	probe.FailureThreshold = probeSetting.FailureThreshold
+	probe.PeriodSeconds = defaultVolumeProtectionProbe.PeriodSeconds
+	probe.TimeoutSeconds = defaultVolumeProtectionProbe.TimeoutSeconds
+	probe.FailureThreshold = defaultVolumeProtectionProbe.FailureThreshold
 	c.StartupProbe.TCPSocket.Port = intstr.FromInt(probeSvcHTTPPort)
 }
 

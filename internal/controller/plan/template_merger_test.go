@@ -125,11 +125,12 @@ max_connections=666
 	Context("with patch Merge", func() {
 		It("test mergerConfigTemplate function", func() {
 			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
-				Namespace: "default",
-				// Name:        configSpec.Name,
-				TemplateRef: updatedCMObject.GetName(),
-				Policy:      appsv1alpha1.PatchPolicy,
-			}
+				RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
+					Namespace: "default",
+					// Name:        configSpec.Name,
+					TemplateRef: updatedCMObject.GetName(),
+					Policy:      appsv1alpha1.PatchPolicy,
+				}}
 
 			tmpCM := baseCMObject.DeepCopy()
 			mergedData, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
@@ -152,10 +153,11 @@ max_connections=666
 	Context("with replace Merge", func() {
 		It("test mergerConfigTemplate function", func() {
 			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
-				Namespace:   "default",
-				TemplateRef: updatedCMObject.GetName(),
-				Policy:      appsv1alpha1.ReplacePolicy,
-			}
+				RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
+					Namespace:   "default",
+					TemplateRef: updatedCMObject.GetName(),
+					Policy:      appsv1alpha1.ReplacePolicy,
+				}}
 
 			tmpCM := baseCMObject.DeepCopy()
 			mergedData, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
@@ -176,10 +178,11 @@ max_connections=666
 	Context("with only add Merge", func() {
 		It("test mergerConfigTemplate function", func() {
 			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
-				Namespace:   "default",
-				TemplateRef: updatedCMObject.GetName(),
-				Policy:      appsv1alpha1.OnlyAddPolicy,
-			}
+				RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
+					Namespace:   "default",
+					TemplateRef: updatedCMObject.GetName(),
+					Policy:      appsv1alpha1.OnlyAddPolicy,
+				}}
 
 			tmpCM := baseCMObject.DeepCopy()
 			_, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
@@ -190,10 +193,11 @@ max_connections=666
 	Context("with none Merge", func() {
 		It("test mergerConfigTemplate function", func() {
 			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
-				Namespace:   "default",
-				TemplateRef: updatedCMObject.GetName(),
-				Policy:      appsv1alpha1.NoneMergePolicy,
-			}
+				RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
+					Namespace:   "default",
+					TemplateRef: updatedCMObject.GetName(),
+					Policy:      appsv1alpha1.NoneMergePolicy,
+				}}
 
 			tmpCM := baseCMObject.DeepCopy()
 			mergedData, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
@@ -205,10 +209,11 @@ max_connections=666
 	Context("failed test", func() {
 		It("test mergerConfigTemplate function", func() {
 			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
-				Namespace:   "default",
-				TemplateRef: updatedCMObject.GetName(),
-				Policy:      "",
-			}
+				RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
+					Namespace:   "default",
+					TemplateRef: updatedCMObject.GetName(),
+					Policy:      "",
+				}}
 
 			tmpCM := baseCMObject.DeepCopy()
 			_, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
@@ -217,10 +222,11 @@ max_connections=666
 
 		It("not configconstraint", func() {
 			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
-				Namespace:   "default",
-				TemplateRef: updatedCMObject.GetName(),
-				Policy:      "none",
-			}
+				RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
+					Namespace:   "default",
+					TemplateRef: updatedCMObject.GetName(),
+					Policy:      "none",
+				}}
 
 			tmpCM := baseCMObject.DeepCopy()
 			tmpConfigSpec := configSpec.DeepCopy()
@@ -231,10 +237,11 @@ max_connections=666
 
 		It("not formatter", func() {
 			importedTemplate := &appsv1alpha1.LazyRenderedTemplateSpec{
-				Namespace:   "default",
-				TemplateRef: updatedCMObject.GetName(),
-				Policy:      "none",
-			}
+				RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
+					Namespace:   "default",
+					TemplateRef: updatedCMObject.GetName(),
+					Policy:      "none",
+				}}
 
 			tmpCM := baseCMObject.DeepCopy()
 			tmpConfigSpec := configSpec.DeepCopy()

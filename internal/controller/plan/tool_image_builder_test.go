@@ -177,11 +177,12 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 				ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
 			}
 			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.VolumeName = "data"
-			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.LazyRenderedConfigSpec = &appsv1alpha1.LazyRenderedTemplateSpec{
-				Namespace:   testCtx.DefaultNamespace,
-				TemplateRef: "secondary_template",
-				Policy:      appsv1alpha1.NoneMergePolicy,
-			}
+			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.LegacyRenderedConfigSpec = &appsv1alpha1.LazyRenderedTemplateSpec{
+				RenderedConfigTemplateSpec: appsv1alpha1.RenderedConfigTemplateSpec{
+					Namespace:   testCtx.DefaultNamespace,
+					TemplateRef: "secondary_template",
+					Policy:      appsv1alpha1.NoneMergePolicy,
+				}}
 			Expect(buildConfigToolsContainer(cfgManagerParams, &sts.Spec.Template.Spec, clusterComponent)).Should(Succeed())
 			Expect(4).Should(BeEquivalentTo(len(cfgManagerParams.ToolsContainers)))
 			Expect("test_images").Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[0].Image))

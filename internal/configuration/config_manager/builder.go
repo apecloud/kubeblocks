@@ -123,7 +123,7 @@ func buildLazyRenderedConfig(cli client.Client, ctx context.Context, param *Conf
 		return nil
 	}
 
-	secondaryTemplate := param.ConfigSpec.LazyRenderedConfigSpec
+	secondaryTemplate := param.ConfigSpec.LegacyRenderedConfigSpec
 	if secondaryTemplate == nil {
 		return nil
 	}

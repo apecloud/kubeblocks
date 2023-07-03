@@ -299,19 +299,49 @@ func BuildHeadlessSvc(cluster *appsv1alpha1.Cluster, component *component.Synthe
 
 func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent, envConfigName string) (*appsv1.StatefulSet, error) {
-	const tplFile = "statefulset_template.cue"
-
-	sts := appsv1.StatefulSet{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"cluster":   cluster,
-		"component": component,
-	}, "statefulset", &sts); err != nil {
-		return nil, err
+	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
+		return corev1.PersistentVolumeClaim{
+			ObjectMeta: vct.ObjectMeta,
+			Spec: vct.Spec,
+		}
 	}
+
+	commonLabels := map[string]string{
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AppNameLabelKey:        component.ClusterDefName,
+		constant.AppComponentLabelKey:   component.CompDefName,
+		constant.AppInstanceLabelKey:    cluster.Name,
+		constant.KBAppComponentLabelKey: component.Name,
+	}
+	podBuilder := NewPodBuilder("", "").
+		AddLabelsInMap(commonLabels).
+		AddLabels(constant.WorkloadTypeLabelKey, string(component.WorkloadType))
+	if len(cluster.Spec.ClusterVersionRef) > 0 {
+		podBuilder.AddLabels(constant.AppVersionLabelKey, cluster.Spec.ClusterVersionRef)
+	}
+	template := corev1.PodTemplateSpec{
+		ObjectMeta: podBuilder.GetObject().ObjectMeta,
+		Spec: *component.PodSpec,
+	}
+	stsBuilder := NewStatefulSetBuilder(cluster.Namespace, cluster.Name+"-"+component.Name).
+		AddLabelsInMap(commonLabels).
+		AddMatchLabelsInMap(commonLabels).
+		SetServiceName(cluster.Name+"-"+component.Name+"-headless").
+		SetReplicas(component.Replicas).
+		SetTemplate(template)
+
+	var vcts []corev1.PersistentVolumeClaim
+	for _, vct := range component.VolumeClaimTemplates {
+		vcts = append(vcts, vctToPVC(vct))
+	}
+	stsBuilder.SetVolumeClaimTemplates(vcts...)
 
 	if component.StatefulSetWorkload != nil {
-		sts.Spec.PodManagementPolicy, sts.Spec.UpdateStrategy = component.StatefulSetWorkload.FinalStsUpdateStrategy()
+		podManagementPolicy, updateStrategy := component.StatefulSetWorkload.FinalStsUpdateStrategy()
+		stsBuilder.SetPodManagementPolicy(podManagementPolicy).SetUpdateStrategy(updateStrategy)
 	}
+
+	sts := stsBuilder.GetObject()
 
 	// update sts.spec.volumeClaimTemplates[].metadata.labels
 	if len(sts.Spec.VolumeClaimTemplates) > 0 && len(sts.GetLabels()) > 0 {
@@ -324,7 +354,7 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	if err := processContainersInjection(reqCtx, cluster, component, envConfigName, &sts.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
-	return &sts, nil
+	return sts, nil
 }
 
 func randomString(length int) string {

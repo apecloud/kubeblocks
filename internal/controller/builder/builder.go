@@ -309,6 +309,10 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		return nil, err
 	}
 
+	if component.PodSpec.EnableServiceLinks == nil {
+		sts.Spec.Template.Spec.EnableServiceLinks = func() *bool { b := false; return &b }()
+	}
+
 	if component.StatefulSetWorkload != nil {
 		sts.Spec.PodManagementPolicy, sts.Spec.UpdateStrategy = component.StatefulSetWorkload.FinalStsUpdateStrategy()
 	}
@@ -438,6 +442,10 @@ func BuildDeploy(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, c
 	if component.StatelessSpec != nil {
 		deploy.Spec.Strategy = component.StatelessSpec.UpdateStrategy
 	}
+	if component.PodSpec.EnableServiceLinks == nil {
+		deploy.Spec.Template.Spec.EnableServiceLinks = func() *bool { b := false; return &b }()
+	}
+
 	if err := processContainersInjection(reqCtx, cluster, component, "", &deploy.Spec.Template.Spec); err != nil {
 		return nil, err
 	}

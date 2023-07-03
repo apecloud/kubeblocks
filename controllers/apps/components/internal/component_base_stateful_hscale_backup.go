@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package internal
 
 import (
@@ -5,6 +24,7 @@ import (
 	"strings"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -21,6 +41,7 @@ import (
 )
 
 type dataClone interface {
+	enabled() bool
 	// succeed check if data clone succeeded
 	succeed() (bool, error)
 	// cloneData do clone data, return objects that need to be created
@@ -48,13 +69,12 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 	component *component.SynthesizedComponent,
 	stsObj *appsv1.StatefulSet,
 	stsProto *appsv1.StatefulSet,
-	key types.NamespacedName) dataClone {
+	key types.NamespacedName) (dataClone, error) {
 	if component == nil || component.HorizontalScalePolicy == nil {
-		return nil
+		return nil, nil
 	}
-	switch component.HorizontalScalePolicy.Type {
-	case appsv1alpha1.HScaleDataClonePolicyFromSnapshot:
-		return &snapshotDataClone{
+	if component.HorizontalScalePolicy.Type == appsv1alpha1.HScaleDataClonePolicyCloneVolume {
+		snapshot := &snapshotDataClone{
 			baseDataClone{
 				reqCtx:    reqCtx,
 				cli:       cli,
@@ -65,8 +85,10 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 				key:       key,
 			},
 		}
-	case appsv1alpha1.HScaleDataClonePolicyFromBackup:
-		return &backupDataClone{
+		if snapshot.enabled() {
+			return snapshot, nil
+		}
+		backupTool := &backupDataClone{
 			baseDataClone{
 				reqCtx:    reqCtx,
 				cli:       cli,
@@ -77,8 +99,12 @@ func newDataClone(reqCtx intctrlutil.RequestCtx,
 				key:       key,
 			},
 		}
+		if backupTool.enabled() {
+			return backupTool, nil
+		}
+		return nil, fmt.Errorf("h-scale policy is Backup but neither snapshot nor backup tool is enabled")
 	}
-	return nil
+	return nil, nil
 }
 
 type baseDataClone struct {
@@ -174,9 +200,11 @@ func (d *baseDataClone) backupVCT() *corev1.PersistentVolumeClaimTemplate {
 	vcts := d.component.VolumeClaimTemplates
 	vct := vcts[0]
 	for _, tmpVct := range vcts {
-		if tmpVct.Name == d.component.HorizontalScalePolicy.VolumeMountsName {
-			vct = tmpVct
-			break
+		for _, volumeType := range d.component.VolumeTypes {
+			if volumeType.Type == appsv1alpha1.VolumeTypeData && volumeType.Name == tmpVct.Name {
+				vct = tmpVct
+				break
+			}
 		}
 	}
 	return &vct
@@ -208,6 +236,10 @@ func (d *baseDataClone) getBackupMatchingLabels() client.MatchingLabels {
 
 type snapshotDataClone struct {
 	baseDataClone
+}
+
+func (d *snapshotDataClone) enabled() bool {
+	return viper.GetBool("VOLUMESNAPSHOT")
 }
 
 var _ dataClone = &snapshotDataClone{}
@@ -272,9 +304,6 @@ func (d *snapshotDataClone) backup() ([]client.Object, error) {
 }
 
 func (d *snapshotDataClone) checkBackupStatus() (backupStatus, error) {
-	if !isSnapshotAvailable(d.cli, d.reqCtx.Ctx) {
-		return backupStatusFailed, fmt.Errorf("HorizontalScaleFailed: volume snapshot not supported")
-	}
 	hasBackupPolicyTemplate := true
 	backupPolicyTplName := d.component.HorizontalScalePolicy.BackupPolicyTemplateName
 	backupPolicyTemplate := &appsv1alpha1.BackupPolicyTemplate{}
@@ -491,6 +520,10 @@ type backupDataClone struct {
 	baseDataClone
 }
 
+func (d *backupDataClone) enabled() bool {
+	return len(viper.GetString(constant.CfgKeyBackupPVCName)) > 0
+}
+
 var _ dataClone = &backupDataClone{}
 
 func (d *backupDataClone) succeed() (bool, error) {
@@ -586,7 +619,7 @@ func (d *backupDataClone) restore(pvcKey types.NamespacedName) ([]client.Object,
 	if len(backupToolList.Items) == 0 {
 		return nil, fmt.Errorf("backuptool not found for clusterdefinition: %s", d.component.ClusterDefName)
 	}
-	pvc, err := builder.BuildPVC(d.cluster, d.component, &d.component.VolumeClaimTemplates[0], pvcKey, "")
+	pvc, err := builder.BuildPVC(d.cluster, d.component, d.backupVCT(), pvcKey, "")
 	if err != nil {
 		return nil, err
 	}

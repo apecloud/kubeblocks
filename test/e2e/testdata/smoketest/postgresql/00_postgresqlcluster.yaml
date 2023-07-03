@@ -6,10 +6,10 @@ metadata:
   name: kb-mycluster-pgcluster
   labels:
     
-    helm.sh/chart: pgcluster-0.5.1-beta.0
+    helm.sh/chart: pgcluster-0.6.0-alpha.21
     app.kubernetes.io/name: pgcluster
     app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "14.7.1"
+    app.kubernetes.io/version: "14.8.0"
     app.kubernetes.io/managed-by: Helm
 ---
 # Source: pgcluster/templates/role.yaml
@@ -20,10 +20,10 @@ metadata:
   namespace: default
   labels:
     
-    helm.sh/chart: pgcluster-0.5.1-beta.0
+    helm.sh/chart: pgcluster-0.6.0-alpha.21
     app.kubernetes.io/name: pgcluster
     app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "14.7.1"
+    app.kubernetes.io/version: "14.8.0"
     app.kubernetes.io/managed-by: Helm
 rules:
   - apiGroups:
@@ -76,10 +76,10 @@ metadata:
   name: kb-mycluster-pgcluster
   labels:
     
-    helm.sh/chart: pgcluster-0.5.1-beta.0
+    helm.sh/chart: pgcluster-0.6.0-alpha.21
     app.kubernetes.io/name: pgcluster
     app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "14.7.1"
+    app.kubernetes.io/version: "14.8.0"
     app.kubernetes.io/managed-by: Helm
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -96,23 +96,24 @@ kind: Cluster
 metadata:
   name: mycluster-pgcluster
   labels: 
-    helm.sh/chart: pgcluster-0.5.1-beta.0
+    helm.sh/chart: pgcluster-0.6.0-alpha.21
     app.kubernetes.io/name: pgcluster
     app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "14.7.1"
+    app.kubernetes.io/version: "14.8.0"
     app.kubernetes.io/managed-by: Helm
 spec:
   clusterDefinitionRef: postgresql # ref clusterdefinition.name
-  clusterVersionRef: postgresql-14.7.1 # ref clusterversion.name
+  clusterVersionRef: postgresql-14.8.0 # ref clusterversion.name
   terminationPolicy: Delete
   affinity:
+    topologyKeys: 
+      - kubernetes.io/hostname
   componentSpecs:
     - name: postgresql # user-defined
       componentDefRef: postgresql # ref clusterdefinition components.name
       monitor: false
       replicas: 2
       serviceAccountName: kb-mycluster-pgcluster
-      primaryIndex: 0
       switchPolicy:
         type: Noop
       enabledLogs:     ["running"]
@@ -124,4 +125,4 @@ spec:
               - ReadWriteOnce
             resources:
               requests:
-                storage: 1Gi
+                storage: 4Gi

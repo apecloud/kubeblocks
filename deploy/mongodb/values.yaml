@@ -3,10 +3,15 @@
 # Declare variables to be passed into your templates.
 
 image:
-  repository: mongo # docker.io/bitnami/mongodb
+  registry: registry.cn-hangzhou.aliyuncs.com
+  repository: apecloud/mongo
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: 5.0.14 # 6.0.3-debian-11-r0
+
+walg:
+  repository: apecloud/wal-g
+  tag: mongo-latest
 
 clusterVersionOverride: ""
 nameOverride: ""
@@ -35,7 +40,7 @@ metrics:
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
     repository: apecloud/agamotto
-    tag: 0.1.0-beta.3
+    tag: 0.1.0-beta.5
     pullPolicy: IfNotPresent
   config:
     extensions:

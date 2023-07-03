@@ -16,11 +16,15 @@ spec:
   {{- end }}
   componentSpecs:
     {{- if eq "combined" $.Values.mode }}
-    - name: kafka-server
+    - name: broker
       componentDefRef: kafka-server
+      tls: {{ $.Values.tls }}
+      {{- if $.Values.tls }}
+      issuer:
+        name: KubeBlocks
+      {{- end }}
       replicas: {{ $.Values.kafkaServer.replicaCount }}
       monitor: {{ $.Values.monitor.enabled }}
-      serviceType: {{ $.Values.service.type | default "ClusterIP" }}
       {{- with $.Values.tolerations }}
       tolerations: {{ .| toYaml | nindent 8 }}
       {{- end }}
@@ -71,11 +75,15 @@ spec:
         {{- end }}
       {{- end }}
     {{- else }}
-    - name: kafka-ctrlr
+    - name: controller
       componentDefRef: kafka-controller
+      tls: {{ $.Values.tls }}
+      {{- if $.Values.tls }}
+      issuer:
+        name: KubeBlocks
+      {{- end }}
       replicas: {{ $.Values.kafkaController.replicaCount }}
       monitor: {{ $.Values.monitor.enabled }}
-      serviceType: {{ $.Values.service.type | default "ClusterIP" }}
       {{- with $.Values.tolerations }}
       tolerations: {{ .| toYaml | nindent 8 }}
       {{- end }}
@@ -115,11 +123,15 @@ spec:
           {{- end }}
         {{- end }}
       {{- end }}
-    - name: kafka-broker
+    - name: broker
       componentDefRef: kafka-broker
+      tls: {{ $.Values.tls }}
+      {{- if $.Values.tls }}
+      issuer:
+        name: KubeBlocks
+      {{- end }}
       replicas: {{ $.Values.kafkaBroker.replicaCount }}
       monitor: {{ $.Values.monitor.enabled }}
-      serviceType: {{ $.Values.service.type | default "None" }}
       {{- with $.Values.tolerations }}
       tolerations: {{ .| toYaml | nindent 8 }}
       {{- end }}
@@ -165,7 +177,6 @@ spec:
       componentDefRef: kafka-exporter
       replicas: {{ $.Values.monitor.kafkaExporter.replicaCount }}
       monitor: true
-      serviceType: "ClusterIP"
       {{- with $.Values.tolerations }}
       tolerations: {{ .| toYaml | nindent 8 }}
       {{- end }}

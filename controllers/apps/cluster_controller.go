@@ -175,6 +175,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&FillClassTransformer{},
 			// create cluster connection credential secret object
 			&ClusterCredentialTransformer{},
+			// handle rbac for pod
+			&RBACTransformer{},
 			// handle restore
 			&RestoreTransformer{Client: r.Client},
 			// create all components objects
@@ -185,8 +187,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&OwnershipTransformer{},
 			// make all workload objects depending on credential secret
 			&SecretTransformer{},
-			// make config configmap immutable
-			&ConfigTransformer{},
 			// update cluster status
 			&ClusterStatusTransformer{},
 			// always safe to put your transformer below

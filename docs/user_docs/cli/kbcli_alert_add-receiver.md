@@ -18,13 +18,13 @@ kbcli alert add-receiver [flags]
   kbcli alert add-receiver --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=XXX'
   
   # add email receiver
-  kbcli alter add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io'
+  kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io'
   
   # add email receiver, and only receive alert from cluster mycluster
-  kbcli alter add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster
+  kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster
   
   # add email receiver, and only receive alert from cluster mycluster and alert severity is warning
-  kbcli alter add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster --severity=warning
+  kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster --severity=warning
   
   # add slack receiver
   kbcli alert add-receiver --slack api_url=https://hooks.slackConfig.com/services/foo,channel=monitor,username=kubeblocks-alert-bot

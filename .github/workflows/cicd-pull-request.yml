@@ -6,6 +6,7 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  BASE_BRANCH: origin/main
 
 jobs:
   trigger-mode:
@@ -16,15 +17,22 @@ jobs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
       matrix: ${{ steps.get_trigger_mode.outputs.matrix }}
     steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          all_but_latest: true
+          access_token: ${{ github.token }}
+
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
       - name: Get trigger mode
         id: get_trigger_mode
         run: |
+          git checkout -b ${{ github.event.pull_request.head.ref }} --track origin/${{ github.event.pull_request.head.ref }}
           TRIGGER_MODE=`bash .github/utils/utils.sh --type 6 \
               --branch-name "${{ github.event.pull_request.head.ref }}" \
-              --base-commit "${{ github.event.pull_request.base.sha }}"`
+              --base-branch "${{ env.BASE_BRANCH }}"`
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
           
@@ -35,7 +43,7 @@ jobs:
           echo "$TEST_PACKAGES"
           echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
 
-  make-test:
+  test-parallel:
     name: make test
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
@@ -53,7 +61,7 @@ jobs:
             libdevmapper-dev
 
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
           go-version: "${{ env.GO_VERSION }}"
 
@@ -63,6 +71,7 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.51.2
 
       - name: make test ${{ matrix.ops }}
+        if: ${{ ! contains(matrix.ops, '/') }}
         run: |
           make ${{ matrix.ops }}
 
@@ -71,11 +80,24 @@ jobs:
         run: |
           make test TEST_PACKAGES=./${{ matrix.ops }}/...
 
+  make-test:
+    name: make test
+    needs: [ trigger-mode, test-parallel ]
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: make test check
+        run: |
+          if [[ "${{ needs.test-parallel.result }}" == "failure" || "${{ needs.test-parallel.result }}" == "cancelled" ]]; then
+              echo "make test fail"
+              exit 1
+          fi
+
   check-image:
     name: check image
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.2
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-manager-image"
@@ -83,15 +105,14 @@ jobs:
       VERSION: "check"
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
-      SYNC_ENABLE: false
-      APECD_REF: "v0.1.0"
+      APECD_REF: "v0.1.2"
     secrets: inherit
 
   check-tools-image:
     name: check image
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[docker]')
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.2
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-tools-image"
@@ -99,21 +120,19 @@ jobs:
       VERSION: "check"
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
-      SYNC_ENABLE: false
-      APECD_REF: "v0.1.0"
+      APECD_REF: "v0.1.2"
     secrets: inherit
 
   check-helm:
     name: check helm
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]')
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts-check.yml@v0.1.4
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "v0.4.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      PUSH_ENABLE: false
-      DEP_REPO: "helm dep update deploy/delphic"
-      APECD_REF: "v0.1.0"
+      DEP_REPO: "delphic|prometheus-cluster|apecloud-mysql-cluster"
+      APECD_REF: "v0.1.4"
     secrets: inherit

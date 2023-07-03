@@ -4,6 +4,8 @@ listen_port = 6432
 unix_socket_dir = /tmp/
 unix_socket_mode = 0777
 auth_file = /opt/bitnami/pgbouncer/conf/userlist.txt
+auth_user = postgres
+auth_query = SELECT usename, passwd FROM pg_shadow WHERE usename=$1
 pidfile =/opt/bitnami/pgbouncer/tmp/pgbouncer.pid
 logfile =/opt/bitnami/pgbouncer/logs/pgbouncer.log
 auth_type = md5
@@ -16,6 +18,5 @@ ignore_startup_parameters = extra_float_digits
 {{- end }}
 max_client_conn = {{ $max_client_conn }}
 admin_users = postgres
-
 ;;; [database]
 ;;; config default database in pgbouncer_setup.sh

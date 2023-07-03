@@ -50,8 +50,8 @@ func init() {
 }
 
 // ActionStartedCondition the started condition when handling the stop request.
-func (stop StopOpsHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRequest) *metav1.Condition {
-	return appsv1alpha1.NewStopCondition(opsRequest)
+func (stop StopOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
+	return appsv1alpha1.NewStopCondition(opsRes.OpsRequest), nil
 }
 
 // Action modifies Cluster.spec.components[*].replicas from the opsRequest

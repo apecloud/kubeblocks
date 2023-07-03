@@ -75,6 +75,7 @@ type K8sClusterInfo struct {
 	CloudProvider string `json:"cloud_provider"`
 	Region        string `json:"region,omitempty"`
 	KubeConfig    string `json:"kube_config,omitempty"`
+	KbcliVersion  string `json:"kbcli_version,omitempty"`
 }
 
 // IsValid checks if kubernetes cluster info is valid

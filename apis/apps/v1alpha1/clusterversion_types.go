@@ -89,14 +89,22 @@ type ClusterComponentVersion struct {
 	// this value replaces ClusterDefinition.spec.componentDefs.podSpec.[initContainers | containers]
 	VersionsCtx VersionsContext `json:"versionsContext"`
 
-	// Provide Database manage tools image for sqlchannel
+	// switchoverSpec defines images for the component to do switchover.
+	// It overrides `image` and `env` attributes defined in ClusterDefinition.spec.componentDefs.SwitchoverSpec.CommandExecutorEnvItem.
 	// +optional
-	ToolsImage string `json:"toolsImage,omitempty"`
+	SwitchoverSpec *SwitchoverShortSpec `json:"switchoverSpec,omitempty"`
 }
 
 // SystemAccountShortSpec is a short version of SystemAccountSpec, with only CmdExecutorConfig field.
 type SystemAccountShortSpec struct {
 	// cmdExecutorConfig configs how to get client SDK and perform statements.
+	// +kubebuilder:validation:Required
+	CmdExecutorConfig *CommandExecutorEnvItem `json:"cmdExecutorConfig"`
+}
+
+// SwitchoverShortSpec is a short version of SwitchoverSpec, with only CommandExecutorEnvItem field.
+type SwitchoverShortSpec struct {
+	// CmdExecutorConfig is the command executor config.
 	// +kubebuilder:validation:Required
 	CmdExecutorConfig *CommandExecutorEnvItem `json:"cmdExecutorConfig"`
 }

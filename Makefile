@@ -19,7 +19,7 @@ VERSION ?= 0.5.0-alpha.0
 GITHUB_PROXY ?=
 GIT_COMMIT  = $(shell git rev-list -1 HEAD)
 GIT_VERSION = $(shell git describe --always --abbrev=0 --tag)
-
+GENERATED_CLIENT_PKG = "pkg/client"
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -128,6 +128,7 @@ manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, Clu
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./cmd/manager/...;./apis/...;./controllers/...;./internal/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
+	$(MAKE) client-sdk-gen
 
 .PHONY: preflight-manifests
 preflight-manifests: generate ## Generate external Preflight API
@@ -136,6 +137,10 @@ preflight-manifests: generate ## Generate external Preflight API
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/...;./externalapis/..."
+
+.PHONY: client-sdk-gen
+client-sdk-gen: module ## Generate CRD client code.
+	@./hack/client-sdk-gen.sh
 
 .PHONY: manager-go-generate
 manager-go-generate: ## Run go generate against lifecycle manager code.
@@ -151,7 +156,7 @@ test-go-generate: ## Run go generate against test code.
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
-	$(GOFMT) -l -w -s $$(git ls-files --exclude-standard | grep "\.go$$")
+	$(GOFMT) -l -w -s $$(git ls-files --exclude-standard | grep "\.go$$" | grep -v $(GENERATED_CLIENT_PKG))
 
 .PHONY: vet
 vet: ## Run go vet against code.
@@ -242,7 +247,7 @@ endif
 
 .PHONY: goimports
 goimports: goimportstool ## Run goimports against code.
-	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(git ls-files|grep "\.go$$")
+	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(git ls-files|grep "\.go$$" | grep -v $(GENERATED_CLIENT_PKG))
 
 
 ##@ CLI
@@ -391,8 +396,6 @@ bump-chart-ver: \
 	bump-single-chart-appver.helm \
 	bump-single-chart-ver.apecloud-mysql \
 	bump-single-chart-ver.apecloud-mysql-cluster \
-	bump-single-chart-ver.apecloud-mysql-scale \
-	bump-single-chart-ver.apecloud-mysql-scale-cluster \
 	bump-single-chart-ver.clickhouse \
 	bump-single-chart-ver.clickhouse-cluster \
 	bump-single-chart-ver.kafka \
@@ -459,6 +462,7 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 ifeq (, $(shell ls $(LOCALBIN)/controller-gen 2>/dev/null))
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 endif
+
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
@@ -561,6 +565,7 @@ KUBECTL=$(shell which kubectl)
 ##@ End-to-end (E2E) tests
 .PHONY: render-smoke-testdata-manifests
 render-smoke-testdata-manifests: ## Update E2E test dataset
+	$(HELM) dependency build deploy/apecloud-mysql-cluster --skip-refresh
 	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
 	$(HELM) template mycluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
 	$(HELM) template mycluster deploy/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml

@@ -226,15 +226,18 @@ func GetOpsRecorderFromSlice(opsRequestSlice []appsv1alpha1.OpsRecorder,
 }
 
 // patchOpsRequestToCreating patches OpsRequest.status.phase to Running
-func patchOpsRequestToCreating(ctx context.Context,
+func patchOpsRequestToCreating(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	opsDeepCoy *appsv1alpha1.OpsRequest,
 	opsHandler OpsHandler) error {
 	var condition *metav1.Condition
 	validatePassCondition := appsv1alpha1.NewValidatePassedCondition(opsRes.OpsRequest.Name)
-	condition = opsHandler.ActionStartedCondition(opsRes.OpsRequest)
-	return PatchOpsStatusWithOpsDeepCopy(ctx, cli, opsRes, opsDeepCoy, appsv1alpha1.OpsCreatingPhase, validatePassCondition, condition)
+	condition, err := opsHandler.ActionStartedCondition(reqCtx, cli, opsRes)
+	if err != nil {
+		return err
+	}
+	return PatchOpsStatusWithOpsDeepCopy(reqCtx.Ctx, cli, opsRes, opsDeepCoy, appsv1alpha1.OpsCreatingPhase, validatePassCondition, condition)
 }
 
 // patchClusterStatusAndRecordEvent records the ops event in the cluster and

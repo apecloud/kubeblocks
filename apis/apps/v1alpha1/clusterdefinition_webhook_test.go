@@ -287,6 +287,14 @@ var _ = Describe("clusterDefinition webhook", func() {
 		Expect(k8sClient.Update(ctx, clusterDef)).Should(Succeed())
 		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)).Should(Succeed())
 		Expect(clusterDef.Spec.ComponentDefs[0].Probes.RoleProbeTimeoutAfterPodsReady).Should(Equal(int32(0)))
+
+		By("set h-scale policy type to Snapshot")
+		clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy = &HorizontalScalePolicy{
+			Type: HScaleDataClonePolicyFromSnapshot,
+		}
+		Expect(k8sClient.Update(ctx, clusterDef)).Should(Succeed())
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: clusterDef.Name}, clusterDef)).Should(Succeed())
+		Expect(clusterDef.Spec.ComponentDefs[0].HorizontalScalePolicy.Type).Should(Equal(HScaleDataClonePolicyCloneVolume))
 	})
 })
 
@@ -390,24 +398,6 @@ spec:
                 name: $(CONN_CREDENTIAL_SECRET_NAME)
                 key: password
         command: ["/usr/bin/bash", "-c"]
-`, name)
-	clusterDefinition := &ClusterDefinition{}
-	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)
-	return clusterDefinition, err
-}
-
-// createTestReplicationSetClusterDefinitionObj  other webhook_test called this function, carefully for modifying the function.
-func createTestReplicationSetClusterDefinitionObj(name string) (*ClusterDefinition, error) {
-	clusterDefYaml := fmt.Sprintf(`
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: ClusterDefinition
-metadata:
-  name: %s
-spec:
-  componentDefs:
-    - name: redis
-      maxUnavailable: 1
-      workloadType: Replication
 `, name)
 	clusterDefinition := &ClusterDefinition{}
 	err := yaml.Unmarshal([]byte(clusterDefYaml), clusterDefinition)

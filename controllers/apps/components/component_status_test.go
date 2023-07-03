@@ -353,12 +353,12 @@ var _ = Describe("ComponentStatusSynchronizer", func() {
 		BeforeEach(func() {
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.ReplicationRedisComponent, compDefName).
-				GetObject()
+				Create(&testCtx).GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, clusterVersionName).
 				AddComponent(compName, compDefName).
 				SetReplicas(2).
-				GetObject()
+				Create(&testCtx).GetObject()
 
 			reqCtx = &intctrlutil.RequestCtx{
 				Ctx: ctx,

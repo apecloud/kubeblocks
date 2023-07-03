@@ -240,21 +240,34 @@ type VolumeTypeSpec struct {
 }
 
 type VolumeProtectionSpec struct {
-	// +kubebuilder:validation:Maximum=100
-	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:default=90
-	// +optional
-	LowWatermark int `json:"lowWatermark,omitempty"`
-
+	// The high watermark threshold for volume space usage.
+	// If there is any specified volumes who's space usage is over the threshold, the pre-defined "LOCK" action
+	// will be triggered to degrade the service to protect volume from space exhaustion, such as to set the instance
+	// as read-only. And after that, if all volumes' space usage drops under the threshold later, the pre-defined
+	// "UNLOCK" action will be performed to recover the service normally.
 	// +kubebuilder:validation:Maximum=100
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:default=90
 	// +optional
 	HighWatermark int `json:"highWatermark,omitempty"`
 
-	// Volumes to monitor.
+	// Volumes to protect.
 	// +optional
-	Volumes []string `json:"volumes,omitempty"`
+	Volumes []ProtectedVolume `json:"volumes,omitempty"`
+}
+
+type ProtectedVolume struct {
+	// Name of volume to protect.
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Volume specified high watermark threshold, it will override the component level threshold.
+	// If the value is invalid, it will be ignored and the component level threshold will be used.
+	// +kubebuilder:validation:Maximum=100
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:default=0
+	// +optional
+	HighWatermark int `json:"highWatermark,omitempty"`
 }
 
 // ClusterComponentDefinition provides a workload component specification template,

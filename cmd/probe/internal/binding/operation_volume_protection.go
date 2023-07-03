@@ -29,7 +29,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
@@ -62,14 +61,20 @@ const (
 	reasonUnlock = "LowVolumeWatermark" // TODO
 )
 
+type volumeExt struct {
+	Name          string
+	HighWatermark int
+	Stats         statsv1alpha1.VolumeStats
+}
+
 type operationVolumeProtection struct {
-	Logger               logger.Logger
-	Client               *http.Client
-	Request              *http.Request
-	Pod                  string
-	VolumeProtectionSpec appsv1alpha1.VolumeProtectionSpec
-	VolumeStats          map[string]statsv1alpha1.VolumeStats
-	Readonly             bool
+	Logger        logger.Logger
+	Client        *http.Client
+	Request       *http.Request
+	Pod           string
+	HighWatermark int
+	Volumes       map[string]volumeExt
+	Readonly      bool
 
 	// TODO: hack it here, remove it later
 	BaseOperation *BaseOperations
@@ -95,27 +100,30 @@ func (o *operationVolumeProtection) Init(metadata bindings.Metadata) error {
 		o.Logger.Warnf("init volumes to monitor error: %s", err.Error())
 		return err
 	}
-	o.Logger.Infof("succeed to init %s operation, pod: %s, low watermark: %d, high watermark: %d, volumes: %s",
-		o.Kind(), o.Pod, o.VolumeProtectionSpec.LowWatermark, o.VolumeProtectionSpec.HighWatermark,
-		strings.Join(o.VolumeProtectionSpec.Volumes, ","))
+	o.Logger.Infof("succeed to init %s operation, pod: %s, spec: %s", o.Kind(), o.Pod, o.buildVolumesMsg())
 	return nil
 }
 
 func (o *operationVolumeProtection) initVolumes() error {
-	spec := &o.VolumeProtectionSpec
+	spec := &appsv1alpha1.VolumeProtectionSpec{}
 	raw := os.Getenv(envVolumesToProbe)
 	if err := json.Unmarshal([]byte(raw), spec); err != nil {
 		o.Logger.Warnf("unmarshal volume protection spec error: %s, raw spec: %s", err.Error(), raw)
 		return err
 	}
-	normalizeWatermarks(&o.VolumeProtectionSpec.LowWatermark, &o.VolumeProtectionSpec.HighWatermark)
 
-	if o.VolumeStats == nil {
-		o.VolumeStats = make(map[string]statsv1alpha1.VolumeStats)
+	o.HighWatermark = normalizeVolumeWatermark(spec.HighWatermark, 0)
+
+	if o.Volumes == nil {
+		o.Volumes = make(map[string]volumeExt)
 	}
-	for _, name := range spec.Volumes {
-		o.VolumeStats[name] = statsv1alpha1.VolumeStats{
-			Name: name,
+	for _, v := range spec.Volumes {
+		o.Volumes[v.Name] = volumeExt{
+			Name:          v.Name,
+			HighWatermark: normalizeVolumeWatermark(v.HighWatermark, o.HighWatermark),
+			Stats: statsv1alpha1.VolumeStats{
+				Name: v.Name,
+			},
 		}
 	}
 	return nil
@@ -157,12 +165,17 @@ func (o *operationVolumeProtection) Invoke(ctx context.Context, req *bindings.In
 }
 
 func (o *operationVolumeProtection) disabled() bool {
-	skip := func(watermark int) bool {
-		return watermark <= 0 || watermark >= 100
-	}
 	// TODO: check the role and skip secondary instances.
-	return len(o.Pod) == 0 || len(o.VolumeProtectionSpec.Volumes) == 0 ||
-		skip(o.VolumeProtectionSpec.LowWatermark) || skip(o.VolumeProtectionSpec.HighWatermark)
+	if len(o.Pod) == 0 || len(o.Volumes) == 0 {
+		return true
+	}
+	for _, v := range o.Volumes {
+		// take (0, 100] as enabled
+		if v.HighWatermark > 0 && v.HighWatermark <= 100 {
+			return false
+		}
+	}
+	return true
 }
 
 func (o *operationVolumeProtection) request(ctx context.Context) ([]byte, error) {
@@ -190,10 +203,12 @@ func (o *operationVolumeProtection) updateVolumeStats(payload []byte) error {
 	for _, pod := range summary.Pods {
 		if pod.PodRef.Name == o.Pod {
 			for _, stats := range pod.VolumeStats {
-				if _, ok := o.VolumeStats[stats.Name]; !ok {
+				if _, ok := o.Volumes[stats.Name]; !ok {
 					continue
 				}
-				o.VolumeStats[stats.Name] = stats
+				v := o.Volumes[stats.Name]
+				v.Stats = stats
+				o.Volumes[stats.Name] = v
 			}
 			break
 		}
@@ -204,19 +219,16 @@ func (o *operationVolumeProtection) updateVolumeStats(payload []byte) error {
 func (o *operationVolumeProtection) checkUsage(ctx context.Context) (string, error) {
 	lower := make([]string, 0)
 	higher := make([]string, 0)
-	for name, stats := range o.VolumeStats {
-		ret := o.checkVolumeWatermark(stats)
+	for name, v := range o.Volumes {
+		ret := o.checkVolumeWatermark(v)
 		if ret == 0 {
-			continue
-		}
-		if ret < 0 {
 			lower = append(lower, name)
 		} else {
 			higher = append(higher, name)
 		}
 	}
 
-	msg := o.buildEventMsg()
+	msg := o.buildVolumesMsg()
 	readonly := o.Readonly
 	// the instance is running normally and there have volume(s) over the space usage threshold.
 	if !readonly && len(higher) > 0 {
@@ -225,7 +237,7 @@ func (o *operationVolumeProtection) checkUsage(ctx context.Context) (string, err
 		}
 	}
 	// the instance is protected in RO mode, and all volumes' space usage are under the threshold.
-	if readonly && len(lower) == len(o.VolumeStats) {
+	if readonly && len(lower) == len(o.Volumes) {
 		if err := o.lowWatermark(ctx, msg); err != nil {
 			return "", err
 		}
@@ -233,20 +245,22 @@ func (o *operationVolumeProtection) checkUsage(ctx context.Context) (string, err
 	return msg, nil
 }
 
-func (o *operationVolumeProtection) checkVolumeWatermark(stats statsv1alpha1.VolumeStats) int {
-	if stats.CapacityBytes == nil || stats.UsedBytes == nil {
+// checkVolumeWatermark checks whether the volume's space usage is over the threshold.
+//
+//	returns 0 if the volume will not be taken in account or its space usage is under the threshold
+//	returns non-zero if the volume space usage is over the threshold
+func (o *operationVolumeProtection) checkVolumeWatermark(v volumeExt) int {
+	if v.HighWatermark == 0 { // disabled
 		return 0
 	}
-
-	lowThresholdBytes := *stats.CapacityBytes / 100 * uint64(o.VolumeProtectionSpec.LowWatermark)
-	if *stats.UsedBytes < lowThresholdBytes {
-		return -1
+	if v.Stats.CapacityBytes == nil || v.Stats.UsedBytes == nil {
+		return 0
 	}
-	highThresholdBytes := *stats.CapacityBytes / 100 * uint64(o.VolumeProtectionSpec.HighWatermark)
-	if *stats.UsedBytes > highThresholdBytes {
-		return 1
+	thresholdBytes := *v.Stats.CapacityBytes / 100 * uint64(v.HighWatermark)
+	if *v.Stats.UsedBytes < thresholdBytes {
+		return 0
 	}
-	return 0
+	return 1
 }
 
 func (o *operationVolumeProtection) highWatermark(ctx context.Context, msg string) error {
@@ -257,12 +271,14 @@ func (o *operationVolumeProtection) highWatermark(ctx context.Context, msg strin
 		o.Logger.Warnf("set instance to read-only error: %s, volumes: %s", err.Error(), msg)
 		return err
 	}
+
 	o.Logger.Infof("set instance to read-only OK: %s", msg)
+	o.Readonly = true
+
 	if err := o.sendEvent(ctx, reasonLock, msg); err != nil {
 		o.Logger.Warnf("send volume protection (lock) event error: %s, volumes: %s", err.Error(), msg)
 		return err
 	}
-	o.Readonly = true
 	return nil
 }
 
@@ -274,12 +290,14 @@ func (o *operationVolumeProtection) lowWatermark(ctx context.Context, msg string
 		o.Logger.Warnf("reset instance to read-write error: %s, volumes: %s", err.Error(), msg)
 		return err
 	}
+
 	o.Logger.Infof("reset instance to read-write OK: %s", msg)
+	o.Readonly = false
+
 	if err := o.sendEvent(ctx, reasonUnlock, msg); err != nil {
 		o.Logger.Warnf("send volume protection (unlock) event error: %s, volumes: %s", err.Error(), msg)
 		return err
 	}
-	o.Readonly = false
 	return nil
 }
 
@@ -291,18 +309,24 @@ func (o *operationVolumeProtection) unlockInstance(ctx context.Context) error {
 	return o.BaseOperation.UnlockInstance(ctx)
 }
 
-func (o *operationVolumeProtection) buildEventMsg() string {
-	usages := map[string]string{
-		"lowWatermark":  fmt.Sprintf("%d", o.VolumeProtectionSpec.LowWatermark),
-		"highWatermark": fmt.Sprintf("%d", o.VolumeProtectionSpec.HighWatermark),
-	}
-	for _, v := range o.VolumeProtectionSpec.Volumes {
-		stats := o.VolumeStats[v]
-		if stats.UsedBytes == nil || stats.CapacityBytes == nil {
-			usages[v] = "<nil>"
-		} else {
-			usages[v] = fmt.Sprintf("%d%%", int(*stats.UsedBytes*100 / *stats.CapacityBytes))
+func (o *operationVolumeProtection) buildVolumesMsg() string {
+	volumes := make([]map[string]string, 0)
+	for _, v := range o.Volumes {
+		usage := make(map[string]string)
+		if v.HighWatermark != o.HighWatermark {
+			usage["highWatermark"] = fmt.Sprintf("%d", v.HighWatermark)
 		}
+		stats := v.Stats
+		if stats.UsedBytes == nil || stats.CapacityBytes == nil {
+			usage[v.Name] = "<nil>"
+		} else {
+			usage[v.Name] = fmt.Sprintf("%d%%", int(*stats.UsedBytes*100 / *stats.CapacityBytes))
+		}
+		volumes = append(volumes, usage)
+	}
+	usages := map[string]any{
+		"highWatermark": fmt.Sprintf("%d", o.HighWatermark),
+		"volumes":       volumes,
 	}
 	msg, _ := json.Marshal(usages)
 	return string(msg)
@@ -400,20 +424,9 @@ func kubeletEndpointPort(ctx context.Context) (string, error) {
 	return strconv.Itoa(int(node.Status.DaemonEndpoints.KubeletEndpoint.Port)), nil
 }
 
-func normalizeWatermarks(low, high *int) {
-	if *low < 0 || *low > 100 {
-		*low = 0
+func normalizeVolumeWatermark(watermark int, defaultVal int) int {
+	if watermark < 0 || watermark > 100 {
+		return defaultVal
 	}
-	if *high < 0 || *high > 100 {
-		*high = 0
-	}
-	if *low == 0 && *high != 0 {
-		*low = *high
-	}
-	if *low != 0 && *high == 0 {
-		*high = *low
-	}
-	if *low > *high {
-		*low = *high
-	}
+	return watermark
 }

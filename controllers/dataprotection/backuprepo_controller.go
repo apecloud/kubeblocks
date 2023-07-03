@@ -656,16 +656,24 @@ func (r *BackupRepoReconciler) deleteSecrets(reqCtx intctrlutil.RequestCtx, repo
 }
 
 func (r *BackupRepoReconciler) mapBackupToRepo(obj client.Object) []ctrl.Request {
-	repoName, ok := obj.GetLabels()[dataProtectionBackupRepoKey]
+	backup := obj.(*dpv1alpha1.Backup)
+	repoName, ok := backup.Labels[dataProtectionBackupRepoKey]
 	if !ok {
 		return nil
 	}
 	// ignore backups that doesn't need to create PVC (yet)
-	if obj.GetLabels()[dataProtectionNeedRepoPVCKey] != trueVal {
+	if backup.Labels[dataProtectionNeedRepoPVCKey] != trueVal {
 		return nil
 	}
 	// ignore failed backups
-	if obj.(*dpv1alpha1.Backup).Status.Phase == dpv1alpha1.BackupFailed {
+	if backup.Status.Phase == dpv1alpha1.BackupFailed {
+		return nil
+	}
+	// ignore backups that we have created the PVC for it.
+	// expect for the Backup is being deleted, because it may
+	// block the deletion of the BackupRepo.
+	if backup.Annotations[dataProtectionRepoPVCNameAnnotationKey] != "" &&
+		backup.DeletionTimestamp.IsZero() {
 		return nil
 	}
 	return []ctrl.Request{{

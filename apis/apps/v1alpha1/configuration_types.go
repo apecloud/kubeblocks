@@ -70,12 +70,6 @@ type CustomConfigurationItem struct {
 	ConfigParams map[string]ConfigParams `json:"configParams"`
 }
 
-type ConfigParams struct {
-	// Data holds the configuration keys and values.
-	// This field exists to work around https://github.com/kubernetes-sigs/kubebuilder/issues/528
-	ConfigItem map[string]interface{} `json:"-"`
-}
-
 // ConfigurationStatus defines the observed state of Configuration
 type ConfigurationStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster

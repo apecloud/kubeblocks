@@ -65,36 +65,41 @@ spec:
                       additionalProperties:
                         type: object
                       type: object
+                    importTemplateRef:
+                      description: Specify the type of config template.
+                      properties:
+                        namespace:
+                          default: default
+                          description: Specify the namespace of the referenced the
+                            configuration template ConfigMap object. An empty namespace
+                            is equivalent to the "default" namespace.
+                          maxLength: 63
+                          type: string
+                        policy:
+                          default: none
+                          description: policy defines how to merge external imported
+                            templates into component templates.
+                          enum:
+                          - patch
+                          - replace
+                          - none
+                          type: string
+                        templateRef:
+                          description: Specify the name of the referenced the configuration
+                            template ConfigMap object.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                      required:
+                      - templateRef
+                      type: object
                     name:
                       description: Specify the name of configuration template.
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
-                    namespace:
-                      default: default
-                      description: Specify the namespace of the referenced the configuration
-                        template ConfigMap object. An empty namespace is equivalent
-                        to the "default" namespace.
-                      maxLength: 63
-                      type: string
-                    policy:
-                      default: none
-                      description: policy defines how to merge external imported templates
-                        into component templates.
-                      enum:
-                      - patch
-                      - replace
-                      - none
-                      type: string
-                    templateRef:
-                      description: Specify the name of the referenced the configuration
-                        template ConfigMap object.
-                      maxLength: 63
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                      type: string
                   required:
                   - name
-                  - templateRef
                   type: object
                 type: array
             required:

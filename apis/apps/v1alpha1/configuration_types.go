@@ -64,7 +64,7 @@ type CustomConfigurationItem struct {
 	Name string `json:"name"`
 
 	// Specify the type of config template.
-	*RenderedConfigTemplateSpec `json:",inline"`
+	ImportTemplateRef *RenderedConfigTemplateSpec `json:"importTemplateRef,omitempty"`
 
 	// +optional
 	ConfigParams map[string]ConfigParams `json:"configParams"`

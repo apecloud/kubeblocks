@@ -33,7 +33,6 @@ spec:
     - -c
     - |
       #!/bin/bash
-      set -e
       mkdir -p ${BACKUP_DIR} && cd ${BACKUP_DIR}
       # retention 8 days by default
       retention_minute=11520
@@ -76,7 +75,7 @@ spec:
           retryTimes=0
         fi
         if [ $retryTimes -ge 3 ]; then
-           echo "ERROR: the current mongo instance is not a primary node, 3 attempts have been made!" && exit 1
+           echo "ERROR: the current mongo instance is not a primary node, 3 attempts have been made!" && kill $wal_g_pid
         fi
       }
 

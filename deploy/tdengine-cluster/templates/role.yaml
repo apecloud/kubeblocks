@@ -4,7 +4,7 @@ metadata:
   name: kb-{{ include "clustername" . }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{ include "apecloud-mysql-cluster.labels" . | nindent 4 }}
+    {{ include "tdengine-cluster.labels" . | nindent 4 }}
 rules:
   - apiGroups:
       - ""

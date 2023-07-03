@@ -325,11 +325,11 @@ func getPodOrdinal(podName string) (int, error) {
 }
 
 // ordinal is the ordinal of pod which this action apply to
-func createAction(dag *graph.DAG, rsm *workloads.ReplicatedStateMachine, action *batchv1.Job) error {
+func createAction(dag *graph.DAG, cli model.GraphClient, rsm *workloads.ReplicatedStateMachine, action *batchv1.Job) error {
 	if err := intctrlutil.SetOwnership(rsm, action, model.GetScheme(), rsmFinalizerName); err != nil {
 		return err
 	}
-	model.PrepareCreate(dag, action)
+	cli.Create(dag, action)
 	return nil
 }
 
@@ -471,11 +471,11 @@ func getActionCommand(reconfiguration *workloads.MembershipReconfiguration, acti
 	return nil
 }
 
-func doActionCleanup(dag *graph.DAG, action *batchv1.Job) {
+func doActionCleanup(dag *graph.DAG, graphCli model.GraphClient, action *batchv1.Job) {
 	actionOld := action.DeepCopy()
 	actionNew := actionOld.DeepCopy()
 	actionNew.Labels[jobHandledLabel] = jobHandledTrue
-	model.PrepareUpdate(dag, actionOld, actionNew)
+	graphCli.Update(dag, actionOld, actionNew)
 }
 
 func emitEvent(transCtx *rsmTransformContext, action *batchv1.Job) {

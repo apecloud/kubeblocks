@@ -8,6 +8,25 @@ Run pgbench against a PostgreSQL cluster
 kbcli bench pgbench run [flags]
 ```
 
+### Examples
+
+```
+  # pgbench run on a cluster
+  kbcli bench pgbench run pgcluster --database postgres --user xxx --password xxx
+  
+  # pgbench run on a cluster with different threads and different client
+  kbcli bench sysbench run  pgcluster --user xxx --password xxx --database xxx --clients 5 --threads 5
+  
+  # pgbench run on a cluster with specified transactions
+  kbcli bench pgbench run pgcluster --database postgres --user xxx --password xxx --transactions 1000
+  
+  # pgbench run on a cluster with specified times
+  kbcli bench pgbench run pgcluster --database postgres --user xxx --password xxx --times 1000
+  
+  # pgbench run on a cluster with select only
+  kbcli bench pgbench run pgcluster --database postgres --user xxx --password xxx --select
+```
+
 ### Options
 
 ```

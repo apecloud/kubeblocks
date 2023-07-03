@@ -21,14 +21,12 @@ package bench
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/leaanthony/debme"
 	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -38,7 +36,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 var (
@@ -221,12 +218,6 @@ func (o *SysBenchOptions) Validate() error {
 }
 
 func (o *SysBenchOptions) Run() error {
-	var (
-		err            error
-		unstructureObj *unstructured.Unstructured
-		optionsByte    []byte
-	)
-
 	o.Value = fmt.Sprintf("mode:%s", o.Mode)
 	o.Value = fmt.Sprintf("%s,driver:%s", o.Value, o.Driver)
 	o.Value = fmt.Sprintf("%s,host:%s", o.Value, o.Host)
@@ -251,26 +242,45 @@ func (o *SysBenchOptions) Run() error {
 		o.Value = fmt.Sprintf("%s,others:--read-percent=%d --write-percent=%d", o.Value, o.ReadPercent, o.WritePercent)
 	}
 
-	if optionsByte, err = json.Marshal(o); err != nil {
-		return err
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:    o.namespace,
+			GenerateName: fmt.Sprintf("test-sysbench-%s-", o.Mode),
+			Labels: map[string]string{
+				"sysbench": fmt.Sprintf("test-sysbench-%s", o.Database),
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "test-sysbench",
+					Image: "registry.cn-hangzhou.aliyuncs.com/apecloud/customsuites:latest",
+					Env: []corev1.EnvVar{
+						{
+							Name:  "TYPE",
+							Value: "2",
+						},
+						{
+							Name:  "FLAG",
+							Value: fmt.Sprintf("%d", o.Flag),
+						},
+						{
+							Name:  "CONFIGS",
+							Value: o.Value,
+						},
+					},
+				},
+			},
+			RestartPolicy: corev1.RestartPolicyNever,
+		},
 	}
 
-	cueFS, _ := debme.FS(cueTemplate, "template")
-	cueTpl, err := intctrlutil.NewCUETplFromBytes(cueFS.ReadFile(CueSysBenchTemplateName))
+	pod, err := o.client.CoreV1().Pods(o.namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 	if err != nil {
+		fmt.Fprintf(o.ErrOut, "failed to create pod: %v\n", err)
 		return err
 	}
-	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
-	if err := cueValue.Fill("options", optionsByte); err != nil {
-		return err
-	}
-	if unstructureObj, err = cueValue.ConvertContentToUnstructured("content"); err != nil {
-		return err
-	}
-
-	if _, err := o.dynamic.Resource(types.PodGVR()).Namespace(o.namespace).Create(context.Background(), unstructureObj, metav1.CreateOptions{}); err != nil {
-		return err
-	}
+	fmt.Fprintf(o.Out, "pod/%s created\n", pod.Name)
 
 	return nil
 }

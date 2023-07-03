@@ -22,13 +22,29 @@ data:
       echo "Primary pod information not available. Exiting..."
       exit 1
     fi
+
+    # usage: retry <command>
+    retry() {
+      local max_attempts=10
+      local attempt=1
+      until "$@" || [ $attempt -eq $max_attempts ]; do
+        echo "Command '$*' failed. Attempt $attempt of $max_attempts. Retrying in 5 seconds..."
+        attempt=$((attempt + 1))
+        sleep 3
+      done
+      if [ $attempt -eq $max_attempts ]; then
+        echo "Command '$*' failed after $max_attempts attempts. Exiting..."
+        exit 1
+      fi
+    }
+
     if [ "$primary" = "$KB_POD_NAME" ]; then
       echo "primary instance skip create a replication relationship."
       exit 0
     else
       primary_fqdn="$primary.$KB_CLUSTER_NAME-$KB_COMP_NAME-headless.$KB_NAMESPACE.svc"
       echo "primary_fqdn=$primary_fqdn" >> /etc/redis/.kb_set_up.log
-      until redis-cli -h $primary_fqdn -p 6379 -a $REDIS_DEFAULT_PASSWORD ping; do sleep 1; done
+      retry redis-cli -h $primary_fqdn -p 6379 -a $REDIS_DEFAULT_PASSWORD ping
       redis-cli -h 127.0.0.1 -p 6379 -a $REDIS_DEFAULT_PASSWORD replicaof $primary_fqdn 6379 || exit 1
     fi
   redis-start.sh: |

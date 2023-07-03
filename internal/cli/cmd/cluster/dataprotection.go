@@ -107,6 +107,7 @@ var (
 
 		# restore a new cluster from point in time
 		kbcli cluster restore new-cluster-name --restore-to-time "Apr 13,2023 18:40:35 UTC+0800" --source-cluster mycluster
+        kbcli cluster restore new-cluster-name --restore-to-time "2023-04-13T18:40:35+08:00" --source-cluster mycluster
 	`)
 )
 
@@ -245,6 +246,14 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 }
 
 func printBackupList(o ListBackupOptions) error {
+	// if format is JSON or YAML, use default printer to output the result.
+	if o.Format == printer.JSON || o.Format == printer.YAML {
+		if o.BackupName != "" {
+			o.Names = []string{o.BackupName}
+		}
+		_, err := o.Run()
+		return err
+	}
 	dynamic, err := o.Factory.DynamicClient()
 	if err != nil {
 		return err
@@ -473,9 +482,8 @@ func (o *CreateRestoreOptions) runPITR() error {
 		Namespace: clusterObj.Namespace,
 		Name:      o.Name,
 		Annotations: map[string]string{
-			// TODO: use constant annotation key
-			"kubeblocks.io/restore-from-time":           o.RestoreTime.Format(time.RFC3339),
-			"kubeblocks.io/restore-from-source-cluster": o.SourceCluster,
+			constant.RestoreFromTimeAnnotationKey:       o.RestoreTime.Format(time.RFC3339),
+			constant.RestoreFromSrcClusterAnnotationKey: o.SourceCluster,
 		},
 	}
 	return o.createCluster(clusterObj)
@@ -494,7 +502,13 @@ func (o *CreateRestoreOptions) validateRestoreTime() error {
 	}
 	restoreTime, err := util.TimeParse(o.RestoreTimeStr, time.Second)
 	if err != nil {
-		return err
+		// retry to parse time with RFC3339 format.
+		var errRFC error
+		restoreTime, errRFC = time.Parse(time.RFC3339, o.RestoreTimeStr)
+		if errRFC != nil {
+			// if retry failure, report the error
+			return err
+		}
 	}
 	o.RestoreTime = &restoreTime
 	objs, err := o.Dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).
@@ -598,6 +612,11 @@ func NewListBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStrea
 
 // printBackupPolicyList prints the backup policy list.
 func printBackupPolicyList(o list.ListOptions) error {
+	// if format is JSON or YAML, use default printer to output the result.
+	if o.Format == printer.JSON || o.Format == printer.YAML {
+		_, err := o.Run()
+		return err
+	}
 	dynamic, err := o.Factory.DynamicClient()
 	if err != nil {
 		return err

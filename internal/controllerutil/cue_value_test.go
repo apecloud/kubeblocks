@@ -115,6 +115,82 @@ output: {
 	}
 }
 
+func TestCUEFillObj(t *testing.T) {
+	cueTplIntJSON := `
+	input: {
+		replicas:       int32
+	}
+	output: {
+		replicas:       input.replicas
+	}
+	`
+
+	testCases := []struct {
+		name  string
+		tpl   string
+		input any
+		err   string
+	}{
+		{
+			name:  "testCUEInvalidInput",
+			tpl:   cueTplIntJSON,
+			input: make(chan int),
+			err:   "unsupported type",
+		},
+		{
+			name:  "testCUEInput",
+			tpl:   cueTplIntJSON,
+			input: testCUEInput{Replicas: 0},
+		},
+	}
+
+	for _, tc := range testCases {
+		cueTpl := NewCUETpl(tc.tpl)
+		cueValue := NewCUEBuilder(*cueTpl)
+
+		err := cueValue.FillObj("input", tc.input)
+		checkErr(t, err, tc.err, tc.name)
+	}
+}
+
+func TestCUEFill(t *testing.T) {
+	cueTplIntJSON := `
+	input: {
+		replicas:       int32
+	}
+	output: {
+		replicas:       input.replicas
+	}
+	`
+
+	testCases := []struct {
+		name  string
+		tpl   string
+		input string
+		err   string
+	}{
+		{
+			name:  "testCUEInvalidJSON",
+			tpl:   cueTplIntJSON,
+			input: "",
+			err:   "invalid JSON",
+		},
+		{
+			name:  "testCUEInput",
+			input: `{ "replicas": 0}`,
+			tpl:   cueTplIntJSON,
+		},
+	}
+
+	for _, tc := range testCases {
+		cueTpl := NewCUETpl(tc.tpl)
+		cueValue := NewCUEBuilder(*cueTpl)
+
+		err := cueValue.Fill("input", []byte(tc.input))
+		checkErr(t, err, tc.err, tc.name)
+	}
+}
+
 func checkErr(t *testing.T, err error, str, name string) bool {
 	t.Helper()
 	if err == nil {

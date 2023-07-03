@@ -18,7 +18,7 @@ package v1alpha1
 
 // BackupPhase The current phase. Valid values are New, InProgress, Completed, Failed.
 // +enum
-// +kubebuilder:validation:Enum={New,InProgress,Running,Completed,Failed}
+// +kubebuilder:validation:Enum={New,InProgress,Running,Completed,Failed,Deleting}
 type BackupPhase string
 
 const (
@@ -27,6 +27,7 @@ const (
 	BackupRunning    BackupPhase = "Running"
 	BackupCompleted  BackupPhase = "Completed"
 	BackupFailed     BackupPhase = "Failed"
+	BackupDeleting   BackupPhase = "Deleting"
 )
 
 // BackupType the backup type, marked backup set is datafile or logfile or snapshot.

@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package bench
 
 import (
-	"embed"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -28,20 +27,11 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
-var (
-	//go:embed template/*
-	cueTemplate embed.FS
-)
-
 const (
 	all              = "all"
 	prepareOperation = "prepare"
 	runOperation     = "run"
 	cleanupOperation = "cleanup"
-)
-
-const (
-	CueSysBenchTemplateName = "bench_sysbench_template.cue"
 )
 
 type BenchBaseOptions struct {

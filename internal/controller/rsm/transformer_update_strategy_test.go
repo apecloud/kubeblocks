@@ -34,8 +34,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
-	"github.com/apecloud/kubeblocks/internal/controller/graph"
-	"github.com/apecloud/kubeblocks/internal/controller/model"
 )
 
 var _ = Describe("update strategy transformer test.", func() {
@@ -65,7 +63,7 @@ var _ = Describe("update strategy transformer test.", func() {
 
 		transCtx = &rsmTransformContext{
 			Context:       ctx,
-			Client:        k8sMock,
+			Client:        graphCli,
 			EventRecorder: nil,
 			Logger:        logger,
 			rsmOrig:       rsm.DeepCopy(),
@@ -80,8 +78,7 @@ var _ = Describe("update strategy transformer test.", func() {
 		It("should return directly", func() {
 			transCtx.rsmOrig.Generation = 2
 			transCtx.rsmOrig.Status.ObservedGeneration = 1
-			dagExpected := graph.NewDAG()
-			model.PrepareStatus(dagExpected, transCtx.rsmOrig, transCtx.rsm)
+			dagExpected := mockDAG()
 
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
@@ -107,8 +104,7 @@ var _ = Describe("update strategy transformer test.", func() {
 				DoAndReturn(func(_ context.Context, list *corev1.PodList, _ ...client.ListOption) error {
 					return nil
 				}).Times(1)
-			dagExpected := graph.NewDAG()
-			model.PrepareStatus(dagExpected, transCtx.rsmOrig, transCtx.rsm)
+			dagExpected := mockDAG()
 
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
@@ -135,8 +131,7 @@ var _ = Describe("update strategy transformer test.", func() {
 				DoAndReturn(func(_ context.Context, list *corev1.PodList, _ ...client.ListOption) error {
 					return nil
 				}).Times(1)
-			dagExpected := graph.NewDAG()
-			model.PrepareStatus(dagExpected, transCtx.rsmOrig, transCtx.rsm)
+			dagExpected := mockDAG()
 
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
@@ -180,17 +175,15 @@ var _ = Describe("update strategy transformer test.", func() {
 				}).Times(1)
 
 			By("update the first pod")
-			dagExpected := graph.NewDAG()
-			model.PrepareStatus(dagExpected, transCtx.rsmOrig, transCtx.rsm)
-			model.PrepareDelete(dagExpected, pod0)
+			dagExpected := mockDAG()
+			graphCli.Delete(dagExpected, pod0)
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 
 			By("update the second pod")
 			makePodUpdateReady(newRevision, pod0)
-			dagExpected = graph.NewDAG()
-			model.PrepareStatus(dagExpected, transCtx.rsmOrig, transCtx.rsm)
-			model.PrepareDelete(dagExpected, pod2)
+			dagExpected = mockDAG()
+			graphCli.Delete(dagExpected, pod2)
 			k8sMock.EXPECT().
 				List(gomock.Any(), &corev1.PodList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *corev1.PodList, _ ...client.ListOption) error {
@@ -198,18 +191,16 @@ var _ = Describe("update strategy transformer test.", func() {
 					list.Items = []corev1.Pod{*pod0, *pod1, *pod2}
 					return nil
 				}).Times(1)
-			dag = graph.NewDAG()
-			model.PrepareStatus(dag, transCtx.rsmOrig, transCtx.rsm)
+			dag = mockDAG()
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 
 			By("switchover")
 			makePodUpdateReady(newRevision, pod2)
-			dagExpected = graph.NewDAG()
-			model.PrepareStatus(dagExpected, transCtx.rsmOrig, transCtx.rsm)
+			dagExpected = mockDAG()
 			actionName := getActionName(rsm.Name, int(rsm.Generation), 1, jobTypeSwitchover)
 			action := builder.NewJobBuilder(name, actionName).GetObject()
-			model.PrepareCreate(dagExpected, action)
+			graphCli.Create(dagExpected, action)
 			k8sMock.EXPECT().
 				List(gomock.Any(), &corev1.PodList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *corev1.PodList, _ ...client.ListOption) error {
@@ -222,14 +213,12 @@ var _ = Describe("update strategy transformer test.", func() {
 				DoAndReturn(func(_ context.Context, list *batchv1.JobList, _ ...client.ListOption) error {
 					return nil
 				}).Times(1)
-			dag = graph.NewDAG()
-			model.PrepareStatus(dag, transCtx.rsmOrig, transCtx.rsm)
+			dag = mockDAG()
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 
 			By("update the last(leader) pod")
-			dagExpected = graph.NewDAG()
-			model.PrepareStatus(dagExpected, transCtx.rsmOrig, transCtx.rsm)
+			dagExpected = mockDAG()
 			action = builder.NewJobBuilder(name, actionName).
 				AddLabelsInMap(map[string]string{
 					constant.AppInstanceLabelKey: rsm.Name,
@@ -241,8 +230,8 @@ var _ = Describe("update strategy transformer test.", func() {
 				SetSuspend(false).
 				GetObject()
 			action.Status.Succeeded = 1
-			model.PrepareUpdate(dagExpected, action, action)
-			model.PrepareDelete(dagExpected, pod1)
+			graphCli.Update(dagExpected, action, action)
+			graphCli.Delete(dagExpected, pod1)
 			k8sMock.EXPECT().
 				List(gomock.Any(), &corev1.PodList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *corev1.PodList, _ ...client.ListOption) error {
@@ -257,8 +246,7 @@ var _ = Describe("update strategy transformer test.", func() {
 					list.Items = []batchv1.Job{*action}
 					return nil
 				}).Times(1)
-			dag = graph.NewDAG()
-			model.PrepareStatus(dag, transCtx.rsmOrig, transCtx.rsm)
+			dag = mockDAG()
 			Expect(transformer.Transform(transCtx, dag)).Should(Succeed())
 			Expect(dag.Equals(dagExpected, less)).Should(BeTrue())
 		})

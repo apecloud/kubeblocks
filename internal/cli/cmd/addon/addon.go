@@ -824,8 +824,15 @@ func addonListRun(o *list.ListOptions) error {
 				selectors = addon.Spec.Installable.GetSelectorsStrings()
 				autoInstall = addon.Spec.Installable.AutoInstall
 			}
+			label := obj.GetLabels()
+			version, provider := "", ""
+			if label != nil {
+				version, provider = label[constant.AddonVersionKey], label[constant.AddonProviderLabelKey]
+			}
 			tbl.AddRow(addon.Name,
+				version,
 				addon.Spec.Type,
+				provider,
 				addon.Status.Phase,
 				strings.Join(extraNames, ","),
 				autoInstall,
@@ -836,7 +843,7 @@ func addonListRun(o *list.ListOptions) error {
 	}
 
 	if err = printer.PrintTable(o.Out, nil, printRows,
-		"NAME", "TYPE", "STATUS", "EXTRAS", "AUTO-INSTALL", "AUTO-INSTALLABLE-SELECTOR"); err != nil {
+		"NAME", "VERSION", "TYPE", "PROVIDER", "STATUS", "EXTRAS", "AUTO-INSTALL", "AUTO-INSTALLABLE-SELECTOR"); err != nil {
 		return err
 	}
 	return nil

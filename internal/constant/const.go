@@ -104,7 +104,7 @@ const (
 	DataProtectionLabelBackupNameKey       = "dataprotection.kubeblocks.io/backup-name"
 	AddonNameLabelKey                      = "extensions.kubeblocks.io/addon-name"
 	OpsRequestTypeLabelKey                 = "ops.kubeblocks.io/ops-type"
-
+	AddonVersionKey                        = "app.kubernetes.io/version"
 	// kubeblocks.io annotations
 	ClusterSnapshotAnnotationKey                = "kubeblocks.io/cluster-snapshot"            // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 	DefaultClusterVersionAnnotationKey          = "kubeblocks.io/is-default-cluster-version"  // DefaultClusterVersionAnnotationKey specifies the default cluster version.

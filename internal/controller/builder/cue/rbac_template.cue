@@ -25,7 +25,7 @@ cluster: {
     }
 }
 
-serviceaccounta: {
+serviceaccount: {
     apiVersion: "v1"
     kind: "ServiceAccount"
     metadata: {

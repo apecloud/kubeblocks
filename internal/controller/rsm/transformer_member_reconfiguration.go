@@ -122,7 +122,7 @@ func (t *MemberReconfigurationTransformer) Transform(ctx graph.TransformContext,
 			return nil
 		}
 		// mark it as 'handled'
-		deleteAction(dag, action)
+		deleteAction(transCtx, dag, action)
 		return createNextAction(transCtx, dag, rsm, action)
 	case action.Status.Failed > 0:
 		emitEvent(transCtx, action)
@@ -186,7 +186,7 @@ func cleanAction(transCtx *rsmTransformContext, dag *graph.DAG) error {
 	action := actionList[0]
 	switch {
 	case action.Status.Succeeded > 0:
-		deleteAction(dag, action)
+		deleteAction(transCtx, dag, action)
 	case action.Status.Failed > 0:
 		emitEvent(transCtx, action)
 	}
@@ -215,8 +215,9 @@ func isSwitchoverAction(action *batchv1.Job) bool {
 	return action.Labels[jobTypeLabel] == jobTypeSwitchover
 }
 
-func deleteAction(dag *graph.DAG, action *batchv1.Job) {
-	doActionCleanup(dag, action)
+func deleteAction(transCtx *rsmTransformContext, dag *graph.DAG, action *batchv1.Job) {
+	cli, _ := transCtx.Client.(model.GraphClient)
+	doActionCleanup(dag, cli, action)
 }
 
 func createNextAction(transCtx *rsmTransformContext, dag *graph.DAG, rsm *workloads.ReplicatedStateMachine, currentAction *batchv1.Job) error {
@@ -241,7 +242,8 @@ func createNextAction(transCtx *rsmTransformContext, dag *graph.DAG, rsm *worklo
 		return err
 	}
 
-	return createAction(dag, rsm, nextAction)
+	cli, _ := transCtx.Client.(model.GraphClient)
+	return createAction(dag, cli, rsm, nextAction)
 }
 
 func generateActionInfoList(rsm *workloads.ReplicatedStateMachine) []*actionInfo {

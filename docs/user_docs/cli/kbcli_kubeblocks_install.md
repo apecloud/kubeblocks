@@ -31,7 +31,6 @@ kbcli kubeblocks install [flags]
       --create-namespace             Create the namespace if not present
       --force                        If present, just print fail item and continue with the following steps
   -h, --help                         help for install
-      --monitor                      Auto install monitoring add-ons including prometheus, grafana and alertmanager-webhook-adaptor (default true)
       --node-labels stringToString   Node label selector (default [])
       --pod-anti-affinity string     Pod anti-affinity type, one of: (Preferred, Required)
       --set stringArray              Set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)

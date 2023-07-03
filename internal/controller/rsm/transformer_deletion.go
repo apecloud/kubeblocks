@@ -39,6 +39,7 @@ func (t *ObjectDeletionTransformer) Transform(ctx graph.TransformContext, dag *g
 		return nil
 	}
 
+	graphCli, _ := transCtx.Client.(model.GraphClient)
 	// list all objects owned by this primary obj in cache, and delete them all
 	// there is chance that objects leak occurs because of cache stale
 	// ignore the problem currently
@@ -49,12 +50,9 @@ func (t *ObjectDeletionTransformer) Transform(ctx graph.TransformContext, dag *g
 		return err
 	}
 	for _, object := range snapshot {
-		model.PrepareDelete(dag, object)
+		graphCli.Delete(dag, object)
 	}
-
-	if err := model.PrepareRootDelete(dag); err != nil {
-		return err
-	}
+	graphCli.Delete(dag, obj)
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop

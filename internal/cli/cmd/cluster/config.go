@@ -279,10 +279,15 @@ func (r *reconfigureOptions) printExplainConfigure(tplName string) error {
 	}
 
 	confSpec := configConstraint.Spec
+	if confSpec.ConfigurationSchema == nil {
+		fmt.Printf("\n%s\n", fmt.Sprintf(notConfigSchemaPrompt, printer.BoldYellow(tplName)))
+		return nil
+	}
+
 	schema := confSpec.ConfigurationSchema.DeepCopy()
 	if schema.Schema == nil {
 		if schema.CUE == "" {
-			fmt.Printf("\n%s\n", notCueSchemaPrompt)
+			fmt.Printf("\n%s\n", fmt.Sprintf(notConfigSchemaPrompt, printer.BoldYellow(tplName)))
 			return nil
 		}
 		apiSchema, err := cfgcore.GenerateOpenAPISchema(schema.CUE, "")

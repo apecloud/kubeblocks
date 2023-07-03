@@ -48,6 +48,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	transCtx, _ := ctx.(*rsmTransformContext)
 	rsm := transCtx.rsm
 	rsmOrig := transCtx.rsmOrig
+	cli, _ := transCtx.Client.(model.GraphClient)
 
 	if model.IsObjectDeleting(rsmOrig) {
 		return nil
@@ -74,7 +75,7 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	// compute create/update/delete set
-	newSnapshot := make(map[model.GVKName]client.Object)
+	newSnapshot := make(map[model.GVKNObjKey]client.Object)
 	for _, object := range objects {
 		name, err := model.GetGVKName(object)
 		if err != nil {
@@ -93,21 +94,21 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 
 	createNewObjects := func() {
 		for name := range createSet {
-			model.PrepareCreate(dag, newSnapshot[name])
+			cli.Create(dag, newSnapshot[name])
 		}
 	}
 	updateObjects := func() {
 		for name := range updateSet {
-			model.PrepareUpdate(dag, oldSnapshot[name], newSnapshot[name])
+			cli.Update(dag, oldSnapshot[name], newSnapshot[name])
 		}
 	}
 	deleteOrphanObjects := func() {
 		for name := range deleteSet {
-			model.PrepareDelete(dag, oldSnapshot[name])
+			cli.Delete(dag, oldSnapshot[name])
 		}
 	}
 	handleDependencies := func() {
-		model.DependOn(dag, sts, svc, headLessSvc, envConfig)
+		cli.DependOn(dag, sts, svc, headLessSvc, envConfig)
 	}
 
 	// objects to be created

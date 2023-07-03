@@ -238,8 +238,8 @@ spec:
                       type: string
                     noCreatePDB:
                       default: false
-                      description: noCreatePDB defines the PodDistruptionBudget creation
-                        behavior and is set to true if creation of PodDistruptionBudget
+                      description: noCreatePDB defines the PodDisruptionBudget creation
+                        behavior and is set to true if creation of PodDisruptionBudget
                         for this component is not needed. It defaults to false.
                       type: boolean
                     replicas:

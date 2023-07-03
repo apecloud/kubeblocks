@@ -353,9 +353,13 @@ func (p *RestoreManager) getRecoveryInfo(baseBackup, logfileBackup *dpv1alpha1.B
 	if baseBackup.Status.Manifests != nil {
 		// inject env for backup startTime
 		backupLog := baseBackup.Status.Manifests.BackupLog
+		startTime := baseBackup.Status.StartTimestamp
 		if backupLog != nil && backupLog.StartTime != nil {
-			startTimeEnv := corev1.EnvVar{Name: constant.DPBackupStartTime, Value: backupLog.StartTime.UTC().Format(timeFormat)}
-			startTimeTimestampEnv := corev1.EnvVar{Name: constant.DPBackupStartTimestamp, Value: strconv.FormatInt(backupLog.StartTime.Unix(), 10)}
+			startTime = backupLog.StartTime
+		}
+		if startTime != nil {
+			startTimeEnv := corev1.EnvVar{Name: constant.DPBackupStartTime, Value: startTime.UTC().Format(timeFormat)}
+			startTimeTimestampEnv := corev1.EnvVar{Name: constant.DPBackupStartTimestamp, Value: strconv.FormatInt(startTime.Unix(), 10)}
 			headEnv = append(headEnv, startTimeEnv, startTimeTimestampEnv)
 		}
 		// inject env for user contexts

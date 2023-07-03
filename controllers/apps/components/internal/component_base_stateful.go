@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package internal
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -37,7 +36,6 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
-	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -211,9 +209,6 @@ func (c *StatefulComponentBase) Status(reqCtx intctrlutil.RequestCtx, cli client
 		return err
 	}
 
-	if err := c.handleGarbageOfRestoreBeforeRunning(); err != nil {
-		return err
-	}
 	c.updateWorkload(c.runningWorkload)
 	return delayedRequeueError
 }
@@ -735,70 +730,4 @@ func (c *StatefulComponentBase) getRunningVolumes(reqCtx intctrlutil.RequestCtx,
 		}
 	}
 	return matchedPVCs, nil
-}
-
-// handleGarbageOfRestoreBeforeRunning handles the garbage for restore before cluster phase changes to Running.
-// @return ErrNoOps if no operation
-// REVIEW: this handling is rather hackish, call for refactor.
-// Deprecated: to be removed by PITR feature.
-func (c *StatefulComponentBase) handleGarbageOfRestoreBeforeRunning() error {
-	clusterBackupResourceMap, err := c.getClusterBackupSourceMap(c.GetCluster())
-	if err != nil {
-		return err
-	}
-	if clusterBackupResourceMap == nil {
-		return nil
-	}
-	if c.GetPhase() != appsv1alpha1.RunningClusterCompPhase {
-		return nil
-	}
-
-	// remove the garbage for restore if the component restores from backup.
-	for _, v := range clusterBackupResourceMap {
-		// remove the init container for restore
-		if err = c.removeStsInitContainerForRestore(v); err != nil {
-			return err
-		}
-	}
-	// TODO: remove from the cluster annotation RestoreFromBackUpAnnotationKey?
-	return nil
-}
-
-// getClusterBackupSourceMap gets the backup source map from cluster.annotations
-func (c *StatefulComponentBase) getClusterBackupSourceMap(cluster *appsv1alpha1.Cluster) (map[string]string, error) {
-	compBackupMapString := cluster.Annotations[constant.RestoreFromBackUpAnnotationKey]
-	if len(compBackupMapString) == 0 {
-		return nil, nil
-	}
-	compBackupMap := map[string]string{}
-	err := json.Unmarshal([]byte(compBackupMapString), &compBackupMap)
-	for k := range compBackupMap {
-		if cluster.Spec.GetComponentByName(k) == nil {
-			return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNotFound, "restore: not found componentSpecs[*].name %s", k)
-		}
-	}
-	return compBackupMap, err
-}
-
-// removeStsInitContainerForRestore removes the statefulSet's init container which restores data from backup.
-func (c *StatefulComponentBase) removeStsInitContainerForRestore(backupName string) error {
-	sts := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
-	initContainers := sts.Spec.Template.Spec.InitContainers
-	restoreInitContainerName := component.GetRestoredInitContainerName(backupName)
-	restoreInitContainerIndex, _ := intctrlutil.GetContainerByName(initContainers, restoreInitContainerName)
-	if restoreInitContainerIndex == -1 {
-		return nil
-	}
-
-	initContainers = append(initContainers[:restoreInitContainerIndex], initContainers[restoreInitContainerIndex+1:]...)
-	sts.Spec.Template.Spec.InitContainers = initContainers
-	if *c.WorkloadVertex.Action != ictrltypes.UPDATE {
-		if *c.WorkloadVertex.Action != ictrltypes.CREATE && *c.WorkloadVertex.Action != ictrltypes.DELETE {
-			c.WorkloadVertex.Action = ictrltypes.ActionUpdatePtr()
-		}
-	}
-	// TODO: it seems not reasonable to reset component phase back to Creating.
-	//// if need to remove init container, reset component to Creating.
-	// c.SetStatusPhase(appsv1alpha1.CreatingClusterCompPhase, "Remove init container for restore")
-	return nil
 }

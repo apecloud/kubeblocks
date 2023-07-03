@@ -21,6 +21,7 @@ package dataprotection
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo/v2"
@@ -70,8 +71,8 @@ var _ = Describe("Backup Controller test", func() {
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS)
 		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
 		testapps.ClearResources(&testCtx, generics.JobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.CronJobSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
@@ -212,10 +213,10 @@ var _ = Describe("Backup Controller test", func() {
 
 		Context("deletes a datafile backup", func() {
 			var backupKey types.NamespacedName
-
+			var backup *dpv1alpha1.Backup
 			BeforeEach(func() {
 				By("creating a backup from backupPolicy: " + backupPolicyName)
-				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+				backup = testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dpv1alpha1.BackupTypeDataFile).
 					Create(&testCtx).GetObject()
@@ -235,6 +236,7 @@ var _ = Describe("Backup Controller test", func() {
 						backup.Status.Manifests.BackupTool = &dpv1alpha1.BackupToolManifestsStatus{}
 					}
 					backup.Status.Manifests.BackupTool.FilePath = "/" + backupName
+					backup.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
 				})).Should(Succeed())
 			})
 
@@ -243,12 +245,10 @@ var _ = Describe("Backup Controller test", func() {
 				testapps.DeleteObject(&testCtx, backupKey, &dpv1alpha1.Backup{})
 
 				By("checking new created Job")
-				jobKey := types.NamespacedName{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      deleteBackupFilesJobNamePrefix + backupName,
-				}
+				jobKey := buildDeleteBackupFilesJobNamespacedName(backup)
+				job := &batchv1.Job{}
 				Eventually(testapps.CheckObjExists(&testCtx, jobKey,
-					&batchv1.Job{}, true)).Should(Succeed())
+					job, true)).Should(Succeed())
 				volumeName := "backup-" + backupRemotePVCName
 				Eventually(testapps.CheckObj(&testCtx, jobKey, func(g Gomega, job *batchv1.Job) {
 					Expect(job.Spec.Template.Spec.Volumes).
@@ -267,9 +267,32 @@ var _ = Describe("Backup Controller test", func() {
 						}))
 				})).Should(Succeed())
 
-				By("checking Backup object, it should be deleted")
+				By("checking Backup object, it should not be deleted")
+				Eventually(testapps.CheckObjExists(&testCtx, backupKey,
+					&dpv1alpha1.Backup{}, true)).Should(Succeed())
+
+				By("mock job for deletion to Failed, backup should not be deleted")
+				Expect(testapps.ChangeObjStatus(&testCtx, job, func() {
+					job.Status.Conditions = []batchv1.JobCondition{
+						{
+							Type: batchv1.JobFailed,
+						},
+					}
+				})).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, backupKey,
+					&dpv1alpha1.Backup{}, true)).Should(Succeed())
+
+				By("mock job for deletion to completed, backup should be deleted")
+				Expect(testapps.ChangeObjStatus(&testCtx, job, func() {
+					job.Status.Conditions = []batchv1.JobCondition{
+						{
+							Type: batchv1.JobComplete,
+						},
+					}
+				})).Should(Succeed())
 				Eventually(testapps.CheckObjExists(&testCtx, backupKey,
 					&dpv1alpha1.Backup{}, false)).Should(Succeed())
+
 				// TODO: add delete backup test case with the pvc not exists
 			})
 		})

@@ -96,6 +96,7 @@ const (
 	CMConfigurationSpecProviderLabelKey    = "config.kubeblocks.io/config-spec"    // CMConfigurationSpecProviderLabelKey is ComponentConfigSpec name
 	CMConfigurationCMKeysLabelKey          = "config.kubeblocks.io/configmap-keys" // CMConfigurationCMKeysLabelKey Specify configmap keys
 	CMConfigurationTemplateNameLabelKey    = "config.kubeblocks.io/config-template-name"
+	CMTemplateNameLabelKey                 = "config.kubeblocks.io/template-name"
 	CMConfigurationTypeLabelKey            = "config.kubeblocks.io/config-type"
 	CMInsConfigurationHashLabelKey         = "config.kubeblocks.io/config-hash"
 	CMConfigurationConstraintsNameLabelKey = "config.kubeblocks.io/config-constraints-name"

@@ -8,11 +8,18 @@ Prepare pgbench test data for a PostgreSQL cluster
 kbcli bench pgbench prepare [ClusterName] [flags]
 ```
 
+### Examples
+
+```
+  # pgbench prepare data on a cluster
+  kbcli bench pgbench prepare pgcluster --database postgres --user xxx --password xxx --scale 100
+```
+
 ### Options
 
 ```
-  -h, --help       help for prepare
-      --size int   The scale factor to use for pgbench (default 1)
+  -h, --help        help for prepare
+      --scale int   The scale factor to use for pgbench (default 1)
 ```
 
 ### Options inherited from parent commands

@@ -71,9 +71,8 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 		setMembersStatus(rsm, pods)
 	}
 
-	if err := model.PrepareRootStatus(dag); err != nil {
-		return err
-	}
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	graphCli.Status(dag, rsmOrig, rsm)
 
 	return nil
 }

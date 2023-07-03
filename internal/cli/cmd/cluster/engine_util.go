@@ -20,12 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/stoewer/go-strcase"
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -36,28 +34,26 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
-)
-
-const (
-	strType = "string"
+	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 )
 
 // addEngineFlags adds the flags for creating a cluster, these flags are built by the cluster schema.
-func addEngineFlags(cmd *cobra.Command, f cmdutil.Factory, schema *spec.Schema, excludeProps ...string) error {
+func addEngineFlags(cmd *cobra.Command, f cmdutil.Factory, schema *cluster.EngineSchema) error {
 	if schema == nil {
 		return nil
 	}
 
-	for k, s := range schema.Properties {
-		// ignore exclude properties
-		if slices.Contains(excludeProps, k) {
-			continue
-		}
-		if err := buildOneFlag(cmd, f, k, &s); err != nil {
-			return err
-		}
+	// add the flags for the cluster schema
+	if err := flags.BuildFlagsBySchema(cmd, f, schema.Schema); err != nil {
+		return err
 	}
 
+	// add the flags for sub helm chart
+	if err := flags.BuildFlagsBySchema(cmd, f, schema.SubSchema); err != nil {
+		return err
+	}
+
+	registerFlagCompFunc(cmd, f)
 	return nil
 }
 
@@ -84,68 +80,13 @@ func getValuesFromFlags(fs *flag.FlagSet) map[string]interface{} {
 	return values
 }
 
-func buildOneFlag(cmd *cobra.Command, f cmdutil.Factory, k string, s *spec.Schema) error {
-	name := strcase.KebabCase(k)
-	tpe := strType
-	if len(s.Type) > 0 {
-		tpe = s.Type[0]
-	}
-
-	switch tpe {
-	case strType:
-		cmd.Flags().String(name, s.Default.(string), buildFlagDescription(s))
-	case "integer":
-		cmd.Flags().Int(name, int(s.Default.(float64)), buildFlagDescription(s))
-	case "number":
-		cmd.Flags().Float64(name, s.Default.(float64), buildFlagDescription(s))
-	case "boolean":
-		cmd.Flags().Bool(name, s.Default.(bool), buildFlagDescription(s))
-	default:
-		return fmt.Errorf("unsupported json schema type %s", s.Type)
-	}
-
-	registerFlagCompFunc(cmd, f, name, s)
-	return nil
-}
-
-func buildFlagDescription(s *spec.Schema) string {
-	desc := strings.Builder{}
-	desc.WriteString(s.Description)
-
-	var legalVals []string
-	for _, e := range s.Enum {
-		legalVals = append(legalVals, fmt.Sprintf("%s", e))
-	}
-	if len(legalVals) > 0 {
-		desc.WriteString(fmt.Sprintf(" Legal values [%s].", strings.Join(legalVals, ", ")))
-	}
-	return desc.String()
-}
-
-func registerFlagCompFunc(cmd *cobra.Command, f cmdutil.Factory, name string, s *spec.Schema) {
-	// register the enum entry for autocompletion
-	if len(s.Enum) > 0 {
-		var entries []string
-		for _, e := range s.Enum {
-			entries = append(entries, fmt.Sprintf("%s\t", e))
-		}
-		_ = cmd.RegisterFlagCompletionFunc(name,
-			func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-				return entries, cobra.ShellCompDirectiveNoFileComp
-			})
-		return
-	}
-
-	// for general property, register the completion function
-	switch cluster.SchemaPropName(name) {
-	case cluster.VersionSchemaProp:
-		// TODO(ldm): gets cluster versions based on the cluster engine type, do not get all
-		// but, now the cluster version does not has any engine type label, we can not get them by label
-		_ = cmd.RegisterFlagCompletionFunc(name,
-			func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-				return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
-			})
-	}
+func registerFlagCompFunc(cmd *cobra.Command, f cmdutil.Factory) {
+	// TODO(ldm): gets cluster versions based on the cluster engine type, do not get all
+	// but, now the cluster version does not has any engine type label, we can not get them by label
+	_ = cmd.RegisterFlagCompletionFunc(string(cluster.VersionSchemaProp),
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+		})
 }
 
 // buildEngineCreateExamples builds the creation examples for the specified engine type.
@@ -187,4 +128,27 @@ func getObjectsInfo(f cmdutil.Factory, manifests map[string]string) ([]*objectIn
 		objects = append(objects, objInfo)
 	}
 	return objects, nil
+}
+
+// buildHelmValues builds the helm values from the cluster schema and the values from the flags.
+// For helm, the sub chart values should be in the sub map of the values.
+func buildHelmValues(schema *cluster.EngineSchema, values map[string]interface{}) map[string]interface{} {
+	if schema == nil || schema.SubSchema == nil {
+		return values
+	}
+
+	subSchemaKeys := maps.Keys(schema.SubSchema.Properties)
+	newValues := map[string]interface{}{
+		schema.SubChartName: map[string]interface{}{},
+	}
+
+	for k, v := range values {
+		if slices.Contains(subSchemaKeys, k) {
+			subValues := newValues[schema.SubChartName]
+			subValues.(map[string]interface{})[k] = v
+		} else {
+			newValues[k] = v
+		}
+	}
+	return newValues
 }

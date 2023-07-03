@@ -31,13 +31,16 @@ var _ = Describe("cluster builder", func() {
 	})
 
 	It("get cluster schema", func() {
-		res, err := GetEngineSchema(MySQL)
+		c, err := GetHelmChart(MySQL)
+		Expect(err).Should(Succeed())
+		res, err := GetEngineSchema(c)
 		Expect(err).Should(Succeed())
 		Expect(res).ShouldNot(BeEmpty())
 	})
 
 	It("get cluster manifest", func() {
-		manifests, err := GetManifests(MySQL, "default", "my", nil)
+		c, err := GetHelmChart(MySQL)
+		manifests, err := GetManifests(c, "default", "my", nil)
 		Expect(err).Should(Succeed())
 		Expect(manifests).ShouldNot(BeEmpty())
 	})

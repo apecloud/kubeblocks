@@ -25,10 +25,10 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"helm.sh/helm/v3/pkg/chart"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kube-openapi/pkg/validation/spec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
@@ -52,7 +52,10 @@ type CreateEngineOptions struct {
 
 	// schema is the cluster helm chart schema, used to render the command flag
 	// and validate the values.
-	schema *spec.Schema
+	schema *cluster.EngineSchema
+
+	// chart is the cluster helm chart.
+	chart *chart.Chart
 
 	*create.CreateOptions
 }
@@ -69,8 +72,12 @@ func buildCreateEngineCmds(createOptions *create.CreateOptions) []*cobra.Command
 			engine:        e,
 		}
 
+		// get engine helm chart
+		o.chart, err = cluster.GetHelmChart(e)
+		util.CheckErr(err)
+
 		// get engine schema
-		o.schema, err = cluster.GetEngineSchema(e)
+		o.schema, err = cluster.GetEngineSchema(o.chart)
 		util.CheckErr(err)
 
 		cmd := &cobra.Command{
@@ -113,8 +120,11 @@ func (o *CreateEngineOptions) validate() error {
 }
 
 func (o *CreateEngineOptions) run() error {
+	// move values that belong to sub chart to sub map
+	values := buildHelmValues(o.schema, o.values)
+
 	// get cluster manifests
-	manifests, err := cluster.GetManifests(o.engine, o.Namespace, o.Name, o.values)
+	manifests, err := cluster.GetManifests(o.chart, o.Namespace, o.Name, values)
 	if err != nil {
 		return err
 	}

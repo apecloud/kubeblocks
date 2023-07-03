@@ -20,16 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
-	"archive/tar"
-	"bytes"
 	"compress/gzip"
 	"embed"
 	"fmt"
-	"io"
-	"path/filepath"
 	"strings"
 
 	"github.com/leaanthony/debme"
+	"github.com/pkg/errors"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -40,10 +37,6 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
-)
-
-const (
-	jsonSchemaFileName = "values.schema.json"
 )
 
 type EngineType string
@@ -58,27 +51,36 @@ type SchemaPropName string
 // the command schema property name
 const (
 	VersionSchemaProp SchemaPropName = "version"
-	ModeSchemaProp    SchemaPropName = "mode"
 )
+
+type EngineSchema struct {
+	// schema is the cluster parent helm chart schema, used to render the command flag
+	Schema *spec.Schema
+
+	// subSchema is the sub chart schema, used to render the command flag
+	SubSchema *spec.Schema
+
+	// subChartName is the name (alias if exists) of the sub chart
+	SubChartName string
+}
 
 var (
 	//go:embed charts/*
 	charts embed.FS
 )
 
-// GetManifests gets the cluster manifests
-func GetManifests(e EngineType, namespace, name string, values map[string]interface{}) (map[string]string, error) {
+func GetHelmChart(e EngineType) (*chart.Chart, error) {
 	chartsFS, err := debme.FS(charts, "charts")
 	if err != nil {
 		return nil, err
 	}
 
-	// load the chart package to memory from embed tgz file
-	chartRequested, err := loadHelmChart(chartsFS, getEngineChartName(e))
-	if err != nil {
-		return nil, err
-	}
+	// load helm chart from embed tgz file
+	return loadHelmChart(chartsFS, getEngineChartName(e))
+}
 
+// GetManifests gets the cluster manifests
+func GetManifests(c *chart.Chart, namespace, name string, values map[string]interface{}) (map[string]string, error) {
 	// get the helm chart manifest
 	actionCfg, err := helm.NewActionConfig(helm.NewFakeConfig(namespace))
 	if err != nil {
@@ -95,7 +97,7 @@ func GetManifests(e EngineType, namespace, name string, values map[string]interf
 	client.ReleaseName = name
 	client.Namespace = namespace
 
-	rel, err := client.Run(chartRequested, values)
+	rel, err := client.Run(c, values)
 	if err != nil {
 		return nil, err
 	}
@@ -103,58 +105,65 @@ func GetManifests(e EngineType, namespace, name string, values map[string]interf
 }
 
 // GetEngineSchema gets the schema for the given cluster engine type.
-func GetEngineSchema(e EngineType) (*spec.Schema, error) {
-	chartsFS, err := debme.FS(charts, "charts")
-	if err != nil {
-		return nil, err
-	}
-
-	chartName := getEngineChartName(e)
-	file, err := chartsFS.Open(chartName + ".tgz")
-	if err != nil {
-		return nil, err
-	}
-
-	gr, err := gzip.NewReader(file)
-	if err != nil {
-		return nil, err
-	}
-	defer gr.Close()
-
-	tr := tar.NewReader(gr)
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
+func GetEngineSchema(c *chart.Chart) (*EngineSchema, error) {
+	var err error
+	buildSchema := func(bs []byte) (*spec.Schema, error) {
+		schema := &spec.Schema{}
+		if err = json.Unmarshal(bs, schema); err != nil {
+			return nil, errors.Wrapf(err, "failed to build schema for engine %s", c.Name())
 		}
+		return schema, nil
+	}
 
+	// build engine schema
+	eSchema := &EngineSchema{}
+	eSchema.Schema, err = buildSchema(c.Schema)
+	if err != nil {
+		return nil, err
+	}
+
+	// build extra schema in sub chart, now, we only support one sub chart
+	for _, subChart := range c.Dependencies() {
+		eSchema.SubChartName = subChart.Name()
+		eSchema.SubSchema, err = buildSchema(subChart.Schema)
 		if err != nil {
 			return nil, err
 		}
+		break
+	}
 
-		if hdr.Name != filepath.Join(chartName, jsonSchemaFileName) {
+	// if sub chart has alias, we should use alias instead of chart name
+	for _, dep := range c.Metadata.Dependencies {
+		if dep.Name != eSchema.SubChartName {
 			continue
 		}
 
-		// found the schema file
-		var buf bytes.Buffer
-		if _, err = io.Copy(&buf, tr); err != nil {
-			return nil, err
+		if dep.Alias != "" {
+			eSchema.SubChartName = dep.Alias
 		}
-
-		schema := spec.Schema{}
-		if err = json.Unmarshal(buf.Bytes(), &schema); err != nil {
-			return nil, err
-		}
-		return &schema, nil
 	}
 
-	return nil, fmt.Errorf("failed to build schema for engine %s", e)
+	return eSchema, nil
 }
 
-func ValidateValues(schema *spec.Schema, values map[string]interface{}) error {
-	validator := validate.NewSchemaValidator(schema, nil, "", strfmt.Default)
-	return validator.Validate(values).AsError()
+// ValidateValues validates the given values against the schema.
+func ValidateValues(schema *EngineSchema, values map[string]interface{}) error {
+	if schema == nil {
+		return nil
+	}
+
+	validateFn := func(s *spec.Schema, values map[string]interface{}) error {
+		if s == nil {
+			return nil
+		}
+		v := validate.NewSchemaValidator(s, nil, "", strfmt.Default)
+		return v.Validate(values).AsError()
+	}
+
+	if err := validateFn(schema.Schema, values); err != nil {
+		return err
+	}
+	return validateFn(schema.SubSchema, values)
 }
 
 // getEngineChartName gets the chart name for the given cluster engine type.
@@ -181,12 +190,15 @@ func loadHelmChart(fs debme.Debme, name string) (*chart.Chart, error) {
 			return nil, fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", name, err)
 		}
 	}
+
+	if c == nil {
+		return nil, fmt.Errorf("failed to load engine helm chart %s", name)
+	}
 	return c, err
 }
 
 func SupportedEngines() []EngineType {
 	return []EngineType{MySQL}
-
 }
 
 func (e EngineType) String() string {

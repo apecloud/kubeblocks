@@ -52,6 +52,11 @@ var keyWhiteList = []string{
 	"tolerations",
 }
 
+var sensitiveValues = []string{
+	"cloudProvider.accessKey",
+	"cloudProvider.secretKey",
+}
+
 var backupConfigExample = templates.Examples(`
 		# Enable the snapshot-controller and volume snapshot, to support snapshot backup.
 		kbcli kubeblocks config --set snapshot-controller.enabled=true
@@ -161,7 +166,36 @@ func getHelmValues(release string, opt *Options) (map[string]interface{}, error)
 	for _, item := range list.Items {
 		delete(values, item.GetName())
 	}
+	// encrypted the sensitive values
+	for _, key := range sensitiveValues {
+		sp := strings.Split(key, ".")
+		rootKey := sp[0]
+		if node, ok := values[rootKey]; ok {
+			encryptNodeData(values, node, sp, 0)
+		}
+	}
 	return pruningConfigResults(values), nil
+}
+
+// encryptNodeData encrypts the specified key of helm values. will ignore the key if the type of the value is in [map, slice].
+func encryptNodeData(parentNode map[string]interface{}, node interface{}, sp []string, index int) {
+	switch v := node.(type) {
+	case map[string]interface{}:
+		// do nothing, if target node is not the leaf node
+		if len(sp)-1 == index {
+			return
+		}
+		index += 1
+		encryptNodeData(v, v[sp[index]], sp, index)
+	case []interface{}:
+		// ignore slice ?
+	default:
+		// reach the leaf node, encrypt the value
+		key := sp[index]
+		if _, ok := parentNode[key]; ok {
+			parentNode[key] = "******"
+		}
+	}
 }
 
 // pruningConfigResults prunes the configs results by options

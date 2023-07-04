@@ -426,18 +426,6 @@ var _ = Describe("builder", func() {
 			Expect(vs).ShouldNot(BeNil())
 		})
 
-		It("builds CronJob correctly", func() {
-			sts := newStsObj()
-			pvcKey := types.NamespacedName{
-				Namespace: "default",
-				Name:      "test-pvc",
-			}
-			schedule := "* * * * *"
-			cronJob, err := BuildCronJob(pvcKey, schedule, sts)
-			Expect(err).Should(BeNil())
-			Expect(cronJob).ShouldNot(BeNil())
-		})
-
 		It("builds ConfigMap with template correctly", func() {
 			config := map[string]string{}
 			params := newParams()

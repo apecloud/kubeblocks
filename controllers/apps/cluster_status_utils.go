@@ -22,15 +22,12 @@ package apps
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -285,16 +282,6 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 	nilReturnHandler := func() error { return nil }
 	pps := []predicateProcessor{
 		{
-			// handle cronjob complete or fail event
-			pred: func() bool {
-				return event.InvolvedObject.Kind == constant.CronJobKind &&
-					event.Reason == "SawCompletedJob"
-			},
-			processor: func() error {
-				return handleDeletePVCCronJobEvent(ctx, cli, recorder, event)
-			},
-		},
-		{
 			pred: func() bool {
 				return event.Type != corev1.EventTypeWarning ||
 					!isTargetKindForEvent(event)
@@ -325,90 +312,6 @@ func handleEventForClusterStatus(ctx context.Context, cli client.Client, recorde
 		}
 	}
 	return nil
-}
-
-func handleDeletePVCCronJobEvent(ctx context.Context,
-	cli client.Client,
-	recorder record.EventRecorder,
-	event *corev1.Event) error {
-	re := regexp.MustCompile("status: Failed")
-	var (
-		err    error
-		object client.Object
-	)
-	matches := re.FindStringSubmatch(event.Message)
-	if len(matches) == 0 {
-		// delete pvc success, then delete cronjob
-		return checkedDeleteDeletePVCCronJob(ctx, cli, event.InvolvedObject.Name, event.InvolvedObject.Namespace)
-	}
-	// cronjob failed
-	if object, err = getEventInvolvedObject(ctx, cli, event); err != nil {
-		return err
-	}
-	if object == nil {
-		return nil
-	}
-	labels := object.GetLabels()
-	cluster := appsv1alpha1.Cluster{}
-	if err = cli.Get(ctx, client.ObjectKey{Name: labels[constant.AppInstanceLabelKey],
-		Namespace: object.GetNamespace()}, &cluster); err != nil {
-		return err
-	}
-	componentName := labels[constant.KBAppComponentLabelKey]
-	// update component phase to abnormal
-	if err = updateComponentStatusPhase(cli,
-		ctx,
-		&cluster,
-		componentName,
-		appsv1alpha1.AbnormalClusterCompPhase,
-		event.Message,
-		object); err != nil {
-		return err
-	}
-	recorder.Eventf(&cluster, corev1.EventTypeWarning, event.Reason, event.Message)
-	return nil
-}
-
-func checkedDeleteDeletePVCCronJob(ctx context.Context, cli client.Client, name string, namespace string) error {
-	// label check
-	cronJob := batchv1.CronJob{}
-	if err := cli.Get(ctx, types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}, &cronJob); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-	if cronJob.ObjectMeta.Labels[constant.AppManagedByLabelKey] != constant.AppName {
-		return nil
-	}
-	// check the delete-pvc-cronjob annotation.
-	// the reason for this is that the backup policy also creates cronjobs,
-	// which need to be distinguished by the annotation.
-	if cronJob.ObjectMeta.Annotations[lifecycleAnnotationKey] != lifecycleDeletePVCAnnotation {
-		return nil
-	}
-	// if managed by kubeblocks, then it must be the cronjob used to delete pvc, delete it since it's completed
-	if err := cli.Delete(ctx, &cronJob); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-	return nil
-}
-
-func updateComponentStatusPhase(cli client.Client,
-	ctx context.Context,
-	cluster *appsv1alpha1.Cluster,
-	componentName string,
-	phase appsv1alpha1.ClusterComponentPhase,
-	message string,
-	object client.Object) error {
-	c, ok := cluster.Status.Components[componentName]
-	if ok && c.Phase == phase {
-		return nil
-	}
-	c.SetObjectMessage(object.GetObjectKind().GroupVersionKind().Kind, object.GetName(), message)
-	patch := client.MergeFrom(cluster.DeepCopy())
-	cluster.Status.SetComponentStatus(componentName, c)
-	return cli.Status().Patch(ctx, cluster, patch)
 }
 
 // existsOperations checks if the cluster is doing operations

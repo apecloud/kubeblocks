@@ -503,11 +503,7 @@ func (o *CreateOptions) Complete() error {
 }
 
 func (o *CreateOptions) CleanUp() error {
-	if o.Client == nil {
-		return nil
-	}
-
-	return deleteDependencies(o.Client, o.Namespace, o.Name)
+	return nil
 }
 
 // buildComponents builds components from file or set values
@@ -561,12 +557,7 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 	return comps, nil
 }
 
-const (
-	saNamePrefix          = "kb-sa-"
-	roleNamePrefix        = "kb-role-"
-	roleBindingNamePrefix = "kb-rolebinding-"
-)
-
+// MultipleSourceComponents gets component data from multiple source, such as stdin, URI and local file
 func MultipleSourceComponents(fileName string, in io.Reader) ([]byte, error) {
 	var data io.Reader
 	switch {

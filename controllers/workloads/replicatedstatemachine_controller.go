@@ -106,7 +106,7 @@ func (r *ReplicatedStateMachineReconciler) Reconcile(ctx context.Context, req ct
 			&rsm.ObjectGenerationTransformer{},
 			// handle status
 			&rsm.ObjectStatusTransformer{},
-			// handle UpdateStrategy
+			// handle MemberUpdateStrategy
 			&rsm.UpdateStrategyTransformer{},
 			// handle member reconfiguration
 			&rsm.MemberReconfigurationTransformer{},

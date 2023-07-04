@@ -36,6 +36,18 @@ type ReplicatedStateMachineSpec struct {
 	// +optional
 	Replicas int32 `json:"replicas,omitempty"`
 
+	// selector is a label query over pods that should match the replica count.
+	// It must match the pod template's labels.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+	Selector *metav1.LabelSelector `json:"selector"`
+
+	// serviceName is the name of the service that governs this StatefulSet.
+	// This service must exist before the StatefulSet, and is responsible for
+	// the network identity of the set. Pods get DNS/hostnames that follow the
+	// pattern: pod-specific-string.serviceName.default.svc.cluster.local
+	// where "pod-specific-string" is managed by the StatefulSet controller.
+	ServiceName string `json:"serviceName"`
+
 	// service defines the behavior of a service spec.
 	// provides read-write service
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
@@ -54,6 +66,23 @@ type ReplicatedStateMachineSpec struct {
 	// +optional
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 
+	// podManagementPolicy controls how pods are created during initial scale up,
+	// when replacing pods on nodes, or when scaling down. The default policy is
+	// `OrderedReady`, where pods are created in increasing order (pod-0, then
+	// pod-1, etc) and the controller will wait until each pod is ready before
+	// continuing. When scaling down, the pods are removed in the opposite order.
+	// The alternative policy is `Parallel` which will create pods in parallel
+	// to match the desired scale without waiting, and on scale down will delete
+	// all pods at once.
+	// +optional
+	PodManagementPolicy appsv1.PodManagementPolicyType `json:"podManagementPolicy,omitempty"`
+
+	// updateStrategy indicates the StatefulSetUpdateStrategy that will be
+	// employed to update Pods in the RSM when a revision is made to
+	// Template.
+	// UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil
+	UpdateStrategy appsv1.StatefulSetUpdateStrategy `json:"updateStrategy,omitempty"`
+
 	// Roles, a list of roles defined in the system.
 	// +kubebuilder:validation:Required
 	Roles []ReplicaRole `json:"roles"`
@@ -66,16 +95,16 @@ type ReplicatedStateMachineSpec struct {
 	// +optional
 	MembershipReconfiguration *MembershipReconfiguration `json:"membershipReconfiguration,omitempty"`
 
-	// UpdateStrategy, Pods update strategy.
-	// serial: update Pods one by one that guarantee minimum component unavailable time.
+	// MemberUpdateStrategy, Members(Pods) update strategy.
+	// serial: update Members one by one that guarantee minimum component unavailable time.
 	// 		Learner -> Follower(with AccessMode=none) -> Follower(with AccessMode=readonly) -> Follower(with AccessMode=readWrite) -> Leader
-	// bestEffortParallel: update Pods in parallel that guarantee minimum component un-writable time.
+	// bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
 	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time.
 	// parallel: force parallel
 	// +kubebuilder:default=Serial
 	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
 	// +optional
-	UpdateStrategy UpdateStrategy `json:"updateStrategy,omitempty"`
+	MemberUpdateStrategy *MemberUpdateStrategy `json:"MemberUpdateStrategy,omitempty"`
 
 	// Credential used to connect to DB engine
 	// +optional
@@ -159,14 +188,14 @@ const (
 	NoneMode      AccessMode = "None"
 )
 
-// UpdateStrategy defines Cluster Component update strategy.
+// MemberUpdateStrategy defines Cluster Component update strategy.
 // +enum
-type UpdateStrategy string
+type MemberUpdateStrategy string
 
 const (
-	SerialUpdateStrategy             UpdateStrategy = "Serial"
-	BestEffortParallelUpdateStrategy UpdateStrategy = "BestEffortParallel"
-	ParallelUpdateStrategy           UpdateStrategy = "Parallel"
+	SerialUpdateStrategy             MemberUpdateStrategy = "Serial"
+	BestEffortParallelUpdateStrategy MemberUpdateStrategy = "BestEffortParallel"
+	ParallelUpdateStrategy           MemberUpdateStrategy = "Parallel"
 )
 
 // RoleObservation defines how to observe role

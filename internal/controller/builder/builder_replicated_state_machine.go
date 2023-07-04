@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
+	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
@@ -43,7 +45,6 @@ func NewReplicatedStateMachineBuilder(namespace, name string) *ReplicatedStateMa
 						CanVote:    true,
 					},
 				},
-				UpdateStrategy: workloads.SerialUpdateStrategy,
 			},
 		}, builder)
 	return builder
@@ -54,6 +55,38 @@ func (builder *ReplicatedStateMachineBuilder) SetReplicas(replicas int32) *Repli
 	return builder
 }
 
+func (builder *ReplicatedStateMachineBuilder) AddMatchLabel(key, value string) *ReplicatedStateMachineBuilder {
+	labels := make(map[string]string, 1)
+	labels[key] = value
+	return builder.AddMatchLabelsInMap(labels)
+}
+
+func (builder *ReplicatedStateMachineBuilder) AddMatchLabels(keyValues ...string) *ReplicatedStateMachineBuilder {
+	return builder.AddMatchLabelsInMap(WithMap(keyValues...))
+}
+
+func (builder *ReplicatedStateMachineBuilder) AddMatchLabelsInMap(labels map[string]string) *ReplicatedStateMachineBuilder {
+	selector := builder.get().Spec.Selector
+	if selector == nil {
+		selector = &metav1.LabelSelector{}
+		builder.get().Spec.Selector = selector
+	}
+	matchLabels := builder.get().Spec.Selector.MatchLabels
+	if matchLabels == nil {
+		matchLabels = make(map[string]string, len(labels))
+	}
+	for k, v := range labels {
+		matchLabels[k] = v
+	}
+	builder.get().Spec.Selector.MatchLabels = matchLabels
+	return builder
+}
+
+func (builder *ReplicatedStateMachineBuilder) SetServiceName(serviceName string) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.ServiceName = serviceName
+	return builder
+}
+
 func (builder *ReplicatedStateMachineBuilder) SetRoles(roles []workloads.ReplicaRole) *ReplicatedStateMachineBuilder {
 	builder.get().Spec.Roles = roles
 	return builder
@@ -61,6 +94,33 @@ func (builder *ReplicatedStateMachineBuilder) SetRoles(roles []workloads.Replica
 
 func (builder *ReplicatedStateMachineBuilder) SetTemplate(template corev1.PodTemplateSpec) *ReplicatedStateMachineBuilder {
 	builder.get().Spec.Template = template
+	return builder
+}
+
+func (builder *ReplicatedStateMachineBuilder) AddVolumeClaimTemplates(templates ...corev1.PersistentVolumeClaim) *ReplicatedStateMachineBuilder {
+	templateList := builder.get().Spec.VolumeClaimTemplates
+	templateList = append(templateList, templates...)
+	builder.get().Spec.VolumeClaimTemplates = templateList
+	return builder
+}
+
+func (builder *ReplicatedStateMachineBuilder) SetVolumeClaimTemplates(templates ...corev1.PersistentVolumeClaim) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.VolumeClaimTemplates = templates
+	return builder
+}
+
+func (builder *ReplicatedStateMachineBuilder) SetPodManagementPolicy(policy apps.PodManagementPolicyType) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.PodManagementPolicy = policy
+	return builder
+}
+
+func (builder *ReplicatedStateMachineBuilder) SetUpdateStrategy(strategy apps.StatefulSetUpdateStrategy) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.UpdateStrategy = strategy
+	return builder
+}
+
+func (builder *ReplicatedStateMachineBuilder) SetUpdateStrategyType(strategyType apps.StatefulSetUpdateStrategyType) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.UpdateStrategy.Type = strategyType
 	return builder
 }
 
@@ -83,6 +143,12 @@ func (builder *ReplicatedStateMachineBuilder) SetService(service corev1.ServiceS
 
 func (builder *ReplicatedStateMachineBuilder) SetMembershipReconfiguration(reconfiguration workloads.MembershipReconfiguration) *ReplicatedStateMachineBuilder {
 	builder.get().Spec.MembershipReconfiguration = &reconfiguration
+	return builder
+}
+
+func (builder *ReplicatedStateMachineBuilder) SetMemberUpdateStrategy(strategy workloads.MemberUpdateStrategy) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.MemberUpdateStrategy = &strategy
+	builder.SetUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType)
 	return builder
 }
 

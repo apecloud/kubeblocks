@@ -25,6 +25,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"strconv"
 	"strings"
 
@@ -355,6 +356,67 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		return nil, err
 	}
 	return sts, nil
+}
+
+func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
+	component *component.SynthesizedComponent, envConfigName string) (*workloads.ReplicatedStateMachine, error) {
+	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
+		return corev1.PersistentVolumeClaim{
+			ObjectMeta: vct.ObjectMeta,
+			Spec: vct.Spec,
+		}
+	}
+
+	commonLabels := map[string]string{
+		constant.AppManagedByLabelKey:   constant.AppName,
+		constant.AppNameLabelKey:        component.ClusterDefName,
+		constant.AppComponentLabelKey:   component.CompDefName,
+		constant.AppInstanceLabelKey:    cluster.Name,
+		constant.KBAppComponentLabelKey: component.Name,
+	}
+	podBuilder := NewPodBuilder("", "").
+		AddLabelsInMap(commonLabels).
+		AddLabels(constant.WorkloadTypeLabelKey, string(component.WorkloadType))
+	if len(cluster.Spec.ClusterVersionRef) > 0 {
+		podBuilder.AddLabels(constant.AppVersionLabelKey, cluster.Spec.ClusterVersionRef)
+	}
+	template := corev1.PodTemplateSpec{
+		ObjectMeta: podBuilder.GetObject().ObjectMeta,
+		Spec: *component.PodSpec,
+	}
+	name := fmt.Sprintf("%s-%s", cluster.Name, component.Name)
+	rsmBuilder := NewReplicatedStateMachineBuilder(cluster.Namespace, name).
+		AddLabelsInMap(commonLabels).
+		AddMatchLabelsInMap(commonLabels).
+		SetServiceName(name+"-headless").
+		SetReplicas(component.Replicas).
+		SetTemplate(template)
+
+	var vcts []corev1.PersistentVolumeClaim
+	for _, vct := range component.VolumeClaimTemplates {
+		vcts = append(vcts, vctToPVC(vct))
+	}
+	rsmBuilder.SetVolumeClaimTemplates(vcts...)
+
+	if component.StatefulSetWorkload != nil {
+		podManagementPolicy, updateStrategy := component.StatefulSetWorkload.FinalStsUpdateStrategy()
+		rsmBuilder.SetPodManagementPolicy(podManagementPolicy).SetUpdateStrategy(updateStrategy)
+	}
+
+	rsm := rsmBuilder.GetObject()
+
+	// update sts.spec.volumeClaimTemplates[].metadata.labels
+	if len(rsm.Spec.VolumeClaimTemplates) > 0 && len(rsm.GetLabels()) > 0 {
+		for index, vct := range rsm.Spec.VolumeClaimTemplates {
+			BuildPersistentVolumeClaimLabels(component, &vct, vct.Name)
+			rsm.Spec.VolumeClaimTemplates[index] = vct
+		}
+	}
+
+	if err := processContainersInjection(reqCtx, cluster, component, envConfigName, &rsm.Spec.Template.Spec); err != nil {
+		return nil, err
+	}
+	return rsm, nil
 }
 
 func randomString(length int) string {

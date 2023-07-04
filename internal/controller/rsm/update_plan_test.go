@@ -135,7 +135,7 @@ var _ = Describe("update plan test.", func() {
 
 		It("should work well in a parallel plan", func() {
 			By("build a parallel plan")
-			rsm.Spec.UpdateStrategy = workloads.ParallelUpdateStrategy
+			rsm.Spec.MemberUpdateStrategy = workloads.ParallelUpdateStrategy
 			expectedPlan := [][]*corev1.Pod{
 				{pod0, pod1, pod2, pod3, pod4, pod5, pod6},
 			}
@@ -144,7 +144,7 @@ var _ = Describe("update plan test.", func() {
 
 		It("should work well in a best effort parallel", func() {
 			By("build a best effort parallel plan")
-			rsm.Spec.UpdateStrategy = workloads.BestEffortParallelUpdateStrategy
+			rsm.Spec.MemberUpdateStrategy = workloads.BestEffortParallelUpdateStrategy
 			expectedPlan := [][]*corev1.Pod{
 				{pod2, pod3, pod4, pod6},
 				{pod1},

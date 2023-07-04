@@ -126,6 +126,7 @@ const (
 	dataProtectionFlagKey flagName = "dataprotection"
 	extensionsFlagKey     flagName = "extensions"
 	workloadsFlagKey      flagName = "workloads"
+	storageFlagKey        flagName = "storage"
 )
 
 func (r flagName) String() string {
@@ -202,6 +203,8 @@ func main() {
 		"Enable the extensions controller manager. ")
 	flag.Bool(workloadsFlagKey.String(), true,
 		"Enable the workloads controller manager. ")
+	flag.Bool(storageFlagKey.String(), true,
+		"Enable the storage controller manager. ")
 
 	opts := zap.Options{
 		Development: true,
@@ -382,15 +385,6 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "Class")
 			os.Exit(1)
 		}
-
-		if err = (&storagecontrollers.StorageProviderReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("storage-provider-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "StorageProvider")
-			os.Exit(1)
-		}
 	}
 
 	if viper.GetBool(dataProtectionFlagKey.viperName()) {
@@ -468,6 +462,17 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("replicated-state-machine-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ReplicatedStateMachine")
+			os.Exit(1)
+		}
+	}
+
+	if viper.GetBool(storageFlagKey.viperName()) {
+		if err = (&storagecontrollers.StorageProviderReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("storage-provider-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "StorageProvider")
 			os.Exit(1)
 		}
 	}

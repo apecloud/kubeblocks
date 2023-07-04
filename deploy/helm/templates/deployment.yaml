@@ -56,6 +56,7 @@ spec:
             - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
             - "--apps=true"
             - "--workloads=true"
+            - "--storage=true"
             - "--dataprotection={{- and .Values.dataProtection.enabled (not .Values.separatedDeployment) }}"
           env:
             - name: CM_NAMESPACE
@@ -238,6 +239,7 @@ spec:
             - "--apps=false"
             - "--extensions=false"
             - "--workloads=false"
+            - "--storage=false"
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}

@@ -121,6 +121,8 @@ var _ = Describe("update plan test.", func() {
 
 		It("should work well in a serial plan", func() {
 			By("build a serial plan")
+			strategy := workloads.SerialUpdateStrategy
+			rsm.Spec.MemberUpdateStrategy = &strategy
 			expectedPlan := [][]*corev1.Pod{
 				{pod4},
 				{pod2},

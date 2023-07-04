@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
+	"github.com/apecloud/kubeblocks/internal/constant"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -34,6 +35,13 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 		var rsm *ReplicatedStateMachine
 
 		BeforeEach(func() {
+			commonLabels := map[string]string{
+				constant.AppManagedByLabelKey:   constant.AppName,
+				constant.AppNameLabelKey:        "ClusterDefName",
+				constant.AppComponentLabelKey:   "CompDefName",
+				constant.AppInstanceLabelKey:    "clusterName",
+				constant.KBAppComponentLabelKey: "componentName",
+			}
 			rsm = &ReplicatedStateMachine{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
@@ -41,6 +49,9 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 				},
 				Spec: ReplicatedStateMachineSpec{
 					Replicas: 1,
+					Selector: &metav1.LabelSelector{
+						MatchLabels: commonLabels,
+					},
 					RoleObservation: RoleObservation{
 						ObservationActions: []Action{
 							{
@@ -50,6 +61,9 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 						},
 					},
 					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: commonLabels,
+						},
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
 								{

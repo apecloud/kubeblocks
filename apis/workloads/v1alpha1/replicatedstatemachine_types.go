@@ -101,7 +101,6 @@ type ReplicatedStateMachineSpec struct {
 	// bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
 	//		Learner, Follower(minority) in parallel -> Follower(majority) -> Leader, keep majority online all the time.
 	// parallel: force parallel
-	// +kubebuilder:default=Serial
 	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
 	// +optional
 	MemberUpdateStrategy *MemberUpdateStrategy `json:"MemberUpdateStrategy,omitempty"`

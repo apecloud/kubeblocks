@@ -487,7 +487,6 @@ rules:
   - list
   - patch
   - update
-  - watch
 - apiGroups:
   - ""
   resources:
@@ -689,7 +688,6 @@ rules:
   - list
   - patch
   - update
-  - watch
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
@@ -715,7 +713,6 @@ rules:
   - list
   - patch
   - update
-  - watch
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:

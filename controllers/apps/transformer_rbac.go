@@ -23,7 +23,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
@@ -134,11 +133,9 @@ func isPostgresqlCluster(transCtx *ClusterTransformContext) bool {
 		return false
 	}
 
-	var compDef *appsv1alpha1.ClusterComponentDefinition
-
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		for _, def := range cd.Spec.ComponentDefs {
-			if def.Name == compSpec.ComponentDefRef && compDef.CharacterType == PGTYPE {
+			if def.Name == compSpec.ComponentDefRef && def.CharacterType == PGTYPE {
 				return true
 			}
 		}

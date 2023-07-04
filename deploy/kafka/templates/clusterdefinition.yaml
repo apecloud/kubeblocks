@@ -192,7 +192,7 @@ spec:
                 mountPath: /etc/jmx-kafka
 
     # controller(kraft) Ref: https://kafka.apache.org/documentation/#kraft_role
-    - name: kafka-controller
+    - name: kafka-kraft
       description: |-
         Kafka controller that act as controllers (kraft) only server.
       workloadType: Stateful # Consensus

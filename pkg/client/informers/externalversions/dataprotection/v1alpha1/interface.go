@@ -28,6 +28,8 @@ type Interface interface {
 	Backups() BackupInformer
 	// BackupPolicies returns a BackupPolicyInformer.
 	BackupPolicies() BackupPolicyInformer
+	// BackupRepos returns a BackupRepoInformer.
+	BackupRepos() BackupRepoInformer
 	// BackupTools returns a BackupToolInformer.
 	BackupTools() BackupToolInformer
 	// RestoreJobs returns a RestoreJobInformer.
@@ -53,6 +55,11 @@ func (v *version) Backups() BackupInformer {
 // BackupPolicies returns a BackupPolicyInformer.
 func (v *version) BackupPolicies() BackupPolicyInformer {
 	return &backupPolicyInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// BackupRepos returns a BackupRepoInformer.
+func (v *version) BackupRepos() BackupRepoInformer {
+	return &backupRepoInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // BackupTools returns a BackupToolInformer.

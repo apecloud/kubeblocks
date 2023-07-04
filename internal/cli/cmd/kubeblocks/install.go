@@ -54,9 +54,10 @@ import (
 )
 
 const (
-	kNodeAffinity    = "affinity.nodeAffinity=%s"
-	kPodAntiAffinity = "affinity.podAntiAffinity=%s"
-	kTolerations     = "tolerations=%s"
+	kNodeAffinity                     = "affinity.nodeAffinity=%s"
+	kPodAntiAffinity                  = "affinity.podAntiAffinity=%s"
+	kTolerations                      = "tolerations=%s"
+	defaultTolerationsForInstallation = "kb-controller=true:NoSchedule"
 )
 
 type Options struct {
@@ -202,9 +203,6 @@ func (o *InstallOptions) PreCheck() error {
 		return err
 	}
 
-	// Todo: KubeBlocks maybe already installed but it's status could be Failed.
-	// For example: 'kbcli playground init' in windows will fail and try 'kbcli playground init' again immediately,
-	// kbcli will output SUCCESSFULLY, however the addon csi is still failed and KubeBlocks is not installed SUCCESSFULLY
 	if v.KubeBlocks != "" {
 		return fmt.Errorf("KubeBlocks %s already exists, repeated installation is not supported", v.KubeBlocks)
 	}
@@ -247,18 +245,17 @@ func (o *InstallOptions) Install() error {
 		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kNodeAffinity, string(nodeLabelsJSON)))
 	}
 
-	// parse tolerations and add to values
-	if len(o.TolerationsRaw) > 0 {
-		tolerations, err := util.BuildTolerations(o.TolerationsRaw)
-		if err != nil {
-			return err
-		}
-		tolerationsJSON, err := json.Marshal(tolerations)
-		if err != nil {
-			return err
-		}
-		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kTolerations, string(tolerationsJSON)))
+	// parse tolerations and add to values, the default tolerations are defined in var defaultTolerationsForInstallation
+	o.TolerationsRaw = append(o.TolerationsRaw, defaultTolerationsForInstallation)
+	tolerations, err := util.BuildTolerations(o.TolerationsRaw)
+	if err != nil {
+		return err
 	}
+	tolerationsJSON, err := json.Marshal(tolerations)
+	if err != nil {
+		return err
+	}
+	o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kTolerations, string(tolerationsJSON)))
 
 	// add helm repo
 	s := spinner.New(o.Out, spinnerMsg("Add and update repo "+types.KubeBlocksRepoName))

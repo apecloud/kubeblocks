@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlcomputil "github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -65,12 +65,12 @@ func needDoSwitchover(ctx context.Context,
 	case constant.KBSwitchoverCandidateInstanceForAnyPod:
 		return true, nil
 	default:
-		podList, err := componentutil.GetComponentPodList(ctx, cli, *cluster, componentSpec.Name)
+		podList, err := components.GetComponentPodList(ctx, cli, *cluster, componentSpec.Name)
 		if err != nil {
 			return false, err
 		}
-		podParent, _ := componentutil.ParseParentNameAndOrdinal(pod.Name)
-		siParent, o := componentutil.ParseParentNameAndOrdinal(switchover.InstanceName)
+		podParent, _ := components.ParseParentNameAndOrdinal(pod.Name)
+		siParent, o := components.ParseParentNameAndOrdinal(switchover.InstanceName)
 		if podParent != siParent || o < 0 || o >= int32(len(podList.Items)) {
 			return false, errors.New("switchover.InstanceName is invalid")
 		}
@@ -479,7 +479,7 @@ func getPrimaryOrLeaderPod(ctx context.Context, cli client.Client, cluster appsv
 		err     error
 		podList *corev1.PodList
 	)
-	compDef, err := componentutil.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
+	compDef, err := components.GetComponentDefByCluster(ctx, cli, cluster, compDefName)
 	if err != nil {
 		return nil, err
 	}
@@ -488,9 +488,9 @@ func getPrimaryOrLeaderPod(ctx context.Context, cli client.Client, cluster appsv
 	}
 	switch compDef.WorkloadType {
 	case appsv1alpha1.Replication:
-		podList, err = componentutil.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, constant.Primary)
+		podList, err = components.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, constant.Primary)
 	case appsv1alpha1.Consensus:
-		podList, err = componentutil.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, compDef.ConsensusSpec.Leader.Name)
+		podList, err = components.GetComponentPodListWithRole(ctx, cli, cluster, compSpecName, compDef.ConsensusSpec.Leader.Name)
 	}
 	if err != nil {
 		return nil, err

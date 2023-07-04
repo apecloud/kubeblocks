@@ -28,6 +28,7 @@ import (
 	dataprotection "github.com/apecloud/kubeblocks/pkg/client/informers/externalversions/dataprotection"
 	extensions "github.com/apecloud/kubeblocks/pkg/client/informers/externalversions/extensions"
 	internalinterfaces "github.com/apecloud/kubeblocks/pkg/client/informers/externalversions/internalinterfaces"
+	storage "github.com/apecloud/kubeblocks/pkg/client/informers/externalversions/storage"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -248,6 +249,7 @@ type SharedInformerFactory interface {
 	Apps() apps.Interface
 	Dataprotection() dataprotection.Interface
 	Extensions() extensions.Interface
+	Storage() storage.Interface
 }
 
 func (f *sharedInformerFactory) Apps() apps.Interface {
@@ -260,4 +262,8 @@ func (f *sharedInformerFactory) Dataprotection() dataprotection.Interface {
 
 func (f *sharedInformerFactory) Extensions() extensions.Interface {
 	return extensions.New(f, f.namespace, f.tweakListOptions)
+}
+
+func (f *sharedInformerFactory) Storage() storage.Interface {
+	return storage.New(f, f.namespace, f.tweakListOptions)
 }

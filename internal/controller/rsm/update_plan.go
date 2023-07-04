@@ -90,11 +90,15 @@ func (p *realUpdatePlan) build() {
 	root := &model.ObjectVertex{}
 	p.dag.AddVertex(root)
 
+	if p.rsm.Spec.MemberUpdateStrategy == nil {
+		return
+	}
+
 	rolePriorityMap := composeRolePriorityMap(p.rsm)
 	sortPods(p.pods, rolePriorityMap, false)
 
 	// generate plan by MemberUpdateStrategy
-	switch p.rsm.Spec.MemberUpdateStrategy {
+	switch *p.rsm.Spec.MemberUpdateStrategy {
 	case workloads.SerialUpdateStrategy:
 		p.buildSerialUpdatePlan()
 	case workloads.ParallelUpdateStrategy:

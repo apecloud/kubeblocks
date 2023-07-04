@@ -142,7 +142,8 @@ var _ = Describe("update strategy transformer test.", func() {
 		It("should update all pods", func() {
 			transCtx.rsmOrig.Generation = 2
 			transCtx.rsmOrig.Status.ObservedGeneration = 2
-			rsm.Spec.MemberUpdateStrategy = workloads.SerialUpdateStrategy
+			strategy := workloads.SerialUpdateStrategy
+			rsm.Spec.MemberUpdateStrategy = &strategy
 			k8sMock.EXPECT().
 				Get(gomock.Any(), gomock.Any(), &apps.StatefulSet{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *apps.StatefulSet, _ ...client.GetOption) error {

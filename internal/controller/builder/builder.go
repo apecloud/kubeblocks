@@ -25,7 +25,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"strconv"
 	"strings"
 
@@ -42,6 +41,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -303,7 +303,7 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
 		return corev1.PersistentVolumeClaim{
 			ObjectMeta: vct.ObjectMeta,
-			Spec: vct.Spec,
+			Spec:       vct.Spec,
 		}
 	}
 
@@ -322,12 +322,12 @@ func BuildSts(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	}
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
-		Spec: *component.PodSpec,
+		Spec:       *component.PodSpec,
 	}
 	stsBuilder := NewStatefulSetBuilder(cluster.Namespace, cluster.Name+"-"+component.Name).
 		AddLabelsInMap(commonLabels).
 		AddMatchLabelsInMap(commonLabels).
-		SetServiceName(cluster.Name+"-"+component.Name+"-headless").
+		SetServiceName(cluster.Name + "-" + component.Name + "-headless").
 		SetReplicas(component.Replicas).
 		SetTemplate(template)
 
@@ -363,7 +363,7 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	vctToPVC := func(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {
 		return corev1.PersistentVolumeClaim{
 			ObjectMeta: vct.ObjectMeta,
-			Spec: vct.Spec,
+			Spec:       vct.Spec,
 		}
 	}
 
@@ -382,13 +382,13 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 	}
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
-		Spec: *component.PodSpec,
+		Spec:       *component.PodSpec,
 	}
 	name := fmt.Sprintf("%s-%s", cluster.Name, component.Name)
 	rsmBuilder := NewReplicatedStateMachineBuilder(cluster.Namespace, name).
 		AddLabelsInMap(commonLabels).
 		AddMatchLabelsInMap(commonLabels).
-		SetServiceName(name+"-headless").
+		SetServiceName(name + "-headless").
 		SetReplicas(component.Replicas).
 		SetTemplate(template)
 

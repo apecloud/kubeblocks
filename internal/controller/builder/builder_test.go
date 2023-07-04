@@ -386,18 +386,6 @@ var _ = Describe("builder", func() {
 			Expect(backupJob).ShouldNot(BeNil())
 		})
 
-		It("builds VolumeSnapshot correctly", func() {
-			sts := newStsObj()
-			snapshotKey := types.NamespacedName{
-				Namespace: "default",
-				Name:      "test-snapshot",
-			}
-			pvcName := "test-pvc-name"
-			vs, err := BuildVolumeSnapshot(snapshotKey, pvcName, sts)
-			Expect(err).Should(BeNil())
-			Expect(vs).ShouldNot(BeNil())
-		})
-
 		It("builds ConfigMap with template correctly", func() {
 			config := map[string]string{}
 			_, cluster, synthesizedComponent := newClusterObjs(nil)

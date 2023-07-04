@@ -24,12 +24,10 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -103,30 +101,6 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 			}
 			return nil
 		}
-		cleanCronJobs := func() error {
-			for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
-				for _, vct := range stsObj.Spec.VolumeClaimTemplates {
-					pvcKey := types.NamespacedName{
-						Namespace: key.Namespace,
-						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
-					}
-					// delete deletion cronjob if exists
-					cronJobKey := pvcKey
-					cronJobKey.Name = "delete-pvc-" + pvcKey.Name
-					cronJob := &batchv1.CronJob{}
-					if err := transCtx.Client.Get(transCtx.Context, cronJobKey, cronJob); err != nil {
-						return client.IgnoreNotFound(err)
-					}
-					v := &lifecycleVertex{
-						obj:    cronJob,
-						action: actionPtr(DELETE),
-					}
-					dag.AddVertex(v)
-					dag.Connect(vertex, v)
-				}
-			}
-			return nil
-		}
 
 		checkAllPVCsExist := func() (bool, error) {
 			for i := *stsObj.Spec.Replicas; i < *stsProto.Spec.Replicas; i++ {
@@ -189,9 +163,6 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 		}
 
 		scaleOut := func() error {
-			if err := cleanCronJobs(); err != nil {
-				return err
-			}
 			allPVCsExist, err := checkAllPVCsExist()
 			if err != nil {
 				return err
@@ -243,10 +214,14 @@ func (t *StsHorizontalScalingTransformer) Transform(ctx graph.TransformContext, 
 						Namespace: key.Namespace,
 						Name:      fmt.Sprintf("%s-%s-%d", vct.Name, stsObj.Name, i),
 					}
-					// create cronjob to delete pvc after 30 minutes
-					if err := checkedCreateDeletePVCCronJob(transCtx.Client, reqCtx, pvcKey, stsObj, cluster, dag, rootVertex); err != nil {
+					// delete pvcs
+					pvc := corev1.PersistentVolumeClaim{}
+					if err := transCtx.Client.Get(reqCtx.Ctx, pvcKey, &pvc); err != nil {
 						return err
 					}
+					pvcVertex := &lifecycleVertex{obj: &pvc, action: actionPtr(DELETE)}
+					dag.AddVertex(pvcVertex)
+					dag.Connect(rootVertex, pvcVertex)
 				}
 			}
 			return nil
@@ -495,46 +470,6 @@ func doBackup(reqCtx intctrlutil.RequestCtx,
 		break
 	}
 	return nil
-}
-
-// TODO: handle unfinished jobs from previous scale in
-func checkedCreateDeletePVCCronJob(cli roclient.ReadonlyClient,
-	reqCtx intctrlutil.RequestCtx,
-	pvcKey types.NamespacedName,
-	stsObj *appsv1.StatefulSet,
-	cluster *appsv1alpha1.Cluster,
-	dag *graph.DAG,
-	root graph.Vertex) error {
-	ctx := reqCtx.Ctx
-	now := time.Now()
-	// hack: delete after 30 minutes
-	t := now.Add(30 * 60 * time.Second)
-	schedule := timeToSchedule(t)
-	cronJob, err := builder.BuildCronJob(pvcKey, schedule, stsObj)
-	if err != nil {
-		return err
-	}
-	job := &batchv1.CronJob{}
-	if err := cli.Get(ctx, client.ObjectKeyFromObject(cronJob), job); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return err
-		}
-		vertex := &lifecycleVertex{obj: cronJob, action: actionPtr(CREATE)}
-		dag.AddVertex(vertex)
-		dag.Connect(root, vertex)
-		reqCtx.Eventf(cluster,
-			corev1.EventTypeNormal,
-			"CronJobCreate",
-			"create cronjob to delete pvc/%s",
-			pvcKey.Name)
-	}
-
-	return nil
-}
-
-func timeToSchedule(t time.Time) string {
-	utc := t.UTC()
-	return fmt.Sprintf("%d %d %d %d *", utc.Minute(), utc.Hour(), utc.Day(), utc.Month())
 }
 
 // check volume snapshot available

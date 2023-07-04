@@ -7,7 +7,7 @@ metadata:
 data:
   redis-post-start.sh: |
     #!/bin/sh
-    set -ex
+    set -e
     # Waiting for primary pod information from the DownwardAPI annotation to be available, with a maximum of 5 attempts
     attempt=1
     max_attempts=5
@@ -55,13 +55,13 @@ data:
     {{- .Files.Get "scripts/redis-sentinel-start.sh.tpl" | nindent 4 }}
   redis-sentinel-post-start.sh: |-
     #!/bin/sh
-    set -ex
+    set -e
     # set default user password and replication user password
     until redis-cli -h 127.0.0.1 -p 26379 -a $SENTINEL_PASSWORD ping; do sleep 1; done
     redis-cli -h 127.0.0.1 -p 26379 ACL SETUSER $SENTINEL_USER ON \>$SENTINEL_PASSWORD allchannels +@all
   redis-sentinel-ping.sh: |-
     #!/bin/sh
-    set -ex
+    set -e
     response=$(
           timeout -s 3 $1 \
           redis-cli \

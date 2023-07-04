@@ -8,7 +8,7 @@ data:
   init_container.sh: |
     #!/bin/bash
     set -o errexit
-    set -ex
+    set -e
     mkdir -p /home/postgres/pgdata/conf
     chmod +777 -R /home/postgres/pgdata/conf
     cp /home/postgres/conf/postgresql.conf /home/postgres/pgdata/conf
@@ -78,7 +78,7 @@ data:
   setup.sh: |
     #!/bin/bash
     set -o errexit
-    set -ex
+    set -e
 
     # Waiting for primary pod information from the DownwardAPI annotation to be available, with a maximum of 5 attempts
     attempt=1
@@ -127,7 +127,7 @@ data:
   pgbouncer_setup.sh: |
     #!/bin/bash
     set -o errexit
-    set -ex
+    set -e
     mkdir -p /opt/bitnami/pgbouncer/conf/ /opt/bitnami/pgbouncer/logs/ /opt/bitnami/pgbouncer/tmp/
     cp /home/pgbouncer/conf/pgbouncer.ini /opt/bitnami/pgbouncer/conf/
     echo "\"$POSTGRESQL_USERNAME\" \"$POSTGRESQL_PASSWORD\"" > /opt/bitnami/pgbouncer/conf/userlist.txt

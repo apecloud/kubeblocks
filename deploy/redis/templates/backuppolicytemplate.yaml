@@ -15,8 +15,16 @@ spec:
       snapshot:
         enable: false
         cronExpression: "0 18 * * 0"
+      datafile:
+        enable: false
+        cronExpression: "0 18 * * 0"
     snapshot:
       target:
         connectionCredentialKey:
           passwordKey: password
           usernameKey: username
+    datafile:
+      backupToolName: redis-physical-backup-tool
+      backupsHistoryLimit: 7
+      target:
+        role: secondary

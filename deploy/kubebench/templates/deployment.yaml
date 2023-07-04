@@ -1,8 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kubebench.fullname" . }}
+  name: {{ include "kubebench.fullname" . }}-controller-manager
+  namespace: {{ .Release.Namespace }}
   labels:
+    control-plane: controller-manager
     {{- include "kubebench.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
@@ -10,7 +12,7 @@ spec:
   {{- end }}
   selector:
     matchLabels:
-      {{- include "kubebench.selectorLabels" . | nindent 6 }}
+      control-plane: controller-manager
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -18,13 +20,14 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
+        control-plane: controller-manager
         {{- include "kubebench.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "kubebench.serviceAccountName" . }}
+      serviceAccountName: {{ include "kubebench.serviceAccountName" . }}-controller-manager
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -52,12 +55,8 @@ spec:
           - /manager
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository | default "docker.io" }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: {{ .Values.service.port }}
-              protocol: TCP
           livenessProbe:
             httpGet:
               path: /healthz

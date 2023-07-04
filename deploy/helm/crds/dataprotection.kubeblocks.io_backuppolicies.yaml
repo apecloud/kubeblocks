@@ -135,7 +135,6 @@ spec:
                         description: the name of PersistentVolumeClaim to store backup
                           data.
                         maxLength: 63
-                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                       persistentVolumeConfigMap:
                         description: 'persistentVolumeConfigMap references the configmap
@@ -337,7 +336,6 @@ spec:
                         description: the name of PersistentVolumeClaim to store backup
                           data.
                         maxLength: 63
-                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                       persistentVolumeConfigMap:
                         description: 'persistentVolumeConfigMap references the configmap

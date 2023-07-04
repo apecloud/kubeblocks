@@ -696,3 +696,7 @@ storageClass:
       fsType: xfs
     tke:
       volumeType: CLOUD_SSD
+
+
+rbac:
+  enabled: true

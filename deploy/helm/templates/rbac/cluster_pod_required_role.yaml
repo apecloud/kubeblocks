@@ -1,0 +1,32 @@
+# permissions for end users to edit clusters.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kubeblocks.fullname" . }}-cluster-pod-role
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+- apiGroups:
+  - "dataprotection.kubeblocks.io"
+  resources:
+  - backups/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - "dataprotection.kubeblocks.io"
+  resources:
+  - backups
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - patch

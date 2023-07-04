@@ -19,7 +19,16 @@ rules:
 {{- $doInclude := false }}
 {{- range $i, $line := .Files.Lines "config/rbac/role.yaml" }}
   {{- if eq $doInclude true }}
-{{- $line | nindent 2 }}
+    {{- $line | nindent 2 }}
   {{- end }}
   {{- if eq $line "rules:" }}{{- $doInclude = true }}{{- end }}
+{{- end }}
+{{- if eq .Values.rbac.enabled  true }}
+  {{- $doInclude := false }}
+  {{- range $i, $line := .Files.Lines "config/rbac/rbac_manager_role.yaml" }}
+    {{- if eq $doInclude true }}
+      {{- $line | nindent 2 }}
+    {{- end }}
+  {{- if eq $line "rules:" }}{{- $doInclude = true }}{{- end }}
+  {{- end }}
 {{- end }}

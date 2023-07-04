@@ -66,6 +66,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
+	github.com/stoewer/go-strcase v1.2.0
 	github.com/stretchr/testify v1.8.1
 	github.com/sykesm/zap-logfmt v0.0.4
 	github.com/valyala/fasthttp v1.41.0
@@ -317,7 +318,6 @@ require (
 	github.com/sony/gobreaker v0.4.2-0.20210216022020-dd874f9dd33b // indirect
 	github.com/spf13/afero v1.9.3 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
-	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
 	github.com/sylabs/sif/v2 v2.9.0 // indirect

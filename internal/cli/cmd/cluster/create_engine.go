@@ -92,8 +92,9 @@ func buildCreateEngineCmds(createOptions *create.CreateOptions) []*cobra.Command
 		util.CheckErr(err)
 
 		cmd := &cobra.Command{
-			Use:   strings.ToLower(e.String()) + " NAME",
-			Short: fmt.Sprintf("Create a %s cluster.", e),
+			Use:     strings.ToLower(e.String()) + " NAME",
+			Short:   fmt.Sprintf("Create a %s cluster.", e),
+			Example: buildEngineCreateExamples(e),
 			Run: func(cmd *cobra.Command, args []string) {
 				o.Args = args
 				cmdutil.CheckErr(o.CreateOptions.Complete())

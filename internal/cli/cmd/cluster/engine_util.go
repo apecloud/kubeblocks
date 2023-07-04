@@ -20,15 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"strings"
+
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 	"github.com/stoewer/go-strcase"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/kube-openapi/pkg/validation/spec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	utilcomp "k8s.io/kubectl/pkg/util/completion"
+	"k8s.io/kubectl/pkg/util/templates"
 	"sigs.k8s.io/yaml"
 
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
@@ -112,8 +114,20 @@ func registerFlagCompFunc(cmd *cobra.Command, f cmdutil.Factory) {
 }
 
 // buildEngineCreateExamples builds the creation examples for the specified engine type.
-func buildEngineCreateExamples(e cluster.EngineType, schema *spec.SchemaProps) string {
-	return ""
+func buildEngineCreateExamples(e cluster.EngineType) string {
+	exampleTpl := `
+	# Create a cluster with the default values
+	kbcli cluster create {{ .EngineType }}
+
+	# Create a cluster with the specified cpu, memory and storage
+	kbcli cluster create {{ .EngineType }} --cpu 1 --memory 2 --storage 10
+`
+
+	var builder strings.Builder
+	_ = util.PrintGoTemplate(&builder, exampleTpl, map[string]interface{}{
+		"EngineType": strings.ToLower(e.String()),
+	})
+	return templates.Examples(builder.String())
 }
 
 // getObjectsInfo gets the objects info from the manifests.

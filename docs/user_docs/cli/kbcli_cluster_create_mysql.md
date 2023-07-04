@@ -8,6 +8,16 @@ Create a MySQL cluster.
 kbcli cluster create mysql NAME [flags]
 ```
 
+### Examples
+
+```
+  # Create a cluster with the default values
+  kbcli cluster create mysql
+  
+  # Create a cluster with the specified cpu, memory and storage
+  kbcli cluster create mysql --cpu 1 --memory 2 --storage 10
+```
+
 ### Options
 
 ```
@@ -19,12 +29,12 @@ kbcli cluster create mysql NAME [flags]
       --mode string                  Cluster topology mode. Legal values [standalone, replication, raftGroup]. (default "standalone")
       --monitoring-interval int      The monitoring interval of cluster, 0 is disabled, the unit is second.
       --proxy-enabled                Enable proxy or not.
-      --publicly-accessible          Specify whether the cluster can be accessed from the public Internet.
+      --publicly-accessible          Specify whether the cluster can be accessed from the public internet.
       --replicas int                 The number of replicas. (default 1)
       --storage float                Storage size, the unit is Gi. (default 20)
       --tenancy string               The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")
       --termination-policy string    The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")
-      --version string               Cluster version, run "kbcli cv list --devel" to see all versions. (default "ac-mysql-8.0.30")
+      --version string               Cluster version.
 ```
 
 ### Options inherited from parent commands

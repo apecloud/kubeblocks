@@ -56,7 +56,7 @@ spec:
             - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
             - "--apps=true"
             - "--workloads=true"
-            - "--dataprotection=false"
+            - "--dataprotection={{- and .Values.dataProtection.enabled (not .Values.separatedDeployment) }}"
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}
@@ -176,7 +176,7 @@ spec:
             secretName: {{ include "kubeblocks.fullname" . }}.{{ .Release.Namespace }}.svc.tls-pair
         {{- end }}
 
-{{- if .Values.dataProtection.enabled }}
+{{- if and .Values.separatedDeployment .Values.dataProtection.enabled }}
 ---
 apiVersion: apps/v1
 kind: Deployment

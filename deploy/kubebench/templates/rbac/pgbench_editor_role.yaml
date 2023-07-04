@@ -1,0 +1,26 @@
+# permissions for end users to edit pgbenches.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kubebench.fullname" . }}-pgbench-editor-role
+  labels:
+    {{- include "kubebench.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - benchmark.kubebench.io
+  resources:
+  - pgbenches
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - benchmark.kubebench.io
+  resources:
+  - pgbenches/status
+  verbs:
+  - get

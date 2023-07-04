@@ -1,0 +1,87 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kubebench.fullname" . }}-manager-role
+rules:
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - benchmark.kubebench.io
+  resources:
+  - pgbenches
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - benchmark.kubebench.io
+  resources:
+  - pgbenches/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - benchmark.kubebench.io
+  resources:
+  - pgbenches/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - benchmark.kubebench.io
+  resources:
+  - sysbenches
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - benchmark.kubebench.io
+  resources:
+  - sysbenches/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - benchmark.kubebench.io
+  resources:
+  - sysbenches/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - delete
+  - deletecollection
+  - get
+  - list
+- apiGroups:
+  - ""
+  resources:
+  - pods/log
+  verbs:
+  - get
+  - list

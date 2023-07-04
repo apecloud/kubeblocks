@@ -1,0 +1,22 @@
+# permissions for end users to view pgbenches.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kubebench.fullname" . }}-pgbench-viewer-role
+  labels:
+    {{- include "kubebench.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - benchmark.kubebench.io
+  resources:
+  - pgbenches
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - benchmark.kubebench.io
+  resources:
+  - pgbenches/status
+  verbs:
+  - get

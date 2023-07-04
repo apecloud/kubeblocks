@@ -85,6 +85,10 @@ spec:
             - name: ENABLE_WEBHOOKS
               value: "true"
             {{- end }}
+            {{- if .Values.rbac.enabled }}
+            - name: ENABLE_RBAC_MANAGER
+              value: "true"
+            {{- end }}
             {{- if ( include "kubeblocks.addonControllerEnabled" . ) | deepEqual "false" }}
             - name: DISABLE_ADDON_CTRLER
               value: "true"

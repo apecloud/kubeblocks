@@ -22,6 +22,7 @@ package apps
 import (
 	"fmt"
 
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -35,11 +36,13 @@ import (
 // RBACTransformer puts the rbac at the beginning of the DAG
 type RBACTransformer struct{}
 
-const PGTYPE = "postgresql"
-
 var _ graph.Transformer = &RBACTransformer{}
 
 func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	if !viper.GetBool("ENABLE_RBAC_MANAGER") {
+		return nil
+	}
+
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
 	if cluster.IsDeleting() {

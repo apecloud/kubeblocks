@@ -27,17 +27,11 @@ import (
 	"strings"
 
 	"github.com/containerd/stargz-snapshotter/estargz/errorutil"
+	tablePrinter "github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/maps"
-
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	"github.com/apecloud/kubeblocks/internal/cli/printer"
-	"github.com/apecloud/kubeblocks/internal/cli/types"
-	"github.com/apecloud/kubeblocks/internal/cli/util"
-	"github.com/apecloud/kubeblocks/internal/constant"
-
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,8 +44,11 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	metrics "k8s.io/metrics/pkg/client/clientset/versioned"
 
-	tablePrinter "github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jedib0t/go-pretty/v6/text"
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
+	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
@@ -193,12 +190,12 @@ func (o *statusOptions) run() error {
 func (o *statusOptions) buildSelectorList(ctx context.Context, allErrs *[]error) {
 	addons := make([]*extensionsv1alpha1.Addon, 0)
 	objs, err := o.dynamic.Resource(types.AddonGVR()).List(ctx, metav1.ListOptions{})
-	appendErrIgnoreNotFound(allErrs, err)
+	util.AppendErrIgnoreNotFound(allErrs, err)
 	if objs != nil {
 		for _, obj := range objs.Items {
 			addon := &extensionsv1alpha1.Addon{}
 			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, addon); err != nil {
-				appendErrIgnoreNotFound(allErrs, err)
+				util.AppendErrIgnoreNotFound(allErrs, err)
 				continue
 			}
 			addons = append(addons, addon)
@@ -263,7 +260,7 @@ func (o *statusOptions) showKubeBlocksResources(ctx context.Context, allErrs *[]
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("KIND", "NAME")
 
-	unstructuredList := listResourceByGVR(ctx, o.dynamic, metav1.NamespaceAll, kubeBlocksGlobalCustomResources, o.selectorList, allErrs)
+	unstructuredList := util.ListResourceByGVR(ctx, o.dynamic, metav1.NamespaceAll, kubeBlocksGlobalCustomResources, o.selectorList, allErrs)
 	for _, resourceList := range unstructuredList {
 		for _, resource := range resourceList.Items {
 			tblPrinter.AddRow(resource.GetKind(), resource.GetName())
@@ -276,7 +273,7 @@ func (o *statusOptions) showKubeBlocksConfig(ctx context.Context, allErrs *[]err
 	fmt.Fprintln(o.Out, "\nKubeBlocks Configurations:")
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME")
-	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksConfigurations, o.selectorList, allErrs)
+	unstructuredList := util.ListResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksConfigurations, o.selectorList, allErrs)
 	for _, resourceList := range unstructuredList {
 		for _, resource := range resourceList.Items {
 			tblPrinter.AddRow(resource.GetNamespace(), resource.GetKind(), resource.GetName())
@@ -289,7 +286,7 @@ func (o *statusOptions) showKubeBlocksRBAC(ctx context.Context, allErrs *[]error
 	fmt.Fprintln(o.Out, "\nKubeBlocks Global RBAC:")
 	tblPrinter := printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("KIND", "NAME")
-	unstructuredList := listResourceByGVR(ctx, o.dynamic, metav1.NamespaceAll, kubeBlocksClusterRBAC, o.selectorList, allErrs)
+	unstructuredList := util.ListResourceByGVR(ctx, o.dynamic, metav1.NamespaceAll, kubeBlocksClusterRBAC, o.selectorList, allErrs)
 	for _, resourceList := range unstructuredList {
 		for _, resource := range resourceList.Items {
 			tblPrinter.AddRow(resource.GetKind(), resource.GetName())
@@ -301,7 +298,7 @@ func (o *statusOptions) showKubeBlocksRBAC(ctx context.Context, allErrs *[]error
 	fmt.Fprintln(o.Out, "\nKubeBlocks Namespaced RBAC:")
 	tblPrinter = printer.NewTablePrinter(o.Out)
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME")
-	unstructuredList = listResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksNamespacedRBAC, o.selectorList, allErrs)
+	unstructuredList = util.ListResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksNamespacedRBAC, o.selectorList, allErrs)
 	for _, resourceList := range unstructuredList {
 		for _, resource := range resourceList.Items {
 			tblPrinter.AddRow(resource.GetNamespace(), resource.GetKind(), resource.GetName())
@@ -320,13 +317,13 @@ func (o *statusOptions) showKubeBlocksStorage(ctx context.Context, allErrs *[]er
 		pvc := &corev1.PersistentVolumeClaim{}
 		err := runtime.DefaultUnstructuredConverter.FromUnstructured(raw.Object, pvc)
 		if err != nil {
-			appendErrIgnoreNotFound(allErrs, err)
+			util.AppendErrIgnoreNotFound(allErrs, err)
 			return
 		}
 		tblPrinter.AddRow(pvc.GetNamespace(), pvc.Kind, pvc.GetName(), pvc.Status.Capacity.Storage())
 	}
 
-	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksStorages, o.selectorList, allErrs)
+	unstructuredList := util.ListResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksStorages, o.selectorList, allErrs)
 	for _, resourceList := range unstructuredList {
 		for _, resource := range resourceList.Items {
 			switch resource.GetKind() {
@@ -334,7 +331,7 @@ func (o *statusOptions) showKubeBlocksStorage(ctx context.Context, allErrs *[]er
 				renderPVC(&resource)
 			default:
 				err := fmt.Errorf("unsupported resources: %s", resource.GetKind())
-				appendErrIgnoreNotFound(allErrs, err)
+				util.AppendErrIgnoreNotFound(allErrs, err)
 			}
 		}
 	}
@@ -357,7 +354,7 @@ func (o *statusOptions) showHelmResources(ctx context.Context, allErrs *[]error)
 	}
 	// label selector 'owner=helm,name in (kubeblocks,kb-addon-mongodb,kb-addon-redis...)'
 	selectors := []metav1.ListOptions{{LabelSelector: helmLabel(helmReleaseList)}}
-	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, helmConfigurations, selectors, allErrs)
+	unstructuredList := util.ListResourceByGVR(ctx, o.dynamic, o.ns, helmConfigurations, selectors, allErrs)
 	for _, resourceList := range unstructuredList {
 		for _, resource := range resourceList.Items {
 			deployedStatus := resource.GetLabels()["status"]
@@ -404,7 +401,7 @@ func (o *statusOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
 
 	tblPrinter.SetHeader("NAMESPACE", "KIND", "NAME", "READY PODS", "CPU(cores)", "MEMORY(bytes)", "CREATED-AT")
 
-	unstructuredList := listResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksWorkloads, o.selectorList, allErrs)
+	unstructuredList := util.ListResourceByGVR(ctx, o.dynamic, o.ns, kubeBlocksWorkloads, o.selectorList, allErrs)
 
 	cpuMap, memMap, readyMap := computeMetricByWorkloads(ctx, o.ns, unstructuredList, o.mc, allErrs)
 
@@ -422,7 +419,7 @@ func (o *statusOptions) showWorkloads(ctx context.Context, allErrs *[]error) {
 func (o *statusOptions) showK8sClusterInfos(ctx context.Context, allErrs *[]error) {
 	version, err := util.GetVersionInfo(o.client)
 	if err != nil {
-		appendErrIgnoreNotFound(allErrs, err)
+		util.AppendErrIgnoreNotFound(allErrs, err)
 	}
 	if o.ns != "" {
 		fmt.Fprintf(o.Out, "KubeBlocks is deployed in namespace: %s", o.ns)
@@ -445,7 +442,7 @@ func (o *statusOptions) showK8sClusterInfos(ctx context.Context, allErrs *[]erro
 	tblPrinter.SetHeader("VERSION", "PROVIDER", "REGION", "AVAILABLE ZONES")
 	nodesList, err := o.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
-		appendErrIgnoreNotFound(allErrs, err)
+		util.AppendErrIgnoreNotFound(allErrs, err)
 	}
 	if nodesList == nil {
 		tblPrinter.AddRow(version.Kubernetes, provider, "", "")
@@ -561,32 +558,9 @@ func computeMetricByWorkloads(ctx context.Context, ns string, workloads []*unstr
 				err = fmt.Errorf("unsupported workload kind: %s, name: %s", resource.GetKind(), resource.GetName())
 			}
 			if err != nil {
-				appendErrIgnoreNotFound(allErrs, err)
+				util.AppendErrIgnoreNotFound(allErrs, err)
 			}
 		}
 	}
 	return cpuMetricMap, memMetricMap, readyMap
-}
-
-func listResourceByGVR(ctx context.Context, client dynamic.Interface, namespace string, gvrs []schema.GroupVersionResource, selector []metav1.ListOptions, allErrs *[]error) []*unstructured.UnstructuredList {
-	unstructuredList := make([]*unstructured.UnstructuredList, 0)
-	for _, gvr := range gvrs {
-		for _, labelSelector := range selector {
-			klog.V(1).Infof("listResourceByGVR: namespace=%s, gvr=%v, selector=%v", namespace, gvr, labelSelector)
-			resource, err := client.Resource(gvr).Namespace(namespace).List(ctx, labelSelector)
-			if err != nil {
-				appendErrIgnoreNotFound(allErrs, err)
-				continue
-			}
-			unstructuredList = append(unstructuredList, resource)
-		}
-	}
-	return unstructuredList
-}
-
-func appendErrIgnoreNotFound(allErrs *[]error, err error) {
-	if err == nil || apierrors.IsNotFound(err) {
-		return
-	}
-	*allErrs = append(*allErrs, err)
 }

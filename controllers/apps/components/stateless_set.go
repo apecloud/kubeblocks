@@ -50,14 +50,10 @@ type Stateless struct {
 var _ ComponentSet = &Stateless{}
 
 func (stateless *Stateless) getReplicas() int32 {
-	if stateless.Component != nil {
-		return stateless.Component.GetReplicas()
+	if stateless.SynthesizedComponent != nil {
+		return stateless.SynthesizedComponent.Replicas
 	}
 	return stateless.ComponentSpec.Replicas
-}
-
-func (stateless *Stateless) SetComponent(comp Component) {
-	stateless.Component = comp
 }
 
 func (stateless *Stateless) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
@@ -129,21 +125,17 @@ func (stateless *Stateless) HandleRoleChange(context.Context, client.Object) ([]
 	return nil, nil
 }
 
-func (stateless *Stateless) HandleHA(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	return nil, nil
-}
-
 func newStateless(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	spec *appsv1alpha1.ClusterComponentSpec,
 	def appsv1alpha1.ClusterComponentDefinition) *Stateless {
 	return &Stateless{
 		ComponentSetBase: ComponentSetBase{
-			Cli:           cli,
-			Cluster:       cluster,
-			ComponentSpec: spec,
-			ComponentDef:  &def,
-			Component:     nil,
+			Cli:                  cli,
+			Cluster:              cluster,
+			SynthesizedComponent: nil,
+			ComponentSpec:        spec,
+			ComponentDef:         &def,
 		},
 	}
 }

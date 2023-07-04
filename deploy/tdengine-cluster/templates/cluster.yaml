@@ -1,0 +1,41 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ include "clustername" . }}
+  labels: {{ include "tdengine-cluster.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: tdengine
+  clusterVersionRef: tdengine-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  terminationPolicy: {{ .Values.terminationPolicy }}
+  affinity:
+    {{- with .Values.topologyKeys }}
+    topologyKeys: {{ . | toYaml | nindent 6 }}
+    {{- end }}
+  {{- with $.Values.tolerations }}
+  tolerations: {{ . | toYaml | nindent 4 }}
+  {{- end }}
+  componentSpecs:
+    - name: tdengine
+      componentDefRef: tdengine
+      monitor: {{ .Values.monitor.enabled | default false }}
+      replicas: {{ .Values.replicaCount | default 3 }}
+      serviceAccountName: {{ include "tdengine-cluster.serviceAccountName" . }}
+      {{- with  .Values.resources }}
+      resources:
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.persistence.data.size }}
+      {{- end }}

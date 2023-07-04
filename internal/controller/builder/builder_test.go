@@ -22,16 +22,16 @@ package builder
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/resource"
+	"github.com/spf13/viper"
 
 	"github.com/leaanthony/debme"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -374,55 +374,6 @@ var _ = Describe("builder", func() {
 			}
 		})
 
-		It("builds Env Config with Replication component correctly", func() {
-			var cfg *corev1.ConfigMap
-			var err error
-
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			synthesizedComponent.WorkloadType = appsv1alpha1.Replication
-
-			checkEnvValues := func() {
-				cfg, err = BuildEnvConfig(cluster, synthesizedComponent)
-				Expect(err).Should(BeNil())
-				Expect(cfg).ShouldNot(BeNil())
-				toCheckKeys := append(requiredKeys, []string{
-					"KB_PRIMARY_POD_NAME",
-				}...)
-				for _, k := range toCheckKeys {
-					_, ok := cfg.Data[k]
-					Expect(ok).Should(BeTrue())
-				}
-				Expect(cfg.Data["KB_REPLICA_COUNT"]).
-					Should(Equal(strconv.Itoa(int(synthesizedComponent.Replicas))))
-				stsName := fmt.Sprintf("%s-%s", cluster.Name, synthesizedComponent.Name)
-				svcName := fmt.Sprintf("%s-headless", stsName)
-				By("Checking KB_PRIMARY_POD_NAME value be right")
-				Expect(cfg.Data["KB_PRIMARY_POD_NAME"]).
-					Should(Equal(stsName + "-" + strconv.Itoa(int(synthesizedComponent.GetPrimaryIndex())) + "." + svcName))
-				for i := 0; i < int(synthesizedComponent.Replicas); i++ {
-					if i == 0 {
-						By("Checking the 1st replica's hostname should not have suffix '-0'")
-						Expect(cfg.Data["KB_"+strconv.Itoa(i)+"_HOSTNAME"]).
-							Should(Equal(stsName + "-" + strconv.Itoa(0) + "." + svcName))
-					} else {
-						Expect(cfg.Data["KB_"+strconv.Itoa(i)+"_HOSTNAME"]).
-							Should(Equal(stsName + "-" + strconv.Itoa(int(synthesizedComponent.GetPrimaryIndex())) + "." + svcName))
-					}
-				}
-			}
-
-			By("Checking env values with primaryIndex=0 ")
-			var mockPrimaryIndex = int32(testapps.DefaultReplicationPrimaryIndex)
-			synthesizedComponent.PrimaryIndex = &mockPrimaryIndex
-			checkEnvValues()
-
-			By("Checking env values with primaryIndex=1 ")
-			synthesizedComponent.Replicas = 2
-			var newPrimaryIndex = int32(1)
-			synthesizedComponent.PrimaryIndex = &newPrimaryIndex
-			checkEnvValues()
-		})
-
 		It("builds BackupJob correctly", func() {
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
 			backupJobKey := types.NamespacedName{
@@ -583,6 +534,71 @@ var _ = Describe("builder", func() {
 			job, err := BuildRestoreJobForFullBackup(restoreJobKey.Name, &component, &backup, &backupTool, podName)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(job).ShouldNot(BeNil())
+		})
+
+		It("builds backup manifests job correctly", func() {
+			backup := &dataprotectionv1alpha1.Backup{}
+			podSpec := &corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Command: []string{"sh"},
+					},
+				},
+			}
+			key := types.NamespacedName{Name: "backup", Namespace: "default"}
+			job, err := BuildBackupManifestsJob(key, backup, podSpec)
+			Expect(err).Should(BeNil())
+			Expect(job).ShouldNot(BeNil())
+			Expect(job.Name).Should(Equal(key.Name))
+		})
+
+		It("builds restore job correctly", func() {
+			key := types.NamespacedName{Name: "restore", Namespace: "default"}
+			volumes := []corev1.Volume{}
+			volumeMounts := []corev1.VolumeMount{}
+			env := []corev1.EnvVar{}
+			job, err := BuildRestoreJob(key.Name, key.Namespace, "", []string{"sh"}, volumes, volumeMounts, env, nil)
+			Expect(err).Should(BeNil())
+			Expect(job).ShouldNot(BeNil())
+			Expect(job.Name).Should(Equal(key.Name))
+		})
+
+		It("builds volume snapshot class correctly", func() {
+			className := "vsc-test"
+			driverName := "csi-driver-test"
+			obj, err := BuildVolumeSnapshotClass(className, driverName)
+			Expect(err).Should(BeNil())
+			Expect(obj).ShouldNot(BeNil())
+			Expect(obj.Name).Should(Equal(className))
+			Expect(obj.Driver).Should(Equal(driverName))
+		})
+
+		It("builds headless svc correctly", func() {
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			expectSvcName := fmt.Sprintf("%s-%s-headless", cluster.Name, synthesizedComponent.Name)
+			obj, err := BuildHeadlessSvc(cluster, synthesizedComponent)
+			Expect(err).Should(BeNil())
+			Expect(obj).ShouldNot(BeNil())
+			Expect(obj.Name).Should(Equal(expectSvcName))
+		})
+
+		It("builds cfg manager tools  correctly", func() {
+			_, cluster, synthesizedComponent := newClusterObjs(nil)
+			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
+				ManagerName:               constant.ConfigSidecarName,
+				SecreteName:               component.GenerateConnCredential(cluster.Name),
+				EnvConfigName:             component.GenerateComponentEnvName(cluster.Name, synthesizedComponent.Name),
+				Image:                     viper.GetString(constant.KBToolsImage),
+				Cluster:                   cluster,
+				ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
+			}
+			toolContainers := []appsv1alpha1.ToolConfig{
+				{Name: "test-tool", Image: "test-image", Command: []string{"sh"}},
+			}
+
+			obj, err := BuildCfgManagerToolsContainer(cfgManagerParams, synthesizedComponent, toolContainers)
+			Expect(err).Should(BeNil())
+			Expect(obj).ShouldNot(BeEmpty())
 		})
 	})
 

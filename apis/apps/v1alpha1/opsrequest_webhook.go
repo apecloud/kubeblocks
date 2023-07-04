@@ -41,7 +41,7 @@ import (
 
 // log is for logging in this package.
 var (
-	opsrequestlog           = logf.Log.WithName("opsrequest-resource")
+	opsRequestLog           = logf.Log.WithName("opsrequest-resource")
 	opsRequestAnnotationKey = "kubeblocks.io/ops-request"
 	// OpsRequestBehaviourMapper records the opsRequest behaviour according to the OpsType.
 	OpsRequestBehaviourMapper = map[OpsType]OpsRequestBehaviour{}
@@ -60,13 +60,13 @@ var _ webhook.Validator = &OpsRequest{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateCreate() error {
-	opsrequestlog.Info("validate create", "name", r.Name)
+	opsRequestLog.Info("validate create", "name", r.Name)
 	return r.validateEntry(true)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
-	opsrequestlog.Info("validate update", "name", r.Name)
+	opsRequestLog.Info("validate update", "name", r.Name)
 	lastOpsRequest := old.(*OpsRequest).DeepCopy()
 	// if no spec updated, we should skip validation.
 	// if not, we can not delete the OpsRequest when cluster has been deleted.
@@ -89,7 +89,7 @@ func (r *OpsRequest) ValidateUpdate(old runtime.Object) error {
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *OpsRequest) ValidateDelete() error {
-	opsrequestlog.Info("validate delete", "name", r.Name)
+	opsRequestLog.Info("validate delete", "name", r.Name)
 	return nil
 }
 
@@ -197,6 +197,8 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 		return r.validateRestart(cluster)
 	case ReconfiguringType:
 		return r.validateReconfigure(cluster)
+	case SwitchoverType:
+		return r.validateSwitchover(ctx, k8sClient, cluster)
 	}
 	return nil
 }
@@ -323,6 +325,30 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 		return fmt.Errorf("existing other VolumeExpansion OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", runningOpsList[0].Name, cluster.Name)
 	}
 	return r.checkVolumesAllowExpansion(ctx, cli, cluster)
+}
+
+// validateSwitchover validates switchover api when spec.type is Switchover.
+func (r *OpsRequest) validateSwitchover(ctx context.Context, cli client.Client, cluster *Cluster) error {
+	switchoverList := r.Spec.SwitchoverList
+	if len(switchoverList) == 0 {
+		return notEmptyError("spec.switchover")
+	}
+	componentNames := make([]string, len(switchoverList))
+	for i, v := range switchoverList {
+		componentNames[i] = v.ComponentName
+
+	}
+	if err := r.checkComponentExistence(cluster, componentNames); err != nil {
+		return err
+	}
+	runningOpsList, err := GetRunningOpsByOpsType(ctx, cli, r.Spec.ClusterRef, r.Namespace, string(SwitchoverType))
+	if err != nil {
+		return err
+	}
+	if len(runningOpsList) > 0 && runningOpsList[0].Name != r.Name {
+		return fmt.Errorf("existing other Switchover OpsRequest: %s is running in Cluster: %s, handle this OpsRequest first", runningOpsList[0].Name, cluster.Name)
+	}
+	return validateSwitchoverResourceList(ctx, cli, cluster, switchoverList)
 }
 
 // checkComponentExistence checks whether components to be operated exist in cluster spec.
@@ -518,4 +544,70 @@ func GetRunningOpsByOpsType(ctx context.Context, cli client.Client,
 		}
 	}
 	return runningOpsList, nil
+}
+
+// getComponentDefByCluster gets component from ClusterDefinition with compDefName
+func getComponentDefByCluster(ctx context.Context, cli client.Client, cluster Cluster,
+	compDefName string) (*ClusterComponentDefinition, error) {
+	clusterDef := &ClusterDefinition{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
+		return nil, err
+	}
+	for _, component := range clusterDef.Spec.ComponentDefs {
+		if component.Name == compDefName {
+			return &component, nil
+		}
+	}
+	return nil, nil
+}
+
+// validateSwitchoverResourceList checks if switchover resourceList is legal.
+func validateSwitchoverResourceList(ctx context.Context, cli client.Client, cluster *Cluster, switchoverList []Switchover) error {
+	for _, switchover := range switchoverList {
+		if switchover.InstanceName == "" {
+			return notEmptyError("switchover.instanceName")
+		}
+
+		// check clusterComponentDefinition whether support switchover
+		compDefObj, err := getComponentDefByCluster(ctx, cli, *cluster, cluster.Spec.GetComponentDefRefName(switchover.ComponentName))
+		if err != nil {
+			return err
+		}
+		if compDefObj == nil {
+			return fmt.Errorf("this cluster component %s is invalid", switchover.ComponentName)
+		}
+		if compDefObj.SwitchoverSpec == nil {
+			return fmt.Errorf("this cluster component %s does not support switchover", switchover.ComponentName)
+		}
+		switch switchover.InstanceName {
+		case constant.KBSwitchoverCandidateInstanceForAnyPod:
+			if compDefObj.SwitchoverSpec.WithoutCandidate == nil {
+				return fmt.Errorf("this cluster component %s does not support promote without specifying an instance. Please specify a specific instance for the promotion", switchover.ComponentName)
+			}
+		default:
+			if compDefObj.SwitchoverSpec.WithCandidate == nil {
+				return fmt.Errorf("this cluster component %s does not support specifying an instance for promote. If you want to perform a promote operation, please do not specify an instance", switchover.ComponentName)
+			}
+		}
+
+		// check switchover.InstanceName whether exist and role label is correct
+		if switchover.InstanceName == constant.KBSwitchoverCandidateInstanceForAnyPod {
+			return nil
+		}
+		pod := &corev1.Pod{}
+		if err := cli.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: switchover.InstanceName}, pod); err != nil {
+			return fmt.Errorf("get instanceName %s failed, err: %s, and check the validity of the instanceName using \"kbcli cluster list-instances\"", switchover.InstanceName, err.Error())
+		}
+		v, ok := pod.Labels[constant.RoleLabelKey]
+		if !ok || v == "" {
+			return fmt.Errorf("instanceName %s cannot be promoted because it had a invalid role label", switchover.InstanceName)
+		}
+		if v == constant.Primary || v == constant.Leader {
+			return fmt.Errorf("instanceName %s cannot be promoted because it is already the primary or leader instance", switchover.InstanceName)
+		}
+		if !strings.HasPrefix(pod.Name, fmt.Sprintf("%s-%s", cluster.Name, switchover.ComponentName)) {
+			return fmt.Errorf("instanceName %s does not belong to the current component, please check the validity of the instance using \"kbcli cluster list-instances\"", switchover.InstanceName)
+		}
+	}
+	return nil
 }

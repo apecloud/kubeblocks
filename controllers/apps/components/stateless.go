@@ -50,18 +50,17 @@ func NewStatelessComponent(cli client.Client,
 			Component:      synthesizedComponent,
 			ComponentSet: &Stateless{
 				ComponentSetBase: ComponentSetBase{
-					Cli:           cli,
-					Cluster:       cluster,
-					ComponentSpec: nil,
-					ComponentDef:  nil,
-					Component:     nil,
+					Cli:                  cli,
+					Cluster:              cluster,
+					SynthesizedComponent: synthesizedComponent,
+					ComponentSpec:        nil,
+					ComponentDef:         nil,
 				},
 			},
 			Dag:            dag,
 			WorkloadVertex: nil,
 		},
 	}
-	comp.ComponentSet.SetComponent(comp)
 	return comp
 }
 

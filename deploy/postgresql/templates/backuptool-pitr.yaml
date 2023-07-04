@@ -28,12 +28,16 @@ spec:
   image: ""
   logical:
     restoreCommands:
+      - sh
+      - -c
       - |
         set -e;
         rm -f ${CONF_DIR}/recovery.conf;
         rm -rf ${PITR_DIR};
   physical:
     restoreCommands:
+      - sh
+      - -c
       - |
         set -e;
         if [ -d ${DATA_DIR}.old ]; then echo "${DATA_DIR}.old directory already exists, skip restore."; exit 0; fi
@@ -61,6 +65,8 @@ spec:
         echo "done.";
         sync;
   backupCommands:
+    - sh
+    - -c
     - |
       set -e;
       EXPIRED_INCR_LOG=${BACKUP_DIR}/$(date -d"7 day ago" +%Y%m%d);

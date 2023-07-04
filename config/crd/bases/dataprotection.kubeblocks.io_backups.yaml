@@ -24,6 +24,9 @@ spec:
     - jsonPath: .status.phase
       name: STATUS
       type: string
+    - jsonPath: .status.sourceCluster
+      name: SOURCE-CLUSTER
+      type: string
     - jsonPath: .status.totalSize
       name: TOTAL-SIZE
       type: string
@@ -58,6 +61,7 @@ spec:
             properties:
               backupPolicyName:
                 description: Which backupPolicy is applied to perform this backup
+                maxLength: 63
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               backupType:
@@ -79,6 +83,11 @@ spec:
           status:
             description: BackupStatus defines the observed state of Backup.
             properties:
+              availableReplicas:
+                description: availableReplicas available replicas for statefulSet
+                  which created by backup.
+                format: int32
+                type: integer
               backupToolName:
                 description: backupToolName references the backup tool name.
                 type: string
@@ -148,6 +157,10 @@ spec:
                         description: Backup upload total size. A string with capacity
                           units in the form of "1Gi", "1Mi", "1Ki".
                         type: string
+                      volumeName:
+                        description: volumeName records volume name of backup data
+                          pvc.
+                        type: string
                     type: object
                   target:
                     description: target records the target cluster metadata string,
@@ -172,8 +185,14 @@ spec:
                 enum:
                 - New
                 - InProgress
+                - Running
                 - Completed
                 - Failed
+                - Deleting
+                type: string
+              sourceCluster:
+                description: sourceCluster records the source cluster information
+                  for this backup.
                 type: string
               startTimestamp:
                 description: Date/time when the backup started being processed.

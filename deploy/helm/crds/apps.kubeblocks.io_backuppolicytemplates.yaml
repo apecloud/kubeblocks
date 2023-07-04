@@ -55,9 +55,10 @@ spec:
                   properties:
                     componentDefRef:
                       description: componentDefRef references componentDef defined
-                        in ClusterDefinition spec.
-                      maxLength: 63
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                        in ClusterDefinition spec. Need to comply with IANA Service
+                        Naming rule.
+                      maxLength: 22
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     datafile:
                       description: the policy for datafile backup.
@@ -89,11 +90,21 @@ spec:
                                 - pre
                                 - post
                                 type: string
+                              useTargetPodServiceAccount:
+                                description: useTargetPodServiceAccount defines whether
+                                  this job requires the service account of the backup
+                                  target pod. if true, will use the service account
+                                  of the backup target pod. otherwise, will use the
+                                  system service account.
+                                type: boolean
+                            required:
+                            - updateStage
                             type: object
                           type: array
                         backupToolName:
                           description: which backup tool to perform database backup,
                             only support one tool.
+                          maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         backupsHistoryLimit:
@@ -177,11 +188,21 @@ spec:
                                 - pre
                                 - post
                                 type: string
+                              useTargetPodServiceAccount:
+                                description: useTargetPodServiceAccount defines whether
+                                  this job requires the service account of the backup
+                                  target pod. if true, will use the service account
+                                  of the backup target pod. otherwise, will use the
+                                  system service account.
+                                type: boolean
+                            required:
+                            - updateStage
                             type: object
                           type: array
                         backupToolName:
                           description: which backup tool to perform database backup,
                             only support one tool.
+                          maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         backupsHistoryLimit:
@@ -322,6 +343,15 @@ spec:
                                 - pre
                                 - post
                                 type: string
+                              useTargetPodServiceAccount:
+                                description: useTargetPodServiceAccount defines whether
+                                  this job requires the service account of the backup
+                                  target pod. if true, will use the service account
+                                  of the backup target pod. otherwise, will use the
+                                  system service account.
+                                type: boolean
+                            required:
+                            - updateStage
                             type: object
                           type: array
                         backupsHistoryLimit:
@@ -408,6 +438,9 @@ spec:
                   this is an immutable attribute.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
+                x-kubernetes-validations:
+                - message: clusterDefinitionRef is immutable
+                  rule: self == oldSelf
               identifier:
                 description: Identifier is a unique identifier for this BackupPolicyTemplate.
                   this identifier will be the suffix of the automatically generated

@@ -25,7 +25,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"helm.sh/helm/v3/pkg/repo"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -116,7 +115,7 @@ func (o *InstallOptions) Upgrade() error {
 	s := spinner.New(o.Out, spinnerMsg("Add and update repo "+types.KubeBlocksChartName))
 	defer s.Fail()
 	// Add repo, if exists, will update it
-	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
+	if err = helm.AddRepo(newHelmRepoEntry()); err != nil {
 		return err
 	}
 	s.Success()
@@ -137,8 +136,6 @@ func (o *InstallOptions) Upgrade() error {
 
 	if !o.Quiet {
 		fmt.Fprintf(o.Out, "\nKubeBlocks has been upgraded %s SUCCESSFULLY!\n", msg)
-		// set monitor to true, so that we can print notes with monitor
-		o.Monitor = true
 		o.printNotes()
 	}
 	return nil

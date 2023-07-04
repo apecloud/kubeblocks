@@ -79,18 +79,9 @@ func (b *ComponentWorkloadBuilderBase) BuildConfig() ComponentWorkloadBuilder {
 			return nil, fmt.Errorf("build config but workload is nil, cluster: %s, component: %s",
 				b.Comp.GetClusterName(), b.Comp.GetName())
 		}
-
-		objs, err := plan.RenderConfigNScriptFiles(b.Comp.GetClusterVersion(), b.Comp.GetCluster(),
+		err := plan.RenderConfigNScriptFiles(b.Comp.GetClusterVersion(), b.Comp.GetCluster(),
 			b.Comp.GetSynthesizedComponent(), b.Workload, b.getRuntime(), b.LocalObjs, b.ReqCtx.Ctx, b.Client)
-		if err != nil {
-			return nil, err
-		}
-		for _, obj := range objs {
-			if cm, ok := obj.(*corev1.ConfigMap); ok {
-				b.LocalObjs = append(b.LocalObjs, cm)
-			}
-		}
-		return objs, nil
+		return nil, err
 	}
 	return b.BuildWrapper(buildfn)
 }

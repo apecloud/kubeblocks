@@ -30,7 +30,10 @@ component: {
 	compDefName:    string
 	workloadType:   string
 	replicas:       int
-	podSpec: containers: [...]
+	podSpec: {
+		containers: [...]
+		enableServiceLinks: bool | *false
+	}
 	volumeClaimTemplates: [...]
 }
 

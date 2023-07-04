@@ -9,6 +9,8 @@ terminationPolicy: Delete
 ##
 tolerations: []
 
+extraLabels: {}
+
 ## @param topologySpreadConstraints Topology Spread Constraints for pod assignment spread across your cluster among failure-domains. Evaluated as a template
 ## Ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/#spread-constraints-for-pods
 ##
@@ -28,7 +30,7 @@ server:
     #   memory: 512Mi
 
   persistence:
-    enabled: true
+    enabled: false
 
     ## If defined, storageClassName: <storageClass>
     ## If set to "-", storageClassName: "", which disables dynamic provisioning
@@ -54,7 +56,7 @@ alertmanager:
     #   memory: 512Mi
 
   persistence:
-    enabled: true
+    enabled: false
 
     ## If defined, storageClassName: <storageClass>
     ## If set to "-", storageClassName: "", which disables dynamic provisioning

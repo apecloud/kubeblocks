@@ -293,4 +293,3 @@ const (
 const (
 	FeatureGateReplicatedStateMachine = "ReplicatedStateMachine" // enable rsm
 )
-

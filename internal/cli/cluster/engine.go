@@ -192,7 +192,7 @@ func ValidateValues(schema *EngineSchema, values map[string]interface{}) error {
 		if err != nil {
 			// the default error message is like "cpu in body should be a multiple of 0.5"
 			// the "in body" is not necessary, so we remove it
-			errMsg := strings.Replace(err.Error(), " in body", "", -1)
+			errMsg := strings.ReplaceAll(err.Error(), " in body", "")
 			return errors.New(errMsg)
 		}
 		return nil

@@ -181,7 +181,9 @@ func buildProbeServiceContainer(component *SynthesizedComponent, container *core
 		}}
 
 	// pass the volume protection spec to probe container through env.
-	container.Env = append(container.Env, env4VolumeProtection(*component.VolumeProtection))
+	if component.VolumeProtection != nil {
+		container.Env = append(container.Env, env4VolumeProtection(*component.VolumeProtection))
+	}
 }
 
 func getComponentRoles(component *SynthesizedComponent) map[string]string {

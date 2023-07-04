@@ -98,7 +98,7 @@ var _ = Describe("backupconfig", func() {
 			"hostNetwork":       false,
 			"keepAddons":        false,
 		}
-		for _, key := range encryptedValues {
+		for _, key := range sensitiveValues {
 			sp := strings.Split(key, ".")
 			rootKey := sp[0]
 			if node, ok := values[rootKey]; ok {

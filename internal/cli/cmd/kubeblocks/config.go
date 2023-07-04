@@ -52,7 +52,7 @@ var keyWhiteList = []string{
 	"tolerations",
 }
 
-var encryptedValues = []string{
+var sensitiveValues = []string{
 	"cloudProvider.accessKey",
 	"cloudProvider.secretKey",
 }
@@ -166,8 +166,8 @@ func getHelmValues(release string, opt *Options) (map[string]interface{}, error)
 	for _, item := range list.Items {
 		delete(values, item.GetName())
 	}
-	// encrypted values
-	for _, key := range encryptedValues {
+	// encrypted the sensitive values
+	for _, key := range sensitiveValues {
 		sp := strings.Split(key, ".")
 		rootKey := sp[0]
 		if node, ok := values[rootKey]; ok {

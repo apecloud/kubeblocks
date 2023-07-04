@@ -40,25 +40,25 @@ const (
 	primaryPriority
 )
 
-// ReplicationSet is a component object used by Cluster, ClusterComponentDefinition and ClusterComponentSpec
-type ReplicationSet struct {
-	Stateful
+// replicationSet is a component object used by Cluster, ClusterComponentDefinition and ClusterComponentSpec
+type replicationSet struct {
+	stateful
 }
 
-var _ ComponentSet = &ReplicationSet{}
+var _ componentSet = &replicationSet{}
 
-func (r *ReplicationSet) getName() string {
+func (r *replicationSet) getName() string {
 	if r.SynthesizedComponent != nil {
 		return r.SynthesizedComponent.Name
 	}
 	return r.ComponentSpec.Name
 }
 
-func (r *ReplicationSet) getWorkloadType() appsv1alpha1.WorkloadType {
+func (r *replicationSet) getWorkloadType() appsv1alpha1.WorkloadType {
 	return appsv1alpha1.Replication
 }
 
-func (r *ReplicationSet) getReplicas() int32 {
+func (r *replicationSet) getReplicas() int32 {
 	if r.SynthesizedComponent != nil {
 		return r.SynthesizedComponent.Replicas
 	}
@@ -67,14 +67,14 @@ func (r *ReplicationSet) getReplicas() int32 {
 
 // IsRunning is the implementation of the type Component interface method,
 // which is used to check whether the replicationSet component is running normally.
-func (r *ReplicationSet) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
+func (r *replicationSet) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	var componentStatusIsRunning = true
-	sts := ConvertToStatefulSet(obj)
-	isRevisionConsistent, err := IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
+	sts := convertToStatefulSet(obj)
+	isRevisionConsistent, err := isStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
 	}
-	stsIsReady := StatefulSetOfComponentIsReady(sts, isRevisionConsistent, nil)
+	stsIsReady := statefulSetOfComponentIsReady(sts, isRevisionConsistent, nil)
 	if !stsIsReady {
 		return false, nil
 	}
@@ -86,31 +86,31 @@ func (r *ReplicationSet) IsRunning(ctx context.Context, obj client.Object) (bool
 
 // PodsReady is the implementation of the type Component interface method,
 // which is used to check whether all the pods of replicationSet component are ready.
-func (r *ReplicationSet) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
-	return r.Stateful.PodsReady(ctx, obj)
+func (r *replicationSet) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
+	return r.stateful.PodsReady(ctx, obj)
 }
 
 // PodIsAvailable is the implementation of the type Component interface method,
 // Check whether the status of a Pod of the replicationSet is ready, including the role label on the Pod
-func (r *ReplicationSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+func (r *replicationSet) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	if pod == nil {
 		return false
 	}
 	return intctrlutil.PodIsReadyWithLabel(*pod)
 }
 
-func (r *ReplicationSet) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap) {
+func (r *replicationSet) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap) {
 	return "", nil
 }
 
 // GetPhaseWhenPodsNotReady is the implementation of the type Component interface method,
 // when the pods of replicationSet are not ready, calculate the component phase is Failed or Abnormal.
 // if return an empty phase, means the pods of component are ready and skips it.
-func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
+func (r *replicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 	componentName string,
 	originPhaseIsUpRunning bool) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	stsList := &appsv1.StatefulSetList{}
-	podList, err := GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster,
+	podList, err := getCompRelatedObjectList(ctx, r.Cli, *r.Cluster,
 		componentName, stsList)
 	if err != nil || len(stsList.Items) == 0 {
 		return "", nil, err
@@ -119,7 +119,7 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 	podCount := len(podList.Items)
 	componentReplicas := r.getReplicas()
 	if podCount == 0 || stsObj.Status.AvailableReplicas == 0 {
-		return GetPhaseWithNoAvailableReplicas(componentReplicas), nil, nil
+		return getPhaseWithNoAvailableReplicas(componentReplicas), nil, nil
 	}
 	// get the statefulSet of component
 	var (
@@ -153,24 +153,24 @@ func (r *ReplicationSet) GetPhaseWhenPodsNotReady(ctx context.Context,
 			statusMessages.SetObjectMessage(v.Kind, v.Name, message)
 		}
 	}
-	return GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryIsReady,
+	return getCompPhaseByConditions(existLatestRevisionFailedPod, primaryIsReady,
 		componentReplicas, int32(podCount), stsObj.Status.AvailableReplicas), statusMessages, nil
 }
 
 // HandleRestart is the implementation of the type Component interface method, which is used to handle the restart of the Replication workload.
-func (r *ReplicationSet) HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
+func (r *replicationSet) HandleRestart(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
 	if r.getWorkloadType() != appsv1alpha1.Replication {
 		return nil, nil
 	}
 	priorityMapperFn := func(component *appsv1alpha1.ClusterComponentDefinition) map[string]int {
-		return ComposeReplicationRolePriorityMap()
+		return composeReplicationRolePriorityMap()
 	}
 	return r.HandleUpdateWithStrategy(ctx, obj, nil, priorityMapperFn, generateReplicationSerialPlan, generateReplicationBestEffortParallelPlan, generateReplicationParallelPlan)
 }
 
 // HandleRoleChange is the implementation of the type Component interface method, which is used to handle the role change of the Replication workload.
-func (r *ReplicationSet) HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
-	podList, err := GetRunningPods(ctx, r.Cli, obj)
+func (r *replicationSet) HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error) {
+	podList, err := getRunningPods(ctx, r.Cli, obj)
 	if err != nil {
 		return nil, err
 	}
@@ -251,14 +251,14 @@ func DefaultRole(i int32) string {
 	return role
 }
 
-// newReplicationSet is the constructor of the type ReplicationSet.
+// newReplicationSet is the constructor of the type replicationSet.
 func newReplicationSet(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	spec *appsv1alpha1.ClusterComponentSpec,
-	def appsv1alpha1.ClusterComponentDefinition) *ReplicationSet {
-	return &ReplicationSet{
-		Stateful: Stateful{
-			ComponentSetBase: ComponentSetBase{
+	def appsv1alpha1.ClusterComponentDefinition) *replicationSet {
+	return &replicationSet{
+		stateful: stateful{
+			componentSetBase: componentSetBase{
 				Cli:                  cli,
 				Cluster:              cluster,
 				SynthesizedComponent: nil,

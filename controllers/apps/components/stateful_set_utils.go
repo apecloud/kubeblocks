@@ -23,7 +23,6 @@ import (
 	"context"
 	"regexp"
 	"strconv"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -51,8 +50,8 @@ func IsMemberOf(set *appsv1.StatefulSet, pod *corev1.Pod) bool {
 	return getParentName(pod) == set.Name
 }
 
-// IsStsAndPodsRevisionConsistent checks if StatefulSet and pods of the StatefulSet have the same revision.
-func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) (bool, error) {
+// isStsAndPodsRevisionConsistent checks if StatefulSet and pods of the StatefulSet have the same revision.
+func isStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) (bool, error) {
 	pods, err := GetPodListByStatefulSet(ctx, cli, sts)
 	if err != nil {
 		return false, err
@@ -72,8 +71,8 @@ func IsStsAndPodsRevisionConsistent(ctx context.Context, cli client.Client, sts 
 	return revisionConsistent, nil
 }
 
-// GetPods4Delete gets all pods for delete
-func GetPods4Delete(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) ([]*corev1.Pod, error) {
+// getPods4Delete gets all pods for delete
+func getPods4Delete(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) ([]*corev1.Pod, error) {
 	if sts.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType {
 		return nil, nil
 	}
@@ -99,9 +98,9 @@ func GetPods4Delete(ctx context.Context, cli client.Client, sts *appsv1.Stateful
 	return podList, nil
 }
 
-// DeleteStsPods deletes pods of the StatefulSet manually
-func DeleteStsPods(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
-	pods, err := GetPods4Delete(ctx, cli, sts)
+// deleteStsPods deletes pods of the StatefulSet manually
+func deleteStsPods(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
+	pods, err := getPods4Delete(ctx, cli, sts)
 	if err != nil {
 		return err
 	}
@@ -114,22 +113,22 @@ func DeleteStsPods(ctx context.Context, cli client.Client, sts *appsv1.StatefulS
 	return nil
 }
 
-// StatefulSetOfComponentIsReady checks if statefulSet of component is ready.
-func StatefulSetOfComponentIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool, targetReplicas *int32) bool {
+// statefulSetOfComponentIsReady checks if statefulSet of component is ready.
+func statefulSetOfComponentIsReady(sts *appsv1.StatefulSet, statefulStatusRevisionIsEquals bool, targetReplicas *int32) bool {
 	if targetReplicas == nil {
 		targetReplicas = sts.Spec.Replicas
 	}
-	return StatefulSetPodsAreReady(sts, *targetReplicas) && statefulStatusRevisionIsEquals
+	return statefulSetPodsAreReady(sts, *targetReplicas) && statefulStatusRevisionIsEquals
 }
 
-// StatefulSetPodsAreReady checks if all pods of statefulSet are ready.
-func StatefulSetPodsAreReady(sts *appsv1.StatefulSet, targetReplicas int32) bool {
+// statefulSetPodsAreReady checks if all pods of statefulSet are ready.
+func statefulSetPodsAreReady(sts *appsv1.StatefulSet, targetReplicas int32) bool {
 	return sts.Status.AvailableReplicas == targetReplicas &&
 		sts.Status.Replicas == targetReplicas &&
 		sts.Status.ObservedGeneration == sts.Generation
 }
 
-func ConvertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
+func convertToStatefulSet(obj client.Object) *appsv1.StatefulSet {
 	if obj == nil {
 		return nil
 	}
@@ -176,8 +175,8 @@ func GetPodListByStatefulSet(ctx context.Context, cli client.Client, stsObj *app
 	return pods, nil
 }
 
-// GetPodOwnerReferencesSts gets the owner reference statefulSet of the pod.
-func GetPodOwnerReferencesSts(ctx context.Context, cli client.Client, podObj *corev1.Pod) (*appsv1.StatefulSet, error) {
+// getPodOwnerReferencesSts gets the owner reference statefulSet of the pod.
+func getPodOwnerReferencesSts(ctx context.Context, cli client.Client, podObj *corev1.Pod) (*appsv1.StatefulSet, error) {
 	stsList := &appsv1.StatefulSetList{}
 	if err := cli.List(ctx, stsList,
 		&client.ListOptions{Namespace: podObj.Namespace},
@@ -193,14 +192,4 @@ func GetPodOwnerReferencesSts(ctx context.Context, cli client.Client, podObj *co
 		}
 	}
 	return nil, nil
-}
-
-// MarkPrimaryStsToReconcile marks the primary statefulSet annotation to be reconciled.
-func MarkPrimaryStsToReconcile(ctx context.Context, cli client.Client, sts *appsv1.StatefulSet) error {
-	patch := client.MergeFrom(sts.DeepCopy())
-	if sts.Annotations == nil {
-		sts.Annotations = map[string]string{}
-	}
-	sts.Annotations[constant.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
-	return cli.Patch(ctx, sts, patch)
 }

@@ -30,23 +30,23 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func NewReplicationComponent(cli client.Client,
+func newReplicationComponent(cli client.Client,
 	recorder record.EventRecorder,
 	cluster *appsv1alpha1.Cluster,
 	clusterVersion *appsv1alpha1.ClusterVersion,
 	synthesizedComponent *component.SynthesizedComponent,
 	dag *graph.DAG) *replicationComponent {
 	comp := &replicationComponent{
-		StatefulComponentBase: StatefulComponentBase{
-			ComponentBase: ComponentBase{
+		statefulComponentBase: statefulComponentBase{
+			componentBase: componentBase{
 				Client:         cli,
 				Recorder:       recorder,
 				Cluster:        cluster,
 				ClusterVersion: clusterVersion,
 				Component:      synthesizedComponent,
-				ComponentSet: &ReplicationSet{
-					Stateful: Stateful{
-						ComponentSetBase: ComponentSetBase{
+				ComponentSet: &replicationSet{
+					stateful: stateful{
+						componentSetBase: componentSetBase{
 							Cli:                  cli,
 							Cluster:              cluster,
 							SynthesizedComponent: synthesizedComponent,
@@ -64,15 +64,15 @@ func NewReplicationComponent(cli client.Client,
 }
 
 type replicationComponent struct {
-	StatefulComponentBase
+	statefulComponentBase
 }
 
 var _ Component = &replicationComponent{}
 
 func (c *replicationComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	action *ictrltypes.LifecycleAction) ComponentWorkloadBuilder {
+	action *ictrltypes.LifecycleAction) componentWorkloadBuilder {
 	builder := &replicationComponentWorkloadBuilder{
-		ComponentWorkloadBuilderBase: ComponentWorkloadBuilderBase{
+		componentWorkloadBuilderBase: componentWorkloadBuilderBase{
 			ReqCtx:        reqCtx,
 			Client:        cli,
 			Comp:          c,
@@ -91,17 +91,17 @@ func (c *replicationComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *replicationComponent) GetBuiltObjects(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]client.Object, error) {
-	return c.StatefulComponentBase.GetBuiltObjects(c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
+	return c.statefulComponentBase.GetBuiltObjects(c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }
 
 func (c *replicationComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.StatefulComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
+	return c.statefulComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }
 
 func (c *replicationComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.StatefulComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
+	return c.statefulComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
 }
 
 func (c *replicationComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.StatefulComponentBase.Status(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionNoopPtr()))
+	return c.statefulComponentBase.Status(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionNoopPtr()))
 }

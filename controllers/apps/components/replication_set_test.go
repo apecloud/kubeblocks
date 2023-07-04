@@ -210,7 +210,7 @@ var _ = Describe("Replication Component", func() {
 			pods, err := GetPodListByStatefulSet(ctx, k8sClient, replicationSetSts)
 			Expect(err).To(Succeed())
 			Expect(len(pods)).To(Equal(int(replicas)))
-			Expect(IsStsAndPodsRevisionConsistent(ctx, k8sClient, replicationSetSts)).Should(BeTrue())
+			Expect(isStsAndPodsRevisionConsistent(ctx, k8sClient, replicationSetSts)).Should(BeTrue())
 
 			By("Checking if the pod is deleted when statefulSet is updated and UpdateStrategy is SerialStrategy")
 			status.UpdateRevision = "new-mock-revision"

@@ -43,27 +43,27 @@ import (
 // is at least the minimum available pods that need to run for the deployment.
 const NewRSAvailableReason = "NewReplicaSetAvailable"
 
-type Stateless struct {
-	ComponentSetBase
+type stateless struct {
+	componentSetBase
 }
 
-var _ ComponentSet = &Stateless{}
+var _ componentSet = &stateless{}
 
-func (stateless *Stateless) getReplicas() int32 {
+func (stateless *stateless) getReplicas() int32 {
 	if stateless.SynthesizedComponent != nil {
 		return stateless.SynthesizedComponent.Replicas
 	}
 	return stateless.ComponentSpec.Replicas
 }
 
-func (stateless *Stateless) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
+func (stateless *stateless) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if stateless == nil {
 		return false, nil
 	}
 	return stateless.PodsReady(ctx, obj)
 }
 
-func (stateless *Stateless) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
+func (stateless *stateless) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	if stateless == nil {
 		return false, nil
 	}
@@ -75,23 +75,23 @@ func (stateless *Stateless) PodsReady(ctx context.Context, obj client.Object) (b
 	return deploymentIsReady(deploy, &targetReplicas), nil
 }
 
-func (stateless *Stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+func (stateless *stateless) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	if stateless == nil || pod == nil {
 		return false
 	}
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 
-func (stateless *Stateless) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap) {
+func (stateless *stateless) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap) {
 	return "", nil
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
-func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
+func (stateless *stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
 	componentName string,
 	originPhaseIsUpRunning bool) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	deployList := &appsv1.DeploymentList{}
-	podList, err := GetCompRelatedObjectList(ctx, stateless.Cli, *stateless.Cluster, componentName, deployList)
+	podList, err := getCompRelatedObjectList(ctx, stateless.Cli, *stateless.Cluster, componentName, deployList)
 	if err != nil || len(deployList.Items) == 0 {
 		return "", nil, err
 	}
@@ -113,24 +113,24 @@ func (stateless *Stateless) GetPhaseWhenPodsNotReady(ctx context.Context,
 		return existLatestRevisionFailedPod
 	}
 	deploy := &deployList.Items[0]
-	return GetComponentPhaseWhenPodsNotReady(podList, deploy, stateless.getReplicas(),
+	return getComponentPhaseWhenPodsNotReady(podList, deploy, stateless.getReplicas(),
 		deploy.Status.AvailableReplicas, checkExistFailedPodOfNewRS), statusMessages, nil
 }
 
-func (stateless *Stateless) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {
+func (stateless *stateless) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {
 	return nil, nil
 }
 
-func (stateless *Stateless) HandleRoleChange(context.Context, client.Object) ([]graph.Vertex, error) {
+func (stateless *stateless) HandleRoleChange(context.Context, client.Object) ([]graph.Vertex, error) {
 	return nil, nil
 }
 
 func newStateless(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	spec *appsv1alpha1.ClusterComponentSpec,
-	def appsv1alpha1.ClusterComponentDefinition) *Stateless {
-	return &Stateless{
-		ComponentSetBase: ComponentSetBase{
+	def appsv1alpha1.ClusterComponentDefinition) *stateless {
+	return &stateless{
+		componentSetBase: componentSetBase{
 			Cli:                  cli,
 			Cluster:              cluster,
 			SynthesizedComponent: nil,

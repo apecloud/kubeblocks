@@ -196,15 +196,15 @@ func patchWorkloadCustomLabel(ctx context.Context,
 	for _, customLabelSpec := range compDef.CustomLabelSpecs {
 		// TODO if the customLabelSpec.Resources is empty, we should add the label to the workload resources under the component.
 		for _, resource := range customLabelSpec.Resources {
-			gvk, err := ParseCustomLabelPattern(resource.GVK)
+			gvk, err := parseCustomLabelPattern(resource.GVK)
 			if err != nil {
 				return err
 			}
 			// only handle workload kind
-			if !slices.Contains(GetCustomLabelWorkloadKind(), gvk.Kind) {
+			if !slices.Contains(getCustomLabelWorkloadKind(), gvk.Kind) {
 				continue
 			}
-			if err := PatchGVRCustomLabels(ctx, cli, cluster, resource, componentSpec.Name, customLabelSpec.Key, customLabelSpec.Value); err != nil {
+			if err := patchGVRCustomLabels(ctx, cli, cluster, resource, componentSpec.Name, customLabelSpec.Key, customLabelSpec.Value); err != nil {
 				return err
 			}
 		}

@@ -27,16 +27,16 @@ import (
 )
 
 type consensusComponentWorkloadBuilder struct {
-	ComponentWorkloadBuilderBase
+	componentWorkloadBuilderBase
 }
 
-var _ ComponentWorkloadBuilder = &consensusComponentWorkloadBuilder{}
+var _ componentWorkloadBuilder = &consensusComponentWorkloadBuilder{}
 
-func (b *consensusComponentWorkloadBuilder) BuildWorkload() ComponentWorkloadBuilder {
+func (b *consensusComponentWorkloadBuilder) BuildWorkload() componentWorkloadBuilder {
 	return b.BuildWorkload4StatefulSet("consensus")
 }
 
-func (b *consensusComponentWorkloadBuilder) BuildService() ComponentWorkloadBuilder {
+func (b *consensusComponentWorkloadBuilder) BuildService() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		svcList, err := builder.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {

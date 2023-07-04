@@ -54,7 +54,7 @@ func TestIsProbeTimeout(t *testing.T) {
 			RoleProbeTimeoutAfterPodsReady: appsv1alpha1.DefaultRoleProbeTimeoutAfterPodsReady,
 		},
 	}
-	if !IsProbeTimeout(compDef.Probes, podsReadyTime) {
+	if !isProbeTimeout(compDef.Probes, podsReadyTime) {
 		t.Error("probe timed out should be true")
 	}
 }
@@ -64,64 +64,73 @@ func TestGetComponentPhase(t *testing.T) {
 		isFailed   = true
 		isAbnormal = true
 	)
-	status := GetComponentPhase(isFailed, isAbnormal)
+	getComponentPhase := func(isFailed, isAbnormal bool) appsv1alpha1.ClusterComponentPhase {
+		var componentPhase appsv1alpha1.ClusterComponentPhase
+		if isFailed {
+			componentPhase = appsv1alpha1.FailedClusterCompPhase
+		} else if isAbnormal {
+			componentPhase = appsv1alpha1.AbnormalClusterCompPhase
+		}
+		return componentPhase
+	}
+	status := getComponentPhase(isFailed, isAbnormal)
 	if status != appsv1alpha1.FailedClusterCompPhase {
-		t.Error("function GetComponentPhase should return Failed")
+		t.Error("function getComponentPhase should return Failed")
 	}
 	isFailed = false
-	status = GetComponentPhase(isFailed, isAbnormal)
+	status = getComponentPhase(isFailed, isAbnormal)
 	if status != appsv1alpha1.AbnormalClusterCompPhase {
-		t.Error("function GetComponentPhase should return Abnormal")
+		t.Error("function getComponentPhase should return Abnormal")
 	}
 	isAbnormal = false
-	status = GetComponentPhase(isFailed, isAbnormal)
+	status = getComponentPhase(isFailed, isAbnormal)
 	if status != "" {
-		t.Error(`function GetComponentPhase should return ""`)
+		t.Error(`function getComponentPhase should return ""`)
 	}
 }
 
 func TestGetPhaseWithNoAvailableReplicas(t *testing.T) {
-	status := GetPhaseWithNoAvailableReplicas(int32(0))
+	status := getPhaseWithNoAvailableReplicas(int32(0))
 	if status != "" {
-		t.Error(`function GetComponentPhase should return ""`)
+		t.Error(`function getComponentPhase should return ""`)
 	}
-	status = GetPhaseWithNoAvailableReplicas(int32(2))
+	status = getPhaseWithNoAvailableReplicas(int32(2))
 	if status != appsv1alpha1.FailedClusterCompPhase {
-		t.Error(`function GetComponentPhase should return "Failed"`)
+		t.Error(`function getComponentPhase should return "Failed"`)
 	}
 }
 
 func TestAvailableReplicasAreConsistent(t *testing.T) {
-	isConsistent := AvailableReplicasAreConsistent(int32(1), int32(1), int32(1))
+	isConsistent := availableReplicasAreConsistent(int32(1), int32(1), int32(1))
 	if !isConsistent {
-		t.Error(`function GetComponentPhase should return "true"`)
+		t.Error(`function getComponentPhase should return "true"`)
 	}
-	isConsistent = AvailableReplicasAreConsistent(int32(1), int32(2), int32(1))
+	isConsistent = availableReplicasAreConsistent(int32(1), int32(2), int32(1))
 	if isConsistent {
-		t.Error(`function GetComponentPhase should return "false"`)
+		t.Error(`function getComponentPhase should return "false"`)
 	}
 }
 
 func TestGetCompPhaseByConditions(t *testing.T) {
 	existLatestRevisionFailedPod := true
 	primaryReplicaIsReady := true
-	phase := GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(1), int32(1), int32(1))
+	phase := getCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(1), int32(1), int32(1))
 	if phase != "" {
-		t.Error(`function GetComponentPhase should return ""`)
+		t.Error(`function getComponentPhase should return ""`)
 	}
-	phase = GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(2), int32(1), int32(1))
+	phase = getCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(2), int32(1), int32(1))
 	if phase != appsv1alpha1.AbnormalClusterCompPhase {
-		t.Error(`function GetComponentPhase should return "Abnormal"`)
+		t.Error(`function getComponentPhase should return "Abnormal"`)
 	}
 	primaryReplicaIsReady = false
-	phase = GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(2), int32(1), int32(1))
+	phase = getCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(2), int32(1), int32(1))
 	if phase != appsv1alpha1.FailedClusterCompPhase {
-		t.Error(`function GetComponentPhase should return "Failed"`)
+		t.Error(`function getComponentPhase should return "Failed"`)
 	}
 	existLatestRevisionFailedPod = false
-	phase = GetCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(2), int32(1), int32(1))
+	phase = getCompPhaseByConditions(existLatestRevisionFailedPod, primaryReplicaIsReady, int32(2), int32(1), int32(1))
 	if phase != "" {
-		t.Error(`function GetComponentPhase should return ""`)
+		t.Error(`function getComponentPhase should return ""`)
 	}
 }
 
@@ -177,87 +186,84 @@ var _ = Describe("Consensus Component", func() {
 			newCluster, _ := GetClusterByObject(ctx, k8sClient, sts)
 			Expect(newCluster != nil).Should(BeTrue())
 
-			By("test consensusSet InitClusterComponentStatusIfNeed function")
-			err := InitClusterComponentStatusIfNeed(cluster, consensusCompName, componentDef.WorkloadType)
+			By("test consensusSet initClusterComponentStatusIfNeed function")
+			err := initClusterComponentStatusIfNeed(cluster, consensusCompName, componentDef.WorkloadType)
 			Expect(err).Should(Succeed())
 			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus).ShouldNot(BeNil())
 			Expect(cluster.Status.Components[consensusCompName].ConsensusSetStatus.Leader.Pod).Should(Equal(constant.ComponentStatusDefaultPodName))
 
-			By("test ReplicationSet InitClusterComponentStatusIfNeed function")
+			By("test replicationSet initClusterComponentStatusIfNeed function")
 			componentDef.WorkloadType = appsv1alpha1.Replication
-			err = InitClusterComponentStatusIfNeed(cluster, consensusCompName, componentDef.WorkloadType)
+			err = initClusterComponentStatusIfNeed(cluster, consensusCompName, componentDef.WorkloadType)
 			Expect(err).Should(Succeed())
 			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus).ShouldNot(BeNil())
 			Expect(cluster.Status.Components[consensusCompName].ReplicationSetStatus.Primary.Pod).Should(Equal(constant.ComponentStatusDefaultPodName))
 
-			By("test GetObjectListByComponentName function")
+			By("test getObjectListByComponentName function")
 			stsList := &appsv1.StatefulSetList{}
-			_ = GetObjectListByComponentName(ctx, k8sClient, *cluster, stsList, consensusCompName)
+			_ = getObjectListByComponentName(ctx, k8sClient, *cluster, stsList, consensusCompName)
 			Expect(len(stsList.Items) > 0).Should(BeTrue())
 
-			By("test GetObjectListByCustomLabels function")
+			By("test getObjectListByCustomLabels function")
 			stsList = &appsv1.StatefulSetList{}
-			matchLabel := GetComponentMatchLabels(cluster.Name, consensusCompName)
-			_ = GetObjectListByCustomLabels(ctx, k8sClient, *cluster, stsList, client.MatchingLabels(matchLabel))
+			matchLabel := getComponentMatchLabels(cluster.Name, consensusCompName)
+			_ = getObjectListByCustomLabels(ctx, k8sClient, *cluster, stsList, client.MatchingLabels(matchLabel))
 			Expect(len(stsList.Items) > 0).Should(BeTrue())
 
-			By("test GetClusterComponentSpecByName function")
-			clusterComp := GetClusterComponentSpecByName(*cluster, consensusCompName)
+			By("test getClusterComponentSpecByName function")
+			clusterComp := getClusterComponentSpecByName(*cluster, consensusCompName)
 			Expect(clusterComp).ShouldNot(BeNil())
 
-			By("test UpdateObjLabel function")
+			By("test updateObjLabel function")
 			stsObj := stsList.Items[0]
-			err = UpdateObjLabel(ctx, k8sClient, stsObj, "test", "test")
+			err = updateObjLabel(ctx, k8sClient, stsObj, "test", "test")
 			Expect(err).Should(Succeed())
 
-			By("test PatchGVRCustomLabels of clusterDefinition")
+			By("test patchGVRCustomLabels of clusterDefinition")
 			resource := &appsv1alpha1.GVKResource{
-				Selector: GetComponentMatchLabels(cluster.Name, consensusCompName),
+				Selector: getComponentMatchLabels(cluster.Name, consensusCompName),
 			}
 			customLabelSpec := &appsv1alpha1.CustomLabelSpec{
 				Key:       "custom-label-key",
 				Value:     "$(KB_CLUSTER_NAME)-$(KB_COMP_NAME)",
 				Resources: []appsv1alpha1.GVKResource{*resource},
 			}
-			By("test statefulSet resource PatchGVRCustomLabels")
+			By("test statefulSet resource patchGVRCustomLabels")
 			resource.GVK = "apps/v1/StatefulSet"
-			err = PatchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
+			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
 			Expect(err).Should(Succeed())
-			By("test Pod resource PatchGVRCustomLabels")
+			By("test Pod resource patchGVRCustomLabels")
 			resource.GVK = "v1/Pod"
-			err = PatchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
+			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
 			Expect(err).Should(Succeed())
-			By("test Deployment resource PatchGVRCustomLabels")
+			By("test Deployment resource patchGVRCustomLabels")
 			resource.GVK = "apps/v1/Deployment"
-			err = PatchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
+			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
 			Expect(err).Should(Succeed())
-			By("test Service resource PatchGVRCustomLabels")
+			By("test Service resource patchGVRCustomLabels")
 			resource.GVK = "/v1/Service"
-			err = PatchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
+			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
 			Expect(err).Should(Succeed())
-			By("test ConfigMap resource PatchGVRCustomLabels")
+			By("test ConfigMap resource patchGVRCustomLabels")
 			resource.GVK = "/v1/ConfigMap"
-			err = PatchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
+			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
 			Expect(err).Should(Succeed())
-			By("test CronJob resource PatchGVRCustomLabels")
+			By("test CronJob resource patchGVRCustomLabels")
 			resource.GVK = "batch/v1/CronJob"
-			err = PatchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
+			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
 			Expect(err).Should(Succeed())
-			By("test Invalid resource PatchGVRCustomLabels")
+			By("test Invalid resource patchGVRCustomLabels")
 			resource.GVK = "Invalid"
-			err = PatchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
+			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
 			Expect(err.Error()).Should(ContainSubstring("invalid pattern"))
-			By("test Invalid resource PatchGVRCustomLabels")
+			By("test Invalid resource patchGVRCustomLabels")
 			resource.GVK = "apps/v1/Invalid"
-			err = PatchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
+			err = patchGVRCustomLabels(ctx, k8sClient, cluster, *resource, consensusCompName, customLabelSpec.Key, customLabelSpec.Value)
 			Expect(err.Error()).Should(ContainSubstring("kind is not supported for custom labels"))
 
-			By("test GetCustomLabelWorkloadKind")
-			workloadList := GetCustomLabelWorkloadKind()
+			By("test getCustomLabelWorkloadKind")
+			workloadList := getCustomLabelWorkloadKind()
 			Expect(len(workloadList)).Should(Equal(5))
-
-			By("test GetComponentStatusMessageKey function")
-			Expect(GetComponentStatusMessageKey("Pod", "mysql-01")).To(Equal("Pod/mysql-01"))
 
 			By("test GetComponentStsMinReadySeconds")
 			minReadySeconds, _ := GetComponentWorkloadMinReadySeconds(ctx, k8sClient, *cluster,
@@ -267,9 +273,9 @@ var _ = Describe("Consensus Component", func() {
 				appsv1alpha1.Consensus, statelessCompName)
 			Expect(minReadySeconds).To(Equal(int32(0)))
 
-			By("test GetCompRelatedObjectList function")
+			By("test getCompRelatedObjectList function")
 			stsList = &appsv1.StatefulSetList{}
-			podList, _ := GetCompRelatedObjectList(ctx, k8sClient, *cluster, consensusCompName, stsList)
+			podList, _ := getCompRelatedObjectList(ctx, k8sClient, *cluster, consensusCompName, stsList)
 			Expect(len(stsList.Items) > 0 && len(podList.Items) > 0).Should(BeTrue())
 
 			By("test GetComponentInfoByPod function")
@@ -286,14 +292,14 @@ var _ = Describe("Consensus Component", func() {
 			_, _, err = GetComponentInfoByPod(ctx, k8sClient, *cluster, podNoLabel)
 			Expect(err).ShouldNot(Succeed())
 
-			By("test GetComponentPhaseWhenPodsNotReady function")
+			By("test getComponentPhaseWhenPodsNotReady function")
 			consensusComp := cluster.Spec.GetComponentByName(consensusCompName)
 			checkExistFailedPodOfLatestRevision := func(pod *corev1.Pod, workload metav1.Object) bool {
 				sts := workload.(*appsv1.StatefulSet)
 				return !intctrlutil.PodIsReady(pod) && intctrlutil.PodIsControlledByLatestRevision(pod, sts)
 			}
 			// component phase should be Failed when available replicas is 0
-			phase := GetComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
+			phase := getComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
 				sts.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision)
 			Expect(phase).Should(Equal(appsv1alpha1.FailedClusterCompPhase))
 
@@ -301,7 +307,7 @@ var _ = Describe("Consensus Component", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 				testk8s.MockStatefulSetReady(sts)
 			})).Should(Succeed())
-			phase = GetComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
+			phase = getComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
 				sts.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision)
 			Expect(len(phase) == 0).Should(BeTrue())
 
@@ -313,7 +319,7 @@ var _ = Describe("Consensus Component", func() {
 			Expect(testapps.ChangeObjStatus(&testCtx, sts, func() {
 				sts.Status.AvailableReplicas = *sts.Spec.Replicas - 1
 			})).Should(Succeed())
-			phase = GetComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
+			phase = getComponentPhaseWhenPodsNotReady(podList, sts, consensusComp.Replicas,
 				sts.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision)
 			Expect(phase).Should(Equal(appsv1alpha1.AbnormalClusterCompPhase))
 
@@ -335,13 +341,13 @@ var _ = Describe("Component utils test", func() {
 				targetKey:  "true",
 				updatedKey: "true",
 			}
-			MergeAnnotations(originalAnnotations, &targetAnnotations)
+			mergeAnnotations(originalAnnotations, &targetAnnotations)
 			Expect(targetAnnotations[targetKey]).ShouldNot(BeEmpty())
 			Expect(targetAnnotations[originalKey]).ShouldNot(BeEmpty())
 			Expect(targetAnnotations[updatedKey]).Should(Equal("true"))
 			By("merging with target being nil")
 			var nilAnnotations map[string]string
-			MergeAnnotations(originalAnnotations, &nilAnnotations)
+			mergeAnnotations(originalAnnotations, &nilAnnotations)
 			Expect(nilAnnotations).ShouldNot(BeNil())
 		})
 
@@ -364,7 +370,7 @@ var _ = Describe("Component utils test", func() {
 				AddControllerRevisionHashLabel("").
 				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 				GetObject()
-			ResolvePodSpecDefaultFields(pod.Spec, &ppod.Spec)
+			resolvePodSpecDefaultFields(pod.Spec, &ppod.Spec)
 			Expect(reflect.DeepEqual(pod.Spec, ppod.Spec)).Should(BeTrue())
 		})
 	})

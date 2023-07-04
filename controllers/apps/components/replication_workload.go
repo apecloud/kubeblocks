@@ -27,16 +27,16 @@ import (
 )
 
 type replicationComponentWorkloadBuilder struct {
-	ComponentWorkloadBuilderBase
+	componentWorkloadBuilderBase
 }
 
-var _ ComponentWorkloadBuilder = &replicationComponentWorkloadBuilder{}
+var _ componentWorkloadBuilder = &replicationComponentWorkloadBuilder{}
 
-func (b *replicationComponentWorkloadBuilder) BuildWorkload() ComponentWorkloadBuilder {
+func (b *replicationComponentWorkloadBuilder) BuildWorkload() componentWorkloadBuilder {
 	return b.BuildWorkload4StatefulSet("replication")
 }
 
-func (b *replicationComponentWorkloadBuilder) BuildService() ComponentWorkloadBuilder {
+func (b *replicationComponentWorkloadBuilder) BuildService() componentWorkloadBuilder {
 	buildFn := func() ([]client.Object, error) {
 		svcList, err := builder.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {

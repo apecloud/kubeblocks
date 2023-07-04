@@ -63,7 +63,7 @@ func TestInitClusterComponentStatusIfNeed(t *testing.T) {
 			},
 		},
 	}
-	if err := InitClusterComponentStatusIfNeed(cluster, componentName, appsv1alpha1.Consensus); err != nil {
+	if err := initClusterComponentStatusIfNeed(cluster, componentName, appsv1alpha1.Consensus); err != nil {
 		t.Errorf("caught error %v", err)
 	}
 

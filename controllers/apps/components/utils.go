@@ -46,13 +46,10 @@ import (
 )
 
 var (
-	ErrReqCtrlClient              = errors.New("required arg client.Client is nil")
-	ErrReqClusterObj              = errors.New("required arg *appsv1alpha1.Cluster is nil")
-	ErrReqClusterComponentDefObj  = errors.New("required arg *appsv1alpha1.ClusterComponentDefinition is nil")
-	ErrReqClusterComponentSpecObj = errors.New("required arg *appsv1alpha1.ClusterComponentSpec is nil")
+	errReqClusterObj = errors.New("required arg *appsv1alpha1.Cluster is nil")
 )
 
-func ListObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
+func listObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L generics.ObjList[T], PL generics.PObjList[T, L]](
 	ctx context.Context, cli client.Client, _ func(T, L), namespace string, labels client.MatchingLabels) ([]PT, error) {
 	var objList L
 	if err := cli.List(ctx, PL(&objList), labels, client.InNamespace(namespace)); err != nil {
@@ -67,20 +64,20 @@ func ListObjWithLabelsInNamespace[T generics.Object, PT generics.PObject[T], L g
 	return objs, nil
 }
 
-func ListStsOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.StatefulSet, error) {
-	return ListObjWithLabelsInNamespace(ctx, cli, generics.StatefulSetSignature, namespace, labels)
+func listStsOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.StatefulSet, error) {
+	return listObjWithLabelsInNamespace(ctx, cli, generics.StatefulSetSignature, namespace, labels)
 }
 
-func ListDeployOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.Deployment, error) {
-	return ListObjWithLabelsInNamespace(ctx, cli, generics.DeploymentSignature, namespace, labels)
+func listDeployOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*appsv1.Deployment, error) {
+	return listObjWithLabelsInNamespace(ctx, cli, generics.DeploymentSignature, namespace, labels)
 }
 
-func ListPodOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*corev1.Pod, error) {
-	return ListObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels)
+func listPodOwnedByComponent(ctx context.Context, cli client.Client, namespace string, labels client.MatchingLabels) ([]*corev1.Pod, error) {
+	return listObjWithLabelsInNamespace(ctx, cli, generics.PodSignature, namespace, labels)
 }
 
-// RestartPod restarts a Pod through updating the pod's annotation
-func RestartPod(podTemplate *corev1.PodTemplateSpec) error {
+// restartPod restarts a Pod through updating the pod's annotation
+func restartPod(podTemplate *corev1.PodTemplateSpec) error {
 	if podTemplate.Annotations == nil {
 		podTemplate.Annotations = map[string]string{}
 	}
@@ -94,9 +91,9 @@ func RestartPod(podTemplate *corev1.PodTemplateSpec) error {
 	return nil
 }
 
-// MergeAnnotations keeps the original annotations.
+// mergeAnnotations keeps the original annotations.
 // if annotations exist and are replaced, the Deployment/StatefulSet will be updated.
-func MergeAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
+func mergeAnnotations(originalAnnotations map[string]string, targetAnnotations *map[string]string) {
 	if targetAnnotations == nil || originalAnnotations == nil {
 		return
 	}
@@ -111,8 +108,8 @@ func MergeAnnotations(originalAnnotations map[string]string, targetAnnotations *
 	}
 }
 
-// BuildWorkLoadAnnotations builds the annotations for Deployment/StatefulSet
-func BuildWorkLoadAnnotations(obj client.Object, cluster *appsv1alpha1.Cluster) {
+// buildWorkLoadAnnotations builds the annotations for Deployment/StatefulSet
+func buildWorkLoadAnnotations(obj client.Object, cluster *appsv1alpha1.Cluster) {
 	workloadAnnotations := obj.GetAnnotations()
 	if workloadAnnotations == nil {
 		workloadAnnotations = map[string]string{}
@@ -146,8 +143,8 @@ func IsFailedOrAbnormal(phase appsv1alpha1.ClusterComponentPhase) bool {
 		appsv1alpha1.AbnormalClusterCompPhase}, phase) != -1
 }
 
-// GetComponentMatchLabels gets the labels for matching the cluster component
-func GetComponentMatchLabels(clusterName, componentName string) map[string]string {
+// getComponentMatchLabels gets the labels for matching the cluster component
+func getComponentMatchLabels(clusterName, componentName string) map[string]string {
 	return client.MatchingLabels{
 		constant.AppInstanceLabelKey:    clusterName,
 		constant.KBAppComponentLabelKey: componentName,
@@ -159,7 +156,7 @@ func GetComponentMatchLabels(clusterName, componentName string) map[string]strin
 func GetComponentPodList(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster, componentName string) (*corev1.PodList, error) {
 	podList := &corev1.PodList{}
 	err := cli.List(ctx, podList, client.InNamespace(cluster.Namespace),
-		client.MatchingLabels(GetComponentMatchLabels(cluster.Name, componentName)))
+		client.MatchingLabels(getComponentMatchLabels(cluster.Name, componentName)))
 	return podList, err
 }
 
@@ -178,12 +175,8 @@ func GetComponentPodListWithRole(ctx context.Context, cli client.Client, cluster
 	return podList, nil
 }
 
-func GetComponentStatusMessageKey(kind, name string) string {
-	return fmt.Sprintf("%s/%s", kind, name)
-}
-
-// IsProbeTimeout checks if the application of the pod is probe timed out.
-func IsProbeTimeout(probes *appsv1alpha1.ClusterDefinitionProbes, podsReadyTime *metav1.Time) bool {
+// isProbeTimeout checks if the application of the pod is probe timed out.
+func isProbeTimeout(probes *appsv1alpha1.ClusterDefinitionProbes, podsReadyTime *metav1.Time) bool {
 	if podsReadyTime == nil {
 		return false
 	}
@@ -197,26 +190,16 @@ func IsProbeTimeout(probes *appsv1alpha1.ClusterDefinitionProbes, podsReadyTime 
 	return time.Now().After(podsReadyTime.Add(roleProbeTimeout))
 }
 
-func GetComponentPhase(isFailed, isAbnormal bool) appsv1alpha1.ClusterComponentPhase {
-	var componentPhase appsv1alpha1.ClusterComponentPhase
-	if isFailed {
-		componentPhase = appsv1alpha1.FailedClusterCompPhase
-	} else if isAbnormal {
-		componentPhase = appsv1alpha1.AbnormalClusterCompPhase
-	}
-	return componentPhase
-}
-
-// GetObjectListByComponentName gets k8s workload list with component
-func GetObjectListByComponentName(ctx context.Context, cli client2.ReadonlyClient, cluster appsv1alpha1.Cluster,
+// getObjectListByComponentName gets k8s workload list with component
+func getObjectListByComponentName(ctx context.Context, cli client2.ReadonlyClient, cluster appsv1alpha1.Cluster,
 	objectList client.ObjectList, componentName string) error {
-	matchLabels := GetComponentMatchLabels(cluster.Name, componentName)
+	matchLabels := getComponentMatchLabels(cluster.Name, componentName)
 	inNamespace := client.InNamespace(cluster.Namespace)
 	return cli.List(ctx, objectList, client.MatchingLabels(matchLabels), inNamespace)
 }
 
-// GetObjectListByCustomLabels gets k8s workload list with custom labels
-func GetObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster,
+// getObjectListByCustomLabels gets k8s workload list with custom labels
+func getObjectListByCustomLabels(ctx context.Context, cli client.Client, cluster appsv1alpha1.Cluster,
 	objectList client.ObjectList, matchLabels client.ListOption) error {
 	inNamespace := client.InNamespace(cluster.Namespace)
 	return cli.List(ctx, objectList, matchLabels, inNamespace)
@@ -237,8 +220,8 @@ func GetComponentDefByCluster(ctx context.Context, cli client2.ReadonlyClient, c
 	return nil, nil
 }
 
-// GetClusterComponentSpecByName gets componentSpec from cluster with compSpecName.
-func GetClusterComponentSpecByName(cluster appsv1alpha1.Cluster, compSpecName string) *appsv1alpha1.ClusterComponentSpec {
+// getClusterComponentSpecByName gets componentSpec from cluster with compSpecName.
+func getClusterComponentSpecByName(cluster appsv1alpha1.Cluster, compSpecName string) *appsv1alpha1.ClusterComponentSpec {
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		if compSpec.Name == compSpecName {
 			return &compSpec
@@ -247,13 +230,13 @@ func GetClusterComponentSpecByName(cluster appsv1alpha1.Cluster, compSpecName st
 	return nil
 }
 
-// InitClusterComponentStatusIfNeed Initialize the state of the corresponding component in cluster.status.components
-func InitClusterComponentStatusIfNeed(
+// initClusterComponentStatusIfNeed Initialize the state of the corresponding component in cluster.status.components
+func initClusterComponentStatusIfNeed(
 	cluster *appsv1alpha1.Cluster,
 	componentName string,
 	workloadType appsv1alpha1.WorkloadType) error {
 	if cluster == nil {
-		return ErrReqClusterObj
+		return errReqClusterObj
 	}
 
 	// REVIEW: should have following removed
@@ -295,7 +278,7 @@ func GetComponentDeployMinReadySeconds(ctx context.Context,
 	cluster appsv1alpha1.Cluster,
 	componentName string) (minReadySeconds int32, err error) {
 	deployList := &appsv1.DeploymentList{}
-	if err = GetObjectListByComponentName(ctx, cli, cluster, deployList, componentName); err != nil {
+	if err = getObjectListByComponentName(ctx, cli, cluster, deployList, componentName); err != nil {
 		return
 	}
 	if len(deployList.Items) > 0 {
@@ -311,7 +294,7 @@ func GetComponentStsMinReadySeconds(ctx context.Context,
 	cluster appsv1alpha1.Cluster,
 	componentName string) (minReadySeconds int32, err error) {
 	stsList := &appsv1.StatefulSetList{}
-	if err = GetObjectListByComponentName(ctx, cli, cluster, stsList, componentName); err != nil {
+	if err = getObjectListByComponentName(ctx, cli, cluster, stsList, componentName); err != nil {
 		return
 	}
 	if len(stsList.Items) > 0 {
@@ -355,8 +338,8 @@ func GetComponentInfoByPod(ctx context.Context,
 	return componentName, componentDef, nil
 }
 
-// GetCompRelatedObjectList gets the related pods and workloads of the component
-func GetCompRelatedObjectList(ctx context.Context,
+// getCompRelatedObjectList gets the related pods and workloads of the component
+func getCompRelatedObjectList(ctx context.Context,
 	cli client.Client,
 	cluster appsv1alpha1.Cluster,
 	compName string,
@@ -365,36 +348,36 @@ func GetCompRelatedObjectList(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	if err = GetObjectListByComponentName(ctx,
+	if err = getObjectListByComponentName(ctx,
 		cli, cluster, relatedWorkloads, compName); err != nil {
 		return nil, err
 	}
 	return podList, nil
 }
 
-// AvailableReplicasAreConsistent checks if expected replicas number of component is consistent with
+// availableReplicasAreConsistent checks if expected replicas number of component is consistent with
 // the number of available workload replicas.
-func AvailableReplicasAreConsistent(componentReplicas, podCount, workloadAvailableReplicas int32) bool {
+func availableReplicasAreConsistent(componentReplicas, podCount, workloadAvailableReplicas int32) bool {
 	return workloadAvailableReplicas == componentReplicas && componentReplicas == podCount
 }
 
-// GetPhaseWithNoAvailableReplicas gets the component phase when the workload of component has no available replicas.
-func GetPhaseWithNoAvailableReplicas(componentReplicas int32) appsv1alpha1.ClusterComponentPhase {
+// getPhaseWithNoAvailableReplicas gets the component phase when the workload of component has no available replicas.
+func getPhaseWithNoAvailableReplicas(componentReplicas int32) appsv1alpha1.ClusterComponentPhase {
 	if componentReplicas == 0 {
 		return ""
 	}
 	return appsv1alpha1.FailedClusterCompPhase
 }
 
-// GetComponentPhaseWhenPodsNotReady gets the component phase when pods of component are not ready.
-func GetComponentPhaseWhenPodsNotReady(podList *corev1.PodList,
+// getComponentPhaseWhenPodsNotReady gets the component phase when pods of component are not ready.
+func getComponentPhaseWhenPodsNotReady(podList *corev1.PodList,
 	workload metav1.Object,
 	componentReplicas,
 	availableReplicas int32,
 	checkFailedPodRevision func(pod *corev1.Pod, workload metav1.Object) bool) appsv1alpha1.ClusterComponentPhase {
 	podCount := len(podList.Items)
 	if podCount == 0 || availableReplicas == 0 {
-		return GetPhaseWithNoAvailableReplicas(componentReplicas)
+		return getPhaseWithNoAvailableReplicas(componentReplicas)
 	}
 	var existLatestRevisionFailedPod bool
 	for _, v := range podList.Items {
@@ -406,16 +389,16 @@ func GetComponentPhaseWhenPodsNotReady(podList *corev1.PodList,
 			existLatestRevisionFailedPod = true
 		}
 	}
-	return GetCompPhaseByConditions(existLatestRevisionFailedPod, true,
+	return getCompPhaseByConditions(existLatestRevisionFailedPod, true,
 		componentReplicas, int32(podCount), availableReplicas)
 }
 
-// GetCompPhaseByConditions gets the component phase according to the following conditions:
+// getCompPhaseByConditions gets the component phase according to the following conditions:
 // 1. if the failed pod is not controlled by the latest revision, ignore it.
 // 2. if the primary replicas are not available, the component is failed.
 // 3. finally if expected replicas number of component is inconsistent with
 // the number of available workload replicas, the component is abnormal.
-func GetCompPhaseByConditions(existLatestRevisionFailedPod bool,
+func getCompPhaseByConditions(existLatestRevisionFailedPod bool,
 	primaryReplicasAvailable bool,
 	compReplicas,
 	podCount,
@@ -428,14 +411,14 @@ func GetCompPhaseByConditions(existLatestRevisionFailedPod bool,
 		return appsv1alpha1.FailedClusterCompPhase
 	}
 	// checks if expected replicas number of component is consistent with the number of available workload replicas.
-	if !AvailableReplicasAreConsistent(compReplicas, podCount, availableReplicas) {
+	if !availableReplicasAreConsistent(compReplicas, podCount, availableReplicas) {
 		return appsv1alpha1.AbnormalClusterCompPhase
 	}
 	return ""
 }
 
-// UpdateObjLabel updates the value of the role label of the object.
-func UpdateObjLabel[T generics.Object, PT generics.PObject[T]](
+// updateObjLabel updates the value of the role label of the object.
+func updateObjLabel[T generics.Object, PT generics.PObject[T]](
 	ctx context.Context, cli client.Client, obj T, labelKey, labelValue string) error {
 	pObj := PT(&obj)
 	patch := client.MergeFrom(PT(pObj.DeepCopy()))
@@ -449,10 +432,10 @@ func UpdateObjLabel[T generics.Object, PT generics.PObject[T]](
 	return nil
 }
 
-// PatchGVRCustomLabels patches the custom labels to the object list of the specified GVK.
-func PatchGVRCustomLabels(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster,
+// patchGVRCustomLabels patches the custom labels to the object list of the specified GVK.
+func patchGVRCustomLabels(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster,
 	resource appsv1alpha1.GVKResource, componentName, labelKey, labelValue string) error {
-	gvk, err := ParseCustomLabelPattern(resource.GVK)
+	gvk, err := parseCustomLabelPattern(resource.GVK)
 	if err != nil {
 		return err
 	}
@@ -461,11 +444,11 @@ func PatchGVRCustomLabels(ctx context.Context, cli client.Client, cluster *appsv
 	}
 
 	objectList := getObjectListMapOfResourceKind()[gvk.Kind]
-	matchLabels := GetComponentMatchLabels(cluster.Name, componentName)
+	matchLabels := getComponentMatchLabels(cluster.Name, componentName)
 	for k, v := range resource.Selector {
 		matchLabels[k] = v
 	}
-	if err := GetObjectListByCustomLabels(ctx, cli, *cluster, objectList, client.MatchingLabels(matchLabels)); err != nil {
+	if err := getObjectListByCustomLabels(ctx, cli, *cluster, objectList, client.MatchingLabels(matchLabels)); err != nil {
 		return err
 	}
 	labelKey = replaceKBEnvPlaceholderTokens(cluster, componentName, labelKey)
@@ -474,42 +457,42 @@ func PatchGVRCustomLabels(ctx context.Context, cli client.Client, cluster *appsv
 	case constant.StatefulSetKind:
 		stsList := objectList.(*appsv1.StatefulSetList)
 		for _, sts := range stsList.Items {
-			if err := UpdateObjLabel(ctx, cli, sts, labelKey, labelValue); err != nil {
+			if err := updateObjLabel(ctx, cli, sts, labelKey, labelValue); err != nil {
 				return err
 			}
 		}
 	case constant.DeploymentKind:
 		deployList := objectList.(*appsv1.DeploymentList)
 		for _, deploy := range deployList.Items {
-			if err := UpdateObjLabel(ctx, cli, deploy, labelKey, labelValue); err != nil {
+			if err := updateObjLabel(ctx, cli, deploy, labelKey, labelValue); err != nil {
 				return err
 			}
 		}
 	case constant.PodKind:
 		podList := objectList.(*corev1.PodList)
 		for _, pod := range podList.Items {
-			if err := UpdateObjLabel(ctx, cli, pod, labelKey, labelValue); err != nil {
+			if err := updateObjLabel(ctx, cli, pod, labelKey, labelValue); err != nil {
 				return err
 			}
 		}
 	case constant.ServiceKind:
 		svcList := objectList.(*corev1.ServiceList)
 		for _, svc := range svcList.Items {
-			if err := UpdateObjLabel(ctx, cli, svc, labelKey, labelValue); err != nil {
+			if err := updateObjLabel(ctx, cli, svc, labelKey, labelValue); err != nil {
 				return err
 			}
 		}
 	case constant.ConfigMapKind:
 		cmList := objectList.(*corev1.ConfigMapList)
 		for _, cm := range cmList.Items {
-			if err := UpdateObjLabel(ctx, cli, cm, labelKey, labelValue); err != nil {
+			if err := updateObjLabel(ctx, cli, cm, labelKey, labelValue); err != nil {
 				return err
 			}
 		}
 	case constant.CronJobKind:
 		cjList := objectList.(*batchv1.CronJobList)
 		for _, cj := range cjList.Items {
-			if err := UpdateObjLabel(ctx, cli, cj, labelKey, labelValue); err != nil {
+			if err := updateObjLabel(ctx, cli, cj, labelKey, labelValue); err != nil {
 				return err
 			}
 		}
@@ -517,8 +500,8 @@ func PatchGVRCustomLabels(ctx context.Context, cli client.Client, cluster *appsv
 	return nil
 }
 
-// ParseCustomLabelPattern parses the custom label pattern to GroupVersionKind.
-func ParseCustomLabelPattern(pattern string) (schema.GroupVersionKind, error) {
+// parseCustomLabelPattern parses the custom label pattern to GroupVersionKind.
+func parseCustomLabelPattern(pattern string) (schema.GroupVersionKind, error) {
 	patterns := strings.Split(pattern, "/")
 	switch len(patterns) {
 	case 2:
@@ -550,8 +533,8 @@ func getCustomLabelSupportKind() []string {
 	}
 }
 
-// GetCustomLabelWorkloadKind returns the kinds that support custom label.
-func GetCustomLabelWorkloadKind() []string {
+// getCustomLabelWorkloadKind returns the kinds that support custom label.
+func getCustomLabelWorkloadKind() []string {
 	return []string{
 		constant.CronJobKind,
 		constant.StatefulSetKind,
@@ -596,17 +579,17 @@ func replaceKBEnvPlaceholderTokens(cluster *appsv1alpha1.Cluster, componentName,
 	return componentutil.ReplaceNamedVars(builtInEnvMap, strToReplace, -1, true)
 }
 
-// GetRunningPods gets the running pods of the specified statefulSet.
-func GetRunningPods(ctx context.Context, cli client.Client, obj client.Object) ([]corev1.Pod, error) {
-	sts := ConvertToStatefulSet(obj)
+// getRunningPods gets the running pods of the specified statefulSet.
+func getRunningPods(ctx context.Context, cli client.Client, obj client.Object) ([]corev1.Pod, error) {
+	sts := convertToStatefulSet(obj)
 	if sts == nil || sts.Generation != sts.Status.ObservedGeneration {
 		return nil, nil
 	}
 	return GetPodListByStatefulSet(ctx, cli, sts)
 }
 
-// ResolvePodSpecDefaultFields set default value for some known fields of proto PodSpec @pobj.
-func ResolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
+// resolvePodSpecDefaultFields set default value for some known fields of proto PodSpec @pobj.
+func resolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	resolveVolume := func(v corev1.Volume, vv *corev1.Volume) {
 		if vv.DownwardAPI == nil || v.DownwardAPI == nil {
 			return

@@ -38,7 +38,7 @@ import (
 	testk8s "github.com/apecloud/kubeblocks/internal/testutil/k8s"
 )
 
-var _ = Describe("ReplicationSet Util", func() {
+var _ = Describe("replicationSet Util", func() {
 
 	var (
 		clusterName        = "test-cluster-repl"

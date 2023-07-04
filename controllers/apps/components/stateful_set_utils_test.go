@@ -67,19 +67,19 @@ func TestIsMemberOf(t *testing.T) {
 func TestStatefulSetPodsAreReady(t *testing.T) {
 	sts := testk8s.NewFakeStatefulSet("test", 3)
 	testk8s.MockStatefulSetReady(sts)
-	ready := StatefulSetPodsAreReady(sts, *sts.Spec.Replicas)
+	ready := statefulSetPodsAreReady(sts, *sts.Spec.Replicas)
 	if !ready {
 		t.Errorf("StatefulSet pods should be ready")
 	}
-	convertSts := ConvertToStatefulSet(sts)
+	convertSts := convertToStatefulSet(sts)
 	if convertSts == nil {
 		t.Errorf("Convert to statefulSet should be succeed")
 	}
-	convertSts = ConvertToStatefulSet(&apps.Deployment{})
+	convertSts = convertToStatefulSet(&apps.Deployment{})
 	if convertSts != nil {
 		t.Errorf("Convert to statefulSet should be failed")
 	}
-	convertSts = ConvertToStatefulSet(nil)
+	convertSts = convertToStatefulSet(nil)
 	if convertSts != nil {
 		t.Errorf("Convert to statefulSet should be failed")
 	}
@@ -88,11 +88,11 @@ func TestStatefulSetPodsAreReady(t *testing.T) {
 func TestSStatefulSetOfComponentIsReady(t *testing.T) {
 	sts := testk8s.NewFakeStatefulSet("test", 3)
 	testk8s.MockStatefulSetReady(sts)
-	ready := StatefulSetOfComponentIsReady(sts, true, nil)
+	ready := statefulSetOfComponentIsReady(sts, true, nil)
 	if !ready {
 		t.Errorf("StatefulSet should be ready")
 	}
-	ready = StatefulSetOfComponentIsReady(sts, false, nil)
+	ready = statefulSetOfComponentIsReady(sts, false, nil)
 	if ready {
 		t.Errorf("StatefulSet should not be ready")
 	}
@@ -133,7 +133,7 @@ var _ = Describe("StatefulSet utils test", func() {
 
 			By("Creating pods by the StatefulSet")
 			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterName, testapps.DefaultRedisCompSpecName, nil)
-			Expect(IsStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
+			Expect(isStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
 
 			By("Updating the StatefulSet's UpdateRevision")
 			sts.Status.UpdateRevision = "new-mock-revision"
@@ -143,19 +143,19 @@ var _ = Describe("StatefulSet utils test", func() {
 			Expect(len(podList)).To(Equal(1))
 
 			By("Testing get the StatefulSet of the pod")
-			ownerSts, err := GetPodOwnerReferencesSts(ctx, k8sClient, &podList[0])
+			ownerSts, err := getPodOwnerReferencesSts(ctx, k8sClient, &podList[0])
 			Expect(err).To(Succeed())
 			Expect(ownerSts).ShouldNot(BeNil())
 
 			By("Deleting the pods of StatefulSet")
-			Expect(DeleteStsPods(testCtx.Ctx, k8sClient, sts)).Should(Succeed())
+			Expect(deleteStsPods(testCtx.Ctx, k8sClient, sts)).Should(Succeed())
 			podList, err = GetPodListByStatefulSet(ctx, k8sClient, sts)
 			Expect(err).To(Succeed())
 			Expect(len(podList)).To(Equal(0))
 
 			By("Creating new pods by StatefulSet with new UpdateRevision")
 			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterName, testapps.DefaultRedisCompSpecName, nil)
-			Expect(IsStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
+			Expect(isStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
 		})
 	})
 })

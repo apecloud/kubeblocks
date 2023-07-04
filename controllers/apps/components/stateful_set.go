@@ -37,57 +37,57 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-type Stateful struct {
-	ComponentSetBase
+type stateful struct {
+	componentSetBase
 }
 
-var _ ComponentSet = &Stateful{}
+var _ componentSet = &stateful{}
 
-func (r *Stateful) getReplicas() int32 {
+func (r *stateful) getReplicas() int32 {
 	if r.SynthesizedComponent != nil {
 		return r.SynthesizedComponent.Replicas
 	}
 	return r.ComponentSpec.Replicas
 }
 
-func (r *Stateful) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
+func (r *stateful) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
-	sts := ConvertToStatefulSet(obj)
-	isRevisionConsistent, err := IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
+	sts := convertToStatefulSet(obj)
+	isRevisionConsistent, err := isStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
 	}
 	targetReplicas := r.getReplicas()
-	return StatefulSetOfComponentIsReady(sts, isRevisionConsistent, &targetReplicas), nil
+	return statefulSetOfComponentIsReady(sts, isRevisionConsistent, &targetReplicas), nil
 }
 
-func (r *Stateful) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
+func (r *stateful) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
-	sts := ConvertToStatefulSet(obj)
-	return StatefulSetPodsAreReady(sts, r.getReplicas()), nil
+	sts := convertToStatefulSet(obj)
+	return statefulSetPodsAreReady(sts, r.getReplicas()), nil
 }
 
-func (r *Stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+func (r *stateful) PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	if pod == nil {
 		return false
 	}
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
 }
 
-func (r *Stateful) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap) {
+func (r *stateful) GetPhaseWhenPodsReadyAndProbeTimeout(pods []*corev1.Pod) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap) {
 	return "", nil
 }
 
 // GetPhaseWhenPodsNotReady gets the component phase when the pods of component are not ready.
-func (r *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context,
+func (r *stateful) GetPhaseWhenPodsNotReady(ctx context.Context,
 	componentName string,
 	originPhaseIsUpRunning bool) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	stsList := &appsv1.StatefulSetList{}
-	podList, err := GetCompRelatedObjectList(ctx, r.Cli, *r.Cluster, componentName, stsList)
+	podList, err := getCompRelatedObjectList(ctx, r.Cli, *r.Cluster, componentName, stsList)
 	if err != nil || len(stsList.Items) == 0 {
 		return "", nil, err
 	}
@@ -109,22 +109,22 @@ func (r *Stateful) GetPhaseWhenPodsNotReady(ctx context.Context,
 		return existLatestRevisionFailedPod
 	}
 	stsObj := stsList.Items[0]
-	return GetComponentPhaseWhenPodsNotReady(podList, &stsObj, r.getReplicas(),
+	return getComponentPhaseWhenPodsNotReady(podList, &stsObj, r.getReplicas(),
 		stsObj.Status.AvailableReplicas, checkExistFailedPodOfLatestRevision), statusMessages, nil
 }
 
-func (r *Stateful) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {
+func (r *stateful) HandleRestart(context.Context, client.Object) ([]graph.Vertex, error) {
 	return nil, nil
 }
 
-func (r *Stateful) HandleRoleChange(context.Context, client.Object) ([]graph.Vertex, error) {
+func (r *stateful) HandleRoleChange(context.Context, client.Object) ([]graph.Vertex, error) {
 	return nil, nil
 }
 
 // HandleUpdateWithStrategy handles the update of component with strategy.
 // REVIEW/TODO: (nashtsai)
 //  1. too many args
-func (r *Stateful) HandleUpdateWithStrategy(ctx context.Context, obj client.Object,
+func (r *stateful) HandleUpdateWithStrategy(ctx context.Context, obj client.Object,
 	compStatusProcessor func(compDef *appsv1alpha1.ClusterComponentDefinition, pods []corev1.Pod, componentName string) error,
 	priorityMapper func(component *appsv1alpha1.ClusterComponentDefinition) map[string]int,
 	serialStrategyHandler, bestEffortParallelStrategyHandler, parallelStrategyHandler func(plan *Plan, pods []corev1.Pod, rolePriorityMap map[string]int)) ([]graph.Vertex, error) {
@@ -132,7 +132,7 @@ func (r *Stateful) HandleUpdateWithStrategy(ctx context.Context, obj client.Obje
 		return nil, nil
 	}
 
-	stsObj := ConvertToStatefulSet(obj)
+	stsObj := convertToStatefulSet(obj)
 	// get compDefName from stsObj.name
 	compDefName := r.Cluster.Spec.GetComponentDefRefName(stsObj.Labels[constant.KBAppComponentLabelKey])
 
@@ -197,9 +197,9 @@ func (r *Stateful) HandleUpdateWithStrategy(ctx context.Context, obj client.Obje
 func newStateful(cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	spec *appsv1alpha1.ClusterComponentSpec,
-	def appsv1alpha1.ClusterComponentDefinition) *Stateful {
-	return &Stateful{
-		ComponentSetBase: ComponentSetBase{
+	def appsv1alpha1.ClusterComponentDefinition) *stateful {
+	return &stateful{
+		componentSetBase: componentSetBase{
 			Cli:                  cli,
 			Cluster:              cluster,
 			SynthesizedComponent: nil,

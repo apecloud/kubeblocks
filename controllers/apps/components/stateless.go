@@ -35,21 +35,21 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func NewStatelessComponent(cli client.Client,
+func newStatelessComponent(cli client.Client,
 	recorder record.EventRecorder,
 	cluster *appsv1alpha1.Cluster,
 	clusterVersion *appsv1alpha1.ClusterVersion,
 	synthesizedComponent *component.SynthesizedComponent,
 	dag *graph.DAG) *statelessComponent {
 	comp := &statelessComponent{
-		ComponentBase: ComponentBase{
+		componentBase: componentBase{
 			Client:         cli,
 			Recorder:       recorder,
 			Cluster:        cluster,
 			ClusterVersion: clusterVersion,
 			Component:      synthesizedComponent,
-			ComponentSet: &Stateless{
-				ComponentSetBase: ComponentSetBase{
+			ComponentSet: &stateless{
+				componentSetBase: componentSetBase{
 					Cli:                  cli,
 					Cluster:              cluster,
 					SynthesizedComponent: synthesizedComponent,
@@ -65,7 +65,7 @@ func NewStatelessComponent(cli client.Client,
 }
 
 type statelessComponent struct {
-	ComponentBase
+	componentBase
 	// runningWorkload can be nil, and the replicas of workload can be nil (zero)
 	runningWorkload *appsv1.Deployment
 }
@@ -73,9 +73,9 @@ type statelessComponent struct {
 var _ Component = &statelessComponent{}
 
 func (c *statelessComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	action *ictrltypes.LifecycleAction) ComponentWorkloadBuilder {
+	action *ictrltypes.LifecycleAction) componentWorkloadBuilder {
 	builder := &statelessComponentWorkloadBuilder{
-		ComponentWorkloadBuilderBase: ComponentWorkloadBuilderBase{
+		componentWorkloadBuilderBase: componentWorkloadBuilderBase{
 			ReqCtx:        reqCtx,
 			Client:        cli,
 			Comp:          c,
@@ -89,7 +89,7 @@ func (c *statelessComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli clien
 	return builder
 }
 
-func (c *statelessComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, builder ComponentWorkloadBuilder, load bool) error {
+func (c *statelessComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Client, builder componentWorkloadBuilder, load bool) error {
 	var err error
 	if builder != nil {
 		if err = builder.BuildEnv().
@@ -115,7 +115,7 @@ func (c *statelessComponent) init(reqCtx intctrlutil.RequestCtx, cli client.Clie
 }
 
 func (c *statelessComponent) loadRunningWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client) (*appsv1.Deployment, error) {
-	deployList, err := ListDeployOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
+	deployList, err := listDeployOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +209,7 @@ func (c *statelessComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	if c.runningWorkload == nil {
 		return nil
 	}
-	return c.ComponentBase.StatusWorkload(reqCtx, cli, c.runningWorkload, nil)
+	return c.componentBase.StatusWorkload(reqCtx, cli, c.runningWorkload, nil)
 }
 
 func (c *statelessComponent) ExpandVolume(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -234,7 +234,7 @@ func (c *statelessComponent) HorizontalScale(reqCtx intctrlutil.RequestCtx, cli 
 }
 
 func (c *statelessComponent) Restart(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return RestartPod(&c.runningWorkload.Spec.Template)
+	return restartPod(&c.runningWorkload.Spec.Template)
 }
 
 func (c *statelessComponent) Reconfigure(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
@@ -267,11 +267,11 @@ func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
 	deployObjCopy := deployObj.DeepCopy()
 	deployProto := c.WorkloadVertex.Obj.(*appsv1.Deployment)
 
-	MergeAnnotations(deployObj.Spec.Template.Annotations, &deployProto.Spec.Template.Annotations)
-	BuildWorkLoadAnnotations(deployObjCopy, c.Cluster)
+	mergeAnnotations(deployObj.Spec.Template.Annotations, &deployProto.Spec.Template.Annotations)
+	buildWorkLoadAnnotations(deployObjCopy, c.Cluster)
 	deployObjCopy.Spec = deployProto.Spec
 
-	ResolvePodSpecDefaultFields(deployObj.Spec.Template.Spec, &deployObjCopy.Spec.Template.Spec)
+	resolvePodSpecDefaultFields(deployObj.Spec.Template.Spec, &deployObjCopy.Spec.Template.Spec)
 
 	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
 		c.WorkloadVertex.Obj = deployObjCopy

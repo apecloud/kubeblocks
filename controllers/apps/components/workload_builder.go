@@ -36,34 +36,34 @@ import (
 
 // TODO(impl): define a custom workload to encapsulate all the resources.
 
-type ComponentWorkloadBuilder interface {
+type componentWorkloadBuilder interface {
 	//	runtime, config, script, env, volume, service, monitor, probe
-	BuildEnv() ComponentWorkloadBuilder
-	BuildConfig() ComponentWorkloadBuilder
-	BuildWorkload() ComponentWorkloadBuilder
-	BuildPDB() ComponentWorkloadBuilder
-	BuildVolumeMount() ComponentWorkloadBuilder
-	BuildService() ComponentWorkloadBuilder
-	BuildHeadlessService() ComponentWorkloadBuilder
-	BuildTLSCert() ComponentWorkloadBuilder
-	BuildTLSVolume() ComponentWorkloadBuilder
+	BuildEnv() componentWorkloadBuilder
+	BuildConfig() componentWorkloadBuilder
+	BuildWorkload() componentWorkloadBuilder
+	BuildPDB() componentWorkloadBuilder
+	BuildVolumeMount() componentWorkloadBuilder
+	BuildService() componentWorkloadBuilder
+	BuildHeadlessService() componentWorkloadBuilder
+	BuildTLSCert() componentWorkloadBuilder
+	BuildTLSVolume() componentWorkloadBuilder
 
 	Complete() error
 }
 
-type ComponentWorkloadBuilderBase struct {
+type componentWorkloadBuilderBase struct {
 	ReqCtx          intctrlutil.RequestCtx
 	Client          client.Client
 	Comp            Component
 	DefaultAction   *ictrltypes.LifecycleAction
-	ConcreteBuilder ComponentWorkloadBuilder
+	ConcreteBuilder componentWorkloadBuilder
 	Error           error
 	EnvConfig       *corev1.ConfigMap
 	Workload        client.Object
 	LocalObjs       []client.Object // cache the objects needed for configuration, should remove this after refactoring the configuration
 }
 
-func (b *ComponentWorkloadBuilderBase) BuildEnv() ComponentWorkloadBuilder {
+func (b *componentWorkloadBuilderBase) BuildEnv() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		envCfg, err := builder.BuildEnvConfig(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		b.EnvConfig = envCfg
@@ -73,7 +73,7 @@ func (b *ComponentWorkloadBuilderBase) BuildEnv() ComponentWorkloadBuilder {
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *ComponentWorkloadBuilderBase) BuildConfig() ComponentWorkloadBuilder {
+func (b *componentWorkloadBuilderBase) BuildConfig() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		if b.Workload == nil {
 			return nil, fmt.Errorf("build config but workload is nil, cluster: %s, component: %s",
@@ -86,7 +86,7 @@ func (b *ComponentWorkloadBuilderBase) BuildConfig() ComponentWorkloadBuilder {
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *ComponentWorkloadBuilderBase) BuildWorkload4StatefulSet(workloadType string) ComponentWorkloadBuilder {
+func (b *componentWorkloadBuilderBase) BuildWorkload4StatefulSet(workloadType string) componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		if b.EnvConfig == nil {
 			return nil, fmt.Errorf("build %s workload but env config is nil, cluster: %s, component: %s",
@@ -106,7 +106,7 @@ func (b *ComponentWorkloadBuilderBase) BuildWorkload4StatefulSet(workloadType st
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *ComponentWorkloadBuilderBase) BuildPDB() ComponentWorkloadBuilder {
+func (b *componentWorkloadBuilderBase) BuildPDB() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		// if without this handler, the cluster controller will occur error during reconciling.
 		// conditionally build PodDisruptionBudget
@@ -124,7 +124,7 @@ func (b *ComponentWorkloadBuilderBase) BuildPDB() ComponentWorkloadBuilder {
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *ComponentWorkloadBuilderBase) BuildVolumeMount() ComponentWorkloadBuilder {
+func (b *componentWorkloadBuilderBase) BuildVolumeMount() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		if b.Workload == nil {
 			return nil, fmt.Errorf("build volume mount but workload is nil, cluster: %s, component: %s",
@@ -155,7 +155,7 @@ func (b *ComponentWorkloadBuilderBase) BuildVolumeMount() ComponentWorkloadBuild
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *ComponentWorkloadBuilderBase) BuildService() ComponentWorkloadBuilder {
+func (b *componentWorkloadBuilderBase) BuildService() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		svcList, err := builder.BuildSvcList(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {
@@ -170,7 +170,7 @@ func (b *ComponentWorkloadBuilderBase) BuildService() ComponentWorkloadBuilder {
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *ComponentWorkloadBuilderBase) BuildHeadlessService() ComponentWorkloadBuilder {
+func (b *componentWorkloadBuilderBase) BuildHeadlessService() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		svc, err := builder.BuildHeadlessSvc(b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		return []client.Object{svc}, err
@@ -178,7 +178,7 @@ func (b *ComponentWorkloadBuilderBase) BuildHeadlessService() ComponentWorkloadB
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *ComponentWorkloadBuilderBase) BuildTLSCert() ComponentWorkloadBuilder {
+func (b *componentWorkloadBuilderBase) BuildTLSCert() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		cluster := b.Comp.GetCluster()
 		component := b.Comp.GetSynthesizedComponent()
@@ -208,7 +208,7 @@ func (b *ComponentWorkloadBuilderBase) BuildTLSCert() ComponentWorkloadBuilder {
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *ComponentWorkloadBuilderBase) BuildTLSVolume() ComponentWorkloadBuilder {
+func (b *componentWorkloadBuilderBase) BuildTLSVolume() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		if b.Workload == nil {
 			return nil, fmt.Errorf("build TLS volumes but workload is nil, cluster: %s, component: %s",
@@ -220,7 +220,7 @@ func (b *ComponentWorkloadBuilderBase) BuildTLSVolume() ComponentWorkloadBuilder
 	return b.BuildWrapper(buildfn)
 }
 
-func (b *ComponentWorkloadBuilderBase) Complete() error {
+func (b *componentWorkloadBuilderBase) Complete() error {
 	if b.Error != nil {
 		return b.Error
 	}
@@ -232,7 +232,7 @@ func (b *ComponentWorkloadBuilderBase) Complete() error {
 	return nil
 }
 
-func (b *ComponentWorkloadBuilderBase) BuildWrapper(buildfn func() ([]client.Object, error)) ComponentWorkloadBuilder {
+func (b *componentWorkloadBuilderBase) BuildWrapper(buildfn func() ([]client.Object, error)) componentWorkloadBuilder {
 	if b.Error != nil || buildfn == nil {
 		return b.ConcreteBuilder
 	}
@@ -247,7 +247,7 @@ func (b *ComponentWorkloadBuilderBase) BuildWrapper(buildfn func() ([]client.Obj
 	return b.ConcreteBuilder
 }
 
-func (b *ComponentWorkloadBuilderBase) getRuntime() *corev1.PodSpec {
+func (b *componentWorkloadBuilderBase) getRuntime() *corev1.PodSpec {
 	if sts, ok := b.Workload.(*appsv1.StatefulSet); ok {
 		return &sts.Spec.Template.Spec
 	}

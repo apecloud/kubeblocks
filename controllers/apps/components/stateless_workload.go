@@ -26,12 +26,12 @@ import (
 )
 
 type statelessComponentWorkloadBuilder struct {
-	ComponentWorkloadBuilderBase
+	componentWorkloadBuilderBase
 }
 
-var _ ComponentWorkloadBuilder = &statelessComponentWorkloadBuilder{}
+var _ componentWorkloadBuilder = &statelessComponentWorkloadBuilder{}
 
-func (b *statelessComponentWorkloadBuilder) BuildWorkload() ComponentWorkloadBuilder {
+func (b *statelessComponentWorkloadBuilder) BuildWorkload() componentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		deploy, err := builder.BuildDeploy(b.ReqCtx, b.Comp.GetCluster(), b.Comp.GetSynthesizedComponent())
 		if err != nil {

@@ -30,22 +30,22 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func NewStatefulComponent(cli client.Client,
+func newStatefulComponent(cli client.Client,
 	recorder record.EventRecorder,
 	cluster *appsv1alpha1.Cluster,
 	clusterVersion *appsv1alpha1.ClusterVersion,
 	synthesizedComponent *component.SynthesizedComponent,
 	dag *graph.DAG) *statefulComponent {
 	comp := &statefulComponent{
-		StatefulComponentBase: StatefulComponentBase{
-			ComponentBase: ComponentBase{
+		statefulComponentBase: statefulComponentBase{
+			componentBase: componentBase{
 				Client:         cli,
 				Recorder:       recorder,
 				Cluster:        cluster,
 				ClusterVersion: clusterVersion,
 				Component:      synthesizedComponent,
-				ComponentSet: &Stateful{
-					ComponentSetBase: ComponentSetBase{
+				ComponentSet: &stateful{
+					componentSetBase: componentSetBase{
 						Cli:                  cli,
 						Cluster:              cluster,
 						SynthesizedComponent: synthesizedComponent,
@@ -62,15 +62,15 @@ func NewStatefulComponent(cli client.Client,
 }
 
 type statefulComponent struct {
-	StatefulComponentBase
+	statefulComponentBase
 }
 
 var _ Component = &statefulComponent{}
 
 func (c *statefulComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Client,
-	action *ictrltypes.LifecycleAction) ComponentWorkloadBuilder {
+	action *ictrltypes.LifecycleAction) componentWorkloadBuilder {
 	builder := &statefulComponentWorkloadBuilder{
-		ComponentWorkloadBuilderBase: ComponentWorkloadBuilderBase{
+		componentWorkloadBuilderBase: componentWorkloadBuilderBase{
 			ReqCtx:        reqCtx,
 			Client:        cli,
 			Comp:          c,
@@ -89,17 +89,17 @@ func (c *statefulComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *statefulComponent) GetBuiltObjects(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]client.Object, error) {
-	return c.StatefulComponentBase.GetBuiltObjects(c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
+	return c.statefulComponentBase.GetBuiltObjects(c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }
 
 func (c *statefulComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.StatefulComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
+	return c.statefulComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }
 
 func (c *statefulComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.StatefulComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
+	return c.statefulComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
 }
 
 func (c *statefulComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.StatefulComponentBase.Status(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionNoopPtr()))
+	return c.statefulComponentBase.Status(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionNoopPtr()))
 }

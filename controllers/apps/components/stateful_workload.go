@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package components
 
 type statefulComponentWorkloadBuilder struct {
-	ComponentWorkloadBuilderBase
+	componentWorkloadBuilderBase
 }
 
-var _ ComponentWorkloadBuilder = &statefulComponentWorkloadBuilder{}
+var _ componentWorkloadBuilder = &statefulComponentWorkloadBuilder{}
 
-func (b *statefulComponentWorkloadBuilder) BuildWorkload() ComponentWorkloadBuilder {
+func (b *statefulComponentWorkloadBuilder) BuildWorkload() componentWorkloadBuilder {
 	return b.BuildWorkload4StatefulSet("stateful")
 }

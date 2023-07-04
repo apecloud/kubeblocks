@@ -82,13 +82,13 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 
 	switch compDef.WorkloadType {
 	case appsv1alpha1.Replication:
-		return NewReplicationComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
+		return newReplicationComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
 	case appsv1alpha1.Consensus:
-		return NewConsensusComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
+		return newConsensusComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
 	case appsv1alpha1.Stateful:
-		return NewStatefulComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
+		return newStatefulComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
 	case appsv1alpha1.Stateless:
-		return NewStatelessComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
+		return newStatelessComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
 	}
 	panic(fmt.Sprintf("unknown workload type: %s, cluster: %s, component: %s, component definition ref: %s",
 		compDef.WorkloadType, cluster.Name, compSpec.Name, compSpec.ComponentDefRef))

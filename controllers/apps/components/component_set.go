@@ -32,7 +32,7 @@ import (
 
 // TODO(impl): replace it with ComponentWorkload and <*>Set implementation.
 
-type ComponentSet interface {
+type componentSet interface {
 	// IsRunning when relevant k8s workloads changes, it checks whether the component is running.
 	// you can also reconcile the pods of component till the component is Running here.
 	IsRunning(ctx context.Context, obj client.Object) (bool, error)
@@ -45,7 +45,7 @@ type ComponentSet interface {
 	// if the component is Stateless/StatefulSet, the available conditions follows as:
 	// 1. the pod is ready.
 	// 2. readyTime reached minReadySeconds.
-	// if the component is ConsensusSet,it will be available when the pod is ready and labeled with its role.
+	// if the component is consensusSet,it will be available when the pod is ready and labeled with its role.
 	PodIsAvailable(pod *corev1.Pod, minReadySeconds int32) bool
 
 	// GetPhaseWhenPodsReadyAndProbeTimeout when the pods of component are ready but the probe timed-out,
@@ -61,8 +61,8 @@ type ComponentSet interface {
 	HandleRoleChange(ctx context.Context, obj client.Object) ([]graph.Vertex, error)
 }
 
-// ComponentSetBase is a common component set base struct.
-type ComponentSetBase struct {
+// componentSetBase is a common component set base struct.
+type componentSetBase struct {
 	Cli                  client.Client
 	Cluster              *v1alpha1.Cluster
 	SynthesizedComponent *component.SynthesizedComponent

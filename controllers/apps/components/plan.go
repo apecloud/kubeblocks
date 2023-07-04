@@ -21,7 +21,7 @@ package components
 
 type Plan struct {
 	Start    *Step
-	WalkFunc WalkFunc
+	WalkFunc walkFunc
 }
 
 type Step struct {
@@ -29,7 +29,7 @@ type Step struct {
 	NextSteps []*Step
 }
 
-type WalkFunc func(obj interface{}) (bool, error)
+type walkFunc func(obj interface{}) (bool, error)
 
 // WalkOneStep process plan stepping
 // @return isCompleted

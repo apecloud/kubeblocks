@@ -52,7 +52,7 @@ func rebuildReplicationSetClusterStatus(cluster *appsv1alpha1.Cluster,
 	}
 	// if status changed, do update
 	if !cmp.Equal(newReplicationStatus, oldReplicationStatus) {
-		if err := InitClusterComponentStatusIfNeed(cluster, compName, workloadType); err != nil {
+		if err := initClusterComponentStatusIfNeed(cluster, compName, workloadType); err != nil {
 			return err
 		}
 		componentStatus := cluster.Status.Components[compName]
@@ -128,7 +128,7 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 		return nil
 	}
 	// if switchPolicy is not Noop, return
-	clusterCompSpec := GetClusterComponentSpecByName(*cluster, compName)
+	clusterCompSpec := getClusterComponentSpecByName(*cluster, compName)
 	if clusterCompSpec == nil || clusterCompSpec.SwitchPolicy == nil || clusterCompSpec.SwitchPolicy.Type != appsv1alpha1.Noop {
 		reqCtx.Log.Info("cluster switchPolicy is not Noop, does not support handling role change event", "cluster", cluster.Name)
 		return nil
@@ -167,8 +167,8 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 	return nil
 }
 
-// ComposeReplicationRolePriorityMap generates a priority map based on roles.
-func ComposeReplicationRolePriorityMap() map[string]int {
+// composeReplicationRolePriorityMap generates a priority map based on roles.
+func composeReplicationRolePriorityMap() map[string]int {
 	return map[string]int{
 		"":                 emptyReplicationPriority,
 		constant.Primary:   primaryPriority,

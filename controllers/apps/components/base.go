@@ -51,50 +51,50 @@ import (
 	"github.com/apecloud/kubeblocks/internal/generics"
 )
 
-type ComponentBase struct {
+type componentBase struct {
 	Client         client.Client
 	Recorder       record.EventRecorder
 	Cluster        *appsv1alpha1.Cluster
 	ClusterVersion *appsv1alpha1.ClusterVersion    // building config needs the cluster version
 	Component      *component.SynthesizedComponent // built synthesized component, replace it with component workload proto
-	ComponentSet   ComponentSet
+	ComponentSet   componentSet
 	Dag            *graph.DAG
 	WorkloadVertex *ictrltypes.LifecycleVertex // DAG vertex of main workload object
 }
 
-func (c *ComponentBase) GetName() string {
+func (c *componentBase) GetName() string {
 	return c.Component.Name
 }
 
-func (c *ComponentBase) GetNamespace() string {
+func (c *componentBase) GetNamespace() string {
 	return c.Cluster.Namespace
 }
 
-func (c *ComponentBase) GetClusterName() string {
+func (c *componentBase) GetClusterName() string {
 	return c.Cluster.Name
 }
 
-func (c *ComponentBase) GetDefinitionName() string {
+func (c *componentBase) GetDefinitionName() string {
 	return c.Component.ComponentDef
 }
 
-func (c *ComponentBase) GetCluster() *appsv1alpha1.Cluster {
+func (c *componentBase) GetCluster() *appsv1alpha1.Cluster {
 	return c.Cluster
 }
 
-func (c *ComponentBase) GetClusterVersion() *appsv1alpha1.ClusterVersion {
+func (c *componentBase) GetClusterVersion() *appsv1alpha1.ClusterVersion {
 	return c.ClusterVersion
 }
 
-func (c *ComponentBase) GetSynthesizedComponent() *component.SynthesizedComponent {
+func (c *componentBase) GetSynthesizedComponent() *component.SynthesizedComponent {
 	return c.Component
 }
 
-func (c *ComponentBase) GetConsensusSpec() *appsv1alpha1.ConsensusSetSpec {
+func (c *componentBase) GetConsensusSpec() *appsv1alpha1.ConsensusSetSpec {
 	return c.Component.ConsensusSpec
 }
 
-func (c *ComponentBase) GetMatchingLabels() client.MatchingLabels {
+func (c *componentBase) GetMatchingLabels() client.MatchingLabels {
 	return client.MatchingLabels{
 		constant.AppManagedByLabelKey:   constant.AppName,
 		constant.AppInstanceLabelKey:    c.GetClusterName(),
@@ -102,7 +102,7 @@ func (c *ComponentBase) GetMatchingLabels() client.MatchingLabels {
 	}
 }
 
-func (c *ComponentBase) GetPhase() appsv1alpha1.ClusterComponentPhase {
+func (c *componentBase) GetPhase() appsv1alpha1.ClusterComponentPhase {
 	if c.Cluster.Status.Components == nil {
 		return ""
 	}
@@ -112,11 +112,11 @@ func (c *ComponentBase) GetPhase() appsv1alpha1.ClusterComponentPhase {
 	return c.Cluster.Status.Components[c.GetName()].Phase
 }
 
-func (c *ComponentBase) SetWorkload(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex) {
+func (c *componentBase) SetWorkload(obj client.Object, action *ictrltypes.LifecycleAction, parent *ictrltypes.LifecycleVertex) {
 	c.WorkloadVertex = c.AddResource(obj, action, parent)
 }
 
-func (c *ComponentBase) AddResource(obj client.Object, action *ictrltypes.LifecycleAction,
+func (c *componentBase) AddResource(obj client.Object, action *ictrltypes.LifecycleAction,
 	parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
 	if obj == nil {
 		panic("try to add nil object")
@@ -133,28 +133,28 @@ func (c *ComponentBase) AddResource(obj client.Object, action *ictrltypes.Lifecy
 	return vertex
 }
 
-func (c *ComponentBase) CreateResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
+func (c *componentBase) CreateResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
 	return ictrltypes.LifecycleObjectCreate(c.Dag, obj, parent)
 }
 
-func (c *ComponentBase) DeleteResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
+func (c *componentBase) DeleteResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
 	return ictrltypes.LifecycleObjectDelete(c.Dag, obj, parent)
 }
 
-func (c *ComponentBase) UpdateResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
+func (c *componentBase) UpdateResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
 	return ictrltypes.LifecycleObjectUpdate(c.Dag, obj, parent)
 }
 
-func (c *ComponentBase) PatchResource(obj client.Object, objCopy client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
+func (c *componentBase) PatchResource(obj client.Object, objCopy client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
 	return ictrltypes.LifecycleObjectPatch(c.Dag, obj, objCopy, parent)
 }
 
-func (c *ComponentBase) NoopResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
+func (c *componentBase) NoopResource(obj client.Object, parent *ictrltypes.LifecycleVertex) *ictrltypes.LifecycleVertex {
 	return ictrltypes.LifecycleObjectNoop(c.Dag, obj, parent)
 }
 
 // ValidateObjectsAction validates the action of objects in dag has been determined.
-func (c *ComponentBase) ValidateObjectsAction() error {
+func (c *componentBase) ValidateObjectsAction() error {
 	for _, v := range c.Dag.Vertices() {
 		node, ok := v.(*ictrltypes.LifecycleVertex)
 		if !ok {
@@ -174,7 +174,7 @@ func (c *ComponentBase) ValidateObjectsAction() error {
 }
 
 // ResolveObjectsAction resolves the action of objects in dag to guarantee that all object actions will be determined.
-func (c *ComponentBase) ResolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+func (c *componentBase) ResolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
 	snapshot, err := readCacheSnapshot(reqCtx, cli, c.GetCluster())
 	if err != nil {
 		return err
@@ -205,8 +205,8 @@ func (c *ComponentBase) ResolveObjectsAction(reqCtx intctrlutil.RequestCtx, cli 
 	return c.ValidateObjectsAction()
 }
 
-func (c *ComponentBase) UpdatePDB(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	pdbObjList, err := ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PodDisruptionBudgetSignature, c.GetNamespace(), c.GetMatchingLabels())
+func (c *componentBase) UpdatePDB(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	pdbObjList, err := listObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.PodDisruptionBudgetSignature, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -230,8 +230,8 @@ func (c *ComponentBase) UpdatePDB(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	return nil
 }
 
-func (c *ComponentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	svcObjList, err := ListObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.ServiceSignature, c.GetNamespace(), c.GetMatchingLabels())
+func (c *componentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	svcObjList, err := listObjWithLabelsInNamespace(reqCtx.Ctx, cli, generics.ServiceSignature, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return client.IgnoreNotFound(err)
 	}
@@ -254,7 +254,7 @@ func (c *ComponentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.
 					return strings.HasPrefix(k, "monitor.kubeblocks.io")
 				})
 			}
-			MergeAnnotations(svcObjList[pos].Annotations, &svcProto.Annotations)
+			mergeAnnotations(svcObjList[pos].Annotations, &svcProto.Annotations)
 			node.Action = ictrltypes.ActionUpdatePtr()
 		}
 	}
@@ -273,7 +273,7 @@ func (c *ComponentBase) UpdateService(reqCtx intctrlutil.RequestCtx, cli client.
 }
 
 // SetStatusPhase sets the cluster component phase and messages conditionally.
-func (c *ComponentBase) SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase,
+func (c *componentBase) SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase,
 	statusMessage appsv1alpha1.ComponentMessageMap, phaseTransitionMsg string) {
 	updatefn := func(status *appsv1alpha1.ClusterComponentStatus) error {
 		if status.Phase == phase {
@@ -294,12 +294,12 @@ func (c *ComponentBase) SetStatusPhase(phase appsv1alpha1.ClusterComponentPhase,
 	}
 }
 
-func (c *ComponentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object, txn *statusReconciliationTxn) error {
+func (c *componentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client.Client, obj client.Object, txn *statusReconciliationTxn) error {
 	// if reflect.ValueOf(obj).Kind() == reflect.Ptr && reflect.ValueOf(obj).IsNil() {
 	//	return nil
 	// }
 
-	pods, err := ListPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
+	pods, err := listPodOwnedByComponent(reqCtx.Ctx, cli, c.GetNamespace(), c.GetMatchingLabels())
 	if err != nil {
 		return err
 	}
@@ -377,7 +377,7 @@ func (c *ComponentBase) StatusWorkload(reqCtx intctrlutil.RequestCtx, cli client
 	return delayedRequeueError
 }
 
-func (c *ComponentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isRunning bool, podsReady *bool,
+func (c *componentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isRunning bool, podsReady *bool,
 	hasFailedPodTimedOut bool, timedOutPodStatusMessage appsv1alpha1.ComponentMessageMap) (appsv1alpha1.ClusterComponentPhase, appsv1alpha1.ComponentMessageMap, error) {
 	var (
 		err           error
@@ -426,7 +426,7 @@ func (c *ComponentBase) buildStatus(ctx context.Context, pods []*corev1.Pod, isR
 }
 
 // updateStatus updates the cluster component status by @updatefn, with additional message to explain the transition occurred.
-func (c *ComponentBase) updateStatus(phaseTransitionMsg string, updatefn func(status *appsv1alpha1.ClusterComponentStatus) error) error {
+func (c *componentBase) updateStatus(phaseTransitionMsg string, updatefn func(status *appsv1alpha1.ClusterComponentStatus) error) error {
 	if updatefn == nil {
 		return nil
 	}

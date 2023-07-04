@@ -97,7 +97,7 @@ func init() {
 
 	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 100)
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
-	viper.SetDefault("ENABLE_RBAC_MANAGER", false)
+	viper.SetDefault("ENABLE_RBAC_MANAGER", true)
 	viper.SetDefault("VOLUMESNAPSHOT", false)
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)
 	viper.SetDefault(constant.KBToolsImage, "apecloud/kubeblocks-tools:latest")

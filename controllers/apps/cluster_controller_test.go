@@ -542,9 +542,7 @@ var _ = Describe("Cluster Controller", func() {
 						Name:      backupKey.Name,
 						Namespace: backupKey.Namespace,
 						Labels: map[string]string{
-							constant.KBManagedByKey:         "cluster",
-							constant.AppInstanceLabelKey:    clusterKey.Name,
-							constant.KBAppComponentLabelKey: comp.Name,
+							constant.DataProtectionLabelBackupNameKey: backupKey.Name,
 						}},
 					Spec: snapshotv1.VolumeSnapshotSpec{
 						Source: snapshotv1.VolumeSnapshotSource{
@@ -610,7 +608,6 @@ var _ = Describe("Cluster Controller", func() {
 					constant.AppInstanceLabelKey:    clusterKey.Name,
 					constant.KBAppComponentLabelKey: comp.Name,
 				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
-			Eventually(testapps.CheckObjExists(&testCtx, backupKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
 
 			if !viper.GetBool("VOLUMESNAPSHOT") && len(viper.GetString(constant.CfgKeyBackupPVCName)) > 0 {
 				By("Checking restore job cleanup")

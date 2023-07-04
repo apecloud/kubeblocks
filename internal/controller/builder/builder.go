@@ -568,20 +568,6 @@ func BuildBackup(cluster *appsv1alpha1.Cluster,
 	return &backup, nil
 }
 
-func BuildVolumeSnapshot(snapshotKey types.NamespacedName,
-	pvcName string,
-	sts *appsv1.StatefulSet) (*snapshotv1.VolumeSnapshot, error) {
-	snapshot := snapshotv1.VolumeSnapshot{}
-	if err := buildFromCUE("snapshot_template.cue", map[string]any{
-		"snapshot_key": snapshotKey,
-		"pvc_name":     pvcName,
-		"sts":          sts,
-	}, "snapshot", &snapshot); err != nil {
-		return nil, err
-	}
-	return &snapshot, nil
-}
-
 func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent,
 	configs map[string]string,

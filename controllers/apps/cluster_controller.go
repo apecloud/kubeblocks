@@ -23,8 +23,6 @@ import (
 	"context"
 	"time"
 
-	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -34,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -222,13 +219,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&dataprotectionv1alpha1.Backup{}).
 		Owns(&batchv1.Job{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterPods))
-	if viper.GetBool("VOLUMESNAPSHOT") {
-		if intctrlutil.InVolumeSnapshotV1Beta1() {
-			b.Owns(&snapshotv1beta1.VolumeSnapshot{}, builder.Predicates{})
-		} else {
-			b.Owns(&snapshotv1.VolumeSnapshot{}, builder.Predicates{})
-		}
-	}
+
 	return b.Complete(r)
 }
 

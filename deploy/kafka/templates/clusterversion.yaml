@@ -29,7 +29,7 @@ spec:
             securityContext:
               runAsNonRoot: true
               runAsUser: 1001
-    - componentDefRef: kafka-controller
+    - componentDefRef: kafka-kraft
       versionsContext:
         containers:
           - name: kafka
@@ -61,7 +61,6 @@ spec:
             securityContext:
               runAsNonRoot: true
               runAsUser: 1001
-
     - componentDefRef: kafka-exporter
       versionsContext:
         containers:

@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	opsutil "github.com/apecloud/kubeblocks/controllers/apps/operations/util"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
@@ -85,7 +85,7 @@ func reconcileActionWithComponentOps(reqCtx intctrlutil.RequestCtx,
 		if _, ok = componentNameMap[k]; !ok && !checkAllClusterComponent {
 			continue
 		}
-		if util.IsFailedOrAbnormal(v.Phase) {
+		if components.IsFailedOrAbnormal(v.Phase) {
 			isFailed = true
 		}
 		var compStatus appsv1alpha1.OpsRequestComponentStatus

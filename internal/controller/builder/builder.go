@@ -332,13 +332,13 @@ func randomString(length int) string {
 	return rand.String(length)
 }
 
-func BuildConnCredential(clusterDefiniiton *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
+func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent) (*corev1.Secret, error) {
 	const tplFile = "conn_credential_template.cue"
 
 	connCredential := corev1.Secret{}
 	if err := buildFromCUE(tplFile, map[string]any{
-		"clusterdefinition": clusterDefiniiton,
+		"clusterdefinition": clusterDefinition,
 		"cluster":           cluster,
 	}, "secret", &connCredential); err != nil {
 		return nil, err
@@ -567,20 +567,6 @@ func BuildBackup(cluster *appsv1alpha1.Cluster,
 		return nil, err
 	}
 	return &backup, nil
-}
-
-func BuildVolumeSnapshot(snapshotKey types.NamespacedName,
-	pvcName string,
-	sts *appsv1.StatefulSet) (*snapshotv1.VolumeSnapshot, error) {
-	snapshot := snapshotv1.VolumeSnapshot{}
-	if err := buildFromCUE("snapshot_template.cue", map[string]any{
-		"snapshot_key": snapshotKey,
-		"pvc_name":     pvcName,
-		"sts":          sts,
-	}, "snapshot", &snapshot); err != nil {
-		return nil, err
-	}
-	return &snapshot, nil
 }
 
 func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,

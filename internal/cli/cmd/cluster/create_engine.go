@@ -57,6 +57,9 @@ type CreateEngineOptions struct {
 	// chart is the cluster helm chart.
 	chart *chart.Chart
 
+	// clusterDef is the engine cluster definition.
+	clusterDef string
+
 	*create.CreateOptions
 }
 
@@ -72,6 +75,10 @@ func newEngineOptions(createOptions *create.CreateOptions, e cluster.EngineType)
 	}
 
 	if o.schema, err = cluster.GetEngineSchema(o.chart); err != nil {
+		return nil, err
+	}
+
+	if o.clusterDef, err = cluster.GetEngineClusterDef(o.chart); err != nil {
 		return nil, err
 	}
 	return o, nil
@@ -119,6 +126,9 @@ func (o *CreateEngineOptions) complete(cmd *cobra.Command, args []string) error 
 }
 
 func (o *CreateEngineOptions) validate() error {
+	if err := o.validateVersion(); err != nil {
+		return err
+	}
 	return cluster.ValidateValues(o.schema, o.values)
 }
 
@@ -208,5 +218,37 @@ func (o *CreateEngineOptions) run() error {
 			return err
 		}
 	}
+	return nil
+}
+
+func (o *CreateEngineOptions) validateVersion() error {
+	var err error
+
+	cv := o.values[cluster.VersionSchemaProp.String()].(string)
+	if cv != "" {
+		if err = cluster.ValidateClusterVersion(o.Dynamic, o.clusterDef, cv); err != nil {
+			return fmt.Errorf("cluster version \"%s\" does not exist, run following command to get the available cluster versions\n\tkbcli cv list --cluster-definition=%s",
+				o.clusterDef, cv)
+		}
+		return nil
+	}
+
+	cv, err = cluster.GetDefaultVersion(o.Dynamic, o.clusterDef)
+	if err != nil {
+		return err
+	}
+	// set cluster version
+	o.values[cluster.VersionSchemaProp.String()] = cv
+
+	dryRun, err := o.GetDryRunStrategy()
+	if err != nil {
+		return err
+	}
+	// if dryRun is set, run in quiet mode, avoid to output yaml file with the info
+	if dryRun != create.DryRunNone {
+		return nil
+	}
+
+	fmt.Fprintf(o.Out, "Info: --version is not specified, %s is applied by default.\n", cv)
 	return nil
 }

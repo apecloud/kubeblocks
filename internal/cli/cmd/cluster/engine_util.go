@@ -37,6 +37,12 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
 )
 
+var (
+	resetDefaultValsFlagNames = []string{
+		cluster.VersionSchemaProp.String(),
+	}
+)
+
 // addEngineFlags adds the flags for creating a cluster, these flags are built by the cluster schema.
 func addEngineFlags(cmd *cobra.Command, f cmdutil.Factory, schema *cluster.EngineSchema) error {
 	if schema == nil {
@@ -53,6 +59,11 @@ func addEngineFlags(cmd *cobra.Command, f cmdutil.Factory, schema *cluster.Engin
 		return err
 	}
 
+	// reset some flags default value, such as version, a suitable version will be chosen
+	// if user doesn't specify the version
+	resetFlagsDefaultValue(cmd.Flags())
+
+	// register completion function for some generic flag name
 	registerFlagCompFunc(cmd, f)
 	return nil
 }
@@ -78,6 +89,17 @@ func getValuesFromFlags(fs *flag.FlagSet) map[string]interface{} {
 		values[strcase.LowerCamelCase(f.Name)] = val
 	})
 	return values
+}
+
+// resetFlagsDefaultValue reset the default value of some flags
+func resetFlagsDefaultValue(fs *flag.FlagSet) {
+	fs.VisitAll(func(f *flag.Flag) {
+		for _, n := range resetDefaultValsFlagNames {
+			if n == f.Name {
+				f.DefValue = ""
+			}
+		}
+	})
 }
 
 func registerFlagCompFunc(cmd *cobra.Command, f cmdutil.Factory) {

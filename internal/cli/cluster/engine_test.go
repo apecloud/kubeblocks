@@ -54,6 +54,11 @@ var _ = Describe("cluster engine", func() {
 		Expect(s.SubSchema).ShouldNot(BeNil())
 		Expect(s.SubChartName).ShouldNot(BeEmpty())
 
+		By("get engine cluster definition")
+		cd, err := GetEngineClusterDef(c)
+		Expect(err).Should(Succeed())
+		Expect(cd).ShouldNot(BeNil())
+
 		By("validate values")
 		testCases := []struct {
 			desc    string

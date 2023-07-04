@@ -259,17 +259,16 @@ func GetClusterByName(dynamic dynamic.Interface, name string, namespace string) 
 
 func GetVersionByClusterDef(dynamic dynamic.Interface, clusterDef string) (*appsv1alpha1.ClusterVersionList, error) {
 	versionList := &appsv1alpha1.ClusterVersionList{}
-	objList, err := dynamic.Resource(types.ClusterVersionGVR()).Namespace("").
-		List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDef),
-		})
+	obj, err := dynamic.Resource(types.ClusterVersionGVR()).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDef),
+	})
 	if err != nil {
 		return nil, err
 	}
-	if objList == nil {
+	if obj == nil {
 		return nil, fmt.Errorf("failed to find component version referencing cluster definition %s", clusterDef)
 	}
-	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objList.UnstructuredContent(), versionList); err != nil {
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), versionList); err != nil {
 		return nil, err
 	}
 	return versionList, nil
@@ -302,19 +301,32 @@ func BuildStorageClass(storages []StorageInfo) string {
 	return util.CheckEmpty(strings.Join(scs, "\n"))
 }
 
-// GetLatestVersion gets the latest cluster versions that referencing the cluster definition
-func GetLatestVersion(dynamic dynamic.Interface, clusterDef string) (string, error) {
+// GetDefaultVersion gets the default cluster versions that referencing the cluster definition.
+// If only one version is found, it will be returned directly, otherwise the version with
+// constant.DefaultClusterVersionAnnotationKey label will be returned.
+func GetDefaultVersion(dynamic dynamic.Interface, clusterDef string) (string, error) {
 	versionList, err := GetVersionByClusterDef(dynamic, clusterDef)
 	if err != nil {
 		return "", err
 	}
 
-	// find the latest version to use
-	version := findLatestVersion(versionList)
-	if version == nil {
-		return "", fmt.Errorf("failed to find the latest cluster version referencing current cluster definition %s", clusterDef)
+	if len(versionList.Items) == 1 {
+		return versionList.Items[0].Name, nil
 	}
-	return version.Name, nil
+
+	found := false
+	defaultVersion := ""
+	for _, item := range versionList.Items {
+		if k, ok := item.Annotations[constant.DefaultClusterVersionAnnotationKey]; ok && k == "true" {
+			if found {
+				return "", fmt.Errorf("found more than one default cluster version referencing current cluster definition %s", clusterDef)
+			}
+			found = true
+			defaultVersion = item.Name
+		}
+	}
+
+	return defaultVersion, nil
 }
 
 func findLatestVersion(versions *appsv1alpha1.ClusterVersionList) *appsv1alpha1.ClusterVersion {

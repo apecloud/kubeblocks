@@ -23,6 +23,7 @@ import (
 	"compress/gzip"
 	"embed"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/leaanthony/debme"
@@ -37,6 +38,11 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/validate"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+)
+
+const (
+	templatesDir = "templates"
+	clusterFile  = "cluster.yaml"
 )
 
 type EngineType string
@@ -144,6 +150,31 @@ func GetEngineSchema(c *chart.Chart) (*EngineSchema, error) {
 	}
 
 	return eSchema, nil
+}
+
+func GetEngineClusterDef(c *chart.Chart) (string, error) {
+	if c == nil {
+		return "", fmt.Errorf("failed to get the cluster definition of %s, chart is nil", c.Name())
+	}
+
+	clusterFilePath := filepath.Join(templatesDir, clusterFile)
+	for _, tpl := range c.Templates {
+		if tpl.Name != clusterFilePath {
+			continue
+		}
+
+		// get cluster definition from cluster.yaml
+		pattern := "  clusterDefinitionRef: "
+		str := string(tpl.Data)
+		start := strings.Index(str, pattern)
+		if start != -1 {
+			end := strings.IndexAny(str[start+len(pattern):], " \n")
+			if end != -1 {
+				return strings.TrimSpace(str[start+len(pattern) : start+len(pattern)+end]), nil
+			}
+		}
+	}
+	return "", fmt.Errorf("failed to find the cluster definition of %s", c.Name())
 }
 
 // ValidateValues validates the given values against the schema.

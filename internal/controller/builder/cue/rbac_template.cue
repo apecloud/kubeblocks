@@ -74,9 +74,8 @@ rolebinding: {
     }
     roleRef: {
         apiGroup: "rbac.authorization.k8s.io"
-        kind: "Role"
-        name: "kb-\(cluster.metadata.name)"
-        namespace: cluster.metadata.namespace
+        kind: "ClusterRole"
+        name: "kubeblocks-cluster-pod-role"
     }
     subjects: [{
         kind: "ServiceAccount"

@@ -20,8 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -47,98 +51,56 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 		return err
 	}
 
-	serviceAccount, err := builder.BuildServiceAccount(cluster)
-	if err != nil {
-		return err
-	}
-	saVertex := ictrltypes.LifecycleObjectCreate(dag, serviceAccount, root)
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		ServiceAccountName := compSpec.ServiceAccountName
+		if !isServiceAccountNotExist(transCtx, ServiceAccountName) {
+			continue
+		}
 
-	role, err := builder.BuildRole(cluster)
-	if err != nil {
-		return err
-	}
+		serviceAccount, err := builder.BuildServiceAccount(cluster)
+		if err != nil {
+			return err
+		}
+		serviceAccount.Name = ServiceAccountName
+		saVertex := ictrltypes.LifecycleObjectCreate(dag, serviceAccount, root)
 
-	completeRoleRules(transCtx, role)
-	roleVertex := ictrltypes.LifecycleObjectCreate(dag, role, root)
+		roleBinding, err := builder.BuildRoleBinding(cluster)
+		if err != nil {
+			return err
+		}
+		roleBinding.Subjects[0].Name = ServiceAccountName
+		rbVertex := ictrltypes.LifecycleObjectCreate(dag, roleBinding, root)
+		dag.Connect(rbVertex, saVertex)
 
-	roleBinding, err := builder.BuildRoleBinding(cluster)
-	if err != nil {
-		return err
-	}
-	rbVertex := ictrltypes.LifecycleObjectCreate(dag, roleBinding, root)
-	dag.Connect(rbVertex, roleVertex)
-	dag.Connect(rbVertex, saVertex)
+		statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
+		for _, statefulSetVertex := range statefulSetVertices {
+			// rbac must be created before statefulset
+			dag.Connect(statefulSetVertex, rbVertex)
+		}
 
-	statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
-	for _, statefulSetVertex := range statefulSetVertices {
-		// rbac must be created before statefulset
-		dag.Connect(statefulSetVertex, rbVertex)
-	}
-
-	deploymentVertices := ictrltypes.FindAll[*appsv1.Deployment](dag)
-	for _, deploymentVertex := range deploymentVertices {
-		// rbac must be created before deployment
-		dag.Connect(deploymentVertex, rbVertex)
+		deploymentVertices := ictrltypes.FindAll[*appsv1.Deployment](dag)
+		for _, deploymentVertex := range deploymentVertices {
+			// rbac must be created before deployment
+			dag.Connect(deploymentVertex, rbVertex)
+		}
 	}
 	return nil
 }
 
-func completeRoleRules(transCtx *ClusterTransformContext, role *rbacv1.Role) {
-	rules := []rbacv1.PolicyRule{
-		{
-			APIGroups: []string{""},
-			Resources: []string{"events"},
-			Verbs:     []string{"create"},
-		},
-		{
-			APIGroups: []string{"dataprotection.kubeblocks.io"},
-			Resources: []string{"backups/status"},
-			Verbs:     []string{"get", "update", "patch"},
-		},
-		{
-			APIGroups: []string{"dataprotection.kubeblocks.io"},
-			Resources: []string{"backups"},
-			Verbs:     []string{"create", "get", "list", "update", "patch"},
-		},
-	}
-
-	// postgresql need more rules for patroni
-	if isPostgresqlCluster(transCtx) {
-		rules = append(rules, []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{""},
-				Resources: []string{"configmaps"},
-				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"endpoints"},
-				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"pods"},
-				Verbs:     []string{"get", "list", "patch", "update", "watch"},
-			},
-		}...)
-	}
-	role.Rules = append(role.Rules, rules...)
-}
-
-func isPostgresqlCluster(transCtx *ClusterTransformContext) bool {
-	cd := transCtx.ClusterDef
+func isServiceAccountNotExist(transCtx *ClusterTransformContext, serviceAccountName string) bool {
 	cluster := transCtx.Cluster
-
-	if cd.Spec.Type != PGTYPE {
-		return false
+	namespaceName := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      serviceAccountName,
 	}
-
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		for _, def := range cd.Spec.ComponentDefs {
-			if def.Name == compSpec.ComponentDefRef && def.CharacterType == PGTYPE {
-				return true
-			}
+	sa := &corev1.ServiceAccount{}
+	if err := transCtx.Client.Get(transCtx.Context, namespaceName, sa); err != nil {
+		// KubeBlocks will create a serviceaccount only if it has RBAC access priority and
+		// the serviceaccount is not already present.
+		if errors.IsNotFound(err) {
+			return true
 		}
+		transCtx.Logger.V(0).Info(fmt.Sprintf("get service account error: %v", err))
 	}
 
 	return false

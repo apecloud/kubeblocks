@@ -548,6 +548,9 @@ func IsSupportReconfigureParams(tpl appsv1alpha1.ComponentConfigSpec, values map
 		if err != nil {
 			return false, err
 		}
+		if schema.Schema == nil {
+			return true, nil
+		}
 	}
 
 	schemaSpec := schema.Schema.Properties["spec"]

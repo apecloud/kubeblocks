@@ -374,7 +374,7 @@ fix-license-header: ## Run license header fix.
 
 ##@ Helm Chart Tasks
 
-bump-single-chart-appver.%: chart=$(word 2,$(subst ., ,$@))
+bump-single-chart-appver.%: chart=$*
 bump-single-chart-appver.%:
 ifeq ($(GOOS), darwin)
 	sed -i '' "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
@@ -382,7 +382,7 @@ else
 	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
 endif
 
-bump-single-chart-ver.%: chart=$(word 2,$(subst ., ,$@))
+bump-single-chart-ver.%: chart=$*
 bump-single-chart-ver.%:
 ifeq ($(GOOS), darwin)
 	sed -i '' "s/^version:.*/version: $(VERSION)/" deploy/$(chart)/Chart.yaml
@@ -414,7 +414,9 @@ bump-chart-ver: \
 	bump-single-chart-ver.qdrant-cluster \
 	bump-single-chart-ver.weaviate \
 	bump-single-chart-ver.weaviate-cluster \
-	bump-single-chart-ver.chatgpt-retrieval-plugin
+	bump-single-chart-ver.chatgpt-retrieval-plugin \
+	bump-single-chart-ver.tdengine \
+	bump-single-chart-ver.tdengine-cluster
 bump-chart-ver: ## Bump helm chart version.
 
 .PHONY: helm-package

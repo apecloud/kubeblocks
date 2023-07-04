@@ -358,45 +358,6 @@ func (d *snapshotDataClone) listVolumeSnapshotByLabels(vsList *snapshotv1.Volume
 	})
 }
 
-// check snapshot existence
-func (d *snapshotDataClone) isVolumeSnapshotExists() (bool, error) {
-	ml := d.getBackupMatchingLabels()
-	vsList := snapshotv1.VolumeSnapshotList{}
-	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: d.cli, Ctx: d.reqCtx.Ctx}
-	if err := compatClient.List(&vsList, ml); err != nil {
-		return false, client.IgnoreNotFound(err)
-	}
-	for _, vs := range vsList.Items {
-		// when do h-scale very shortly after last h-scale,
-		// the last volume snapshot could not be deleted completely
-		if vs.DeletionTimestamp.IsZero() {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-// check snapshot ready to use
-func (d *snapshotDataClone) isVolumeSnapshotReadyToUse() (bool, error) {
-	ml := d.getBackupMatchingLabels()
-	vsList := snapshotv1.VolumeSnapshotList{}
-	compatClient := intctrlutil.VolumeSnapshotCompatClient{ReadonlyClient: d.cli, Ctx: d.reqCtx.Ctx}
-	if err := compatClient.List(&vsList, ml); err != nil {
-		return false, client.IgnoreNotFound(err)
-	}
-	if len(vsList.Items) == 0 || vsList.Items[0].Status == nil {
-		return false, nil
-	}
-	status := vsList.Items[0].Status
-	if status.Error != nil {
-		return false, fmt.Errorf("VolumeSnapshot/" + vsList.Items[0].Name + ": " + *status.Error.Message)
-	}
-	if status.ReadyToUse == nil {
-		return false, nil
-	}
-	return *status.ReadyToUse, nil
-}
-
 func (d *snapshotDataClone) checkedCreatePVCFromSnapshot(pvcKey types.NamespacedName,
 	vct *corev1.PersistentVolumeClaimTemplate) (client.Object, error) {
 	pvc := corev1.PersistentVolumeClaim{}

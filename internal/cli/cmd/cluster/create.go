@@ -141,6 +141,7 @@ var clusterCreateExample = templates.Examples(`
 const (
 	CueTemplateName = "cluster_template.cue"
 	monitorKey      = "monitor"
+	saNamePrefix    = "kb-sa-"
 )
 
 type setKey string
@@ -548,6 +549,8 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 			return nil, err
 		}
 
+		// set component service account name
+		compSpec.ServiceAccountName = saNamePrefix + o.Name
 		comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compSpec)
 		if err != nil {
 			return nil, err

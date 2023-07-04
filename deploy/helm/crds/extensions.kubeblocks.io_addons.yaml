@@ -243,6 +243,8 @@ spec:
                               type: string
                             name:
                               description: Object name of the referent.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                               type: string
                           required:
                           - key
@@ -261,6 +263,8 @@ spec:
                               type: string
                             name:
                               description: Object name of the referent.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                               type: string
                           required:
                           - key

@@ -75,8 +75,9 @@ type InstallOpts struct {
 	ForceUninstall  bool
 
 	// for helm template
-	DryRun    *bool
-	OutputDir string
+	DryRun     *bool
+	OutputDir  string
+	IncludeCRD bool
 }
 
 type Option func(*cli.EnvSettings)
@@ -177,7 +178,7 @@ func (i *InstallOpts) Install(cfg *Config) (*release.Release, error) {
 	}
 
 	var rel *release.Release
-	if err = retry.IfNecessary(ctx, func() error {
+	if err := retry.IfNecessary(ctx, func() error {
 		var err1 error
 		if rel, err1 = i.tryInstall(actionCfg); err1 != nil {
 			klog.Error(err1)
@@ -192,14 +193,15 @@ func (i *InstallOpts) Install(cfg *Config) (*release.Release, error) {
 }
 
 func (i *InstallOpts) tryInstall(cfg *action.Configuration) (*release.Release, error) {
-	released, err := i.GetInstalled(cfg)
-	if released != nil {
-		return released, nil
+	if i.DryRun == nil || !*i.DryRun {
+		released, err := i.GetInstalled(cfg)
+		if released != nil {
+			return released, nil
+		}
+		if err != nil && !releaseNotFound(err) {
+			return nil, err
+		}
 	}
-	if err != nil && !releaseNotFound(err) {
-		return nil, err
-	}
-
 	settings := cli.New()
 
 	// TODO: Does not work now
@@ -219,10 +221,14 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (*release.Release, e
 	client.Timeout = i.Timeout
 	client.Version = i.Version
 	client.Atomic = i.Atomic
+
 	// for helm template
 	if i.DryRun != nil {
 		client.DryRun = *i.DryRun
 		client.OutputDir = i.OutputDir
+		client.IncludeCRDs = i.IncludeCRD
+		client.Replace = true
+		client.ClientOnly = true
 	}
 
 	if client.Timeout == 0 {
@@ -261,7 +267,7 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (*release.Release, e
 		cancel()
 	}()
 
-	released, err = client.RunWithContext(ctx, chartRequested, vals)
+	released, err := client.RunWithContext(ctx, chartRequested, vals)
 	if err != nil {
 		return nil, err
 	}
@@ -433,13 +439,18 @@ func fakeActionConfig() *action.Configuration {
 		return nil
 	}
 
-	return &action.Configuration{
+	res := &action.Configuration{
 		Releases:       storage.Init(driver.NewMemory()),
 		KubeClient:     &kubefake.FailingKubeClient{PrintingKubeClient: kubefake.PrintingKubeClient{Out: io.Discard}},
 		Capabilities:   chartutil.DefaultCapabilities,
 		RegistryClient: registryClient,
 		Log:            func(format string, v ...interface{}) {},
 	}
+	// to template the kubeblocks manifest, dry-run install will check and valida the KubeVersion in Capabilities is bigger than
+	// the KubeVersion in Chart.yaml.
+	// in helm v3.11.1 the DefaultCapabilities KubeVersion is 1.20 which lower than the kubeblocks Chart claimed '>=1.22.0-0'
+	res.Capabilities.KubeVersion.Version = "v99.99.0"
+	return res
 }
 
 // Upgrade will upgrade a Chart
@@ -467,10 +478,10 @@ func (i *InstallOpts) Upgrade(cfg *Config) error {
 	return nil
 }
 
-func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
+func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (*release.Release, error) {
 	installed, err := i.GetInstalled(cfg)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	settings := cli.New()
@@ -495,30 +506,30 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 
 	cp, err := client.ChartPathOptions.LocateChart(i.Chart, settings)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	p := getter.All(settings)
 	vals, err := i.ValueOpts.MergeValues(p)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	// get coalesced values of current chart
 	currentValues, err := chartutil.CoalesceValues(installed.Chart, installed.Config)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	// merge current values into vals, so current release's user values can be kept
 	installed.Chart.Values = currentValues
 	vals, err = chartutil.CoalesceValues(installed.Chart, vals)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Check Chart dependencies to make sure all are present in /charts
 	chartRequested, err := loader.Load(cp)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Create context and prepare the handle of SIGTERM
@@ -541,22 +552,22 @@ func (i *InstallOpts) tryUpgrade(cfg *action.Configuration) (string, error) {
 		// Read in the resources
 		target, err := cfg.KubeClient.Build(bytes.NewBuffer(obj.File.Data), false)
 		if err != nil {
-			return "", errors.Wrapf(err, "failed to update CRD %s", obj.Name)
+			return nil, errors.Wrapf(err, "failed to update CRD %s", obj.Name)
 		}
 
 		// helm only use the original.Info part for looking up original CRD in Update interface
 		// so set original with target as they have same .Info part
 		original := target
 		if _, err := cfg.KubeClient.Update(original, target, false); err != nil {
-			return "", errors.Wrapf(err, "failed to update CRD %s", obj.Name)
+			return nil, errors.Wrapf(err, "failed to update CRD %s", obj.Name)
 		}
 	}
 
 	released, err := client.RunWithContext(ctx, i.Name, chartRequested, vals)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return released.Info.Notes, nil
+	return released, nil
 }
 
 func GetChartVersions(chartName string) ([]*semver.Version, error) {
@@ -646,4 +657,19 @@ func GetValues(release string, cfg *Config) (map[string]interface{}, error) {
 	client := action.NewGetValues(actionConfig)
 	client.AllValues = true
 	return client.Run(release)
+}
+
+// GetTemplateInstallOps build a helm InstallOpts with dryrun to implement helm template
+func GetTemplateInstallOps(name, chart, version, namespace string) *InstallOpts {
+	dryrun := true
+	return &InstallOpts{
+		Name:       name,
+		Chart:      chart,
+		Version:    version,
+		Namespace:  namespace,
+		TryTimes:   2,
+		Atomic:     true,
+		IncludeCRD: true,
+		DryRun:     &dryrun,
+	}
 }

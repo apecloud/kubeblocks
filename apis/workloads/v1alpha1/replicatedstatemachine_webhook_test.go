@@ -52,7 +52,8 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 					Selector: &metav1.LabelSelector{
 						MatchLabels: commonLabels,
 					},
-					RoleObservation: RoleObservation{
+					Service: &corev1.ServiceSpec{},
+					RoleObservation: &RoleObservation{
 						ObservationActions: []Action{
 							{
 								Image:   "foo",

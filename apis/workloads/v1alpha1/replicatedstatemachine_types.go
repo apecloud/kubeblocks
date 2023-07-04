@@ -52,8 +52,13 @@ type ReplicatedStateMachineSpec struct {
 	// provides read-write service
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	// +kubebuilder:pruning:PreserveUnknownFields
-	// +kubebuilder:validation:Required
-	Service corev1.ServiceSpec `json:"service"`
+	// +optional
+	Service *corev1.ServiceSpec `json:"service,omitempty"`
+
+	// AlternativeServices defines Alternative Services selector pattern specifier.
+	// can be used for create Readonly service.
+	// +optional
+	AlternativeServices []corev1.Service `json:"alternativeServices,omitempty"`
 
 	Template corev1.PodTemplateSpec `json:"template"`
 
@@ -84,12 +89,12 @@ type ReplicatedStateMachineSpec struct {
 	UpdateStrategy appsv1.StatefulSetUpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// Roles, a list of roles defined in the system.
-	// +kubebuilder:validation:Required
-	Roles []ReplicaRole `json:"roles"`
+	// +optional
+	Roles []ReplicaRole `json:"roles,omitempty"`
 
 	// RoleObservation provides method to observe role.
-	// +kubebuilder:validation:Required
-	RoleObservation RoleObservation `json:"roleObservation"`
+	// +optional
+	RoleObservation *RoleObservation `json:"roleObservation,omitempty"`
 
 	// MembershipReconfiguration provides actions to do membership dynamic reconfiguration.
 	// +optional

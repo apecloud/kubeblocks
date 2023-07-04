@@ -21,6 +21,7 @@ package apps
 
 import (
 	"encoding/json"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -162,6 +163,7 @@ func kindsForHalt() []client.ObjectList {
 		&corev1.ServiceList{},
 		&appsv1.StatefulSetList{},
 		&appsv1.DeploymentList{},
+		&workloads.ReplicatedStateMachineList{},
 		&corev1.ServiceList{},
 		&policyv1.PodDisruptionBudgetList{},
 	}

@@ -80,24 +80,28 @@ func (r *ReplicatedStateMachine) ValidateDelete() error {
 func (r *ReplicatedStateMachine) validate() error {
 	var allErrs field.ErrorList
 
-	// Leader is required
-	hasHeader := false
-	for _, role := range r.Spec.Roles {
-		if role.IsLeader && len(role.Name) > 0 {
-			hasHeader = true
+	if len(r.Spec.Roles) > 0 {
+		// Leader is required
+		hasHeader := false
+		for _, role := range r.Spec.Roles {
+			if role.IsLeader && len(role.Name) > 0 {
+				hasHeader = true
+			}
+		}
+		if !hasHeader {
+			allErrs = append(allErrs,
+				field.Required(field.NewPath("spec.roles"),
+					"leader is required"))
 		}
 	}
-	if !hasHeader {
-		allErrs = append(allErrs,
-			field.Required(field.NewPath("spec.roles"),
-				"leader is required"))
-	}
 
-	// servicePort must provide
-	if len(r.Spec.Service.Ports) == 0 {
-		allErrs = append(allErrs,
-			field.Required(field.NewPath("spec.service.ports"),
-				"servicePort must provide"))
+	if r.Spec.Service != nil {
+		// servicePort must provide
+		if len(r.Spec.Service.Ports) == 0 {
+			allErrs = append(allErrs,
+				field.Required(field.NewPath("spec.service.ports"),
+					"servicePort must provide"))
+		}
 	}
 
 	if len(allErrs) > 0 {

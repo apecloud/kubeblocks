@@ -259,6 +259,9 @@ func getHeadlessSvcName(rsm workloads.ReplicatedStateMachine) string {
 }
 
 func findSvcPort(rsm workloads.ReplicatedStateMachine) int {
+	if rsm.Spec.Service == nil {
+		return 0
+	}
 	port := rsm.Spec.Service.Ports[0]
 	for _, c := range rsm.Spec.Template.Spec.Containers {
 		for _, p := range c.Ports {

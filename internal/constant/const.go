@@ -291,5 +291,5 @@ const (
 )
 
 const (
-	FeatureGateReplicatedStateMachine = "ReplicatedStateMachine" // enable rsm
+	FeatureGateReplicatedStateMachine = "REPLICATED_STATE_MACHINE" // enable rsm
 )

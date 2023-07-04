@@ -59,7 +59,10 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 	headLessSvc := buildHeadlessSvc(*rsm)
 	envConfig := buildEnvConfigMap(*rsm)
 	sts := buildSts(*rsm, headLessSvc.Name, *envConfig)
-	objects := []client.Object{svc, headLessSvc, envConfig, sts}
+	objects := []client.Object{headLessSvc, envConfig, sts}
+	if svc != nil {
+		objects = append(objects, svc)
+	}
 
 	for _, object := range objects {
 		if err := controllerutil.SetOwnership(rsm, object, model.GetScheme(), rsmFinalizerName); err != nil {
@@ -124,6 +127,9 @@ func (t *ObjectGenerationTransformer) Transform(ctx graph.TransformContext, dag 
 }
 
 func buildSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
+	if rsm.Spec.Service == nil {
+		return nil
+	}
 	svcBuilder := builder.NewServiceBuilder(rsm.Namespace, rsm.Name).
 		AddLabels(constant.AppInstanceLabelKey, rsm.Name).
 		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
@@ -225,6 +231,9 @@ func buildStsPodTemplate(rsm workloads.ReplicatedStateMachine, envConfig corev1.
 
 func injectRoleObservationContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec) {
 	roleObservation := rsm.Spec.RoleObservation
+	if roleObservation == nil {
+		return
+	}
 	credential := rsm.Spec.Credential
 	credentialEnv := make([]corev1.EnvVar, 0)
 	if credential != nil {
@@ -282,6 +291,9 @@ func findAllUsedPorts(template *corev1.PodTemplateSpec) []int32 {
 func injectRoleObserveContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcList string, credentialEnv []corev1.EnvVar) {
 	// compute parameters for role observation container
 	roleObservation := rsm.Spec.RoleObservation
+	if roleObservation == nil {
+		return
+	}
 	credential := rsm.Spec.Credential
 	image := viper.GetString("ROLE_OBSERVATION_IMAGE")
 	if len(image) == 0 {
@@ -364,6 +376,10 @@ func injectRoleObserveContainer(rsm workloads.ReplicatedStateMachine, template *
 }
 
 func injectObservationActionContainer(rsm workloads.ReplicatedStateMachine, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {
+	if rsm.Spec.RoleObservation == nil {
+		return
+	}
+
 	// inject shared volume
 	agentVolume := corev1.Volume{
 		Name: roleAgentVolumeName,

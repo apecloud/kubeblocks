@@ -125,19 +125,29 @@ func (builder *ReplicatedStateMachineBuilder) SetUpdateStrategyType(strategyType
 }
 
 func (builder *ReplicatedStateMachineBuilder) SetObservationActions(actions []workloads.Action) *ReplicatedStateMachineBuilder {
-	builder.get().Spec.RoleObservation.ObservationActions = actions
+	roleObservation := builder.get().Spec.RoleObservation
+	if roleObservation == nil {
+		roleObservation = &workloads.RoleObservation{}
+	}
+	roleObservation.ObservationActions = actions
+	builder.get().Spec.RoleObservation = roleObservation
 	return builder
 }
 
 func (builder *ReplicatedStateMachineBuilder) AddObservationAction(action workloads.Action) *ReplicatedStateMachineBuilder {
-	actions := builder.get().Spec.RoleObservation.ObservationActions
+	roleObservation := builder.get().Spec.RoleObservation
+	if roleObservation == nil {
+		roleObservation = &workloads.RoleObservation{}
+	}
+	actions := roleObservation.ObservationActions
 	actions = append(actions, action)
-	builder.get().Spec.RoleObservation.ObservationActions = actions
+	roleObservation.ObservationActions = actions
+	builder.get().Spec.RoleObservation = roleObservation
 	return builder
 }
 
 func (builder *ReplicatedStateMachineBuilder) SetService(service corev1.ServiceSpec) *ReplicatedStateMachineBuilder {
-	builder.get().Spec.Service = service
+	builder.get().Spec.Service = &service
 	return builder
 }
 

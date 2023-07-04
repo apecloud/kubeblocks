@@ -188,7 +188,14 @@ func ValidateValues(schema *EngineSchema, values map[string]interface{}) error {
 			return nil
 		}
 		v := validate.NewSchemaValidator(s, nil, "", strfmt.Default)
-		return v.Validate(values).AsError()
+		err := v.Validate(values).AsError()
+		if err != nil {
+			// the default error message is like "cpu in body should be a multiple of 0.5"
+			// the "in body" is not necessary, so we remove it
+			errMsg := strings.Replace(err.Error(), " in body", "", -1)
+			return errors.New(errMsg)
+		}
+		return nil
 	}
 
 	if err := validateFn(schema.Schema, values); err != nil {

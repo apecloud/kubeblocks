@@ -712,6 +712,21 @@ func registerFlagCompletionFunc(cmd *cobra.Command, f cmdutil.Factory) {
 			}
 			return clusterVersion, cobra.ShellCompDirectiveNoFileComp
 		}))
+
+	var formatsWithDesc = map[string]string{
+		"JSON": "Output result in JSON format",
+		"YAML": "Output result in YAML format",
+	}
+	util.CheckErr(cmd.RegisterFlagCompletionFunc("output",
+		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			var names []string
+			for format, desc := range formatsWithDesc {
+				if strings.HasPrefix(format, toComplete) {
+					names = append(names, fmt.Sprintf("%s\t%s", format, desc))
+				}
+			}
+			return names, cobra.ShellCompDirectiveNoFileComp
+		}))
 }
 
 // PreCreate before saving yaml to k8s, makes changes on Unstructured yaml

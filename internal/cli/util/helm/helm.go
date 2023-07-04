@@ -179,11 +179,11 @@ func (i *InstallOpts) Install(cfg *Config) (*release.Release, error) {
 
 	var rel *release.Release
 	if err := retry.IfNecessary(ctx, func() error {
-		var err1 error
-		if rel, err1 = i.tryInstall(actionCfg); err1 != nil {
-			klog.Error(err1)
+		release, err1 := i.tryInstall(actionCfg)
+		if err1 != nil {
 			return err1
 		}
+		rel = release
 		return nil
 	}, &opts); err != nil {
 		return nil, errors.Errorf("install chart %s error: %s", i.Name, err.Error())

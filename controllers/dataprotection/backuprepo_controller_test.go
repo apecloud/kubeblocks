@@ -523,7 +523,7 @@ parameters:
 					g.Expect(false).Should(BeTrue())
 				}
 			}).Should(Succeed())
-			By("checking the PVC is created in the namespace")
+			By("checking the PVC has been created in the namespace")
 			pvcKey := types.NamespacedName{
 				Name:      pvcName,
 				Namespace: namespace,

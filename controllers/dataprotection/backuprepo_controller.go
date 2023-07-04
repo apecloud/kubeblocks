@@ -162,7 +162,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	// check associated backups, to create PVC in their namespaces
 	if repo.Status.Phase == dpv1alpha1.BackupRepoReady {
-		if err = r.checkAssociatedBackups(reqCtx, repo); err != nil {
+		if err = r.createPVCForAssociatedBackups(reqCtx, repo); err != nil {
 			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log,
 				"check associated backups failed")
 		}
@@ -419,13 +419,16 @@ func (r *BackupRepoReconciler) createStorageClass(
 }
 
 func (r *BackupRepoReconciler) listAssociatedBackups(
-	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) ([]*dpv1alpha1.Backup, error) {
+	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo, extraSelector map[string]string) ([]*dpv1alpha1.Backup, error) {
 	// list backups associated with the repo
 	backupList := &dpv1alpha1.BackupList{}
-	err := r.Client.List(reqCtx.Ctx, backupList, client.MatchingLabels{
-		dataProtectionBackupRepoKey:  repo.Name,
-		dataProtectionNeedRepoPVCKey: trueVal,
-	})
+	selectors := client.MatchingLabels{
+		dataProtectionBackupRepoKey: repo.Name,
+	}
+	for k, v := range extraSelector {
+		selectors[k] = v
+	}
+	err := r.Client.List(reqCtx.Ctx, backupList, selectors)
 	var filtered []*dpv1alpha1.Backup
 	for _, backup := range backupList.Items {
 		if backup.Status.Phase == dpv1alpha1.BackupFailed {
@@ -436,9 +439,11 @@ func (r *BackupRepoReconciler) listAssociatedBackups(
 	return filtered, err
 }
 
-func (r *BackupRepoReconciler) checkAssociatedBackups(
+func (r *BackupRepoReconciler) createPVCForAssociatedBackups(
 	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) error {
-	backups, err := r.listAssociatedBackups(reqCtx, repo)
+	backups, err := r.listAssociatedBackups(reqCtx, repo, map[string]string{
+		dataProtectionNeedRepoPVCKey: trueVal,
+	})
 	if err != nil {
 		return err
 	}
@@ -454,6 +459,7 @@ func (r *BackupRepoReconciler) checkAssociatedBackups(
 		if backup.Annotations == nil {
 			backup.Annotations = make(map[string]string)
 		}
+		delete(backup.Annotations, dataProtectionNeedRepoPVCKey)
 		backup.Annotations[dataProtectionRepoPVCNameAnnotationKey] = repo.Status.BackupPVCName
 		if err = r.Client.Patch(reqCtx.Ctx, backup, patch); err != nil {
 			reqCtx.Log.Error(err, "failed to patch backup",
@@ -537,7 +543,7 @@ func (r *BackupRepoReconciler) deleteExternalResources(
 	// TODO: block deletion if any BackupPolicy is referencing to this repo
 
 	// check if the repo is still being used by any backup
-	if backups, err := r.listAssociatedBackups(reqCtx, repo); err != nil {
+	if backups, err := r.listAssociatedBackups(reqCtx, repo, nil); err != nil {
 		return err
 	} else if len(backups) > 0 {
 		_ = updateCondition(reqCtx.Ctx, r.Client, repo, ConditionTypeDerivedObjectsDeleted,
@@ -661,24 +667,21 @@ func (r *BackupRepoReconciler) mapBackupToRepo(obj client.Object) []ctrl.Request
 	if !ok {
 		return nil
 	}
-	// ignore backups that doesn't need to create PVC (yet)
-	if backup.Labels[dataProtectionNeedRepoPVCKey] != trueVal {
-		return nil
-	}
 	// ignore failed backups
 	if backup.Status.Phase == dpv1alpha1.BackupFailed {
 		return nil
 	}
-	// ignore backups that we have created the PVC for it.
-	// expect for the Backup is being deleted, because it may
-	// block the deletion of the BackupRepo.
-	if backup.Annotations[dataProtectionRepoPVCNameAnnotationKey] != "" &&
-		backup.DeletionTimestamp.IsZero() {
-		return nil
+	// we should reconcile the BackupRepo when:
+	//   1. the Backup needs a PVC which is not present and should be created by the BackupRepo.
+	//   2. the Backup is being deleted, because it may block the deletion of the BackupRepo.
+	shouldReconcileRepo := backup.Labels[dataProtectionNeedRepoPVCKey] == trueVal ||
+		!backup.DeletionTimestamp.IsZero()
+	if shouldReconcileRepo {
+		return []ctrl.Request{{
+			NamespacedName: client.ObjectKey{Name: repoName},
+		}}
 	}
-	return []ctrl.Request{{
-		NamespacedName: client.ObjectKey{Name: repoName},
-	}}
+	return nil
 }
 
 func (r *BackupRepoReconciler) mapProviderToRepos(obj client.Object) []ctrl.Request {

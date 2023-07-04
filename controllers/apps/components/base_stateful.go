@@ -580,6 +580,11 @@ func (c *statefulComponentBase) scaleOut(reqCtx intctrlutil.RequestCtx, cli clie
 		}
 	)
 
+	// sts's replicas=0 means it's starting not scaling, skip all the scaling work.
+	if *stsObj.Spec.Replicas == 0 {
+		return nil
+	}
+
 	c.WorkloadVertex.Immutable = true
 	stsProto := c.WorkloadVertex.Obj.(*appsv1.StatefulSet)
 	d, err := newDataClone(reqCtx, cli, c.Cluster, c.Component, stsObj, stsProto, backupKey)

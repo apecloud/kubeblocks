@@ -144,8 +144,7 @@ func buildHelmValues(schema *cluster.EngineSchema, values map[string]interface{}
 
 	for k, v := range values {
 		if slices.Contains(subSchemaKeys, k) {
-			subValues := newValues[schema.SubChartName]
-			subValues.(map[string]interface{})[k] = v
+			newValues[schema.SubChartName].(map[string]interface{})[k] = v
 		} else {
 			newValues[k] = v
 		}

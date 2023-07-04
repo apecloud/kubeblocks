@@ -24,13 +24,21 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
+	"github.com/apecloud/kubeblocks/internal/cli/printer"
+	"github.com/apecloud/kubeblocks/internal/cli/testing"
 )
 
 // write test case to test engine.go
 var _ = Describe("create cluster by engine type", func() {
+	const (
+		engine = cluster.MySQL
+	)
+
 	var (
 		tf            *cmdtesting.TestFactory
 		streams       genericclioptions.IOStreams
@@ -39,7 +47,8 @@ var _ = Describe("create cluster by engine type", func() {
 
 	BeforeEach(func() {
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
-		tf = cmdtesting.NewTestFactory().WithNamespace("default")
+		tf = testing.NewTestFactory("default")
+		tf.Client = &clientfake.RESTClient{}
 		createOptions = &create.CreateOptions{
 			IOStreams: streams,
 			Factory:   tf,
@@ -50,8 +59,32 @@ var _ = Describe("create cluster by engine type", func() {
 		tf.Cleanup()
 	})
 
-	It("create engine cmd", func() {
-		cmd := buildCreateEngineCmds(createOptions)
-		Expect(cmd).ShouldNot(BeNil())
+	It("engine cmd", func() {
+		By("create engine commands")
+		cmds := buildCreateEngineCmds(createOptions)
+		Expect(cmds).ShouldNot(BeNil())
+		Expect(cmds[0].HasFlags()).Should(BeTrue())
+
+		By("create engine options")
+		o, err := newEngineOptions(createOptions, engine)
+		Expect(err).Should(Succeed())
+		Expect(o).ShouldNot(BeNil())
+		Expect(o.chart).ShouldNot(BeNil())
+		Expect(o.schema).ShouldNot(BeNil())
+
+		By("complete")
+		cmd := cmds[0]
+		o.Format = printer.YAML
+		Expect(o.CreateOptions.Complete()).Should(Succeed())
+		Expect(o.complete(cmd, nil)).Should(Succeed())
+		Expect(o.Name).ShouldNot(BeEmpty())
+		Expect(o.values).ShouldNot(BeNil())
+
+		By("validate")
+		Expect(o.validate()).Should(Succeed())
+
+		By("run")
+		o.DryRun = "client"
+		Expect(o.run()).Should(Succeed())
 	})
 })

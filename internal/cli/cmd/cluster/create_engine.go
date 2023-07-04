@@ -60,24 +60,28 @@ type CreateEngineOptions struct {
 	*create.CreateOptions
 }
 
+func newEngineOptions(createOptions *create.CreateOptions, e cluster.EngineType) (*CreateEngineOptions, error) {
+	var err error
+	o := &CreateEngineOptions{
+		CreateOptions: createOptions,
+		engine:        e,
+	}
+
+	if o.chart, err = cluster.GetHelmChart(e); err != nil {
+		return nil, err
+	}
+
+	if o.schema, err = cluster.GetEngineSchema(o.chart); err != nil {
+		return nil, err
+	}
+	return o, nil
+}
+
 func buildCreateEngineCmds(createOptions *create.CreateOptions) []*cobra.Command {
-	var (
-		err  error
-		cmds []*cobra.Command
-	)
+	var cmds []*cobra.Command
 
 	for _, e := range cluster.SupportedEngines() {
-		o := &CreateEngineOptions{
-			CreateOptions: createOptions,
-			engine:        e,
-		}
-
-		// get engine helm chart
-		o.chart, err = cluster.GetHelmChart(e)
-		util.CheckErr(err)
-
-		// get engine schema
-		o.schema, err = cluster.GetEngineSchema(o.chart)
+		o, err := newEngineOptions(createOptions, e)
 		util.CheckErr(err)
 
 		cmd := &cobra.Command{
@@ -93,7 +97,6 @@ func buildCreateEngineCmds(createOptions *create.CreateOptions) []*cobra.Command
 		}
 
 		util.CheckErr(addEngineFlags(cmd, o.Factory, o.schema))
-
 		cmds = append(cmds, cmd)
 	}
 	return cmds

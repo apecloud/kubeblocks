@@ -331,13 +331,13 @@ func randomString(length int) string {
 	return rand.String(length)
 }
 
-func BuildConnCredential(clusterDefiniiton *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
+func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent) (*corev1.Secret, error) {
 	const tplFile = "conn_credential_template.cue"
 
 	connCredential := corev1.Secret{}
 	if err := buildFromCUE(tplFile, map[string]any{
-		"clusterdefinition": clusterDefiniiton,
+		"clusterdefinition": clusterDefinition,
 		"cluster":           cluster,
 	}, "secret", &connCredential); err != nil {
 		return nil, err

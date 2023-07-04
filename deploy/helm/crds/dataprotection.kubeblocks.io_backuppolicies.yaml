@@ -92,6 +92,7 @@ spec:
                   backupToolName:
                     description: which backup tool to perform database backup, only
                       support one tool.
+                    maxLength: 63
                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                     type: string
                   backupsHistoryLimit:
@@ -130,23 +131,31 @@ spec:
                         pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                         x-kubernetes-int-or-string: true
                       name:
-                        description: the name of the PersistentVolumeClaim.
+                        default: kb-backup-data
+                        description: the name of PersistentVolumeClaim to store backup
+                          data.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                       persistentVolumeConfigMap:
                         description: 'persistentVolumeConfigMap references the configmap
                           which contains a persistentVolume template. key must be
                           "persistentVolume" and value is the "PersistentVolume" struct.
                           support the following built-in Objects: - $(GENERATE_NAME):
-                          generate a specific format "pvcName-pvcNamespace". if the
-                          PersistentVolumeClaim not exists and CreatePolicy is "IfNotPresent",
-                          the controller will create it by this template. this is
-                          a mutually exclusive setting with "storageClassName".'
+                          generate a specific format "<PVC NAME>-<PVC NAMESPACE>".
+                          if the PersistentVolumeClaim not exists and CreatePolicy
+                          is "IfNotPresent", the controller will create it by this
+                          template. this is a mutually exclusive setting with "storageClassName".'
                         properties:
                           name:
                             description: the name of the persistentVolume ConfigMap.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           namespace:
                             description: the namespace of the persistentVolume ConfigMap.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                         required:
                         - name
@@ -155,6 +164,8 @@ spec:
                       storageClassName:
                         description: storageClassName is the name of the StorageClass
                           required by the claim.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                     required:
                     - name
@@ -218,6 +229,7 @@ spec:
                         properties:
                           name:
                             description: the secret name
+                            maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           passwordKey:
@@ -282,6 +294,7 @@ spec:
                   backupToolName:
                     description: which backup tool to perform database backup, only
                       support one tool.
+                    maxLength: 63
                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                     type: string
                   backupsHistoryLimit:
@@ -320,23 +333,31 @@ spec:
                         pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                         x-kubernetes-int-or-string: true
                       name:
-                        description: the name of the PersistentVolumeClaim.
+                        default: kb-backup-data
+                        description: the name of PersistentVolumeClaim to store backup
+                          data.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                       persistentVolumeConfigMap:
                         description: 'persistentVolumeConfigMap references the configmap
                           which contains a persistentVolume template. key must be
                           "persistentVolume" and value is the "PersistentVolume" struct.
                           support the following built-in Objects: - $(GENERATE_NAME):
-                          generate a specific format "pvcName-pvcNamespace". if the
-                          PersistentVolumeClaim not exists and CreatePolicy is "IfNotPresent",
-                          the controller will create it by this template. this is
-                          a mutually exclusive setting with "storageClassName".'
+                          generate a specific format "<PVC NAME>-<PVC NAMESPACE>".
+                          if the PersistentVolumeClaim not exists and CreatePolicy
+                          is "IfNotPresent", the controller will create it by this
+                          template. this is a mutually exclusive setting with "storageClassName".'
                         properties:
                           name:
                             description: the name of the persistentVolume ConfigMap.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           namespace:
                             description: the namespace of the persistentVolume ConfigMap.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                         required:
                         - name
@@ -345,6 +366,8 @@ spec:
                       storageClassName:
                         description: storageClassName is the name of the StorageClass
                           required by the claim.
+                        maxLength: 63
+                        pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
                     required:
                     - name
@@ -408,6 +431,7 @@ spec:
                         properties:
                           name:
                             description: the secret name
+                            maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           passwordKey:
@@ -616,6 +640,7 @@ spec:
                         properties:
                           name:
                             description: the secret name
+                            maxLength: 63
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
                           passwordKey:

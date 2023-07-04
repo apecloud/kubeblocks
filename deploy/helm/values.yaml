@@ -284,7 +284,7 @@ admissionWebhooks:
 dataProtection:
   enabled: true
   enableVolumeSnapshot: false
-  backupPVCName: ""
+  backupPVCName: kb-backup-data
   backupPVCInitCapacity: ""
   backupPVCStorageClassName: ""
   backupPVCCreatePolicy: ""

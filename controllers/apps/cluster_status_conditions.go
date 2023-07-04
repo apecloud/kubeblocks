@@ -55,8 +55,10 @@ func conditionIsChanged(oldCondition *metav1.Condition, newCondition metav1.Cond
 }
 
 func setProvisioningStartedCondition(conditions *[]metav1.Condition, clusterName string, clusterGeneration int64, err error) {
-	condition := newProvisioningStartedCondition(clusterName, clusterGeneration)
-	if err != nil {
+	var condition metav1.Condition
+	if err == nil {
+		condition = newProvisioningStartedCondition(clusterName, clusterGeneration)
+	} else {
 		condition = newFailedProvisioningStartedCondition(err)
 	}
 	meta.SetStatusCondition(conditions, condition)

@@ -42,7 +42,7 @@ backupTool: {
 	spec: {
 		image: string
 		physical: {
-			restoreCommands: [string]
+			restoreCommands: [...]
 		}
 		env: [...]
 	}

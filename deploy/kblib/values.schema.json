@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "properties": {
+    "monitoringInterval": {
+      "title": "Monitoring Interval",
+      "description": "The monitoring interval of cluster, 0 is disabled, the unit is second.",
+      "type": "integer",
+      "default": 0,
+      "minimum": 0,
+      "maximum": 60
+    },
+    "terminationPolicy": {
+      "title": "Termination Policy",
+      "description": "The termination policy of cluster.",
+      "type": "string",
+      "default": "Delete",
+      "enum": [
+        "DoNotTerminate",
+        "Halt",
+        "Delete",
+        "WipeOut"
+      ]
+    },
+    "availabilityPolicy": {
+      "title": "Availability Policy",
+      "description": "The availability policy of cluster.",
+      "type": "string",
+      "default": "none",
+      "enum": [
+        "none",
+        "node",
+        "zone"
+      ]
+    },
+    "tenancy": {
+      "title": "Tenancy",
+      "description": "The tenancy of cluster.",
+      "type": "string",
+      "default": "SharedNode",
+      "enum": [
+        "SharedNode",
+        "DedicatedNode"
+      ]
+    },
+    "hostNetworkAccessible": {
+      "title": "Host Network Accessible",
+      "description": "Specify whether the cluster can be accessed from within the VPC.",
+      "type": "boolean",
+      "default": false
+    },
+    "publiclyAccessible": {
+      "title": "Publicly Accessible",
+      "description": "Specify whether the cluster can be accessed from the public Internet.",
+      "type": "boolean",
+      "default": false
+    }
+  }
+}

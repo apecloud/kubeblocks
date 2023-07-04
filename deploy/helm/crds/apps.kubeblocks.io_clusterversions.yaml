@@ -53,6 +53,7 @@ spec:
             properties:
               clusterDefinitionRef:
                 description: ref ClusterDefinition.
+                maxLength: 63
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               componentVersions:
@@ -111,6 +112,7 @@ spec:
                                   the configuration template ConfigMap object. An
                                   empty namespace is equivalent to the "default" namespace.
                                 maxLength: 63
+                                pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                                 type: string
                               policy:
                                 default: patch
@@ -141,6 +143,7 @@ spec:
                               configuration template ConfigMap object. An empty namespace
                               is equivalent to the "default" namespace.
                             maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                           templateRef:
                             description: Specify the name of the referenced the configuration
@@ -152,8 +155,10 @@ spec:
                             description: volumeName is the volume name of PodTemplate,
                               which the configuration file produced through the configuration
                               template will be mounted to the corresponding volume.
-                              The volume name must be defined in podSpec.containers[*].volumeMounts.
-                            maxLength: 32
+                              Must be a DNS_LABEL name. The volume name must be defined
+                              in podSpec.containers[*].volumeMounts.
+                            maxLength: 63
+                            pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                         required:
                         - name

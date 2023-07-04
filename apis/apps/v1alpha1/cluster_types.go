@@ -30,10 +30,13 @@ import (
 type ClusterSpec struct {
 	// Cluster referencing ClusterDefinition name. This is an immutable attribute.
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="clusterDefinitionRef is immutable"
 	ClusterDefRef string `json:"clusterDefinitionRef"`
 
 	// Cluster referencing ClusterVersion name.
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
@@ -102,16 +105,18 @@ type ClusterStatus struct {
 
 // ClusterComponentSpec defines the cluster component spec.
 type ClusterComponentSpec struct {
-	// name defines cluster's component name.
+	// name defines cluster's component name, this name is also part of Service DNS name, so this name will
+	// comply with IANA Service Naming rule.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=15
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// componentDefRef references the componentDef defined in ClusterDefinition spec.
+	// componentDefRef references componentDef defined in ClusterDefinition spec. Need to
+	// comply with IANA Service Naming rule.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	ComponentDefRef string `json:"componentDefRef"`
 
 	// classDefRef references the class defined in ComponentClassDefinition.
@@ -180,7 +185,7 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
-	// noCreatePDB defines the PodDistruptionBudget creation behavior and is set to true if creation of PodDistruptionBudget
+	// noCreatePDB defines the PodDisruptionBudget creation behavior and is set to true if creation of PodDisruptionBudget
 	// for this component is not needed. It defaults to false.
 	// +kubebuilder:default=false
 	// +optional
@@ -461,6 +466,8 @@ type ClusterComponentService struct {
 
 type ClassDefRef struct {
 	// Name refers to the name of the ComponentClassDefinition.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	Name string `json:"name,omitempty"`
 

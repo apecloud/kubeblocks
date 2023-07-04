@@ -232,7 +232,7 @@ var _ = Describe("DataProtection", func() {
 		tf.FakeDynamicClient = testing.FakeDynamicClient(backup1)
 		Expect(printBackupList(o)).Should(Succeed())
 		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("test1"))
-		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("apecloud-mysql (deleted)"))
+		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("apecloud-mysql"))
 		Expect(o.Out.(*bytes.Buffer).String()).Should(ContainSubstring("(AvailablePods: 1)"))
 	})
 
@@ -286,6 +286,7 @@ var _ = Describe("DataProtection", func() {
 	It("restore-to-time", func() {
 		timestamp := time.Now().Format("20060102150405")
 		backupName := "backup-test-" + timestamp
+		backupName1 := backupName + "1"
 		clusterName := "source-cluster-" + timestamp
 		secrets := testing.FakeSecrets(testing.Namespace, clusterName)
 		clusterDef := testing.FakeClusterDef()
@@ -297,8 +298,9 @@ var _ = Describe("DataProtection", func() {
 		backupPolicy := testing.FakeBackupPolicy("backPolicy", cluster.Name)
 		backupTypeMeta := testing.FakeBackup("backup-none").TypeMeta
 		backupLabels := map[string]string{
-			constant.AppInstanceLabelKey:    clusterName,
-			constant.KBAppComponentLabelKey: "test",
+			constant.AppInstanceLabelKey:              clusterName,
+			constant.KBAppComponentLabelKey:           "test",
+			constant.DataProtectionLabelClusterUIDKey: string(cluster.UID),
 		}
 		now := metav1.Now()
 		baseBackup := testapps.NewBackupFactory(testing.Namespace, "backup-base").
@@ -307,15 +309,26 @@ var _ = Describe("DataProtection", func() {
 			SetLabels(backupLabels).GetObject()
 		baseBackup.TypeMeta = backupTypeMeta
 		baseBackup.Status.Phase = dpv1alpha1.BackupCompleted
-		incrBackup := testapps.NewBackupFactory(testing.Namespace, backupName).
+		logfileBackup := testapps.NewBackupFactory(testing.Namespace, backupName).
 			SetBackupType(dpv1alpha1.BackupTypeLogFile).
 			SetBackLog(now.Add(-time.Minute), now.Add(time.Minute)).
 			SetLabels(backupLabels).GetObject()
-		incrBackup.TypeMeta = backupTypeMeta
+		logfileBackup.TypeMeta = backupTypeMeta
+
+		logfileBackup1 := testapps.NewBackupFactory(testing.Namespace, backupName1).
+			SetBackupType(dpv1alpha1.BackupTypeLogFile).
+			SetBackLog(now.Add(-time.Minute), now.Add(2*time.Minute)).GetObject()
+		uid := string(cluster.UID)
+		logfileBackup1.Labels = map[string]string{
+			constant.AppInstanceLabelKey:              clusterName,
+			constant.KBAppComponentLabelKey:           "test",
+			constant.DataProtectionLabelClusterUIDKey: uid[:30] + "00",
+		}
+		logfileBackup1.TypeMeta = backupTypeMeta
 
 		pods := testing.FakePods(1, testing.Namespace, clusterName)
 		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
-			scheme.Scheme, &secrets.Items[0], &pods.Items[0], cluster, backupPolicy, baseBackup, incrBackup)
+			scheme.Scheme, &secrets.Items[0], &pods.Items[0], cluster, backupPolicy, baseBackup, logfileBackup, logfileBackup1)
 		tf.Client = &clientfake.RESTClient{}
 
 		By("restore new cluster from source cluster which is not deleted")
@@ -324,6 +337,22 @@ var _ = Describe("DataProtection", func() {
 		_ = cmdRestore.Flags().Set("restore-to-time", util.TimeFormatWithDuration(&now, time.Second))
 		_ = cmdRestore.Flags().Set("source-cluster", clusterName)
 		cmdRestore.Run(nil, []string{})
+
+		// test with RFC3339 format
+		_ = cmdRestore.Flags().Set("restore-to-time", now.Format(time.RFC3339))
+		_ = cmdRestore.Flags().Set("source-cluster", clusterName)
+		cmdRestore.Run(nil, []string{"new-cluster"})
+
+		By("restore should be failed when backups belong to different source clusters")
+		o := &CreateRestoreOptions{CreateOptions: create.CreateOptions{
+			IOStreams: streams,
+			Factory:   tf,
+		}}
+		restoreTime := time.Now().Add(90 * time.Second)
+		o.RestoreTimeStr = util.TimeFormatWithDuration(&metav1.Time{Time: restoreTime}, time.Second)
+		o.SourceCluster = clusterName
+		Expect(o.Complete()).Should(Succeed())
+		Expect(o.validateRestoreTime().Error()).Should(ContainSubstring("restore-to-time is out of time range"))
 	})
 })
 

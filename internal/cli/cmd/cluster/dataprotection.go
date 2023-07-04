@@ -107,6 +107,7 @@ var (
 
 		# restore a new cluster from point in time
 		kbcli cluster restore new-cluster-name --restore-to-time "Apr 13,2023 18:40:35 UTC+0800" --source-cluster mycluster
+        kbcli cluster restore new-cluster-name --restore-to-time "2023-04-13T18:40:35+08:00" --source-cluster mycluster
 	`)
 )
 
@@ -244,20 +245,15 @@ func NewCreateBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 	return cmd
 }
 
-// getClusterNameMap get cluster list by namespace and convert to map.
-func getClusterNameMap(dClient dynamic.Interface, o *list.ListOptions) (map[string]struct{}, error) {
-	clusterList, err := dClient.Resource(types.ClusterGVR()).Namespace(o.Namespace).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	clusterMap := make(map[string]struct{})
-	for _, v := range clusterList.Items {
-		clusterMap[v.GetName()] = struct{}{}
-	}
-	return clusterMap, nil
-}
-
 func printBackupList(o ListBackupOptions) error {
+	// if format is JSON or YAML, use default printer to output the result.
+	if o.Format == printer.JSON || o.Format == printer.YAML {
+		if o.BackupName != "" {
+			o.Names = []string{o.BackupName}
+		}
+		_, err := o.Run()
+		return err
+	}
 	dynamic, err := o.Factory.DynamicClient()
 	if err != nil {
 		return err
@@ -275,23 +271,18 @@ func printBackupList(o ListBackupOptions) error {
 		return nil
 	}
 
-	clusterNameMap, err := getClusterNameMap(dynamic, o.ListOptions)
-	if err != nil {
-		return err
-	}
-
 	// sort the unstructured objects with the creationTimestamp in positive order
 	sort.Sort(unstructuredList(backupList.Items))
 	tbl := printer.NewTablePrinter(o.Out)
-	tbl.SetHeader("NAME", "CLUSTER", "TYPE", "STATUS", "TOTAL-SIZE", "DURATION", "CREATE-TIME", "COMPLETION-TIME", "EXPIRATION")
+	tbl.SetHeader("NAME", "SOURCE-CLUSTER", "TYPE", "STATUS", "TOTAL-SIZE", "DURATION", "CREATE-TIME", "COMPLETION-TIME", "EXPIRATION")
 	for _, obj := range backupList.Items {
 		backup := &dpv1alpha1.Backup{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, backup); err != nil {
 			return err
 		}
-		clusterName := backup.Labels[constant.AppInstanceLabelKey]
-		if _, ok := clusterNameMap[clusterName]; !ok {
-			clusterName = fmt.Sprintf("%s (deleted)", clusterName)
+		sourceCluster := backup.Status.SourceCluster
+		if sourceCluster == "" {
+			sourceCluster = backup.Labels[constant.AppInstanceLabelKey]
 		}
 		durationStr := ""
 		if backup.Status.Duration != nil {
@@ -303,12 +294,12 @@ func printBackupList(o ListBackupOptions) error {
 		}
 		if len(o.BackupName) > 0 {
 			if o.BackupName == obj.GetName() {
-				tbl.AddRow(backup.Name, clusterName, backup.Spec.BackupType, statusString, backup.Status.TotalSize,
+				tbl.AddRow(backup.Name, sourceCluster, backup.Spec.BackupType, statusString, backup.Status.TotalSize,
 					durationStr, util.TimeFormat(&backup.CreationTimestamp), util.TimeFormat(backup.Status.CompletionTimestamp))
 			}
 			continue
 		}
-		tbl.AddRow(backup.Name, clusterName, backup.Spec.BackupType, statusString, backup.Status.TotalSize,
+		tbl.AddRow(backup.Name, sourceCluster, backup.Spec.BackupType, statusString, backup.Status.TotalSize,
 			durationStr, util.TimeFormat(&backup.CreationTimestamp), util.TimeFormat(backup.Status.CompletionTimestamp),
 			util.TimeFormat(backup.Status.Expiration))
 	}
@@ -351,6 +342,7 @@ func NewDeleteBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		},
 	}
 	cmd.Flags().StringSliceVar(&o.Names, "name", []string{}, "Backup names")
+	_ = cmd.MarkFlagRequired("name")
 	o.AddFlags(cmd)
 	return cmd
 }
@@ -490,9 +482,8 @@ func (o *CreateRestoreOptions) runPITR() error {
 		Namespace: clusterObj.Namespace,
 		Name:      o.Name,
 		Annotations: map[string]string{
-			// TODO: use constant annotation key
-			"kubeblocks.io/restore-from-time":           o.RestoreTime.Format(time.RFC3339),
-			"kubeblocks.io/restore-from-source-cluster": o.SourceCluster,
+			constant.RestoreFromTimeAnnotationKey:       o.RestoreTime.Format(time.RFC3339),
+			constant.RestoreFromSrcClusterAnnotationKey: o.SourceCluster,
 		},
 	}
 	return o.createCluster(clusterObj)
@@ -511,7 +502,13 @@ func (o *CreateRestoreOptions) validateRestoreTime() error {
 	}
 	restoreTime, err := util.TimeParse(o.RestoreTimeStr, time.Second)
 	if err != nil {
-		return err
+		// retry to parse time with RFC3339 format.
+		var errRFC error
+		restoreTime, errRFC = time.Parse(time.RFC3339, o.RestoreTimeStr)
+		if errRFC != nil {
+			// if retry failure, report the error
+			return err
+		}
 	}
 	o.RestoreTime = &restoreTime
 	objs, err := o.Dynamic.Resource(types.BackupGVR()).Namespace(o.Namespace).
@@ -522,18 +519,24 @@ func (o *CreateRestoreOptions) validateRestoreTime() error {
 	if err != nil {
 		return err
 	}
-	backups := make([]dpv1alpha1.Backup, 0)
+	backupMap := map[string][]dpv1alpha1.Backup{}
 	for _, i := range objs.Items {
 		obj := dpv1alpha1.Backup{}
 		if err = runtime.DefaultUnstructuredConverter.FromUnstructured(i.Object, &obj); err != nil {
 			return err
 		}
-		backups = append(backups, obj)
+		uid := obj.Labels[constant.DataProtectionLabelClusterUIDKey]
+		if backupMap[uid] == nil {
+			backupMap[uid] = make([]dpv1alpha1.Backup, 0)
+		}
+		backupMap[uid] = append(backupMap[uid], obj)
 	}
-	recoverableTime := dpv1alpha1.GetRecoverableTimeRange(backups)
-	for _, i := range recoverableTime {
-		if isTimeInRange(restoreTime, i.StartTime.Time, i.StopTime.Time) {
-			return nil
+	for _, v := range backupMap {
+		recoverableTime := dpv1alpha1.GetRecoverableTimeRange(v)
+		for _, i := range recoverableTime {
+			if isTimeInRange(restoreTime, i.StartTime.Time, i.StopTime.Time) {
+				return nil
+			}
 		}
 	}
 	return fmt.Errorf("restore-to-time is out of time range, you can view the recoverable time: \n"+
@@ -570,10 +573,9 @@ func NewCreateRestoreCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	}
 
 	cmd := &cobra.Command{
-		Use:               "restore",
-		Short:             "Restore a new cluster from backup.",
-		Example:           createRestoreExample,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		Use:     "restore",
+		Short:   "Restore a new cluster from backup.",
+		Example: createRestoreExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			o.Args = args
 			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
@@ -610,6 +612,11 @@ func NewListBackupPolicyCmd(f cmdutil.Factory, streams genericclioptions.IOStrea
 
 // printBackupPolicyList prints the backup policy list.
 func printBackupPolicyList(o list.ListOptions) error {
+	// if format is JSON or YAML, use default printer to output the result.
+	if o.Format == printer.JSON || o.Format == printer.YAML {
+		_, err := o.Run()
+		return err
+	}
 	dynamic, err := o.Factory.DynamicClient()
 	if err != nil {
 		return err
@@ -916,15 +923,17 @@ func (o *editBackupPolicyOptions) getValueWithJsonpath(spec dpv1alpha1.BackupPol
 			continue
 		}
 		v1 := v[0]
-		if v1.Kind() != reflect.Ptr {
+		switch v1.Kind() {
+		case reflect.Ptr, reflect.Interface:
+			if v1.IsNil() {
+				return nil, nil
+			}
+			val := fmt.Sprintf("%v", v1.Elem())
+			return &val, nil
+		default:
 			val := fmt.Sprintf("%v", v1.Interface())
 			return &val, nil
 		}
-		if v1.IsNil() {
-			return nil, nil
-		}
-		val := fmt.Sprintf("%v", v1.Elem())
-		return &val, nil
 	}
 	return nil, nil
 }

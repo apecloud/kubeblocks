@@ -69,9 +69,10 @@ var _ = Describe("Backup Policy Controller", func() {
 		testapps.ClearResources(&testCtx, intctrlutil.ClusterSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.StatefulSetSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.PodSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
+
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.JobSignature, true, inNS)
 		testapps.ClearResources(&testCtx, intctrlutil.CronJobSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PersistentVolumeClaimSignature, true, inNS)
@@ -366,7 +367,6 @@ var _ = Describe("Backup Policy Controller", func() {
 					Create(&testCtx).GetObject()
 				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
-					fmt.Printf("backupPolicy: %v", fetched.Status)
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
 				})).Should(Succeed())
 				By("enable schedule for reconfigure")
@@ -518,6 +518,11 @@ var _ = Describe("Backup Policy Controller", func() {
 					}, func(g Gomega, tmpBackup *dpv1alpha1.Backup) {
 						g.Expect(tmpBackup.Status.Phase).Should(Equal(dpv1alpha1.BackupCompleted))
 					})).Should(Succeed())
+
+					// disabled logfile
+					Expect(testapps.ChangeObj(&testCtx, backupPolicy, func(policy *dpv1alpha1.BackupPolicy) {
+						backupPolicy.Spec.Schedule.Logfile.Enable = true
+					})).Should(Succeed())
 				}
 
 				testLogfileBackupWithstatefulSet()
@@ -528,6 +533,7 @@ var _ = Describe("Backup Policy Controller", func() {
 
 				// test again for create a cluster with same name
 				testLogfileBackupWithstatefulSet()
+
 			})
 		})
 	})

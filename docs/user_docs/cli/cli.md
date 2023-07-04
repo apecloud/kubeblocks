@@ -29,6 +29,7 @@ Manage alert receiver, include add, list and delete receiver.
 
 Run a benchmark.
 
+* [kbcli bench pgbench](kbcli_bench_pgbench.md)	 - Run pgbench against a PostgreSQL cluster
 * [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
 
 
@@ -188,6 +189,14 @@ Provides utilities for interacting with plugins.
 * [kbcli plugin search](kbcli_plugin_search.md)	 - Search kbcli or kubectl plugins
 * [kbcli plugin uninstall](kbcli_plugin_uninstall.md)	 - Uninstall kbcli or kubectl plugins
 * [kbcli plugin upgrade](kbcli_plugin_upgrade.md)	 - Upgrade kbcli or kubectl plugins
+
+
+## [report](kbcli_report.md)
+
+report kubeblocks or cluster info.
+
+* [kbcli report cluster](kbcli_report_cluster.md)	 - Report Cluster information
+* [kbcli report kubeblocks](kbcli_report_kubeblocks.md)	 - Report KubeBlocks information, including deployments, events, logs, etc.
 
 
 ## [version](kbcli_version.md)

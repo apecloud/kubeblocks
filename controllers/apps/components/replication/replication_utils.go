@@ -170,11 +170,11 @@ func HandleReplicationSetRoleChangeEvent(cli client.Client,
 
 // ComposeReplicationRolePriorityMap generates a priority map based on roles.
 func ComposeReplicationRolePriorityMap() map[string]int {
-	rolePriorityMap := make(map[string]int, 0)
-	rolePriorityMap[""] = emptyPriority
-	rolePriorityMap[constant.Primary] = primaryPriority
-	rolePriorityMap[constant.Secondary] = secondaryPriority
-	return rolePriorityMap
+	return map[string]int{
+		"":                 emptyPriority,
+		constant.Primary:   primaryPriority,
+		constant.Secondary: secondaryPriority,
+	}
 }
 
 // generateReplicationParallelPlan generates a parallel plan for the replication workload.
@@ -204,55 +204,45 @@ func generateReplicationSerialPlan(plan *util.Plan, pods []corev1.Pod, rolePrior
 // unknown & empty & 1/2 secondaries -> 1/2 secondaries -> primary
 func generateReplicationBestEffortParallelPlan(plan *util.Plan, pods []corev1.Pod, rolePriorityMap map[string]int) {
 	start := plan.Start
-	// append unknown, empty
-	index := 0
+	l := len(pods)
+	unknownEmptySteps := make([]*util.Step, 0, l)
+	secondarySteps := make([]*util.Step, 0, l)
+	primarySteps := make([]*util.Step, 0, l)
+
 	for _, pod := range pods {
 		role := pod.Labels[constant.RoleLabelKey]
-		if rolePriorityMap[role] <= emptyPriority {
-			nextStep := &util.Step{}
-			nextStep.Obj = pod
-			start.NextSteps = append(start.NextSteps, nextStep)
-			index++
+		nextStep := &util.Step{Obj: pod}
+		switch {
+		case rolePriorityMap[role] <= emptyPriority:
+			unknownEmptySteps = append(unknownEmptySteps, nextStep)
+		case rolePriorityMap[role] < primaryPriority:
+			secondarySteps = append(secondarySteps, nextStep)
+		default:
+			primarySteps = append(primarySteps, nextStep)
 		}
-	}
-	if len(start.NextSteps) > 0 {
-		start = start.NextSteps[0]
-	}
-	// append 1/2 secondaries
-	podList := pods[index:]
-	secondaryCount := 0
-	for _, pod := range podList {
-		if rolePriorityMap[pod.Labels[constant.RoleLabelKey]] < primaryPriority {
-			secondaryCount++
-		}
-	}
-	end := secondaryCount / 2
-	for i := 0; i < end; i++ {
-		nextStep := &util.Step{}
-		nextStep.Obj = podList[i]
-		start.NextSteps = append(start.NextSteps, nextStep)
 	}
 
-	if len(start.NextSteps) > 0 {
+	// append unknown, empty
+	if len(unknownEmptySteps) > 0 {
+		start.NextSteps = append(start.NextSteps, unknownEmptySteps...)
 		start = start.NextSteps[0]
 	}
+
+	//  append 1/2 secondaries
+	end := len(secondarySteps) / 2
+	if end > 0 {
+		start.NextSteps = append(start.NextSteps, secondarySteps[:end]...)
+		start = start.NextSteps[0]
+	}
+
 	// append the other 1/2 secondaries
-	podList = podList[end:]
-	end = secondaryCount - end
-	for i := 0; i < end; i++ {
-		nextStep := &util.Step{}
-		nextStep.Obj = podList[i]
-		start.NextSteps = append(start.NextSteps, nextStep)
-	}
-
-	if len(start.NextSteps) > 0 {
+	if len(secondarySteps) > end {
+		start.NextSteps = append(start.NextSteps, secondarySteps[end:]...)
 		start = start.NextSteps[0]
 	}
+
 	// append primary
-	podList = podList[end:]
-	for _, pod := range podList {
-		nextStep := &util.Step{}
-		nextStep.Obj = pod
-		start.NextSteps = append(start.NextSteps, nextStep)
+	if len(primarySteps) > 0 {
+		start.NextSteps = append(start.NextSteps, primarySteps...)
 	}
 }

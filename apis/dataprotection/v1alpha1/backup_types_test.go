@@ -83,6 +83,19 @@ func TestGetRecoverableTimeRange(t *testing.T) {
 			Phase: BackupCompleted,
 		},
 	}
+	stopTimeGTLogFileStopTimeBaseBackup := Backup{
+		ObjectMeta: metav1.ObjectMeta{Name: "backup-snapshot2"},
+		Spec:       BackupSpec{BackupType: BackupTypeSnapshot},
+		Status: BackupStatus{
+			Phase: BackupCompleted,
+			Manifests: &ManifestsStatus{
+				BackupLog: &BackupLogStatus{
+					StartTime: &now,
+					StopTime:  &metav1.Time{Time: now.Add(time.Minute * 61)},
+				},
+			},
+		},
+	}
 	backupLogfile := Backup{
 		ObjectMeta: metav1.ObjectMeta{Name: "backup-logfile"},
 		Spec:       BackupSpec{BackupType: BackupTypeLogFile},
@@ -104,5 +117,8 @@ func TestGetRecoverableTimeRange(t *testing.T) {
 	g.Expect(GetRecoverableTimeRange(backups)).ShouldNot(BeEmpty())
 
 	backups = []Backup{backupLogfile, noTimeSnapshotBackup}
+	g.Expect(GetRecoverableTimeRange(backups)).Should(BeEmpty())
+
+	backups = []Backup{backupLogfile, stopTimeGTLogFileStopTimeBaseBackup}
 	g.Expect(GetRecoverableTimeRange(backups)).Should(BeEmpty())
 }

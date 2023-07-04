@@ -32,11 +32,22 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+)
+
+var (
+	deleteOpsExample = templates.Examples(`
+		# delete all ops belong the specified cluster 
+		kbcli cluster delete-ops mycluster
+
+		# delete the specified ops belong the specify cluster 
+		kbcli cluster delete-ops --name=mysql-restart-82zxv
+`)
 )
 
 func NewDeleteOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -45,6 +56,7 @@ func NewDeleteOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 	cmd := &cobra.Command{
 		Use:               "delete-ops",
 		Short:             "Delete an OpsRequest.",
+		Example:           deleteOpsExample,
 		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(completeForDeleteOps(o, args))
@@ -52,6 +64,7 @@ func NewDeleteOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 		},
 	}
 	cmd.Flags().StringSliceVar(&o.Names, "name", []string{}, "OpsRequest names")
+	_ = cmd.RegisterFlagCompletionFunc("name", util.ResourceNameCompletionFunc(f, types.OpsGVR()))
 	o.AddFlags(cmd)
 	return cmd
 }

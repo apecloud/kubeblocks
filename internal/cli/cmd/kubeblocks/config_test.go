@@ -112,7 +112,6 @@ var _ = Describe("backupconfig", func() {
 				Dynamic:   testing.FakeDynamicClient(),
 			},
 			Version:   version.DefaultKubeBlocksVersion,
-			Monitor:   true,
 			ValueOpts: values.Options{Values: []string{"snapshot-controller.enabled=true"}},
 		}
 	})

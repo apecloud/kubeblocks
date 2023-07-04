@@ -235,10 +235,10 @@ func generateJSON(path string, value string) string {
 	return jsonString
 }
 
-// cropJobName job name cannot exceed 64 characters.
+// cropJobName job name cannot exceed 63 characters for label name limit.
 func cropJobName(jobName string) string {
 	if len(jobName) > 63 {
-		return jobName[:64]
+		return jobName[:63]
 	}
 	return jobName
 }
@@ -257,4 +257,12 @@ func generateUniqueNameWithBackupPolicy(backupPolicy *dataprotectionv1alpha1.Bac
 
 func generateUniqueJobName(backup *dataprotectionv1alpha1.Backup, prefix string) string {
 	return cropJobName(fmt.Sprintf("%s-%s-%s", prefix, backup.UID[:8], backup.Name))
+}
+
+func buildDeleteBackupFilesJobNamespacedName(backup *dataprotectionv1alpha1.Backup) types.NamespacedName {
+	jobName := fmt.Sprintf("%s-%s%s", backup.UID[:8], deleteBackupFilesJobNamePrefix, backup.Name)
+	if len(jobName) > 63 {
+		jobName = jobName[:63]
+	}
+	return types.NamespacedName{Namespace: backup.Namespace, Name: jobName}
 }

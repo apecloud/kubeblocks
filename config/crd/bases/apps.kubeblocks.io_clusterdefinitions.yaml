@@ -105,6 +105,7 @@ spec:
                                   the configuration template ConfigMap object. An
                                   empty namespace is equivalent to the "default" namespace.
                                 maxLength: 63
+                                pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                                 type: string
                               policy:
                                 default: patch
@@ -135,6 +136,7 @@ spec:
                               configuration template ConfigMap object. An empty namespace
                               is equivalent to the "default" namespace.
                             maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                           templateRef:
                             description: Specify the name of the referenced the configuration
@@ -146,8 +148,10 @@ spec:
                             description: volumeName is the volume name of PodTemplate,
                               which the configuration file produced through the configuration
                               template will be mounted to the corresponding volume.
-                              The volume name must be defined in podSpec.containers[*].volumeMounts.
-                            maxLength: 32
+                              Must be a DNS_LABEL name. The volume name must be defined
+                              in podSpec.containers[*].volumeMounts.
+                            maxLength: 63
+                            pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                         required:
                         - name
@@ -456,9 +460,14 @@ spec:
                           type: object
                       type: object
                     name:
-                      description: name of the component, it can be any valid string.
-                      maxLength: 18
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      description: A component definition name, this name could be
+                        used as default name of `Cluster.spec.componentSpecs.name`,
+                        and so this name is need to conform with same validation rules
+                        as `Cluster.spec.componentSpecs.name`, that is currently comply
+                        with IANA Service Naming rule. This name will apply to "apps.kubeblocks.io/component-name"
+                        object label value.
+                      maxLength: 22
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     podSpec:
                       description: podSpec define pod spec template of the cluster
@@ -8226,6 +8235,7 @@ spec:
                               configuration template ConfigMap object. An empty namespace
                               is equivalent to the "default" namespace.
                             maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                           templateRef:
                             description: Specify the name of the referenced the configuration
@@ -8237,8 +8247,10 @@ spec:
                             description: volumeName is the volume name of PodTemplate,
                               which the configuration file produced through the configuration
                               template will be mounted to the corresponding volume.
-                              The volume name must be defined in podSpec.containers[*].volumeMounts.
-                            maxLength: 32
+                              Must be a DNS_LABEL name. The volume name must be defined
+                              in podSpec.containers[*].volumeMounts.
+                            maxLength: 63
+                            pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                             type: string
                         required:
                         - name

@@ -202,9 +202,6 @@ func (o *InstallOptions) PreCheck() error {
 		return err
 	}
 
-	// Todo: KubeBlocks maybe already installed but it's status could be Failed.
-	// For example: 'kbcli playground init' in windows will fail and try 'kbcli playground init' again immediately,
-	// kbcli will output SUCCESSFULLY, however the addon csi is still failed and KubeBlocks is not installed SUCCESSFULLY
 	if v.KubeBlocks != "" {
 		return fmt.Errorf("KubeBlocks %s already exists, repeated installation is not supported", v.KubeBlocks)
 	}

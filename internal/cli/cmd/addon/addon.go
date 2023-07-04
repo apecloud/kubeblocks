@@ -825,10 +825,7 @@ func addonListRun(o *list.ListOptions) error {
 				autoInstall = addon.Spec.Installable.AutoInstall
 			}
 			label := obj.GetLabels()
-			provider := ""
-			if label != nil {
-				provider = label[constant.AddonProviderLabelKey]
-			}
+			provider := label[constant.AddonProviderLabelKey]
 			tbl.AddRow(addon.Name,
 				addon.Spec.Type,
 				provider,

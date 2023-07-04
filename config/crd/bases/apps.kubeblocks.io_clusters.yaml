@@ -104,6 +104,9 @@ spec:
                 maxLength: 63
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
+                x-kubernetes-validations:
+                - message: clusterDefinitionRef is immutable
+                  rule: self == oldSelf
               clusterVersionRef:
                 description: Cluster referencing ClusterVersion name.
                 maxLength: 63

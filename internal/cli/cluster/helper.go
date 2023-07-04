@@ -423,13 +423,6 @@ func GetPodComponentName(pod *corev1.Pod) string {
 	return pod.Labels[constant.KBAppComponentLabelKey]
 }
 
-func GetPodWorkloadType(pod *corev1.Pod) string {
-	if pod.Labels == nil {
-		return ""
-	}
-	return pod.Labels[constant.WorkloadTypeLabelKey]
-}
-
 func GetConfigMapByName(dynamic dynamic.Interface, namespace, name string) (*corev1.ConfigMap, error) {
 	cmObj := &corev1.ConfigMap{}
 	if err := GetK8SClientObject(dynamic, cmObj, types.ConfigmapGVR(), namespace, name); err != nil {

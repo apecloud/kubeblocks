@@ -24,24 +24,86 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("cluster builder", func() {
-	It("get cluster chart name", func() {
-		res := getEngineChartName(MySQL)
-		Expect(res).Should(Equal("apecloud-mysql-cluster"))
-	})
+var _ = Describe("cluster engine", func() {
+	const (
+		engineType = MySQL
+		name       = "test-cluster"
+		namespace  = "test-namespace"
+	)
 
-	It("get cluster schema", func() {
-		c, err := GetHelmChart(MySQL)
-		Expect(err).Should(Succeed())
-		res, err := GetEngineSchema(c)
-		Expect(err).Should(Succeed())
-		Expect(res).ShouldNot(BeEmpty())
-	})
+	It("get and validate engine helm chart", func() {
+		By("unsupported engine type")
+		_, err := GetHelmChart("unsupported")
+		Expect(err).Should(HaveOccurred())
 
-	It("get cluster manifest", func() {
-		c, err := GetHelmChart(MySQL)
-		manifests, err := GetManifests(c, "default", "my", nil)
+		By("get engine helm chart")
+		c, err := GetHelmChart(engineType)
+		Expect(err).Should(Succeed())
+		Expect(c).ShouldNot(BeNil())
+
+		By("get manifests")
+		manifests, err := GetManifests(c, namespace, name, nil)
 		Expect(err).Should(Succeed())
 		Expect(manifests).ShouldNot(BeEmpty())
+
+		By("get engine schema")
+		s, err := GetEngineSchema(c)
+		Expect(err).Should(Succeed())
+		Expect(s).ShouldNot(BeNil())
+		Expect(s.Schema).ShouldNot(BeNil())
+		Expect(s.SubSchema).ShouldNot(BeNil())
+		Expect(s.SubChartName).ShouldNot(BeEmpty())
+
+		By("validate values")
+		testCases := []struct {
+			desc    string
+			values  map[string]interface{}
+			success bool
+		}{
+			{
+				"cpu is greater than maximum",
+				map[string]interface{}{
+					"cpu": 1000,
+				},
+				// cpu should greater than 0.1
+				false,
+			},
+			{
+				"terminationPolicy is unknown",
+				map[string]interface{}{
+					"terminationPolicy": "unknown",
+				},
+				// "unknown" is not a valid value
+				false,
+			},
+			{
+				"all values are valid",
+				map[string]interface{}{
+					"cpu":               1.0,
+					"terminationPolicy": "Halt",
+				},
+				true,
+			},
+		}
+		for _, tc := range testCases {
+			By(tc.desc)
+			err = ValidateValues(s, tc.values)
+			if tc.success {
+				Expect(err).Should(Succeed())
+			} else {
+				Expect(err).Should(HaveOccurred())
+			}
+		}
+	})
+
+	It("get cluster chart name", func() {
+		By("mysql engine type")
+		res := getEngineChartName(MySQL)
+		Expect(res).Should(Equal("apecloud-mysql-cluster"))
+
+		By("other engine type")
+		eType := "unknown"
+		res = getEngineChartName(EngineType(eType))
+		Expect(res).Should(ContainSubstring("cluster"))
 	})
 })

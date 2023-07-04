@@ -48,19 +48,19 @@ const (
 
 type SchemaPropName string
 
-// the command schema property name
+// the common schema property name
 const (
 	VersionSchemaProp SchemaPropName = "version"
 )
 
 type EngineSchema struct {
-	// schema is the cluster parent helm chart schema, used to render the command flag
+	// Schema is the cluster parent helm chart schema, used to render the command flag
 	Schema *spec.Schema
 
-	// subSchema is the sub chart schema, used to render the command flag
+	// SubSchema is the sub chart schema, used to render the command flag
 	SubSchema *spec.Schema
 
-	// subChartName is the name (alias if exists) of the sub chart
+	// SubChartName is the name (alias if exists) of the sub chart
 	SubChartName string
 }
 

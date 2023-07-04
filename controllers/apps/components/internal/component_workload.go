@@ -22,12 +22,14 @@ package internal
 import (
 	"fmt"
 
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/plan"
@@ -95,12 +97,18 @@ func (b *ComponentWorkloadBuilderBase) BuildWorkload4StatefulSet(workloadType st
 		}
 
 		component := b.Comp.GetSynthesizedComponent()
-		sts, err := builder.BuildSts(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
+		var obj client.Object
+		var err error
+		if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+			obj, err = builder.BuildRSM(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
+		} else {
+			obj, err = builder.BuildSts(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
+		}
 		if err != nil {
 			return nil, err
 		}
 
-		b.Workload = sts
+		b.Workload = obj
 
 		return nil, nil // don't return sts here
 	}

@@ -289,3 +289,8 @@ const (
 	DPBackupStartTime      = "BACKUP_START_TIME"      // backup start time
 	DPBackupStartTimestamp = "BACKUP_START_TIMESTAMP" // backup start timestamp
 )
+
+const (
+	FeatureGateReplicatedStateMachine = "ReplicatedStateMachine" // enable rsm
+)
+

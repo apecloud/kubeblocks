@@ -7,9 +7,21 @@ nebula:
   storageClassName: ""
   ## @param nebula.terminationPolicy, temination policy for nebula-cluster
   terminationPolicy: Delete
+  console:
+    ## @param nebula.graph.replicas, number of nebula-graph instances
+    ## in a nebula-graph cluster, all nebula-graphd instances are independent
+    replicas: 1
+    ## @param nebula.graphd.resources
+    ## resource management
+    ## more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "100Mi"
+      limits:
+        cpu: "500m"
+        memory: "500Mi"
   graphd:
-    ## @param nebula.graphd.image, container image for nebula-graphd
-    image: docker.io/vesoft/nebula-graphd:v3.5.0
     ## @param nebula.graph.replicas, number of nebula-graph instances
     ## in a nebula-graph cluster, all nebula-graphd instances are independent
     replicas: 1
@@ -28,8 +40,6 @@ nebula:
     ## @param nebula.graphd.resoruces.logStorage
     logStorage: "500Mi"
   metad:
-    ## @param nebula.metad.image, container image for nebula-metad
-    image: docker.io/vesoft/nebula-metad:v3.5.0
     ## @param nebula.metad.replicas, number of nebula-graph instances
     ## in a nebula-graph cluter, nebula-metad instances form a raft group
     replicas: 1
@@ -48,8 +58,6 @@ nebula:
     ## @param nebula.metad.dataStorage
     dataStorage: "2Gi"
   storaged:
-    ## @param nebula.storaged.image, container image for nebula-storaged
-    image: docker.io/vesoft/nebula-storaged:v3.5.0
     ## @param nebula.storaged.replicas, number of nebula-graph instances
     ## in a nebula-graph cluter, nebula-storaged instances form a raft group
     replicas: 1

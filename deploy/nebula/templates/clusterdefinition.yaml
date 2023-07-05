@@ -17,78 +17,12 @@ spec:
     - name: nebula-console
       workloadType: Stateless
       characterType: nebula-console
-      scriptSpecs:
-        - name: nebula-console-scripts
-          templateRef: nebula-console-scripts-template
-          namespace: {{ .Release.Namespace }}
-          volumeName: scripts
-          defaultMode: 493
       podSpec:
         containers:
           - name: nebula-console
             imagePullPolicy: {{default .Values.nebula.metad.image.pullPolicy "IfNotPresent"}}
             command: ["/bin/sh"]
             args: ["-c", "exec /bin/sh -c 'trap : TERM INT; sleep infinity & wait'"]
-            lifecycle:
-              postStart:
-                exec:
-                  command: ["/bin/sh", "-c", "/scripts/nebula-console-start.sh"]
-            volumeMounts:
-              - name: scripts
-                mountPath: /scripts
-    - name: nebula-metad
-      configSpecs:
-        - name: nebula-metad-config
-          templateRef: nebula-metad-config-template
-          namespace: {{ .Release.Namespace }}
-          volumeName: nebula-metad
-      scriptSpecs:
-        - name: nebula-metad-scripts
-          templateRef: nebula-metad-scripts-template
-          namespace: {{ .Release.Namespace }}
-          volumeName: scripts
-          defaultMode: 493
-      workloadType: Stateful
-      characterType: nebula-metad
-      podSpec:
-        containers:
-          - name: nebula-metad
-            command:
-              - /bin/bash
-              - -c
-              - |
-                set -ex
-                /scripts/nebula-metad-start.sh
-            imagePullPolicy: {{default .Values.nebula.metad.image.pullPolicy "IfNotPresent"}}
-            ports:
-            - containerPort: 9559
-              name: thrift
-              protocol: TCP
-            - containerPort: 19559
-              name: http
-              protocol: TCP
-            - containerPort: 19560
-              name: http2
-              protocol: TCP
-            readinessProbe:
-              failureThreshold: 3
-              httpGet:
-                path: /status
-                port: http
-                scheme: HTTP
-              initialDelaySeconds: 10
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-            volumeMounts:
-              - name: scripts
-                mountPath: /scripts
-              - mountPath: /usr/local/nebula/data
-                name: data
-              - mountPath: /usr/local/nebula/logs
-                name: logs
-              - mountPath: /usr/local/nebula/etc
-                name: nebula-metad
     - name: nebula-graphd
       configSpecs:
         - name: nebula-graphd-config
@@ -158,6 +92,59 @@ spec:
               periodSeconds: 10
               successThreshold: 1
               timeoutSeconds: 5
+    - name: nebula-metad
+      configSpecs:
+        - name: nebula-metad-config
+          templateRef: nebula-metad-config-template
+          namespace: {{ .Release.Namespace }}
+          volumeName: nebula-metad
+      scriptSpecs:
+        - name: nebula-metad-scripts
+          templateRef: nebula-metad-scripts-template
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
+      workloadType: Stateful
+      characterType: nebula-metad
+      podSpec:
+        containers:
+          - name: nebula-metad
+            command:
+              - /bin/bash
+              - -c
+              - |
+                set -ex
+                /scripts/nebula-metad-start.sh
+            imagePullPolicy: {{default .Values.nebula.metad.image.pullPolicy "IfNotPresent"}}
+            ports:
+            - containerPort: 9559
+              name: thrift
+              protocol: TCP
+            - containerPort: 19559
+              name: http
+              protocol: TCP
+            - containerPort: 19560
+              name: http2
+              protocol: TCP
+            readinessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /status
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 10
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 5
+            volumeMounts:
+              - name: scripts
+                mountPath: /scripts
+              - mountPath: /usr/local/nebula/data
+                name: data
+              - mountPath: /usr/local/nebula/logs
+                name: logs
+              - mountPath: /usr/local/nebula/etc
+                name: nebula-metad
     - name: nebula-storaged
       configSpecs:
         - name: nebula-storaged-config
@@ -216,3 +203,26 @@ spec:
                 name: data
               - mountPath: /usr/local/nebula/logs
                 name: logs
+          - name: nebula-console
+            imagePullPolicy: {{default .Values.nebula.metad.image.pullPolicy "IfNotPresent"}}
+            command: ["/bin/sh"]
+            args: ["-c", "trap : TERM INT; sleep infinity & wait"]
+            lifecycle:
+              postStart:
+                exec:
+                  command: ["/bin/sh", "-c", "/scripts/post-start.sh"]
+              preStop:
+                exec:
+                  command: ["/bin/sh", "-c", "/scripts/pre-stop.sh"]
+            volumeMounts:
+              - name: annotations
+                mountPath: /etc/annotations
+              - name: scripts
+                mountPath: /scripts
+        volumes:
+          - name: annotations
+            downwardAPI:
+              items:
+                - path: "component-replicas"
+                  fieldRef:
+                    fieldPath: metadata.annotations['apps.kubeblocks.io/component-replicas']

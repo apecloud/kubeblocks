@@ -18,6 +18,7 @@ package installation
 
 import (
 	"context"
+	"log"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -71,6 +72,7 @@ func InstallationTest() {
 
 		It("Install KubeBlocks via Helm", func() {
 			cfg := getHelmConfig()
+			log.Println("Version: " + Version)
 			chart.Version = Version
 			_, err := chart.Install(cfg)
 			Expect(err).NotTo(HaveOccurred())

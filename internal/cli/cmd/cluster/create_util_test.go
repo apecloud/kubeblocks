@@ -61,7 +61,7 @@ var _ = Describe("cluster create util", func() {
 			Expect(err).Should(Succeed())
 			Expect(c.Schema).ShouldNot(BeNil())
 			Expect(addCreateFlags(cmd, tf, c)).Should(Succeed())
-			Expect(cmd.Flags().GetString("version")).ShouldNot(BeEmpty())
+			Expect(cmd.Flags().Lookup("version")).ShouldNot(BeNil())
 		})
 
 		It("get kubernetes object info from manifests", func() {

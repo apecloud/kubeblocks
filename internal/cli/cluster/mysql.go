@@ -24,6 +24,7 @@ import (
 )
 
 var (
+	// run `make kbcli-fast` to generate this embed file
 	//go:embed charts/apecloud-mysql-cluster.tgz
 	mysqlChart embed.FS
 )

@@ -274,6 +274,8 @@ kbcli-fast: build-kbcli-embed-chart
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
 	@mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
 
+create-kbcli-embed-charts-dir:
+	mkdir -p internal/cli/cluster/charts/
 build-single-kbcli-embed-chart.%: chart=$(word 2,$(subst ., ,$@))
 build-single-kbcli-embed-chart.%:
 	$(HELM) dependency update deploy/$(chart) --skip-refresh
@@ -281,7 +283,7 @@ build-single-kbcli-embed-chart.%:
 	mv $(chart)-*.tgz internal/cli/cluster/charts/$(chart).tgz
 
 .PHONY: build-kbcli-embed-chart
-build-kbcli-embed-chart: helmtool \
+build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
 	build-single-kbcli-embed-chart.apecloud-mysql-cluster
 #	build-single-kbcli-embed-chart.postgresql-cluster \
 #	build-single-kbcli-embed-chart.clickhouse-cluster \
@@ -463,7 +465,6 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v4.5.7
 CONTROLLER_TOOLS_VERSION ?= v0.9.0
-HELM_VERSION ?= v3.9.0
 CUE_VERSION ?= v0.4.3
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
@@ -561,7 +562,9 @@ helmtool: ## Download helm locally if necessary.
 ifeq (, $(shell which helm))
 	@{ \
 	set -e ;\
-	go install github.com/helm/helm@$(HELM_VERSION);\
+	echo 'installing helm' ;\
+	curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash;\
+	echo 'Successfully installed' ;\
 	}
 HELM=$(GOBIN)/helm
 else

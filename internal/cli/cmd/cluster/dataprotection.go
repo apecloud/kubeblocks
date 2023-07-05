@@ -1104,7 +1104,7 @@ func (o *describeBackupOptions) printBackupObj(obj *dpv1alpha1.Backup) error {
 		}
 	}
 
-	// get all events about cluster
+	// get all events about backup
 	events, err := o.client.CoreV1().Events(o.namespace).Search(scheme.Scheme, obj)
 	if err != nil {
 		return err

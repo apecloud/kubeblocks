@@ -11,8 +11,8 @@ kbcli infra delete [flags]
 ### Examples
 
 ```
-
-
+  # delete kubernetes cluster with specified config yaml
+  kbcli infra delete -c cluster.yaml
 ```
 
 ### Options

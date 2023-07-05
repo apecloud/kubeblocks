@@ -24,7 +24,6 @@ import (
 	"embed"
 	"fmt"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -238,19 +237,19 @@ func loadHelmChart(t ClusterType) (*chart.Chart, error) {
 	c, err := loader.LoadArchive(file)
 	if err != nil {
 		if err == gzip.ErrHeader {
-			return nil, fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", err)
+			return nil, fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", cf.name, err)
 		}
 	}
 
 	if c == nil {
-		return nil, fmt.Errorf("failed to load cluster helm chart %s", t.String())
+		return nil, fmt.Errorf("failed to load cluster helm chart %s", t)
 	}
 	return c, err
 }
 
 func SupportedTypes() []ClusterType {
 	types := maps.Keys(clusterTypeCharts)
-	slices.SortFunc(types, func(i, j ClusterType) bool {
+	slices.SortFunc(maps.Keys(clusterTypeCharts), func(i, j ClusterType) bool {
 		return i < j
 	})
 	return types
@@ -258,12 +257,6 @@ func SupportedTypes() []ClusterType {
 
 func (t ClusterType) String() string {
 	return string(t)
-}
-
-func sortClusterTypes(types []ClusterType) {
-	sort.Slice(types, func(i, j int) bool {
-		return types[i] < types[j]
-	})
 }
 
 func (s SchemaPropName) String() string {

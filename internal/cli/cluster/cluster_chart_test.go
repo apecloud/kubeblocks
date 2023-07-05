@@ -26,9 +26,9 @@ import (
 
 var _ = Describe("cluster engine", func() {
 	const (
-		engineType = MySQLType
-		name       = "test-cluster"
-		namespace  = "test-namespace"
+		clusterType = "mysql"
+		name        = "test-cluster"
+		namespace   = "test-namespace"
 	)
 
 	It("get and validate engine helm chart", func() {
@@ -37,7 +37,7 @@ var _ = Describe("cluster engine", func() {
 		Expect(err).Should(HaveOccurred())
 
 		By("build cluster chart info")
-		c, err := BuildChartInfo(engineType)
+		c, err := BuildChartInfo(clusterType)
 		Expect(err).Should(Succeed())
 		Expect(c).ShouldNot(BeNil())
 		Expect(c.ClusterDef).ShouldNot(BeEmpty())

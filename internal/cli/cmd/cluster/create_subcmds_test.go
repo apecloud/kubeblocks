@@ -44,7 +44,7 @@ import (
 
 var _ = Describe("create cluster by clusterType type", func() {
 	const (
-		clusterType = cluster.MySQLType
+		clusterType = "mysql"
 	)
 
 	var (

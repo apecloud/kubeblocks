@@ -317,13 +317,14 @@ func GetDefaultVersion(dynamic dynamic.Interface, clusterDef string) (string, er
 	found := false
 	defaultVersion := ""
 	for _, item := range versionList.Items {
-		if k, ok := item.Annotations[constant.DefaultClusterVersionAnnotationKey]; ok && k == "true" {
-			if found {
-				return "", fmt.Errorf("found more than one default cluster version referencing cluster definition %s", clusterDef)
-			}
-			found = true
-			defaultVersion = item.Name
+		if k, ok := item.Annotations[constant.DefaultClusterVersionAnnotationKey]; !ok || k != "true" {
+			continue
 		}
+		if found {
+			return "", fmt.Errorf("found more than one default cluster version referencing cluster definition %s", clusterDef)
+		}
+		found = true
+		defaultVersion = item.Name
 	}
 
 	if defaultVersion == "" {

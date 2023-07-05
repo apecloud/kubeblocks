@@ -52,6 +52,8 @@ type MysqlOperations struct {
 	BaseOperations
 }
 
+type QueryRes []map[string]interface{}
+
 var _ BaseInternalOps = &MysqlOperations{}
 
 const (
@@ -72,6 +74,9 @@ const (
 	maxOpenConnsKey    = "maxOpenConns"
 	connMaxLifetimeKey = "connMaxLifetime"
 	connMaxIdleTimeKey = "connMaxIdleTime"
+	workloadKey        = "workload"
+	Replication        = "Replication"
+	Consensus          = "Consensus"
 )
 
 const (
@@ -226,6 +231,40 @@ func (mysqlOps *MysqlOperations) GetRunningPort() int {
 }
 
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+	workload := request.Metadata["workloadType"]
+	if workload == Replication {
+		return mysqlOps.GetRoleForReplication(ctx, request, response)
+	}
+	return mysqlOps.GetRoleForConsensus(ctx, request, response)
+}
+
+func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+	getReadOnlySql := `show global variables like 'read_only';`
+	data, err := mysqlOps.query(ctx, getReadOnlySql)
+	if err != nil {
+		mysqlOps.Logger.Infof("error executing %s: %v", getReadOnlySql, err)
+		return "", errors.Wrapf(err, "error executing %s", getReadOnlySql)
+	}
+
+	queryRes := &QueryRes{}
+	err = json.Unmarshal(data, queryRes)
+	if err != nil {
+		return "", errors.Errorf("parse query failed, err:%v", err)
+	}
+
+	for _, mapVal := range *queryRes {
+		if mapVal["Variable_name"] == "read_only" {
+			if mapVal["Value"].(string) == "OFF" {
+				return PRIMARY, nil
+			} else if mapVal["Value"].(string) == "ON" {
+				return SECONDARY, nil
+			}
+		}
+	}
+	return "", errors.Errorf("parse query failed, no records")
+}
+
+func (mysqlOps *MysqlOperations) GetRoleForConsensus(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	sql := "select CURRENT_LEADER, ROLE, SERVER_ID  from information_schema.wesql_cluster_local"
 
 	rows, err := mysqlOps.db.QueryContext(ctx, sql)

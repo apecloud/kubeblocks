@@ -118,10 +118,7 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 		VolumeProtection:      ops.volumeProtection,
 	}
 	ops.Ops = map[bindings.OperationKind]Operation{
-		VolumeProtection: &operationVolumeProtection{
-			Logger:        ops.Logger,
-			BaseOperation: ops,
-		},
+		VolumeProtection: newVolumeProtectionOperation(ops.Logger, ops),
 	}
 	ops.DBAddress = ops.getAddress()
 

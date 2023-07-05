@@ -41,7 +41,7 @@ import (
 	statsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	"github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 const (
@@ -50,16 +50,21 @@ const (
 	certFile  = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 	tokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
-	envNamespace      = "KB_NAMESPACE"
-	envHostIP         = "KB_HOST_IP"
-	envNodeName       = "KB_NODENAME"
-	envPodName        = "KB_POD_NAME"
-	envPodUID         = "KB_POD_UID"
-	envVolumesToProbe = "KB_VOLUME_PROTECTION_SPEC"
+	envNamespace             = "KB_NAMESPACE"
+	envHostIP                = "KB_HOST_IP"
+	envNodeName              = "KB_NODENAME"
+	envPodName               = "KB_POD_NAME"
+	envPodUID                = "KB_POD_UID"
+	envVolumesProtectionSpec = "KB_VOLUME_PROTECTION_SPEC"
 
 	reasonLock   = "HighVolumeWatermark"
 	reasonUnlock = "LowVolumeWatermark" // TODO
 )
+
+type volumeStatsRequester interface {
+	init(ctx context.Context) error
+	request(ctx context.Context) ([]byte, error)
+}
 
 type volumeExt struct {
 	Name          string
@@ -69,34 +74,39 @@ type volumeExt struct {
 
 type operationVolumeProtection struct {
 	Logger        logger.Logger
-	Client        *http.Client
-	Request       *http.Request
+	Requester     volumeStatsRequester
 	Pod           string
 	HighWatermark int
 	Volumes       map[string]volumeExt
 	Readonly      bool
+	SendEvent     bool // to disable event for testing
 
 	// TODO: hack it here, remove it later
 	BaseOperation *BaseOperations
 }
 
+func newVolumeProtectionOperation(logger logger.Logger, ops *BaseOperations) *operationVolumeProtection {
+	return &operationVolumeProtection{
+		Logger: logger,
+		Requester: &httpsVolumeStatsRequester{
+			logger: logger,
+		},
+		SendEvent:     true,
+		BaseOperation: ops,
+	}
+}
+
 func (o *operationVolumeProtection) Kind() bindings.OperationKind {
-	return VolumeProtection
+	return util.VolumeProtection
 }
 
 func (o *operationVolumeProtection) Init(metadata bindings.Metadata) error {
-	var err error
-	if o.Client, err = httpClient(); err != nil {
-		o.Logger.Warnf("build HTTP client error at setup: %s", err.Error())
+	if err := o.Requester.init(context.Background()); err != nil {
 		return err
 	}
 
-	if o.Request, err = httpRequest(context.Background()); err != nil {
-		o.Logger.Warnf("build HTTP request error at setup, will try it later: %s", err.Error())
-	}
-
 	o.Pod = os.Getenv(envPodName)
-	if err = o.initVolumes(); err != nil {
+	if err := o.initVolumes(); err != nil {
 		o.Logger.Warnf("init volumes to monitor error: %s", err.Error())
 		return err
 	}
@@ -106,7 +116,7 @@ func (o *operationVolumeProtection) Init(metadata bindings.Metadata) error {
 
 func (o *operationVolumeProtection) initVolumes() error {
 	spec := &appsv1alpha1.VolumeProtectionSpec{}
-	raw := os.Getenv(envVolumesToProbe)
+	raw := os.Getenv(envVolumesProtectionSpec)
 	if err := json.Unmarshal([]byte(raw), spec); err != nil {
 		o.Logger.Warnf("unmarshal volume protection spec error: %s, raw spec: %s", err.Error(), raw)
 		return err
@@ -134,20 +144,8 @@ func (o *operationVolumeProtection) Invoke(ctx context.Context, req *bindings.In
 		o.Logger.Infof("The operation %s is disabled", o.Kind())
 		return nil
 	}
-	if o.Client == nil {
-		return fmt.Errorf("HTTP client for kubelet is unavailable")
-	}
-	if o.Request == nil {
-		// try to build http request again
-		var err error
-		o.Request, err = httpRequest(ctx)
-		if err != nil {
-			o.Logger.Warnf("build HTTP request to query kubelet error: %s", err.Error())
-			return err
-		}
-	}
 
-	summary, err := o.request(ctx)
+	summary, err := o.Requester.request(ctx)
 	if err != nil {
 		o.Logger.Warnf("request stats summary from kubelet error: %s", err.Error())
 		return err
@@ -176,22 +174,6 @@ func (o *operationVolumeProtection) disabled() bool {
 		}
 	}
 	return true
-}
-
-func (o *operationVolumeProtection) request(ctx context.Context) ([]byte, error) {
-	req := o.Request.WithContext(ctx)
-	rsp, err := o.Client.Do(req)
-	if err != nil {
-		o.Logger.Warnf("issue request to kubelet error: %s", err.Error())
-		return nil, err
-	}
-	if rsp.StatusCode != 200 {
-		o.Logger.Warnf("HTTP response from kubelet error: %s", rsp.Status)
-		return nil, fmt.Errorf(rsp.Status)
-	}
-
-	defer rsp.Body.Close()
-	return io.ReadAll(rsp.Body)
 }
 
 func (o *operationVolumeProtection) updateVolumeStats(payload []byte) error {
@@ -333,7 +315,10 @@ func (o *operationVolumeProtection) buildVolumesMsg() string {
 }
 
 func (o *operationVolumeProtection) sendEvent(ctx context.Context, reason, msg string) error {
-	return sendEvent(ctx, o.Logger, o.createEvent(reason, msg))
+	if o.SendEvent {
+		return sendEvent(ctx, o.Logger, o.createEvent(reason, msg))
+	}
+	return nil
 }
 
 func (o *operationVolumeProtection) createEvent(reason, msg string) *corev1.Event {
@@ -359,6 +344,55 @@ func (o *operationVolumeProtection) createEvent(reason, msg string) *corev1.Even
 		LastTimestamp:  metav1.Now(),
 		Type:           "Normal",
 	}
+}
+
+type httpsVolumeStatsRequester struct {
+	logger logger.Logger
+	cli    *http.Client
+	req    *http.Request
+}
+
+var _ volumeStatsRequester = &httpsVolumeStatsRequester{}
+
+func (r *httpsVolumeStatsRequester) init(ctx context.Context) error {
+	var err error
+	if r.cli, err = httpClient(); err != nil {
+		r.logger.Warnf("build HTTP client error at setup: %s", err.Error())
+		return err
+	}
+	if r.req, err = httpRequest(ctx); err != nil {
+		r.logger.Warnf("build HTTP request error at setup, will try it later: %s", err.Error())
+	}
+	return nil
+}
+
+func (r *httpsVolumeStatsRequester) request(ctx context.Context) ([]byte, error) {
+	if r.cli == nil {
+		return nil, fmt.Errorf("HTTP client for kubelet is unavailable")
+	}
+	if r.req == nil {
+		// try to build http request again
+		var err error
+		r.req, err = httpRequest(ctx)
+		if err != nil {
+			r.logger.Warnf("build HTTP request to query kubelet error: %s", err.Error())
+			return nil, err
+		}
+	}
+
+	req := r.req.WithContext(ctx)
+	rsp, err := r.cli.Do(req)
+	if err != nil {
+		r.logger.Warnf("issue request to kubelet error: %s", err.Error())
+		return nil, err
+	}
+	if rsp.StatusCode != 200 {
+		r.logger.Warnf("HTTP response from kubelet error: %s", rsp.Status)
+		return nil, fmt.Errorf(rsp.Status)
+	}
+
+	defer rsp.Body.Close()
+	return io.ReadAll(rsp.Body)
 }
 
 func httpClient() (*http.Client, error) {

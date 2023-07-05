@@ -74,7 +74,7 @@ func TestOperations(t *testing.T) {
 	p.Init(bindings.Metadata{})
 	ops := p.Operations()
 
-	if len(ops) != 4 {
+	if len(ops) != 5 {
 		t.Errorf("p.LegacyOperations init failed: %s", p.OriRole)
 	}
 }

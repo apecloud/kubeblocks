@@ -15,7 +15,7 @@ metadata:
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 data:
-  my.cnf: |-
+  wesql-scale.cnf: |-
     {{- .Files.Get "config/mysql-scale-config.tpl" | nindent 4 }}
 ---
 apiVersion: v1

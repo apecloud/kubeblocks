@@ -600,15 +600,6 @@ var _ = Describe("builder", func() {
 			Expect(serviceAccount.Name).Should(Equal(expectName))
 		})
 
-		It("builds role correctly", func() {
-			_, cluster, _ := newClusterObjs(nil)
-			expectName := fmt.Sprintf("kb-%s", cluster.Name)
-			role, err := BuildRole(cluster)
-			Expect(err).Should(BeNil())
-			Expect(role).ShouldNot(BeNil())
-			Expect(role.Name).Should(Equal(expectName))
-		})
-
 		It("builds rolebinding correctly", func() {
 			_, cluster, _ := newClusterObjs(nil)
 			expectName := fmt.Sprintf("kb-%s", cluster.Name)

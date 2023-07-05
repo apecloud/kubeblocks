@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -51,37 +52,42 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
-		if !isServiceAccountNotExist(transCtx, serviceAccountName) {
-			continue
+		if isServiceAccountNotExist(transCtx, serviceAccountName) {
+			serviceAccount, err := builder.BuildServiceAccount(cluster)
+			if err != nil {
+				return err
+			}
+			serviceAccount.Name = serviceAccountName
+			saVertex := ictrltypes.LifecycleObjectCreate(dag, serviceAccount, nil)
+
+			statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
+			for _, statefulSetVertex := range statefulSetVertices {
+				// serviceaccount must be created before statefulset
+				dag.Connect(statefulSetVertex, saVertex)
+			}
+
+			deploymentVertices := ictrltypes.FindAll[*appsv1.Deployment](dag)
+			for _, deploymentVertex := range deploymentVertices {
+				// serviceaccount must be created before deployment
+				dag.Connect(deploymentVertex, saVertex)
+			}
 		}
 
-		serviceAccount, err := builder.BuildServiceAccount(cluster)
-		if err != nil {
-			return err
-		}
-		serviceAccount.Name = serviceAccountName
-		saVertex := ictrltypes.LifecycleObjectCreate(dag, serviceAccount, root)
+		if isRoleBindingNotExist(transCtx) {
+			roleBinding, err := builder.BuildRoleBinding(cluster)
+			if err != nil {
+				return err
+			}
+			roleBinding.Subjects[0].Name = serviceAccountName
+			rbVertex := ictrltypes.LifecycleObjectCreate(dag, roleBinding, root)
 
-		roleBinding, err := builder.BuildRoleBinding(cluster)
-		if err != nil {
-			return err
-		}
-		roleBinding.Subjects[0].Name = serviceAccountName
-		rbVertex := ictrltypes.LifecycleObjectCreate(dag, roleBinding, root)
-		dag.Connect(rbVertex, saVertex)
-
-		transCtx.Logger.V(0).Info("get service account failed", "dag", dag.String())
-		statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
-		for _, statefulSetVertex := range statefulSetVertices {
-			// rbac must be created before statefulset
-			dag.Connect(statefulSetVertex, rbVertex)
+			saVertices := ictrltypes.FindAll[*corev1.ServiceAccount](dag)
+			for _, saVertex := range saVertices {
+				// rolebinding must be created before serviceaccount
+				dag.Connect(saVertex, rbVertex)
+			}
 		}
 
-		deploymentVertices := ictrltypes.FindAll[*appsv1.Deployment](dag)
-		for _, deploymentVertex := range deploymentVertices {
-			// rbac must be created before deployment
-			dag.Connect(deploymentVertex, rbVertex)
-		}
 	}
 	return nil
 }
@@ -96,6 +102,25 @@ func isServiceAccountNotExist(transCtx *ClusterTransformContext, serviceAccountN
 	if err := transCtx.Client.Get(transCtx.Context, namespaceName, sa); err != nil {
 		// KubeBlocks will create a serviceaccount only if it has RBAC access priority and
 		// the serviceaccount is not already present.
+		if errors.IsNotFound(err) {
+			return true
+		}
+		transCtx.Logger.V(0).Error(err, "get service account failed")
+	}
+
+	return false
+}
+
+func isRoleBindingNotExist(transCtx *ClusterTransformContext) bool {
+	cluster := transCtx.Cluster
+	namespaceName := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      "kb-" + cluster.Name,
+	}
+	rb := &rbacv1.RoleBinding{}
+	if err := transCtx.Client.Get(transCtx.Context, namespaceName, rb); err != nil {
+		// KubeBlocks will create a rolebinding only if it has RBAC access priority and
+		// the rolebinding is not already present.
 		if errors.IsNotFound(err) {
 			return true
 		}

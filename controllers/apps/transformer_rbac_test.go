@@ -82,13 +82,14 @@ var _ = Describe("object rbac transformer test.", func() {
 
 		dag = mockDAG(cluster)
 		transformer = &RBACTransformer{}
-		//allSettings = viper.AllSettings()
+		allSettings = viper.AllSettings()
 		viper.SetDefault("ENABLE_RBAC_MANAGER", true)
 	})
 
 	AfterEach(func() {
+		viper.SetDefault("ENABLE_RBAC_MANAGER", false)
 		if allSettings != nil {
-			//	Expect(viper.MergeConfigMap(allSettings)).ShouldNot(HaveOccurred())
+			Expect(viper.MergeConfigMap(allSettings)).ShouldNot(HaveOccurred())
 			allSettings = nil
 		}
 	})

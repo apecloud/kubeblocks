@@ -40,26 +40,6 @@ serviceaccount: {
 }
 
 
-role: { 
-    apiVersion: "rbac.authorization.k8s.io/v1"
-    kind: "Role"
-    metadata: {
-        name: "kb-\(cluster.metadata.name)"
-        namespace: cluster.metadata.namespace
-        labels: {
-			"app.kubernetes.io/name":       cluster.spec.clusterDefinitionRef
-			"app.kubernetes.io/instance":   cluster.metadata.name
-            "app.kubernetes.io/managed-by": "kubeblocks"
-        }
-    }
-    rules: [{
-        apiGroups: [""]
-        resources: ["events"]
-        verbs: ["create"]
-    }]
-}
-
-
 rolebinding: {
     apiVersion: "rbac.authorization.k8s.io/v1"
     kind: "RoleBinding"

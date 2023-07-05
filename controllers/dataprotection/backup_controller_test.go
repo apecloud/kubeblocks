@@ -693,6 +693,8 @@ var _ = Describe("Backup Controller test", func() {
 			By("creating backup tool")
 			backupTool = testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
 				&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
+
+			viper.SetDefault(constant.CfgKeyBackupPVCName, "")
 		})
 
 		Context("explicitly specify backup repo", func() {

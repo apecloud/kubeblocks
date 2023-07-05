@@ -333,27 +333,6 @@ func GetDefaultVersion(dynamic dynamic.Interface, clusterDef string) (string, er
 	return defaultVersion, nil
 }
 
-func findLatestVersion(versions *appsv1alpha1.ClusterVersionList) *appsv1alpha1.ClusterVersion {
-	if len(versions.Items) == 0 {
-		return nil
-	}
-	if len(versions.Items) == 1 {
-		return &versions.Items[0]
-	}
-
-	var version *appsv1alpha1.ClusterVersion
-	for i, v := range versions.Items {
-		if version == nil {
-			version = &versions.Items[i]
-			continue
-		}
-		if v.CreationTimestamp.Time.After(version.CreationTimestamp.Time) {
-			version = &versions.Items[i]
-		}
-	}
-	return version
-}
-
 type CompInfo struct {
 	Component       *appsv1alpha1.ClusterComponentSpec
 	ComponentStatus *appsv1alpha1.ClusterComponentStatus

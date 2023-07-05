@@ -88,6 +88,7 @@ type Schedule struct {
 	// time for any reason. the unit of time is minute.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=1440
 	StartWindowMinutes *int64 `json:"startWindowMinutes,omitempty"`
 
 	// schedule policy for snapshot backup.

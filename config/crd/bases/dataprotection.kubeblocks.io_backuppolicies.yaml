@@ -513,6 +513,7 @@ spec:
                       the job if it misses scheduled time for any reason. the unit
                       of time is minute.
                     format: int64
+                    maximum: 1440
                     minimum: 0
                     type: integer
                 type: object

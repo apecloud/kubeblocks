@@ -28,6 +28,7 @@ import (
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/pipeline"
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 )
@@ -38,6 +39,11 @@ type deleteOptions struct {
 	deleteCRI bool
 	debug     bool
 }
+
+var deleteExamples = templates.Examples(`
+	# delete kubernetes cluster with specified config yaml
+	kbcli infra delete -c cluster.yaml
+`)
 
 func (o *deleteOptions) Run() error {
 	o.Cluster.Kubernetes.AutoDefaultFill()
@@ -99,7 +105,7 @@ func NewDeleteKubernetesCmd(streams genericclioptions.IOStreams) *cobra.Command 
 	cmd := &cobra.Command{
 		Use:     "delete",
 		Short:   "delete kubernetes cluster.",
-		Example: createExamples,
+		Example: deleteExamples,
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete())
 			util.CheckErr(o.Validate())

@@ -50,8 +50,8 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	}
 
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		ServiceAccountName := compSpec.ServiceAccountName
-		if !isServiceAccountNotExist(transCtx, ServiceAccountName) {
+		serviceAccountName := compSpec.ServiceAccountName
+		if !isServiceAccountNotExist(transCtx, serviceAccountName) {
 			continue
 		}
 
@@ -59,17 +59,18 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 		if err != nil {
 			return err
 		}
-		serviceAccount.Name = ServiceAccountName
+		serviceAccount.Name = serviceAccountName
 		saVertex := ictrltypes.LifecycleObjectCreate(dag, serviceAccount, root)
 
 		roleBinding, err := builder.BuildRoleBinding(cluster)
 		if err != nil {
 			return err
 		}
-		roleBinding.Subjects[0].Name = ServiceAccountName
+		roleBinding.Subjects[0].Name = serviceAccountName
 		rbVertex := ictrltypes.LifecycleObjectCreate(dag, roleBinding, root)
 		dag.Connect(rbVertex, saVertex)
 
+		transCtx.Logger.V(0).Info("get service account failed", "dag", dag.String())
 		statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
 		for _, statefulSetVertex := range statefulSetVertices {
 			// rbac must be created before statefulset

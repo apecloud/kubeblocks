@@ -114,9 +114,6 @@ var (
 	describeBackupExample = templates.Examples(`
 		# describe a backup
 		kbcli cluster describe-backup backup-default-mycluster-20230616190023
-
-		# using short cmd to describe a backup
-		kbcli cluster desc-bp backup-default-mycluster-20230616190023
 	`)
 )
 

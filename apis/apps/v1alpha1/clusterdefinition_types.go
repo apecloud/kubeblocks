@@ -21,6 +21,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -367,6 +368,106 @@ type ClusterComponentDefinition struct {
 	// in particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
 	// +optional
 	SwitchoverSpec *SwitchoverSpec `json:"switchoverSpec,omitempty"`
+	// componentRef is used to select the component to be referenced.
+	// +optional
+	ComponentRef []*ComponentRef `json:"componentRef,omitempty"`
+}
+
+// FailurePolicyType specifies the type of failure policy
+type FailurePolicyType string
+
+const (
+	// Ignore means that an error will be ignored but logged.
+	FailurePolicyIgnore FailurePolicyType = "Ignore"
+	// ReportError means that an error will be reported.
+	FailurePolicyFail FailurePolicyType = "Fail"
+)
+
+// ComponentRef is used to select the component and its fields to be referenced.
+type ComponentRef struct {
+	// componentDefName is the name of the componentDef to select.
+	// +optional
+	ComponentDefName string `json:"componentDefName,omitempty"`
+	// failurePolicy is the failure policy of the component.
+	// If failed to find the component, the failure policy will be used.
+	// +optional
+	// +default=Ignore
+	FailurePolicy FailurePolicyType `json:"failurePolicy,omitempty"`
+	// fieldRefs is the field of the component to select.
+	// +optional
+	FieldRefs []*ComponentFieldRef `json:"fieldRefs,omitempty"`
+	// serviceFieldRef is the field of the service to select.
+	// +optional
+	ServiceRefs []*ComponentServiceRef `json:"serviceRef,omitempty"`
+	// headlessServiceFieldRef is the field of the headless service to select.
+	// +optional
+	HeadlessServiceRefs []*ComponentHeadlessServiceRef `json:"headlessServiceRef,omitempty"`
+	// resourceFieldRef is the field of the resource to select.
+	// +optional
+	ResourceFieldRefs []*ComponentResourceFieldRef `json:"resourceFieldRefs,omitempty"`
+}
+
+// ComponentFieldRef is used to select the field of the component to be referenced.
+type ComponentFieldRef struct {
+	// envName is the name of the env to be injected.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[-._a-zA-Z][-._a-zA-Z0-9]*$`
+	EnvName string `json:"envName"`
+	// fieldPath is the field of the component to select.
+	// +kubebuilder:validation:Required
+	FieldPath string `json:"fieldPath"`
+}
+
+// ComponentResourceFieldRef is used to select the field of the resource to be referenced.
+type ComponentResourceFieldRef struct {
+	// envName is the name of the env to be injected.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[-._a-zA-Z][-._a-zA-Z0-9]*$`
+	EnvName string `json:"envName"`
+	// resource to select
+	// +kubebuilder:validation:Required
+	Resource string `json:"resource"`
+	// divisor specifies the output format of the exposed resources, defaults to "1"
+	// +optional
+	Divisor resource.Quantity `json:"divisor,omitempty"`
+}
+
+// ComponentServiceRef is used to select service to be referenced.
+type ComponentServiceRef struct {
+	// envNamePrefix is the prefix of the env to be injected.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[-._a-zA-Z][-._a-zA-Z0-9]*$`
+	EnvName string `json:"envName"`
+	// serviceName is the name of the service to select.
+	// +kubebuilder:validation:Required
+	ServiceName string `json:"name"`
+}
+
+type ComponentHeadlessServiceRef struct {
+	// envNamePrefix is the prefix of the env to be injected.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[-._a-zA-Z][-._a-zA-Z0-9]*$`
+	EnvName string `json:"envName"`
+	// PortName is the name of the port to select.
+	// +kubebuilder:validation:Required
+	PortName string `json:"portName"`
+	// containerName is the name of the container to select.
+	// +kubebuilder:validation:Required
+	ContainerName string `json:"containerName"`
+	// format is the format of the values to be organized.
+	// there are four build-int values: {{.Hostname}}, {{.Port}}, {{.FQDN}}, {{.Ordinal}}.
+	// + optional
+	// + default: "{{.Hostname}}:{{.Port}}"
+	Format string `json:"format,omitempty"`
+	// joinWith is the string to join the values.
+	// + optional
+	// + default: ","
+	JoinWith string `json:"joinWith,omitempty"`
+	// top is the number of the top elements to select.
+	// 0 for all elements.
+	// +optional
+	// +default: 0
+	Top *int32 `json:"top,omitempty"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {

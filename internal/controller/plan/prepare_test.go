@@ -159,7 +159,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	case appsv1alpha1.Stateless:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return builder.BuildDeploy(reqCtx, cluster, component)
+				return builder.BuildDeploy(reqCtx, cluster, component, "")
 			}); err != nil {
 			return nil, err
 		}

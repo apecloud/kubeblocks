@@ -184,6 +184,133 @@ spec:
                       maxLength: 22
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                    componentRef:
+                      description: componentRef defines inter-component field reference.
+                        componentRef defined in ClusterComponentSpec will override
+                        componentRef defined in ClusterDefinition.
+                      items:
+                        description: ComponentRef is used to select the component
+                          and its fields to be referenced.
+                        properties:
+                          componentDefName:
+                            description: componentDefName is the name of the componentDef
+                              to select.
+                            type: string
+                          failurePolicy:
+                            description: failurePolicy is the failure policy of the
+                              component. If failed to find the component, the failure
+                              policy will be used.
+                            type: string
+                          fieldRefs:
+                            description: fieldRefs is the field of the component to
+                              select.
+                            items:
+                              description: ComponentFieldRef is used to select the
+                                field of the component to be referenced.
+                              properties:
+                                envName:
+                                  description: envName is the name of the env to be
+                                    injected.
+                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
+                                  type: string
+                                fieldPath:
+                                  description: fieldPath is the field of the component
+                                    to select.
+                                  type: string
+                              required:
+                              - envName
+                              - fieldPath
+                              type: object
+                            type: array
+                          headlessServiceRef:
+                            description: headlessServiceFieldRef is the field of the
+                              headless service to select.
+                            items:
+                              properties:
+                                containerName:
+                                  description: containerName is the name of the container
+                                    to select.
+                                  type: string
+                                envName:
+                                  description: envNamePrefix is the prefix of the
+                                    env to be injected.
+                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
+                                  type: string
+                                format:
+                                  description: 'format is the format of the values
+                                    to be organized. there are four build-int values:
+                                    {{.Hostname}}, {{.Port}}, {{.FQDN}}, {{.Ordinal}}.'
+                                  type: string
+                                joinWith:
+                                  description: joinWith is the string to join the
+                                    values.
+                                  type: string
+                                portName:
+                                  description: PortName is the name of the port to
+                                    select.
+                                  type: string
+                                top:
+                                  description: top is the number of the top elements
+                                    to select. 0 for all elements.
+                                  format: int32
+                                  type: integer
+                              required:
+                              - containerName
+                              - envName
+                              - portName
+                              type: object
+                            type: array
+                          resourceFieldRefs:
+                            description: resourceFieldRef is the field of the resource
+                              to select.
+                            items:
+                              description: ComponentResourceFieldRef is used to select
+                                the field of the resource to be referenced.
+                              properties:
+                                divisor:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: divisor specifies the output format
+                                    of the exposed resources, defaults to "1"
+                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                  x-kubernetes-int-or-string: true
+                                envName:
+                                  description: envName is the name of the env to be
+                                    injected.
+                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
+                                  type: string
+                                resource:
+                                  description: resource to select
+                                  type: string
+                              required:
+                              - envName
+                              - resource
+                              type: object
+                            type: array
+                          serviceRef:
+                            description: serviceFieldRef is the field of the service
+                              to select.
+                            items:
+                              description: ComponentServiceRef is used to select service
+                                to be referenced.
+                              properties:
+                                envName:
+                                  description: envNamePrefix is the prefix of the
+                                    env to be injected.
+                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
+                                  type: string
+                                name:
+                                  description: serviceName is the name of the service
+                                    to select.
+                                  type: string
+                              required:
+                              - envName
+                              - name
+                              type: object
+                            type: array
+                        type: object
+                      type: array
                     enabledLogs:
                       description: enabledLogs indicates which log file takes effect
                         in the database cluster. element is the log type which is

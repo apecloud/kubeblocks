@@ -457,13 +457,7 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 		return 0, 0, intctrlutil.NewError(intctrlutil.ErrorWaitCacheRefresh, "wait for the pods of component to be synchronized")
 	}
 	if opsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
-		expectReplicas = lastComponentReplicas
-		// lastComponentPods is the snapshot of component pods at cancelling,
-		// use this count as the last component replicas during canceling.
-		lastComponentPodNames := getTargetResourcesOfLastComponent(opsRes.OpsRequest.Status.LastConfiguration,
-			pgRes.clusterComponent.Name, appsv1alpha1.PodsCompResourceKey)
-		lastComponentPodCount := int32(len(lastComponentPodNames))
-		lastComponentReplicas = &lastComponentPodCount
+		expectReplicas = opsRequest.Status.LastConfiguration.Components[clusterComponent.Name].Replicas
 	}
 	var (
 		isScaleOut          bool

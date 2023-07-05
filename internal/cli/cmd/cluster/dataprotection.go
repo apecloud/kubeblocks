@@ -32,6 +32,8 @@ import (
 	"github.com/dapr/kit/cron"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -1064,7 +1066,6 @@ func (o *describeBackupOptions) printBackupObj(obj *dpv1alpha1.Backup) error {
 
 	printer.PrintLine("\nStatus:")
 	realPrintPairStringToLine("Phase", string(obj.Status.Phase))
-	realPrintPairStringToLine("Failure Reason", obj.Status.FailureReason)
 	realPrintPairStringToLine("Total Size", obj.Status.TotalSize)
 	realPrintPairStringToLine("Backup Tool", obj.Status.BackupToolName)
 	realPrintPairStringToLine("PVC Name", obj.Status.PersistentVolumeClaimName)
@@ -1077,6 +1078,8 @@ func (o *describeBackupOptions) printBackupObj(obj *dpv1alpha1.Backup) error {
 	realPrintPairStringToLine("Expiration Time", util.TimeFormat(obj.Status.Expiration))
 	realPrintPairStringToLine("Start Time", util.TimeFormat(obj.Status.StartTimestamp))
 	realPrintPairStringToLine("Completion Time", util.TimeFormat(obj.Status.CompletionTimestamp))
+	// print failure reason, ignore error
+	_ = o.enhancePrintFailureReason(obj.Name, obj.Status.FailureReason)
 
 	if obj.Status.Manifests != nil {
 		printer.PrintLine("\nManifests:")
@@ -1117,4 +1120,52 @@ func realPrintPairStringToLine(name, value string, spaceCount ...int) {
 	if value != "" {
 		printer.PrintPairStringToLine(name, value, spaceCount...)
 	}
+}
+
+// print the pod error logs if failure reason has occurred
+// TODO: the failure reason should be improved in the backup controller
+func (o *describeBackupOptions) enhancePrintFailureReason(backupName, failureReason string, spaceCount ...int) error {
+	if failureReason == "" {
+		return nil
+	}
+	ctx := context.Background()
+	// get the latest job log details.
+	labels := fmt.Sprintf("%s=%s",
+		constant.DataProtectionLabelBackupNameKey, backupName,
+	)
+	jobList, err := o.client.BatchV1().Jobs("").List(ctx, metav1.ListOptions{LabelSelector: labels})
+	if err != nil {
+		return err
+	}
+	var failedJob *batchv1.Job
+	for _, i := range jobList.Items {
+		if i.Status.Failed > 0 {
+			failedJob = &i
+			break
+		}
+	}
+	if failedJob != nil {
+		podLabels := fmt.Sprintf("%s=%s",
+			"controller-uid", failedJob.UID,
+		)
+		podList, err := o.client.CoreV1().Pods(failedJob.Namespace).List(ctx, metav1.ListOptions{LabelSelector: podLabels})
+		if err != nil {
+			return err
+		}
+		if len(podList.Items) > 0 {
+			tailLines := int64(5)
+			req := o.client.CoreV1().
+				Pods(podList.Items[0].Namespace).
+				GetLogs(podList.Items[0].Name, &corev1.PodLogOptions{TailLines: &tailLines})
+			data, err := req.DoRaw(ctx)
+			if err != nil {
+				return err
+			}
+			failureReason = fmt.Sprintf("%s\n pod %s error logs:\n%s",
+				failureReason, podList.Items[0].Name, string(data))
+		}
+	}
+	printer.PrintPairStringToLine("Failure Reason", failureReason, spaceCount...)
+
+	return nil
 }

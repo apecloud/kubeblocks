@@ -84,6 +84,12 @@ type RetentionSpec struct {
 }
 
 type Schedule struct {
+	// startWindowMinutes starts the job in this time window if it misses scheduled
+	// time for any reason. the unit of time is minute.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	StartWindowMinutes *int64 `json:"startWindowMinutes,omitempty"`
+
 	// schedule policy for snapshot backup.
 	// +optional
 	Snapshot *SchedulePolicy `json:"snapshot,omitempty"`

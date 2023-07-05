@@ -136,6 +136,11 @@ func (factory *MockBackupPolicyFactory) SetSchedule(schedule string, enable bool
 	return factory
 }
 
+func (factory *MockBackupPolicyFactory) SetScheduleStartWindowMinutes(startWindowMinutes *int64) *MockBackupPolicyFactory {
+	factory.get().Spec.Schedule.StartWindowMinutes = startWindowMinutes
+	return factory
+}
+
 func (factory *MockBackupPolicyFactory) SetTTL(duration string) *MockBackupPolicyFactory {
 	factory.get().Spec.Retention = &dataprotectionv1alpha1.RetentionSpec{
 		TTL: &duration,

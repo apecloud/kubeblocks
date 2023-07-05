@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	componentutil "github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -127,7 +127,7 @@ func doSwitchoverComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 		opsRequest.Status.Components = make(map[string]appsv1alpha1.OpsRequestComponentStatus)
 	}
 	for _, switchover := range switchoverList {
-		compDef, err := componentutil.GetComponentDefByCluster(reqCtx.Ctx, cli, *opsRes.Cluster, switchover.ComponentName)
+		compDef, err := components.GetComponentDefByCluster(reqCtx.Ctx, cli, *opsRes.Cluster, switchover.ComponentName)
 		if err != nil {
 			return err
 		}
@@ -214,7 +214,7 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 			Status:    appsv1alpha1.ProcessingProgressStatus,
 			Message:   fmt.Sprintf("waiting for component %s pod role label consistency after switchover", switchover.ComponentName),
 		}
-		compDef, err = componentutil.GetComponentDefByCluster(reqCtx.Ctx, cli, *opsRes.Cluster, switchover.ComponentName)
+		compDef, err = components.GetComponentDefByCluster(reqCtx.Ctx, cli, *opsRes.Cluster, switchover.ComponentName)
 		if err != nil {
 			checkRoleLabelProcessDetail.Message = fmt.Sprintf("handleSwitchoverProgress get component %s definition failed", switchover.ComponentName)
 			checkRoleLabelProcessDetail.Status = appsv1alpha1.FailedProgressStatus

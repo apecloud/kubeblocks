@@ -244,10 +244,13 @@ type VolumeTypeSpec struct {
 // behaviors.
 // +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Consensus' ?  has(self.consensusSpec) : !has(self.consensusSpec)",message="componentDefs.consensusSpec is required when componentDefs.workloadType is Consensus, and forbidden otherwise"
 type ClusterComponentDefinition struct {
-	// name of the component, it can be any valid string.
+	// A component definition name, this name could be used as default name of `Cluster.spec.componentSpecs.name`,
+	// and so this name is need to conform with same validation rules as `Cluster.spec.componentSpecs.name`, that
+	// is currently comply with IANA Service Naming rule. This name will apply to "apps.kubeblocks.io/component-name"
+	// object label value.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=18
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
 	// The description of component definition.

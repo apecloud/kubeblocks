@@ -21,17 +21,14 @@ package components
 
 import (
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/stateless"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -40,7 +37,17 @@ import (
 // PodIsAvailable checks whether a pod is available with respect to the workload type.
 // Deprecated: provide for ops request using, remove this interface later.
 func PodIsAvailable(workloadType appsv1alpha1.WorkloadType, pod *corev1.Pod, minReadySeconds int32) bool {
-	return util.PodIsAvailable(workloadType, pod, minReadySeconds)
+	if pod == nil {
+		return false
+	}
+	switch workloadType {
+	case appsv1alpha1.Consensus, appsv1alpha1.Replication:
+		return intctrlutil.PodIsReadyWithLabel(*pod)
+	case appsv1alpha1.Stateful, appsv1alpha1.Stateless:
+		return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Time{Time: time.Now()})
+	default:
+		panic("unknown workload type")
+	}
 }
 
 func NewComponent(reqCtx intctrlutil.RequestCtx,
@@ -49,7 +56,7 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 	version *appsv1alpha1.ClusterVersion,
 	cluster *appsv1alpha1.Cluster,
 	compName string,
-	dag *graph.DAG) (types.Component, error) {
+	dag *graph.DAG) (Component, error) {
 	var compDef *appsv1alpha1.ClusterComponentDefinition
 	var compVer *appsv1alpha1.ClusterComponentVersion
 	compSpec := cluster.Spec.GetComponentByName(compName)
@@ -75,13 +82,13 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 
 	switch compDef.WorkloadType {
 	case appsv1alpha1.Replication:
-		return replication.NewReplicationComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
+		return newReplicationComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
 	case appsv1alpha1.Consensus:
-		return consensus.NewConsensusComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
+		return newConsensusComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
 	case appsv1alpha1.Stateful:
-		return stateful.NewStatefulComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
+		return newStatefulComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
 	case appsv1alpha1.Stateless:
-		return stateless.NewStatelessComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
+		return newStatelessComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
 	}
 	panic(fmt.Sprintf("unknown workload type: %s, cluster: %s, component: %s, component definition ref: %s",
 		compDef.WorkloadType, cluster.Name, compSpec.Name, compSpec.ComponentDefRef))

@@ -160,7 +160,7 @@ fmt: ## Run go fmt against code.
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	GOOS=linux $(GO) vet -mod=mod ./...
+	GOOS=$(GOOS) $(GO) vet -mod=mod ./...
 
 .PHONY: cue-fmt
 cue-fmt: cuetool ## Run cue fmt against code.
@@ -374,7 +374,7 @@ fix-license-header: ## Run license header fix.
 
 ##@ Helm Chart Tasks
 
-bump-single-chart-appver.%: chart=$(word 2,$(subst ., ,$@))
+bump-single-chart-appver.%: chart=$*
 bump-single-chart-appver.%:
 ifeq ($(GOOS), darwin)
 	sed -i '' "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
@@ -382,7 +382,7 @@ else
 	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
 endif
 
-bump-single-chart-ver.%: chart=$(word 2,$(subst ., ,$@))
+bump-single-chart-ver.%: chart=$*
 bump-single-chart-ver.%:
 ifeq ($(GOOS), darwin)
 	sed -i '' "s/^version:.*/version: $(VERSION)/" deploy/$(chart)/Chart.yaml
@@ -414,7 +414,9 @@ bump-chart-ver: \
 	bump-single-chart-ver.qdrant-cluster \
 	bump-single-chart-ver.weaviate \
 	bump-single-chart-ver.weaviate-cluster \
-	bump-single-chart-ver.chatgpt-retrieval-plugin
+	bump-single-chart-ver.chatgpt-retrieval-plugin \
+	bump-single-chart-ver.tdengine \
+	bump-single-chart-ver.tdengine-cluster
 bump-chart-ver: ## Bump helm chart version.
 
 .PHONY: helm-package
@@ -574,7 +576,7 @@ render-smoke-testdata-manifests: ## Update E2E test dataset
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) -C test/e2e run
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

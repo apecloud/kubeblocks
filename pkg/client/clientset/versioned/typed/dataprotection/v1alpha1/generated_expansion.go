@@ -22,6 +22,8 @@ type BackupExpansion interface{}
 
 type BackupPolicyExpansion interface{}
 
+type BackupRepoExpansion interface{}
+
 type BackupToolExpansion interface{}
 
 type RestoreJobExpansion interface{}

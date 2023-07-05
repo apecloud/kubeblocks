@@ -4,7 +4,7 @@ description: A ClickHouse cluster Helm chart for KubeBlocks.
 
 type: application
 
-version: 0.6.0-alpha.21
+version: 0.6.0-alpha.28
 
 appVersion: 22.9.4
 

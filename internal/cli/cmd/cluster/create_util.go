@@ -67,7 +67,7 @@ func addCreateFlags(cmd *cobra.Command, f cmdutil.Factory, c *cluster.ChartInfo)
 	// by cli if user doesn't specify the version
 	resetFlagsValue(cmd.Flags())
 
-	// register completion function for some generic flag name
+	// register completion function for some generic flag
 	registerFlagCompFunc(cmd, f, c)
 	return nil
 }
@@ -175,7 +175,7 @@ func getObjectsInfo(f cmdutil.Factory, manifests map[string]string) ([]*objectIn
 }
 
 // buildHelmValues builds the helm values from the cluster schema and the values from the flags.
-// For helm, the sub chartInfo values should be in the sub map of the values.
+// For helm, the sub chart values should be in the sub map of the values.
 func buildHelmValues(c *cluster.ChartInfo, values map[string]interface{}) map[string]interface{} {
 	if c.SubSchema == nil {
 		return values

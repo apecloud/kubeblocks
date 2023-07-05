@@ -28,7 +28,7 @@ import (
 func TestFormat(t *testing.T) {
 	var format Format
 	cmd := &cobra.Command{}
-	AddOutputFlag(cmd, &format, false)
+	AddOutputFlag(cmd, &format)
 	flag := cmd.Flags().Lookup("output")
 	if flag == nil {
 		t.Fatal("expect output flag")

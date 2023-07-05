@@ -301,7 +301,7 @@ func BuildStorageClass(storages []StorageInfo) string {
 	return util.CheckEmpty(strings.Join(scs, "\n"))
 }
 
-// GetDefaultVersion gets the default cluster versions that referencing the cluster definition.
+// GetDefaultVersion gets the default cluster version that referencing the cluster definition.
 // If only one version is found, it will be returned directly, otherwise the version with
 // constant.DefaultClusterVersionAnnotationKey label will be returned.
 func GetDefaultVersion(dynamic dynamic.Interface, clusterDef string) (string, error) {
@@ -319,13 +319,16 @@ func GetDefaultVersion(dynamic dynamic.Interface, clusterDef string) (string, er
 	for _, item := range versionList.Items {
 		if k, ok := item.Annotations[constant.DefaultClusterVersionAnnotationKey]; ok && k == "true" {
 			if found {
-				return "", fmt.Errorf("found more than one default cluster version referencing current cluster definition %s", clusterDef)
+				return "", fmt.Errorf("found more than one default cluster version referencing cluster definition %s", clusterDef)
 			}
 			found = true
 			defaultVersion = item.Name
 		}
 	}
 
+	if defaultVersion == "" {
+		return "", fmt.Errorf("failed to find default cluster version referencing cluster definition %s", clusterDef)
+	}
 	return defaultVersion, nil
 }
 

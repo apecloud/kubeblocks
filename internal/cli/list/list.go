@@ -86,7 +86,7 @@ func (o *ListOptions) AddFlags(cmd *cobra.Command, isClusterScope ...bool) {
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.")
 	cmd.Flags().BoolVar(&o.ShowLabels, "show-labels", false, "When printing, show all labels as the last column (default hide labels column)")
 	//Todo: --sortBy supports custom field sorting, now `list` is to sort using the `.metadata.name` field in default
-	printer.AddOutputFlag(cmd, &o.Format, false)
+	printer.AddOutputFlag(cmd, &o.Format)
 }
 
 func (o *ListOptions) Complete() error {

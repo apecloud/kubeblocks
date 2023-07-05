@@ -142,7 +142,7 @@ func (o *createSubCmdsOptions) run() error {
 		return nil, fmt.Errorf("failed to find cluster object from manifests rendered from %s chart", o.clusterType)
 	}
 
-	// only edits the cluster object, other dependencies object is not allowed to edit
+	// only edits the cluster object, other dependency objects are created directly
 	if o.EditBeforeCreate {
 		clusterObj, err := getClusterObj()
 		if err != nil {

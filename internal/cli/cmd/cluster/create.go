@@ -873,7 +873,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 
 		// HACK: for apecloud-mysql cluster definition, if setsMap is empty, user
 		// does not specify any set, so we only build the first component.
-		// TODO(ldm): remove this hack and use helm chartInfo to render the cluster.
+		// TODO(ldm): remove this hack and use helm chart to render the cluster.
 		if i > 0 && len(sets) == 0 && cd.Name == "apecloud-mysql" {
 			continue
 		}

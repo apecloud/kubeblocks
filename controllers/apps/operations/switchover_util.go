@@ -179,12 +179,12 @@ func renderSwitchoverCmdJob(ctx context.Context,
 		return nil, errors.New("primary pod not found")
 	}
 
-	renderJobPodVolumes := func(configMapRefs []appsv1alpha1.DataObjectKeySelector) ([]corev1.Volume, []corev1.VolumeMount) {
+	renderJobPodVolumes := func(configMapRefs []appsv1alpha1.ConfigMapSelector) ([]corev1.Volume, []corev1.VolumeMount) {
 		volumes := make([]corev1.Volume, 0)
 		volumeMounts := make([]corev1.VolumeMount, 0)
 
 		// find current pod's volume which mapped to configMapRefs
-		findVolumes := func(tplSpec appsv1alpha1.ComponentTemplateSpec, configMapRef appsv1alpha1.DataObjectKeySelector) {
+		findVolumes := func(tplSpec appsv1alpha1.ComponentTemplateSpec, configMapRef appsv1alpha1.ConfigMapSelector) {
 			if tplSpec.Name != configMapRef.Name {
 				return
 			}
@@ -220,8 +220,10 @@ func renderSwitchoverCmdJob(ctx context.Context,
 	}
 
 	renderJob := func(switchoverSpec *appsv1alpha1.SwitchoverSpec, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
-		var cmdExecutorConfig *appsv1alpha1.CmdExecutorConfig
-		configMapRefs := make([]appsv1alpha1.DataObjectKeySelector, 0)
+		var (
+			cmdExecutorConfig *appsv1alpha1.CmdExecutorConfig
+			configMapRefs     []appsv1alpha1.ConfigMapSelector
+		)
 		switch switchover.InstanceName {
 		case constant.KBSwitchoverCandidateInstanceForAnyPod:
 			if switchoverSpec.WithoutCandidate != nil {

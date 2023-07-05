@@ -78,6 +78,7 @@ spec:
               - /scripts/switchover-without-candidate.sh
           configMapRefs:
             - name: mongodb-scripts
+            - name: mongodb-config
       service:
         ports:
           - name: mongodb

@@ -8620,11 +8620,8 @@ spec:
                                 ".yml" extension name to specify a content type.
                               items:
                                 properties:
-                                  key:
-                                    description: The key to select.
-                                    type: string
                                   name:
-                                    description: Object name of the referent.
+                                    description: ConfigMap name of the referent.
                                     maxLength: 63
                                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                     type: string
@@ -8791,11 +8788,8 @@ spec:
                                 ".yml" extension name to specify a content type.
                               items:
                                 properties:
-                                  key:
-                                    description: The key to select.
-                                    type: string
                                   name:
-                                    description: Object name of the referent.
+                                    description: ConfigMap name of the referent.
                                     maxLength: 63
                                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                     type: string

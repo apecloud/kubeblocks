@@ -842,19 +842,15 @@ type SwitchoverAction struct {
 	// a JSON or YAML string content. Use a key name with ".json" or ".yaml" or ".yml"
 	// extension name to specify a content type.
 	// +optional
-	ConfigMapRefs []DataObjectKeySelector `json:"configMapRefs,omitempty"`
+	ConfigMapRefs []ConfigMapSelector `json:"configMapRefs,omitempty"`
 }
 
-type DataObjectKeySelector struct {
-	// Object name of the referent.
+type ConfigMapSelector struct {
+	// ConfigMap name of the referent.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"` // need corev1.LocalObjectReference
-
-	// The key to select.
-	// +optional
-	Key string `json:"key"`
 }
 
 type CommandExecutorEnvItem struct {

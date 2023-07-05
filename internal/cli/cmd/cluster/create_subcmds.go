@@ -22,10 +22,8 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
-	"helm.sh/helm/v3/pkg/chart"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -43,58 +41,44 @@ type objectInfo struct {
 	obj *unstructured.Unstructured
 }
 
-type CreateEngineOptions struct {
-	// engine is the type of the engine to create.
-	engine cluster.EngineType
+type createSubCmdsOptions struct {
+	// clusterType is the type of the cluster to create.
+	clusterType cluster.ClusterType
 
-	// values is used to render the cluster helm chart.
+	// values is used to render the cluster helm chartInfo.
 	values map[string]interface{}
 
-	// schema is the cluster helm chart schema, used to render the command flag
+	// chartInfo is the cluster chart information, used to render the command flag
 	// and validate the values.
-	schema *cluster.EngineSchema
-
-	// chart is the cluster helm chart.
-	chart *chart.Chart
-
-	// clusterDef is the engine cluster definition.
-	clusterDef string
+	chartInfo *cluster.ChartInfo
 
 	*create.CreateOptions
 }
 
-func newEngineOptions(createOptions *create.CreateOptions, e cluster.EngineType) (*CreateEngineOptions, error) {
+func newSubCmdsOptions(createOptions *create.CreateOptions, t cluster.ClusterType) (*createSubCmdsOptions, error) {
 	var err error
-	o := &CreateEngineOptions{
+	o := &createSubCmdsOptions{
 		CreateOptions: createOptions,
-		engine:        e,
+		clusterType:   t,
 	}
 
-	if o.chart, err = cluster.GetHelmChart(e); err != nil {
-		return nil, err
-	}
-
-	if o.schema, err = cluster.GetEngineSchema(o.chart); err != nil {
-		return nil, err
-	}
-
-	if o.clusterDef, err = cluster.GetEngineClusterDef(o.chart); err != nil {
+	if o.chartInfo, err = cluster.BuildChartInfo(t); err != nil {
 		return nil, err
 	}
 	return o, nil
 }
 
-func buildCreateEngineCmds(createOptions *create.CreateOptions) []*cobra.Command {
+func buildCreateSubCmds(createOptions *create.CreateOptions) []*cobra.Command {
 	var cmds []*cobra.Command
 
-	for _, e := range cluster.SupportedEngines() {
-		o, err := newEngineOptions(createOptions, e)
+	for _, t := range cluster.SupportedTypes() {
+		o, err := newSubCmdsOptions(createOptions, t)
 		util.CheckErr(err)
 
 		cmd := &cobra.Command{
-			Use:     strings.ToLower(e.String()) + " NAME",
-			Short:   fmt.Sprintf("Create a %s cluster.", e),
-			Example: buildEngineCreateExamples(e),
+			Use:     t.String() + " NAME",
+			Short:   fmt.Sprintf("Create a %s cluster.", t),
+			Example: buildCreateSubCmdsExamples(t),
 			Run: func(cmd *cobra.Command, args []string) {
 				o.Args = args
 				cmdutil.CheckErr(o.CreateOptions.Complete())
@@ -104,13 +88,13 @@ func buildCreateEngineCmds(createOptions *create.CreateOptions) []*cobra.Command
 			},
 		}
 
-		util.CheckErr(addEngineFlags(cmd, o.Factory, o.schema))
+		util.CheckErr(addCreateFlags(cmd, o.Factory, o.chartInfo))
 		cmds = append(cmds, cmd)
 	}
 	return cmds
 }
 
-func (o *CreateEngineOptions) complete(cmd *cobra.Command, args []string) error {
+func (o *createSubCmdsOptions) complete(cmd *cobra.Command, args []string) error {
 	var err error
 
 	// if name is not specified, generate a random cluster name
@@ -126,19 +110,19 @@ func (o *CreateEngineOptions) complete(cmd *cobra.Command, args []string) error 
 	return nil
 }
 
-func (o *CreateEngineOptions) validate() error {
+func (o *createSubCmdsOptions) validate() error {
 	if err := o.validateVersion(); err != nil {
 		return err
 	}
-	return cluster.ValidateValues(o.schema, o.values)
+	return cluster.ValidateValues(o.chartInfo, o.values)
 }
 
-func (o *CreateEngineOptions) run() error {
+func (o *createSubCmdsOptions) run() error {
 	// move values that belong to sub chart to sub map
-	values := buildHelmValues(o.schema, o.values)
+	values := buildHelmValues(o.chartInfo, o.values)
 
 	// get cluster manifests
-	manifests, err := cluster.GetManifests(o.chart, o.Namespace, o.Name, values)
+	manifests, err := cluster.GetManifests(o.chartInfo.Chart, o.Namespace, o.Name, values)
 	if err != nil {
 		return err
 	}
@@ -155,7 +139,7 @@ func (o *CreateEngineOptions) run() error {
 				return obj.obj, nil
 			}
 		}
-		return nil, fmt.Errorf("failed to find cluster object from manifests rendered from engine %s template", o.engine)
+		return nil, fmt.Errorf("failed to find cluster object from manifests rendered from %s chart", o.clusterType)
 	}
 
 	// only edits the cluster object, other dependencies object is not allowed to edit
@@ -222,19 +206,19 @@ func (o *CreateEngineOptions) run() error {
 	return nil
 }
 
-func (o *CreateEngineOptions) validateVersion() error {
+func (o *createSubCmdsOptions) validateVersion() error {
 	var err error
 
 	cv := o.values[cluster.VersionSchemaProp.String()].(string)
 	if cv != "" {
-		if err = cluster.ValidateClusterVersion(o.Dynamic, o.clusterDef, cv); err != nil {
+		if err = cluster.ValidateClusterVersion(o.Dynamic, o.chartInfo.ClusterDef, cv); err != nil {
 			return fmt.Errorf("cluster version \"%s\" does not exist, run following command to get the available cluster versions\n\tkbcli cv list --cluster-definition=%s",
-				o.clusterDef, cv)
+				cv, o.chartInfo.ClusterDef)
 		}
 		return nil
 	}
 
-	cv, err = cluster.GetDefaultVersion(o.Dynamic, o.clusterDef)
+	cv, err = cluster.GetDefaultVersion(o.Dynamic, o.chartInfo.ClusterDef)
 	if err != nil {
 		return err
 	}

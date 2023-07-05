@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -37,40 +38,41 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	"github.com/apecloud/kubeblocks/internal/cli/util/flags"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
 var (
-	resetDefaultValsFlagNames = []string{
+	resetValFlagNames = []string{
 		cluster.VersionSchemaProp.String(),
 	}
 )
 
-// addEngineFlags adds the flags for creating a cluster, these flags are built by the cluster schema.
-func addEngineFlags(cmd *cobra.Command, f cmdutil.Factory, schema *cluster.EngineSchema) error {
-	if schema == nil {
+// addCreateFlags adds the flags for creating a cluster, these flags are built by the cluster schema.
+func addCreateFlags(cmd *cobra.Command, f cmdutil.Factory, c *cluster.ChartInfo) error {
+	if c == nil {
 		return nil
 	}
 
 	// add the flags for the cluster schema
-	if err := flags.BuildFlagsBySchema(cmd, f, schema.Schema); err != nil {
+	if err := flags.BuildFlagsBySchema(cmd, f, c.Schema); err != nil {
 		return err
 	}
 
 	// add the flags for sub helm chart
-	if err := flags.BuildFlagsBySchema(cmd, f, schema.SubSchema); err != nil {
+	if err := flags.BuildFlagsBySchema(cmd, f, c.SubSchema); err != nil {
 		return err
 	}
 
 	// reset some flags default value, such as version, a suitable version will be chosen
-	// if user doesn't specify the version
-	resetFlagsDefaultValue(cmd.Flags())
+	// by cli if user doesn't specify the version
+	resetFlagsValue(cmd.Flags())
 
 	// register completion function for some generic flag name
-	registerFlagCompFunc(cmd, f)
+	registerFlagCompFunc(cmd, f, c)
 	return nil
 }
 
-// getValuesFromFlags gets the values from the flags, these values are used to template a cluster.
+// getValuesFromFlags gets the values from the flags, these values are used to render a cluster.
 func getValuesFromFlags(fs *flag.FlagSet) map[string]interface{} {
 	values := make(map[string]interface{}, 0)
 	fs.VisitAll(func(f *flag.Flag) {
@@ -93,39 +95,45 @@ func getValuesFromFlags(fs *flag.FlagSet) map[string]interface{} {
 	return values
 }
 
-// resetFlagsDefaultValue reset the default value of some flags
-func resetFlagsDefaultValue(fs *flag.FlagSet) {
+// resetFlagsValue reset the default value of some flags
+func resetFlagsValue(fs *flag.FlagSet) {
 	fs.VisitAll(func(f *flag.Flag) {
-		for _, n := range resetDefaultValsFlagNames {
+		for _, n := range resetValFlagNames {
 			if n == f.Name {
 				f.DefValue = ""
+				_ = f.Value.Set("")
 			}
 		}
 	})
 }
 
-func registerFlagCompFunc(cmd *cobra.Command, f cmdutil.Factory) {
-	// TODO(ldm): gets cluster versions based on the cluster engine type, do not get all
-	// but, now the cluster version does not has any engine type label, we can not get them by label
+func registerFlagCompFunc(cmd *cobra.Command, f cmdutil.Factory, c *cluster.ChartInfo) {
 	_ = cmd.RegisterFlagCompletionFunc(string(cluster.VersionSchemaProp),
 		func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete), cobra.ShellCompDirectiveNoFileComp
+			var versions []string
+			if c != nil && c.ClusterDef != "" {
+				label := fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, c.ClusterDef)
+				versions = util.CompGetResourceWithLabels(f, cmd, util.GVRToString(types.ClusterVersionGVR()), []string{label}, toComplete)
+			} else {
+				versions = utilcomp.CompGetResource(f, cmd, util.GVRToString(types.ClusterVersionGVR()), toComplete)
+			}
+			return versions, cobra.ShellCompDirectiveNoFileComp
 		})
 }
 
-// buildEngineCreateExamples builds the creation examples for the specified engine type.
-func buildEngineCreateExamples(e cluster.EngineType) string {
+// buildCreateSubCmdsExamples builds the creation examples for the specified clusterType type.
+func buildCreateSubCmdsExamples(t cluster.ClusterType) string {
 	exampleTpl := `
 	# Create a cluster with the default values
-	kbcli cluster create {{ .EngineType }}
+	kbcli cluster create {{ .ClusterType }}
 
 	# Create a cluster with the specified cpu, memory and storage
-	kbcli cluster create {{ .EngineType }} --cpu 1 --memory 2 --storage 10
+	kbcli cluster create {{ .ClusterType }} --cpu 1 --memory 2 --storage 10
 `
 
 	var builder strings.Builder
 	_ = util.PrintGoTemplate(&builder, exampleTpl, map[string]interface{}{
-		"EngineType": strings.ToLower(e.String()),
+		"ClusterType": t.String(),
 	})
 	return templates.Examples(builder.String())
 }
@@ -167,20 +175,20 @@ func getObjectsInfo(f cmdutil.Factory, manifests map[string]string) ([]*objectIn
 }
 
 // buildHelmValues builds the helm values from the cluster schema and the values from the flags.
-// For helm, the sub chart values should be in the sub map of the values.
-func buildHelmValues(schema *cluster.EngineSchema, values map[string]interface{}) map[string]interface{} {
-	if schema == nil || schema.SubSchema == nil {
+// For helm, the sub chartInfo values should be in the sub map of the values.
+func buildHelmValues(c *cluster.ChartInfo, values map[string]interface{}) map[string]interface{} {
+	if c.SubSchema == nil {
 		return values
 	}
 
-	subSchemaKeys := maps.Keys(schema.SubSchema.Properties)
+	subSchemaKeys := maps.Keys(c.SubSchema.Properties)
 	newValues := map[string]interface{}{
-		schema.SubChartName: map[string]interface{}{},
+		c.SubChartName: map[string]interface{}{},
 	}
 
 	for k, v := range values {
 		if slices.Contains(subSchemaKeys, k) {
-			newValues[schema.SubChartName].(map[string]interface{})[k] = v
+			newValues[c.SubChartName].(map[string]interface{})[k] = v
 		} else {
 			newValues[k] = v
 		}

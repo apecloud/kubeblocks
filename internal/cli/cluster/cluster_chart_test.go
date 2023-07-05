@@ -26,38 +26,29 @@ import (
 
 var _ = Describe("cluster engine", func() {
 	const (
-		engineType = MySQL
+		engineType = MySQLType
 		name       = "test-cluster"
 		namespace  = "test-namespace"
 	)
 
 	It("get and validate engine helm chart", func() {
 		By("unsupported engine type")
-		_, err := GetHelmChart("unsupported")
+		_, err := BuildChartInfo("unsupported")
 		Expect(err).Should(HaveOccurred())
 
-		By("get engine helm chart")
-		c, err := GetHelmChart(engineType)
+		By("build cluster chart info")
+		c, err := BuildChartInfo(engineType)
 		Expect(err).Should(Succeed())
 		Expect(c).ShouldNot(BeNil())
+		Expect(c.ClusterDef).ShouldNot(BeEmpty())
+		Expect(c.Schema).ShouldNot(BeNil())
+		Expect(c.SubSchema).ShouldNot(BeNil())
+		Expect(c.SubChartName).ShouldNot(BeEmpty())
 
 		By("get manifests")
-		manifests, err := GetManifests(c, namespace, name, nil)
+		manifests, err := GetManifests(c.Chart, namespace, name, nil)
 		Expect(err).Should(Succeed())
 		Expect(manifests).ShouldNot(BeEmpty())
-
-		By("get engine schema")
-		s, err := GetEngineSchema(c)
-		Expect(err).Should(Succeed())
-		Expect(s).ShouldNot(BeNil())
-		Expect(s.Schema).ShouldNot(BeNil())
-		Expect(s.SubSchema).ShouldNot(BeNil())
-		Expect(s.SubChartName).ShouldNot(BeEmpty())
-
-		By("get engine cluster definition")
-		cd, err := GetEngineClusterDef(c)
-		Expect(err).Should(Succeed())
-		Expect(cd).ShouldNot(BeNil())
 
 		By("validate values")
 		testCases := []struct {
@@ -92,23 +83,12 @@ var _ = Describe("cluster engine", func() {
 		}
 		for _, tc := range testCases {
 			By(tc.desc)
-			err = ValidateValues(s, tc.values)
+			err = ValidateValues(c, tc.values)
 			if tc.success {
 				Expect(err).Should(Succeed())
 			} else {
 				Expect(err).Should(HaveOccurred())
 			}
 		}
-	})
-
-	It("get cluster chart name", func() {
-		By("mysql engine type")
-		res := getEngineChartName(MySQL)
-		Expect(res).Should(Equal("apecloud-mysql-cluster"))
-
-		By("other engine type")
-		eType := "unknown"
-		res = getEngineChartName(EngineType(eType))
-		Expect(res).Should(ContainSubstring("cluster"))
 	})
 })

@@ -24,10 +24,12 @@ import (
 	"embed"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
-	"github.com/leaanthony/debme"
 	"github.com/pkg/errors"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -45,13 +47,6 @@ const (
 	clusterFile  = "cluster.yaml"
 )
 
-type EngineType string
-
-// the supported cluster engine type
-const (
-	MySQL EngineType = "MySQL"
-)
-
 type SchemaPropName string
 
 // the common schema property name
@@ -59,7 +54,7 @@ const (
 	VersionSchemaProp SchemaPropName = "version"
 )
 
-type EngineSchema struct {
+type ChartInfo struct {
 	// Schema is the cluster parent helm chart schema, used to render the command flag
 	Schema *spec.Schema
 
@@ -68,21 +63,51 @@ type EngineSchema struct {
 
 	// SubChartName is the name (alias if exists) of the sub chart
 	SubChartName string
+
+	// ClusterDef is the cluster definition
+	ClusterDef string
+
+	// Chart is the cluster helm chart object
+	Chart *chart.Chart
 }
 
-var (
-	//go:embed charts/*
-	charts embed.FS
+type (
+	// ClusterType is the type of the cluster
+	ClusterType string
+
+	// chartFile is the helm chart file information
+	chartFile struct {
+		chartFS embed.FS
+		name    string
+	}
 )
 
-func GetHelmChart(e EngineType) (*chart.Chart, error) {
-	chartsFS, err := debme.FS(charts, "charts")
-	if err != nil {
+var clusterTypeCharts = map[ClusterType]chartFile{}
+
+func registerClusterType(t ClusterType, chartFS embed.FS, name string) {
+	if _, ok := clusterTypeCharts[t]; ok {
+		panic(fmt.Sprintf("cluster type %s already registered", t))
+	}
+	clusterTypeCharts[t] = chartFile{chartFS: chartFS, name: name}
+}
+
+func BuildChartInfo(t ClusterType) (*ChartInfo, error) {
+	var err error
+
+	c := &ChartInfo{}
+	// load helm chart from embed tgz file
+	if c.Chart, err = loadHelmChart(t); err != nil {
 		return nil, err
 	}
 
-	// load helm chart from embed tgz file
-	return loadHelmChart(chartsFS, getEngineChartName(e))
+	if err = c.buildClusterSchema(); err != nil {
+		return nil, err
+	}
+
+	if err = c.buildClusterDef(); err != nil {
+		return nil, err
+	}
+	return c, nil
 }
 
 // GetManifests gets the cluster manifests
@@ -110,55 +135,52 @@ func GetManifests(c *chart.Chart, namespace, name string, values map[string]inte
 	return releaseutil.SplitManifests(rel.Manifest), nil
 }
 
-// GetEngineSchema gets the schema for the given cluster engine type.
-func GetEngineSchema(c *chart.Chart) (*EngineSchema, error) {
+// buildClusterSchema build the schema for the given cluster chart.
+func (c *ChartInfo) buildClusterSchema() error {
 	var err error
+	cht := c.Chart
 	buildSchema := func(bs []byte) (*spec.Schema, error) {
 		schema := &spec.Schema{}
 		if err = json.Unmarshal(bs, schema); err != nil {
-			return nil, errors.Wrapf(err, "failed to build schema for engine %s", c.Name())
+			return nil, errors.Wrapf(err, "failed to build schema for engine %s", cht.Name())
 		}
 		return schema, nil
 	}
 
-	// build engine schema
-	eSchema := &EngineSchema{}
-	eSchema.Schema, err = buildSchema(c.Schema)
-	if err != nil {
-		return nil, err
+	// build cluster schema
+	if c.Schema, err = buildSchema(cht.Schema); err != nil {
+		return err
+	}
+
+	if len(cht.Dependencies()) == 0 {
+		return nil
 	}
 
 	// build extra schema in sub chart, now, we only support one sub chart
-	for _, subChart := range c.Dependencies() {
-		eSchema.SubChartName = subChart.Name()
-		eSchema.SubSchema, err = buildSchema(subChart.Schema)
-		if err != nil {
-			return nil, err
-		}
-		break
+	subChart := cht.Dependencies()[0]
+	c.SubChartName = subChart.Name()
+	if c.SubSchema, err = buildSchema(subChart.Schema); err != nil {
+		return err
 	}
 
 	// if sub chart has alias, we should use alias instead of chart name
-	for _, dep := range c.Metadata.Dependencies {
-		if dep.Name != eSchema.SubChartName {
+	for _, dep := range cht.Metadata.Dependencies {
+		if dep.Name != c.SubChartName {
 			continue
 		}
 
 		if dep.Alias != "" {
-			eSchema.SubChartName = dep.Alias
+			c.SubChartName = dep.Alias
 		}
 	}
 
-	return eSchema, nil
+	return nil
 }
 
-func GetEngineClusterDef(c *chart.Chart) (string, error) {
-	if c == nil {
-		return "", fmt.Errorf("failed to get the cluster definition of %s, chart is nil", c.Name())
-	}
-
+func (c *ChartInfo) buildClusterDef() error {
+	cht := c.Chart
 	clusterFilePath := filepath.Join(templatesDir, clusterFile)
-	for _, tpl := range c.Templates {
+	for _, tpl := range cht.Templates {
 		if tpl.Name != clusterFilePath {
 			continue
 		}
@@ -170,19 +192,16 @@ func GetEngineClusterDef(c *chart.Chart) (string, error) {
 		if start != -1 {
 			end := strings.IndexAny(str[start+len(pattern):], " \n")
 			if end != -1 {
-				return strings.TrimSpace(str[start+len(pattern) : start+len(pattern)+end]), nil
+				c.ClusterDef = strings.TrimSpace(str[start+len(pattern) : start+len(pattern)+end])
+				return nil
 			}
 		}
 	}
-	return "", fmt.Errorf("failed to find the cluster definition of %s", c.Name())
+	return fmt.Errorf("failed to find the cluster definition of %s", cht.Name())
 }
 
 // ValidateValues validates the given values against the schema.
-func ValidateValues(schema *EngineSchema, values map[string]interface{}) error {
-	if schema == nil {
-		return nil
-	}
-
+func ValidateValues(c *ChartInfo, values map[string]interface{}) error {
 	validateFn := func(s *spec.Schema, values map[string]interface{}) error {
 		if s == nil {
 			return nil
@@ -198,25 +217,19 @@ func ValidateValues(schema *EngineSchema, values map[string]interface{}) error {
 		return nil
 	}
 
-	if err := validateFn(schema.Schema, values); err != nil {
+	if err := validateFn(c.Schema, values); err != nil {
 		return err
 	}
-	return validateFn(schema.SubSchema, values)
+	return validateFn(c.SubSchema, values)
 }
 
-// getEngineChartName gets the chart name for the given cluster engine type.
-func getEngineChartName(e EngineType) string {
-	eStr := strings.ToLower(string(e))
-	switch e {
-	case MySQL:
-		return "apecloud-" + eStr + "-cluster"
-	default:
-		return eStr + "-cluster"
+func loadHelmChart(t ClusterType) (*chart.Chart, error) {
+	cf, ok := clusterTypeCharts[t]
+	if !ok {
+		return nil, fmt.Errorf("failed to find the helm chart of %s", t)
 	}
-}
 
-func loadHelmChart(fs debme.Debme, name string) (*chart.Chart, error) {
-	file, err := fs.Open(name + ".tgz")
+	file, err := cf.chartFS.Open(fmt.Sprintf("charts/%s", cf.name))
 	if err != nil {
 		return nil, err
 	}
@@ -225,22 +238,32 @@ func loadHelmChart(fs debme.Debme, name string) (*chart.Chart, error) {
 	c, err := loader.LoadArchive(file)
 	if err != nil {
 		if err == gzip.ErrHeader {
-			return nil, fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", name, err)
+			return nil, fmt.Errorf("file '%s' does not appear to be a valid chart file (details: %s)", err)
 		}
 	}
 
 	if c == nil {
-		return nil, fmt.Errorf("failed to load engine helm chart %s", name)
+		return nil, fmt.Errorf("failed to load cluster helm chart %s", t.String())
 	}
 	return c, err
 }
 
-func SupportedEngines() []EngineType {
-	return []EngineType{MySQL}
+func SupportedTypes() []ClusterType {
+	types := maps.Keys(clusterTypeCharts)
+	slices.SortFunc(types, func(i, j ClusterType) bool {
+		return i < j
+	})
+	return types
 }
 
-func (e EngineType) String() string {
-	return string(e)
+func (t ClusterType) String() string {
+	return string(t)
+}
+
+func sortClusterTypes(types []ClusterType) {
+	sort.Slice(types, func(i, j int) bool {
+		return types[i] < types[j]
+	})
 }
 
 func (s SchemaPropName) String() string {

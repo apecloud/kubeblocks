@@ -35,15 +35,9 @@ import (
 
 var _ = Describe("cluster create util", func() {
 	const (
-		namespace = "test-ns"
-		engine    = cluster.MySQL
+		namespace   = "test-ns"
+		clusterType = "mysql"
 	)
-
-	getSchema := func() *cluster.EngineSchema {
-		c, _ := cluster.GetHelmChart(engine)
-		schema, _ := cluster.GetEngineSchema(c)
-		return schema
-	}
 
 	Context("add create flags", func() {
 		var cmd *cobra.Command
@@ -57,17 +51,16 @@ var _ = Describe("cluster create util", func() {
 		})
 
 		It("add create flags for a nil schema", func() {
-			Expect(addEngineFlags(cmd, tf, nil)).Should(Succeed())
+			Expect(addCreateFlags(cmd, tf, nil)).Should(Succeed())
 		})
 
 		It("add create flags for a not-nil schema", func() {
-			c, err := cluster.GetHelmChart(engine)
+			c, err := cluster.BuildChartInfo(clusterType)
 			Expect(err).Should(Succeed())
 
-			schema, err := cluster.GetEngineSchema(c)
 			Expect(err).Should(Succeed())
-			Expect(schema).ShouldNot(BeNil())
-			Expect(addEngineFlags(cmd, tf, schema)).Should(Succeed())
+			Expect(c.Schema).ShouldNot(BeNil())
+			Expect(addCreateFlags(cmd, tf, c)).Should(Succeed())
 			Expect(cmd.Flags().GetString("version")).ShouldNot(BeEmpty())
 		})
 
@@ -160,9 +153,10 @@ metadata:
 	})
 
 	It("build helm values", func() {
-		By("get engine schema")
-		schema := getSchema()
-		Expect(schema).ShouldNot(BeNil())
+		By("get cluster schema")
+		c, err := cluster.BuildChartInfo(clusterType)
+		Expect(err).Should(Succeed())
+		Expect(c).ShouldNot(BeNil())
 
 		By("build helm values")
 		values := map[string]interface{}{
@@ -171,10 +165,10 @@ metadata:
 			"memory":            1,
 			"terminationPolicy": "Halt",
 		}
-		helmValues := buildHelmValues(schema, values)
+		helmValues := buildHelmValues(c, values)
 		Expect(helmValues).ShouldNot(BeNil())
 		Expect(helmValues["version"]).Should(Equal("1.0.0"))
-		Expect(helmValues[schema.SubChartName]).ShouldNot(BeNil())
-		Expect(helmValues[schema.SubChartName].(map[string]interface{})["terminationPolicy"]).Should(Equal("Halt"))
+		Expect(helmValues[c.SubChartName]).ShouldNot(BeNil())
+		Expect(helmValues[c.SubChartName].(map[string]interface{})["terminationPolicy"]).Should(Equal("Halt"))
 	})
 })

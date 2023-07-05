@@ -239,8 +239,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	// register flag completion func
 	registerFlagCompletionFunc(cmd, f)
 
-	// add all subcommands for supported cluster engine
-	cmd.AddCommand(buildCreateEngineCmds(&o.CreateOptions)...)
+	// add all subcommands for supported cluster type
+	cmd.AddCommand(buildCreateSubCmds(&o.CreateOptions)...)
 
 	return cmd
 }
@@ -873,7 +873,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 
 		// HACK: for apecloud-mysql cluster definition, if setsMap is empty, user
 		// does not specify any set, so we only build the first component.
-		// TODO(ldm): remove this hack and use helm chart to render the cluster.
+		// TODO(ldm): remove this hack and use helm chartInfo to render the cluster.
 		if i > 0 && len(sets) == 0 && cd.Name == "apecloud-mysql" {
 			continue
 		}

@@ -20,35 +20,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package cluster
 
 import (
+	"net/http"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/testing"
+	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
-// write test case to test engine.go
-var _ = Describe("create cluster by engine type", func() {
+var _ = Describe("create cluster by clusterType type", func() {
 	const (
-		engine = cluster.MySQL
+		clusterType = cluster.MySQLType
 	)
 
 	var (
 		tf            *cmdtesting.TestFactory
 		streams       genericclioptions.IOStreams
 		createOptions *create.CreateOptions
+		mockClient    = func(data runtime.Object) *cmdtesting.TestFactory {
+			tf = testing.NewTestFactory(testing.Namespace)
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+			tf.UnstructuredClient = &clientfake.RESTClient{
+				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+				GroupVersion:         schema.GroupVersion{Group: types.AppsAPIGroup, Version: types.AppsAPIVersion},
+				Resp:                 &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, data)},
+			}
+			tf.Client = tf.UnstructuredClient
+			tf.FakeDynamicClient = testing.FakeDynamicClient(data)
+			return tf
+		}
 	)
 
 	BeforeEach(func() {
+		_ = appsv1alpha1.AddToScheme(scheme.Scheme)
+		_ = metav1.AddMetaToScheme(scheme.Scheme)
 		streams, _, _, _ = genericclioptions.NewTestIOStreams()
-		tf = testing.NewTestFactory("default")
-		tf.Client = &clientfake.RESTClient{}
+		tf = mockClient(testing.FakeClusterVersion())
 		createOptions = &create.CreateOptions{
 			IOStreams: streams,
 			Factory:   tf,
@@ -59,18 +80,17 @@ var _ = Describe("create cluster by engine type", func() {
 		tf.Cleanup()
 	})
 
-	It("engine cmd", func() {
-		By("create engine commands")
-		cmds := buildCreateEngineCmds(createOptions)
+	It("cluster sub command", func() {
+		By("create commands")
+		cmds := buildCreateSubCmds(createOptions)
 		Expect(cmds).ShouldNot(BeNil())
 		Expect(cmds[0].HasFlags()).Should(BeTrue())
 
-		By("create engine options")
-		o, err := newEngineOptions(createOptions, engine)
+		By("create command options")
+		o, err := newSubCmdsOptions(createOptions, clusterType)
 		Expect(err).Should(Succeed())
 		Expect(o).ShouldNot(BeNil())
-		Expect(o.chart).ShouldNot(BeNil())
-		Expect(o.schema).ShouldNot(BeNil())
+		Expect(o.chartInfo).ShouldNot(BeNil())
 
 		By("complete")
 		cmd := cmds[0]
@@ -81,7 +101,9 @@ var _ = Describe("create cluster by engine type", func() {
 		Expect(o.values).ShouldNot(BeNil())
 
 		By("validate")
+		o.chartInfo.ClusterDef = testing.ClusterDefName
 		Expect(o.validate()).Should(Succeed())
+		Expect(o.values[cluster.VersionSchemaProp.String()]).Should(Equal(testing.ClusterVersionName))
 
 		By("run")
 		o.DryRun = "client"

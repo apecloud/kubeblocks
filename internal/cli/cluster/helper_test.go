@@ -73,12 +73,11 @@ var _ = Describe("helper", func() {
 	})
 
 	It("get version by cluster def", func() {
-		cv := testing.FakeClusterVersion()
-		dynamic := testing.FakeDynamicClient(testing.FakeClusterVersion(), cv)
+		dynamic := testing.FakeDynamicClient(testing.FakeClusterVersion())
 		version, err := GetVersionByClusterDef(dynamic, testing.ClusterDefName)
 		Expect(err).Should(Succeed())
 		Expect(version).ShouldNot(BeNil())
-		Expect(len(version.Items)).Should(Equal(2))
+		Expect(version.Items).Should(HaveLen(1))
 	})
 
 	It("get default version", func() {

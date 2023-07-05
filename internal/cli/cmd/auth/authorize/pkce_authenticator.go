@@ -1,0 +1,330 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+package authorize
+
+import (
+	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"path"
+	"strings"
+
+	"github.com/benbjohnson/clock"
+	"github.com/hashicorp/go-cleanhttp"
+	"github.com/pkg/errors"
+)
+
+type OIDCWellKnownEndpoints struct {
+	AuthorizationEndpoint string `json:"authorization_endpoint"`
+	TokenEndpoint         string `json:"token_endpoint"`
+}
+
+type PKCEAuthenticator struct {
+	client             *http.Client
+	Clock              clock.Clock
+	ClientID           string
+	AuthURL            string
+	AuthAudience       string
+	Challenge          Challenge
+	WellKnownEndpoints *OIDCWellKnownEndpoints
+}
+
+// Challenge holds challenge and verification data needed for the PKCE flow
+type Challenge struct {
+	Code     string
+	Verifier string
+	Method   string
+}
+
+// CallbackResponse holds the code gotten from the authorization callback.
+// Error will hold an error struct if an error occurred.
+type CallbackResponse struct {
+	Code  string
+	Error error
+}
+
+type AuthorizationResponse struct {
+	CallbackURL string
+	Code        string
+}
+
+func NewPKCEAuthenticator(client *http.Client, clientID string, authURL string) (*PKCEAuthenticator, error) {
+	if client == nil {
+		client = cleanhttp.DefaultClient()
+	}
+	p := &PKCEAuthenticator{
+		client:       client,
+		Clock:        clock.New(),
+		ClientID:     clientID,
+		AuthURL:      authURL,
+		AuthAudience: authURL + "/api/v2/",
+	}
+	var err error
+	p.WellKnownEndpoints, err = getOIDCWellKnownEndpoints(authURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get OIDC well known endpoints")
+	}
+	p.Challenge = defaultChallengeGenerator()
+	return p, nil
+}
+
+func (p *PKCEAuthenticator) GetAuthorization(openURLFunc func(URL string)) (*AuthorizationResponse, error) {
+	callback := NewCallbackService()
+	codeReceiverCh := make(chan CallbackResponse)
+	defer close(codeReceiverCh)
+	state := defaultStateGenerator()
+	go callback.AwaitResponse(codeReceiverCh, state)
+
+	params := url.Values{
+		"audience":              []string{p.AuthAudience},
+		"client_id":             []string{p.ClientID},
+		"code_challenge":        []string{p.Challenge.Code},
+		"code_challenge_method": []string{p.Challenge.Method},
+		"response_type":         []string{"code"},
+		"state":                 []string{state},
+		"redirect_uri":          []string{callback.GetCallbackURL()},
+		"scope": []string{strings.Join([]string{
+			"read_databases", "write_databases", "read_user", "read_organization", "offline_access", "openid", "profile", "email",
+		}, " ")},
+	}
+
+	URL := fmt.Sprintf("%s?%s",
+		p.WellKnownEndpoints.AuthorizationEndpoint,
+		params.Encode(),
+	)
+	openURLFunc(URL)
+
+	callbackResult := <-codeReceiverCh
+
+	if callbackResult.Error != nil {
+		return nil, callbackResult.Error
+	}
+	callback.Close()
+
+	return &AuthorizationResponse{
+		Code:        callbackResult.Code,
+		CallbackURL: callback.GetCallbackURL(),
+	}, nil
+}
+
+func (p *PKCEAuthenticator) GetToken(ctx context.Context, authorize AuthorizationResponse) (*TokenResponse, error) {
+	req, err := p.newRequest(ctx, p.WellKnownEndpoints.TokenEndpoint, url.Values{
+		"grant_type":    []string{"authorization_code"},
+		"code_verifier": []string{p.Challenge.Verifier},
+		"client_id":     []string{p.ClientID},
+		"code":          []string{authorize.Code},
+		"redirect_uri":  []string{authorize.CallbackURL},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating request for token")
+	}
+
+	res, err := p.client.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "error performing http request for token")
+	}
+	defer res.Body.Close()
+
+	if _, err = CheckErrorResponse(res); err != nil {
+		return nil, err
+	}
+
+	tokenRes := &TokenResponse{}
+	err = json.NewDecoder(res.Body).Decode(tokenRes)
+	if err != nil {
+		return nil, errors.Wrap(err, "error decoding token response")
+	}
+
+	return tokenRes, nil
+}
+
+func (p *PKCEAuthenticator) GetUserInfo(ctx context.Context, token string) (*UserInfoResponse, error) {
+	URL := fmt.Sprintf("%s/userinfo", p.AuthURL)
+	req, err := p.newRequest(ctx, URL, url.Values{
+		"access_token": []string{token},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating request for userinfo")
+	}
+
+	res, err := p.client.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "error performing http request for userinfo")
+	}
+	defer res.Body.Close()
+
+	if _, err = CheckErrorResponse(res); err != nil {
+		return nil, err
+	}
+
+	userInfo := &UserInfoResponse{}
+	err = json.NewDecoder(res.Body).Decode(userInfo)
+	if err != nil {
+		return nil, errors.Wrap(err, "error decoding userinfo")
+	}
+
+	return userInfo, err
+}
+
+func (p *PKCEAuthenticator) RefreshToken(ctx context.Context, refreshToken string) (*TokenResponse, error) {
+	req, err := p.newRequest(ctx, p.WellKnownEndpoints.TokenEndpoint, url.Values{
+		"grant_type":    []string{"refresh_token"},
+		"client_id":     []string{p.ClientID},
+		"refresh_token": []string{refreshToken},
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating request for refresh token")
+	}
+
+	res, err := p.client.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "error performing http request for refresh token")
+	}
+	defer res.Body.Close()
+
+	if _, err = CheckErrorResponse(res); err != nil {
+		return nil, err
+	}
+
+	refreshTokenRes := &RefreshTokenResponse{}
+	err = json.NewDecoder(res.Body).Decode(refreshTokenRes)
+	if err != nil {
+		return nil, errors.Wrap(err, "error decoding refresh token response")
+	}
+
+	return &TokenResponse{
+		AccessToken:  refreshTokenRes.AccessToken,
+		IDToken:      refreshTokenRes.IDToken,
+		RefreshToken: refreshToken,
+		ExpiresIn:    refreshTokenRes.ExpiresIn,
+	}, nil
+}
+
+func (p *PKCEAuthenticator) Logout(ctx context.Context, token string, openURLFunc func(URL string)) error {
+	URL := fmt.Sprintf("%s/oidc/logout", p.AuthURL)
+	req, err := p.newRequest(ctx, URL, url.Values{
+		"id_token_hint": []string{token},
+		"client_id":     []string{p.ClientID},
+	})
+	if err != nil {
+		return errors.Wrap(err, "error creating request for logout")
+	}
+
+	res, err := p.client.Do(req)
+	if err != nil {
+		return errors.Wrap(err, "error performing http request for logout")
+	}
+	defer res.Body.Close()
+
+	if _, err = CheckErrorResponse(res); err != nil {
+		return err
+	}
+
+	err = p.SecondLogout(openURLFunc)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *PKCEAuthenticator) SecondLogout(openURLFunc func(URL string)) error {
+	logoutURL := fmt.Sprintf(p.AuthURL + "/v2/logout")
+	openURLFunc(logoutURL)
+	return nil
+}
+
+func (p *PKCEAuthenticator) newRequest(ctx context.Context, url string, payload url.Values) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		url,
+		strings.NewReader(payload.Encode()),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	return req, nil
+}
+
+func getOIDCWellKnownEndpoints(authURL string) (*OIDCWellKnownEndpoints, error) {
+	u, err := url.Parse(authURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not parse issuer url to build well known endpoints")
+	}
+	u.Path = path.Join(u.Path, ".well-known/openid-configuration")
+
+	r, err := http.Get(u.String())
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not get well known endpoints from url %s", u.String())
+	}
+
+	if _, err = CheckErrorResponse(r); err != nil {
+		return nil, err
+	}
+
+	var wkEndpoints OIDCWellKnownEndpoints
+	err = json.NewDecoder(r.Body).Decode(&wkEndpoints)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not decode json body when getting well known endpoints")
+	}
+
+	return &wkEndpoints, nil
+}
+
+// generateRandomString returns a URL-safe, base64 encoded
+// securely generated random string.
+func generateRandomString(n int) string {
+	b := make([]byte, n)
+	_, err := rand.Read(b)
+	// Note that err == nil only if we read len(b) bytes.
+	if err != nil {
+		panic(err)
+	}
+
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+func generateChallenge(length int) Challenge {
+	c := Challenge{}
+
+	c.Verifier = generateRandomString(length)
+
+	sum := sha256.Sum256([]byte(c.Verifier))
+	c.Code = base64.RawURLEncoding.EncodeToString(sum[:])
+	c.Method = "S256"
+
+	return c
+}
+
+func defaultChallengeGenerator() Challenge {
+	return generateChallenge(32)
+}
+
+func defaultStateGenerator() string {
+	return generateRandomString(32)
+}

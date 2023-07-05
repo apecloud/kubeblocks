@@ -1,26 +1,104 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package auth
 
 import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"io"
+
 	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize"
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/utils"
 )
 
-func LogoutCmd() *cobra.Command {
-	var clientID string
-	var clientSecret string
-	var apiURL string
+type LogOutOptions struct {
+	authorize.Options
 
+	Provider authorize.Provider
+}
+
+func NewLogout(streams genericclioptions.IOStreams) *cobra.Command {
+	o := &LogOutOptions{Options: authorize.Options{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:   "logout",
-		Args:  cobra.NoArgs,
-		Short: "Log out of the PlanetScale API",
-		RunE: func(cmd *cobra.Command, args []string) error {
-
-			return nil
+		Short: "Log out of the Kubeblocks API",
+		Run: func(cmd *cobra.Command, args []string) {
+			cobra.CheckErr(o.Complete())
+			cobra.CheckErr(o.Validate())
+			cobra.CheckErr(o.Run(cmd))
 		},
 	}
 
-	cmd.Flags().StringVar(&clientID, "client-id", OAuthClientID, "The client ID for the PlanetScale CLI application.")
-	cmd.Flags().StringVar(&clientSecret, "client-secret", OAuthClientSecret, "The client ID for the PlanetScale CLI application")
-	cmd.Flags().StringVar(&apiURL, "api-url", DefaultBaseURL, "The PlanetScale base API URL.")
+	cmd.Flags().StringVar(&o.ClientID, "client-id", "", "The client ID for the Kubeblocks CLI application.")
+	cmd.Flags().StringVar(&o.AuthURL, "api-url", DefaultBaseURL, "The Kubeblocks Auth API base URL.")
 	return cmd
+}
+
+func (o *LogOutOptions) Complete() error {
+	o.Provider = authorize.NewTokenProvider(o.Options)
+	if o.ClientID == "" {
+		return o.loadConfig()
+	}
+	return nil
+}
+
+func (o *LogOutOptions) Validate() error {
+	return nil
+}
+
+func (o *LogOutOptions) Run(cmd *cobra.Command) error {
+	if utils.IsTTY() {
+		fmt.Fprintln(o.Out, "Press Enter to log out of the Kubeblocks API.")
+		_ = waitForEnter(cmd.InOrStdin())
+	}
+	provider := authorize.NewTokenProvider(o.Options)
+	err := provider.Logout()
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintln(o.Out, "Successfully logged out.")
+	return nil
+}
+
+func waitForEnter(r io.Reader) error {
+	scanner := bufio.NewScanner(r)
+	scanner.Scan()
+	return scanner.Err()
+}
+
+func (o *LogOutOptions) loadConfig() error {
+	data, err := utils.Asset("config/config.enc")
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(data, &o.Options)
+	if err != nil {
+		return err
+	}
+
+	o.Provider = authorize.NewTokenProvider(o.Options)
+	return nil
 }

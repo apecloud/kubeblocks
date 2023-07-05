@@ -10,7 +10,7 @@ require (
 	github.com/Shopify/sarama v1.30.0
 	github.com/StudioSol/set v1.0.0
 	github.com/authzed/controller-idioms v0.7.0
-	github.com/aws/aws-sdk-go v1.44.122
+	github.com/aws/aws-sdk-go v1.44.180
 	github.com/bhmj/jsonslice v1.1.2
 	github.com/briandowns/spinner v1.23.0
 	github.com/cenkalti/backoff/v4 v4.2.0
@@ -136,8 +136,6 @@ require (
 	github.com/antlr/antlr4/runtime/Go/antlr v1.4.10 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
-	github.com/aws/aws-sdk-go v1.44.180 // indirect
-	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
 	github.com/bhmj/xpression v0.9.1 // indirect
@@ -205,7 +203,6 @@ require (
 	github.com/go-openapi/swag v0.22.3 // indirect
 	github.com/go-openapi/validate v0.22.0 // indirect
 	github.com/go-redis/redis/v7 v7.4.1 // indirect
-	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/go-test/deep v1.1.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect

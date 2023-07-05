@@ -116,7 +116,6 @@ func buildComponent(reqCtx intctrlutil.RequestCtx,
 		if clusterCompSpec.Affinity != nil {
 			affinity = clusterCompSpec.Affinity
 		}
-		if
 		return affinity
 	}
 

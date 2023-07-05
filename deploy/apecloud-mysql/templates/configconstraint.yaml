@@ -65,8 +65,11 @@ metadata:
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
+  cfgSchemaTopLevelName: VtTabletParameter
+
   configurationSchema:
-    cue: ""
+    cue: |-
+      {{- .Files.Get "config/mysql-scale-vttablet-config-constraint.cue" | nindent 6 }}
 
   # mysql-scale configuration file format
   formatterConfig:
@@ -81,8 +84,11 @@ metadata:
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
+  cfgSchemaTopLevelName: VtConsensusParameter
+
   configurationSchema:
-    cue: ""
+    cue: |-
+      {{- .Files.Get "config/mysql-scale-vtconsensus-config-constraint.cue" | nindent 6 }}
 
   # mysql-scale configuration file format
   formatterConfig:
@@ -97,8 +103,11 @@ metadata:
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
 spec:
+  cfgSchemaTopLevelName: VtGateParameter
+
   configurationSchema:
-    cue: ""
+    cue: |-
+      {{- .Files.Get "config/mysql-scale-vtgate-config-constraint.cue" | nindent 6 }}
 
   # mysql-scale configuration file format
   formatterConfig:

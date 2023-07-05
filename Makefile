@@ -124,7 +124,7 @@ all: manager kbcli probe reloader ## Make all cmd binaries.
 ##@ Development
 
 .PHONY: manifests
-manifests: test-go-generate build-kbcli-embed-chart controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+manifests: test-go-generate generate ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./cmd/manager/...;./apis/...;./controllers/...;./internal/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
@@ -135,7 +135,7 @@ preflight-manifests: generate ## Generate external Preflight API
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./externalapis/preflight/..." output:crd:artifacts:config=config/crd/preflight
 
 .PHONY: generate
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: controller-gen build-kbcli-embed-chart ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/...;./externalapis/..."
 
 .PHONY: client-sdk-gen
@@ -281,7 +281,7 @@ build-single-kbcli-embed-chart.%:
 	mv $(chart)-*.tgz internal/cli/cluster/charts/$(chart).tgz
 
 .PHONY: build-kbcli-embed-chart
-build-kbcli-embed-chart: \
+build-kbcli-embed-chart: helmtool \
 	build-single-kbcli-embed-chart.apecloud-mysql-cluster
 #	build-single-kbcli-embed-chart.postgresql-cluster \
 #	build-single-kbcli-embed-chart.clickhouse-cluster \

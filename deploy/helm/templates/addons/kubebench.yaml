@@ -31,7 +31,7 @@ spec:
         - "version=0.0.1"
 
   installable:
-    autoInstall: true
+    autoInstall: false
 
   defaultInstallValues:
     - enabled: true

@@ -826,11 +826,35 @@ func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolic
 type SwitchoverSpec struct {
 	// withCandidate corresponds to the switchover of the specified candidate primary or leader instance.
 	// +optional
-	WithCandidate *CmdExecutorConfig `json:"withCandidate,omitempty"`
+	WithCandidate *SwitchoverAction `json:"withCandidate,omitempty"`
 
 	// withoutCandidate corresponds to a switchover that does not specify a candidate primary or leader instance.
 	// +optional
-	WithoutCandidate *CmdExecutorConfig `json:"withoutCandidate,omitempty"`
+	WithoutCandidate *SwitchoverAction `json:"withoutCandidate,omitempty"`
+}
+
+type SwitchoverAction struct {
+	// cmdExecutorConfig is the executor configuration of the switchover command.
+	// +kubebuilder:validation:Required
+	CmdExecutorConfig *CmdExecutorConfig `json:"cmdExecutorConfig"`
+
+	// Selects a key of a ConfigMap item list. The value of ConfigMap can be
+	// a JSON or YAML string content. Use a key name with ".json" or ".yaml" or ".yml"
+	// extension name to specify a content type.
+	// +optional
+	ConfigMapRefs []DataObjectKeySelector `json:"configMapRefs,omitempty"`
+}
+
+type DataObjectKeySelector struct {
+	// Object name of the referent.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"` // need corev1.LocalObjectReference
+
+	// The key to select.
+	// +optional
+	Key string `json:"key"`
 }
 
 type CommandExecutorEnvItem struct {

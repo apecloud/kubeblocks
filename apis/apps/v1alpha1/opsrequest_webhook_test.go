@@ -459,13 +459,17 @@ var _ = Describe("OpsRequest webhook", func() {
 			Args:    []string{},
 		}
 		switchoverSpec := &SwitchoverSpec{
-			WithCandidate: &CmdExecutorConfig{
-				CommandExecutorEnvItem: commandExecutorEnvItem,
-				CommandExecutorItem:    commandExecutorItem,
+			WithCandidate: &SwitchoverAction{
+				CmdExecutorConfig: &CmdExecutorConfig{
+					CommandExecutorEnvItem: commandExecutorEnvItem,
+					CommandExecutorItem:    commandExecutorItem,
+				},
 			},
-			WithoutCandidate: &CmdExecutorConfig{
-				CommandExecutorEnvItem: commandExecutorEnvItem,
-				CommandExecutorItem:    commandExecutorItem,
+			WithoutCandidate: &SwitchoverAction{
+				CmdExecutorConfig: &CmdExecutorConfig{
+					CommandExecutorEnvItem: commandExecutorEnvItem,
+					CommandExecutorItem:    commandExecutorItem,
+				},
 			},
 		}
 		clusterDef.Spec.ComponentDefs[0].SwitchoverSpec = switchoverSpec

@@ -404,12 +404,18 @@ func getFailedPodMessage(cluster *appsv1alpha1.Cluster, componentName string, po
 }
 
 func getComponentLastReplicas(opsRequest *appsv1alpha1.OpsRequest, componentName string) *int32 {
-	for k, v := range opsRequest.Status.LastConfiguration.Components {
-		if k == componentName {
-			return v.Replicas
+	lastCompConfiguration := opsRequest.Status.LastConfiguration.Components[componentName]
+	if lastCompConfiguration.Replicas == nil {
+		return nil
+	}
+	if lastPods, ok := lastCompConfiguration.TargetResources[appsv1alpha1.PodsCompResourceKey]; ok {
+		lastActualComponents := int32(len(lastPods))
+		// may the actual pods not equals the component replicas
+		if lastActualComponents < *lastCompConfiguration.Replicas {
+			return &lastActualComponents
 		}
 	}
-	return nil
+	return lastCompConfiguration.Replicas
 }
 
 // handleComponentProgressDetails handles the component progressDetails when scale the replicas.

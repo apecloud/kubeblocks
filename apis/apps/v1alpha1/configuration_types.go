@@ -72,8 +72,23 @@ type CustomConfigurationItem struct {
 
 // ConfigurationStatus defines the observed state of Configuration
 type ConfigurationStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// phase is status of configuration.
+	// +optional
+	Phase ConfigurationPhase `json:"phase,omitempty"`
+
+	// message field describes the reasons of abnormal status.
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// observedGeneration is the latest generation observed for this
+	// ClusterDefinition. It refers to the ConfigConstraint's generation, which is
+	// updated by the API Server.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// Describe current state of cluster API Resource, like warning.
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true

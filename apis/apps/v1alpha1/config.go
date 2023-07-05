@@ -21,6 +21,21 @@ package v1alpha1
 
 import "encoding/json"
 
+// ConfigurationPhase defines the Configuration FSM phase
+// +enum
+// +kubebuilder:validation:Enum={CInitPhase,CRunningPhase,CInitFailedPhase,CFailedPhase,CRollbackPhase,CDeletingPhase,CFinishedPhase}
+type ConfigurationPhase string
+
+const (
+	CInitPhase       ConfigurationPhase = "Init"
+	CRunningPhase    ConfigurationPhase = "Running"
+	CInitFailedPhase ConfigurationPhase = "InitFailed"
+	CFailedPhase     ConfigurationPhase = "Failed"
+	CRollbackPhase   ConfigurationPhase = "Rollback"
+	CDeletingPhase   ConfigurationPhase = "Deleting"
+	CFinishedPhase   ConfigurationPhase = "Finished"
+)
+
 type ConfigParams struct {
 	// Data holds the configuration keys and values.
 	// This field exists to work around https://github.com/kubernetes-sigs/kubebuilder/issues/528

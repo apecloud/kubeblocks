@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // ConfigurationReconciler reconciles a Configuration object
@@ -52,10 +53,26 @@ type ConfigurationReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx:      ctx,
+		Req:      req,
+		Log:      log.FromContext(ctx).WithName("ConfigurationReconciler").WithValues("Configuration", req.NamespacedName),
+		Recorder: r.Recorder,
+	}
 
-	// TODO(user): your logic here
+	configuration := &appsv1alpha1.Configuration{}
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, configuration); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
 
+	// err := afsm.RecoverFSM(reqCtx, configuration).
+	//	        HandleEvent(...).
+	//	        UpdateStatus(...).
+	//	        Complete()
+	//
+	// if err != nil {
+	//	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	// }
 	return ctrl.Result{}, nil
 }
 

@@ -41,6 +41,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/util/jsonpath"
 	"k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -109,6 +111,13 @@ var (
 		kbcli cluster restore new-cluster-name --restore-to-time "Apr 13,2023 18:40:35 UTC+0800" --source-cluster mycluster
         kbcli cluster restore new-cluster-name --restore-to-time "2023-04-13T18:40:35+08:00" --source-cluster mycluster
 	`)
+	describeBackupExample = templates.Examples(`
+		# describe a backup
+		kbcli cluster describe-backup backup-default-mycluster-20230616190023
+
+		# using short cmd to describe a backup
+		kbcli cluster desc-bp backup-default-mycluster-20230616190023
+	`)
 )
 
 const annotationTrueValue = "true"
@@ -125,6 +134,19 @@ type CreateBackupOptions struct {
 type ListBackupOptions struct {
 	*list.ListOptions
 	BackupName string
+}
+
+type describeBackupOptions struct {
+	factory   cmdutil.Factory
+	client    clientset.Interface
+	dynamic   dynamic.Interface
+	namespace string
+
+	// resource type and names
+	gvr   schema.GroupVersionResource
+	names []string
+
+	genericclioptions.IOStreams
 }
 
 func (o *CreateBackupOptions) CompleteBackup() error {
@@ -325,6 +347,27 @@ func NewListBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *c
 	}
 	o.AddFlags(cmd)
 	cmd.Flags().StringVar(&o.BackupName, "name", "", "The backup name to get the details.")
+	return cmd
+}
+
+func NewDescribeBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &describeBackupOptions{
+		factory:   f,
+		IOStreams: streams,
+		gvr:       types.BackupGVR(),
+	}
+	cmd := &cobra.Command{
+		Use:               "describe-backup BACKUP-NAME",
+		Short:             "Describe a backup.",
+		Aliases:           []string{"desc-backup"},
+		Example:           describeBackupExample,
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.BackupGVR()),
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.BehaviorOnFatal(printer.FatalWithRedColor)
+			util.CheckErr(o.complete(args))
+			util.CheckErr(o.run())
+		},
+	}
 	return cmd
 }
 
@@ -974,4 +1017,107 @@ func (o *editBackupPolicyOptions) applyChanges(backupPolicy *dpv1alpha1.BackupPo
 	}
 	fmt.Fprintln(o.Out, "updated")
 	return nil
+}
+
+func (o *describeBackupOptions) complete(args []string) error {
+	var err error
+
+	if len(args) == 0 {
+		return fmt.Errorf("backup name should be specified")
+	}
+
+	o.names = args
+
+	if o.client, err = o.factory.KubernetesClientSet(); err != nil {
+		return err
+	}
+
+	if o.dynamic, err = o.factory.DynamicClient(); err != nil {
+		return err
+	}
+
+	if o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (o *describeBackupOptions) run() error {
+	for _, name := range o.names {
+		backupObj := &dpv1alpha1.Backup{}
+		if err := cluster.GetK8SClientObject(o.dynamic, backupObj, o.gvr, o.namespace, name); err != nil {
+			return err
+		}
+		if err := o.printBackupObj(backupObj); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (o *describeBackupOptions) printBackupObj(obj *dpv1alpha1.Backup) error {
+	printer.PrintLineWithTabSeparator(
+		printer.NewPair("Name", obj.Name),
+		printer.NewPair("Cluster", obj.Status.SourceCluster),
+		printer.NewPair("Namespace", obj.Namespace),
+	)
+	printer.PrintLine("\nSpec:")
+	realPrintPairStringToLine("Type", string(obj.Spec.BackupType))
+	realPrintPairStringToLine("Policy Name", obj.Spec.BackupPolicyName)
+
+	printer.PrintLine("\nStatus:")
+	realPrintPairStringToLine("Phase", string(obj.Status.Phase))
+	realPrintPairStringToLine("Failure Reason", obj.Status.FailureReason)
+	realPrintPairStringToLine("Total Size", obj.Status.TotalSize)
+	realPrintPairStringToLine("Backup Tool", obj.Status.BackupToolName)
+	realPrintPairStringToLine("PVC Name", obj.Status.PersistentVolumeClaimName)
+	if obj.Status.AvailableReplicas != nil {
+		realPrintPairStringToLine("Available Replicas", string(*obj.Status.AvailableReplicas))
+	}
+	if obj.Status.Duration != nil {
+		realPrintPairStringToLine("Duration", duration.HumanDuration(obj.Status.Duration.Duration))
+	}
+	realPrintPairStringToLine("Expiration Time", util.TimeFormat(obj.Status.Expiration))
+	realPrintPairStringToLine("Start Time", util.TimeFormat(obj.Status.StartTimestamp))
+	realPrintPairStringToLine("Completion Time", util.TimeFormat(obj.Status.CompletionTimestamp))
+
+	if obj.Status.Manifests != nil {
+		printer.PrintLine("\nManifests:")
+		realPrintPairStringToLine("Target", obj.Status.Manifests.Target)
+		if obj.Status.Manifests.BackupLog != nil {
+			realPrintPairStringToLine("Log Start Time", util.TimeFormat(obj.Status.Manifests.BackupLog.StartTime))
+			realPrintPairStringToLine("Log Stop Time", util.TimeFormat(obj.Status.Manifests.BackupLog.StopTime))
+		}
+		if obj.Status.Manifests.BackupTool != nil {
+			realPrintPairStringToLine("File Path", obj.Status.Manifests.BackupTool.FilePath)
+			realPrintPairStringToLine("Volume Name", obj.Status.Manifests.BackupTool.VolumeName)
+			realPrintPairStringToLine("Upload Total Size", obj.Status.Manifests.BackupTool.UploadTotalSize)
+			realPrintPairStringToLine("Checksum", obj.Status.Manifests.BackupTool.Checksum)
+			realPrintPairStringToLine("Checkpoint", obj.Status.Manifests.BackupTool.Checkpoint)
+		}
+		if obj.Status.Manifests.Snapshot != nil {
+			realPrintPairStringToLine("Snapshot Name", obj.Status.Manifests.Snapshot.VolumeSnapshotName)
+			realPrintPairStringToLine("Snapshot Content Name", obj.Status.Manifests.Snapshot.VolumeSnapshotContentName)
+		}
+		for k, v := range obj.Status.Manifests.UserContext {
+			realPrintPairStringToLine(k, v)
+		}
+	}
+
+	// get all events about cluster
+	events, err := o.client.CoreV1().Events(o.namespace).Search(scheme.Scheme, obj)
+	if err != nil {
+		return err
+	}
+
+	// print the warning events
+	printer.PrintAllWarningEvents(events, o.Out)
+
+	return nil
+}
+
+func realPrintPairStringToLine(name, value string, spaceCount ...int) {
+	if value != "" {
+		printer.PrintPairStringToLine(name, value, spaceCount...)
+	}
 }

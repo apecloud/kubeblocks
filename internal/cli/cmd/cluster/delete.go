@@ -43,6 +43,7 @@ var deleteExample = templates.Examples(`
 func NewDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := delete.NewDeleteOptions(f, streams, types.ClusterGVR())
 	o.PreDeleteHook = clusterPreDeleteHook
+	o.PostDeleteHook = clusterPostDeleteHook
 
 	cmd := &cobra.Command{
 		Use:               "delete NAME",
@@ -90,4 +91,16 @@ func getClusterFromObject(object runtime.Object) (*appsv1alpha1.Cluster, error) 
 		return nil, err
 	}
 	return cluster, nil
+}
+
+func clusterPostDeleteHook(o *delete.DeleteOptions, object runtime.Object) error {
+	if object == nil {
+		return nil
+	}
+
+	_, err := getClusterFromObject(object)
+	if err != nil {
+		return err
+	}
+	return nil
 }

@@ -83,8 +83,8 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 
 			saVertices := ictrltypes.FindAll[*corev1.ServiceAccount](dag)
 			for _, saVertex := range saVertices {
-				// rolebinding must be created before serviceaccount
-				dag.Connect(saVertex, rbVertex)
+				// serviceaccount must be created before rolebinding
+				dag.Connect(rbVertex, saVertex)
 			}
 		}
 

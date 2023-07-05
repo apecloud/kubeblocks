@@ -193,8 +193,6 @@ type CreateOptions struct {
 	SetFile           string                   `json:"-"`
 	Values            []string                 `json:"-"`
 
-	shouldCreateDependencies bool `json:"-"`
-
 	// backup name to restore in creation
 	Backup        string `json:"backup,omitempty"`
 	RestoreTime   string `json:"restoreTime,omitempty"`

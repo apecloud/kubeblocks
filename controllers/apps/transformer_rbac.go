@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
-
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -39,13 +37,10 @@ type RBACTransformer struct{}
 var _ graph.Transformer = &RBACTransformer{}
 
 func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	if !viper.GetBool("ENABLE_RBAC_MANAGER") {
-		return nil
-	}
-
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
-	if cluster.IsDeleting() {
+	if !viper.GetBool("ENABLE_RBAC_MANAGER") {
+		transCtx.Logger.Info("rbac manager is not enabled")
 		return nil
 	}
 
@@ -103,7 +98,7 @@ func isServiceAccountNotExist(transCtx *ClusterTransformContext, serviceAccountN
 		if errors.IsNotFound(err) {
 			return true
 		}
-		transCtx.Logger.V(0).Info(fmt.Sprintf("get service account error: %v", err))
+		transCtx.Logger.V(0).Error(err, "get service account failed")
 	}
 
 	return false

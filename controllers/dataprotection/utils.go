@@ -271,17 +271,18 @@ func buildDeleteBackupFilesJobNamespacedName(backup *dataprotectionv1alpha1.Back
 }
 
 func getDefaultBackupRepo(ctx context.Context, cli client.Client) (*dataprotectionv1alpha1.BackupRepo, error) {
-	backupList := &dataprotectionv1alpha1.BackupRepoList{}
-	err := cli.List(ctx, backupList)
+	backupRepoList := &dataprotectionv1alpha1.BackupRepoList{}
+	err := cli.List(ctx, backupRepoList)
 	if err != nil {
 		return nil, err
 	}
 	var defaultRepo *dataprotectionv1alpha1.BackupRepo
-	for _, repo := range backupList.Items {
+	for idx := range backupRepoList.Items {
+		repo := &backupRepoList.Items[idx]
 		if repo.Annotations[constant.DefaultBackupRepoAnnotationKey] == trueVal &&
 			repo.Status.Phase == dataprotectionv1alpha1.BackupRepoReady {
 			if defaultRepo == nil {
-				defaultRepo = repo.DeepCopy()
+				defaultRepo = repo
 			} else {
 				return nil, fmt.Errorf("multiple default BackupRepo found, both %s and %s are default",
 					defaultRepo.Name, repo.Name)

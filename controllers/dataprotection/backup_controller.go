@@ -468,7 +468,7 @@ func (r *BackupReconciler) handlePersistentVolumeClaim(reqCtx intctrlutil.Reques
 		return pvcName, pvc.Spec.VolumeName, err
 	}
 	// the PVC is not present
-	// add a special annotation and wait for the backup repo controller
+	// add a special label and wait for the backup repo controller
 	// to create the PVC.
 	_, err = r.patchBackupObjectLabels(reqCtx, backup, map[string]string{
 		dataProtectionBackupRepoKey:  repo.Name,
@@ -538,7 +538,6 @@ func (r *BackupReconciler) getBackupRepo(
 		return repo, nil
 	}
 	// fallback to use the default repo
-	// TODO: cache the default repo?
 	return getDefaultBackupRepo(reqCtx.Ctx, r.Client)
 }
 

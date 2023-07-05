@@ -17,34 +17,27 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package helm
+package infrastructure
 
 import (
-	"errors"
-	"fmt"
-	"strings"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
-	"helm.sh/helm/v3/pkg/release"
-	"helm.sh/helm/v3/pkg/storage/driver"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
-// Working with Errors in Go 1.13
-// https://go.dev/blog/go1.13-errors
-// Implementing errors should be more friendly to downstream handlers
+var _ = Describe("kubeblock infra", func() {
+	var streams genericclioptions.IOStreams
 
-var ErrReleaseNotDeployed = fmt.Errorf("release: not in deployed status")
+	BeforeEach(func() {
+		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+	})
 
-func ReleaseNotFound(err error) bool {
-	if err == nil {
-		return false
-	}
-	return errors.Is(err, driver.ErrReleaseNotFound) ||
-		strings.Contains(err.Error(), driver.ErrReleaseNotFound.Error())
-}
+	AfterEach(func() {
+	})
 
-func statusDeployed(rl *release.Release) bool {
-	if rl == nil {
-		return false
-	}
-	return release.StatusDeployed == rl.Info.Status
-}
+	It("command should succeed", func() {
+		cmd := NewInfraCmd(streams)
+		Expect(cmd).ShouldNot(BeNil())
+	})
+})

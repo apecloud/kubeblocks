@@ -17,34 +17,16 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package helm
+package infrastructure
 
 import (
-	"errors"
-	"fmt"
-	"strings"
+	"testing"
 
-	"helm.sh/helm/v3/pkg/release"
-	"helm.sh/helm/v3/pkg/storage/driver"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-// Working with Errors in Go 1.13
-// https://go.dev/blog/go1.13-errors
-// Implementing errors should be more friendly to downstream handlers
-
-var ErrReleaseNotDeployed = fmt.Errorf("release: not in deployed status")
-
-func ReleaseNotFound(err error) bool {
-	if err == nil {
-		return false
-	}
-	return errors.Is(err, driver.ErrReleaseNotFound) ||
-		strings.Contains(err.Error(), driver.ErrReleaseNotFound.Error())
-}
-
-func statusDeployed(rl *release.Release) bool {
-	if rl == nil {
-		return false
-	}
-	return release.StatusDeployed == rl.Info.Status
+func TestAppp(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Infra Cmd Test Suite")
 }

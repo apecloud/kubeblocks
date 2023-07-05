@@ -17,34 +17,40 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package helm
+package utils
 
 import (
 	"errors"
 	"fmt"
-	"strings"
+	"io"
+	"os/exec"
 
-	"helm.sh/helm/v3/pkg/release"
-	"helm.sh/helm/v3/pkg/storage/driver"
+	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/common"
+	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/logger"
 )
 
-// Working with Errors in Go 1.13
-// https://go.dev/blog/go1.13-errors
-// Implementing errors should be more friendly to downstream handlers
-
-var ErrReleaseNotDeployed = fmt.Errorf("release: not in deployed status")
-
-func ReleaseNotFound(err error) bool {
-	if err == nil {
-		return false
+func RunCommand(cmd *exec.Cmd) error {
+	logger.Log.Messagef(common.LocalHost, "Running: %s", cmd.String())
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
 	}
-	return errors.Is(err, driver.ErrReleaseNotFound) ||
-		strings.Contains(err.Error(), driver.ErrReleaseNotFound.Error())
-}
-
-func statusDeployed(rl *release.Release) bool {
-	if rl == nil {
-		return false
+	cmd.Stderr = cmd.Stdout
+	if err = cmd.Start(); err != nil {
+		return err
 	}
-	return release.StatusDeployed == rl.Info.Status
+
+	// read from stdout
+	for {
+		tmp := make([]byte, 1024)
+		_, err := stdout.Read(tmp)
+		fmt.Print(string(tmp))
+		if errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			logger.Log.Errorln(err)
+			break
+		}
+	}
+	return cmd.Wait()
 }

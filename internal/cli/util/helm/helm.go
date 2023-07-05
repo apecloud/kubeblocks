@@ -198,7 +198,7 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (*release.Release, e
 		if released != nil {
 			return released, nil
 		}
-		if err != nil && !releaseNotFound(err) {
+		if err != nil && !ReleaseNotFound(err) {
 			return nil, err
 		}
 	}

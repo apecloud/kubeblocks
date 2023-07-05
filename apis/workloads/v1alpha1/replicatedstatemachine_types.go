@@ -100,6 +100,7 @@ type ReplicatedStateMachineStatus struct {
 	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`
 }
 
+// +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks,all},shortName=rsm

@@ -12,7 +12,6 @@ spec:
     retention:
       ttl: 7d
     schedule:
-      startWindowMinutes: 120
       snapshot:
         enable: false
         cronExpression: "0 18 * * 0"

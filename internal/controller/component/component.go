@@ -45,11 +45,6 @@ func BuildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return nil, err
 	}
-	/*
-		if err := buildRestoreInfoFromBackup(reqCtx, cli, cluster, synthesizedComp); err != nil {
-			return nil, err
-		}
-	*/
 	return synthesizedComp, nil
 }
 

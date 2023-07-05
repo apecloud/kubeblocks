@@ -119,7 +119,6 @@ type CommonBackupPolicy struct {
 type PersistentVolumeClaim struct {
 	// the name of PersistentVolumeClaim to store backup data.
 	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	Name *string `json:"name,omitempty"`
 

@@ -6,7 +6,7 @@ metadata:
     {{- include "etcd.labels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: etcd
-  componentSpecs:
+  componentVersions:
     - componentDefRef: etcd
       versionsContext:
         containers:

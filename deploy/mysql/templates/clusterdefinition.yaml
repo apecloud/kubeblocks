@@ -1,0 +1,66 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: mysql
+  labels:
+    {{- include "mysql.labels" . | nindent 4 }}
+spec:
+  type: mysql
+  connectionCredential:
+    username: root
+    password: "$(RANDOM_PASSWD)"
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_mysql)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_mysql)"
+  componentDefs:
+    - name: mysql
+      characterType: mysql
+      probes:
+        roleProbe:
+          failureThreshold: {{ .Values.roleProbe.failureThreshold }}
+          periodSeconds: {{ .Values.roleProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.roleProbe.timeoutSeconds }}
+      workloadType: Replication
+      service:
+        ports:
+          - name: mysql
+            port: 3306
+            targetPort: mysql
+      volumeTypes:
+        - name: data
+          type: data
+      podSpec:
+        containers:
+          - name: mysql
+            imagePullPolicy: IfNotPresent
+            volumeMounts:
+              - mountPath: /var/lib/mysql
+                name: data
+            ports:
+              - containerPort: 3306
+                name: mysql
+            env:
+              - name: MYSQL_ROOT_HOST
+                value: {{ .Values.auth.rootHost | default "%" | quote }}
+              - name: MYSQL_ROOT_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+              - name: MYSQL_DATABASE
+                value: {{- if .Values.auth.createDatabase }} {{ .Values.auth.database | quote }}  {{- else }} "" {{- end }}
+              - name: MYSQL_USER
+                value: {{ .Values.auth.username | default "" | quote }}
+              - name: MYSQL_PASSWORD
+                value: {{ .Values.auth.password | default "" | quote }}
+              - name: REPLICATION_USER
+                value: {{ .Values.auth.replicationUser | default "replicator" | quote }}
+              - name: REPLICATION_PASSWORD
+                value: {{ .Values.auth.replicationPassword | default "" | quote }}

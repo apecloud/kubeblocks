@@ -32,7 +32,7 @@ component: {
 	replicas:       int
 	podSpec: {
 		containers: [...]
-		enableServiceLinks: false
+		enableServiceLinks: bool | *false
 	}
 	volumeClaimTemplates: [...]
 }

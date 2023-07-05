@@ -386,18 +386,6 @@ var _ = Describe("builder", func() {
 			Expect(backupJob).ShouldNot(BeNil())
 		})
 
-		It("builds VolumeSnapshot correctly", func() {
-			sts := newStsObj()
-			snapshotKey := types.NamespacedName{
-				Namespace: "default",
-				Name:      "test-snapshot",
-			}
-			pvcName := "test-pvc-name"
-			vs, err := BuildVolumeSnapshot(snapshotKey, pvcName, sts)
-			Expect(err).Should(BeNil())
-			Expect(vs).ShouldNot(BeNil())
-		})
-
 		It("builds ConfigMap with template correctly", func() {
 			config := map[string]string{}
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
@@ -526,6 +514,8 @@ var _ = Describe("builder", func() {
 					Physical: dataprotectionv1alpha1.BackupToolRestoreCommand{
 						RestoreCommands: []string{
 							"echo \"hello world\"",
+							"echo \"hello world\"",
+							"echo \"hello world\"",
 						},
 					},
 				},
@@ -608,15 +598,6 @@ var _ = Describe("builder", func() {
 			Expect(err).Should(BeNil())
 			Expect(serviceAccount).ShouldNot(BeNil())
 			Expect(serviceAccount.Name).Should(Equal(expectName))
-		})
-
-		It("builds role correctly", func() {
-			_, cluster, _ := newClusterObjs(nil)
-			expectName := fmt.Sprintf("kb-%s", cluster.Name)
-			role, err := BuildRole(cluster)
-			Expect(err).Should(BeNil())
-			Expect(role).ShouldNot(BeNil())
-			Expect(role.Name).Should(Equal(expectName))
 		})
 
 		It("builds rolebinding correctly", func() {

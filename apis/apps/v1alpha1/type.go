@@ -49,14 +49,17 @@ type ComponentTemplateSpec struct {
 	// Specify the namespace of the referenced the configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
 	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +kubebuilder:default="default"
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
-	// volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration template will be mounted to the corresponding volume.
+	// volumeName is the volume name of PodTemplate, which the configuration file produced through the configuration
+	// template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=32
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	VolumeName string `json:"volumeName"`
 
 	// defaultMode is optional: mode bits used to set permissions on created files by default.
@@ -79,8 +82,9 @@ type LazyRenderedTemplateSpec struct {
 
 	// Specify the namespace of the referenced the configuration template ConfigMap object.
 	// An empty namespace is equivalent to the "default" namespace.
-	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:default="default"
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 

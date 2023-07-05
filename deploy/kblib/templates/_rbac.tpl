@@ -2,21 +2,21 @@
 Define the service account name
 */}}
 {{- define "kblib.serviceAccountName" -}}
-{{- printf "kb-%s" (include "kblib.clusterName" .) }}
+{{- printf "kb-sa-%s" (include "kblib.clusterName" .) }}
 {{- end }}
 
 {{/*
 Define the role name
 */}}
 {{- define "kblib.roleName" -}}
-{{- printf "kb-%s" (include "kblib.clusterName" .) }}
+{{- printf "kb-role-%s" (include "kblib.clusterName" .) }}
 {{- end }}
 
 {{/*
 Define the rolebinding name
 */}}
 {{- define "kblib.roleBindingName" -}}
-{{- printf "kb-%s" (include "kblib.clusterName" .) }}
+{{- printf "kb-rolebinding-%s" (include "kblib.clusterName" .) }}
 {{- end }}
 
 {{/*

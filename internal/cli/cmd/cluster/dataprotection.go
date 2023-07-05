@@ -342,7 +342,6 @@ func NewDeleteBackupCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		},
 	}
 	cmd.Flags().StringSliceVar(&o.Names, "name", []string{}, "Backup names")
-	_ = cmd.MarkFlagRequired("name")
 	o.AddFlags(cmd)
 	return cmd
 }

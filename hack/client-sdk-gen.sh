@@ -29,7 +29,7 @@ CODE_GENERATOR_PATH=$(go list -f '{{.Dir}}' -m k8s.io/code-generator)
 GENERATORS="all"   # deepcopy,defaulter,client,lister,informer or all
 OUTPUT_PACKAGE="github.com/apecloud/kubeblocks/pkg/client"
 APIS_PACKAGE="github.com/apecloud/kubeblocks/apis"
-GROUP_VERSIONS="apps:v1alpha1 dataprotection:v1alpha1 extensions:v1alpha1 workloads:v1alpha1"
+GROUP_VERSIONS="apps:v1alpha1 dataprotection:v1alpha1 extensions:v1alpha1 workloads:v1alpha1 storage:v1alpha1"
 OUTPUT_BASE="${SCRIPT_ROOT}/hack"
 
 

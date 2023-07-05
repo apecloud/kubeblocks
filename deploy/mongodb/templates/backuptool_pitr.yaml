@@ -67,7 +67,7 @@ spec:
           echo $errorLog && exit 1
         fi
         # check role of the connected mongodb
-        isPrimary=$(mongo -u ${DB_USER} -p ${DB_PASSWORD} --port 27017 --host ${DB_HOST} --authenticationDatabase admin  --eval 'db.isMaster().ismaster' --quiet)
+        isPrimary=$(mongosh -u ${DB_USER} -p ${DB_PASSWORD} --port 27017 --host ${DB_HOST} --authenticationDatabase admin  --eval 'db.isMaster().ismaster' --quiet)
         if [ "${isPrimary}" != "true" ]; then
           echo "isPrimary: ${isPrimary}"
           retryTimes=$(($retryTimes+1))

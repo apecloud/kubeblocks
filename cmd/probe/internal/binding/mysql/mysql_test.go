@@ -87,7 +87,6 @@ func TestInitDelay(t *testing.T) {
 	// mysqlOps.initIfNeed()
 	t.Run("Invalid url", func(t *testing.T) {
 		mysqlOps.db = nil
-		mysqlOps.initIfNeed()
 		mysqlOps.Metadata.Properties["url"] = "invalid_url"
 		err := mysqlOps.InitDelay()
 		if err == nil {

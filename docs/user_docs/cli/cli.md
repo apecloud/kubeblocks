@@ -140,6 +140,7 @@ Inject faults to pod.
 
 KubeBlocks operation commands.
 
+* [kbcli kubeblocks compare](kbcli_kubeblocks_compare.md)	 - List the changes between two different version KubeBlocks.
 * [kbcli kubeblocks config](kbcli_kubeblocks_config.md)	 - KubeBlocks config.
 * [kbcli kubeblocks describe-config](kbcli_kubeblocks_describe-config.md)	 - Describe KubeBlocks config.
 * [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks.

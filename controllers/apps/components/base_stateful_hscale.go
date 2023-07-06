@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
@@ -534,38 +535,29 @@ func (d *backupDataClone) checkBackupStatus() (backupStatus, error) {
 
 func (d *backupDataClone) restore(pvcKey types.NamespacedName) ([]client.Object, error) {
 	objs := make([]client.Object, 0)
-	restoreJobKey := d.restoreKeyFromPVCKey(pvcKey)
 	backup := dataprotectionv1alpha1.Backup{}
 	if err := d.cli.Get(d.reqCtx.Ctx, d.key, &backup); err != nil {
 		return nil, err
-	}
-	ml := client.MatchingLabels{
-		constant.ClusterDefLabelKey: d.component.ClusterDefName,
-	}
-	backupToolList := dataprotectionv1alpha1.BackupToolList{}
-	if err := d.cli.List(d.reqCtx.Ctx, &backupToolList, ml); err != nil {
-		return nil, err
-	}
-	if len(backupToolList.Items) == 0 {
-		return nil, fmt.Errorf("backuptool not found for clusterdefinition: %s", d.component.ClusterDefName)
 	}
 	pvc, err := builder.BuildPVC(d.cluster, d.component, d.backupVCT(), pvcKey, "")
 	if err != nil {
 		return nil, err
 	}
 	objs = append(objs, pvc)
-	// TODO: @dengshao refactor it to backup api
-	job, err := builder.BuildRestoreJobForFullBackup(restoreJobKey.Name, d.component, &backup, &backupToolList.Items[0], pvcKey.Name)
+	restoreMgr := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil)
+	restoreJobs, err := restoreMgr.BuildDatafileRestoreJobByPVCS(d.baseDataClone.component, &backup, []string{pvc.Name}, d.getBackupMatchingLabels())
 	if err != nil {
 		return nil, err
 	}
-	objs = append(objs, job)
+	objs = append(objs, restoreJobs...)
 	return objs, nil
 }
 
 func (d *backupDataClone) checkRestoreStatus(pvcKey types.NamespacedName) (backupStatus, error) {
 	job := v1.Job{}
-	if err := d.cli.Get(d.reqCtx.Ctx, d.restoreKeyFromPVCKey(pvcKey), &job); err != nil {
+	restoreMgr := plan.NewRestoreManager(d.reqCtx.Ctx, d.cli, d.cluster, nil)
+	jobName := restoreMgr.GetDatafileRestoreJobName(pvcKey.Name)
+	if err := d.cli.Get(d.reqCtx.Ctx, types.NamespacedName{Namespace: pvcKey.Namespace, Name: jobName}, &job); err != nil {
 		if errors.IsNotFound(err) {
 			return backupStatusNotCreated, nil
 		} else {
@@ -576,14 +568,6 @@ func (d *backupDataClone) checkRestoreStatus(pvcKey types.NamespacedName) (backu
 		return backupStatusReadyToUse, nil
 	}
 	return backupStatusProcessing, nil
-}
-
-func (d *backupDataClone) restoreKeyFromPVCKey(pvcKey types.NamespacedName) types.NamespacedName {
-	restoreJobKey := types.NamespacedName{
-		Namespace: pvcKey.Namespace,
-		Name:      "restore-" + pvcKey.Name,
-	}
-	return restoreJobKey
 }
 
 // getBackupPolicyFromTemplate gets backup policy from template policy template.

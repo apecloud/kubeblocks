@@ -9,7 +9,7 @@
         - running
       serviceAccountName: {{ include "kblib.serviceAccountName" . }}
       switchPolicy:
-        type: NNoop
+        type: Noop
       {{- include "kblib.componentResources" . | indent 6 }}
     {{- if eq .Values.mode "replication" }}
     {{- include "redis-cluster.sentinel" . | indent 4 }}

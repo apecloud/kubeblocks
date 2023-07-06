@@ -33,7 +33,11 @@ requests:
 ##
 storage: 20
 
+## @param sentinel.cpu
+## @param sentinel.memory
+## @param sentinel.storage
+##
 sentinel:
-  cpu: 200m
-  memory: 200Mi
-  storage: 5Gi
+  cpu: 0.2
+  memory: 0.2
+  storage: 5

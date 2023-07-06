@@ -25,7 +25,7 @@ keywords:
   - cluster
   - raft
 
-home: https://github.com/apecloud/kubeblocks/deploy/apecloud-mysql-cluster
+home: https://github.com/apecloud/kubeblocks/tree/main/deploy/apecloud-mysql-cluster
 icon: https://github.com/apecloud/kubeblocks/raw/main/img/logo.png
 
 maintainers:

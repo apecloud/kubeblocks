@@ -1,10 +1,10 @@
+annotations:
+  category: Database
 apiVersion: v2
 name: redis-cluster
-description: An Redis Replication Cluster Helm chart for KubeBlocks.
-
 type: application
-
 version: 0.6.0-alpha.28
+description: An Redis Replication Cluster Helm chart for KubeBlocks.
 
 appVersion: "7.0.6"
 

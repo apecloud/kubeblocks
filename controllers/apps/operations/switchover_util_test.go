@@ -189,7 +189,7 @@ var _ = Describe("Switchover Util", func() {
 				Command: []string{"echo", "hello"},
 				Args:    []string{},
 			}
-			configMapRefs := []appsv1alpha1.ConfigMapSelector{
+			scriptSpecSelectors := []appsv1alpha1.ScriptSpecSelector{
 				{
 					Name: "test-mock-cm",
 				},
@@ -203,14 +203,14 @@ var _ = Describe("Switchover Util", func() {
 						CommandExecutorEnvItem: *commandExecutorEnvItem,
 						CommandExecutorItem:    *commandExecutorItem,
 					},
-					ConfigMapRefs: configMapRefs,
+					ScriptSpecSelectors: scriptSpecSelectors,
 				},
 				WithoutCandidate: &appsv1alpha1.SwitchoverAction{
 					CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
 						CommandExecutorEnvItem: *commandExecutorEnvItem,
 						CommandExecutorItem:    *commandExecutorItem,
 					},
-					ConfigMapRefs: configMapRefs,
+					ScriptSpecSelectors: scriptSpecSelectors,
 				},
 			}
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).

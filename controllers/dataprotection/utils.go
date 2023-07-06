@@ -279,15 +279,16 @@ func getDefaultBackupRepo(ctx context.Context, cli client.Client) (*dataprotecti
 	var defaultRepo *dataprotectionv1alpha1.BackupRepo
 	for idx := range backupRepoList.Items {
 		repo := &backupRepoList.Items[idx]
-		if repo.Annotations[constant.DefaultBackupRepoAnnotationKey] == trueVal &&
-			repo.Status.Phase == dataprotectionv1alpha1.BackupRepoReady {
-			if defaultRepo == nil {
-				defaultRepo = repo
-			} else {
-				return nil, fmt.Errorf("multiple default BackupRepo found, both %s and %s are default",
-					defaultRepo.Name, repo.Name)
-			}
+		// skip non-default repo
+		if !(repo.Annotations[constant.DefaultBackupRepoAnnotationKey] == trueVal &&
+			repo.Status.Phase == dataprotectionv1alpha1.BackupRepoReady) {
+			continue
 		}
+		if defaultRepo != nil {
+			return nil, fmt.Errorf("multiple default BackupRepo found, both %s and %s are default",
+				defaultRepo.Name, repo.Name)
+		}
+		defaultRepo = repo
 	}
 	if defaultRepo == nil {
 		return nil, fmt.Errorf("no default BackupRepo found")

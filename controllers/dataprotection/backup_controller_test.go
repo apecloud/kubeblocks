@@ -784,8 +784,10 @@ var _ = Describe("Backup Controller test", func() {
 
 		Context("no backup repo available", func() {
 			It("should fail if there is no available backup repo", func() {
-				By("deleting backup repo")
-				testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(repo), &dpv1alpha1.BackupRepo{})
+				By("making the backup repo as non-default")
+				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(repo), func(repo *dpv1alpha1.BackupRepo) {
+					delete(repo.Annotations, constant.DefaultBackupRepoAnnotationKey)
+				})).Should(Succeed())
 				By("creating backup")
 				policy := createBackupPolicy("", "")
 				backup := createBackup(policy, nil)

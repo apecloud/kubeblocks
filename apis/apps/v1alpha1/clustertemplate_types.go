@@ -26,21 +26,13 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// ClusterTemplateSpec defines the desired state of ClusterTemplate
-type ClusterTemplateSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of ClusterTemplate. Edit clustertemplate_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
-}
-
 // ClusterTemplateStatus defines the observed state of ClusterTemplate
 type ClusterTemplateStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
 
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=ct
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
@@ -49,7 +41,7 @@ type ClusterTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ClusterTemplateSpec   `json:"spec,omitempty"`
+	Spec   ClusterSpec           `json:"spec,omitempty"`
 	Status ClusterTemplateStatus `json:"status,omitempty"`
 }
 

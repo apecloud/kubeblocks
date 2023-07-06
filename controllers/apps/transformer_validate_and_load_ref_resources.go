@@ -85,6 +85,18 @@ func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformCo
 		transCtx.ClusterVer = &appsv1alpha1.ClusterVersion{}
 	}
 
+	var cf *appsv1alpha1.ClusterFamily
+	if len(cd.Spec.ClusterFamilyRef) > 0 {
+		cf = &appsv1alpha1.ClusterFamily{}
+		if err = validateExistence(types.NamespacedName{Name: cd.Spec.ClusterFamilyRef}, cf); err != nil {
+			return err
+		}
+	}
+	if cf == nil {
+		return nil
+	}
+	// TODO: get clustertemplate from clusterfamily and cluster
+
 	return nil
 }
 

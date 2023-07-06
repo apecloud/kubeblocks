@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"text/template"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -32,7 +31,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -114,40 +112,6 @@ func (c *clusterPlanBuilder) Init() error {
 		cluster:       c.transCtx.Cluster,
 		originCluster: c.transCtx.OrigCluster,
 	})
-	return c.renderClusterTemplate()
-}
-
-func (c *clusterPlanBuilder) renderClusterTemplate() error {
-
-	// find cluster template if exists
-	ml := client.MatchingLabels{
-		constant.AppInstanceLabelKey: c.transCtx.Cluster.GetName(),
-		constant.ModeKey:             string(c.transCtx.Cluster.Spec.Mode),
-	}
-	configMapList := corev1.ConfigMapList{}
-	if err := c.cli.List(c.transCtx.Context, &configMapList, ml); err != nil {
-		return err
-	}
-	if len(configMapList.Items) == 0 {
-		return nil
-	}
-	clusterTpl := appsv1alpha1.Cluster{}
-	tplStr := configMapList.Items[0].Data["clusterTpl"]
-	args := map[string]interface{}{
-		"mode":       c.transCtx.Cluster.Spec.Mode,
-		"parameters": c.transCtx.Cluster.Spec.Parameters,
-	}
-	var buf strings.Builder
-	t := template.Must(template.New("clusterTpl").Parse(tplStr))
-	if err := t.Execute(&buf, args); err != nil {
-		return err
-	}
-	clusterStr := buf.String()
-	// render template
-	if err := yaml.Unmarshal([]byte(clusterStr), &clusterTpl); err != nil {
-		return err
-	}
-	c.transCtx.ClusterTemplate = &clusterTpl
 	return nil
 }
 

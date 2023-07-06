@@ -41,6 +41,7 @@ type ClusterFamilyStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 }
 
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=cf
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 

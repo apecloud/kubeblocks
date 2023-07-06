@@ -22,7 +22,6 @@ package infrastructure
 import (
 	"fmt"
 
-	"github.com/apecloud/kubeblocks/internal/gotemplate"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/common"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/connector"
 	"github.com/kubesphere/kubekey/v3/cmd/kk/pkg/core/pipeline"
@@ -31,6 +30,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/util"
+	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
 type deleteOptions struct {

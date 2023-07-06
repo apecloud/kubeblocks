@@ -393,6 +393,8 @@ spec:
                           type: string
                         name:
                           description: Name refers to the name of the ComponentClassDefinition.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                       required:
                       - class
@@ -685,6 +687,8 @@ spec:
                               type: string
                             name:
                               description: Name refers to the name of the ComponentClassDefinition.
+                              maxLength: 63
+                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                               type: string
                           required:
                           - class

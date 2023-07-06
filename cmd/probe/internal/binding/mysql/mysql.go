@@ -232,7 +232,7 @@ func (mysqlOps *MysqlOperations) GetRunningPort() int {
 
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
 	workloadType := request.Metadata[workloadTypeKey]
-	if workloadType == Replication {
+	if strings.EqualFold(workloadType, Replication) {
 		return mysqlOps.GetRoleForReplication(ctx, request, response)
 	}
 	return mysqlOps.GetRoleForConsensus(ctx, request, response)

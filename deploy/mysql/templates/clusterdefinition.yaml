@@ -33,6 +33,9 @@ spec:
         containers:
           - name: mysql
             imagePullPolicy: IfNotPresent
+            command:
+              - docker-entrypoint.sh
+              - mysqld
             volumeMounts:
               - mountPath: /var/lib/mysql
                 name: data

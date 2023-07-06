@@ -2,8 +2,8 @@ package mongodb
 
 import (
 	"errors"
+	"net"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -91,11 +91,12 @@ func NewConfig(properties map[string]string) (*Config, error) {
 }
 
 func (config *Config) GetDBPort() int {
-	index := strings.Index(config.host, ":")
-	if index < 0 {
+	_, portStr, err := net.SplitHostPort(config.host)
+	if err != nil {
 		return defaultDBPort
 	}
-	port, err := strconv.Atoi(config.host[index+1:])
+
+	port, err := strconv.Atoi(portStr)
 	if err != nil {
 		return defaultDBPort
 	}

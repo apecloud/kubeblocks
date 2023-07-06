@@ -2,11 +2,11 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-## @param version MySQL cluster version
+## @param version redis cluster version
 ##
 version: redis-7.0.6
 
-## @param mode MySQL cluster topology mode, standalone, replication or raftGroup
+## @param mode redis cluster topology mode, standalone and replication
 ##
 mode: standalone
 

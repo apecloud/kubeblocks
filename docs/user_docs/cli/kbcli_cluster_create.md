@@ -99,7 +99,7 @@ kbcli cluster create [NAME] [flags]
   -h, --help                           help for create
       --monitor                        Set monitor enabled and inject metrics exporter (default true)
       --node-labels stringToString     Node label selector (default [])
-  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+  -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --pod-anti-affinity string       Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
       --restore-to-time string         Set a time for point in time recovery
       --set stringArray                Set the cluster resource including cpu, memory, replicas and storage, or just specify the class, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)
@@ -138,6 +138,7 @@ kbcli cluster create [NAME] [flags]
 ### SEE ALSO
 
 * [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+* [kbcli cluster create mysql](kbcli_cluster_create_mysql.md)	 - Create a MySQL cluster.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

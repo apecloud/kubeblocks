@@ -2110,7 +2110,7 @@
           "type": "prometheus",
           "uid": "$datasource"
         },
-        "definition": "label_values(go_info{namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\"，app_kubernetes_io_name=\"weaviate\"}, pod)",
+        "definition": "label_values(go_info{namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\",app_kubernetes_io_name=\"weaviate\"}, pod)",
         "hide": 0,
         "includeAll": true,
         "label": "instance",
@@ -2118,7 +2118,7 @@
         "name": "instance",
         "options": [],
         "query": {
-          "query": "label_values(go_info{namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\"，app_kubernetes_io_name=\"weaviate\"}, pod)",
+          "query": "label_values(go_info{namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\",app_kubernetes_io_name=\"weaviate\"}, pod)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,

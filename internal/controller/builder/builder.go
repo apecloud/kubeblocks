@@ -681,13 +681,13 @@ func BuildBackupManifestsJob(key types.NamespacedName, backup *dataprotectionv1a
 	return job, nil
 }
 
-func BuildRestoreJob(name, namespace string, image string, command []string,
+func BuildRestoreJob(cluster *appsv1alpha1.Cluster, synthesizedComponent *component.SynthesizedComponent, name, image string, command []string,
 	volumes []corev1.Volume, volumeMounts []corev1.VolumeMount, env []corev1.EnvVar, resources *corev1.ResourceRequirements) (*batchv1.Job, error) {
 	const tplFile = "restore_job_template.cue"
 	job := &batchv1.Job{}
 	fillMaps := map[string]any{
 		"job.metadata.name":              name,
-		"job.metadata.namespace":         namespace,
+		"job.metadata.namespace":         cluster.Namespace,
 		"job.spec.template.spec.volumes": volumes,
 		"container.image":                image,
 		"container.command":              command,
@@ -701,27 +701,13 @@ func BuildRestoreJob(name, namespace string, image string, command []string,
 	if err := buildFromCUE(tplFile, fillMaps, "job", job); err != nil {
 		return nil, err
 	}
-	return job, nil
-}
-
-func BuildRestoreJobForFullBackup(
-	restoreJobName string,
-	component *component.SynthesizedComponent,
-	backup *dataprotectionv1alpha1.Backup,
-	backupTool *dataprotectionv1alpha1.BackupTool,
-	pvcName string) (*batchv1.Job, error) {
-	const tplFile = "restore_full_backup_job.cue"
-	job := batchv1.Job{}
-	if err := buildFromCUE(tplFile, map[string]any{
-		"restoreJobName": restoreJobName,
-		"component":      component,
-		"backup":         backup,
-		"backupTool":     backupTool,
-		"pvcName":        pvcName,
-	}, "job", &job); err != nil {
-		return nil, err
+	containers := job.Spec.Template.Spec.Containers
+	if len(containers) > 0 {
+		if err := injectEnvs(cluster, synthesizedComponent, "", &containers[0]); err != nil {
+			return nil, err
+		}
 	}
-	return &job, nil
+	return job, nil
 }
 
 func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, component *component.SynthesizedComponent, toolsMetas []appsv1alpha1.ToolConfig) ([]corev1.Container, error) {

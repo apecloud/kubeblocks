@@ -34,7 +34,7 @@ import (
 
 var ErrReleaseNotDeployed = fmt.Errorf("release: not in deployed status")
 
-func releaseNotFound(err error) bool {
+func ReleaseNotFound(err error) bool {
 	if err == nil {
 		return false
 	}

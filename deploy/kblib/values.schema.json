@@ -51,7 +51,7 @@
     },
     "publiclyAccessible": {
       "title": "Publicly Accessible",
-      "description": "Specify whether the cluster can be accessed from the public Internet.",
+      "description": "Specify whether the cluster can be accessed from the public internet.",
       "type": "boolean",
       "default": false
     }

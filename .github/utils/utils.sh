@@ -471,6 +471,9 @@ get_trigger_mode() {
         if [[ "$filePath" == "go."* || "$filePath" == *".go" ]]; then
             add_trigger_mode "[test][go]"
             continue
+        elif [[ "$filePath" == "Makefile" ]]; then
+            add_trigger_mode "[test]"
+            continue
         elif [[ "$filePath" != *"/"* ]]; then
             add_trigger_mode "[other]"
             continue

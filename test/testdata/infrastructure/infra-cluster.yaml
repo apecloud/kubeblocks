@@ -1,0 +1,56 @@
+metadata:
+  name: kb-k8s-test-cluster
+user:
+  name: user1
+  privateKeyPath: ~/.ssh/test.pem
+nodes:
+  - name: kb-infra-node-0
+    address: 1.1.1.1
+    internalAddress: 10.128.0.19
+  - name: kb-infra-node-1
+    address: 1.1.1.2
+    internalAddress: 10.128.0.20
+  - name: kb-infra-node-2
+    address: 1.1.1.3
+    internalAddress: 10.128.0.21
+    options:
+      hugePageFeature:
+        hugePageSize: 10GB
+roleGroup:
+  etcd:
+    - kb-infra-node-0
+    - kb-infra-node-1
+    - kb-infra-node-2
+  master:
+    - kb-infra-node-0
+  worker:
+    - kb-infra-node-1
+    - kb-infra-node-2
+
+kubernetes:
+  containerManager: containerd
+  # apis/kubeadm/types.Networking
+  networking:
+    plugin: cilium
+    dnsDomain: cluster.local
+    podSubnet: 10.233.64.0/18
+    serviceSubnet: 10.233.0.0/18
+  controlPlaneEndpoint:
+    domain: lb.kubeblocks.local
+    port: 6443
+  cri:
+    containerRuntimeType: "containerd"
+    containerRuntimeEndpoint: "unix:///run/containerd/containerd.sock"
+    sandBoxImage: "k8s.gcr.io/pause:3.8"
+addons:
+  - name: openebs
+    namespace: kube-blocks
+    sources:
+      chart:
+        name: openebs
+        version: 3.7.0
+        repo: https://openebs.github.io/charts
+        options:
+          values:
+            - "localprovisioner.basePath=/mnt/disks"
+            - "localprovisioner.hostpathClass.isDefaultClass=true"

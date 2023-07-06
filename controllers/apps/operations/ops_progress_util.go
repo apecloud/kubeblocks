@@ -404,12 +404,18 @@ func getFailedPodMessage(cluster *appsv1alpha1.Cluster, componentName string, po
 }
 
 func getComponentLastReplicas(opsRequest *appsv1alpha1.OpsRequest, componentName string) *int32 {
-	for k, v := range opsRequest.Status.LastConfiguration.Components {
-		if k == componentName {
-			return v.Replicas
+	lastCompConfiguration := opsRequest.Status.LastConfiguration.Components[componentName]
+	if lastCompConfiguration.Replicas == nil {
+		return nil
+	}
+	if lastPods, ok := lastCompConfiguration.TargetResources[appsv1alpha1.PodsCompResourceKey]; ok {
+		lastActualComponents := int32(len(lastPods))
+		// may the actual pods not equals the component replicas
+		if lastActualComponents < *lastCompConfiguration.Replicas {
+			return &lastActualComponents
 		}
 	}
-	return nil
+	return lastCompConfiguration.Replicas
 }
 
 // handleComponentProgressDetails handles the component progressDetails when scale the replicas.
@@ -451,13 +457,7 @@ func handleComponentProgressForScalingReplicas(reqCtx intctrlutil.RequestCtx,
 		return 0, 0, intctrlutil.NewError(intctrlutil.ErrorWaitCacheRefresh, "wait for the pods of component to be synchronized")
 	}
 	if opsRequest.Status.Phase == appsv1alpha1.OpsCancellingPhase {
-		expectReplicas = lastComponentReplicas
-		// lastComponentPods is the snapshot of component pods at cancelling,
-		// use this count as the last component replicas during canceling.
-		lastComponentPodNames := getTargetResourcesOfLastComponent(opsRes.OpsRequest.Status.LastConfiguration,
-			pgRes.clusterComponent.Name, appsv1alpha1.PodsCompResourceKey)
-		lastComponentPodCount := int32(len(lastComponentPodNames))
-		lastComponentReplicas = &lastComponentPodCount
+		expectReplicas = opsRequest.Status.LastConfiguration.Components[clusterComponent.Name].Replicas
 	}
 	var (
 		isScaleOut          bool

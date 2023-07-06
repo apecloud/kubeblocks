@@ -446,7 +446,6 @@ func (o *CreateOptions) Complete() error {
 			clusterCompSpecs = cls.Spec.ComponentSpecs
 		}
 	}
-	//
 	if err = fillClusterInfoFromBackup(o, &cls); err != nil {
 		return err
 	}

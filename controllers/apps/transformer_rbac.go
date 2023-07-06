@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
-
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -47,7 +45,7 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
 	if !viper.GetBool("ENABLE_RBAC_MANAGER") {
-		transCtx.Logger.Info("rbac manager is not enabled")
+		transCtx.Logger.V(1).Info("rbac manager is not enabled")
 		return nil
 	}
 
@@ -58,41 +56,40 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
-		if isRoleBindingNotExist(transCtx, serviceAccountName) {
-			serviceAccount, err := builder.BuildServiceAccount(cluster)
-			if err != nil {
-				return err
-			}
-			serviceAccount.Name = serviceAccountName
-			saVertex := ictrltypes.LifecycleObjectCreate(dag, serviceAccount, nil)
+		if isRoleBindingExist(transCtx, serviceAccountName) {
+			continue
+		}
+		roleBinding, err := builder.BuildRoleBinding(cluster)
+		if err != nil {
+			return err
+		}
+		roleBinding.Subjects[0].Name = serviceAccountName
+		rbVertex := ictrltypes.LifecycleObjectCreate(dag, roleBinding, root)
 
-			statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
-			for _, statefulSetVertex := range statefulSetVertices {
-				// serviceaccount must be created before statefulset
-				dag.Connect(statefulSetVertex, saVertex)
-			}
+		serviceAccount, err := builder.BuildServiceAccount(cluster)
+		if err != nil {
+			return err
+		}
+		serviceAccount.Name = serviceAccountName
+		// serviceaccount must be created before rolebinding
+		saVertex := ictrltypes.LifecycleObjectCreate(dag, serviceAccount, rbVertex)
 
-			deploymentVertices := ictrltypes.FindAll[*appsv1.Deployment](dag)
-			for _, deploymentVertex := range deploymentVertices {
-				// serviceaccount must be created before deployment
-				dag.Connect(deploymentVertex, saVertex)
-			}
-
-			roleBinding, err := builder.BuildRoleBinding(cluster)
-			if err != nil {
-				return err
-			}
-			roleBinding.Subjects[0].Name = serviceAccountName
-			rbVertex := ictrltypes.LifecycleObjectCreate(dag, roleBinding, root)
-			// serviceaccount must be created before rolebinding
-			dag.Connect(rbVertex, saVertex)
+		statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
+		for _, statefulSetVertex := range statefulSetVertices {
+			// serviceaccount must be created before statefulset
+			dag.Connect(statefulSetVertex, saVertex)
 		}
 
+		deploymentVertices := ictrltypes.FindAll[*appsv1.Deployment](dag)
+		for _, deploymentVertex := range deploymentVertices {
+			// serviceaccount must be created before deployment
+			dag.Connect(deploymentVertex, saVertex)
+		}
 	}
 	return nil
 }
 
-func isRoleBindingNotExist(transCtx *ClusterTransformContext, serviceAccountName string) bool {
+func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName string) bool {
 	cluster := transCtx.Cluster
 	namespaceName := types.NamespacedName{
 		Namespace: cluster.Namespace,
@@ -103,7 +100,8 @@ func isRoleBindingNotExist(transCtx *ClusterTransformContext, serviceAccountName
 		// KubeBlocks will create a rolebinding only if it has RBAC access priority and
 		// the rolebinding is not already present.
 		if errors.IsNotFound(err) {
-			return true
+			transCtx.Logger.V(1).Info("RoleBinding not exists", "namespaceName", namespaceName)
+			return false
 		}
 		transCtx.Logger.V(0).Error(err, "get service account failed")
 		return false
@@ -112,7 +110,8 @@ func isRoleBindingNotExist(transCtx *ClusterTransformContext, serviceAccountName
 		return false
 	}
 	if rb.RoleRef.Name != RBACRoleName {
-		transCtx.Logger.V(0).Error(fmt.Errorf("ClusterRole %s is not match with %s", RBACRoleName, rb.RoleRef.Name), "rbac manager")
+		transCtx.Logger.V(1).Info("rbac manager: ClusterRole not match", "ClusterRole",
+			RBACRoleName, "rolebinding.RoleRef", rb.RoleRef.Name)
 	}
 
 	isServiceAccountMatch := false
@@ -123,7 +122,8 @@ func isRoleBindingNotExist(transCtx *ClusterTransformContext, serviceAccountName
 	}
 
 	if !isServiceAccountMatch {
-		transCtx.Logger.V(0).Error(fmt.Errorf("ServiceAccount %s is not in rolebinding: %v", serviceAccountName, rb.Subjects), "rbac manager")
+		transCtx.Logger.V(1).Info("rbac manager: ServiceAccount not match", "ServiceAccount",
+			serviceAccountName, "rolebinding.Subjects", rb.Subjects)
 	}
-	return false
+	return true
 }

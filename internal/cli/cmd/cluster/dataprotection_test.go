@@ -354,6 +354,44 @@ var _ = Describe("DataProtection", func() {
 		Expect(o.Complete()).Should(Succeed())
 		Expect(o.validateRestoreTime().Error()).Should(ContainSubstring("restore-to-time is out of time range"))
 	})
+
+	It("describe-backup", func() {
+		cmd := NewDescribeBackupCmd(tf, streams)
+		Expect(cmd).ShouldNot(BeNil())
+		By("test describe-backup cmd with no backup")
+		tf.FakeDynamicClient = testing.FakeDynamicClient()
+		o := describeBackupOptions{
+			factory:   tf,
+			IOStreams: streams,
+			gvr:       types.BackupGVR(),
+		}
+		args := []string{}
+		Expect(o.complete(args)).Should(HaveOccurred())
+
+		By("test describe-backup")
+		backupName := "test1"
+		backup1 := testing.FakeBackup(backupName)
+		args = append(args, backupName)
+		availableReplicas := int32(1)
+		backup1.Status.Phase = dpv1alpha1.BackupCompleted
+		logNow := metav1.Now()
+		backup1.Status.StartTimestamp = &logNow
+		backup1.Status.CompletionTimestamp = &logNow
+		backup1.Status.Expiration = &logNow
+		backup1.Status.Duration = &metav1.Duration{Duration: logNow.Sub(logNow.Time)}
+		backup1.Status.AvailableReplicas = &availableReplicas
+		backup1.Status.Manifests = &dpv1alpha1.ManifestsStatus{
+			BackupLog:   &dpv1alpha1.BackupLogStatus{StartTime: &logNow, StopTime: &logNow},
+			BackupTool:  &dpv1alpha1.BackupToolManifestsStatus{FilePath: "/backupdata/test1"},
+			Snapshot:    &dpv1alpha1.BackupSnapshotStatus{VolumeSnapshotName: backupName},
+			UserContext: map[string]string{"user_define_key": "user_define_value"},
+		}
+		backup1.Status.SourceCluster = "mycluster"
+		tf.FakeDynamicClient = testing.FakeDynamicClient(backup1)
+		Expect(o.complete(args)).Should(Succeed())
+		o.client = testing.FakeClientSet()
+		Expect(o.run()).Should(Succeed())
+	})
 })
 
 func mockBackupInfo(dynamic dynamic.Interface, backupName, clusterName string, manifests map[string]any, backupType string) {

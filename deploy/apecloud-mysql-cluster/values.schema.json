@@ -15,13 +15,12 @@
       "default": "standalone",
       "enum": [
         "standalone",
-        "replication",
         "raftGroup"
       ]
     },
     "replicas": {
       "title": "Replicas",
-      "description": "The number of replicas.",
+      "description": "The number of replicas. For standalone mode, the replicas is 1, for raftGroup mode, the default replicas is 3.",
       "type": "integer",
       "default": 1,
       "minimum": 1,

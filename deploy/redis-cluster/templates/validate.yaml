@@ -1,16 +1,4 @@
 {{/*
-Validate replicas
-*/}}
-{{- if .Values.replicas }}
-  {{- if and (eq .Values.mode "standalone") (gt (int .Values.replicas) 1) }}
-    {{ fail "Redis cluster with standalone mode does not support running with more than one replica." }}
-  {{- end }}
-  {{- if and (eq .Values.mode "replication") (lt (int .Values.replicas) 2) }}
-    {{ fail "Redis cluster with replication mode does not support running with less than two replicas." }}
-  {{- end }}
-{{- end }}
-
-{{/*
 Validate cpu, memory and storage
 */}}
 {{- $cpu := (float64 .Values.cpu) }}

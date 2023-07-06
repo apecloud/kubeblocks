@@ -6,7 +6,7 @@
 ##
 version: ac-mysql-8.0.30
 
-## @param mode MySQL cluster topology mode, standalone, replication or raftGroup
+## @param mode MySQL cluster topology mode, standalone, raftGroup
 ##
 mode: standalone
 

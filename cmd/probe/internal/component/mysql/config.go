@@ -139,14 +139,14 @@ func (config *Config) GetLocalDBConn() (*sql.DB, error) {
 	return db, nil
 }
 
-func (config *Config) GetDBConnWithHostPort(host, port string) (*sql.DB, error) {
+func (config *Config) GetDBConnWithAddr(addr string) (*sql.DB, error) {
 	mysqlConfig, err := mysql.ParseDSN(config.url)
 	if err != nil {
 		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", connectionURLKey)
 	}
 	config.User = dbUser
 	config.Passwd = dbPasswd
-	config.Addr = net.JoinHostPort(host, port)
+	config.Addr = addr
 	db, err := sql.Open("mysql", mysqlConfig.FormatDSN())
 	if err != nil {
 		return nil, errors.Wrap(err, "error opening DB connection")

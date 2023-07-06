@@ -34,6 +34,7 @@ import (
 	"github.com/spf13/viper"
 
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
 )
 
 type Operation func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error)
@@ -108,6 +109,10 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 		GetRoleOperation:      ops.GetRoleOps,
 	}
 	ops.DBAddress = ops.getAddress()
+}
+
+func (ops *BaseOperations) RegisterOperationOnDBReady(opsKind bindings.OperationKind, operation Operation, manager component.DBManager) {
+	ops.RegisterOperation(opsKind, StartupCheckWraper(manager, operation))
 }
 
 func (ops *BaseOperations) RegisterOperation(opsKind bindings.OperationKind, operation Operation) {

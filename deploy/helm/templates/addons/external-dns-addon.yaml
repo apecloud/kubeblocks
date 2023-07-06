@@ -109,7 +109,12 @@ spec:
   type: Helm
 
   helm:
-    chartLocationURL: oci://registry-1.docker.io/bitnamicharts/external-dns
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/external-dns
+    {{- else }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/external-dns-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    {{- end }}
+
 
     installValues:
       configMapRefs:

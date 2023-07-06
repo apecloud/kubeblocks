@@ -71,10 +71,8 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 			return err
 		}
 		serviceAccount.Name = serviceAccountName
-		saVertex := ictrltypes.LifecycleObjectCreate(dag, serviceAccount, nil)
-
 		// serviceaccount must be created before rolebinding
-		dag.Connect(rbVertex, saVertex)
+		saVertex := ictrltypes.LifecycleObjectCreate(dag, serviceAccount, rbVertex)
 
 		statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
 		for _, statefulSetVertex := range statefulSetVertices {

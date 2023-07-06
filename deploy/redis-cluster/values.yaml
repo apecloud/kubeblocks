@@ -16,8 +16,6 @@ clusterVersionOverride: ""
 monitor:
   enabled: false
 
-primaryIndex: 0
-
 switchPolicy:
   type: Noop
 

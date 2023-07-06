@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	appv1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -103,7 +103,10 @@ type reconfigureParams struct {
 	Component *appsv1alpha1.ClusterComponentDefinition
 
 	// List of StatefulSets using this config template.
-	ComponentUnits []appv1.StatefulSet
+	ComponentUnits []appsv1.StatefulSet
+
+	// List of Deployment using this config template.
+	DeploymentUnits []appsv1.Deployment
 }
 
 var (
@@ -258,4 +261,20 @@ func makeReturnedStatus(status ExecStatus, ops ...func(status *ReturnedStatus)) 
 		o(&ret)
 	}
 	return ret
+}
+
+func fromDeploymentObjects(units []appsv1.Deployment) []client.Object {
+	r := make([]client.Object, len(units))
+	for i, unit := range units {
+		r[i] = &unit
+	}
+	return r
+}
+
+func fromStatefulSetObjects(units []appsv1.StatefulSet) []client.Object {
+	r := make([]client.Object, len(units))
+	for i, unit := range units {
+		r[i] = &unit
+	}
+	return r
 }

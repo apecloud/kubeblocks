@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	dbaasv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 )
@@ -41,11 +42,12 @@ import (
 //  2. should avoid using Go template to call a function, this is too hacky & costly,
 //     should just call underlying registered Go template function.
 func ComposeTLSSecret(namespace, clusterName, componentName string) (*v1.Secret, error) {
-	secret, err := builder.BuildTLSSecret(namespace, clusterName, componentName)
-	if err != nil {
-		return nil, err
-	}
-	secret.Name = GenerateTLSSecretName(clusterName, componentName)
+	name := GenerateTLSSecretName(clusterName, componentName)
+	secret := builder.NewSecretBuilder(namespace, name).
+		AddLabels(constant.AppInstanceLabelKey, clusterName).
+		AddLabels(constant.KBManagedByKey, constant.AppName).
+		SetStringData(map[string]string{}).
+		GetObject()
 
 	const tpl = `{{- $cert := genSelfSignedCert "KubeBlocks" nil nil 365 }}
 {{ $cert.Cert }}
@@ -92,12 +94,12 @@ func CheckTLSSecretRef(ctx context.Context, cli client2.ReadonlyClient, namespac
 	if err := cli.Get(ctx, types.NamespacedName{Namespace: namespace, Name: secretRef.Name}, secret); err != nil {
 		return err
 	}
-	if secret.Data == nil {
+	if secret.StringData == nil {
 		return errors.New("tls secret's data field shouldn't be nil")
 	}
 	keys := []string{secretRef.CA, secretRef.Cert, secretRef.Key}
 	for _, key := range keys {
-		if _, ok := secret.Data[key]; !ok {
+		if _, ok := secret.StringData[key]; !ok {
 			return errors.Errorf("tls secret's data[%s] field shouldn't be empty", key)
 		}
 	}

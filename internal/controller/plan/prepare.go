@@ -24,9 +24,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/StudioSol/set"
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -50,11 +50,11 @@ func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
 	podSpec *corev1.PodSpec,
 	localObjs []client.Object,
 	ctx context.Context,
-	cli client.Client) ([]client.Object, error) {
+	cli client.Client) error {
 	// Need to Merge configTemplateRef of ClusterVersion.Components[*].ConfigTemplateRefs and
 	// ClusterDefinition.Components[*].ConfigTemplateRefs
 	if len(component.ConfigTemplates) == 0 && len(component.ScriptTemplates) == 0 {
-		return nil, nil
+		return nil
 	}
 
 	clusterName := cluster.Name
@@ -62,15 +62,15 @@ func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
 	templateBuilder := newTemplateBuilder(clusterName, namespaceName, cluster, clusterVersion, ctx, cli)
 	// Prepare built-in objects and built-in functions
 	if err := templateBuilder.injectBuiltInObjectsAndFunctions(podSpec, component.ConfigTemplates, component, localObjs); err != nil {
-		return nil, err
+		return err
 	}
 
 	renderWrapper := newTemplateRenderWrapper(templateBuilder, cluster, ctx, cli)
 	if err := renderWrapper.renderConfigTemplate(cluster, component, localObjs); err != nil {
-		return nil, err
+		return err
 	}
 	if err := renderWrapper.renderScriptTemplate(cluster, component, localObjs); err != nil {
-		return nil, err
+		return err
 	}
 
 	if len(renderWrapper.templateAnnotations) > 0 {
@@ -79,14 +79,32 @@ func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
 
 	// Generate Pod Volumes for ConfigMap objects
 	if err := intctrlutil.CreateOrUpdatePodVolumes(podSpec, renderWrapper.volumes); err != nil {
-		return nil, cfgcore.WrapError(err, "failed to generate pod volume")
+		return cfgcore.WrapError(err, "failed to generate pod volume")
 	}
 
 	if err := buildConfigManagerWithComponent(podSpec, component.ConfigTemplates, ctx, cli, cluster, component); err != nil {
-		return nil, cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
+		return cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
 	}
+	// TODO config resource objects are updated by the operator
+	return createConfigObjects(cli, ctx, renderWrapper.renderedObjs)
+}
 
-	return renderWrapper.renderedObjs, nil
+func createConfigObjects(cli client.Client, ctx context.Context, objs []client.Object) error {
+	for _, obj := range objs {
+		if err := cli.Create(ctx, obj); err != nil {
+			if !apierrors.IsAlreadyExists(err) {
+				return err
+			}
+			// for update script cm
+			if cfgcore.IsSchedulableConfigResource(obj) {
+				continue
+			}
+			if err := cli.Update(ctx, obj); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func updateResourceAnnotationsWithTemplate(obj client.Object, allTemplateAnnotations map[string]string) {
@@ -118,13 +136,8 @@ func updateResourceAnnotationsWithTemplate(obj client.Object, allTemplateAnnotat
 // into PodSpec if configuration reload option is on
 func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []appsv1alpha1.ComponentConfigSpec,
 	ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) error {
-	var (
-		err error
-
-		buildParams *cfgcm.CfgManagerBuildParams
-		// volumeDirs       []corev1.VolumeMount
-		// usingConfigSpecs []appsv1alpha1.ComponentConfigSpec
-	)
+	var err error
+	var buildParams *cfgcm.CfgManagerBuildParams
 
 	volumeDirs, usingConfigSpecs := getUsingVolumesByConfigSpecs(podSpec, configSpecs)
 	if len(volumeDirs) == 0 {
@@ -134,6 +147,9 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 	if err != nil {
 		return err
 	}
+	// Configmap uses subPath case: https://github.com/kubernetes/kubernetes/issues/50345
+	// The files are being updated on the host VM, but can't be updated in the container.
+	configSpecMetas = cfgcm.FilterSubPathVolumeMount(configSpecMetas, volumeDirs)
 	if len(configSpecMetas) == 0 {
 		return nil
 	}
@@ -240,7 +256,7 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1a
 		if !cfgcore.NeedReloadVolume(configSpec) {
 			continue
 		}
-		sets := set.NewLinkedHashSetString()
+		sets := util.NewSet()
 		for _, container := range config2Containers[configSpec.Name] {
 			volume := intctrlutil.GetVolumeMountByVolume(container, configSpec.VolumeName)
 			if volume != nil && !sets.InArray(volume.Name) {

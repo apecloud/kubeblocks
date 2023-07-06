@@ -19,14 +19,17 @@ Addon command.
 Manage alert receiver, include add, list and delete receiver.
 
 * [kbcli alert add-receiver](kbcli_alert_add-receiver.md)	 - Add alert receiver, such as email, slack, webhook and so on.
+* [kbcli alert config-smtpserver](kbcli_alert_config-smtpserver.md)	 - Set smtp server config
 * [kbcli alert delete-receiver](kbcli_alert_delete-receiver.md)	 - Delete alert receiver.
 * [kbcli alert list-receivers](kbcli_alert_list-receivers.md)	 - List all alert receivers.
+* [kbcli alert list-smtpserver](kbcli_alert_list-smtpserver.md)	 - List alert smtp servers config.
 
 
 ## [bench](kbcli_bench.md)
 
 Run a benchmark.
 
+* [kbcli bench pgbench](kbcli_bench_pgbench.md)	 - Run pgbench against a PostgreSQL cluster
 * [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
 
 
@@ -51,7 +54,7 @@ Manage classes
 Cluster command.
 
 * [kbcli cluster backup](kbcli_cluster_backup.md)	 - Create a backup for the cluster.
-* [kbcli cluster cancel-ops](kbcli_cluster_cancel-ops.md)	 - cancel the pending/creating/running OpsRequest which type is vscale or hscale.
+* [kbcli cluster cancel-ops](kbcli_cluster_cancel-ops.md)	 - Cancel the pending/creating/running OpsRequest which type is vscale or hscale.
 * [kbcli cluster configure](kbcli_cluster_configure.md)	 - Configure parameters with the specified components in the cluster.
 * [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a cluster or instance.
 * [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster.
@@ -62,6 +65,7 @@ Cluster command.
 * [kbcli cluster delete-ops](kbcli_cluster_delete-ops.md)	 - Delete an OpsRequest.
 * [kbcli cluster describe](kbcli_cluster_describe.md)	 - Show details of a specific cluster.
 * [kbcli cluster describe-account](kbcli_cluster_describe-account.md)	 - Describe account roles and related information
+* [kbcli cluster describe-backup](kbcli_cluster_describe-backup.md)	 - Describe a backup.
 * [kbcli cluster describe-config](kbcli_cluster_describe-config.md)	 - Show details of a specific reconfiguring.
 * [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest.
 * [kbcli cluster diff-config](kbcli_cluster_diff-config.md)	 - Show the difference in parameters between the two submitted OpsRequest.
@@ -82,6 +86,7 @@ Cluster command.
 * [kbcli cluster list-logs](kbcli_cluster_list-logs.md)	 - List supported log files in cluster.
 * [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - List all opsRequests.
 * [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file.
+* [kbcli cluster promote](kbcli_cluster_promote.md)	 - Promote a non-primary or non-leader instance as the new primary or leader of the cluster
 * [kbcli cluster restart](kbcli_cluster_restart.md)	 - Restart the specified components in the cluster.
 * [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup.
 * [kbcli cluster revoke-role](kbcli_cluster_revoke-role.md)	 - Revoke role from account
@@ -132,12 +137,21 @@ Inject faults to pod.
 * [kbcli fault time](kbcli_fault_time.md)	 - Clock skew failure.
 
 
+## [infra](kbcli_infra.md)
+
+infra command
+
+* [kbcli infra create](kbcli_infra_create.md)	 - create kubernetes cluster.
+* [kbcli infra delete](kbcli_infra_delete.md)	 - delete kubernetes cluster.
+
+
 ## [kubeblocks](kbcli_kubeblocks.md)
 
 KubeBlocks operation commands.
 
+* [kbcli kubeblocks compare](kbcli_kubeblocks_compare.md)	 - List the changes between two different version KubeBlocks.
 * [kbcli kubeblocks config](kbcli_kubeblocks_config.md)	 - KubeBlocks config.
-* [kbcli kubeblocks describe-config](kbcli_kubeblocks_describe-config.md)	 - describe KubeBlocks config.
+* [kbcli kubeblocks describe-config](kbcli_kubeblocks_describe-config.md)	 - Describe KubeBlocks config.
 * [kbcli kubeblocks install](kbcli_kubeblocks_install.md)	 - Install KubeBlocks.
 * [kbcli kubeblocks list-versions](kbcli_kubeblocks_list-versions.md)	 - List KubeBlocks versions.
 * [kbcli kubeblocks preflight](kbcli_kubeblocks_preflight.md)	 - Run and retrieve preflight checks for KubeBlocks.
@@ -185,6 +199,14 @@ Provides utilities for interacting with plugins.
 * [kbcli plugin search](kbcli_plugin_search.md)	 - Search kbcli or kubectl plugins
 * [kbcli plugin uninstall](kbcli_plugin_uninstall.md)	 - Uninstall kbcli or kubectl plugins
 * [kbcli plugin upgrade](kbcli_plugin_upgrade.md)	 - Upgrade kbcli or kubectl plugins
+
+
+## [report](kbcli_report.md)
+
+report kubeblocks or cluster info.
+
+* [kbcli report cluster](kbcli_report_cluster.md)	 - Report Cluster information
+* [kbcli report kubeblocks](kbcli_report_kubeblocks.md)	 - Report KubeBlocks information, including deployments, events, logs, etc.
 
 
 ## [version](kbcli_version.md)

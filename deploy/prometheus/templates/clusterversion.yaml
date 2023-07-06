@@ -7,7 +7,7 @@ metadata:
 spec:
   clusterDefinitionRef: prometheus
   componentVersions:
-  - componentDefRef: server
+  - componentDefRef: prometheus
     versionsContext:
       containers:
       - name: configmap-reload

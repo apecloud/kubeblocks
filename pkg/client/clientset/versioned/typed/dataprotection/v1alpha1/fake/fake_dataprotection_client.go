@@ -36,6 +36,10 @@ func (c *FakeDataprotectionV1alpha1) BackupPolicies(namespace string) v1alpha1.B
 	return &FakeBackupPolicies{c, namespace}
 }
 
+func (c *FakeDataprotectionV1alpha1) BackupRepos() v1alpha1.BackupRepoInterface {
+	return &FakeBackupRepos{c}
+}
+
 func (c *FakeDataprotectionV1alpha1) BackupTools() v1alpha1.BackupToolInterface {
 	return &FakeBackupTools{c}
 }

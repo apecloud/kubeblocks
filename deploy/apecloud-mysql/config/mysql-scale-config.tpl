@@ -1,0 +1,15 @@
+[vttablet]
+health_check_interval=1s
+shard_sync_retry_delay=1s
+remote_operation_timeout=1s
+db_connect_timeout_ms=500
+[vtconsensus]
+refresh_interval=1s
+scan_repair_timeout=1s
+[vtgate]
+gateway_initial_tablet_timeout=30s
+healthcheck_timeout=2s
+srv_topo_timeout=1s
+grpc_keepalive_time=10s
+grpc_keepalive_timeout=10s
+tablet_refresh_interval=1m

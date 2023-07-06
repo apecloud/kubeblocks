@@ -22,24 +22,33 @@ package dataprotection
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/leaanthony/debme"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -105,11 +114,11 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.patchStatusFailed(reqCtx, backupPolicy, "HandleSnapshotPolicyFailed", err)
 	}
 
-	if err = r.handleFullPolicy(reqCtx, backupPolicy); err != nil {
+	if err = r.handleDatafilePolicy(reqCtx, backupPolicy); err != nil {
 		return r.patchStatusFailed(reqCtx, backupPolicy, "HandleFullPolicyFailed", err)
 	}
 
-	if err = r.handleIncrementalPolicy(reqCtx, backupPolicy); err != nil {
+	if err = r.handleLogfilePolicy(reqCtx, backupPolicy); err != nil {
 		return r.patchStatusFailed(reqCtx, backupPolicy, "HandleIncrementalPolicyFailed", err)
 	}
 
@@ -120,10 +129,44 @@ func (r *BackupPolicyReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *BackupPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dataprotectionv1alpha1.BackupPolicy{}).
+		Watches(&source.Kind{Type: &dataprotectionv1alpha1.Backup{}}, r.backupDeleteHandler(),
+			builder.WithPredicates(predicate.NewPredicateFuncs(filterCreatedByPolicy))).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(maxConcurDataProtectionReconKey),
 		}).
 		Complete(r)
+}
+
+func (r *BackupPolicyReconciler) backupDeleteHandler() *handler.Funcs {
+	return &handler.Funcs{
+		DeleteFunc: func(event event.DeleteEvent, limitingInterface workqueue.RateLimitingInterface) {
+			backup := event.Object.(*dataprotectionv1alpha1.Backup)
+			ctx := context.Background()
+			backupPolicy := &dataprotectionv1alpha1.BackupPolicy{}
+			if err := r.Client.Get(ctx, types.NamespacedName{Name: backup.Spec.BackupPolicyName, Namespace: backup.Namespace}, backupPolicy); err != nil {
+				return
+			}
+			backupType := backup.Spec.BackupType
+			// if not refer the backupTool, skip
+			commonPolicy := backupPolicy.Spec.GetCommonPolicy(backupType)
+			if commonPolicy == nil {
+				return
+			}
+			// if not enable the schedule, skip
+			schedulerPolicy := backupPolicy.Spec.GetCommonSchedulePolicy(backupType)
+			if schedulerPolicy != nil && !schedulerPolicy.Enable {
+				return
+			}
+			backupTool := &dataprotectionv1alpha1.BackupTool{}
+			if err := r.Client.Get(ctx, types.NamespacedName{Name: commonPolicy.BackupToolName}, backupTool); err != nil {
+				return
+			}
+			if backupTool.Spec.DeployKind != dataprotectionv1alpha1.DeployKindStatefulSet {
+				return
+			}
+			_ = r.reconcileForStatefulSetKind(ctx, backupPolicy, backupType, schedulerPolicy.CronExpression)
+		},
+	}
 }
 
 func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.RequestCtx, backupPolicy *dataprotectionv1alpha1.BackupPolicy) error {
@@ -147,6 +190,25 @@ func (r *BackupPolicyReconciler) deleteExternalResources(reqCtx intctrlutil.Requ
 			return err
 		}
 	}
+	// notice running backup to completed
+	backup := &dataprotectionv1alpha1.Backup{}
+	for _, v := range []dataprotectionv1alpha1.BackupType{dataprotectionv1alpha1.BackupTypeDataFile,
+		dataprotectionv1alpha1.BackupTypeLogFile, dataprotectionv1alpha1.BackupTypeSnapshot} {
+		if err := r.Client.Get(reqCtx.Ctx, types.NamespacedName{Namespace: backupPolicy.Namespace,
+			Name: getCreatedCRNameByBackupPolicy(backupPolicy.Name, backupPolicy.Namespace, v),
+		}, backup); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return err
+		}
+		patch := client.MergeFrom(backup.DeepCopy())
+		backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
+		backup.Status.CompletionTimestamp = &metav1.Time{Time: time.Now().UTC()}
+		if err := r.Client.Status().Patch(reqCtx.Ctx, backup, patch); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -163,6 +225,7 @@ func (r *BackupPolicyReconciler) patchStatusAvailable(reqCtx intctrlutil.Request
 	if backupPolicy.Status.Phase != dataprotectionv1alpha1.PolicyAvailable ||
 		backupPolicy.Status.ObservedGeneration != backupPolicy.Generation {
 		patch := client.MergeFrom(backupPolicy.DeepCopy())
+		backupPolicy.Status.ObservedGeneration = backupPolicy.Generation
 		backupPolicy.Status.Phase = dataprotectionv1alpha1.PolicyAvailable
 		backupPolicy.Status.FailureReason = ""
 		if err := r.Client.Status().Patch(reqCtx.Ctx, backupPolicy, patch); err != nil {
@@ -255,20 +318,51 @@ func (r *BackupPolicyReconciler) removeOldestBackups(reqCtx intctrlutil.RequestC
 	return nil
 }
 
-func (r *BackupPolicyReconciler) getCronJobName(backupPolicyName, backupPolicyNamespace string, backupType dataprotectionv1alpha1.BackupType) string {
-	name := fmt.Sprintf("%s-%s", backupPolicyName, backupPolicyNamespace)
-	if len(name) > 30 {
-		name = strings.TrimRight(name[:30], "-")
+// reconcileForStatefulSetKind reconciles the backup which is controlled by backupPolicy.
+func (r *BackupPolicyReconciler) reconcileForStatefulSetKind(
+	ctx context.Context,
+	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
+	backType dataprotectionv1alpha1.BackupType,
+	cronExpression string) error {
+	backupName := getCreatedCRNameByBackupPolicy(generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace, backType)
+	backup := &dataprotectionv1alpha1.Backup{}
+	exists, err := intctrlutil.CheckResourceExists(ctx, r.Client, types.NamespacedName{Name: backupName, Namespace: backupPolicy.Namespace}, backup)
+	if err != nil {
+		return err
 	}
-	return fmt.Sprintf("%s-%s", name, string(backupType))
-}
+	patch := client.MergeFrom(backup.DeepCopy())
+	backup.Name = backupName
+	backup.Namespace = backupPolicy.Namespace
+	if backup.Labels == nil {
+		backup.Labels = map[string]string{}
+	}
+	backup.Labels[constant.AppManagedByLabelKey] = constant.AppName
+	backup.Labels[dataProtectionLabelBackupPolicyKey] = backupPolicy.Name
+	backup.Labels[dataProtectionLabelBackupTypeKey] = string(backType)
+	backup.Labels[dataProtectionLabelAutoBackupKey] = trueVal
+	if !exists {
+		if cronExpression == "" {
+			return nil
+		}
+		backup.Spec.BackupType = backType
+		backup.Spec.BackupPolicyName = backupPolicy.Name
+		return intctrlutil.IgnoreIsAlreadyExists(r.Client.Create(ctx, backup))
+	}
 
-func generateUniqueName(backupPolicy *dataprotectionv1alpha1.BackupPolicy) string {
-	uniqueName := backupPolicy.Name
-	if len(backupPolicy.OwnerReferences) > 0 {
-		uniqueName = fmt.Sprintf("%s-%s", backupPolicy.OwnerReferences[0].UID[:8], backupPolicy.OwnerReferences[0].Name)
+	// notice to reconcile backup CR
+	if cronExpression != "" && slices.Contains([]dataprotectionv1alpha1.BackupPhase{
+		dataprotectionv1alpha1.BackupCompleted, dataprotectionv1alpha1.BackupFailed},
+		backup.Status.Phase) {
+		// if schedule is enabled and backup already is completed, update phase to running
+		backup.Status.Phase = dataprotectionv1alpha1.BackupRunning
+		backup.Status.FailureReason = ""
+		return r.Client.Status().Patch(ctx, backup, patch)
 	}
-	return uniqueName
+	if backup.Annotations == nil {
+		backup.Annotations = map[string]string{}
+	}
+	backup.Annotations[constant.ReconcileAnnotationKey] = time.Now().Format(time.RFC3339Nano)
+	return r.Client.Patch(ctx, backup, patch)
 }
 
 // buildCronJob builds cronjob from backup policy.
@@ -284,13 +378,17 @@ func (r *BackupPolicyReconciler) buildCronJob(
 	if err != nil {
 		return nil, err
 	}
+	tolerationPodSpec := corev1.PodSpec{}
+	if err = addTolerations(&tolerationPodSpec); err != nil {
+		return nil, err
+	}
 	var ttl metav1.Duration
 	if backupPolicy.Spec.Retention != nil && backupPolicy.Spec.Retention.TTL != nil {
 		ttl = metav1.Duration{Duration: dataprotectionv1alpha1.ToDuration(backupPolicy.Spec.Retention.TTL)}
 	}
 	cueValue := intctrlutil.NewCUEBuilder(*cueTpl)
 	if cronJobName == "" {
-		cronJobName = r.getCronJobName(generateUniqueName(backupPolicy), backupPolicy.Namespace, backType)
+		cronJobName = getCreatedCRNameByBackupPolicy(generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace, backType)
 	}
 	options := backupPolicyOptions{
 		Name:             cronJobName,
@@ -303,6 +401,7 @@ func (r *BackupPolicyReconciler) buildCronJob(
 		ServiceAccount:   viper.GetString("KUBEBLOCKS_SERVICEACCOUNT_NAME"),
 		MgrNamespace:     viper.GetString(constant.CfgKeyCtrlrMgrNS),
 		Image:            viper.GetString(constant.KBToolsImage),
+		Tolerations:      &tolerationPodSpec,
 	}
 	backupPolicyOptionsByte, err := json.Marshal(options)
 	if err != nil {
@@ -349,7 +448,7 @@ func (r *BackupPolicyReconciler) removeCronJobFinalizer(reqCtx intctrlutil.Reque
 func (r *BackupPolicyReconciler) reconcileCronJob(reqCtx intctrlutil.RequestCtx,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
 	basePolicy dataprotectionv1alpha1.BasePolicy,
-	cronExpression string,
+	schedulePolicy *dataprotectionv1alpha1.SchedulePolicy,
 	backType dataprotectionv1alpha1.BackupType) error {
 	// get cronjob from labels
 	cronJob := &batchv1.CronJob{}
@@ -366,8 +465,7 @@ func (r *BackupPolicyReconciler) reconcileCronJob(reqCtx intctrlutil.RequestCtx,
 	} else if len(cronJobList.Items) > 0 {
 		cronJob = &cronJobList.Items[0]
 	}
-
-	if len(cronExpression) == 0 {
+	if schedulePolicy == nil || !schedulePolicy.Enable {
 		if len(cronJob.Name) != 0 {
 			// delete the old cronjob.
 			if err := r.removeCronJobFinalizer(reqCtx, cronJob); err != nil {
@@ -378,20 +476,25 @@ func (r *BackupPolicyReconciler) reconcileCronJob(reqCtx intctrlutil.RequestCtx,
 		// if no cron expression, return
 		return nil
 	}
-	cronjobProto, err := r.buildCronJob(backupPolicy, basePolicy.Target, cronExpression, backType, cronJob.Name)
+	cronjobProto, err := r.buildCronJob(backupPolicy, basePolicy.Target, schedulePolicy.CronExpression, backType, cronJob.Name)
 	if err != nil {
 		return err
 	}
 
+	if backupPolicy.Spec.Schedule.StartWindowMinutes != nil {
+		startingDeadlineSeconds := *backupPolicy.Spec.Schedule.StartWindowMinutes * 60
+		cronjobProto.Spec.StartingDeadlineSeconds = &startingDeadlineSeconds
+	}
 	if len(cronJob.Name) == 0 {
 		// if no cronjob, create it.
 		return r.Client.Create(reqCtx.Ctx, cronjobProto)
 	}
 	// sync the cronjob with the current backup policy configuration.
 	patch := client.MergeFrom(cronJob.DeepCopy())
+	cronJob.Spec.StartingDeadlineSeconds = cronjobProto.Spec.StartingDeadlineSeconds
 	cronJob.Spec.JobTemplate.Spec.BackoffLimit = &basePolicy.OnFailAttempted
 	cronJob.Spec.JobTemplate.Spec.Template = cronjobProto.Spec.JobTemplate.Spec.Template
-	cronJob.Spec.Schedule = cronExpression
+	cronJob.Spec.Schedule = schedulePolicy.CronExpression
 	return r.Client.Patch(reqCtx.Ctx, cronJob, patch)
 }
 
@@ -399,15 +502,14 @@ func (r *BackupPolicyReconciler) reconcileCronJob(reqCtx intctrlutil.RequestCtx,
 func (r *BackupPolicyReconciler) handlePolicy(reqCtx intctrlutil.RequestCtx,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
 	basePolicy dataprotectionv1alpha1.BasePolicy,
-	cronExpression string,
+	schedulePolicy *dataprotectionv1alpha1.SchedulePolicy,
 	backType dataprotectionv1alpha1.BackupType) error {
 
 	if err := r.reconfigure(reqCtx, backupPolicy, basePolicy, backType); err != nil {
 		return err
 	}
 	// create/delete/patch cronjob workload
-	if err := r.reconcileCronJob(reqCtx, backupPolicy, basePolicy,
-		cronExpression, backType); err != nil {
+	if err := r.reconcileCronJob(reqCtx, backupPolicy, basePolicy, schedulePolicy, backType); err != nil {
 		return err
 	}
 	return r.removeOldestBackups(reqCtx, backupPolicy.Name, backType, basePolicy.BackupsHistoryLimit)
@@ -421,56 +523,53 @@ func (r *BackupPolicyReconciler) handleSnapshotPolicy(
 		// TODO delete cronjob if exists
 		return nil
 	}
-	var cronExpression string
-	schedule := backupPolicy.Spec.Schedule.Snapshot
-	if schedule != nil && schedule.Enable {
-		cronExpression = schedule.CronExpression
-	}
 	return r.handlePolicy(reqCtx, backupPolicy, backupPolicy.Spec.Snapshot.BasePolicy,
-		cronExpression, dataprotectionv1alpha1.BackupTypeSnapshot)
+		backupPolicy.Spec.Schedule.Snapshot, dataprotectionv1alpha1.BackupTypeSnapshot)
 }
 
-// handleFullPolicy handles datafile policy.
-func (r *BackupPolicyReconciler) handleFullPolicy(
+// handleDatafilePolicy handles datafile policy.
+func (r *BackupPolicyReconciler) handleDatafilePolicy(
 	reqCtx intctrlutil.RequestCtx,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy) error {
 	if backupPolicy.Spec.Datafile == nil {
 		// TODO delete cronjob if exists
 		return nil
 	}
-	var cronExpression string
-	schedule := backupPolicy.Spec.Schedule.Datafile
-	if schedule != nil && schedule.Enable {
-		cronExpression = schedule.CronExpression
-	}
 	r.setGlobalPersistentVolumeClaim(backupPolicy.Spec.Datafile)
 	return r.handlePolicy(reqCtx, backupPolicy, backupPolicy.Spec.Datafile.BasePolicy,
-		cronExpression, dataprotectionv1alpha1.BackupTypeDataFile)
+		backupPolicy.Spec.Schedule.Datafile, dataprotectionv1alpha1.BackupTypeDataFile)
 }
 
-// handleIncrementalPolicy handles incremental policy.
-func (r *BackupPolicyReconciler) handleIncrementalPolicy(
+// handleLogFilePolicy handles logfile policy.
+func (r *BackupPolicyReconciler) handleLogfilePolicy(
 	reqCtx intctrlutil.RequestCtx,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy) error {
-	if backupPolicy.Spec.Logfile == nil {
+	logfile := backupPolicy.Spec.Logfile
+	if logfile == nil {
 		return nil
 	}
-	var cronExpression string
-	schedule := backupPolicy.Spec.Schedule.Logfile
-	if schedule != nil && schedule.Enable {
-		cronExpression = schedule.CronExpression
+	backupTool, err := getBackupToolByName(reqCtx, r.Client, logfile.BackupToolName)
+	if err != nil {
+		return err
 	}
-	r.setGlobalPersistentVolumeClaim(backupPolicy.Spec.Logfile)
-	return r.handlePolicy(reqCtx, backupPolicy, backupPolicy.Spec.Logfile.BasePolicy,
-		cronExpression, dataprotectionv1alpha1.BackupTypeLogFile)
+	r.setGlobalPersistentVolumeClaim(logfile)
+	schedule := backupPolicy.Spec.Schedule.Logfile
+	if backupTool.Spec.DeployKind == dataprotectionv1alpha1.DeployKindStatefulSet {
+		var cronExpression string
+		if schedule != nil && schedule.Enable {
+			cronExpression = schedule.CronExpression
+		}
+		return r.reconcileForStatefulSetKind(reqCtx.Ctx, backupPolicy, dataprotectionv1alpha1.BackupTypeLogFile, cronExpression)
+	}
+	return r.handlePolicy(reqCtx, backupPolicy, logfile.BasePolicy, schedule, dataprotectionv1alpha1.BackupTypeLogFile)
 }
 
 // setGlobalPersistentVolumeClaim sets global config of pvc to common policy.
 func (r *BackupPolicyReconciler) setGlobalPersistentVolumeClaim(backupPolicy *dataprotectionv1alpha1.CommonBackupPolicy) {
 	pvcCfg := backupPolicy.PersistentVolumeClaim
 	globalPVCName := viper.GetString(constant.CfgKeyBackupPVCName)
-	if len(pvcCfg.Name) == 0 && globalPVCName != "" {
-		backupPolicy.PersistentVolumeClaim.Name = globalPVCName
+	if (pvcCfg.Name == nil || len(*pvcCfg.Name) == 0) && globalPVCName != "" {
+		backupPolicy.PersistentVolumeClaim.Name = &globalPVCName
 	}
 
 	globalInitCapacity := viper.GetString(constant.CfgKeyBackupPVCInitCapacity)

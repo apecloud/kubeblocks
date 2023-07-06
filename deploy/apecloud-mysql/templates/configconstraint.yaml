@@ -57,3 +57,60 @@ spec:
     format: ini
     iniConfig:
       sectionName: mysqld
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: mysql-scale-vttablet-config-constraints
+  labels:
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+spec:
+  cfgSchemaTopLevelName: VtTabletParameter
+
+  configurationSchema:
+    cue: |-
+      {{- .Files.Get "config/mysql-scale-vttablet-config-constraint.cue" | nindent 6 }}
+
+  # mysql-scale configuration file format
+  formatterConfig:
+    format: ini
+    iniConfig:
+      sectionName: vttablet
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: mysql-scale-vtconsensus-config-constraints
+  labels:
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+spec:
+  cfgSchemaTopLevelName: VtConsensusParameter
+
+  configurationSchema:
+    cue: |-
+      {{- .Files.Get "config/mysql-scale-vtconsensus-config-constraint.cue" | nindent 6 }}
+
+  # mysql-scale configuration file format
+  formatterConfig:
+    format: ini
+    iniConfig:
+      sectionName: vtconsensus
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: mysql-scale-vtgate-config-constraints
+  labels:
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+spec:
+  cfgSchemaTopLevelName: VtGateParameter
+
+  configurationSchema:
+    cue: |-
+      {{- .Files.Get "config/mysql-scale-vtgate-config-constraint.cue" | nindent 6 }}
+
+  # mysql-scale configuration file format
+  formatterConfig:
+    format: ini
+    iniConfig:
+      sectionName: vtgate

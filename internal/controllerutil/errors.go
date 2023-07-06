@@ -22,6 +22,7 @@ package controllerutil
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 type Error struct {
@@ -55,6 +56,8 @@ const (
 	ErrorTypeBackupJobFailed          ErrorType = "BackupJobFailed"          // backup job failed
 	ErrorTypeStorageNotMatch          ErrorType = "ErrorTypeStorageNotMatch"
 	ErrorTypeReconfigureFailed        ErrorType = "ErrorTypeReconfigureFailed"
+	ErrorTypeInvalidLogfileBackupName ErrorType = "InvalidLogfileBackupName"
+	ErrorTypeBackupScheduleDisabled   ErrorType = "BackupScheduleDisabled"
 
 	// ErrorType for cluster controller
 	ErrorTypeBackupFailed ErrorType = "BackupFailed"
@@ -121,11 +124,21 @@ func NewBackupPVTemplateNotFound(cmName, cmNamespace string) *Error {
 }
 
 // NewBackupPVCNameIsEmpty returns a new Error with ErrorTypeBackupPVCNameIsEmpty.
-func NewBackupPVCNameIsEmpty(backupPolicyName string) *Error {
-	return NewErrorf(ErrorTypeBackupPVCNameIsEmpty, `the persistentVolumeClaim name of this policy "%s" is empty`, backupPolicyName)
+func NewBackupPVCNameIsEmpty(backupType, backupPolicyName string) *Error {
+	return NewErrorf(ErrorTypeBackupPVCNameIsEmpty, `the persistentVolumeClaim name of spec.%s is empty in BackupPolicy "%s"`, strings.ToLower(backupType), backupPolicyName)
 }
 
 // NewBackupJobFailed returns a new Error with ErrorTypeBackupJobFailed.
 func NewBackupJobFailed(jobName string) *Error {
 	return NewErrorf(ErrorTypeBackupJobFailed, `backup job "%s" failed`, jobName)
+}
+
+// NewInvalidLogfileBackupName returns a new Error with ErrorTypeInvalidLogfileBackupName.
+func NewInvalidLogfileBackupName(backupPolicyName string) *Error {
+	return NewErrorf(ErrorTypeInvalidLogfileBackupName, `backup name is incorrect for logfile, you can create the logfile backup by enabling the schedule in BackupPolicy "%s"`, backupPolicyName)
+}
+
+// NewBackupScheduleDisabled returns a new Error with ErrorTypeBackupScheduleDisabled.
+func NewBackupScheduleDisabled(backupType, backupPolicyName string) *Error {
+	return NewErrorf(ErrorTypeBackupScheduleDisabled, `%s schedule is disabled, you can enable spec.schedule.%s in BackupPolicy "%s"`, backupType, backupType, backupPolicyName)
 }

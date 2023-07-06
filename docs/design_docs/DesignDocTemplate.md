@@ -13,7 +13,7 @@
  
 
 # Naming rule：Product vMajor-XX Investigation/Requirement/Design
-eg：kubeblocksv0-XXdesign，vMajor follows the product's version number
+eg：kubeblocksv0-XXdesign, vMajor follows the product's version number
 
 # Release checklist
 eg：

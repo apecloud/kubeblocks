@@ -39,7 +39,8 @@ type renderTPLCmdOpts struct {
 	// dynamic dynamic.Interface
 
 	clusterYaml    string
-	clusterDefYaml string
+	clusterDef     string
+	clusterVersion string
 
 	outputDir       string
 	clearOutputDir  bool
@@ -68,7 +69,7 @@ func (o *renderTPLCmdOpts) complete() error {
 }
 
 func (o *renderTPLCmdOpts) run() error {
-	workflow, err := NewWorkflowTemplateRender(o.helmOutputDir, o.opts)
+	workflow, err := NewWorkflowTemplateRender(o.helmOutputDir, o.opts, o.clusterDef, o.clusterVersion)
 	if err != nil {
 		return err
 	}
@@ -86,11 +87,11 @@ var templateExamples = templates.Examples(`
 // buildReconfigureCommonFlags build common flags for reconfigure command
 func (o *renderTPLCmdOpts) buildTemplateFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&o.clusterYaml, "cluster", "", "the cluster yaml file")
-	cmd.Flags().StringVar(&o.clusterDefYaml, "cluster-definition", "", "the cluster definition yaml file")
+	cmd.Flags().StringVar(&o.clusterVersion, "cluster-version", "", "specify the cluster version name")
+	cmd.Flags().StringVar(&o.clusterDef, "cluster-definition", "", "specify the cluster definition name")
 	cmd.Flags().StringVarP(&o.outputDir, "output-dir", "o", "", "specify the output directory")
 
 	cmd.Flags().StringVar(&o.opts.ConfigSpec, "config-spec", "", "specify the config spec to be rendered")
-	cmd.Flags().BoolVarP(&o.opts.AllConfigSpecs, "all", "a", false, "template all config specs")
 
 	// mock cluster object
 	cmd.Flags().Int32VarP(&o.opts.Replicas, "replicas", "r", 1, "specify the replicas of the component")

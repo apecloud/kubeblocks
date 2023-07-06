@@ -95,9 +95,9 @@ func confirmUninstall(in io.Reader) error {
 }
 
 func getHelmChartVersions(chart string) ([]*semver.Version, error) {
-	errMsg := "failed to find the version information"
+	errMsg := "failed to find the chart version"
 	// add repo, if exists, will update it
-	if err := helm.AddRepo(&repo.Entry{Name: types.KubeBlocksChartName, URL: util.GetHelmChartRepoURL()}); err != nil {
+	if err := helm.AddRepo(newHelmRepoEntry()); err != nil {
 		return nil, errors.Wrap(err, errMsg)
 	}
 
@@ -268,4 +268,11 @@ func checkAddons(addons []*extensionsv1alpha1.Addon, install bool) *addonStatus 
 	sort.Strings(all)
 	status.outputMsg = strings.Join(all, "\n  ")
 	return status
+}
+
+func newHelmRepoEntry() *repo.Entry {
+	return &repo.Entry{
+		Name: types.KubeBlocksChartName,
+		URL:  util.GetHelmChartRepoURL(),
+	}
 }

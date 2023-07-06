@@ -61,7 +61,7 @@ var _ = Describe("MySQL data protection function", func() {
 		// namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.RestoreJobSignature, inNS, ml)
@@ -125,7 +125,7 @@ var _ = Describe("MySQL data protection function", func() {
 		By("By creating a backupPolicy from backupPolicyTemplate: " + backupPolicyTemplateName)
 		backupPolicyObj := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
 			WithRandomName().
-			AddFullPolicy().
+			AddDataFilePolicy().
 			SetBackupToolName(backupTool.Name).
 			AddMatchLabels(constant.AppInstanceLabelKey, clusterKey.Name).
 			SetTargetSecretName(component.GenerateConnCredential(clusterKey.Name)).

@@ -24,7 +24,9 @@ import (
 	"fmt"
 	"os/exec"
 	"reflect"
+	"strings"
 
+	gv "github.com/hashicorp/go-version"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
@@ -111,15 +113,24 @@ func GetKubeBlocksDeploy(client kubernetes.Interface) (*appsv1.Deployment, error
 		return nil, nil
 	}
 	if len(deploys.Items) > 1 {
+		// for compatibility with older versions, filter here instead of LabelSelector
+		for _, i := range deploys.Items {
+			if _, ok := i.Labels["app.kubernetes.io/component"]; ok {
+				return &i, nil
+			}
+		}
 		return nil, fmt.Errorf("found multiple KubeBlocks deployments, please check your cluster")
 	}
 	return &deploys.Items[0], nil
 }
 
 // GetDockerVersion get Docker Version
-func GetDockerVersion() (string, error) {
+func GetDockerVersion() (*gv.Version, error) {
 	// exec cmd to get output from docker info --format '{{.ServerVersion}}'
 	cmd := exec.Command("docker", "info", "--format", "{{.ServerVersion}}")
 	out, err := cmd.Output()
-	return string(out), err
+	if err != nil {
+		return nil, err
+	}
+	return gv.NewVersion(strings.TrimSpace(string(out)))
 }

@@ -35,6 +35,7 @@ const (
 	ConditionTypeHorizontalScaling = "HorizontalScaling"
 	ConditionTypeVolumeExpanding   = "VolumeExpanding"
 	ConditionTypeReconfigure       = "Reconfigure"
+	ConditionTypeSwitchover        = "Switchover"
 	ConditionTypeStop              = "Stopping"
 	ConditionTypeStart             = "Starting"
 	ConditionTypeVersionUpgrading  = "VersionUpgrading"
@@ -42,20 +43,22 @@ const (
 
 	// condition and event reasons
 
-	ReasonReconfigureMerging   = "ReconfigureMerging"
-	ReasonReconfigureMerged    = "ReconfigureMerged"
-	ReasonReconfigureFailed    = "ReconfigureFailed"
-	ReasonReconfigureNoChanged = "ReconfigureNoChanged"
-	ReasonReconfigureSucceed   = "ReconfigureSucceed"
-	ReasonReconfigureRunning   = "ReconfigureRunning"
-	ReasonClusterPhaseMismatch = "ClusterPhaseMismatch"
-	ReasonOpsTypeNotSupported  = "OpsTypeNotSupported"
-	ReasonValidateFailed       = "ValidateFailed"
-	ReasonClusterNotFound      = "ClusterNotFound"
-	ReasonOpsRequestFailed     = "OpsRequestFailed"
-	ReasonOpsCanceling         = "Canceling"
-	ReasonOpsCancelFailed      = "CancelFailed"
-	ReasonOpsCancelSucceed     = "CancelSucceed"
+	ReasonReconfigureMerging       = "ReconfigureMerging"
+	ReasonReconfigureMerged        = "ReconfigureMerged"
+	ReasonReconfigureFailed        = "ReconfigureFailed"
+	ReasonReconfigureRestartFailed = "ReconfigureRestartFailed"
+	ReasonReconfigureRestart       = "ReconfigureRestarted"
+	ReasonReconfigureNoChanged     = "ReconfigureNoChanged"
+	ReasonReconfigureSucceed       = "ReconfigureSucceed"
+	ReasonReconfigureRunning       = "ReconfigureRunning"
+	ReasonClusterPhaseMismatch     = "ClusterPhaseMismatch"
+	ReasonOpsTypeNotSupported      = "OpsTypeNotSupported"
+	ReasonValidateFailed           = "ValidateFailed"
+	ReasonClusterNotFound          = "ClusterNotFound"
+	ReasonOpsRequestFailed         = "OpsRequestFailed"
+	ReasonOpsCanceling             = "Canceling"
+	ReasonOpsCancelFailed          = "CancelFailed"
+	ReasonOpsCancelSucceed         = "CancelSucceed"
 )
 
 func (r *OpsRequest) SetStatusCondition(condition metav1.Condition) {
@@ -169,6 +172,18 @@ func NewRestartingCondition(ops *OpsRequest) *metav1.Condition {
 		Reason:             "RestartStarted",
 		LastTransitionTime: metav1.Now(),
 		Message:            fmt.Sprintf("Start to restart database in Cluster: %s", ops.Spec.ClusterRef),
+	}
+}
+
+// NewSwitchoveringCondition creates a condition that the operation starts to switchover components
+func NewSwitchoveringCondition(generation int64, message string) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               ConditionTypeSwitchover,
+		Status:             metav1.ConditionTrue,
+		Reason:             "SwitchoverStarted",
+		LastTransitionTime: metav1.Now(),
+		Message:            message,
+		ObservedGeneration: generation,
 	}
 }
 

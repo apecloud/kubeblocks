@@ -19,4 +19,4 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package mocks
 
-//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -package mocks -destination k8sclient_mocks.go sigs.k8s.io/controller-runtime/pkg/client Client
+//go:generate go run github.com/golang/mock/mockgen -copyright_file ../../../../hack/boilerplate.go.txt -package mocks -destination k8sclient_mocks.go sigs.k8s.io/controller-runtime/pkg/client Client,StatusWriter

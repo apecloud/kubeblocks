@@ -11,6 +11,16 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  name: mysql-scale-config-template
+  labels:
+    {{- include "apecloud-mysql.labels" . | nindent 4 }}
+data:
+  wesql-scale.cnf: |-
+    {{- .Files.Get "config/mysql-scale-config.tpl" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
   name: mysql-reload-script
   labels:
     {{- include "apecloud-mysql.labels" . | nindent 4 }}

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -43,11 +44,41 @@ const (
 	dataProtectionBackupTargetPodKey          = "dataprotection.kubeblocks.io/target-pod-name"
 	dataProtectionAnnotationCreateByPolicyKey = "dataprotection.kubeblocks.io/created-by-policy"
 
+	dataProtectionBackupRepoKey  = "dataprotection.kubeblocks.io/backup-repo-name"
+	dataProtectionNeedRepoPVCKey = "dataprotection.kubeblocks.io/need-repo-pvc"
+
+	// annotation keys
+	dataProtectionRepoPVCNameAnnotationKey       = "dataprotection.kubeblocks.io/repo-pvc-name"
+	dataProtectionSecretTemplateMD5AnnotationKey = "dataprotection.kubeblocks.io/secret-template-md5"
+	dataProtectionTemplateValuesMD5AnnotationKey = "dataprotection.kubeblocks.io/template-values-md5"
+
 	// the key of persistentVolumeTemplate in the configmap.
 	persistentVolumeTemplateKey = "persistentVolume"
 
 	hostNameLabelKey = "kubernetes.io/hostname"
 )
+
+// condition constants
+const (
+	// condition types
+	ConditionTypeStorageProviderReady  = "StorageProviderReady"
+	ConditionTypeStorageClassCreated   = "StorageClassCreated"
+	ConditionTypeDerivedObjectsDeleted = "DerivedObjectsDeleted"
+
+	// condition reasons
+	ReasonStorageProviderReady    = "StorageProviderReady"
+	ReasonStorageProviderNotReady = "StorageProviderNotReady"
+	ReasonStorageProviderNotFound = "StorageProviderNotFound"
+	ReasonBadSecretTemplate       = "BadSecretTemplate"
+	ReasonBadStorageClassTemplate = "BadStorageClassTemplate"
+	ReasonStorageClassCreated     = "StorageClassCreated"
+	ReasonHaveAssociatedBackups   = "HaveAssociatedBackups"
+	ReasonHaveResidualPVCs        = "HaveResidualPVCs"
+	ReasonDerivedObjectsDeleted   = "DerivedObjectsDeleted"
+	ReasonUnknownError            = "UnknownError"
+)
+
+const manifestsUpdaterContainerName = "manifests-updater"
 
 var reconcileInterval = time.Second
 
@@ -71,4 +102,5 @@ type backupPolicyOptions struct {
 	TTL              metav1.Duration `json:"ttl,omitempty"`
 	ServiceAccount   string          `json:"serviceAccount"`
 	Image            string          `json:"image"`
+	Tolerations      *corev1.PodSpec `json:"tolerations"`
 }

@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tdengine-config-template
+  labels:
+    {{- include "tdengine.labels" . | nindent 4 }}
+data:
+  taos.cfg: |-
+    {{- .Files.Get "configs/tdengine-taos-config.tpl" | nindent 4 }}
+  taosadapter.toml: |-
+    {{- .Files.Get "configs/tdengine-taosadapter-config.tpl" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tdengine-reload-script
+  labels:
+    {{- include "tdengine.labels" . | nindent 4 }}
+data:
+  reload.tpl: |-
+    {{- .Files.Get "scripts/tdengine-reload.tpl" | nindent 4 }}
+  reload.yaml: |-
+    scripts: reload.tpl
+    fileRegex: taos.cfg
+    formatterConfig:
+      format: redis

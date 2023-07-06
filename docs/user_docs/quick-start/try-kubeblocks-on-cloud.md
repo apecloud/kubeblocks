@@ -113,7 +113,7 @@ Make sure you have all the followings prepared.
    gcloud auth application-default login
    ```
 
-4. Configure GOOGLE_PROJECT environment variables，```kbcli playground``` creates GKE cluster in the project.
+4. Configure GOOGLE_PROJECT environment variables, ```kbcli playground``` creates GKE cluster in the project.
 
    ```bash
    export GOOGLE_PROJECT=<project-name>

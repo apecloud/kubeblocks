@@ -5676,8 +5676,8 @@
       "30d"
     ]
   },
-  "timezone": "browser",
-  "title": "MongoDB-ReplSet-KubeBlocks",
+  "timezone": "",
+  "title": "MongoDB",
   "uid": "mongodb",
   "version": 1,
   "weekStart": ""

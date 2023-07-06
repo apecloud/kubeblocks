@@ -72,5 +72,16 @@ metrics:
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
     repository: apecloud/agamotto
-    tag: 0.1.0-beta.4
+    tag: 0.1.1
+    pullPolicy: IfNotPresent
+
+  service:
+    port: 9104
+
+wesqlscale:
+  cell: "zone1"
+  image:
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/apecloud-mysql-scale
+    tag: "latest"
     pullPolicy: IfNotPresent

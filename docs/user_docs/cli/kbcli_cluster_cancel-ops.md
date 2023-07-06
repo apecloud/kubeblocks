@@ -2,7 +2,7 @@
 title: kbcli cluster cancel-ops
 ---
 
-cancel the pending/creating/running OpsRequest which type is vscale or hscale.
+Cancel the pending/creating/running OpsRequest which type is vscale or hscale.
 
 ```
 kbcli cluster cancel-ops NAME [flags]

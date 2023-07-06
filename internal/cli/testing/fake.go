@@ -77,6 +77,7 @@ func GetRandomStr() string {
 
 func FakeCluster(name, namespace string, conditions ...metav1.Condition) *appsv1alpha1.Cluster {
 	var replicas int32 = 1
+
 	return &appsv1alpha1.Cluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       types.KindCluster,
@@ -85,6 +86,7 @@ func FakeCluster(name, namespace string, conditions ...metav1.Condition) *appsv1
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
+			UID:       "b262b889-a27f-42d8-b066-2978561c8167",
 		},
 		Status: appsv1alpha1.ClusterStatus{
 			Phase: appsv1alpha1.RunningClusterPhase,
@@ -286,6 +288,17 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 					ConfigConstraintRef: "mysql8.0-config-constraints",
 				},
 			},
+			SwitchoverSpec: &appsv1alpha1.SwitchoverSpec{
+				WithCandidate: &appsv1alpha1.CmdExecutorConfig{
+					CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
+						Image: "",
+					},
+					CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
+						Command: []string{"mysql"},
+						Args:    []string{"-h$(KB_CONSENSUS_LEADER_POD_FQDN)", "-e $(KB_SWITCHOVER_ACTION)"},
+					},
+				},
+			},
 		},
 	}
 	return clusterDef
@@ -325,6 +338,7 @@ func FakeBackupTool() *dpv1alpha1.BackupTool {
 }
 
 func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPolicy {
+	ttl := "7d"
 	template := &dpv1alpha1.BackupPolicy{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
@@ -338,6 +352,46 @@ func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPo
 			},
 			Annotations: map[string]string{
 				constant.DefaultBackupPolicyAnnotationKey: "true",
+			},
+		},
+		Spec: dpv1alpha1.BackupPolicySpec{
+			Snapshot: &dpv1alpha1.SnapshotPolicy{
+				BasePolicy: dpv1alpha1.BasePolicy{
+					BackupsHistoryLimit: 1,
+				},
+			},
+			Datafile: &dpv1alpha1.CommonBackupPolicy{
+				BasePolicy: dpv1alpha1.BasePolicy{
+					BackupsHistoryLimit: 1,
+				},
+				PersistentVolumeClaim: dpv1alpha1.PersistentVolumeClaim{
+					Name: "test1",
+				},
+			},
+			Logfile: &dpv1alpha1.CommonBackupPolicy{
+				BasePolicy: dpv1alpha1.BasePolicy{
+					BackupsHistoryLimit: 1,
+				},
+				PersistentVolumeClaim: dpv1alpha1.PersistentVolumeClaim{
+					Name: "test1",
+				},
+			},
+			Schedule: dpv1alpha1.Schedule{
+				Snapshot: &dpv1alpha1.SchedulePolicy{
+					Enable:         false,
+					CronExpression: "0 18 * * *",
+				},
+				Datafile: &dpv1alpha1.SchedulePolicy{
+					Enable:         false,
+					CronExpression: "0 18 * * *",
+				},
+				Logfile: &dpv1alpha1.SchedulePolicy{
+					Enable:         false,
+					CronExpression: "* */1 * * *",
+				},
+			},
+			Retention: &dpv1alpha1.RetentionSpec{
+				TTL: &ttl,
 			},
 		},
 		Status: dpv1alpha1.BackupPolicyStatus{
@@ -356,6 +410,25 @@ func FakeBackup(backupName string) *dpv1alpha1.Backup {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      backupName,
 			Namespace: Namespace,
+		},
+	}
+	backup.SetCreationTimestamp(metav1.Now())
+	return backup
+}
+
+func FakeBackupWithCluster(cluster *appsv1alpha1.Cluster, backupName string) *dpv1alpha1.Backup {
+	backup := &dpv1alpha1.Backup{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: fmt.Sprintf("%s/%s", types.DPAPIGroup, types.DPAPIVersion),
+			Kind:       types.KindBackup,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      backupName,
+			Namespace: Namespace,
+			Labels: map[string]string{
+				constant.AppInstanceLabelKey:              cluster.Name,
+				constant.DataProtectionLabelClusterUIDKey: string(cluster.UID),
+			},
 		},
 	}
 	backup.SetCreationTimestamp(metav1.Now())
@@ -482,7 +555,12 @@ func FakeVolumeSnapshotClass() *snapshotv1.VolumeSnapshotClass {
 }
 
 func FakeKBDeploy(version string) *appsv1.Deployment {
-	deploy := &appsv1.Deployment{}
+	deploy := &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+	}
 	deploy.SetLabels(map[string]string{
 		"app.kubernetes.io/name": types.KubeBlocksChartName,
 	})
@@ -834,6 +912,22 @@ func FakePodChaos(name, namespace string) *chaosmeshv1alpha1.PodChaos {
 				},
 			},
 			Action: chaosmeshv1alpha1.PodKillAction,
+		},
+	}
+}
+
+func FakeEventForObject(name string, namespace string, object string) *corev1.Event {
+	return &corev1.Event{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Event",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		InvolvedObject: corev1.ObjectReference{
+			Name: object,
 		},
 	}
 }

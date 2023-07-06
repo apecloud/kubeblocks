@@ -1,30 +1,25 @@
 ---
-# Source: apecloud-mysql-cluster/templates/serviceaccount.yaml
+# Source: apecloud-mysql-cluster/templates/rbac.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: kb-mycluster-apecloud-mysql-cluster
+  name: kb-sa-mycluster
+  namespace: default
   labels:
-    
-    helm.sh/chart: apecloud-mysql-cluster-0.5.1-beta.0
-    app.kubernetes.io/name: apecloud-mysql-cluster
-    app.kubernetes.io/instance: mycluster
+    helm.sh/chart: apecloud-mysql-cluster-0.6.0-alpha.28
     app.kubernetes.io/version: "8.0.30"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: mycluster
 ---
-# Source: apecloud-mysql-cluster/templates/role.yaml
+# Source: apecloud-mysql-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: kb-mycluster-apecloud-mysql-cluster
+  name: kb-role-mycluster
   namespace: default
   labels:
-    
-    helm.sh/chart: apecloud-mysql-cluster-0.5.1-beta.0
-    app.kubernetes.io/name: apecloud-mysql-cluster
-    app.kubernetes.io/instance: mycluster
+    helm.sh/chart: apecloud-mysql-cluster-0.6.0-alpha.28
     app.kubernetes.io/version: "8.0.30"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: mycluster
 rules:
   - apiGroups:
       - ""
@@ -33,58 +28,62 @@ rules:
     verbs:
       - create
 ---
-# Source: apecloud-mysql-cluster/templates/rolebinding.yaml
+# Source: apecloud-mysql-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: kb-mycluster-apecloud-mysql-cluster
+  name: kb-rolebinding-mycluster
   labels:
-    
-    helm.sh/chart: apecloud-mysql-cluster-0.5.1-beta.0
-    app.kubernetes.io/name: apecloud-mysql-cluster
-    app.kubernetes.io/instance: mycluster
+    helm.sh/chart: apecloud-mysql-cluster-0.6.0-alpha.28
     app.kubernetes.io/version: "8.0.30"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: mycluster
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: kb-mycluster-apecloud-mysql-cluster
+  name: kb-role-mycluster
 subjects:
   - kind: ServiceAccount
-    name: kb-mycluster-apecloud-mysql-cluster
+    name: kb-sa-mycluster
     namespace: default
 ---
 # Source: apecloud-mysql-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mycluster-apecloud-mysql-cluster
+  name: mycluster
   labels: 
-    helm.sh/chart: apecloud-mysql-cluster-0.5.1-beta.0
-    app.kubernetes.io/name: apecloud-mysql-cluster
-    app.kubernetes.io/instance: mycluster
+    helm.sh/chart: apecloud-mysql-cluster-0.6.0-alpha.28
     app.kubernetes.io/version: "8.0.30"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: mycluster
 spec:
-  clusterDefinitionRef: apecloud-mysql  # ref clusterdefinition.name
-  clusterVersionRef: ac-mysql-8.0.30 # ref clusterversion.name
-  terminationPolicy: Delete
+  clusterVersionRef: ac-mysql-8.0.30
+  terminationPolicy: Delete  
   affinity:
-    topologyKeys: 
-      - kubernetes.io/hostname
+    podAntiAffinity: Preferred
+    tenancy: SharedNode
+  clusterDefinitionRef: apecloud-mysql # ref clusterdefinition.name
   componentSpecs:
-    - name: mysql # user-defined
-      componentDefRef: mysql # ref clusterdefinition componentDefs.name
-      monitor: false
-      replicas: 3
-      serviceAccountName: kb-mycluster-apecloud-mysql-cluster
-      enabledLogs:     ["slow","error"]
+    - name: mysql
+      componentDefRef: mysql # ref clusterdefinition componentDefs.name      
+      monitor: false      
+      replicas: 1
+      enabledLogs:
+        - slow
+        - error
+      serviceAccountName: kb-sa-mycluster      
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "1Gi"
+        requests:
+          cpu: "0.5"
+          memory: "1Gi"
       volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+        - name: data # ref clusterDefinition components.containers.volumeMounts.name
           spec:
-            storageClassName: 
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: 1Gi
+                storage: 20Gi      
+      services:

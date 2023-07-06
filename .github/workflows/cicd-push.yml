@@ -20,6 +20,7 @@ jobs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
     steps:
       - name: Cancel Previous Runs
+        if: github.ref_name != 'main'
         uses: styfle/cancel-workflow-action@0.11.0
         with:
           all_but_latest: true
@@ -187,7 +188,7 @@ jobs:
   check-image:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.2
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-manager-image"
@@ -195,14 +196,13 @@ jobs:
       VERSION: "check"
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
-      SYNC_ENABLE: false
-      APECD_REF: "v0.1.0"
+      APECD_REF: "v0.1.2"
     secrets: inherit
 
   check-tools-image:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.2
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-tools-image"
@@ -210,22 +210,20 @@ jobs:
       VERSION: "check"
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
-      SYNC_ENABLE: false
-      APECD_REF: "v0.1.0"
+      APECD_REF: "v0.1.2"
     secrets: inherit
 
   check-helm:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]') }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts-check.yml@v0.1.4
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "v0.4.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      PUSH_ENABLE: false
-      DEP_REPO: "helm dep update deploy/delphic"
-      APECD_REF: "v0.1.0"
+      DEP_REPO: "delphic|prometheus-cluster|apecloud-mysql-cluster|tdengine-cluster"
+      APECD_REF: "v0.1.4"
     secrets: inherit
 
   deploy-kubeblocks-io:

@@ -1,0 +1,130 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterDefinition
+metadata:
+  name: tdengine
+  labels:
+    {{- include "tdengine.labels" . | nindent 4 }}
+spec:
+  type: tdengine
+  connectionCredential:
+    username: {{ .Values.defaultAuth.username }}
+    password: {{ .Values.defaultAuth.password }}
+    endpoint: "$(SVC_FQDN):$(SVC_PORT_tdengine)"
+    host: "$(SVC_FQDN)"
+    port: "$(SVC_PORT_tdengine)"
+  componentDefs:
+    - name: tdengine
+      characterType: tdengine
+      workloadType: Stateful
+      service:
+        ports:
+          - name: taosd
+            port: 6030
+            protocol: TCP
+            targetPort: taosd
+          - name: taos-adapter
+            port: 6041
+            protocol: TCP
+            targetPort: taos-adapter
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: {{ .Values.metrics.service.port }}
+      configSpecs:
+        - name: tdengine-taos-config
+          templateRef: tdengine-config-template
+          constraintRef: tdengine-taos-config-constraints
+          volumeName: taos-config
+          namespace: {{ .Release.Namespace }}
+        - name: metrics-configuration
+          templateRef: metrics-configuration
+          namespace: {{ .Release.Namespace }}
+          volumeName: metrics-configuration
+          defaultMode: 0777
+      scriptSpecs:
+        - name: taos-adapter-scripts
+          templateRef: taos-adapter-scripts-template
+          namespace: {{ .Release.Namespace }}
+          volumeName: scripts
+          defaultMode: 493
+      podSpec:
+        containers:
+          - name: tdengine
+            imagePullPolicy: IfNotPresent
+            ports:
+              - name: taosd
+                containerPort: 6030
+              - name: taos-adapter
+                containerPort: 6041
+            env:
+              - name: SVC_PORT
+                value: "6030"
+              - name: TAOS_ADAPTER_PORT
+                value: "6041"
+              - name: TZ
+                value: {{ .Values.timeZone }}
+              - name: TAOS_FQDN
+                value: "$(KB_POD_FQDN).cluster.local"
+              - name: TAOS_FIRST_EP
+                value: "$(KB_0_HOSTNAME).$(KB_NAMESPACE).svc.cluster.local:$(SVC_PORT)"
+              - name: TAOS_ADAPTER_USERNAME
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: TAOS_ADAPTER_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+            lifecycle:
+              postStart:
+                exec:
+                  command: ["/bin/sh", "-c", "/scripts/taos-adapter-check.sh"]
+            readinessProbe:
+              tcpSocket:
+                port: 6030
+              initialDelaySeconds: 5
+              timeoutSeconds: 60
+            livenessProbe:
+              tcpSocket:
+                port: 6030
+              initialDelaySeconds: 15
+              periodSeconds: 20
+            volumeMounts:
+              - name: taos-config
+                mountPath: /etc/taos
+              - name: data
+                mountPath: /var/lib/taos
+              - name: scripts
+                mountPath: /scripts
+          - name: metrics
+            image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001
+            env:
+              - name: TAOS_KEEPER_TDENGINE_USERNAME
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: TAOS_KEEPER_TDENGINE_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+            command: ["taoskeeper"]
+            args: ["-c", "/etc/taos/taoskeeper.toml"]
+            ports:
+              - name: http-metrics
+                containerPort: {{ .Values.metrics.service.port }}
+            volumeMounts:
+              - name: metrics-configuration
+                mountPath: /etc/taos/

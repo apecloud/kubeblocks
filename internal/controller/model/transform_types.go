@@ -49,19 +49,9 @@ const (
 	STATUS = Action("STATUS")
 )
 
-const (
-	AppInstanceLabelKey            = "app.kubernetes.io/instance"
-	KBManagedByKey                 = "apps.kubeblocks.io/managed-by"
-	RoleLabelKey                   = "kubeblocks.io/role"
-	ConsensusSetAccessModeLabelKey = "cs.apps.kubeblocks.io/access-mode"
-)
-
-// RequeueDuration default reconcile requeue after duration
-var RequeueDuration = time.Millisecond * 100
-
-type GVKName struct {
-	gvk      schema.GroupVersionKind
-	ns, name string
+type GVKNObjKey struct {
+	schema.GroupVersionKind
+	client.ObjectKey
 }
 
 // ObjectVertex describes expected object spec and how to reach it
@@ -80,7 +70,7 @@ type ObjectVertex struct {
 	Action    *Action
 }
 
-func (v ObjectVertex) String() string {
+func (v *ObjectVertex) String() string {
 	if v.Action == nil {
 		return fmt.Sprintf("{obj:%T, name: %s, immutable: %v, orphan: %v, action: nil}",
 			v.Obj, v.Obj.GetName(), v.Immutable, v.IsOrphan)
@@ -89,7 +79,7 @@ func (v ObjectVertex) String() string {
 		v.Obj, v.Obj.GetName(), v.Immutable, v.IsOrphan, *v.Action)
 }
 
-type ObjectSnapshot map[GVKName]client.Object
+type ObjectSnapshot map[GVKNObjKey]client.Object
 
 type RequeueError interface {
 	RequeueAfter() time.Duration

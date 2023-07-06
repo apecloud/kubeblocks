@@ -34,7 +34,6 @@ import (
 	"github.com/spf13/pflag"
 	"golang.org/x/exp/maps"
 	"helm.sh/helm/v3/pkg/cli/values"
-	"helm.sh/helm/v3/pkg/repo"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,10 +54,10 @@ import (
 )
 
 const (
-	kMonitorParam    = "prometheus.enabled=%[1]t,grafana.enabled=%[1]t"
-	kNodeAffinity    = "affinity.nodeAffinity=%s"
-	kPodAntiAffinity = "affinity.podAntiAffinity=%s"
-	kTolerations     = "tolerations=%s"
+	kNodeAffinity                     = "affinity.nodeAffinity=%s"
+	kPodAntiAffinity                  = "affinity.podAntiAffinity=%s"
+	kTolerations                      = "tolerations=%s"
+	defaultTolerationsForInstallation = "kb-controller=true:NoSchedule"
 )
 
 type Options struct {
@@ -77,7 +76,6 @@ type Options struct {
 type InstallOptions struct {
 	Options
 	Version         string
-	Monitor         bool
 	Quiet           bool
 	CreateNamespace bool
 	Check           bool
@@ -143,7 +141,6 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		},
 	}
 
-	cmd.Flags().BoolVar(&o.Monitor, "monitor", true, "Auto install monitoring add-ons including prometheus, grafana and alertmanager-webhook-adaptor")
 	cmd.Flags().StringVar(&o.Version, "version", version.DefaultKubeBlocksVersion, "KubeBlocks version")
 	cmd.Flags().BoolVar(&o.CreateNamespace, "create-namespace", false, "Create the namespace if not present")
 	cmd.Flags().BoolVar(&o.Check, "check", true, "Check kubernetes environment before installation")
@@ -206,9 +203,6 @@ func (o *InstallOptions) PreCheck() error {
 		return err
 	}
 
-	// Todo: KubeBlocks maybe already installed but it's status could be Failed.
-	// For example: 'kbcli playground init' in windows will fail and try 'kbcli playground init' again immediately,
-	// kbcli will output SUCCESSFULLY, however the addon csi is still failed and KubeBlocks is not installed SUCCESSFULLY
 	if v.KubeBlocks != "" {
 		return fmt.Errorf("KubeBlocks %s already exists, repeated installation is not supported", v.KubeBlocks)
 	}
@@ -232,8 +226,6 @@ func (o *InstallOptions) PreCheck() error {
 
 func (o *InstallOptions) Install() error {
 	var err error
-	// add monitor parameters
-	o.ValueOpts.Values = append(o.ValueOpts.Values, fmt.Sprintf(kMonitorParam, o.Monitor))
 
 	// add pod anti-affinity
 	if o.PodAntiAffinity != "" || len(o.TopologyKeys) > 0 {
@@ -253,24 +245,23 @@ func (o *InstallOptions) Install() error {
 		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kNodeAffinity, string(nodeLabelsJSON)))
 	}
 
-	// parse tolerations and add to values
-	if len(o.TolerationsRaw) > 0 {
-		tolerations, err := util.BuildTolerations(o.TolerationsRaw)
-		if err != nil {
-			return err
-		}
-		tolerationsJSON, err := json.Marshal(tolerations)
-		if err != nil {
-			return err
-		}
-		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kTolerations, string(tolerationsJSON)))
+	// parse tolerations and add to values, the default tolerations are defined in var defaultTolerationsForInstallation
+	o.TolerationsRaw = append(o.TolerationsRaw, defaultTolerationsForInstallation)
+	tolerations, err := util.BuildTolerations(o.TolerationsRaw)
+	if err != nil {
+		return err
 	}
+	tolerationsJSON, err := json.Marshal(tolerations)
+	if err != nil {
+		return err
+	}
+	o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kTolerations, string(tolerationsJSON)))
 
 	// add helm repo
 	s := spinner.New(o.Out, spinnerMsg("Add and update repo "+types.KubeBlocksRepoName))
 	defer s.Fail()
 	// Add repo, if exists, will update it
-	if err = helm.AddRepo(&repo.Entry{Name: types.KubeBlocksRepoName, URL: util.GetHelmChartRepoURL()}); err != nil {
+	if err = helm.AddRepo(newHelmRepoEntry()); err != nil {
 		return err
 	}
 	s.Success()
@@ -401,7 +392,7 @@ func (o *InstallOptions) checkVersion(v util.Version) error {
 		if err != nil {
 			klog.V(1).Infof(err.Error())
 		}
-		return fmt.Errorf("version %s does not exist, please use \"kbcli kubeblocks list-versions --devel\" to show the available versions", o.Version)
+		return errors.Wrapf(err, "version %s does not exist, please use \"kbcli kubeblocks list-versions --devel\" to show the available versions", o.Version)
 	}
 
 	versionErr := fmt.Errorf("failed to get kubernetes version")
@@ -499,18 +490,6 @@ func (o *InstallOptions) printNotes() {
 -> Uninstall KubeBlocks:
     kbcli kubeblocks uninstall
 `)
-	if o.Monitor {
-		fmt.Fprint(o.Out, `
--> To view the monitoring add-ons web console:
-    kbcli dashboard list        # list all monitoring web consoles
-    kbcli dashboard open <name> # open the web console in the default browser
-`)
-	} else {
-		fmt.Fprint(o.Out, `
-Note: Monitoring add-ons are not installed.
-    Use 'kbcli addon enable <addon-name>' to install them later.
-`)
-	}
 }
 
 func (o *InstallOptions) buildChart() *helm.InstallOpts {

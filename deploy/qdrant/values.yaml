@@ -15,9 +15,12 @@ commonLabels: {}
 ## @param application images
 ##
 images:
+  registry: docker.io
+  repository: qdrant/qdrant
   pullPolicy: IfNotPresent
-  qdrant:
-    repository: docker.io/qdrant/qdrant
+  tag: latest
+  tools:
+    repository: apecloud/curl-jq
     tag: latest
 
 ## @param debugEnabled enables containers' debug logging

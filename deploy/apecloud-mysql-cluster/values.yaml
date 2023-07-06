@@ -34,7 +34,7 @@ requests:
 storage: 20
 
 ## @param proxyEnabled if true, enable the proxy
-## if mode is standalone or replication, proxyEnabled is always false
+## if mode is standalone, proxyEnabled is always false
 ## if mode is raftGroup, proxyEnabled can be true or false
 ##
 proxyEnabled: false

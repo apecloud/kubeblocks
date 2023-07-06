@@ -60,6 +60,20 @@ func cloudProviderRepoDir() (string, error) {
 	return filepath.Join(dir, cpDir), err
 }
 
+// cloudProviderRepoDirFromVersion cloud provider repo directory from kbcli version
+func cloudProviderRepoDirFromVersion(version string) (string, error) {
+	dir, err := playgroundDir()
+	if err != nil {
+		return "", err
+	}
+	major := strings.Split(version, "-")[0]
+	cpDir := cp.GitRepoName
+	if major != "" {
+		cpDir = fmt.Sprintf("%s-%s", cp.GitRepoName, version)
+	}
+	return filepath.Join(dir, cpDir), err
+}
+
 func initPlaygroundDir() (string, error) {
 	dir, err := playgroundDir()
 	if err != nil {

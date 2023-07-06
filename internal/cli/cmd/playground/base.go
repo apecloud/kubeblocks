@@ -26,8 +26,6 @@ import (
 	"time"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
-	"github.com/apecloud/kubeblocks/version"
-	gv "github.com/hashicorp/go-version"
 )
 
 type baseOptions struct {
@@ -58,20 +56,6 @@ func (o *baseOptions) validate() error {
 	o.prevCluster, err = readClusterInfoFromFile(o.stateFilePath)
 	if err != nil {
 		return err
-	}
-
-	// check the kbcli version
-	if o.prevCluster != nil && o.prevCluster.KbcliVersion != "" {
-		prev, err := gv.NewVersion(o.prevCluster.KbcliVersion)
-		fmt.Printf("failed to parse previous kbcli version %s, %v\n", o.prevCluster.KbcliVersion, err)
-
-		cur, err := gv.NewVersion(version.GetVersion())
-		fmt.Printf("failed to parse current kbcli version %s, %v\n", version.GitVersion, err)
-
-		// compare core version
-		if prev != nil && cur != nil && !prev.Core().Equal(cur.Core()) {
-			fmt.Printf("the playground cluster is created by kbcli %s, but the current kbcli version is %s, please use the same version of kbcli to manage the playground cluster", o.prevCluster.KbcliVersion, version.GetVersion())
-		}
 	}
 
 	// check existed cluster info

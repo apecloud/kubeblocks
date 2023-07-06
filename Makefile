@@ -67,6 +67,8 @@ LD_FLAGS="-s -w -X main.version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%
 local : ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
 ARCH ?= linux-amd64
 
+# build tags
+BUILD_TAGS="containers_image_openpgp"
 
 
 TAG_LATEST ?= false
@@ -124,8 +126,8 @@ all: manager kbcli probe reloader ## Make all cmd binaries.
 ##@ Development
 
 .PHONY: manifests
-manifests: test-go-generate generate ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./cmd/manager/...;./apis/...;./controllers/...;./internal/..." output:crd:artifacts:config=config/crd/bases
+manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./cmd/manager/...;./apis/...;./controllers/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
 	$(MAKE) client-sdk-gen
@@ -160,7 +162,7 @@ fmt: ## Run go fmt against code.
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	GOOS=$(GOOS) $(GO) vet -mod=mod ./...
+	GOOS=$(GOOS) $(GO) vet -tags $(BUILD_TAGS) -mod=mod ./...
 
 .PHONY: cue-fmt
 cue-fmt: cuetool ## Run cue fmt against code.
@@ -180,7 +182,7 @@ golangci-lint: golangci ## Run golangci-lint against code.
 
 .PHONY: staticcheck
 staticcheck: staticchecktool ## Run staticcheck against code.
-	$(STATICCHECK) ./...
+	$(STATICCHECK) -tags $(BUILD_TAGS) ./...
 
 .PHONY: build-checks
 build-checks: generate fmt vet goimports lint-fast ## Run build checks.
@@ -211,22 +213,22 @@ endif
 
 .PHONY: test-current-ctx
 test-current-ctx: manifests generate add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
-	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -p 1 -coverprofile cover.out $(TEST_PACKAGES)
+	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) -p 1 -coverprofile cover.out $(TEST_PACKAGES)
 
 .PHONY: test-fast
 test-fast: envtest
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -short -coverprofile cover.out $(TEST_PACKAGES)
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) -short -coverprofile cover.out $(TEST_PACKAGES)
 
 .PHONY: test
 test: manifests generate test-go-generate add-k8s-host test-fast ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 
 .PHONY: race
 race:
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -race $(TEST_PACKAGES)
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) -race $(TEST_PACKAGES)
 
 .PHONY: test-integration
 test-integration: manifests generate envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./test/integration
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) ./test/integration
 
 .PHONY: test-delve
 test-delve: manifests generate envtest ## Run tests.
@@ -265,7 +267,7 @@ CLI_LD_FLAGS ="-s -w \
 	-X github.com/apecloud/kubeblocks/version.DefaultKubeBlocksVersion=$(VERSION)"
 
 bin/kbcli.%: test-go-generate ## Cross build bin/kbcli.$(OS).$(ARCH).
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) CGO_ENABLED=0 $(GO) build -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) CGO_ENABLED=0 $(GO) build -tags $(BUILD_TAGS) -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
 
 .PHONY: kbcli-fast
 kbcli-fast: OS=$(shell $(GO) env GOOS)
@@ -303,9 +305,7 @@ clean-kbcli: ## Clean bin/kbcli*.
 
 .PHONY: kbcli-doc
 kbcli-doc: generate test-go-generate ## generate CLI command reference manual.
-	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
-
-
+	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 .PHONY: api-doc
 api-doc:  ## generate API reference manual.
@@ -316,7 +316,7 @@ api-doc:  ## generate API reference manual.
 
 .PHONY: manager
 manager: cue-fmt generate manager-go-generate test-go-generate build-checks ## Build manager binary.
-	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
+	$(GO) build -tags $(BUILD_TAGS) -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
 .PHONY: webhook-cert
@@ -351,26 +351,26 @@ endif
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	($(KUSTOMIZE) build config/crd | kubectl replace -f -) || ($(KUSTOMIZE) build config/crd | kubectl create -f -)
+	($(KUSTOMIZE) build -tags $(BUILD_TAGS) config/crd | kubectl replace -f -) || ($(KUSTOMIZE) build config/crd | kubectl create -f -)
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build -tags $(BUILD_TAGS) config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
+	$(KUSTOMIZE) build -tags $(BUILD_TAGS) config/default | kubectl apply -f -
 
 .PHONY: dry-run
 dry-run: manifests kustomize ## Dry-run deploy job.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	mkdir -p dry-run
-	$(KUSTOMIZE) build config/default > dry-run/manifests.yaml
+	$(KUSTOMIZE) build -tags $(BUILD_TAGS) config/default > dry-run/manifests.yaml
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build -tags $(BUILD_TAGS) config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 ##@ Contributor
 
@@ -394,7 +394,7 @@ fix-license-header: ## Run license header fix.
 
 ##@ Helm Chart Tasks
 
-bump-single-chart-appver.%: chart=$(word 2,$(subst ., ,$@))
+bump-single-chart-appver.%: chart=$*
 bump-single-chart-appver.%:
 ifeq ($(GOOS), darwin)
 	sed -i '' "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
@@ -402,7 +402,7 @@ else
 	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
 endif
 
-bump-single-chart-ver.%: chart=$(word 2,$(subst ., ,$@))
+bump-single-chart-ver.%: chart=$*
 bump-single-chart-ver.%:
 ifeq ($(GOOS), darwin)
 	sed -i '' "s/^version:.*/version: $(VERSION)/" deploy/$(chart)/Chart.yaml
@@ -434,7 +434,9 @@ bump-chart-ver: \
 	bump-single-chart-ver.qdrant-cluster \
 	bump-single-chart-ver.weaviate \
 	bump-single-chart-ver.weaviate-cluster \
-	bump-single-chart-ver.chatgpt-retrieval-plugin
+	bump-single-chart-ver.chatgpt-retrieval-plugin \
+	bump-single-chart-ver.tdengine \
+	bump-single-chart-ver.tdengine-cluster
 bump-chart-ver: ## Bump helm chart version.
 
 .PHONY: helm-package
@@ -595,7 +597,7 @@ render-smoke-testdata-manifests: ## Update E2E test dataset
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) -C test/e2e run
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

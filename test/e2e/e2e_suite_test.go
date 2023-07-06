@@ -52,6 +52,7 @@ var provider string
 var region string
 var secretID string
 var secretKey string
+var initEnv bool
 
 func init() {
 	viper.AutomaticEnv()
@@ -60,6 +61,7 @@ func init() {
 	flag.StringVar(&region, "REGION", "", "kubeblocks test region")
 	flag.StringVar(&secretID, "SECRET_ID", "", "cloud-provider SECRET_ID")
 	flag.StringVar(&secretKey, "SECRET_KEY", "", "cloud-provider SECRET_KEY")
+	flag.BoolVar(&initEnv, "INIT_ENV", false, "cloud-provider INIT_ENV")
 }
 
 func TestE2e(t *testing.T) {
@@ -99,6 +101,7 @@ var _ = BeforeSuite(func() {
 	}
 	log.Println("kb version:" + version)
 	Version = version
+	InitEnv = initEnv
 	if len(provider) > 0 && len(region) > 0 && len(secretID) > 0 && len(secretKey) > 0 {
 		Provider = provider
 		Region = region
@@ -152,11 +155,15 @@ var _ = AfterSuite(func() {
 })
 
 var _ = Describe("e2e test", func() {
-	var _ = Describe("KubeBlocks playground init", PlaygroundInit)
 
-	var _ = Describe("KubeBlocks uninstall", UninstallKubeblocks)
+	log.Println(initEnv)
+	if initEnv {
+		var _ = Describe("KubeBlocks playground init", PlaygroundInit)
 
-	var _ = Describe("Check healthy Kubernetes cluster status", EnvCheckTest)
+		var _ = Describe("KubeBlocks uninstall", UninstallKubeblocks)
+
+		var _ = Describe("Check healthy Kubernetes cluster status", EnvCheckTest)
+	}
 
 	var _ = Describe("KubeBlocks operator installation", InstallationTest)
 
@@ -166,5 +173,10 @@ var _ = Describe("e2e test", func() {
 
 	var _ = Describe("Check environment has been cleaned", EnvGotCleanedTest)
 
-	var _ = Describe("KubeBlocks playground destroy", PlaygroundDestroy)
+	if initEnv {
+		var _ = Describe("KubeBlocks playground destroy", PlaygroundDestroy)
+	}
+
+	var _ = Describe("save test report to s3", UploadReport)
+
 })

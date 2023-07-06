@@ -448,7 +448,7 @@ func (r *BackupPolicyReconciler) removeCronJobFinalizer(reqCtx intctrlutil.Reque
 func (r *BackupPolicyReconciler) reconcileCronJob(reqCtx intctrlutil.RequestCtx,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
 	basePolicy dataprotectionv1alpha1.BasePolicy,
-	cronExpression string,
+	schedulePolicy *dataprotectionv1alpha1.SchedulePolicy,
 	backType dataprotectionv1alpha1.BackupType) error {
 	// get cronjob from labels
 	cronJob := &batchv1.CronJob{}
@@ -465,8 +465,7 @@ func (r *BackupPolicyReconciler) reconcileCronJob(reqCtx intctrlutil.RequestCtx,
 	} else if len(cronJobList.Items) > 0 {
 		cronJob = &cronJobList.Items[0]
 	}
-
-	if len(cronExpression) == 0 {
+	if schedulePolicy == nil || !schedulePolicy.Enable {
 		if len(cronJob.Name) != 0 {
 			// delete the old cronjob.
 			if err := r.removeCronJobFinalizer(reqCtx, cronJob); err != nil {
@@ -477,20 +476,25 @@ func (r *BackupPolicyReconciler) reconcileCronJob(reqCtx intctrlutil.RequestCtx,
 		// if no cron expression, return
 		return nil
 	}
-	cronjobProto, err := r.buildCronJob(backupPolicy, basePolicy.Target, cronExpression, backType, cronJob.Name)
+	cronjobProto, err := r.buildCronJob(backupPolicy, basePolicy.Target, schedulePolicy.CronExpression, backType, cronJob.Name)
 	if err != nil {
 		return err
 	}
 
+	if backupPolicy.Spec.Schedule.StartWindowMinutes != nil {
+		startingDeadlineSeconds := *backupPolicy.Spec.Schedule.StartWindowMinutes * 60
+		cronjobProto.Spec.StartingDeadlineSeconds = &startingDeadlineSeconds
+	}
 	if len(cronJob.Name) == 0 {
 		// if no cronjob, create it.
 		return r.Client.Create(reqCtx.Ctx, cronjobProto)
 	}
 	// sync the cronjob with the current backup policy configuration.
 	patch := client.MergeFrom(cronJob.DeepCopy())
+	cronJob.Spec.StartingDeadlineSeconds = cronjobProto.Spec.StartingDeadlineSeconds
 	cronJob.Spec.JobTemplate.Spec.BackoffLimit = &basePolicy.OnFailAttempted
 	cronJob.Spec.JobTemplate.Spec.Template = cronjobProto.Spec.JobTemplate.Spec.Template
-	cronJob.Spec.Schedule = cronExpression
+	cronJob.Spec.Schedule = schedulePolicy.CronExpression
 	return r.Client.Patch(reqCtx.Ctx, cronJob, patch)
 }
 
@@ -498,15 +502,14 @@ func (r *BackupPolicyReconciler) reconcileCronJob(reqCtx intctrlutil.RequestCtx,
 func (r *BackupPolicyReconciler) handlePolicy(reqCtx intctrlutil.RequestCtx,
 	backupPolicy *dataprotectionv1alpha1.BackupPolicy,
 	basePolicy dataprotectionv1alpha1.BasePolicy,
-	cronExpression string,
+	schedulePolicy *dataprotectionv1alpha1.SchedulePolicy,
 	backType dataprotectionv1alpha1.BackupType) error {
 
 	if err := r.reconfigure(reqCtx, backupPolicy, basePolicy, backType); err != nil {
 		return err
 	}
 	// create/delete/patch cronjob workload
-	if err := r.reconcileCronJob(reqCtx, backupPolicy, basePolicy,
-		cronExpression, backType); err != nil {
+	if err := r.reconcileCronJob(reqCtx, backupPolicy, basePolicy, schedulePolicy, backType); err != nil {
 		return err
 	}
 	return r.removeOldestBackups(reqCtx, backupPolicy.Name, backType, basePolicy.BackupsHistoryLimit)
@@ -520,13 +523,8 @@ func (r *BackupPolicyReconciler) handleSnapshotPolicy(
 		// TODO delete cronjob if exists
 		return nil
 	}
-	var cronExpression string
-	schedule := backupPolicy.Spec.Schedule.Snapshot
-	if schedule != nil && schedule.Enable {
-		cronExpression = schedule.CronExpression
-	}
 	return r.handlePolicy(reqCtx, backupPolicy, backupPolicy.Spec.Snapshot.BasePolicy,
-		cronExpression, dataprotectionv1alpha1.BackupTypeSnapshot)
+		backupPolicy.Spec.Schedule.Snapshot, dataprotectionv1alpha1.BackupTypeSnapshot)
 }
 
 // handleDatafilePolicy handles datafile policy.
@@ -537,14 +535,9 @@ func (r *BackupPolicyReconciler) handleDatafilePolicy(
 		// TODO delete cronjob if exists
 		return nil
 	}
-	var cronExpression string
-	schedule := backupPolicy.Spec.Schedule.Datafile
-	if schedule != nil && schedule.Enable {
-		cronExpression = schedule.CronExpression
-	}
 	r.setGlobalPersistentVolumeClaim(backupPolicy.Spec.Datafile)
 	return r.handlePolicy(reqCtx, backupPolicy, backupPolicy.Spec.Datafile.BasePolicy,
-		cronExpression, dataprotectionv1alpha1.BackupTypeDataFile)
+		backupPolicy.Spec.Schedule.Datafile, dataprotectionv1alpha1.BackupTypeDataFile)
 }
 
 // handleLogFilePolicy handles logfile policy.
@@ -559,17 +552,16 @@ func (r *BackupPolicyReconciler) handleLogfilePolicy(
 	if err != nil {
 		return err
 	}
-	schedule := backupPolicy.Spec.Schedule.Logfile
-	var cronExpression string
-	if schedule != nil && schedule.Enable {
-		cronExpression = schedule.CronExpression
-	}
 	r.setGlobalPersistentVolumeClaim(logfile)
+	schedule := backupPolicy.Spec.Schedule.Logfile
 	if backupTool.Spec.DeployKind == dataprotectionv1alpha1.DeployKindStatefulSet {
+		var cronExpression string
+		if schedule != nil && schedule.Enable {
+			cronExpression = schedule.CronExpression
+		}
 		return r.reconcileForStatefulSetKind(reqCtx.Ctx, backupPolicy, dataprotectionv1alpha1.BackupTypeLogFile, cronExpression)
 	}
-	return r.handlePolicy(reqCtx, backupPolicy, logfile.BasePolicy,
-		cronExpression, dataprotectionv1alpha1.BackupTypeLogFile)
+	return r.handlePolicy(reqCtx, backupPolicy, logfile.BasePolicy, schedule, dataprotectionv1alpha1.BackupTypeLogFile)
 }
 
 // setGlobalPersistentVolumeClaim sets global config of pvc to common policy.

@@ -531,7 +531,7 @@ parameters:
 			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
 				g.Expect(pvc).ShouldNot(BeNil())
 			})).Should(Succeed())
-			return
+			return backup, pvcName
 		}
 
 		It("should create a PVC in Backup's namespace (in default namespace)", func() {

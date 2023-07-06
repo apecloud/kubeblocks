@@ -3,7 +3,7 @@ annotations:
 apiVersion: v2
 name: apecloud-mysql-cluster
 type: application
-version: 0.6.0-alpha.21
+version: 0.6.0-alpha.28
 description: ApeCloud MySQL is a database that is compatible with MySQL syntax and achieves high availability
   through the utilization of the RAFT consensus protocol.
 dependencies:

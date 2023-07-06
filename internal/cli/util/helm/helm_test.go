@@ -119,7 +119,7 @@ var _ = Describe("helm util", func() {
 		})
 
 		It("should fail when release is not found", func() {
-			Expect(releaseNotFound(o.Upgrade(cfg))).Should(BeTrue())
+			Expect(ReleaseNotFound(o.Upgrade(cfg))).Should(BeTrue())
 			Expect(o.Uninstall(cfg)).Should(HaveOccurred()) // release not found
 		})
 

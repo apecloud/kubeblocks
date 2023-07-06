@@ -20,10 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"fmt"
+	"strings"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
-	resource "k8s.io/apimachinery/pkg/api/resource"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
@@ -40,422 +41,155 @@ var _ = Describe("ComponentRef Fields Tests", func() {
 	const mysqlCompName = "mysql"
 	const referredCompName = "maxscale"
 
-	Context("test getReferredComponent", func() {
+	Context("test fieldRef", func() {
 		var clusterDefBuilder *testapps.MockClusterDefFactory
 		var clusterBuilder *testapps.MockClusterFactory
 
 		BeforeEach(func() {
-			By("create cluster definition")
-			clusterDefBuilder = testapps.NewClusterDefFactory(clusterDefName)
-			// add one component definition
-			clusterDefBuilder = clusterDefBuilder.AddComponentDef(testapps.StatefulMySQLComponent, referredCompDefName)
+			By("create cluster definition builder")
+			clusterDefBuilder = testapps.NewClusterDefFactory(clusterDefName).
+				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
+				AddComponentDef(testapps.StatefulMySQLComponent, referredCompDefName)
+
 			// add one mysql component
 			clusterDefBuilder = clusterDefBuilder.AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName)
 
-			By("create cluster")
+			By("create cluste builder")
 			clusterBuilder = testapps.NewClusterFactory(clusterNamespace, clusterName, clusterDefName, clusterVersionName)
 		})
 
-		It("get component from empty cluster, should fail", func() {
+		It("test fieldref", func() {
 			clusterDef := clusterDefBuilder.GetObject()
+
+			By("add one component to cluster")
+			clusterBuilder = clusterBuilder.AddComponent(mysqlCompName, mysqlCompDefName).AddComponent(referredCompName, referredCompDefName)
 			cluster := clusterBuilder.GetObject()
-			Expect(cluster.Spec.ComponentSpecs).To(BeEmpty())
-			selector := ""
-			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("not found"))
-			Expect(compSpec).To(BeNil())
-			Expect(compDefSpec).To(BeNil())
-		})
 
-		It("get component with invalid name, should fail", func() {
-			clusterDef := clusterDefBuilder.GetObject()
-			cluster := clusterBuilder.AddComponent(mysqlCompDefName, mysqlCompDefName).GetObject()
-			Expect(cluster.Spec.ComponentSpecs).To(HaveLen(1))
+			componentDef := clusterDef.GetComponentDefByName(referredCompDefName)
+			Expect(componentDef).NotTo(BeNil())
+			components := cluster.Spec.GetDefNameMappingComponents()[referredCompDefName]
+			Expect(len(components)).To(Equal(1))
 
-			selector := ""
-			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("not found"))
-			Expect(compSpec).To(BeNil())
-			Expect(compDefSpec).To(BeNil())
-		})
-
-		It("get component with valid name, should pass", func() {
-			clusterDef := clusterDefBuilder.GetObject()
-			cluster := clusterBuilder.AddComponent(mysqlCompName, mysqlCompDefName).
-				AddComponent(referredCompName, referredCompDefName).GetObject()
-			Expect(cluster.Spec.ComponentSpecs).To(HaveLen(2))
-			selector := ""
-			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
+			By("lookup component name, should success")
+			valueFrom := &appsv1alpha1.ComponentValueFrom{
+				Type:      appsv1alpha1.FromFieldRef,
+				FieldPath: "$.components[0].name",
+			}
+			value, err := resolveFieldRef(valueFrom, components, componentDef)
 			Expect(err).To(BeNil())
-			Expect(compSpec).NotTo(BeNil())
-			Expect(compDefSpec).NotTo(BeNil())
-			Expect(compSpec.Name).To(Equal(referredCompName))
-			Expect(compDefSpec.Name).To(Equal(referredCompDefName))
-		})
+			Expect(value).To(Equal(referredCompName))
 
-		It("get component with invalid componentDef name, should fail", func() {
-			clusterDef := clusterDefBuilder.GetObject()
-			cluster := clusterBuilder.AddComponent(mysqlCompName, mysqlCompDefName).
-				AddComponent(referredCompName, referredCompDefName).GetObject()
-			Expect(cluster.Spec.ComponentSpecs).To(HaveLen(2))
-			selector := "some-invalid-comp"
-			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("not found"))
-			Expect(compSpec).To(BeNil())
-			Expect(compDefSpec).To(BeNil())
-		})
-
-		It("get component with valid componentDef name, should pass", func() {
-			clusterDef := clusterDefBuilder.GetObject()
-			cluster := clusterBuilder.AddComponent(mysqlCompName, mysqlCompDefName).
-				AddComponent(referredCompName, referredCompDefName).GetObject()
-			Expect(cluster.Spec.ComponentSpecs).To(HaveLen(2))
-
-			selector := referredCompDefName
-			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
+			By("lookup componentSpec name, should success")
+			valueFrom = &appsv1alpha1.ComponentValueFrom{
+				Type:      appsv1alpha1.FromFieldRef,
+				FieldPath: "$.componentDef.name",
+			}
+			value, err = resolveFieldRef(valueFrom, components, componentDef)
 			Expect(err).To(BeNil())
-			Expect(compSpec).NotTo(BeNil())
-			Expect(compDefSpec).NotTo(BeNil())
-			Expect(compSpec.Name).To(Equal(referredCompName))
-			Expect(compDefSpec.Name).To(Equal(referredCompDefName))
+			Expect(value).To(Equal(referredCompDefName))
+
+			By("invalid json path, should fail")
+			valueFrom = &appsv1alpha1.ComponentValueFrom{
+				Type:      appsv1alpha1.FromFieldRef,
+				FieldPath: "$.invalidField.name",
+			}
+			_, err = resolveFieldRef(valueFrom, components, componentDef)
+			Expect(err).ShouldNot(BeNil())
 		})
 
-		It("get component with inconsistent componentDef and comp name, should fail", func() {
+		It("test invalid serviceRef with no service", func() {
 			clusterDef := clusterDefBuilder.GetObject()
-			cluster := clusterBuilder.AddComponent(mysqlCompName, mysqlCompDefName).
-				AddComponent(referredCompName, referredCompDefName).GetObject()
-			Expect(cluster.Spec.ComponentSpecs).To(HaveLen(2))
-			selector := referredCompDefName
-			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("not match"))
-			Expect(compSpec).To(BeNil())
-			Expect(compDefSpec).To(BeNil())
+
+			By("add one component to cluster")
+			clusterBuilder = clusterBuilder.AddComponent(mysqlCompName, mysqlCompDefName).AddComponent(referredCompName, referredCompDefName)
+			cluster := clusterBuilder.GetObject()
+
+			componentDef := clusterDef.GetComponentDefByName(referredCompDefName)
+			Expect(componentDef).NotTo(BeNil())
+			components := cluster.Spec.GetDefNameMappingComponents()[referredCompDefName]
+			Expect(len(components)).To(Equal(1))
+
+			By("lookup service name, should fail")
+			_, err := resolveServiceRef(cluster.Name, components, componentDef)
+			if componentDef.Service != nil {
+				Expect(err).To(BeNil())
+			} else {
+				Expect(err).NotTo(BeNil())
+				Expect(err.Error()).To(ContainSubstring("does not have service"))
+			}
 		})
 
-		It("get component with consistent componentDef and comp name, should pass", func() {
+		It("test invalid serviceRef with multiple components", func() {
 			clusterDef := clusterDefBuilder.GetObject()
-			cluster := clusterBuilder.AddComponent(mysqlCompName, mysqlCompDefName).
-				AddComponent(referredCompName, referredCompDefName).GetObject()
-			Expect(cluster.Spec.ComponentSpecs).To(HaveLen(2))
 
-			selector := referredCompDefName
-			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
-			Expect(err).To(BeNil())
-			Expect(compSpec).NotTo(BeNil())
-			Expect(compDefSpec).NotTo(BeNil())
-			Expect(compSpec.Name).To(Equal(referredCompName))
-			Expect(compDefSpec.Name).To(Equal(referredCompDefName))
-		})
-
-		It("get component with multi-occurrence componentDef name, should fail", func() {
-			clusterDef := clusterDefBuilder.GetObject()
-			cluster := clusterBuilder.AddComponent(mysqlCompName, mysqlCompDefName).
+			By("add one component to cluster")
+			clusterBuilder = clusterBuilder.
+				AddComponent(mysqlCompName, mysqlCompDefName).
 				AddComponent(referredCompName, referredCompDefName).
-				// add another component with same componentDef name
-				AddComponent("some-dup-comp", referredCompDefName).GetObject()
-			Expect(cluster.Spec.ComponentSpecs).To(HaveLen(3))
-
-			selector := referredCompDefName
-			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("found multiple components"))
-			Expect(compSpec).To(BeNil())
-			Expect(compDefSpec).To(BeNil())
-		})
-
-		It("get component with multi-occurrence componentDef name, should fail", func() {
-			clusterDef := clusterDefBuilder.GetObject()
-			cluster := clusterBuilder.AddComponent(mysqlCompName, mysqlCompDefName).
-				AddComponent(referredCompName, referredCompDefName).GetObject()
-
-			selector := ""
-			compSpec, compDefSpec, err := getReferredComponent(clusterDef, cluster, selector)
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("must specify either componentName or componentDefName"))
-			Expect(compSpec).To(BeNil())
-			Expect(compDefSpec).To(BeNil())
-		})
-	})
-
-	Context("test service port", func() {
-		It("search test port", func() {
-			portName := "test-port"
-			port := int32(3306)
-			mockSvcSpec := &appsv1alpha1.ServiceSpec{
-				Ports: []appsv1alpha1.ServicePort{
-					{
-						Name: portName,
-						Port: port,
-					},
-				},
-			}
-			svcPort, err := getServicePort(mockSvcSpec, portName)
-			Expect(err).To(BeNil())
-			Expect(svcPort.Port).To(Equal(port))
-
-			svcPort, err = getServicePort(mockSvcSpec, "invalid-port-name")
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).To(ContainSubstring("not found"))
-			Expect(svcPort).To(BeNil())
-		})
-	})
-
-	Context("test extract field path", func() {
-
-		It("test extract field path", func() {
-			compSpec := &appsv1alpha1.ClusterComponentSpec{}
-			By("get invalid path, should fail")
-			_, err := extractFieldPathAsString(compSpec, "some-path")
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).To(ContainSubstring("not supported"))
-
-			By("get primary index, should fail")
-			_, err = extractFieldPathAsString(compSpec, "primaryIndex")
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).To(ContainSubstring("primaryIndex not set"))
-
-			By("get replicas, should pass")
-			path, err := extractFieldPathAsString(compSpec, "replicas")
-			Expect(err).To(BeNil())
-			Expect(path).To(Equal("0"))
-
-			compSpec.Replicas = 3
-			path, err = extractFieldPathAsString(compSpec, "replicas")
-			Expect(err).To(BeNil())
-			Expect(path).To(Equal("3"))
-
-			By("get name, should pass")
-			compSpec.Name = "test-name"
-			path, err = extractFieldPathAsString(compSpec, "name")
-			Expect(err).To(BeNil())
-			Expect(path).To(Equal("test-name"))
-		})
-	})
-	Context("test resource field path", func() {
-		var comp *appsv1alpha1.ClusterComponentSpec
-
-		BeforeEach(func() {
-			// prepare component spec
-			comp = &appsv1alpha1.ClusterComponentSpec{
-				Replicas: 3,
-				Name:     "test-name",
-			}
-		})
-
-		type reousrceTestCase struct {
-			fields   string
-			expected string
-		}
-
-		It("test regular resources", func() {
-			comp.Resources = corev1.ResourceRequirements{
-				Limits: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("1"),
-					corev1.ResourceMemory: resource.MustParse("1Gi"),
-				},
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("500m"),
-					corev1.ResourceMemory: resource.MustParse("512Mi"),
-				},
-			}
-
-			testCases := []reousrceTestCase{
-				{
-					fields:   "limits.cpu",
-					expected: "1",
-				},
-				{
-					fields:   "limits.memory",
-					expected: "1073741824",
-				},
-				{
-					fields:   "requests.cpu",
-					expected: "1",
-				},
-				{
-					fields:   "requests.memory",
-					expected: "536870912",
-				},
-			}
-
-			resourceFieldRef := &appsv1alpha1.ComponentResourceFieldRef{
-				EnvName: "test-container",
-			}
-			for _, test := range testCases {
-				resourceFieldRef.Resource = test.fields
-				path, err := extractComponentResourceValue(resourceFieldRef, comp)
-				Expect(err).To(BeNil())
-				Expect(path).To(Equal(test.expected))
-			}
-		})
-
-		It("test hugepage resources", func() {
-			comp.Resources = corev1.ResourceRequirements{
-				Limits: corev1.ResourceList{
-					corev1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("1"),
-					corev1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi"),
-				},
-				Requests: corev1.ResourceList{
-					corev1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("0.5"),
-					corev1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
-				},
-			}
-
-			testCases := []reousrceTestCase{
-				{
-					fields:   "limits." + corev1.ResourceHugePagesPrefix + "2Mi",
-					expected: "1",
-				},
-				{
-					fields:   "limits." + corev1.ResourceHugePagesPrefix + "1Gi",
-					expected: "2147483648",
-				},
-				{
-					fields:   "requests." + corev1.ResourceHugePagesPrefix + "2Mi",
-					expected: "1",
-				},
-				{
-					fields:   "requests." + corev1.ResourceHugePagesPrefix + "1Gi",
-					expected: "1073741824",
-				},
-			}
-
-			resourceFieldRef := &appsv1alpha1.ComponentResourceFieldRef{
-				EnvName: "test-container",
-			}
-			for _, test := range testCases {
-				resourceFieldRef.Resource = test.fields
-				path, err := extractComponentResourceValue(resourceFieldRef, comp)
-				Expect(err).To(BeNil())
-				Expect(path).To(Equal(test.expected))
-			}
-		})
-	})
-
-	Context("test buildComponentEnv", func() {
-		var clusterDefBuilder *testapps.MockClusterDefFactory
-		var clusterBuilder *testapps.MockClusterFactory
-		var componentRef *appsv1alpha1.ComponentRef
-
-		BeforeEach(func() {
-			By("create cluster definition")
-			clusterDefBuilder = testapps.NewClusterDefFactory(clusterDefName)
-			// add one component definition
-			clusterDefBuilder = clusterDefBuilder.AddComponentDef(testapps.StatefulMySQLComponent, referredCompDefName)
-			clusterDefBuilder = clusterDefBuilder.AddNamedServicePort("maxscale", 3306)
-			// add one mysql component definition
-			clusterDefBuilder = clusterDefBuilder.AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName)
-
-			By("create cluster")
-			clusterBuilder = testapps.NewClusterFactory(clusterNamespace, clusterName, clusterDefName, clusterVersionName).
-				AddComponent(mysqlCompName, mysqlCompDefName)
-			clusterBuilder = clusterBuilder.AddComponent(referredCompName, referredCompDefName).SetResources(corev1.ResourceRequirements{
-				Limits: corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("1"),
-					corev1.ResourceMemory: resource.MustParse("1Gi"),
-				},
-			})
-
-			componentRef = &appsv1alpha1.ComponentRef{
-
-				ComponentDefName: referredCompDefName,
-
-				FieldRefs: []*appsv1alpha1.ComponentFieldRef{
-					{
-						EnvName:   "MAXSCALE_REPLICAS",
-						FieldPath: "replicas",
-					},
-					{
-						EnvName:   "MAXSCALE_COMP_NAME",
-						FieldPath: "name",
-					},
-				},
-				ServiceRefs: []*appsv1alpha1.ComponentServiceRef{
-					{
-						EnvName:     "MAXSCALE_SVC",
-						ServiceName: "maxscale",
-					},
-				},
-				ResourceFieldRefs: []*appsv1alpha1.ComponentResourceFieldRef{
-					{
-						EnvName:  "MAXSCALE_CPU_LIMIT",
-						Resource: "limits.cpu",
-					},
-				},
-			}
-		})
-
-		It("build componentRef info from ClusterDef", func() {
-			clusterDef := clusterDefBuilder.GetObject()
+				// add component one more time
+				AddComponent("oneMoreComp", referredCompDefName)
 			cluster := clusterBuilder.GetObject()
-			component := &SynthesizedComponent{}
 
-			clusterCompDef := clusterDef.GetComponentDefByName(mysqlCompDefName)
-			Expect(clusterCompDef).NotTo(BeNil())
-			Expect(clusterCompDef.ComponentRef).To(HaveLen(0))
-			clusterComp := cluster.Spec.GetComponentByName(mysqlCompName)
-			Expect(clusterComp).NotTo(BeNil())
-			Expect(clusterComp.ComponentRef).To(HaveLen(0))
+			componentDef := clusterDef.GetComponentDefByName(referredCompDefName)
+			Expect(componentDef).NotTo(BeNil())
+			components := cluster.Spec.GetDefNameMappingComponents()[referredCompDefName]
+			Expect(len(components)).To(Equal(2))
 
-			// append component ref to cluster definition
-			clusterCompDef.ComponentRef = append(clusterCompDef.ComponentRef, componentRef)
-			err := buildComponentRef(clusterDef, cluster, clusterCompDef, clusterComp, component)
-			Expect(err).To(BeNil())
-			Expect(component.ComponentRefEnvs).NotTo(BeEmpty())
-			Expect(component.ComponentRefEnvs).To(HaveLen(6))
-
+			By("lookup service name, should fail")
+			_, err := resolveServiceRef(cluster.Name, components, componentDef)
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(ContainSubstring("expect one component but got"))
 		})
 
-		It("build componentRef info from ClusterComponent", func() {
-			clusterDef := clusterDefBuilder.GetObject()
+		It("test serviceRef with correct setting", func() {
+			clusterDef := clusterDefBuilder.AddNamedServicePort("mysql", 3306).GetObject()
+
+			By("add one component to cluster")
+			clusterBuilder = clusterBuilder.
+				AddComponent(mysqlCompName, mysqlCompDefName).
+				AddComponent(referredCompName, referredCompDefName)
 			cluster := clusterBuilder.GetObject()
-			component := &SynthesizedComponent{}
 
-			clusterCompDef := clusterDef.GetComponentDefByName(mysqlCompDefName)
-			Expect(clusterCompDef).NotTo(BeNil())
-			Expect(clusterCompDef.ComponentRef).To(HaveLen(0))
-			clusterComp := cluster.Spec.GetComponentByName(mysqlCompName)
-			Expect(clusterComp).NotTo(BeNil())
-			Expect(clusterComp.ComponentRef).To(HaveLen(0))
+			componentDef := clusterDef.GetComponentDefByName(referredCompDefName)
+			Expect(componentDef).NotTo(BeNil())
+			components := cluster.Spec.GetDefNameMappingComponents()[referredCompDefName]
+			Expect(len(components)).To(Equal(1))
 
-			// append component ref to cluster definition
-			clusterComp.ComponentRef = append(clusterComp.ComponentRef, componentRef)
-			err := buildComponentRef(clusterDef, cluster, clusterCompDef, clusterComp, component)
+			By("lookup service name, should fail")
+			value, err := resolveServiceRef(cluster.Name, components, componentDef)
 			Expect(err).To(BeNil())
-			Expect(component.ComponentRefEnvs).NotTo(BeEmpty())
-			Expect(component.ComponentRefEnvs).To(HaveLen(6))
+			Expect(value).To(Equal(fmt.Sprintf("%s-%s", cluster.Name, referredCompName)))
 		})
 
-		It("build componentRef info overrides ClusterCompDef", func() {
+		It("test headlessServiceSvc", func() {
 			clusterDef := clusterDefBuilder.GetObject()
+
+			By("add one component to cluster")
+			var replicas int32 = 3
+			clusterBuilder = clusterBuilder.
+				AddComponent(mysqlCompName, mysqlCompDefName).
+				AddComponent(referredCompName, referredCompDefName).SetReplicas(replicas)
 			cluster := clusterBuilder.GetObject()
-			component := &SynthesizedComponent{}
 
-			clusterCompDef := clusterDef.GetComponentDefByName(mysqlCompDefName)
-			Expect(clusterCompDef).NotTo(BeNil())
-			Expect(clusterCompDef.ComponentRef).To(HaveLen(0))
-			clusterComp := cluster.Spec.GetComponentByName(mysqlCompName)
-			Expect(clusterComp).NotTo(BeNil())
-			Expect(clusterComp.ComponentRef).To(HaveLen(0))
+			componentDef := clusterDef.GetComponentDefByName(referredCompDefName)
+			Expect(componentDef).NotTo(BeNil())
 
-			clusterCompDef.ComponentRef = append(clusterCompDef.ComponentRef, componentRef.DeepCopy())
-			// append component ref to cluster definition
-			compRefCopy := componentRef.DeepCopy()
-			compRefCopy.ResourceFieldRefs = append(compRefCopy.ResourceFieldRefs, &appsv1alpha1.ComponentResourceFieldRef{
-				EnvName:  "MAXSCALE_CPU_REQUEST",
-				Resource: "requests.cpu",
-			})
-			compRefCopy.FieldRefs = nil
-			compRefCopy.ServiceRefs = nil
-			clusterComp.ComponentRef = append(clusterComp.ComponentRef, compRefCopy)
+			components := cluster.Spec.GetDefNameMappingComponents()[referredCompDefName]
+			Expect(len(components)).To(Equal(1))
 
-			err := buildComponentRef(clusterDef, cluster, clusterCompDef, clusterComp, component)
-			Expect(err).To(BeNil())
-			Expect(component.ComponentRefEnvs).To(HaveLen(2))
+			By("construct headless service name")
+			valueFrom := &appsv1alpha1.ComponentValueFrom{
+				Type:     appsv1alpha1.FromHeadlessServiceRef,
+				Format:   "",
+				JoinWith: "",
+			}
+
+			value := resolveHeadlessServiceFieldRef(valueFrom, cluster, components)
+			addrs := strings.Split(value, ",")
+			Expect(len(addrs)).To(Equal(int(replicas)))
+			for i, addr := range addrs {
+				Expect(addr).To(Equal(fmt.Sprintf("%s-%s-%d.%s-%s-headless.%s.svc", cluster.Name, referredCompName, i, cluster.Name, referredCompName, cluster.Namespace)))
+			}
 		})
 	})
 })

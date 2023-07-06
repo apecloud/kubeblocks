@@ -22,16 +22,14 @@ package component
 import (
 	"bytes"
 	"fmt"
-	"html/template"
-	"reflect"
 	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	jsonpath "k8s.io/client-go/util/jsonpath"
 	klog "k8s.io/klog/v2"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 func buildComponentRef(clusterDef *appsv1alpha1.ClusterDefinition,
@@ -40,232 +38,134 @@ func buildComponentRef(clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterComp *appsv1alpha1.ClusterComponentSpec,
 	component *SynthesizedComponent) error {
 
-	compRef := clusterCompDef.ComponentRef
-	if len(compRef) == 0 {
+	compRefs := clusterCompDef.ComponentRef
+	if len(compRefs) == 0 {
 		return nil
 	}
 
-	component.ComponentRefEnvs = make([]corev1.EnvVar, 0)
-	for _, compRef := range compRef {
-		if compRef == nil {
-			continue
-		}
-		selector := compRef.ComponentDefName
-		// get referenced component by componentDefName and componentName
-		referredComponent, referredComponentDef, err := getReferredComponent(clusterDef, cluster, selector)
-		if err != nil {
+	component.ComponentRefEnvs = make([]*corev1.EnvVar, 0)
+
+	for _, compRef := range compRefs {
+		referredComponentDef := clusterDef.GetComponentDefByName(compRef.ComponentDefName)
+		referredComponents := cluster.Spec.GetDefNameMappingComponents()[compRef.ComponentDefName]
+
+		if referredComponentDef == nil || len(referredComponents) == 0 {
+			err := fmt.Errorf("failes to match %s in cluster %s", compRef.ComponentDefName, cluster.Name)
 			if compRef.FailurePolicy == appsv1alpha1.FailurePolicyFail {
 				return err
 			} else {
-				klog.Errorf("ComponentSelector: %s failes to match,", selector)
+				klog.V(1).Info(err.Error())
 				continue
 			}
 		}
 
-		if envs, err := resolveFieldRefs(compRef.FieldRefs, referredComponent); err != nil {
-			return err
-		} else {
-			component.ComponentRefEnvs = append(component.ComponentRefEnvs, envs...)
+		envMap := make(map[string]string)
+		for _, refEnv := range compRef.ComponentRefEnvs {
+			env := &corev1.EnvVar{Name: refEnv.Name}
+			var err error
+			if len(refEnv.Value) != 0 {
+				env.Value = refEnv.Value
+			} else if refEnv.ValueFrom != nil {
+				switch refEnv.ValueFrom.Type {
+				case appsv1alpha1.FromFieldRef:
+					if env.Value, err = resolveFieldRef(refEnv.ValueFrom, referredComponents, referredComponentDef); err != nil {
+						return err
+					}
+				case appsv1alpha1.FromServiceRef:
+					if env.Value, err = resolveServiceRef(cluster.Name, referredComponents, referredComponentDef); err != nil {
+						return err
+					}
+				case appsv1alpha1.FromHeadlessServiceRef:
+					env.Value = resolveHeadlessServiceFieldRef(refEnv.ValueFrom, cluster, referredComponents)
+				}
+			}
+
+			component.ComponentRefEnvs = append(component.ComponentRefEnvs, env)
+			envMap[env.Name] = env.Value
 		}
 
-		if envs, err := resolveServiceFieldRefs(compRef.ServiceRefs, cluster, referredComponent, referredComponentDef); err != nil {
-			return err
-		} else {
-			component.ComponentRefEnvs = append(component.ComponentRefEnvs, envs...)
-		}
-
-		if envs, err := resolveHeadlessServiceFieldRefs(compRef.HeadlessServiceRefs, cluster, referredComponent, referredComponentDef); err != nil {
-			return err
-		} else {
-			component.ComponentRefEnvs = append(component.ComponentRefEnvs, envs...)
-		}
-
-		if envs, err := resolveResourceFieldRefs(compRef.ResourceFieldRefs, referredComponent); err != nil {
-			return err
-		} else {
-			component.ComponentRefEnvs = append(component.ComponentRefEnvs, envs...)
+		// for each env in componentRefEnvs, resolve reference
+		for _, env := range component.ComponentRefEnvs {
+			val := env.Value
+			for k, v := range envMap {
+				val = strings.ReplaceAll(val, fmt.Sprintf("$(%s)", k), v)
+			}
+			env.Value = val
 		}
 	}
 	return nil
 }
 
-func resolveFieldRefs(fieldRefs []*appsv1alpha1.ComponentFieldRef,
-	referredComponent *appsv1alpha1.ClusterComponentSpec) ([]corev1.EnvVar, error) {
-	if len(fieldRefs) == 0 {
-		return nil, nil
-	}
-
-	envs := make([]corev1.EnvVar, 0)
-	for _, fieldRef := range fieldRefs {
-		fieldPath := fieldRef.FieldPath
-		envName := fieldRef.EnvName
-		value, err := extractFieldPathAsString(referredComponent, fieldPath)
-		if err != nil {
-			return nil, err
-		}
-		envs = append(envs, corev1.EnvVar{Name: envName, Value: value})
-	}
-	return envs, nil
+type referredObject struct {
+	ComponentDef *appsv1alpha1.ClusterComponentDefinition `json:"componentDef"`
+	Components   []appsv1alpha1.ClusterComponentSpec      `json:"components"`
 }
 
-func resolveServiceFieldRefs(serviceRefs []*appsv1alpha1.ComponentServiceRef,
-	cluster *appsv1alpha1.Cluster,
-	referredComponent *appsv1alpha1.ClusterComponentSpec,
-	referredComponentDef *appsv1alpha1.ClusterComponentDefinition) ([]corev1.EnvVar, error) {
-	if len(serviceRefs) == 0 {
-		return nil, nil
+func resolveFieldRef(valueFrom *appsv1alpha1.ComponentValueFrom, components []appsv1alpha1.ClusterComponentSpec, componentDef *appsv1alpha1.ClusterComponentDefinition) (string, error) {
+	referred := referredObject{
+		ComponentDef: componentDef,
+		Components:   components,
 	}
 
-	envs := make([]corev1.EnvVar, 0)
-	for _, svcref := range serviceRefs {
-		envNamePrefix := svcref.EnvName
-		serviceName := svcref.ServiceName
-		svcPort, err := getServicePort(referredComponentDef.Service, serviceName)
-		if err != nil {
-			return nil, err
-		}
-		// append component svc name
-		envs = append(envs, corev1.EnvVar{Name: envNamePrefix + "_NAME", Value: fmt.Sprintf("%s-%s", cluster.Name, referredComponent.Name)})
-		// append component svc port
-		envs = append(envs, corev1.EnvVar{Name: envNamePrefix + "_PORT", Value: strconv.Itoa(int(svcPort.Port))})
+	if value, err := retrieveValueByJSONPath(referred, valueFrom.FieldPath); err != nil {
+		return "", err
+	} else {
+		return string(value), nil
 	}
-	return envs, nil
 }
 
-type headlessSvc struct {
-	Hostname string `json:"hostname"`
-	FQDN     string `json:"fqdn"`
-	Port     int32  `json:"port"`
-	Ordinal  int32  `json:"ordinal"`
+func resolveServiceRef(clusterName string, components []appsv1alpha1.ClusterComponentSpec, componentDef *appsv1alpha1.ClusterComponentDefinition) (string, error) {
+	if componentDef.Service == nil {
+		return "", fmt.Errorf("componentDef %s does not have service", componentDef.Name)
+	}
+	if len(components) != 1 {
+		return "", fmt.Errorf("expect one component but got %d for componentDef %s", len(components), componentDef.Name)
+	}
+	return fmt.Sprintf("%s-%s", clusterName, components[0].Name), nil
 }
 
-func resolveHeadlessServiceFieldRefs(serviceRefs []*appsv1alpha1.ComponentHeadlessServiceRef,
-	cluster *appsv1alpha1.Cluster,
-	referredComponent *appsv1alpha1.ClusterComponentSpec,
-	referredComponentDef *appsv1alpha1.ClusterComponentDefinition) ([]corev1.EnvVar, error) {
-	if len(serviceRefs) == 0 {
-		return nil, nil
+func resolveHeadlessServiceFieldRef(valueFrom *appsv1alpha1.ComponentValueFrom,
+	cluster *appsv1alpha1.Cluster, components []appsv1alpha1.ClusterComponentSpec) string {
+
+	preDefineVars := []string{"POD_NAME", "POD_FQDN", "POD_ORDINAL"}
+
+	format := valueFrom.Format
+	if len(format) == 0 {
+		format = "$(POD_FQDN)"
+	}
+	joinWith := valueFrom.JoinWith
+	if len(joinWith) == 0 {
+		joinWith = ","
 	}
 
-	envs := make([]corev1.EnvVar, 0)
 	hosts := make([]string, 0)
-	for _, svcref := range serviceRefs {
-		envNamePrefix := svcref.EnvName
-		portName := svcref.PortName
-		containerName := svcref.ContainerName
+	for _, comp := range components {
+		for i := int32(0); i < comp.Replicas; i++ {
+			qualifiedName := fmt.Sprintf("%s-%s", cluster.Name, comp.Name)
+			podOrdinal := strconv.Itoa(int(i))
+			podName := fmt.Sprintf("%s-%s", qualifiedName, podOrdinal)
+			podFQDN := fmt.Sprintf("%s.%s-headless.%s.svc", podName, qualifiedName, cluster.Namespace)
 
-		port, err := getContainerPort(referredComponentDef, containerName, portName)
-		if err != nil {
-			return nil, err
+			valuesToReplace := []string{podName, podFQDN, podOrdinal}
+
+			host := format
+			for idx, preDefineVar := range preDefineVars {
+				host = strings.ReplaceAll(host, "$("+preDefineVar+")", valuesToReplace[idx])
+			}
+			hosts = append(hosts, host)
 		}
-
-		for i := int32(0); i < referredComponent.Replicas; i++ {
-			if svcref.Top != nil && *svcref.Top != 0 && i >= *svcref.Top {
-				break
-			}
-
-			headlessSvc := headlessSvc{
-				Hostname: fmt.Sprintf("%s-%s-%d", cluster.Name, referredComponent.Name, i),
-				FQDN:     fmt.Sprintf("%s-%s-%d.%s-%s-headless.%s.svc", cluster.Name, referredComponent.Name, i, cluster.Name, referredComponent.Name, cluster.Namespace),
-				Port:     port.ContainerPort,
-				Ordinal:  i,
-			}
-
-			tmpl, err := template.New("headlessSvc").Parse(svcref.Format)
-			if err != nil {
-				return nil, err
-			}
-
-			var buf bytes.Buffer
-			if err = tmpl.Execute(&buf, headlessSvc); err != nil {
-				return nil, err
-			} else {
-				hosts = append(hosts, buf.String())
-			}
-		}
-		envs = append(envs, corev1.EnvVar{Name: envNamePrefix, Value: strings.Join(hosts, svcref.JoinWith)})
 	}
-	return envs, nil
+	return strings.Join(hosts, joinWith)
 }
 
-func resolveResourceFieldRefs(resourceFieldRefs []*appsv1alpha1.ComponentResourceFieldRef,
-	referredComponent *appsv1alpha1.ClusterComponentSpec) ([]corev1.EnvVar, error) {
-	if len(resourceFieldRefs) == 0 {
-		return nil, nil
+func retrieveValueByJSONPath(jsonObj interface{}, jpath string) ([]byte, error) {
+	path := jsonpath.New("jsonpath")
+	if err := path.Parse(fmt.Sprintf("{%s}", jpath)); err != nil {
+		return nil, fmt.Errorf("failed to parse jsonpath %s", jpath)
 	}
-	envs := make([]corev1.EnvVar, 0)
-	for _, resourceFieldRef := range resourceFieldRefs {
-		envName := resourceFieldRef.EnvName
-		envValue, err := extractComponentResourceValue(resourceFieldRef, referredComponent)
-		if err != nil {
-			return nil, err
-		}
-		envs = append(envs, corev1.EnvVar{Name: envName, Value: envValue})
+	buff := bytes.NewBuffer([]byte{})
+	if err := path.Execute(buff, jsonObj); err != nil {
+		return nil, fmt.Errorf("failed to execute jsonpath %s", jpath)
 	}
-	return envs, nil
-}
-
-func getReferredComponent(clusterDef *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster, compDefName string) (*appsv1alpha1.ClusterComponentSpec, *appsv1alpha1.ClusterComponentDefinition, error) {
-	if len(compDefName) > 0 {
-		mapping := cluster.Spec.GetDefNameMappingComponents()
-		if comps, ok := mapping[compDefName]; ok {
-			if len(comps) > 1 {
-				return nil, nil, fmt.Errorf("componentDef %s found multiple components", compDefName)
-			}
-			return &comps[0], clusterDef.GetComponentDefByName(compDefName), nil
-		} else {
-			return nil, nil, fmt.Errorf("componentDef %s not found", compDefName)
-		}
-	}
-	return nil, nil, fmt.Errorf("must specify either componentName or componentDefName")
-}
-
-func getServicePort(serviceSpec *appsv1alpha1.ServiceSpec, serviceName string) (*appsv1alpha1.ServicePort, error) {
-	if serviceSpec == nil {
-		return nil, fmt.Errorf("serviceSpec is nil")
-	}
-	for _, svc := range serviceSpec.Ports {
-		if svc.Name == serviceName {
-			return &svc, nil
-		}
-	}
-	return nil, fmt.Errorf("service %s not found", serviceName)
-}
-
-func getContainerPort(referredComponentDef *appsv1alpha1.ClusterComponentDefinition,
-	containerName, portName string) (*corev1.ContainerPort, error) {
-	if referredComponentDef == nil {
-		return nil, fmt.Errorf("referredComponentDef is nil")
-	}
-	idx, container := intctrlutil.GetContainerByName(referredComponentDef.PodSpec.Containers, containerName)
-	if idx < 0 {
-		return nil, fmt.Errorf("container %s not found", containerName)
-	}
-	for _, port := range container.Ports {
-		if port.Name == portName {
-			return &port, nil
-		}
-	}
-	return nil, fmt.Errorf("port %s not found", portName)
-}
-
-// extractFieldPathAsString extracts fieldPath value from referredComponent
-func extractFieldPathAsString(object *appsv1alpha1.ClusterComponentSpec, fieldPath string) (string, error) {
-	// get field value by fieldPath
-	value := reflect.ValueOf(*object).FieldByName(fieldPath)
-	if !value.IsValid() {
-		return "", fmt.Errorf("fieldPath %s not found", fieldPath)
-	}
-	switch value.Kind() {
-	case reflect.Bool:
-		return strconv.FormatBool(value.Bool()), nil
-	case reflect.String:
-		return value.String(), nil
-	case reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return strconv.Itoa(int(value.Int())), nil
-	case reflect.Float32, reflect.Float64:
-		return strconv.FormatFloat(value.Float(), 'f', -1, 64), nil
-	default:
-		return "", fmt.Errorf("fieldPath %s is not string, int32 or bool", fieldPath)
-	}
+	return buff.Bytes(), nil
 }

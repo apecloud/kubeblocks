@@ -21,7 +21,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -368,106 +367,12 @@ type ClusterComponentDefinition struct {
 	// in particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
 	// +optional
 	SwitchoverSpec *SwitchoverSpec `json:"switchoverSpec,omitempty"`
-	// componentRef is used to select the component to be referenced.
+	// componentRef is used to inject values from other components into the current component.
+	// values will be saved and updated in a configmap and mounted to the current component.
+	// +patchMergeKey=componentDefName
+	// +patchStrategy=merge,retainKeys
 	// +optional
-	ComponentRef []*ComponentRef `json:"componentRef,omitempty"`
-}
-
-// FailurePolicyType specifies the type of failure policy
-type FailurePolicyType string
-
-const (
-	// Ignore means that an error will be ignored but logged.
-	FailurePolicyIgnore FailurePolicyType = "Ignore"
-	// ReportError means that an error will be reported.
-	FailurePolicyFail FailurePolicyType = "Fail"
-)
-
-// ComponentRef is used to select the component and its fields to be referenced.
-type ComponentRef struct {
-	// componentDefName is the name of the componentDef to select.
-	// +optional
-	ComponentDefName string `json:"componentDefName,omitempty"`
-	// failurePolicy is the failure policy of the component.
-	// If failed to find the component, the failure policy will be used.
-	// +optional
-	// +default=Ignore
-	FailurePolicy FailurePolicyType `json:"failurePolicy,omitempty"`
-	// fieldRefs is the field of the component to select.
-	// +optional
-	FieldRefs []*ComponentFieldRef `json:"fieldRefs,omitempty"`
-	// serviceFieldRef is the field of the service to select.
-	// +optional
-	ServiceRefs []*ComponentServiceRef `json:"serviceRef,omitempty"`
-	// headlessServiceFieldRef is the field of the headless service to select.
-	// +optional
-	HeadlessServiceRefs []*ComponentHeadlessServiceRef `json:"headlessServiceRef,omitempty"`
-	// resourceFieldRef is the field of the resource to select.
-	// +optional
-	ResourceFieldRefs []*ComponentResourceFieldRef `json:"resourceFieldRefs,omitempty"`
-}
-
-// ComponentFieldRef is used to select the field of the component to be referenced.
-type ComponentFieldRef struct {
-	// envName is the name of the env to be injected.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern=`^[-._a-zA-Z][-._a-zA-Z0-9]*$`
-	EnvName string `json:"envName"`
-	// fieldPath is the field of the component to select.
-	// +kubebuilder:validation:Required
-	FieldPath string `json:"fieldPath"`
-}
-
-// ComponentResourceFieldRef is used to select the field of the resource to be referenced.
-type ComponentResourceFieldRef struct {
-	// envName is the name of the env to be injected.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern=`^[-._a-zA-Z][-._a-zA-Z0-9]*$`
-	EnvName string `json:"envName"`
-	// resource to select
-	// +kubebuilder:validation:Required
-	Resource string `json:"resource"`
-	// divisor specifies the output format of the exposed resources, defaults to "1"
-	// +optional
-	Divisor resource.Quantity `json:"divisor,omitempty"`
-}
-
-// ComponentServiceRef is used to select service to be referenced.
-type ComponentServiceRef struct {
-	// envNamePrefix is the prefix of the env to be injected.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern=`^[-._a-zA-Z][-._a-zA-Z0-9]*$`
-	EnvName string `json:"envName"`
-	// serviceName is the name of the service to select.
-	// +kubebuilder:validation:Required
-	ServiceName string `json:"name"`
-}
-
-type ComponentHeadlessServiceRef struct {
-	// envNamePrefix is the prefix of the env to be injected.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern=`^[-._a-zA-Z][-._a-zA-Z0-9]*$`
-	EnvName string `json:"envName"`
-	// PortName is the name of the port to select.
-	// +kubebuilder:validation:Required
-	PortName string `json:"portName"`
-	// containerName is the name of the container to select.
-	// +kubebuilder:validation:Required
-	ContainerName string `json:"containerName"`
-	// format is the format of the values to be organized.
-	// there are four build-int values: {{.Hostname}}, {{.Port}}, {{.FQDN}}, {{.Ordinal}}.
-	// + optional
-	// + default: "{{.Hostname}}:{{.Port}}"
-	Format string `json:"format,omitempty"`
-	// joinWith is the string to join the values.
-	// + optional
-	// + default: ","
-	JoinWith string `json:"joinWith,omitempty"`
-	// top is the number of the top elements to select.
-	// 0 for all elements.
-	// +optional
-	// +default: 0
-	Top *int32 `json:"top,omitempty"`
+	ComponentRef []ComponentRef `json:"componentRef,omitempty" patchStrategy:"merge" patchMergeKey:"componentDefName"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
@@ -1045,4 +950,77 @@ func (r *ClusterDefinition) GetComponentDefByName(compDefName string) *ClusterCo
 		}
 	}
 	return nil
+}
+
+// FailurePolicyType specifies the type of failure policy
+type FailurePolicyType string
+
+const (
+	// Ignore means that an error will be ignored but logged.
+	FailurePolicyIgnore FailurePolicyType = "Ignore"
+	// ReportError means that an error will be reported.
+	FailurePolicyFail FailurePolicyType = "Fail"
+)
+
+type ComponentValueFromType string
+
+const (
+	FromFieldRef           ComponentValueFromType = "FieldRef"
+	FromServiceRef         ComponentValueFromType = "ServiceRef"
+	FromHeadlessServiceRef ComponentValueFromType = "HeadlessServiceRef"
+)
+
+// ComponentRef is used to select the component and its fields to be referenced.
+type ComponentRef struct {
+	// componentDefName is the name of the componentDef to select.
+	// +kubebuilder:validation:Required
+	ComponentDefName string `json:"componentDefName,omitempty"`
+	// failurePolicy is the failure policy of the component.
+	// If failed to find the component, the failure policy will be used.
+	// +kubebuilder:validation:Enum={Ignore,Fail}
+	// +default="Ignore"
+	// +optional
+	FailurePolicy FailurePolicyType `json:"failurePolicy,omitempty"`
+	// componentRefEnv specifies a list of values to be injected as env variables to each component.
+	// +kbubebuilder:validation:Required
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +optional
+	ComponentRefEnvs []*ComponentRefEnv `json:"componentRefEnv" patchStrategy:"merge" patchMergeKey:"name"`
+}
+
+// ComponentRefEnv specifies name and value of an env.
+type ComponentRefEnv struct {
+	// name is the name of the env to be injected.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[-._a-zA-Z][-._a-zA-Z0-9]*$`
+	Name string `json:"name"`
+	// value is the value of the env to be injected.
+	// +optional
+	Value string `json:"value,omitempty"`
+	// valueFrom specifies the source of the env to be injected.
+	// +optional
+	ValueFrom *ComponentValueFrom `json:"valueFrom,omitempty"`
+}
+
+type ComponentValueFrom struct {
+	// type is the type of the source to select. There are three types: `FieldRef`, `ServiceRef`, `HeadlessServiceRef`.
+	// +kubebuilder:validation:Enum={FieldRef,ServiceRef,HeadlessServiceRef}
+	// +kubebuilder:validation:Required
+	Type ComponentValueFromType `json:"type"`
+	// fieldRef is the jsonpath of the source to select when type is `FieldRef`.
+	// there are two objects registered in the jsonpath: `componentDef` and `components`.
+	// componentDef is the component definition object specified in `componentRef.componentDefName`.
+	// components is the component list objects referring to the component definition object.
+	// + optional
+	FieldPath string `json:"fieldPath,omitempty"`
+	// format is the format of each headless service address.
+	// there are three buildin values: $POD_ORDINAL, $POD_FQDN, $POD_NAME
+	// + optional
+	// + default: "$POD_FQDN"
+	Format string `json:"format,omitempty"`
+	// joinWith is the string to join the values of headless service addresses.
+	// + optional
+	// + default: ","
+	JoinWith string `json:"joinWith,omitempty"`
 }

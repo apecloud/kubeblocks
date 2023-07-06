@@ -271,9 +271,9 @@ func (factory *MockClusterDefFactory) AddComponentRef(ref *appsv1alpha1.Componen
 		return factory
 	}
 	if len(comp.ComponentRef) == 0 {
-		comp.ComponentRef = make([]*appsv1alpha1.ComponentRef, 0)
+		comp.ComponentRef = make([]appsv1alpha1.ComponentRef, 0)
 	}
-	comp.ComponentRef = append(comp.ComponentRef, ref)
+	comp.ComponentRef = append(comp.ComponentRef, *ref)
 	return factory
 }
 

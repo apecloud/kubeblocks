@@ -1,33 +1,27 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: nebula-graphd-scripts-template
+  name: nebula-storaged-scripts
   labels:
     {{- include "nebula.labels" . | nindent 4 }}
 data:
-  nebula-graphd-start.sh: |
-    {{- .Files.Get "scripts/nebula-graphd-start.sh.tpl" | nindent 4 }}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nebula-metad-scripts-template
-  labels:
-    {{- include "nebula.labels" . | nindent 4 }}
-data:
-  nebula-metad-start.sh: |
-    {{- .Files.Get "scripts/nebula-metad-start.sh.tpl" | nindent 4 }}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: nebula-storaged-scripts-template
-  labels:
-    {{- include "nebula.labels" . | nindent 4 }}
-data:
-  nebula-storaged-start.sh: |
-    {{- .Files.Get "scripts/nebula-storaged-start.sh.tpl" | nindent 4 }}
   pre-stop.sh: |
-    {{- .Files.Get "scripts/nebula-console-prestop.sh.tpl" | nindent 4 }}
+    #!/bin/sh
+    idx=${KB_POD_NAME##*-}
+    current_component_replicas=`cat /etc/annotations/component-replicas`
+    if [ ! $idx -lt $current_component_replicas ] && [ $current_component_replicas -ne 0 ]; then
+      storagedhost=$(echo DROP HOSTS \"$KB_POD_FQDN.cluster.local\":9779)
+      touch /tmp/nebula-storaged-hosts
+      echo DROP HOSTS \"$KB_POD_FQDN.cluster.local\":9779 > /tmp/nebula-storaged-hosts
+      exec /usr/local/bin/nebula-console --addr $GRAPHD_SVC_NAME --port $GRAPHD_SVC_PORT --user root --password nebula -f /tmp/nebula-storaged-hosts
+      rm /tmp/nebula-storaged-hosts
+    fi
   post-start.sh: |
-    {{- .Files.Get "scripts/nebula-console-poststart.sh.tpl" | nindent 4 }}
+    #!/bin/sh
+    echo "Waiting for graphd service $GRAPHD_SVC_NAME to be ready..."
+    until /usr/local/bin/nebula-console --addr $GRAPHD_SVC_NAME --port $GRAPHD_SVC_PORT --user root --password nebula -e "show spaces"; do sleep 2; done
+    touch  /tmp/nebula-storaged-hosts
+    echo ADD HOSTS \"$KB_POD_FQDN.cluster.local\":9779 > /tmp/nebula-storaged-hosts
+    exec /usr/local/bin/nebula-console --addr $GRAPHD_SVC_NAME --port $GRAPHD_SVC_PORT --user root --password nebula -f /tmp/nebula-storaged-hosts
+    rm /tmp/nebula-storaged-hosts
+    echo "Start Console succeeded!"

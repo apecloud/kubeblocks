@@ -56,7 +56,7 @@ func (m *nebula) ConnectCommand(connectInfo *AuthInfo) []string {
 		userPass = connectInfo.UserPasswd
 	}
 
-	nebulaCmd := []string{fmt.Sprintf("%s --addr $NEBULA_GRAPHD_SVC_NAME --port $NEBULA_GRAPHD_SVC_PORT --user %s --password %s", m.info.Client, userName, userPass)}
+	nebulaCmd := []string{fmt.Sprintf("%s --addr $GRAPHD_SVC_NAME --port $GRAPHD_SVC_PORT --user %s --password %s", m.info.Client, userName, userPass)}
 
 	return []string{"sh", "-c", strings.Join(nebulaCmd, " ")}
 }

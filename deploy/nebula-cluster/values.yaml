@@ -7,11 +7,12 @@ nebula:
   storageClassName: ""
   ## @param nebula.terminationPolicy, temination policy for nebula-cluster
   terminationPolicy: Delete
+
   console:
-    ## @param nebula.graph.replicas, number of nebula-graph instances
-    ## in a nebula-graph cluster, all nebula-graphd instances are independent
+    ## @param nebula.console.replicas, number of nebula-console instances
+    ## in a nebula-graph cluster
     replicas: 1
-    ## @param nebula.graphd.resources
+    ## @param nebula.console.resources
     ## resource management
     ## more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
     resources:
@@ -42,7 +43,7 @@ nebula:
   metad:
     ## @param nebula.metad.replicas, number of nebula-graph instances
     ## in a nebula-graph cluter, nebula-metad instances form a raft group
-    replicas: 1
+    replicas: 3
     ## @param nebula.metad.resources
     ## resource management
     ## more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
@@ -56,11 +57,11 @@ nebula:
     ## @param nebula.metad.logStorage
     logStorage: "500Mi"
     ## @param nebula.metad.dataStorage
-    dataStorage: "2Gi"
+    dataStorage: "1Gi"
   storaged:
     ## @param nebula.storaged.replicas, number of nebula-graph instances
     ## in a nebula-graph cluter, nebula-storaged instances form a raft group
-    replicas: 1
+    replicas: 3
     ## @param nebula.storaged.resources
     ## resource management
     ## more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
@@ -74,4 +75,4 @@ nebula:
     ## @param nebula.metad.logStorage
     logStorage: "500Mi"
     ## @param nebula.metad.dataStorage
-    dataStorage: "10Gi"
+    dataStorage: "1Gi"

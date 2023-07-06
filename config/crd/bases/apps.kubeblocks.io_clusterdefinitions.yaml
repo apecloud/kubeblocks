@@ -65,8 +65,9 @@ spec:
                         characterType when builtIn is true.
                       type: string
                     componentRef:
-                      description: componentRef is used to select the component to
-                        be referenced.
+                      description: componentRef is used to inject values from other
+                        components into the current component. values will be saved
+                        and updated in a configmap and mounted to the current component.
                       items:
                         description: ComponentRef is used to select the component
                           and its fields to be referenced.
@@ -75,119 +76,67 @@ spec:
                             description: componentDefName is the name of the componentDef
                               to select.
                             type: string
+                          componentRefEnv:
+                            description: componentRefEnv specifies a list of values
+                              to be injected as env variables to each component.
+                            items:
+                              description: ComponentRefEnv specifies name and value
+                                of an env.
+                              properties:
+                                name:
+                                  description: name is the name of the env to be injected.
+                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
+                                  type: string
+                                value:
+                                  description: value is the value of the env to be
+                                    injected.
+                                  type: string
+                                valueFrom:
+                                  description: valueFrom specifies the source of the
+                                    env to be injected.
+                                  properties:
+                                    fieldPath:
+                                      description: 'fieldRef is the jsonpath of the
+                                        source to select when type is `FieldRef`.
+                                        there are two objects registered in the jsonpath:
+                                        `componentDef` and `components`. componentDef
+                                        is the component definition object specified
+                                        in `componentRef.componentDefName`. components
+                                        is the component list objects referring to
+                                        the component definition object.'
+                                      type: string
+                                    format:
+                                      description: 'format is the format of each headless
+                                        service address. there are three buildin values:
+                                        $POD_ORDINAL, $POD_FQDN, $POD_NAME'
+                                      type: string
+                                    joinWith:
+                                      description: joinWith is the string to join
+                                        the values of headless service addresses.
+                                      type: string
+                                    type:
+                                      description: type is the type of the source
+                                        to select.
+                                      enum:
+                                      - FieldRef
+                                      - ServiceRef
+                                      - HeadlessServiceRef
+                                      type: string
+                                  required:
+                                  - type
+                                  type: object
+                              required:
+                              - name
+                              type: object
+                            type: array
                           failurePolicy:
                             description: failurePolicy is the failure policy of the
                               component. If failed to find the component, the failure
                               policy will be used.
+                            enum:
+                            - Ignore
+                            - Fail
                             type: string
-                          fieldRefs:
-                            description: fieldRefs is the field of the component to
-                              select.
-                            items:
-                              description: ComponentFieldRef is used to select the
-                                field of the component to be referenced.
-                              properties:
-                                envName:
-                                  description: envName is the name of the env to be
-                                    injected.
-                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
-                                  type: string
-                                fieldPath:
-                                  description: fieldPath is the field of the component
-                                    to select.
-                                  type: string
-                              required:
-                              - envName
-                              - fieldPath
-                              type: object
-                            type: array
-                          headlessServiceRef:
-                            description: headlessServiceFieldRef is the field of the
-                              headless service to select.
-                            items:
-                              properties:
-                                containerName:
-                                  description: containerName is the name of the container
-                                    to select.
-                                  type: string
-                                envName:
-                                  description: envNamePrefix is the prefix of the
-                                    env to be injected.
-                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
-                                  type: string
-                                format:
-                                  description: 'format is the format of the values
-                                    to be organized. there are four build-int values:
-                                    {{.Hostname}}, {{.Port}}, {{.FQDN}}, {{.Ordinal}}.'
-                                  type: string
-                                joinWith:
-                                  description: joinWith is the string to join the
-                                    values.
-                                  type: string
-                                portName:
-                                  description: PortName is the name of the port to
-                                    select.
-                                  type: string
-                                top:
-                                  description: top is the number of the top elements
-                                    to select. 0 for all elements.
-                                  format: int32
-                                  type: integer
-                              required:
-                              - containerName
-                              - envName
-                              - portName
-                              type: object
-                            type: array
-                          resourceFieldRefs:
-                            description: resourceFieldRef is the field of the resource
-                              to select.
-                            items:
-                              description: ComponentResourceFieldRef is used to select
-                                the field of the resource to be referenced.
-                              properties:
-                                divisor:
-                                  anyOf:
-                                  - type: integer
-                                  - type: string
-                                  description: divisor specifies the output format
-                                    of the exposed resources, defaults to "1"
-                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                  x-kubernetes-int-or-string: true
-                                envName:
-                                  description: envName is the name of the env to be
-                                    injected.
-                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
-                                  type: string
-                                resource:
-                                  description: resource to select
-                                  type: string
-                              required:
-                              - envName
-                              - resource
-                              type: object
-                            type: array
-                          serviceRef:
-                            description: serviceFieldRef is the field of the service
-                              to select.
-                            items:
-                              description: ComponentServiceRef is used to select service
-                                to be referenced.
-                              properties:
-                                envName:
-                                  description: envNamePrefix is the prefix of the
-                                    env to be injected.
-                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
-                                  type: string
-                                name:
-                                  description: serviceName is the name of the service
-                                    to select.
-                                  type: string
-                              required:
-                              - envName
-                              - name
-                              type: object
-                            type: array
                         type: object
                       type: array
                     configSpecs:

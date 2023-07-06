@@ -5,7 +5,7 @@ description: ApeCloud MySQL is a database that is compatible with MySQL syntax a
 
 type: application
 
-version: 0.6.0-alpha.28
+version: 0.6.0-alpha.33
 
 # This is the version number of the ApeCloud MySQL being deployed,
 # rather than the version number of ApeCloud MySQL-Scale itself.

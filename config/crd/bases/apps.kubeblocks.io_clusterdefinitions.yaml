@@ -64,12 +64,12 @@ spec:
                         KubeBlocks will generate proper monitor configs for well-known
                         characterType when builtIn is true.
                       type: string
-                    componentRef:
-                      description: componentRef is used to inject values from other
+                    componentDefRef:
+                      description: componentDefRef is used to inject values from other
                         components into the current component. values will be saved
                         and updated in a configmap and mounted to the current component.
                       items:
-                        description: ComponentRef is used to select the component
+                        description: ComponentDefRef is used to select the component
                           and its fields to be referenced.
                         properties:
                           componentDefName:
@@ -84,8 +84,9 @@ spec:
                                 of an env.
                               properties:
                                 name:
-                                  description: name is the name of the env to be injected.
-                                  pattern: ^[-._a-zA-Z][-._a-zA-Z0-9]*$
+                                  description: name is the name of the env to be injected,
+                                    and it must be a C identifier.
+                                  pattern: ^[A-Za-z_][A-Za-z0-9_]*$
                                   type: string
                                 value:
                                   description: value is the value of the env to be
@@ -121,13 +122,18 @@ spec:
                                         the values of headless service addresses.
                                       type: string
                                     type:
+                                      allOf:
+                                      - enum:
+                                        - FieldRef
+                                        - ServiceRef
+                                        - HeadlessServiceRef
+                                      - enum:
+                                        - FieldRef
+                                        - ServiceRef
+                                        - HeadlessServiceRef
                                       description: 'type is the type of the source
                                         to select. There are three types: `FieldRef`,
                                         `ServiceRef`, `HeadlessServiceRef`.'
-                                      enum:
-                                      - FieldRef
-                                      - ServiceRef
-                                      - HeadlessServiceRef
                                       type: string
                                   required:
                                   - type
@@ -136,18 +142,28 @@ spec:
                               - name
                               type: object
                             type: array
+                            x-kubernetes-list-map-keys:
+                            - name
+                            x-kubernetes-list-type: map
                           failurePolicy:
+                            allOf:
+                            - enum:
+                              - Ignore
+                              - Fail
+                            - enum:
+                              - Ignore
+                              - Fail
                             description: failurePolicy is the failure policy of the
                               component. If failed to find the component, the failure
                               policy will be used.
-                            enum:
-                            - Ignore
-                            - Fail
                             type: string
                         required:
                         - componentDefName
                         type: object
                       type: array
+                      x-kubernetes-list-map-keys:
+                      - componentDefName
+                      x-kubernetes-list-type: map
                     configSpecs:
                       description: The configSpec field provided by provider, and
                         finally this configTemplateRefs will be rendered into the

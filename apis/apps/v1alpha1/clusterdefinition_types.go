@@ -367,12 +367,14 @@ type ClusterComponentDefinition struct {
 	// in particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
 	// +optional
 	SwitchoverSpec *SwitchoverSpec `json:"switchoverSpec,omitempty"`
-	// componentRef is used to inject values from other components into the current component.
+	// componentDefRef is used to inject values from other components into the current component.
 	// values will be saved and updated in a configmap and mounted to the current component.
 	// +patchMergeKey=componentDefName
 	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentDefName
 	// +optional
-	ComponentRef []ComponentRef `json:"componentRef,omitempty" patchStrategy:"merge" patchMergeKey:"componentDefName"`
+	ComponentDefRef []ComponentDefRef `json:"componentDefRef,omitempty" patchStrategy:"merge" patchMergeKey:"componentDefName"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
@@ -953,6 +955,8 @@ func (r *ClusterDefinition) GetComponentDefByName(compDefName string) *ClusterCo
 }
 
 // FailurePolicyType specifies the type of failure policy
+// +enum
+// +kubebuilder:validation:Enum={Ignore,Fail}
 type FailurePolicyType string
 
 const (
@@ -962,6 +966,9 @@ const (
 	FailurePolicyFail FailurePolicyType = "Fail"
 )
 
+// ComponentValueFromType specifies the type of component value from.
+// +enum
+// +kubebuilder:validation:Enum={FieldRef,ServiceRef,HeadlessServiceRef}
 type ComponentValueFromType string
 
 const (
@@ -970,8 +977,8 @@ const (
 	FromHeadlessServiceRef ComponentValueFromType = "HeadlessServiceRef"
 )
 
-// ComponentRef is used to select the component and its fields to be referenced.
-type ComponentRef struct {
+// ComponentDefRef is used to select the component and its fields to be referenced.
+type ComponentDefRef struct {
 	// componentDefName is the name of the componentDef to select.
 	// +kubebuilder:validation:Required
 	ComponentDefName string `json:"componentDefName"`
@@ -985,15 +992,17 @@ type ComponentRef struct {
 	// +kbubebuilder:validation:Required
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
 	// +optional
-	ComponentRefEnvs []*ComponentRefEnv `json:"componentRefEnv" patchStrategy:"merge" patchMergeKey:"name"`
+	ComponentRefEnvs []ComponentRefEnv `json:"componentRefEnv" patchStrategy:"merge" patchMergeKey:"name"`
 }
 
 // ComponentRefEnv specifies name and value of an env.
 type ComponentRefEnv struct {
-	// name is the name of the env to be injected.
+	// name is the name of the env to be injected, and it must be a C identifier.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern=`^[-._a-zA-Z][-._a-zA-Z0-9]*$`
+	// +kubebuilder:validation:Pattern=`^[A-Za-z_][A-Za-z0-9_]*$`
 	Name string `json:"name"`
 	// value is the value of the env to be injected.
 	// +optional

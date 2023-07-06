@@ -190,7 +190,7 @@ func (r *ClusterDefinition) validateComponents(allErrs *field.ErrorList) {
 	}
 
 	for _, component := range r.Spec.ComponentDefs {
-		for _, compRef := range component.ComponentRef {
+		for _, compRef := range component.ComponentDefRef {
 			compRef.validate(allErrs)
 		}
 
@@ -292,7 +292,7 @@ func validateConfigTemplateList(ctpls []ComponentConfigSpec) error {
 	return nil
 }
 
-func (r ComponentRef) validate(allErrs *field.ErrorList) {
+func (r ComponentDefRef) validate(allErrs *field.ErrorList) {
 	if len(r.ComponentDefName) == 0 {
 		*allErrs = append(*allErrs, field.Invalid(field.NewPath("componentDefName"), r.ComponentDefName, "componentDefName cannot be empty"))
 	}

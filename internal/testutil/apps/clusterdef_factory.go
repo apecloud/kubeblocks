@@ -265,15 +265,15 @@ func appendContainerVolumeMounts(containers []corev1.Container, targetContainerN
 	return containers
 }
 
-func (factory *MockClusterDefFactory) AddComponentRef(ref *appsv1alpha1.ComponentRef) *MockClusterDefFactory {
+func (factory *MockClusterDefFactory) AddComponentRef(ref *appsv1alpha1.ComponentDefRef) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {
 		return factory
 	}
-	if len(comp.ComponentRef) == 0 {
-		comp.ComponentRef = make([]appsv1alpha1.ComponentRef, 0)
+	if len(comp.ComponentDefRef) == 0 {
+		comp.ComponentDefRef = make([]appsv1alpha1.ComponentDefRef, 0)
 	}
-	comp.ComponentRef = append(comp.ComponentRef, *ref)
+	comp.ComponentDefRef = append(comp.ComponentDefRef, *ref)
 	return factory
 }
 

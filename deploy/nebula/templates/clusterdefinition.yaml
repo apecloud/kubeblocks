@@ -17,7 +17,7 @@ spec:
     - name: nebula-console
       workloadType: Stateless
       characterType: nebula
-      componentRef:
+      componentDefRef:
         - &graphdRef
           componentDefName: nebula-graphd
           componentRefEnv:
@@ -56,7 +56,7 @@ spec:
             port: 19670
             targetPort: http2
             protocol: TCP
-      componentRef:
+      componentDefRef:
         - &metadRef
           componentDefName: nebula-metad
           componentRefEnv:
@@ -113,7 +113,7 @@ spec:
           volumeName: nebula-metad
       workloadType: Stateful
       characterType: nebula-metad
-      componentRef:
+      componentDefRef:
         - *metadRef
       podSpec:
         containers:
@@ -167,7 +167,7 @@ spec:
           defaultMode: 493
       workloadType: Stateful
       characterType: nebula-storaged
-      componentRef:
+      componentDefRef:
         - *metadRef
         - *graphdRef
       podSpec:

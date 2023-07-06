@@ -38,7 +38,7 @@ func buildComponentRef(clusterDef *appsv1alpha1.ClusterDefinition,
 	clusterComp *appsv1alpha1.ClusterComponentSpec,
 	component *SynthesizedComponent) error {
 
-	compRefs := clusterCompDef.ComponentRef
+	compRefs := clusterCompDef.ComponentDefRef
 	if len(compRefs) == 0 {
 		return nil
 	}

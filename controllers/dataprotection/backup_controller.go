@@ -461,15 +461,18 @@ func (r *BackupReconciler) handlePersistentVolumeClaim(reqCtx intctrlutil.Reques
 		return "", "", err
 	}
 	if err == nil {
-		// the PVC is already present
-		_, err = r.patchBackupObjectLabels(reqCtx, backup, map[string]string{
-			dataProtectionBackupRepoKey: repo.Name,
-		})
-		return pvcName, pvc.Spec.VolumeName, err
+		// the PVC is already present, bind the backup to the repo
+		if backup.Labels == nil {
+			backup.Labels = map[string]string{}
+		}
+		if backup.Labels[dataProtectionBackupRepoKey] == "" {
+			backup.Labels[dataProtectionBackupRepoKey] = repo.Name
+		}
+		return pvcName, pvc.Spec.VolumeName, nil
 	}
 	// the PVC is not present
-	// add a special label and wait for the backup repo controller
-	// to create the PVC.
+	// add a special label and wait for the backup repo controller to create the PVC.
+	// we need to update the object meta immediately, because we are going to break the current reconciliation.
 	_, err = r.patchBackupObjectLabels(reqCtx, backup, map[string]string{
 		dataProtectionBackupRepoKey:  repo.Name,
 		dataProtectionNeedRepoPVCKey: trueVal,

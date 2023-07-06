@@ -422,20 +422,17 @@ type CreateRestoreOptions struct {
 }
 
 func (o *CreateRestoreOptions) getClusterObject(backup *dpv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
-	clusterName := backup.Labels[constant.AppInstanceLabelKey]
-	clusterObj, err := cluster.GetClusterByName(o.Dynamic, clusterName, o.Namespace)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
-	}
-	if apierrors.IsNotFound(err) {
-		// if the source cluster does not exist, get it from the cluster snapshot of the backup.
-		clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
-		if !ok {
-			return nil, fmt.Errorf("source cluster: %s not found", clusterName)
+	// use the cluster snapshot to restore firstly
+	clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
+	if ok {
+		clusterObj := &appsv1alpha1.Cluster{}
+		if err := json.Unmarshal([]byte(clusterString), &clusterObj); err != nil {
+			return nil, err
 		}
-		err = json.Unmarshal([]byte(clusterString), &clusterObj)
+		return clusterObj, nil
 	}
-	return clusterObj, err
+	clusterName := backup.Labels[constant.AppInstanceLabelKey]
+	return cluster.GetClusterByName(o.Dynamic, clusterName, o.Namespace)
 }
 
 func (o *CreateRestoreOptions) Run() error {
@@ -1015,157 +1012,5 @@ func (o *editBackupPolicyOptions) applyChanges(backupPolicy *dpv1alpha1.BackupPo
 		return err
 	}
 	fmt.Fprintln(o.Out, "updated")
-	return nil
-}
-
-func (o *describeBackupOptions) complete(args []string) error {
-	var err error
-
-	if len(args) == 0 {
-		return fmt.Errorf("backup name should be specified")
-	}
-
-	o.names = args
-
-	if o.client, err = o.factory.KubernetesClientSet(); err != nil {
-		return err
-	}
-
-	if o.dynamic, err = o.factory.DynamicClient(); err != nil {
-		return err
-	}
-
-	if o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (o *describeBackupOptions) run() error {
-	for _, name := range o.names {
-		backupObj := &dpv1alpha1.Backup{}
-		if err := cluster.GetK8SClientObject(o.dynamic, backupObj, o.gvr, o.namespace, name); err != nil {
-			return err
-		}
-		if err := o.printBackupObj(backupObj); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (o *describeBackupOptions) printBackupObj(obj *dpv1alpha1.Backup) error {
-	printer.PrintLineWithTabSeparator(
-		printer.NewPair("Name", obj.Name),
-		printer.NewPair("Cluster", obj.Status.SourceCluster),
-		printer.NewPair("Namespace", obj.Namespace),
-	)
-	printer.PrintLine("\nSpec:")
-	realPrintPairStringToLine("Type", string(obj.Spec.BackupType))
-	realPrintPairStringToLine("Policy Name", obj.Spec.BackupPolicyName)
-
-	printer.PrintLine("\nStatus:")
-	realPrintPairStringToLine("Phase", string(obj.Status.Phase))
-	realPrintPairStringToLine("Total Size", obj.Status.TotalSize)
-	realPrintPairStringToLine("Backup Tool", obj.Status.BackupToolName)
-	realPrintPairStringToLine("PVC Name", obj.Status.PersistentVolumeClaimName)
-	if obj.Status.AvailableReplicas != nil {
-		realPrintPairStringToLine("Available Replicas", string(*obj.Status.AvailableReplicas))
-	}
-	if obj.Status.Duration != nil {
-		realPrintPairStringToLine("Duration", duration.HumanDuration(obj.Status.Duration.Duration))
-	}
-	realPrintPairStringToLine("Expiration Time", util.TimeFormat(obj.Status.Expiration))
-	realPrintPairStringToLine("Start Time", util.TimeFormat(obj.Status.StartTimestamp))
-	realPrintPairStringToLine("Completion Time", util.TimeFormat(obj.Status.CompletionTimestamp))
-	// print failure reason, ignore error
-	_ = o.enhancePrintFailureReason(obj.Name, obj.Status.FailureReason)
-
-	if obj.Status.Manifests != nil {
-		printer.PrintLine("\nManifests:")
-		realPrintPairStringToLine("Target", obj.Status.Manifests.Target)
-		if obj.Status.Manifests.BackupLog != nil {
-			realPrintPairStringToLine("Log Start Time", util.TimeFormat(obj.Status.Manifests.BackupLog.StartTime))
-			realPrintPairStringToLine("Log Stop Time", util.TimeFormat(obj.Status.Manifests.BackupLog.StopTime))
-		}
-		if obj.Status.Manifests.BackupTool != nil {
-			realPrintPairStringToLine("File Path", obj.Status.Manifests.BackupTool.FilePath)
-			realPrintPairStringToLine("Volume Name", obj.Status.Manifests.BackupTool.VolumeName)
-			realPrintPairStringToLine("Upload Total Size", obj.Status.Manifests.BackupTool.UploadTotalSize)
-			realPrintPairStringToLine("Checksum", obj.Status.Manifests.BackupTool.Checksum)
-			realPrintPairStringToLine("Checkpoint", obj.Status.Manifests.BackupTool.Checkpoint)
-		}
-		if obj.Status.Manifests.Snapshot != nil {
-			realPrintPairStringToLine("Snapshot Name", obj.Status.Manifests.Snapshot.VolumeSnapshotName)
-			realPrintPairStringToLine("Snapshot Content Name", obj.Status.Manifests.Snapshot.VolumeSnapshotContentName)
-		}
-		for k, v := range obj.Status.Manifests.UserContext {
-			realPrintPairStringToLine(k, v)
-		}
-	}
-
-	// get all events about backup
-	events, err := o.client.CoreV1().Events(o.namespace).Search(scheme.Scheme, obj)
-	if err != nil {
-		return err
-	}
-
-	// print the warning events
-	printer.PrintAllWarningEvents(events, o.Out)
-
-	return nil
-}
-
-func realPrintPairStringToLine(name, value string, spaceCount ...int) {
-	if value != "" {
-		printer.PrintPairStringToLine(name, value, spaceCount...)
-	}
-}
-
-// print the pod error logs if failure reason has occurred
-// TODO: the failure reason should be improved in the backup controller
-func (o *describeBackupOptions) enhancePrintFailureReason(backupName, failureReason string, spaceCount ...int) error {
-	if failureReason == "" {
-		return nil
-	}
-	ctx := context.Background()
-	// get the latest job log details.
-	labels := fmt.Sprintf("%s=%s",
-		constant.DataProtectionLabelBackupNameKey, backupName,
-	)
-	jobList, err := o.client.BatchV1().Jobs("").List(ctx, metav1.ListOptions{LabelSelector: labels})
-	if err != nil {
-		return err
-	}
-	var failedJob *batchv1.Job
-	for _, i := range jobList.Items {
-		if i.Status.Failed > 0 {
-			failedJob = &i
-			break
-		}
-	}
-	if failedJob != nil {
-		podLabels := fmt.Sprintf("%s=%s",
-			"controller-uid", failedJob.UID,
-		)
-		podList, err := o.client.CoreV1().Pods(failedJob.Namespace).List(ctx, metav1.ListOptions{LabelSelector: podLabels})
-		if err != nil {
-			return err
-		}
-		if len(podList.Items) > 0 {
-			tailLines := int64(5)
-			req := o.client.CoreV1().
-				Pods(podList.Items[0].Namespace).
-				GetLogs(podList.Items[0].Name, &corev1.PodLogOptions{TailLines: &tailLines})
-			data, err := req.DoRaw(ctx)
-			if err != nil {
-				return err
-			}
-			failureReason = fmt.Sprintf("%s\n pod %s error logs:\n%s",
-				failureReason, podList.Items[0].Name, string(data))
-		}
-	}
-	printer.PrintPairStringToLine("Failure Reason", failureReason, spaceCount...)
-
 	return nil
 }

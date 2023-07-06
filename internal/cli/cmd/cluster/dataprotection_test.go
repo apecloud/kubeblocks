@@ -40,7 +40,9 @@ import (
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/create"
 	"github.com/apecloud/kubeblocks/internal/cli/delete"
 	"github.com/apecloud/kubeblocks/internal/cli/list"
@@ -243,18 +245,18 @@ var _ = Describe("DataProtection", func() {
 		newClusterName := "new-cluster-" + timestamp
 		secrets := testing.FakeSecrets(testing.Namespace, clusterName)
 		clusterDef := testing.FakeClusterDef()
-		cluster := testing.FakeCluster(clusterName, testing.Namespace)
+		clusterObj := testing.FakeCluster(clusterName, testing.Namespace)
 		clusterDefLabel := map[string]string{
 			constant.ClusterDefLabelKey: clusterDef.Name,
 		}
-		cluster.SetLabels(clusterDefLabel)
-		backupPolicy := testing.FakeBackupPolicy("backPolicy", cluster.Name)
+		clusterObj.SetLabels(clusterDefLabel)
+		backupPolicy := testing.FakeBackupPolicy("backPolicy", clusterObj.Name)
 
 		pods := testing.FakePods(1, testing.Namespace, clusterName)
 		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
-			scheme.Scheme, &secrets.Items[0], &pods.Items[0], cluster, backupPolicy)
+			scheme.Scheme, &secrets.Items[0], &pods.Items[0], clusterObj, backupPolicy)
 		tf.FakeDynamicClient = fake.NewSimpleDynamicClient(
-			scheme.Scheme, &secrets.Items[0], &pods.Items[0], clusterDef, cluster, backupPolicy)
+			scheme.Scheme, &secrets.Items[0], &pods.Items[0], clusterDef, clusterObj, backupPolicy)
 		tf.Client = &clientfake.RESTClient{}
 		// create backup
 		cmd := NewCreateBackupCmd(tf, streams)
@@ -270,7 +272,9 @@ var _ = Describe("DataProtection", func() {
 		Expect(cmdRestore != nil).To(BeTrue())
 		_ = cmdRestore.Flags().Set("backup", backupName)
 		cmdRestore.Run(nil, []string{newClusterName})
-
+		newClusterObj := &appsv1alpha1.Cluster{}
+		Expect(cluster.GetK8SClientObject(tf.FakeDynamicClient, newClusterObj, types.ClusterGVR(), testing.Namespace, newClusterName)).Should(Succeed())
+		Expect(clusterObj.Spec.ComponentSpecs[0].Replicas).Should(Equal(int32(1)))
 		By("restore new cluster from source cluster which is deleted")
 		// mock cluster is not lived in kubernetes
 		mockBackupInfo(tf.FakeDynamicClient, backupName, "deleted-cluster", nil, "")

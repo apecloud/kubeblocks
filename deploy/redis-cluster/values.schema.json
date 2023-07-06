@@ -6,7 +6,7 @@
       "title": "Version",
       "description": "Cluster version.",
       "type": "string",
-      "default": "ac-mysql-8.0.30"
+      "default": "redis-7.0.6"
     },
     "mode": {
       "title": "Mode",
@@ -15,12 +15,12 @@
       "default": "standalone",
       "enum": [
         "standalone",
-        "raftGroup"
+        "replication"
       ]
     },
     "replicas": {
       "title": "Replicas",
-      "description": "The number of replicas, for standalone mode, the replicas is 1, for raftGroup mode, the default replicas is 3.",
+      "description": "The number of replicas, for standalone mode, the replicas is 1, for replication mode, the default replicas is 2.",
       "type": "integer",
       "default": 1,
       "minimum": 1,
@@ -59,12 +59,6 @@
       "default": 20,
       "minimum": 1,
       "maximum": 10000
-    },
-    "proxyEnabled": {
-      "title": "Proxy",
-      "description": "Enable proxy or not.",
-      "type": "boolean",
-      "default": false
     }
   }
 }

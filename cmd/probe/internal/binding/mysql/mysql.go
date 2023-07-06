@@ -74,7 +74,7 @@ const (
 	maxOpenConnsKey    = "maxOpenConns"
 	connMaxLifetimeKey = "connMaxLifetime"
 	connMaxIdleTimeKey = "connMaxIdleTime"
-	workloadKey        = "workload"
+	workloadTypeKey    = "workloadType"
 	Replication        = "Replication"
 	Consensus          = "Consensus"
 )
@@ -231,8 +231,8 @@ func (mysqlOps *MysqlOperations) GetRunningPort() int {
 }
 
 func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
-	workload := request.Metadata["workloadType"]
-	if workload == Replication {
+	workloadType := request.Metadata[workloadTypeKey]
+	if workloadType == Replication {
 		return mysqlOps.GetRoleForReplication(ctx, request, response)
 	}
 	return mysqlOps.GetRoleForConsensus(ctx, request, response)

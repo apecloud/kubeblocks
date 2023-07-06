@@ -248,7 +248,7 @@ func buildRoleProbeContainer(component *SynthesizedComponent, roleChangedContain
 	roleChangedContainer.Name = constant.RoleProbeContainerName
 	probe := roleChangedContainer.ReadinessProbe
 	bindingType := strings.ToLower(component.CharacterType)
-	workloadType := strings.ToLower(component.WorkloadType)
+	workloadType := strings.ToLower(string(component.WorkloadType))
 	httpGet := &corev1.HTTPGetAction{}
 	httpGet.Path = fmt.Sprintf(checkRoleURIFormat, bindingType, workloadType)
 	httpGet.Port = intstr.FromInt(probeSvcHTTPPort)

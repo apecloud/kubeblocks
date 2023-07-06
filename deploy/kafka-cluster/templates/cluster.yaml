@@ -3,6 +3,8 @@ kind: Cluster
 metadata:
   name: {{ include "clustername" . }}
   labels: {{ include "kafka-cluster.labels" . | nindent 4 }}
+  annotations:
+    "kubeblocks.io/extra-env": "{\"KB_KAFKA_ENABLE_SASL\":\"{{ $.Values.sasl }}\"}"
 spec:
   clusterDefinitionRef: kafka # ref clusterdefinition.name
   clusterVersionRef: kafka-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}

@@ -4,7 +4,7 @@ Define redis cluster sentinel component.
 {{- define "redis-cluster.sentinel" }}
 - name: redis-sentinel
   componentDefRef: redis-sentinel
-  replicas: 3
+  replicas: {{ .Values.sentinel.replicas }}
   resources:
     limits:
       cpu: {{ .Values.sentinel.cpu | quote }}

@@ -20,7 +20,7 @@
     },
     "replicas": {
       "title": "Replicas",
-      "description": "The number of replicas. For standalone mode, the replicas is 1, for raftGroup mode, the default replicas is 3.",
+      "description": "The number of replicas, for standalone mode, the replicas is 1, for raftGroup mode, the default replicas is 3.",
       "type": "integer",
       "default": 1,
       "minimum": 1,

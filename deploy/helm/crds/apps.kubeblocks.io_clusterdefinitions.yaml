@@ -106,17 +106,24 @@ spec:
                                         the component definition object.'
                                       type: string
                                     format:
+                                      default: ="$POD_FQDN"
                                       description: 'format is the format of each headless
-                                        service address. there are three buildin values:
-                                        $POD_ORDINAL, $POD_FQDN, $POD_NAME'
+                                        service address. there are three builtin variables
+                                        can be used as placerholder: $POD_ORDINAL,
+                                        $POD_FQDN, $POD_NAME $POD_ORDINAL is the ordinal
+                                        of the pod. $POD_FQDN is the fully qualified
+                                        domain name of the pod. $POD_NAME is the name
+                                        of the pod'
                                       type: string
                                     joinWith:
+                                      default: ','
                                       description: joinWith is the string to join
                                         the values of headless service addresses.
                                       type: string
                                     type:
-                                      description: type is the type of the source
-                                        to select.
+                                      description: 'type is the type of the source
+                                        to select. There are three types: `FieldRef`,
+                                        `ServiceRef`, `HeadlessServiceRef`.'
                                       enum:
                                       - FieldRef
                                       - ServiceRef
@@ -137,6 +144,8 @@ spec:
                             - Ignore
                             - Fail
                             type: string
+                        required:
+                        - componentDefName
                         type: object
                       type: array
                     configSpecs:

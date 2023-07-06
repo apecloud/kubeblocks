@@ -296,4 +296,27 @@ func (r ComponentRef) validate(allErrs *field.ErrorList) {
 	if len(r.ComponentDefName) == 0 {
 		*allErrs = append(*allErrs, field.Invalid(field.NewPath("componentDefName"), r.ComponentDefName, "componentDefName cannot be empty"))
 	}
+
+	for _, env := range r.ComponentRefEnvs {
+		if len(env.Value) > 0 && env.ValueFrom != nil {
+			*allErrs = append(*allErrs, field.Invalid(field.NewPath("componentRefEnv[*].value"), env.Value, "value and valueFrom cannot be set at the same time"))
+		}
+		if len(env.Value) == 0 && env.ValueFrom == nil {
+			*allErrs = append(*allErrs, field.Invalid(field.NewPath("componentRefEnv[*].value"), env.Value, "value and valueFrom cannot be empty at the same time"))
+		}
+		if env.ValueFrom == nil {
+			continue
+		}
+		valueFrom := env.ValueFrom
+		switch valueFrom.Type {
+		case FromFieldRef:
+			if len(valueFrom.FieldPath) == 0 {
+				*allErrs = append(*allErrs, field.Invalid(field.NewPath("componentRefEnv[*].valueFrom"), valueFrom.FieldPath, "fieldRef cannot be empty"))
+			}
+		case FromHeadlessServiceRef:
+			if len(valueFrom.FieldPath) > 0 {
+				*allErrs = append(*allErrs, field.Invalid(field.NewPath("componentRefEnv[*].valueFrom"), valueFrom, "headlessServiceRef cannot set fieldPath"))
+			}
+		}
+	}
 }

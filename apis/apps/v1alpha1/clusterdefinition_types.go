@@ -974,7 +974,7 @@ const (
 type ComponentRef struct {
 	// componentDefName is the name of the componentDef to select.
 	// +kubebuilder:validation:Required
-	ComponentDefName string `json:"componentDefName,omitempty"`
+	ComponentDefName string `json:"componentDefName"`
 	// failurePolicy is the failure policy of the component.
 	// If failed to find the component, the failure policy will be used.
 	// +kubebuilder:validation:Enum={Ignore,Fail}
@@ -1012,15 +1012,18 @@ type ComponentValueFrom struct {
 	// there are two objects registered in the jsonpath: `componentDef` and `components`.
 	// componentDef is the component definition object specified in `componentRef.componentDefName`.
 	// components is the component list objects referring to the component definition object.
-	// + optional
+	// +optional
 	FieldPath string `json:"fieldPath,omitempty"`
 	// format is the format of each headless service address.
-	// there are three buildin values: $POD_ORDINAL, $POD_FQDN, $POD_NAME
-	// + optional
-	// + default: "$POD_FQDN"
+	// there are three builtin variables can be used as placerholder: $POD_ORDINAL, $POD_FQDN, $POD_NAME
+	// $POD_ORDINAL is the ordinal of the pod.
+	// $POD_FQDN is the fully qualified domain name of the pod.
+	// $POD_NAME is the name of the pod
+	// +optional
+	// +kubebuilder:default=="$POD_FQDN"
 	Format string `json:"format,omitempty"`
 	// joinWith is the string to join the values of headless service addresses.
-	// + optional
-	// + default: ","
+	// +optional
+	// +kubebuilder:default=","
 	JoinWith string `json:"joinWith,omitempty"`
 }

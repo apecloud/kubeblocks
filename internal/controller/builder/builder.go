@@ -470,21 +470,19 @@ func BuildEnvConfig(cluster *appsv1alpha1.Cluster, component *component.Synthesi
 	const tplFile = "env_config_template.cue"
 	envData := map[string]string{}
 
-	// build common env
-	if component.WorkloadType != appsv1alpha1.Stateless {
-		commonEnv := buildWorkloadCommonEnv(cluster, component)
-		for k, v := range commonEnv {
-			envData[k] = v
-		}
-	}
-
+	// add component envs
 	if component.ComponentRefEnvs != nil {
 		for _, env := range component.ComponentRefEnvs {
 			envData[env.Name] = env.Value
 		}
 	}
 
-	if component.WorkloadType == appsv1alpha1.Consensus {
+	// build common env, but not for statelsss workload
+	if component.WorkloadType != appsv1alpha1.Stateless {
+		commonEnv := buildWorkloadCommonEnv(cluster, component)
+		for k, v := range commonEnv {
+			envData[k] = v
+		}
 		// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
 		// build consensus env from cluster.status
 		consensusEnv := buildConsensusSetEnv(cluster, component)

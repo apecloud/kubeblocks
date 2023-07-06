@@ -289,13 +289,15 @@ func FakeClusterDef() *appsv1alpha1.ClusterDefinition {
 				},
 			},
 			SwitchoverSpec: &appsv1alpha1.SwitchoverSpec{
-				WithCandidate: &appsv1alpha1.CmdExecutorConfig{
-					CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
-						Image: "",
-					},
-					CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
-						Command: []string{"mysql"},
-						Args:    []string{"-h$(KB_CONSENSUS_LEADER_POD_FQDN)", "-e $(KB_SWITCHOVER_ACTION)"},
+				WithCandidate: &appsv1alpha1.SwitchoverAction{
+					CmdExecutorConfig: &appsv1alpha1.CmdExecutorConfig{
+						CommandExecutorEnvItem: appsv1alpha1.CommandExecutorEnvItem{
+							Image: "",
+						},
+						CommandExecutorItem: appsv1alpha1.CommandExecutorItem{
+							Command: []string{"mysql"},
+							Args:    []string{"-h$(KB_CONSENSUS_LEADER_POD_FQDN)", "-e $(KB_SWITCHOVER_ACTION)"},
+						},
 					},
 				},
 			},

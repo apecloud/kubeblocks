@@ -826,11 +826,30 @@ func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolic
 type SwitchoverSpec struct {
 	// withCandidate corresponds to the switchover of the specified candidate primary or leader instance.
 	// +optional
-	WithCandidate *CmdExecutorConfig `json:"withCandidate,omitempty"`
+	WithCandidate *SwitchoverAction `json:"withCandidate,omitempty"`
 
 	// withoutCandidate corresponds to a switchover that does not specify a candidate primary or leader instance.
 	// +optional
-	WithoutCandidate *CmdExecutorConfig `json:"withoutCandidate,omitempty"`
+	WithoutCandidate *SwitchoverAction `json:"withoutCandidate,omitempty"`
+}
+
+type SwitchoverAction struct {
+	// cmdExecutorConfig is the executor configuration of the switchover command.
+	// +kubebuilder:validation:Required
+	CmdExecutorConfig *CmdExecutorConfig `json:"cmdExecutorConfig"`
+
+	// scriptSpecSelectors defines the selector of the scriptSpecs that need to be referenced.
+	// Once ScriptSpecSelectors is defined, the scripts defined in scriptSpecs can be referenced in the SwitchoverAction.CmdExecutorConfig.
+	// +optional
+	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
+}
+
+type ScriptSpecSelector struct {
+	// ScriptSpec name of the referent, refer to componentDefs[x].scriptSpecs[y].Name.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
 }
 
 type CommandExecutorEnvItem struct {

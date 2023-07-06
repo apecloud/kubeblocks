@@ -330,8 +330,12 @@ func overrideSwitchoverSpecAttr(switchoverSpec *appsv1alpha1.SwitchoverSpec, cvS
 			cmdExecutorConfig.Env = cvSwitchoverSpec.CmdExecutorConfig.Env
 		}
 	}
-	applyCmdExecutorConfig(switchoverSpec.WithCandidate)
-	applyCmdExecutorConfig(switchoverSpec.WithoutCandidate)
+	if switchoverSpec.WithCandidate != nil {
+		applyCmdExecutorConfig(switchoverSpec.WithCandidate.CmdExecutorConfig)
+	}
+	if switchoverSpec.WithoutCandidate != nil {
+		applyCmdExecutorConfig(switchoverSpec.WithoutCandidate.CmdExecutorConfig)
+	}
 }
 
 func GenerateComponentEnvName(clusterName, componentName string) string {

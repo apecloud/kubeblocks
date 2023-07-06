@@ -179,13 +179,13 @@ func renderSwitchoverCmdJob(ctx context.Context,
 		return nil, errors.New("primary pod not found")
 	}
 
-	renderJobPodVolumes := func(configMapRefs []appsv1alpha1.ConfigMapSelector) ([]corev1.Volume, []corev1.VolumeMount) {
+	renderJobPodVolumes := func(scriptSpecSelectors []appsv1alpha1.ScriptSpecSelector) ([]corev1.Volume, []corev1.VolumeMount) {
 		volumes := make([]corev1.Volume, 0)
 		volumeMounts := make([]corev1.VolumeMount, 0)
 
 		// find current pod's volume which mapped to configMapRefs
-		findVolumes := func(tplSpec appsv1alpha1.ComponentTemplateSpec, configMapRef appsv1alpha1.ConfigMapSelector) {
-			if tplSpec.Name != configMapRef.Name {
+		findVolumes := func(tplSpec appsv1alpha1.ComponentTemplateSpec, scriptSpecSelector appsv1alpha1.ScriptSpecSelector) {
+			if tplSpec.Name != scriptSpecSelector.Name {
 				return
 			}
 			for _, podVolume := range pod.Spec.Volumes {
@@ -196,13 +196,10 @@ func renderSwitchoverCmdJob(ctx context.Context,
 			}
 		}
 
-		// filter out the corresponding configMap volumes from the volumes of the current leader pod based on the configMapRefs defined by the user.
-		for _, configMapRef := range configMapRefs {
+		// filter out the corresponding script configMap volumes from the volumes of the current leader pod based on the scriptSpecSelectors defined by the user.
+		for _, scriptSpecSelector := range scriptSpecSelectors {
 			for _, scriptSpec := range componentDef.ScriptSpecs {
-				findVolumes(scriptSpec, configMapRef)
-			}
-			for _, configSpec := range componentDef.ConfigSpecs {
-				findVolumes(configSpec.ComponentTemplateSpec, configMapRef)
+				findVolumes(scriptSpec, scriptSpecSelector)
 			}
 		}
 
@@ -221,25 +218,25 @@ func renderSwitchoverCmdJob(ctx context.Context,
 
 	renderJob := func(switchoverSpec *appsv1alpha1.SwitchoverSpec, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
 		var (
-			cmdExecutorConfig *appsv1alpha1.CmdExecutorConfig
-			configMapRefs     []appsv1alpha1.ConfigMapSelector
+			cmdExecutorConfig   *appsv1alpha1.CmdExecutorConfig
+			scriptSpecSelectors []appsv1alpha1.ScriptSpecSelector
 		)
 		switch switchover.InstanceName {
 		case constant.KBSwitchoverCandidateInstanceForAnyPod:
 			if switchoverSpec.WithoutCandidate != nil {
 				cmdExecutorConfig = switchoverSpec.WithoutCandidate.CmdExecutorConfig
-				configMapRefs = switchoverSpec.WithoutCandidate.ConfigMapRefs
+				scriptSpecSelectors = switchoverSpec.WithoutCandidate.ScriptSpecSelectors
 			}
 		default:
 			if switchoverSpec.WithCandidate != nil {
 				cmdExecutorConfig = switchoverSpec.WithCandidate.CmdExecutorConfig
-				configMapRefs = switchoverSpec.WithCandidate.ConfigMapRefs
+				scriptSpecSelectors = switchoverSpec.WithCandidate.ScriptSpecSelectors
 			}
 		}
 		if cmdExecutorConfig == nil {
 			return nil, errors.New("switchover action not found")
 		}
-		volumes, volumeMounts := renderJobPodVolumes(configMapRefs)
+		volumes, volumeMounts := renderJobPodVolumes(scriptSpecSelectors)
 
 		// jobName named with generation to distinguish different switchover jobs.
 		jobName := genSwitchoverJobName(cluster.Name, componentSpec.Name, cluster.Generation)

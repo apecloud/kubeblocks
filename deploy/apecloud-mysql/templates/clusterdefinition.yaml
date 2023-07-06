@@ -78,14 +78,14 @@ spec:
               - -p$(MYSQL_ROOT_PASSWORD)
               - -e
               - "call dbms_consensus.change_leader('$(KB_SWITCHOVER_CANDIDATE_FQDN):13306');"
-          configMapRefs:
+          scriptSpecSelectors:
             - name: apecloud-mysql-scripts
         withoutCandidate:
           cmdExecutorConfig:
             image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
             command:
               - /scripts/switchover-without-candidate.sh
-          configMapRefs:
+          scriptSpecSelectors:
             - name: apecloud-mysql-scripts
       volumeTypes:
         - name: data

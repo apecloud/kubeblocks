@@ -838,19 +838,18 @@ type SwitchoverAction struct {
 	// +kubebuilder:validation:Required
 	CmdExecutorConfig *CmdExecutorConfig `json:"cmdExecutorConfig"`
 
-	// Selects a key of a ConfigMap item list. The value of ConfigMap can be
-	// a JSON or YAML string content. Use a key name with ".json" or ".yaml" or ".yml"
-	// extension name to specify a content type.
+	// scriptSpecSelectors defines the selector of the scriptSpecs that need to be referenced.
+	// Once ScriptSpecSelectors is defined, the scripts defined in scriptSpecs can be referenced in the SwitchoverAction.CmdExecutorConfig.
 	// +optional
-	ConfigMapRefs []ConfigMapSelector `json:"configMapRefs,omitempty"`
+	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }
 
-type ConfigMapSelector struct {
-	// ConfigMap name of the referent.
+type ScriptSpecSelector struct {
+	// ScriptSpec name of the referent, refer to componentDefs[x].scriptSpecs[y].Name.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"` // need corev1.LocalObjectReference
+	Name string `json:"name"`
 }
 
 type CommandExecutorEnvItem struct {

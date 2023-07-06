@@ -69,16 +69,15 @@ spec:
             image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
             command:
               - /scripts/switchover-with-candidate.sh
-          configMapRefs:
+          scriptSpecSelectors:
             - name: mongodb-scripts
         withoutCandidate:
           cmdExecutorConfig:
             image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
             command:
               - /scripts/switchover-without-candidate.sh
-          configMapRefs:
+          scriptSpecSelectors:
             - name: mongodb-scripts
-            - name: mongodb-config
       service:
         ports:
           - name: mongodb

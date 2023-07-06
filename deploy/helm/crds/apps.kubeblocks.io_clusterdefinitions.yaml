@@ -8613,15 +8613,16 @@ spec:
                               - command
                               - image
                               type: object
-                            configMapRefs:
-                              description: Selects a key of a ConfigMap item list.
-                                The value of ConfigMap can be a JSON or YAML string
-                                content. Use a key name with ".json" or ".yaml" or
-                                ".yml" extension name to specify a content type.
+                            scriptSpecSelectors:
+                              description: scriptSpecSelectors defines the selector
+                                of the scriptSpecs that need to be referenced. Once
+                                ScriptSpecSelectors is defined, the scripts defined
+                                in scriptSpecs can be referenced in the SwitchoverAction.CmdExecutorConfig.
                               items:
                                 properties:
                                   name:
-                                    description: ConfigMap name of the referent.
+                                    description: ScriptSpec name of the referent,
+                                      refer to componentDefs[x].scriptSpecs[y].Name.
                                     maxLength: 63
                                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                     type: string
@@ -8781,15 +8782,16 @@ spec:
                               - command
                               - image
                               type: object
-                            configMapRefs:
-                              description: Selects a key of a ConfigMap item list.
-                                The value of ConfigMap can be a JSON or YAML string
-                                content. Use a key name with ".json" or ".yaml" or
-                                ".yml" extension name to specify a content type.
+                            scriptSpecSelectors:
+                              description: scriptSpecSelectors defines the selector
+                                of the scriptSpecs that need to be referenced. Once
+                                ScriptSpecSelectors is defined, the scripts defined
+                                in scriptSpecs can be referenced in the SwitchoverAction.CmdExecutorConfig.
                               items:
                                 properties:
                                   name:
-                                    description: ConfigMap name of the referent.
+                                    description: ScriptSpec name of the referent,
+                                      refer to componentDefs[x].scriptSpecs[y].Name.
                                     maxLength: 63
                                     pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                     type: string

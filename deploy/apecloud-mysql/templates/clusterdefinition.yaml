@@ -178,9 +178,11 @@ spec:
             image:  {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
             imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
             securityContext:
-              runAsNonRoot: true
-              runAsUser: 1001
+              runAsNonRoot: false
+              runAsUser: 0
             env:
+              - name: DB_TYPE
+                value: MySQL
               - name: ENDPOINT
                 value: {{ printf "localhost:3306" }}
               - name: MYSQL_USER
@@ -204,6 +206,11 @@ spec:
             volumeMounts:
               - name: agamotto-configuration
                 mountPath: /opt/agamotto
+              - name: data
+                mountPath: /data/mysql
+              - name: log-data
+                mountPath: /var/log/kubeblocks
+                readOnly: false
           - name: vttablet
             image: {{ .Values.wesqlscale.image.registry | default "docker.io" }}/{{ .Values.wesqlscale.image.repository }}:{{ .Values.wesqlscale.image.tag }}
             imagePullPolicy: {{ default .Values.wesqlscale.image.pullPolicy "IfNotPresent" }}
@@ -250,6 +257,10 @@ spec:
               - name: mysql-scale-config
                 mountPath: /conf
         volumes:
+          - name: log-data
+            hostPath:
+              path: /var/log/kubeblocks
+              type: DirectoryOrCreate
           - name: annotations
             downwardAPI:
               items:

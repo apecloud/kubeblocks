@@ -203,15 +203,10 @@ func (r *BackupReconciler) handleBackupDeleting(reqCtx intctrlutil.RequestCtx, b
 	if deleteFileJob == nil {
 		return deleteBackup()
 	}
-	// wait for the deletion job completed
-	jobStatusConditions := deleteFileJob.Status.Conditions
-	if len(jobStatusConditions) == 0 {
-		return nil
-	}
-	switch jobStatusConditions[0].Type {
-	case batchv1.JobComplete:
+	if containsJobCondition(deleteFileJob, batchv1.JobComplete) {
 		return deleteBackup()
-	case batchv1.JobFailed:
+	}
+	if containsJobCondition(deleteFileJob, batchv1.JobFailed) {
 		failureReason := fmt.Sprintf(`the job "%s" for backup files deletion failed, you can delete it to re-delete the files`, deleteFileJob.Name)
 		if backup.Status.FailureReason == failureReason {
 			return nil
@@ -221,6 +216,7 @@ func (r *BackupReconciler) handleBackupDeleting(reqCtx intctrlutil.RequestCtx, b
 		r.Recorder.Event(backup, corev1.EventTypeWarning, "DeleteBackupFilesFailed", failureReason)
 		return r.Status().Patch(reqCtx.Ctx, backup, backupPatch)
 	}
+	// wait for the deletion job completed
 	return nil
 }
 
@@ -345,10 +341,9 @@ func (r *BackupReconciler) doNewPhaseAction(
 	// TODO: get pod with matching labels to do backup.
 	var targetCluster dataprotectionv1alpha1.TargetCluster
 	var isStatefulSetKind bool
-	switch backup.Spec.BackupType {
-	case dataprotectionv1alpha1.BackupTypeSnapshot:
+	if backup.Spec.BackupType == dataprotectionv1alpha1.BackupTypeSnapshot {
 		targetCluster = backupPolicy.Spec.Snapshot.Target
-	default:
+	} else {
 		commonPolicy := backupPolicy.Spec.GetCommonPolicy(backup.Spec.BackupType)
 		if commonPolicy == nil {
 			return r.updateStatusIfFailed(reqCtx, backup, intctrlutil.NewBackupNotSupported(string(backup.Spec.BackupType), backupPolicy.Name))
@@ -395,6 +390,13 @@ func (r *BackupReconciler) doNewPhaseAction(
 		return intctrlutil.Reconciled()
 	}
 
+	// clean up failed job if backup type is logfile
+	if backup.Spec.BackupType == dataprotectionv1alpha1.BackupTypeLogFile {
+		if err = r.cleanupFailedJob(reqCtx, backup); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+	}
+
 	// update Phase to InProgress/Running
 	if isStatefulSetKind {
 		backup.Status.Phase = dataprotectionv1alpha1.BackupRunning
@@ -415,6 +417,31 @@ func (r *BackupReconciler) doNewPhaseAction(
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	return intctrlutil.Reconciled()
+}
+
+func (r *BackupReconciler) cleanupFailedJob(reqCtx intctrlutil.RequestCtx, backup *dataprotectionv1alpha1.Backup) error {
+	jobList := batchv1.JobList{}
+	if err := r.Client.List(reqCtx.Ctx, &jobList, client.InNamespace(backup.Namespace),
+		client.MatchingLabels{constant.DataProtectionLabelBackupNameKey: backup.Name}); err != nil {
+		return nil
+	}
+
+	for _, job := range jobList.Items {
+		if !containsJobCondition(&job, batchv1.JobFailed) {
+			continue
+		}
+		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, &job); err != nil {
+			return err
+		}
+		if controllerutil.ContainsFinalizer(&job, dataProtectionFinalizerName) {
+			patch := client.MergeFrom(job.DeepCopy())
+			controllerutil.RemoveFinalizer(&job, dataProtectionFinalizerName)
+			if err := r.Patch(reqCtx.Ctx, &job, patch); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // handlePersistentVolumeClaim handles the persistent volume claim for the backup, the rules are as follows
@@ -629,26 +656,14 @@ func (r *BackupReconciler) doBaseBackupInProgressPhaseAction(reqCtx intctrlutil.
 	if !isOK {
 		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	}
-	job, err := getBackupBatchV1Job(reqCtx, r.Client, backup)
-	if err != nil {
-		return intctrlutil.ResultToP(r.updateStatusIfFailed(reqCtx, backup, err))
-	}
 	// createUpdatesJobs should not affect the backup status, just need to record events when the run fails
 	if err = r.createUpdatesJobs(reqCtx, backup, commonPolicy, &commonPolicy.BasePolicy, pathPrefix, dataprotectionv1alpha1.POST); err != nil {
 		r.Recorder.Event(backup, corev1.EventTypeNormal, "CreatedPostUpdatesJob", err.Error())
 	}
-	jobStatusConditions := job.Status.Conditions
-	if len(jobStatusConditions) > 0 {
-		switch jobStatusConditions[0].Type {
-		case batchv1.JobComplete:
-			// update Phase to Completed
-			backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
-			backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
-		case batchv1.JobFailed:
-			backup.Status.Phase = dataprotectionv1alpha1.BackupFailed
-			backup.Status.FailureReason = job.Status.Conditions[0].Reason
-		}
-	}
+	// updates Phase directly to Completed because `ensureBatchV1JobCompleted` has checked job failed
+	backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
+	backup.Status.CompletionTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+
 	if backup.Spec.BackupType == dataprotectionv1alpha1.BackupTypeLogFile {
 		if backup.Status.Manifests != nil &&
 			backup.Status.Manifests.BackupLog != nil &&
@@ -975,13 +990,11 @@ func (r *BackupReconciler) ensureBatchV1JobCompleted(
 		return false, err
 	}
 	if exists {
-		jobStatusConditions := job.Status.Conditions
-		if len(jobStatusConditions) > 0 {
-			if jobStatusConditions[0].Type == batchv1.JobComplete {
-				return true, nil
-			} else if jobStatusConditions[0].Type == batchv1.JobFailed {
-				return false, intctrlutil.NewBackupJobFailed(job.Name)
-			}
+		if containsJobCondition(job, batchv1.JobComplete) {
+			return true, nil
+		}
+		if containsJobCondition(job, batchv1.JobFailed) {
+			return false, intctrlutil.NewBackupJobFailed(job.Name)
 		}
 	}
 	return false, nil

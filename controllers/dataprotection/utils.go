@@ -85,21 +85,6 @@ func getCreatedCRNameByBackupPolicy(backupPolicyName, backupPolicyNamespace stri
 	return fmt.Sprintf("%s-%s", name, string(backupType))
 }
 
-// getBackupBatchV1Job gets the v1 job which is created by backup.
-func getBackupBatchV1Job(reqCtx intctrlutil.RequestCtx, cli client.Client, backup *dataprotectionv1alpha1.Backup) (*batchv1.Job, error) {
-	job := &batchv1.Job{}
-	jobNameSpaceName := types.NamespacedName{
-		Namespace: reqCtx.Req.Namespace,
-		Name:      backup.Name,
-	}
-	if err := cli.Get(reqCtx.Ctx, jobNameSpaceName, job); err != nil {
-		// not found backup, do nothing
-		reqCtx.Log.Info(err.Error())
-		return nil, err
-	}
-	return job, nil
-}
-
 func getClusterLabelKeys() []string {
 	return []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey}
 }
@@ -214,6 +199,7 @@ func sendWarningEventForError(recorder record.EventRecorder, backup *dataprotect
 var configVolumeSnapshotError = []string{
 	"Failed to set default snapshot class with error",
 	"Failed to get snapshot class with error",
+	"Failed to create snapshot content with error",
 }
 
 func isVolumeSnapshotConfigError(snap *snapshotv1.VolumeSnapshot) bool {
@@ -369,4 +355,13 @@ func fromFlattenName(flatten string) (name string, namespace string) {
 		name = flatten
 	}
 	return
+}
+
+func containsJobCondition(job *batchv1.Job, jobCondType batchv1.JobConditionType) bool {
+	for _, jobCond := range job.Status.Conditions {
+		if jobCond.Type == jobCondType {
+			return true
+		}
+	}
+	return false
 }

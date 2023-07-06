@@ -181,7 +181,7 @@ golangci-lint: golangci generate ## Run golangci-lint against code.
 	$(GOLANGCILINT) run ./...
 
 .PHONY: staticcheck
-staticcheck: staticchecktool generate ## Run staticcheck against code.
+staticcheck: staticchecktool test-go-generate generate ## Run staticcheck against code.
 	$(STATICCHECK) -tags $(BUILD_TAGS) ./...
 
 .PHONY: build-checks

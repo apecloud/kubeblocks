@@ -41,7 +41,7 @@ jobs:
           TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
               --trigger-type "$TRIGGER_MODE" \
               --test-pkgs "internal|apis|controllers|cmd" \
-              --test-check "mod-vendor|lint"`
+              --test-check "mod-vendor|lint|staticcheck"`
           echo "$TEST_PACKAGES"
           echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
 

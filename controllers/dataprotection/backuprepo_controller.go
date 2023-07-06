@@ -425,11 +425,12 @@ func (r *BackupRepoReconciler) listAssociatedBackups(
 	}
 	err := r.Client.List(reqCtx.Ctx, backupList, selectors)
 	var filtered []*dpv1alpha1.Backup
-	for _, backup := range backupList.Items {
+	for idx := range backupList.Items {
+		backup := &backupList.Items[idx]
 		if backup.Status.Phase == dpv1alpha1.BackupFailed {
 			continue
 		}
-		filtered = append(filtered, backup.DeepCopy())
+		filtered = append(filtered, backup)
 	}
 	return filtered, err
 }

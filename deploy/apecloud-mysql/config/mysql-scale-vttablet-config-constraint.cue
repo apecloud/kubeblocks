@@ -17,15 +17,15 @@
 
 #VtTabletParameter: {
 
-  // Connection timeout to mysqld in milliseconds. (0 for no timeout)
-  db_connect_timeout_ms: int
+	// Connection timeout to mysqld in milliseconds. (0 for no timeout)
+	db_connect_timeout_ms: int
 
-  // Interval between health checks. (default 20s)
-  health_check_interval: string
+	// Interval between health checks. (default 20s)
+	health_check_interval: string
 
-  // Time to wait for a remote operation. (default 15s)
-  remote_operation_timeout: string
+	// Time to wait for a remote operation. (default 15s)
+	remote_operation_timeout: string
 
-  // Delay between retries of updates to keep the tablet and its shard record in sync. (default 30s)
-  shard_sync_retry_delay: string
+	// Delay between retries of updates to keep the tablet and its shard record in sync. (default 30s)
+	shard_sync_retry_delay: string
 }

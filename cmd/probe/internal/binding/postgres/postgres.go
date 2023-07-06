@@ -23,17 +23,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"strconv"
 	"sync"
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/postgres"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -86,8 +86,8 @@ var (
 
 // PostgresOperations represents PostgreSQL output binding.
 type PostgresOperations struct {
-	mu sync.Mutex
-	db *pgxpool.Pool
+	mu      sync.Mutex
+	manager *postgres.Manager
 	BaseOperations
 }
 
@@ -100,83 +100,35 @@ func NewPostgres(logger logger.Logger) bindings.OutputBinding {
 
 // Init initializes the PostgreSql binding.
 func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
+	pgOps.Logger.Debug("Initializing Postgres binding")
 	pgOps.BaseOperations.Init(metadata)
 	if viper.IsSet("KB_SERVICE_USER") {
 		dbUser = viper.GetString("KB_SERVICE_USER")
 	}
-
 	if viper.IsSet("KB_SERVICE_PASSWORD") {
 		dbPasswd = viper.GetString("KB_SERVICE_PASSWORD")
 	}
+	config, _ := postgres.NewConfig(metadata.Properties)
+	manager, _ := postgres.NewManager(pgOps.Logger)
 
-	pgOps.Logger.Debug("Initializing Postgres binding")
-	pgOps.DBType = "postgres"
-	pgOps.InitIfNeed = pgOps.initIfNeed
+	pgOps.DBType = "postgresql"
+	pgOps.manager = manager
+	pgOps.DBPort = config.GetDBPort()
 	pgOps.BaseOperations.GetRole = pgOps.GetRole
-	pgOps.DBPort = pgOps.GetRunningPort()
-	pgOps.RegisterOperation(GetRoleOperation, pgOps.GetRoleOps)
+	pgOps.OperationMap[GetRoleOperation] = StartupCheckWraper(manager, pgOps.GetRoleOps)
 	// pgOps.RegisterOperation(GetLagOperation, pgOps.GetLagOps)
-	pgOps.RegisterOperation(CheckStatusOperation, pgOps.CheckStatusOps)
-	pgOps.RegisterOperation(ExecOperation, pgOps.ExecOps)
-	pgOps.RegisterOperation(QueryOperation, pgOps.QueryOps)
+	pgOps.OperationMap[CheckStatusOperation] = StartupCheckWraper(manager, pgOps.CheckStatusOps)
+	pgOps.OperationMap[ExecOperation] = StartupCheckWraper(manager, pgOps.ExecOps)
+	pgOps.OperationMap[QueryOperation] = StartupCheckWraper(manager, pgOps.QueryOps)
 
 	// following are ops for account management
-	pgOps.RegisterOperation(ListUsersOp, pgOps.listUsersOps)
-	pgOps.RegisterOperation(CreateUserOp, pgOps.createUserOps)
-	pgOps.RegisterOperation(DeleteUserOp, pgOps.deleteUserOps)
-	pgOps.RegisterOperation(DescribeUserOp, pgOps.describeUserOps)
-	pgOps.RegisterOperation(GrantUserRoleOp, pgOps.grantUserRoleOps)
-	pgOps.RegisterOperation(RevokeUserRoleOp, pgOps.revokeUserRoleOps)
-	pgOps.RegisterOperation(ListSystemAccountsOp, pgOps.listSystemAccountsOps)
-	return nil
-}
-
-func (pgOps *PostgresOperations) initIfNeed() bool {
-	if pgOps.db == nil {
-		go func() {
-			err := pgOps.InitDelay()
-			if err != nil {
-				pgOps.Logger.Errorf("Postgres connection init failed: %v", err)
-			} else {
-				pgOps.Logger.Info("Postgres connection init succeeded: %s", pgOps.db.Config().ConnConfig)
-			}
-		}()
-		return true
-	}
-	return false
-}
-
-func (pgOps *PostgresOperations) InitDelay() error {
-	pgOps.mu.Lock()
-	defer pgOps.mu.Unlock()
-	if pgOps.db != nil {
-		return nil
-	}
-
-	p := pgOps.Metadata.Properties
-	url, ok := p[connectionURLKey]
-	if !ok || url == "" {
-		return fmt.Errorf("required metadata not set: %s", connectionURLKey)
-	}
-
-	poolConfig, err := pgxpool.ParseConfig(url)
-	if err != nil {
-		return fmt.Errorf("error opening DB connection: %w", err)
-	}
-	if dbUser != "" {
-		poolConfig.ConnConfig.User = dbUser
-	}
-	if dbPasswd != "" {
-		poolConfig.ConnConfig.Password = dbPasswd
-	}
-
-	// This context doesn't control the lifetime of the connection pool, and is
-	// only creating resources at init.
-	pgOps.db, err = pgxpool.NewWithConfig(context.Background(), poolConfig)
-	if err != nil {
-		return fmt.Errorf("unable to ping the DB: %w", err)
-	}
-
+	pgOps.OperationMap[ListUsersOp] = StartupCheckWraper(manager, pgOps.listUsersOps)
+	pgOps.OperationMap[CreateUserOp] = StartupCheckWraper(manager, pgOps.createUserOps)
+	pgOps.OperationMap[DeleteUserOp] = StartupCheckWraper(manager, pgOps.deleteUserOps)
+	pgOps.OperationMap[DescribeUserOp] = StartupCheckWraper(manager, pgOps.describeUserOps)
+	pgOps.OperationMap[GrantUserRoleOp] = StartupCheckWraper(manager, pgOps.grantUserRoleOps)
+	pgOps.OperationMap[RevokeUserRoleOp] = StartupCheckWraper(manager, pgOps.revokeUserRoleOps)
+	pgOps.OperationMap[ListSystemAccountsOp] = StartupCheckWraper(manager, pgOps.listSystemAccountsOps)
 	return nil
 }
 
@@ -198,30 +150,7 @@ func (pgOps *PostgresOperations) GetRunningPort() int {
 }
 
 func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
-	sql := "select pg_is_in_recovery();"
-
-	rows, err := pgOps.db.Query(ctx, sql)
-	if err != nil {
-		pgOps.Logger.Infof("error executing %s: %v", sql, err)
-		return "", errors.Wrapf(err, "error executing %s", sql)
-	}
-
-	var isRecovery bool
-	var isReady bool
-	for rows.Next() {
-		if err = rows.Scan(&isRecovery); err != nil {
-			pgOps.Logger.Errorf("Role query error: %v", err)
-			return "", err
-		}
-		isReady = true
-	}
-	if isRecovery {
-		return SECONDARY, nil
-	}
-	if isReady {
-		return PRIMARY, nil
-	}
-	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
+	return pgOps.manager.GetMemberState(ctx)
 }
 
 func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
@@ -232,7 +161,7 @@ func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.Invo
 		result["message"] = "no sql provided"
 		return result, nil
 	}
-	count, err := pgOps.exec(ctx, sql)
+	count, err := pgOps.manager.Exec(ctx, sql)
 	if err != nil {
 		pgOps.Logger.Infof("exec error: %v", err)
 		result["event"] = OperationFailed
@@ -256,10 +185,10 @@ insert into kb_health_check values(%d, CURRENT_TIMESTAMP) on conflict(type) do u
 	switch pgOps.OriRole {
 	case PRIMARY:
 		var count int64
-		count, err = pgOps.exec(ctx, rwSQL)
+		count, err = pgOps.manager.Exec(ctx, rwSQL)
 		data = []byte(strconv.FormatInt(count, 10))
 	case SECONDARY:
-		data, err = pgOps.query(ctx, roSQL)
+		data, err = pgOps.manager.Query(ctx, roSQL)
 	default:
 		msg := fmt.Sprintf("unknown role %s: %v", pgOps.OriRole, pgOps.DBRoles)
 		pgOps.Logger.Info(msg)
@@ -292,7 +221,7 @@ func (pgOps *PostgresOperations) QueryOps(ctx context.Context, req *bindings.Inv
 		result["message"] = "no sql provided"
 		return result, nil
 	}
-	data, err := pgOps.query(ctx, sql)
+	data, err := pgOps.manager.Query(ctx, sql)
 	if err != nil {
 		pgOps.Logger.Infof("Query error: %v", err)
 		result["event"] = OperationFailed
@@ -304,64 +233,14 @@ func (pgOps *PostgresOperations) QueryOps(ctx context.Context, req *bindings.Inv
 	return result, nil
 }
 
-func (pgOps *PostgresOperations) query(ctx context.Context, sql string) (result []byte, err error) {
-	pgOps.Logger.Debugf("query: %s", sql)
-
-	rows, err := pgOps.db.Query(ctx, sql)
-	if err != nil {
-		return nil, fmt.Errorf("error executing query: %w", err)
-	}
-	defer func() {
-		rows.Close()
-		_ = rows.Err()
-	}()
-
-	rs := make([]interface{}, 0)
-	columnTypes := rows.FieldDescriptions()
-	for rows.Next() {
-		values := make([]interface{}, len(columnTypes))
-		for i := range values {
-			values[i] = new(interface{})
-		}
-
-		if err = rows.Scan(values...); err != nil {
-			return nil, fmt.Errorf("error scanning row: %w", err)
-		}
-
-		r := map[string]interface{}{}
-		for i, ct := range columnTypes {
-			r[ct.Name] = values[i]
-		}
-		rs = append(rs, r)
-	}
-
-	if result, err = json.Marshal(rs); err != nil {
-		err = fmt.Errorf("error serializing results: %w", err)
-	}
-	return result, err
-}
-
-func (pgOps *PostgresOperations) exec(ctx context.Context, sql string) (result int64, err error) {
-	pgOps.Logger.Debugf("exec: %s", sql)
-
-	res, err := pgOps.db.Exec(ctx, sql)
-	if err != nil {
-		return 0, fmt.Errorf("error executing query: %w", err)
-	}
-
-	result = res.RowsAffected()
-
-	return
-}
-
 // InternalQuery is used for internal query, implements BaseInternalOps interface
 func (pgOps *PostgresOperations) InternalQuery(ctx context.Context, sql string) (result []byte, err error) {
-	return pgOps.query(ctx, sql)
+	return pgOps.manager.Query(ctx, sql)
 }
 
 // InternalExec is used for internal execution, implements BaseInternalOps interface
 func (pgOps *PostgresOperations) InternalExec(ctx context.Context, sql string) (result int64, err error) {
-	return pgOps.exec(ctx, sql)
+	return pgOps.manager.Exec(ctx, sql)
 }
 
 // GetLogger is used for getting logger, implements BaseInternalOps interface

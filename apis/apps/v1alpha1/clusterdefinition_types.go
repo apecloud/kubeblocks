@@ -367,6 +367,14 @@ type ClusterComponentDefinition struct {
 	// in particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
 	// +optional
 	SwitchoverSpec *SwitchoverSpec `json:"switchoverSpec,omitempty"`
+	// componentDefRef is used to inject values from other components into the current component.
+	// values will be saved and updated in a configmap and mounted to the current component.
+	// +patchMergeKey=componentDefName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentDefName
+	// +optional
+	ComponentDefRef []ComponentDefRef `json:"componentDefRef,omitempty" patchStrategy:"merge" patchMergeKey:"componentDefName"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
@@ -963,4 +971,87 @@ func (r *ClusterDefinition) GetComponentDefByName(compDefName string) *ClusterCo
 		}
 	}
 	return nil
+}
+
+// FailurePolicyType specifies the type of failure policy
+// +enum
+// +kubebuilder:validation:Enum={Ignore,Fail}
+type FailurePolicyType string
+
+const (
+	// Ignore means that an error will be ignored but logged.
+	FailurePolicyIgnore FailurePolicyType = "Ignore"
+	// ReportError means that an error will be reported.
+	FailurePolicyFail FailurePolicyType = "Fail"
+)
+
+// ComponentValueFromType specifies the type of component value from.
+// +enum
+// +kubebuilder:validation:Enum={FieldRef,ServiceRef,HeadlessServiceRef}
+type ComponentValueFromType string
+
+const (
+	FromFieldRef           ComponentValueFromType = "FieldRef"
+	FromServiceRef         ComponentValueFromType = "ServiceRef"
+	FromHeadlessServiceRef ComponentValueFromType = "HeadlessServiceRef"
+)
+
+// ComponentDefRef is used to select the component and its fields to be referenced.
+type ComponentDefRef struct {
+	// componentDefName is the name of the componentDef to select.
+	// +kubebuilder:validation:Required
+	ComponentDefName string `json:"componentDefName"`
+	// failurePolicy is the failure policy of the component.
+	// If failed to find the component, the failure policy will be used.
+	// +kubebuilder:validation:Enum={Ignore,Fail}
+	// +default="Ignore"
+	// +optional
+	FailurePolicy FailurePolicyType `json:"failurePolicy,omitempty"`
+	// componentRefEnv specifies a list of values to be injected as env variables to each component.
+	// +kbubebuilder:validation:Required
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	ComponentRefEnvs []ComponentRefEnv `json:"componentRefEnv" patchStrategy:"merge" patchMergeKey:"name"`
+}
+
+// ComponentRefEnv specifies name and value of an env.
+type ComponentRefEnv struct {
+	// name is the name of the env to be injected, and it must be a C identifier.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[A-Za-z_][A-Za-z0-9_]*$`
+	Name string `json:"name"`
+	// value is the value of the env to be injected.
+	// +optional
+	Value string `json:"value,omitempty"`
+	// valueFrom specifies the source of the env to be injected.
+	// +optional
+	ValueFrom *ComponentValueFrom `json:"valueFrom,omitempty"`
+}
+
+type ComponentValueFrom struct {
+	// type is the type of the source to select. There are three types: `FieldRef`, `ServiceRef`, `HeadlessServiceRef`.
+	// +kubebuilder:validation:Enum={FieldRef,ServiceRef,HeadlessServiceRef}
+	// +kubebuilder:validation:Required
+	Type ComponentValueFromType `json:"type"`
+	// fieldRef is the jsonpath of the source to select when type is `FieldRef`.
+	// there are two objects registered in the jsonpath: `componentDef` and `components`.
+	// componentDef is the component definition object specified in `componentRef.componentDefName`.
+	// components is the component list objects referring to the component definition object.
+	// +optional
+	FieldPath string `json:"fieldPath,omitempty"`
+	// format is the format of each headless service address.
+	// there are three builtin variables can be used as placerholder: $POD_ORDINAL, $POD_FQDN, $POD_NAME
+	// $POD_ORDINAL is the ordinal of the pod.
+	// $POD_FQDN is the fully qualified domain name of the pod.
+	// $POD_NAME is the name of the pod
+	// +optional
+	// +kubebuilder:default=="$POD_FQDN"
+	Format string `json:"format,omitempty"`
+	// joinWith is the string to join the values of headless service addresses.
+	// +optional
+	// +kubebuilder:default=","
+	JoinWith string `json:"joinWith,omitempty"`
 }

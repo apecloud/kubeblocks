@@ -64,6 +64,106 @@ spec:
                         KubeBlocks will generate proper monitor configs for well-known
                         characterType when builtIn is true.
                       type: string
+                    componentDefRef:
+                      description: componentDefRef is used to inject values from other
+                        components into the current component. values will be saved
+                        and updated in a configmap and mounted to the current component.
+                      items:
+                        description: ComponentDefRef is used to select the component
+                          and its fields to be referenced.
+                        properties:
+                          componentDefName:
+                            description: componentDefName is the name of the componentDef
+                              to select.
+                            type: string
+                          componentRefEnv:
+                            description: componentRefEnv specifies a list of values
+                              to be injected as env variables to each component.
+                            items:
+                              description: ComponentRefEnv specifies name and value
+                                of an env.
+                              properties:
+                                name:
+                                  description: name is the name of the env to be injected,
+                                    and it must be a C identifier.
+                                  pattern: ^[A-Za-z_][A-Za-z0-9_]*$
+                                  type: string
+                                value:
+                                  description: value is the value of the env to be
+                                    injected.
+                                  type: string
+                                valueFrom:
+                                  description: valueFrom specifies the source of the
+                                    env to be injected.
+                                  properties:
+                                    fieldPath:
+                                      description: 'fieldRef is the jsonpath of the
+                                        source to select when type is `FieldRef`.
+                                        there are two objects registered in the jsonpath:
+                                        `componentDef` and `components`. componentDef
+                                        is the component definition object specified
+                                        in `componentRef.componentDefName`. components
+                                        is the component list objects referring to
+                                        the component definition object.'
+                                      type: string
+                                    format:
+                                      default: ="$POD_FQDN"
+                                      description: 'format is the format of each headless
+                                        service address. there are three builtin variables
+                                        can be used as placerholder: $POD_ORDINAL,
+                                        $POD_FQDN, $POD_NAME $POD_ORDINAL is the ordinal
+                                        of the pod. $POD_FQDN is the fully qualified
+                                        domain name of the pod. $POD_NAME is the name
+                                        of the pod'
+                                      type: string
+                                    joinWith:
+                                      default: ','
+                                      description: joinWith is the string to join
+                                        the values of headless service addresses.
+                                      type: string
+                                    type:
+                                      allOf:
+                                      - enum:
+                                        - FieldRef
+                                        - ServiceRef
+                                        - HeadlessServiceRef
+                                      - enum:
+                                        - FieldRef
+                                        - ServiceRef
+                                        - HeadlessServiceRef
+                                      description: 'type is the type of the source
+                                        to select. There are three types: `FieldRef`,
+                                        `ServiceRef`, `HeadlessServiceRef`.'
+                                      type: string
+                                  required:
+                                  - type
+                                  type: object
+                              required:
+                              - name
+                              type: object
+                            type: array
+                            x-kubernetes-list-map-keys:
+                            - name
+                            x-kubernetes-list-type: map
+                          failurePolicy:
+                            allOf:
+                            - enum:
+                              - Ignore
+                              - Fail
+                            - enum:
+                              - Ignore
+                              - Fail
+                            description: failurePolicy is the failure policy of the
+                              component. If failed to find the component, the failure
+                              policy will be used.
+                            type: string
+                        required:
+                        - componentDefName
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - componentDefName
+                      x-kubernetes-list-type: map
                     configSpecs:
                       description: The configSpec field provided by provider, and
                         finally this configTemplateRefs will be rendered into the

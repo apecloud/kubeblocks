@@ -17,21 +17,21 @@
 
 #VtGateParameter: {
 
-  // At startup, the tabletGateway will wait up to this duration to get at least one tablet per keyspace/shard/tablet type. (default 30s)
-  gateway_initial_tablet_timeout: string
+	// At startup, the tabletGateway will wait up to this duration to get at least one tablet per keyspace/shard/tablet type. (default 30s)
+	gateway_initial_tablet_timeout: string
 
-  // After a duration of this time, if the client doesn't see any activity, it pings the server to see if the transport is still alive. (default 10s)
-  grpc_keepalive_time: string
+	// After a duration of this time, if the client doesn't see any activity, it pings the server to see if the transport is still alive. (default 10s)
+	grpc_keepalive_time: string
 
-  // After having pinged for keepalive check, the client waits for a duration of Timeout and if no activity is seen even after that the connection is closed. (default 10s)
-  grpc_keepalive_timeout: string
+	// After having pinged for keepalive check, the client waits for a duration of Timeout and if no activity is seen even after that the connection is closed. (default 10s)
+	grpc_keepalive_timeout: string
 
-  // The health check timeout period. (default 1m0s)
-  healthcheck_timeout: string
+	// The health check timeout period. (default 1m0s)
+	healthcheck_timeout: string
 
-  // Topo server timeout. (default 5s)
-  srv_topo_timeout: string
+	// Topo server timeout. (default 5s)
+	srv_topo_timeout: string
 
-  // Tablet refresh interval. (default 1m0s)
-  tablet_refresh_interval: string
+	// Tablet refresh interval. (default 1m0s)
+	tablet_refresh_interval: string
 }

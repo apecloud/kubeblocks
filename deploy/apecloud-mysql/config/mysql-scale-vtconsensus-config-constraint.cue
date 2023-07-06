@@ -16,10 +16,10 @@
 //along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #VtConsensusParameter: {
-  
-  // Refresh interval to load tablets. (default 10s)
-  refresh_interval: string
 
-  // Time to wait for a diagnose and repair operation. (default 3s)
-  scan_repair_timeout: string
+	// Refresh interval to load tablets. (default 10s)
+	refresh_interval: string
+
+	// Time to wait for a diagnose and repair operation. (default 3s)
+	scan_repair_timeout: string
 }

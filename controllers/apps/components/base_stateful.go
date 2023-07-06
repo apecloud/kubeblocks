@@ -664,6 +664,8 @@ func (c *statefulComponentBase) updateUnderlyingResources(reqCtx intctrlutil.Req
 	if err := c.UpdateService(reqCtx, cli); err != nil {
 		return err
 	}
+	// update KB_<component-type>_<pod-idx>_<hostname> env needed by pod to obtain hostname.
+	c.updatePodEnvConfig()
 	return nil
 }
 

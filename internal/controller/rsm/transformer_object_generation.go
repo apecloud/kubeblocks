@@ -179,19 +179,18 @@ func buildHeadlessSvc(rsm workloads.ReplicatedStateMachine) *corev1.Service {
 }
 
 func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envConfig corev1.ConfigMap) *apps.StatefulSet {
-	stsBuilder := builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name)
 	template := buildStsPodTemplate(rsm, envConfig)
-	stsBuilder.AddLabels(constant.AppInstanceLabelKey, rsm.Name).
-		AddLabels(constant.KBManagedByKey, kindReplicatedStateMachine).
-		AddMatchLabel(constant.AppInstanceLabelKey, rsm.Name).
-		AddMatchLabel(constant.KBManagedByKey, kindReplicatedStateMachine).
+	return builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
+		AddLabelsInMap(rsm.Labels).
+		AddAnnotationsInMap(rsm.Annotations).
+		SetSelector(rsm.Spec.Selector).
 		SetServiceName(headlessSvcName).
 		SetReplicas(rsm.Spec.Replicas).
-		SetPodManagementPolicy(apps.OrderedReadyPodManagement).
+		SetPodManagementPolicy(rsm.Spec.PodManagementPolicy).
 		SetVolumeClaimTemplates(rsm.Spec.VolumeClaimTemplates...).
 		SetTemplate(*template).
-		SetUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType)
-	return stsBuilder.GetObject()
+		SetUpdateStrategy(rsm.Spec.UpdateStrategy).
+		GetObject()
 }
 
 func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
@@ -204,14 +203,6 @@ func buildEnvConfigMap(rsm workloads.ReplicatedStateMachine) *corev1.ConfigMap {
 
 func buildStsPodTemplate(rsm workloads.ReplicatedStateMachine, envConfig corev1.ConfigMap) *corev1.PodTemplateSpec {
 	template := rsm.Spec.Template
-	labels := template.Labels
-	if labels == nil {
-		labels = make(map[string]string, 2)
-	}
-	labels[constant.AppInstanceLabelKey] = rsm.Name
-	labels[constant.KBManagedByKey] = kindReplicatedStateMachine
-	template.Labels = labels
-
 	// inject env ConfigMap into workload pods only
 	for i := range template.Spec.Containers {
 		template.Spec.Containers[i].EnvFrom = append(template.Spec.Containers[i].EnvFrom,

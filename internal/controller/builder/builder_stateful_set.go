@@ -62,6 +62,11 @@ func (builder *StatefulSetBuilder) AddMatchLabelsInMap(labels map[string]string)
 	return builder
 }
 
+func (builder *StatefulSetBuilder) SetSelector(selector *metav1.LabelSelector) *StatefulSetBuilder  {
+	builder.get().Spec.Selector = selector
+	return builder
+}
+
 func (builder *StatefulSetBuilder) SetServiceName(serviceName string) *StatefulSetBuilder {
 	builder.get().Spec.ServiceName = serviceName
 	return builder

@@ -21,9 +21,9 @@ package apps
 
 import (
 	"encoding/json"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"strings"
 
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,6 +34,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
@@ -161,13 +162,16 @@ func kindsForHalt() []client.ObjectList {
 	kindsPlus := []client.ObjectList{
 		&policyv1.PodDisruptionBudgetList{},
 		&corev1.ServiceList{},
-		&appsv1.StatefulSetList{},
-		&appsv1.DeploymentList{},
-		&workloads.ReplicatedStateMachineList{},
 		&corev1.ServiceList{},
 		&policyv1.PodDisruptionBudgetList{},
 	}
-	return append(kinds, kindsPlus...)
+	kindsPlus = append(kindsPlus, kinds...)
+	if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		kindsPlus = append(kindsPlus, &workloads.ReplicatedStateMachineList{})
+	} else {
+		kindsPlus = append(kindsPlus, &appsv1.StatefulSetList{}, &appsv1.DeploymentList{})
+	}
+	return kindsPlus
 }
 
 func kindsForDelete() []client.ObjectList {

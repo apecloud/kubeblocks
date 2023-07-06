@@ -138,5 +138,11 @@ var _ = Describe("stateful_set builder", func() {
 		Expect(*sts.Spec.UpdateStrategy.RollingUpdate.Partition).Should(Equal(partition))
 		Expect(sts.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(BeNil())
 		Expect(sts.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(Equal(maxUnavailable))
+
+		labelSelector := &metav1.LabelSelector{
+			MatchLabels: selectors,
+		}
+		sts = NewStatefulSetBuilder(ns, name).SetSelector(labelSelector).GetObject()
+		Expect(sts.Spec.Selector).Should(Equal(labelSelector))
 	})
 })

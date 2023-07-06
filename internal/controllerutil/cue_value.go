@@ -26,7 +26,6 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 	cuejson "cuelang.org/go/encoding/json"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func NewCUETplFromPath(filePathString string) (*CUETpl, error) {
@@ -84,30 +83,9 @@ func (v *CUEBuilder) Fill(path string, jsonByte []byte) error {
 	return nil
 }
 
-func (v *CUEBuilder) FillRaw(path string, value interface{}) error {
-	v.Value = v.Value.FillPath(cue.ParsePath(path), value)
-	return nil
-}
-
 func (v *CUEBuilder) Lookup(path string) ([]byte, error) {
 	cueValue := v.Value.LookupPath(cue.ParsePath(path))
 	return cueValue.MarshalJSON()
-}
-
-func (v *CUEBuilder) ConvertContentToUnstructured(path string) (*unstructured.Unstructured, error) {
-	var (
-		contentByte     []byte
-		err             error
-		unstructuredObj = &unstructured.Unstructured{}
-	)
-	if contentByte, err = v.Lookup(path); err != nil {
-		return nil, err
-	}
-	if err = json.Unmarshal(contentByte, &unstructuredObj); err != nil {
-		return nil, err
-	}
-
-	return unstructuredObj, nil
 }
 
 // func (v *CueValue) Render() (string, error) {

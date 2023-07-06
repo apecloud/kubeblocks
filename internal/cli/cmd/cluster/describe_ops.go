@@ -82,7 +82,7 @@ func NewDescribeOpsCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 		Short:             "Show details of a specific OpsRequest.",
 		Aliases:           []string{"desc-ops"},
 		Example:           describeOpsExample,
-		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.ClusterGVR()),
+		ValidArgsFunction: util.ResourceNameCompletionFunc(f, types.OpsGVR()),
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.complete(args))
 			util.CheckErr(o.run())

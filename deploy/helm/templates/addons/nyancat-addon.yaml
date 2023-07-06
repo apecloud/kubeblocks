@@ -15,8 +15,17 @@ spec:
   type: Helm
 
   helm:
-    # chartLocationURL: {{ .Values.addonChartLocationBase }}/nyancat-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/nyancat
+    {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/nyancat-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    {{- end }}
+
+    installOptions:
+     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: {{ default .Chart.Version .Values.versionOverride }}
+     {{- end }}
+
     valuesMapping:
       valueMap:
         replicaCount: replicaCount

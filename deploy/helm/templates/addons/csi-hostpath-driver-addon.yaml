@@ -14,7 +14,17 @@ spec:
   type: Helm
 
   helm:
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/csi-hostpath-driver
+    {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/csi-hostpath-driver-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    {{- end }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: {{ default .Chart.Version .Values.versionOverride }}
+      {{- end }}
+
     installValues:
       configMapRefs:
         - name: csi-hostpath-driver-chart-kubeblocks-values

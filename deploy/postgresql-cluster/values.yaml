@@ -10,8 +10,6 @@ terminationPolicy: Delete
 
 clusterVersionOverride: ""
 
-primaryIndex: 0
-
 switchPolicy:
   type: Noop
 

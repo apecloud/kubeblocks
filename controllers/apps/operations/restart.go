@@ -53,8 +53,8 @@ func init() {
 }
 
 // ActionStartedCondition the started condition when handle the restart request.
-func (r restartOpsHandler) ActionStartedCondition(opsRequest *appsv1alpha1.OpsRequest) *metav1.Condition {
-	return appsv1alpha1.NewRestartingCondition(opsRequest)
+func (r restartOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
+	return appsv1alpha1.NewRestartingCondition(opsRes.OpsRequest), nil
 }
 
 // Action restarts components by updating StatefulSet.

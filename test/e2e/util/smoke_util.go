@@ -32,7 +32,6 @@ import (
 )
 
 const label = "app.kubernetes.io/instance"
-const name = "mycluster"
 const namespace = "default"
 
 func GetFiles(path string) ([]string, error) {
@@ -75,7 +74,7 @@ func GetFolders(path string) ([]string, error) {
 	return result, nil
 }
 
-func CheckClusterStatus() bool {
+func CheckClusterStatus(name string) bool {
 	cmd := "kubectl get cluster " + name + " -n " + namespace + " | grep " + name + " | awk '{print $5}'"
 	log.Println(cmd)
 	clusterStatus := ExecCommand(cmd)
@@ -83,7 +82,7 @@ func CheckClusterStatus() bool {
 	return strings.TrimSpace(clusterStatus) == "Running"
 }
 
-func CheckPodStatus() map[string]bool {
+func CheckPodStatus(name string) map[string]bool {
 	var podStatusResult = make(map[string]bool)
 	cmd := "kubectl get pod -n " + namespace + " -l '" + label + "=" + name + "'| grep " + name + " | awk '{print $1}'"
 	log.Println(cmd)
@@ -316,4 +315,34 @@ func Check(command string, input string) (string, error) {
 	}
 
 	return output.String(), nil
+}
+
+func GetName(fileName string) (name string) {
+	name = ReadLineLast(fileName, "  name:")
+	s := StringSplit(name)
+	return s
+}
+
+func ReadLineLast(fileName string, name string) string {
+	file, err := os.Open(fileName)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	scanner := bufio.NewScanner(file)
+	var last string
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.Contains(line, name) {
+			last = line
+		}
+	}
+	return last
+}
+
+func StringSplit(str string) string {
+	s := strings.Split(str, ":")[1]
+	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.ReplaceAll(s, "\n", "")
+	return s
 }

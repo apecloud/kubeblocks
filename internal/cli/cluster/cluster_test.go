@@ -51,10 +51,12 @@ var _ = Describe("cluster util", func() {
 			testing.FakePVCs(),
 		}
 	}
-
+	cluster := testing.FakeCluster(testing.ClusterName, testing.Namespace)
 	dynamic := testing.FakeDynamicClient(
-		testing.FakeCluster(testing.ClusterName, testing.Namespace),
+		cluster,
 		testing.FakeClusterDef(),
+		testing.FakeBackupPolicy("backupPolicy-test", testing.ClusterName),
+		testing.FakeBackupWithCluster(cluster, "backup-test"),
 		testing.FakeClusterVersion())
 
 	getOptions := GetOptions{
@@ -65,6 +67,7 @@ var _ = Describe("cluster util", func() {
 		WithSecret:         true,
 		WithPVC:            true,
 		WithPod:            true,
+		WithDataProtection: true,
 	}
 
 	It("get cluster objects", func() {

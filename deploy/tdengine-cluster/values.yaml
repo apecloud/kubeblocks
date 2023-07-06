@@ -1,0 +1,38 @@
+# Default values for tdengine-cluster.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+## @param version MySQL cluster version
+##
+version: tdengine-3.0.5.0
+
+## @param mode TDengine cluster topology mode: standalone(=1) or raftGroup(=3)
+##
+mode: raftGroup
+
+## @param replicas specify cluster replicas
+##
+replicas: 3
+
+## @param cpu
+##
+cpu: 0.5
+
+## @param memory, the unit is Gi
+##
+memory: 1
+
+## @param requests.cpu if not set, use cpu
+## @param requests.memory, if not set, use memory
+##
+requests:
+#  cpu:
+#  memory:
+
+## @param storage size, the unit is Gi
+##
+storage: 10
+
+## customized values to override kblib chart's values
+extra:
+  monitoringInterval: 60

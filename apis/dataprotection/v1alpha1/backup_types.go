@@ -28,6 +28,7 @@ import (
 type BackupSpec struct {
 	// Which backupPolicy is applied to perform this backup
 	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	BackupPolicyName string `json:"backupPolicyName"`
 
@@ -83,6 +84,9 @@ type BackupStatus struct {
 	// backupToolName references the backup tool name.
 	// +optional
 	BackupToolName string `json:"backupToolName,omitempty"`
+
+	// sourceCluster records the source cluster information for this backup.
+	SourceCluster string `json:"sourceCluster,omitempty"`
 
 	// availableReplicas available replicas for statefulSet which created by backup.
 	// +optional
@@ -143,6 +147,10 @@ type BackupToolManifestsStatus struct {
 	// +optional
 	FilePath string `json:"filePath,omitempty"`
 
+	// volumeName records volume name of backup data pvc.
+	// +optional
+	VolumeName string `json:"volumeName,omitempty"`
+
 	// Backup upload total size.
 	// A string with capacity units in the form of "1Gi", "1Mi", "1Ki".
 	// +optional
@@ -164,6 +172,7 @@ type BackupToolManifestsStatus struct {
 // +kubebuilder:resource:categories={kubeblocks},scope=Namespaced
 // +kubebuilder:printcolumn:name="TYPE",type=string,JSONPath=`.spec.backupType`
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="SOURCE-CLUSTER",type=string,JSONPath=`.status.sourceCluster`
 // +kubebuilder:printcolumn:name="TOTAL-SIZE",type=string,JSONPath=`.status.totalSize`
 // +kubebuilder:printcolumn:name="DURATION",type=string,JSONPath=`.status.duration`
 // +kubebuilder:printcolumn:name="CREATE-TIME",type=string,JSONPath=".metadata.creationTimestamp"
@@ -247,13 +256,13 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 		return startTime, stopTime
 	}
 	logfileStartTime, logfileStopTime := getLogfileStartTimeAndStopTime()
-	// if not exists the start time of the first log file, return
-	if logfileStartTime.IsZero() {
+	// if not exists the startTime/stopTime of the first log file, return
+	if logfileStartTime.IsZero() || logfileStopTime.IsZero() {
 		return nil
 	}
 	getFirstRecoverableBaseBackup := func() *Backup {
 		for _, b := range backups {
-			if !slices.Contains([]BackupType{BackupTypeDataFile, BackupTypeSnapshot}, b.Spec.BackupType) &&
+			if !slices.Contains([]BackupType{BackupTypeDataFile, BackupTypeSnapshot}, b.Spec.BackupType) ||
 				b.Status.Phase != BackupCompleted {
 				continue
 			}
@@ -261,8 +270,9 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 				b.Status.Manifests.BackupLog.StopTime == nil {
 				continue
 			}
-			// checks if the 'stopTime' greater than or equals 'logfileStartTime'.
-			if !b.Status.Manifests.BackupLog.StopTime.Before(&logfileStartTime) {
+			// checks if the baseBackup stop time is between logfileStartTime and logfileStopTime.
+			if !b.Status.Manifests.BackupLog.StopTime.Before(&logfileStartTime) &&
+				b.Status.Manifests.BackupLog.StopTime.Before(&logfileStopTime) {
 				return &b
 			}
 		}
@@ -272,8 +282,7 @@ func GetRecoverableTimeRange(backups []Backup) []BackupLogStatus {
 	if firstRecoverableBaseBackup == nil {
 		return nil
 	}
-	result := make([]BackupLogStatus, 0)
 	// range of recoverable time
-	return append(result, BackupLogStatus{StopTime: &logfileStopTime,
-		StartTime: firstRecoverableBaseBackup.Status.Manifests.BackupLog.StopTime})
+	return []BackupLogStatus{{StopTime: &logfileStopTime,
+		StartTime: firstRecoverableBaseBackup.Status.Manifests.BackupLog.StopTime}}
 }

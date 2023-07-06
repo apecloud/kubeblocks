@@ -73,7 +73,7 @@ type OpsRequestSpec struct {
 	// +listMapKey=componentName
 	VolumeExpansionList []VolumeExpansion `json:"volumeExpansion,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
-	// restart the specified component.
+	// restart the specified components.
 	// +optional
 	// +patchMergeKey=componentName
 	// +patchStrategy=merge,retainKeys
@@ -81,6 +81,15 @@ type OpsRequestSpec struct {
 	// +listMapKey=componentName
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.restart"
 	RestartList []ComponentOps `json:"restart,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
+	// switchover the specified components.
+	// +optional
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.switchover"
+	SwitchoverList []Switchover `json:"switchover,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
 	// Deprecate: replace by update cluster command.
 	// Note: Quantity struct can not do immutable check by CEL.
@@ -118,6 +127,21 @@ type ComponentOps struct {
 	// componentName cluster component name.
 	// +kubebuilder:validation:Required
 	ComponentName string `json:"componentName"`
+}
+
+type Switchover struct {
+	ComponentOps `json:",inline"`
+
+	// instanceName is used to specify the candidate primary or leader instanceName for switchover.
+	// If instanceName is set to "*", it means that no specific primary or leader is specified for the switchover,
+	// and the switchoverAction defined in clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate will be executed,
+	// It is required that clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate is not empty.
+	// If instanceName is set to a valid instanceName other than "*", it means that a specific candidate primary or leader is specified for the switchover.
+	// the value of instanceName can be obtained using `kbcli cluster list-instances`, any other value is invalid.
+	// In this case, the `switchoverAction` defined in clusterDefinition.componentDefs[x].switchoverSpec.withCandidate will be executed,
+	// and it is required that clusterDefinition.componentDefs[x].switchoverSpec.withCandidate is not empty.
+	// +kubebuilder:validation:Required
+	InstanceName string `json:"instanceName"`
 }
 
 // Upgrade defines the variables of upgrade operation.
@@ -409,6 +433,16 @@ type OpsRequestComponentStatus struct {
 	// workloadType references workload type of component in ClusterDefinition.
 	// +optional
 	WorkloadType WorkloadType `json:"workloadType,omitempty"`
+
+	// reason describes the reason for the component phase.
+	// +kubebuilder:validation:MaxLength=1024
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
+
+	// message is a human-readable message indicating details about this operation.
+	// +kubebuilder:validation:MaxLength=32768
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
 type ReconfiguringStatus struct {
@@ -511,6 +545,15 @@ func init() {
 func (r OpsRequestSpec) GetRestartComponentNameSet() ComponentNameSet {
 	set := make(ComponentNameSet)
 	for _, v := range r.RestartList {
+		set[v.ComponentName] = struct{}{}
+	}
+	return set
+}
+
+// GetSwitchoverComponentNameSet gets the component name map with switchover operation.
+func (r OpsRequestSpec) GetSwitchoverComponentNameSet() ComponentNameSet {
+	set := make(ComponentNameSet)
+	for _, v := range r.SwitchoverList {
 		set[v.ComponentName] = struct{}{}
 	}
 	return set
@@ -626,6 +669,8 @@ func (r *OpsRequest) GetComponentNameSet() ComponentNameSet {
 		return r.Spec.GetReconfiguringComponentNameSet()
 	case ExposeType:
 		return r.Spec.GetExposeComponentNameSet()
+	case SwitchoverType:
+		return r.Spec.GetSwitchoverComponentNameSet()
 	default:
 		return nil
 	}

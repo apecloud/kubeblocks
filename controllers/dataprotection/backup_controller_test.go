@@ -21,6 +21,7 @@ package dataprotection
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo/v2"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -69,9 +71,9 @@ var _ = Describe("Backup Controller test", func() {
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.ClusterSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS)
 		testapps.ClearResources(&testCtx, generics.BackupPolicySignature, inNS, ml)
-		testapps.ClearResources(&testCtx, generics.JobSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.JobSignature, true, inNS)
 		testapps.ClearResources(&testCtx, generics.CronJobSignature, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS)
 		// non-namespaced
@@ -80,13 +82,14 @@ var _ = Describe("Backup Controller test", func() {
 	}
 	var nodeName string
 	var pvcName string
+	var cluster *appsv1alpha1.Cluster
 
 	BeforeEach(func() {
 		cleanEnv()
 		viper.Set(constant.CfgKeyCtrlrMgrNS, testCtx.DefaultNamespace)
 		By("mock a cluster")
-		testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
-			"test-cd", "test-cv").Create(&testCtx)
+		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			"test-cd", "test-cv").Create(&testCtx).GetObject()
 		podGenerateName := clusterName + "-" + componentName
 		By("By mocking a storage class")
 		_ = testapps.CreateStorageClass(&testCtx, storageClassName, true)
@@ -187,6 +190,8 @@ var _ = Describe("Backup Controller test", func() {
 				By("Check backup job completed")
 				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					g.Expect(fetched.Status.SourceCluster).Should(Equal(clusterName))
+					g.Expect(fetched.Labels[constant.DataProtectionLabelClusterUIDKey]).Should(Equal(string(cluster.UID)))
 					g.Expect(fetched.Labels[constant.AppInstanceLabelKey]).Should(Equal(clusterName))
 					g.Expect(fetched.Labels[constant.KBAppComponentLabelKey]).Should(Equal(componentName))
 					g.Expect(fetched.Annotations[constant.ClusterSnapshotAnnotationKey]).ShouldNot(BeEmpty())
@@ -208,10 +213,10 @@ var _ = Describe("Backup Controller test", func() {
 
 		Context("deletes a datafile backup", func() {
 			var backupKey types.NamespacedName
-
+			var backup *dpv1alpha1.Backup
 			BeforeEach(func() {
 				By("creating a backup from backupPolicy: " + backupPolicyName)
-				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+				backup = testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dpv1alpha1.BackupTypeDataFile).
 					Create(&testCtx).GetObject()
@@ -231,6 +236,7 @@ var _ = Describe("Backup Controller test", func() {
 						backup.Status.Manifests.BackupTool = &dpv1alpha1.BackupToolManifestsStatus{}
 					}
 					backup.Status.Manifests.BackupTool.FilePath = "/" + backupName
+					backup.Status.StartTimestamp = &metav1.Time{Time: time.Now()}
 				})).Should(Succeed())
 			})
 
@@ -239,12 +245,10 @@ var _ = Describe("Backup Controller test", func() {
 				testapps.DeleteObject(&testCtx, backupKey, &dpv1alpha1.Backup{})
 
 				By("checking new created Job")
-				jobKey := types.NamespacedName{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      deleteBackupFilesJobNamePrefix + backupName,
-				}
+				jobKey := buildDeleteBackupFilesJobNamespacedName(backup)
+				job := &batchv1.Job{}
 				Eventually(testapps.CheckObjExists(&testCtx, jobKey,
-					&batchv1.Job{}, true)).Should(Succeed())
+					job, true)).Should(Succeed())
 				volumeName := "backup-" + backupRemotePVCName
 				Eventually(testapps.CheckObj(&testCtx, jobKey, func(g Gomega, job *batchv1.Job) {
 					Expect(job.Spec.Template.Spec.Volumes).
@@ -263,9 +267,32 @@ var _ = Describe("Backup Controller test", func() {
 						}))
 				})).Should(Succeed())
 
-				By("checking Backup object, it should be deleted")
+				By("checking Backup object, it should not be deleted")
+				Eventually(testapps.CheckObjExists(&testCtx, backupKey,
+					&dpv1alpha1.Backup{}, true)).Should(Succeed())
+
+				By("mock job for deletion to Failed, backup should not be deleted")
+				Expect(testapps.ChangeObjStatus(&testCtx, job, func() {
+					job.Status.Conditions = []batchv1.JobCondition{
+						{
+							Type: batchv1.JobFailed,
+						},
+					}
+				})).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, backupKey,
+					&dpv1alpha1.Backup{}, true)).Should(Succeed())
+
+				By("mock job for deletion to completed, backup should be deleted")
+				Expect(testapps.ChangeObjStatus(&testCtx, job, func() {
+					job.Status.Conditions = []batchv1.JobCondition{
+						{
+							Type: batchv1.JobComplete,
+						},
+					}
+				})).Should(Succeed())
 				Eventually(testapps.CheckObjExists(&testCtx, backupKey,
 					&dpv1alpha1.Backup{}, false)).Should(Succeed())
+
 				// TODO: add delete backup test case with the pvc not exists
 			})
 		})
@@ -282,9 +309,9 @@ var _ = Describe("Backup Controller test", func() {
 				viper.Set(constant.CfgKeyCtrlrMgrTolerations,
 					"[{\"key\":\"key1\", \"operator\": \"Exists\", \"effect\": \"NoSchedule\"}]")
 				viper.Set(constant.CfgKeyCtrlrMgrNodeSelector, "{\"beta.kubernetes.io/arch\":\"amd64\"}")
-
+				snapshotBackupName := "backup-default-postgres-cluster-20230628104804"
 				By("By creating a backup from backupPolicy: " + backupPolicyName)
-				backup = testapps.NewBackupFactory(testCtx.DefaultNamespace, backupName).
+				backup = testapps.NewBackupFactory(testCtx.DefaultNamespace, snapshotBackupName).
 					SetBackupPolicyName(backupPolicyName).
 					SetBackupType(dpv1alpha1.BackupTypeSnapshot).
 					Create(&testCtx).GetObject()

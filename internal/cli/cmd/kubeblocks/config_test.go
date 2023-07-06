@@ -21,6 +21,7 @@ package kubeblocks
 
 import (
 	"bytes"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -70,7 +71,7 @@ var _ = Describe("backupconfig", func() {
 	}
 
 	mockHelmConfig := func(release string, opt *Options) (map[string]interface{}, error) {
-		return map[string]interface{}{
+		values := map[string]interface{}{
 			"updateStrategy": map[string]interface{}{
 				"rollingUpdate": map[string]interface{}{
 					"maxSurge":       1,
@@ -86,6 +87,9 @@ var _ = Describe("backupconfig", func() {
 				"encoder":         "console",
 				"timeEncoding":    "iso8601",
 			},
+			"cloudProvider": map[string]interface{}{
+				"accessKey": "testAK",
+			},
 			"priorityClassName": nil,
 			"nameOverride":      "",
 			"fullnameOverride":  "",
@@ -93,7 +97,15 @@ var _ = Describe("backupconfig", func() {
 			"replicaCount":      1,
 			"hostNetwork":       false,
 			"keepAddons":        false,
-		}, nil
+		}
+		for _, key := range sensitiveValues {
+			sp := strings.Split(key, ".")
+			rootKey := sp[0]
+			if node, ok := values[rootKey]; ok {
+				encryptNodeData(values, node, sp, 0)
+			}
+		}
+		return values, nil
 	}
 
 	BeforeEach(func() {
@@ -112,7 +124,6 @@ var _ = Describe("backupconfig", func() {
 				Dynamic:   testing.FakeDynamicClient(),
 			},
 			Version:   version.DefaultKubeBlocksVersion,
-			Monitor:   true,
 			ValueOpts: values.Options{Values: []string{"snapshot-controller.enabled=true"}},
 		}
 	})
@@ -127,6 +138,58 @@ var _ = Describe("backupconfig", func() {
 		Expect(o.PreCheck()).Should(HaveOccurred())
 	})
 
+	It("pruningConfigResults test, and expected success", func() {
+		configs := map[string]interface{}{
+			"key1": "value1",
+			"key2": "value2",
+			"key3": "value3",
+		}
+		tests := []struct {
+			configs       map[string]interface{}
+			showAllConfig bool
+			filterConfig  string
+			keyWhiteList  []string
+			results       map[string]interface{}
+		}{
+			{
+				configs,
+				true,
+				"",
+				keyWhiteList,
+				configs,
+			}, {
+				configs,
+				false,
+				"key1",
+				keyWhiteList,
+				map[string]interface{}{
+					"key1": "value1",
+				},
+			}, {
+				configs,
+				false,
+				"",
+				[]string{"key2"},
+				map[string]interface{}{
+					"key2": "value2",
+				},
+			}, {
+				configs,
+				false,
+				"",
+				[]string{},
+				map[string]interface{}{},
+			}}
+		Eventually(func(g Gomega) {
+			for _, t := range tests {
+				showAllConfig = t.showAllConfig
+				filterConfig = t.filterConfig
+				keyWhiteList = t.keyWhiteList
+				g.Expect(pruningConfigResults(t.configs)).Should(Equal(t.results))
+			}
+		}).Should(Succeed())
+	})
+
 	Context("run describe config cmd", func() {
 		var output printer.Format
 
@@ -135,6 +198,7 @@ var _ = Describe("backupconfig", func() {
 			err := describeConfig(o, output, mockHelmConfig)
 			Expect(err).Should(Succeed())
 			expect := `KEY                                VALUE                                   
+cloudProvider.accessKey            "******"                                
 dnsPolicy                          "ClusterFirst"                          
 fullnameOverride                   ""                                      
 hostNetwork                        false                                   
@@ -155,6 +219,9 @@ updateStrategy.type                "RollingUpdate"
 		It("describe-config --output json", func() {
 			output = printer.JSON
 			expect := `{
+  "cloudProvider": {
+    "accessKey": "******"
+  },
   "dnsPolicy": "ClusterFirst",
   "fullnameOverride": "",
   "hostNetwork": false,
@@ -186,7 +253,9 @@ updateStrategy.type                "RollingUpdate"
 
 		It("describe-config --output yaml", func() {
 			output = printer.YAML
-			expect := `dnsPolicy: ClusterFirst
+			expect := `cloudProvider:
+  accessKey: '******'
+dnsPolicy: ClusterFirst
 fullnameOverride: ""
 hostNetwork: false
 keepAddons: false

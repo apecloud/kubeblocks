@@ -440,6 +440,76 @@ var _ = Describe("Backup Controller test", func() {
 			})
 
 		})
+
+		Context("creates a logfile backup", func() {
+			var backupKey types.NamespacedName
+
+			BeforeEach(func() {
+				backupTool := testapps.CreateCustomizedObj(&testCtx, "backup/backuptool.yaml",
+					&dpv1alpha1.BackupTool{}, testapps.RandomizedObjName())
+				backupPolicy := testapps.NewBackupPolicyFactory(testCtx.DefaultNamespace, backupPolicyName).
+					WithRandomName().
+					AddLogfilePolicy().
+					SetTTL("7d").
+					SetSchedule("*/1 * * * *", true).
+					SetBackupToolName(backupTool.Name).
+					SetPVC(backupRemotePVCName).
+					AddMatchLabels(constant.AppInstanceLabelKey, clusterName).
+					Create(&testCtx).GetObject()
+				By("By creating a backup from backupPolicy: " + backupPolicy.Name)
+				logFileBackupName := getCreatedCRNameByBackupPolicy(generateUniqueNameWithBackupPolicy(backupPolicy), backupPolicy.Namespace, dpv1alpha1.BackupTypeLogFile)
+				backup := testapps.NewBackupFactory(testCtx.DefaultNamespace, logFileBackupName).
+					SetBackupPolicyName(backupPolicy.Name).
+					SetBackupType(dpv1alpha1.BackupTypeLogFile).
+					Create(&testCtx).GetObject()
+				backupKey = client.ObjectKeyFromObject(backup)
+			})
+
+			It("should succeed", func() {
+				By("Check backup job's nodeName equals pod's nodeName")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *batchv1.Job) {
+					g.Expect(fetched.Spec.Template.Spec.NodeSelector[hostNameLabelKey]).To(Equal(nodeName))
+				})).Should(Succeed())
+
+				patchK8sJobStatus(backupKey, batchv1.JobComplete)
+
+				By("Check backup job completed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+					g.Expect(fetched.Status.SourceCluster).Should(Equal(clusterName))
+					g.Expect(fetched.Labels[constant.DataProtectionLabelClusterUIDKey]).Should(Equal(string(cluster.UID)))
+					g.Expect(fetched.Labels[constant.AppInstanceLabelKey]).Should(Equal(clusterName))
+					g.Expect(fetched.Labels[constant.KBAppComponentLabelKey]).Should(Equal(componentName))
+					g.Expect(fetched.Annotations[constant.ClusterSnapshotAnnotationKey]).ShouldNot(BeEmpty())
+				})).Should(Succeed())
+
+				By("Check backup job is deleted after completed")
+				Eventually(testapps.CheckObjExists(&testCtx, backupKey, &batchv1.Job{}, false)).Should(Succeed())
+			})
+
+			It("should succeed if the previous job failed and the current job succeeded", func() {
+				patchK8sJobStatus(backupKey, batchv1.JobFailed)
+
+				By("Check backup job failed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupFailed))
+				})).Should(Succeed())
+
+				By("Patch backup Phase to New")
+				Eventually(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(fetched *dpv1alpha1.Backup) {
+					fetched.Status.Phase = dpv1alpha1.BackupNew
+				})).Should(Succeed())
+
+				By("Check backup job completed")
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupInProgress))
+				})).Should(Succeed())
+				patchK8sJobStatus(backupKey, batchv1.JobComplete)
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupCompleted))
+				})).Should(Succeed())
+			})
+		})
 	})
 
 	When("with backupTool resources", func() {

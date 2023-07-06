@@ -24,9 +24,8 @@ import (
 
 	kubekeyapiv1alpha2 "github.com/kubesphere/kubekey/v3/cmd/kk/apis/kubekey/v1alpha2"
 
-	"github.com/apecloud/kubeblocks/internal/configuration/container"
-
 	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/types"
+	"github.com/apecloud/kubeblocks/internal/configuration/container"
 )
 
 func TestCreateClusterWithOptions(t *testing.T) {

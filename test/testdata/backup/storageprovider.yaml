@@ -1,0 +1,11 @@
+apiVersion: storage.kubeblocks.io/v1alpha1
+kind: StorageProvider
+metadata:
+  generateName: storage-provider-
+spec:
+  csiDriverName: testcsidriver.kubeblocks.io
+  storageClassTemplate: |
+    provisioner: testcsidriver.kubeblocks.io
+    reclaimPolicy: Retain
+    allowVolumeExpansion: true
+    volumeBindingMode: Immediate

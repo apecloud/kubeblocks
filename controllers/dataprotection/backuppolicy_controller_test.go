@@ -339,7 +339,8 @@ var _ = Describe("Backup Policy Controller", func() {
 				backupPolicyKey := client.ObjectKeyFromObject(backupPolicy)
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, fetched *dpv1alpha1.BackupPolicy) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.PolicyAvailable))
-					g.Expect(fetched.Spec.Datafile.PersistentVolumeClaim.Name).To(Equal(pvcName))
+					g.Expect(fetched.Spec.Datafile.PersistentVolumeClaim.Name).ToNot(BeNil())
+					g.Expect(*fetched.Spec.Datafile.PersistentVolumeClaim.Name).To(Equal(pvcName))
 					g.Expect(fetched.Spec.Datafile.PersistentVolumeClaim.InitCapacity.String()).To(Equal(pvcInitCapacity))
 				})).Should(Succeed())
 			})

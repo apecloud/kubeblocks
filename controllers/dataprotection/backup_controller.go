@@ -70,6 +70,11 @@ const (
 	deleteBackupFilesJobNamePrefix = "delete-"
 )
 
+var (
+	// errBreakReconcile is not a real error, it is used to break the current reconciliation
+	errBreakReconcile = errors.New("break reconcile")
+)
+
 // BackupReconciler reconciles a Backup object
 type BackupReconciler struct {
 	client.Client
@@ -353,25 +358,30 @@ func (r *BackupReconciler) doNewPhaseAction(
 		if commonPolicy == nil {
 			return r.updateStatusIfFailed(reqCtx, backup, intctrlutil.NewBackupNotSupported(string(backup.Spec.BackupType), backupPolicy.Name))
 		}
-		// save the backup message for restore
-		backupToolName := commonPolicy.BackupToolName
-		backup.Status.PersistentVolumeClaimName = commonPolicy.PersistentVolumeClaim.Name
-		backup.Status.BackupToolName = backupToolName
-		pathPrefix := getBackupPathPrefix(backup, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
 		if backup.Status.Manifests == nil {
 			backup.Status.Manifests = &dataprotectionv1alpha1.ManifestsStatus{}
 		}
 		if backup.Status.Manifests.BackupTool == nil {
 			backup.Status.Manifests.BackupTool = &dataprotectionv1alpha1.BackupToolManifestsStatus{}
 		}
+		// handle the PVC used in this backup
+		pvcName, pvName, err := r.handlePersistentVolumeClaim(reqCtx, backup, backupPolicy.Name, commonPolicy)
+		if err != nil {
+			if errors.Is(err, errBreakReconcile) {
+				// wait for the PVC to be created
+				return intctrlutil.Reconciled()
+			}
+			return r.updateStatusIfFailed(reqCtx, backup, err)
+		}
+		// record volume name
+		backup.Status.PersistentVolumeClaimName = pvcName
+		backup.Status.Manifests.BackupTool.VolumeName = pvName
+		// save the backup message for restore
+		backupToolName := commonPolicy.BackupToolName
+		backup.Status.BackupToolName = backupToolName
+		pathPrefix := getBackupPathPrefix(backup, backupPolicy.Annotations[constant.BackupDataPathPrefixAnnotationKey])
 		backup.Status.Manifests.BackupTool.FilePath = pathPrefix
 		targetCluster = commonPolicy.Target
-		if volumeName, err := r.handlePersistentVolumeClaim(reqCtx, backup.Spec.BackupType, backupPolicy.Name, commonPolicy); err != nil {
-			return r.updateStatusIfFailed(reqCtx, backup, err)
-		} else {
-			// record volume name
-			backup.Status.Manifests.BackupTool.VolumeName = volumeName
-		}
 		backupTool, err := getBackupToolByName(reqCtx, r.Client, backupToolName)
 		if err != nil {
 			return r.updateStatusIfFailed(reqCtx, backup, intctrlutil.NewNotFound("backupTool: %s not found", backupToolName))
@@ -417,27 +427,83 @@ func (r *BackupReconciler) doNewPhaseAction(
 	return intctrlutil.Reconciled()
 }
 
-// handlePersistentVolumeClaim handles the persistent volume claim for the backup, the rules are as follows
+func (r *BackupReconciler) handlePersistentVolumeClaim(reqCtx intctrlutil.RequestCtx,
+	backup *dataprotectionv1alpha1.Backup,
+	backupPolicyName string,
+	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) (pvcName string, pvName string, err error) {
+	// check the legacy PVC field first for compatibility,
+	// and fallback to the backup repo approach if the legacy PVC field is empty
+	if commonPolicy.PersistentVolumeClaim.Name != nil {
+		pvcName = *commonPolicy.PersistentVolumeClaim.Name
+	}
+	pvName, err = r.handlePersistentVolumeClaimLegacy(reqCtx, backup.Spec.BackupType, backupPolicyName, commonPolicy)
+	if err == nil || !intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeBackupPVCNameIsEmpty) {
+		return pvcName, pvName, err
+	}
+
+	// check the PVC from backup repo
+	repo, err := r.getBackupRepo(reqCtx, backup, commonPolicy)
+	if err != nil {
+		return "", "", err
+	}
+	pvcName = repo.Status.BackupPVCName
+	if pvcName == "" {
+		err = intctrlutil.NewBackupPVCNameIsEmpty(string(backup.Spec.BackupType), backupPolicyName)
+		return "", "", err
+	}
+	pvc := &corev1.PersistentVolumeClaim{}
+	err = r.Client.Get(reqCtx.Ctx, client.ObjectKey{
+		Namespace: reqCtx.Req.Namespace,
+		Name:      pvcName,
+	}, pvc)
+	if err != nil && !apierrors.IsNotFound(err) {
+		// error occurred
+		return "", "", err
+	}
+	if err == nil {
+		// the PVC is already present, bind the backup to the repo
+		if backup.Labels == nil {
+			backup.Labels = map[string]string{}
+		}
+		if backup.Labels[dataProtectionBackupRepoKey] == "" {
+			backup.Labels[dataProtectionBackupRepoKey] = repo.Name
+		}
+		return pvcName, pvc.Spec.VolumeName, nil
+	}
+	// the PVC is not present
+	// add a special label and wait for the backup repo controller to create the PVC.
+	// we need to update the object meta immediately, because we are going to break the current reconciliation.
+	_, err = r.patchBackupObjectLabels(reqCtx, backup, map[string]string{
+		dataProtectionBackupRepoKey:  repo.Name,
+		dataProtectionNeedRepoPVCKey: trueVal,
+	})
+	if err != nil {
+		return "", "", err
+	}
+	return "", "", errBreakReconcile
+}
+
+// handlePersistentVolumeClaimLegacy handles the persistent volume claim for the backup, the rules are as follows
 // - if CreatePolicy is "Never", it will check if the pvc exists. if not existed, then report an error.
 // - if CreatePolicy is "IfNotPresent" and the pvc not existed, then create the pvc automatically.
-func (r *BackupReconciler) handlePersistentVolumeClaim(reqCtx intctrlutil.RequestCtx,
+func (r *BackupReconciler) handlePersistentVolumeClaimLegacy(reqCtx intctrlutil.RequestCtx,
 	backupType dataprotectionv1alpha1.BackupType,
 	backupPolicyName string,
 	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) (string, error) {
 	pvcConfig := commonPolicy.PersistentVolumeClaim
-	if len(pvcConfig.Name) == 0 {
+	if pvcConfig.Name == nil || len(*pvcConfig.Name) == 0 {
 		return "", intctrlutil.NewBackupPVCNameIsEmpty(string(backupType), backupPolicyName)
 	}
 	pvc := &corev1.PersistentVolumeClaim{}
 	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Namespace: reqCtx.Req.Namespace,
-		Name: pvcConfig.Name}, pvc); err != nil && !apierrors.IsNotFound(err) {
+		Name: *pvcConfig.Name}, pvc); err != nil && !apierrors.IsNotFound(err) {
 		return "", err
 	}
 	if len(pvc.Name) > 0 {
 		return pvc.Spec.VolumeName, nil
 	}
 	if pvcConfig.CreatePolicy == dataprotectionv1alpha1.CreatePVCPolicyNever {
-		return "", intctrlutil.NewNotFound(`persistent volume claim "%s" not found`, pvcConfig.Name)
+		return "", intctrlutil.NewNotFound(`persistent volume claim "%s" not found`, *pvcConfig.Name)
 	}
 	if pvcConfig.PersistentVolumeConfigMap != nil &&
 		(pvcConfig.StorageClassName == nil || *pvcConfig.StorageClassName == "") {
@@ -450,13 +516,41 @@ func (r *BackupReconciler) handlePersistentVolumeClaim(reqCtx intctrlutil.Reques
 	return "", r.createPVCWithStorageClassName(reqCtx, backupPolicyName, pvcConfig)
 }
 
+// getBackupRepo returns the backup repo specified by the backup object or the policy.
+// if no backup repo specified, it will return the default one.
+func (r *BackupReconciler) getBackupRepo(
+	reqCtx intctrlutil.RequestCtx,
+	backup *dataprotectionv1alpha1.Backup,
+	commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) (*dataprotectionv1alpha1.BackupRepo, error) {
+	// use the specified backup repo
+	var repoName string
+	if val := backup.Labels[dataProtectionBackupRepoKey]; val != "" {
+		repoName = val
+	} else if commonPolicy.BackupRepoName != nil && *commonPolicy.BackupRepoName != "" {
+		repoName = *commonPolicy.BackupRepoName
+	}
+	if repoName != "" {
+		repo := &dataprotectionv1alpha1.BackupRepo{}
+		err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: repoName}, repo)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, intctrlutil.NewNotFound("backup repo %s not found", repoName)
+			}
+			return nil, err
+		}
+		return repo, nil
+	}
+	// fallback to use the default repo
+	return getDefaultBackupRepo(reqCtx.Ctx, r.Client)
+}
+
 // createPVCWithStorageClassName creates the persistent volume claim with the storageClassName.
 func (r *BackupReconciler) createPVCWithStorageClassName(reqCtx intctrlutil.RequestCtx,
 	backupPolicyName string,
 	pvcConfig dataprotectionv1alpha1.PersistentVolumeClaim) error {
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        pvcConfig.Name,
+			Name:        *pvcConfig.Name,
 			Namespace:   reqCtx.Req.Namespace,
 			Annotations: buildAutoCreationAnnotations(backupPolicyName),
 		},
@@ -490,7 +584,7 @@ func (r *BackupReconciler) createPersistentVolumeWithTemplate(reqCtx intctrlutil
 	if pvTemplate == "" {
 		return intctrlutil.NewBackupPVTemplateNotFound(pvConfig.Namespace, pvConfig.Name)
 	}
-	pvName := fmt.Sprintf("%s-%s", pvcConfig.Name, reqCtx.Req.Namespace)
+	pvName := fmt.Sprintf("%s-%s", *pvcConfig.Name, reqCtx.Req.Namespace)
 	pvTemplate = strings.ReplaceAll(pvTemplate, "$(GENERATE_NAME)", pvName)
 	pv := &corev1.PersistentVolume{}
 	if err := yaml.Unmarshal([]byte(pvTemplate), pv); err != nil {
@@ -499,7 +593,7 @@ func (r *BackupReconciler) createPersistentVolumeWithTemplate(reqCtx intctrlutil
 	pv.Name = pvName
 	pv.Spec.ClaimRef = &corev1.ObjectReference{
 		Namespace: reqCtx.Req.Namespace,
-		Name:      pvcConfig.Name,
+		Name:      *pvcConfig.Name,
 	}
 	pv.Annotations = buildAutoCreationAnnotations(backupPolicyName)
 	// set the storageClassName to empty for the persistentVolumeClaim to avoid the dynamic provisioning
@@ -795,7 +889,7 @@ func (r *BackupReconciler) buildManifestsUpdaterContainer(backup *dataprotection
 		return container, err
 	}
 	container.VolumeMounts = []corev1.VolumeMount{
-		{Name: fmt.Sprintf("backup-%s", commonPolicy.PersistentVolumeClaim.Name), MountPath: backupPathBase},
+		{Name: fmt.Sprintf("backup-%s", backup.Status.PersistentVolumeClaimName), MountPath: backupPathBase},
 	}
 	container.Env = []corev1.EnvVar{
 		{Name: constant.DPBackupInfoFile, Value: buildBackupInfoENV(pathPrefix)},
@@ -891,6 +985,24 @@ func (r *BackupReconciler) getCluster(
 		return nil
 	}
 	return cluster
+}
+
+// patchBackupObjectLabels add missed labels to the backup object.
+func (r *BackupReconciler) patchBackupObjectLabels(
+	reqCtx intctrlutil.RequestCtx,
+	backup *dataprotectionv1alpha1.Backup,
+	labels map[string]string) (bool, error) {
+	oldBackup := backup.DeepCopy()
+	if backup.Labels == nil {
+		backup.Labels = make(map[string]string)
+	}
+	for k, v := range labels {
+		backup.Labels[k] = v
+	}
+	if reflect.DeepEqual(oldBackup.ObjectMeta, backup.ObjectMeta) {
+		return false, nil
+	}
+	return true, r.Client.Patch(reqCtx.Ctx, backup, client.MergeFrom(oldBackup))
 }
 
 // patchBackupObjectMeta patches backup object metaObject include cluster snapshot.
@@ -1704,7 +1816,7 @@ func (r *BackupReconciler) buildBackupToolPodSpec(reqCtx intctrlutil.RequestCtx,
 	podSpec.RestartPolicy = corev1.RestartPolicyNever
 
 	// mount the backup volume to the pod of backup tool
-	pvcName := commonPolicy.PersistentVolumeClaim.Name
+	pvcName := backup.Status.PersistentVolumeClaimName
 	r.appendBackupVolumeMount(pvcName, &podSpec, &podSpec.Containers[0])
 
 	// the pod of job needs to be scheduled on the same node as the workload pod, because it needs to share one pvc
@@ -1789,7 +1901,7 @@ func (r *BackupReconciler) buildMetadataCollectionPodSpec(
 		container.Env = []corev1.EnvVar{
 			{Name: "BACKUP_INFO_FILE", Value: buildBackupInfoENV(pathPrefix)},
 		}
-		r.appendBackupVolumeMount(commonPolicy.PersistentVolumeClaim.Name, &podSpec, &container)
+		r.appendBackupVolumeMount(backup.Status.PersistentVolumeClaimName, &podSpec, &container)
 	} else {
 		args = "set -o errexit; set -o nounset;" +
 			"OUTPUT=$(kubectl -n %s exec -it pod/%s -c %s -- %s);" +

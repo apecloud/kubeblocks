@@ -365,7 +365,7 @@ func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPo
 					BackupsHistoryLimit: 1,
 				},
 				PersistentVolumeClaim: dpv1alpha1.PersistentVolumeClaim{
-					Name: "test1",
+					Name: pointer.String("test1"),
 				},
 			},
 			Logfile: &dpv1alpha1.CommonBackupPolicy{
@@ -373,7 +373,7 @@ func FakeBackupPolicy(backupPolicyName, clusterName string) *dpv1alpha1.BackupPo
 					BackupsHistoryLimit: 1,
 				},
 				PersistentVolumeClaim: dpv1alpha1.PersistentVolumeClaim{
-					Name: "test1",
+					Name: pointer.String("test1"),
 				},
 			},
 			Schedule: dpv1alpha1.Schedule{

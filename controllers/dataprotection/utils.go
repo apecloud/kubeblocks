@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -267,6 +268,32 @@ func buildDeleteBackupFilesJobNamespacedName(backup *dataprotectionv1alpha1.Back
 		jobName = jobName[:63]
 	}
 	return types.NamespacedName{Namespace: backup.Namespace, Name: jobName}
+}
+
+func getDefaultBackupRepo(ctx context.Context, cli client.Client) (*dataprotectionv1alpha1.BackupRepo, error) {
+	backupRepoList := &dataprotectionv1alpha1.BackupRepoList{}
+	err := cli.List(ctx, backupRepoList)
+	if err != nil {
+		return nil, err
+	}
+	var defaultRepo *dataprotectionv1alpha1.BackupRepo
+	for idx := range backupRepoList.Items {
+		repo := &backupRepoList.Items[idx]
+		// skip non-default repo
+		if !(repo.Annotations[constant.DefaultBackupRepoAnnotationKey] == trueVal &&
+			repo.Status.Phase == dataprotectionv1alpha1.BackupRepoReady) {
+			continue
+		}
+		if defaultRepo != nil {
+			return nil, fmt.Errorf("multiple default BackupRepo found, both %s and %s are default",
+				defaultRepo.Name, repo.Name)
+		}
+		defaultRepo = repo
+	}
+	if defaultRepo == nil {
+		return nil, fmt.Errorf("no default BackupRepo found")
+	}
+	return defaultRepo, nil
 }
 
 // ============================================================================

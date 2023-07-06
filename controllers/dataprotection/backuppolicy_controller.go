@@ -339,7 +339,7 @@ func (r *BackupPolicyReconciler) reconcileForStatefulSetKind(
 	backup.Labels[constant.AppManagedByLabelKey] = constant.AppName
 	backup.Labels[dataProtectionLabelBackupPolicyKey] = backupPolicy.Name
 	backup.Labels[dataProtectionLabelBackupTypeKey] = string(backType)
-	backup.Labels[dataProtectionLabelAutoBackupKey] = "true"
+	backup.Labels[dataProtectionLabelAutoBackupKey] = trueVal
 	if !exists {
 		if cronExpression == "" {
 			return nil
@@ -568,8 +568,8 @@ func (r *BackupPolicyReconciler) handleLogfilePolicy(
 func (r *BackupPolicyReconciler) setGlobalPersistentVolumeClaim(backupPolicy *dataprotectionv1alpha1.CommonBackupPolicy) {
 	pvcCfg := backupPolicy.PersistentVolumeClaim
 	globalPVCName := viper.GetString(constant.CfgKeyBackupPVCName)
-	if len(pvcCfg.Name) == 0 && globalPVCName != "" {
-		backupPolicy.PersistentVolumeClaim.Name = globalPVCName
+	if (pvcCfg.Name == nil || len(*pvcCfg.Name) == 0) && globalPVCName != "" {
+		backupPolicy.PersistentVolumeClaim.Name = &globalPVCName
 	}
 
 	globalInitCapacity := viper.GetString(constant.CfgKeyBackupPVCInitCapacity)

@@ -774,7 +774,7 @@ func (o *editBackupPolicyOptions) complete(args []string) error {
 	}
 	updatePVCName := func(commonPolicy *dpv1alpha1.CommonBackupPolicy, targetVal string) error {
 		if commonPolicy != nil {
-			commonPolicy.PersistentVolumeClaim.Name = targetVal
+			commonPolicy.PersistentVolumeClaim.Name = &targetVal
 		}
 		return nil
 	}

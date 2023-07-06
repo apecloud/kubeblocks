@@ -42,7 +42,7 @@ kbcli fault node detach-volume [flags]
       --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
       --duration string                Supported formats of the duration are: ms / s / m / h. (default "30s")
   -h, --help                           help for detach-volume
-  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+  -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --project string                 The name of the GCP project. Only available when cloud-provider=gcp.
       --region string                  The region of the node.
       --secret string                  The name of the secret containing cloud provider specific credentials.

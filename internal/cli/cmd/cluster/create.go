@@ -35,7 +35,6 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -194,8 +193,6 @@ type CreateOptions struct {
 	SetFile           string                   `json:"-"`
 	Values            []string                 `json:"-"`
 
-	shouldCreateDependencies bool `json:"-"`
-
 	// backup name to restore in creation
 	Backup        string `json:"backup,omitempty"`
 	RestoreTime   string `json:"restoreTime,omitempty"`
@@ -227,9 +224,9 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVar(&o.Backup, "backup", "", "Set a source backup to restore data")
 	cmd.Flags().StringVar(&o.RestoreTime, "restore-to-time", "", "Set a time for point in time recovery")
 	cmd.Flags().StringVar(&o.SourceCluster, "source-cluster", "", "Set a source cluster for point in time recovery")
-	cmd.Flags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
-	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
-	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
+	cmd.PersistentFlags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
+	cmd.PersistentFlags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
+	cmd.PersistentFlags().Lookup("dry-run").NoOptDefVal = "unchanged"
 
 	// add required
 	_ = cmd.MarkFlagRequired("cluster-definition")
@@ -237,10 +234,13 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	o.UpdatableFlags.addFlags(cmd)
 
 	// add print flags
-	printer.AddOutputFlagForCreate(cmd, &o.Format)
+	printer.AddOutputFlagForCreate(cmd, &o.Format, true)
 
 	// register flag completion func
 	registerFlagCompletionFunc(cmd, f)
+
+	// add all subcommands for supported cluster type
+	cmd.AddCommand(buildCreateSubCmds(&o.CreateOptions)...)
 
 	return cmd
 }
@@ -456,14 +456,10 @@ func (o *CreateOptions) Complete() error {
 
 	// if name is not specified, generate a random cluster name
 	if o.Name == "" {
-		name, err := generateClusterName(o.Dynamic, o.Namespace)
+		o.Name, err = generateClusterName(o.Dynamic, o.Namespace)
 		if err != nil {
 			return err
 		}
-		if name == "" {
-			return fmt.Errorf("failed to generate a random cluster name")
-		}
-		o.Name = name
 	}
 
 	// build annotation
@@ -582,7 +578,6 @@ func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
 
 	// set component service account name
 	compSpec.ServiceAccountName = saNamePrefix + o.Name
-	o.shouldCreateDependencies = true
 	return nil
 }
 
@@ -592,10 +587,6 @@ func (o *CreateOptions) CreateDependencies(dryRun []string) error {
 		roleName        = roleNamePrefix + o.Name
 		roleBindingName = roleBindingNamePrefix + o.Name
 	)
-
-	if !o.shouldCreateDependencies {
-		return nil
-	}
 
 	klog.V(1).Infof("create dependencies for cluster %s", o.Name)
 	// create service account
@@ -1055,7 +1046,7 @@ func generateClusterName(dynamic dynamic.Interface, namespace string) (string, e
 			return "", err
 		}
 	}
-	return "", nil
+	return "", fmt.Errorf("failed to generate cluster name")
 }
 
 func (f *UpdatableFlags) addFlags(cmd *cobra.Command) {
@@ -1147,8 +1138,19 @@ func getStorageClasses(dynamic dynamic.Interface) (map[string]struct{}, bool, er
 // validateClusterVersion checks the existence of declared cluster version,
 // if not set, check the existence of default cluster version
 func (o *CreateOptions) validateClusterVersion() error {
-	existedClusterVersions, defaultVersion, existedDefault, err := getClusterVersions(o.Dynamic, o.ClusterDefRef)
-	if err != nil {
+	var err error
+
+	// cluster version is specified, validate if exists
+	if o.ClusterVersionRef != "" {
+		if err = cluster.ValidateClusterVersion(o.Dynamic, o.ClusterDefRef, o.ClusterVersionRef); err != nil {
+			return fmt.Errorf("cluster version \"%s\" does not exist, run following command to get the available cluster versions\n\tkbcli cv list --cluster-definition=%s",
+				o.ClusterVersionRef, o.ClusterDefRef)
+		}
+		return nil
+	}
+
+	// cluster version is not specified, get the default cluster version
+	if o.ClusterVersionRef, err = cluster.GetDefaultVersion(o.Dynamic, o.ClusterDefRef); err != nil {
 		return err
 	}
 
@@ -1156,62 +1158,13 @@ func (o *CreateOptions) validateClusterVersion() error {
 	if err != nil {
 		return err
 	}
-
-	printCvInfo := func(cv string) {
-		// if dryRun is set, run in quiet mode, avoid to output yaml file with the info
-		if dryRun != create.DryRunNone {
-			return
-		}
-		fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", cv)
+	// if dryRun is set, run in quiet mode, avoid to output yaml file with the info
+	if dryRun != create.DryRunNone {
+		return nil
 	}
 
-	switch {
-	case o.ClusterVersionRef != "":
-		if _, ok := existedClusterVersions[o.ClusterVersionRef]; !ok {
-			return fmt.Errorf("failed to find the specified cluster version \"%s\"", o.ClusterVersionRef)
-		}
-	case !existedDefault:
-		// if default version is not set and there is only one version, pick it
-		if len(existedClusterVersions) == 1 {
-			o.ClusterVersionRef = maps.Keys(existedClusterVersions)[0]
-			printCvInfo(o.ClusterVersionRef)
-		} else {
-			return fmt.Errorf("failed to find the default cluster version, use '--cluster-version ClusterVersion' to set it")
-		}
-	case existedDefault:
-		// TODO: achieve this in operator
-		if existedDefault {
-			o.ClusterVersionRef = defaultVersion
-			printCvInfo(o.ClusterVersionRef)
-		}
-	}
-
+	fmt.Fprintf(o.Out, "Info: --cluster-version is not specified, ClusterVersion %s is applied by default\n", o.ClusterVersionRef)
 	return nil
-}
-
-// getClusterVersions returns all cluster versions in K8S and return true if the cluster has a default cluster version
-func getClusterVersions(dynamic dynamic.Interface, clusterDef string) (map[string]struct{}, string, bool, error) {
-	allClusterVersions := make(map[string]struct{})
-	existedDefault := false
-	defaultVersion := ""
-	list, err := dynamic.Resource(types.ClusterVersionGVR()).List(context.Background(), metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDef),
-	})
-	if err != nil {
-		return nil, defaultVersion, false, err
-	}
-	for _, item := range list.Items {
-		allClusterVersions[item.GetName()] = struct{}{}
-		annotations := item.GetAnnotations()
-		if annotations != nil && annotations[constant.DefaultClusterVersionAnnotationKey] == annotationTrueValue {
-			if existedDefault {
-				return nil, defaultVersion, existedDefault, fmt.Errorf("clusterDef %s has more than one default cluster version", clusterDef)
-			}
-			existedDefault = true
-			defaultVersion = item.GetName()
-		}
-	}
-	return allClusterVersions, defaultVersion, existedDefault, nil
 }
 
 func buildResourceLabels(clusterName string) map[string]string {

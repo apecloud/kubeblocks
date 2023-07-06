@@ -1598,7 +1598,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "redis_memory_fragmentation_ratio{pod=~\"$instance\"}",
+          "expr": "redis_mem_fragmentation_ratio{pod=~\"$instance\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "{{pod}}",

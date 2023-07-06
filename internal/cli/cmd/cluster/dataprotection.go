@@ -34,7 +34,6 @@ import (
 	"github.com/spf13/cobra"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -422,20 +421,17 @@ type CreateRestoreOptions struct {
 }
 
 func (o *CreateRestoreOptions) getClusterObject(backup *dpv1alpha1.Backup) (*appsv1alpha1.Cluster, error) {
-	clusterName := backup.Labels[constant.AppInstanceLabelKey]
-	clusterObj, err := cluster.GetClusterByName(o.Dynamic, clusterName, o.Namespace)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
-	}
-	if apierrors.IsNotFound(err) {
-		// if the source cluster does not exist, get it from the cluster snapshot of the backup.
-		clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
-		if !ok {
-			return nil, fmt.Errorf("source cluster: %s not found", clusterName)
+	// use the cluster snapshot to restore firstly
+	clusterString, ok := backup.Annotations[constant.ClusterSnapshotAnnotationKey]
+	if ok {
+		clusterObj := &appsv1alpha1.Cluster{}
+		if err := json.Unmarshal([]byte(clusterString), &clusterObj); err != nil {
+			return nil, err
 		}
-		err = json.Unmarshal([]byte(clusterString), &clusterObj)
+		return clusterObj, nil
 	}
-	return clusterObj, err
+	clusterName := backup.Labels[constant.AppInstanceLabelKey]
+	return cluster.GetClusterByName(o.Dynamic, clusterName, o.Namespace)
 }
 
 func (o *CreateRestoreOptions) Run() error {
@@ -778,7 +774,7 @@ func (o *editBackupPolicyOptions) complete(args []string) error {
 	}
 	updatePVCName := func(commonPolicy *dpv1alpha1.CommonBackupPolicy, targetVal string) error {
 		if commonPolicy != nil {
-			commonPolicy.PersistentVolumeClaim.Name = targetVal
+			commonPolicy.PersistentVolumeClaim.Name = &targetVal
 		}
 		return nil
 	}

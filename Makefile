@@ -137,7 +137,7 @@ preflight-manifests: generate ## Generate external Preflight API
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./externalapis/preflight/..." output:crd:artifacts:config=config/crd/preflight
 
 .PHONY: generate
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: controller-gen build-kbcli-embed-chart ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/...;./externalapis/..."
 
 .PHONY: client-sdk-gen
@@ -177,11 +177,11 @@ lint: test-go-generate generate ## Run default lint job against code.
 	$(MAKE) golangci-lint
 
 .PHONY: golangci-lint
-golangci-lint: golangci ## Run golangci-lint against code.
+golangci-lint: golangci generate ## Run golangci-lint against code.
 	$(GOLANGCILINT) run ./...
 
 .PHONY: staticcheck
-staticcheck: staticchecktool ## Run staticcheck against code.
+staticcheck: staticchecktool generate ## Run staticcheck against code.
 	$(STATICCHECK) -tags $(BUILD_TAGS) ./...
 
 .PHONY: build-checks
@@ -211,13 +211,15 @@ ifeq (, $(shell sed -n "/^127.0.0.1[[:space:]]*host.$(EXISTING_CLUSTER_TYPE).int
 endif
 endif
 
+
+OUTPUT_COVERAGE=-coverprofile cover.out.tmp && grep -v "zz_generated.deepcopy.go" cover.out.tmp > cover.out && rm cover.out.tmp
 .PHONY: test-current-ctx
 test-current-ctx: manifests generate add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
-	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) -p 1 -coverprofile cover.out $(TEST_PACKAGES)
+	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) -p 1 $(TEST_PACKAGES) $(OUTPUT_COVERAGE)
 
 .PHONY: test-fast
 test-fast: envtest
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) -short -coverprofile cover.out $(TEST_PACKAGES)
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) -short $(TEST_PACKAGES)  $(OUTPUT_COVERAGE)
 
 .PHONY: test
 test: manifests generate test-go-generate add-k8s-host test-fast ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
@@ -272,9 +274,29 @@ bin/kbcli.%: test-go-generate ## Cross build bin/kbcli.$(OS).$(ARCH).
 .PHONY: kbcli-fast
 kbcli-fast: OS=$(shell $(GO) env GOOS)
 kbcli-fast: ARCH=$(shell $(GO) env GOARCH)
-kbcli-fast:
+kbcli-fast: build-kbcli-embed-chart
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
 	@mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
+
+create-kbcli-embed-charts-dir:
+	mkdir -p internal/cli/cluster/charts/
+build-single-kbcli-embed-chart.%: chart=$(word 2,$(subst ., ,$@))
+build-single-kbcli-embed-chart.%:
+	$(HELM) dependency update deploy/$(chart) --skip-refresh
+	$(HELM) package deploy/$(chart) --version $(VERSION)
+	mv $(chart)-*.tgz internal/cli/cluster/charts/$(chart).tgz
+
+.PHONY: build-kbcli-embed-chart
+build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
+	build-single-kbcli-embed-chart.apecloud-mysql-cluster
+#	build-single-kbcli-embed-chart.postgresql-cluster \
+#	build-single-kbcli-embed-chart.clickhouse-cluster \
+#	build-single-kbcli-embed-chart.kafka-cluster \
+#	build-single-kbcli-embed-chart.mongodb-cluster \
+#	build-single-kbcli-embed-chart.redis-cluster \
+#	build-single-kbcli-embed-chart.milvus-cluster \
+#	build-single-kbcli-embed-chart.qdrant-cluster \
+#	build-single-kbcli-embed-chart.weaviate-cluster
 
 .PHONY: kbcli
 kbcli: test-go-generate build-checks kbcli-fast ## Build bin/kbcli.
@@ -447,7 +469,6 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v4.5.7
 CONTROLLER_TOOLS_VERSION ?= v0.9.0
-HELM_VERSION ?= v3.9.0
 CUE_VERSION ?= v0.4.3
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
@@ -545,7 +566,9 @@ helmtool: ## Download helm locally if necessary.
 ifeq (, $(shell which helm))
 	@{ \
 	set -e ;\
-	go install github.com/helm/helm@$(HELM_VERSION);\
+	echo 'installing helm' ;\
+	curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash;\
+	echo 'Successfully installed' ;\
 	}
 HELM=$(GOBIN)/helm
 else

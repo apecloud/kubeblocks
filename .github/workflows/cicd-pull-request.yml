@@ -24,8 +24,16 @@ jobs:
           access_token: ${{ github.token }}
 
       - uses: actions/checkout@v3
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          fetch-depth: 0     
+
+      - uses: actions/checkout@v3
+        if: github.event.pull_request.head.repo.full_name != github.repository
         with:
           fetch-depth: 0
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+      
       - name: Get trigger mode
         id: get_trigger_mode
         run: |

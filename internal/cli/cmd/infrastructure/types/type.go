@@ -20,10 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package types
 
 import (
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/constant"
 	kubekeyapiv1alpha2 "github.com/kubesphere/kubekey/v3/cmd/kk/apis/kubekey/v1alpha2"
 	"helm.sh/helm/v3/pkg/cli/values"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/infrastructure/constant"
 )
 
 type InfraVersionInfo struct {

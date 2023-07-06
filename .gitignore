@@ -62,3 +62,6 @@ tmp/
 # helm dependency charts
 deploy/**/Chart.lock
 deploy/**/charts
+
+# cli embed chart directory
+internal/cli/cluster/charts/

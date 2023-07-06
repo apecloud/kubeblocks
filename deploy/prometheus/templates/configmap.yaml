@@ -40,8 +40,10 @@ metadata:
   name: {{ template "prometheus.server.fullname" . }}-config
 data:
 {{- $values := .Values }}
+{{- $root := . -}}
 {{- range $path, $content := .Files.Glob "config/server/serverFiles/*" }}
-  {{ trimPrefix "config/server/serverFiles/" $path }}: |-
+  {{- if eq $path "config/server/serverFiles/prometheus.yml" -}}
+  {{ trimPrefix "config/server/serverFiles/" $path | nindent 2 }}: |-
     global:
     {{- with $values.server.global }}
       scrape_interval: {{ .scrape_interval }}
@@ -49,8 +51,36 @@ data:
       evaluation_interval: {{ .evaluation_interval }}
     {{- end }}
     {{- if $values.server.remoteWrite }}
-      remote_write:
-        {{- $values.server.remoteWrite | toYaml | nindent 8 }}
+    remote_write:
+      {{- $values.server.remoteWrite | toYaml | nindent 8 }}
     {{- end }}
+    alerting:
+      alertmanagers:
+      - kubernetes_sd_configs:
+          - role: pod
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - source_labels: [ __meta_kubernetes_namespace ]
+            regex: {{ $root.Release.Namespace }}
+            action: keep
+          - source_labels: [ __meta_kubernetes_pod_label_app_kubernetes_io_instance ]
+            regex: .*prometheus-playground
+            action: keep
+          - source_labels: [ __meta_kubernetes_pod_label_apps_kubeblocks_io_component_name ]
+            regex: alertmanager
+            action: keep
+          - source_labels: [ __meta_kubernetes_pod_annotation_prometheus_io_probe ]
+            regex: .*
+            action: keep
+          - source_labels: [ __meta_kubernetes_pod_container_port_number ]
+            regex: "9093"
+            action: keep
     {{- $content | toString | nindent 4 }}
+  {{- else }}
+  {{ trimPrefix "config/server/serverFiles/" $path | nindent 2 }}: |-
+    {{- $content | toString | nindent 4 }}
+  {{- end }}
 {{- end }}
+

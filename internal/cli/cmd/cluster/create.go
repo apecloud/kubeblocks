@@ -159,16 +159,11 @@ const (
 	keyUnknown      setKey = "unknown"
 )
 
-type envSet struct {
-	name       string
-	defaultVal string
-}
-
-var setKeyEnvMap = map[setKey]envSet{
-	keyCPU:      {"CLUSTER_DEFAULT_CPU", "1000m"},
-	keyMemory:   {"CLUSTER_DEFAULT_MEMORY", "1Gi"},
-	keyStorage:  {"CLUSTER_DEFAULT_STORAGE_SIZE", "20Gi"},
-	keyReplicas: {"CLUSTER_DEFAULT_REPLICAS", "1"},
+var setKeyCfg = map[setKey]string{
+	keyCPU:      types.CfgKeyClusterDefaultCPU,
+	keyMemory:   types.CfgKeyClusterDefaultMemory,
+	keyStorage:  types.CfgKeyClusterDefaultStorageSize,
+	keyReplicas: types.CfgKeyClusterDefaultReplicas,
 }
 
 // UpdatableFlags is the flags that cat be updated by update command
@@ -236,6 +231,8 @@ func NewCreateCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	cmd.Flags().StringVar(&o.DryRun, "dry-run", "none", `Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent.`)
 	cmd.Flags().Lookup("dry-run").NoOptDefVal = "unchanged"
 
+	// add required
+	_ = cmd.MarkFlagRequired("cluster-definition")
 	// add updatable flags
 	o.UpdatableFlags.addFlags(cmd)
 
@@ -821,10 +818,8 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 	// true if the value is from environment variables
 	getVal := func(c *appsv1alpha1.ClusterComponentDefinition, key setKey, sets map[setKey]string) string {
 		// get value from set values
-		if sets != nil {
-			if v := sets[key]; len(v) > 0 {
-				return v
-			}
+		if v := sets[key]; len(v) > 0 {
+			return v
 		}
 
 		// HACK: if user does not set by command flag, for replicationSet workload,
@@ -856,12 +851,8 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		}
 
 		// get value from environment variables
-		env := setKeyEnvMap[key]
-		val := viper.GetString(env.name)
-		if len(val) == 0 {
-			val = env.defaultVal
-		}
-		return val
+		cfg := setKeyCfg[key]
+		return viper.GetString(cfg)
 	}
 
 	buildSwitchPolicy := func(c *appsv1alpha1.ClusterComponentDefinition, compObj *appsv1alpha1.ClusterComponentSpec, sets map[setKey]string) error {
@@ -886,10 +877,14 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 	}
 
 	var comps []*appsv1alpha1.ClusterComponentSpec
-	for _, c := range cd.Spec.ComponentDefs {
-		sets := map[setKey]string{}
-		if setsMap != nil {
-			sets = setsMap[c.Name]
+	for i, c := range cd.Spec.ComponentDefs {
+		sets := setsMap[c.Name]
+
+		// HACK: for apecloud-mysql cluster definition, if setsMap is empty, user
+		// does not specify any set, so we only build the first component.
+		// TODO(ldm): remove this hack and use helm chart to render the cluster.
+		if i > 0 && len(sets) == 0 && cd.Name == "apecloud-mysql" {
+			continue
 		}
 
 		// get replicas
@@ -967,9 +962,8 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 // specified in the set, use the cluster definition default component name.
 func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[string]map[setKey]string, error) {
 	allSets := map[string]map[setKey]string{}
-	keys := []string{string(keyCPU), string(keyType), string(keyStorage), string(keyMemory), string(keyReplicas), string(keyClass), string(keyStorageClass), string(keySwitchPolicy)}
 	parseKey := func(key string) setKey {
-		for _, k := range keys {
+		for _, k := range setKeys() {
 			if strings.EqualFold(k, key) {
 				return setKey(k)
 			}
@@ -987,7 +981,7 @@ func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[
 			// only record the supported key
 			k := parseKey(kv[0])
 			if k == keyUnknown {
-				return nil, fmt.Errorf("unknown set key \"%s\", should be one of [%s]", kv[0], strings.Join(keys, ","))
+				return nil, fmt.Errorf("unknown set key \"%s\", should be one of [%s]", kv[0], strings.Join(setKeys(), ","))
 			}
 			res[k] = kv[1]
 		}
@@ -1013,6 +1007,11 @@ func buildCompSetsMap(values []string, cd *appsv1alpha1.ClusterDefinition) (map[
 			name, err := cluster.GetDefaultCompName(cd)
 			if err != nil {
 				return nil, err
+			}
+
+			// if the number of component definitions is more than one, default use the first one and output a log
+			if len(cd.Spec.ComponentDefs) > 1 {
+				klog.V(1).Infof("the component is not specified, use the default component \"%s\" in cluster definition \"%s\"", name, cd.Name)
 			}
 			compDefName = name
 		} else {
@@ -1278,4 +1277,17 @@ func parseClusterComponentSpec(compByte []byte) ([]appsv1alpha1.ClusterComponent
 	}
 
 	return compSpecs, nil
+}
+
+func setKeys() []string {
+	return []string{
+		string(keyCPU),
+		string(keyType),
+		string(keyStorage),
+		string(keyMemory),
+		string(keyReplicas),
+		string(keyClass),
+		string(keyStorageClass),
+		string(keySwitchPolicy),
+	}
 }

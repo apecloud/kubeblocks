@@ -9,4 +9,4 @@ spec:
     - componentName: mongodb
       volumeClaimTemplates:
         - name: data
-          storage: "2Gi"
+          storage: "20Gi"

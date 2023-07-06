@@ -449,25 +449,23 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 			Timeout:   o.Timeout,
 		},
 		Version: o.kbVersion,
-		Monitor: true,
 		Quiet:   true,
 		Check:   true,
 	}
+
+	// enable monitor components by default
+	insOpts.ValueOpts.Values = append(insOpts.ValueOpts.Values,
+		"prometheus.enabled=true",
+		"grafana.enabled=true",
+		"agamotto.enabled=true",
+	)
 
 	if o.cloudProvider == cp.Local {
 		insOpts.ValueOpts.Values = append(insOpts.ValueOpts.Values,
 			// use hostpath csi driver to support snapshot
 			"snapshot-controller.enabled=true",
 			"csi-hostpath-driver.enabled=true",
-
-			// disable the persistent volume of prometheus, if not, the prometheus
-			// will depend on the hostpath csi driver to create persistent
-			// volume, but the order of addon installation is not guaranteed which
-			// will cause the prometheus PVC pending forever.
-			"prometheus.server.persistentVolume.enabled=false",
-			"prometheus.server.statefulSet.enabled=false",
-			"prometheus.alertmanager.persistentVolume.enabled=false",
-			"prometheus.alertmanager.statefulSet.enabled=false")
+		)
 	} else if o.cloudProvider == cp.AWS {
 		insOpts.ValueOpts.Values = append(insOpts.ValueOpts.Values,
 			// enable aws-load-balancer-controller addon automatically on playground

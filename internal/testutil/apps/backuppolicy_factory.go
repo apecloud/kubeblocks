@@ -102,6 +102,7 @@ func (factory *MockBackupPolicyFactory) AddSnapshotPolicy() *MockBackupPolicyFac
 func (factory *MockBackupPolicyFactory) AddDataFilePolicy() *MockBackupPolicyFactory {
 	factory.get().Spec.Datafile = &dataprotectionv1alpha1.CommonBackupPolicy{
 		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
+			Name:         "backup-data",
 			CreatePolicy: dataprotectionv1alpha1.CreatePVCPolicyIfNotPresent,
 		},
 	}
@@ -112,6 +113,7 @@ func (factory *MockBackupPolicyFactory) AddDataFilePolicy() *MockBackupPolicyFac
 func (factory *MockBackupPolicyFactory) AddLogfilePolicy() *MockBackupPolicyFactory {
 	factory.get().Spec.Logfile = &dataprotectionv1alpha1.CommonBackupPolicy{
 		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
+			Name:         "backup-data",
 			CreatePolicy: dataprotectionv1alpha1.CreatePVCPolicyIfNotPresent,
 		},
 	}
@@ -131,6 +133,11 @@ func (factory *MockBackupPolicyFactory) SetSchedule(schedule string, enable bool
 		schedulePolicy.Enable = enable
 		schedulePolicy.CronExpression = schedule
 	})
+	return factory
+}
+
+func (factory *MockBackupPolicyFactory) SetScheduleStartWindowMinutes(startWindowMinutes *int64) *MockBackupPolicyFactory {
+	factory.get().Spec.Schedule.StartWindowMinutes = startWindowMinutes
 	return factory
 }
 

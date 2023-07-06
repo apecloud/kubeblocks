@@ -101,10 +101,15 @@ spec:
               clusterDefinitionRef:
                 description: Cluster referencing ClusterDefinition name. This is an
                   immutable attribute.
+                maxLength: 63
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
+                x-kubernetes-validations:
+                - message: clusterDefinitionRef is immutable
+                  rule: self == oldSelf
               clusterVersionRef:
                 description: Cluster referencing ClusterVersion name.
+                maxLength: 63
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
               componentSpecs:
@@ -112,6 +117,8 @@ spec:
                   and ClusterVersion. It will replace the field in ClusterDefinition's
                   and ClusterVersion's component if type is matching.
                 items:
+                  description: ClusterComponentSpec defines the cluster component
+                    spec.
                   properties:
                     affinity:
                       description: affinity describes affinities specified by users.
@@ -164,15 +171,18 @@ spec:
                           type: string
                         name:
                           description: Name refers to the name of the ComponentClassDefinition.
+                          maxLength: 63
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                       required:
                       - class
                       type: object
                     componentDefRef:
-                      description: componentDefRef references the componentDef defined
-                        in ClusterDefinition spec.
-                      maxLength: 63
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      description: componentDefRef references componentDef defined
+                        in ClusterDefinition spec. Need to comply with IANA Service
+                        Naming rule.
+                      maxLength: 22
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     enabledLogs:
                       description: enabledLogs indicates which log file takes effect
@@ -230,23 +240,18 @@ spec:
                         and export metrics to Time Series Database.
                       type: boolean
                     name:
-                      description: name defines cluster's component name.
-                      maxLength: 15
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      description: name defines cluster's component name, this name
+                        is also part of Service DNS name, so this name will comply
+                        with IANA Service Naming rule.
+                      maxLength: 22
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     noCreatePDB:
                       default: false
-                      description: noCreatePDB defines the PodDistruptionBudget creation
-                        behavior and is set to true if creation of PodDistruptionBudget
+                      description: noCreatePDB defines the PodDisruptionBudget creation
+                        behavior and is set to true if creation of PodDisruptionBudget
                         for this component is not needed. It defaults to false.
                       type: boolean
-                    primaryIndex:
-                      description: primaryIndex determines which index is primary
-                        when workloadType is Replication. Index number starts from
-                        zero.
-                      format: int32
-                      minimum: 0
-                      type: integer
                     replicas:
                       default: 1
                       description: Component replicas. The default value is used in
@@ -354,12 +359,23 @@ spec:
                         and failover when workloadType is Replication.
                       properties:
                         type:
-                          default: MaximumAvailability
-                          description: clusterSwitchPolicy type defined by Provider
-                            in ClusterDefinition, refer components[i].replicationSpec.switchPolicies[x].type
+                          default: Noop
+                          description: 'clusterSwitchPolicy defines type of the switchPolicy
+                            when workloadType is Replication. MaximumAvailability:
+                            [WIP] when the primary is active, do switch if the synchronization
+                            delay = 0 in the user-defined lagProbe data delay detection
+                            logic, otherwise do not switch. The primary is down, switch
+                            immediately. It will be available in future versions.
+                            MaximumDataProtection: [WIP] when the primary is active,
+                            do switch if synchronization delay = 0 in the user-defined
+                            lagProbe data lag detection logic, otherwise do not switch.
+                            If the primary is down, if it can be judged that the primary
+                            and secondary data are consistent, then do the switch,
+                            otherwise do not switch. It will be available in future
+                            versions. Noop: KubeBlocks will not perform high-availability
+                            switching on components. Users need to implement HA by
+                            themselves or integrate open source HA solution.'
                           enum:
-                          - MaximumAvailability
-                          - MaximumDataProtection
                           - Noop
                           type: string
                       type: object

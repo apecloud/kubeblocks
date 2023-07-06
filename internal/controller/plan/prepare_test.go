@@ -124,31 +124,6 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 		return RenderConfigNScriptFiles(clusterVer, cluster, component, workload, podSpec, nil, reqCtx.Ctx, cli)
 	}
 
-	// pre-condition check
-	// if component.WorkloadType == appsv1alpha1.Replication {
-	//	// get the number of existing pods under the current component
-	//	var existPodList = &corev1.PodList{}
-	//	if err := componentutil.GetObjectListByComponentName(reqCtx.Ctx, cli, *cluster, existPodList, component.Name); err != nil {
-	//		return nil, err
-	//	}
-	//
-	//	// If the Pods already exists, check whether there is an HA switching and the HA process is prioritized to handle.
-	//	// TODO: (xingran) After refactoring, HA switching will be handled in the replicationSet controller.
-	//	if len(existPodList.Items) > 0 {
-	//		primaryIndexChanged, _, err := replication.CheckPrimaryIndexChanged(reqCtx.Ctx, cli, cluster,
-	//			component.Name, component.GetPrimaryIndex())
-	//		if err != nil {
-	//			return nil, err
-	//		}
-	//		if primaryIndexChanged {
-	//			if err := replication.HandleReplicationSetHASwitch(reqCtx.Ctx, cli, cluster,
-	//				componentutil.GetClusterComponentSpecByName(*cluster, component.Name)); err != nil {
-	//				return nil, err
-	//			}
-	//		}
-	//	}
-	// }
-
 	// TODO: may add a PDB transform to Create/Update/Delete.
 	// if no these handle, the cluster controller will occur an error during reconciling.
 	// conditional build PodDisruptionBudget
@@ -543,7 +518,6 @@ var _ = Describe("Cluster Controller", func() {
 				clusterDef.Name, clusterVersion.Name).
 				AddComponent(redisCompName, redisCompDefName).
 				SetReplicas(2).
-				SetPrimaryIndex(0).
 				GetObject()
 		})
 
@@ -601,7 +575,6 @@ var _ = Describe("Cluster Controller", func() {
 	// 			clusterDef.Name, clusterVersion.Name).
 	// 			AddComponentVersion(redisCompName, redisCompDefName).
 	// 			SetReplicas(2).
-	// 			SetPrimaryIndex(0).
 	// 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 	// 			GetObject()
 	// 	})

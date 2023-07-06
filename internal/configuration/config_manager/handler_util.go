@@ -154,6 +154,8 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec,
 			continue
 		}
 		reloadConfigSpecMeta = append(reloadConfigSpecMeta, ConfigSpecMeta{
+			ToolsImageSpec: cc.Spec.ToolsImageSpec,
+			ScriptConfig:   cc.Spec.ScriptConfigs,
 			ConfigSpecInfo: ConfigSpecInfo{
 				ReloadOptions:      cc.Spec.ReloadOptions,
 				ConfigSpec:         configSpec,
@@ -161,9 +163,18 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec,
 				DownwardAPIOptions: cc.Spec.DownwardAPIOptions,
 				FormatterConfig:    *cc.Spec.FormatterConfig,
 			},
-			ToolsImageSpec: cc.Spec.ToolsImageSpec,
-			ScriptConfig:   cc.Spec.ScriptConfigs,
 		})
 	}
 	return reloadConfigSpecMeta, nil
+}
+
+func FilterSubPathVolumeMount(metas []ConfigSpecMeta, volumes []corev1.VolumeMount) []ConfigSpecMeta {
+	var filtered []ConfigSpecMeta
+	for _, meta := range metas {
+		v := FindVolumeMount(volumes, meta.ConfigSpec.VolumeName)
+		if v == nil || v.SubPath == "" || meta.ReloadType == appsv1alpha1.TPLScriptType {
+			filtered = append(filtered, meta)
+		}
+	}
+	return filtered
 }

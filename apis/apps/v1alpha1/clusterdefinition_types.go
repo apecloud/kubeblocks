@@ -44,18 +44,20 @@ type ClusterDefinitionSpec struct {
 	ComponentDefs []ClusterComponentDefinition `json:"componentDefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Connection credential template used for creating a connection credential
-	// secret for cluster.apps.kubeblocks.io object. Built-in objects are:
-	// `$(RANDOM_PASSWD)` - random 8 characters.
-	// `$(UUID)` - generate a random UUID v4 string.
-	// `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string.
-	// `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded.
-	// `$(UUID_HEX)` - generate a random UUID v4 HEX representation.
-	// `$(HEADLESS_SVC_FQDN)` - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
+	// secret for cluster.apps.kubeblocks.io object.
+	//
+	// Built-in objects are:
+	// - `$(RANDOM_PASSWD)` - random 8 characters.
+	// - `$(UUID)` - generate a random UUID v4 string.
+	// - `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string.
+	// - `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded.
+	// - `$(UUID_HEX)` - generate a random UUID v4 HEX representation.
+	// - `$(HEADLESS_SVC_FQDN)` - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
+	// - `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
-	//    `"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306`, and "$(SVC_PORT_mysql)" in the
+	// - `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
+	//    `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and "$(SVC_PORT_mysql)" in the
 	//    connection credential value is 3306.
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
@@ -126,7 +128,7 @@ type ProvisionPolicy struct {
 	// type defines the way to provision an account, either `CreateByStmt` or `ReferToExisting`.
 	// +kubebuilder:validation:Required
 	Type ProvisionPolicyType `json:"type"`
-	// scope is the scope to provision account, and the scope could be `anyPod` or `allPods`.
+	// scope is the scope to provision account, and the scope could be `AnyPods` or `AllPods`.
 	// +kubebuilder:default=AnyPods
 	Scope ProvisionScope `json:"scope"`
 	// statements will be used when Type is CreateByStmt.
@@ -242,10 +244,13 @@ type VolumeTypeSpec struct {
 // behaviors.
 // +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Consensus' ?  has(self.consensusSpec) : !has(self.consensusSpec)",message="componentDefs.consensusSpec is required when componentDefs.workloadType is Consensus, and forbidden otherwise"
 type ClusterComponentDefinition struct {
-	// name of the component, it can be any valid string.
+	// A component definition name, this name could be used as default name of `Cluster.spec.componentSpecs.name`,
+	// and so this name is need to conform with same validation rules as `Cluster.spec.componentSpecs.name`, that
+	// is currently comply with IANA Service Naming rule. This name will apply to "apps.kubeblocks.io/component-name"
+	// object label value.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=18
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
 	// The description of component definition.
@@ -357,6 +362,11 @@ type ClusterComponentDefinition struct {
 	// +listMapKey=key
 	// +optional
 	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
+
+	// switchoverSpec defines command to do switchover.
+	// in particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
+	// +optional
+	SwitchoverSpec *SwitchoverSpec `json:"switchoverSpec,omitempty"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
@@ -789,15 +799,6 @@ type ConsensusMember struct {
 
 type ReplicationSetSpec struct {
 	StatefulSetSpec `json:",inline"`
-
-	// switchPolicies defines a collection of different types of switchPolicy, and each type of switchPolicy is limited to one.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	SwitchPolicies []SwitchPolicy `json:"switchPolicies,omitempty"`
-
-	// switchCmdExecutorConfig configs how to get client SDK and perform switch statements.
-	// +kubebuilder:validation:Required
-	SwitchCmdExecutorConfig *SwitchCmdExecutorConfig `json:"switchCmdExecutorConfig"`
 }
 
 var _ StatefulSetWorkload = &ReplicationSetSpec{}
@@ -817,61 +818,19 @@ func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolic
 		return r.LLPodManagementPolicy, *r.LLUpdateStrategy
 	}
 	_, s := r.StatefulSetSpec.finalStsUpdateStrategy()
-	// TODO(xingran): The update of the replicationSet needs to generate a plan according to the role
 	s.Type = appsv1.OnDeleteStatefulSetStrategyType
 	s.RollingUpdate = nil
 	return appsv1.ParallelPodManagement, s
 }
 
-type SwitchPolicy struct {
-	// switchPolicyType defines type of the switchPolicy.
-	// MaximumAvailability: when the primary is active, do switch if the synchronization delay = 0 in the user-defined lagProbe data delay detection logic, otherwise do not switch. The primary is down, switch immediately.
-	// MaximumDataProtection: when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch.
-	// Noop: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=MaximumAvailability
-	Type SwitchPolicyType `json:"type"`
-
-	// switchStatements defines switching actions according to their respective roles, We divide all pods into three switchStatement role={Promote,Demote,Follow}.
-	// Promote: candidate primary after elected, which to be promoted
-	// Demote: primary before switch, which to be demoted
-	// Follow: the other secondaries that are not selected as the primary, which to follow the new primary
-	// if switchStatements is not set, we will try to use the built-in switchStatements for the database engine with built-in support.
+type SwitchoverSpec struct {
+	// withCandidate corresponds to the switchover of the specified candidate primary or leader instance.
 	// +optional
-	SwitchStatements *SwitchStatements `json:"switchStatements,omitempty"`
-}
+	WithCandidate *CmdExecutorConfig `json:"withCandidate,omitempty"`
 
-type SwitchStatements struct {
-	// promote defines the switching actions for the candidate primary which to be promoted.
+	// withoutCandidate corresponds to a switchover that does not specify a candidate primary or leader instance.
 	// +optional
-	Promote []string `json:"promote,omitempty"`
-
-	// demote defines the switching actions for the old primary which to be demoted.
-	// +optional
-	Demote []string `json:"demote,omitempty"`
-
-	// follow defines the switching actions for the other secondaries which are not selected as the primary.
-	// +optional
-	Follow []string `json:"follow,omitempty"`
-}
-
-type SwitchCmdExecutorConfig struct {
-	CommandExecutorEnvItem `json:",inline"`
-
-	// switchSteps definition, users can customize the switching steps on the provided three roles - NewPrimary, OldPrimary, and Secondaries.
-	// the same role can customize multiple steps in the order of the list, and KubeBlocks will perform switching operations in the defined order.
-	// if switchStep is not set, we will try to use the built-in switchStep for the database engine with built-in support.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +optional
-	SwitchSteps []SwitchStep `json:"switchSteps"`
-}
-
-type SwitchStep struct {
-	CommandExecutorItem `json:",inline"`
-
-	// role determines which role to execute the command on, role is divided into three roles NewPrimary, OldPrimary, and Secondaries.
-	Role SwitchStepRole `json:"role"`
+	WithoutCandidate *CmdExecutorConfig `json:"withoutCandidate,omitempty"`
 }
 
 type CommandExecutorEnvItem struct {

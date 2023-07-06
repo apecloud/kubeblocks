@@ -84,6 +84,21 @@ spec:
       volumeTypes:
         - name: data
           type: data
+      switchoverSpec:
+        withCandidate:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+          command:
+            - /bin/bash
+            - -c
+          args:
+            - curl -s http://$(KB_REPLICATION_PRIMARY_POD_FQDN):8008/switchover -XPOST -d '{"leader":"$(KB_REPLICATION_PRIMARY_POD_NAME)","candidate":"$(KB_SWITCHOVER_CANDIDATE_NAME)"}'
+        withoutCandidate:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+          command:
+            - /bin/bash
+            - -c
+          args:
+            - curl -s http://$(KB_REPLICATION_PRIMARY_POD_FQDN):8008/switchover -XPOST -d '{"leader":"$(KB_REPLICATION_PRIMARY_POD_NAME)"}'
       podSpec:
         securityContext:
           runAsUser: 0
@@ -101,6 +116,8 @@ spec:
                 mountPath: /home/postgres/conf
               - name: scripts
                 mountPath: /kb-scripts
+              - name: pod-info
+                mountPath: /kb-podinfo
         containers:
           - name: postgresql
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
@@ -131,6 +148,8 @@ spec:
                 mountPath: /home/postgres/conf
               - name: scripts
                 mountPath: /kb-scripts
+              - name: pod-info
+                mountPath: /kb-podinfo
             ports:
               - name: tcp-postgresql
                 containerPort: 5432
@@ -307,6 +326,18 @@ spec:
               {{- with .Values.shmVolume.sizeLimit }}
               sizeLimit: {{ . }}
               {{- end }}
+          - name: pod-info
+            downwardAPI:
+              items:
+                - path: "pod-role"
+                  fieldRef:
+                    fieldPath: metadata.labels['kubeblocks.io/role']
+                - path: "primary-pod"
+                  fieldRef:
+                    fieldPath: metadata.annotations['rs.apps.kubeblocks.io/primary']
+                - path: "component-replicas"
+                  fieldRef:
+                    fieldPath: metadata.annotations['apps.kubeblocks.io/component-replicas']
       systemAccounts:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}

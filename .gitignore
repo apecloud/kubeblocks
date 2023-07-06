@@ -37,10 +37,6 @@ cover.html
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
 
-# Kubernetes Generated files - skip generated files, except for vendored files
-zz_generated.*
-!vendor/**/zz_generated.*
-
 # editor and IDE paraphernalia
 .vscode/
 .idea/
@@ -58,9 +54,11 @@ pkg/resources/static/k3d/
 
 # Distribution directories
 _dist/
+dist/
 bin/
 tmp/
 
 
 # helm dependency charts
+deploy/**/Chart.lock
 deploy/**/charts

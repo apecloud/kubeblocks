@@ -21,6 +21,9 @@ spec:
     systemAccountSpec:
       cmdExecutorConfig:
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
+    switchoverSpec:
+      cmdExecutorConfig:
+        image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
 
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -67,6 +70,9 @@ spec:
       systemAccountSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1
+      switchoverSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.14.1
 
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -108,6 +114,9 @@ spec:
       systemAccountSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.15.0
+      switchoverSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:12.15.0
 
 ---
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -132,5 +141,8 @@ spec:
           - name: pgbouncer
             image: {{ .Values.pgbouncer.image.registry | default "docker.io" }}/{{ .Values.pgbouncer.image.repository }}:{{ .Values.pgbouncer.image.tag }}
       systemAccountSpec:
+        cmdExecutorConfig:
+          image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:14.8.0
+      switchoverSpec:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:14.8.0

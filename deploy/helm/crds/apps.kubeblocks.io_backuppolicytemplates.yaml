@@ -55,9 +55,10 @@ spec:
                   properties:
                     componentDefRef:
                       description: componentDefRef references componentDef defined
-                        in ClusterDefinition spec.
-                      maxLength: 63
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                        in ClusterDefinition spec. Need to comply with IANA Service
+                        Naming rule.
+                      maxLength: 22
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                       type: string
                     datafile:
                       description: the policy for datafile backup.
@@ -103,6 +104,7 @@ spec:
                         backupToolName:
                           description: which backup tool to perform database backup,
                             only support one tool.
+                          maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         backupsHistoryLimit:
@@ -200,6 +202,7 @@ spec:
                         backupToolName:
                           description: which backup tool to perform database backup,
                             only support one tool.
+                          maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                           type: string
                         backupsHistoryLimit:
@@ -309,6 +312,14 @@ spec:
                           - cronExpression
                           - enable
                           type: object
+                        startWindowMinutes:
+                          description: startWindowMinutes defines the time window
+                            for starting the job if it misses scheduled time for any
+                            reason. the unit of time is minute.
+                          format: int64
+                          maximum: 1440
+                          minimum: 0
+                          type: integer
                       type: object
                     snapshot:
                       description: the policy for snapshot backup.
@@ -435,6 +446,9 @@ spec:
                   this is an immutable attribute.
                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                 type: string
+                x-kubernetes-validations:
+                - message: clusterDefinitionRef is immutable
+                  rule: self == oldSelf
               identifier:
                 description: Identifier is a unique identifier for this BackupPolicyTemplate.
                   this identifier will be the suffix of the automatically generated

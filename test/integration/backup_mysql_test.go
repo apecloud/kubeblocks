@@ -61,7 +61,7 @@ var _ = Describe("MySQL data protection function", func() {
 		// namespaced
 		testapps.ClearResources(&testCtx, intctrlutil.OpsRequestSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.ConfigMapSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.BackupSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupSignature, true, inNS)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupPolicySignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.BackupToolSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, intctrlutil.RestoreJobSignature, inNS, ml)

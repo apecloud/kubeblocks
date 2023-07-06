@@ -49,8 +49,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
-	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/controllers/apps/components"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 	"github.com/apecloud/kubeblocks/internal/generics"
@@ -183,7 +182,7 @@ var _ = Describe("Cluster Controller", func() {
 	// ClusterComponentDefinition.PodSpec, it's a subset of the real ports as some containers can be dynamically
 	// injected into the pod by the lifecycle controller, such as the probe container.
 	getHeadlessSvcPorts := func(g Gomega, compDefName string) []corev1.ServicePort {
-		comp, err := util.GetComponentDefByCluster(testCtx.Ctx, k8sClient, *clusterObj, compDefName)
+		comp, err := components.GetComponentDefByCluster(testCtx.Ctx, k8sClient, *clusterObj, compDefName)
 		g.Expect(err).ShouldNot(HaveOccurred())
 		var headlessSvcPorts []corev1.ServicePort
 		for _, container := range comp.PodSpec.Containers {
@@ -511,6 +510,9 @@ var _ = Describe("Cluster Controller", func() {
 		}
 
 		scaleOutCheck := func() {
+			if comp.Replicas == 0 {
+				return
+			}
 			if policy == nil {
 				checkUpdatedStsReplicas()
 				return
@@ -540,9 +542,7 @@ var _ = Describe("Cluster Controller", func() {
 						Name:      backupKey.Name,
 						Namespace: backupKey.Namespace,
 						Labels: map[string]string{
-							constant.KBManagedByKey:         "cluster",
-							constant.AppInstanceLabelKey:    clusterKey.Name,
-							constant.KBAppComponentLabelKey: comp.Name,
+							constant.DataProtectionLabelBackupNameKey: backupKey.Name,
 						}},
 					Spec: snapshotv1.VolumeSnapshotSpec{
 						Source: snapshotv1.VolumeSnapshotSource{
@@ -608,7 +608,6 @@ var _ = Describe("Cluster Controller", func() {
 					constant.AppInstanceLabelKey:    clusterKey.Name,
 					constant.KBAppComponentLabelKey: comp.Name,
 				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(0))
-			Eventually(testapps.CheckObjExists(&testCtx, backupKey, &snapshotv1.VolumeSnapshot{}, false)).Should(Succeed())
 
 			if !viper.GetBool("VOLUMESNAPSHOT") && len(viper.GetString(constant.CfgKeyBackupPVCName)) > 0 {
 				By("Checking restore job cleanup")
@@ -1260,7 +1259,7 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	mockRoleChangedEvent := func(key types.NamespacedName, sts *appsv1.StatefulSet) []corev1.Event {
-		pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		pods, err := components.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).To(Succeed())
 
 		events := make([]corev1.Event, 0)
@@ -1286,7 +1285,7 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	getStsPodsName := func(sts *appsv1.StatefulSet) []string {
-		pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
+		pods, err := components.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).To(Succeed())
 
 		names := make([]string, 0)
@@ -1343,7 +1342,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking pods' role are changed accordingly")
 		Eventually(func(g Gomega) {
-			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			pods, err := components.GetPodListByStatefulSet(ctx, k8sClient, sts)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			// should have 3 pods
 			g.Expect(pods).Should(HaveLen(3))
@@ -1364,7 +1363,7 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("Checking pods' annotations")
 		Eventually(func(g Gomega) {
-			pods, err := util.GetPodListByStatefulSet(ctx, k8sClient, sts)
+			pods, err := components.GetPodListByStatefulSet(ctx, k8sClient, sts)
 			g.Expect(err).ShouldNot(HaveOccurred())
 			g.Expect(pods).Should(HaveLen(int(*sts.Spec.Replicas)))
 			for _, pod := range pods {
@@ -1971,6 +1970,10 @@ var _ = Describe("Cluster Controller", func() {
 			It(fmt.Sprintf("[comp: %s] h-scale to 0 and pvc should not deleted", compName), func() {
 				testHorizontalScale(compName, compDefName, 3, 0)
 			})
+
+			It(fmt.Sprintf("[comp: %s] h-scale from 0 and should work", compName), func() {
+				testHorizontalScale(compName, compDefName, 0, 3)
+			})
 		}
 	})
 
@@ -2089,7 +2092,6 @@ var _ = Describe("Cluster Controller", func() {
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
 				clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
 				AddComponent(compName, compDefName).
-				SetPrimaryIndex(testapps.DefaultReplicationPrimaryIndex).
 				SetReplicas(testapps.DefaultReplicationReplicas).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				Create(&testCtx).GetObject()
@@ -2108,7 +2110,7 @@ var _ = Describe("Cluster Controller", func() {
 			for i := int32(0); i < *sts.Spec.Replicas; i++ {
 				podName := fmt.Sprintf("%s-%d", sts.Name, i)
 				testapps.MockReplicationComponentPod(nil, testCtx, sts, clusterObj.Name,
-					compDefName, podName, replication.DefaultRole(i))
+					compDefName, podName, components.DefaultRole(i))
 			}
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1alpha1.RunningClusterPhase))
 		})
@@ -2232,7 +2234,7 @@ var _ = Describe("Cluster Controller", func() {
 func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition) {
 	By("Creating a BackupPolicyTemplate")
 	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
-		AddLabels(clusterDefLabelKey, clusterDefObj.Name).
+		AddLabels(constant.ClusterDefLabelKey, clusterDefObj.Name).
 		SetClusterDefRef(clusterDefObj.Name)
 	for _, v := range clusterDefObj.Spec.ComponentDefs {
 		bpt = bpt.AddBackupPolicy(v.Name).AddSnapshotPolicy()

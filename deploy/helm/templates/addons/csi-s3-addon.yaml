@@ -14,8 +14,17 @@ spec:
   type: Helm
 
   helm:
-    # chartLocationURL: https://raw.githubusercontent.com/cloudve/helm-charts/master/charts/csi-s3-0.31.3.tgz
+    {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/csi-s3
+    {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/csi-s3-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    {{- end }}
+
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: {{ default .Chart.Version .Values.versionOverride }}
+      {{- end }}
+
     installValues:
       secretRefs:
         - name: {{ include "kubeblocks.fullname" . }}-cloud-provider

@@ -68,6 +68,7 @@ func NewClusterCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 				NewVolumeExpansionCmd(f, streams),
 				NewVerticalScalingCmd(f, streams),
 				NewHorizontalScalingCmd(f, streams),
+				NewPromoteCmd(f, streams),
 				NewDescribeOpsCmd(f, streams),
 				NewListOpsCmd(f, streams),
 				NewDeleteOpsCmd(f, streams),

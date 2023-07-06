@@ -6,7 +6,7 @@ metadata:
   name: kb-mycluster-mongodb-cluster
   labels:
     
-    helm.sh/chart: mongodb-cluster-0.5.1-beta.0
+    helm.sh/chart: mongodb-cluster-0.6.0-alpha.28
     app.kubernetes.io/name: mongodb-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"
@@ -20,7 +20,7 @@ metadata:
   namespace: default
   labels:
     
-    helm.sh/chart: mongodb-cluster-0.5.1-beta.0
+    helm.sh/chart: mongodb-cluster-0.6.0-alpha.28
     app.kubernetes.io/name: mongodb-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"
@@ -32,6 +32,24 @@ rules:
       - events
     verbs:
       - create
+  - apiGroups:
+      - "dataprotection.kubeblocks.io"
+    resources:
+      - backups/status
+    verbs:
+      - get
+      - update
+      - patch
+  - apiGroups:
+      - "dataprotection.kubeblocks.io"
+    resources:
+      - backups
+    verbs:
+      - create
+      - get
+      - list
+      - update
+      - patch
 ---
 # Source: mongodb-cluster/templates/rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -40,7 +58,7 @@ metadata:
   name: kb-mycluster-mongodb-cluster
   labels:
     
-    helm.sh/chart: mongodb-cluster-0.5.1-beta.0
+    helm.sh/chart: mongodb-cluster-0.6.0-alpha.28
     app.kubernetes.io/name: mongodb-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"
@@ -60,7 +78,7 @@ kind: Cluster
 metadata:
   name: mycluster
   labels:
-    helm.sh/chart: mongodb-cluster-0.5.1-beta.0
+    helm.sh/chart: mongodb-cluster-0.6.0-alpha.28
     app.kubernetes.io/name: mongodb-cluster
     app.kubernetes.io/instance: mycluster
     app.kubernetes.io/version: "5.0.14"

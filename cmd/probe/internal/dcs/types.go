@@ -34,6 +34,16 @@ func (c *Cluster) GetMemberWithName(name string) *Member {
 	return nil
 }
 
+func (c *Cluster) GetMemberWithHost(host string) *Member {
+	for _, m := range c.Members {
+		if host == c.GetMemberAddr(m) {
+			return &m
+		}
+	}
+
+	return nil
+}
+
 func (c *Cluster) GetMemberName() []string {
 	var memberList []string
 	for _, member := range c.Members {

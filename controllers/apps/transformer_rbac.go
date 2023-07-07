@@ -56,6 +56,10 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
+		if serverAccountName == "" {
+			continue
+		}
+
 		if isRoleBindingExist(transCtx, serviceAccountName) {
 			continue
 		}

@@ -28,6 +28,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -219,6 +220,11 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&dataprotectionv1alpha1.Backup{}).
 		Owns(&batchv1.Job{}).
 		Watches(&source.Kind{Type: &corev1.Pod{}}, handler.EnqueueRequestsFromMapFunc(r.filterClusterPods))
+
+	if viper.GetBool("ENABLE_RBAC_MANAGER") {
+		b.Owns(&rbacv1.RoleBinding{}).
+			Owns(&corev1.ServiceAccount{})
+	}
 
 	return b.Complete(r)
 }

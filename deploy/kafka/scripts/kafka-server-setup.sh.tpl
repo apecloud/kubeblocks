@@ -113,10 +113,10 @@ if [[ "broker" = "$KAFKA_CFG_PROCESS_ROLES" ]]; then
     # generate KAFKA_CFG_CONTROLLER_QUORUM_VOTERS for broker if not a combine-cluster
     {{- $voters := "" }}
     {{- range $i, $c := $.cluster.spec.componentSpecs }}
-      {{- if eq "kafka-controller" $c.componentDefRef }}
+      {{- if eq "controller" $c.componentDefRef }}
         {{- $replicas := $c.replicas | int }}
         {{- range $n, $e := until $replicas }}
-          {{- $podFQDN := printf "%s-%s-%d.%s-%s-headless.%s.svc.cluster.local" $clusterName $c.name $n $clusterName $c.name $namespace }} # Todo: cluster.local
+          {{- $podFQDN := printf "%s-%s-%d.%s-%s-headless.%s.svc.cluster.local" $clusterName $c.name $n $clusterName $c.name $namespace }} #
           {{- $voter := printf "%d@%s:9093" ( $n | int ) $podFQDN }}
           {{- $voters = printf "%s,%s" $voters $voter }}
         {{- end }}

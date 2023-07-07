@@ -41,7 +41,7 @@ jobs:
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
       DEP_CHART_DIR: "deploy/helm/depend-charts"
-      DEP_REPO: "delphic|prometheus-cluster|apecloud-mysql-cluster|tdengine-cluster|redis-cluster"
+      DEP_REPO: "delphic|prometheus-cluster|apecloud-mysql-cluster|tdengine-cluster|redis-cluster|mongodb-cluster"
       APECD_REF: "v0.1.4"
     secrets: inherit
 

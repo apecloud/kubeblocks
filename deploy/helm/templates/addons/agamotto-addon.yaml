@@ -17,12 +17,12 @@ spec:
     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/agamotto
     {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/agamotto-0.1.1.tgz
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/agamotto-0.1.2-beta.1.tgz
     {{- end }}
 
     installOptions:
       {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
-      version: 0.1.1
+      version: 0.1.2-beta.1
       {{- end }}
 
     installValues:

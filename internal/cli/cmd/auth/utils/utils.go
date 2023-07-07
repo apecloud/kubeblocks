@@ -20,11 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package utils
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
-	"fmt"
+	"context"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -76,18 +74,19 @@ func linuxExe() string {
 	return exe
 }
 
-func Decrypt(ciphertext, privateKeyBytes []byte) (string, error) {
-	block, _ := pem.Decode(privateKeyBytes)
-	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+func NewRequest(ctx context.Context, url string, payload url.Values) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		url,
+		strings.NewReader(payload.Encode()),
+	)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	plaintext, err := rsa.DecryptPKCS1v15(rand.Reader, privateKey, ciphertext)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(string(plaintext))
-	return string(plaintext), nil
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	return req, nil
 }
 
 // BoldRed returns a string formatted with red and bold.

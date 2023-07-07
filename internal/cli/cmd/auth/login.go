@@ -23,6 +23,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -33,7 +36,9 @@ import (
 )
 
 const (
-	DefaultBaseURL = "https://tenent2.jp.auth0.com"
+	// DefaultBaseURL = "https://tenent2.jp.auth0.com"
+	DefaultBaseURL = "https://dev-0cf3xqbt63n7rs7t.us.auth0.com"
+	clientID       = "lYbU8d2i8WqsM1YszomQZPuvg5F4MIgS"
 )
 
 type LoginOptions struct {
@@ -46,7 +51,7 @@ func NewLogin(streams genericclioptions.IOStreams) *cobra.Command {
 	o := &LoginOptions{Options: authorize.Options{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:   "login",
-		Short: "Authenticate with the Kubeblocks API",
+		Short: "Authenticate with the Kubeblocks Cloud",
 		Run: func(cmd *cobra.Command, args []string) {
 			cobra.CheckErr(o.complete())
 			cobra.CheckErr(o.validate())
@@ -54,7 +59,7 @@ func NewLogin(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&o.ClientID, "client-id", "", "The client ID for the Kubeblocks CLI application.")
+	cmd.Flags().StringVar(&o.ClientID, "client-id", clientID, "The client ID for the Kubeblocks CLI application.")
 	cmd.Flags().StringVar(&o.AuthURL, "site", DefaultBaseURL, "The Kubeblocks Auth API base URL.")
 	cmd.Flags().BoolVar(&o.NoBrowser, "no-browser", false, "Do not open the browser for authentication.")
 	return cmd
@@ -112,5 +117,34 @@ func IsLoggedIn() bool {
 		return false
 	}
 
-	return authorize.IsValidToken(tokenResult.AccessToken)
+	if !authorize.IsValidToken(tokenResult.AccessToken) {
+		return false
+	}
+
+	return checkTokenAvailable(tokenResult.AccessToken, DefaultBaseURL)
+}
+
+// CheckTokenAvailable Check whether the token is available by getting user info.
+func checkTokenAvailable(token, domain string) bool {
+	URL := fmt.Sprintf("%s/userinfo", domain)
+	req, err := utils.NewRequest(context.TODO(), URL, url.Values{
+		"access_token": []string{token},
+	})
+	if err != nil {
+		return false
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false
+	}
+	_, err = io.ReadAll(resp.Body)
+
+	return err == nil
 }

@@ -96,7 +96,6 @@ func (c *CallbackService) AwaitResponse(callbackResponse chan CallbackResponse, 
 
 	http.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
 		response := CallbackResponse{}
-
 		if r.URL.Query().Get("state") != state {
 			response.Error = errors.New("callback completed with incorrect state")
 			writeHTML(w, "error.html")

@@ -42,7 +42,7 @@ func NewLogout(streams genericclioptions.IOStreams) *cobra.Command {
 	o := &LogOutOptions{Options: authorize.Options{IOStreams: streams}}
 	cmd := &cobra.Command{
 		Use:   "logout",
-		Short: "Log out of the Kubeblocks API",
+		Short: "Log out of the Kubeblocks Cloud",
 		Run: func(cmd *cobra.Command, args []string) {
 			cobra.CheckErr(o.Complete())
 			cobra.CheckErr(o.Validate())
@@ -50,7 +50,7 @@ func NewLogout(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&o.ClientID, "client-id", "", "The client ID for the Kubeblocks CLI application.")
+	cmd.Flags().StringVar(&o.ClientID, "client-id", clientID, "The client ID for the Kubeblocks CLI application.")
 	cmd.Flags().StringVar(&o.AuthURL, "api-url", DefaultBaseURL, "The Kubeblocks Auth API base URL.")
 	return cmd
 }
@@ -72,8 +72,8 @@ func (o *LogOutOptions) Run(cmd *cobra.Command) error {
 		fmt.Fprintln(o.Out, "Press Enter to log out of the Kubeblocks API.")
 		_ = waitForEnter(cmd.InOrStdin())
 	}
-	provider := authorize.NewTokenProvider(o.Options)
-	err := provider.Logout()
+
+	err := o.Provider.Logout(cmd.Context())
 	if err != nil {
 		return err
 	}

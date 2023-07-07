@@ -107,7 +107,7 @@ func (c *CloudIssuedTokenProvider) PKCEAuthenticate(ctx context.Context) (*Token
 	end := c.PrintProgress("Waiting for confirmation...")
 	defer end()
 
-	tokenResponse, err := authenticator.GetToken(ctx, *authorizeResponse)
+	tokenResponse, err := authenticator.GetToken(ctx, authorizeResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +158,7 @@ func (c *CloudIssuedTokenProvider) Logout(token string) error {
 	return nil
 }
 
-func (c *CloudIssuedTokenProvider) LogoutForPKCE(token string) error {
+func (c *CloudIssuedTokenProvider) LogoutForPKCE(ctx context.Context, token string) error {
 	authenticator, err := NewPKCEAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
 	if err != nil {
 		return err
@@ -166,7 +166,7 @@ func (c *CloudIssuedTokenProvider) LogoutForPKCE(token string) error {
 
 	end := c.PrintProgress("Logging out...")
 	defer end()
-	err = authenticator.Logout(context.TODO(), token, c.openURLFunc)
+	err = authenticator.Logout(ctx, token, c.openURLFunc)
 	if err != nil {
 		return err
 	}

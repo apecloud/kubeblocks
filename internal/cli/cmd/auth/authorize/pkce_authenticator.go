@@ -34,6 +34,8 @@ import (
 	"github.com/benbjohnson/clock"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/pkg/errors"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/utils"
 )
 
 type OIDCWellKnownEndpoints struct {
@@ -90,11 +92,17 @@ func NewPKCEAuthenticator(client *http.Client, clientID string, authURL string) 
 	return p, nil
 }
 
-func (p *PKCEAuthenticator) GetAuthorization(openURLFunc func(URL string)) (*AuthorizationResponse, error) {
+func (p *PKCEAuthenticator) GetAuthorization(openURLFunc func(URL string), states ...string) (*AuthorizationResponse, error) {
 	callback := NewCallbackService()
 	codeReceiverCh := make(chan CallbackResponse)
 	defer close(codeReceiverCh)
-	state := defaultStateGenerator()
+
+	var state string
+	if states == nil {
+		state = defaultStateGenerator()
+	} else {
+		state = states[0]
+	}
 	go callback.AwaitResponse(codeReceiverCh, state)
 
 	params := url.Values{
@@ -122,15 +130,14 @@ func (p *PKCEAuthenticator) GetAuthorization(openURLFunc func(URL string)) (*Aut
 		return nil, callbackResult.Error
 	}
 	callback.Close()
-
 	return &AuthorizationResponse{
 		Code:        callbackResult.Code,
 		CallbackURL: callback.GetCallbackURL(),
 	}, nil
 }
 
-func (p *PKCEAuthenticator) GetToken(ctx context.Context, authorize AuthorizationResponse) (*TokenResponse, error) {
-	req, err := p.newRequest(ctx, p.WellKnownEndpoints.TokenEndpoint, url.Values{
+func (p *PKCEAuthenticator) GetToken(ctx context.Context, authorize *AuthorizationResponse) (*TokenResponse, error) {
+	req, err := utils.NewRequest(ctx, p.WellKnownEndpoints.TokenEndpoint, url.Values{
 		"grant_type":    []string{"authorization_code"},
 		"code_verifier": []string{p.Challenge.Verifier},
 		"client_id":     []string{p.ClientID},
@@ -162,7 +169,7 @@ func (p *PKCEAuthenticator) GetToken(ctx context.Context, authorize Authorizatio
 
 func (p *PKCEAuthenticator) GetUserInfo(ctx context.Context, token string) (*UserInfoResponse, error) {
 	URL := fmt.Sprintf("%s/userinfo", p.AuthURL)
-	req, err := p.newRequest(ctx, URL, url.Values{
+	req, err := utils.NewRequest(ctx, URL, url.Values{
 		"access_token": []string{token},
 	})
 	if err != nil {
@@ -189,7 +196,7 @@ func (p *PKCEAuthenticator) GetUserInfo(ctx context.Context, token string) (*Use
 }
 
 func (p *PKCEAuthenticator) RefreshToken(ctx context.Context, refreshToken string) (*TokenResponse, error) {
-	req, err := p.newRequest(ctx, p.WellKnownEndpoints.TokenEndpoint, url.Values{
+	req, err := utils.NewRequest(ctx, p.WellKnownEndpoints.TokenEndpoint, url.Values{
 		"grant_type":    []string{"refresh_token"},
 		"client_id":     []string{p.ClientID},
 		"refresh_token": []string{refreshToken},
@@ -224,7 +231,7 @@ func (p *PKCEAuthenticator) RefreshToken(ctx context.Context, refreshToken strin
 
 func (p *PKCEAuthenticator) Logout(ctx context.Context, token string, openURLFunc func(URL string)) error {
 	URL := fmt.Sprintf("%s/oidc/logout", p.AuthURL)
-	req, err := p.newRequest(ctx, URL, url.Values{
+	req, err := utils.NewRequest(ctx, URL, url.Values{
 		"id_token_hint": []string{token},
 		"client_id":     []string{p.ClientID},
 	})
@@ -242,35 +249,20 @@ func (p *PKCEAuthenticator) Logout(ctx context.Context, token string, openURLFun
 		return err
 	}
 
-	err = p.SecondLogout(openURLFunc)
-	if err != nil {
-		return err
+	if err := p.SecondLogout(openURLFunc); err != nil {
+		return errors.Wrap(err, "error performing second logout")
 	}
+
 	return nil
 }
 
 func (p *PKCEAuthenticator) SecondLogout(openURLFunc func(URL string)) error {
-	logoutURL := fmt.Sprintf(p.AuthURL + "/v2/logout")
+	logoutURL := fmt.Sprintf(p.AuthURL + "/oidc/logout?federated")
 	openURLFunc(logoutURL)
 	return nil
 }
 
-func (p *PKCEAuthenticator) newRequest(ctx context.Context, url string, payload url.Values) (*http.Request, error) {
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		url,
-		strings.NewReader(payload.Encode()),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "application/json")
-	return req, nil
-}
-
+// Get authorize endpoint and token endpoint
 func getOIDCWellKnownEndpoints(authURL string) (*OIDCWellKnownEndpoints, error) {
 	u, err := url.Parse(authURL)
 	if err != nil {

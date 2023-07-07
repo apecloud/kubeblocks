@@ -19,7 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package authorize
 
-import "context"
+import (
+	"context"
+	"github.com/99designs/keyring"
+)
 
 type CachedTokenProvider interface {
 	GetTokens() (*TokenResponse, error)
@@ -29,6 +32,12 @@ type CachedTokenProvider interface {
 	GetUserInfo() (*UserInfoResponse, error)
 }
 
+type KeyringProvider interface {
+	Get(key string) (keyring.Item, error)
+	Set(item keyring.Item) error
+	Remove(key string) error
+}
+
 type IssuedTokenProvider interface {
 	DeviceAuthenticate() (*TokenResponse, error)
 	PKCEAuthenticate(ctx context.Context) (*TokenResponse, error)
@@ -36,12 +45,12 @@ type IssuedTokenProvider interface {
 	GetUserInfo(token string) (*UserInfoResponse, error)
 	GetUserInfoFromPKCE(token string) (*UserInfoResponse, error)
 	Logout(token string) error
-	LogoutForPKCE(token string) error
+	LogoutForPKCE(ctx context.Context, token string) error
 }
 
 type Provider interface {
 	Login(ctx context.Context) (*UserInfoResponse, error)
-	Logout() error
+	Logout(ctx context.Context) error
 }
 
 type TokenResponse struct {

@@ -79,7 +79,7 @@ func (p *TokenProvider) Login(ctx context.Context) (*UserInfoResponse, error) {
 	return userInfo, nil
 }
 
-func (p *TokenProvider) Logout() error {
+func (p *TokenProvider) Logout(ctx context.Context) error {
 	tokenResult, err := p.cached.GetTokens()
 	if err != nil {
 		return err
@@ -93,7 +93,7 @@ func (p *TokenProvider) Logout() error {
 		return err
 	}
 
-	err = p.issued.LogoutForPKCE(tokenResult.IDToken)
+	err = p.issued.LogoutForPKCE(ctx, tokenResult.IDToken)
 	if err != nil {
 		return err
 	}

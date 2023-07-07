@@ -167,8 +167,9 @@ func (r *ClusterVersionReconciler) patchClusterDefLabel(reqCtx intctrlutil.Reque
 		if err := r.Client.Patch(reqCtx.Ctx, clusterVersion, patch); err != nil {
 			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 		}
+		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	}
-	return intctrlutil.ResultToP(intctrlutil.Reconciled())
+	return nil, nil
 }
 
 // handleClusterDefNotFound handles clusterVersion status when clusterDefinition not found.

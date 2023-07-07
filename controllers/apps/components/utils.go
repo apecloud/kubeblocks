@@ -29,6 +29,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -664,4 +665,46 @@ func resolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	if pobj.PreemptionPolicy == nil {
 		pobj.PreemptionPolicy = obj.PreemptionPolicy
 	}
+}
+
+// delayUpdatePodSpecSystemFields to delay the updating to system fields in pod spec.
+func delayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
+	for i := range pobj.Containers {
+		delayUpdateKubeBlocksToolsImage(obj.Containers, &pobj.Containers[i])
+	}
+}
+
+// updatePodSpecSystemFields to update system fields in pod spec.
+func updatePodSpecSystemFields(pobj *corev1.PodSpec) {
+	for i := range pobj.Containers {
+		updateKubeBlocksToolsImage(&pobj.Containers[i])
+	}
+}
+
+func delayUpdateKubeBlocksToolsImage(containers []corev1.Container, pc *corev1.Container) {
+	if pc.Image != viper.GetString(constant.KBToolsImage) {
+		return
+	}
+	for _, c := range containers {
+		if c.Name == pc.Name {
+			if getImageName(c.Image) == getImageName(pc.Image) {
+				pc.Image = c.Image
+			}
+			break
+		}
+	}
+}
+
+func updateKubeBlocksToolsImage(pc *corev1.Container) {
+	if getImageName(pc.Image) == getImageName(viper.GetString(constant.KBToolsImage)) {
+		pc.Image = viper.GetString(constant.KBToolsImage)
+	}
+}
+
+func getImageName(image string) string {
+	subs := strings.Split(image, ":")
+	if len(subs) != 2 {
+		return ""
+	}
+	return subs[0]
 }

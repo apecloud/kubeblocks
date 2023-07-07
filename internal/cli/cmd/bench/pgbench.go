@@ -194,7 +194,7 @@ func (o *PgBenchOptions) Run() error {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: o.namespace,
-			Name:      o.name,
+			Name:      fmt.Sprintf("pgbench-%s", o.name),
 		},
 		Spec: v1alpha1.PgbenchSpec{
 			Scale:        o.Scale,

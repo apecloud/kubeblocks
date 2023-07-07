@@ -1,13 +1,24 @@
 ---
-title: kbcli bench
+title: kbcli bench delete
 ---
 
-Run a benchmark.
+Delete a benchmark.
+
+```
+kbcli bench delete [flags]
+```
+
+### Examples
+
+```
+  # Delete  benchmark
+  kbcli bench delete mybench
+```
 
 ### Options
 
 ```
-  -h, --help   help for bench
+  -h, --help   help for delete
 ```
 
 ### Options inherited from parent commands
@@ -36,11 +47,7 @@ Run a benchmark.
 
 ### SEE ALSO
 
-
-* [kbcli bench delete](kbcli_bench_delete.md)	 - Delete a benchmark.
-* [kbcli bench list](kbcli_bench_list.md)	 - List all benchmarks.
-* [kbcli bench pgbench](kbcli_bench_pgbench.md)	 - Run pgbench against a PostgreSQL cluster
-* [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
+* [kbcli bench](kbcli_bench.md)	 - Run a benchmark.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

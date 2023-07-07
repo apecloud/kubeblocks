@@ -20,15 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package bench
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
 	"github.com/docker/cli/cli"
 	"github.com/spf13/cobra"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/client-go/dynamic"
+	clientset "k8s.io/client-go/kubernetes"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/templates"
 
@@ -42,7 +47,17 @@ var (
 		# List all benchmarks
 		kbcli bench list
 	`)
+
+	benchDeleteExample = templates.Examples(`
+		# Delete  benchmark
+		kbcli bench delete mybench
+	`)
 )
+
+var benchGVRList = []schema.GroupVersionResource{
+	types.PgBenchGVR(),
+	types.SysbenchGVR(),
+}
 
 type BenchBaseOptions struct {
 	Driver   string `json:"driver"`
@@ -101,12 +116,13 @@ func NewBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		NewSysBenchCmd(f, streams),
 		NewPgBenchCmd(f, streams),
 		newListCmd(f, streams),
+		newDeleteCmd(f, streams),
 	)
 
 	return cmd
 }
 
-type benchListOptions struct {
+type benchListOption struct {
 	Factory       cmdutil.Factory
 	LabelSelector string
 	Format        string
@@ -114,8 +130,17 @@ type benchListOptions struct {
 	genericclioptions.IOStreams
 }
 
+type benchDeleteOption struct {
+	factory   cmdutil.Factory
+	client    clientset.Interface
+	dynamic   dynamic.Interface
+	namespace string
+
+	genericclioptions.IOStreams
+}
+
 func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := &benchListOptions{
+	o := &benchListOption{
 		Factory:   f,
 		IOStreams: streams,
 	}
@@ -126,7 +151,7 @@ func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Args:    cli.NoArgs,
 		Example: benchListExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(benchListRun(o))
+			cmdutil.CheckErr(o.run())
 		},
 	}
 
@@ -134,12 +159,26 @@ func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	return cmd
 }
 
-func benchListRun(o *benchListOptions) error {
-	benchGVRList := []schema.GroupVersionResource{
-		types.PgBenchGVR(),
-		types.SysbenchGVR(),
+func newDeleteCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+	o := &benchDeleteOption{
+		factory:   f,
+		IOStreams: streams,
+	}
+	cmd := &cobra.Command{
+		Use:     "delete",
+		Short:   "Delete a benchmark.",
+		Aliases: []string{"del"},
+		Example: benchDeleteExample,
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(o.complete())
+			cmdutil.CheckErr(o.run(args))
+		},
 	}
 
+	return cmd
+}
+
+func (o *benchListOption) run() error {
 	var infos []*resource.Info
 	for _, gvr := range benchGVRList {
 		bench := list.NewListOptions(o.Factory, o.IOStreams, gvr)
@@ -196,6 +235,56 @@ func benchListRun(o *benchListOptions) error {
 
 	if err := printer.PrintTable(o.Out, nil, printRows, "NAME", "KIND", "STATUS", "COMPLETIONS"); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (o *benchDeleteOption) complete() error {
+	var err error
+
+	o.namespace, _, err = o.factory.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return err
+	}
+
+	if o.dynamic, err = o.factory.DynamicClient(); err != nil {
+		return err
+	}
+
+	if o.client, err = o.factory.KubernetesClientSet(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (o *benchDeleteOption) run(args []string) error {
+	delete := func(benchName string) error {
+		var found bool
+
+		for _, gvr := range benchGVRList {
+			if err := o.dynamic.Resource(gvr).Namespace(o.namespace).Delete(context.TODO(), benchName, metav1.DeleteOptions{}); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue
+				}
+				return err
+			}
+
+			found = true
+			break
+		}
+
+		if !found {
+			return fmt.Errorf("benchmark %s not found", benchName)
+		}
+
+		return nil
+	}
+
+	for _, benchName := range args {
+		if err := delete(benchName); err != nil {
+			return err
+		}
 	}
 	return nil
 }

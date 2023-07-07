@@ -167,9 +167,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&ValidateAndLoadRefResourcesTransformer{},
 			// validate config
 			&ValidateEnableLogsTransformer{},
-			// fix spec
-			// fill class related info
-			&FillClassTransformer{},
 			// create cluster connection credential secret object
 			&ClusterCredentialTransformer{},
 			// handle restore

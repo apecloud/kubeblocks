@@ -62,12 +62,15 @@ var _ = Describe("operations", func() {
 		}
 		clusterWithOneComp.Spec.ComponentSpecs[0].ClassDefRef = &appsv1alpha1.ClassDefRef{Class: testapps.Class1c1gName}
 		classDef := testapps.NewComponentClassDefinitionFactory("custom", clusterWithOneComp.Spec.ClusterDefRef, testing.ComponentDefName).
-			AddClasses(testapps.DefaultResourceConstraintName, []string{testapps.Class1c1gName}).
+			AddClasses(testapps.DefaultResourceConstraintName, []appsv1alpha1.ComponentClass{testapps.Class1c1g}).
+			GetObject()
+		resourceConstraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
+			AddConstraints(testapps.ProductionResourceConstraint).
 			GetObject()
 		pods := testing.FakePods(2, clusterWithOneComp.Namespace, clusterName1)
 		tf.Client = &clientfake.RESTClient{}
 		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(),
-			testing.FakeClusterVersion(), clusterWithTwoComps, clusterWithOneComp, classDef, &pods.Items[0], &pods.Items[1])
+			testing.FakeClusterVersion(), clusterWithTwoComps, clusterWithOneComp, classDef, &pods.Items[0], &pods.Items[1], resourceConstraint)
 	})
 
 	AfterEach(func() {

@@ -32,6 +32,11 @@ spec:
           constraintRef: redis7-config-constraints
           namespace: {{ .Release.Namespace }}
           volumeName: redis-config
+        - name: redis-metrics-config
+          templateRef: redis-metrics-config
+          namespace: {{ .Release.Namespace }}
+          volumeName: redis-metrics-config
+          defaultMode: 0777
       scriptSpecs:
         - name: redis-scripts
           templateRef: redis-scripts
@@ -41,7 +46,7 @@ spec:
       monitor:
         builtIn: false
         exporterConfig:
-          scrapePort: 9121
+          scrapePort: {{ .Values.metrics.service.port }}
           scrapePath: "/metrics"
       logConfigs:
         {{- range $name,$pattern := .Values.logConfigs }}
@@ -98,20 +103,36 @@ spec:
               postStart:
                 exec:
                   command: ["/scripts/redis-post-start.sh"]
-          - name: redis-exporter
-            image: {{ .Values.exporter.image.registry }}/{{ .Values.exporter.image.repository }}:{{ .Values.exporter.image.tag }}
-            imagePullPolicy: IfNotPresent
+          - name: metrics
+            image: {{ .Values.metrics.image.registry | default "docker.io" }}/{{ .Values.metrics.image.repository }}:{{ .Values.metrics.image.tag }}
+            imagePullPolicy: {{ .Values.metrics.image.pullPolicy | quote }}
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001
+            env:
+              - name: ENDPOINT
+                value: {{ printf "localhost:6379" }}
+              - name: REDIS_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: username
+                    optional: false
+              - name: REDIS_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: $(CONN_CREDENTIAL_SECRET_NAME)
+                    key: password
+                    optional: false
+            command:
+              - "/bin/agamotto"
+              - "--config=/opt/conf/metrics-config.yaml"
             ports:
-              - name: metrics
-                containerPort: 9121
-            livenessProbe:
-              httpGet:
-                path: /
-                port: metrics
-            readinessProbe:
-              httpGet:
-                path: /
-                port: metrics
+              - name: http-metrics
+                containerPort: {{ .Values.metrics.service.port }}
+            volumeMounts:
+              - name: redis-metrics-config
+                mountPath: /opt/conf
         volumes:
           - name: pod-info
             downwardAPI:
@@ -126,7 +147,7 @@ spec:
                   fieldRef:
                     fieldPath: metadata.annotations['apps.kubeblocks.io/component-replicas']
       systemAccounts:
-# Seems redis-cli has its own mechanism to parse input tokens and there is no elegent way
+# Seems redis-cli has its own mechanism to parse input tokens and there is no elegant way
 # to pass $(KB_ACCOUNT_STATEMENT) to redis-cli without causing parsing error.
 # Instead, using a shell script to wrap redis-cli and pass $(KB_ACCOUNT_STATEMENT) to it will do.
         cmdExecutorConfig:

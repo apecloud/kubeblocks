@@ -35,15 +35,12 @@ The proxy cpu cores is 1/6 of the cluster total cpu cores.
 {{/*
 Define replica count.
 standalone mode: 1
-replication mode: 2
-raftGroup mode: 3 or more
+raftGroup mode: 3
 */}}
 {{- define "apecloud-mysql-cluster.replicaCount" -}}
 {{- if eq .Values.mode "standalone" }}
 replicas: 1
-{{- else if eq .Values.mode "replication" }}
-replicas: {{ max .Values.replicas 2 }}
-{{- else }}
+{{- else if eq .Values.mode "raftGroup" }}
 replicas: {{ max .Values.replicas 3 }}
 {{- end }}
 {{- end -}}

@@ -572,6 +572,12 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
 			})).Should(Succeed())
 
+			By("check the underlying workload been updated")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
+				func(g Gomega, sts *appsv1.StatefulSet) {
+					g.Expect(*sts.Spec.Replicas).Should(Equal(replicas))
+				})).Should(Succeed())
+
 			By("mock scale down successfully by deleting one pod ")
 			podName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, mysqlCompName, 2)
 			dPodKeys := types.NamespacedName{Name: podName, Namespace: testCtx.DefaultNamespace}

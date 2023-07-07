@@ -65,6 +65,7 @@ Cluster command.
 * [kbcli cluster delete-ops](kbcli_cluster_delete-ops.md)	 - Delete an OpsRequest.
 * [kbcli cluster describe](kbcli_cluster_describe.md)	 - Show details of a specific cluster.
 * [kbcli cluster describe-account](kbcli_cluster_describe-account.md)	 - Describe account roles and related information
+* [kbcli cluster describe-backup](kbcli_cluster_describe-backup.md)	 - Describe a backup.
 * [kbcli cluster describe-config](kbcli_cluster_describe-config.md)	 - Show details of a specific reconfiguring.
 * [kbcli cluster describe-ops](kbcli_cluster_describe-ops.md)	 - Show details of a specific OpsRequest.
 * [kbcli cluster diff-config](kbcli_cluster_diff-config.md)	 - Show the difference in parameters between the two submitted OpsRequest.
@@ -134,6 +135,14 @@ Inject faults to pod.
 * [kbcli fault pod](kbcli_fault_pod.md)	 - Pod chaos.
 * [kbcli fault stress](kbcli_fault_stress.md)	 - Add memory pressure or CPU load to the system.
 * [kbcli fault time](kbcli_fault_time.md)	 - Clock skew failure.
+
+
+## [infra](kbcli_infra.md)
+
+infra command
+
+* [kbcli infra create](kbcli_infra_create.md)	 - create kubernetes cluster.
+* [kbcli infra delete](kbcli_infra_delete.md)	 - delete kubernetes cluster.
 
 
 ## [kubeblocks](kbcli_kubeblocks.md)

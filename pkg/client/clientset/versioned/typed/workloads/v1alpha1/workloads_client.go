@@ -28,11 +28,16 @@ import (
 
 type WorkloadsV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	ReplicatedStateMachinesGetter
 }
 
 // WorkloadsV1alpha1Client is used to interact with features provided by the workloads group.
 type WorkloadsV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *WorkloadsV1alpha1Client) ReplicatedStateMachines(namespace string) ReplicatedStateMachineInterface {
+	return newReplicatedStateMachines(c, namespace)
 }
 
 // NewForConfig creates a new WorkloadsV1alpha1Client for the given config.

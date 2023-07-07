@@ -50,7 +50,7 @@ kbcli fault io mistake [flags]
       --node stringArray               Inject faults into pods in the specified node.
       --node-label stringToString      label for node, such as '"kubernetes.io/arch=arm64,kubernetes.io/hostname=minikube-m03,kubernetes.io/os=linux. (default [])
       --ns-fault stringArray           Specifies the namespace into which you want to inject faults. (default [default])
-  -o, --output format                  prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+  -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --path string                    The effective scope of the injection error can be a wildcard or a single file.
       --percent int                    Probability of failure per operation, in %. (default 100)
       --phase stringArray              Specify the pod that injects the fault by the state of the pod.

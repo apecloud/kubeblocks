@@ -58,7 +58,7 @@ type ClusterVersionReconciler struct {
 
 func init() {
 	clusterDefUpdateHandlers["clusterVersion"] = clusterVersionUpdateHandler
-	viper.SetDefault(maxConcurReconClusterVersionKey, runtime.NumCPU()*2)
+	viper.SetDefault(maxConcurReconClusterVersionKey, runtime.NumCPU())
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -104,10 +104,13 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		Name: clusterVersion.Spec.ClusterDefinitionRef,
 	}, clusterdefinition); err != nil {
 		if apierrors.IsNotFound(err) {
+			if res, patchErr := r.patchClusterDefLabel(reqCtx, clusterVersion); res != nil {
+				return *res, patchErr
+			}
 			if err = r.handleClusterDefNotFound(reqCtx, clusterVersion, err.Error()); err != nil {
 				return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
 			}
-			return intctrlutil.RequeueAfter(requeueDuration, reqCtx.Log, "")
+			return intctrlutil.Reconciled()
 		}
 		return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)
 	}
@@ -128,20 +131,12 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return intctrlutil.Reconciled()
 	}
 
-	if err := appsconfig.ReconcileConfigSpecsForReferencedCR(r.Client, reqCtx, clusterVersion); err != nil {
+	if err = appsconfig.ReconcileConfigSpecsForReferencedCR(r.Client, reqCtx, clusterVersion); err != nil {
 		return intctrlutil.RequeueAfter(time.Second, reqCtx.Log, err.Error())
 	}
 
-	if v, ok := clusterVersion.ObjectMeta.Labels[constant.ClusterDefLabelKey]; !ok || v != clusterdefinition.Name {
-		patch := client.MergeFrom(clusterVersion.DeepCopy())
-		if clusterVersion.ObjectMeta.Labels == nil {
-			clusterVersion.ObjectMeta.Labels = map[string]string{}
-		}
-		clusterVersion.ObjectMeta.Labels[constant.ClusterDefLabelKey] = clusterdefinition.Name
-		if err = r.Client.Patch(reqCtx.Ctx, clusterVersion, patch); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-		}
-		return intctrlutil.Reconciled()
+	if res, err = r.patchClusterDefLabel(reqCtx, clusterVersion); res != nil {
+		return *res, err
 	}
 
 	if err = patchStatus(appsv1alpha1.AvailablePhase, ""); err != nil {
@@ -159,6 +154,22 @@ func (r *ClusterVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			MaxConcurrentReconciles: viper.GetInt(maxConcurReconClusterVersionKey),
 		}).
 		Complete(r)
+}
+
+func (r *ClusterVersionReconciler) patchClusterDefLabel(reqCtx intctrlutil.RequestCtx,
+	clusterVersion *appsv1alpha1.ClusterVersion) (*ctrl.Result, error) {
+	if v, ok := clusterVersion.ObjectMeta.Labels[constant.ClusterDefLabelKey]; !ok || v != clusterVersion.Spec.ClusterDefinitionRef {
+		patch := client.MergeFrom(clusterVersion.DeepCopy())
+		if clusterVersion.ObjectMeta.Labels == nil {
+			clusterVersion.ObjectMeta.Labels = map[string]string{}
+		}
+		clusterVersion.ObjectMeta.Labels[constant.ClusterDefLabelKey] = clusterVersion.Spec.ClusterDefinitionRef
+		if err := r.Client.Patch(reqCtx.Ctx, clusterVersion, patch); err != nil {
+			return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
+		}
+		return intctrlutil.ResultToP(intctrlutil.Reconciled())
+	}
+	return nil, nil
 }
 
 // handleClusterDefNotFound handles clusterVersion status when clusterDefinition not found.

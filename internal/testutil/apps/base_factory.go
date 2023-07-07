@@ -136,6 +136,11 @@ func (factory *BaseFactory[T, PT, F]) AddFinalizers(finalizers []string) *F {
 	return factory.concreteFactory
 }
 
+func (factory *BaseFactory[T, PT, F]) Apply(changeFn func(PT)) *F {
+	changeFn(factory.object)
+	return factory.concreteFactory
+}
+
 func (factory *BaseFactory[T, PT, F]) Create(testCtx *testutil.TestContext) *F {
 	gomega.Expect(testCtx.CreateObj(testCtx.Ctx, factory.get())).Should(gomega.Succeed())
 	return factory.concreteFactory

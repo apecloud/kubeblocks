@@ -26,6 +26,8 @@ jobs:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+
       - name: Get trigger mode
         id: get_trigger_mode
         run: |
@@ -39,14 +41,14 @@ jobs:
           TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
               --trigger-type "$TRIGGER_MODE" \
               --test-pkgs "internal|apis|controllers|cmd" \
-              --test-check "mod-vendor|lint"`
+              --test-check "mod-vendor|lint|staticcheck"`
           echo "$TEST_PACKAGES"
           echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
 
   test-parallel:
-    name: make test
+    name: test
     needs: trigger-mode
-    if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
@@ -81,17 +83,62 @@ jobs:
           make test TEST_PACKAGES=./${{ matrix.ops }}/...
 
   make-test:
-    name: make test
-    needs: [ trigger-mode, test-parallel ]
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && always() }}
-    runs-on: ubuntu-latest
+    needs: trigger-mode
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && github.event.pull_request.head.repo.full_name != github.repository }}
+    outputs:
+      runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
+    runs-on: [ self-hosted, kubeblocks-runner ]
     steps:
-      - name: make test check
+      - uses: actions/checkout@v3
+      - name: make mod-vendor
         run: |
-          if [[ "${{ needs.test-parallel.result }}" == "failure" || "${{ needs.test-parallel.result }}" == "cancelled" ]]; then
-              echo "make test fail"
-              exit 1
-          fi
+          mkdir -p ./bin
+          cp -r /go/bin/controller-gen ./bin/controller-gen
+          cp -r /go/bin/setup-envtest ./bin/setup-envtest
+          make mod-vendor
+
+      - name: make lint
+        run: |
+          make lint
+
+      - name: make test
+        run: |
+          make test
+
+      - name: ignore cover pkgs
+        run: |
+          bash .github/utils/utils.sh --type 14 \
+              --file cover.out \
+              --ignore-pkgs "cmd/|internal/cli|internal/controller/consensusset|internal/controller/model|controllers/k8score" 
+
+      - name: upload coverage report
+        uses: codecov/codecov-action@v3
+        continue-on-error: true
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./cover_new.out
+          flags: unittests
+          name: codecov-report
+          verbose: true
+
+      - name: kill kube-apiserver and etcd
+        id: get_runner_name
+        if: ${{ always() }}
+        run: |
+          echo runner_name=${RUNNER_NAME} >> $GITHUB_OUTPUT
+          bash .github/utils/utils.sh --type 8
+
+  remove-runner:
+    needs: [ trigger-mode, make-test ]
+    runs-on: ubuntu-latest
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && github.event.pull_request.head.repo.full_name != github.repository && always()  }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: remove runner
+        run: |
+          bash .github/utils/utils.sh --type 9 \
+              --github-token ${{ env.GITHUB_TOKEN }} \
+              --runner-name ${{ needs.make-test.outputs.runner-name }}
 
   check-image:
     name: check image
@@ -133,6 +180,88 @@ jobs:
       VERSION: "v0.4.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      DEP_REPO: "delphic|prometheus-cluster|apecloud-mysql-cluster|tdengine-cluster"
+      DEP_REPO: "delphic|prometheus-cluster|apecloud-mysql-cluster|tdengine-cluster|redis-cluster"
       APECD_REF: "v0.1.4"
     secrets: inherit
+
+  check-kbcli:
+    name: check kbcli
+    needs: trigger-mode
+    runs-on: ubuntu-latest
+    if: contains(needs.trigger-mode.outputs.trigger-mode, '[cli]')
+    strategy:
+      matrix:
+        os: [linux-amd64, darwin-arm64]
+    steps:
+      - uses: actions/checkout@v3
+      - name: install lib
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libbtrfs-dev \
+            libdevmapper-dev \
+            libgpgme-dev
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "${{ env.GO_VERSION }}"
+
+      - name: make generate
+        run: make generate
+
+      - name: build cli
+        run: |
+          CLI_OS_ARCH=`bash .github/utils/utils.sh \
+            --tag-name ${{ matrix.os }} \
+            --type 2`
+
+          make bin/kbcli.$CLI_OS_ARCH
+
+  pr-check:
+    name: make test
+    needs: [ trigger-mode, test-parallel, make-test, check-image, check-tools-image, check-helm, check-kbcli ]
+    if: ${{ github.event.review.state == 'approved' && always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: test parallel check
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          if [[ "${{ needs.test-parallel.result }}" == "failure" || "${{ needs.test-parallel.result }}" == "cancelled" ]]; then
+              echo "test parallel fail"
+              exit 1
+          fi
+
+      - name: make test check
+        if: github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          if [[ "${{ needs.make-test.result }}" == "failure" || "${{ needs.make-test.result }}" == "cancelled" ]]; then
+              echo "make test fail"
+              exit 1
+          fi
+
+      - name: release image check
+        run: |
+          if [[ "${{ needs.check-image.result }}" == "failure" || "${{ needs.check-image.result }}" == "cancelled" ]]; then
+              echo "release image fail"
+              exit 1
+          fi
+          
+          if [[ "${{ needs.check-tools-image.result }}" == "failure" || "${{ needs.check-tools-image.result }}" == "cancelled" ]]; then
+              echo "release tools image fail"
+              exit 1
+          fi
+
+      - name: release helm check
+        run: |
+          if [[ "${{ needs.check-helm.result }}" == "failure" || "${{ needs.check-helm.result }}" == "cancelled" ]]; then
+              echo "release helm fail"
+              exit 1
+          fi
+
+      - name: release kbcli check
+        run: |
+          if [[ "${{ needs.check-kbcli.result }}" == "failure" || "${{ needs.check-kbcli.result }}" == "cancelled" ]]; then
+              echo "release kbcli fail"
+              exit 1
+          fi

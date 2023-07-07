@@ -53,6 +53,12 @@ spec:
               datafile:
                 description: the policy for datafile backup.
                 properties:
+                  backupRepoName:
+                    description: refer to BackupRepo and the backup data will be stored
+                      in the corresponding repo.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                    type: string
                   backupStatusUpdates:
                     description: define how to update metadata for backup status.
                     items:
@@ -131,7 +137,6 @@ spec:
                         pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                         x-kubernetes-int-or-string: true
                       name:
-                        default: kb-backup-data
                         description: the name of PersistentVolumeClaim to store backup
                           data.
                         maxLength: 63
@@ -166,8 +171,6 @@ spec:
                         maxLength: 63
                         pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
-                    required:
-                    - name
                     type: object
                   target:
                     description: target database cluster for backup.
@@ -248,12 +251,17 @@ spec:
                     - labelsSelector
                     type: object
                 required:
-                - persistentVolumeClaim
                 - target
                 type: object
               logfile:
                 description: the policy for logfile backup.
                 properties:
+                  backupRepoName:
+                    description: refer to BackupRepo and the backup data will be stored
+                      in the corresponding repo.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                    type: string
                   backupStatusUpdates:
                     description: define how to update metadata for backup status.
                     items:
@@ -332,7 +340,6 @@ spec:
                         pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                         x-kubernetes-int-or-string: true
                       name:
-                        default: kb-backup-data
                         description: the name of PersistentVolumeClaim to store backup
                           data.
                         maxLength: 63
@@ -367,8 +374,6 @@ spec:
                         maxLength: 63
                         pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                         type: string
-                    required:
-                    - name
                     type: object
                   target:
                     description: target database cluster for backup.
@@ -449,7 +454,6 @@ spec:
                     - labelsSelector
                     type: object
                 required:
-                - persistentVolumeClaim
                 - target
                 type: object
               retention:

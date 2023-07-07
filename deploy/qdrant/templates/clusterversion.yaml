@@ -9,6 +9,9 @@ spec:
   componentVersions:
     - componentDefRef: qdrant
       versionsContext:
+        initContainers:
+        - name: qdrant-tools
+          image: {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.tools.repository }}:{{ default .Chart.AppVersion .Values.images.tools.tag }}
         containers:
           - name: qdrant
-            image: {{ .Values.images.qdrant.repository }}:{{ default .Chart.AppVersion .Values.images.qdrant.tag }}
+            image:  {{ .Values.images.registry | default "docker.io" }}/{{ .Values.images.repository}}:{{ default .Chart.AppVersion .Values.images.tag }}

@@ -77,6 +77,7 @@ var _ = Describe("Cluster Controller", func() {
 		consensusCompDefName   = "consensus"
 		replicationCompName    = "replication"
 		replicationCompDefName = "replication"
+		backupToolName         = "test-backup-tool"
 	)
 
 	var (
@@ -532,6 +533,7 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, backupKey, func(backup *dataprotectionv1alpha1.Backup) {
 				backup.Status.Phase = dataprotectionv1alpha1.BackupCompleted
 				backup.Status.PersistentVolumeClaimName = "backup-data"
+				backup.Status.BackupToolName = backupToolName
 			})()).Should(Succeed())
 
 			if viper.GetBool("VOLUMESNAPSHOT") {
@@ -738,7 +740,7 @@ var _ = Describe("Cluster Controller", func() {
 						By("creating backup tool if backup policy is backup")
 						backupTool := &dataprotectionv1alpha1.BackupTool{
 							ObjectMeta: metav1.ObjectMeta{
-								Name:      "test-backup-tool",
+								Name:      backupToolName,
 								Namespace: clusterKey.Namespace,
 								Labels: map[string]string{
 									constant.ClusterDefLabelKey: clusterDef.Name,
@@ -2038,7 +2040,7 @@ var _ = Describe("Cluster Controller", func() {
 			}
 			for i := 0; i < 3; i++ {
 				restoreJobKey := client.ObjectKey{
-					Name:      fmt.Sprintf("base-%s-%s-%d", clusterObj.Name, compName, i),
+					Name:      fmt.Sprintf("base-%s-%s-%s-%d", testapps.DataVolumeName, clusterObj.Name, compName, i),
 					Namespace: clusterKey.Namespace,
 				}
 				patchK8sJobStatus(restoreJobKey, batchv1.JobComplete)

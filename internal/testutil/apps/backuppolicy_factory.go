@@ -22,6 +22,7 @@ package apps
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -102,7 +103,7 @@ func (factory *MockBackupPolicyFactory) AddSnapshotPolicy() *MockBackupPolicyFac
 func (factory *MockBackupPolicyFactory) AddDataFilePolicy() *MockBackupPolicyFactory {
 	factory.get().Spec.Datafile = &dataprotectionv1alpha1.CommonBackupPolicy{
 		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
-			Name:         "backup-data",
+			Name:         pointer.String("backup-data"),
 			CreatePolicy: dataprotectionv1alpha1.CreatePVCPolicyIfNotPresent,
 		},
 	}
@@ -113,7 +114,7 @@ func (factory *MockBackupPolicyFactory) AddDataFilePolicy() *MockBackupPolicyFac
 func (factory *MockBackupPolicyFactory) AddLogfilePolicy() *MockBackupPolicyFactory {
 	factory.get().Spec.Logfile = &dataprotectionv1alpha1.CommonBackupPolicy{
 		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
-			Name:         "backup-data",
+			Name:         pointer.String("backup-data"),
 			CreatePolicy: dataprotectionv1alpha1.CreatePVCPolicyIfNotPresent,
 		},
 	}
@@ -206,8 +207,23 @@ func (factory *MockBackupPolicyFactory) AddHookPostCommand(postCommand string) *
 
 func (factory *MockBackupPolicyFactory) SetPVC(pvcName string) *MockBackupPolicyFactory {
 	factory.setCommonPolicyField(func(commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) {
-		commonPolicy.PersistentVolumeClaim.Name = pvcName
+		if pvcName == "" {
+			commonPolicy.PersistentVolumeClaim.Name = nil
+		} else {
+			commonPolicy.PersistentVolumeClaim.Name = &pvcName
+		}
 		commonPolicy.PersistentVolumeClaim.InitCapacity = resource.MustParse(constant.DefaultBackupPvcInitCapacity)
+	})
+	return factory
+}
+
+func (factory *MockBackupPolicyFactory) SetBackupRepo(repoName string) *MockBackupPolicyFactory {
+	factory.setCommonPolicyField(func(commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) {
+		if repoName == "" {
+			commonPolicy.BackupRepoName = nil
+		} else {
+			commonPolicy.BackupRepoName = &repoName
+		}
 	})
 	return factory
 }

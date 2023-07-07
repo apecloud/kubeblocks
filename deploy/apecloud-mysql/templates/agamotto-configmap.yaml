@@ -19,6 +19,14 @@ data:
         database:
         collection_interval: 15s
         transport: tcp
+      filelog/error:
+        include: [/data/mysql/log/mysqld-error.log]
+        include_file_name: false
+        start_at: beginning
+      filelog/slow:
+        include: [/data/mysql/log/mysqld-slowquery.log]
+        include_file_name: false
+        start_at: beginning
 
     processors:
       memory_limiter:
@@ -34,14 +42,36 @@ data:
         enable_open_metrics: false
         resource_to_telemetry_conversion:
           enabled: true
+      apecloudfile/error:
+        path: /var/log/kubeblocks/${env:KB_NAMESPACE}_${env:DB_TYPE}_${env:KB_CLUSTER_NAME}/${env:KB_POD_NAME}/error.log
+        format: raw
+        rotation:
+          max_megabytes: 10
+          max_days: 3
+          max_backups: 1
+          localtime: true
+      apecloudfile/slow:
+        path: /var/log/kubeblocks/${env:KB_NAMESPACE}_${env:DB_TYPE}_${env:KB_CLUSTER_NAME}/${env:KB_POD_NAME}/slow.log
+        format: raw
+        rotation:
+          max_megabytes: 10
+          max_days: 3
+          max_backups: 1
+          localtime: true
 
     service:
       telemetry:
         logs:
           level: info
+      extensions: [ memory_ballast ]
       pipelines:
         metrics:
           receivers: [ apecloudmysql ]
           processors: [ memory_limiter ]
           exporters: [ prometheus ]
-      extensions: [ ]
+        logs/error:
+          receivers: [filelog/error]
+          exporters: [apecloudfile/error]
+        logs/slow:
+          receivers: [filelog/slow]
+          exporters: [apecloudfile/slow]

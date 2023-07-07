@@ -1,62 +1,36 @@
 {{/*
-Expand the name of the chart.
+Define redis cluster sentinel component.
 */}}
-{{- define "redis-cluster.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- define "redis-cluster.sentinel" }}
+- name: redis-sentinel
+  componentDefRef: redis-sentinel
+  replicas: {{ .Values.sentinel.replicas }}
+  resources:
+    limits:
+      cpu: {{ .Values.sentinel.cpu | quote }}
+      memory:  {{ print .Values.sentinel.memory "Gi" | quote }}
+    requests:
+      cpu: {{ .Values.sentinel.cpu | quote }}
+      memory:  {{ print .Values.sentinel.memory "Gi" | quote }}
+  volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ print .Values.sentinel.storage "Gi" }}
 {{- end }}
 
 {{/*
-Create a default fully qualified app name.
-We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-If release name contains chart name it will be used as a full name.
+Define replica count.
+standalone mode: 1
+replication mode: 2
 */}}
-{{- define "redis-cluster.fullname" -}}
-{{- if .Values.fullnameOverride }}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
-{{- if contains $name .Release.Name }}
-{{- .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+{{- define "redis-cluster.replicaCount" }}
+{{- if eq .Values.mode "standalone" }}
+replicas: 1
+{{- else if eq .Values.mode "replication" }}
+replicas: {{ max .Values.replicas 2 }}
 {{- end }}
-{{- end }}
-{{- end }}
-
-{{/*
-Create chart name and version as used by the chart label.
-*/}}
-{{- define "redis-cluster.chart" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{/*
-Common labels
-*/}}
-{{- define "redis-cluster.labels" -}}
-helm.sh/chart: {{ include "redis-cluster.chart" . }}
-{{ include "redis-cluster.selectorLabels" . }}
-{{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-{{- end }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- end }}
-
-{{/*
-Selector labels
-*/}}
-{{- define "redis-cluster.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "redis-cluster.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
-{{- end }}
-
-{{- define "clustername" -}}
-{{ include "redis-cluster.fullname" .}}
-{{- end}}
-
-{{/*
-Create the name of the service account to use
-*/}}
-{{- define "redis-cluster.serviceAccountName" -}}
-{{- default (printf "kb-%s" (include "clustername" .)) .Values.serviceAccount.name }}
 {{- end }}

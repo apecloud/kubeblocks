@@ -99,7 +99,7 @@ func init() {
 	viper.AddConfigPath(".")                               // optionally look for config in the working directory
 	viper.AutomaticEnv()
 
-	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 100)
+	viper.SetDefault(constant.CfgKeyCtrlrReconcileRetryDurationMS, 1000)
 	viper.SetDefault("CERT_DIR", "/tmp/k8s-webhook-server/serving-certs")
 	viper.SetDefault("VOLUMESNAPSHOT", false)
 	viper.SetDefault("VOLUMESNAPSHOT_API_BETA", false)

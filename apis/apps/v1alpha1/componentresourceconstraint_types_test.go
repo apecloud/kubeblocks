@@ -85,9 +85,7 @@ func TestGetMinimalResources(t *testing.T) {
 }
 
 func TestCompleteResources(t *testing.T) {
-	var resources corev1.ResourceList
-
-	resources = corev1.ResourceList{
+	resources := corev1.ResourceList{
 		corev1.ResourceCPU: resource.MustParse("1"),
 	}
 	cf.Spec.Constraints[0].CompleteResources(resources)

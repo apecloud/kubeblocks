@@ -30,17 +30,18 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubeblocks/internal/cli/list"
 	"github.com/apecloud/kubeblocks/internal/cli/printer"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
 
-const (
-	all              = "all"
-	prepareOperation = "prepare"
-	runOperation     = "run"
-	cleanupOperation = "cleanup"
+var (
+	benchListExample = templates.Examples(`
+		# List all benchmarks
+		kbcli bench list
+	`)
 )
 
 type BenchBaseOptions struct {
@@ -123,6 +124,7 @@ func newListCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Short:   "List all benchmarks.",
 		Aliases: []string{"ls"},
 		Args:    cli.NoArgs,
+		Example: benchListExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(benchListRun(o))
 		},

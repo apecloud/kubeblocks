@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 
 	"github.com/apecloud/kubebench/api/v1alpha1"
+
 	"github.com/apecloud/kubeblocks/internal/cli/cluster"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 )
@@ -52,8 +53,8 @@ kbcli bench sysbench run  pgcluster --user xxx --password xxx --database xxx --c
 # pgbench run on a cluster with specified transactions
 kbcli bench pgbench run pgcluster --database postgres --user xxx --password xxx --transactions 1000
 
-# pgbench run on a cluster with specified times
-kbcli bench pgbench run pgcluster --database postgres --user xxx --password xxx --times 1000
+# pgbench run on a cluster with specified seconds
+kbcli bench pgbench run pgcluster --database postgres --user xxx --password xxx -- 1000
 
 # pgbench run on a cluster with select only
 kbcli bench pgbench run pgcluster --database postgres --user xxx --password xxx --select
@@ -71,7 +72,7 @@ type PgBenchOptions struct {
 	Clients      []int    // specify the number of clients to run
 	Threads      int      // specify the number of threads per client
 	Transactions int      // specify the number of transactions per client
-	Times        int      // specify the duration of benchmark test in seconds
+	Duration     int      // specify the duration of benchmark test in seconds
 	Select       bool     // specify to run SELECT-only transactions
 	ExtraArgs    []string // specify extra arguments for pgbench
 
@@ -102,7 +103,7 @@ func NewPgBenchCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd.Flags().IntSliceVar(&o.Clients, "clients", []int{1}, "The number of clients to use for pgbench")
 	cmd.Flags().IntVar(&o.Threads, "threads", 1, "The number of threads to use for pgbench")
 	cmd.Flags().IntVar(&o.Transactions, "transactions", 0, "The number of transactions to run for pgbench")
-	cmd.Flags().IntVar(&o.Times, "time", 60, "The duration to run pgbench for")
+	cmd.Flags().IntVar(&o.Duration, "duration", 60, "The seconds to run pgbench for")
 	cmd.Flags().BoolVar(&o.Select, "select", false, "Run pgbench with select only")
 	cmd.Flags().StringVar(&o.ClusterName, "cluster", "", "The name of the cluster to run pgbench against")
 	return cmd
@@ -201,7 +202,7 @@ func (o *PgBenchOptions) Run() error {
 			Threads:      o.Threads,
 			SelectOnly:   o.Select,
 			Transactions: o.Transactions,
-			Duration:     o.Times,
+			Duration:     o.Duration,
 			Target: v1alpha1.PgbenchTarget{
 				Host:     o.Host,
 				Port:     o.Port,

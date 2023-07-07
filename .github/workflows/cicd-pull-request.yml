@@ -184,10 +184,44 @@ jobs:
       APECD_REF: "v0.1.4"
     secrets: inherit
 
+  check-kbcli:
+    name: check kbcli
+    needs: trigger-mode
+    runs-on: ubuntu-latest
+    if: contains(needs.trigger-mode.outputs.trigger-mode, '[cli]')
+    strategy:
+      matrix:
+        os: [linux-amd64, darwin-arm64]
+    steps:
+      - uses: actions/checkout@v3
+      - name: install lib
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libbtrfs-dev \
+            libdevmapper-dev \
+            libgpgme-dev
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "${{ env.GO_VERSION }}"
+
+      - name: make generate
+        run: make generate
+
+      - name: build cli
+        run: |
+          CLI_OS_ARCH=`bash .github/utils/utils.sh \
+            --tag-name ${{ matrix.os }} \
+            --type 2`
+
+          make bin/kbcli.$CLI_OS_ARCH
+
   pr-check:
     name: make test
-    needs: [ test-parallel, make-test, check-image, check-tools-image, check-helm ]
-    if: ${{ always() }}
+    needs: [ trigger-mode, test-parallel, make-test, check-image, check-tools-image, check-helm, check-kbcli ]
+    if: ${{ github.event.review.state == 'approved' && always() }}
     runs-on: ubuntu-latest
     steps:
       - name: test parallel check
@@ -222,5 +256,12 @@ jobs:
         run: |
           if [[ "${{ needs.check-helm.result }}" == "failure" || "${{ needs.check-helm.result }}" == "cancelled" ]]; then
               echo "release helm fail"
+              exit 1
+          fi
+
+      - name: release kbcli check
+        run: |
+          if [[ "${{ needs.check-kbcli.result }}" == "failure" || "${{ needs.check-kbcli.result }}" == "cancelled" ]]; then
+              echo "release kbcli fail"
               exit 1
           fi

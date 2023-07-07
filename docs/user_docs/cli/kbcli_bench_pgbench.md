@@ -12,19 +12,19 @@ kbcli bench pgbench [flags]
 
 ```
   # pgbench run on a cluster
-  kbcli bench pgbench run pgcluster --database postgres --user xxx --password xxx
+  kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx
   
   # pgbench run on a cluster with different threads and different client
-  kbcli bench sysbench run  pgcluster --user xxx --password xxx --database xxx --clients 5 --threads 5
+  kbcli bench sysbench mytest --cluster pgcluster --user xxx --password xxx --database xxx --clients 5 --threads 5
   
   # pgbench run on a cluster with specified transactions
-  kbcli bench pgbench run pgcluster --database postgres --user xxx --password xxx --transactions 1000
+  kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --transactions 1000
   
   # pgbench run on a cluster with specified seconds
-  kbcli bench pgbench run pgcluster --database postgres --user xxx --password xxx -- 1000
+  kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --duration 60
   
   # pgbench run on a cluster with select only
-  kbcli bench pgbench run pgcluster --database postgres --user xxx --password xxx --select
+  kbcli bench pgbench mytest --cluster pgcluster --database postgres --user xxx --password xxx --select
 ```
 
 ### Options

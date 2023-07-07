@@ -232,7 +232,7 @@ func (o *SysBenchOptions) Run() error {
 			APIVersion: "benchmark.kubebench.io/v1alpha1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("sysbench-%s", o.name),
+			Name:      o.name,
 			Namespace: o.namespace,
 		},
 		Spec: v1alpha1.SysbenchSpec{

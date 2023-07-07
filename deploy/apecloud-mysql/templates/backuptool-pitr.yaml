@@ -5,7 +5,7 @@ metadata:
     clusterdefinition.kubeblocks.io/name: apecloud-mysql
     kubeblocks.io/backup-tool-type: pitr
     {{- include "apecloud-mysql.labels" . | nindent 4 }}
-  name: wal-g-for-apecloud-mysql
+  name: apecloud-mysql-pitr-tool
 spec:
   deployKind: job
   env:
@@ -23,14 +23,18 @@ spec:
       value: 2006-01-02T15:04:05Z
     - name: LOG_DIR
       value: $(VOLUME_DATA_DIR)/data
-  image: "docker.io/apecloud/wal-g:mysql-latest"
+  image: {{ .Values.image.registry | default "docker.io" }}/apecloud/wal-g:mysql-latest
   logical:
     restoreCommands:
+      - sh
+      - -c
       - |
         set -e;
         rm -rf ${PITR_DIR}/replay.sql;
   physical:
     restoreCommands:
+      - sh
+      - -c
       - |
         set -e;
         if [ -e ${PITR_DIR}/replay.sql ]; then echo "replay SQL '${PITR_DIR}/replay.sql' file exists, skip restore."; exit 0; fi
@@ -56,6 +60,8 @@ spec:
         echo "done.";
         sync;
   backupCommands:
+    - sh
+    - -c
     - |
       set -e;
       mkdir -p ${BACKUP_DIR};

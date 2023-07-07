@@ -160,6 +160,18 @@ KubeBlocks operation commands.
 * [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks.
 
 
+## [login](kbcli_login.md)
+
+Authenticate with the Kubeblocks Cloud
+
+
+
+## [logout](kbcli_logout.md)
+
+Log out of the Kubeblocks Cloud
+
+
+
 ## [migration](kbcli_migration.md)
 
 Data migration between two data sources.

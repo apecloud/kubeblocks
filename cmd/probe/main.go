@@ -135,6 +135,7 @@ func main() {
 		defer ha.ShutdownWithWait()
 		go ha.Start()
 	}
+
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
 	<-stop

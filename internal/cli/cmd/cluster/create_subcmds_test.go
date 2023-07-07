@@ -97,7 +97,7 @@ var _ = Describe("create cluster by clusterType type", func() {
 		cmd := cmds[0]
 		o.Format = printer.YAML
 		Expect(o.CreateOptions.Complete()).Should(Succeed())
-		Expect(o.complete(cmd, nil)).Should(Succeed())
+		Expect(o.complete(cmd)).Should(Succeed())
 		Expect(o.Name).ShouldNot(BeEmpty())
 		Expect(o.values).ShouldNot(BeNil())
 

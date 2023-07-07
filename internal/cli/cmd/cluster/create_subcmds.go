@@ -79,10 +79,11 @@ func buildCreateSubCmds(createOptions *create.CreateOptions) []*cobra.Command {
 			Use:     t.String() + " NAME",
 			Short:   fmt.Sprintf("Create a %s cluster.", t),
 			Example: buildCreateSubCmdsExamples(t),
+			Aliases: []string{o.chartInfo.Alias},
 			Run: func(cmd *cobra.Command, args []string) {
 				o.Args = args
 				cmdutil.CheckErr(o.CreateOptions.Complete())
-				cmdutil.CheckErr(o.complete(cmd, args))
+				cmdutil.CheckErr(o.complete(cmd))
 				cmdutil.CheckErr(o.validate())
 				cmdutil.CheckErr(o.run())
 			},
@@ -94,7 +95,7 @@ func buildCreateSubCmds(createOptions *create.CreateOptions) []*cobra.Command {
 	return cmds
 }
 
-func (o *createSubCmdsOptions) complete(cmd *cobra.Command, args []string) error {
+func (o *createSubCmdsOptions) complete(cmd *cobra.Command) error {
 	var err error
 
 	// if name is not specified, generate a random cluster name

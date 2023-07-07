@@ -112,9 +112,13 @@ spec:
     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/external-dns
     {{- else }}
-    chartLocationURL: {{ .Values.addonChartLocationBase }}/external-dns-{{ default .Chart.Version .Values.versionOverride }}.tgz
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/external-dns-6.20.4.tgz
     {{- end }}
 
+    installOptions:
+      {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
+      version: 6.20.4
+      {{- end }}
 
     installValues:
       configMapRefs:

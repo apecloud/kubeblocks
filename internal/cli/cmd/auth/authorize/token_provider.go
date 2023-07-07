@@ -34,7 +34,7 @@ type TokenProvider struct {
 }
 
 func NewTokenProvider(o Options) Provider {
-	cached := NewKeyringCachedTokenProvider()
+	cached := NewKeyringCachedTokenProvider(nil)
 	issued := NewCloudIssuedTokenProvider(o)
 
 	return &TokenProvider{

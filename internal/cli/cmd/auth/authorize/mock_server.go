@@ -1,4 +1,4 @@
-package test
+package authorize
 
 import (
 	"context"
@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize"
 )
 
 type MockServer struct {
@@ -48,7 +46,7 @@ func (m *MockServer) Start() {
 	})
 
 	mux.HandleFunc("/oauth/token", func(w http.ResponseWriter, r *http.Request) {
-		tokenResp := authorize.TokenResponse{
+		tokenResp := TokenResponse{
 			AccessToken:  "test_access_token",
 			RefreshToken: "test_refresh_token",
 			IDToken:      "test_id_token",
@@ -62,11 +60,14 @@ func (m *MockServer) Start() {
 
 		w.Header().Set("Content-Type", "application/json")
 
-		w.Write(jsonData)
+		_, err = w.Write(jsonData)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	})
 
 	mux.HandleFunc("/userinfo", func(w http.ResponseWriter, r *http.Request) {
-		user := authorize.UserInfoResponse{
+		user := UserInfoResponse{
 			Name:    "John Doe",
 			Email:   "john.doe@example.com",
 			Locale:  "en-US",
@@ -80,7 +81,10 @@ func (m *MockServer) Start() {
 
 		w.Header().Set("Content-Type", "application/json")
 
-		w.Write(jsonData)
+		_, err = w.Write(jsonData)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	})
 
 	mux.HandleFunc("/oidc/logout", func(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +92,7 @@ func (m *MockServer) Start() {
 	})
 
 	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
-		oidcConfig := authorize.OIDCWellKnownEndpoints{
+		oidcConfig := OIDCWellKnownEndpoints{
 			AuthorizationEndpoint: "http://localhost:" + m.Port + "/authorize",
 			TokenEndpoint:         "http://localhost:" + m.Port + "/oauth/token",
 		}
@@ -100,7 +104,10 @@ func (m *MockServer) Start() {
 
 		w.Header().Set("Content-Type", "application/json")
 
-		w.Write(jsonData)
+		_, err = w.Write(jsonData)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	})
 
 	m.server = &http.Server{

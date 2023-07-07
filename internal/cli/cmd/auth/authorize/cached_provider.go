@@ -36,48 +36,81 @@ const (
 	userInfoFile      = "user_info.json"
 	tokenFile         = "token.json"
 
-	keyringService  = "kueblocks"
-	keyringKeyToken = "access-token"
+	keyringKey     = "token"
+	keyringService = "kueblocks"
+	keyringLabel   = "KUBEBLOCKS CLI"
 
-	keyringLabel = "KUBEBLOCKS CLI"
-	fileMode     = 0o600
+	fileMode = 0o600
 )
 
-type keyringCached struct {
-	keyring    keyring.Keyring
-	keyringKey string
-	err        error
+type KeyringCached struct {
+	key     string
+	isValid bool
+	keyring keyring.Keyring
 }
 
-type fileCached struct {
-	tokenFile         string
-	userInfoFile      string
+func (k *KeyringCached) IsValid() bool {
+	return k.isValid
+}
+
+func (k *KeyringCached) Get() ([]byte, error) {
+	item, err := k.keyring.Get(k.key)
+	if err != nil {
+		return nil, err
+	}
+	return item.Data, nil
+}
+
+func (k *KeyringCached) Set(data []byte) error {
+	return k.keyring.Set(keyring.Item{
+		Key:   k.key,
+		Data:  data,
+		Label: keyringLabel,
+	})
+}
+
+func (k *KeyringCached) Remove() error {
+	return k.keyring.Remove(k.key)
+}
+
+type FileCached struct {
+	tokenFilename     string
+	userInfoFilename  string
 	defaultConfigPath string
 }
 
 type KeyringCachedTokenProvider struct {
-	keyringCached
-	fileCached
+	keyringCached KeyringProvider
+	fileCached    FileCached
 }
 
-func NewKeyringCachedTokenProvider() *KeyringCachedTokenProvider {
-	k, err := OpenKeyring()
+func NewKeyringCachedTokenProvider(keyringCached *KeyringProvider) *KeyringCachedTokenProvider {
+	fileCached := FileCached{
+		tokenFilename:     tokenFile,
+		userInfoFilename:  userInfoFile,
+		defaultConfigPath: defaultConfigPath,
+	}
+
+	if keyringCached == nil {
+		defaultKeyring, isValid := DefaultKeyring()
+		return &KeyringCachedTokenProvider{
+			keyringCached: &KeyringCached{
+				key:     keyringKey,
+				isValid: isValid,
+				keyring: defaultKeyring,
+			},
+			fileCached: fileCached,
+		}
+	}
+
 	return &KeyringCachedTokenProvider{
-		keyringCached: keyringCached{
-			keyring:    k,
-			err:        err,
-			keyringKey: keyringKeyToken,
-		},
-		fileCached: fileCached{
-			tokenFile:         tokenFile,
-			userInfoFile:      userInfoFile,
-			defaultConfigPath: defaultConfigPath,
-		},
+		keyringCached: *keyringCached,
+		fileCached:    fileCached,
 	}
 }
 
-func OpenKeyring() (keyring.Keyring, error) {
-	return keyring.Open(keyring.Config{
+func DefaultKeyring() (keyring.Keyring, bool) {
+	k, err := keyring.Open(keyring.Config{
 		AllowedBackends: []keyring.BackendType{
 			keyring.SecretServiceBackend,
 			keyring.KWalletBackend,
@@ -88,18 +121,23 @@ func OpenKeyring() (keyring.Keyring, error) {
 		KeychainTrustApplication: true,
 		KeychainSynchronizable:   true,
 	})
+
+	if err != nil {
+		return nil, false
+	}
+	return k, true
 }
 
 func (k *KeyringCachedTokenProvider) GetTokens() (*TokenResponse, error) {
-	if errors.Is(k.err, keyring.ErrNoAvailImpl) {
-		token, tokenErr := readToken()
+	if !k.keyringCached.IsValid() {
+		token, tokenErr := k.fileCached.readToken()
 		if os.IsNotExist(tokenErr) {
 			return nil, nil
 		}
 		return token, tokenErr
 	}
 
-	item, err := k.keyring.Get(k.keyringKey)
+	data, err := k.keyringCached.Get()
 	if err != nil {
 		if err == keyring.ErrKeyNotFound {
 			return nil, nil
@@ -108,7 +146,7 @@ func (k *KeyringCachedTokenProvider) GetTokens() (*TokenResponse, error) {
 	}
 
 	var tokenResponse TokenResponse
-	err = json.Unmarshal(item.Data, &tokenResponse)
+	err = json.Unmarshal(data, &tokenResponse)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not unmarshal token data from keyring")
 	}
@@ -122,27 +160,23 @@ func (k *KeyringCachedTokenProvider) CacheTokens(tokenResponse *TokenResponse) e
 		return errors.Wrap(err, "could not marshal token data for keyring")
 	}
 
-	if errors.Is(k.err, keyring.ErrNoAvailImpl) {
-		return writeToken(data)
+	if !k.keyringCached.IsValid() {
+		return k.fileCached.writeToken(data)
 	}
 
-	return k.keyring.Set(keyring.Item{
-		Key:   k.keyringKey,
-		Data:  data,
-		Label: keyringLabel,
-	})
+	return k.keyringCached.Set(data)
 }
 
 func (k *KeyringCachedTokenProvider) DeleteTokens() error {
-	if errors.Is(k.err, keyring.ErrNoAvailImpl) {
-		return deleteToken()
+	if !k.keyringCached.IsValid() {
+		return k.fileCached.deleteToken()
 	}
 
-	return k.keyring.Remove(k.keyringKey)
+	return k.keyringCached.Remove()
 }
 
 func (k *KeyringCachedTokenProvider) StoreUserInfo(userInfo *UserInfoResponse) error {
-	saveDir, err := getConfigDir()
+	saveDir, err := k.fileCached.getConfigDir()
 	if err != nil {
 		return err
 	}
@@ -150,7 +184,7 @@ func (k *KeyringCachedTokenProvider) StoreUserInfo(userInfo *UserInfoResponse) e
 	if err := os.MkdirAll(saveDir, os.ModePerm); err != nil {
 		return errors.Wrap(err, "failed to create config directory")
 	}
-	savePath := filepath.Join(saveDir, k.userInfoFile)
+	savePath := filepath.Join(saveDir, k.fileCached.userInfoFilename)
 
 	newData, err := json.Marshal(userInfo)
 	if err != nil {
@@ -164,11 +198,11 @@ func (k *KeyringCachedTokenProvider) StoreUserInfo(userInfo *UserInfoResponse) e
 }
 
 func (k *KeyringCachedTokenProvider) GetUserInfo() (*UserInfoResponse, error) {
-	saveDir, err := getConfigDir()
+	saveDir, err := k.fileCached.getConfigDir()
 	if err != nil {
 		return nil, err
 	}
-	savePath := filepath.Join(saveDir, k.userInfoFile)
+	savePath := filepath.Join(saveDir, k.fileCached.userInfoFilename)
 	data, err := os.ReadFile(savePath)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read user info file")
@@ -181,8 +215,8 @@ func (k *KeyringCachedTokenProvider) GetUserInfo() (*UserInfoResponse, error) {
 	return &userInfo, nil
 }
 
-func getConfigDir() (string, error) {
-	dir, err := homedir.Expand(defaultConfigPath)
+func (f *FileCached) getConfigDir() (string, error) {
+	dir, err := homedir.Expand(f.defaultConfigPath)
 	if err != nil {
 		return "", fmt.Errorf("can't expand path %q: %s", defaultConfigPath, err)
 	}
@@ -190,17 +224,17 @@ func getConfigDir() (string, error) {
 	return dir, nil
 }
 
-func getTokenPath() (string, error) {
-	dir, err := getConfigDir()
+func (f *FileCached) getTokenPath() (string, error) {
+	dir, err := f.getConfigDir()
 	if err != nil {
 		return "", err
 	}
 
-	return filepath.Join(dir, keyringKeyToken), nil
+	return filepath.Join(dir, f.tokenFilename), nil
 }
 
-func writeToken(data []byte) error {
-	tokenPath, err := getTokenPath()
+func (f *FileCached) writeToken(data []byte) error {
+	tokenPath, err := f.getTokenPath()
 	if err != nil {
 		return err
 	}
@@ -225,9 +259,9 @@ func writeToken(data []byte) error {
 	return nil
 }
 
-func readToken() (*TokenResponse, error) {
+func (f *FileCached) readToken() (*TokenResponse, error) {
 	var data []byte
-	tokenPath, err := getTokenPath()
+	tokenPath, err := f.getTokenPath()
 	if err != nil {
 		return nil, err
 	}
@@ -260,8 +294,8 @@ func readToken() (*TokenResponse, error) {
 	return tokenResponse, nil
 }
 
-func deleteToken() error {
-	tokenPath, err := getTokenPath()
+func (f *FileCached) deleteToken() error {
+	tokenPath, err := f.getTokenPath()
 	if err != nil {
 		return err
 	}
@@ -273,7 +307,7 @@ func deleteToken() error {
 		}
 	}
 
-	configFile, err := getConfigDir()
+	configFile, err := f.getConfigDir()
 	if err != nil {
 		return err
 	}

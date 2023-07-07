@@ -21,7 +21,6 @@ package authorize
 
 import (
 	"context"
-	"github.com/99designs/keyring"
 )
 
 type CachedTokenProvider interface {
@@ -33,9 +32,10 @@ type CachedTokenProvider interface {
 }
 
 type KeyringProvider interface {
-	Get(key string) (keyring.Item, error)
-	Set(item keyring.Item) error
-	Remove(key string) error
+	Get() ([]byte, error)
+	Set(data []byte) error
+	Remove() error
+	IsValid() bool
 }
 
 type IssuedTokenProvider interface {

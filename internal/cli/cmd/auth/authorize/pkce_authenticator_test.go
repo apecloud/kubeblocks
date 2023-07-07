@@ -1,11 +1,11 @@
 package authorize
 
 import (
-	"context"
-	"fmt"
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/test"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"context"
+	"fmt"
 )
 
 var _ = Describe("PKCE_Authenticator", func() {
@@ -13,11 +13,11 @@ var _ = Describe("PKCE_Authenticator", func() {
 		clientID   = "test_clientID"
 		a          *PKCEAuthenticator
 		err        error
-		mockServer *test.MockServer
+		mockServer *MockServer
 	)
 
 	BeforeEach(func() {
-		mockServer = test.NewMockServer()
+		mockServer = NewMockServer()
 		fmt.Println(mockServer.Port)
 		go mockServer.Start()
 
@@ -29,7 +29,6 @@ var _ = Describe("PKCE_Authenticator", func() {
 	})
 
 	AfterEach(func() {
-		mockServer.Close()
 	})
 
 	Context("test Authorization", func() {

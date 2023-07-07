@@ -108,7 +108,7 @@ func (o *LoginOptions) loadConfig() error {
 }
 
 func IsLoggedIn() bool {
-	cached := authorize.NewKeyringCachedTokenProvider()
+	cached := authorize.NewKeyringCachedTokenProvider(nil)
 	tokenResult, err := cached.GetTokens()
 	if err != nil {
 		return false

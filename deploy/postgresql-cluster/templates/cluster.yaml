@@ -1,8 +1,8 @@
 {{- include "kblib.clusterCommon" . }}
   clusterDefinitionRef: postgresql
   componentSpecs:
-    - name: postgresql # user-defined
-      componentDefRef: postgresql # ref clusterdefinition components.name
+    - name: postgresql
+      componentDefRef: postgresql
       {{- include "kblib.componentMonitor" . | indent 6 }}
       {{- include "postgresql-cluster.replicaCount" . | indent 6 }}
       enabledLogs:

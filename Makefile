@@ -582,6 +582,8 @@ KUBECTL=$(shell which kubectl)
 .PHONY: render-smoke-testdata-manifests
 render-smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) dependency build deploy/apecloud-mysql-cluster --skip-refresh
+	$(HELM) dependency build deploy/redis-cluster --skip-refresh
+	$(HELM) dependency build deploy/postgresql-cluster --skip-refresh
 	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
 	$(HELM) template mycluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
 	$(HELM) template mycluster deploy/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml

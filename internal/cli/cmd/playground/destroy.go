@@ -156,7 +156,7 @@ func (o *destroyOptions) destroyCloud() error {
 	}
 
 	// destroy playground kubernetes cluster
-	cpPath, err := cloudProviderRepoDir()
+	cpPath, err := cloudProviderRepoDir(o.prevCluster.KbcliVersion)
 	if err != nil {
 		return err
 	}

@@ -2,7 +2,7 @@
 title: kbcli cluster create mysql
 ---
 
-Create a MySQL cluster.
+Create a mysql cluster.
 
 ```
 kbcli cluster create mysql NAME [flags]
@@ -26,11 +26,11 @@ kbcli cluster create mysql NAME [flags]
   -h, --help                         help for mysql
       --host-network-accessible      Specify whether the cluster can be accessed from within the VPC.
       --memory float                 Memory, the unit is Gi. (default 1)
-      --mode string                  Cluster topology mode. Legal values [standalone, replication, raftGroup]. (default "standalone")
+      --mode string                  Cluster topology mode. Legal values [standalone, raftGroup]. (default "standalone")
       --monitoring-interval int      The monitoring interval of cluster, 0 is disabled, the unit is second.
       --proxy-enabled                Enable proxy or not.
       --publicly-accessible          Specify whether the cluster can be accessed from the public internet.
-      --replicas int                 The number of replicas. (default 1)
+      --replicas int                 The number of replicas, for standalone mode, the replicas is 1, for raftGroup mode, the default replicas is 3. (default 1)
       --storage float                Storage size, the unit is Gi. (default 20)
       --tenancy string               The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")
       --termination-policy string    The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")

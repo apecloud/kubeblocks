@@ -1,0 +1,5 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterFamily
+metadata:
+  name: apecloud-mysql-cluster-family
+spec: # ClusterSpec struct

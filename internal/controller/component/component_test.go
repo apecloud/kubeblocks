@@ -174,7 +174,7 @@ spec:
       componentDefRef: proxy # ref clusterdefinition componentDefs.name
       replicas: 1
 `
-			clusterTpl := appsv1alpha1.Cluster{}
+			clusterTpl := appsv1alpha1.ClusterTemplate{}
 			Expect(yaml.Unmarshal([]byte(clusterTplStr), &clusterTpl)).Should(Succeed())
 			By("fill simplified fields")
 			cluster.Spec.Replicas = 3

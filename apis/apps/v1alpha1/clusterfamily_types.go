@@ -32,7 +32,7 @@ type ClusterFamilySpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of ClusterFamily. Edit clusterfamily_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	ClusterTemplateRefs []ClusterFamilyTemplateRef `json:"clusterTemplateRefs,omitempty"`
 }
 
 // ClusterFamilyStatus defines the observed state of ClusterFamily
@@ -65,4 +65,24 @@ type ClusterFamilyList struct {
 
 func init() {
 	SchemeBuilder.Register(&ClusterFamily{}, &ClusterFamilyList{})
+}
+
+type ClusterFamilyTemplateRef struct {
+	Key string `json:"key,omitempty"`
+
+	Expression string `json:"expression,omitempty"`
+
+	Value string `json:"value,omitempty"`
+
+	TemplateRef string `json:"templateRef,omitempty"`
+
+	Selector []ClusterFamilyTemplateRefSelector `json:"selector,omitempty"`
+}
+
+type ClusterFamilyTemplateRefSelector struct {
+	Value string `json:"value,omitempty"`
+
+	Expression string `json:"expression,omitempty"`
+
+	TemplateRef string `json:"template,omitempty"`
 }

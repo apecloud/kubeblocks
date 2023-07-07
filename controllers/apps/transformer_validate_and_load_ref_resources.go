@@ -95,7 +95,20 @@ func (t *ValidateAndLoadRefResourcesTransformer) Transform(ctx graph.TransformCo
 	if cf == nil {
 		return nil
 	}
-	// TODO: get clustertemplate from clusterfamily and cluster
+	tplNames, err := getTemplateNamesFromCF(transCtx.Context, cf, cluster)
+	if err != nil {
+		return err
+	}
+	var cts []appsv1alpha1.ClusterTemplate
+	for _, tplName := range tplNames {
+		ct := appsv1alpha1.ClusterTemplate{}
+		if err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: tplName}, &ct); err != nil {
+			return err
+		}
+		cts = append(cts, ct)
+	}
+	clusterTpl := mergeClusterTemplates(cts)
+	transCtx.ClusterTemplate = clusterTpl
 
 	return nil
 }

@@ -57,7 +57,7 @@ type ClusterTransformContext struct {
 	OrigCluster     *appsv1alpha1.Cluster
 	ClusterDef      *appsv1alpha1.ClusterDefinition
 	ClusterVer      *appsv1alpha1.ClusterVersion
-	ClusterTemplate *appsv1alpha1.Cluster
+	ClusterTemplate *appsv1alpha1.ClusterTemplate
 }
 
 // clusterPlanBuilder a graph.PlanBuilder implementation for Cluster reconciliation

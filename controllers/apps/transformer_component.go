@@ -83,7 +83,7 @@ func (c *ComponentTransformer) Transform(ctx graph.TransformContext, dag *graph.
 }
 
 func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, clusterTpl *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
+	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, clusterTpl *appsv1alpha1.ClusterTemplate, dags *[]*graph.DAG) error {
 	compSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
 	compDefMap := make(map[string]*appsv1alpha1.ClusterComponentDefinition)
 	for _, spec := range cluster.Spec.ComponentSpecs {
@@ -149,7 +149,7 @@ func (c *ComponentTransformer) transform4SpecUpdate(reqCtx ictrlutil.RequestCtx,
 }
 
 func (c *ComponentTransformer) transform4StatusUpdate(reqCtx ictrlutil.RequestCtx, clusterDef *appsv1alpha1.ClusterDefinition,
-	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, clusterTpl *appsv1alpha1.Cluster, dags *[]*graph.DAG) error {
+	clusterVer *appsv1alpha1.ClusterVersion, cluster *appsv1alpha1.Cluster, clusterTpl *appsv1alpha1.ClusterTemplate, dags *[]*graph.DAG) error {
 	var delayedError error
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		dag := graph.NewDAG()

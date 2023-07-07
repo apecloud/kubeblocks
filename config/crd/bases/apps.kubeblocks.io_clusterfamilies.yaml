@@ -39,10 +39,32 @@ spec:
           spec:
             description: ClusterFamilySpec defines the desired state of ClusterFamily
             properties:
-              foo:
+              clusterTemplateRefs:
                 description: Foo is an example field of ClusterFamily. Edit clusterfamily_types.go
                   to remove/update
-                type: string
+                items:
+                  properties:
+                    expression:
+                      type: string
+                    key:
+                      type: string
+                    selector:
+                      items:
+                        properties:
+                          expression:
+                            type: string
+                          template:
+                            type: string
+                          value:
+                            type: string
+                        type: object
+                      type: array
+                    templateRef:
+                      type: string
+                    value:
+                      type: string
+                  type: object
+                type: array
             type: object
           status:
             description: ClusterFamilyStatus defines the observed state of ClusterFamily

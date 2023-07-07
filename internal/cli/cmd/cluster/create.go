@@ -42,6 +42,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
+	rbacv1ac "k8s.io/client-go/applyconfigurations/rbac/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -140,7 +142,6 @@ var clusterCreateExample = templates.Examples(`
 const (
 	CueTemplateName = "cluster_template.cue"
 	monitorKey      = "monitor"
-	saNamePrefix    = "kb-sa-"
 )
 
 type setKey string
@@ -253,6 +254,7 @@ func NewCreateOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *C
 	}}
 	o.CreateOptions.Options = o
 	o.CreateOptions.PreCreate = o.PreCreate
+	o.CreateOptions.CreateDependencies = o.CreateDependencies
 	return o
 }
 
@@ -500,7 +502,11 @@ func (o *CreateOptions) Complete() error {
 }
 
 func (o *CreateOptions) CleanUp() error {
-	return nil
+	if o.Client == nil {
+		return nil
+	}
+
+	return deleteDependencies(o.Client, o.Namespace, o.Name)
 }
 
 // buildComponents builds components from file or set values
@@ -545,8 +551,11 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 			return nil, err
 		}
 
-		// set component service account name
-		compSpec.ServiceAccountName = saNamePrefix + o.Name
+		// create component dependencies
+		if err = o.buildDependenciesFn(cd, compSpec); err != nil {
+			return nil, err
+		}
+
 		comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compSpec)
 		if err != nil {
 			return nil, err
@@ -554,6 +563,110 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 		comps = append(comps, comp)
 	}
 	return comps, nil
+}
+
+const (
+	saNamePrefix          = "kb-"
+	roleNamePrefix        = "kb-"
+	roleBindingNamePrefix = "kb-"
+)
+
+// buildDependenciesFn creates dependencies function for components, e.g. postgresql depends on
+// a service account, a role and a rolebinding
+func (o *CreateOptions) buildDependenciesFn(cd *appsv1alpha1.ClusterDefinition,
+	compSpec *appsv1alpha1.ClusterComponentSpec) error {
+
+	// set component service account name
+	compSpec.ServiceAccountName = saNamePrefix + o.Name
+	return nil
+}
+
+func (o *CreateOptions) CreateDependencies(dryRun []string) error {
+	var (
+		saName          = saNamePrefix + o.Name
+		roleName        = roleNamePrefix + o.Name
+		roleBindingName = roleBindingNamePrefix + o.Name
+	)
+
+	klog.V(1).Infof("create dependencies for cluster %s", o.Name)
+	// create service account
+	labels := buildResourceLabels(o.Name)
+	applyOptions := metav1.ApplyOptions{FieldManager: "kbcli", DryRun: dryRun}
+	sa := corev1ac.ServiceAccount(saName, o.Namespace).WithLabels(labels)
+
+	klog.V(1).Infof("create service account %s", saName)
+	if _, err := o.Client.CoreV1().ServiceAccounts(o.Namespace).Apply(context.TODO(), sa, applyOptions); err != nil {
+		return err
+	}
+
+	// create role
+	klog.V(1).Infof("create role %s", roleName)
+	role := rbacv1ac.Role(roleName, o.Namespace).WithRules([]*rbacv1ac.PolicyRuleApplyConfiguration{
+		{
+			APIGroups: []string{""},
+			Resources: []string{"events"},
+			Verbs:     []string{"create"},
+		},
+		{
+			APIGroups: []string{"dataprotection.kubeblocks.io"},
+			Resources: []string{"backups/status"},
+			Verbs:     []string{"get", "update", "patch"},
+		},
+		{
+			APIGroups: []string{"dataprotection.kubeblocks.io"},
+			Resources: []string{"backups"},
+			Verbs:     []string{"create", "get", "list", "update", "patch"},
+		},
+	}...).WithLabels(labels)
+
+	// postgresql need more rules for patroni
+	if ok, err := o.isPostgresqlCluster(); err != nil {
+		return err
+	} else if ok {
+		rules := []rbacv1ac.PolicyRuleApplyConfiguration{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"configmaps"},
+				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"endpoints"},
+				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
+			},
+			{
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+				Verbs:     []string{"get", "list", "patch", "update", "watch"},
+			},
+		}
+		role.Rules = append(role.Rules, rules...)
+	}
+
+	if _, err := o.Client.RbacV1().Roles(o.Namespace).Apply(context.TODO(), role, applyOptions); err != nil {
+		return err
+	}
+
+	// create role binding
+	rbacAPIGroup := "rbac.authorization.k8s.io"
+	rbacKind := "Role"
+	saKind := "ServiceAccount"
+	roleBinding := rbacv1ac.RoleBinding(roleBindingName, o.Namespace).WithLabels(labels).
+		WithSubjects([]*rbacv1ac.SubjectApplyConfiguration{
+			{
+				Kind:      &saKind,
+				Name:      &saName,
+				Namespace: &o.Namespace,
+			},
+		}...).
+		WithRoleRef(&rbacv1ac.RoleRefApplyConfiguration{
+			APIGroup: &rbacAPIGroup,
+			Kind:     &rbacKind,
+			Name:     &roleName,
+		})
+	klog.V(1).Infof("create role binding %s", roleBindingName)
+	_, err := o.Client.RbacV1().RoleBindings(o.Namespace).Apply(context.TODO(), roleBinding, applyOptions)
+	return err
 }
 
 // MultipleSourceComponents gets component data from multiple source, such as stdin, URI and local file

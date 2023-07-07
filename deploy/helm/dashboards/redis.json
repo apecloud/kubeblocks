@@ -4697,13 +4697,13 @@
     "list": [
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "default",
           "value": "default"
         },
         "hide": 0,
         "includeAll": false,
-        "label": "Data source",
+        "label": "data source",
         "multi": false,
         "name": "datasource",
         "options": [],
@@ -4715,10 +4715,15 @@
         "type": "datasource"
       },
       {
+        "allValue": ".+",
         "current": {
-          "selected": true,
-          "text": "default",
-          "value": "default"
+          "selected": false,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "type": "prometheus",
@@ -4726,9 +4731,9 @@
         },
         "definition": "label_values(redis_up{job=\"$job\"}, namespace)",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "namespace",
-        "multi": false,
+        "multi": true,
         "name": "namespace",
         "options": [],
         "query": {
@@ -4738,14 +4743,19 @@
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
-        "sort": 0,
+        "sort": 5,
         "type": "query"
       },
       {
+        "allValue": ".+",
         "current": {
-          "selected": true,
-          "text": [],
-          "value": []
+          "selected": false,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "type": "prometheus",
@@ -4753,9 +4763,9 @@
         },
         "definition": "label_values(redis_up{job=\"$job\"}, app_kubernetes_io_instance)",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "cluster",
-        "multi": false,
+        "multi": true,
         "name": "cluster",
         "options": [],
         "query": {
@@ -4765,39 +4775,44 @@
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
-        "sort": 0,
+        "sort": 5,
         "type": "query"
       },
       {
+        "allValue": ".+",
         "current": {
-          "selected": true,
-          "text": [],
-          "value": []
+          "selected": false,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "type": "prometheus",
           "uid": "$datasource"
         },
-        "definition": "label_values(redis_up{namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\",job=\"$job\"}, pod)",
+        "definition": "label_values(redis_up{job=\"$job\",namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\"}, pod)",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "instance",
         "multi": true,
         "name": "instance",
         "options": [],
         "query": {
-          "query": "label_values(redis_up{namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\",job=\"$job\"}, pod)",
+          "query": "label_values(redis_up{job=\"$job\",namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\"}, pod)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
-        "sort": 0,
+        "sort": 5,
         "type": "query"
       },
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "kubeblocks-service",
           "value": "kubeblocks-service"
         },

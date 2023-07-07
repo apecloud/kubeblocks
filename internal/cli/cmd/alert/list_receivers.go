@@ -35,7 +35,7 @@ import (
 
 var (
 	listReceiversExample = templates.Examples(`
-		# list all alter receivers
+		# list all alert receivers
 		kbcli alert list-receivers`)
 )
 
@@ -58,7 +58,7 @@ func newListReceiversCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 }
 
 func (o *listReceiversOptions) run() error {
-	data, err := getConfigData(o.alterConfigMap, alertConfigFileName)
+	data, err := getConfigData(o.alertConfigMap, alertConfigFileName)
 	if err != nil {
 		return err
 	}

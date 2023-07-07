@@ -20,7 +20,6 @@ container: {
 	image:           string
 	imagePullPolicy: "IfNotPresent"
 	command: [...]
-	args: [...]
 	volumeMounts: [...]
 	env: [...]
 	resources: {}

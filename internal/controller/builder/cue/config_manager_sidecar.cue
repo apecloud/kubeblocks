@@ -18,9 +18,15 @@
 template: {
 	name: parameter.name
 	command: [
-		"/bin/reloader",
+		"env",
 	]
-	args: parameter.args
+	args: [
+		"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$(TOOLS_PATH)",
+		"/bin/reloader",
+		for arg in parameter.args {
+			arg
+		},
+	]
 	env: [
 		{
 			name: "CONFIG_MANAGER_POD_IP"
@@ -68,9 +74,13 @@ template: {
 	image:           parameter.sidecarImage
 	imagePullPolicy: "IfNotPresent"
 	volumeMounts:    parameter.volumes
-	securityContext:
-		runAsUser: 0
-	defaultAllowPrivilegeEscalation: false
+	if parameter.shareProcessNamespace {
+		{
+			securityContext:
+				runAsUser: 0
+			defaultAllowPrivilegeEscalation: false
+		}
+	}
 }
 
 #ArgType: string
@@ -83,10 +93,11 @@ template: {
 }
 
 parameter: {
-	name:          string
-	characterType: string
-	sidecarImage:  string
-	secreteName:   string
+	name:                  string
+	characterType:         string
+	sidecarImage:          string
+	secreteName:           string
+	shareProcessNamespace: bool
 	args: [...#ArgType]
 	// envs?: [...#EnvType]
 	volumes: [...]

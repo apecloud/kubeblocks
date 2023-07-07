@@ -449,7 +449,7 @@ func (mgr *Manager) Premote() error {
 	hosts := mgr.GetMemberAddrsFromRSConfig(rsConfig)
 	client, _ := mgr.GetReplSetClientWithHosts(context.TODO(), hosts)
 	defer client.Disconnect(context.TODO())
-	for i, _ := range rsConfig.Members {
+	for i := range rsConfig.Members {
 		if strings.HasPrefix(rsConfig.Members[i].Host, mgr.CurrentMemberName) {
 			rsConfig.Members[i].Priority = 2
 		} else if rsConfig.Members[i].Priority == 2 {

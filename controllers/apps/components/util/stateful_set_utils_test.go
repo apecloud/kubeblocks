@@ -122,17 +122,17 @@ var _ = Describe("StatefulSet utils test", func() {
 	When("Updating a StatefulSet with `OnDelete` UpdateStrategy", func() {
 		It("will not update pods of the StatefulSet util the pods have been manually deleted", func() {
 			By("Creating a StatefulSet")
-			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, testapps.DefaultRedisCompName).
+			sts := testapps.NewStatefulSetFactory(testCtx.DefaultNamespace, stsName, clusterName, testapps.DefaultRedisCompSpecName).
 				AddContainer(corev1.Container{Name: testapps.DefaultRedisContainerName, Image: testapps.DefaultRedisImageName}).
 				AddAppInstanceLabel(clusterName).
-				AddAppComponentLabel(testapps.DefaultRedisCompName).
+				AddAppComponentLabel(testapps.DefaultRedisCompSpecName).
 				AddAppManangedByLabel().
 				AddRoleLabel(role).
 				SetReplicas(1).
 				Create(&testCtx).GetObject()
 
 			By("Creating pods by the StatefulSet")
-			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterName, testapps.DefaultRedisCompName, nil)
+			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterName, testapps.DefaultRedisCompSpecName, nil)
 			Expect(IsStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
 
 			By("Updating the StatefulSet's UpdateRevision")
@@ -154,7 +154,7 @@ var _ = Describe("StatefulSet utils test", func() {
 			Expect(len(podList)).To(Equal(0))
 
 			By("Creating new pods by StatefulSet with new UpdateRevision")
-			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterName, testapps.DefaultRedisCompName, nil)
+			testapps.MockReplicationComponentPods(nil, testCtx, sts, clusterName, testapps.DefaultRedisCompSpecName, nil)
 			Expect(IsStsAndPodsRevisionConsistent(testCtx.Ctx, k8sClient, sts)).Should(BeTrue())
 		})
 	})

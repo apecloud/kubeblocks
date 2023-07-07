@@ -41,7 +41,7 @@ var (
 	notFoundConfigFileErrorMessage   = "cannot find config file[name=%s] in the configspec[name=%s], all configfiles: %v"
 	notSupportFileUpdateErrorMessage = "not supported file[%s] for updating, current supported files: %v"
 
-	notCueSchemaPrompt            = "The config template is not defined in cue schema and parameter explanation info cannot be generated."
+	notConfigSchemaPrompt         = "The config template[%s] is not defined in schema and parameter explanation info cannot be generated."
 	cue2openAPISchemaFailedPrompt = "The cue schema may not satisfy the conversion constraints of openAPISchema and parameter explanation info cannot be generated."
 	restartConfirmPrompt          = "The parameter change incurs a cluster restart, which brings the cluster down for a while. Enter to continue...\n, "
 	confirmApplyReconfigurePrompt = "Are you sure you want to apply these changes?\n"

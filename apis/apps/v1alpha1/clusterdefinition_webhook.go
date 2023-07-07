@@ -68,6 +68,11 @@ func (r *ClusterDefinition) Default() {
 				probes.RoleProbeTimeoutAfterPodsReady = 0
 			}
 		}
+		// set to CloneVolume if deprecated value used
+		if r.Spec.ComponentDefs[i].HorizontalScalePolicy != nil &&
+			r.Spec.ComponentDefs[i].HorizontalScalePolicy.Type == HScaleDataClonePolicyFromSnapshot {
+			r.Spec.ComponentDefs[i].HorizontalScalePolicy.Type = HScaleDataClonePolicyCloneVolume
+		}
 	}
 }
 

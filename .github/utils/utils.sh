@@ -26,6 +26,8 @@ Usage: $(basename "$0") <options>
                                 14) ignore cover pkgs
                                 15) set size label
                                 16) get test packages
+                                17) delete actions cache
+                                18) check release tag
     -tn, --tag-name           Release tag name
     -gr, --github-repo        Github Repo
     -gt, --github-token       Github token
@@ -121,6 +123,12 @@ main() {
         ;;
         16)
             get_test_packages
+        ;;
+        17)
+            delete_actions_cache
+        ;;
+        18)
+            check_release_tag
         ;;
         *)
             show_help
@@ -339,9 +347,32 @@ get_next_available_tag() {
     RELEASE_VERSION="${tag_type}${index}"
 }
 
+check_release_version(){
+    TMP_TAG_NAME=""
+    for content in $(echo "$CONTENT"); do
+        if [[ "$content" == "v"*"."* || "$content" == *"."* ]]; then
+            TMP_TAG_NAME=$content
+        fi
+        if [[ -n "$TMP_TAG_NAME" ]]; then
+            TMP_BRANCH_NAME="release-${TMP_TAG_NAME/v/}"
+            branch_url=$GITHUB_API/repos/$LATEST_REPO/branches/$TMP_BRANCH_NAME
+            branch_info=$( gh_curl -s $branch_url | (grep  $TMP_BRANCH_NAME || true) )
+            if [[ -n "$branch_info" ]]; then
+                BRANCH_NAME=$TMP_BRANCH_NAME
+                TAG_NAME=$TMP_TAG_NAME
+            fi
+            break
+        fi
+    done
+}
+
 release_next_available_tag() {
+    check_release_version
     dispatches_url=$1
-    v_major_minor="v$TAG_NAME"
+    v_major_minor="$TAG_NAME"
+    if [[ "$TAG_NAME" != "v"* ]]; then
+        v_major_minor="v$TAG_NAME"
+    fi
     stable_type="$v_major_minor."
     get_next_available_tag $stable_type
     v_number=$RELEASE_VERSION
@@ -367,7 +398,7 @@ release_next_available_tag() {
 
 usage_message() {
     curl -H "Content-Type: application/json" -X POST $BOT_WEBHOOK \
-        -d '{"msg_type":"post","content":{"post":{"zh_cn":{"title":"Usage:","content":[[{"tag":"text","text":"please enter the correct format\n"},{"tag":"text","text":"1. do <alpha|beta|rc|stable> release\n"},{"tag":"text","text":"2. {\"ref\":\"<ref_branch>\",\"inputs\":{\"release_version\":\"<release_version>\"}}"}]]}}}}'
+        -d '{"msg_type":"post","content":{"post":{"zh_cn":{"title":"Usage:","content":[[{"tag":"text","text":"please enter the correct format\n"},{"tag":"text","text":"1. do [v*.*] <alpha|beta|rc> release\n"},{"tag":"text","text":"2. {\"ref\":\"<ref_branch>\",\"inputs\":{\"release_version\":\"<release_version>\"}}"}]]}}}}'
 }
 
 trigger_release() {
@@ -437,8 +468,8 @@ get_trigger_mode() {
     echo "BASE_COMMIT_ID:$BASE_COMMIT_ID"
     filePaths=$( git diff --name-only HEAD ${BASE_COMMIT_ID} )
     for filePath in $( echo "$filePaths" ); do
-        if [[ "$filePath" == "go."* ]]; then
-            add_trigger_mode "[test]"
+        if [[ "$filePath" == "go."* || "$filePath" == *".go" ]]; then
+            add_trigger_mode "[test][go]"
             continue
         elif [[ "$filePath" != *"/"* ]]; then
             add_trigger_mode "[other]"
@@ -527,11 +558,10 @@ ignore_cover_pkgs() {
 }
 
 set_size_label() {
-    pr_changes=$( gh_curl -s $GITHUB_API/repos/$LATEST_REPO/pulls/$PR_NUMBER/files | jq -r '.[].changes' )
-    total_changes=0
-    for changes in $( echo "$pr_changes" ); do
-       total_changes=$(( $total_changes + $changes ))
-    done
+    pr_info=$( gh pr view $PR_NUMBER --repo $LATEST_REPO --json "additions,deletions,labels" )
+    pr_additions=$( echo "$pr_info" | jq -r '.additions' )
+    pr_deletions=$( echo "$pr_info" | jq -r '.deletions' )
+    total_changes=$(( $pr_additions + $pr_deletions ))
     size_label=""
     if [[ $total_changes -lt 10 ]]; then
         size_label="size/XS"
@@ -547,11 +577,10 @@ set_size_label() {
         size_label="size/XXL"
     fi
     echo "size label:$size_label"
-    label_list=$( gh pr view $PR_NUMBER --repo $LATEST_REPO | grep labels: )
+    label_list=$(  echo "$pr_info" | jq -r '.labels[].name' )
     remove_label=""
     add_label=true
     for label in $( echo "$label_list" ); do
-        label=${label/,/}
         case $label in
             $size_label)
                 add_label=false
@@ -566,10 +595,6 @@ set_size_label() {
             ;;
         esac
     done
-    if [[ "$remove_label" == *"," ]]; then
-        echo $remove_label
-        remove_label=${remove_label::-1}
-    fi
 
     if [[ ! -z "$remove_label" ]]; then
         echo "remove label:$remove_label"
@@ -620,6 +645,29 @@ get_test_packages() {
         done
     done
     echo $TEST_PACKAGES
+}
+
+delete_actions_cache() {
+    gh extension install actions/gh-actions-cache --force
+
+    gh actions-cache delete --repo $LATEST_REPO $TAG_NAME --confirm
+}
+
+check_release_tag(){
+    if [[ "$TAG_NAME" == "latest" ]]; then
+        echo "$TAG_NAME"
+        return
+    fi
+    release_list=$( gh release list --repo $LATEST_REPO --limit 100 )
+    for tag in $( echo "$release_list"); do
+        if [[ "$tag" == "$TAG_NAME" ]]; then
+            echo "$TAG_NAME"
+            break
+        elif [[ "$tag" == "v$TAG_NAME" ]]; then
+            echo "v$TAG_NAME"
+            break
+        fi
+    done
 }
 
 main "$@"

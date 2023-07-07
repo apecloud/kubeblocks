@@ -67,7 +67,7 @@ func (o *deleteReceiverOptions) validate(args []string) error {
 }
 
 func (o *deleteReceiverOptions) run() error {
-	// delete receiver from alter manager config
+	// delete receiver from alert manager config
 	if err := o.deleteReceiver(); err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func (o *deleteReceiverOptions) run() error {
 }
 
 func (o *deleteReceiverOptions) deleteReceiver() error {
-	data, err := getConfigData(o.alterConfigMap, alertConfigFileName)
+	data, err := getConfigData(o.alertConfigMap, alertConfigFileName)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func (o *deleteReceiverOptions) deleteReceiver() error {
 
 	data["receivers"] = newReceivers
 	data["route"].(map[string]interface{})["routes"] = newRoutes
-	return updateConfig(o.client, o.alterConfigMap, alertConfigFileName, data)
+	return updateConfig(o.client, o.alertConfigMap, alertConfigFileName, data)
 }
 
 func (o *deleteReceiverOptions) deleteWebhookReceivers() error {

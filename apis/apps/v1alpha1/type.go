@@ -70,6 +70,26 @@ type ComponentTemplateSpec struct {
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }
 
+type LazyRenderedTemplateSpec struct {
+	// Specify the name of the referenced the configuration template ConfigMap object.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	TemplateRef string `json:"templateRef"`
+
+	// Specify the namespace of the referenced the configuration template ConfigMap object.
+	// An empty namespace is equivalent to the "default" namespace.
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:default="default"
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// policy defines how to merge external imported templates into component templates.
+	// +kubebuilder:default="patch"
+	// +optional
+	Policy MergedPolicy `json:"policy,omitempty"`
+}
+
 type ComponentConfigSpec struct {
 	ComponentTemplateSpec `json:",inline"`
 
@@ -79,12 +99,28 @@ type ComponentConfigSpec struct {
 	// +optional
 	Keys []string `json:"keys,omitempty"`
 
+	// lazyRenderedConfigSpec is optional: specify the secondary rendered config spec.
+	// +optional
+	LazyRenderedConfigSpec *LazyRenderedTemplateSpec `json:"lazyRenderedConfigSpec,omitempty"`
+
 	// Specify the name of the referenced the configuration constraints object.
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
 }
+
+// MergedPolicy defines how to merge external imported templates into component templates.
+// +enum
+// +kubebuilder:validation:Enum={patch,replace,none}
+type MergedPolicy string
+
+const (
+	PatchPolicy     MergedPolicy = "patch"
+	ReplacePolicy   MergedPolicy = "replace"
+	OnlyAddPolicy   MergedPolicy = "add"
+	NoneMergePolicy MergedPolicy = "none"
+)
 
 // ClusterPhase defines the Cluster CR .status.phase
 // +enum
@@ -125,7 +161,7 @@ const (
 	ConditionTypeApplyResources            = "ApplyResources"            // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
 	ConditionTypeReplicasReady             = "ReplicasReady"             // ConditionTypeReplicasReady all pods of components are ready
 	ConditionTypeReady                     = "Ready"                     // ConditionTypeReady all components are running
-
+	ConditionTypeSwitchoverPrefix          = "Switchover-"               // ConditionTypeSwitchoverPrefix component status condition of switchover
 )
 
 // Phase defines the ClusterDefinition and ClusterVersion  CR .status.phase
@@ -166,7 +202,7 @@ const (
 
 // OpsType defines operation types.
 // +enum
-// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose}
+// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover}
 type OpsType string
 
 const (
@@ -175,6 +211,7 @@ const (
 	VolumeExpansionType   OpsType = "VolumeExpansion"
 	UpgradeType           OpsType = "Upgrade"
 	ReconfiguringType     OpsType = "Reconfiguring"
+	SwitchoverType        OpsType = "Switchover"
 	RestartType           OpsType = "Restart" // RestartType the restart operation is a special case of the rolling update operation.
 	StopType              OpsType = "Stop"    // StopType the stop operation will delete all pods in a cluster concurrently.
 	StartType             OpsType = "Start"   // StartType the start operation will start the pods which is deleted in stop operation.
@@ -243,13 +280,13 @@ const (
 
 // HScaleDataClonePolicyType defines data clone policy when horizontal scaling.
 // +enum
-// +kubebuilder:validation:Enum={None,Snapshot,Backup}
+// +kubebuilder:validation:Enum={None,CloneVolume,Snapshot}
 type HScaleDataClonePolicyType string
 
 const (
 	HScaleDataClonePolicyNone         HScaleDataClonePolicyType = "None"
+	HScaleDataClonePolicyCloneVolume  HScaleDataClonePolicyType = "CloneVolume"
 	HScaleDataClonePolicyFromSnapshot HScaleDataClonePolicyType = "Snapshot"
-	HScaleDataClonePolicyFromBackup   HScaleDataClonePolicyType = "Backup"
 )
 
 // PodAntiAffinity defines pod anti-affinity strategy.
@@ -472,8 +509,9 @@ const (
 )
 
 // SwitchPolicyType defines switchPolicy type.
+// Currently, only Noop is supported. MaximumAvailability and MaximumDataProtection will be supported in the future.
 // +enum
-// +kubebuilder:validation:Enum={MaximumAvailability, MaximumDataProtection, Noop}
+// +kubebuilder:validation:Enum={Noop}
 type SwitchPolicyType string
 
 const (

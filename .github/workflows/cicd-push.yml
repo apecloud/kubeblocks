@@ -18,8 +18,14 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
-      matrix: ${{ steps.get_trigger_mode.outputs.matrix }}
     steps:
+      - name: Cancel Previous Runs
+        if: github.ref_name != 'main'
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          all_but_latest: true
+          access_token: ${{ github.token }}
+
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -32,12 +38,6 @@ jobs:
           
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
-          
-          TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
-              --trigger-type "$TRIGGER_MODE" \
-              --test-pkgs "internal|apis|controllers|cmd" \
-              --test-check "manifests|mod-vendor|lint"`
-          echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
 
       - name: merge releasing to release
         if: ${{ startsWith(github.ref_name, 'releasing-') }}
@@ -92,7 +92,7 @@ jobs:
             libdevmapper-dev
 
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: "${{ env.GO_VERSION }}"
 
@@ -118,58 +118,45 @@ jobs:
 
   make-test:
     needs: trigger-mode
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, kubeblocks-runner ]
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[test]')
-    strategy:
-      fail-fast: true
-      matrix: ${{ fromJSON(needs.trigger-mode.outputs.matrix) }}
+    outputs:
+      runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
     steps:
       - uses: actions/checkout@v3
-      - name: install lib
+      - name: make manifests check
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libbtrfs-dev \
-            libdevmapper-dev
+          mkdir -p ./bin
+          cp -r /go/bin/controller-gen ./bin/controller-gen
+          cp -r /go/bin/setup-envtest ./bin/setup-envtest
 
-      - name: Set up Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: "${{ env.GO_VERSION }}"
-
-      - name: Install golangci-lint
-        if: matrix.ops == 'lint'
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.51.2
-
-      - name: make test ${{ matrix.ops }}
-        run: |
-          make ${{ matrix.ops }}
-
-      - name: make ${{ matrix.ops }}
-        if: matrix.ops == 'manifests'
-        run: |
+          make manifests
           FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
           if [[ ! -z "$FILE_CHANGES" ]]; then
-              echo $FILE_CHANGES
-              echo "make manifests causes inconsistent files"
-              exit 1
+            echo $FILE_CHANGES
+            echo "make manifests causes inconsistent files"
+            exit 1
           fi
 
-      - name: make ${{ matrix.ops }}
-        if: ${{ contains(matrix.ops, '/') }}
+      - name: make mod-vendor
         run: |
-          make test TEST_PACKAGES=./${{ matrix.ops }}/...
+          make mod-vendor
+
+      - name: make lint
+        run: |
+          make lint
+
+      - name: make test
+        run: |
+          make test
 
       - name: ignore cover pkgs
-        if: ${{ contains(matrix.ops, '/') }}
         run: |
           bash .github/utils/utils.sh --type 14 \
               --file cover.out \
               --ignore-pkgs "cmd/|internal/cli|internal/controller/consensusset|internal/controller/model|controllers/k8score" 
 
       - name: upload coverage report
-        if: ${{ contains(matrix.ops, '/') }}
         uses: codecov/codecov-action@v3
         continue-on-error: true
         with:
@@ -179,10 +166,29 @@ jobs:
           name: codecov-report
           verbose: true
 
+      - name: kill kube-apiserver and etcd
+        id: get_runner_name
+        if: ${{ always() }}
+        run: |
+          echo runner_name=${RUNNER_NAME} >> $GITHUB_OUTPUT
+          bash .github/utils/utils.sh --type 8
+
+  remove-runner:
+    needs: [ trigger-mode, make-test ]
+    runs-on: ubuntu-latest
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && always() }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: remove runner
+        run: |
+          bash .github/utils/utils.sh --type 9 \
+            --github-token "${{ env.GITHUB_TOKEN }}" \
+            --runner-name ${{ needs.make-test.outputs.runner-name }}
+
   check-image:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.2
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-manager-image"
@@ -190,14 +196,13 @@ jobs:
       VERSION: "check"
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
-      SYNC_ENABLE: false
-      APECD_REF: "v0.1.0"
+      APECD_REF: "v0.1.2"
     secrets: inherit
 
   check-tools-image:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[docker]') }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-check.yml@v0.1.2
     with:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-tools-image"
@@ -205,22 +210,20 @@ jobs:
       VERSION: "check"
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
-      SYNC_ENABLE: false
-      APECD_REF: "v0.1.0"
+      APECD_REF: "v0.1.2"
     secrets: inherit
 
   check-helm:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]') }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.0
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts-check.yml@v0.1.4
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "v0.4.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      PUSH_ENABLE: false
-      DEP_REPO: "helm dep update deploy/delphic"
-      APECD_REF: "v0.1.0"
+      DEP_REPO: "delphic|prometheus-cluster|apecloud-mysql-cluster"
+      APECD_REF: "v0.1.4"
     secrets: inherit
 
   deploy-kubeblocks-io:
@@ -251,7 +254,7 @@ jobs:
             libdevmapper-dev
 
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: "${{ env.GO_VERSION }}"
 

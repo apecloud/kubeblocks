@@ -27,7 +27,9 @@ import (
 	"strconv"
 
 	"github.com/spf13/viper"
+	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
@@ -36,51 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/internal/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
-
-type createReconfigureClient func(addr string) (cfgproto.ReconfigureClient, error)
-
-type GetPodsFunc func(params reconfigureParams) ([]corev1.Pod, error)
-
-type RestartContainerFunc func(pod *corev1.Pod, ctx context.Context, containerName []string, createConnFn createReconfigureClient) error
-type OnlineUpdatePodFunc func(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, updatedParams map[string]string) error
-
-type RollingUpgradeFuncs struct {
-	GetPodsFunc          GetPodsFunc
-	RestartContainerFunc RestartContainerFunc
-	OnlineUpdatePodFunc  OnlineUpdatePodFunc
-}
-
-func GetConsensusRollingUpgradeFuncs() RollingUpgradeFuncs {
-	return RollingUpgradeFuncs{
-		GetPodsFunc:          getConsensusPods,
-		RestartContainerFunc: commonStopContainerWithPod,
-		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
-	}
-}
-
-func GetStatefulSetRollingUpgradeFuncs() RollingUpgradeFuncs {
-	return RollingUpgradeFuncs{
-		GetPodsFunc:          getStatefulSetPods,
-		RestartContainerFunc: commonStopContainerWithPod,
-		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
-	}
-}
-
-func GetReplicationRollingUpgradeFuncs() RollingUpgradeFuncs {
-	return RollingUpgradeFuncs{
-		GetPodsFunc:          getReplicationSetPods,
-		RestartContainerFunc: commonStopContainerWithPod,
-		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
-	}
-}
-
-func GetDeploymentRollingUpgradeFuncs() RollingUpgradeFuncs {
-	return RollingUpgradeFuncs{
-		GetPodsFunc:          getDeploymentRollingPods,
-		RestartContainerFunc: commonStopContainerWithPod,
-		OnlineUpdatePodFunc:  commonOnlineUpdateWithPod,
-	}
-}
 
 func getDeploymentRollingPods(params reconfigureParams) ([]corev1.Pod, error) {
 	// util.GetComponentPodList supports deployment
@@ -245,4 +202,70 @@ func getURLFromPod(pod *corev1.Pod, portPort int) (string, error) {
 		return "", fmt.Errorf("%s is not a valid IPv4/IPv6 address", pod.Status.PodIP)
 	}
 	return net.JoinHostPort(ip.String(), strconv.Itoa(portPort)), nil
+}
+
+func restartStatelessComponent(client client.Client, ctx intctrlutil.RequestCtx, configKey string, expectedVersion string, deployObjs []client.Object, recordEvent func(obj client.Object)) (client.Object, error) {
+	cfgAnnotationKey := cfgcore.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
+	deployRestart := func(deploy *appv1.Deployment, expectedVersion string) error {
+		if deploy.Spec.Template.Annotations == nil {
+			deploy.Spec.Template.Annotations = map[string]string{}
+		}
+		deploy.Spec.Template.Annotations[cfgAnnotationKey] = expectedVersion
+		if err := client.Update(ctx.Ctx, deploy); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	for _, obj := range deployObjs {
+		deploy, ok := obj.(*appv1.Deployment)
+		if !ok {
+			continue
+		}
+		if updatedVersion(&deploy.Spec.Template, cfgAnnotationKey, expectedVersion) {
+			continue
+		}
+		if err := deployRestart(deploy, expectedVersion); err != nil {
+			return deploy, err
+		}
+		if recordEvent != nil {
+			recordEvent(deploy)
+		}
+	}
+	return nil, nil
+}
+
+func restartStatefulComponent(client client.Client, ctx intctrlutil.RequestCtx, configKey string, newVersion string, objs []client.Object, recordEvent func(obj client.Object)) (client.Object, error) {
+	cfgAnnotationKey := cfgcore.GenerateUniqKeyWithConfig(constant.UpgradeRestartAnnotationKey, configKey)
+	stsRestart := func(sts *appv1.StatefulSet, expectedVersion string) error {
+		if sts.Spec.Template.Annotations == nil {
+			sts.Spec.Template.Annotations = map[string]string{}
+		}
+		sts.Spec.Template.Annotations[cfgAnnotationKey] = expectedVersion
+		if err := client.Update(ctx.Ctx, sts); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	for _, obj := range objs {
+		sts, ok := obj.(*appv1.StatefulSet)
+		if !ok {
+			continue
+		}
+		if updatedVersion(&sts.Spec.Template, cfgAnnotationKey, newVersion) {
+			continue
+		}
+		if err := stsRestart(sts, newVersion); err != nil {
+			return sts, err
+		}
+		if recordEvent != nil {
+			recordEvent(sts)
+		}
+	}
+	return nil, nil
+}
+
+func updatedVersion(podTemplate *corev1.PodTemplateSpec, keyPath, expectedVersion string) bool {
+	return podTemplate.Annotations != nil && podTemplate.Annotations[keyPath] == expectedVersion
 }

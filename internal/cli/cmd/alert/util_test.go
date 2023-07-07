@@ -78,4 +78,21 @@ var _ = Describe("alter", func() {
 			Expect(res).Should(Equal(tc.expected))
 		}
 	})
+
+	It("email validation", func() {
+		testCases := []struct {
+			email    string
+			expected bool
+		}{
+			{email: "", expected: false},
+			{email: "test.com", expected: false},
+			{email: "test@com", expected: true},
+		}
+		for _, tc := range testCases {
+			By(fmt.Sprintf("email: %s, expected: %t", tc.email, tc.expected))
+			res := validEmail(tc.email)
+			Expect(res).Should(Equal(tc.expected))
+		}
+	})
+
 })

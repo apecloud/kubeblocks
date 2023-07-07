@@ -38,6 +38,7 @@ const (
 	ShellTool                         // "exec"
 	SQL                               // "sql"
 	TPLScript                         // "tpl"
+	Comb                              // "comb"
 )
 
 const (
@@ -99,28 +100,11 @@ type ReconfigureServiceOptions struct {
 type VolumeWatcherOpts struct {
 	VolumeDirs []string
 
-	// fileRegex watches file regex
-	FileRegex string
-
-	// ProcessName: program name
-	ProcessName string
-
-	// Signal is valid for UnixSignal
-	Signal appsv1alpha1.SignalType
-
 	// Exec command for reload
-	Command string
+	BackupPath string
 
-	// Exec command for reload
-	TPLConfig       string
-	BackupPath      string
-	FormatterConfig *appsv1alpha1.FormatterConfig
-	TPLScriptPath   string
-	DataType        string
-	DSN             string
-
-	LogLevel       string
-	NotifyHandType NotifyEventType
+	LogLevel   string
+	CombConfig string
 
 	ServiceOpt ReconfigureServiceOptions
 }
@@ -136,10 +120,7 @@ func NewVolumeWatcherOpts() *VolumeWatcherOpts {
 			ContainerRuntimeEnable:   false,
 			RemoteOnlineUpdateEnable: false,
 		},
-		// for configmap watch
-		NotifyHandType: UnixSignal,
-		Signal:         appsv1alpha1.SIGHUP,
-		LogLevel:       "info",
+		LogLevel: "info",
 	}
 }
 
@@ -148,46 +129,46 @@ func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
 		"volume-dir",
 		opt.VolumeDirs,
 		"the config map volume directory to be watched for updates; may be used multiple times.")
-	flags.Var(&opt.NotifyHandType,
-		"notify-type",
-		"the config describes how to process notification messages.",
-	)
 
+	// flags.Var(&opt.NotifyHandType,
+	//	"notify-type",
+	//	"the config describes how to process notification messages.",
+	// )
+	//
 	// for signal handle
-	flags.StringVar(&opt.ProcessName,
-		"process",
-		opt.ProcessName,
-		"the config describes what db program is.")
-	flags.StringVar((*string)(&opt.Signal),
-		"signal",
-		string(opt.Signal),
-		"the config describes the reload unix signal.")
-
+	// flags.StringVar(&opt.ProcessName,
+	//	"process",
+	//	opt.ProcessName,
+	//	"the config describes what db program is.")
+	// flags.StringVar((*string)(&opt.Signal),
+	//	"signal",
+	//	string(opt.Signal),
+	//	"the config describes the reload unix signal.")
+	//
 	// for exec handle
-	flags.StringVar(&opt.Command,
-		"command",
-		opt.Command,
-		"the config describes reload command. ")
-
+	// flags.StringVar(&opt.Command,
+	//	"command",
+	//	opt.Command,
+	//	"the config describes reload command. ")
+	//
 	// for exec tpl scripts
-	flags.StringVar(&opt.TPLConfig,
-		"tpl-config",
-		opt.TPLConfig,
-		"the config describes reload behaviors by tpl script.")
-	flags.StringVar(&opt.BackupPath,
-		"backup-path",
-		opt.BackupPath,
-		"the config describes backup path.")
+	// flags.StringVar(&opt.TPLConfig,
+	//	"tpl-config",
+	//	opt.TPLConfig,
+	//	"the config describes reload behaviors by tpl script.")
+	// flags.StringVar(&opt.BackupPath,
+	//	"backup-path",
+	//	opt.BackupPath,
+	//	"the config describes backup path.")
+	// flags.StringVar(&opt.FileRegex,
+	//	"regex",
+	//	opt.FileRegex,
+	//	"the config sets filter config file.")
 
 	flags.StringVar(&opt.LogLevel,
 		"log-level",
 		opt.LogLevel,
 		"the config sets log level. enum: [error, info, debug]")
-	flags.StringVar(&opt.FileRegex,
-		"regex",
-		opt.FileRegex,
-		"the config sets filter config file.")
-
 	flags.StringVar(&opt.ServiceOpt.PodIP,
 		"pod-ip",
 		opt.ServiceOpt.PodIP,
@@ -218,4 +199,10 @@ func InstallFlags(flags *pflag.FlagSet, opt *VolumeWatcherOpts) {
 		"operator-update-enable",
 		opt.ServiceOpt.ContainerRuntimeEnable,
 		"the config sets enable operator update parameter.")
+
+	// for multi handler
+	flags.StringVar(&opt.CombConfig,
+		"config",
+		"",
+		"the reload config.")
 }

@@ -77,7 +77,7 @@ var mockBaseOptions = func(s genericclioptions.IOStreams) baseOptions {
       type: dingtalk-webhook`
 	alertCM := mockConfigmap(alertConfigmapName, alertConfigFileName, alertManagerConfig)
 	webhookAdaptorCM := mockConfigmap(webhookAdaptorConfigmapName, webhookAdaptorFileName, webhookAdaptorConfig)
-	o.alterConfigMap = alertCM
+	o.alertConfigMap = alertCM
 	o.webhookConfigMap = webhookAdaptorCM
 	return o
 }
@@ -114,7 +114,7 @@ var _ = Describe("add receiver", func() {
 
 		By("set email, do not specify the name")
 		o.emails = []string{"user@kubeblocks.io"}
-		o.alterConfigMap = mockConfigmap(alertConfigmapName, alertConfigFileName, "")
+		o.alertConfigMap = mockConfigmap(alertConfigmapName, alertConfigFileName, "")
 		Expect(o.validate([]string{})).Should(HaveOccurred())
 		Expect(o.name).ShouldNot(BeEmpty())
 
@@ -124,7 +124,7 @@ var _ = Describe("add receiver", func() {
 
 		By("set email, set smtp config in configmap")
 		baseOptions := mockBaseOptions(s)
-		o.alterConfigMap = baseOptions.alterConfigMap
+		o.alertConfigMap = baseOptions.alertConfigMap
 		Expect(o.validate([]string{})).Should(Succeed())
 	})
 
@@ -158,7 +158,7 @@ var _ = Describe("add receiver", func() {
 		o := addReceiverOptions{baseOptions: baseOptions{IOStreams: s}}
 		alertCM := mockConfigmap(alertConfigmapName, alertConfigFileName, "")
 		webhookAdaptorCM := mockConfigmap(webhookAdaptorConfigmapName, webhookAdaptorFileName, "")
-		o.baseOptions.alterConfigMap = alertCM
+		o.baseOptions.alertConfigMap = alertCM
 		o.baseOptions.webhookConfigMap = webhookAdaptorCM
 		o.client = testing.FakeClientSet(alertCM, webhookAdaptorCM)
 		o.name = "receiver-test"

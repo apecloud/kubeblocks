@@ -1,0 +1,74 @@
+{{- $cc := .Files.Get "config/redis7-config-effect-scope.yaml" | fromYaml }}
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ConfigConstraint
+metadata:
+  name: redis7-demo-config-constraints
+  labels:
+    {{- include "redis.labels" . | nindent 4 }}
+spec:
+
+  cfgSchemaTopLevelName: RedisParameter
+  # ConfigurationSchema that impose restrictions on engine parameter's rule
+  configurationSchema:
+    cue: |-
+      {{- .Files.Get "config/redis7-config-constraint.cue" | nindent 6 }}
+
+  ## require db instance restart
+  {{- if hasKey $cc "staticParameters" }}
+  staticParameters:
+    {{- $params := get $cc "staticParameters" }}
+    {{- range $params }}
+    - {{ . }}
+    {{- end }}
+  {{- end}}
+
+  ## reload parameters
+  ## dynamicParameters
+  {{- if hasKey $cc "dynamicParameters" }}
+  dynamicParameters:
+   {{- $params := get $cc "dynamicParameters" }}
+   {{- range $params }}
+    - {{ . }}
+   {{- end }}
+ {{- end}}
+
+
+  # redis configuration file format
+  formatterConfig:
+    format: redis
+
+  #  shared_volume:
+  #    name: redis-config
+  #    mountPath: /etc/redis
+
+  ## for tools
+  reloadOptions:
+    shellTrigger:
+      command:
+      - "redis-update.sh"
+
+  scriptConfigs:
+    - scriptConfigMapRef: redis-demo-reload-script
+      namespace: {{ .Release.Namespace }}
+
+  toolsImageSpec:
+    mountPoint: /kb/tools
+    toolConfigs:
+      - name: init-redis-tools
+        command:
+          - cp
+          - /usr/local/bin/redis-cli
+          - /kb/tools/redis-cli
+        image: docker.io/library/redis:7.0.11-alpine
+
+  downwardAPIOptions:
+    - name: "pod-info"
+      mountPoint: "/etc/pod_info"
+      command:
+      - sh
+      - -c
+      - redis-process-switchover.sh /etc/pod_info/labels/role
+      items:
+        - path: "labels/role"
+          fieldRef:
+            fieldPath: metadata.labels['kubeblocks.io/role']

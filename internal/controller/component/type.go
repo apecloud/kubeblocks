@@ -47,7 +47,6 @@ type SynthesizedComponent struct {
 	StatefulSpec          *v1alpha1.StatefulSetSpec              `json:"statefulSpec,omitempty"`
 	ConsensusSpec         *v1alpha1.ConsensusSetSpec             `json:"consensusSpec,omitempty"`
 	ReplicationSpec       *v1alpha1.ReplicationSetSpec           `json:"replicationSpec,omitempty"`
-	PrimaryIndex          *int32                                 `json:"primaryIndex,omitempty"`
 	PodSpec               *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	Services              []corev1.Service                       `json:"services,omitempty"`
 	Probes                *v1alpha1.ClusterDefinitionProbes      `json:"probes,omitempty"`
@@ -62,20 +61,9 @@ type SynthesizedComponent struct {
 	Issuer                *v1alpha1.Issuer                       `json:"issuer,omitempty"`
 	VolumeTypes           []v1alpha1.VolumeTypeSpec              `json:"volumeTypes,omitempty"`
 	CustomLabelSpecs      []v1alpha1.CustomLabelSpec             `json:"customLabelSpecs,omitempty"`
+	SwitchoverSpec        *v1alpha1.SwitchoverSpec               `json:"switchoverSpec,omitempty"`
 	ComponentDef          string                                 `json:"componentDef,omitempty"`
 	ServiceAccountName    string                                 `json:"serviceAccountName,omitempty"`
 	ToolsImage            string                                 `json:"toolsImage,omitempty"`
 	StatefulSetWorkload   v1alpha1.StatefulSetWorkload
-}
-
-// GetPrimaryIndex provides PrimaryIndex value getter, if PrimaryIndex is
-// a nil pointer it's treated as 0, return -1 if function receiver is nil.
-func (r *SynthesizedComponent) GetPrimaryIndex() int32 {
-	if r == nil {
-		return -1
-	}
-	if r.PrimaryIndex == nil {
-		return 0
-	}
-	return *r.PrimaryIndex
 }

@@ -39,17 +39,40 @@ type CfgManagerBuildParams struct {
 	Args        []string        `json:"args"`
 	Envs        []corev1.EnvVar `json:"envs"`
 
+	ShareProcessNamespace bool `json:"shareProcessNamespace"`
+
 	Volumes       []corev1.VolumeMount `json:"volumes"`
+	ComponentName string               `json:"componentName"`
 	CharacterType string               `json:"characterType"`
 	SecreteName   string               `json:"secreteName"`
+	EnvConfigName string               `json:"envConfigName"`
 
 	// add volume to pod
-	ScriptVolume *corev1.Volume
-	Cluster      *appsv1alpha1.Cluster
+	ScriptVolume           []corev1.Volume
+	Cluster                *appsv1alpha1.Cluster
+	ConfigSpecsBuildParams []ConfigSpecMeta
+
+	// init tools container
+	ToolsContainers           []corev1.Container
+	DownwardAPIVolumes        []corev1.VolumeMount
+	CMConfigVolumes           []corev1.Volume
+	ConfigLazyRenderedVolumes map[string]corev1.VolumeMount
 }
 
 func IsSupportReload(reload *appsv1alpha1.ReloadOptions) bool {
 	return reload != nil && (reload.ShellTrigger != nil || reload.UnixSignalTrigger != nil || reload.TPLScriptTrigger != nil)
+}
+
+func FromReloadTypeConfig(reloadOptions *appsv1alpha1.ReloadOptions) appsv1alpha1.CfgReloadType {
+	switch {
+	case reloadOptions.UnixSignalTrigger != nil:
+		return appsv1alpha1.UnixSignalType
+	case reloadOptions.ShellTrigger != nil:
+		return appsv1alpha1.ShellType
+	case reloadOptions.TPLScriptTrigger != nil:
+		return appsv1alpha1.TPLScriptType
+	}
+	return ""
 }
 
 func ValidateReloadOptions(reloadOptions *appsv1alpha1.ReloadOptions, cli client.Client, ctx context.Context) error {
@@ -73,7 +96,7 @@ func checkTPLScriptTrigger(options *appsv1alpha1.TPLScriptTrigger, cli client.Cl
 }
 
 func checkShellTrigger(options *appsv1alpha1.ShellTrigger) error {
-	if options.Exec == "" {
+	if len(options.Command) == 0 {
 		return cfgutil.MakeError("required shell trigger")
 	}
 	return nil
@@ -110,4 +133,48 @@ func CreateValidConfigMapFilter() NotifyEventFilter {
 		}
 		return true, nil
 	}
+}
+
+func GetSupportReloadConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec, cli client.Client, ctx context.Context) ([]ConfigSpecMeta, error) {
+	var reloadConfigSpecMeta []ConfigSpecMeta
+	for _, configSpec := range configSpecs {
+		if !cfgutil.NeedReloadVolume(configSpec) {
+			continue
+		}
+		ccKey := client.ObjectKey{
+			Namespace: "",
+			Name:      configSpec.ConfigConstraintRef,
+		}
+		cc := &appsv1alpha1.ConfigConstraint{}
+		if err := cli.Get(ctx, ccKey, cc); err != nil {
+			return nil, cfgutil.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
+		}
+		reloadOptions := cc.Spec.ReloadOptions
+		if !IsSupportReload(reloadOptions) {
+			continue
+		}
+		reloadConfigSpecMeta = append(reloadConfigSpecMeta, ConfigSpecMeta{
+			ToolsImageSpec: cc.Spec.ToolsImageSpec,
+			ScriptConfig:   cc.Spec.ScriptConfigs,
+			ConfigSpecInfo: ConfigSpecInfo{
+				ReloadOptions:      cc.Spec.ReloadOptions,
+				ConfigSpec:         configSpec,
+				ReloadType:         FromReloadTypeConfig(reloadOptions),
+				DownwardAPIOptions: cc.Spec.DownwardAPIOptions,
+				FormatterConfig:    *cc.Spec.FormatterConfig,
+			},
+		})
+	}
+	return reloadConfigSpecMeta, nil
+}
+
+func FilterSubPathVolumeMount(metas []ConfigSpecMeta, volumes []corev1.VolumeMount) []ConfigSpecMeta {
+	var filtered []ConfigSpecMeta
+	for _, meta := range metas {
+		v := FindVolumeMount(volumes, meta.ConfigSpec.VolumeName)
+		if v == nil || v.SubPath == "" || meta.ReloadType == appsv1alpha1.TPLScriptType {
+			filtered = append(filtered, meta)
+		}
+	}
+	return filtered
 }

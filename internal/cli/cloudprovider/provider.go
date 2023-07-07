@@ -24,6 +24,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/apecloud/kubeblocks/version"
 )
 
 type cloudProvider struct {
@@ -101,5 +103,6 @@ func (p *cloudProvider) GetClusterInfo() (*K8sClusterInfo, error) {
 		ClusterName:   vals[0],
 		Region:        vals[1],
 		KubeConfig:    vals[2],
+		KbcliVersion:  version.GetVersion(),
 	}, nil
 }

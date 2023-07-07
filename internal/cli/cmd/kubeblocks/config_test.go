@@ -112,7 +112,6 @@ var _ = Describe("backupconfig", func() {
 				Dynamic:   testing.FakeDynamicClient(),
 			},
 			Version:   version.DefaultKubeBlocksVersion,
-			Monitor:   true,
 			ValueOpts: values.Options{Values: []string{"snapshot-controller.enabled=true"}},
 		}
 	})
@@ -125,6 +124,58 @@ var _ = Describe("backupconfig", func() {
 		cmd := NewConfigCmd(tf, streams)
 		Expect(cmd).ShouldNot(BeNil())
 		Expect(o.PreCheck()).Should(HaveOccurred())
+	})
+
+	It("pruningConfigResults test, and expected success", func() {
+		configs := map[string]interface{}{
+			"key1": "value1",
+			"key2": "value2",
+			"key3": "value3",
+		}
+		tests := []struct {
+			configs       map[string]interface{}
+			showAllConfig bool
+			filterConfig  string
+			keyWhiteList  []string
+			results       map[string]interface{}
+		}{
+			{
+				configs,
+				true,
+				"",
+				keyWhiteList,
+				configs,
+			}, {
+				configs,
+				false,
+				"key1",
+				keyWhiteList,
+				map[string]interface{}{
+					"key1": "value1",
+				},
+			}, {
+				configs,
+				false,
+				"",
+				[]string{"key2"},
+				map[string]interface{}{
+					"key2": "value2",
+				},
+			}, {
+				configs,
+				false,
+				"",
+				[]string{},
+				map[string]interface{}{},
+			}}
+		Eventually(func(g Gomega) {
+			for _, t := range tests {
+				showAllConfig = t.showAllConfig
+				filterConfig = t.filterConfig
+				keyWhiteList = t.keyWhiteList
+				g.Expect(pruningConfigResults(t.configs)).Should(Equal(t.results))
+			}
+		}).Should(Succeed())
 	})
 
 	Context("run describe config cmd", func() {

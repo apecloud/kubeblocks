@@ -20,7 +20,6 @@ spec:
       monitor: {{ .Values.monitor.enabled | default false }}
       replicas: {{ .Values.replicaCount | default 2 }}
       serviceAccountName: {{ include "postgresqlcluster.serviceAccountName" . }}
-      primaryIndex: {{ .Values.primaryIndex | default 0 }}
       switchPolicy:
         type: {{ .Values.switchPolicy.type}}
       enabledLogs: {{ .Values.enabledLogs | toJson | indent 4 }}

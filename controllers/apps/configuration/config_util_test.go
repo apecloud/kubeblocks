@@ -20,9 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	"reflect"
-	"strings"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -287,86 +284,4 @@ var _ = Describe("ConfigWrapper util test", func() {
 		})
 	})
 
-	Context("common funcs test", func() {
-		It("GetReloadOptions Should success without error", func() {
-			mockTpl := appsv1alpha1.ConfigConstraint{
-				Spec: appsv1alpha1.ConfigConstraintSpec{
-					ReloadOptions: &appsv1alpha1.ReloadOptions{
-						UnixSignalTrigger: &appsv1alpha1.UnixSignalTrigger{
-							Signal:      "HUB",
-							ProcessName: "for_test",
-						},
-					},
-				},
-			}
-			tests := []struct {
-				name    string
-				tpls    []appsv1alpha1.ComponentConfigSpec
-				want    *appsv1alpha1.ReloadOptions
-				wantErr bool
-			}{{
-				// empty config templates
-				name:    "test",
-				tpls:    nil,
-				want:    nil,
-				wantErr: false,
-			}, {
-				// empty config templates
-				name:    "test",
-				tpls:    []appsv1alpha1.ComponentConfigSpec{},
-				want:    nil,
-				wantErr: false,
-			}, {
-				// config templates without configConstraintObj
-				name: "test",
-				tpls: []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name: "for_test",
-					},
-				}, {
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name: "for_test2",
-					},
-				}},
-				want:    nil,
-				wantErr: false,
-			}, {
-				// normal
-				name: "test",
-				tpls: []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name: "for_test",
-					},
-					ConfigConstraintRef: "eg_v1",
-				}},
-				want:    mockTpl.Spec.ReloadOptions,
-				wantErr: false,
-			}, {
-				// not exist config constraint
-				name: "test",
-				tpls: []appsv1alpha1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
-						Name: "for_test",
-					},
-					ConfigConstraintRef: "not_exist",
-				}},
-				want:    nil,
-				wantErr: true,
-			}}
-
-			k8sMockClient.MockGetMethod(testutil.WithGetReturned(func(key client.ObjectKey, obj client.Object) error {
-				if strings.Contains(key.Name, "not_exist") {
-					return cfgcore.MakeError("not exist config!")
-				}
-				testutil.SetGetReturnedObject(obj, &mockTpl)
-				return nil
-			}, testutil.WithMaxTimes(len(tests))))
-
-			for _, tt := range tests {
-				got, _, err := cfgcore.GetReloadOptions(k8sMockClient.Client(), ctx, tt.tpls)
-				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
-				Expect(reflect.DeepEqual(got, tt.want)).Should(BeTrue())
-			}
-		})
-	})
 })

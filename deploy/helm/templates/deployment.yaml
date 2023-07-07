@@ -95,6 +95,8 @@ spec:
               value: {{ .jobImagePullPolicy | default "IfNotPresent" }}
             - name: KUBEBLOCKS_ADDON_SA_NAME
               value: {{ include "kubeblocks.addonSAName" . }}
+            - name: KUBEBLOCKS_ADDON_HELM_INSTALL_OPTIONS
+              value: {{ join " " .Values.addonHelmInstallOptions }}
             {{- end }}
             {{- if .Values.enabledAlphaFeatureGates.recoverVolumeExpansionFailure }}
             - name: RECOVER_VOLUME_EXPANSION_FAILURE

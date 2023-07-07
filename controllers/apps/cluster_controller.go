@@ -106,6 +106,18 @@ import (
 // componentresourceconstraint get list
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=componentresourceconstraints,verbs=get;list;watch
 
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings/finalizers,verbs=update
+
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
 	client.Client
@@ -175,6 +187,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&FillClassTransformer{},
 			// create cluster connection credential secret object
 			&ClusterCredentialTransformer{},
+			// handle rbac for pod
+			&RBACTransformer{},
 			// handle restore
 			&RestoreTransformer{Client: r.Client},
 			// create all components objects
@@ -185,8 +199,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&OwnershipTransformer{},
 			// make all workload objects depending on credential secret
 			&SecretTransformer{},
-			// make config configmap immutable
-			&ConfigTransformer{},
 			// update cluster status
 			&ClusterStatusTransformer{},
 			// always safe to put your transformer below

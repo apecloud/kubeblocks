@@ -1,0 +1,46 @@
+# Default values for apecloud-mysql-cluster.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 3
+
+terminationPolicy: Delete
+
+clusterVersionOverride: ""
+nameOverride: ""
+fullnameOverride: ""
+
+monitor:
+  enabled: true
+
+resources: { }
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+
+  # limits:
+  #   cpu: 500m
+  #   memory: 2Gi
+  # requests:
+  #   cpu: 100m
+  #   memory: 1Gi
+
+persistence:
+  enabled: true
+  data:
+    storageClassName:
+    size: 10Gi
+
+
+topologyKeys:
+  - kubernetes.io/hostname
+
+## @param tolerations
+## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+##
+tolerations: [ ]
+
+# The RBAC permission used by cluster component pod, now include event.create
+serviceAccount:
+  name: ""

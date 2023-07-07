@@ -68,6 +68,8 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		Client:   client,
 		Database: client.Database(config.databaseName),
 	}
+
+	component.RegisterManager("mongodb", Mgr)
 	return Mgr, nil
 
 }
@@ -566,4 +568,8 @@ func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster) []*dcs.Member {
 	}
 
 	return members
+}
+
+func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
+	return nil
 }

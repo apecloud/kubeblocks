@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/dapr/kit/logger"
+	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mongodb"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
@@ -23,11 +23,23 @@ type Ha struct {
 func NewHa(logger logger.Logger) *Ha {
 
 	dcs, _ := dcs.NewKubernetesStore(logger)
+	characterType := viper.GetString("KB_SERVICE_CHARACTER_TYPE")
+	if characterType == "" {
+		logger.Errorf("KB_SERVICE_CHARACTER_TYPE not set")
+		return nil
+	}
+
+	manager := component.GetManager(characterType)
+	if manager == nil {
+		logger.Errorf("No DB Manager for character type %s", characterType)
+		return nil
+	}
+
 	ha := &Ha{
 		ctx:       context.Background(),
 		dcs:       dcs,
 		logger:    logger,
-		dbManager: mongodb.Mgr,
+		dbManager: manager,
 	}
 	return ha
 }
@@ -117,6 +129,7 @@ func (ha *Ha) RunCycle() {
 		} else {
 			// make sure sync source is leader when role changed
 			ha.dbManager.Demote()
+			ha.dbManager.Follow(cluster)
 		}
 	}
 }

@@ -52,8 +52,8 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		},
 		DB: db,
 	}
+	component.RegisterManager("mysql", Mgr)
 	return Mgr, nil
-
 }
 
 func (mgr *Manager) Initialize() {}
@@ -232,7 +232,7 @@ func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
 		return fmt.Errorf("cluster has no leader")
 	}
 
-	if mgr.GetCurrentMemberName() == cluster.Leader.Name {
+	if mgr.CurrentMemberName == cluster.Leader.Name {
 		mgr.Logger.Infof("i get the leader key, don't need to follow")
 		return nil
 	}
@@ -252,22 +252,22 @@ func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
 }
 
 func (mgr *Manager) checkRecoveryConf(ctx context.Context, leader string) bool {
-	//sql := "show slave status"
-	//data, err := mysqlOps.query(ctx, sql)
-	//if err != nil {
-	//	mysqlOps.Logger.Errorf("error executing %s: %v", sql, err)
-	//	return true
-	//}
+	// sql := "show slave status"
+	// data, err := mysqlOps.query(ctx, sql)
+	// if err != nil {
+	// 	mysqlOps.Logger.Errorf("error executing %s: %v", sql, err)
+	// 	return true
+	// }
 
-	//result, err := ParseSingleQuery(string(data))
-	//if err != nil {
-	//	mysqlOps.Logger.Errorf("parse query err:%v", err)
-	//	return true
-	//}
+	// result, err := ParseSingleQuery(string(data))
+	// if err != nil {
+	// 	mysqlOps.Logger.Errorf("parse query err:%v", err)
+	// 	return true
+	// }
 
-	//if result == nil || strings.Split(result["Master_Host"].(string), ".")[0] != leader {
-	//	return true
-	//}
+	// if result == nil || strings.Split(result["Master_Host"].(string), ".")[0] != leader {
+	// 	return true
+	// }
 
 	return false
 }

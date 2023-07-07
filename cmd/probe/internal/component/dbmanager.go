@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"strings"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	"github.com/dapr/kit/logger"
@@ -22,6 +23,7 @@ type DBManager interface {
 	DeleteMemberFromCluster(*dcs.Cluster, string) error
 	Premote() error
 	Demote() error
+	Follow(*dcs.Cluster) error
 	GetHealthiestMember(*dcs.Cluster, string) *dcs.Member
 	// IsHealthiestMember(*dcs.Cluster) bool
 	HasOtherHealthyLeader(*dcs.Cluster) *dcs.Member
@@ -30,6 +32,8 @@ type DBManager interface {
 	GetMemberAddrs(*dcs.Cluster) []string
 	GetLogger() logger.Logger
 }
+
+var managers = make(map[string]DBManager)
 
 type DBManagerBase struct {
 	CurrentMemberName string
@@ -50,4 +54,13 @@ func (mgr *DBManagerBase) GetLogger() logger.Logger {
 
 func (mgr *DBManagerBase) GetCurrentMemberName() string {
 	return mgr.CurrentMemberName
+}
+
+func RegisterManager(characterType string, manager DBManager) {
+	managers[characterType] = manager
+}
+
+func GetManager(characterType string) DBManager {
+	characterType = strings.ToLower(characterType)
+	return managers[characterType] 
 }

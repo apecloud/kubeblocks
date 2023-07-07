@@ -9,10 +9,10 @@ import (
 
 type DBManager interface {
 	Initialize()
-	IsRunning()
+	IsRunning() bool
 	IsCurrentMemberInCluster(*dcs.Cluster) bool
 	IsCurrentMemberHealthy() bool
-	IsMemberHealthy(string) bool
+	IsMemberHealthy(*dcs.Cluster, *dcs.Member) bool
 	IsClusterHealthy(context.Context, *dcs.Cluster) bool
 	IsClusterInitialized(context.Context, *dcs.Cluster) (bool, error)
 	IsLeader(context.Context) (bool, error)

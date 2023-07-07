@@ -26,6 +26,7 @@ type Manager struct {
 }
 
 var Mgr *Manager
+var _ component.DBManager = &Manager{}
 
 func NewManager(logger logger.Logger) (*Manager, error) {
 	db, err := config.GetLocalDBConn()
@@ -53,6 +54,22 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 	}
 	return Mgr, nil
 
+}
+
+func (mgr *Manager) Initialize() {}
+
+func (mgr *Manager) IsRunning() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	// test if db is ready to connect or not
+	err := mgr.DB.PingContext(ctx)
+	if err != nil {
+		mgr.Logger.Infof("DB is not ready: %v", err)
+		return false
+	}
+
+	return true
 }
 
 func (mgr *Manager) IsDBStartupReady() bool {
@@ -128,9 +145,6 @@ func (mgr *Manager) GetLeaderClient(ctx context.Context, cluster *dcs.Cluster) (
 	addr := cluster.GetMemberAddr(*leaderMember)
 	return config.GetDBConnWithAddr(addr)
 }
-
-func (mgr *Manager) Initialize() {}
-func (mgr *Manager) IsRunning()  {}
 
 func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 	return true

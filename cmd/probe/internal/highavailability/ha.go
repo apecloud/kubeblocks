@@ -40,11 +40,11 @@ func (ha *Ha) RunCycle() {
 	}
 
 	switch {
-	//case !dbManger.IsRunning():
-	//	logger.Infof("DB Service is not running,  wait for sqlctl to start it")
-	//	if dcs.HasLock() {
-	//		dcs.ReleaseLock()
-	//	}
+	case !ha.dbManager.IsRunning():
+		ha.logger.Infof("DB Service is not running,  wait for sqlctl to start it")
+		if ha.dcs.HasLock() {
+			ha.dcs.ReleaseLock()
+		}
 
 	case !ha.dbManager.IsClusterHealthy(context.TODO(), cluster):
 		ha.logger.Errorf("The cluster is not healthy, wait...")
@@ -183,7 +183,8 @@ func (ha *Ha) IsHealthiestMember(cluster *dcs.Cluster) bool {
 		if candidate == ha.dbManager.GetCurrentMemberName() {
 			return true
 		}
-		if candidate != "" && ha.dbManager.IsMemberHealthy(candidate) {
+
+		if candidate != "" && ha.dbManager.IsMemberHealthy(cluster, cluster.GetMemberWithName(candidate)) {
 			ha.logger.Infof("manual switchover to new leader: %s", candidate)
 			return false
 		}

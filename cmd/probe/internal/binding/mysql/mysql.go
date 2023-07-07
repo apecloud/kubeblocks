@@ -33,7 +33,6 @@ import (
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
-	"github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 
@@ -141,6 +140,10 @@ func (mysqlOps *MysqlOperations) GetRole(ctx context.Context, request *bindings.
 		return mysqlOps.GetRoleForReplication(ctx, request, response)
 	}
 	return mysqlOps.GetRoleForConsensus(ctx, request, response)
+}
+
+func (mysqlOps *MysqlOperations) GetRunningPort() int {
+	return 0
 }
 
 func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {

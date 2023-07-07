@@ -27,6 +27,7 @@ type Manager struct {
 }
 
 var Mgr *Manager
+var _ component.DBManager = &Manager{}
 
 func NewManager(logger logger.Logger) (*Manager, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -69,6 +70,20 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 	}
 	return Mgr, nil
 
+}
+
+func (mgr *Manager) Initialize() {}
+
+func (mgr *Manager) IsRunning() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	err := mgr.Client.Ping(ctx, readpref.Primary())
+	if err != nil {
+		mgr.Logger.Infof("DB is not ready: %v", err)
+		return false
+	}
+	return true
 }
 
 func (mgr *Manager) IsDBStartupReady() bool {
@@ -301,9 +316,6 @@ func (mgr *Manager) GetReplSetClientWithHosts(ctx context.Context, hosts []strin
 	return client, err
 }
 
-func (mgr *Manager) Initialize() {}
-func (mgr *Manager) IsRunning()  {}
-
 func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 	client, err := mgr.GetReplSetClient(context.TODO(), cluster)
 	if err != nil {
@@ -329,10 +341,17 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 }
 
 func (mgr *Manager) IsCurrentMemberHealthy() bool {
-	return mgr.IsMemberHealthy(mgr.CurrentMemberName)
+	return mgr.IsMemberHealthy(nil, nil)
 }
 
-func (mgr *Manager) IsMemberHealthy(memberName string) bool {
+func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bool {
+	var memberName string
+	if member != nil {
+		memberName = member.Name
+	} else {
+		memberName = mgr.CurrentMemberName
+	}
+
 	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
 	if rsStatus == nil {
 		return false

@@ -33,8 +33,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
-	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
 type Operation func(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (OpsResult, error)

@@ -24,6 +24,14 @@ func (c *Cluster) HasMember(memberName string) bool {
 	return false
 }
 
+func (c *Cluster) GetLeaderMember() *Member {
+	if c.Leader == nil || c.Leader.Name == "" {
+		return nil
+	}
+
+	return c.GetMemberWithName(c.Leader.Name)
+}
+
 func (c *Cluster) GetMemberWithName(name string) *Member {
 	for _, m := range c.Members {
 		if m.Name == name {

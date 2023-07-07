@@ -1,18 +1,18 @@
-package mongodb
+package mysql
 
 import (
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
-	"errors"
 	"fmt"
 	"net"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/apecloud/kubeblocks/cmd/probe/vendor/github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 	"github.com/spf13/viper"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -55,10 +55,7 @@ type Config struct {
 var config *Config
 
 func NewConfig(properties map[string]string) (*Config, error) {
-	config = &Config{
-		direct:           true,
-		operationTimeout: defaultTimeout,
-	}
+	config = &Config{}
 
 	if val, ok := properties[connectionURLKey]; ok && val != "" {
 		config.url = val
@@ -98,7 +95,7 @@ func NewConfig(properties map[string]string) (*Config, error) {
 		}
 	}
 
-	if val, ok := properties[connMaxIdletimeKey]; ok {
+	if val, ok := properties[connMaxIdleTimeKey]; ok {
 		if d, err := time.ParseDuration(val); err == nil {
 			config.connMaxIdletime = d
 		}
@@ -106,9 +103,9 @@ func NewConfig(properties map[string]string) (*Config, error) {
 
 	if config.pemPath != "" {
 		rootCertPool := x509.NewCertPool()
-		pem, err := os.ReadFile(pemPath)
+		pem, err := os.ReadFile(config.pemPath)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Error reading PEM file from %s", pemPath)
+			return nil, errors.Wrapf(err, "Error reading PEM file from %s", config.pemPath)
 		}
 
 		ok := rootCertPool.AppendCertsFromPEM(pem)
@@ -129,8 +126,8 @@ func (config *Config) GetLocalDBConn() (*sql.DB, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", connectionURLKey)
 	}
-	config.User = dbUser
-	config.Passwd = dbPasswd
+	mysqlConfig.User = config.username
+	mysqlConfig.Passwd = config.password
 	db, err := sql.Open("mysql", mysqlConfig.FormatDSN())
 	if err != nil {
 		return nil, errors.Wrap(err, "error opening DB connection")
@@ -144,9 +141,9 @@ func (config *Config) GetDBConnWithAddr(addr string) (*sql.DB, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "illegal Data Source Name (DNS) specified by %s", connectionURLKey)
 	}
-	config.User = dbUser
-	config.Passwd = dbPasswd
-	config.Addr = addr
+	mysqlConfig.User = config.username
+	mysqlConfig.Passwd = config.password
+	mysqlConfig.Addr = addr
 	db, err := sql.Open("mysql", mysqlConfig.FormatDSN())
 	if err != nil {
 		return nil, errors.Wrap(err, "error opening DB connection")

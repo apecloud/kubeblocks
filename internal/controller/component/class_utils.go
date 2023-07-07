@@ -17,23 +17,15 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package playground
+package component
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"strings"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	"github.com/apecloud/kubeblocks/internal/constant"
 )
 
-var _ = Describe("util", func() {
-	It("playground dir", func() {
-		dir, err := playgroundDir()
-		Expect(err).Should(Succeed())
-		Expect(dir).ShouldNot(BeEmpty())
-	})
-
-	It("cloud provider repo dir", func() {
-		dir, err := cloudProviderRepoDir("")
-		Expect(err).Should(Succeed())
-		Expect(dir).ShouldNot(BeEmpty())
-	})
-})
+func ignoreResourceConstraint(cluster *appsv1alpha1.Cluster) bool {
+	return strings.ToLower(cluster.GetAnnotations()[constant.IgnoreResourceConstraint]) == "true"
+}

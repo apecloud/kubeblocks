@@ -54,7 +54,7 @@ type ClusterDefinitionReconciler struct {
 var clusterDefUpdateHandlers = map[string]func(client client.Client, ctx context.Context, clusterDef *appsv1alpha1.ClusterDefinition) error{}
 
 func init() {
-	viper.SetDefault(maxConcurReconClusterDefKey, runtime.NumCPU()*2)
+	viper.SetDefault(maxConcurReconClusterDefKey, runtime.NumCPU())
 }
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to

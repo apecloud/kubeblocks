@@ -703,3 +703,12 @@ storageClass:
       fsType: xfs
     tke:
       volumeType: CLOUD_SSD
+
+external-dns:
+  enabled: false
+  domain: kubeblocks.io
+  tolerations:
+  - key: kb-controller
+    operator: Equal
+    value: "true"
+    effect: NoSchedule

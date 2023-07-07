@@ -150,7 +150,7 @@ func (pgOps *PostgresOperations) GetRunningPort() int {
 }
 
 func (pgOps *PostgresOperations) GetRole(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
-	return pgOps.manager.GetMemberState(ctx)
+	return pgOps.manager.GetMemberStateWithPool(ctx, nil)
 }
 
 func (pgOps *PostgresOperations) ExecOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {

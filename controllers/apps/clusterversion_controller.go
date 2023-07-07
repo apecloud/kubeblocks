@@ -104,8 +104,8 @@ func (r *ClusterVersionReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		Name: clusterVersion.Spec.ClusterDefinitionRef,
 	}, clusterdefinition); err != nil {
 		if apierrors.IsNotFound(err) {
-			if res, err = r.patchClusterDefLabel(reqCtx, clusterVersion); res != nil {
-				return *res, err
+			if res, patchErr := r.patchClusterDefLabel(reqCtx, clusterVersion); res != nil {
+				return *res, patchErr
 			}
 			if err = r.handleClusterDefNotFound(reqCtx, clusterVersion, err.Error()); err != nil {
 				return intctrlutil.RequeueWithErrorAndRecordEvent(clusterVersion, r.Recorder, err, reqCtx.Log)

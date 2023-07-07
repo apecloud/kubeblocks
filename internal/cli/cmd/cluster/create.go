@@ -254,7 +254,7 @@ func NewCreateOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *C
 	}}
 	o.CreateOptions.Options = o
 	o.CreateOptions.PreCreate = o.PreCreate
-	o.CreateOptions.CreateDependencies = o.CreateDependencies
+	//o.CreateOptions.CreateDependencies = o.CreateDependencies
 	return o
 }
 

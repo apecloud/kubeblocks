@@ -29,7 +29,6 @@ spec:
         deployment environments.
       workloadType: Stateful # Consensus
       characterType: kafka
-      maxUnavailable: 49%
       probes:
       monitor:
         builtIn: false
@@ -127,8 +126,8 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: kraftClusterID
                     optional: false
-              - name: KB_KAFKA_ENABLE_SASL  # enable the SASL with plain mode
-                value: "false"
+{{/*              - name: KB_KAFKA_ENABLE_SASL  # enable the SASL with plain mode*/}}
+{{/*                value: "false"*/}}
               - name: KB_KAFKA_SASL_CONFIG_PATH  # specify the SASL jaas users
                 value: /tools/server-jaas.properties
             ports:
@@ -192,12 +191,11 @@ spec:
                 mountPath: /etc/jmx-kafka
 
     # controller(kraft) Ref: https://kafka.apache.org/documentation/#kraft_role
-    - name: kafka-kraft
+    - name: controller
       description: |-
         Kafka controller that act as controllers (kraft) only server.
       workloadType: Stateful # Consensus
       characterType: kafka
-      maxUnavailable: 49%
       probes:
       monitor:
         builtIn: false
@@ -213,6 +211,7 @@ spec:
         - name: kafka-jmx-configuration-tpl
           templateRef: {{ include "kafka.name" . }}-jmx-configuration-tpl
           volumeName: jmx-config
+          namespace: {{ .Release.Namespace }}
       scriptSpecs:
         - name: kafka-scripts-tpl
           templateRef: {{ include "kafka.name" . }}-scripts-tpl
@@ -351,6 +350,7 @@ spec:
         - name: kafka-jmx-configuration-tpl
           templateRef: {{ include "kafka.name" . }}-jmx-configuration-tpl
           volumeName: jmx-config
+          namespace: {{ .Release.Namespace }}
       scriptSpecs:
         - name: kafka-scripts-tpl
           templateRef: {{ include "kafka.name" . }}-scripts-tpl
@@ -428,8 +428,8 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: kraftClusterID
                     optional: false
-              - name: KB_KAFKA_ENABLE_SASL  # enable the SASL with plain mode
-                value: "true"
+{{/*              - name: KB_KAFKA_ENABLE_SASL  # enable the SASL with plain mode*/}}
+{{/*                value: "true"*/}}
               - name: KB_KAFKA_SASL_CONFIG_PATH  # specify the SASL jaas users
                 value: /tools/server-jaas.properties
               - name: BROKER_MIN_NODE_ID

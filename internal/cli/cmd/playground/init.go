@@ -483,6 +483,9 @@ func (o *initOptions) installKubeBlocks(k8sClusterName string) error {
 		}
 		return err
 	}
+	if err = insOpts.CompleteInstallOptions(); err != nil {
+		return err
+	}
 	return insOpts.Install()
 }
 

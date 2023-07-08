@@ -17,7 +17,8 @@ images:
   pullPolicy: IfNotPresent
   kafka:
     repository: docker.io/bitnami/kafka
-    tag: 3.4.0-debian-11-r22
+#    tag: 3.4.0-debian-11-r22
+    tag: 3.3.2-debian-11-r54
   kafkaExporter:
     repository: docker.io/bitnami/kafka-exporter
     tag: 1.6.0-debian-11-r67

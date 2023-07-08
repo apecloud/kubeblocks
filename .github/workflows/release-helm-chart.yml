@@ -34,15 +34,14 @@ jobs:
 
   release-chart:
     needs: chart-version
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.4
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.8
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "${{ needs.chart-version.outputs.chart-version }}"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
       DEP_CHART_DIR: "deploy/helm/depend-charts"
-      DEP_REPO: "delphic|prometheus-cluster|apecloud-mysql-cluster|tdengine-cluster|redis-cluster|mongodb-cluster"
-      APECD_REF: "v0.1.4"
+      APECD_REF: "v0.1.8"
     secrets: inherit
 
   send-message:

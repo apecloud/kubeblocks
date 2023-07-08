@@ -1,7 +1,7 @@
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
-  name: loki
+  name: {{ include "addon.loki.name" . }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
     "kubeblocks.io/provider": community

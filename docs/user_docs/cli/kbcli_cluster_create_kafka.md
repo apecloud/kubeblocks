@@ -22,21 +22,21 @@ kbcli cluster create kafka NAME [flags]
 
 ```
       --availability-policy string   The availability policy of cluster. Legal values [none, node, zone]. (default "none")
-      --broker-replicas int          The number of Kafka broker replicas for separated mode. (default 1)
-      --controller-replicas int      The number of Kafka controller replicas for separated mode. Legal values [%!s(float64=1), %!s(float64=3), %!s(float64=5)]. (default 1)
-      --cpu float                    CPU cores. (default 1)
-      --data-storage float           Data Storage size, the unit is Gi. (default 10)
+      --broker-replicas int          The number of Kafka broker replicas for separated mode. Value range [1, 100]. (default 1)
+      --controller-replicas int      The number of Kafka controller replicas for separated mode. Legal values [1, 3, 5]. (default 1)
+      --cpu float                    CPU cores. Value range [0.5, 64]. (default 1)
+      --data-storage float           Data Storage size, the unit is Gi. Value range [1, 10000]. (default 10)
   -h, --help                         help for kafka
       --host-network-accessible      Specify whether the cluster can be accessed from within the VPC.
-      --log-storage float            Log Storage size, the unit is Gi. (default 2)
-      --memory float                 Memory, the unit is Gi. (default 1)
-      --meta-storage float           Meta Storage size, the unit is Gi. (default 5)
+      --log-storage float            Log Storage size, the unit is Gi. Value range [1, 10000]. (default 2)
+      --memory float                 Memory, the unit is Gi. Value range [0.5, 1000]. (default 1)
+      --meta-storage float           Meta Storage size, the unit is Gi. Value range [1, 10000]. (default 5)
       --mode string                  Mode for Kafka kraft cluster, 'combined' is combined Kafka controller and broker,'separated' is broker and controller running independently. Legal values [combined, separated]. (default "combined")
       --monitor-enable               Enable monitor for Kafka.
-      --monitor-replicas int         The number of Kafka monitor replicas. (default 1)
-      --monitoring-interval int      The monitoring interval of cluster, 0 is disabled, the unit is second.
+      --monitor-replicas int         The number of Kafka monitor replicas. Value range [1, 5]. (default 1)
+      --monitoring-interval int      The monitoring interval of cluster, 0 is disabled, the unit is second. Value range [0, 60].
       --publicly-accessible          Specify whether the cluster can be accessed from the public internet.
-      --replicas int                 The number of Kafka replicas for combined mode. Legal values [%!s(float64=1), %!s(float64=3), %!s(float64=5)]. (default 1)
+      --replicas int                 The number of Kafka replicas for combined mode. Legal values [1, 3, 5]. (default 1)
       --sasl-enable                  Enable authentication using SASL/PLAIN for Kafka.
       --storage-enable               Enable storage for Kafka meta/data/log.
       --tenancy string               The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")

@@ -22,15 +22,15 @@ kbcli cluster create postgresql NAME [flags]
 
 ```
       --availability-policy string   The availability policy of cluster. Legal values [none, node, zone]. (default "none")
-      --cpu float                    CPU cores. (default 1)
+      --cpu float                    CPU cores. Value range [0.5, 64]. (default 1)
   -h, --help                         help for postgresql
       --host-network-accessible      Specify whether the cluster can be accessed from within the VPC.
-      --memory float                 Memory, the unit is Gi. (default 1)
+      --memory float                 Memory, the unit is Gi. Value range [0.5, 1000]. (default 1)
       --mode string                  Cluster topology mode. Legal values [standalone, replication]. (default "standalone")
-      --monitoring-interval int      The monitoring interval of cluster, 0 is disabled, the unit is second.
+      --monitoring-interval int      The monitoring interval of cluster, 0 is disabled, the unit is second. Value range [0, 60].
       --publicly-accessible          Specify whether the cluster can be accessed from the public internet.
-      --replicas int                 The number of replicas, for standalone mode, the replicas is 1, for replication mode, the default replicas is 2. (default 1)
-      --storage float                Storage size, the unit is Gi. (default 20)
+      --replicas int                 The number of replicas, for standalone mode, the replicas is 1, for replication mode, the default replicas is 2. Value range [1, 5]. (default 1)
+      --storage float                Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
       --tenancy string               The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")
       --termination-policy string    The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")
       --version string               Cluster version.

@@ -1,5 +1,5 @@
 {{/*
-Define component resources, including cpu, memory and storage
+Define component resources, including cpu, memory
 */}}
 {{- define "kblib.componentResources" }}
 {{- $requestCPU := (float64 .Values.cpu) }}
@@ -19,12 +19,4 @@ resources:
   requests:
     cpu: {{ $requestCPU | quote }}
     memory: {{ print $requestMemory "Gi" | quote }}
-volumeClaimTemplates:
-  - name: data # ref clusterDefinition components.containers.volumeMounts.name
-    spec:
-      accessModes:
-        - ReadWriteOnce
-      resources:
-        requests:
-          storage: {{ print .Values.storage "Gi" }}
 {{- end }}

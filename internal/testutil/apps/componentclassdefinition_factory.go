@@ -45,11 +45,7 @@ func NewComponentClassDefinitionFactory(name, clusterDefinitionRef, componentTyp
 	return f
 }
 
-func (factory *MockComponentClassDefinitionFactory) AddClasses(constraintRef string, classNames []string) *MockComponentClassDefinitionFactory {
-	var classes []appsv1alpha1.ComponentClass
-	for _, name := range classNames {
-		classes = append(classes, DefaultClasses[name])
-	}
+func (factory *MockComponentClassDefinitionFactory) AddClasses(constraintRef string, classes []appsv1alpha1.ComponentClass) *MockComponentClassDefinitionFactory {
 	groups := factory.get().Spec.Groups
 	groups = append(groups, appsv1alpha1.ComponentClassGroup{
 		ResourceConstraintRef: constraintRef,

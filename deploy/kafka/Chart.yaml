@@ -13,7 +13,7 @@ type: application
 
 version: 0.6.0-alpha.28
 
-appVersion: 3.4.0
+appVersion: 3.3.2
 
 home: https://kubeblocks.io/
 icon: https://bitnami.com/assets/stacks/kafka/img/kafka-stack-220x234.png

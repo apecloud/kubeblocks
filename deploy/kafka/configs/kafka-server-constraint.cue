@@ -72,7 +72,7 @@
 	"metadata.log.max.record.bytes.between.snapshots"?: int & >=1
 
 	// This is the maximum number of milliseconds to wait to generate a snapshot if there are committed records in the log that are not included in the latest snapshot.
-	"metadata.log.max.snapshot.interval.ms"?: int & >=0
+	// "metadata.log.max.snapshot.interval.ms"?: int & >=0
 
 	// The length of time in milliseconds between broker heartbeats. Used when running in KRaft mode.
 	"broker.heartbeat.interval.ms"?: int
@@ -399,7 +399,7 @@
 	"transaction.remove.expired.transaction.cleanup.interval.ms"?: int & >=1
 
 	// The time in ms that a topic partition leader will wait before expiring producer IDs.
-	"producer.id.expiration.ms"?: int & >=1
+	// "producer.id.expiration.ms"?: int & >=1
 
 	// The maximum number of incremental fetch sessions that we will maintain.
 	"max.incremental.fetch.session.cache.slots"?: int & >=0

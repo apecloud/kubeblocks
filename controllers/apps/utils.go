@@ -35,7 +35,7 @@ import (
 )
 
 // default reconcile requeue after duration
-var requeueDuration = time.Millisecond * 100
+var requeueDuration = time.Millisecond * 1000
 
 func getEnvReplacementMapForAccount(name, passwd string) map[string]string {
 	return map[string]string{

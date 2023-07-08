@@ -17,23 +17,18 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package playground
+package cluster
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"embed"
 )
 
-var _ = Describe("util", func() {
-	It("playground dir", func() {
-		dir, err := playgroundDir()
-		Expect(err).Should(Succeed())
-		Expect(dir).ShouldNot(BeEmpty())
-	})
+var (
+	// run `make generate` to generate this embed file
+	//go:embed charts/kafka-cluster.tgz
+	kafkaChart embed.FS
+)
 
-	It("cloud provider repo dir", func() {
-		dir, err := cloudProviderRepoDir("")
-		Expect(err).Should(Succeed())
-		Expect(dir).ShouldNot(BeEmpty())
-	})
-})
+func init() {
+	registerClusterType("kafka", kafkaChart, "kafka-cluster.tgz")
+}

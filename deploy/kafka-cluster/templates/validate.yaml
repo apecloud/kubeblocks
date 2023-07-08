@@ -1,16 +1,22 @@
-{{- if .Values.kafkaServer.replicaCount }}
-  {{- if gt (int .Values.kafkaServer.replicaCount) 3 }}
+{{- if .Values.replicas }}
+  {{- if gt (int .Values.replicas) 5 }}
     {{ fail "kafka-server cluster does not support running replicas greater than 3." }}
   {{- end }}
-  {{- if ne (mod (int .Values.kafkaServer.replicaCount) 2) 1 }}
+  {{- if ne (mod (int .Values.replicas) 2) 1 }}
     {{ fail "kafka-server cluster does not support running with even number replicas." }}
   {{- end }}
 {{- end }}
-{{- if .Values.kafkaController.replicaCount }}
-  {{- if gt (int .Values.kafkaController.replicaCount) 3 }}
-    {{ fail "kafka-controller cluster does not support running replicas greater than 3." }}
+
+{{- if .Values.brokerReplicas }}
+  {{- if gt (int .Values.brokerReplicas) 100 }}
+    {{ fail "kafka-broker cluster does not support running replicas greater than 100." }}
   {{- end }}
-  {{- if ne (mod (int .Values.kafkaController.replicaCount) 2) 1 }}
+{{- end }}
+{{- if .Values.controllerReplicas }}
+  {{- if gt (int .Values.controllerReplicas) 5 }}
+    {{ fail "kafka-controller cluster does not support running replicas greater than 5." }}
+  {{- end }}
+  {{- if ne (mod (int .Values.controllerReplicas) 2) 1 }}
     {{ fail "kafka-controller cluster does not support running with even number replicas." }}
   {{- end }}
 {{- end }}

@@ -119,7 +119,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -1579,107 +1579,64 @@ var _ = Describe("Cluster Controller", func() {
 		By("Waiting for the cluster controller to create resources completely")
 		waitForCreatingResourceCompletely(clusterKey, compName)
 
-		// remove finalizers for cluster object
-		defer Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
-			cluster.Finalizers = []string{}
-		})()).Should(Succeed())
-
-		By("Checking the workload generation as 1")
-		checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
-			if sts != nil {
-				g.Expect(sts.Generation).Should(Equal(int64(1)))
-			}
-			if deploy != nil {
-				g.Expect(deploy.Generation).Should(Equal(int64(1)))
-			}
-		})
-
 		oldToolsImage := viper.GetString(constant.KBToolsImage)
 		newToolsImage := fmt.Sprintf("%s-%s", oldToolsImage, rand.String(4))
+		checkWorkloadGenerationAndToolsImage := func(workloadGenerationExpected int64, oldImageCntExpected, newImageCntExpected int) {
+			checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
+				if sts != nil {
+					g.Expect(sts.Generation).Should(Equal(workloadGenerationExpected))
+				}
+				if deploy != nil {
+					g.Expect(deploy.Generation).Should(Equal(workloadGenerationExpected))
+				}
+				oldImageCnt := 0
+				newImageCnt := 0
+				for _, c := range getPodSpec(sts, deploy).Containers {
+					if c.Image == oldToolsImage {
+						oldImageCnt += 1
+					}
+					if c.Image == newToolsImage {
+						newImageCnt += 1
+					}
+				}
+				g.Expect(oldImageCnt).Should(Equal(oldImageCntExpected))
+				g.Expect(newImageCnt).Should(Equal(newImageCntExpected))
+			})
+		}
 
-		By("update kubeblocks tools image and patch cluster annotation to trigger cluster status reconcile")
+		By("check the workload generation as 1")
+		checkWorkloadGenerationAndToolsImage(int64(1), 1, 0)
+
+		By("update kubeblocks tools image")
 		viper.Set(constant.KBToolsImage, newToolsImage)
-		updateClusterAnnotation(clusterObj)
+
+		By("update cluster annotation to trigger cluster status reconcile")
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			cluster.Annotations = map[string]string{"time": time.Now().Format(time.RFC3339)}
+		})()).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 			g.Expect(cluster.Generation).Should(Equal(int64(1)))
 		})).Should(Succeed())
-		checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
-			if sts != nil {
-				g.Expect(sts.Generation).Should(Equal(int64(1)))
-			}
-			if deploy != nil {
-				g.Expect(deploy.Generation).Should(Equal(int64(1)))
-			}
-			oldImageCnt := 0
-			newImageCnt := 0
-			for _, c := range getPodSpec(sts, deploy).Containers {
-				if c.Image == oldToolsImage {
-					oldImageCnt += 1
-				}
-				if c.Image == newToolsImage {
-					newImageCnt += 1
-				}
-			}
-			g.Expect(oldImageCnt).Should(Equal(1))
-			g.Expect(newImageCnt).Should(Equal(0))
-		})
+		checkWorkloadGenerationAndToolsImage(int64(1), 1, 0)
 
-		By("update termination policy to trigger cluster spec reconcile")
+		By("update termination policy to trigger cluster spec reconcile, but workload not changed")
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			cluster.Spec.TerminationPolicy = appsv1alpha1.DoNotTerminate
-		})()).ShouldNot(HaveOccurred())
+		})()).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 			g.Expect(cluster.Generation).Should(Equal(int64(2)))
 		})).Should(Succeed())
-		checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
-			if sts != nil {
-				g.Expect(sts.Generation).Should(Equal(int64(1)))
-			}
-			if deploy != nil {
-				g.Expect(deploy.Generation).Should(Equal(int64(1)))
-			}
-			oldImageCnt := 0
-			newImageCnt := 0
-			for _, c := range getPodSpec(sts, deploy).Containers {
-				if c.Image == oldToolsImage {
-					oldImageCnt += 1
-				}
-				if c.Image == newToolsImage {
-					newImageCnt += 1
-				}
-			}
-			g.Expect(oldImageCnt).Should(Equal(1))
-			g.Expect(newImageCnt).Should(Equal(0))
-		})
+		checkWorkloadGenerationAndToolsImage(int64(1), 1, 0)
 
 		By("update replicas to trigger cluster spec and workload reconcile")
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
 			replicas := cluster.Spec.ComponentSpecs[0].Replicas
 			cluster.Spec.ComponentSpecs[0].Replicas = replicas + 1
-		})()).ShouldNot(HaveOccurred())
+		})()).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
 			g.Expect(cluster.Generation).Should(Equal(int64(3)))
 		})).Should(Succeed())
-		checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
-			if sts != nil {
-				g.Expect(sts.Generation).Should(Equal(int64(2)))
-			}
-			if deploy != nil {
-				g.Expect(deploy.Generation).Should(Equal(int64(2)))
-			}
-			oldImageCnt := 0
-			newImageCnt := 0
-			for _, c := range getPodSpec(sts, deploy).Containers {
-				if c.Image == oldToolsImage {
-					oldImageCnt += 1
-				}
-				if c.Image == newToolsImage {
-					newImageCnt += 1
-				}
-			}
-			g.Expect(oldImageCnt).Should(Equal(0))
-			g.Expect(newImageCnt).Should(Equal(1))
-		})
+		checkWorkloadGenerationAndToolsImage(int64(2), 0, 1)
 	}
 
 	// Test cases
@@ -1972,6 +1929,25 @@ var _ = Describe("Cluster Controller", func() {
 			viper.Set(constant.CfgKeyBackupPVCName, "test-backup-pvc")
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})
+	})
+
+	FWhen("creating cluster with all workloadTypes (being Stateless|Stateful|Consensus|Replication) component", func() {
+		compNameNDef := map[string]string{
+			statelessCompName:   statelessCompDefName,
+			statefulCompName:    statefulCompDefName,
+			consensusCompName:   consensusCompDefName,
+			replicationCompName: replicationCompDefName,
+		}
+
+		BeforeEach(func() {
+			createAllWorkloadTypesClusterDef()
+		})
+
+		for compName, compDefName := range compNameNDef {
+			FIt(fmt.Sprintf("[comp: %s] update kubeblocks-tools image", compName), func() {
+				testUpdateKubeBlocksToolsImage(compName, compDefName)
+			})
+		}
 	})
 
 	When("creating cluster with all workloadTypes (being Stateless|Stateful|Consensus|Replication) component", func() {

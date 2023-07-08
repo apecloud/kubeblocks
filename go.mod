@@ -35,7 +35,7 @@ require (
 	github.com/go-redis/redismock/v9 v9.0.2
 	github.com/go-sql-driver/mysql v1.7.0
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0
-	github.com/go-test/deep v1.0.8
+	github.com/go-test/deep v1.1.0
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
@@ -205,8 +205,6 @@ require (
 	github.com/go-openapi/swag v0.22.3 // indirect
 	github.com/go-openapi/validate v0.22.0 // indirect
 	github.com/go-redis/redis/v7 v7.4.1 // indirect
-	github.com/go-test/deep v1.1.0 // indirect
-	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect

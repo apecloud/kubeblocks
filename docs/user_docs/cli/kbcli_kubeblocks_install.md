@@ -17,6 +17,9 @@ kbcli kubeblocks install [flags]
   # Install KubeBlocks with specified version
   kbcli kubeblocks install --version=0.4.0
   
+  # Install KubeBlocks with ignoring preflight checks
+  kbcli kubeblocks install --force
+  
   # Install KubeBlocks with specified namespace, if the namespace is not present, it will be created
   kbcli kubeblocks install --namespace=my-namespace --create-namespace
   

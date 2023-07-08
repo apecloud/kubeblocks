@@ -116,6 +116,12 @@ var (
 			Label:      "app.kubernetes.io/instance=kb-addon-loki",
 			TargetPort: "13100",
 		},
+		{
+			Name:       "kubeblocks-pyroscope-server",
+			AddonName:  "kb-addon-pyroscope-server",
+			Label:      "app.kubernetes.io/instance=kb-addon-pyroscope-server,app.kubernetes.io/name=pyroscope",
+			TargetPort: "14040",
+		},
 	}
 )
 

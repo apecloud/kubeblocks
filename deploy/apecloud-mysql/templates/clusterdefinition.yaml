@@ -219,7 +219,7 @@ spec:
                 readOnly: false
           - name: vttablet
             image: {{ .Values.wesqlscale.image.registry | default "docker.io" }}/{{ .Values.wesqlscale.image.repository }}:{{ .Values.wesqlscale.image.tag }}
-            imagePullPolicy: {{ default .Values.wesqlscale.image.pullPolicy "IfNotPresent" }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
             ports:
               - containerPort: 15100
                 name: vttabletport
@@ -365,7 +365,7 @@ spec:
       podSpec:
         containers:
           - name: etcd
-            imagePullPolicy: {{ default .Values.wesqlscale.image.pullPolicy "IfNotPresent" }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
             ports:
               - containerPort: 2379
                 name: etcd-client
@@ -389,7 +389,7 @@ spec:
                 exec:
                   command: ["/scripts/etcd-post-start.sh"]
           - name: vtctld
-            imagePullPolicy: {{ default .Values.wesqlscale.image.pullPolicy "IfNotPresent" }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
             ports:
               - containerPort: 15000
                 name: vtctld-webport
@@ -415,7 +415,7 @@ spec:
               - name: scripts
                 mountPath: /scripts 
           - name: vtconsensus
-            imagePullPolicy: {{ default .Values.wesqlscale.image.pullPolicy "IfNotPresent" }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.wesqlscale.image.pullPolicy }}
             ports:
               - containerPort: 16000
                 name: port

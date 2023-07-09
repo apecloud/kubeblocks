@@ -93,9 +93,10 @@ func (mgr *Manager) IsDBStartupReady() bool {
 
 func (mgr *Manager) IsReadonly(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
 	var db *sql.DB
+	var err error
 	if member != nil {
 		addr := cluster.GetMemberAddr(*member)
-		db, err := config.GetDBConnWithAddr(addr)
+		db, err = config.GetDBConnWithAddr(addr)
 		if err != nil {
 			mgr.Logger.Infof("Get Member conn failed: %v", err)
 			return false, err
@@ -108,7 +109,7 @@ func (mgr *Manager) IsReadonly(ctx context.Context, cluster *dcs.Cluster, member
 	}
 
 	var readonly bool
-	err := db.QueryRowContext(ctx, "select @@global.hostname, @@global.server_id, @@global.version, "+
+	err = db.QueryRowContext(ctx, "select @@global.hostname, @@global.server_id, @@global.version, "+
 		"@@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").
 		Scan(&mgr.hostname, &mgr.serverID, &mgr.version, &readonly, &mgr.binlogFormat,
 			&mgr.logbinEnabled, &mgr.logReplicationUpdatesEnabled)
@@ -119,9 +120,24 @@ func (mgr *Manager) IsReadonly(ctx context.Context, cluster *dcs.Cluster, member
 	return readonly, nil
 }
 
-func (mgr *Manager) IsLeader(ctx context.Context) (bool, error) {
+func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	readonly, err := mgr.IsReadonly(ctx, nil, nil)
-	return !readonly, err
+
+	if err != nil || readonly {
+		return false, err
+	}
+
+	// During the initialization of cluster, there would be more than one leader,
+	// in this case, the first member is chosen as the leader
+	if mgr.CurrentMemberName == cluster.Members[0].Name {
+		return true, nil
+	}
+	isFirstMemberLeader, err := mgr.IsLeaderMember(ctx, cluster, &cluster.Members[0])
+	if err == nil && isFirstMemberLeader {
+		return false, nil
+	}
+
+	return true, err
 }
 
 func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
@@ -281,6 +297,12 @@ func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) 
 }
 
 func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
+	isLeader, err := mgr.IsLeader(context.TODO(), cluster)
+	if err == nil && isLeader {
+		// if current member is leader, just return
+		return nil
+	}
+
 	for _, member := range cluster.Members {
 		if member.Name == mgr.CurrentMemberName {
 			continue

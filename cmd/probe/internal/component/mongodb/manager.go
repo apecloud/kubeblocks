@@ -148,7 +148,7 @@ func (mgr *Manager) GetReplSetStatusWithClient(ctx context.Context, client *mong
 	return status, nil
 }
 
-func (mgr *Manager) IsLeader(ctx context.Context) (bool, error) {
+func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	cur := mgr.Client.Database("admin").RunCommand(ctx, bson.D{{Key: "isMaster", Value: 1}})
 	if cur.Err() != nil {
 		return false, errors.Wrap(cur.Err(), "run isMaster")

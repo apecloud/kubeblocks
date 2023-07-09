@@ -99,7 +99,7 @@ func (ha *Ha) RunCycle() {
 			}
 		}
 
-		if ok, _ := ha.dbManager.IsLeader(context.TODO()); ok {
+		if ok, _ := ha.dbManager.IsLeader(context.TODO(), cluster); ok {
 			ha.logger.Infof("Refresh leader ttl")
 			ha.dcs.UpdateLock()
 			if int(cluster.Replicas) < len(ha.dbManager.GetMemberAddrs(cluster)) {
@@ -121,7 +121,7 @@ func (ha *Ha) RunCycle() {
 		// TODO: In the event that the database service and SQL channel both go down concurrently, eg. Pod deleted,
 		// there is no healthy leader node and the lock remains unreleased, attempt to acquire the leader lock.
 
-		if ok, _ := ha.dbManager.IsLeader(context.TODO()); ok {
+		if ok, _ := ha.dbManager.IsLeader(context.TODO(), cluster); ok {
 			ha.logger.Infof("I am the real leader, wait for lock released")
 			// if ha.dcs.AttempAcquireLock() == nil {
 			// 	ha.dbManager.Premote()
@@ -156,7 +156,7 @@ func (ha *Ha) Start() {
 
 	isExist, _ := ha.dcs.IsLockExist()
 	for !isExist {
-		if ok, err := ha.dbManager.IsLeader(context.Background()); err == nil && ok {
+		if ok, _ := ha.dbManager.IsLeader(context.Background(), cluster); ok {
 			ha.dcs.Initialize()
 			break
 		}

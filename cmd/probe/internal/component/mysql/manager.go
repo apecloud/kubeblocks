@@ -113,6 +113,7 @@ func (mgr *Manager) IsReadonly(ctx context.Context, cluster *dcs.Cluster, member
 		Scan(&mgr.hostname, &mgr.serverID, &mgr.version, &readonly, &mgr.binlogFormat,
 			&mgr.logbinEnabled, &mgr.logReplicationUpdatesEnabled)
 	if err != nil {
+		mgr.Logger.Infof("Get global readonly failed: %v", err)
 		return false, err
 	}
 	return readonly, nil

@@ -156,7 +156,7 @@ func (ha *Ha) Start() {
 
 	isExist, _ := ha.dcs.IsLockExist()
 	for !isExist {
-		if ok, _ := ha.dbManager.IsLeader(context.Background()); ok {
+		if ok, err := ha.dbManager.IsLeader(context.Background()); err == nil && ok {
 			ha.dcs.Initialize()
 			break
 		}

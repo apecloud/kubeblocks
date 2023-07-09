@@ -175,6 +175,7 @@ func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bo
 	roSQL := `select 1`
 	_, err = db.Query(roSQL)
 	if err != nil {
+		mgr.Logger.Infof("Check Member failed: %v", err)
 		return false
 	}
 	return true

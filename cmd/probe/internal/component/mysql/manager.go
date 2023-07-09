@@ -139,9 +139,9 @@ func (mgr *Manager) IsReadonly(ctx context.Context, cluster *dcs.Cluster, member
 	}
 
 	var readonly bool
-	err = db.QueryRowContext(ctx, "select @@global.hostname, @@global.server_id, @@global.version, "+
+	err = db.QueryRowContext(ctx, "select @@global.hostname, @@global.version, "+
 		"@@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").
-		Scan(&mgr.hostname, &mgr.serverID, &mgr.version, &readonly, &mgr.binlogFormat,
+		Scan(&mgr.hostname, &mgr.version, &readonly, &mgr.binlogFormat,
 			&mgr.logbinEnabled, &mgr.logReplicationUpdatesEnabled)
 	if err != nil {
 		mgr.Logger.Infof("Get global readonly failed: %v", err)

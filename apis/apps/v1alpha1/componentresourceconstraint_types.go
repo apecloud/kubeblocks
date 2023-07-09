@@ -169,20 +169,34 @@ func (m *ResourceConstraint) ValidateMemory(cpu *resource.Quantity, memory *reso
 		return true
 	}
 
-	// fast path if cpu is specified
-	if cpu != nil && m.Memory.SizePerCPU != nil {
-		return inf.NewDec(1, 0).Mul(cpu.AsDec(), m.Memory.SizePerCPU.AsDec()).Cmp(memory.AsDec()) == 0
+	var slots []resource.Quantity
+	if cpu != nil && !cpu.IsZero() {
+		slots = append(slots, *cpu)
+	} else if len(m.CPU.Slots) > 0 {
+		slots = m.CPU.Slots
+	} else {
+		slot := *m.CPU.Min
+		for slot.Cmp(*m.CPU.Max) <= 0 {
+			slots = append(slots, slot)
+			slot = resource.MustParse(inf.NewDec(1, 0).Add(slot.AsDec(), m.CPU.Step.AsDec()).String())
+		}
 	}
 
-	if cpu != nil && m.Memory.MaxPerCPU != nil && m.Memory.MinPerCPU != nil {
-		maxMemory := inf.NewDec(1, 0).Mul(cpu.AsDec(), m.Memory.MaxPerCPU.AsDec())
-		minMemory := inf.NewDec(1, 0).Mul(cpu.AsDec(), m.Memory.MinPerCPU.AsDec())
-		return maxMemory.Cmp(memory.AsDec()) >= 0 && minMemory.Cmp(memory.AsDec()) <= 0
+	for _, slot := range slots {
+		if m.Memory.SizePerCPU != nil && !m.Memory.SizePerCPU.IsZero() {
+			match := inf.NewDec(1, 0).Mul(slot.AsDec(), m.Memory.SizePerCPU.AsDec()).Cmp(memory.AsDec()) == 0
+			if match {
+				return true
+			}
+		} else {
+			maxMemory := inf.NewDec(1, 0).Mul(slot.AsDec(), m.Memory.MaxPerCPU.AsDec())
+			minMemory := inf.NewDec(1, 0).Mul(slot.AsDec(), m.Memory.MinPerCPU.AsDec())
+			if maxMemory.Cmp(memory.AsDec()) >= 0 && minMemory.Cmp(memory.AsDec()) <= 0 {
+				return true
+			}
+		}
 	}
-
-	// TODO slow path if cpu is not specified
-
-	return true
+	return false
 }
 
 // ValidateStorage validates if the storage meets the constraint

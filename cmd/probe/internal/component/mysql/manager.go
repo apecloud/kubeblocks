@@ -190,6 +190,7 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 }
 
 func (mgr *Manager) IsCurrentMemberHealthy() bool {
+	mgr.EnsureServerID(context.TODO())
 	return mgr.IsMemberHealthy(nil, nil)
 }
 
@@ -244,6 +245,10 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 
 // IsClusterInitialized is a method to check if cluster is initailized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	return mgr.EnsureServerID(ctx)
+}
+
+func (mgr *Manager) EnsureServerID(ctx context.Context) (bool, error) {
 	var serverID uint
 	err := mgr.DB.QueryRowContext(ctx, "select @@global.server_id").Scan(&serverID)
 	if err != nil {

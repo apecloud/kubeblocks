@@ -224,8 +224,9 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 
 func (mgr *Manager) Premote() error {
 	stopReadOnly := `set global read_only=off;set global super_read_only=off;`
+	turnOnGTID := `SET @@GLOBAL.GTID_MODE = ON;`
 	stopSlave := `stop slave;`
-	resp, err := mgr.DB.Exec(stopReadOnly + stopSlave)
+	resp, err := mgr.DB.Exec(stopReadOnly + turnOnGTID + stopSlave)
 	if err != nil {
 		mgr.Logger.Errorf("promote err: %v", err)
 		return err
@@ -237,8 +238,9 @@ func (mgr *Manager) Premote() error {
 
 func (mgr *Manager) Demote() error {
 	setReadOnly := `set global read_only=on;set global super_read_only=on;`
+	turnOnGTID := `SET @@GLOBAL.GTID_MODE = ON;`
 
-	_, err := mgr.DB.Exec(setReadOnly)
+	_, err := mgr.DB.Exec(setReadOnly + turnOnGTID)
 	if err != nil {
 		mgr.Logger.Errorf("demote err: %v", err)
 		return err

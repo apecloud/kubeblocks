@@ -339,6 +339,9 @@ spec:
     - name: vitess
       charactorType: vitess
       workloadType: Stateful
+      volumeTypes:
+        - name: data
+          type: data
       scriptSpecs:
         - name: apecloud-mysql-scripts
           templateRef: apecloud-mysql-scripts
@@ -384,6 +387,8 @@ spec:
             volumeMounts:
               - name: scripts
                 mountPath: /scripts
+              - name: data
+                mountPath: /vtdataroot/etcd
             lifecycle:
               postStart:
                 exec:

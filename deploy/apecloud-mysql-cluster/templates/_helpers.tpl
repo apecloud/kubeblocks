@@ -15,6 +15,14 @@ The proxy cpu cores is 1/6 of the cluster total cpu cores.
 {{- end }}
 - name: vitess
   componentDefRef: vitess # ref clusterdefinition componentDefs.name
+  volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
   replicas: 1
 - name: vtgate
   componentDefRef: vtgate # ref clusterdefinition componentDefs.name

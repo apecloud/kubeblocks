@@ -26,6 +26,12 @@ spec:
           - name: mysql
             port: 3306
             targetPort: mysql
+      configSpecs:
+        - name: mysql-replication-config
+          templateRef: mysql8.0.33-config-template
+          constraintRef: mysql8.0.33-config-constraints
+          volumeName: mysql-config
+          namespace: {{ .Release.Namespace }}
       volumeTypes:
         - name: data
           type: data
@@ -39,6 +45,8 @@ spec:
             volumeMounts:
               - mountPath: /var/lib/mysql
                 name: data
+              - mountPath: /etc/mysql/conf.d
+                name: mysql-config
             ports:
               - containerPort: 3306
                 name: mysql

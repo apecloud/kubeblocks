@@ -65,13 +65,3 @@ spec:
                     name: $(CONN_CREDENTIAL_SECRET_NAME)
                     key: password
                     optional: false
-              - name: MYSQL_DATABASE
-                value: {{- if .Values.auth.createDatabase }} {{ .Values.auth.database | quote }}  {{- else }} "" {{- end }}
-              - name: MYSQL_USER
-                value: {{ .Values.auth.username | default "" | quote }}
-              - name: MYSQL_PASSWORD
-                value: {{ .Values.auth.password | default "" | quote }}
-              - name: REPLICATION_USER
-                value: {{ .Values.auth.replicationUser | default "replicator" | quote }}
-              - name: REPLICATION_PASSWORD
-                value: {{ .Values.auth.replicationPassword | default "" | quote }}

@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+	"strconv"
+	"strings"
 
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
@@ -43,17 +45,38 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		}
 	}()
 
+	currentMemberName:= viper.GetString("KB_POD_NAME")
+	if currentMemberName == "" {
+		return nil, fmt.Errorf("KB_POD_NAME is not set")
+	}
+
+	serverID, err := getIndex(currentMemberName)
+	if err != nil {
+		return nil, err
+	}
+
+
 	Mgr = &Manager{
 		DBManagerBase: component.DBManagerBase{
-			CurrentMemberName: viper.GetString("KB_POD_NAME"),
+			CurrentMemberName: currentMemberName,
 			ClusterCompName:   viper.GetString("KB_CLUSTER_COMP_NAME"),
 			Namespace:         viper.GetString("KB_NAMESPACE"),
 			Logger:            logger,
 		},
 		DB: db,
+		serverID: uint(serverID)+1,
 	}
+
 	component.RegisterManager("mysql", Mgr)
 	return Mgr, nil
+}
+
+func getIndex(memberName string) (int, error) {
+	i := strings.LastIndex(memberName, "-")
+	if i < 0 {
+		return 0, fmt.Errorf("The format of Member name is wrong: %s", memberName)
+	}
+	return  strconv.Atoi(memberName[i+1:])
 }
 
 func (mgr *Manager) Initialize() {}
@@ -219,6 +242,23 @@ func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) 
 
 // IsClusterInitialized is a method to check if cluster is initailized or not
 func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
+	var serverID uint
+	err := mgr.DB.QueryRowContext(ctx, "select @@global.server_id").Scan(&serverID)
+	if err != nil {
+		mgr.Logger.Infof("Get global server id failed: %v", err)
+		return false, err
+	}
+	if serverID == mgr.serverID {
+		return true, nil
+	}
+
+	setServerID := fmt.Sprintf(`set global server_id = %d`, mgr.serverID)
+	_, err = mgr.DB.Exec(setServerID)
+	if err != nil {
+		mgr.Logger.Errorf("set server id err: %v", err)
+		return false, err
+	}
+
 	return true, nil
 }
 

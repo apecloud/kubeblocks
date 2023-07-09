@@ -148,6 +148,23 @@ func (mgr *Manager) GetReplSetStatusWithClient(ctx context.Context, client *mong
 	return status, nil
 }
 
+func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
+	status, err := mgr.GetReplSetStatus(ctx)
+	if err != nil {
+		mgr.Logger.Errorf("rs.status() error: %", err)
+		return false, err
+	}
+	for _, member := range status.Members {
+		if strings.HasPrefix(member.Name, member.Name) {
+			if member.StateStr == "PRIMARY"{
+				return true, nil
+			}
+			break
+		}
+	}
+	return false, nil
+}
+
 func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	cur := mgr.Client.Database("admin").RunCommand(ctx, bson.D{{Key: "isMaster", Value: 1}})
 	if cur.Err() != nil {

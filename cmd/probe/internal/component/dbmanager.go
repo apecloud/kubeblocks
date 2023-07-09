@@ -17,6 +17,7 @@ type DBManager interface {
 	IsClusterHealthy(context.Context, *dcs.Cluster) bool
 	IsClusterInitialized(context.Context, *dcs.Cluster) (bool, error)
 	IsLeader(context.Context, *dcs.Cluster) (bool, error)
+	IsLeaderMember(context.Context, *dcs.Cluster, *dcs.Member) (bool, error)
 	IsDBStartupReady() bool
 	Recover()
 	AddCurrentMemberToCluster(*dcs.Cluster) error
@@ -62,5 +63,5 @@ func RegisterManager(characterType string, manager DBManager) {
 
 func GetManager(characterType string) DBManager {
 	characterType = strings.ToLower(characterType)
-	return managers[characterType] 
+	return managers[characterType]
 }

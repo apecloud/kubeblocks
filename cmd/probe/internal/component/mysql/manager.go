@@ -296,6 +296,10 @@ func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
 		mgr.Logger.Infof("i get the leader key, don't need to follow")
 		return nil
 	}
+	
+	if !mgr.isRecoveryConfigOutdate(context.TODO(), cluster.Leader.Name) {
+		return nil
+	}
 
 	stopSlave := `stop slave;`
 	changeMaster := fmt.Sprintf(`change master to master_host='%s',master_user='%s',master_password='%s',master_port=%s,master_auto_position=1;`,
@@ -331,10 +335,10 @@ func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bo
 	masterHost := rowMap.GetString("Master_Host")
 
 	if strings.HasPrefix(masterHost, leader) {
-		return true
+		return false
 	}
 
-	return false
+	return true
 }
 
 func (mgr *Manager) GetHealthiestMember(cluster *dcs.Cluster, candidate string) *dcs.Member {

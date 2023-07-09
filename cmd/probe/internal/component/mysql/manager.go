@@ -87,6 +87,13 @@ func (mgr *Manager) IsRunning() bool {
 	// test if db is ready to connect or not
 	err := mgr.DB.PingContext(ctx)
 	if err != nil {
+		if driverErr, ok := err.(*mysql.MySQLError); ok { 
+			// Now the error number is accessible directly
+			if driverErr.Number == 1040 {
+				mgr.Logger.Infof("Too many connections: %v", err)
+				return true
+			}
+		}
 		mgr.Logger.Infof("DB is not ready: %v", err)
 		return false
 	}

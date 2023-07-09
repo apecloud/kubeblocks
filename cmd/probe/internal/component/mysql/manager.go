@@ -311,23 +311,28 @@ func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
 	return nil
 }
 
-func (mgr *Manager) checkRecoveryConf(ctx context.Context, leader string) bool {
-	// sql := "show slave status"
-	// data, err := mysqlOps.query(ctx, sql)
-	// if err != nil {
-	// 	mysqlOps.Logger.Errorf("error executing %s: %v", sql, err)
-	// 	return true
-	// }
+func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bool {
+	sql := "show slave status"
+	var rowMap RowMap
 
-	// result, err := ParseSingleQuery(string(data))
-	// if err != nil {
-	// 	mysqlOps.Logger.Errorf("parse query err:%v", err)
-	// 	return true
-	// }
+	err := QueryRowsMap(mgr.DB,sql, func(rMap RowMap) error{
+		rowMap = rMap
+		return nil
+	})
+	if err != nil {
+		mgr.Logger.Errorf("error executing %s: %v", sql, err)
+		return true
+	}
 
-	// if result == nil || strings.Split(result["Master_Host"].(string), ".")[0] != leader {
-	// 	return true
-	// }
+	if len(rowMap) == 0 {
+		return true
+	}
+
+	masterHost := rowMap.GetString("Master_Host")
+
+	if strings.HasPrefix(masterHost, leader) {
+		return true
+	}
 
 	return false
 }

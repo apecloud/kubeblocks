@@ -297,7 +297,7 @@ func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
 		return nil
 	}
 	
-	if !mgr.isRecoveryConfigOutdate(context.TODO(), cluster.Leader.Name) {
+	if !mgr.isRecoveryConfOutdate(context.TODO(), cluster.Leader.Name) {
 		return nil
 	}
 

@@ -19,31 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package hsm
 
-import (
-	"container/list"
-	"sync"
-)
+import "testing"
 
-//type Context[S StateInterface[C], C any] interface {
-//	context.Context
-//}
+func TestStateMachineDefinition_BuildState(t *testing.T) {
 
-type StateMachineInterface interface {
-	ID() string
 }
-
-type StateMachine[S StateInterface[C], E Event, C any] struct {
-	*StateMachineDefinition[S, E, C]
-
-	context    *C
-	state      *BaseContext[S, C]
-	eventQueue list.List
-	mutex      sync.Mutex
-}
-
-//type StateMachineDefinition[T any, S StateInterface, E Event, C Context[S]] interface {
-//	//eventQueue list.List
-//	//mutex      sync.Mutex
-//	//
-//	//StateMachineDef *StateMachineDefinition
-//}

@@ -17,33 +17,39 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package hsm
+package configuration
 
 import (
-	"container/list"
-	"sync"
+	"context"
+	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/spf13/viper"
+	"go.uber.org/zap/zapcore"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
-//type Context[S StateInterface[C], C any] interface {
-//	context.Context
-//}
+var ctx context.Context
+var cancel context.CancelFunc
 
-type StateMachineInterface interface {
-	ID() string
+func TestNetwork(t *testing.T) {
+	RegisterFailHandler(Fail)
+
+	RunSpecs(t, "config Test Suite")
 }
 
-type StateMachine[S StateInterface[C], E Event, C any] struct {
-	*StateMachineDefinition[S, E, C]
+var _ = BeforeSuite(func() {
+	if viper.GetBool("ENABLE_DEBUG_LOG") {
+		logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true), func(o *zap.Options) {
+			o.TimeEncoder = zapcore.ISO8601TimeEncoder
+		}))
+	}
+	ctx, cancel = context.WithCancel(context.TODO())
+})
 
-	context    *C
-	state      *BaseContext[S, C]
-	eventQueue list.List
-	mutex      sync.Mutex
-}
-
-//type StateMachineDefinition[T any, S StateInterface, E Event, C Context[S]] interface {
-//	//eventQueue list.List
-//	//mutex      sync.Mutex
-//	//
-//	//StateMachineDef *StateMachineDefinition
-//}
+var _ = AfterSuite(func() {
+	cancel()
+})

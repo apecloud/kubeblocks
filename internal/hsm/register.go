@@ -20,30 +20,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package hsm
 
 import (
-	"container/list"
 	"sync"
 )
 
-//type Context[S StateInterface[C], C any] interface {
-//	context.Context
-//}
+var (
+	locker          sync.Mutex
+	stateMachineMap map[string]StateMachineInterface
+)
 
-type StateMachineInterface interface {
-	ID() string
+func init() {
+	stateMachineMap = make(map[string]StateMachineInterface)
 }
 
-type StateMachine[S StateInterface[C], E Event, C any] struct {
-	*StateMachineDefinition[S, E, C]
-
-	context    *C
-	state      *BaseContext[S, C]
-	eventQueue list.List
-	mutex      sync.Mutex
+func RegisterStateMachine(fsm StateMachineInterface) {
+	locker.Lock()
+	defer locker.Unlock()
+	stateMachineMap[fsm.ID()] = fsm
 }
 
-//type StateMachineDefinition[T any, S StateInterface, E Event, C Context[S]] interface {
-//	//eventQueue list.List
-//	//mutex      sync.Mutex
-//	//
-//	//StateMachineDef *StateMachineDefinition
-//}
+func GetStateMachine[S StateInterface[C], E, C any](id string) *StateMachineDefinition[S, E, C] {
+	locker.Lock()
+	defer locker.Unlock()
+	if sm, ok := stateMachineMap[id]; ok {
+		return sm.(*StateMachineDefinition[S, E, C])
+	}
+	return nil
+}

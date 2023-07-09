@@ -19,12 +19,109 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package hsm
 
-type StateMachineDefinition struct {
+import "reflect"
+
+//type StateMachine[T any, S StateInterface, E Event, C] interface {
+
+//states map[StateInterface]*StateDefinition
+//}
+
+type BuilderInterface[S StateInterface[C], E, C any] interface {
+	OnEvent(event Event, destinationState S) BuilderInterface[S, E, C]
+	Build() error
 }
 
-type StateDefinition struct {
+type StateBuilder[S StateInterface[C], E, C any] struct {
+	BuilderInterface[S, E, C]
+
+	State        S
+	StateMachine *StateMachineDefinition[S, E, C]
+	Superstate   *StateDefinition[S, E, C]
+
+	// substates
+	Substates []*StateDefinition[S, E, C]
 }
 
-func (smDef *StateMachineDefinition) AddState() {
+type StateMachineDefinition[S StateInterface[C], E Event, C any] struct {
+	StateMachineInterface
 
+	name         string
+	InitialState S
+	states       map[S]*StateDefinition[S, E, C]
+}
+
+func NewStateMachine[S StateInterface[C], E, C any](id string, initialState S, _ func(_ S, _ E, _ C)) *StateMachineDefinition[S, E, C] {
+	return &StateMachineDefinition[S, E, C]{
+		name:         id,
+		InitialState: initialState,
+	}
+}
+
+func (smDef *StateMachineDefinition[S, E, C]) StateBuilder() BuilderInterface[S, E, C] {
+	return &StateBuilder[S, E, C]{
+		StateMachine: smDef,
+	}
+}
+
+func (smDef *StateMachineDefinition[S, E, C]) stateDefinition(state S) (stateDef *StateDefinition[S, E, C]) {
+	var ok bool
+	if stateDef, ok = smDef.states[state]; !ok {
+		stateDef = &StateDefinition[S, E, C]{
+			StateMachine: smDef,
+			State:        state,
+		}
+		smDef.states[state] = stateDef
+	}
+	return
+}
+
+func (smDef StateMachineDefinition[S, E, C]) ID() string {
+	return smDef.name
+}
+
+func (builder *StateBuilder[S, E, C]) OnEvent(event Event, destinationState S) BuilderInterface[S, E, C] {
+	return builder
+}
+
+func (builder *StateBuilder[S, E, C]) Build() error {
+	sd := builder.StateMachine.stateDefinition(builder.State)
+	sd.Superstate = builder.Superstate
+	sd.Substates = builder.Substates
+	return nil
+}
+
+func FromContext[S StateInterface[C], E, C any](ctx *C, id string, _ func(_ S, _ E, _ C)) *StateMachine[S, E, C] {
+	stateReference := func(context *C) *BaseContext[S, C] {
+		v := reflect.ValueOf(ctx)
+		if v.Kind() == reflect.Ptr {
+			v = v.Elem()
+		}
+		v = v.FieldByName("BaseContext")
+		if !v.IsValid() {
+			return nil
+		}
+		switch i := v.Interface().(type) {
+		default:
+			return nil
+		case BaseContext[S, C]:
+			return &i
+		case *BaseContext[S, C]:
+			return i
+		}
+	}
+
+	smDef := GetStateMachine[S, E, C](id)
+	if smDef == nil {
+		return nil
+	}
+	baseState := stateReference(ctx)
+	if baseState == nil {
+		baseState = &BaseContext[S, C]{}
+		baseState.InitState(smDef.InitialState)
+	}
+	return &StateMachine[S, E, C]{
+		context:                ctx,
+		state:                  baseState,
+		StateMachineDefinition: smDef,
+	}
 }

@@ -17,33 +17,25 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package hsm
+package configuration
 
 import (
-	"container/list"
-	"sync"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/apecloud/kubeblocks/internal/hsm"
 )
 
-//type Context[S StateInterface[C], C any] interface {
-//	context.Context
-//}
+var _ = Describe("affinity utils", func() {
 
-type StateMachineInterface interface {
-	ID() string
-}
+	Context("with PodAntiAffinity set to Required", func() {
+		It("should return true", func() {
+			//Expect(nil).To(BeTrue())
+			fsmContext := NewConfigContext()
+			fsm := hsm.FromContext(fsmContext, "config-fsm", ConfigFSMSignature)
+			Expect(fsm).ShouldNot(BeNil())
+			//fsm.HandleEvent(CreateInstance)
+		})
+	})
 
-type StateMachine[S StateInterface[C], E Event, C any] struct {
-	*StateMachineDefinition[S, E, C]
-
-	context    *C
-	state      *BaseContext[S, C]
-	eventQueue list.List
-	mutex      sync.Mutex
-}
-
-//type StateMachineDefinition[T any, S StateInterface, E Event, C Context[S]] interface {
-//	//eventQueue list.List
-//	//mutex      sync.Mutex
-//	//
-//	//StateMachineDef *StateMachineDefinition
-//}
+})

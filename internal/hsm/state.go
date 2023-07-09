@@ -19,9 +19,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package hsm
 
-type StateInterface interface {
-	ID() string
+type StateInterface[C any] interface {
+	OnEnter(e Event, ctx C) error
+	OnExit(e Event, ctx C) error
 
-	OnEnter(e Event)
-	OnExit(e Event)
+	comparable
+}
+
+type StateBase[C any] interface {
+	StateInterface[C]
+}
+
+type StateDefinition[S StateInterface[C], E, C any] struct {
+	State        S
+	StateMachine *StateMachineDefinition[S, E, C]
+	Superstate   *StateDefinition[S, E, C]
+
+	// substates
+	Substates []*StateDefinition[S, E, C]
+
+	// transitions
+	// Transitions []*TransitionDefinition
 }

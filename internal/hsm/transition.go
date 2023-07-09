@@ -21,9 +21,3 @@ package hsm
 
 type Transition interface {
 }
-
-type InternalTransition interface {
-}
-
-type ExternalTransition interface {
-}

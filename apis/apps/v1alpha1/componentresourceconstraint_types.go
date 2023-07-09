@@ -170,11 +170,12 @@ func (m *ResourceConstraint) ValidateMemory(cpu *resource.Quantity, memory *reso
 	}
 
 	var slots []resource.Quantity
-	if cpu != nil && !cpu.IsZero() {
+	switch {
+	case cpu != nil && !cpu.IsZero():
 		slots = append(slots, *cpu)
-	} else if len(m.CPU.Slots) > 0 {
+	case len(m.CPU.Slots) > 0:
 		slots = m.CPU.Slots
-	} else {
+	default:
 		slot := *m.CPU.Min
 		for slot.Cmp(*m.CPU.Max) <= 0 {
 			slots = append(slots, slot)

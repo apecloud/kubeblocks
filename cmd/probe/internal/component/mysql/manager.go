@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dapr/kit/logger"
 	"github.com/pkg/errors"
@@ -45,7 +45,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		}
 	}()
 
-	currentMemberName:= viper.GetString("KB_POD_NAME")
+	currentMemberName := viper.GetString("KB_POD_NAME")
 	if currentMemberName == "" {
 		return nil, fmt.Errorf("KB_POD_NAME is not set")
 	}
@@ -55,7 +55,6 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		return nil, err
 	}
 
-
 	Mgr = &Manager{
 		DBManagerBase: component.DBManagerBase{
 			CurrentMemberName: currentMemberName,
@@ -63,8 +62,8 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 			Namespace:         viper.GetString("KB_NAMESPACE"),
 			Logger:            logger,
 		},
-		DB: db,
-		serverID: uint(serverID)+1,
+		DB:       db,
+		serverID: uint(serverID) + 1,
 	}
 
 	component.RegisterManager("mysql", Mgr)
@@ -76,7 +75,7 @@ func getIndex(memberName string) (int, error) {
 	if i < 0 {
 		return 0, fmt.Errorf("The format of Member name is wrong: %s", memberName)
 	}
-	return  strconv.Atoi(memberName[i+1:])
+	return strconv.Atoi(memberName[i+1:])
 }
 
 func (mgr *Manager) Initialize() {}
@@ -212,7 +211,10 @@ func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bo
 	}
 
 	roSQL := `select 1`
-	_, err = db.Query(roSQL)
+	rows, err := db.Query(roSQL)
+	if rows != nil {
+		defer rows.Close()
+	}
 	if err != nil {
 		mgr.Logger.Infof("Check Member failed: %v", err)
 		return false
@@ -251,8 +253,10 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 	if serverID == mgr.serverID {
 		return true, nil
 	}
+	mgr.Logger.Infof("Set global server id : %v")
 
 	setServerID := fmt.Sprintf(`set global server_id = %d`, mgr.serverID)
+	mgr.Logger.Infof("Set global server id : %v", setServerID)
 	_, err = mgr.DB.Exec(setServerID)
 	if err != nil {
 		mgr.Logger.Errorf("set server id err: %v", err)
@@ -296,7 +300,7 @@ func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
 		mgr.Logger.Infof("i get the leader key, don't need to follow")
 		return nil
 	}
-	
+
 	if !mgr.isRecoveryConfOutdate(context.TODO(), cluster.Leader.Name) {
 		return nil
 	}
@@ -319,7 +323,7 @@ func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bo
 	sql := "show slave status"
 	var rowMap RowMap
 
-	err := QueryRowsMap(mgr.DB,sql, func(rMap RowMap) error{
+	err := QueryRowsMap(mgr.DB, sql, func(rMap RowMap) error {
 		rowMap = rMap
 		return nil
 	})

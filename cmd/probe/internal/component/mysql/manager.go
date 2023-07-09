@@ -157,9 +157,10 @@ func (mgr *Manager) IsCurrentMemberHealthy() bool {
 
 func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bool {
 	var db *sql.DB
+	var err error
 	if member != nil {
 		addr := cluster.GetMemberAddr(*member)
-		db, err := config.GetDBConnWithAddr(addr)
+		db, err = config.GetDBConnWithAddr(addr)
 		if err != nil {
 			mgr.Logger.Infof("Get Member conn failed: %v", err)
 			return false
@@ -172,7 +173,7 @@ func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bo
 	}
 
 	roSQL := `select 1`
-	_, err := db.Query(roSQL)
+	_, err = db.Query(roSQL)
 	if err != nil {
 		return false
 	}

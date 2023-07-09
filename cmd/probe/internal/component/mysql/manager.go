@@ -95,7 +95,7 @@ func (mgr *Manager) IsReadonly(ctx context.Context, cluster *dcs.Cluster, member
 	var db *sql.DB
 	var err error
 	if member != nil {
-		addr := cluster.GetMemberAddr(*member)
+		addr := cluster.GetMemberAddrWithPort(*member)
 		db, err = config.GetDBConnWithAddr(addr)
 		if err != nil {
 			mgr.Logger.Infof("Get Member conn failed: %v", err)
@@ -159,7 +159,7 @@ func (mgr *Manager) GetLeaderClient(ctx context.Context, cluster *dcs.Cluster) (
 		return nil, fmt.Errorf("cluster has no leader")
 	}
 
-	addr := cluster.GetMemberAddr(*leaderMember)
+	addr := cluster.GetMemberAddrWithPort(*leaderMember)
 	return config.GetDBConnWithAddr(addr)
 }
 
@@ -175,7 +175,7 @@ func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bo
 	var db *sql.DB
 	var err error
 	if member != nil {
-		addr := cluster.GetMemberAddr(*member)
+		addr := cluster.GetMemberAddrWithPort(*member)
 		db, err = config.GetDBConnWithAddr(addr)
 		if err != nil {
 			mgr.Logger.Infof("Get Member conn failed: %v", err)

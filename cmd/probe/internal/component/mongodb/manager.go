@@ -176,7 +176,7 @@ func (mgr *Manager) InitiateReplSet(cluster *dcs.Cluster) error {
 
 	for i, member := range cluster.Members {
 		configMembers[i].ID = i
-		configMembers[i].Host = cluster.GetMemberAddr(member)
+		configMembers[i].Host = cluster.GetMemberAddrWithPort(member)
 		if strings.HasPrefix(member.Name, mgr.CurrentMemberName) {
 			configMembers[i].Priority = 2
 		} else {
@@ -290,7 +290,7 @@ func (mgr *Manager) GetLeaderClient(ctx context.Context, cluster *dcs.Cluster) (
 	}
 
 	leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
-	host := cluster.GetMemberAddr(*leaderMember)
+	host := cluster.GetMemberAddrWithPort(*leaderMember)
 	return mgr.GetReplSetClientWithHosts(context.TODO(), []string{host})
 }
 
@@ -377,7 +377,7 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 
 	defer client.Disconnect(context.TODO())
 	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
-	currentHost := cluster.GetMemberAddr(*currentMember)
+	currentHost := cluster.GetMemberAddrWithPort(*currentMember)
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)

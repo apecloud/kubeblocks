@@ -59,14 +59,18 @@ func (c *Cluster) GetOpTime() int64 {
 	return c.OpTime
 }
 
-func (c *Cluster) GetMemberAddr(member Member) string {
+func (c *Cluster) GetMemberAddrWithPort(member Member) string {
 	return fmt.Sprintf("%s.%s-headless.%s.svc:%s", member.Name, c.ClusterCompName, c.Namespace, member.DBPort)
+}
+
+func (c *Cluster) GetMemberAddr(member Member) string {
+	return fmt.Sprintf("%s.%s-headless.%s.svc", member.Name, c.ClusterCompName, c.Namespace)
 }
 
 func (c *Cluster) GetMemberAddrs() []string {
 	hosts := make([]string, len(c.Members))
 	for i, member := range c.Members {
-		hosts[i] = c.GetMemberAddr(member)
+		hosts[i] = c.GetMemberAddrWithPort(member)
 	}
 	return hosts
 }

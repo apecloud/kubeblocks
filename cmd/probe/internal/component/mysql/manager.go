@@ -194,7 +194,8 @@ func (mgr *Manager) DeleteMemberFromCluster(cluster *dcs.Cluster, host string) e
 func (mgr *Manager) IsClusterHealthy(ctx context.Context, cluster *dcs.Cluster) bool {
 	leaderMember := cluster.GetLeaderMember()
 	if leaderMember == nil {
-		return fmt.Errorf("cluster has no leader")
+		mgr.Logger.Infof("cluster has no leader, wait for leader to take the lock")
+		return true
 	}
 
 	return mgr.IsMemberHealthy(cluster, leaderMember)

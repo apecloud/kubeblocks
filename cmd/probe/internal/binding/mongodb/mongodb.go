@@ -93,8 +93,8 @@ func (mongoOps *MongoDBOperations) Init(metadata bindings.Metadata) error {
 	// mongoOps.InitIfNeed = mongoOps.initIfNeed
 	mongoOps.DBPort = config.GetDBPort()
 	mongoOps.BaseOperations.GetRole = mongoOps.GetRole
-	mongoOps.OperationMap[GetRoleOperation] = StartupCheckWraper(manager, mongoOps.GetRoleOps)
-	mongoOps.OperationMap[CheckRoleOperation] = StartupCheckWraper(manager, mongoOps.CheckRoleOps)
+	mongoOps.RegisterOperationOnDBReady(GetRoleOperation, mongoOps.GetRoleOps, manager)
+	mongoOps.RegisterOperationOnDBReady(CheckRoleOperation, mongoOps.CheckRoleOps, manager)
 	return nil
 }
 

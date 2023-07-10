@@ -2,6 +2,7 @@ package dcs
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -58,6 +59,7 @@ func NewKubernetesStore(logger logger.Logger) (*KubernetesStore, error) {
 		clientset:         clientset,
 		logger:            logger,
 	}
+	dcs = store
 	return store, err
 }
 
@@ -367,11 +369,11 @@ func (store *KubernetesStore) GetHaConfig() (*HaConfig, error) {
 }
 
 func (store *KubernetesStore) GetSwitchOverConfigMap() (*corev1.ConfigMap, error) {
-	switchOverName := store.clusterCompName + "-switchover"
-	switchOverConfigMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, switchOverName, metav1.GetOptions{})
+	switchoverName := store.clusterCompName + "-switchover"
+	switchOverConfigMap, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Get(store.ctx, switchoverName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			store.logger.Infof("no switchOver [%s] setting", switchOverName)
+			store.logger.Infof("no switchOver [%s] setting", switchoverName)
 			return nil, nil
 		}
 		store.logger.Errorf("Get switchOver configmap failed: %v", err)
@@ -390,13 +392,39 @@ func (store *KubernetesStore) GetSwitchover() (*Switchover, error) {
 	return switchOver, nil
 }
 
-func (store *KubernetesStore) SetSwitchover() error {
+func (store *KubernetesStore) CreateSwitchover(leader, candidate string) error {
+	switchoverName := store.clusterCompName + "-switchover"
+	switchover, _ := store.GetSwitchover()
+	if switchover != nil {
+		return fmt.Errorf("There is another switchover %s unfinished", switchoverName)
+	}
+
+	labelsMap := map[string]string{
+		"app.kubernetes.io/instance":        store.clusterName,
+		"app.kubernetes.io/managed-by":      "kubeblocks",
+		"apps.kubeblocks.io/component-name": store.componentName,
+	}
+
+	if _, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Create(store.ctx, &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      switchoverName,
+			Namespace: store.namespace,
+			Labels:    labelsMap,
+			Annotations: map[string]string{
+				"leader":    leader,
+				"candidate": candidate,
+			},
+			// OwnerReferences: ownerReference,
+		},
+	}, metav1.CreateOptions{}); err != nil {
+		return err
+	}
 	return nil
 }
 
 func (store *KubernetesStore) DeleteSwitchover() error {
-	switchOverName := store.clusterCompName + "-switchover"
-	err := store.clientset.CoreV1().ConfigMaps(store.namespace).Delete(store.ctx, switchOverName, metav1.DeleteOptions{})
+	switchoverName := store.clusterCompName + "-switchover"
+	err := store.clientset.CoreV1().ConfigMaps(store.namespace).Delete(store.ctx, switchoverName, metav1.DeleteOptions{})
 	if err != nil {
 		store.logger.Errorf("Delete switchOver configmap failed: %v", err)
 	}

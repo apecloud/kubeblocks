@@ -141,6 +141,7 @@ var clusterCreateExample = templates.Examples(`
 const (
 	CueTemplateName = "cluster_template.cue"
 	monitorKey      = "monitor"
+	saNamePrefix    = "kb-sa-"
 )
 
 type setKey string
@@ -191,8 +192,6 @@ type CreateOptions struct {
 	Annotations       map[string]string        `json:"annotations,omitempty"`
 	SetFile           string                   `json:"-"`
 	Values            []string                 `json:"-"`
-
-	shouldCreateDependencies bool `json:"-"`
 
 	// backup name to restore in creation
 	Backup        string `json:"backup,omitempty"`
@@ -503,11 +502,7 @@ func (o *CreateOptions) Complete() error {
 }
 
 func (o *CreateOptions) CleanUp() error {
-	if o.Client == nil {
-		return nil
-	}
-
-	return deleteDependencies(o.Client, o.Namespace, o.Name)
+	return nil
 }
 
 // buildComponents builds components from file or set values
@@ -552,6 +547,8 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 			return nil, err
 		}
 
+		// set component service account name
+		compSpec.ServiceAccountName = saNamePrefix + o.Name
 		comp, err := runtime.DefaultUnstructuredConverter.ToUnstructured(compSpec)
 		if err != nil {
 			return nil, err
@@ -561,12 +558,7 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 	return comps, nil
 }
 
-const (
-	saNamePrefix          = "kb-sa-"
-	roleNamePrefix        = "kb-role-"
-	roleBindingNamePrefix = "kb-rolebinding-"
-)
-
+// MultipleSourceComponents gets component data from multiple source, such as stdin, URI and local file
 func MultipleSourceComponents(fileName string, in io.Reader) ([]byte, error) {
 	var data io.Reader
 	switch {

@@ -165,7 +165,6 @@ func kindsForHalt() []client.ObjectList {
 		&appsv1.DeploymentList{},
 		&corev1.ServiceList{},
 		&corev1.ServiceAccountList{},
-		&rbacv1.RoleList{},
 		&rbacv1.RoleBindingList{},
 		&policyv1.PodDisruptionBudgetList{},
 	}

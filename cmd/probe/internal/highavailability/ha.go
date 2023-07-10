@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/dapr/kit/logger"
+	"github.com/spf13/viper"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
-	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mongodb"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 )
 
@@ -23,11 +23,23 @@ type Ha struct {
 func NewHa(logger logger.Logger) *Ha {
 
 	dcs, _ := dcs.NewKubernetesStore(logger)
+	characterType := viper.GetString("KB_SERVICE_CHARACTER_TYPE")
+	if characterType == "" {
+		logger.Errorf("KB_SERVICE_CHARACTER_TYPE not set")
+		return nil
+	}
+
+	manager := component.GetManager(characterType)
+	if manager == nil {
+		logger.Errorf("No DB Manager for character type %s", characterType)
+		return nil
+	}
+
 	ha := &Ha{
 		ctx:       context.Background(),
 		dcs:       dcs,
 		logger:    logger,
-		dbManager: mongodb.Mgr,
+		dbManager: manager,
 	}
 	return ha
 }
@@ -40,11 +52,11 @@ func (ha *Ha) RunCycle() {
 	}
 
 	switch {
-	//case !dbManger.IsRunning():
-	//	logger.Infof("DB Service is not running,  wait for sqlctl to start it")
-	//	if dcs.HasLock() {
-	//		dcs.ReleaseLock()
-	//	}
+	case !ha.dbManager.IsRunning():
+		ha.logger.Infof("DB Service is not running,  wait for sqlctl to start it")
+		if ha.dcs.HasLock() {
+			ha.dcs.ReleaseLock()
+		}
 
 	case !ha.dbManager.IsClusterHealthy(context.TODO(), cluster):
 		ha.logger.Errorf("The cluster is not healthy, wait...")
@@ -87,7 +99,7 @@ func (ha *Ha) RunCycle() {
 			}
 		}
 
-		if ok, _ := ha.dbManager.IsLeader(context.TODO()); ok {
+		if ok, _ := ha.dbManager.IsLeader(context.TODO(), cluster); ok {
 			ha.logger.Infof("Refresh leader ttl")
 			ha.dcs.UpdateLock()
 			if int(cluster.Replicas) < len(ha.dbManager.GetMemberAddrs(cluster)) {
@@ -109,7 +121,7 @@ func (ha *Ha) RunCycle() {
 		// TODO: In the event that the database service and SQL channel both go down concurrently, eg. Pod deleted,
 		// there is no healthy leader node and the lock remains unreleased, attempt to acquire the leader lock.
 
-		if ok, _ := ha.dbManager.IsLeader(context.TODO()); ok {
+		if ok, _ := ha.dbManager.IsLeader(context.TODO(), cluster); ok {
 			ha.logger.Infof("I am the real leader, wait for lock released")
 			// if ha.dcs.AttempAcquireLock() == nil {
 			// 	ha.dbManager.Premote()
@@ -117,6 +129,7 @@ func (ha *Ha) RunCycle() {
 		} else {
 			// make sure sync source is leader when role changed
 			ha.dbManager.Demote()
+			ha.dbManager.Follow(cluster)
 		}
 	}
 }
@@ -143,7 +156,7 @@ func (ha *Ha) Start() {
 
 	isExist, _ := ha.dcs.IsLockExist()
 	for !isExist {
-		if ok, _ := ha.dbManager.IsLeader(context.Background()); ok {
+		if ok, _ := ha.dbManager.IsLeader(context.Background(), cluster); ok {
 			ha.dcs.Initialize()
 			break
 		}
@@ -179,16 +192,19 @@ func (ha *Ha) DecreaseClusterReplicas(cluster *dcs.Cluster) {
 func (ha *Ha) IsHealthiestMember(cluster *dcs.Cluster) bool {
 	if cluster.Switchover != nil {
 		switchover := cluster.Switchover
+		leader := switchover.Leader
 		candidate := switchover.Candidate
 		if candidate == ha.dbManager.GetCurrentMemberName() {
 			return true
 		}
-		if candidate != "" && ha.dbManager.IsMemberHealthy(candidate) {
+
+		if candidate != "" && ha.dbManager.IsMemberHealthy(cluster, cluster.GetMemberWithName(candidate)) {
 			ha.logger.Infof("manual switchover to new leader: %s", candidate)
 			return false
 		}
 
-		if switchover.Leader == ha.dbManager.GetCurrentMemberName() && len(ha.dbManager.HasOtherHealthyMembers(cluster)) > 0 {
+		if leader == ha.dbManager.GetCurrentMemberName() &&
+			len(ha.dbManager.HasOtherHealthyMembers(cluster, leader)) > 0 {
 			ha.logger.Infof("manual switchover to other member")
 			return false
 		}

@@ -102,6 +102,7 @@ func (factory *MockBackupPolicyFactory) AddSnapshotPolicy() *MockBackupPolicyFac
 func (factory *MockBackupPolicyFactory) AddDataFilePolicy() *MockBackupPolicyFactory {
 	factory.get().Spec.Datafile = &dataprotectionv1alpha1.CommonBackupPolicy{
 		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
+			Name:         "backup-data",
 			CreatePolicy: dataprotectionv1alpha1.CreatePVCPolicyIfNotPresent,
 		},
 	}
@@ -112,6 +113,7 @@ func (factory *MockBackupPolicyFactory) AddDataFilePolicy() *MockBackupPolicyFac
 func (factory *MockBackupPolicyFactory) AddLogfilePolicy() *MockBackupPolicyFactory {
 	factory.get().Spec.Logfile = &dataprotectionv1alpha1.CommonBackupPolicy{
 		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
+			Name:         "backup-data",
 			CreatePolicy: dataprotectionv1alpha1.CreatePVCPolicyIfNotPresent,
 		},
 	}

@@ -20,8 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -31,14 +34,18 @@ import (
 // RBACTransformer puts the rbac at the beginning of the DAG
 type RBACTransformer struct{}
 
-const PGTYPE = "postgresql"
-
 var _ graph.Transformer = &RBACTransformer{}
+
+const (
+	RBACRoleName       = "kubeblocks-cluster-pod-role"
+	ServiceAccountKind = "ServiceAccount"
+)
 
 func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
-	if cluster.IsDeleting() {
+	if !viper.GetBool("ENABLE_RBAC_MANAGER") {
+		transCtx.Logger.V(1).Info("rbac manager is not enabled")
 		return nil
 	}
 
@@ -47,99 +54,76 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 		return err
 	}
 
-	serviceAccount, err := builder.BuildServiceAccount(cluster)
-	if err != nil {
-		return err
-	}
-	saVertex := ictrltypes.LifecycleObjectCreate(dag, serviceAccount, root)
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		serviceAccountName := compSpec.ServiceAccountName
+		if isRoleBindingExist(transCtx, serviceAccountName) {
+			continue
+		}
+		roleBinding, err := builder.BuildRoleBinding(cluster)
+		if err != nil {
+			return err
+		}
+		roleBinding.Subjects[0].Name = serviceAccountName
+		rbVertex := ictrltypes.LifecycleObjectCreate(dag, roleBinding, root)
 
-	role, err := builder.BuildRole(cluster)
-	if err != nil {
-		return err
-	}
+		serviceAccount, err := builder.BuildServiceAccount(cluster)
+		if err != nil {
+			return err
+		}
+		serviceAccount.Name = serviceAccountName
+		// serviceaccount must be created before rolebinding
+		saVertex := ictrltypes.LifecycleObjectCreate(dag, serviceAccount, rbVertex)
 
-	completeRoleRules(transCtx, role)
-	roleVertex := ictrltypes.LifecycleObjectCreate(dag, role, root)
+		statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
+		for _, statefulSetVertex := range statefulSetVertices {
+			// serviceaccount must be created before statefulset
+			dag.Connect(statefulSetVertex, saVertex)
+		}
 
-	roleBinding, err := builder.BuildRoleBinding(cluster)
-	if err != nil {
-		return err
-	}
-	rbVertex := ictrltypes.LifecycleObjectCreate(dag, roleBinding, root)
-	dag.Connect(rbVertex, roleVertex)
-	dag.Connect(rbVertex, saVertex)
-
-	statefulSetVertices := ictrltypes.FindAll[*appsv1.StatefulSet](dag)
-	for _, statefulSetVertex := range statefulSetVertices {
-		// rbac must be created before statefulset
-		dag.Connect(statefulSetVertex, rbVertex)
-	}
-
-	deploymentVertices := ictrltypes.FindAll[*appsv1.Deployment](dag)
-	for _, deploymentVertex := range deploymentVertices {
-		// rbac must be created before deployment
-		dag.Connect(deploymentVertex, rbVertex)
+		deploymentVertices := ictrltypes.FindAll[*appsv1.Deployment](dag)
+		for _, deploymentVertex := range deploymentVertices {
+			// serviceaccount must be created before deployment
+			dag.Connect(deploymentVertex, saVertex)
+		}
 	}
 	return nil
 }
 
-func completeRoleRules(transCtx *ClusterTransformContext, role *rbacv1.Role) {
-	rules := []rbacv1.PolicyRule{
-		{
-			APIGroups: []string{""},
-			Resources: []string{"events"},
-			Verbs:     []string{"create"},
-		},
-		{
-			APIGroups: []string{"dataprotection.kubeblocks.io"},
-			Resources: []string{"backups/status"},
-			Verbs:     []string{"get", "update", "patch"},
-		},
-		{
-			APIGroups: []string{"dataprotection.kubeblocks.io"},
-			Resources: []string{"backups"},
-			Verbs:     []string{"create", "get", "list", "update", "patch"},
-		},
-	}
-
-	// postgresql need more rules for patroni
-	if isPostgresqlCluster(transCtx) {
-		rules = append(rules, []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{""},
-				Resources: []string{"configmaps"},
-				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"endpoints"},
-				Verbs:     []string{"create", "get", "list", "patch", "update", "watch", "delete"},
-			},
-			{
-				APIGroups: []string{""},
-				Resources: []string{"pods"},
-				Verbs:     []string{"get", "list", "patch", "update", "watch"},
-			},
-		}...)
-	}
-	role.Rules = append(role.Rules, rules...)
-}
-
-func isPostgresqlCluster(transCtx *ClusterTransformContext) bool {
-	cd := transCtx.ClusterDef
+func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName string) bool {
 	cluster := transCtx.Cluster
-
-	if cd.Spec.Type != PGTYPE {
+	namespaceName := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      "kb-" + cluster.Name,
+	}
+	rb := &rbacv1.RoleBinding{}
+	if err := transCtx.Client.Get(transCtx.Context, namespaceName, rb); err != nil {
+		// KubeBlocks will create a rolebinding only if it has RBAC access priority and
+		// the rolebinding is not already present.
+		if errors.IsNotFound(err) {
+			transCtx.Logger.V(1).Info("RoleBinding not exists", "namespaceName", namespaceName)
+			return false
+		}
+		transCtx.Logger.V(0).Error(err, "get service account failed")
 		return false
 	}
+	if rb == nil {
+		return false
+	}
+	if rb.RoleRef.Name != RBACRoleName {
+		transCtx.Logger.V(1).Info("rbac manager: ClusterRole not match", "ClusterRole",
+			RBACRoleName, "rolebinding.RoleRef", rb.RoleRef.Name)
+	}
 
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		for _, def := range cd.Spec.ComponentDefs {
-			if def.Name == compSpec.ComponentDefRef && def.CharacterType == PGTYPE {
-				return true
-			}
+	isServiceAccountMatch := false
+	for _, sub := range rb.Subjects {
+		if sub.Kind == ServiceAccountKind && sub.Name == serviceAccountName {
+			isServiceAccountMatch = true
 		}
 	}
 
-	return false
+	if !isServiceAccountMatch {
+		transCtx.Logger.V(1).Info("rbac manager: ServiceAccount not match", "ServiceAccount",
+			serviceAccountName, "rolebinding.Subjects", rb.Subjects)
+	}
+	return true
 }

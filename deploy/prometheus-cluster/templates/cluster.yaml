@@ -22,7 +22,7 @@ spec:
     {{- end }}
   componentSpecs:
     - name: server # user-defined
-      componentDefRef: server # ref clusterdefinition components.name
+      componentDefRef: prometheus # ref clusterdefinition components.name
       replicas: {{ .Values.server.replicaCount | default 1 }}
       serviceAccountName: {{ template "prometheus-cluster.server.fullname" . }}
       resources:

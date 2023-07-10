@@ -75,8 +75,8 @@ spec:
         {{- end }}
       {{- end }}
     {{- else }}
-    - name: controller
-      componentDefRef: kafka-controller
+    - name: kafka-kraft
+      componentDefRef: kafka-kraft
       tls: {{ $.Values.tls }}
       {{- if $.Values.tls }}
       issuer:

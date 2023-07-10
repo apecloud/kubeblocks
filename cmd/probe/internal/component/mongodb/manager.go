@@ -27,6 +27,7 @@ type Manager struct {
 }
 
 var Mgr *Manager
+var _ component.DBManager = &Manager{}
 
 func NewManager(logger logger.Logger) (*Manager, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -67,8 +68,24 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		Client:   client,
 		Database: client.Database(config.databaseName),
 	}
+
+	component.RegisterManager("mongodb", Mgr)
 	return Mgr, nil
 
+}
+
+func (mgr *Manager) Initialize() {}
+
+func (mgr *Manager) IsRunning() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	err := mgr.Client.Ping(ctx, readpref.Primary())
+	if err != nil {
+		mgr.Logger.Infof("DB is not ready: %v", err)
+		return false
+	}
+	return true
 }
 
 func (mgr *Manager) IsDBStartupReady() bool {
@@ -131,7 +148,24 @@ func (mgr *Manager) GetReplSetStatusWithClient(ctx context.Context, client *mong
 	return status, nil
 }
 
-func (mgr *Manager) IsLeader(ctx context.Context) (bool, error) {
+func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
+	status, err := mgr.GetReplSetStatus(ctx)
+	if err != nil {
+		mgr.Logger.Errorf("rs.status() error: %", err)
+		return false, err
+	}
+	for _, member := range status.Members {
+		if strings.HasPrefix(member.Name, member.Name) {
+			if member.StateStr == "PRIMARY" {
+				return true, nil
+			}
+			break
+		}
+	}
+	return false, nil
+}
+
+func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	cur := mgr.Client.Database("admin").RunCommand(ctx, bson.D{{Key: "isMaster", Value: 1}})
 	if cur.Err() != nil {
 		return false, errors.Wrap(cur.Err(), "run isMaster")
@@ -159,7 +193,7 @@ func (mgr *Manager) InitiateReplSet(cluster *dcs.Cluster) error {
 
 	for i, member := range cluster.Members {
 		configMembers[i].ID = i
-		configMembers[i].Host = cluster.GetMemberAddr(member)
+		configMembers[i].Host = cluster.GetMemberAddrWithPort(member)
 		if strings.HasPrefix(member.Name, mgr.CurrentMemberName) {
 			configMembers[i].Priority = 2
 		} else {
@@ -273,7 +307,7 @@ func (mgr *Manager) GetLeaderClient(ctx context.Context, cluster *dcs.Cluster) (
 	}
 
 	leaderMember := cluster.GetMemberWithName(cluster.Leader.Name)
-	host := cluster.GetMemberAddr(*leaderMember)
+	host := cluster.GetMemberAddrWithPort(*leaderMember)
 	return mgr.GetReplSetClientWithHosts(context.TODO(), []string{host})
 }
 
@@ -301,9 +335,6 @@ func (mgr *Manager) GetReplSetClientWithHosts(ctx context.Context, hosts []strin
 	return client, err
 }
 
-func (mgr *Manager) Initialize() {}
-func (mgr *Manager) IsRunning()  {}
-
 func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 	client, err := mgr.GetReplSetClient(context.TODO(), cluster)
 	if err != nil {
@@ -329,10 +360,17 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 }
 
 func (mgr *Manager) IsCurrentMemberHealthy() bool {
-	return mgr.IsMemberHealthy(mgr.CurrentMemberName)
+	return mgr.IsMemberHealthy(nil, nil)
 }
 
-func (mgr *Manager) IsMemberHealthy(memberName string) bool {
+func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bool {
+	var memberName string
+	if member != nil {
+		memberName = member.Name
+	} else {
+		memberName = mgr.CurrentMemberName
+	}
+
 	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
 	if rsStatus == nil {
 		return false
@@ -356,7 +394,7 @@ func (mgr *Manager) AddCurrentMemberToCluster(cluster *dcs.Cluster) error {
 
 	defer client.Disconnect(context.TODO())
 	currentMember := cluster.GetMemberWithName(mgr.GetCurrentMemberName())
-	currentHost := cluster.GetMemberAddr(*currentMember)
+	currentHost := cluster.GetMemberAddrWithPort(*currentMember)
 	rsConfig, err := mgr.GetReplSetConfigWithClient(context.TODO(), client)
 	if rsConfig == nil {
 		mgr.Logger.Errorf("Get replSet config failed: %v", err)
@@ -525,7 +563,8 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 	return nil
 }
 
-func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster) []*dcs.Member {
+// Are there any healthy members other than the leader?
+func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) []*dcs.Member {
 	members := make([]*dcs.Member, 0)
 	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
 	if rsStatus == nil {
@@ -537,7 +576,7 @@ func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster) []*dcs.Member {
 			continue
 		}
 		memberName := strings.Split(member.Name, ".")[0]
-		if memberName == mgr.CurrentMemberName {
+		if memberName == leader {
 			continue
 		}
 		member := cluster.GetMemberWithName(memberName)
@@ -547,4 +586,8 @@ func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster) []*dcs.Member {
 	}
 
 	return members
+}
+
+func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
+	return nil
 }

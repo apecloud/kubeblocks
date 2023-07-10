@@ -1,0 +1,40 @@
+# Default values for mysql-cluster.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+## @param version MySQL cluster version
+##
+version: mysql-8.0.33
+
+## @param mode MySQL cluster topology mode, standalone, replication or raftGroup
+##
+mode: standalone
+
+## @param replicas specify cluster replicas
+##
+replicas: 1
+
+## @param cpu
+##
+cpu: 1
+
+## @param memory, the unit is Gi
+##
+memory: 1
+
+## @param requests.cpu if not set, use cpu
+## @param requests.memory, if not set, use memory
+##
+requests:
+#  cpu:
+#  memory:
+
+## @param storage size, the unit is Gi
+##
+storage: 20
+
+## @param proxyEnabled if true, enable the proxy
+## if mode is standalone or replication, proxyEnabled is always false
+## if mode is raftGroup, proxyEnabled can be true or false
+##
+proxyEnabled: false

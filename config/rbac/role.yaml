@@ -479,31 +479,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - serviceaccounts
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - serviceaccounts/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - serviceaccounts/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - ""
-  resources:
   - services
   verbs:
   - create
@@ -549,6 +524,32 @@ rules:
   - dataprotection.kubeblocks.io
   resources:
   - backuppolicies/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backuprepoes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backuprepoes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backuprepoes/status
   verbs:
   - get
   - patch
@@ -678,56 +679,6 @@ rules:
   verbs:
   - update
 - apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - rolebindings
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - rolebindings/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - rolebindings/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - roles
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - roles/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - roles/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
   - snapshot.storage.k8s.io
   resources:
   - volumesnapshotclasses
@@ -768,11 +719,47 @@ rules:
 - apiGroups:
   - storage.k8s.io
   resources:
-  - storageclasses
+  - csidrivers
   verbs:
   - get
   - list
   - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - storage.kubeblocks.io
+  resources:
+  - storageproviders
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - storage.kubeblocks.io
+  resources:
+  - storageproviders/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - storage.kubeblocks.io
+  resources:
+  - storageproviders/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - workloads.kubeblocks.io
   resources:

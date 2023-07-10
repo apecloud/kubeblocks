@@ -40,7 +40,7 @@ func NewConsensusComponent(cli client.Client,
 	synthesizedComponent *component.SynthesizedComponent,
 	dag *graph.DAG) *consensusComponent {
 	comp := &consensusComponent{
-		RSMComponentBase: internal.RSMComponentBase{
+		StatefulComponentBase: internal.StatefulComponentBase{
 			ComponentBase: internal.ComponentBase{
 				Client:         cli,
 				Recorder:       recorder,
@@ -67,7 +67,7 @@ func NewConsensusComponent(cli client.Client,
 }
 
 type consensusComponent struct {
-	internal.RSMComponentBase
+	internal.StatefulComponentBase
 }
 
 var _ types.Component = &consensusComponent{}
@@ -94,17 +94,17 @@ func (c *consensusComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *consensusComponent) GetBuiltObjects(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]client.Object, error) {
-	return c.RSMComponentBase.GetBuiltObjects(c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
+	return c.StatefulComponentBase.GetBuiltObjects(c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }
 
 func (c *consensusComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.RSMComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
+	return c.StatefulComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }
 
 func (c *consensusComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.RSMComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
+	return c.StatefulComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
 }
 
 func (c *consensusComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.RSMComponentBase.Status(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionNoopPtr()))
+	return c.StatefulComponentBase.Status(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionNoopPtr()))
 }

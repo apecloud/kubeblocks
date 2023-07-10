@@ -20,6 +20,84 @@ spec:
     mysqlEndpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-mysql)"
     pgEndpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
   componentDefs:
+    - name: bookies-bk
+      workloadType: Stateful
+      characterType: bookies
+      configSpecs:
+        - name: bookies-bk-config
+          templateRef: bookies-bk-config
+          namespace: {{ .Release.Namespace }}
+          volumeName: bookies-bk-config
+      podSpec:
+        containers:
+          - args:
+              - "bin/apply-config-from-env.py conf/bookkeeper.conf &&\n\t\t\tif [ -x scripts/run-bookie.sh
+            ];then exec scripts/run-bookie.sh;else exec bin/pulsar bookie; fi"
+            command:
+              - bash
+              - -c
+            envFrom:
+              - configMapRef:
+                  name: bookies-bk-config
+            image: streamnative/sn-platform-slim:2.10.3.4
+            imagePullPolicy: IfNotPresent
+            livenessProbe:
+              failureThreshold: 10
+              httpGet:
+                path: /api/v1/bookie/state
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 30
+              periodSeconds: 3
+              successThreshold: 1
+              timeoutSeconds: 5
+            name: bookie
+            ports:
+              - containerPort: 8000
+                name: http
+                protocol: TCP
+              - containerPort: 3181
+                name: bookie
+                protocol: TCP
+            readinessProbe:
+              failureThreshold: 10
+              httpGet:
+                path: /api/v1/bookie/is_ready
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 30
+              periodSeconds: 3
+              successThreshold: 1
+              timeoutSeconds: 5
+            resources:
+              requests:
+                cpu: 200m
+                memory: 512Mi
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+              privileged: false
+              runAsGroup: 0
+              runAsNonRoot: true
+              runAsUser: 10000
+            startupProbe:
+              failureThreshold: 200
+              httpGet:
+                path: /api/v1/bookie/is_ready
+                port: http
+                scheme: HTTP
+              periodSeconds: 3
+              successThreshold: 1
+              timeoutSeconds: 5
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - mountPath: /pulsar/data/bookkeeper/journal-0
+                name: journal-0
+              - mountPath: /pulsar/data/bookkeeper/ledgers-0
+                name: ledgers-0
     - name: zookeeper
       workloadType: Stateful
       characterType: zookeeper

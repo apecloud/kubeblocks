@@ -1,0 +1,69 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ include "clustername" . }}
+  labels: {{ include "pulsar-cluster.labels" . | nindent 4 }}
+spec:
+  clusterDefinitionRef: pulsar  # ref clusterdefinition.name
+  clusterVersionRef: pulsar-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
+  terminationPolicy: {{ $.Values.terminationPolicy }}
+  affinity:
+    {{- with $.Values.topologyKeys }}
+    topologyKeys: {{ . | toYaml | nindent 6 }}
+    {{- end }}
+  {{- with $.Values.tolerations }}
+  tolerations: {{ . | toYaml | nindent 4 }}
+  {{- end }}
+  componentSpecs:
+    - name: bookies
+      componentDefRef: bookies-bk # ref clusterDefinition componentDefs.name
+      replicas: {{ .Values.bookies.replicaCount | default 3 }}
+      serviceAccountName: {{ include "pulsar-cluster.serviceAccountName" . }}
+      {{- with  .Values.bookies.resources }}
+      resources:
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- if .Values.bookies.persistence.enabled }}
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.bookies.persistence.data.size }}
+        - name: log
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.bookies.persistence.log.size }}
+      {{- end }}
+    - name: zookeeper
+      componentDefRef: zookeeper
+      replicas: {{ .Values.zookeeper.replicaCount | default 3 }}
+      {{- with  .Values.zookeeper.resources }}
+      resources:
+        limits:
+          cpu: {{ .limits.cpu | quote }}
+          memory: {{ .limits.memory | quote }}
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+      {{- if .Values.zookeeper.persistence.enabled }}
+      volumeClaimTemplates:
+        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ .Values.zookeeper.persistence.data.size }}
+      {{- end }}

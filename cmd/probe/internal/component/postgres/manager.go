@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"time"
 	"unicode"
 
 	"github.com/containerd/containerd/pkg/cri/util"
@@ -230,7 +229,7 @@ func (mgr *Manager) GetMemberStateWithPool(ctx context.Context, pool *pgxpool.Po
 	return "", errors.Errorf("exec sql %s failed: no data returned", sql)
 }
 
-func (mgr *Manager) IsLeader(ctx context.Context) (bool, error) {
+func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, error) {
 	return mgr.IsLeaderWithPool(ctx, nil)
 }
 
@@ -264,23 +263,27 @@ func (mgr *Manager) IsCurrentMemberInCluster(cluster *dcs.Cluster) bool {
 	return true
 }
 
-func (mgr *Manager) IsCurrentMemberHealthy(cluster *dcs.Cluster) bool {
-	return mgr.IsMemberHealthy(mgr.CurrentMemberName, cluster)
+func (mgr *Manager) IsCurrentMemberHealthy() bool {
+	return mgr.IsMemberHealthy(nil, nil)
 }
 
-func (mgr *Manager) IsMemberHealthy(memberName string, cluster *dcs.Cluster) bool {
+func (mgr *Manager) IsMemberHealthy(cluster *dcs.Cluster, member *dcs.Member) bool {
 	ctx := context.TODO()
 
 	pools := []*pgxpool.Pool{nil}
-	var err error
-	if memberName != mgr.CurrentMemberName {
-		host := cluster.GetMemberAddr(*cluster.GetMemberWithName(memberName))
+	if member != nil && cluster != nil {
+		var err error
+		if member.Name != mgr.CurrentMemberName {
+			host := cluster.GetMemberAddr(*member)
 
-		pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{host})
-		if err != nil || pools[0] == nil {
-			mgr.Logger.Errorf("Get other pools failed, err:%v", err)
-			return false
+			pools, err = mgr.GetOtherPoolsWithHosts(ctx, []string{host})
+			if err != nil || pools[0] == nil {
+				mgr.Logger.Errorf("Get other pools failed, err:%v", err)
+				return false
+			}
 		}
+	} else {
+		pools[0] = mgr.Pool
 	}
 
 	// Typically, the synchronous_commit parameter remains consistent between the primary and standby
@@ -291,7 +294,7 @@ func (mgr *Manager) IsMemberHealthy(memberName string, cluster *dcs.Cluster) boo
 	}
 
 	if replicationMode == "synchronous" {
-		if !mgr.checkStandbySynchronizedToLeader(ctx, memberName, true, cluster) {
+		if !mgr.checkStandbySynchronizedToLeader(ctx, member.Name, true, cluster) {
 			return false
 		}
 	}
@@ -430,7 +433,7 @@ func (mgr *Manager) IsClusterInitialized(ctx context.Context, cluster *dcs.Clust
 	return true, nil
 }
 
-func (mgr *Manager) Promote() error {
+func (mgr *Manager) Premote() error {
 	err := mgr.prePromote()
 	if err != nil {
 		return err
@@ -460,7 +463,7 @@ func (mgr *Manager) postPromote() error {
 	return nil
 }
 
-func (mgr *Manager) Demote(cluster *dcs.Cluster) error {
+func (mgr *Manager) Demote() error {
 	var stdout, stderr bytes.Buffer
 	stopCmd := exec.Command("su", "-c", `'pg_ctl stop -m fast'`, "postgres")
 	stopCmd.Stdout = &stdout
@@ -471,12 +474,12 @@ func (mgr *Manager) Demote(cluster *dcs.Cluster) error {
 		mgr.Logger.Errorf("stop failed, err:%v, stderr:%s", err, stderr.String())
 		return err
 	}
-	time.Sleep(time.Second * 2)
 
-	return mgr.follow(context.TODO(), true, cluster.Leader.Name)
+	return nil
 }
 
-func (mgr *Manager) HandleFollow(ctx context.Context, cluster *dcs.Cluster) error {
+func (mgr *Manager) Follow(cluster *dcs.Cluster) error {
+	ctx := context.TODO()
 	err := mgr.handleRewind(ctx, cluster)
 	if err != nil {
 		mgr.Logger.Errorf("handle rewind failed, err:%v", err)
@@ -484,7 +487,7 @@ func (mgr *Manager) HandleFollow(ctx context.Context, cluster *dcs.Cluster) erro
 
 	needChange, needRestart := mgr.checkRecoveryConf(ctx, cluster.Leader.Name)
 	if needChange {
-		return mgr.follow(ctx, needRestart, cluster.Leader.Name)
+		return mgr.follow(needRestart, cluster)
 	}
 
 	mgr.Logger.Infof("no action coz i still follow the leader:%s", cluster.Leader.Name)
@@ -705,18 +708,15 @@ func (mgr *Manager) getHistory() []*history {
 	return nil
 }
 
-func (mgr *Manager) follow(ctx context.Context, needRestart bool, leaderName string) error {
-	if mgr.CurrentMemberName == leaderName {
+func (mgr *Manager) follow(needRestart bool, cluster *dcs.Cluster) error {
+	leaderMember := cluster.GetLeaderMember()
+	if mgr.CurrentMemberName == leaderMember.Name {
 		mgr.Logger.Infof("i get the leader key, don't need to follow")
 		return nil
 	}
 
-	primaryInfo := "host="
-	primaryInfo += leaderName + "." + mgr.ClusterCompName + "-headless"
-	primaryInfo += " port=" + viper.GetString("KB_SERVICE_PORT")
-	primaryInfo += " user=" + viper.GetString("KB_SERVICE_USER")
-	primaryInfo += " password=" + viper.GetString("KB_SERVICE_PASSWORD")
-	primaryInfo += " application_name=" + "my-application\n"
+	primaryInfo := fmt.Sprintf("host=%s port=%s user=%s password=%s application_name=my-application\n",
+		cluster.GetMemberAddr(*leaderMember), leaderMember.DBPort, config.username, config.password)
 
 	pgConf, err := os.OpenFile("/postgresql/conf/postgresql.conf", os.O_APPEND, 0644)
 	if err != nil {
@@ -750,7 +750,7 @@ func (mgr *Manager) follow(ctx context.Context, needRestart bool, leaderName str
 			return err
 		}
 
-		mgr.Logger.Infof("successfully follow new leader:%s", leaderName)
+		mgr.Logger.Infof("successfully follow new leader:%s", leaderMember.Name)
 		return nil
 	}
 
@@ -811,7 +811,7 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 	return nil
 }
 
-func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster) []*dcs.Member {
+func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) []*dcs.Member {
 	ctx := context.TODO()
 	members := make([]*dcs.Member, 0)
 	replicationMode, err := mgr.getReplicationMode(ctx)
@@ -822,7 +822,7 @@ func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster) []*dcs.Member {
 
 	if replicationMode == "synchronous" {
 		for i, m := range cluster.Members {
-			if mgr.IsMemberHealthy(m.Name, cluster) {
+			if m.Name != leader && mgr.IsMemberHealthy(cluster, &m) {
 				members = append(members, &cluster.Members[i])
 			}
 		}
@@ -856,4 +856,8 @@ func (mgr *Manager) GetOtherPoolsWithHosts(ctx context.Context, hosts []string) 
 	}
 
 	return resp, nil
+}
+
+func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
+	return true, nil
 }

@@ -8,7 +8,7 @@ dependencies:
     alias: extra
 
 type: application
-version: 0.6.0-alpha.28
+version: 0.6.0-alpha.33
 appVersion: 3.3.2
 
 home: https://github.com/apecloud/kubeblocks/tree/main/deploy/kafka-cluster

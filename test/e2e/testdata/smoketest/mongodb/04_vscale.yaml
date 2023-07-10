@@ -3,7 +3,7 @@ kind: OpsRequest
 metadata:
   name: ops-vscale
 spec:
-  clusterRef: mycluster
+  clusterRef: mongodb-cluster
   type: VerticalScaling
   verticalScaling:
     - componentName: mongodb

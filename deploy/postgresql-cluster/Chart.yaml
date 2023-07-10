@@ -1,7 +1,7 @@
 apiVersion: v2
 name: postgresql-cluster
 type: application
-version: 0.6.0-alpha.28
+version: 0.6.0-alpha.33
 description: A PostgreSQL (with Patroni HA) cluster Helm chart for KubeBlocks.
 
 dependencies:

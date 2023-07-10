@@ -6,5 +6,5 @@ metadata:
     dataprotection.kubeblocks.io/backup-type: snapshot
   name: backup-snapshot-mycluster
 spec:
-  backupPolicyName: mycluster-pgcluster-postgresql-backup-policy
+  backupPolicyName: pg-cluster-postgresql-backup-policy
   backupType: snapshot

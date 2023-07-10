@@ -239,10 +239,7 @@ func getPodsOfStatefulSet(ctx context.Context, cli roclient.ReadonlyClient, stsO
 	podList := &corev1.PodList{}
 	if err := cli.List(ctx, podList,
 		&client.ListOptions{Namespace: stsObj.Namespace},
-		client.MatchingLabels{
-			constant.KBManagedByKey:      stsObj.Labels[constant.KBManagedByKey],
-			constant.AppInstanceLabelKey: stsObj.Labels[constant.AppInstanceLabelKey],
-		}); err != nil {
+		client.MatchingLabels(stsObj.Spec.Selector.MatchLabels)); err != nil {
 		return nil, err
 	}
 	var pods []corev1.Pod

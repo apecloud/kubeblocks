@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package hsm
 
+import "reflect"
+
 type StateReference[S any] struct {
 	State S
 }
@@ -37,4 +39,23 @@ func (c *BaseContext[S, C]) SetState(newState S) {
 
 func (c *BaseContext[S, C]) InitState(initialState S) {
 	c.reference = &StateReference[S]{State: initialState}
+}
+
+func wrapStateReference[S StateInterface[C], E, C any](ctx *C, _ func(_ S, _ E, _ C)) *BaseContext[S, C] {
+	v := reflect.ValueOf(ctx)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	v = v.FieldByName("BaseContext")
+	if !v.IsValid() {
+		return nil
+	}
+	switch i := v.Interface().(type) {
+	default:
+		return nil
+	case BaseContext[S, C]:
+		return &i
+	case *BaseContext[S, C]:
+		return i
+	}
 }

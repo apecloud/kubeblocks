@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package hsm
 
 import (
-	"reflect"
 	"sync"
 )
 
@@ -49,31 +48,12 @@ func GetStateMachine[S StateInterface[C], E, C any](id string, _ func(_ S, _ E, 
 }
 
 func FromContext[S StateInterface[C], E, C any](ctx *C, id string, signature func(_ S, _ E, _ C)) *StateMachine[S, E, C] {
-	stateReference := func(context *C) *BaseContext[S, C] {
-		v := reflect.ValueOf(ctx)
-		if v.Kind() == reflect.Ptr {
-			v = v.Elem()
-		}
-		v = v.FieldByName("BaseContext")
-		if !v.IsValid() {
-			return nil
-		}
-		switch i := v.Interface().(type) {
-		default:
-			return nil
-		case BaseContext[S, C]:
-			return &i
-		case *BaseContext[S, C]:
-			return i
-		}
-	}
-
 	smDef := GetStateMachine(id, signature)
 	if smDef == nil {
 		return nil
 	}
-	baseState := stateReference(ctx)
-	if baseState == nil {
+	baseState := wrapStateReference(ctx, signature)
+	if baseState == nil || baseState.reference == nil {
 		baseState = &BaseContext[S, C]{}
 		baseState.InitState(smDef.InitialState)
 	}

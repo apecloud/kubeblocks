@@ -30,5 +30,5 @@ var (
 )
 
 func init() {
-	registerClusterType("redis", redisChart, "redis-cluster.tgz")
+	registerClusterType("redis", redisChart, "redis-cluster.tgz", "")
 }

@@ -104,7 +104,7 @@ var _ = Describe("create cluster by cluster type", func() {
 		}
 		o.Format = printer.YAML
 		Expect(o.CreateOptions.Complete()).Should(Succeed())
-		Expect(o.complete(mysqlCmd, nil)).Should(Succeed())
+		Expect(o.complete(mysqlCmd)).Should(Succeed())
 		Expect(o.Name).ShouldNot(BeEmpty())
 		Expect(o.values).ShouldNot(BeNil())
 

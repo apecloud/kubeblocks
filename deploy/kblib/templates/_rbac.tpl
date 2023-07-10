@@ -1,7 +1,7 @@
 {{/*
 Define the service account name
 */}}
-{{- define "kblib.serviceAccountName" -}}
+{{- define "kblib.serviceAccountName" }}
 {{- printf "kb-sa-%s" (include "kblib.clusterName" .) }}
 {{- end }}
 
@@ -15,7 +15,7 @@ Define the role name
 {{/*
 Define the rolebinding name
 */}}
-{{- define "kblib.roleBindingName" -}}
+{{- define "kblib.roleBindingName" }}
 {{- printf "kb-rolebinding-%s" (include "kblib.clusterName" .) }}
 {{- end }}
 
@@ -75,7 +75,7 @@ subjects:
 {{/*
 Define the whole rbac
 */}}
-{{- define "kblib.rbac" -}}
+{{- define "kblib.rbac" }}
 ---
 {{- include "kblib.serviceAccount" . }}
 ---

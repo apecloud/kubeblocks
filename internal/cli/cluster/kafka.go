@@ -30,5 +30,5 @@ var (
 )
 
 func init() {
-	registerClusterType("kafka", kafkaChart, "kafka-cluster.tgz")
+	registerClusterType("kafka", kafkaChart, "kafka-cluster.tgz", "")
 }

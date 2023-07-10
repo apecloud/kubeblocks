@@ -1,12 +1,9 @@
-{{- if .Values.serviceAccount.enabled }}
----
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: kb-{{ include "clustername" . }}
-  namespace: {{ .Release.Namespace }}
+  name: {{ include "kblib.roleName" . }}
   labels:
-    {{ include "postgresqlcluster.labels" . | nindent 4 }}
+    {{- include "kblib.clusterLabels" . | nindent 4 }}
 rules:
   - apiGroups:
       - ""
@@ -50,4 +47,7 @@ rules:
       - events
     verbs:
       - create
-{{- end }}
+---
+{{- include "kblib.serviceAccount" . }}
+---
+{{- include "kblib.roleBinding" . }}

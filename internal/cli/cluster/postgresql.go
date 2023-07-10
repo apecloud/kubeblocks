@@ -25,10 +25,10 @@ import (
 
 var (
 	// run `make generate` to generate this embed file
-	//go:embed charts/apecloud-mysql-cluster.tgz
-	mysqlChart embed.FS
+	//go:embed charts/postgresql-cluster.tgz
+	postgresqlChart embed.FS
 )
 
 func init() {
-	registerClusterType("mysql", mysqlChart, "apecloud-mysql-cluster.tgz", "")
+	registerClusterType("postgresql", postgresqlChart, "postgresql-cluster.tgz", "pg")
 }

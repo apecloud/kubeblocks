@@ -32,6 +32,7 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/chartutil"
 	"helm.sh/helm/v3/pkg/releaseutil"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -120,14 +121,24 @@ func BuildChartInfo(t ClusterType) (*ChartInfo, error) {
 }
 
 // GetManifests gets the cluster manifests
-func GetManifests(c *chart.Chart, namespace, name string, values map[string]interface{}) (map[string]string, error) {
+func GetManifests(c *chart.Chart, namespace, name, kubeVersion string, values map[string]interface{}) (map[string]string, error) {
 	// get the helm chart manifest
-	actionCfg, err := helm.NewActionConfig(helm.NewFakeConfig(namespace))
+	actionCfg, err := helm.NewActionConfig(helm.NewConfig(namespace, "", "", false))
 	if err != nil {
 		return nil, err
 	}
 	actionCfg.Log = func(format string, v ...interface{}) {
 		fmt.Printf(format, v...)
+	}
+
+	// Parse Kubernetes version to fit the helm action config.
+	//
+	// We must set a valid Kubernetes version to render the manifests, otherwise
+	// helm will use a fake one that will cause the .Capabilities.KubeVersion.GitVersion
+	// return the fake version that is not expected.
+	v, err := chartutil.ParseKubeVersion(kubeVersion)
+	if err != nil {
+		return nil, err
 	}
 
 	client := action.NewInstall(actionCfg)
@@ -136,6 +147,7 @@ func GetManifests(c *chart.Chart, namespace, name string, values map[string]inte
 	client.ClientOnly = true
 	client.ReleaseName = name
 	client.Namespace = namespace
+	client.KubeVersion = v
 
 	rel, err := client.Run(c, values)
 	if err != nil {

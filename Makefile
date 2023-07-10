@@ -295,9 +295,10 @@ build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
 	build-single-kbcli-embed-chart.apecloud-mysql-cluster \
 	build-single-kbcli-embed-chart.redis-cluster \
 	build-single-kbcli-embed-chart.postgresql-cluster \
-	build-single-kbcli-embed-chart.kafka-cluster
+	build-single-kbcli-embed-chart.kafka-cluster \
+	build-single-kbcli-embed-chart.mongodb-cluster
+#	build-single-kbcli-embed-chart.postgresql-cluster \
 #	build-single-kbcli-embed-chart.clickhouse-cluster \
-#	build-single-kbcli-embed-chart.mongodb-cluster \
 #	build-single-kbcli-embed-chart.milvus-cluster \
 #	build-single-kbcli-embed-chart.qdrant-cluster \
 #	build-single-kbcli-embed-chart.weaviate-cluster
@@ -589,6 +590,7 @@ render-smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) dependency build deploy/redis-cluster --skip-refresh
 	$(HELM) dependency build deploy/postgresql-cluster --skip-refresh
 	$(HELM) dependency build deploy/kafka-cluster --skip-refresh
+	$(HELM) dependency build deploy/mongodb-cluster --skip-refresh
 	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
 	$(HELM) template mycluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
 	$(HELM) template mycluster deploy/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml

@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an user related feature for this project
+about: Suggest a user related feature for this project
 title: "[Features]"
 labels: area/user-interaction, documentation, kind/feature
 assignees: nayutah

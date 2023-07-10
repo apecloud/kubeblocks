@@ -11,8 +11,9 @@ type: application
 version: 0.6.0-alpha.28
 appVersion: 3.3.2
 
-home: https://kubeblocks.io/
-icon: https://bitnami.com/assets/stacks/kafka/img/kafka-stack-220x234.png
+home: https://github.com/apecloud/kubeblocks/tree/main/deploy/kafka-cluster
+icon: https://kubeblocks.io/img/logo.png
+
 keywords:
   - kafka
   - kraft
@@ -21,5 +22,5 @@ keywords:
   - consumer
 
 maintainers:
-- name: Nash Tsai
-  url: https://github.com/apecloud/kubeblocks/deploy
+- name: ApeCloud
+  url: https://kubeblocks.io/

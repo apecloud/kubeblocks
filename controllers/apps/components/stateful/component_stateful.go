@@ -39,7 +39,7 @@ func NewStatefulComponent(cli client.Client,
 	synthesizedComponent *component.SynthesizedComponent,
 	dag *graph.DAG) *statefulComponent {
 	comp := &statefulComponent{
-		StatefulComponentBase: internal.StatefulComponentBase{
+		RSMComponentBase: internal.RSMComponentBase{
 			ComponentBase: internal.ComponentBase{
 				Client:         cli,
 				Recorder:       recorder,
@@ -64,7 +64,7 @@ func NewStatefulComponent(cli client.Client,
 }
 
 type statefulComponent struct {
-	internal.StatefulComponentBase
+	internal.RSMComponentBase
 }
 
 var _ types.Component = &statefulComponent{}
@@ -91,17 +91,17 @@ func (c *statefulComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
 }
 
 func (c *statefulComponent) GetBuiltObjects(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]client.Object, error) {
-	return c.StatefulComponentBase.GetBuiltObjects(c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
+	return c.RSMComponentBase.GetBuiltObjects(c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }
 
 func (c *statefulComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.StatefulComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
+	return c.RSMComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }
 
 func (c *statefulComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.StatefulComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
+	return c.RSMComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
 }
 
 func (c *statefulComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.StatefulComponentBase.Status(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionNoopPtr()))
+	return c.RSMComponentBase.Status(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionNoopPtr()))
 }

@@ -77,8 +77,7 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 	}
 
 	if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
-		switch compDef.WorkloadType {
-		case appsv1alpha1.Consensus:
+		if compDef.WorkloadType == appsv1alpha1.Consensus {
 			return rsm.NewRSMComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
 		}
 	}

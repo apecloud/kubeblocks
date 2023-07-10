@@ -41,6 +41,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	client2 "github.com/apecloud/kubeblocks/internal/controller/client"
 	componentutil "github.com/apecloud/kubeblocks/internal/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -701,4 +702,23 @@ func ResolvePodSpecDefaultFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 	if pobj.PreemptionPolicy == nil {
 		pobj.PreemptionPolicy = obj.PreemptionPolicy
 	}
+}
+
+func ConvertRSMToSTS(rsm *workloads.ReplicatedStateMachine) *appsv1.StatefulSet {
+	if rsm == nil {
+		return nil
+	}
+	sts := builder.NewStatefulSetBuilder(rsm.Namespace, rsm.Name).
+		AddLabelsInMap(rsm.Labels).
+		AddAnnotationsInMap(rsm.Annotations).
+		SetReplicas(*rsm.Spec.Replicas).
+		SetSelector(rsm.Spec.Selector).
+		SetServiceName(rsm.Spec.ServiceName).
+		SetTemplate(rsm.Spec.Template).
+		SetVolumeClaimTemplates(rsm.Spec.VolumeClaimTemplates...).
+		SetPodManagementPolicy(rsm.Spec.PodManagementPolicy).
+		SetUpdateStrategy(rsm.Spec.UpdateStrategy).
+		GetObject()
+	sts.Status = rsm.Status.StatefulSetStatus
+	return sts
 }

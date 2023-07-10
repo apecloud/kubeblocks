@@ -32,6 +32,14 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
+type rsmComponent struct {
+	internal.RSMComponentBase
+}
+
+var _ types.Component = &rsmComponent{}
+
+const workloadType = "RSM"
+
 func NewRSMComponent(cli client.Client,
 	recorder record.EventRecorder,
 	cluster *appsv1alpha1.Cluster,
@@ -39,7 +47,7 @@ func NewRSMComponent(cli client.Client,
 	synthesizedComponent *component.SynthesizedComponent,
 	dag *graph.DAG) *rsmComponent {
 	comp := &rsmComponent{
-		StatefulComponentBase: internal.StatefulComponentBase{
+		RSMComponentBase: internal.RSMComponentBase{
 			ComponentBase: internal.ComponentBase{
 				Client:         cli,
 				Recorder:       recorder,
@@ -63,12 +71,6 @@ func NewRSMComponent(cli client.Client,
 	return comp
 }
 
-type rsmComponent struct {
-	internal.StatefulComponentBase
-}
-
-var _ types.Component = &rsmComponent{}
-
 func (c *rsmComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	action *ictrltypes.LifecycleAction) internal.ComponentWorkloadBuilder {
 	builder := &rsmComponentWorkloadBuilder{
@@ -87,21 +89,21 @@ func (c *rsmComponent) newBuilder(reqCtx intctrlutil.RequestCtx, cli client.Clie
 }
 
 func (c *rsmComponent) GetWorkloadType() appsv1alpha1.WorkloadType {
-	return appsv1alpha1.Stateful
+	return workloadType
 }
 
 func (c *rsmComponent) GetBuiltObjects(reqCtx intctrlutil.RequestCtx, cli client.Client) ([]client.Object, error) {
-	return c.StatefulComponentBase.GetBuiltObjects(c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
+	return c.RSMComponentBase.GetBuiltObjects(c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }
 
 func (c *rsmComponent) Create(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.StatefulComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
+	return c.RSMComponentBase.Create(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionCreatePtr()))
 }
 
 func (c *rsmComponent) Update(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.StatefulComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
+	return c.RSMComponentBase.Update(reqCtx, cli, c.newBuilder(reqCtx, cli, nil))
 }
 
 func (c *rsmComponent) Status(reqCtx intctrlutil.RequestCtx, cli client.Client) error {
-	return c.StatefulComponentBase.Status(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionNoopPtr()))
+	return c.RSMComponentBase.Status(reqCtx, cli, c.newBuilder(reqCtx, cli, ictrltypes.ActionNoopPtr()))
 }

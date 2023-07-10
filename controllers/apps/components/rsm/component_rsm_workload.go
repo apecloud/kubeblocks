@@ -34,8 +34,6 @@ type rsmComponentWorkloadBuilder struct {
 
 var _ internal.ComponentWorkloadBuilder = &rsmComponentWorkloadBuilder{}
 
-const workloadType = "RSM"
-
 func (b *rsmComponentWorkloadBuilder) BuildWorkload() internal.ComponentWorkloadBuilder {
 	buildfn := func() ([]client.Object, error) {
 		if b.EnvConfig == nil {

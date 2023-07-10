@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
@@ -53,7 +54,11 @@ func (r *RSM) IsRunning(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
-	sts := util.ConvertToStatefulSet(obj)
+	rsm, ok := obj.(*workloads.ReplicatedStateMachine)
+	if !ok {
+		return false, nil
+	}
+	sts := util.ConvertRSMToSTS(rsm)
 	isRevisionConsistent, err := util.IsStsAndPodsRevisionConsistent(ctx, r.Cli, sts)
 	if err != nil {
 		return false, err
@@ -66,7 +71,11 @@ func (r *RSM) PodsReady(ctx context.Context, obj client.Object) (bool, error) {
 	if obj == nil {
 		return false, nil
 	}
-	sts := util.ConvertToStatefulSet(obj)
+	rsm, ok := obj.(*workloads.ReplicatedStateMachine)
+	if !ok {
+		return false, nil
+	}
+	sts := util.ConvertRSMToSTS(rsm)
 	return util.StatefulSetPodsAreReady(sts, r.getReplicas()), nil
 }
 

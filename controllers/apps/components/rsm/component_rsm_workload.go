@@ -20,7 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package rsm
 
 import (
+	"fmt"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/apecloud/kubeblocks/controllers/apps/components/internal"
+	"github.com/apecloud/kubeblocks/internal/controller/builder"
 )
 
 type rsmComponentWorkloadBuilder struct {
@@ -29,6 +34,24 @@ type rsmComponentWorkloadBuilder struct {
 
 var _ internal.ComponentWorkloadBuilder = &rsmComponentWorkloadBuilder{}
 
+const workloadType = "RSM"
+
 func (b *rsmComponentWorkloadBuilder) BuildWorkload() internal.ComponentWorkloadBuilder {
-	return b.BuildWorkload4StatefulSet("stateful")
+	buildfn := func() ([]client.Object, error) {
+		if b.EnvConfig == nil {
+			return nil, fmt.Errorf("build %s workload but env config is nil, cluster: %s, component: %s",
+				workloadType, b.Comp.GetClusterName(), b.Comp.GetName())
+		}
+
+		component := b.Comp.GetSynthesizedComponent()
+		obj, err := builder.BuildRSM(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		b.Workload = obj
+
+		return nil, nil // don't return sts here
+	}
+	return b.BuildWrapper(buildfn)
 }

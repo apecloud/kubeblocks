@@ -32,7 +32,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
-func NewComponent(cli client.Client,
+func NewRSMComponent(cli client.Client,
 	recorder record.EventRecorder,
 	cluster *appsv1alpha1.Cluster,
 	clusterVersion *appsv1alpha1.ClusterVersion,

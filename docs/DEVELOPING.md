@@ -263,7 +263,7 @@ make run-delve GO_PACKAGE=./cmd/manager/main.go
 ```shell
 make test-delve TEST_PACKAGES=./controllers/apps/...
 ```
-> Unlike `go test` supports multiple packages, `Delve` needs a single executable to work, it only support single package.
+> Unlike `go test` supports multiple packages, `Delve` needs a single executable to work, it only supports single package.
 
 #### Change debug server port
 You can change debug server port for `make run-delve` and `make test-delve`.

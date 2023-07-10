@@ -4,13 +4,13 @@ TODO: For azure, we should get provider from node.Spec.ProviderID
 */}}
 {{- define "kblib.cloudProvider" }}
 {{- $kubeVersion := .Capabilities.KubeVersion.GitVersion }}
-{{- if contains $kubeVersion "eks" }}
+{{- if contains "eks" $kubeVersion }}
 {{- "aws" -}}
-{{- else if contains $kubeVersion "gke" }}
+{{- else if contains "gke" $kubeVersion }}
 {{- "gcp" -}}
-{{- else if contains $kubeVersion "aliyun" }}
+{{- else if contains "aliyun" $kubeVersion }}
 {{- "aliyun" -}}
-{{- else if contains $kubeVersion "tke" }}
+{{- else if contains "tke" $kubeVersion }}
 {{- "tencentCloud" -}}
 {{- else }}
 {{- "" -}}

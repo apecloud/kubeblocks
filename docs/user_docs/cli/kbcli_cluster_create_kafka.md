@@ -21,7 +21,7 @@ kbcli cluster create kafka NAME [flags]
 ### Options
 
 ```
-      --availability-policy string   The availability policy of cluster. Legal values [none, node, zone]. (default "none")
+      --availability-policy string   The availability policy of cluster. Legal values [none, node, zone]. (default "node")
       --broker-replicas int          The number of Kafka broker replicas for separated mode. Value range [1, 100]. (default 1)
       --controller-replicas int      The number of Kafka controller replicas for separated mode. Legal values [1, 3, 5]. (default 1)
       --cpu float                    CPU cores. Value range [0.5, 64]. (default 1)

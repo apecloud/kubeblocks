@@ -27,10 +27,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 )
 
 const (
-	ListenerAddress = "127.0.0.1:8000"
+	ListenerAddress = "127.0.0.1"
 	DIR             = "./internal/cli/cmd/auth/authorize/callback_html/"
 )
 
@@ -49,9 +50,9 @@ type callbackServer struct {
 	server *http.Server
 }
 
-func NewCallbackService() *CallbackService {
+func NewCallbackService(port string) *CallbackService {
 	return &CallbackService{
-		ListenerAddress,
+		strings.Join([]string{ListenerAddress, port}, ":"),
 		&callbackServer{},
 	}
 }

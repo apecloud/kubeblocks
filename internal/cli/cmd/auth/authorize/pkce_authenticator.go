@@ -92,8 +92,8 @@ func NewPKCEAuthenticator(client *http.Client, clientID string, authURL string) 
 	return p, nil
 }
 
-func (p *PKCEAuthenticator) GetAuthorization(openURLFunc func(URL string), states ...string) (*AuthorizationResponse, error) {
-	callback := NewCallbackService()
+func (p *PKCEAuthenticator) GetAuthorizationCode(openURLFunc func(URL string), states ...string) (*AuthorizationResponse, error) {
+	callback := NewCallbackService("8000")
 	codeReceiverCh := make(chan CallbackResponse)
 	defer close(codeReceiverCh)
 
@@ -249,16 +249,20 @@ func (p *PKCEAuthenticator) Logout(ctx context.Context, token string, openURLFun
 		return err
 	}
 
-	if err := p.SecondLogout(openURLFunc); err != nil {
+	if err = p.secondLogout(openURLFunc); err != nil {
 		return errors.Wrap(err, "error performing second logout")
 	}
 
 	return nil
 }
 
-func (p *PKCEAuthenticator) SecondLogout(openURLFunc func(URL string)) error {
+func (p *PKCEAuthenticator) secondLogout(openURLFunc func(URL string)) error {
 	logoutURL := fmt.Sprintf(p.AuthURL + "/oidc/logout?federated")
-	openURLFunc(logoutURL)
+	_, err := http.Get(logoutURL)
+	if err != nil {
+		return err
+	}
+	// openURLFunc(logoutURL)
 	return nil
 }
 

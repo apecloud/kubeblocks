@@ -44,18 +44,18 @@ func NewLogout(streams genericclioptions.IOStreams) *cobra.Command {
 		Use:   "logout",
 		Short: "Log out of the Kubeblocks Cloud",
 		Run: func(cmd *cobra.Command, args []string) {
-			cobra.CheckErr(o.Complete())
-			cobra.CheckErr(o.Validate())
-			cobra.CheckErr(o.Run(cmd))
+			cobra.CheckErr(o.complete())
+			cobra.CheckErr(o.validate())
+			cobra.CheckErr(o.run(cmd))
 		},
 	}
 
-	cmd.Flags().StringVar(&o.ClientID, "client-id", clientID, "The client ID for the Kubeblocks CLI application.")
+	cmd.Flags().StringVar(&o.ClientID, "client-id", "", "The client ID for the Kubeblocks CLI application.")
 	cmd.Flags().StringVar(&o.AuthURL, "api-url", DefaultBaseURL, "The Kubeblocks Auth API base URL.")
 	return cmd
 }
 
-func (o *LogOutOptions) Complete() error {
+func (o *LogOutOptions) complete() error {
 	o.Provider = authorize.NewTokenProvider(o.Options)
 	if o.ClientID == "" {
 		return o.loadConfig()
@@ -63,11 +63,14 @@ func (o *LogOutOptions) Complete() error {
 	return nil
 }
 
-func (o *LogOutOptions) Validate() error {
+func (o *LogOutOptions) validate() error {
+	if o.ClientID == "" {
+		return fmt.Errorf("client ID is required")
+	}
 	return nil
 }
 
-func (o *LogOutOptions) Run(cmd *cobra.Command) error {
+func (o *LogOutOptions) run(cmd *cobra.Command) error {
 	if utils.IsTTY() {
 		fmt.Fprintln(o.Out, "Press Enter to log out of the Kubeblocks API.")
 		_ = waitForEnter(cmd.InOrStdin())

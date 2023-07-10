@@ -32,18 +32,6 @@ var _ = Describe("PKCE_Authenticator", func() {
 	})
 
 	Context("test Authorization", func() {
-		// It("test get Authorization code", func() {
-		//	openFunc := func(URL string) {
-		//		go func() {
-		//			_, err := http.Get(URL)
-		//			fmt.Println(err)
-		//		}()
-		//	}
-		//
-		//	_, err := a.GetAuthorization(openFunc, "test_state")
-		//	Expect(err).To(BeNil())
-		// })
-
 		It("test get token", func() {
 			authorizationResponse := &AuthorizationResponse{
 				CallbackURL: "http://localhost:5000?code=test_code&state=test_state",

@@ -132,16 +132,6 @@ func (m *MockServer) Start() {
 	log.Println("Server is shutting down...")
 }
 
-func (m *MockServer) Close() {
-	err := m.server.Shutdown(context.Background())
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println("Server is shutting down...")
-	os.Exit(0)
-}
-
 func getAvailablePort() (string, error) {
 	l, err := net.Listen("tcp", ":0")
 	if err != nil {

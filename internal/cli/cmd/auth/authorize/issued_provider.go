@@ -83,7 +83,7 @@ func (c *CloudIssuedTokenProvider) DeviceAuthenticate() (*TokenResponse, error) 
 		fmt.Fprint(c.Out, msg)
 	}
 
-	end := c.PrintProgress("Waiting for confirmation...")
+	end := c.printProgress("Waiting for confirmation...")
 	defer end()
 
 	tokenResponse, err := authenticator.GetToken(context.TODO(), *deviceVerification)
@@ -99,12 +99,12 @@ func (c *CloudIssuedTokenProvider) PKCEAuthenticate(ctx context.Context) (*Token
 		return nil, err
 	}
 
-	authorizeResponse, err := authenticator.GetAuthorization(c.openURLFunc)
+	authorizeResponse, err := authenticator.GetAuthorizationCode(c.openURLFunc)
 	if err != nil {
 		return nil, err
 	}
 
-	end := c.PrintProgress("Waiting for confirmation...")
+	end := c.printProgress("Waiting for confirmation...")
 	defer end()
 
 	tokenResponse, err := authenticator.GetToken(ctx, authorizeResponse)
@@ -149,7 +149,7 @@ func (c *CloudIssuedTokenProvider) Logout(token string) error {
 		return err
 	}
 
-	end := c.PrintProgress("Logging out...")
+	end := c.printProgress("Logging out...")
 	defer end()
 	err = authenticator.Logout(context.TODO(), token)
 	if err != nil {
@@ -164,7 +164,7 @@ func (c *CloudIssuedTokenProvider) LogoutForPKCE(ctx context.Context, token stri
 		return err
 	}
 
-	end := c.PrintProgress("Logging out...")
+	end := c.printProgress("Logging out...")
 	defer end()
 	err = authenticator.Logout(ctx, token, c.openURLFunc)
 	if err != nil {
@@ -173,7 +173,7 @@ func (c *CloudIssuedTokenProvider) LogoutForPKCE(ctx context.Context, token stri
 	return nil
 }
 
-func (c *CloudIssuedTokenProvider) PrintProgress(message string) func() {
+func (c *CloudIssuedTokenProvider) printProgress(message string) func() {
 	if !utils.IsTTY() {
 		fmt.Fprintln(c.Out, message)
 		return func() {}

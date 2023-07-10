@@ -45,7 +45,7 @@ func NewTokenProvider(o Options) Provider {
 
 func (p *TokenProvider) Login(ctx context.Context) (*UserInfoResponse, error) {
 	isAccessTokenValid := func(tokenResponse TokenResponse) bool { return IsValidToken(tokenResponse.AccessToken) }
-	tokenResult, err := p.refreshFromCache(isAccessTokenValid)
+	tokenResult, err := p.getTokenFromCache(isAccessTokenValid)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not refresh from cache")
 	}
@@ -100,7 +100,7 @@ func (p *TokenProvider) Logout(ctx context.Context) error {
 	return nil
 }
 
-func (p *TokenProvider) refreshFromCache(isTokenValid func(TokenResponse) bool) (*TokenResponse, error) {
+func (p *TokenProvider) getTokenFromCache(isTokenValid func(TokenResponse) bool) (*TokenResponse, error) {
 	tokenResult, err := p.cached.GetTokens()
 	if err != nil {
 		return nil, errors.Wrap(err, "could get tokens from the cache")

@@ -430,8 +430,13 @@ var _ = Describe("create", func() {
 		o.Namespace = testing.Namespace
 		o.RestoreTime = "Jun 16,2023 18:57:01 UTC+0800"
 		o.SourceCluster = testing.ClusterName
+		components := []map[string]interface{}{
+			{
+				"name": testing.ClusterName,
+			},
+		}
 		By("test setRestoreTime")
-		Expect(setRestoreTime(o)).Should(Succeed())
+		Expect(setRestoreTime(o, components)).Should(Succeed())
 	})
 
 	It("test fillClusterMetadataFromBackup", func() {

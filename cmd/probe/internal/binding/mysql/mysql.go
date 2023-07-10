@@ -111,7 +111,12 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	mysqlOps.Logger.Debug("Initializing MySQL binding")
 	mysqlOps.BaseOperations.Init(metadata)
 	config, _ := mysql.NewConfig(metadata.Properties)
-	manager, _ := mysql.NewManager(mysqlOps.Logger)
+	manager, err := mysql.NewManager(mysqlOps.Logger)
+	if err != nil {
+		mysqlOps.Logger.Errorf("MySQL DB Manager initialize failed: %v", err)
+		return err
+	}
+	mysqlOps.manager = manager
 	mysqlOps.DBType = "mysql"
 	//mysqlOps.InitIfNeed = mysqlOps.initIfNeed
 	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole

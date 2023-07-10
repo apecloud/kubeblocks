@@ -33,10 +33,11 @@ type ReplicatedStateMachineBuilder struct {
 
 func NewReplicatedStateMachineBuilder(namespace, name string) *ReplicatedStateMachineBuilder {
 	builder := &ReplicatedStateMachineBuilder{}
+	replicas := int32(1)
 	builder.init(namespace, name,
 		&workloads.ReplicatedStateMachine{
 			Spec: workloads.ReplicatedStateMachineSpec{
-				Replicas: 1,
+				Replicas: &replicas,
 				Roles: []workloads.ReplicaRole{
 					{
 						Name:       "leader",
@@ -51,7 +52,7 @@ func NewReplicatedStateMachineBuilder(namespace, name string) *ReplicatedStateMa
 }
 
 func (builder *ReplicatedStateMachineBuilder) SetReplicas(replicas int32) *ReplicatedStateMachineBuilder {
-	builder.get().Spec.Replicas = replicas
+	builder.get().Spec.Replicas = &replicas
 	return builder
 }
 

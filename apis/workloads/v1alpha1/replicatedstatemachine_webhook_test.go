@@ -42,13 +42,14 @@ var _ = Describe("ReplicatedStateMachine Webhook", func() {
 				constant.AppInstanceLabelKey:    "clusterName",
 				constant.KBAppComponentLabelKey: "componentName",
 			}
+			replicas := int32(1)
 			rsm = &ReplicatedStateMachine{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: testCtx.DefaultNamespace,
 				},
 				Spec: ReplicatedStateMachineSpec{
-					Replicas: 1,
+					Replicas: &replicas,
 					Selector: &metav1.LabelSelector{
 						MatchLabels: commonLabels,
 					},

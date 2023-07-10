@@ -123,7 +123,7 @@ var _ = Describe("update strategy transformer test.", func() {
 					obj.Name = objKey.Name
 					obj.Generation = 2
 					obj.Status.ObservedGeneration = obj.Generation
-					obj.Spec.Replicas = &rsm.Spec.Replicas
+					obj.Spec.Replicas = rsm.Spec.Replicas
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().
@@ -152,7 +152,7 @@ var _ = Describe("update strategy transformer test.", func() {
 					obj.Name = objKey.Name
 					obj.Generation = 2
 					obj.Status.ObservedGeneration = obj.Generation
-					obj.Spec.Replicas = &rsm.Spec.Replicas
+					obj.Spec.Replicas = rsm.Spec.Replicas
 					return nil
 				}).Times(4)
 			pod0 := builder.NewPodBuilder(namespace, getPodName(rsm.Name, 0)).

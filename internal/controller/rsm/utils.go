@@ -204,7 +204,7 @@ func setMembersStatus(rsm *workloads.ReplicatedStateMachine, pods []corev1.Pod) 
 	for podName := range memberToKeepSet {
 		ordinal, _ := getPodOrdinal(podName)
 		// members have left because of scale-in
-		if ordinal >= int(rsm.Spec.Replicas) {
+		if ordinal >= int(*rsm.Spec.Replicas) {
 			continue
 		}
 		newMembersStatus = append(newMembersStatus, *oldMemberMap[podName])

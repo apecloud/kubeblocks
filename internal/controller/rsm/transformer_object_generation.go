@@ -185,7 +185,7 @@ func buildSts(rsm workloads.ReplicatedStateMachine, headlessSvcName string, envC
 		AddAnnotationsInMap(rsm.Annotations).
 		SetSelector(rsm.Spec.Selector).
 		SetServiceName(headlessSvcName).
-		SetReplicas(rsm.Spec.Replicas).
+		SetReplicas(*rsm.Spec.Replicas).
 		SetPodManagementPolicy(rsm.Spec.PodManagementPolicy).
 		SetVolumeClaimTemplates(rsm.Spec.VolumeClaimTemplates...).
 		SetTemplate(*template).
@@ -430,8 +430,8 @@ func buildEnvConfigData(set workloads.ReplicatedStateMachine) map[string]string 
 
 	prefix := constant.KBPrefix + "_RSM_"
 	svcName := getHeadlessSvcName(set)
-	envData[prefix+"N"] = strconv.Itoa(int(set.Spec.Replicas))
-	for i := 0; i < int(set.Spec.Replicas); i++ {
+	envData[prefix+"N"] = strconv.Itoa(int(*set.Spec.Replicas))
+	for i := 0; i < int(*set.Spec.Replicas); i++ {
 		hostNameTplKey := prefix + strconv.Itoa(i) + "_HOSTNAME"
 		hostNameTplValue := set.Name + "-" + strconv.Itoa(i)
 		envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)

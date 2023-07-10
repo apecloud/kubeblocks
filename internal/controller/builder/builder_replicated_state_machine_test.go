@@ -161,6 +161,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 
 		Expect(rsm.Name).Should(Equal(name))
 		Expect(rsm.Namespace).Should(Equal(ns))
+		Expect(rsm.Spec.Replicas).ShouldNot(BeNil())
 		Expect(rsm.Spec.Replicas).Should(Equal(replicas))
 		Expect(rsm.Spec.Selector).ShouldNot(BeNil())
 		Expect(rsm.Spec.Selector.MatchLabels).Should(HaveLen(4))

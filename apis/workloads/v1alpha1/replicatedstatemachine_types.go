@@ -30,11 +30,14 @@ import (
 
 // ReplicatedStateMachineSpec defines the desired state of ReplicatedStateMachine
 type ReplicatedStateMachineSpec struct {
-	// Replicas defines number of Pods
+	// replicas is the desired number of replicas of the given Template.
+	// These are replicas in the sense that they are instantiations of the
+	// same Template, but individual replicas also have a consistent identity.
+	// If unspecified, defaults to 1.
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Minimum=0
 	// +optional
-	Replicas int32 `json:"replicas,omitempty"`
+	Replicas *int32 `json:"replicas,omitempty"`
 
 	// selector is a label query over pods that should match the replica count.
 	// It must match the pod template's labels.

@@ -143,7 +143,8 @@ var _ = Describe("utils test", func() {
 					ReplicaRole: workloads.ReplicaRole{Name: "follower"},
 				},
 			}
-			rsm.Spec.Replicas = 3
+			replicas := int32(3)
+			rsm.Spec.Replicas = &replicas
 			rsm.Status.MembersStatus = oldMembersStatus
 			setMembersStatus(rsm, pods)
 

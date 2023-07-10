@@ -22,16 +22,19 @@ package components
 import (
 	"fmt"
 
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/consensus"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/replication"
+	"github.com/apecloud/kubeblocks/controllers/apps/components/rsm"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateful"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/stateless"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/util"
+	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	intctrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
@@ -71,6 +74,13 @@ func NewComponent(reqCtx intctrlutil.RequestCtx,
 	synthesizedComp, err := composeSynthesizedComponent(reqCtx, cli, cluster, definition, compDef, compSpec, compVer)
 	if err != nil {
 		return nil, err
+	}
+
+	if viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		switch compDef.WorkloadType {
+		case appsv1alpha1.Consensus:
+			return rsm.NewComponent(cli, reqCtx.Recorder, cluster, version, synthesizedComp, dag), nil
+		}
 	}
 
 	switch compDef.WorkloadType {

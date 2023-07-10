@@ -50,7 +50,7 @@ func (t *ObjectStatusTransformer) Transform(ctx graph.TransformContext, dag *gra
 		rsm.Status.ObservedGeneration = rsm.Generation
 		// hack for sts initialization error: is invalid: status.replicas: Required value
 		if rsm.Status.Replicas == 0 {
-			rsm.Status.Replicas = rsm.Spec.Replicas
+			rsm.Status.Replicas = *rsm.Spec.Replicas
 		}
 	case model.IsObjectStatusUpdating(rsmOrig):
 		// read the underlying sts

@@ -1,6 +1,6 @@
 ---
 name: Improvement request
-about: Suggest a improvement idea for this project
+about: Suggest an improvement idea for this project
 title: "[Improvement]"
 labels: kind/enhancement
 assignees: nayutah

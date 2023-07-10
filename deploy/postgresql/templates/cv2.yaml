@@ -11,4 +11,4 @@ spec:
       versionsContext:
         containers:
           - name: postgresql
-            image: kizuna-lek/postgres:14.7
+            image: registry.cn-hangzhou.aliyuncs.com/apecloud/postgresql:14.7.0

@@ -86,7 +86,7 @@ data:
             local -a args=("$group")
             if [[ -n "$gid" ]]; then
                 if group_exists "$gid"; then
-                    error "The GID $gid is already in use." >&2
+                    echo "The GID $gid is already in use." >&2
                     return 1
                 fi
                 args+=("--gid" "$gid")
@@ -140,7 +140,7 @@ data:
             local -a user_args=("-N" "$user")
             if [[ -n "$uid" ]]; then
                 if user_exists "$uid"; then
-                    error "The UID $uid is already in use."
+                    echo "The UID $uid is already in use."
                     return 1
                 fi
                 user_args+=("--uid" "$uid")
@@ -245,7 +245,7 @@ data:
             sleep 1
             ready_counter=$((ready_counter - 1))
             if ((ready_counter <= 0)); then
-                error "PostgreSQL master is not ready after $POSTGRESQL_INIT_MAX_TIMEOUT seconds"
+                echo "PostgreSQL master is not ready after $POSTGRESQL_INIT_MAX_TIMEOUT seconds"
                 exit 1
             fi
 
@@ -261,7 +261,7 @@ data:
             sleep 1
             replication_counter=$((replication_counter - 1))
             if ((replication_counter <= 0)); then
-                error "Slave replication failed after trying for $POSTGRESQL_INIT_MAX_TIMEOUT seconds"
+                echo "Slave replication failed after trying for $POSTGRESQL_INIT_MAX_TIMEOUT seconds"
                 exit 1
             fi
         done
@@ -299,8 +299,11 @@ data:
          echo "slave init finish"
       fi
     else
-      # bitnami scripts will execute all the *.sh files in the /docker-entrypoint-initdb.d directory after setup
       cp /scripts/post_start.sh /docker-entrypoint-initdb.d
+    fi
+    if [ -f ${PGDATA}/../init-scripts/restore.sh ]; then
+        # add recovery.signal/standby.signal to trigger recovery
+        cp ${PGDATA}/../init-scripts/restore.sh /docker-entrypoint-preinitdb.d
     fi
     docker-entrypoint.sh --config-file=/postgresql/conf/postgresql.conf --hba_file=postgresql/conf/pg_hba.conf &
     while true

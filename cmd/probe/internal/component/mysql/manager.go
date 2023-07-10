@@ -88,7 +88,7 @@ func (mgr *Manager) IsRunning() bool {
 	// test if db is ready to connect or not
 	err := mgr.DB.PingContext(ctx)
 	if err != nil {
-		if driverErr, ok := err.(*mysql.MySQLError); ok { 
+		if driverErr, ok := err.(*mysql.MySQLError); ok {
 			// Now the error number is accessible directly
 			if driverErr.Number == 1040 {
 				mgr.Logger.Infof("Too many connections: %v", err)
@@ -383,27 +383,18 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 	return nil
 }
 
-func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster) []*dcs.Member {
-	// members := make([]*dcs.Member, 0)
-	// rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
-	// if rsStatus == nil {
-	// 	return members
-	// }
+// Are there any healthy members other than the leader?
+func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) []*dcs.Member {
+	members := make([]*dcs.Member, 0)
+	for _, member := range cluster.Members {
+		if member.Name == leader {
+			continue
+		}
+		if !mgr.IsMemberHealthy(cluster, &member) {
+			continue
+		}
+		members = append(members, &member)
+	}
 
-	// for _, member := range rsStatus.Members {
-	// 	if member.State != 1 {
-	// 		continue
-	// 	}
-	// 	memberName := strings.Split(member.Name, ".")[0]
-	// 	if memberName == mgr.CurrentMemberName {
-	// 		continue
-	// 	}
-	// 	member := cluster.GetMemberWithName(memberName)
-	// 	if member != nil {
-	// 		members = append(members, member)
-	// 	}
-	// }
-
-	// return members
-	return nil
+	return members
 }

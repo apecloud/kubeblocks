@@ -5,20 +5,25 @@ import "github.com/spf13/viper"
 type DCS interface {
 	Initialize() error
 
+	// cluster manage functions
 	GetClusterName() string
 	GetCluster() (*Cluster, error)
 	ResetCluser()
 	DeleteCluser()
 
+	// cluster scole ha config
+	GetHaConfig() (*HaConfig, error)
+
+	// member manager funtions
 	GetMembers() ([]Member, error)
 	AddCurrentMember() error
 
-	GetHaConfig() (*HaConfig, error)
-
+	// manual switchover
 	GetSwitchover() (*Switchover, error)
 	CreateSwitchover(string, string) error
 	DeleteSwitchover() error
 
+	// cluster scope leader lock
 	AttempAcquireLock() error
 	CreateLock() error
 	IsLockExist() (bool, error)

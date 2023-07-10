@@ -192,6 +192,7 @@ func (ha *Ha) DecreaseClusterReplicas(cluster *dcs.Cluster) {
 func (ha *Ha) IsHealthiestMember(cluster *dcs.Cluster) bool {
 	if cluster.Switchover != nil {
 		switchover := cluster.Switchover
+		leader := switchover.Leader
 		candidate := switchover.Candidate
 		if candidate == ha.dbManager.GetCurrentMemberName() {
 			return true
@@ -202,7 +203,8 @@ func (ha *Ha) IsHealthiestMember(cluster *dcs.Cluster) bool {
 			return false
 		}
 
-		if switchover.Leader == ha.dbManager.GetCurrentMemberName() && len(ha.dbManager.HasOtherHealthyMembers(cluster)) > 0 {
+		if leader == ha.dbManager.GetCurrentMemberName() &&
+			len(ha.dbManager.HasOtherHealthyMembers(cluster, leader)) > 0 {
 			ha.logger.Infof("manual switchover to other member")
 			return false
 		}

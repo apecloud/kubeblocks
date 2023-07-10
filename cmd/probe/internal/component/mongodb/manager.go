@@ -156,7 +156,7 @@ func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, me
 	}
 	for _, member := range status.Members {
 		if strings.HasPrefix(member.Name, member.Name) {
-			if member.StateStr == "PRIMARY"{
+			if member.StateStr == "PRIMARY" {
 				return true, nil
 			}
 			break
@@ -563,7 +563,8 @@ func (mgr *Manager) HasOtherHealthyLeader(cluster *dcs.Cluster) *dcs.Member {
 	return nil
 }
 
-func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster) []*dcs.Member {
+// Are there any healthy members other than the leader?
+func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster, leader string) []*dcs.Member {
 	members := make([]*dcs.Member, 0)
 	rsStatus, _ := mgr.GetReplSetStatus(context.TODO())
 	if rsStatus == nil {
@@ -575,7 +576,7 @@ func (mgr *Manager) HasOtherHealthyMembers(cluster *dcs.Cluster) []*dcs.Member {
 			continue
 		}
 		memberName := strings.Split(member.Name, ".")[0]
-		if memberName == mgr.CurrentMemberName {
+		if memberName == leader {
 			continue
 		}
 		member := cluster.GetMemberWithName(memberName)

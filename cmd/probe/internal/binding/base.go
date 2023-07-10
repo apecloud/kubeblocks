@@ -336,8 +336,8 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 
 func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
 	opsRes := OpsResult{}
-	leader, _ := req.Metadata[LEADER]
-	candidate, _ := req.Metadata[CANDIDATE]
+	leader, _ := req.Metadata["leader"]
+	candidate, _ := req.Metadata["candidate"]
 	if leader == "" && candidate == "" {
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = "Leader or Candidate must be set"
@@ -347,7 +347,7 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *bindings.Invo
 	dcsStore := dcs.GetStore()
 	if dcsStore == nil {
 		opsRes["event"] = OperationFailed
-		opsRes["message"] = "dcs store init failed"
+		opsRes["message"] = "DCS store init failed"
 		return opsRes, nil
 	}
 	cluster, err := dcsStore.GetCluster()
@@ -396,7 +396,7 @@ func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *bindings.Invo
 			opsRes["message"] = fmt.Sprintf("candidate %s is unhealthy", candidate)
 			return opsRes, nil
 		}
-	} else if len(manager.HasOtherHealthyMembers(cluster)) == 0 {
+	} else if len(manager.HasOtherHealthyMembers(cluster, leader)) == 0 {
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = fmt.Sprintf("candidate is not set and has no other healthy members")
 		return opsRes, nil

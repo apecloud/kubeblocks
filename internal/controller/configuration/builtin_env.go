@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package plan
+package configuration
 
 import (
 	b64 "encoding/base64"
@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/StudioSol/set"
+	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubectl/pkg/util/resource"
@@ -197,7 +198,7 @@ func (w *envWrapper) getResourceFromLocal(key coreclient.ObjectKey, gvk schema.G
 	if v, ok := w.cache[gvk][key]; ok {
 		return v
 	}
-	return findMatchedLocalObject(w.localObjects, key, gvk)
+	return plan.findMatchedLocalObject(w.localObjects, key, gvk)
 }
 
 var envPlaceHolderRegexp = regexp.MustCompile(`\$\(\w+\)`)

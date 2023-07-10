@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package plan
+package configuration
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -45,6 +45,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 	const mysqlCompDefName = "replicasets"
 	const scriptConfigName = "test-script-config"
 	const configSpecName = "test-config-spec"
+	const mysqlCompName = "mysql"
 
 	var mockK8sCli *testutil.K8sClientMockHelper
 	var clusterObj *appsv1alpha1.Cluster

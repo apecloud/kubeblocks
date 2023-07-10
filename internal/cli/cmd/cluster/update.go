@@ -47,7 +47,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
+	"github.com/apecloud/kubeblocks/internal/controller/configuration"
 	"github.com/apecloud/kubeblocks/internal/gotemplate"
 )
 
@@ -371,7 +371,7 @@ func findConfigTemplateInfo(dynamic dynamic.Interface, configSpec *appsv1alpha1.
 }
 
 func newConfigTemplateEngine() *template.Template {
-	customizedFuncMap := plan.BuiltInCustomFunctions(nil, nil, nil)
+	customizedFuncMap := configuration.BuiltInCustomFunctions(nil, nil, nil)
 	engine := gotemplate.NewTplEngine(nil, customizedFuncMap, logsTemplateName, nil, context.TODO())
 	return engine.GetTplEngine()
 }

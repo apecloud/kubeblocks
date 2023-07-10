@@ -31,8 +31,9 @@ var _ = Describe("affinity utils", func() {
 	Context("with PodAntiAffinity set to Required", func() {
 		It("should return true", func() {
 			//Expect(nil).To(BeTrue())
-			fsmContext := NewConfigContext()
-			fsm := hsm.FromContext(fsmContext, "config-fsm", ConfigFSMSignature)
+			fsmContext := &ConfigFSMContext{}
+			fsm, err := hsm.FromContext(fsmContext, ConfigFSMID, ConfigFSMSignature)
+			Expect(err).ShouldNot(Succeed())
 			Expect(fsm).ShouldNot(BeNil())
 			//fsm.HandleEvent(CreateInstance)
 		})

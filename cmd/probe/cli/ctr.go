@@ -28,10 +28,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
-	"github.com/dapr/cli/pkg/api"
-	"github.com/dapr/cli/pkg/print"
-	"github.com/dapr/cli/pkg/standalone"
 )
 
 const cliVersionTemplateString = "CLI version: %s \nRuntime version: %s\n"
@@ -71,13 +67,10 @@ var (
 )
 
 // Execute adds all child commands to the root command.
-func Execute(version, apiVersion string) {
-	cliVersion = version
-	api.RuntimeAPIVersion = apiVersion
-
+func Execute(cliVersion, apiVersion string) {
 	sqlChannelVer = sqlChannelVersion{
-		CliVersion:     version,
-		RuntimeVersion: strings.ReplaceAll(standalone.GetRuntimeVersion(), "\n", ""),
+		CliVersion:     cliVersion,
+		RuntimeVersion: apiVersion,
 	}
 
 	cobra.OnInitialize(initConfig)
@@ -100,10 +93,6 @@ func printVersion() {
 }
 
 func initConfig() {
-	if logAsJSON {
-		print.EnableJSONFormat()
-	}
-
 	// err intentionally ignored since sqlChanneld may not yet be installed.
 	runtimeVer := GetRuntimeVersion()
 

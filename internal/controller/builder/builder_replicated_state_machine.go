@@ -38,14 +38,6 @@ func NewReplicatedStateMachineBuilder(namespace, name string) *ReplicatedStateMa
 		&workloads.ReplicatedStateMachine{
 			Spec: workloads.ReplicatedStateMachineSpec{
 				Replicas: &replicas,
-				Roles: []workloads.ReplicaRole{
-					{
-						Name:       "leader",
-						AccessMode: workloads.ReadWriteMode,
-						IsLeader:   true,
-						CanVote:    true,
-					},
-				},
 			},
 		}, builder)
 	return builder

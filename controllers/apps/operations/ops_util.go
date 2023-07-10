@@ -213,6 +213,12 @@ func patchValidateErrorCondition(ctx context.Context, cli client.Client, opsRes 
 	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
 }
 
+// patchFastFailErrorCondition patches a new failed condition to the OpsRequest.status.conditions.
+func patchFastFailErrorCondition(ctx context.Context, cli client.Client, opsRes *OpsResource, err error) error {
+	condition := appsv1alpha1.NewFailedCondition(opsRes.OpsRequest, err)
+	return PatchOpsStatus(ctx, cli, opsRes, appsv1alpha1.OpsFailedPhase, condition)
+}
+
 // GetOpsRecorderFromSlice gets OpsRequest recorder from slice by target cluster phase
 func GetOpsRecorderFromSlice(opsRequestSlice []appsv1alpha1.OpsRecorder,
 	opsRequestName string) (int, appsv1alpha1.OpsRecorder) {

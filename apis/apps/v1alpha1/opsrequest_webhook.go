@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
@@ -46,6 +47,18 @@ var (
 	// OpsRequestBehaviourMapper records the opsRequest behaviour according to the OpsType.
 	OpsRequestBehaviourMapper = map[OpsType]OpsRequestBehaviour{}
 )
+
+var _ error = &WaitForClusterPhaseErr{}
+
+type WaitForClusterPhaseErr struct {
+	clusterName   string
+	currentPhase  ClusterPhase
+	expectedPhase []ClusterPhase
+}
+
+func (e *WaitForClusterPhaseErr) Error() string {
+	return fmt.Sprintf("wait for cluster %s to reach phase %v, current status is :%s", e.clusterName, e.expectedPhase, e.currentPhase)
+}
 
 func (r *OpsRequest) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
@@ -117,9 +130,25 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	if opsRequestValue, ok = cluster.Annotations[opsRequestAnnotationKey]; ok {
 		// opsRequest annotation value in cluster to map
 		if err := json.Unmarshal([]byte(opsRequestValue), &opsRecorder); err != nil {
-			return nil
+			return err
 		}
 	}
+
+	// check if entry-condition is met
+	// if the cluster is not in the expected phase, we should wait for it for up to TTLSecondsBeforeAbort seconds.
+	if len(opsRecorder) == 0 && !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
+		// TTLSecondsBeforeAbort is 0 means that the we do not need to wait for the cluster to reach the expected phase.
+		expiredTime := r.GetCreationTimestamp().Add(time.Duration(r.Spec.TTLSecondsBeforeAbort) * time.Second)
+		if time.Now().After(expiredTime) {
+			return fmt.Errorf("cluster: %s is not in the expected phase: %v after waiting for %d seconds", cluster.Name, opsBehaviour.FromClusterPhases, r.Spec.TTLSecondsBeforeAbort)
+		}
+		return &WaitForClusterPhaseErr{
+			clusterName:   cluster.Name,
+			currentPhase:  cluster.Status.Phase,
+			expectedPhase: opsBehaviour.FromClusterPhases,
+		}
+	}
+
 	opsNamesInQueue := make([]string, len(opsRecorder))
 	for i, v := range opsRecorder {
 		// judge whether the opsRequest meets the following conditions:
@@ -199,6 +228,8 @@ func (r *OpsRequest) validateOps(ctx context.Context,
 		return r.validateReconfigure(cluster)
 	case SwitchoverType:
 		return r.validateSwitchover(ctx, k8sClient, cluster)
+	case DataScriptType:
+		return r.validateDataScript(ctx, k8sClient, cluster)
 	}
 	return nil
 }
@@ -502,6 +533,38 @@ func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 			vctName, previousValue.String())
 	}
 	return pvc.Spec.StorageClassName, nil
+}
+
+// validateDataScript validates the data script.
+func (r *OpsRequest) validateDataScript(ctx context.Context, cli client.Client, cluster *Cluster) error {
+	validateScript := func(spec *ScriptSpec) error {
+		rawScripts := spec.Script
+		scriptsFrom := spec.ScriptFrom
+		if len(rawScripts) == 0 && (scriptsFrom == nil) {
+			return fmt.Errorf("spec.scriptSpec.script and spec.scriptSpec.scriptFrom can not be empty at the same time")
+		}
+		if scriptsFrom != nil {
+			if scriptsFrom.ConfigMapRef == nil && scriptsFrom.SecretRef == nil {
+				return fmt.Errorf("spec.scriptSpec.scriptFrom.configMapRefs and spec.scriptSpec.scriptFrom.secretRefs can not be empty at the same time")
+			}
+		}
+		return nil
+	}
+
+	scriptSpec := r.Spec.ScriptSpec
+	if scriptSpec == nil {
+		return notEmptyError("spec.scriptSpec")
+	}
+
+	if err := r.checkComponentExistence(cluster, []string{scriptSpec.ComponentName}); err != nil {
+		return err
+	}
+
+	if err := validateScript(scriptSpec); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // validateVerticalResourceList checks if k8s resourceList is legal

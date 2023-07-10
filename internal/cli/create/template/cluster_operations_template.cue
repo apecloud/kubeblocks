@@ -27,9 +27,9 @@ options: {
 	component:              string
 	instance:               string
 	componentNames: [...string]
-	cpu:      string
-	memory:   string
-	class:    string
+	cpu:    string
+	memory: string
+	class:  string
 	classDefRef: {...}
 	replicas: int
 	storage:  string

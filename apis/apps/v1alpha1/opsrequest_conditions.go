@@ -40,6 +40,7 @@ const (
 	ConditionTypeStart             = "Starting"
 	ConditionTypeVersionUpgrading  = "VersionUpgrading"
 	ConditionTypeExpose            = "Exposing"
+	ConditionTypeDataScript        = "ExecutDataScript"
 
 	// condition and event reasons
 
@@ -273,6 +274,20 @@ func NewReconfigureCondition(ops *OpsRequest) *metav1.Condition {
 		Message: fmt.Sprintf("Start to reconfigure in Cluster: %s, Component: %s",
 			ops.Spec.ClusterRef,
 			ops.Spec.Reconfigure.ComponentName),
+	}
+}
+
+func NewDataScriptCondition(ops *OpsRequest) *metav1.Condition {
+	return newOpsCondition(ops, ConditionTypeDataScript, "DataScriptStarted", fmt.Sprintf("Start to execute data script in Cluster: %s", ops.Spec.ClusterRef))
+}
+
+func newOpsCondition(ops *OpsRequest, condType, reason, message string) *metav1.Condition {
+	return &metav1.Condition{
+		Type:               condType,
+		Status:             metav1.ConditionTrue,
+		Reason:             reason,
+		LastTransitionTime: metav1.Now(),
+		Message:            message,
 	}
 }
 

@@ -59,11 +59,17 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 
 	// validate OpsRequest.spec
 	if err = opsRequest.Validate(reqCtx.Ctx, cli, opsRes.Cluster, true); err != nil {
+		// check if the error is caused by WaitForClusterPhaseErr  error
+		if _, ok := err.(*appsv1alpha1.WaitForClusterPhaseErr); ok {
+			return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Second, reqCtx.Log, ""))
+		}
+
 		if patchErr := patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error()); patchErr != nil {
 			return nil, patchErr
 		}
 		return nil, err
 	}
+
 	if opsRequest.Status.Phase != appsv1alpha1.OpsCreatingPhase {
 		// If the operation causes the cluster phase to change, the cluster needs to be locked.
 		// At the same time, only one operation is running if these operations are mutually exclusive(exist opsBehaviour.ToClusterPhase).
@@ -79,7 +85,14 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 
 		return &ctrl.Result{}, patchOpsRequestToCreating(reqCtx, cli, opsRes, opsDeepCopy, opsBehaviour.OpsHandler)
 	}
+
 	if err = opsBehaviour.OpsHandler.Action(reqCtx, cli, opsRes); err != nil {
+		// patch the status.phase to Failed when the error is FastFaileError, which means the operation is failed and there is no need to retry
+		if _, ok := err.(*FastFaileError); ok {
+			if patchErr := patchFastFailErrorCondition(reqCtx.Ctx, cli, opsRes, err); patchErr != nil {
+				return nil, patchErr
+			}
+		}
 		return nil, err
 	}
 

@@ -21,6 +21,8 @@ package hsm
 
 import (
 	"sync"
+
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 )
 
 var (
@@ -47,19 +49,15 @@ func GetStateMachine[S StateInterface[C], E, C any](id string, _ func(_ S, _ E, 
 	return nil
 }
 
-func FromContext[S StateInterface[C], E, C any](ctx *C, id string, signature func(_ S, _ E, _ C)) *StateMachine[S, E, C] {
+func FromContext[S StateInterface[C], E, C any](ctx *C, id string, signature func(_ S, _ E, _ C)) (*StateMachine[S, E, C], error) {
 	smDef := GetStateMachine(id, signature)
 	if smDef == nil {
-		return nil
+		return nil, cfgcore.MakeError("state machine not found: %s", id)
 	}
 	baseState := wrapStateReference(ctx, signature)
 	if baseState == nil || baseState.reference == nil {
 		baseState = &BaseContext[S, C]{}
 		baseState.InitState(smDef.InitialState)
 	}
-	return &StateMachine[S, E, C]{
-		context:                ctx,
-		state:                  baseState,
-		StateMachineDefinition: smDef,
-	}
+	return NewStateMachineInstance(ctx, baseState, smDef, signature)
 }

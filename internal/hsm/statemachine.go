@@ -32,6 +32,10 @@ type StateMachineInterface interface {
 	ID() string
 }
 
+type StatelessStateMachine[S StateInterface[C], E Event, C any] interface {
+	OnRecover(recoverFn func(ctx *C) (S, error))
+}
+
 type StateMachine[S StateInterface[C], E Event, C any] struct {
 	*StateMachineDefinition[S, E, C]
 
@@ -41,9 +45,20 @@ type StateMachine[S StateInterface[C], E Event, C any] struct {
 	mutex      sync.Mutex
 }
 
-//type StateMachineDefinition[T any, S StateInterface, E Event, C Context[S]] interface {
-//	//eventQueue list.List
-//	//mutex      sync.Mutex
-//	//
-//	//StateMachineDef *StateMachineDefinition
-//}
+func NewStateMachineInstance[S StateInterface[C], E Event, C any](ctx *C, baseState *BaseContext[S, C], smDef *StateMachineDefinition[S, E, C], _ func(_ S, _ E, _ C)) (*StateMachine[S, E, C], error) {
+	sm := &StateMachine[S, E, C]{
+		context:                ctx,
+		state:                  baseState,
+		StateMachineDefinition: smDef,
+	}
+
+	if sm.recoverFn == nil {
+		return sm, nil
+	}
+	newState, err := sm.recoverFn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sm.state.SetState(newState)
+	return sm, err
+}

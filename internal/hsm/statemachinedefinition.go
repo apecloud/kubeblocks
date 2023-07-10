@@ -45,8 +45,11 @@ type StateBuilder[S StateInterface[C], E, C any] struct {
 
 type StateMachineDefinition[S StateInterface[C], E Event, C any] struct {
 	StateMachineInterface
+	StatelessStateMachine[S, E, C]
 
-	name         string
+	name      string
+	recoverFn func(ctx *C) (S, error)
+
 	InitialState S
 	states       map[S]*StateDefinition[S, E, C]
 }
@@ -86,10 +89,6 @@ func (builder *StateBuilder[S, E, C]) OnEnter(action func(ctx *C) error) Builder
 func (builder *StateBuilder[S, E, C]) OnExit(action func(ctx *C) error) BuilderInterface[S, E, C] {
 	builder.EntryActions = append(builder.EntryActions, action)
 	return builder
-}
-
-func (smDef StateMachineDefinition[S, E, C]) ID() string {
-	return smDef.name
 }
 
 func (builder *StateBuilder[S, E, C]) Transition(event E, destinationState S, guards ...func(ctx *C) bool) BuilderInterface[S, E, C] {
@@ -136,4 +135,12 @@ func (builder *StateBuilder[S, E, C]) buildWrapper(fn func() Transition) Builder
 
 	builder.Transitions = append(builder.Transitions, fn())
 	return builder
+}
+
+func (smDef *StateMachineDefinition[S, E, C]) ID() string {
+	return smDef.name
+}
+
+func (smDef *StateMachineDefinition[S, E, C]) OnRecover(recoverFn func(ctx *C) (S, error)) {
+	smDef.recoverFn = recoverFn
 }

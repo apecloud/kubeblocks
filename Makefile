@@ -283,7 +283,11 @@ create-kbcli-embed-charts-dir:
 build-single-kbcli-embed-chart.%: chart=$(word 2,$(subst ., ,$@))
 build-single-kbcli-embed-chart.%:
 	$(HELM) dependency update deploy/$(chart) --skip-refresh
+ifeq ($(VERSION), latest)
+	$(HELM) package deploy/$(chart)
+else
 	$(HELM) package deploy/$(chart) --version $(VERSION)
+endif
 	mv $(chart)-*.tgz internal/cli/cluster/charts/$(chart).tgz
 
 .PHONY: build-kbcli-embed-chart

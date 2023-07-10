@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 
@@ -162,4 +163,42 @@ func getMatchLastGroupNumber(rs []*regexp2.Regexp, str string, substr string, st
 type DataBaseStatus struct {
 	isLeader    bool
 	WalPosition int64
+}
+
+type history struct {
+	parentTimeline int64
+	switchPoint    int64
+}
+
+func parsePgLsn(str string) int64 {
+	list := strings.Split(str, "/")
+	prefix, _ := strconv.ParseInt(list[0], 16, 64)
+	suffix, _ := strconv.ParseInt(list[1], 16, 64)
+	return prefix*0x100000000 + suffix
+}
+
+func parseSingleQuery(str string) (map[string]interface{}, error) {
+	result := make(map[string]interface{})
+	str = strings.Trim(str, "[]")
+
+	err := json.Unmarshal([]byte(str), &result)
+	if err != nil {
+		return nil, errors.Errorf("json unmarshal failed, err:%v", err)
+	}
+
+	return result, nil
+}
+
+func parsePrimaryConnInfo(str string) map[string]string {
+	infos := strings.Split(str, " ")
+	result := make(map[string]string)
+
+	for _, info := range infos {
+		v := strings.Split(info, "=")
+		if len(v) >= 2 {
+			result[v[0]] = v[1]
+		}
+	}
+
+	return result
 }

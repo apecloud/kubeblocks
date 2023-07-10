@@ -4,10 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"github.com/containerd/containerd/pkg/cri/util"
-	"github.com/jackc/pgx/v5"
 	"os"
 	"os/exec"
 	"strconv"
@@ -15,11 +14,14 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/dapr/kit/logger"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 	"github.com/shirou/gopsutil/v3/process"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
@@ -36,7 +38,7 @@ type Manager struct {
 var Mgr *Manager
 
 func NewManager(logger logger.Logger) (*Manager, error) {
-	database, err := pgxpool.NewWithConfig(context.Background(), config.pool)
+	pool, err := pgxpool.NewWithConfig(context.Background(), config.pool)
 	if err != nil {
 		return nil, errors.Errorf("unable to ping the DB: %v", err)
 	}
@@ -49,7 +51,7 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 			Logger:            logger,
 			DataDir:           viper.GetString("PGDATA"),
 		},
-		Pool: database,
+		Pool: pool,
 	}
 
 	pidFile, err := Mgr.readPidFile()
@@ -440,11 +442,11 @@ func (mgr *Manager) Promote() error {
 	cmd.Stderr = &stderr
 
 	err = cmd.Run()
-	if err != nil || string(stderr.Bytes()) != "" {
-		mgr.Logger.Errorf("promote failed, err:%v, stderr:%s", err, string(stderr.Bytes()))
+	if err != nil || stderr.String() != "" {
+		mgr.Logger.Errorf("promote failed, err:%v, stderr:%s", err, stderr.String())
 		return err
 	}
-	mgr.Logger.Infof("promote success, response:%s", string(stdout.Bytes()))
+	mgr.Logger.Infof("promote success, response:%s", stdout.String())
 
 	err = mgr.postPromote()
 	return nil
@@ -458,23 +460,328 @@ func (mgr *Manager) postPromote() error {
 	return nil
 }
 
-func (mgr *Manager) Demote() error {
+func (mgr *Manager) Demote(cluster *dcs.Cluster) error {
 	var stdout, stderr bytes.Buffer
 	stopCmd := exec.Command("su", "-c", `'pg_ctl stop -m fast'`, "postgres")
 	stopCmd.Stdout = &stdout
 	stopCmd.Stderr = &stderr
 
 	err := stopCmd.Run()
-	if err != nil || string(stderr.Bytes()) != "" {
-		mgr.Logger.Errorf("stop failed, err:%v, stderr:%s", err, string(stderr.Bytes()))
+	if err != nil || stderr.String() != "" {
+		mgr.Logger.Errorf("stop failed, err:%v, stderr:%s", err, stderr.String())
 		return err
 	}
 	time.Sleep(time.Second * 2)
 
-	return mgr.Follow()
+	return mgr.follow(context.TODO(), true, cluster.Leader.Name)
 }
 
-func (mgr *Manager) Follow() error {
+func (mgr *Manager) HandleFollow(ctx context.Context, cluster *dcs.Cluster) error {
+	err := mgr.handleRewind(ctx, cluster)
+	if err != nil {
+		mgr.Logger.Errorf("handle rewind failed, err:%v", err)
+	}
+
+	needChange, needRestart := mgr.checkRecoveryConf(ctx, cluster.Leader.Name)
+	if needChange {
+		return mgr.follow(ctx, needRestart, cluster.Leader.Name)
+	}
+
+	mgr.Logger.Infof("no action coz i still follow the leader:%s", cluster.Leader.Name)
+	return nil
+}
+
+func (mgr *Manager) handleRewind(ctx context.Context, cluster *dcs.Cluster) error {
+	needRewind := mgr.checkTimelineAndLsn(ctx, cluster)
+	if !needRewind {
+		return nil
+	}
+
+	return mgr.executeRewind()
+}
+
+func (mgr *Manager) executeRewind() error {
+	return nil
+}
+
+func (mgr *Manager) checkTimelineAndLsn(ctx context.Context, cluster *dcs.Cluster) bool {
+	var needRewind bool
+	var historys []*history
+
+	isRecovery, localTimeLine, localLsn := mgr.getLocalTimeLineAndLsn(ctx)
+	if localTimeLine == 0 || localLsn == 0 {
+		return false
+	}
+
+	host := cluster.GetMemberAddr(*cluster.GetMemberWithName(cluster.Leader.Name))
+	pools, err := mgr.GetOtherPoolsWithHosts(ctx, []string{host})
+	if err != nil || pools[0] == nil {
+		mgr.Logger.Errorf("Get other pools failed, err:%v", err)
+		return false
+	}
+
+	role, err := mgr.GetMemberStateWithPool(ctx, pools[0])
+	if err != nil {
+		return false
+	}
+	if role != binding.PRIMARY {
+		mgr.Logger.Warnf("Leader is still in_recovery and therefore can't be used for rewind")
+		return false
+	}
+
+	primaryTimeLine, err := mgr.getPrimaryTimeLine()
+	if err != nil {
+		mgr.Logger.Errorf("get primary timeLine failed, err:%v", err)
+		return false
+	}
+
+	if localTimeLine > primaryTimeLine {
+		needRewind = true
+	} else if localTimeLine == primaryTimeLine {
+		needRewind = false
+	} else if primaryTimeLine > 1 {
+		historys = mgr.getHistory()
+	}
+
+	if historys != nil {
+		for _, h := range historys {
+			if h.parentTimeline == localTimeLine {
+				if isRecovery {
+					needRewind = localLsn > h.switchPoint
+				} else if localLsn >= h.switchPoint {
+					needRewind = true
+				} else {
+					// TODO:get checkpoint end
+				}
+				break
+			} else if h.parentTimeline > localTimeLine {
+				needRewind = true
+				break
+			}
+		}
+	}
+
+	return needRewind
+}
+
+func (mgr *Manager) getPrimaryTimeLine() (int64, error) {
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command("psql", "replication=database", "-c", "IDENTIFY_SYSTEM")
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil || stderr.String() != "" {
+		mgr.Logger.Errorf("get primary time line failed, err:%v, stderr%s", err, stderr.String())
+		return 0, err
+	}
+
+	stdoutList := strings.Split(stdout.String(), "\n")
+	value := stdoutList[2]
+	values := strings.Split(value, "|")
+
+	primaryTimeLine := strings.TrimSpace(values[1])
+
+	return strconv.ParseInt(primaryTimeLine, 10, 64)
+}
+
+func (mgr *Manager) getLocalTimeLineAndLsn(ctx context.Context) (bool, int64, int64) {
+	var inRecovery bool
+
+	if !mgr.IsRunning() {
+		return mgr.getLocalTimeLineAndLsnFromControlData()
+	}
+
+	inRecovery = true
+	timeLine := mgr.getReceivedTimeLine(ctx)
+	lsn, _ := mgr.getLsnWithPool(ctx, "replay", nil)
+
+	return inRecovery, timeLine, lsn
+}
+
+func (mgr *Manager) getLocalTimeLineAndLsnFromControlData() (bool, int64, int64) {
+	var inRecovery bool
+	var timeLineStr, lsnStr string
+	var timeLine, lsn int64
+
+	pgControlData := mgr.getPgControlData()
+	if slices.Contains([]string{"shut down in recovery", "in archive recovery"}, (*pgControlData)["Database cluster state"]) {
+		inRecovery = true
+		lsnStr = (*pgControlData)["Minimum recovery ending location"]
+		timeLineStr = (*pgControlData)["Min recovery ending loc's timeline"]
+	} else if (*pgControlData)["Database cluster state"] == "shut down" {
+		inRecovery = false
+		lsnStr = (*pgControlData)["Latest checkpoint location"]
+		timeLineStr = (*pgControlData)["Latest checkpoint's TimeLineID"]
+	}
+
+	if lsnStr != "" {
+		lsn = parsePgLsn(lsnStr)
+	}
+	if timeLineStr != "" {
+		timeLine, _ = strconv.ParseInt(timeLineStr, 10, 64)
+	}
+
+	return inRecovery, timeLine, lsn
+}
+
+func (mgr *Manager) getReceivedTimeLine(ctx context.Context) int64 {
+	sql := "select case when latest_end_lsn is null then null " +
+		"else received_tli end as received_tli from pg_catalog.pg_stat_get_wal_receiver();"
+
+	resp, err := mgr.Query(ctx, sql)
+	if err != nil || resp == nil {
+		mgr.Logger.Errorf("get received time line failed, err%v", err)
+		return 0
+	}
+
+	return int64(binary.BigEndian.Uint64(resp))
+}
+
+func (mgr *Manager) getPgControlData() *map[string]string {
+	result := map[string]string{}
+
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command("pg_controldata")
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil || stderr.String() != "" {
+		mgr.Logger.Errorf("get pg control data failed, err:%v, stderr: %s", err, stderr.String())
+		return &result
+	}
+
+	stdoutList := strings.Split(stdout.String(), "\n")
+	for _, s := range stdoutList {
+		out := strings.Split(s, ":")
+		if len(out) == 2 {
+			result[out[0]] = strings.TrimSpace(out[1])
+		}
+	}
+
+	return &result
+}
+
+func (mgr *Manager) checkRecoveryConf(ctx context.Context, leaderName string) (bool, bool) {
+	_, err := os.Stat("postgresql/data/standby.signal")
+	if os.IsNotExist(err) {
+		return true, true
+	}
+
+	primaryInfo := mgr.readRecoveryParams(ctx)
+	if primaryInfo == nil {
+		return true, true
+	}
+
+	if strings.Split(primaryInfo["host"], ".")[0] != leaderName {
+		mgr.Logger.Warnf("host not match, need to reload")
+		return true, false
+	}
+
+	return false, false
+}
+
+func (mgr *Manager) readRecoveryParams(ctx context.Context) map[string]string {
+	sql := `SELECT name, setting FROM pg_catalog.pg_settings WHERE pg_catalog.lower(name) = 'primary_conninfo';`
+	resp, err := mgr.Query(ctx, sql)
+	if err != nil {
+		mgr.Logger.Errorf("get primary conn info failed, err:%v", err)
+		return nil
+	}
+	result, err := parseSingleQuery(string(resp))
+	if err != nil {
+		mgr.Logger.Errorf("parse query failed, err:%v", err)
+		return nil
+	}
+	primaryInfoStr := result["setting"].(string)
+	primaryInfo := parsePrimaryConnInfo(primaryInfoStr)
+
+	return primaryInfo
+}
+
+// TODO
+func (mgr *Manager) getHistory() []*history {
+	return nil
+}
+
+func (mgr *Manager) follow(ctx context.Context, needRestart bool, leaderName string) error {
+	if mgr.CurrentMemberName == leaderName {
+		mgr.Logger.Infof("i get the leader key, don't need to follow")
+		return nil
+	}
+
+	primaryInfo := "host="
+	primaryInfo += leaderName + "." + mgr.ClusterCompName + "-headless"
+	primaryInfo += " port=" + viper.GetString("KB_SERVICE_PORT")
+	primaryInfo += " user=" + viper.GetString("KB_SERVICE_USER")
+	primaryInfo += " password=" + viper.GetString("KB_SERVICE_PASSWORD")
+	primaryInfo += " application_name=" + "my-application\n"
+
+	pgConf, err := os.OpenFile("/postgresql/conf/postgresql.conf", os.O_APPEND, 0644)
+	if err != nil {
+		mgr.Logger.Errorf("open postgresql.conf failed, err:%v", err)
+		return err
+	}
+	defer pgConf.Close()
+
+	writer := bufio.NewWriter(pgConf)
+	_, err = writer.WriteString(primaryInfo)
+	if err != nil {
+		mgr.Logger.Errorf("write into postgresql.conf failed, err:%v", err)
+		return err
+	}
+
+	err = writer.Flush()
+	if err != nil {
+		mgr.Logger.Errorf("writer flush failed, err:%v", err)
+		return err
+	}
+
+	if !needRestart {
+		var stdout, stderr bytes.Buffer
+		cmd := exec.Command("su", "-c", `'pg_ctl reload'`, "reload")
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+
+		err = cmd.Run()
+		if err != nil || stderr.String() != "" {
+			mgr.Logger.Errorf("postgresql reload failed, err:%v, stderr:%s", err, stderr.String())
+			return err
+		}
+
+		mgr.Logger.Infof("successfully follow new leader:%s", leaderName)
+		return nil
+	}
+
+	return mgr.Start()
+}
+
+func (mgr *Manager) Start() error {
+	standbySignal, err := os.Create("/postgresql/data/standby.signal")
+	if err != nil {
+		mgr.Logger.Errorf("touch standby signal failed, err:%v", err)
+		return err
+	}
+	defer standbySignal.Close()
+
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command("docker-entrypoint.sh", "--config-file=/postgresql/conf/postgresql.conf", "--hba_file=postgresql/conf/pg_hba.conf", "&")
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err = cmd.Run()
+
+	if err != nil || stderr.String() != "" {
+		mgr.Logger.Errorf("start postgresql failed, err:%v", err)
+		return err
+	}
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), config.pool)
+	if err != nil {
+		return errors.Errorf("unable to ping the DB: %v", err)
+	}
+	mgr.Pool = pool
+
 	return nil
 }
 

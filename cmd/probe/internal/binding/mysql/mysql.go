@@ -118,6 +118,7 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	mysqlOps.DBPort = config.GetDBPort()
 
 	mysqlOps.RegisterOperationOnDBReady(GetRoleOperation, mysqlOps.GetRoleOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(CheckRoleOperation, mysqlOps.CheckRoleOps, manager)
 	mysqlOps.RegisterOperationOnDBReady(GetLagOperation, mysqlOps.GetLagOps, manager)
 	mysqlOps.RegisterOperationOnDBReady(CheckStatusOperation, mysqlOps.CheckStatusOps, manager)
 	mysqlOps.RegisterOperationOnDBReady(ExecOperation, mysqlOps.ExecOps, manager)

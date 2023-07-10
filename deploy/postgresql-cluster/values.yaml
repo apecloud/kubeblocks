@@ -2,54 +2,33 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-nameOverride: ""
-fullnameOverride: ""
-
-replicaCount: 2
-terminationPolicy: Delete
-
-clusterVersionOverride: ""
-
-switchPolicy:
-  type: Noop
-
-monitor:
-  enabled: false
-
-# PostgreSQL (with Patroni HA) needs the corresponding RBAC permission to create a cluster(refer to role.yaml, rolebinding.yaml, serviceaccount.yaml)
-# If you need to automatically create RBAC, please ensure serviceAccount.enabled=true.
-# Otherwise, the user needs to create the corresponding serviceAccount, role and roleBinding permissions manually to use PostgreSQL (with Patroni HA) normally.
-serviceAccount:
-  enabled: true
-  # if enabled is false, the name is required
-  name: ""
-
-resources: { }
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-
-  # limits:
-  #   cpu: 500m
-  #   memory: 2Gi
-  # requests:
-  #   cpu: 100m
-  #   memory: 1Gi
-
-persistence:
-  enabled: true
-  data:
-    storageClassName: ""
-    size: 4Gi
-
-enabledLogs:
-  - running
-
-topologyKeys:
-  - kubernetes.io/hostname
-
-## @param tolerations
-## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+## @param version MySQL cluster version
 ##
-tolerations: [ ]
+version: postgresql-14.8.0
+
+## @param mode postgresql cluster topology mode, standalone, replication
+##
+mode: standalone
+
+## @param replicas specify cluster replicas
+##
+replicas: 1
+
+## @param cpu
+##
+cpu: 0.5
+
+## @param memory, the unit is Gi
+##
+memory: 1
+
+## @param requests.cpu if not set, use cpu
+## @param requests.memory, if not set, use memory
+##
+requests:
+#  cpu:
+#  memory:
+
+## @param storage size, the unit is Gi
+##
+storage: 20

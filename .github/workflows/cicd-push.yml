@@ -216,14 +216,13 @@ jobs:
   check-helm:
     needs: trigger-mode
     if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]') }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts-check.yml@v0.1.4
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts-check.yml@v0.1.8
     with:
       MAKE_OPS: "bump-chart-ver"
-      VERSION: "v0.4.0-check"
+      VERSION: "v0.6.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      DEP_REPO: "delphic|prometheus-cluster|apecloud-mysql-cluster|tdengine-cluster|redis-cluster"
-      APECD_REF: "v0.1.4"
+      APECD_REF: "v0.1.8"
     secrets: inherit
 
   deploy-kubeblocks-io:

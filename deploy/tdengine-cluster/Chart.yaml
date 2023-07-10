@@ -31,4 +31,4 @@ dependencies:
     repository: file://../kblib
     alias: extra
 
-icon: "https://www.taosdata.com/images/taosdata-logo.png"
+icon: "https://kubeblocks.io/img/logo.png"

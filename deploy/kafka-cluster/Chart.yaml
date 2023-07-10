@@ -1,16 +1,19 @@
 apiVersion: v2
 name: kafka-cluster
 description: A Kafka server cluster Helm chart for KubeBlocks.
+dependencies:
+  - name: kblib
+    version: 0.1.0
+    repository: file://../kblib
+    alias: extra
 
 type: application
-
 version: 0.6.0-alpha.28
+appVersion: 3.3.2
 
-appVersion: 3.4.0
+home: https://github.com/apecloud/kubeblocks/tree/main/deploy/kafka-cluster
+icon: https://kubeblocks.io/img/logo.png
 
-
-home: https://kubeblocks.io/
-icon: https://bitnami.com/assets/stacks/kafka/img/kafka-stack-220x234.png
 keywords:
   - kafka
   - kraft
@@ -19,5 +22,5 @@ keywords:
   - consumer
 
 maintainers:
-- name: Nash Tsai
-  url: https://github.com/apecloud/kubeblocks/deploy
+- name: ApeCloud
+  url: https://kubeblocks.io/

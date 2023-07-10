@@ -108,6 +108,9 @@ var _ = Describe("create", func() {
 		})
 
 		It("should fail if class name is conflicted", func() {
+			// class may be conflict only within the same object, so we set the objectName to be consistent with the name of the object classDef
+			createOptions.objectName = "kb.classes.default.apecloud-mysql.mysql"
+
 			fillResources(createOptions, "1", "1Gi", []string{"name=data,size=10Gi", "name=log,size=1Gi"})
 			createOptions.ClassName = "general-1c1g"
 			Expect(createOptions.run()).Should(HaveOccurred())

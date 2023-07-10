@@ -1,192 +1,116 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ include "clustername" . }}
-  labels: {{ include "kafka-cluster.labels" . | nindent 4 }}
+  name: {{ include "kblib.clusterName" . }}
+  labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
+  annotations:
+    "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"{{ $.Values.saslEnable }}"}'
 spec:
   clusterDefinitionRef: kafka # ref clusterdefinition.name
-  clusterVersionRef: kafka-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
-  terminationPolicy: {{ $.Values.terminationPolicy }}
-  affinity:
-    {{- with $.Values.topologyKeys }}
-    topologyKeys: {{ . | toYaml | nindent 6 }}
-    {{- end }}
-  {{- with $.Values.tolerations }}
-  tolerations: {{ . | toYaml | nindent 4 }}
-  {{- end }}
+  clusterVersionRef: {{ .Values.version }}
+  terminationPolicy: {{ .Values.extra.terminationPolicy }}
+  {{- include "kblib.affinity" . | indent 2 }}
   componentSpecs:
     {{- if eq "combined" $.Values.mode }}
     - name: broker
       componentDefRef: kafka-server
-      tls: {{ $.Values.tls }}
-      {{- if $.Values.tls }}
+      tls: {{ $.Values.tlsEnable }}
+      {{- if $.Values.tlsEnable }}
       issuer:
         name: KubeBlocks
       {{- end }}
-      replicas: {{ $.Values.kafkaServer.replicaCount }}
-      monitor: {{ $.Values.monitor.enabled }}
-      {{- with $.Values.tolerations }}
-      tolerations: {{ .| toYaml | nindent 8 }}
-      {{- end }}
-      {{- with $.Values.kafkaServer.resources }}
-      resources:
-        limits:
-          cpu: {{ .limits.cpu | quote }}
-          memory: {{ .limits.memory | quote }}
-        requests:
-          cpu: {{ .requests.cpu | quote }}
-          memory: {{ .requests.memory | quote }}
-      {{- end }}
-      {{- with $.Values.persistence }}
-        {{- if .enabled }}
+      replicas: {{ $.Values.replicas }}
+      monitor: {{ $.Values.monitorEnable }}
+      serviceAccountName: {{ include "kblib.serviceAccountName" . }}
+      {{- include "kblib.componentResources" . | indent 6 }}
+      {{- include "kblib.componentServices" . | indent 6 }}
+      {{- if $.Values.storageEnable }}
       volumeClaimTemplates:
         - name: metadata 
           spec:
-            {{- with .metadata.storageClassName }}
-            storageClassName: {{ . }}
-            {{- end }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ .metadata.size }}
+                storage: {{ print $.Values.metaStorage "Gi" }}
         - name: data 
           spec:
-            {{- with .data.storageClassName }}
-            storageClassName: {{ . }}
-            {{- end }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ .data.size }}
-          {{- if .log.enabled }}
+                storage: {{ print $.Values.dataStorage "Gi" }}
         - name: log 
           spec:
-            {{- with .log.storageClassName }}
-            storageClassName: {{ . }}
-            {{- end }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ .log.size }}
-          {{- end }}
+                storage: {{ print $.Values.logStorage "Gi" }}
         {{- end }}
-      {{- end }}
     {{- else }}
-    - name: kafka-kraft
-      componentDefRef: kafka-kraft
-      tls: {{ $.Values.tls }}
-      {{- if $.Values.tls }}
+    - name: controller
+      componentDefRef: controller
+      tls: {{ $.Values.tlsEnable }}
+      {{- if $.Values.tlsEnable }}
       issuer:
         name: KubeBlocks
       {{- end }}
-      replicas: {{ $.Values.kafkaController.replicaCount }}
-      monitor: {{ $.Values.monitor.enabled }}
-      {{- with $.Values.tolerations }}
-      tolerations: {{ .| toYaml | nindent 8 }}
-      {{- end }}
-      {{- with $.Values.kafkaController.resources }}
-      resources:
-        limits:
-          cpu: {{ .limits.cpu | quote }}
-          memory: {{ .limits.memory | quote }}
-        requests:
-          cpu: {{ .requests.cpu | quote }}
-          memory: {{ .requests.memory | quote }}
-      {{- end }}
-      {{- with $.Values.persistence }}
-        {{- if .enabled }}
+      replicas: {{ $.Values.controllerReplicas }}
+      monitor: {{ $.Values.monitorEnable }}
+      serviceAccountName: {{ include "kblib.serviceAccountName" . }}
+      {{- include "kblib.componentResources" . | indent 6 }}
+      {{- if $.Values.storageEnable }}
       volumeClaimTemplates:
         - name: metadata 
           spec:
-            {{- with .metadata.storageClassName }}
-            storageClassName: {{ . }}
-            {{- end }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ .metadata.size }}
-          {{- if .log.enabled }}
-        - name: log 
+                storage: {{ print $.Values.metaStorage "Gi" }}
+        - name: log
           spec:
-            {{- with .log.storageClassName }}
-            storageClassName: {{ . }}
-            {{- end }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ .log.size }}
-          {{- end }}
-        {{- end }}
+                storage: {{ print $.Values.logStorage "Gi" }}
       {{- end }}
     - name: broker
       componentDefRef: kafka-broker
-      tls: {{ $.Values.tls }}
-      {{- if $.Values.tls }}
+      tls: {{ $.Values.tlsEnable }}
+      {{- if $.Values.tlsEnable }}
       issuer:
         name: KubeBlocks
       {{- end }}
-      replicas: {{ $.Values.kafkaBroker.replicaCount }}
-      monitor: {{ $.Values.monitor.enabled }}
-      {{- with $.Values.tolerations }}
-      tolerations: {{ .| toYaml | nindent 8 }}
-      {{- end }}
-      {{- with $.Values.kafkaBroker.resources }}
-      resources:
-        limits:
-          cpu: {{ .limits.cpu | quote }}
-          memory: {{ .limits.memory | quote }}
-        requests:
-          cpu: {{ .requests.cpu | quote }}
-          memory: {{ .requests.memory | quote }}
-      {{- end }}
-      {{- with $.Values.persistence }}
-        {{- if .enabled }}
+      replicas: {{ $.Values.brokerReplicas }}
+      monitor: {{ $.Values.monitorEnable }}
+      serviceAccountName: {{ include "kblib.serviceAccountName" . }}
+      {{- include "kblib.componentResources" . | indent 6 }}
+      {{- include "kblib.componentServices" . | indent 6 }}
+      {{- if $.Values.storageEnable }}
       volumeClaimTemplates:
         - name: data 
           spec:
-            {{- with .data.storageClassName }}
-            storageClassName: {{ . }}
-            {{- end }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ .data.size }}
-          {{- if .log.enabled }}
-        - name: log 
+                storage: {{ print $.Values.metaStorage "Gi" }}
+        - name: log
           spec:
-            {{- with .log.storageClassName }}
-            storageClassName: {{ . }}
-            {{- end }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
-                storage: {{ .log.size }}
-          {{- end }}
+                storage: {{ print $.Values.logStorage "Gi" }}
         {{- end }}
       {{- end }}
-    {{- end }}
-    {{- if .Values.monitor.enabled }}
+    {{- if .Values.monitorEnable }}
     - name: metrics-exp
       componentDefRef: kafka-exporter
-      replicas: {{ $.Values.monitor.kafkaExporter.replicaCount }}
+      replicas: {{ $.Values.monitorReplicas }}
       monitor: true
-      {{- with $.Values.tolerations }}
-      tolerations: {{ .| toYaml | nindent 8 }}
-      {{- end }}
-      {{- with $.Values.monitor.kafkaExporter.resources }}
-      resources:
-        limits:
-          cpu: {{ .limits.cpu | quote }}
-          memory: {{ .limits.memory | quote }}
-        requests:
-          cpu: {{ .requests.cpu | quote }}
-          memory: {{ .requests.memory | quote }}
-      {{- end }}
+      {{- include "kblib.componentResources" . | nindent 6 }}
     {{- end }}

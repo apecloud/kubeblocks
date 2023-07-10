@@ -1,0 +1,18 @@
+** Please be patient while the chart is being deployed **
+
+To get MongoDB connection address accessed from within your cluster:
+
+    export MONGODB_ADDRESS=$(kubectl get secret --namespace {{ .Release.Namespace }} -l app.kubernetes.io/managed-by=kubeblocks,app.kubernetes.io/instance={{ .Release.Name }} -o jsonpath="{.items[0].data.headlessEndpoint}" | base64 -d)
+
+To get the root password run:
+
+    export MONGODB_ROOT_PASSWORD=$(kubectl get secret --namespace {{ .Release.Namespace }} -l app.kubernetes.io/managed-by=kubeblocks,app.kubernetes.io/instance={{ .Release.Name}} -o jsonpath="{.items[0].data.password}" | base64 -d)
+
+To connect to your database, create a MongoDB client container:
+
+    kubectl run --namespace {{ .Release.Namespace }} {{ .Release.Name }}-client --rm --tty -i --restart='Never' --env="MONGODB_ROOT_PASSWORD=$MONGODB_ROOT_PASSWORD" --env="MONGODB_ADDRESS=$MONGODB_ADDRESS" --image mongo:5.0.14 --command -- bash
+
+Then, run the following command:
+
+    mongosh admin --host $MONGODB_ADDRESS --authenticationDatabase admin -u root -p $MONGODB_ROOT_PASSWORD
+

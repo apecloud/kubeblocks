@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"strings"
+
 	"golang.org/x/exp/slices"
 	"gopkg.in/inf.v0"
 	corev1 "k8s.io/api/core/v1"
@@ -38,6 +40,10 @@ type ResourceConstraint struct {
 	// The constraint for memory size.
 	// +kubebuilder:validation:Required
 	Memory MemoryConstraint `json:"memory"`
+
+	// The constraint for storage size.
+	// +optional
+	Storage StorageConstraint `json:"storage"`
 }
 
 type CPUConstraint struct {
@@ -91,6 +97,18 @@ type MemoryConstraint struct {
 	MinPerCPU *resource.Quantity `json:"minPerCPU,omitempty"`
 }
 
+type StorageConstraint struct {
+	// The minimum size of storage.
+	// +kubebuilder:default="20Gi"
+	// +optional
+	Min *resource.Quantity `json:"min,omitempty"`
+
+	// The maximum size of storage.
+	// +kubebuilder:default="10Ti"
+	// +optional
+	Max *resource.Quantity `json:"max,omitempty"`
+}
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:openapi-gen=true
@@ -118,26 +136,36 @@ func init() {
 	SchemeBuilder.Register(&ComponentResourceConstraint{}, &ComponentResourceConstraintList{})
 }
 
-// ValidateCPU validate if the CPU matches the resource constraints
-func (m ResourceConstraint) ValidateCPU(cpu resource.Quantity) bool {
-	if m.CPU.Min != nil && m.CPU.Min.Cmp(cpu) > 0 {
+// ValidateCPU validates if the CPU meets the constraint
+func (m *ResourceConstraint) ValidateCPU(cpu *resource.Quantity) bool {
+	if cpu.IsZero() {
+		return true
+	}
+	if m.CPU.Min != nil && m.CPU.Min.Cmp(*cpu) > 0 {
 		return false
 	}
-	if m.CPU.Max != nil && m.CPU.Max.Cmp(cpu) < 0 {
+	if m.CPU.Max != nil && m.CPU.Max.Cmp(*cpu) < 0 {
 		return false
 	}
-	if m.CPU.Step != nil && inf.NewDec(1, 0).QuoExact(cpu.AsDec(), m.CPU.Step.AsDec()).Scale() != 0 {
-		return false
+	if m.CPU.Step != nil {
+		result := inf.NewDec(1, 0).QuoExact(cpu.AsDec(), m.CPU.Step.AsDec())
+		if result == nil {
+			return false
+		}
+		// the quotient must be an integer
+		if strings.Contains(strings.TrimRight(result.String(), ".0"), ".") {
+			return false
+		}
 	}
-	if m.CPU.Slots != nil && slices.Index(m.CPU.Slots, cpu) < 0 {
+	if m.CPU.Slots != nil && slices.Index(m.CPU.Slots, *cpu) < 0 {
 		return false
 	}
 	return true
 }
 
-// ValidateMemory validate if the memory matches the resource constraints
-func (m ResourceConstraint) ValidateMemory(cpu *resource.Quantity, memory *resource.Quantity) bool {
-	if memory == nil {
+// ValidateMemory validates if the memory meets the constraint
+func (m *ResourceConstraint) ValidateMemory(cpu *resource.Quantity, memory *resource.Quantity) bool {
+	if memory.IsZero() {
 		return true
 	}
 
@@ -157,51 +185,107 @@ func (m ResourceConstraint) ValidateMemory(cpu *resource.Quantity, memory *resou
 	return true
 }
 
-// ValidateResourceRequirements validate if the resource matches the resource constraints
-func (m ResourceConstraint) ValidateResourceRequirements(r *corev1.ResourceRequirements) bool {
-	var (
-		cpu    = r.Requests.Cpu()
-		memory = r.Requests.Memory()
-	)
-
-	if cpu.IsZero() && memory.IsZero() {
+// ValidateStorage validates if the storage meets the constraint
+func (m *ResourceConstraint) ValidateStorage(storage *resource.Quantity) bool {
+	if storage.IsZero() {
 		return true
 	}
 
-	if !m.ValidateCPU(*cpu) {
+	if m.Storage.Min != nil && m.Storage.Min.Cmp(*storage) > 0 {
+		return false
+	}
+	if m.Storage.Max != nil && m.Storage.Max.Cmp(*storage) < 0 {
+		return false
+	}
+	return true
+}
+
+// ValidateResources validates if the resources meets the constraint
+func (m *ResourceConstraint) ValidateResources(r corev1.ResourceList) bool {
+	if !m.ValidateCPU(r.Cpu()) {
 		return false
 	}
 
-	if !m.ValidateMemory(cpu, memory) {
+	if !m.ValidateMemory(r.Cpu(), r.Memory()) {
+		return false
+	}
+
+	if !m.ValidateStorage(r.Storage()) {
 		return false
 	}
 
 	return true
 }
 
-// FindMatchingConstraints find all constraints that resource matches
-func (c *ComponentResourceConstraint) FindMatchingConstraints(r *corev1.ResourceRequirements) []ResourceConstraint {
+func (m *ResourceConstraint) CompleteResources(r corev1.ResourceList) corev1.ResourceList {
+	if r.Cpu().IsZero() || !r.Memory().IsZero() {
+		return corev1.ResourceList{corev1.ResourceCPU: *r.Cpu(), corev1.ResourceMemory: *r.Memory()}
+	}
+
+	var memory *inf.Dec
+	if m.Memory.SizePerCPU != nil {
+		memory = inf.NewDec(1, 0).Mul(r.Cpu().AsDec(), m.Memory.SizePerCPU.AsDec())
+	} else {
+		memory = inf.NewDec(1, 0).Mul(r.Cpu().AsDec(), m.Memory.MinPerCPU.AsDec())
+	}
+	return corev1.ResourceList{
+		corev1.ResourceCPU:    *r.Cpu(),
+		corev1.ResourceMemory: resource.MustParse(memory.String()),
+	}
+}
+
+// GetMinimalResources gets the minimal resources meets the constraint
+func (m *ResourceConstraint) GetMinimalResources() corev1.ResourceList {
+	var (
+		minCPU    resource.Quantity
+		minMemory resource.Quantity
+	)
+
+	if len(m.CPU.Slots) == 0 && (m.CPU.Min == nil || m.CPU.Min.IsZero()) {
+		return corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("1"),
+			corev1.ResourceMemory: resource.MustParse("1Gi"),
+		}
+	}
+
+	if len(m.CPU.Slots) > 0 {
+		minCPU = m.CPU.Slots[0]
+	}
+
+	if minCPU.IsZero() || (m.CPU.Min != nil && minCPU.Cmp(*m.CPU.Min) > 0) {
+		minCPU = *m.CPU.Min
+	}
+
+	var memory *inf.Dec
+	if m.Memory.MinPerCPU != nil {
+		memory = inf.NewDec(1, 0).Mul(minCPU.AsDec(), m.Memory.MinPerCPU.AsDec())
+	} else {
+		memory = inf.NewDec(1, 0).Mul(minCPU.AsDec(), m.Memory.SizePerCPU.AsDec())
+	}
+	minMemory = resource.MustParse(memory.String())
+	return corev1.ResourceList{corev1.ResourceCPU: minCPU, corev1.ResourceMemory: minMemory}
+}
+
+// FindMatchingConstraints find all constraints that resource satisfies.
+func (c *ComponentResourceConstraint) FindMatchingConstraints(r corev1.ResourceList) []ResourceConstraint {
 	if c == nil {
 		return nil
 	}
 	var constraints []ResourceConstraint
 	for _, constraint := range c.Spec.Constraints {
-		if constraint.ValidateResourceRequirements(r) {
+		if constraint.ValidateResources(r) {
 			constraints = append(constraints, constraint)
 		}
 	}
 	return constraints
 }
 
+// MatchClass checks if the class meets the constraints
 func (c *ComponentResourceConstraint) MatchClass(class *ComponentClassInstance) bool {
 	request := corev1.ResourceList{
 		corev1.ResourceCPU:    class.CPU,
 		corev1.ResourceMemory: class.Memory,
 	}
-	resource := &corev1.ResourceRequirements{
-		Limits:   request,
-		Requests: request,
-	}
-	constraints := c.FindMatchingConstraints(resource)
+	constraints := c.FindMatchingConstraints(request)
 	return len(constraints) > 0
 }

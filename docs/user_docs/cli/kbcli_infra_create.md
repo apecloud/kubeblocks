@@ -85,7 +85,7 @@ kbcli infra create [flags]
       --master strings             Specify master nodes
       --name string                Specify kubernetes cluster name
       --nodes strings              List of machines on which kubernetes is installed. [require]
-      --output-kubeconfig string   Specified output kubeconfig. [option] (default "/Users/yongqihu/.kube/config")
+      --output-kubeconfig string   Specified output kubeconfig. [option] (default "$HOME/.kube/config")
   -p, --password string            Specify the password for the account to execute sudo. [option]
       --private-key string         The PrimaryKey for ssh to the remote machine. [option]
       --private-key-path string    Specify the file PrimaryKeyPath of ssh to the remote machine. default ~/.ssh/id_rsa.

@@ -30,5 +30,5 @@ var (
 )
 
 func init() {
-	registerClusterType("mysql", mysqlChart, "apecloud-mysql-cluster.tgz")
+	registerClusterType("mysql", mysqlChart, "apecloud-mysql-cluster.tgz", "")
 }

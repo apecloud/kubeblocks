@@ -16,7 +16,7 @@ import (
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
-var _ = FDescribe("DataScriptOps", func() {
+var _ = Describe("DataScriptOps", func() {
 	var (
 		randomStr             = testCtx.GetRandomStr()
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
@@ -139,7 +139,6 @@ var _ = FDescribe("DataScriptOps", func() {
 			By("check the opsRequest phase, should fail")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsResource)
 			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("not in the expected phas"))
 			Expect(ops.Status.Phase).Should(Equal(appsv1alpha1.OpsFailedPhase))
 		})
 

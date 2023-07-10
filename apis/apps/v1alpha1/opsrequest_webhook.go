@@ -134,21 +134,6 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 		}
 	}
 
-	// check if entry-condition is met
-	// if the cluster is not in the expected phase, we should wait for it for up to TTLSecondsBeforeAbort seconds.
-	if len(opsRecorder) == 0 && !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
-		// TTLSecondsBeforeAbort is 0 means that the we do not need to wait for the cluster to reach the expected phase.
-		expiredTime := r.GetCreationTimestamp().Add(time.Duration(r.Spec.TTLSecondsBeforeAbort) * time.Second)
-		if time.Now().After(expiredTime) {
-			return fmt.Errorf("cluster: %s is not in the expected phase: %v after waiting for %d seconds", cluster.Name, opsBehaviour.FromClusterPhases, r.Spec.TTLSecondsBeforeAbort)
-		}
-		return &WaitForClusterPhaseErr{
-			clusterName:   cluster.Name,
-			currentPhase:  cluster.Status.Phase,
-			expectedPhase: opsBehaviour.FromClusterPhases,
-		}
-	}
-
 	opsNamesInQueue := make([]string, len(opsRecorder))
 	for i, v := range opsRecorder {
 		// judge whether the opsRequest meets the following conditions:
@@ -163,7 +148,18 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	// check if the opsRequest can be executed in the current cluster phase unless this opsRequest is reentrant.
 	if !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) &&
 		!slices.Contains(opsNamesInQueue, r.Name) {
-		return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
+		// check if entry-condition is met
+		// if the cluster is not in the expected phase, we should wait for it for up to TTLSecondsBeforeAbort seconds.
+		// if len(opsRecorder) == 0 && !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
+		// TTLSecondsBeforeAbort is 0 means that the we do not need to wait for the cluster to reach the expected phase.
+		if r.Spec.TTLSecondsBeforeAbort == 0 || time.Now().After(r.GetCreationTimestamp().Add(time.Duration(r.Spec.TTLSecondsBeforeAbort)*time.Second)) {
+			return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
+		}
+		return &WaitForClusterPhaseErr{
+			clusterName:   cluster.Name,
+			currentPhase:  cluster.Status.Phase,
+			expectedPhase: opsBehaviour.FromClusterPhases,
+		}
 	}
 	return nil
 }

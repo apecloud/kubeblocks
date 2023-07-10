@@ -1,0 +1,22 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: pulsar-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
+  labels:
+    {{- include "pulsar.labels" . | nindent 4 }}
+    {{- if .Values.commonLabels }}
+    {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
+    {{- end }}
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
+spec:
+  clusterDefinitionRef: pulsar
+  componentVersions:
+    - componentDefRef: zookeeper
+      versionsContext:
+        containers:
+          - name: zookeeper
+            image: {{ .Values.zookeeper.image.repository }}:{{ .Values.zookeeper.image.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.zookeeper.image.pullPolicy }}
+  

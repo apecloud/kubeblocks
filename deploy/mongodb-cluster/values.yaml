@@ -4,7 +4,7 @@
 
 ## @param version cluster version
 ##
-version: redis-7.0.6
+version: mongodb-5.0.14
 
 ## @param mode cluster topology mode, standalone or replicaset
 ##

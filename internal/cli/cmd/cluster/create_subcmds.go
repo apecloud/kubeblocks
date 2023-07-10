@@ -125,7 +125,7 @@ func (o *createSubCmdsOptions) run() error {
 	// get Kubernetes version
 	kubeVersion, err := util.GetK8sVersion(o.Client.Discovery())
 	if err != nil || kubeVersion == "" {
-		return fmt.Errorf("failed to get Kubernetes version %s", err)
+		return fmt.Errorf("failed to get Kubernetes version %v", err)
 	}
 
 	// get cluster manifests

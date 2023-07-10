@@ -199,6 +199,8 @@ data:
     tablet_type=replica
     topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
 
+    /scripts/wait-for-service.sh vtctld $vtctld_host $vtctld_web_port
+
     echo "starting vttablet for $alias..."
 
     su vitess <<EOF

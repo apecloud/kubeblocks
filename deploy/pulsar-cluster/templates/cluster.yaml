@@ -30,14 +30,14 @@ spec:
       {{- end }}
       {{- if .Values.bookies.persistence.enabled }}
       volumeClaimTemplates:
-        - name: data
+        - name: ledgers-0
           spec:
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
                 storage: {{ .Values.bookies.persistence.data.size }}
-        - name: log
+        - name: journal-0
           spec:
             accessModes:
               - ReadWriteOnce

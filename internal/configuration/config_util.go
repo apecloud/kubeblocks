@@ -108,6 +108,14 @@ func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[s
 	return r
 }
 
+func FromComponentConfigSpecs(configSpecs []appsv1alpha1.ComponentConfigSpec) []appsv1alpha1.ComponentTemplateSpec {
+	var r []appsv1alpha1.ComponentTemplateSpec
+	for _, configSpec := range configSpecs {
+		r = append(r, configSpec.ComponentTemplateSpec)
+	}
+	return r
+}
+
 // FromStringMap converts a map[string]string to a map[string]interface{}
 func FromStringMap(m map[string]string) map[string]interface{} {
 	r := make(map[string]interface{}, len(m))

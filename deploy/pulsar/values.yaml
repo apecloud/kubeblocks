@@ -12,6 +12,12 @@ commonLabels: {}
 
 logConfigs: {}
 
+bookies:
+  image:
+    repository: streamnative/sn-platform-slim
+    pullPolicy: IfNotPresent
+    tag: 2.10.3.4
+
 zookeeper:
   image:
     repository: docker.io/bitnami/zookeeper

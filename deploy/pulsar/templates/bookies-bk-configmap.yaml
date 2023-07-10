@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bookies-bk-config
+  labels:
+    {{- include "pulsar.labels" . | nindent 4 }}
+data:
+  {{- .Files.Get "config/bookies-bk-config.tpl" | nindent 4 }}

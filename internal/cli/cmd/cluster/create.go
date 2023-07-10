@@ -142,6 +142,7 @@ var clusterCreateExample = templates.Examples(`
 const (
 	CueTemplateName = "cluster_template.cue"
 	monitorKey      = "monitor"
+	apeCloudMysql   = "apecloud-mysql"
 )
 
 type setKey string
@@ -334,7 +335,7 @@ func fillClusterInfoFromBackup(o *CreateOptions, cls **appsv1alpha1.Cluster) err
 		return err
 	}
 	// HACK/TODO: apecloud-mysql pitr only support one replica for PITR.
-	if backupCluster.Spec.ClusterDefRef == "apecloud-mysql" && o.RestoreTime != "" {
+	if backupCluster.Spec.ClusterDefRef == apeCloudMysql && o.RestoreTime != "" {
 		for _, c := range backupCluster.Spec.ComponentSpecs {
 			c.Replicas = 1
 		}
@@ -387,7 +388,7 @@ func setRestoreTime(o *CreateOptions, components []map[string]interface{}) error
 	}
 
 	// HACK/TODO: apecloud-mysql pitr only support one replica for PITR.
-	if o.ClusterDefRef == "apecloud-mysql" {
+	if o.ClusterDefRef == apeCloudMysql {
 		for _, c := range components {
 			if c["replicas"].(int64) > 1 {
 				return fmt.Errorf("apecloud-mysql only support one replica for point-in-time recovery")
@@ -921,7 +922,7 @@ func buildClusterComp(cd *appsv1alpha1.ClusterDefinition, setsMap map[string]map
 		// HACK: for apecloud-mysql cluster definition, if setsMap is empty, user
 		// does not specify any set, so we only build the first component.
 		// TODO(ldm): remove this hack and use helm chart to render the cluster.
-		if i > 0 && len(sets) == 0 && cd.Name == "apecloud-mysql" {
+		if i > 0 && len(sets) == 0 && cd.Name == apeCloudMysql {
 			continue
 		}
 

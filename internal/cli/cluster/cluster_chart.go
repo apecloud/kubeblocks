@@ -121,7 +121,7 @@ func BuildChartInfo(t ClusterType) (*ChartInfo, error) {
 }
 
 // GetManifests gets the cluster manifests
-func GetManifests(c *chart.Chart, namespace, name string, kubeVersion string, values map[string]interface{}) (map[string]string, error) {
+func GetManifests(c *chart.Chart, namespace, name, kubeVersion string, values map[string]interface{}) (map[string]string, error) {
 	// get the helm chart manifest
 	actionCfg, err := helm.NewActionConfig(helm.NewConfig(namespace, "", "", false))
 	if err != nil {

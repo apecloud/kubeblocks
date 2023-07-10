@@ -19,7 +19,7 @@ spec:
     switchoverSpec:
       cmdExecutorConfig:
         image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}
-  - componentDefRef: vitess
+  - componentDefRef: vtcontroller
     versionsContext:
       containers:
         - name: etcd

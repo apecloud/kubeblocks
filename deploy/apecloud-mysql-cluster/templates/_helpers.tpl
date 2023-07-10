@@ -13,8 +13,8 @@ The proxy cpu cores is 1/6 of the cluster total cpu cores.
 {{- if eq (mod $proxyCPU 2) 1 }}
 {{- $proxyCPU = add $proxyCPU 1 }}
 {{- end }}
-- name: vitess
-  componentDefRef: vitess # ref clusterdefinition componentDefs.name
+- name: vtcontroller
+  componentDefRef: vtcontroller # ref clusterdefinition componentDefs.name
   volumeClaimTemplates:
     - name: data
       spec:

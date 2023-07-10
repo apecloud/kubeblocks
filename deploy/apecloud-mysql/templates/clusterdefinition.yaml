@@ -231,7 +231,7 @@ spec:
               - name: CELL
                 value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
               - name: ETCD_SERVER
-                value: "$(KB_CLUSTER_NAME)-vitess-headless"
+                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
               - name: ETCD_PORT
                 value: "2379"
               - name: TOPOLOGY_FLAGS
@@ -241,7 +241,7 @@ spec:
               - name: VTTABLET_GRPC_PORT
                 value: "16100"
               - name: VTCTLD_HOST
-                value: "$(KB_CLUSTER_NAME)-vitess-headless"
+                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
               - name: VTCTLD_WEB_PORT
                 value: "15000"
               - name: MYSQL_ROOT_USER
@@ -336,8 +336,8 @@ spec:
               statements:
                 creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION SLAVE ON *.* TO $(USERNAME) WITH GRANT OPTION;
                 update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
-    - name: vitess
-      charactorType: vitess
+    - name: vtcontroller
+      charactorType: vtcontroller
       workloadType: Stateful
       volumeTypes:
         - name: data
@@ -378,7 +378,7 @@ spec:
               - name: ETCDCTL_API
                 value: "2"
               - name: ETCD_SERVER
-                value: "$(KB_CLUSTER_NAME)-vitess-headless"
+                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
               - name: ETCD_PORT
                 value: "2379"
               - name: TOPOLOGY_FLAGS
@@ -404,7 +404,7 @@ spec:
               - name: CELL
                 value: {{ .Values.wesqlscale.cell | default "zone1" | quote }}
               - name: VTCTLD_SERVER
-                value: "$(KB_CLUSTER_NAME)-vitess-headless"
+                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
               - name: VTCTLD_WEB_PORT
                 value: "15000"
               - name: VTCTLD_GRPC_PORT
@@ -489,7 +489,7 @@ spec:
             image: busybox:1.35
             env:
               - name: VTCTLD_HOST
-                value: "$(KB_CLUSTER_NAME)-vitess-headless" 
+                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless" 
               - name: VTCTLD_GRPC_PORT
                 value: "15999"
             command: ["/scripts/wait-for-service.sh", "vtctld", "$(VTCTLD_HOST)", "$(VTCTLD_GRPC_PORT)"]
@@ -530,7 +530,7 @@ spec:
               - name: VTGATE_GRPC_PORT
                 value: "15991"
               - name: ETCD_SERVER
-                value: "$(KB_CLUSTER_NAME)-vitess-headless"
+                value: "$(KB_CLUSTER_NAME)-vtcontroller-headless"
               - name: ETCD_PORT
                 value: "2379"
               - name: TOPOLOGY_FLAGS

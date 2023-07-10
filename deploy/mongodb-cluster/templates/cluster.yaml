@@ -1,4 +1,4 @@
-{{- include "kblib.clusterCommon" }}
+{{- include "kblib.clusterCommon" . }}
   clusterDefinitionRef: mongodb
   componentSpecs:
     - name: mongodb
@@ -6,6 +6,4 @@
       {{- include "kblib.componentMonitor" . | indent 6 }}
       {{- include "mongodb-cluster.replicaCount" . | indent 6 }}
       serviceAccountName: {{ include "kblib.serviceAccountName" . }}
-      enabledLogs:
-        - running
       {{- include "kblib.componentResources" . | indent 6 }}

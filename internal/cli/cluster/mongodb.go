@@ -30,5 +30,5 @@ var (
 )
 
 func init() {
-	registerClusterType("mongodb", mongodbChart, "mongodb-cluster.tgz")
+	registerClusterType("mongodb", mongodbChart, "mongodb-cluster.tgz", "")
 }

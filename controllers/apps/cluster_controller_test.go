@@ -1581,6 +1581,10 @@ var _ = Describe("Cluster Controller", func() {
 
 		oldToolsImage := viper.GetString(constant.KBToolsImage)
 		newToolsImage := fmt.Sprintf("%s-%s", oldToolsImage, rand.String(4))
+		defer func() {
+			viper.Set(constant.KBToolsImage, oldToolsImage)
+		}()
+
 		checkWorkloadGenerationAndToolsImage := func(workloadGenerationExpected int64, oldImageCntExpected, newImageCntExpected int) {
 			checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
 				if sts != nil {
@@ -1615,7 +1619,7 @@ var _ = Describe("Cluster Controller", func() {
 			cluster.Annotations = map[string]string{"time": time.Now().Format(time.RFC3339)}
 		})()).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-			g.Expect(cluster.Generation).Should(Equal(int64(1)))
+			g.Expect(cluster.Status.ObservedGeneration).Should(Equal(int64(1)))
 		})).Should(Succeed())
 		checkWorkloadGenerationAndToolsImage(int64(1), 1, 0)
 
@@ -1624,7 +1628,7 @@ var _ = Describe("Cluster Controller", func() {
 			cluster.Spec.TerminationPolicy = appsv1alpha1.DoNotTerminate
 		})()).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-			g.Expect(cluster.Generation).Should(Equal(int64(2)))
+			g.Expect(cluster.Status.ObservedGeneration).Should(Equal(int64(2)))
 		})).Should(Succeed())
 		checkWorkloadGenerationAndToolsImage(int64(1), 1, 0)
 
@@ -1634,7 +1638,7 @@ var _ = Describe("Cluster Controller", func() {
 			cluster.Spec.ComponentSpecs[0].Replicas = replicas + 1
 		})()).Should(Succeed())
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
-			g.Expect(cluster.Generation).Should(Equal(int64(3)))
+			g.Expect(cluster.Status.ObservedGeneration).Should(Equal(int64(3)))
 		})).Should(Succeed())
 		checkWorkloadGenerationAndToolsImage(int64(2), 0, 1)
 	}
@@ -1929,25 +1933,6 @@ var _ = Describe("Cluster Controller", func() {
 			viper.Set(constant.CfgKeyBackupPVCName, "test-backup-pvc")
 			testMultiCompHScale(appsv1alpha1.HScaleDataClonePolicyCloneVolume)
 		})
-	})
-
-	FWhen("creating cluster with all workloadTypes (being Stateless|Stateful|Consensus|Replication) component", func() {
-		compNameNDef := map[string]string{
-			statelessCompName:   statelessCompDefName,
-			statefulCompName:    statefulCompDefName,
-			consensusCompName:   consensusCompDefName,
-			replicationCompName: replicationCompDefName,
-		}
-
-		BeforeEach(func() {
-			createAllWorkloadTypesClusterDef()
-		})
-
-		for compName, compDefName := range compNameNDef {
-			FIt(fmt.Sprintf("[comp: %s] update kubeblocks-tools image", compName), func() {
-				testUpdateKubeBlocksToolsImage(compName, compDefName)
-			})
-		}
 	})
 
 	When("creating cluster with all workloadTypes (being Stateless|Stateful|Consensus|Replication) component", func() {

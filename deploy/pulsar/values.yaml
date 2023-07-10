@@ -1,0 +1,35 @@
+# Default values for pulsar.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+clusterVersionOverride: ""
+nameOverride: ""
+fullnameOverride: ""
+
+## @param commonLabels Labels to add to all deployed objects
+##
+commonLabels: {}
+
+logConfigs: {}
+
+zookeeper:
+  image:
+    repository: docker.io/bitnami/zookeeper
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: 3.8.0-debian-11-r47   
+
+  logConfigs: {}
+  roleProbe:
+    failureThreshold: 2
+    periodSeconds: 1
+    successThreshold: 1
+
+  ## @param configuration Configure ZooKeeper with a custom zoo.cfg file
+  ## e.g:
+  ## configuration: |-
+  ##   deploy-working-dir=/bitnami/geode/data
+  ##   log-level=info
+  ##   ...
+  ##
+  configuration: ""

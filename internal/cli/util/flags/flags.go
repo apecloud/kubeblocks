@@ -115,10 +115,21 @@ func buildFlagDescription(s *spec.Schema) string {
 
 	var legalVals []string
 	for _, e := range s.Enum {
-		legalVals = append(legalVals, fmt.Sprintf("%s", e))
+		legalVals = append(legalVals, fmt.Sprintf("%v", e))
 	}
 	if len(legalVals) > 0 {
 		desc.WriteString(fmt.Sprintf(" Legal values [%s].", strings.Join(legalVals, ", ")))
+	}
+
+	var valueRange []string
+	if s.Minimum != nil {
+		valueRange = append(valueRange, fmt.Sprintf("%v", *s.Minimum))
+	}
+	if s.Maximum != nil {
+		valueRange = append(valueRange, fmt.Sprintf("%v", *s.Maximum))
+	}
+	if len(valueRange) > 0 {
+		desc.WriteString(fmt.Sprintf(" Value range [%s].", strings.Join(valueRange, ", ")))
 	}
 	return desc.String()
 }

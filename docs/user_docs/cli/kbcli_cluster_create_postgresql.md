@@ -1,21 +1,21 @@
 ---
-title: kbcli cluster create mysql
+title: kbcli cluster create postgresql
 ---
 
-Create a mysql cluster.
+Create a postgresql cluster.
 
 ```
-kbcli cluster create mysql NAME [flags]
+kbcli cluster create postgresql NAME [flags]
 ```
 
 ### Examples
 
 ```
   # Create a cluster with the default values
-  kbcli cluster create mysql
+  kbcli cluster create postgresql
   
   # Create a cluster with the specified cpu, memory and storage
-  kbcli cluster create mysql --cpu 1 --memory 2 --storage 10
+  kbcli cluster create postgresql --cpu 1 --memory 2 --storage 10
 ```
 
 ### Options
@@ -23,14 +23,13 @@ kbcli cluster create mysql NAME [flags]
 ```
       --availability-policy string   The availability policy of cluster. Legal values [none, node, zone]. (default "none")
       --cpu float                    CPU cores. Value range [0.5, 64]. (default 1)
-  -h, --help                         help for mysql
+  -h, --help                         help for postgresql
       --host-network-accessible      Specify whether the cluster can be accessed from within the VPC.
       --memory float                 Memory, the unit is Gi. Value range [0.5, 1000]. (default 1)
-      --mode string                  Cluster topology mode. Legal values [standalone, raftGroup]. (default "standalone")
+      --mode string                  Cluster topology mode. Legal values [standalone, replication]. (default "standalone")
       --monitoring-interval int      The monitoring interval of cluster, 0 is disabled, the unit is second. Value range [0, 60].
-      --proxy-enabled                Enable proxy or not.
       --publicly-accessible          Specify whether the cluster can be accessed from the public internet.
-      --replicas int                 The number of replicas, for standalone mode, the replicas is 1, for raftGroup mode, the default replicas is 3. Value range [1, 5]. (default 1)
+      --replicas int                 The number of replicas, for standalone mode, the replicas is 1, for replication mode, the default replicas is 2. Value range [1, 5]. (default 1)
       --storage float                Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
       --tenancy string               The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")
       --termination-policy string    The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")

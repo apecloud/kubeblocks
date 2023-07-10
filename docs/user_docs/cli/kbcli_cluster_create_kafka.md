@@ -1,39 +1,47 @@
 ---
-title: kbcli cluster create mysql
+title: kbcli cluster create kafka
 ---
 
-Create a mysql cluster.
+Create a kafka cluster.
 
 ```
-kbcli cluster create mysql NAME [flags]
+kbcli cluster create kafka NAME [flags]
 ```
 
 ### Examples
 
 ```
   # Create a cluster with the default values
-  kbcli cluster create mysql
+  kbcli cluster create kafka
   
   # Create a cluster with the specified cpu, memory and storage
-  kbcli cluster create mysql --cpu 1 --memory 2 --storage 10
+  kbcli cluster create kafka --cpu 1 --memory 2 --storage 10
 ```
 
 ### Options
 
 ```
       --availability-policy string   The availability policy of cluster. Legal values [none, node, zone]. (default "none")
+      --broker-replicas int          The number of Kafka broker replicas for separated mode. Value range [1, 100]. (default 1)
+      --controller-replicas int      The number of Kafka controller replicas for separated mode. Legal values [1, 3, 5]. (default 1)
       --cpu float                    CPU cores. Value range [0.5, 64]. (default 1)
-  -h, --help                         help for mysql
+      --data-storage float           Data Storage size, the unit is Gi. Value range [1, 10000]. (default 10)
+  -h, --help                         help for kafka
       --host-network-accessible      Specify whether the cluster can be accessed from within the VPC.
+      --log-storage float            Log Storage size, the unit is Gi. Value range [1, 10000]. (default 2)
       --memory float                 Memory, the unit is Gi. Value range [0.5, 1000]. (default 1)
-      --mode string                  Cluster topology mode. Legal values [standalone, raftGroup]. (default "standalone")
+      --meta-storage float           Meta Storage size, the unit is Gi. Value range [1, 10000]. (default 5)
+      --mode string                  Mode for Kafka kraft cluster, 'combined' is combined Kafka controller and broker,'separated' is broker and controller running independently. Legal values [combined, separated]. (default "combined")
+      --monitor-enable               Enable monitor for Kafka.
+      --monitor-replicas int         The number of Kafka monitor replicas. Value range [1, 5]. (default 1)
       --monitoring-interval int      The monitoring interval of cluster, 0 is disabled, the unit is second. Value range [0, 60].
-      --proxy-enabled                Enable proxy or not.
       --publicly-accessible          Specify whether the cluster can be accessed from the public internet.
-      --replicas int                 The number of replicas, for standalone mode, the replicas is 1, for raftGroup mode, the default replicas is 3. Value range [1, 5]. (default 1)
-      --storage float                Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
+      --replicas int                 The number of Kafka replicas for combined mode. Legal values [1, 3, 5]. (default 1)
+      --sasl-enable                  Enable authentication using SASL/PLAIN for Kafka.
+      --storage-enable               Enable storage for Kafka meta/data/log.
       --tenancy string               The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")
       --termination-policy string    The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")
+      --tls-enable                   Enable TLS for Kafka.
       --version string               Cluster version.
 ```
 

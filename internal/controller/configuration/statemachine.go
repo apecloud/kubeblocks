@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	"fmt"
+
 	"github.com/apecloud/kubeblocks/internal/hsm"
 )
 
@@ -27,14 +29,12 @@ type ConfigStateType string
 
 var ConfigFSMSignature = func(_ ConfigStateType, _ string, _ ConfigFSMContext) {}
 
-func (c ConfigStateType) OnEnter(e hsm.Event, ctx ConfigFSMContext) error {
-	//TODO implement me
-	panic("implement me")
+func (c ConfigStateType) OnEnter(_ *ConfigFSMContext) error {
+	return nil
 }
 
-func (c ConfigStateType) OnExit(e hsm.Event, ctx ConfigFSMContext) error {
-	//TODO implement me
-	panic("implement me")
+func (c ConfigStateType) OnExit(_ *ConfigFSMContext) error {
+	return nil
 }
 
 type ConfigFSMContext struct {
@@ -43,16 +43,31 @@ type ConfigFSMContext struct {
 
 func NewConfigContext() *ConfigFSMContext {
 	context := &ConfigFSMContext{}
-	context.InitState(ConfigStateType("init"))
+	context.InitState("init")
 	return context
 }
 
 func init() {
 	sm := hsm.NewStateMachine("config-fsm", "init", ConfigFSMSignature)
-	sm.StateBuilder().OnEvent("abcd", "abcde").
-		OnEvent("abcd2", "abcde").
-		OnEvent("abcd3", "abcde").
-		OnEvent("abcd4", "abcde").
+	sm.StateBuilder("init").
+		Transition("abcd", "abcde").
+		Transition("abcd2", "abcde").
+		Transition("abcd3", "abcde").
+		Transition("abcd4", "abcde").
+		InternalTransition("sync", func(_ *ConfigFSMContext) error {
+			return nil
+		}, func(ctx *ConfigFSMContext) bool {
+			return false
+		}).
+		OnEnter(func(ctx *ConfigFSMContext) error {
+			fmt.Printf("enter state: %s", ctx.GetState())
+			return nil
+		}).
+		OnExit(func(ctx *ConfigFSMContext) error {
+			fmt.Printf("exit state: %s", ctx.GetState())
+			return nil
+		}).
 		Build()
+
 	hsm.RegisterStateMachine(sm)
 }

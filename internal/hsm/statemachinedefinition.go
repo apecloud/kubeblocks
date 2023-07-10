@@ -19,27 +19,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package hsm
 
-import "reflect"
-
 //type StateMachine[T any, S StateInterface, E Event, C] interface {
 
 //states map[StateInterface]*StateDefinition
 //}
 
 type BuilderInterface[S StateInterface[C], E, C any] interface {
-	OnEvent(event Event, destinationState S) BuilderInterface[S, E, C]
+	OnEnter(action func(ctx *C) error) BuilderInterface[S, E, C]
+	OnExit(action func(ctx *C) error) BuilderInterface[S, E, C]
+
+	Transition(event E, destinationState S, guards ...func(ctx *C) bool) BuilderInterface[S, E, C]
+	InternalTransition(event E, action func(ctx *C) error, guards ...func(ctx *C) bool) BuilderInterface[S, E, C]
+
 	Build() error
 }
 
 type StateBuilder[S StateInterface[C], E, C any] struct {
 	BuilderInterface[S, E, C]
 
-	State        S
-	StateMachine *StateMachineDefinition[S, E, C]
-	Superstate   *StateDefinition[S, E, C]
-
-	// substates
-	Substates []*StateDefinition[S, E, C]
+	Error           error
+	State           S
+	StateMachineRef *StateMachineDefinition[S, E, C]
+	StateDefinition[S, E, C]
 }
 
 type StateMachineDefinition[S StateInterface[C], E Event, C any] struct {
@@ -57,9 +58,10 @@ func NewStateMachine[S StateInterface[C], E, C any](id string, initialState S, _
 	}
 }
 
-func (smDef *StateMachineDefinition[S, E, C]) StateBuilder() BuilderInterface[S, E, C] {
+func (smDef *StateMachineDefinition[S, E, C]) StateBuilder(state S) BuilderInterface[S, E, C] {
 	return &StateBuilder[S, E, C]{
-		StateMachine: smDef,
+		State:           state,
+		StateMachineRef: smDef,
 	}
 }
 
@@ -67,61 +69,71 @@ func (smDef *StateMachineDefinition[S, E, C]) stateDefinition(state S) (stateDef
 	var ok bool
 	if stateDef, ok = smDef.states[state]; !ok {
 		stateDef = &StateDefinition[S, E, C]{
-			StateMachine: smDef,
 			State:        state,
+			Transitions:  make([]Transition, 0),
+			StateMachine: smDef,
 		}
 		smDef.states[state] = stateDef
 	}
 	return
 }
 
+func (builder *StateBuilder[S, E, C]) OnEnter(action func(ctx *C) error) BuilderInterface[S, E, C] {
+	builder.EntryActions = append(builder.EntryActions, action)
+	return builder
+}
+
+func (builder *StateBuilder[S, E, C]) OnExit(action func(ctx *C) error) BuilderInterface[S, E, C] {
+	builder.EntryActions = append(builder.EntryActions, action)
+	return builder
+}
+
 func (smDef StateMachineDefinition[S, E, C]) ID() string {
 	return smDef.name
 }
 
-func (builder *StateBuilder[S, E, C]) OnEvent(event Event, destinationState S) BuilderInterface[S, E, C] {
-	return builder
+func (builder *StateBuilder[S, E, C]) Transition(event E, destinationState S, guards ...func(ctx *C) bool) BuilderInterface[S, E, C] {
+	buildFn := func() Transition {
+		return &NormalTransition[S, E, C]{
+			destination: destinationState,
+			basicTransition: basicTransition[E, C]{
+				Event:  event,
+				Guards: newTransitionGuard(guards...),
+			}}
+	}
+	return builder.buildWrapper(buildFn)
+}
+
+func (builder StateBuilder[S, E, C]) InternalTransition(event E, action func(ctx *C) error, guards ...func(ctx *C) bool) BuilderInterface[S, E, C] {
+	buildFn := func() Transition {
+		return &internalTransition[E, C]{
+			actions: []func(ctx *C) error{action},
+			basicTransition: basicTransition[E, C]{
+				Event:  event,
+				Guards: newTransitionGuard(guards...),
+			}}
+	}
+	return builder.buildWrapper(buildFn)
 }
 
 func (builder *StateBuilder[S, E, C]) Build() error {
-	sd := builder.StateMachine.stateDefinition(builder.State)
-	sd.Superstate = builder.Superstate
+	if builder.Error != nil {
+		return builder.Error
+	}
+	sd := builder.StateMachineRef.stateDefinition(builder.State)
+	sd.EntryActions = builder.EntryActions
+	sd.ExitActions = builder.ExitActions
 	sd.Substates = builder.Substates
+	sd.Superstate = builder.Superstate
+	sd.Transitions = builder.Transitions
 	return nil
 }
 
-func FromContext[S StateInterface[C], E, C any](ctx *C, id string, _ func(_ S, _ E, _ C)) *StateMachine[S, E, C] {
-	stateReference := func(context *C) *BaseContext[S, C] {
-		v := reflect.ValueOf(ctx)
-		if v.Kind() == reflect.Ptr {
-			v = v.Elem()
-		}
-		v = v.FieldByName("BaseContext")
-		if !v.IsValid() {
-			return nil
-		}
-		switch i := v.Interface().(type) {
-		default:
-			return nil
-		case BaseContext[S, C]:
-			return &i
-		case *BaseContext[S, C]:
-			return i
-		}
+func (builder *StateBuilder[S, E, C]) buildWrapper(fn func() Transition) BuilderInterface[S, E, C] {
+	if builder.Error != nil || fn == nil {
+		return builder
 	}
 
-	smDef := GetStateMachine[S, E, C](id)
-	if smDef == nil {
-		return nil
-	}
-	baseState := stateReference(ctx)
-	if baseState == nil {
-		baseState = &BaseContext[S, C]{}
-		baseState.InitState(smDef.InitialState)
-	}
-	return &StateMachine[S, E, C]{
-		context:                ctx,
-		state:                  baseState,
-		StateMachineDefinition: smDef,
-	}
+	builder.Transitions = append(builder.Transitions, fn())
+	return builder
 }

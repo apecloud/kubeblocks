@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package hsm
 
 import (
+	"reflect"
 	"sync"
 )
 
@@ -38,11 +39,47 @@ func RegisterStateMachine(fsm StateMachineInterface) {
 	stateMachineMap[fsm.ID()] = fsm
 }
 
-func GetStateMachine[S StateInterface[C], E, C any](id string) *StateMachineDefinition[S, E, C] {
+func GetStateMachine[S StateInterface[C], E, C any](id string, _ func(_ S, _ E, _ C)) *StateMachineDefinition[S, E, C] {
 	locker.Lock()
 	defer locker.Unlock()
 	if sm, ok := stateMachineMap[id]; ok {
 		return sm.(*StateMachineDefinition[S, E, C])
 	}
 	return nil
+}
+
+func FromContext[S StateInterface[C], E, C any](ctx *C, id string, signature func(_ S, _ E, _ C)) *StateMachine[S, E, C] {
+	stateReference := func(context *C) *BaseContext[S, C] {
+		v := reflect.ValueOf(ctx)
+		if v.Kind() == reflect.Ptr {
+			v = v.Elem()
+		}
+		v = v.FieldByName("BaseContext")
+		if !v.IsValid() {
+			return nil
+		}
+		switch i := v.Interface().(type) {
+		default:
+			return nil
+		case BaseContext[S, C]:
+			return &i
+		case *BaseContext[S, C]:
+			return i
+		}
+	}
+
+	smDef := GetStateMachine(id, signature)
+	if smDef == nil {
+		return nil
+	}
+	baseState := stateReference(ctx)
+	if baseState == nil {
+		baseState = &BaseContext[S, C]{}
+		baseState.InitState(smDef.InitialState)
+	}
+	return &StateMachine[S, E, C]{
+		context:                ctx,
+		state:                  baseState,
+		StateMachineDefinition: smDef,
+	}
 }

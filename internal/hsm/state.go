@@ -20,14 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package hsm
 
 type StateInterface[C any] interface {
-	OnEnter(e Event, ctx C) error
-	OnExit(e Event, ctx C) error
-
 	comparable
+
+	StateTransitionAction[C]
 }
 
-type StateBase[C any] interface {
-	StateInterface[C]
+type StateTransitionAction[C any] interface {
+	OnExit(ctx *C) error
+	OnEnter(ctx *C) error
+}
+
+type BaseState[C any] struct {
+	StateTransitionAction[C]
 }
 
 type StateDefinition[S StateInterface[C], E, C any] struct {
@@ -39,5 +43,33 @@ type StateDefinition[S StateInterface[C], E, C any] struct {
 	Substates []*StateDefinition[S, E, C]
 
 	// transitions
-	// Transitions []*TransitionDefinition
+	Transitions  []Transition
+	EntryActions []func(ctx *C) error
+	ExitActions  []func(ctx *C) error
+}
+
+func (b *BaseState[C]) OnExit(ctx *C) error {
+	return nil
+}
+
+func (b *BaseState[C]) OnEnter(ctx *C) error {
+	return nil
+}
+
+func (sd *StateDefinition[S, E, C]) OnExit(ctx *C) error {
+	for _, action := range sd.ExitActions {
+		if err := action(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (sd *StateDefinition[S, E, C]) OnEnter(ctx *C) error {
+	for _, action := range sd.EntryActions {
+		if err := action(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
 }

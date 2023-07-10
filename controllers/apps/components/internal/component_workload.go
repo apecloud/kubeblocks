@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/controllers/apps/components/types"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -96,12 +95,12 @@ func (b *ComponentWorkloadBuilderBase) BuildWorkload4StatefulSet(workloadType st
 		}
 
 		component := b.Comp.GetSynthesizedComponent()
-		obj, err := builder.BuildSts(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
+		sts, err := builder.BuildSts(b.ReqCtx, b.Comp.GetCluster(), component, b.EnvConfig.Name)
 		if err != nil {
 			return nil, err
 		}
 
-		b.Workload = obj
+		b.Workload = sts
 
 		return nil, nil // don't return sts here
 	}
@@ -250,13 +249,11 @@ func (b *ComponentWorkloadBuilderBase) BuildWrapper(buildfn func() ([]client.Obj
 }
 
 func (b *ComponentWorkloadBuilderBase) getRuntime() *corev1.PodSpec {
-	switch w := b.Workload.(type) {
-	case *appsv1.StatefulSet:
-		return &w.Spec.Template.Spec
-	case *appsv1.Deployment:
-		return &w.Spec.Template.Spec
-	case *workloads.ReplicatedStateMachine:
-		return &w.Spec.Template.Spec
+	if sts, ok := b.Workload.(*appsv1.StatefulSet); ok {
+		return &sts.Spec.Template.Spec
+	}
+	if deploy, ok := b.Workload.(*appsv1.Deployment); ok {
+		return &deploy.Spec.Template.Spec
 	}
 	return nil
 }

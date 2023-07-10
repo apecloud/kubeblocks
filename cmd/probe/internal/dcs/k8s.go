@@ -104,6 +104,10 @@ func (store *KubernetesStore) GetClusterName() string {
 	return store.clusterName
 }
 
+func (store *KubernetesStore) GetClusterFromCache() *Cluster {
+	return store.cluster
+}
+
 func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 	clusterResource := &appsv1alpha1.Cluster{}
 	err := store.client.Get().
@@ -113,7 +117,7 @@ func (store *KubernetesStore) GetCluster() (*Cluster, error) {
 		VersionedParams(&metav1.GetOptions{}, scheme.ParameterCodec).
 		Do(store.ctx).
 		Into(clusterResource)
-	store.logger.Infof("cluster resource: %v", clusterResource)
+	// store.logger.Debugf("cluster resource: %v", clusterResource)
 	if err != nil {
 		store.logger.Errorf("k8s get cluster error: %v", err)
 		return nil, err

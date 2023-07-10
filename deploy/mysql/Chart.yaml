@@ -10,7 +10,8 @@ version: 0.6.0-alpha.21
 # rather than the version number of ApeCloud MySQL-Scale itself.
 # From a user's perspective, the version number of the frontend
 # proxy of the MySQL being used is not relevant.
-appVersion: "8.0.33"
+# appVersion: "8.0.33"
+appVersion: "5.7"
 
 home: https://kubeblocks.io/
 icon: https://github.com/apecloud/kubeblocks/raw/main/img/logo.png

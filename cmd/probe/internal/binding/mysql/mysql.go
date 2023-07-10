@@ -38,6 +38,7 @@ import (
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -153,6 +154,16 @@ func (mysqlOps *MysqlOperations) GetRunningPort() int {
 }
 
 func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+	dcsStore := dcs.GetStore()
+	if dcsStore == nil {
+		return "", nil
+	}
+	k8sStore := dcsStore.(*dcs.KubernetesStore)
+	cluster := k8sStore.GetClusterFromCache()
+	if cluster == nil || !cluster.IsLocked() {
+		return "", nil
+	}
+
 	getReadOnlySql := `show global variables like 'read_only';`
 	data, err := mysqlOps.query(ctx, getReadOnlySql)
 	if err != nil {

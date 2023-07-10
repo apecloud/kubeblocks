@@ -157,8 +157,12 @@ func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, e
 		return false, err
 	}
 
-	if cluster.Leader != nil && cluster.Leader.Name == mgr.CurrentMemberName {
-		return true, nil
+	if cluster.Leader != nil && cluster.Leader.Name != "" {
+		if cluster.Leader.Name == mgr.CurrentMemberName {
+			return true, nil
+		} else {
+			return false, nil
+		}
 	}
 
 	// During the initialization of cluster, there would be more than one leader,

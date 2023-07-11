@@ -7,5 +7,5 @@
   {{- end }}
 {{- end }}
 {{- $zk_server := "" }}
-{{- $zk_server = printf "%s-%s" $clusterName $pulsar_zk_component }}
-{{ $zk_server }}:2181
+{{- $zk_server = printf "%s-%s.%s.svc" $clusterName $pulsar_zk_component.name $namespace }}
+{{- $zk_server }}:2181

@@ -50,9 +50,6 @@ spec:
       replicas: {{ .Values.zookeeper.replicaCount | default 3 }}
       {{- with  .Values.zookeeper.resources }}
       resources:
-        limits:
-          cpu: {{ .limits.cpu | quote }}
-          memory: {{ .limits.memory | quote }}
         requests:
           cpu: {{ .requests.cpu | quote }}
           memory: {{ .requests.memory | quote }}

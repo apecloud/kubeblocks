@@ -47,6 +47,9 @@ var _ = Describe("DataScriptOps", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.JobSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)

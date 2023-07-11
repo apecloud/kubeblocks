@@ -21,7 +21,7 @@ data:
       config_content=$(sed -n '/\['$1'\]/,/\[/ { /\['$1'\]/d; /\[/q; p; }' $config_file)
       while read line
       do
-        if [[ $line =~ ^[a-zA-Z_][a-zA-Z0-9_]*=[a-zA-Z0-9_]*$ ]]; then
+        if [[ $line =~ ^[a-zA-Z_][a-zA-Z0-9_]*=[a-zA-Z0-9_.]*$ ]]; then
           echo $line
           eval "export $line"
         elif ! [[ $line =~ ^[[:space:]]*# ]]; then 
@@ -200,6 +200,8 @@ data:
     tablet_type=replica
     topology_fags=${TOPOLOGY_FLAGS:-'--topo_implementation etcd2 --topo_global_server_address 127.0.0.1:2379 --topo_global_root /vitess/global'}
 
+    /scripts/wait-for-service.sh vtctld $vtctld_host $vtctld_web_port
+
     echo "starting vttablet for $alias..."
 
     su vitess <<EOF
@@ -254,6 +256,11 @@ data:
 
     cell=${CELL:-'zone1'}
     export ETCDCTL_API=2
+
+    etcdctl --endpoints "http://127.0.0.1:${etcd_port}" get "/vitess/global" >/dev/null 2>&1
+    if [[ $? -eq 1 ]]; then
+      exit 0
+    fi
 
     echo "add /vitess/global"
     etcdctl --endpoints "http://127.0.0.1:${etcd_port}" mkdir /vitess/global
@@ -346,7 +353,15 @@ data:
       --tablet_refresh_interval $tablet_refresh_interval \
       --service_map 'grpc-vtgateservice' \
       --pid_file $VTDATAROOT/vtgate.pid \
-      --mysql_auth_server_impl none
+      --mysql_auth_server_impl none \
+      --read_write_splitting_policy $read_write_splitting_policy  \
+      --read_after_write_consistency $read_after_write_consistency \
+      --read_after_write_timeout $read_after_write_timeout \
+      --enable_buffer=$enable_buffer \
+      --buffer_size $buffer_size \
+      --buffer_window $buffer_window \
+      --buffer_max_failover_duration $buffer_max_failover_duration \
+      --buffer_min_time_between_failovers $buffer_min_time_between_failovers
     EOF
   binlog-collector.sh: |-
     #!/bin/bash

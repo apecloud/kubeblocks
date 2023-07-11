@@ -14,15 +14,21 @@ The proxy cpu cores is 1/6 of the cluster total cpu cores.
 {{- if eq (mod $proxyCPU 2) 1 }}
 {{- $proxyCPU = add $proxyCPU 1 }}
 {{- end }}
-- name: etcd
-  componentDefRef: etcd # ref clusterdefinition componentDefs.name
+- name: vtcontroller
+  componentDefRef: vtcontroller # ref clusterdefinition componentDefs.name
+  volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
   replicas: 1
-- name: vtctld
-  componentDefRef: vtctld # ref clusterdefinition componentDefs.name
-  replicas: 1
-- name: vtconsensus
-  componentDefRef: vtconsensus # ref clusterdefinition componentDefs.name
-  replicas: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
 - name: vtgate
   componentDefRef: vtgate # ref clusterdefinition componentDefs.name
   replicas: 1

@@ -297,7 +297,7 @@ spec:
                 # --broker-service-url ${brokerServiceUrl} \
                 # --broker-service-url-tls pulsar+ssl://pulsar-mini-broker.pulsar.svc.cluster.local:6651/
 
-              bin/pulsar initialize-namespace -cs zookeepers-zk:2181 \
+              bin/pulsar initialize-namespace -cs ${zookeeperServers} \
                 --cluster $clusterName sn/system && (curl -sf -XPOST http://127.0.0.1:15020/quitquitquit || true)
             command:
               - sh
@@ -419,3 +419,123 @@ spec:
               readOnly: true
            #   - name: conf
            #     mountPath: /pulsar/conf
+    - name: proxy
+      workloadType: Stateful
+      characterType: proxy
+      componentDefRef:
+      - componentDefName: broker
+        componentRefEnv:
+        - name: brokerSVC
+          valueFrom:
+            type: ServiceRef
+      # TODO: support monitor
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9141
+      logConfigs:
+      # TODO: refer to broker configuration
+      configSpecs:
+      {{- if .Values.proxy.configuration }}
+        - name: proxy-config
+          templateRef: proxy-tpl
+          namespace: {{ .Release.Namespace }}
+          volumeName: config
+      {{- end }}
+      service:
+        ports:
+        - name: pulsar
+          port: 6650
+          protocol: TCP
+          targetPort: 6650
+        - name: http
+          port: 8080
+          protocol: TCP
+          targetPort: 8080
+      podSpec:
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10000
+          fsGroup: 0
+          runAsGroup: 0
+        initContainers:
+          - name: check-broker
+            args:
+            - set -e; while [ "$(curl -s -o /dev/null -w '%{http_code}' ${brokerSVC}:8080/status.html)"
+                  -ne "200" ]; do echo "pulsar cluster isn't initialized yet..."; sleep 3;
+              done
+            command:
+              - sh
+              - -c
+        containers:
+          - name: proxy
+            securityContext:
+              allowPrivilegeEscalation: false
+              runAsNonRoot: true
+              runAsUser: 10000
+              capabilities:
+                drop:
+                - ALL
+              privileged: false
+              runAsGroup: 0
+            args:
+            - bin/apply-config-from-env.py conf/proxy.conf && echo 'OK' > status && exec bin/pulsar proxy
+            command:
+              - sh
+              - -c
+            env:
+            - name: brokerWebServiceURL
+              value: http://$(brokerSVC):8080
+            - name: brokerServiceURL
+              value: pulsar://$(brokerSVC):6650
+            - name: clusterName
+              value: $(KB_NAMESPACE)-$(KB_CLUSTER_NAME)-proxy
+            - name: webServicePort
+              value: "8080"
+            envFrom:
+              - configMapRef:
+                  name: proxy-test-config
+            ports:
+            - containerPort: 6650
+              name: pulsar
+              protocol: TCP
+            - containerPort: 6651
+              name: pulsarssl
+              protocol: TCP
+            - containerPort: 8443
+              name: https
+              protocol: TCP
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+            livenessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /status.html
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 100
+            readinessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /status.html
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 100
+            startupProbe:
+              failureThreshold: 20
+              httpGet:
+                path: /status.html
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 100

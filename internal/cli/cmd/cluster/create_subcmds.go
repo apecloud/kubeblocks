@@ -125,8 +125,14 @@ func (o *createSubCmdsOptions) run() error {
 	// move values that belong to sub chart to sub map
 	values := buildHelmValues(o.chartInfo, o.values)
 
+	// get Kubernetes version
+	kubeVersion, err := util.GetK8sVersion(o.Client.Discovery())
+	if err != nil || kubeVersion == "" {
+		return fmt.Errorf("failed to get Kubernetes version %v", err)
+	}
+
 	// get cluster manifests
-	manifests, err := cluster.GetManifests(o.chartInfo.Chart, o.Namespace, o.Name, values)
+	manifests, err := cluster.GetManifests(o.chartInfo.Chart, o.Namespace, o.Name, kubeVersion, values)
 	if err != nil {
 		return err
 	}

@@ -29,6 +29,7 @@ var _ = Describe("cluster engine", func() {
 		clusterType = "mysql"
 		name        = "test-cluster"
 		namespace   = "test-namespace"
+		kubeVersion = "v99.99.0"
 	)
 
 	It("get and validate engine helm chart", func() {
@@ -46,7 +47,7 @@ var _ = Describe("cluster engine", func() {
 		Expect(c.SubChartName).ShouldNot(BeEmpty())
 
 		By("get manifests")
-		manifests, err := GetManifests(c.Chart, namespace, name, nil)
+		manifests, err := GetManifests(c.Chart, namespace, name, kubeVersion, nil)
 		Expect(err).Should(Succeed())
 		Expect(manifests).ShouldNot(BeEmpty())
 

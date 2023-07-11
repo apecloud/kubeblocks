@@ -25,7 +25,7 @@ spec:
       configSpecs:
         - name: llm-config-template
           templateRef: llm-config-template
-          volumeName: llm-config
+          volumeName: config
           namespace: {{ .Release.Namespace }}
       service:
         ports:
@@ -78,19 +78,19 @@ spec:
             terminationMessagePolicy: File
             volumeMounts:
               - mountPath: /llm/config/
-                name: llm-config
+                name: config
               - mountPath: /llm/storage
                 name: data
-            dnsPolicy: ClusterFirst
-            enableServiceLinks: true
             command:
             - /bin/sh
             - -c
             - |
-              sed -i "s/KB_LLM_MODEL_NAME_PLACEHOLDER/${MODEL_NAME}/g" /llm/config/config.properties
+              sleep 100000
+              cp /llm/config/config.properties /config.properties
+              sed -i "s/KB_LLM_MODEL_NAME_PLACEHOLDER/${MODEL_NAME}/g" /config.properties
               echo "running config:"
               cat /llm/config/config.properties
-              torchserve --start  --model-store /data/model-store/ --ts-config /llm/config/config.properties
+              torchserve --start  --model-store /llm/storage/model-store/ --ts-config /llm/config/config.properties
             ports:
             - name: ts
               containerPort: 8080

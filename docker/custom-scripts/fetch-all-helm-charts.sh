@@ -14,6 +14,7 @@ fi
 KB_CHART_DIR=${1}
 TARGET_DIR=${2:-"charts"}
 MANIFESTS_DIR="/tmp/manifests"
+GITHUB_HELM_CHARTS_URL=https://github.com/apecloud/helm-charts/releases/download
 
 # make directories
 mkdir -p "${TARGET_DIR}"
@@ -21,7 +22,7 @@ mkdir -p "${MANIFESTS_DIR}"
 
 # get all manifests
 helm version
-helm template "${KB_CHART_DIR}" --output-dir "${MANIFESTS_DIR}"
+helm template "${KB_CHART_DIR}" --output-dir "${MANIFESTS_DIR}" --set addonChartLocationBase=$GITHUB_HELM_CHARTS_URL
 
 # travel all addon manifests and get the helm charts
 for f in "${MANIFESTS_DIR}/kubeblocks/templates/addons"/*; do

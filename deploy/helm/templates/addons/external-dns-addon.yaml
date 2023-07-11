@@ -111,6 +111,8 @@ spec:
   helm:
     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/external-dns
+    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/external-dns-6.20.4/external-dns-6.20.4.tgz
     {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/external-dns-6.20.4.tgz
     {{- end }}

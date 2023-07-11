@@ -23,32 +23,69 @@ spec:
     - name: bookies-bk
       workloadType: Stateful
       characterType: bookies
+      statefulSpec:
+        updateStrategy: BestEffortParallel
       configSpecs:
         - name: bookies-bk-config
           templateRef: bookies-bk-config
           namespace: {{ .Release.Namespace }}
           volumeName: bookies-bk-config
       podSpec:
+        initContainers:
+          - args:
+            - |
+              echo "waiting zookeeper ready..."
+              zkDomain="${zkServers%%:*}"
+              until nslookup $zkDomain; do
+                sleep 3;
+              done;
+              echo "zk is ready, start to config bookkeeper..."
+              bin/apply-config-from-env.py conf/bookkeeper.conf;
+              if bin/bookkeeper shell whatisinstanceid; then
+                echo "bookkeeper cluster already initialized";
+              else
+                echo "bookkeeper init new cluster."
+                bin/bookkeeper shell initnewcluster;
+              fi
+              echo "verify bookkeeper cluster id"
+              bin/apply-config-from-env.py conf/bookkeeper.conf;until bin/bookkeeper shell whatisinstanceid; do
+                sleep 3;
+              done; bin/bookkeeper shell bookieformat -nonInteractive -force -deleteCookie || true
+            command:
+              - sh
+              - -c
+            envFrom:
+              - configMapRef:
+                  name: pulsar-pulsar-cluster-bookies-bookies-bk-config
+            image: apachepulsar/pulsar:2.11.1
+            imagePullPolicy: IfNotPresent
+            name: pulsar-bookkeeper-verify-clusterid
+            resources: { }
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
         containers:
           - args:
-              - "bin/apply-config-from-env.py conf/bookkeeper.conf &&\n\t\t\tif [ -x scripts/run-bookie.sh
-            ];then exec scripts/run-bookie.sh;else exec bin/pulsar bookie; fi"
+            - |
+              sleep 600 && bin/apply-config-from-env.py conf/bookkeeper.conf;
+              OPTS="${OPTS} -Dlog4j2.formatMsgNoLookups=true" exec bin/pulsar bookie;
             command:
               - bash
               - -c
             envFrom:
               - configMapRef:
-                  name: bookies-bk-config
-            image: streamnative/sn-platform-slim:2.10.3.4
+                  ## name: bookies-bk-config
+                  name: pulsar-pulsar-cluster-bookies-bookies-bk-config
+            ## image: streamnative/sn-platform-slim:2.10.3.4
+            image: apachepulsar/pulsar:2.11.1
             imagePullPolicy: IfNotPresent
             livenessProbe:
-              failureThreshold: 10
+              failureThreshold: 60
               httpGet:
                 path: /api/v1/bookie/state
-                port: http
+                port: 8000
                 scheme: HTTP
-              initialDelaySeconds: 30
-              periodSeconds: 3
+              initialDelaySeconds: 10
+              periodSeconds: 30
               successThreshold: 1
               timeoutSeconds: 5
             name: bookie
@@ -60,13 +97,13 @@ spec:
                 name: bookie
                 protocol: TCP
             readinessProbe:
-              failureThreshold: 10
+              failureThreshold: 60
               httpGet:
                 path: /api/v1/bookie/is_ready
-                port: http
+                port: 8000
                 scheme: HTTP
-              initialDelaySeconds: 30
-              periodSeconds: 3
+              initialDelaySeconds: 10
+              periodSeconds: 30
               successThreshold: 1
               timeoutSeconds: 5
             resources:
@@ -74,23 +111,8 @@ spec:
                 cpu: 200m
                 memory: 512Mi
             securityContext:
-              allowPrivilegeEscalation: false
-              capabilities:
-                drop:
-                  - ALL
-              privileged: false
-              runAsGroup: 0
-              runAsNonRoot: true
-              runAsUser: 10000
-            startupProbe:
-              failureThreshold: 200
-              httpGet:
-                path: /api/v1/bookie/is_ready
-                port: http
-                scheme: HTTP
-              periodSeconds: 3
-              successThreshold: 1
-              timeoutSeconds: 5
+              fsGroup: 0
+              fsGroupChangePolicy: OnRootMismatch
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
             volumeMounts:
@@ -101,6 +123,8 @@ spec:
     - name: zookeeper
       workloadType: Stateful
       characterType: zookeeper
+      statefulSpec:
+        updateStrategy: BestEffortParallel
       monitor:
         builtIn: false
         exporterConfig:
@@ -112,21 +136,13 @@ spec:
           filePathPattern: {{ $pattern }}
         {{- end }}
       configSpecs:
-      {{- if .Values.zookeeper.configuration }}
-        - name: zookeeper-tpl
-          templateRef: zookeeper-tpl
+        - name: zookeepers-zk-config
+          templateRef: zookeepers-zk-config
           namespace: {{ .Release.Namespace }}
-          volumeName: config
-      {{- end }}
-      scriptSpecs:
-        - name: zookeeper-scripts-tpl
-          templateRef: zookeeper-scripts-tpl
-          namespace: {{ .Release.Namespace }}
-          volumeName: scripts
-          defaultMode: 0755
+          volumeName: zookeepers-zk-config
       service:
         ports:
-          - name: tcp-client
+          - name: client
             port: 2181
             targetPort: client
           - name: metrics
@@ -134,106 +150,90 @@ spec:
             targetPort: metrics
       podSpec:
         securityContext:
-          fsGroup: 1001
-        initContainers:
+          fsGroup: 0
+          runAsGroup: 0
+          runAsNonRoot: true
+          runAsUser: 10000
         containers:
-          - name: zookeeper
+          - command:
+              - bash
+              - -c
+            args:
+              - |-
+                bin/apply-config-from-env.py conf/zookeeper.conf;
+                bin/generate-zookeeper-config.sh conf/zookeeper.conf; exec bin/pulsar zookeeper;
+            env:
+              - name: EXTERNAL_PROVIDED_SERVERS
+                value: "false"
+              - name: OPTS
+                value: "-Dlog4j2.formatMsgNoLookups=true -XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
+            envFrom:
+              - configMapRef:
+                  ## name: zookeepers-zk-config
+                  name: pulsar-pulsar-cluster-zookeeper-zookeepers-zk-config
+            image: apachepulsar/pulsar:2.11.1
+            imagePullPolicy: IfNotPresent
+            lifecycle: {}
+            livenessProbe:
+              exec:
+                command:
+                  - timeout
+                  - "30"
+                  - bash
+                  - -c
+                  - echo ruok | nc -q 1 localhost 2181 | grep imok
+              failureThreshold: 10
+              initialDelaySeconds: 20
+              periodSeconds: 30
+              successThreshold: 1
+              timeoutSeconds: 30
+            name: zookeeper
+            ports:
+              - containerPort: 2181
+                name: client
+                protocol: TCP
+              - containerPort: 2888
+                name: tcp-quorum
+                protocol: TCP
+              - containerPort: 3888
+                name: tcp-election
+                protocol: TCP
+              - containerPort: 9141
+                name: metrics
+                protocol: TCP
+              - containerPort: 9990
+                name: http-admin
+                protocol: TCP
+            readinessProbe:
+              exec:
+                command:
+                  - timeout
+                  - "30"
+                  - bash
+                  - -c
+                  - echo ruok | nc -q 1 localhost 2181 | grep imok
+              failureThreshold: 10
+              initialDelaySeconds: 20
+              periodSeconds: 30
+              successThreshold: 1
+              timeoutSeconds: 30
+            resources:
+              requests:
+                cpu: 50m
+                memory: 256Mi
             securityContext:
               allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                  - ALL
+              privileged: false
+              runAsGroup: 0
               runAsNonRoot: true
-              runAsUser: 1001
-            command:
-              - /scripts/setup.sh
-            resources:
-              limits: {}
-              requests:
-                cpu: 250m
-                memory: 256Mi
-            env:
-              - name: POD_NAME
-                valueFrom:
-                  fieldRef:
-                    apiVersion: v1
-                    fieldPath: metadata.name
-              - name: BITNAMI_DEBUG
-                value: "false"
-              - name: ZOO_DATA_LOG_DIR
-                value: ""
-              - name: ZOO_PORT_NUMBER
-                value: "2181"
-              - name: ZOO_TICK_TIME
-                value: "2000"
-              - name: ZOO_INIT_LIMIT
-                value: "10"
-              - name: ZOO_SYNC_LIMIT
-                value: "5"
-              - name: ZOO_PRE_ALLOC_SIZE
-                value: "65536"
-              - name: ZOO_SNAPCOUNT
-                value: "100000"
-              - name: ZOO_MAX_CLIENT_CNXNS
-                value: "60"
-              - name: ZOO_4LW_COMMANDS_WHITELIST
-                value: "srvr, mntr, ruok"
-              - name: ZOO_LISTEN_ALLIPS_ENABLED
-                value: "no"
-              - name: ZOO_AUTOPURGE_INTERVAL
-                value: "0"
-              - name: ZOO_AUTOPURGE_RETAIN_COUNT
-                value: "3"
-              - name: ZOO_MAX_SESSION_TIMEOUT
-                value: "40000"
-              # HACK: hack for single ZK node only
-              - name: ZOO_SERVERS
-                value: "$(KB_POD_NAME).$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:2888:3888::1"
-                # value: myck-zookeeper-0.myck-zookeeper-headless.$(POD_NAMESPACE).svc:2888:3888::1 myck-zookeeper-1.myck-zookeeper-headless.$(POD_NAMESPACE).svc:2888:3888::2 myck-zookeeper-2.myck-zookeeper-headless.$(POD_NAMESPACE).svc:2888:3888::3 
-              - name: ZOO_ENABLE_AUTH
-                value: "no"
-              - name: ZOO_ENABLE_QUORUM_AUTH
-                value: "no"
-              - name: ZOO_HEAP_SIZE
-                value: "1024"
-              - name: ZOO_LOG_LEVEL
-                value: "ERROR"
-              - name: ALLOW_ANONYMOUS_LOGIN
-                value: "yes"
-              - name: ZOO_ENABLE_PROMETHEUS_METRICS
-                value: "yes"
-              - name: ZOO_PROMETHEUS_METRICS_PORT_NUMBER
-                value: "9141"
-              - name: POD_NAME
-                value: "$(KB_POD_NAME)"
-              - name: POD_NAMESPACE
-                value: "$(KB_NAMESPACE)"
-              # TODO: using componentDefRef to inject zookeeper or keeper env
-            ports:
-              - name: client
-                containerPort: 2181
-              - name: follower
-                containerPort: 2888
-              - name: election
-                containerPort: 3888
-              - name: metrics
-                containerPort: 9141
-            livenessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 30
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              exec:
-                command: ['/bin/bash', '-c', 'echo "ruok" | timeout 2 nc -w 2 localhost 2181 | grep imok']
-            readinessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              exec:
-                command: ['/bin/bash', '-c', 'echo "ruok" | timeout 2 nc -w 2 localhost 2181 | grep imok']
+              runAsUser: 10000
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
             volumeMounts:
-              - name: scripts
-                mountPath: /scripts/setup.sh
-                subPath: setup.sh
-              - name: data
-                mountPath: /bitnami/zookeeper
+              - mountPath: /pulsar/data
+                name: data
+              - mountPath: /pulsar/data-log
+                name: data-log

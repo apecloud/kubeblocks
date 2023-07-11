@@ -122,9 +122,10 @@ type OpsRequestSpec struct {
 	RestoreFrom *RestoreFromSpec `json:"restoreFrom,omitempty"`
 
 	// ttlSecondsBeforeAbort OpsRequest will wait at most TTLSecondsBeforeAbort seconds for start-conditions to be met.
+	// If not specified, the default value is 0, which means that the start-conditions must be met immediately.
 	// +kubebuilder:default=0
 	// +optional
-	TTLSecondsBeforeAbort int32 `json:"ttlSecondsBeforeAbort,omitempty"`
+	TTLSecondsBeforeAbort *int32 `json:"ttlSecondsBeforeAbort,omitempty"`
 
 	// scriptSpec defines the script to be executed.
 	// +optional

@@ -2382,6 +2382,11 @@ func (in *OpsRequestSpec) DeepCopyInto(out *OpsRequestSpec) {
 		*out = new(RestoreFromSpec)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.TTLSecondsBeforeAbort != nil {
+		in, out := &in.TTLSecondsBeforeAbort, &out.TTLSecondsBeforeAbort
+		*out = new(int32)
+		**out = **in
+	}
 	if in.ScriptSpec != nil {
 		in, out := &in.ScriptSpec, &out.ScriptSpec
 		*out = new(ScriptSpec)

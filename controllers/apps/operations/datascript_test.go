@@ -28,6 +28,10 @@ var _ = Describe("DataScriptOps", func() {
 		reqCtx      intctrlutil.RequestCtx
 	)
 
+	int32Ptr := func(i int32) *int32 {
+		return &i
+	}
+
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,
 		// otherwise if later it needs to create some new resource objects with the same name,
@@ -57,7 +61,7 @@ var _ = Describe("DataScriptOps", func() {
 			ComponentOps: appsv1alpha1.ComponentOps{ComponentName: comp},
 			Script:       []string{"CREATE TABLE test (id INT);"},
 		}
-		ops.Spec.TTLSecondsBeforeAbort = ttlBeforeAbort
+		ops.Spec.TTLSecondsBeforeAbort = int32Ptr(ttlBeforeAbort)
 		Expect(testCtx.CreateObj(testCtx.Ctx, ops)).Should(Succeed())
 		return ops
 	}

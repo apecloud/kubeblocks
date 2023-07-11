@@ -40,7 +40,7 @@ const (
 	ConditionTypeStart             = "Starting"
 	ConditionTypeVersionUpgrading  = "VersionUpgrading"
 	ConditionTypeExpose            = "Exposing"
-	ConditionTypeDataScript        = "ExecutDataScript"
+	ConditionTypeDataScript        = "ExecuteDataScript"
 
 	// condition and event reasons
 

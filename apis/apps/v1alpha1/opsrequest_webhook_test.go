@@ -48,6 +48,11 @@ var _ = Describe("OpsRequest webhook", func() {
 		clusterName                  = "opswebhook-mysql-" + randomStr
 		opsRequestName               = "opswebhook-mysql-ops-" + randomStr
 	)
+
+	int32Ptr := func(i int32) *int32 {
+		return &i
+	}
+
 	cleanupObjects := func() {
 		// Add any setup steps that needs to be executed before each test
 		err := k8sClient.DeleteAllOf(ctx, &OpsRequest{}, client.InNamespace(testCtx.DefaultNamespace), client.HasLabels{testCtx.TestObjLabelKey})
@@ -579,7 +584,7 @@ var _ = Describe("OpsRequest webhook", func() {
 
 			Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).To(ContainSubstring("DataScript is forbidden"))
 
-			opsRequest.Spec.TTLSecondsBeforeAbort = 10
+			opsRequest.Spec.TTLSecondsBeforeAbort = int32Ptr(10)
 			Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).To(ContainSubstring("wait for cluster"))
 
 			By("By testing dataScript, with illegal configmap, should fail")
@@ -614,7 +619,7 @@ var _ = Describe("OpsRequest webhook", func() {
 
 			opsRequest.Spec.ScriptSpec.Script = []string{"create database test;"}
 			opsRequest.Spec.ScriptSpec.ScriptFrom = nil
-			opsRequest.Spec.TTLSecondsBeforeAbort = 0
+			opsRequest.Spec.TTLSecondsBeforeAbort = int32Ptr(0)
 			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
 		})
 	})

@@ -406,7 +406,8 @@ spec:
               ttlSecondsBeforeAbort:
                 default: 0
                 description: ttlSecondsBeforeAbort OpsRequest will wait at most TTLSecondsBeforeAbort
-                  seconds for start-conditions to be met.
+                  seconds for start-conditions to be met. If not specified, the default
+                  value is 0, which means that the start-conditions must be met immediately.
                 format: int32
                 type: integer
               type:

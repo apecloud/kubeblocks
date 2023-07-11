@@ -152,7 +152,7 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 		// if the cluster is not in the expected phase, we should wait for it for up to TTLSecondsBeforeAbort seconds.
 		// if len(opsRecorder) == 0 && !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
 		// TTLSecondsBeforeAbort is 0 means that the we do not need to wait for the cluster to reach the expected phase.
-		if r.Spec.TTLSecondsBeforeAbort == 0 || time.Now().After(r.GetCreationTimestamp().Add(time.Duration(r.Spec.TTLSecondsBeforeAbort)*time.Second)) {
+		if r.Spec.TTLSecondsBeforeAbort == nil || (time.Now().After(r.GetCreationTimestamp().Add(time.Duration(*r.Spec.TTLSecondsBeforeAbort) * time.Second))) {
 			return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
 		}
 		return &WaitForClusterPhaseErr{

@@ -81,16 +81,19 @@ func (smDef *StateMachineDefinition[S, E, C]) stateDefinition(state S) (stateDef
 	return
 }
 
+// OnEnter adds an action to be executed when entering the state
 func (builder *StateBuilder[S, E, C]) OnEnter(action func(ctx *C) error) BuilderInterface[S, E, C] {
 	builder.EntryActions = append(builder.EntryActions, action)
 	return builder
 }
 
+// OnExit adds an action to be executed when exiting the state
 func (builder *StateBuilder[S, E, C]) OnExit(action func(ctx *C) error) BuilderInterface[S, E, C] {
 	builder.EntryActions = append(builder.EntryActions, action)
 	return builder
 }
 
+// Transition adds a transition from the current state to the destination state
 func (builder *StateBuilder[S, E, C]) Transition(event E, destinationState S, guards ...func(ctx *C) bool) BuilderInterface[S, E, C] {
 	buildFn := func() Transition {
 		return &NormalTransition[S, E, C]{
@@ -103,6 +106,7 @@ func (builder *StateBuilder[S, E, C]) Transition(event E, destinationState S, gu
 	return builder.buildWrapper(buildFn)
 }
 
+// InternalTransition adds an internal transition from the current state
 func (builder StateBuilder[S, E, C]) InternalTransition(event E, action func(ctx *C) error, guards ...func(ctx *C) bool) BuilderInterface[S, E, C] {
 	buildFn := func() Transition {
 		return &internalTransition[E, C]{
@@ -115,15 +119,15 @@ func (builder StateBuilder[S, E, C]) InternalTransition(event E, action func(ctx
 	return builder.buildWrapper(buildFn)
 }
 
+// Build builds the state machine
 func (builder *StateBuilder[S, E, C]) Build() error {
 	if builder.Error != nil {
 		return builder.Error
 	}
+
 	sd := builder.StateMachineRef.stateDefinition(builder.State)
 	sd.EntryActions = builder.EntryActions
 	sd.ExitActions = builder.ExitActions
-	sd.Substates = builder.Substates
-	sd.Superstate = builder.Superstate
 	sd.Transitions = builder.Transitions
 	return nil
 }
@@ -141,6 +145,7 @@ func (smDef *StateMachineDefinition[S, E, C]) ID() string {
 	return smDef.name
 }
 
+// OnRecover adds a recover function to the state machine
 func (smDef *StateMachineDefinition[S, E, C]) OnRecover(recoverFn func(ctx *C) (S, error)) {
 	smDef.recoverFn = recoverFn
 }

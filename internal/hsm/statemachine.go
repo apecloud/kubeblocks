@@ -36,9 +36,9 @@ type StatelessStateMachine[S StateInterface[C], E Event, C any] interface {
 	OnRecover(recoverFn func(ctx *C) (S, error))
 }
 
-//type StateMachineInterface[S StateInterface[C], E Event, C any] interface {
-//	Fire(trigger Trigger, args ...interface{}) error
-//}
+type StateMachineInstance[S StateInterface[C], E Event, C any] interface {
+	Fire(event E) error
+}
 
 type StateMachine[S StateInterface[C], E Event, C any] struct {
 	*StateMachineDefinition[S, E, C]

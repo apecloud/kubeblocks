@@ -37,10 +37,10 @@ type BaseState[C any] struct {
 type StateDefinition[S StateInterface[C], E, C any] struct {
 	State        S
 	StateMachine *StateMachineDefinition[S, E, C]
-	Superstate   *StateDefinition[S, E, C]
 
-	// substates
-	Substates []*StateDefinition[S, E, C]
+	// TODO support sub fsm
+	// Superstate *StateDefinition[S, E, C]
+	// Substates  []*StateDefinition[S, E, C]
 
 	// transitions
 	Transitions  []Transition

@@ -36,4 +36,13 @@ spec:
         - name: init-sysctl
           image: {{ .Values.broker.image.repository }}:{{ .Values.broker.image.tag }}
           imagePullPolicy: {{ default .Values.broker.image.pullPolicy "IfNotPresent" }}
-  
+    - componentDefRef: proxy
+      versionsContext:
+        containers:
+          - name: proxy
+            image: {{ .Values.proxy.image.repository }}:{{ .Values.proxy.image.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.proxy.image.pullPolicy }}
+        initContainers:
+        - name: check-broker
+          image: {{ .Values.proxy.image.repository }}:{{ .Values.proxy.image.tag }}
+          imagePullPolicy: {{ default .Values.proxy.image.pullPolicy "IfNotPresent" }}

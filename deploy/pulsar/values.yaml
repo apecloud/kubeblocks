@@ -49,3 +49,11 @@ broker:
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
     tag: 2.10.3.4
+
+proxy:
+  configuration: ""
+  image:
+    repository: streamnative/sn-platform-slim
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: 2.10.3.4

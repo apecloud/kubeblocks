@@ -122,6 +122,7 @@ func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName st
 	for _, sub := range rb.Subjects {
 		if sub.Kind == ServiceAccountKind && sub.Name == serviceAccountName {
 			isServiceAccountMatch = true
+			break
 		}
 	}
 

@@ -22,6 +22,7 @@ package apps
 import (
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -44,11 +45,6 @@ const (
 func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*ClusterTransformContext)
 	cluster := transCtx.Cluster
-	if !viper.GetBool("ENABLE_RBAC_MANAGER") {
-		transCtx.Logger.V(1).Info("rbac manager is not enabled")
-		return nil
-	}
-
 	root, err := ictrltypes.FindRootVertex(dag)
 	if err != nil {
 		return err
@@ -60,7 +56,13 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 			serviceAccountName = "kb-" + cluster.Name
 		}
 
-		if isRoleBindingExist(transCtx, serviceAccountName) {
+		if !viper.GetBool("ENABLE_RBAC_MANAGER") {
+			transCtx.Logger.V(1).Info("rbac manager is not enabled")
+			isRoleBindingExist(transCtx, serviceAccountName, true)
+			return nil
+		}
+
+		if isRoleBindingExist(transCtx, serviceAccountName, false) {
 			continue
 		}
 		roleBinding, err := builder.BuildRoleBinding(cluster)
@@ -93,7 +95,7 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 	return nil
 }
 
-func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName string) bool {
+func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName string, sendEvent bool) bool {
 	cluster := transCtx.Cluster
 	namespaceName := types.NamespacedName{
 		Namespace: cluster.Namespace,
@@ -105,6 +107,9 @@ func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName st
 		// the rolebinding is not already present.
 		if errors.IsNotFound(err) {
 			transCtx.Logger.V(1).Info("RoleBinding not exists", "namespaceName", namespaceName)
+			if sendEvent {
+				transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning, "RoleBinding not exists", err.Error())
+			}
 			return false
 		}
 		transCtx.Logger.Error(err, "get service account failed")

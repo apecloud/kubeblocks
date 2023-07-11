@@ -30,6 +30,12 @@
       "type": "boolean",
       "default": false
     },
+    "storageEnable": {
+      "title": "StorageEnable",
+      "description": "Enable storage for Kafka.",
+      "type": "boolean",
+      "default": false
+    },
     "storage": {
       "title": "Storage(Gi)",
       "description": "Data Storage size, the unit is Gi.",
@@ -40,6 +46,29 @@
       "default": 10,
       "minimum": 1,
       "maximum": 10000
+    },
+    "storageClass": {
+      "title": "StorageClass",
+      "description": "The StorageClass for Kafka Data Storage.",
+      "type": "string",
+      "default": ""
+    },
+    "metaStorage": {
+      "title": "MetaStorage(Gi)",
+      "description": "Metadata Storage size, the unit is Gi.",
+      "type": [
+        "number",
+        "string"
+      ],
+      "default": 5,
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "metaStorageClass": {
+      "title": "MetaStorageClass",
+      "description": "The StorageClass for Kafka Metadata Storage.",
+      "type": "string",
+      "default": ""
     },
     "replicas": {
       "title": "Replicas",
@@ -86,7 +115,7 @@
         "number",
         "string"
       ],
-      "default": 1,
+      "default": 0.5,
       "minimum": 0.5,
       "maximum": 64,
       "multipleOf": 0.5
@@ -98,7 +127,7 @@
         "number",
         "string"
       ],
-      "default": 1,
+      "default": 0.5,
       "minimum": 0.5,
       "maximum": 1000
     },

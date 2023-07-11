@@ -26,14 +26,23 @@ spec:
       {{- include "kblib.componentServices" . | indent 6 }}
       {{- if $.Values.storageEnable }}
       volumeClaimTemplates:
-        - name: data 
+        - name: data
           spec:
+            storageClassName: {{ $.Values.storageClassName }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
                 storage: {{ print $.Values.storage "Gi" }}
-        {{- end }}
+        - name: metadata
+          spec:
+            storageClassName: {{ $.Values.metaStorageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ print $.Values.metaStorage "Gi" }}
+      {{- end }}
     {{- else }}
     - name: controller
       componentDefRef: controller
@@ -50,11 +59,20 @@ spec:
       volumeClaimTemplates:
         - name: data
           spec:
+            storageClassName: {{ $.Values.storageClassName }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
                 storage: {{ print $.Values.storage "Gi" }}
+        - name: metadata
+          spec:
+            storageClassName: {{ $.Values.metaStorageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ print $.Values.metaStorage "Gi" }}
       {{- end }}
     - name: broker
       componentDefRef: kafka-broker
@@ -70,15 +88,24 @@ spec:
       {{- include "kblib.componentServices" . | indent 6 }}
       {{- if $.Values.storageEnable }}
       volumeClaimTemplates:
-        - name: data 
+        - name: data
           spec:
+            storageClassName: {{ $.Values.storageClassName }}
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
                 storage: {{ print $.Values.storage "Gi" }}
-        {{- end }}
+        - name: metadata
+          spec:
+            storageClassName: {{ $.Values.metaStorageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ print $.Values.metaStorage "Gi" }}
       {{- end }}
+    {{- end }}
     {{- if .Values.monitorEnable }}
     - name: metrics-exp
       componentDefRef: kafka-exporter

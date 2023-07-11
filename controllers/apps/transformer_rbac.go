@@ -64,6 +64,7 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 			if !isServiceAccountExist(transCtx, serviceAccountName, true) {
 				return ictrlutil.NewRequeueError(time.Second, serviceAccountName+" ServiceAccount is not exist")
 			}
+			return nil
 		}
 
 		if isRoleBindingExist(transCtx, serviceAccountName) {

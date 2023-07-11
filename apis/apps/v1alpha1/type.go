@@ -114,6 +114,7 @@ type ComponentConfigSpec struct {
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
 
 	// asEnvFrom is optional: the list of containers will be injected into EnvFrom.
+	// +listType=set
 	// +optional
 	AsEnvFrom []string `json:"asEnvFrom,omitempty"`
 }

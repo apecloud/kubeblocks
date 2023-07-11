@@ -176,6 +176,7 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: set
                           constraintRef:
                             description: Specify the name of the referenced the configuration
                               constraints object.

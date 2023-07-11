@@ -466,6 +466,34 @@ var _ = Describe("Cluster Controller", func() {
 		return pods
 	}
 
+	mockPodsForComponent := func(cluster *appsv1alpha1.Cluster, compName string, number int) []corev1.Pod {
+		clusterName := cluster.Name
+		stsName := cluster.Name + "-" + compName
+		pods := make([]corev1.Pod, 0)
+		for i := 0; i < number; i++ {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      stsName + "-" + strconv.Itoa(i),
+					Namespace: testCtx.DefaultNamespace,
+					Labels: map[string]string{
+						constant.AppManagedByLabelKey:         constant.AppName,
+						constant.AppInstanceLabelKey:          clusterName,
+						constant.KBAppComponentLabelKey:       compName,
+						appsv1.ControllerRevisionHashLabelKey: "mock-version",
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{{
+						Name:  "mock-container",
+						Image: "mock-container",
+					}},
+				},
+			}
+			pods = append(pods, *pod)
+		}
+		return pods
+	}
+
 	horizontalScaleComp := func(updatedReplicas int, comp *appsv1alpha1.ClusterComponentSpec, policy *appsv1alpha1.HorizontalScalePolicy) {
 		By("Mocking components' PVCs to bound")
 		for i := 0; i < int(comp.Replicas); i++ {
@@ -1261,6 +1289,156 @@ var _ = Describe("Cluster Controller", func() {
 		})
 	}
 
+	mockComponentWorkloadRunning := func(cluster *appsv1alpha1.Cluster,
+		compName string, sts *appsv1.StatefulSet, pods []corev1.Pod) {
+	}
+
+	mockComponentWorkloadFailed := func(cluster *appsv1alpha1.Cluster,
+		compName string, sts *appsv1.StatefulSet, pods []corev1.Pod) {
+	}
+
+	mockComponentWorkloadAbnormal := func(cluster *appsv1alpha1.Cluster,
+		compName string, sts *appsv1.StatefulSet, pods []corev1.Pod) {
+	}
+
+	testClusterStatusWhileErrorsAtCreating := func(compName, compDefName string) {
+		var (
+			replicas = 1
+		)
+
+		By("creating a cluster")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			clusterDefObj.Name, clusterVersionObj.Name).
+			AddComponent(compName, compDefName).SetReplicas(int32(replicas)).
+			Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, compName)
+
+		By("create pods for component workload")
+		var sts *appsv1.StatefulSet
+		Eventually(func(g Gomega) {
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			g.Expect(stsList.Items).ShouldNot(BeEmpty())
+			sts = &stsList.Items[0]
+		}).Should(Succeed())
+		pods := mockPodsForComponent(clusterObj, compName, replicas)
+		for _, pod := range pods {
+			Expect(controllerutil.SetControllerReference(sts, &pod, scheme.Scheme)).Should(Succeed())
+			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
+		}
+
+		By("mock pods as abnormal, check component and cluster status as Creating")
+		mockComponentWorkloadAbnormal(clusterObj, compName, sts, pods)
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			g.Expect(cluster.Generation).Should(Equal(cluster.Status.ObservedGeneration))
+			g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+			g.Expect(len(cluster.Status.Components)).Should(Equal(1))
+			g.Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+		})).Should(Succeed())
+
+		By("mock pods as failed, check component and cluster status as Creating")
+		mockComponentWorkloadFailed(clusterObj, compName, sts, pods)
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			g.Expect(cluster.Generation).Should(Equal(cluster.Status.ObservedGeneration))
+			g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.CreatingClusterPhase))
+			g.Expect(len(cluster.Status.Components)).Should(Equal(1))
+			g.Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+		})).Should(Succeed())
+
+		By("mock pods as running, check component and cluster status transit to Running")
+		mockComponentWorkloadRunning(clusterObj, compName, sts, pods)
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
+			g.Expect(cluster.Status.Components[compName].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+		})).Should(Succeed())
+	}
+
+	testClusterStatusWhileErrorsAtUpdating := func(compName, compDefName string) {
+		var (
+			compName0 = compName + "-0"
+			compName1 = compName + "-1"
+			replicas  = 1
+		)
+		By("creating a cluster")
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			clusterDefObj.Name, clusterVersionObj.Name).
+			AddComponent(compName0, compDefName).SetReplicas(int32(replicas)).
+			Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+		waitForCreatingResourceCompletely(clusterKey, compName0)
+
+		By("create pods for component workload ")
+		var sts0 *appsv1.StatefulSet
+		Eventually(func(g Gomega) {
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			g.Expect(stsList.Items).ShouldNot(BeEmpty())
+			sts0 = &stsList.Items[0]
+		}).Should(Succeed())
+		pods0 := mockPodsForComponent(clusterObj, compName0, replicas)
+		for _, pod := range pods0 {
+			Expect(controllerutil.SetControllerReference(sts0, &pod, scheme.Scheme)).Should(Succeed())
+			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
+		}
+		mockComponentWorkloadRunning(clusterObj, compName0, sts0, pods0)
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			g.Expect(cluster.Generation).Should(Equal(cluster.Status.ObservedGeneration))
+			g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
+			g.Expect(len(cluster.Status.Components)).Should(Equal(1))
+			g.Expect(cluster.Status.Components[compName0].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+		})).Should(Succeed())
+
+		By("add a new component to cluster")
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			comp := appsv1alpha1.ClusterComponentSpec{
+				Name:            compName1,
+				ComponentDefRef: compDefName,
+				Replicas:        int32(replicas),
+			}
+			cluster.Spec.ComponentSpecs = append(cluster.Spec.ComponentSpecs, comp)
+		})()).ShouldNot(HaveOccurred())
+		waitForCreatingResourceCompletely(clusterKey, compName1)
+
+		By("create pods for new component workload ")
+		var sts1 *appsv1.StatefulSet
+		Eventually(func(g Gomega) {
+			stsList := testk8s.ListAndCheckStatefulSet(&testCtx, clusterKey)
+			g.Expect(stsList.Items).ShouldNot(BeEmpty())
+			sts1 = &stsList.Items[1]
+		}).Should(Succeed())
+		pods1 := mockPodsForComponent(clusterObj, compName0, replicas)
+		for _, pod := range pods1 {
+			Expect(controllerutil.SetControllerReference(sts1, &pod, scheme.Scheme)).Should(Succeed())
+			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
+		}
+
+		By("mock new component pods as abnormal, check the component and cluster status as Creating and Updating")
+		mockComponentWorkloadAbnormal(clusterObj, compName1, sts1, pods1)
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
+			g.Expect(len(cluster.Status.Components)).Should(Equal(2))
+			g.Expect(cluster.Status.Components[compName0].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			g.Expect(cluster.Status.Components[compName1].Phase).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+		})).Should(Succeed())
+
+		By("mock new component pods as failed, check new component and cluster status as Creating and Updating")
+		mockComponentWorkloadFailed(clusterObj, compName1, sts1, pods1)
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.SpecReconcilingClusterPhase))
+			g.Expect(cluster.Status.Components[compName0].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			g.Expect(cluster.Status.Components[compName1].Phase).Should(Equal(appsv1alpha1.CreatingClusterCompPhase))
+		})).Should(Succeed())
+
+		By("mock new component pods as running, check new component and cluster status transit to Running")
+		mockComponentWorkloadRunning(clusterObj, compName1, sts1, pods1)
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			g.Expect(cluster.Status.Phase).Should(Equal(appsv1alpha1.RunningClusterPhase))
+			g.Expect(cluster.Status.Components[compName0].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+			g.Expect(cluster.Status.Components[compName1].Phase).Should(Equal(appsv1alpha1.RunningClusterCompPhase))
+		})).Should(Succeed())
+	}
+
 	mockRoleChangedEvent := func(key types.NamespacedName, sts *appsv1.StatefulSet) []corev1.Event {
 		pods, err := components.GetPodListByStatefulSet(ctx, k8sClient, sts)
 		Expect(err).To(Succeed())
@@ -1994,6 +2172,16 @@ var _ = Describe("Cluster Controller", func() {
 
 			It(fmt.Sprintf("[comp: %s] update kubeblocks-tools image", compName), func() {
 				testUpdateKubeBlocksToolsImage(compName, compDefName)
+			})
+
+			Context(fmt.Sprintf("[comp: %s] should tolerate temporary abnormal/failed at creating and updating", compName), func() {
+				It(fmt.Sprintf("[comp: %s] should tolerate temporary abnormal/failed at creating", compName), func() {
+					testClusterStatusWhileErrorsAtCreating(compName, compDefName)
+				})
+
+				It(fmt.Sprintf("[comp: %s] should tolerate temporary abnormal/failed at updating", compName), func() {
+					testClusterStatusWhileErrorsAtUpdating(compName, compDefName)
+				})
 			})
 		}
 	})

@@ -66,7 +66,7 @@ spec:
         containers:
           - args:
             - |
-              sleep 600 && bin/apply-config-from-env.py conf/bookkeeper.conf;
+              bin/apply-config-from-env.py conf/bookkeeper.conf;
               OPTS="${OPTS} -Dlog4j2.formatMsgNoLookups=true" exec bin/pulsar bookie;
             command:
               - bash
@@ -111,8 +111,9 @@ spec:
                 cpu: 200m
                 memory: 512Mi
             securityContext:
-              fsGroup: 0
-              fsGroupChangePolicy: OnRootMismatch
+              runAsUser: 0
+              fsGroup: 10000
+              runAsGroup: 10000
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
             volumeMounts:

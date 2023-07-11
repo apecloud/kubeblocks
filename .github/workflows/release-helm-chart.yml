@@ -45,7 +45,7 @@ jobs:
     secrets: inherit
 
   release-charts-image:
-    needs: release-chart
+    needs: [ chart-version, release-chart ]
     uses: apecloud/apecloud-cd/.github/workflows/release-image.yml@v0.1.0
     with:
       MAKE_OPS: "push-charts-image"

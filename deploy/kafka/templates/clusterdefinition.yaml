@@ -108,7 +108,7 @@ spec:
               - name: KAFKA_CFG_METADATA_LOG_DIR
                 value: "/bitnami/kafka/metadata"
               - name: KAFKA_LOG_DIR
-                value: "/opt/bitnami/kafka/logs"
+                value: "/bitnami/kafka/data"
               - name: KAFKA_HEAP_OPTS
                 #value: "-Xmx1024m -Xms1024m"
                 value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
@@ -154,12 +154,10 @@ spec:
               tcpSocket:
                 port: kafka-ctrlr
             volumeMounts:
-              - name: metadadata
-                mountPath: /bitnami/kafka/metadata
               - name: data
                 mountPath: /bitnami/kafka
-              - name: logs
-                mountPath: /opt/bitnami/kafka/logs
+              - name: metadata
+                mountPath: /bitnami/kafka/metadata
               - name: scripts
                 mountPath: /scripts/kafka-server-setup.sh
                 subPath: kafka-server-setup.sh
@@ -260,7 +258,7 @@ spec:
               - name: KAFKA_CFG_METADATA_LOG_DIR
                 value: "/bitnami/kafka/metadata"
               - name: KAFKA_LOG_DIR
-                value: "/opt/bitnami/kafka/logs"
+                value: "/bitnami/kafka/data"
               - name: KAFKA_HEAP_OPTS
                 #value: "-Xmx1024m -Xms1024m"
                 value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
@@ -298,12 +296,8 @@ spec:
               tcpSocket:
                 port: kafka-ctrlr
             volumeMounts:
-              - name: metadadata
-                mountPath: /bitnami/kafka/metadata
-              # - name: data
-              #   mountPath: /bitnami/kafka
-              - name: logs
-                mountPath: /opt/bitnami/kafka/logs
+              - name: metadata
+                mountPath: /bitnami/kafka
               - name: kafka-config
                 mountPath: /scripts/server.properties
                 subPath: server.properties
@@ -410,7 +404,7 @@ spec:
               - name: KAFKA_CFG_METADATA_LOG_DIR
                 value: "/bitnami/kafka/metadata"
               - name: KAFKA_LOG_DIR
-                value: "/opt/bitnami/kafka/logs"
+                value: "/bitnami/kafka/data"
               - name: KAFKA_HEAP_OPTS
                 #value: "-Xmx1024m -Xms1024m"
                 value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
@@ -458,8 +452,8 @@ spec:
             volumeMounts:
               - name: data
                 mountPath: /bitnami/kafka
-              - name: logs
-                mountPath: /opt/bitnami/kafka/logs
+              - name: metadata
+                mountPath: /bitnami/kafka/metadata
               - name: scripts
                 mountPath: /scripts/kafka-server-setup.sh
                 subPath: kafka-server-setup.sh

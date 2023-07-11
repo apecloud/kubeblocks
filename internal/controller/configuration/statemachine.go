@@ -139,6 +139,10 @@ func init() {
 			return nil
 		}).
 		Build()
+	sm.StateBuilder(CRunningPhase).
+		Transition(RenderedSucceed, CRunningPhase).
+		Transition(RenderedFailed, CFailedPhase).
+		Build()
 
 	hsm.RegisterStateMachine(sm)
 }

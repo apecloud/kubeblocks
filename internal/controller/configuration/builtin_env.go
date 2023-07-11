@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/StudioSol/set"
-	"github.com/apecloud/kubeblocks/internal/controller/plan"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubectl/pkg/util/resource"
@@ -198,7 +197,7 @@ func (w *envWrapper) getResourceFromLocal(key coreclient.ObjectKey, gvk schema.G
 	if v, ok := w.cache[gvk][key]; ok {
 		return v
 	}
-	return plan.findMatchedLocalObject(w.localObjects, key, gvk)
+	return findMatchedLocalObject(w.localObjects, key, gvk)
 }
 
 var envPlaceHolderRegexp = regexp.MustCompile(`\$\(\w+\)`)

@@ -224,7 +224,7 @@ var _ = Describe("Cluster Controller", func() {
 	)
 
 	isStatefulSet := func(v string) bool {
-		return v == "`StatefulSet"
+		return v == "StatefulSet"
 	}
 
 	Context("with Deployment workload", func() {

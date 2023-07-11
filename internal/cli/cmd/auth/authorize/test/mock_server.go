@@ -1,4 +1,4 @@
-package authorize
+package test
 
 import (
 	"context"
@@ -14,6 +14,25 @@ import (
 type MockServer struct {
 	server *http.Server
 	Port   string
+}
+
+type TokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	IDToken      string `json:"id_token"`
+	ExpiresIn    int    `json:"expires_in"`
+}
+
+type UserInfoResponse struct {
+	Name    string `json:"name"`
+	Email   string `json:"email"`
+	Locale  string `json:"locale"`
+	Subject string `json:"sub"`
+}
+
+type OIDCWellKnownEndpoints struct {
+	AuthorizationEndpoint string `json:"authorization_endpoint"`
+	TokenEndpoint         string `json:"token_endpoint"`
 }
 
 func NewMockServer() *MockServer {

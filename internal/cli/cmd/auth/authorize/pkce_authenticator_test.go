@@ -6,6 +6,8 @@ import (
 
 	"context"
 	"fmt"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/test"
 )
 
 var _ = Describe("PKCE_Authenticator", func() {
@@ -13,11 +15,11 @@ var _ = Describe("PKCE_Authenticator", func() {
 		clientID   = "test_clientID"
 		a          *PKCEAuthenticator
 		err        error
-		mockServer *MockServer
+		mockServer *test.MockServer
 	)
 
 	BeforeEach(func() {
-		mockServer = NewMockServer()
+		mockServer = test.NewMockServer()
 		fmt.Println(mockServer.Port)
 		go mockServer.Start()
 

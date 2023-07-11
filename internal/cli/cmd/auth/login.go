@@ -37,8 +37,6 @@ import (
 
 const (
 	DefaultBaseURL = "https://tenent2.jp.auth0.com"
-	// DefaultBaseURL = "https://dev-0cf3xqbt63n7rs n7t.us.auth0.com"
-	// clientID = "lYbU8d2i8WqsM1YszomQZPuvg5F4MIgS"
 )
 
 type LoginOptions struct {
@@ -59,8 +57,8 @@ func NewLogin(streams genericclioptions.IOStreams) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&o.ClientID, "client-id", "", "The client ID for the Kubeblocks CLI application.")
-	cmd.Flags().StringVar(&o.AuthURL, "site", DefaultBaseURL, "The Kubeblocks Auth API base URL.")
+	cmd.Flags().StringVar(&o.ClientID, "client-id", "", "The client ID for the Kubeblocks cloud application.")
+	cmd.Flags().StringVar(&o.AuthURL, "site", DefaultBaseURL, "The Kubeblocks Auth API Base URL.")
 	cmd.Flags().BoolVar(&o.NoBrowser, "no-browser", false, "Do not open the browser for authentication.")
 	return cmd
 }

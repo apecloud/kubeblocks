@@ -3,6 +3,8 @@ package authorize
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/test"
 )
 
 var _ = Describe("cache", func() {
@@ -17,7 +19,7 @@ var _ = Describe("cache", func() {
 			AccessToken:  "test",
 			RefreshToken: "test",
 		}
-		mockKeyring = &MockKeyring{}
+		mockKeyring = &test.MockKeyring{}
 		cached = NewKeyringCachedTokenProvider(&mockKeyring)
 	})
 

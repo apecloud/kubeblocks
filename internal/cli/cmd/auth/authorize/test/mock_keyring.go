@@ -1,4 +1,4 @@
-package authorize
+package test
 
 type MockKeyring struct {
 	key   string

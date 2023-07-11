@@ -83,6 +83,7 @@ func (s *callbackServer) shutdown() {
 }
 
 func (c *CallbackService) GetCallbackURL() string {
+	fmt.Println("callback url: ", fmt.Sprintf("http://%s/callback", c.addr))
 	return fmt.Sprintf("http://%s/callback", c.addr)
 }
 
@@ -105,7 +106,7 @@ func (c *CallbackService) AwaitResponse(callbackResponse chan CallbackResponse, 
 			writeHTML(w, "error.html")
 		} else if code := r.URL.Query().Get("code"); code != "" {
 			response.Code = code
-			writeHTML(w, "close.html")
+			writeHTML(w, "complete.html")
 		} else {
 			response.Error = errors.New("callback completed with no error or code")
 			writeHTML(w, "error.html")

@@ -162,6 +162,8 @@ func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, requ
 	cluster := k8sStore.GetClusterFromCache()
 	if cluster == nil || !cluster.IsLocked() {
 		return "", nil
+	} else if !dcsStore.HasLock() {
+		return SECONDARY, nil
 	}
 
 	getReadOnlySql := `show global variables like 'read_only';`

@@ -272,6 +272,7 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 	leader := annotations["leader"]
 
 	if ttl > 0 && time.Now().Unix()-renewTime > int64(ttl) {
+		store.logger.Infof("lock expired: %v, now: %d", annotations, time.Now().Unix())
 		leader = ""
 	}
 
@@ -329,6 +330,7 @@ func (store *KubernetesStore) UpdateLock() error {
 }
 
 func (store *KubernetesStore) ReleaseLock() error {
+	store.logger.Info("release lock")
 	configMap := store.cluster.Leader.Resource.(*corev1.ConfigMap)
 	configMap.Annotations["leader"] = ""
 	_, err := store.clientset.CoreV1().ConfigMaps(store.namespace).Update(context.TODO(), configMap, metav1.UpdateOptions{})

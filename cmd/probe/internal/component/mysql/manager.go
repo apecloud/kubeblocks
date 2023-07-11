@@ -357,8 +357,13 @@ func (mgr *Manager) isRecoveryConfOutdate(ctx context.Context, leader string) bo
 		return true
 	}
 
-	masterHost := rowMap.GetString("Master_Host")
+	ioError := rowMap.GetString("Last_IO_Error")
+	sqlError := rowMap.GetString("Last_SQL_Error")
+	if ioError != "" || sqlError != "" {
+		return true
+	}
 
+	masterHost := rowMap.GetString("Master_Host")
 	if strings.HasPrefix(masterHost, leader) {
 		return false
 	}

@@ -51,7 +51,7 @@ spec:
               done; bin/bookkeeper shell bookieformat -nonInteractive -force -deleteCookie || true
             envFrom:
               - configMapRef:
-                  name: pulsar-pulsar-cluster-bookies-pulsar-bookies-config
+                  name: pulsar-bookies-pulsar-bookies-config
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
         containers:
@@ -66,7 +66,7 @@ spec:
             envFrom:
               - configMapRef:
                   ## name: bookies-bk-config
-                  name: pulsar-pulsar-cluster-bookies-pulsar-bookies-config
+                  name: pulsar-bookies-pulsar-bookies-config
             livenessProbe:
               failureThreshold: 60
               httpGet:
@@ -159,7 +159,7 @@ spec:
             envFrom:
               - configMapRef:
                   ## name: zookeepers-zk-config
-                  name: pulsar-pulsar-cluster-zookeeper-pulsar-zookeeper-config
+                  name: pulsar-zookeeper-pulsar-zookeeper-config
             ports:
               - containerPort: 2181
                 name: client
@@ -225,6 +225,8 @@ spec:
     - name: broker
       workloadType: Stateful
       characterType: broker
+      statefulSpec:
+        updateStrategy: BestEffortParallel
       componentDefRef:
       - componentDefName: zookeeper
         componentRefEnv:
@@ -274,6 +276,7 @@ spec:
               until bin/pulsar zookeeper-shell -server ${zookeeperServers} --run-once "ls /"; do
                 sleep 3;
               done;
+              # TODO: remove it
               # wait bookkeeper ready
               # bin/apply-config-from-env.py conf/bookkeeper.conf;
               # echo "INFO: wait for bookkeeper ready..."
@@ -282,23 +285,29 @@ spec:
               # done;
               idx=${KB_POD_NAME##*-}
               if [ $idx -ne 0 ]; then
-                exit 0
+                # if not the first pod, do it
+                until bin/bookkeeper org.apache.zookeeper.ZooKeeperMain -server ${zookeeperServers} get /admin/clusters/${clusterName}; do
+                  echo "INFO: wait for init the meta cluster..."
+                  sleep 3;
+                done
+                echo "INFO: cluster already initialized" && exit 0
               fi
+              # if the pod is the first pod, do it
               if bin/bookkeeper org.apache.zookeeper.ZooKeeperMain -server ${zookeeperServers} get /admin/clusters/${clusterName}; then
-                  echo "INFO: cluster already initialized" && exit 0
+                echo "INFO: cluster already initialized" && exit 0
               fi
               echo "INFO: init cluster metadata for cluster: ${clusterName}"
               bin/pulsar initialize-cluster-metadata \
-                --cluster ${clusterName} \
-                --zookeeper ${zookeeperServers} \
-                --configuration-store ${zookeeperServers} \
-                --web-service-url ${webServiceUrl}
-                # --web-service-url-tls https://pulsar-mini-broker.pulsar.svc.cluster.local:8443/ \
-                # --broker-service-url ${brokerServiceUrl} \
-                # --broker-service-url-tls pulsar+ssl://pulsar-mini-broker.pulsar.svc.cluster.local:6651/
+              --cluster ${clusterName} \
+              --zookeeper ${zookeeperServers} \
+              --configuration-store ${zookeeperServers} \
+              --web-service-url ${webServiceUrl}
+              # --web-service-url-tls https://pulsar-mini-broker.pulsar.svc.cluster.local:8443/ \
+              # --broker-service-url ${brokerServiceUrl} \
+              # --broker-service-url-tls pulsar+ssl://pulsar-mini-broker.pulsar.svc.cluster.local:6651/
 
               bin/pulsar initialize-namespace -cs ${zookeeperServers} \
-                --cluster $clusterName sn/system && (curl -sf -XPOST http://127.0.0.1:15020/quitquitquit || true)
+              --cluster $clusterName sn/system && (curl -sf -XPOST http://127.0.0.1:15020/quitquitquit || true) && exit 0
             command:
               - sh
               - -c
@@ -422,6 +431,8 @@ spec:
     - name: proxy
       workloadType: Stateful
       characterType: proxy
+      statefulSpec:
+        updateStrategy: BestEffortParallel
       componentDefRef:
       - componentDefName: broker
         componentRefEnv:

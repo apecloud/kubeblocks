@@ -45,15 +45,15 @@ zookeeper:
 broker:
   configuration: ""
   image:
-    repository: streamnative/sn-platform-slim
+    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/pulsar
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
-    tag: 2.10.3.4
+    tag: 2.11.1
 
 proxy:
   configuration: ""
   image:
-    repository: streamnative/sn-platform-slim
+    repository: registry.cn-hangzhou.aliyuncs.com/apecloud/pulsar
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
-    tag: 2.10.3.4
+    tag: 2.11.1

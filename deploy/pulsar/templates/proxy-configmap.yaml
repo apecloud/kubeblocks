@@ -9,4 +9,3 @@ data:
 kind: ConfigMap
 metadata:
   name: proxy-test-config
-  namespace: pulsar

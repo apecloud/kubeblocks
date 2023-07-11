@@ -337,7 +337,7 @@ spec:
                 creation: CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWD)'; GRANT REPLICATION SLAVE ON *.* TO $(USERNAME) WITH GRANT OPTION;
                 update: ALTER USER $(USERNAME) IDENTIFIED BY '$(PASSWD)';
     - name: vtcontroller
-      charactorType: vtcontroller
+      characterType: vtcontroller
       workloadType: Stateful
       volumeTypes:
         - name: data

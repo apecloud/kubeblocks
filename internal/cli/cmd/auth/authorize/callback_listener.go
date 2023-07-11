@@ -50,7 +50,7 @@ type callbackServer struct {
 	server *http.Server
 }
 
-func NewCallbackService(port string) *CallbackService {
+func newCallbackService(port string) *CallbackService {
 	return &CallbackService{
 		strings.Join([]string{ListenerAddress, port}, ":"),
 		&callbackServer{},
@@ -82,18 +82,18 @@ func (s *callbackServer) shutdown() {
 	}
 }
 
-func (c *CallbackService) GetCallbackURL() string {
+func (c *CallbackService) getCallbackURL() string {
 	fmt.Println("callback url: ", fmt.Sprintf("http://%s/callback", c.addr))
 	return fmt.Sprintf("http://%s/callback", c.addr)
 }
 
-func (c *CallbackService) Close() {
+func (c *CallbackService) close() {
 	c.httpServer.shutdown()
 }
 
 // AwaitResponse sets up the response channel to receive the code that comes in
 // the from authorization code callback handler
-func (c *CallbackService) AwaitResponse(callbackResponse chan CallbackResponse, state string) {
+func (c *CallbackService) awaitResponse(callbackResponse chan CallbackResponse, state string) {
 	c.httpServer.start(c.addr)
 
 	http.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {

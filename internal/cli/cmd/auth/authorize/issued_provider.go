@@ -47,19 +47,19 @@ type CloudIssuedTokenProvider struct {
 	Options
 }
 
-func NewCloudIssuedTokenProvider(o Options) *CloudIssuedTokenProvider {
+func newCloudIssuedTokenProvider(o Options) *CloudIssuedTokenProvider {
 	return &CloudIssuedTokenProvider{
 		Options: o,
 	}
 }
 
 func (c *CloudIssuedTokenProvider) DeviceAuthenticate() (*TokenResponse, error) {
-	authenticator, err := NewAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
+	authenticator, err := newAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
 	if err != nil {
 		return nil, err
 	}
 
-	deviceVerification, err := authenticator.VerifyDevice(context.TODO())
+	deviceVerification, err := authenticator.verifyDevice(context.TODO())
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (c *CloudIssuedTokenProvider) DeviceAuthenticate() (*TokenResponse, error) 
 	end := c.printProgress("Waiting for confirmation...")
 	defer end()
 
-	tokenResponse, err := authenticator.GetToken(context.TODO(), *deviceVerification)
+	tokenResponse, err := authenticator.getToken(context.TODO(), *deviceVerification)
 	if err != nil {
 		return nil, err
 	}
@@ -94,12 +94,12 @@ func (c *CloudIssuedTokenProvider) DeviceAuthenticate() (*TokenResponse, error) 
 }
 
 func (c *CloudIssuedTokenProvider) PKCEAuthenticate(ctx context.Context) (*TokenResponse, error) {
-	authenticator, err := NewPKCEAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
+	authenticator, err := newPKCEAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
 	if err != nil {
 		return nil, err
 	}
 
-	authorizeResponse, err := authenticator.GetAuthorizationCode(c.openURLFunc)
+	authorizeResponse, err := authenticator.getAuthorizationCode(c.openURLFunc)
 	if err != nil {
 		return nil, err
 	}
@@ -107,66 +107,66 @@ func (c *CloudIssuedTokenProvider) PKCEAuthenticate(ctx context.Context) (*Token
 	end := c.printProgress("Waiting for confirmation...")
 	defer end()
 
-	tokenResponse, err := authenticator.GetToken(ctx, authorizeResponse)
+	tokenResponse, err := authenticator.getToken(ctx, authorizeResponse)
 	if err != nil {
 		return nil, err
 	}
 	return tokenResponse, nil
 }
 
-func (c *CloudIssuedTokenProvider) GetUserInfo(token string) (*UserInfoResponse, error) {
-	authenticator, err := NewAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
+func (c *CloudIssuedTokenProvider) getUserInfoForDevice(token string) (*UserInfoResponse, error) {
+	authenticator, err := newAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
 	if err != nil {
 		return nil, err
 	}
-	return authenticator.GetUserInfo(context.TODO(), token)
+	return authenticator.getUserInfo(context.TODO(), token)
 }
 
-func (c *CloudIssuedTokenProvider) GetUserInfoFromPKCE(token string) (*UserInfoResponse, error) {
-	authenticator, err := NewPKCEAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
+func (c *CloudIssuedTokenProvider) getUserInfoFromPKCE(token string) (*UserInfoResponse, error) {
+	authenticator, err := newPKCEAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
 	if err != nil {
 		return nil, err
 	}
-	return authenticator.GetUserInfo(context.TODO(), token)
+	return authenticator.getUserInfo(context.TODO(), token)
 }
 
-func (c *CloudIssuedTokenProvider) RefreshTokenFromPKCE(refreshToken string) (*TokenResponse, error) {
-	authenticator, err := NewPKCEAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
+func (c *CloudIssuedTokenProvider) refreshTokenFromPKCE(refreshToken string) (*TokenResponse, error) {
+	authenticator, err := newPKCEAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
 	if err != nil {
 		return nil, err
 	}
 
-	tokenResponse, err := authenticator.RefreshToken(context.TODO(), refreshToken)
+	tokenResponse, err := authenticator.refreshToken(context.TODO(), refreshToken)
 	if err != nil {
 		return nil, err
 	}
 	return tokenResponse, nil
 }
 
-func (c *CloudIssuedTokenProvider) Logout(token string) error {
-	authenticator, err := NewAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
+func (c *CloudIssuedTokenProvider) logoutForDevice(token string) error {
+	authenticator, err := newAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
 	if err != nil {
 		return err
 	}
 
 	end := c.printProgress("Logging out...")
 	defer end()
-	err = authenticator.Logout(context.TODO(), token)
+	err = authenticator.logout(context.TODO(), token)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *CloudIssuedTokenProvider) LogoutForPKCE(ctx context.Context, token string) error {
-	authenticator, err := NewPKCEAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
+func (c *CloudIssuedTokenProvider) logoutForPKCE(ctx context.Context, token string) error {
+	authenticator, err := newPKCEAuthenticator(cleanhttp.DefaultClient(), c.ClientID, c.AuthURL)
 	if err != nil {
 		return err
 	}
 
 	end := c.printProgress("Logging out...")
 	defer end()
-	err = authenticator.Logout(ctx, token, c.openURLFunc)
+	err = authenticator.logout(ctx, token, c.openURLFunc)
 	if err != nil {
 		return err
 	}

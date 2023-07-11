@@ -33,10 +33,19 @@ type TokenProvider struct {
 	issued IssuedTokenProvider
 }
 
+// NewTokenProvider default constructor.
 func NewTokenProvider(o Options) Provider {
 	cached := NewKeyringCachedTokenProvider(nil)
-	issued := NewCloudIssuedTokenProvider(o)
+	issued := newCloudIssuedTokenProvider(o)
 
+	return &TokenProvider{
+		cached: cached,
+		issued: issued,
+	}
+}
+
+// Abstract constructor
+func newTokenProvider(cached CachedTokenProvider, issued IssuedTokenProvider) Provider {
 	return &TokenProvider{
 		cached: cached,
 		issued: issued,
@@ -52,7 +61,7 @@ func (p *TokenProvider) Login(ctx context.Context) (*UserInfoResponse, error) {
 
 	var userInfo *UserInfoResponse
 	if tokenResult != nil {
-		userInfo, err = p.cached.GetUserInfo()
+		userInfo, err = p.cached.getUserInfo()
 		if err != nil {
 			return nil, errors.Wrap(err, "could not get user info from cache")
 		}
@@ -61,17 +70,17 @@ func (p *TokenProvider) Login(ctx context.Context) (*UserInfoResponse, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "could not authenticate with cloud")
 		}
-		userInfo, err = p.issued.GetUserInfoFromPKCE(tokenResult.AccessToken)
+		userInfo, err = p.issued.getUserInfoFromPKCE(tokenResult.AccessToken)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not get user info from cloud")
 		}
-		err = p.cached.StoreUserInfo(userInfo)
+		err = p.cached.cacheUserInfo(userInfo)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not store user info")
 		}
 	}
 
-	err = p.cached.CacheTokens(tokenResult)
+	err = p.cached.cacheTokens(tokenResult)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not cache tokens")
 	}
@@ -88,12 +97,12 @@ func (p *TokenProvider) Logout(ctx context.Context) error {
 		return fmt.Errorf("token not found in cache, already logged out")
 	}
 
-	err = p.cached.DeleteTokens()
+	err = p.cached.deleteTokens()
 	if err != nil {
 		return err
 	}
 
-	err = p.issued.LogoutForPKCE(ctx, tokenResult.IDToken)
+	err = p.issued.logoutForPKCE(ctx, tokenResult.IDToken)
 	if err != nil {
 		return err
 	}
@@ -123,7 +132,7 @@ func (p *TokenProvider) getTokenFromCache(isTokenValid func(TokenResponse) bool)
 
 // getRefreshToken gets a new token from the refresh token
 func (p *TokenProvider) getRefreshToken(refreshToken string) *TokenResponse {
-	tokenResult, err := p.issued.RefreshTokenFromPKCE(refreshToken)
+	tokenResult, err := p.issued.refreshTokenFromPKCE(refreshToken)
 	if err != nil {
 		return nil
 	}

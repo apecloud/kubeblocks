@@ -1,3 +1,22 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package authorize
 
 import (
@@ -16,7 +35,7 @@ var _ = Describe("callback listener", func() {
 	)
 
 	BeforeEach(func() {
-		callbackListener = NewCallbackService(port)
+		callbackListener = newCallbackService(port)
 		state = "test_state"
 		codeReceiverCh = make(chan CallbackResponse)
 	})
@@ -26,7 +45,7 @@ var _ = Describe("callback listener", func() {
 
 	Context("test callback listener", func() {
 		It("test callback listener", func() {
-			callbackListener.AwaitResponse(codeReceiverCh, state)
+			callbackListener.awaitResponse(codeReceiverCh, state)
 
 			go func() {
 				_, err := http.Get("http://127.0.0.1:" + port + "/callback?code=test_code&state=test_state")

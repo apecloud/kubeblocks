@@ -75,7 +75,7 @@ func (e ErrorResponse) Error() string {
 	return e.Description
 }
 
-func NewAuthenticator(client *http.Client, clientID string, authURL string) (*DeviceAuthenticator, error) {
+func newAuthenticator(client *http.Client, clientID string, authURL string) (*DeviceAuthenticator, error) {
 	if client == nil {
 		client = cleanhttp.DefaultClient()
 	}
@@ -96,7 +96,7 @@ func NewAuthenticator(client *http.Client, clientID string, authURL string) (*De
 }
 
 // VerifyDevice performs the device verification API calls.
-func (d *DeviceAuthenticator) VerifyDevice(ctx context.Context) (*DeviceVerification, error) {
+func (d *DeviceAuthenticator) verifyDevice(ctx context.Context) (*DeviceVerification, error) {
 	req, err := d.newRequest(ctx, "oauth/device/code", url.Values{
 		"client_id": []string{d.ClientID},
 		"audience":  []string{d.AuthAudience},
@@ -113,7 +113,7 @@ func (d *DeviceAuthenticator) VerifyDevice(ctx context.Context) (*DeviceVerifica
 	}
 	defer res.Body.Close()
 
-	if _, err = CheckErrorResponse(res); err != nil {
+	if _, err = checkErrorResponse(res); err != nil {
 		return nil, err
 	}
 
@@ -140,7 +140,7 @@ func (d *DeviceAuthenticator) VerifyDevice(ctx context.Context) (*DeviceVerifica
 	}, nil
 }
 
-func (d *DeviceAuthenticator) GetToken(ctx context.Context, v DeviceVerification) (*TokenResponse, error) {
+func (d *DeviceAuthenticator) getToken(ctx context.Context, v DeviceVerification) (*TokenResponse, error) {
 	for {
 		// This loop begins right after we open the user's browser to send an
 		// authentication code. We don't request a token immediately because the
@@ -183,7 +183,7 @@ func (d *DeviceAuthenticator) requestToken(ctx context.Context, deviceCode strin
 	}
 	defer res.Body.Close()
 
-	isRetryable, err := CheckErrorResponse(res)
+	isRetryable, err := checkErrorResponse(res)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +201,7 @@ func (d *DeviceAuthenticator) requestToken(ctx context.Context, deviceCode strin
 	return tokenRes, nil
 }
 
-func (d *DeviceAuthenticator) Logout(ctx context.Context, token string) error {
+func (d *DeviceAuthenticator) logout(ctx context.Context, token string) error {
 	req, err := d.newRequest(ctx, "oidc/logout", url.Values{
 		"id_token_hint": []string{token},
 		"client_id":     []string{d.ClientID},
@@ -216,7 +216,7 @@ func (d *DeviceAuthenticator) Logout(ctx context.Context, token string) error {
 		return errors.Wrap(err, "error performing http request")
 	}
 	defer res.Body.Close()
-	if _, err = CheckErrorResponse(res); err != nil {
+	if _, err = checkErrorResponse(res); err != nil {
 		return err
 	}
 
@@ -244,7 +244,7 @@ func (d *DeviceAuthenticator) newRequest(ctx context.Context, path string, paylo
 	return req, nil
 }
 
-func (d *DeviceAuthenticator) GetUserInfo(ctx context.Context, token string) (*UserInfoResponse, error) {
+func (d *DeviceAuthenticator) getUserInfo(ctx context.Context, token string) (*UserInfoResponse, error) {
 	req, err := d.newRequest(ctx, "userinfo", url.Values{
 		"access_token": []string{token},
 	})
@@ -268,7 +268,7 @@ func (d *DeviceAuthenticator) GetUserInfo(ctx context.Context, token string) (*U
 }
 
 // CheckErrorResponse returns whether the error is retryable or not and the error itself.
-func CheckErrorResponse(res *http.Response) (bool, error) {
+func checkErrorResponse(res *http.Response) (bool, error) {
 	if res.StatusCode < 400 {
 		return false, nil
 	}

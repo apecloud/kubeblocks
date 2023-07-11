@@ -25,27 +25,27 @@ import (
 
 type CachedTokenProvider interface {
 	GetTokens() (*TokenResponse, error)
-	CacheTokens(*TokenResponse) error
-	DeleteTokens() error
-	StoreUserInfo(info *UserInfoResponse) error
-	GetUserInfo() (*UserInfoResponse, error)
+	cacheTokens(*TokenResponse) error
+	deleteTokens() error
+	cacheUserInfo(info *UserInfoResponse) error
+	getUserInfo() (*UserInfoResponse, error)
 }
 
 type KeyringProvider interface {
-	Get() ([]byte, error)
-	Set(data []byte) error
-	Remove() error
-	IsValid() bool
+	get() ([]byte, error)
+	set(data []byte) error
+	remove() error
+	isValid() bool
 }
 
 type IssuedTokenProvider interface {
 	DeviceAuthenticate() (*TokenResponse, error)
 	PKCEAuthenticate(ctx context.Context) (*TokenResponse, error)
-	RefreshTokenFromPKCE(refreshToken string) (*TokenResponse, error)
-	GetUserInfo(token string) (*UserInfoResponse, error)
-	GetUserInfoFromPKCE(token string) (*UserInfoResponse, error)
-	Logout(token string) error
-	LogoutForPKCE(ctx context.Context, token string) error
+	refreshTokenFromPKCE(refreshToken string) (*TokenResponse, error)
+	getUserInfoForDevice(token string) (*UserInfoResponse, error)
+	getUserInfoFromPKCE(token string) (*UserInfoResponse, error)
+	logoutForDevice(token string) error
+	logoutForPKCE(ctx context.Context, token string) error
 }
 
 type Provider interface {

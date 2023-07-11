@@ -1,11 +1,52 @@
+/*
+Copyright (C) 2022-2023 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 package authorize
 
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/apecloud/kubeblocks/internal/cli/cmd/auth/authorize/test"
 )
+
+type MockKeyring struct {
+	key   string
+	value []byte
+}
+
+func (m *MockKeyring) set(value []byte) error {
+	m.value = value
+	return nil
+}
+
+func (m *MockKeyring) get() ([]byte, error) {
+	return m.value, nil
+}
+
+func (m *MockKeyring) remove() error {
+	m.key = ""
+	m.value = nil
+	return nil
+}
+
+func (m *MockKeyring) isValid() bool {
+	return true
+}
 
 var _ = Describe("cache", func() {
 	var (
@@ -19,7 +60,7 @@ var _ = Describe("cache", func() {
 			AccessToken:  "test",
 			RefreshToken: "test",
 		}
-		mockKeyring = &test.MockKeyring{}
+		mockKeyring = &MockKeyring{}
 		cached = NewKeyringCachedTokenProvider(&mockKeyring)
 	})
 
@@ -29,14 +70,14 @@ var _ = Describe("cache", func() {
 	Context("test cache", func() {
 		It("test cached token", func() {
 			ExpectWithOffset(1, func() error {
-				err := cached.CacheTokens(&tokenResponse)
+				err := cached.cacheTokens(&tokenResponse)
 				return err
 			}()).To(BeNil())
 		})
 
 		It("test get token", func() {
 			ExpectWithOffset(1, func() error {
-				err := cached.CacheTokens(&tokenResponse)
+				err := cached.cacheTokens(&tokenResponse)
 				return err
 			}()).To(BeNil())
 			ExpectWithOffset(1, func() error {
@@ -48,7 +89,7 @@ var _ = Describe("cache", func() {
 
 		It("test fail to get token", func() {
 			ExpectWithOffset(1, func() error {
-				err := cached.CacheTokens(&tokenResponse)
+				err := cached.cacheTokens(&tokenResponse)
 				return err
 			}()).To(BeNil())
 			ExpectWithOffset(1, func() error {
@@ -60,12 +101,12 @@ var _ = Describe("cache", func() {
 
 		It("test delete token", func() {
 			ExpectWithOffset(1, func() error {
-				err := cached.CacheTokens(&tokenResponse)
+				err := cached.cacheTokens(&tokenResponse)
 				return err
 			}()).To(BeNil())
 
 			ExpectWithOffset(1, func() error {
-				err := cached.DeleteTokens()
+				err := cached.deleteTokens()
 				return err
 			}()).To(BeNil())
 

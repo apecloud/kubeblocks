@@ -72,7 +72,7 @@ type AuthorizationResponse struct {
 	Code        string
 }
 
-func NewPKCEAuthenticator(client *http.Client, clientID string, authURL string) (*PKCEAuthenticator, error) {
+func newPKCEAuthenticator(client *http.Client, clientID string, authURL string) (*PKCEAuthenticator, error) {
 	if client == nil {
 		client = cleanhttp.DefaultClient()
 	}
@@ -92,8 +92,8 @@ func NewPKCEAuthenticator(client *http.Client, clientID string, authURL string) 
 	return p, nil
 }
 
-func (p *PKCEAuthenticator) GetAuthorizationCode(openURLFunc func(URL string), states ...string) (*AuthorizationResponse, error) {
-	callback := NewCallbackService("7001")
+func (p *PKCEAuthenticator) getAuthorizationCode(openURLFunc func(URL string), states ...string) (*AuthorizationResponse, error) {
+	callback := newCallbackService("7001")
 	codeReceiverCh := make(chan CallbackResponse)
 	defer close(codeReceiverCh)
 
@@ -103,7 +103,7 @@ func (p *PKCEAuthenticator) GetAuthorizationCode(openURLFunc func(URL string), s
 	} else {
 		state = states[0]
 	}
-	go callback.AwaitResponse(codeReceiverCh, state)
+	go callback.awaitResponse(codeReceiverCh, state)
 
 	params := url.Values{
 		"audience":              []string{p.AuthAudience},
@@ -112,7 +112,7 @@ func (p *PKCEAuthenticator) GetAuthorizationCode(openURLFunc func(URL string), s
 		"code_challenge_method": []string{p.Challenge.Method},
 		"response_type":         []string{"code"},
 		"state":                 []string{state},
-		"redirect_uri":          []string{callback.GetCallbackURL()},
+		"redirect_uri":          []string{callback.getCallbackURL()},
 		"scope": []string{strings.Join([]string{
 			"read_databases", "write_databases", "read_user", "read_organization", "offline_access", "openid", "profile", "email",
 		}, " ")},
@@ -129,14 +129,14 @@ func (p *PKCEAuthenticator) GetAuthorizationCode(openURLFunc func(URL string), s
 	if callbackResult.Error != nil {
 		return nil, callbackResult.Error
 	}
-	callback.Close()
+	callback.close()
 	return &AuthorizationResponse{
 		Code:        callbackResult.Code,
-		CallbackURL: callback.GetCallbackURL(),
+		CallbackURL: callback.getCallbackURL(),
 	}, nil
 }
 
-func (p *PKCEAuthenticator) GetToken(ctx context.Context, authorize *AuthorizationResponse) (*TokenResponse, error) {
+func (p *PKCEAuthenticator) getToken(ctx context.Context, authorize *AuthorizationResponse) (*TokenResponse, error) {
 	req, err := utils.NewRequest(ctx, p.WellKnownEndpoints.TokenEndpoint, url.Values{
 		"grant_type":    []string{"authorization_code"},
 		"code_verifier": []string{p.Challenge.Verifier},
@@ -154,7 +154,7 @@ func (p *PKCEAuthenticator) GetToken(ctx context.Context, authorize *Authorizati
 	}
 	defer res.Body.Close()
 
-	if _, err = CheckErrorResponse(res); err != nil {
+	if _, err = checkErrorResponse(res); err != nil {
 		return nil, err
 	}
 
@@ -167,7 +167,7 @@ func (p *PKCEAuthenticator) GetToken(ctx context.Context, authorize *Authorizati
 	return tokenRes, nil
 }
 
-func (p *PKCEAuthenticator) GetUserInfo(ctx context.Context, token string) (*UserInfoResponse, error) {
+func (p *PKCEAuthenticator) getUserInfo(ctx context.Context, token string) (*UserInfoResponse, error) {
 	URL := fmt.Sprintf("%s/userinfo", p.AuthURL)
 	req, err := utils.NewRequest(ctx, URL, url.Values{
 		"access_token": []string{token},
@@ -182,7 +182,7 @@ func (p *PKCEAuthenticator) GetUserInfo(ctx context.Context, token string) (*Use
 	}
 	defer res.Body.Close()
 
-	if _, err = CheckErrorResponse(res); err != nil {
+	if _, err = checkErrorResponse(res); err != nil {
 		return nil, err
 	}
 
@@ -195,7 +195,7 @@ func (p *PKCEAuthenticator) GetUserInfo(ctx context.Context, token string) (*Use
 	return userInfo, err
 }
 
-func (p *PKCEAuthenticator) RefreshToken(ctx context.Context, refreshToken string) (*TokenResponse, error) {
+func (p *PKCEAuthenticator) refreshToken(ctx context.Context, refreshToken string) (*TokenResponse, error) {
 	req, err := utils.NewRequest(ctx, p.WellKnownEndpoints.TokenEndpoint, url.Values{
 		"grant_type":    []string{"refresh_token"},
 		"client_id":     []string{p.ClientID},
@@ -211,7 +211,7 @@ func (p *PKCEAuthenticator) RefreshToken(ctx context.Context, refreshToken strin
 	}
 	defer res.Body.Close()
 
-	if _, err = CheckErrorResponse(res); err != nil {
+	if _, err = checkErrorResponse(res); err != nil {
 		return nil, err
 	}
 
@@ -229,7 +229,7 @@ func (p *PKCEAuthenticator) RefreshToken(ctx context.Context, refreshToken strin
 	}, nil
 }
 
-func (p *PKCEAuthenticator) Logout(ctx context.Context, token string, openURLFunc func(URL string)) error {
+func (p *PKCEAuthenticator) logout(ctx context.Context, token string, openURLFunc func(URL string)) error {
 	URL := fmt.Sprintf("%s/oidc/logout", p.AuthURL)
 	req, err := utils.NewRequest(ctx, URL, url.Values{
 		"id_token_hint": []string{token},
@@ -245,7 +245,7 @@ func (p *PKCEAuthenticator) Logout(ctx context.Context, token string, openURLFun
 	}
 	defer res.Body.Close()
 
-	if _, err = CheckErrorResponse(res); err != nil {
+	if _, err = checkErrorResponse(res); err != nil {
 		return err
 	}
 
@@ -275,7 +275,7 @@ func getOIDCWellKnownEndpoints(authURL string) (*OIDCWellKnownEndpoints, error) 
 		return nil, errors.Wrapf(err, "could not get well known endpoints from url %s", u.String())
 	}
 
-	if _, err = CheckErrorResponse(r); err != nil {
+	if _, err = checkErrorResponse(r); err != nil {
 		return nil, err
 	}
 

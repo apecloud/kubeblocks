@@ -45,15 +45,15 @@ const (
 
 type KeyringCached struct {
 	key     string
-	isValid bool
+	valid   bool
 	keyring keyring.Keyring
 }
 
-func (k *KeyringCached) IsValid() bool {
-	return k.isValid
+func (k *KeyringCached) isValid() bool {
+	return k.valid
 }
 
-func (k *KeyringCached) Get() ([]byte, error) {
+func (k *KeyringCached) get() ([]byte, error) {
 	item, err := k.keyring.Get(k.key)
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (k *KeyringCached) Get() ([]byte, error) {
 	return item.Data, nil
 }
 
-func (k *KeyringCached) Set(data []byte) error {
+func (k *KeyringCached) set(data []byte) error {
 	return k.keyring.Set(keyring.Item{
 		Key:   k.key,
 		Data:  data,
@@ -69,7 +69,7 @@ func (k *KeyringCached) Set(data []byte) error {
 	})
 }
 
-func (k *KeyringCached) Remove() error {
+func (k *KeyringCached) remove() error {
 	return k.keyring.Remove(k.key)
 }
 
@@ -92,11 +92,11 @@ func NewKeyringCachedTokenProvider(keyringCached *KeyringProvider) *KeyringCache
 	}
 
 	if keyringCached == nil {
-		defaultKeyring, isValid := DefaultKeyring()
+		defaultKeyring, isValid := defaultKeyring()
 		return &KeyringCachedTokenProvider{
 			keyringCached: &KeyringCached{
 				key:     keyringKey,
-				isValid: isValid,
+				valid:   isValid,
 				keyring: defaultKeyring,
 			},
 			fileCached: fileCached,
@@ -109,7 +109,7 @@ func NewKeyringCachedTokenProvider(keyringCached *KeyringProvider) *KeyringCache
 	}
 }
 
-func DefaultKeyring() (keyring.Keyring, bool) {
+func defaultKeyring() (keyring.Keyring, bool) {
 	k, err := keyring.Open(keyring.Config{
 		AllowedBackends: []keyring.BackendType{
 			keyring.SecretServiceBackend,
@@ -129,7 +129,7 @@ func DefaultKeyring() (keyring.Keyring, bool) {
 }
 
 func (k *KeyringCachedTokenProvider) GetTokens() (*TokenResponse, error) {
-	if !k.keyringCached.IsValid() {
+	if !k.keyringCached.isValid() {
 		token, tokenErr := k.fileCached.readToken()
 		if os.IsNotExist(tokenErr) {
 			return nil, nil
@@ -137,7 +137,7 @@ func (k *KeyringCachedTokenProvider) GetTokens() (*TokenResponse, error) {
 		return token, tokenErr
 	}
 
-	data, err := k.keyringCached.Get()
+	data, err := k.keyringCached.get()
 	if err != nil {
 		if err == keyring.ErrKeyNotFound {
 			return nil, nil
@@ -154,28 +154,28 @@ func (k *KeyringCachedTokenProvider) GetTokens() (*TokenResponse, error) {
 	return &tokenResponse, nil
 }
 
-func (k *KeyringCachedTokenProvider) CacheTokens(tokenResponse *TokenResponse) error {
+func (k *KeyringCachedTokenProvider) cacheTokens(tokenResponse *TokenResponse) error {
 	data, err := json.Marshal(tokenResponse)
 	if err != nil {
 		return errors.Wrap(err, "could not marshal token data for keyring")
 	}
 
-	if !k.keyringCached.IsValid() {
+	if !k.keyringCached.isValid() {
 		return k.fileCached.writeToken(data)
 	}
 
-	return k.keyringCached.Set(data)
+	return k.keyringCached.set(data)
 }
 
-func (k *KeyringCachedTokenProvider) DeleteTokens() error {
-	if !k.keyringCached.IsValid() {
+func (k *KeyringCachedTokenProvider) deleteTokens() error {
+	if !k.keyringCached.isValid() {
 		return k.fileCached.deleteToken()
 	}
 
-	return k.keyringCached.Remove()
+	return k.keyringCached.remove()
 }
 
-func (k *KeyringCachedTokenProvider) StoreUserInfo(userInfo *UserInfoResponse) error {
+func (k *KeyringCachedTokenProvider) cacheUserInfo(userInfo *UserInfoResponse) error {
 	saveDir, err := k.fileCached.getConfigDir()
 	if err != nil {
 		return err
@@ -197,7 +197,7 @@ func (k *KeyringCachedTokenProvider) StoreUserInfo(userInfo *UserInfoResponse) e
 	return nil
 }
 
-func (k *KeyringCachedTokenProvider) GetUserInfo() (*UserInfoResponse, error) {
+func (k *KeyringCachedTokenProvider) getUserInfo() (*UserInfoResponse, error) {
 	saveDir, err := k.fileCached.getConfigDir()
 	if err != nil {
 		return nil, err

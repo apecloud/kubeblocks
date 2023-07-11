@@ -34,14 +34,8 @@ requests:
 
 storageEnable: true
 
-## kafka metaadata storage setting,the unit is Gi
-metaStorage: 5
-
 ## kafka data storage setting,the unit is Gi
-dataStorage: 10
-
-## kafka log storage setting,the unit is Gi
-logStorage: 2
+storage: 10
 
 ## kafka replicas for combined mode
 replicas: 1
@@ -57,3 +51,11 @@ controllerReplicas: 1
 ## kafka monitor component replicas
 ## only effective when monitorEnable=true
 monitorReplicas: 1
+
+## kafka broker's jvm heap setting
+brokerHeap: -XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64
+
+## kafka broker's jvm heap setting
+## only effective when clusterMode='separated'
+controllerHeap: -XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64
+

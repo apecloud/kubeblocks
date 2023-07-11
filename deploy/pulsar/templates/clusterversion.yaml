@@ -4,15 +4,19 @@ metadata:
   name: pulsar-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   labels:
     {{- include "pulsar.labels" . | nindent 4 }}
-    {{- if .Values.commonLabels }}
-    {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
-    {{- end }}
-  {{- if .Values.commonAnnotations }}
-  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
-  {{- end }}
 spec:
   clusterDefinitionRef: pulsar
   componentVersions:
+    - componentDefRef: bookies
+      versionsContext:
+        initContainers:
+          - name: init-bookies
+            image: {{ .Values.bookies.image.repository }}:{{ .Values.bookies.image.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.bookies.image.pullPolicy }}
+        containers:
+          - name: bookies
+            image: {{ .Values.bookies.image.repository }}:{{ .Values.bookies.image.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.bookies.image.pullPolicy }}
     - componentDefRef: zookeeper
       versionsContext:
         containers:

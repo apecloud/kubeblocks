@@ -8,6 +8,9 @@ monitor:
   ##
   enabled: false
 
+## ClusterVersion configuration
+clusterVersionOverride: ""
+
 ## Service configurations
 ##
 service:

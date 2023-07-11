@@ -16,9 +16,9 @@ logConfigs: {}
 
 bookies:
   image:
-    repository: streamnative/sn-platform-slim
+    repository: apachepulsar/pulsar
     pullPolicy: IfNotPresent
-    tag: 2.10.3.4
+    tag: 2.11.1
 
 zookeeper:
   image:

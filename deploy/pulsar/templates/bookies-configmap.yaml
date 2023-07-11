@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: bookies-bk-config
+  name: pulsar-bookies-config
   labels:
     {{- include "pulsar.labels" . | nindent 4 }}
 data:
@@ -23,4 +23,4 @@ data:
   useHostNameAsBookieID: "true"
   zkLedgersRootPath: /ledgers
   zkServers: |-
-    {{- .Files.Get "config/bookies-bk-config.tpl" | nindent 4 }}
+    {{- .Files.Get "config/bookies-config.tpl" | nindent 4 }}

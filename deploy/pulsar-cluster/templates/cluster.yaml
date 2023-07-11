@@ -4,8 +4,8 @@ metadata:
   name: {{ include "clustername" . }}
   labels: {{ include "pulsar-cluster.labels" . | nindent 4 }}
 spec:
-  clusterDefinitionRef: pulsar  # ref clusterdefinition.name
-  clusterVersionRef: pulsar-{{ default .Chart.AppVersion .Values.clusterVersionOverride }} # ref clusterversion.name
+  clusterDefinitionRef: pulsar
+  clusterVersionRef: pulsar-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
   terminationPolicy: {{ $.Values.terminationPolicy }}
   affinity:
     {{- with $.Values.topologyKeys }}
@@ -16,7 +16,7 @@ spec:
   {{- end }}
   componentSpecs:
     - name: bookies
-      componentDefRef: bookies-bk # ref clusterDefinition componentDefs.name
+      componentDefRef: bookies
       replicas: {{ .Values.bookies.replicaCount | default 3 }}
       serviceAccountName: {{ include "pulsar-cluster.serviceAccountName" . }}
       {{- with  .Values.bookies.resources }}
@@ -30,14 +30,14 @@ spec:
       {{- end }}
       {{- if .Values.bookies.persistence.enabled }}
       volumeClaimTemplates:
-        - name: ledgers-0
+        - name: ledgers
           spec:
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
                 storage: {{ .Values.bookies.persistence.data.size }}
-        - name: journal-0
+        - name: journal
           spec:
             accessModes:
               - ReadWriteOnce
@@ -56,7 +56,7 @@ spec:
       {{- end }}
       {{- if .Values.zookeeper.persistence.enabled }}
       volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
+        - name: data
           spec:
             accessModes:
               - ReadWriteOnce

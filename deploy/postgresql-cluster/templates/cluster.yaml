@@ -11,3 +11,5 @@
       switchPolicy:
         type: Noop
       {{- include "kblib.componentResources" . | indent 6 }}
+      {{- include "kblib.componentStorages" . | indent 6 }}
+      {{- include "kblib.componentServices" . | indent 6 }}

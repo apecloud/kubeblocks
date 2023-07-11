@@ -37,7 +37,7 @@ type DCS interface {
 var dcs DCS
 
 func init() {
-	viper.SetDefault("KB_TTL", 30)
+	viper.SetDefault("KB_TTL", 5)
 }
 
 func GetStore() DCS {

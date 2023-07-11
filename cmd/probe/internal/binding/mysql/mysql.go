@@ -38,6 +38,7 @@ import (
 
 	. "github.com/apecloud/kubeblocks/cmd/probe/internal/binding"
 	"github.com/apecloud/kubeblocks/cmd/probe/internal/component/mysql"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -111,13 +112,19 @@ func (mysqlOps *MysqlOperations) Init(metadata bindings.Metadata) error {
 	mysqlOps.Logger.Debug("Initializing MySQL binding")
 	mysqlOps.BaseOperations.Init(metadata)
 	config, _ := mysql.NewConfig(metadata.Properties)
-	manager, _ := mysql.NewManager(mysqlOps.Logger)
+	manager, err := mysql.NewManager(mysqlOps.Logger)
+	if err != nil {
+		mysqlOps.Logger.Errorf("MySQL DB Manager initialize failed: %v", err)
+		return err
+	}
+	mysqlOps.manager = manager
 	mysqlOps.DBType = "mysql"
 	//mysqlOps.InitIfNeed = mysqlOps.initIfNeed
 	mysqlOps.BaseOperations.GetRole = mysqlOps.GetRole
 	mysqlOps.DBPort = config.GetDBPort()
 
 	mysqlOps.RegisterOperationOnDBReady(GetRoleOperation, mysqlOps.GetRoleOps, manager)
+	mysqlOps.RegisterOperationOnDBReady(CheckRoleOperation, mysqlOps.CheckRoleOps, manager)
 	mysqlOps.RegisterOperationOnDBReady(GetLagOperation, mysqlOps.GetLagOps, manager)
 	mysqlOps.RegisterOperationOnDBReady(CheckStatusOperation, mysqlOps.CheckStatusOps, manager)
 	mysqlOps.RegisterOperationOnDBReady(ExecOperation, mysqlOps.ExecOps, manager)
@@ -147,6 +154,16 @@ func (mysqlOps *MysqlOperations) GetRunningPort() int {
 }
 
 func (mysqlOps *MysqlOperations) GetRoleForReplication(ctx context.Context, request *bindings.InvokeRequest, response *bindings.InvokeResponse) (string, error) {
+	dcsStore := dcs.GetStore()
+	if dcsStore == nil {
+		return "", nil
+	}
+	k8sStore := dcsStore.(*dcs.KubernetesStore)
+	cluster := k8sStore.GetClusterFromCache()
+	if cluster == nil || !cluster.IsLocked() {
+		return "", nil
+	}
+
 	getReadOnlySql := `show global variables like 'read_only';`
 	data, err := mysqlOps.query(ctx, getReadOnlySql)
 	if err != nil {

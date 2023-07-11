@@ -40,8 +40,9 @@ spec:
           - name: mysql
             imagePullPolicy: IfNotPresent
             command:
-              - docker-entrypoint.sh
-              - mysqld
+              - bash 
+              - -c
+              - "docker-entrypoint.sh mysqld --server-id $(( ${KB_POD_NAME##*-} + 1))"
             volumeMounts:
               - mountPath: /var/lib/mysql
                 name: data

@@ -7,7 +7,8 @@ image:
   repository: mysql
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: 8.0.33
+  #tag: 8.0.33
+  tag: 5.7
 
 ## MySQL Cluster parameters
 cluster:

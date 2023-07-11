@@ -115,15 +115,15 @@ func injectEnvFrom(containers []corev1.Container, asEnvFrom []string, cmName str
 	sets := cfgutil.NewSet(asEnvFrom...)
 	for i := range containers {
 		container := &containers[i]
-		if !sets.InArray(container.Name) || checkEnvFrom(container, cmName) {
-			continue
+		if sets.InArray(container.Name) && !checkEnvFrom(container, cmName) {
+			container.EnvFrom = append(container.EnvFrom,
+				corev1.EnvFromSource{
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: cmName,
+						}},
+				})
 		}
-		container.EnvFrom = append(container.EnvFrom, corev1.EnvFromSource{
-			ConfigMapRef: &corev1.ConfigMapEnvSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: cmName,
-				}},
-		})
 	}
 }
 

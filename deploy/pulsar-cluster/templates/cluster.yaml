@@ -64,3 +64,12 @@ spec:
               requests:
                 storage: {{ .Values.zookeeper.persistence.data.size }}
       {{- end }}
+    - componentDefRef: broker
+      monitor: true
+      name: broker
+      noCreatePDB: false
+      replicas: 1
+      resources:
+        requests:
+          cpu: 200m
+          memory: 512Mi

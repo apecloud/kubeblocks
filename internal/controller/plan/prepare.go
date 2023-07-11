@@ -27,7 +27,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	"github.com/apecloud/kubeblocks/internal/controller/configuration"
+	"github.com/apecloud/kubeblocks/internal/controller/configfsm"
 	"github.com/apecloud/kubeblocks/internal/hsm"
 )
 
@@ -48,12 +48,12 @@ func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
 		return nil
 	}
 
-	fsmContext := configuration.NewConfigContext(clusterVersion, cluster, component, obj, podSpec, localObjs, ctx, cli)
-	fsm, err := hsm.FromContext(fsmContext, configuration.ConfigFSMID, configuration.ConfigFSMSignature)
+	fsmContext := configfsm.NewConfigContext(clusterVersion, cluster, component, obj, podSpec, localObjs, ctx, cli)
+	fsm, err := hsm.FromContext(fsmContext, configfsm.ConfigFSMID, configfsm.ConfigFSMSignature)
 	if err != nil {
 		return err
 	}
-	return fsm.Fire(configuration.Creating)
+	return fsm.Fire(configfsm.Creating)
 
 	//clusterName := cluster.Name
 	//namespaceName := cluster.Namespace

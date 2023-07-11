@@ -1,8 +1,9 @@
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: {{ include "clustername" . }}
-  labels: {{ include "pulsar-cluster.labels" . | nindent 4 }}
+  name: {{ include "kblib.clusterName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
 spec:
   clusterDefinitionRef: pulsar
   clusterVersionRef: pulsar-{{ default .Chart.AppVersion .Values.clusterVersionOverride }}
@@ -21,12 +22,16 @@ spec:
       serviceAccountName: {{ include "pulsar-cluster.serviceAccountName" . }}
       {{- with  .Values.bookies.resources }}
       resources:
+        {{- if .limits }}
         limits:
           cpu: {{ .limits.cpu | quote }}
           memory: {{ .limits.memory | quote }}
+        {{- end }}
+        {{- if .requests }}
         requests:
           cpu: {{ .requests.cpu | quote }}
           memory: {{ .requests.memory | quote }}
+        {{- end }}
       {{- end }}
       {{- if .Values.bookies.persistence.enabled }}
       volumeClaimTemplates:
@@ -50,9 +55,11 @@ spec:
       replicas: {{ .Values.zookeeper.replicaCount | default 3 }}
       {{- with  .Values.zookeeper.resources }}
       resources:
+        {{- if .requests }}
         requests:
           cpu: {{ .requests.cpu | quote }}
           memory: {{ .requests.memory | quote }}
+        {{- end }}
       {{- end }}
       {{- if .Values.zookeeper.persistence.enabled }}
       volumeClaimTemplates:
@@ -69,16 +76,20 @@ spec:
       replicas: {{ .Values.broker.replicaCount | default 3 }}
       {{- with  .Values.broker.resources }}
       resources:
+      {{- if .requests }}
         requests:
           cpu: {{ .requests.cpu | quote }}
           memory: {{ .requests.memory | quote }}
+      {{- end }}
       {{- end }}
     - componentDefRef: proxy
       name: proxy
       replicas: {{ .Values.proxy.replicaCount | default 3 }}
       {{- with  .Values.proxy.resources }}
       resources:
+      {{- if .requests }}
         requests:
           cpu: {{ .requests.cpu | quote }}
           memory: {{ .requests.memory | quote }}
+      {{- end }}
       {{- end }}

@@ -24,6 +24,10 @@ The proxy cpu cores is 1/6 of the cluster total cpu cores.
           requests:
             storage: 20Gi
   replicas: 1
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
 - name: vtgate
   componentDefRef: vtgate # ref clusterdefinition componentDefs.name
   replicas: 1

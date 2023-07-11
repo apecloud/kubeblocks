@@ -107,7 +107,7 @@ func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName st
 			transCtx.Logger.V(1).Info("RoleBinding not exists", "namespaceName", namespaceName)
 			return false
 		}
-		transCtx.Logger.V(0).Error(err, "get service account failed")
+		transCtx.Logger.Error(err, "get service account failed")
 		return false
 	}
 	if rb == nil {

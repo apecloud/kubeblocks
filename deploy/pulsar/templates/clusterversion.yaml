@@ -19,4 +19,17 @@ spec:
           - name: zookeeper
             image: {{ .Values.zookeeper.image.repository }}:{{ .Values.zookeeper.image.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.zookeeper.image.pullPolicy }}
+    - componentDefRef: broker
+      versionsContext:
+        containers:
+          - name: broker
+            image: {{ .Values.broker.image.repository }}:{{ .Values.broker.image.tag }}
+            imagePullPolicy: {{ default "IfNotPresent" .Values.broker.image.pullPolicy }}
+        initContainers:
+        - name: init-broker-cluster
+          image: {{ .Values.broker.image.repository }}:{{ .Values.broker.image.tag }}
+          imagePullPolicy: {{ default .Values.broker.image.pullPolicy "IfNotPresent" }}
+        - name: init-sysctl
+          image: {{ .Values.broker.image.repository }}:{{ .Values.broker.image.tag }}
+          imagePullPolicy: {{ default .Values.broker.image.pullPolicy "IfNotPresent" }}
   

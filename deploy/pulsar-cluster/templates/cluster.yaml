@@ -65,11 +65,20 @@ spec:
                 storage: {{ .Values.zookeeper.persistence.data.size }}
       {{- end }}
     - componentDefRef: broker
-      monitor: true
       name: broker
-      noCreatePDB: false
-      replicas: 1
+      replicas: {{ .Values.broker.replicaCount | default 3 }}
+      {{- with  .Values.broker.resources }}
       resources:
         requests:
-          cpu: 200m
-          memory: 512Mi
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}
+    - componentDefRef: proxy
+      name: proxy
+      replicas: {{ .Values.proxy.replicaCount | default 3 }}
+      {{- with  .Values.proxy.resources }}
+      resources:
+        requests:
+          cpu: {{ .requests.cpu | quote }}
+          memory: {{ .requests.memory | quote }}
+      {{- end }}

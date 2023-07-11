@@ -211,6 +211,7 @@ func injectEnvs(cluster *appsv1alpha1.Cluster, component *component.SynthesizedC
 			})
 		}
 	}
+
 	// have injected variables placed at the front of the slice
 	if len(c.Env) == 0 {
 		c.Env = toInjectEnvs
@@ -426,7 +427,7 @@ func BuildPDB(cluster *appsv1alpha1.Cluster, component *component.SynthesizedCom
 	return &pdb, nil
 }
 
-func BuildDeploy(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent) (*appsv1.Deployment, error) {
+func BuildDeploy(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, envConfigName string) (*appsv1.Deployment, error) {
 	const tplFile = "deployment_template.cue"
 	deploy := appsv1.Deployment{}
 	if err := buildFromCUE(tplFile, map[string]any{
@@ -439,7 +440,7 @@ func BuildDeploy(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster, c
 	if component.StatelessSpec != nil {
 		deploy.Spec.Strategy = component.StatelessSpec.UpdateStrategy
 	}
-	if err := processContainersInjection(reqCtx, cluster, component, "", &deploy.Spec.Template.Spec); err != nil {
+	if err := processContainersInjection(reqCtx, cluster, component, envConfigName, &deploy.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
 	return &deploy, nil
@@ -470,17 +471,25 @@ func BuildEnvConfig(cluster *appsv1alpha1.Cluster, component *component.Synthesi
 	const tplFile = "env_config_template.cue"
 	envData := map[string]string{}
 
-	// build common env
-	commonEnv := buildWorkloadCommonEnv(cluster, component)
-	for k, v := range commonEnv {
-		envData[k] = v
+	// add component envs
+	if component.ComponentRefEnvs != nil {
+		for _, env := range component.ComponentRefEnvs {
+			envData[env.Name] = env.Value
+		}
 	}
 
-	// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
-	// build consensus env from cluster.status
-	consensusEnv := buildConsensusSetEnv(cluster, component)
-	for k, v := range consensusEnv {
-		envData[k] = v
+	// build common env, but not for statelsss workload
+	if component.WorkloadType != appsv1alpha1.Stateless {
+		commonEnv := buildWorkloadCommonEnv(cluster, component)
+		for k, v := range commonEnv {
+			envData[k] = v
+		}
+		// TODO following code seems to be redundant with updateConsensusRoleInfo in consensus_set_utils.go
+		// build consensus env from cluster.status
+		consensusEnv := buildConsensusSetEnv(cluster, component)
+		for k, v := range consensusEnv {
+			envData[k] = v
+		}
 	}
 
 	config := corev1.ConfigMap{}

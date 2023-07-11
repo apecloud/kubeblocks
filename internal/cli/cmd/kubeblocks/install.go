@@ -103,6 +103,9 @@ var (
 	# Install KubeBlocks with specified version
 	kbcli kubeblocks install --version=0.4.0
 
+	# Install KubeBlocks with ignoring preflight checks
+	kbcli kubeblocks install --force
+
 	# Install KubeBlocks with specified namespace, if the namespace is not present, it will be created
 	kbcli kubeblocks install --namespace=my-namespace --create-namespace
 
@@ -136,6 +139,7 @@ func newInstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 		Run: func(cmd *cobra.Command, args []string) {
 			util.CheckErr(o.Complete(f, cmd))
 			util.CheckErr(o.PreCheck())
+			util.CheckErr(o.CompleteInstallOptions())
 			util.CheckErr(p.Preflight(f, args, o.ValueOpts))
 			util.CheckErr(o.Install())
 		},
@@ -224,9 +228,8 @@ func (o *InstallOptions) PreCheck() error {
 	return nil
 }
 
-func (o *InstallOptions) Install() error {
-	var err error
-
+// CompleteInstallOptions complete options for real installation of kubeblocks
+func (o *InstallOptions) CompleteInstallOptions() error {
 	// add pod anti-affinity
 	if o.PodAntiAffinity != "" || len(o.TopologyKeys) > 0 {
 		podAntiAffinityJSON, err := json.Marshal(util.BuildPodAntiAffinity(o.PodAntiAffinity, o.TopologyKeys))
@@ -245,6 +248,7 @@ func (o *InstallOptions) Install() error {
 		o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kNodeAffinity, string(nodeLabelsJSON)))
 	}
 
+	// add tolerations
 	// parse tolerations and add to values, the default tolerations are defined in var defaultTolerationsForInstallation
 	o.TolerationsRaw = append(o.TolerationsRaw, defaultTolerationsForInstallation)
 	tolerations, err := util.BuildTolerations(o.TolerationsRaw)
@@ -256,7 +260,11 @@ func (o *InstallOptions) Install() error {
 		return err
 	}
 	o.ValueOpts.JSONValues = append(o.ValueOpts.JSONValues, fmt.Sprintf(kTolerations, string(tolerationsJSON)))
+	return nil
+}
 
+func (o *InstallOptions) Install() error {
+	var err error
 	// add helm repo
 	s := spinner.New(o.Out, spinnerMsg("Add and update repo "+types.KubeBlocksRepoName))
 	defer s.Fail()

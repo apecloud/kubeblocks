@@ -159,7 +159,7 @@ func buildComponentResources(reqCtx intctrlutil.RequestCtx, cli client.Client,
 	case appsv1alpha1.Stateless:
 		if err := workloadProcessor(
 			func(envConfig *corev1.ConfigMap) (client.Object, error) {
-				return builder.BuildDeploy(reqCtx, cluster, component)
+				return builder.BuildDeploy(reqCtx, cluster, component, "")
 			}); err != nil {
 			return nil, err
 		}
@@ -431,7 +431,7 @@ var _ = Describe("Cluster Controller", func() {
 				if v == "StatefulSet" {
 					sts := resources[i].(*appsv1.StatefulSet)
 					podSpec := sts.Spec.Template.Spec
-					Expect(len(podSpec.Containers)).Should(Equal(2))
+					Expect(len(podSpec.Containers)).Should(Equal(3))
 				}
 			}
 			originPodSpec := clusterDef.Spec.ComponentDefs[0].PodSpec

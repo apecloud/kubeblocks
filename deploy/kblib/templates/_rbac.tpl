@@ -75,7 +75,7 @@ subjects:
 {{/*
 Define the whole rbac
 */}}
-{{- define "kblib.rbac" -}}
+{{- define "kblib.rbac" }}
 ---
 {{- include "kblib.serviceAccount" . }}
 ---

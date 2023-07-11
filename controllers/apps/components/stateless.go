@@ -253,6 +253,8 @@ func (c *statelessComponent) updateUnderlyingResources(reqCtx intctrlutil.Reques
 	if err := c.UpdateService(reqCtx, cli); err != nil {
 		return err
 	}
+	// update KB_<component-type>_<pod-idx>_<hostname> env needed by pod to obtain hostname.
+	c.updatePodEnvConfig()
 	return nil
 }
 
@@ -273,9 +275,23 @@ func (c *statelessComponent) updateWorkload(deployObj *appsv1.Deployment) {
 
 	resolvePodSpecDefaultFields(deployObj.Spec.Template.Spec, &deployObjCopy.Spec.Template.Spec)
 
+	delayUpdatePodSpecSystemFields(deployObj.Spec.Template.Spec, &deployObjCopy.Spec.Template.Spec)
+
 	if !reflect.DeepEqual(&deployObj.Spec, &deployObjCopy.Spec) {
+		updatePodSpecSystemFields(&deployObjCopy.Spec.Template.Spec)
 		c.WorkloadVertex.Obj = deployObjCopy
 		c.WorkloadVertex.Action = ictrltypes.ActionUpdatePtr()
 		c.SetStatusPhase(appsv1alpha1.SpecReconcilingClusterCompPhase, nil, "Component workload updated")
+	}
+}
+
+func (c *statelessComponent) updatePodEnvConfig() {
+	for _, v := range ictrltypes.FindAll[*corev1.ConfigMap](c.Dag) {
+		node := v.(*ictrltypes.LifecycleVertex)
+		// TODO: need a way to reference the env config.
+		envConfigName := fmt.Sprintf("%s-%s-env", c.GetClusterName(), c.GetName())
+		if node.Obj.GetName() == envConfigName {
+			node.Action = ictrltypes.ActionUpdatePtr()
+		}
 	}
 }

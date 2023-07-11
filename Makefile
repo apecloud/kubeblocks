@@ -181,7 +181,7 @@ golangci-lint: golangci generate ## Run golangci-lint against code.
 	$(GOLANGCILINT) run ./...
 
 .PHONY: staticcheck
-staticcheck: staticchecktool generate ## Run staticcheck against code.
+staticcheck: staticchecktool test-go-generate generate ## Run staticcheck against code.
 	$(STATICCHECK) -tags $(BUILD_TAGS) ./...
 
 .PHONY: build-checks
@@ -283,17 +283,22 @@ create-kbcli-embed-charts-dir:
 build-single-kbcli-embed-chart.%: chart=$(word 2,$(subst ., ,$@))
 build-single-kbcli-embed-chart.%:
 	$(HELM) dependency update deploy/$(chart) --skip-refresh
+ifeq ($(VERSION), latest)
+	$(HELM) package deploy/$(chart)
+else
 	$(HELM) package deploy/$(chart) --version $(VERSION)
+endif
 	mv $(chart)-*.tgz internal/cli/cluster/charts/$(chart).tgz
 
 .PHONY: build-kbcli-embed-chart
 build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
-	build-single-kbcli-embed-chart.apecloud-mysql-cluster
+	build-single-kbcli-embed-chart.apecloud-mysql-cluster \
+	build-single-kbcli-embed-chart.redis-cluster \
+	build-single-kbcli-embed-chart.postgresql-cluster \
+	build-single-kbcli-embed-chart.kafka-cluster \
+	build-single-kbcli-embed-chart.mongodb-cluster
 #	build-single-kbcli-embed-chart.postgresql-cluster \
 #	build-single-kbcli-embed-chart.clickhouse-cluster \
-#	build-single-kbcli-embed-chart.kafka-cluster \
-#	build-single-kbcli-embed-chart.mongodb-cluster \
-#	build-single-kbcli-embed-chart.redis-cluster \
 #	build-single-kbcli-embed-chart.milvus-cluster \
 #	build-single-kbcli-embed-chart.qdrant-cluster \
 #	build-single-kbcli-embed-chart.weaviate-cluster
@@ -353,26 +358,26 @@ endif
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	($(KUSTOMIZE) build -tags $(BUILD_TAGS) config/crd | kubectl replace -f -) || ($(KUSTOMIZE) build config/crd | kubectl create -f -)
+	($(KUSTOMIZE) build config/crd | kubectl replace -f -) || ($(KUSTOMIZE) build config/crd | kubectl create -f -)
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build -tags $(BUILD_TAGS) config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build -tags $(BUILD_TAGS) config/default | kubectl apply -f -
+	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 .PHONY: dry-run
 dry-run: manifests kustomize ## Dry-run deploy job.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	mkdir -p dry-run
-	$(KUSTOMIZE) build -tags $(BUILD_TAGS) config/default > dry-run/manifests.yaml
+	$(KUSTOMIZE) build config/default > dry-run/manifests.yaml
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build -tags $(BUILD_TAGS) config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 ##@ Contributor
 
@@ -582,10 +587,14 @@ KUBECTL=$(shell which kubectl)
 .PHONY: render-smoke-testdata-manifests
 render-smoke-testdata-manifests: ## Update E2E test dataset
 	$(HELM) dependency build deploy/apecloud-mysql-cluster --skip-refresh
-	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
-	$(HELM) template mycluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
-	$(HELM) template mycluster deploy/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
-	$(HELM) template mycluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
+	$(HELM) dependency build deploy/redis-cluster --skip-refresh
+	$(HELM) dependency build deploy/postgresql-cluster --skip-refresh
+	$(HELM) dependency build deploy/kafka-cluster --skip-refresh
+	$(HELM) dependency build deploy/mongodb-cluster --skip-refresh
+	$(HELM) template mysql-cluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
+	$(HELM) template pg-cluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
+	$(HELM) template redis-cluster deploy/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(HELM) template mongodb-cluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
 
 
 .PHONY: test-e2e

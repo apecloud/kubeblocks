@@ -26,7 +26,7 @@
       "title": "Availability Policy",
       "description": "The availability policy of cluster.",
       "type": "string",
-      "default": "none",
+      "default": "node",
       "enum": [
         "none",
         "node",

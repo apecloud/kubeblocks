@@ -1,6 +1,6 @@
 ---
 name: Improvement request
-about: Suggest a improvement idea for this project
+about: Suggest an improvement idea for this project
 title: "[Improvement]"
 labels: kind/enhancement
 assignees: nayutah
@@ -17,7 +17,7 @@ Describe the solution you'd like
 A clear and concise description of what you want to happen.
 
 Describe alternatives you've considered
-A clear and concise description of any alternative solutions or fuctions you've considered.
+A clear and concise description of any alternative solutions or functions you've considered.
 
 Additional context
 Add any other context or screenshots about the improvement request here.

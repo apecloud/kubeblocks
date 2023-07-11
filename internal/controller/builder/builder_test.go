@@ -309,7 +309,7 @@ var _ = Describe("builder", func() {
 		It("builds Deploy correctly", func() {
 			reqCtx := newReqCtx()
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			deploy, err := BuildDeploy(reqCtx, cluster, synthesizedComponent)
+			deploy, err := BuildDeploy(reqCtx, cluster, synthesizedComponent, "")
 			Expect(err).Should(BeNil())
 			Expect(deploy).ShouldNot(BeNil())
 		})

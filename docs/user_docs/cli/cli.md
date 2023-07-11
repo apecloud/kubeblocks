@@ -29,6 +29,8 @@ Manage alert receiver, include add, list and delete receiver.
 
 Run a benchmark.
 
+* [kbcli bench delete](kbcli_bench_delete.md)	 - Delete a benchmark.
+* [kbcli bench list](kbcli_bench_list.md)	 - List all benchmarks.
 * [kbcli bench pgbench](kbcli_bench_pgbench.md)	 - Run pgbench against a PostgreSQL cluster
 * [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
 

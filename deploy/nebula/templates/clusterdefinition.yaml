@@ -16,25 +16,30 @@ spec:
   componentDefs:
     - name: nebula-console
       workloadType: Stateless
-      characterType: nebula-console
+      characterType: nebula
+      componentDefRef:
+        - &graphdRef
+          componentDefName: nebula-graphd
+          componentRefEnv:
+            - name: GRAPHD_SVC_PORT
+              valueFrom:
+                type: FieldRef
+                fieldPath: $.componentDef.service.ports[?(@.name == "thrift")].port
+            - name: GRAPHD_SVC_NAME
+              valueFrom:
+                type: ServiceRef
       podSpec:
         containers:
           - name: nebula-console
             imagePullPolicy: {{default .Values.nebula.metad.image.pullPolicy "IfNotPresent"}}
             command: ["/bin/sh"]
-            args: ["-c", "exec /bin/sh -c 'trap : TERM INT; sleep infinity & wait'"]
+            args: ["-c", "trap : TERM INT; sleep infinity & wait"]
     - name: nebula-graphd
       configSpecs:
         - name: nebula-graphd-config
           templateRef: nebula-graphd-config-template
           namespace: {{ .Release.Namespace }}
           volumeName: nebula-graphd
-      scriptSpecs:
-        - name: nebula-graphd-scripts
-          templateRef: nebula-graphd-scripts-template
-          namespace: {{ .Release.Namespace }}
-          volumeName: scripts
-          defaultMode: 493
       workloadType: Stateful
       characterType: nebula-graphd
       service:
@@ -51,37 +56,38 @@ spec:
             port: 19670
             targetPort: http2
             protocol: TCP
+      componentDefRef:
+        - &metadRef
+          componentDefName: nebula-metad
+          componentRefEnv:
+            - name: NEBULA_METAD_SVC
+              valueFrom:
+                type: HeadlessServiceRef
+                format: $(POD_FQDN).cluster.local:9559
+                joinWith: ","
       podSpec:
         securityContext:
           fsGroup: 1001
         containers:
           - name: nebula-graphd
-            volumeMounts:
-              - mountPath: /usr/local/nebula/data
-                name: data
-              - mountPath: /usr/local/nebula/logs
-                name: logs
-              - mountPath: /usr/local/nebula/etc
-                name: nebula-graphd
-              - name: scripts
-                mountPath: /scripts
             command:
               - /bin/bash
               - -c
               - |
                 set -ex
-                /scripts/nebula-graphd-start.sh
+                trap : TERM INT
+                exec /usr/local/nebula/bin/nebula-graphd --flagfile=/usr/local/nebula/etc/nebula-graphd.conf --meta_server_addrs=$NEBULA_METAD_SVC --local_ip=$KB_POD_FQDN".cluster.local" --daemonize=false
             imagePullPolicy: {{default .Values.nebula.graphd.image.pullPolicy "IfNotPresent"}}
             ports:
-            - containerPort: 9669
-              name: thrift
-              protocol: TCP
-            - containerPort: 19669
-              name: http
-              protocol: TCP
-            - containerPort: 19670
-              name: http2
-              protocol: TCP
+              - containerPort: 9669
+                name: thrift
+                protocol: TCP
+              - containerPort: 19669
+                name: http
+                protocol: TCP
+              - containerPort: 19670
+                name: http2
+                protocol: TCP
             readinessProbe:
               failureThreshold: 3
               httpGet:
@@ -92,20 +98,23 @@ spec:
               periodSeconds: 10
               successThreshold: 1
               timeoutSeconds: 5
+            volumeMounts:
+              - mountPath: /usr/local/nebula/data
+                name: data
+              - mountPath: /usr/local/nebula/logs
+                name: logs
+              - mountPath: /usr/local/nebula/etc
+                name: nebula-graphd
     - name: nebula-metad
       configSpecs:
         - name: nebula-metad-config
           templateRef: nebula-metad-config-template
           namespace: {{ .Release.Namespace }}
           volumeName: nebula-metad
-      scriptSpecs:
-        - name: nebula-metad-scripts
-          templateRef: nebula-metad-scripts-template
-          namespace: {{ .Release.Namespace }}
-          volumeName: scripts
-          defaultMode: 493
       workloadType: Stateful
       characterType: nebula-metad
+      componentDefRef:
+        - *metadRef
       podSpec:
         containers:
           - name: nebula-metad
@@ -114,7 +123,8 @@ spec:
               - -c
               - |
                 set -ex
-                /scripts/nebula-metad-start.sh
+                trap : TERM INT
+                exec /usr/local/nebula/bin/nebula-metad --flagfile=/usr/local/nebula/etc/nebula-metad.conf --meta_server_addrs=$NEBULA_METAD_SVC --local_ip=$KB_POD_FQDN".cluster.local"  --daemonize=false
             imagePullPolicy: {{default .Values.nebula.metad.image.pullPolicy "IfNotPresent"}}
             ports:
             - containerPort: 9559
@@ -126,19 +136,17 @@ spec:
             - containerPort: 19560
               name: http2
               protocol: TCP
-            readinessProbe:
-              failureThreshold: 3
-              httpGet:
-                path: /status
-                port: http
-                scheme: HTTP
-              initialDelaySeconds: 10
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
+            # readinessProbe:
+            #   failureThreshold: 3
+            #   httpGet:
+            #     path: /status
+            #     port: http
+            #     scheme: HTTP
+            #   initialDelaySeconds: 10
+            #   periodSeconds: 10
+            #   successThreshold: 1
+            #   timeoutSeconds: 5
             volumeMounts:
-              - name: scripts
-                mountPath: /scripts
               - mountPath: /usr/local/nebula/data
                 name: data
               - mountPath: /usr/local/nebula/logs
@@ -153,12 +161,15 @@ spec:
           volumeName: nebula-storaged
       scriptSpecs:
         - name: nebula-storaged-scripts
-          templateRef: nebula-storaged-scripts-template
+          templateRef: nebula-storaged-scripts
           namespace: {{ .Release.Namespace }}
           volumeName: scripts
           defaultMode: 493
       workloadType: Stateful
       characterType: nebula-storaged
+      componentDefRef:
+        - *metadRef
+        - *graphdRef
       podSpec:
         securityContext:
           fsGroup: 1001
@@ -168,22 +179,22 @@ spec:
               - /bin/bash
               - -c
               - |
-                set -ex
-                /scripts/nebula-storaged-start.sh
+                trap : TERM INT
+                exec /usr/local/nebula/bin/nebula-storaged --flagfile=/usr/local/nebula/etc/nebula-storaged.conf --meta_server_addrs=$NEBULA_METAD_SVC --local_ip=$KB_POD_FQDN".cluster.local" --daemonize=false
             imagePullPolicy: {{default .Values.nebula.storaged.image.pullPolicy "IfNotPresent"}}
             ports:
-            - containerPort: 9779
-              name: thrift
-              protocol: TCP
-            - containerPort: 19779
-              name: http
-              protocol: TCP
-            - containerPort: 19780
-              name: http2
-              protocol: TCP
-            - containerPort: 9778
-              name: admin
-              protocol: TCP
+              - containerPort: 9779
+                name: thrift
+                protocol: TCP
+              - containerPort: 19779
+                name: http
+                protocol: TCP
+              - containerPort: 19780
+                name: http2
+                protocol: TCP
+              - containerPort: 9778
+                name: admin
+                protocol: TCP
             readinessProbe:
               failureThreshold: 3
               httpGet:
@@ -195,8 +206,6 @@ spec:
               successThreshold: 1
               timeoutSeconds: 5
             volumeMounts:
-              - name: scripts
-                mountPath: /scripts
               - mountPath: /usr/local/nebula/etc
                 name: nebula-storaged
               - mountPath: /usr/local/nebula/data

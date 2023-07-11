@@ -664,6 +664,8 @@ func (c *statefulComponentBase) updateUnderlyingResources(reqCtx intctrlutil.Req
 	if err := c.UpdateService(reqCtx, cli); err != nil {
 		return err
 	}
+	// update KB_<component-type>_<pod-idx>_<hostname> env needed by pod to obtain hostname.
+	c.updatePodEnvConfig()
 	return nil
 }
 
@@ -687,7 +689,10 @@ func (c *statefulComponentBase) updateWorkload(stsObj *appsv1.StatefulSet) bool 
 
 	resolvePodSpecDefaultFields(stsObj.Spec.Template.Spec, &stsObjCopy.Spec.Template.Spec)
 
+	delayUpdatePodSpecSystemFields(stsObj.Spec.Template.Spec, &stsObjCopy.Spec.Template.Spec)
+
 	if !reflect.DeepEqual(&stsObj.Spec, &stsObjCopy.Spec) {
+		updatePodSpecSystemFields(&stsObjCopy.Spec.Template.Spec)
 		c.WorkloadVertex.Obj = stsObjCopy
 		c.WorkloadVertex.Action = ictrltypes.ActionPtr(ictrltypes.UPDATE)
 		return true

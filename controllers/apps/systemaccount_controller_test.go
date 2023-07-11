@@ -35,7 +35,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/internal/generics"
+	"github.com/apecloud/kubeblocks/internal/generics"
 	testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
@@ -96,9 +96,9 @@ var _ = Describe("SystemAccount Controller", func() {
 		// namespaced resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		testapps.ClearResources(&testCtx, intctrlutil.EndpointsSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.JobSignature, inNS, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.SecretSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.EndpointsSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.JobSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.SecretSignature, inNS, ml)
 	}
 
 	/**
@@ -160,7 +160,7 @@ var _ = Describe("SystemAccount Controller", func() {
 		g.Expect(k8sClient.List(ctx, secrets, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
 		jobs := &batchv1.JobList{}
 		g.Expect(k8sClient.List(ctx, jobs, client.InNamespace(cluster.Namespace), ml)).To(Succeed())
-		return getAccountFacts(secrets, jobs)
+		return getAcctFromSecretAndJobs(secrets, jobs)
 	}
 
 	checkOwnerReferenceToObj := func(ref metav1.OwnerReference, obj client.Object) bool {

@@ -10,6 +10,8 @@ fullnameOverride: ""
 ##
 commonLabels: {}
 
+commonAnnotations: {}
+
 logConfigs: {}
 
 bookies:
@@ -20,10 +22,10 @@ bookies:
 
 zookeeper:
   image:
-    repository: docker.io/bitnami/zookeeper
+    repository: apachepulsar/pulsar
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
-    tag: 3.8.0-debian-11-r47   
+    tag: 2.11.1
 
   logConfigs: {}
   roleProbe:

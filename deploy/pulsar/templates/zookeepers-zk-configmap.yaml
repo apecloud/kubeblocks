@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zookeepers-zk-config
+  labels:
+    {{- include "pulsar.labels" . | nindent 4 }}
+data:
+  PULSAR_GC: |
+    -XX:+UseG1GC -XX:MaxGCPauseMillis=10 -Dcom.sun.management.jmxremote -Djute.maxbuffer=10485760 -XX:+ParallelRefProcEnabled -XX:+UnlockExperimentalVMOptions -XX:+DoEscapeAnalysis -XX:+DisableExplicitGC -XX:+ExitOnOutOfMemoryError -XX:+PerfDisableSharedMem
+  PULSAR_MEM: |
+    -Xms64m -Xmx128m
+  PULSAR_PREFIX_serverCnxnFactory: org.apache.zookeeper.server.NIOServerCnxnFactory
+  dataDir: /pulsar/data/zookeeper
+  serverCnxnFactory: org.apache.zookeeper.server.NIOServerCnxnFactory
+  ZOOKEEPER_SERVERS: |-
+    {{- .Files.Get "config/zookeeper-servers.tpl" | nindent 4 }}

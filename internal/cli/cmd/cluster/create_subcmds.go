@@ -79,7 +79,6 @@ func buildCreateSubCmds(createOptions *create.CreateOptions) []*cobra.Command {
 			Use:     t.String() + " NAME",
 			Short:   fmt.Sprintf("Create a %s cluster.", t),
 			Example: buildCreateSubCmdsExamples(t),
-			Aliases: []string{o.chartInfo.Alias},
 			Run: func(cmd *cobra.Command, args []string) {
 				o.Args = args
 				cmdutil.CheckErr(o.CreateOptions.Complete())
@@ -87,6 +86,10 @@ func buildCreateSubCmds(createOptions *create.CreateOptions) []*cobra.Command {
 				cmdutil.CheckErr(o.validate())
 				cmdutil.CheckErr(o.run())
 			},
+		}
+
+		if o.chartInfo.Alias != "" {
+			cmd.Aliases = []string{o.chartInfo.Alias}
 		}
 
 		util.CheckErr(addCreateFlags(cmd, o.Factory, o.chartInfo))

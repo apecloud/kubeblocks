@@ -169,7 +169,23 @@ You can use cloud Kubernetes service, such as [`EKS`](https://aws.amazon.com/eks
 
 ### Makefile
 `KubeBlocks` includes a [Makefile](../Makefile) in the root of the repo. This serves as a high-level interface for common commands. Running `make help` will produce a list of make targets with descriptions. These targets will be referenced throughout this document.
-### [TODO] kbcli
+### kbcli
+
+`kbcli` is a [cobra-based](https://github.com/spf13/cobra) command line interface for `KubeBlocks` which support to the basic interaction commands such as `install/uninstall/upgrade` KubeBlocks and all kinds of actions for KubeBlocks
+
+The source directory for `kbcli` is `/internal/cli/` and the `main.go` is `/cmd/cli/main.go`
+
+Build the local kbcli binary executables by:
+```shell
+make kbcli 
+```
+or
+```shell
+make kbcli-fast 
+``` 
+The file will be generated in `/bin/`
+
+Run `kbcli --help` to list all commands of `kbcli`.
 
 ### Code style
 First, read the Go (Golang) coding guidelines again, looking for any style violations. It's easier to remember a style rule once you've violated it.
@@ -247,7 +263,7 @@ make run-delve GO_PACKAGE=./cmd/manager/main.go
 ```shell
 make test-delve TEST_PACKAGES=./controllers/apps/...
 ```
-> Unlike `go test` supports multiple packages, `Delve` needs a single executable to work, it only support single package.
+> Unlike `go test` supports multiple packages, `Delve` needs a single executable to work, it only supports single package.
 
 #### Change debug server port
 You can change debug server port for `make run-delve` and `make test-delve`.

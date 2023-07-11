@@ -204,6 +204,7 @@ func (p *localCloudProvider) GetClusterInfo() (*K8sClusterInfo, error) {
 		ClusterName:   types.K3dClusterName,
 		KubeConfig:    kubeConfig,
 		Region:        "",
+		KbcliVersion:  version.GetVersion(),
 	}, nil
 }
 
@@ -376,7 +377,7 @@ func setUpK3d(ctx context.Context, cluster *config.ClusterConfig) error {
 	for _, c := range l {
 		if c.Name == cluster.Name {
 			if c, err := k3dClient.ClusterGet(ctx, runtimes.SelectedRuntime, c); err == nil {
-				klog.V(1).Info("Detected an existing cluster: %s\n", c.Name)
+				klog.V(1).Infof("Detected an existing cluster: %s", c.Name)
 				return nil
 			}
 			break

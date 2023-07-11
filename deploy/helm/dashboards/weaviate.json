@@ -1,0 +1,2175 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "gnetId": 11323,
+  "graphTooltip": 0,
+  "id": 10,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "cloud",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "ApeCloud",
+      "tooltip": "Improved productivity, cost-efficiency and business continuity.",
+      "type": "link",
+      "url": "https://kubeblocks.io/"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "KubeBlocks",
+      "tooltip": "An open-source and cloud-neutral DBaaS with Kubernetes.",
+      "type": "link",
+      "url": "https://github.com/apecloud/kubeblocks"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 44,
+      "panels": [],
+      "title": "Startup Times",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 1
+      },
+      "id": 40,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(startup_durations_ms_sum{operation=\"hnsw_read_all_commitlogs\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "interval": "",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Startup all HNSW indexes",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "These times do not represent wall time. Some init processes are running in parallel, so this is CPU time. For a wall clock measurement look at total shard startup time.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 1
+      },
+      "id": 38,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(startup_durations_ms_sum{operation=\"lsm_startup_bucket\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "interval": "",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Startup all LSM buckets",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "This represents the total wall time per shard.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "id": 42,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(startup_durations_ms_sum{operation=\"shard_total_init\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"})",
+          "interval": "",
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Total shard Startup",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "id": 46,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "avg(rate(startup_durations_ms_sum{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval]) / rate(startup_durations_ms_count{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by (namespace,app_kubernetes_io_instance,pod)",
+          "interval": "",
+          "legendFormat": "{{operation}} ({{class_name}} / {{shard_name}})",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Startup durations",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "id": 48,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "avg(rate(startup_diskio_throughput_sum{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval]) / rate(startup_diskio_throughput_count{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by (namespace,app_kubernetes_io_instance,pod)",
+          "interval": "",
+          "legendFormat": "{{operation}} ({{class_name}}/{{shard_name}})",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Startup Disk I/O ",
+      "type": "timeseries"
+    },
+    {
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "id": 36,
+      "title": "Query",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Number of queries per second for each class",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-YlBl"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "id": 34,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "avg(rate(queries_durations_ms_count{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by (namespace,app_kubernetes_io_instance,pod)",
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Query Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Average query latency per time interval for each class.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "id": 32,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "avg(rate(queries_durations_ms_sum{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval]) / rate(queries_durations_ms_count{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by (namespace,app_kubernetes_io_instance,pod)",
+          "legendFormat": "{{class_name}} ",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Average Query Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Note the percentiles are calculated from histogram buckets so have an associated error see https://prometheus.io/docs/practices/histograms/#errors-of-quantile-estimation",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-YlRd"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "id": 30,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum(rate(queries_durations_ms_bucket{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__interval])) by (namespace,app_kubernetes_io_instance,pod,le))",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "95th Percentile Query Latency (Estimated)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Break down of filtered query latency by operation",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
+      "id": 28,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "avg(rate(queries_filtered_vector_durations_ms_sum{operation=\"filter\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval]) / rate(queries_filtered_vector_durations_ms_count{operation=\"filter\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by (namespace,app_kubernetes_io_instance,pod)",
+          "legendFormat": "Filter | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "Filter"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "avg(rate(queries_filtered_vector_durations_ms_sum{operation=\"sort\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__interval])) by (namespace,app_kubernetes_io_instance,pod) / avg(rate(queries_filtered_vector_durations_ms_count{operation=\"sort\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__interval])) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "legendFormat": "Sort | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "Sort"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "avg(rate(queries_filtered_vector_durations_ms_sum{operation=\"vector\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__interval])) by (namespace,app_kubernetes_io_instance,pod) / avg(rate(queries_filtered_vector_durations_ms_count{operation=\"vector\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__interval])) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "legendFormat": "Vector | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "Vector"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "avg(rate(queries_filtered_vector_durations_ms_sum{operation=\"objects\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__interval])) by (namespace,app_kubernetes_io_instance,pod) / avg(rate(queries_filtered_vector_durations_ms_count{operation=\"objects\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__interval])) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "legendFormat": "Objects | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "Objects"
+        }
+      ],
+      "title": "Filtered Query Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
+      "id": 26,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(concurrent_queries_count{query_type=\"aggregate\", namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace,app_kubernetes_io_instance,pod)",
+          "interval": "",
+          "legendFormat": "Aggregate",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(concurrent_queries_count{query_type=\"get_graphql\", namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Get (GraphQL)",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(concurrent_queries_count{query_type=\"get_object\", namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "legendFormat": "Get (Objects)",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(concurrent_queries_count{query_type=\"head_object\", namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "legendFormat": "Head (Objects)",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Concurrent Read Requests",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "axisSoftMin": 0,
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "id": 24,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(concurrent_queries_count{query_type=\"batch\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "legendFormat": "Batch (Objects) | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(concurrent_queries_count{query_type=\"batch_references\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "legendFormat": "Batch (References) | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(concurrent_queries_count{query_type=\"add_object\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace,app_kubernetes_io_instance,pod)",
+          "interval": "",
+          "legendFormat": "Add (Objects) | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(concurrent_queries_count{query_type=\"update_object\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Update (Objects) | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(concurrent_queries_count{query_type=\"merge_object\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "legendFormat": "Merge (Objects) | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(concurrent_queries_count{query_type=\"delete_object\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "legendFormat": "Delete (Objects) | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "F"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(concurrent_queries_count{query_type=\"add_reference\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "legendFormat": "Add (Reference) | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "G"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(concurrent_queries_count{query_type=\"update_reference\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "legendFormat": "Update (Reference) | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "H"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(concurrent_queries_count{query_type=\"delete_reference\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "legendFormat": "Delete (Reference) | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "I"
+        }
+      ],
+      "title": "Concurrent Write Requests",
+      "type": "timeseries"
+    },
+    {
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "id": 20,
+      "title": "Object Operations",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-RdYlGr"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 44
+      },
+      "id": 22,
+      "maxDataPoints": 25,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "9.3.6",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "avg(rate(objects_durations_ms_sum{step=\"total\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval]) / rate(objects_durations_ms_count{step=\"total\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by (namespace,app_kubernetes_io_instance,pod,class_name,shard_name)",
+          "format": "time_series",
+          "interval": "",
+          "legendFormat": "Total | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "avg(rate(objects_durations_ms_sum{step=\"upsert_object_store\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval]) / rate(objects_durations_ms_count{step=\"upsert_object_store\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by (namespace,app_kubernetes_io_instance,pod,class_name,shard_name)",
+          "format": "time_series",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Upsert Object | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "avg(rate(objects_durations_ms_sum{step=\"inverted_total\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval]) / rate(objects_durations_ms_count{step=\"inverted_total\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by (namespace,app_kubernetes_io_instance,pod,class_name,shard_name)",
+          "format": "time_series",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Inverted Index | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "PUT Object (Total)",
+      "type": "timeseries"
+    },
+    {
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 51
+      },
+      "id": 12,
+      "title": "LSM",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Replace is used primarily for object storage.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "id": 14,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(max_over_time(lsm_segment_size{strategy=\"replace\",namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by(namespace,app_kubernetes_io_instance,pod,level, unit)",
+          "legendFormat": "Level {{level}} / {{unit}} ",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "LSM Strategy Replace by Level (Object Storage)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "MapCollections are used in the inverted index for anything that has a frequency, which is mainly text and string props. Those need a frequency for BM25 calculations.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 57
+      },
+      "id": 18,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(max_over_time(lsm_segment_size{strategy=\"mapcollection\", namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by(namespace,app_kubernetes_io_instance,pod,level, unit)",
+          "legendFormat": "Level {{level}} / {{unit}} ",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "LSM Strategy MapCollection by Level (Inverted with frequency)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "SetCollections are used in the inverted index for anything that does not have a frequency, e.g. numbers, bools, etc.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 62
+      },
+      "id": 16,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(max_over_time(lsm_segment_size{strategy=\"setcollection\",namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by(namespace,app_kubernetes_io_instance,pod,level,unit)",
+          "legendFormat": "Level {{level}} / {{unit}} ",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "LSM Strategy SetCollection by Level (Inverted without frequency)",
+      "type": "stat"
+    },
+    {
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 67
+      },
+      "id": 2,
+      "title": "Importing",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 68
+      },
+      "id": 4,
+      "interval": "1",
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(max_over_time(vector_index_tombstones{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by (namespace,app_kubernetes_io_instance,pod)",
+          "instant": false,
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Active Tombstones in HNSW index",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 68
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(max_over_time(vector_index_tombstone_cleanup_threads{namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by (namespace,app_kubernetes_io_instance,pod)",
+          "interval": "",
+          "legendFormat": "{{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Active Tombstone Cleanup Threads",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 76
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "9.2.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(max_over_time(vector_index_operations{operation=\"create\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by (namespace,app_kubernetes_io_instance,pod)",
+          "instant": false,
+          "interval": "",
+          "legendFormat": "Vectors Inserted | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(max_over_time(vector_index_operations{operation=\"delete\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Vectors Deleted | {{namespace}} | {{app_kubernetes_io_instance}} | {{pod}}",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Vector Index Statistics",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Count of active segments across all classes and shards, shown by type.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 9,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 76
+      },
+      "id": 10,
+      "interval": "1",
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(max_over_time(lsm_active_segments{strategy=\"replace\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by (namespace,app_kubernetes_io_instance,pod)",
+          "interval": "",
+          "legendFormat": "Total \"Replace\" (Object Storage)",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(max_over_time(lsm_active_segments{strategy=\"mapcollection\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Total \"Map\" (Inverted storage with term frequency)",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum(max_over_time(lsm_active_segments{strategy=\"setcollection\",namespace=~\"$namespace\", app_kubernetes_io_instance=~\"$cluster\",pod=~\"$instance\"}[$__rate_interval])) by (namespace,app_kubernetes_io_instance,pod)",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "Total \"Set\" (Inverted storage without frequency)",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Active LSM Segments",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 37,
+  "style": "dark",
+  "tags": [
+    "weaviate",
+    "db"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "default",
+          "value": "default"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Data Source",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "allValue": ".+",
+        "current": {
+          "selected": false,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "$datasource"
+        },
+        "definition": "label_values(go_info{app_kubernetes_io_name=\"weaviate\"}, namespace)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "namespace",
+        "multi": true,
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "query": "label_values(go_info{app_kubernetes_io_name=\"weaviate\"}, namespace)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 5,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
+        "allValue": ".+",
+        "current": {
+          "selected": false,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "$datasource"
+        },
+        "definition": "label_values(go_info{app_kubernetes_io_name=\"weaviate\"}, app_kubernetes_io_instance)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "cluster",
+        "multi": true,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "query": "label_values(go_info{app_kubernetes_io_name=\"weaviate\"}, app_kubernetes_io_instance)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      },
+      {
+        "allValue": ".+",
+        "current": {
+          "selected": false,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "All"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "$datasource"
+        },
+        "definition": "label_values(go_info{namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\",app_kubernetes_io_name=\"weaviate\"}, pod)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "instance",
+        "multi": true,
+        "name": "instance",
+        "options": [],
+        "query": {
+          "query": "label_values(go_info{namespace=~\"$namespace\",app_kubernetes_io_instance=~\"$cluster\",app_kubernetes_io_name=\"weaviate\"}, pod)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 5,
+        "tagValuesQuery": "",
+        "tagsQuery": "",
+        "type": "query",
+        "useTags": false
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {
+    "collapse": false,
+    "enable": true,
+    "hidden": false,
+    "notice": false,
+    "now": true,
+    "refresh_intervals": [
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ],
+    "status": "Stable",
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ],
+    "type": "timepicker"
+  },
+  "timezone": "",
+  "title": "Weaviate",
+  "uid": "weaviate",
+  "version": 1,
+  "weekStart": ""
+}

@@ -59,8 +59,15 @@ func (p *Paths) IndexPath(name string) string {
 	return filepath.Join(p.IndexBase(), name)
 }
 
-func (p *Paths) IndexPluginsPath(name string) string {
-	return filepath.Join(p.IndexPath(name), "plugins")
+func (p *Paths) IndexPluginsPath(name string) []string {
+	result := make([]string, 0)
+	if _, err := os.Stat(filepath.Join(p.IndexPath(name), "plugins")); err == nil {
+		result = append(result, filepath.Join(p.IndexPath(name), "plugins"))
+	}
+	if _, err := os.Stat(filepath.Join(p.IndexPath(name), "krew-plugins")); err == nil {
+		result = append(result, filepath.Join(p.IndexPath(name), "krew-plugins"))
+	}
+	return result
 }
 
 func (p *Paths) InstallReceiptsPath() string {

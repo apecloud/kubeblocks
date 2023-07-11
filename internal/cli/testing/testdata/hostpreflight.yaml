@@ -9,11 +9,11 @@ spec:
     - cpu:
         outcomes:
           - fail:
-              when: "physical < 4"
-              message: At least 4 physical CPU cores are required
+              when: "physical < 1"
+              message: At least 1 physical CPU cores are required
           - fail:
-              when: "logical < 8"
-              message: At least 8 CPU cores are required
+              when: "logical < 1"
+              message: At least 1 CPU cores are required
           - warn:
               when: "count < 16"
               message: At least 16 CPU cores preferred

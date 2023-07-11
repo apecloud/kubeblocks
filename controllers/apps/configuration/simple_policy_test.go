@@ -63,6 +63,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
+				withClusterComponent(2),
 				withCDComponent(appsv1alpha1.Consensus, []appsv1alpha1.ComponentConfigSpec{{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 						Name:       "for_test",
@@ -125,6 +126,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
+				withClusterComponent(2),
 				withCDComponent(appsv1alpha1.Replication, []appsv1alpha1.ComponentConfigSpec{{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 						Name:       "for_test",
@@ -157,20 +159,64 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 	Context("simple reconfigure policy test for not supported component", func() {
 		It("Should failed", func() {
 			// not support type
-			mockParam := newMockReconfigureParams("simplePolicy", nil,
-				withMockStatefulSet(2, nil),
+			mockParam := newMockReconfigureParams("simplePolicy", k8sMockClient.Client(),
+				withMockDeployments(2, nil),
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
+				withClusterComponent(2),
 				withCDComponent(appsv1alpha1.Stateless, []appsv1alpha1.ComponentConfigSpec{{
 					ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
 						Name:       "for_test",
 						VolumeName: "test_volume",
 					}}}))
+
+			updateErr := cfgcore.MakeError("update failed!")
+			k8sMockClient.MockUpdateMethod(
+				testutil.WithFailed(updateErr, testutil.WithTimes(1)),
+				testutil.WithSucceed(testutil.WithAnyTimes()))
+			k8sMockClient.MockListMethod(testutil.WithListReturned(
+				testutil.WithConstructListSequenceResult([][]runtime.Object{
+					fromPodObjectList(newMockPodsWithDeployment(&mockParam.DeploymentUnits[0], 2)),
+					fromPodObjectList(newMockPodsWithDeployment(&mockParam.DeploymentUnits[0], 2, withReadyPod(0, 2), func(pod *corev1.Pod, index int) {
+						// mock pod-1 restart
+						if index == 1 {
+							updatePodCfgVersion(pod, mockParam.getConfigKey(), mockParam.getTargetVersionHash())
+						}
+					})),
+					fromPodObjectList(newMockPodsWithDeployment(&mockParam.DeploymentUnits[0], 2, withReadyPod(0, 2), func(pod *corev1.Pod, index int) {
+						// mock all pod restart
+						updatePodCfgVersion(pod, mockParam.getConfigKey(), mockParam.getTargetVersionHash())
+					})),
+				}),
+				testutil.WithTimes(3),
+			))
+
 			status, err := simplePolicy.Upgrade(mockParam)
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("not supported component workload type"))
-			Expect(status.Status).Should(BeEquivalentTo(ESNotSupport))
+			Expect(err).Should(BeEquivalentTo(updateErr))
+			Expect(status.Status).Should(BeEquivalentTo(ESAndRetryFailed))
+
+			// first upgrade, not pod is ready
+			status, err = simplePolicy.Upgrade(mockParam)
+			Expect(err).Should(Succeed())
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(0)))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(int32(2)))
+
+			// only one pod ready
+			status, err = simplePolicy.Upgrade(mockParam)
+			Expect(err).Should(Succeed())
+			Expect(status.Status).Should(BeEquivalentTo(ESRetry))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(1)))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(int32(2)))
+
+			// succeed update pod
+			status, err = simplePolicy.Upgrade(mockParam)
+			Expect(err).Should(Succeed())
+			Expect(status.Status).Should(BeEquivalentTo(ESNone))
+			Expect(status.SucceedCount).Should(BeEquivalentTo(int32(2)))
+			Expect(status.ExpectedCount).Should(BeEquivalentTo(int32(2)))
+
 		})
 	})
 

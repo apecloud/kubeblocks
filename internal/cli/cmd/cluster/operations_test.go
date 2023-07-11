@@ -62,11 +62,15 @@ var _ = Describe("operations", func() {
 		}
 		clusterWithOneComp.Spec.ComponentSpecs[0].ClassDefRef = &appsv1alpha1.ClassDefRef{Class: testapps.Class1c1gName}
 		classDef := testapps.NewComponentClassDefinitionFactory("custom", clusterWithOneComp.Spec.ClusterDefRef, testing.ComponentDefName).
-			AddClasses(testapps.DefaultResourceConstraintName, []string{testapps.Class1c1gName}).
+			AddClasses(testapps.DefaultResourceConstraintName, []appsv1alpha1.ComponentClass{testapps.Class1c1g}).
 			GetObject()
-		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(),
-			testing.FakeClusterVersion(), clusterWithTwoComps, clusterWithOneComp, classDef)
+		resourceConstraint := testapps.NewComponentResourceConstraintFactory(testapps.DefaultResourceConstraintName).
+			AddConstraints(testapps.ProductionResourceConstraint).
+			GetObject()
+		pods := testing.FakePods(2, clusterWithOneComp.Namespace, clusterName1)
 		tf.Client = &clientfake.RESTClient{}
+		tf.FakeDynamicClient = testing.FakeDynamicClient(testing.FakeClusterDef(),
+			testing.FakeClusterVersion(), clusterWithTwoComps, clusterWithOneComp, classDef, &pods.Items[0], &pods.Items[1], resourceConstraint)
 	})
 
 	AfterEach(func() {
@@ -199,6 +203,20 @@ var _ = Describe("operations", func() {
 		in.Write([]byte(o.Name + "\n"))
 		Expect(o.Validate()).Should(HaveOccurred())
 
+		By("validate invalid resource")
+		o.Class = ""
+		o.CPU = "1g"
+		o.Memory = "100Gi"
+		in.Write([]byte(o.Name + "\n"))
+		Expect(o.Validate()).Should(HaveOccurred())
+
+		By("validate invalid resource")
+		o.Class = ""
+		o.CPU = "1"
+		o.Memory = "100MB"
+		in.Write([]byte(o.Name + "\n"))
+		Expect(o.Validate()).Should(HaveOccurred())
+
 		By("expect to validate success with resource")
 		o.Class = ""
 		o.CPU = "1"
@@ -301,5 +319,46 @@ var _ = Describe("operations", func() {
 				Expect(cancelOps(o)).Should(Succeed())
 			}
 		}
+	})
+
+	It("Switchover ops", func() {
+		o := initCommonOperationOps(appsv1alpha1.SwitchoverType, clusterName1, false)
+		By("expect to auto complete components when cluster has only one component")
+		Expect(o.CompleteComponentsFlag()).Should(Succeed())
+		Expect(o.ComponentNames[0]).Should(Equal(testing.ComponentName))
+
+		By("expect for componentNames is nil when cluster has only two component")
+		o.Name = clusterName
+		o.ComponentNames = nil
+		Expect(o.CompleteComponentsFlag()).Should(Succeed())
+		Expect(o.ComponentNames).Should(BeEmpty())
+
+		By("validate failed because there are multi-components in cluster and not specify the component")
+		Expect(o.CompleteComponentsFlag()).Should(Succeed())
+		Expect(o.Validate()).ShouldNot(Succeed())
+		Expect(testing.ContainExpectStrings(o.Validate().Error(), "there are multiple components in cluster, please use --component to specify the component for promote")).Should(BeTrue())
+
+		By("validate failed because o.Instance is illegal ")
+		o.Name = clusterName1
+		o.Instance = fmt.Sprintf("%s-%s-%d", clusterName1, testing.ComponentName, 5)
+		Expect(o.Validate()).ShouldNot(Succeed())
+		Expect(testing.ContainExpectStrings(o.Validate().Error(), "not found")).Should(BeTrue())
+
+		By("validate failed because o.Instance is already leader and cannot be promoted")
+		o.Instance = fmt.Sprintf("%s-pod-%d", clusterName1, 0)
+		Expect(o.Validate()).ShouldNot(Succeed())
+		Expect(testing.ContainExpectStrings(o.Validate().Error(), "cannot be promoted because it is already the primary or leader instance")).Should(BeTrue())
+
+		By("validate failed because o.Instance does not belong to the current component")
+		o.Instance = fmt.Sprintf("%s-pod-%d", clusterName1, 1)
+		Expect(o.Validate()).ShouldNot(Succeed())
+		Expect(testing.ContainExpectStrings(o.Validate().Error(), "does not belong to the current component")).Should(BeTrue())
+
+		By("validate failed because mock component has no switchoverSpec, does not support switchover")
+		o.Name = clusterName
+		o.Instance = ""
+		o.Component = testing.ComponentName
+		Expect(o.Validate()).ShouldNot(Succeed())
+		Expect(testing.ContainExpectStrings(o.Validate().Error(), "does not support switchover")).Should(BeTrue())
 	})
 })

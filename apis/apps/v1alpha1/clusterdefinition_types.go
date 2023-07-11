@@ -44,18 +44,20 @@ type ClusterDefinitionSpec struct {
 	ComponentDefs []ClusterComponentDefinition `json:"componentDefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
 	// Connection credential template used for creating a connection credential
-	// secret for cluster.apps.kubeblocks.io object. Built-in objects are:
-	// `$(RANDOM_PASSWD)` - random 8 characters.
-	// `$(UUID)` - generate a random UUID v4 string.
-	// `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string.
-	// `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded.
-	// `$(UUID_HEX)` - generate a random UUID v4 HEX representation.
-	// `$(HEADLESS_SVC_FQDN)` - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
+	// secret for cluster.apps.kubeblocks.io object.
+	//
+	// Built-in objects are:
+	// - `$(RANDOM_PASSWD)` - random 8 characters.
+	// - `$(UUID)` - generate a random UUID v4 string.
+	// - `$(UUID_B64)` - generate a random UUID v4 BASE64 encoded string.
+	// - `$(UUID_STR_B64)` - generate a random UUID v4 string then BASE64 encoded.
+	// - `$(UUID_HEX)` - generate a random UUID v4 HEX representation.
+	// - `$(HEADLESS_SVC_FQDN)` - headless service FQDN placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
+	// - `$(SVC_FQDN)` - service FQDN  placeholder, value pattern - $(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc,
 	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
-	// `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
-	//    `"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306`, and "$(SVC_PORT_mysql)" in the
+	// - `$(SVC_PORT_{PORT-NAME})` - a ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
+	//    `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and "$(SVC_PORT_mysql)" in the
 	//    connection credential value is 3306.
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
@@ -126,7 +128,7 @@ type ProvisionPolicy struct {
 	// type defines the way to provision an account, either `CreateByStmt` or `ReferToExisting`.
 	// +kubebuilder:validation:Required
 	Type ProvisionPolicyType `json:"type"`
-	// scope is the scope to provision account, and the scope could be `anyPod` or `allPods`.
+	// scope is the scope to provision account, and the scope could be `AnyPods` or `AllPods`.
 	// +kubebuilder:default=AnyPods
 	Scope ProvisionScope `json:"scope"`
 	// statements will be used when Type is CreateByStmt.
@@ -242,10 +244,13 @@ type VolumeTypeSpec struct {
 // behaviors.
 // +kubebuilder:validation:XValidation:rule="has(self.workloadType) && self.workloadType == 'Consensus' ?  has(self.consensusSpec) : !has(self.consensusSpec)",message="componentDefs.consensusSpec is required when componentDefs.workloadType is Consensus, and forbidden otherwise"
 type ClusterComponentDefinition struct {
-	// name of the component, it can be any valid string.
+	// A component definition name, this name could be used as default name of `Cluster.spec.componentSpecs.name`,
+	// and so this name is need to conform with same validation rules as `Cluster.spec.componentSpecs.name`, that
+	// is currently comply with IANA Service Naming rule. This name will apply to "apps.kubeblocks.io/component-name"
+	// object label value.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=18
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +kubebuilder:validation:MaxLength=22
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
 	// The description of component definition.
@@ -357,6 +362,19 @@ type ClusterComponentDefinition struct {
 	// +listMapKey=key
 	// +optional
 	CustomLabelSpecs []CustomLabelSpec `json:"customLabelSpecs,omitempty"`
+
+	// switchoverSpec defines command to do switchover.
+	// in particular, when workloadType=Replication, the command defined in switchoverSpec will only be executed under the condition of cluster.componentSpecs[x].SwitchPolicy.type=Noop.
+	// +optional
+	SwitchoverSpec *SwitchoverSpec `json:"switchoverSpec,omitempty"`
+	// componentDefRef is used to inject values from other components into the current component.
+	// values will be saved and updated in a configmap and mounted to the current component.
+	// +patchMergeKey=componentDefName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentDefName
+	// +optional
+	ComponentDefRef []ComponentDefRef `json:"componentDefRef,omitempty" patchStrategy:"merge" patchMergeKey:"componentDefName"`
 }
 
 func (r *ClusterComponentDefinition) GetStatefulSetWorkload() StatefulSetWorkload {
@@ -549,13 +567,12 @@ func (r *ServicePort) toSVCPort() corev1.ServicePort {
 
 type HorizontalScalePolicy struct {
 	// type controls what kind of data synchronization do when component scale out.
-	// Policy is in enum of {None, Snapshot}. The default policy is `None`.
-	// None: Default policy, do nothing.
-	// Snapshot: Do native volume snapshot before scaling and restore to newly scaled pods.
-	//           Prefer backup job to create snapshot if can find a backupPolicy from 'BackupPolicyTemplateName'.
-	//           Notice that 'Snapshot' policy will only take snapshot on one volumeMount, default is
-	//           the first volumeMount of first container (i.e. clusterdefinition.spec.components.podSpec.containers[0].volumeMounts[0]),
-	//           since take multiple snapshots at one time might cause consistency problem.
+	// Policy is in enum of {None, CloneVolume}. The default policy is `None`.
+	// None: Default policy, create empty volume and no data clone.
+	// CloneVolume: Do data clone to newly scaled pods. Prefer to use volume snapshot first,
+	//         and will try backup tool if volume snapshot is not enabled, finally
+	// 	       report error if both above cannot work.
+	// Snapshot: Deprecated, alias for CloneVolume.
 	// +kubebuilder:default=None
 	// +optional
 	Type HScaleDataClonePolicyType `json:"type,omitempty"`
@@ -790,15 +807,6 @@ type ConsensusMember struct {
 
 type ReplicationSetSpec struct {
 	StatefulSetSpec `json:",inline"`
-
-	// switchPolicies defines a collection of different types of switchPolicy, and each type of switchPolicy is limited to one.
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	SwitchPolicies []SwitchPolicy `json:"switchPolicies,omitempty"`
-
-	// switchCmdExecutorConfig configs how to get client SDK and perform switch statements.
-	// +kubebuilder:validation:Required
-	SwitchCmdExecutorConfig *SwitchCmdExecutorConfig `json:"switchCmdExecutorConfig"`
 }
 
 var _ StatefulSetWorkload = &ReplicationSetSpec{}
@@ -818,61 +826,38 @@ func (r *ReplicationSetSpec) FinalStsUpdateStrategy() (appsv1.PodManagementPolic
 		return r.LLPodManagementPolicy, *r.LLUpdateStrategy
 	}
 	_, s := r.StatefulSetSpec.finalStsUpdateStrategy()
-	// TODO(xingran): The update of the replicationSet needs to generate a plan according to the role
 	s.Type = appsv1.OnDeleteStatefulSetStrategyType
 	s.RollingUpdate = nil
 	return appsv1.ParallelPodManagement, s
 }
 
-type SwitchPolicy struct {
-	// switchPolicyType defines type of the switchPolicy.
-	// MaximumAvailability: when the primary is active, do switch if the synchronization delay = 0 in the user-defined lagProbe data delay detection logic, otherwise do not switch. The primary is down, switch immediately.
-	// MaximumDataProtection: when the primary is active, do switch if synchronization delay = 0 in the user-defined lagProbe data lag detection logic, otherwise do not switch. If the primary is down, if it can be judged that the primary and secondary data are consistent, then do the switch, otherwise do not switch.
-	// Noop: KubeBlocks will not perform high-availability switching on components. Users need to implement HA by themselves.
+type SwitchoverSpec struct {
+	// withCandidate corresponds to the switchover of the specified candidate primary or leader instance.
+	// +optional
+	WithCandidate *SwitchoverAction `json:"withCandidate,omitempty"`
+
+	// withoutCandidate corresponds to a switchover that does not specify a candidate primary or leader instance.
+	// +optional
+	WithoutCandidate *SwitchoverAction `json:"withoutCandidate,omitempty"`
+}
+
+type SwitchoverAction struct {
+	// cmdExecutorConfig is the executor configuration of the switchover command.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default=MaximumAvailability
-	Type SwitchPolicyType `json:"type"`
+	CmdExecutorConfig *CmdExecutorConfig `json:"cmdExecutorConfig"`
 
-	// switchStatements defines switching actions according to their respective roles, We divide all pods into three switchStatement role={Promote,Demote,Follow}.
-	// Promote: candidate primary after elected, which to be promoted
-	// Demote: primary before switch, which to be demoted
-	// Follow: the other secondaries that are not selected as the primary, which to follow the new primary
-	// if switchStatements is not set，we will try to use the built-in switchStatements for the database engine with built-in support.
+	// scriptSpecSelectors defines the selector of the scriptSpecs that need to be referenced.
+	// Once ScriptSpecSelectors is defined, the scripts defined in scriptSpecs can be referenced in the SwitchoverAction.CmdExecutorConfig.
 	// +optional
-	SwitchStatements *SwitchStatements `json:"switchStatements,omitempty"`
+	ScriptSpecSelectors []ScriptSpecSelector `json:"scriptSpecSelectors,omitempty"`
 }
 
-type SwitchStatements struct {
-	// promote defines the switching actions for the candidate primary which to be promoted.
-	// +optional
-	Promote []string `json:"promote,omitempty"`
-
-	// demote defines the switching actions for the old primary which to be demoted.
-	// +optional
-	Demote []string `json:"demote,omitempty"`
-
-	// follow defines the switching actions for the other secondaries which are not selected as the primary.
-	// +optional
-	Follow []string `json:"follow,omitempty"`
-}
-
-type SwitchCmdExecutorConfig struct {
-	CommandExecutorEnvItem `json:",inline"`
-
-	// switchSteps definition, users can customize the switching steps on the provided three roles - NewPrimary, OldPrimary, and Secondaries.
-	// the same role can customize multiple steps in the order of the list, and KubeBlocks will perform switching operations in the defined order.
-	// if switchStep is not set, we will try to use the built-in switchStep for the database engine with built-in support.
+type ScriptSpecSelector struct {
+	// ScriptSpec name of the referent, refer to componentDefs[x].scriptSpecs[y].Name.
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +optional
-	SwitchSteps []SwitchStep `json:"switchSteps"`
-}
-
-type SwitchStep struct {
-	CommandExecutorItem `json:",inline"`
-
-	// role determines which role to execute the command on, role is divided into three roles NewPrimary, OldPrimary, and Secondaries.
-	Role SwitchStepRole `json:"role"`
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
 }
 
 type CommandExecutorEnvItem struct {
@@ -986,4 +971,87 @@ func (r *ClusterDefinition) GetComponentDefByName(compDefName string) *ClusterCo
 		}
 	}
 	return nil
+}
+
+// FailurePolicyType specifies the type of failure policy
+// +enum
+// +kubebuilder:validation:Enum={Ignore,Fail}
+type FailurePolicyType string
+
+const (
+	// Ignore means that an error will be ignored but logged.
+	FailurePolicyIgnore FailurePolicyType = "Ignore"
+	// ReportError means that an error will be reported.
+	FailurePolicyFail FailurePolicyType = "Fail"
+)
+
+// ComponentValueFromType specifies the type of component value from.
+// +enum
+// +kubebuilder:validation:Enum={FieldRef,ServiceRef,HeadlessServiceRef}
+type ComponentValueFromType string
+
+const (
+	FromFieldRef           ComponentValueFromType = "FieldRef"
+	FromServiceRef         ComponentValueFromType = "ServiceRef"
+	FromHeadlessServiceRef ComponentValueFromType = "HeadlessServiceRef"
+)
+
+// ComponentDefRef is used to select the component and its fields to be referenced.
+type ComponentDefRef struct {
+	// componentDefName is the name of the componentDef to select.
+	// +kubebuilder:validation:Required
+	ComponentDefName string `json:"componentDefName"`
+	// failurePolicy is the failure policy of the component.
+	// If failed to find the component, the failure policy will be used.
+	// +kubebuilder:validation:Enum={Ignore,Fail}
+	// +default="Ignore"
+	// +optional
+	FailurePolicy FailurePolicyType `json:"failurePolicy,omitempty"`
+	// componentRefEnv specifies a list of values to be injected as env variables to each component.
+	// +kbubebuilder:validation:Required
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	ComponentRefEnvs []ComponentRefEnv `json:"componentRefEnv" patchStrategy:"merge" patchMergeKey:"name"`
+}
+
+// ComponentRefEnv specifies name and value of an env.
+type ComponentRefEnv struct {
+	// name is the name of the env to be injected, and it must be a C identifier.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^[A-Za-z_][A-Za-z0-9_]*$`
+	Name string `json:"name"`
+	// value is the value of the env to be injected.
+	// +optional
+	Value string `json:"value,omitempty"`
+	// valueFrom specifies the source of the env to be injected.
+	// +optional
+	ValueFrom *ComponentValueFrom `json:"valueFrom,omitempty"`
+}
+
+type ComponentValueFrom struct {
+	// type is the type of the source to select. There are three types: `FieldRef`, `ServiceRef`, `HeadlessServiceRef`.
+	// +kubebuilder:validation:Enum={FieldRef,ServiceRef,HeadlessServiceRef}
+	// +kubebuilder:validation:Required
+	Type ComponentValueFromType `json:"type"`
+	// fieldRef is the jsonpath of the source to select when type is `FieldRef`.
+	// there are two objects registered in the jsonpath: `componentDef` and `components`.
+	// componentDef is the component definition object specified in `componentRef.componentDefName`.
+	// components is the component list objects referring to the component definition object.
+	// +optional
+	FieldPath string `json:"fieldPath,omitempty"`
+	// format is the format of each headless service address.
+	// there are three builtin variables can be used as placerholder: $POD_ORDINAL, $POD_FQDN, $POD_NAME
+	// $POD_ORDINAL is the ordinal of the pod.
+	// $POD_FQDN is the fully qualified domain name of the pod.
+	// $POD_NAME is the name of the pod
+	// +optional
+	// +kubebuilder:default=="$POD_FQDN"
+	Format string `json:"format,omitempty"`
+	// joinWith is the string to join the values of headless service addresses.
+	// +optional
+	// +kubebuilder:default=","
+	JoinWith string `json:"joinWith,omitempty"`
 }

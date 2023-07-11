@@ -25,7 +25,7 @@ Enable CSI-S3 and fill in the values based on your actual environment.
 ```bash
 helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
 
-helm install csi-s3  kubeblocks/csi-s3 --version=0.5.0 \
+helm install csi-s3  kubeblocks/csi-s3 --version=0.5.2 \
 --set secret.accessKey=<your_accessKey> \
 --set secret.secretKey=<your_secretKey> \
 --set storageClass.singleBucket=<s3_bucket>  \
@@ -52,7 +52,7 @@ Endpoint format:
 ```bash
 helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
 
-helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
+helm install csi-s3 kubeblocks/csi-s3 --version=0.5.2 \
 --set secret.accessKey=<your_access_id> \
 --set secret.secretKey=<your_access_secret> \
 --set storageClass.singleBucket=<bucket_name>  \
@@ -78,7 +78,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
    ```bash
    helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
 
-   helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
+   helm install csi-s3 kubeblocks/csi-s3 --version=0.5.2 \
    --set secret.accessKey=<ROOT_USER> \
    --set secret.secretKey=<ROOT_PASSWORD> \
    --set storageClass.singleBucket=backup  \
@@ -92,7 +92,7 @@ helm install csi-s3 kubeblocks/csi-s3 --version=0.5.0 \
 </TabItem>
 </Tabs>
 
-You can configure a global backup storage to make this storage the default backup destination path of all new clusters. But currently, the global backup storage cannot be synchronized as the backup destination path of created clusters.
+You can configure a global backup storage to make this storage the default backup destination path of all new clusters. But currently, the global backup storage cannot be synchronized as the backup destination path of existing clusters.
 
 Set the backup policy with the following command.
 
@@ -113,6 +113,24 @@ kbcli kubeblocks config --set dataProtection.backupPVCName=kubeblocks-backup-dat
 :::
 
 ## Create backup
+
+***Before you start***
+
+Check your backup destination path. If there is no backup destination path, edit the backup policy of this cluster first. Make sure the destination path is configured before creating the backup.
+
+```bash
+kbcli cluster edit-backup-policy mysql-cluster-mysql-backup-policy
+>
+...
+spec:
+  datafile:
+    ... 
+    persistentVolumeClaim:
+      createPolicy: IfNotPresent
+      initCapacity: 20Gi
+      name: kubeblocks-backup-data
+      storageClassName: csi-s3
+```
 
 **Option 1. Manually Backup**
 

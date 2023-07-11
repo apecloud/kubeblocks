@@ -25,12 +25,14 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	gv "github.com/hashicorp/go-version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	cp "github.com/apecloud/kubeblocks/internal/cli/cloudprovider"
 	clitesting "github.com/apecloud/kubeblocks/internal/cli/testing"
 	"github.com/apecloud/kubeblocks/internal/cli/types"
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
+	"github.com/apecloud/kubeblocks/version"
 )
 
 var _ = Describe("playground", func() {
@@ -55,11 +57,26 @@ var _ = Describe("playground", func() {
 			IOStreams:      streams,
 			cloudProvider:  defaultCloudProvider,
 			helmCfg:        helm.NewConfig("", testKubeConfigPath, "", false),
+			dockerVersion:  version.MinimumDockerVersion,
 		}
 		Expect(o.validate()).Should(Succeed())
 		Expect(o.run()).Should(HaveOccurred())
 		Expect(o.installKubeBlocks("test")).Should(HaveOccurred())
 		Expect(o.createCluster()).Should(HaveOccurred())
+	})
+
+	It("init at local host without outdate docker", func() {
+		var err error
+		o := &initOptions{
+			clusterDef:     clitesting.ClusterDefName,
+			clusterVersion: clitesting.ClusterVersionName,
+			IOStreams:      streams,
+			cloudProvider:  defaultCloudProvider,
+			helmCfg:        helm.NewConfig("", testKubeConfigPath, "", false),
+		}
+		o.dockerVersion, err = gv.NewVersion("20.10.0")
+		Expect(err).Should(BeNil())
+		Expect(o.validate()).Should(HaveOccurred())
 	})
 
 	It("init at remote cloud", func() {

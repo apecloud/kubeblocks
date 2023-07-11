@@ -35,7 +35,7 @@ spec:
         builtIn: false
         exporterConfig:
           scrapePath: /metrics
-          scrapePort: 9187
+          scrapePort: {{ .Values.metrics.service.port }}
       logConfigs:
         {{- range $name,$pattern := .Values.logConfigs }}
         - name: {{ $name }}
@@ -62,6 +62,11 @@ spec:
           namespace: {{ .Release.Namespace }}
           volumeName: postgresql-custom-metrics
           defaultMode: 0777
+        - name: agamotto-configuration
+          templateRef: postgresql-agamotto-configuration
+          namespace: {{ .Release.Namespace }}
+          volumeName: agamotto-configuration
+          defaultMode: 0777
       scriptSpecs:
         - name: postgresql-scripts
           templateRef: postgresql-scripts
@@ -79,6 +84,23 @@ spec:
       volumeTypes:
         - name: data
           type: data
+      switchoverSpec:
+        withCandidate:
+          cmdExecutorConfig:
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+            command:
+              - /bin/bash
+              - -c
+            args:
+              - curl -s http://$(KB_REPLICATION_PRIMARY_POD_FQDN):8008/switchover -XPOST -d '{"leader":"$(KB_REPLICATION_PRIMARY_POD_NAME)","candidate":"$(KB_SWITCHOVER_CANDIDATE_NAME)"}'
+        withoutCandidate:
+          cmdExecutorConfig:
+            image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}
+            command:
+              - /bin/bash
+              - -c
+            args:
+              - curl -s http://$(KB_REPLICATION_PRIMARY_POD_FQDN):8008/switchover -XPOST -d '{"leader":"$(KB_REPLICATION_PRIMARY_POD_NAME)"}'
       podSpec:
         securityContext:
           runAsUser: 0
@@ -96,6 +118,8 @@ spec:
                 mountPath: /home/postgres/conf
               - name: scripts
                 mountPath: /kb-scripts
+              - name: pod-info
+                mountPath: /kb-podinfo
         containers:
           - name: postgresql
             imagePullPolicy: {{ default .Values.image.pullPolicy "IfNotPresent" }}
@@ -126,6 +150,8 @@ spec:
                 mountPath: /home/postgres/conf
               - name: scripts
                 mountPath: /kb-scripts
+              - name: pod-info
+                mountPath: /kb-podinfo
             ports:
               - name: tcp-postgresql
                 containerPort: 5432
@@ -154,7 +180,6 @@ spec:
                     initdb:
                       - auth-host: md5
                       - auth-local: trust
-                      - wal-segsize: "1024"
               - name: ALLOW_NOSSL
                 value: "true"
               - name: PGROOT
@@ -271,10 +296,8 @@ spec:
             securityContext:
               runAsUser: 0
             env:
-              {{- $database := "postgres" }}
-              {{- $sslmode := "disable" }}
-              - name: DATA_SOURCE_URI
-                value: {{ printf "127.0.0.1:5432/%s?sslmode=%s" $database $sslmode }}
+              - name: ENDPOINT
+                value: {{ printf "127.0.0.1:5432" }}
               - name: DATA_SOURCE_PASS
                 valueFrom:
                   secretKeyRef:
@@ -288,35 +311,16 @@ spec:
                     key: username
                     optional: false
             command:
-              - "/opt/bitnami/postgres-exporter/bin/postgres_exporter"
-              - "--auto-discover-databases"
-              - "--extend.query-path=/opt/conf/custom-metrics.yaml"
-              - "--exclude-databases=template0,template1"
-              - "--log.level=info"
+              - "/bin/agamotto"
+              - "--config=/opt/agamotto/agamotto-config.yaml"
             ports:
               - name: http-metrics
-                containerPort: 9187
-            livenessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              httpGet:
-                path: /
-                port: http-metrics
-            readinessProbe:
-              failureThreshold: 6
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 5
-              httpGet:
-                path: /
-                port: http-metrics
+                containerPort: {{ .Values.metrics.service.port }}
             volumeMounts:
               - name: postgresql-custom-metrics
                 mountPath: /opt/conf
+              - name: agamotto-configuration
+                mountPath: /opt/agamotto
         volumes:
           - name: dshm
             emptyDir:
@@ -324,6 +328,18 @@ spec:
               {{- with .Values.shmVolume.sizeLimit }}
               sizeLimit: {{ . }}
               {{- end }}
+          - name: pod-info
+            downwardAPI:
+              items:
+                - path: "pod-role"
+                  fieldRef:
+                    fieldPath: metadata.labels['kubeblocks.io/role']
+                - path: "primary-pod"
+                  fieldRef:
+                    fieldPath: metadata.annotations['rs.apps.kubeblocks.io/primary']
+                - path: "component-replicas"
+                  fieldRef:
+                    fieldPath: metadata.annotations['apps.kubeblocks.io/component-replicas']
       systemAccounts:
         cmdExecutorConfig:
           image: {{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.repository }}:{{ default .Values.image.tag }}

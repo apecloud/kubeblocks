@@ -22,6 +22,7 @@ package apps
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/internal/constant"
@@ -80,10 +81,9 @@ func (factory *MockBackupPolicyFactory) setScheduleField(setField func(scheduleP
 	case dataprotectionv1alpha1.BackupTypeSnapshot:
 		factory.get().Spec.Schedule.Snapshot = &dataprotectionv1alpha1.SchedulePolicy{}
 		schedulePolicy = factory.get().Spec.Schedule.Snapshot
-	// todo: set logfile schedule
 	case dataprotectionv1alpha1.BackupTypeLogFile:
 		factory.get().Spec.Schedule.Logfile = &dataprotectionv1alpha1.SchedulePolicy{}
-		schedulePolicy = factory.get().Spec.Schedule.Snapshot
+		schedulePolicy = factory.get().Spec.Schedule.Logfile
 	}
 	if schedulePolicy == nil {
 		// ignore
@@ -100,9 +100,10 @@ func (factory *MockBackupPolicyFactory) AddSnapshotPolicy() *MockBackupPolicyFac
 	return factory
 }
 
-func (factory *MockBackupPolicyFactory) AddFullPolicy() *MockBackupPolicyFactory {
+func (factory *MockBackupPolicyFactory) AddDataFilePolicy() *MockBackupPolicyFactory {
 	factory.get().Spec.Datafile = &dataprotectionv1alpha1.CommonBackupPolicy{
 		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
+			Name:         pointer.String("backup-data"),
 			CreatePolicy: dataprotectionv1alpha1.CreatePVCPolicyIfNotPresent,
 		},
 	}
@@ -110,9 +111,10 @@ func (factory *MockBackupPolicyFactory) AddFullPolicy() *MockBackupPolicyFactory
 	return factory
 }
 
-func (factory *MockBackupPolicyFactory) AddIncrementalPolicy() *MockBackupPolicyFactory {
+func (factory *MockBackupPolicyFactory) AddLogfilePolicy() *MockBackupPolicyFactory {
 	factory.get().Spec.Logfile = &dataprotectionv1alpha1.CommonBackupPolicy{
 		PersistentVolumeClaim: dataprotectionv1alpha1.PersistentVolumeClaim{
+			Name:         pointer.String("backup-data"),
 			CreatePolicy: dataprotectionv1alpha1.CreatePVCPolicyIfNotPresent,
 		},
 	}
@@ -132,6 +134,11 @@ func (factory *MockBackupPolicyFactory) SetSchedule(schedule string, enable bool
 		schedulePolicy.Enable = enable
 		schedulePolicy.CronExpression = schedule
 	})
+	return factory
+}
+
+func (factory *MockBackupPolicyFactory) SetScheduleStartWindowMinutes(startWindowMinutes *int64) *MockBackupPolicyFactory {
+	factory.get().Spec.Schedule.StartWindowMinutes = startWindowMinutes
 	return factory
 }
 
@@ -200,8 +207,30 @@ func (factory *MockBackupPolicyFactory) AddHookPostCommand(postCommand string) *
 
 func (factory *MockBackupPolicyFactory) SetPVC(pvcName string) *MockBackupPolicyFactory {
 	factory.setCommonPolicyField(func(commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) {
-		commonPolicy.PersistentVolumeClaim.Name = pvcName
+		if pvcName == "" {
+			commonPolicy.PersistentVolumeClaim.Name = nil
+		} else {
+			commonPolicy.PersistentVolumeClaim.Name = &pvcName
+		}
 		commonPolicy.PersistentVolumeClaim.InitCapacity = resource.MustParse(constant.DefaultBackupPvcInitCapacity)
+	})
+	return factory
+}
+
+func (factory *MockBackupPolicyFactory) SetBackupRepo(repoName string) *MockBackupPolicyFactory {
+	factory.setCommonPolicyField(func(commonPolicy *dataprotectionv1alpha1.CommonBackupPolicy) {
+		if repoName == "" {
+			commonPolicy.BackupRepoName = nil
+		} else {
+			commonPolicy.BackupRepoName = &repoName
+		}
+	})
+	return factory
+}
+
+func (factory *MockBackupPolicyFactory) SetBackupStatusUpdates(backupStatusUpdates []dataprotectionv1alpha1.BackupStatusUpdate) *MockBackupPolicyFactory {
+	factory.setBasePolicyField(func(basePolicy *dataprotectionv1alpha1.BasePolicy) {
+		basePolicy.BackupStatusUpdates = backupStatusUpdates
 	})
 	return factory
 }

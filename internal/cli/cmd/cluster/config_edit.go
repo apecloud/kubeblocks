@@ -52,7 +52,7 @@ var (
 
 	editConfigExample = templates.Examples(`
 		# update mysql max_connections, cluster name is mycluster
-		kbcli cluster edit-config mycluster --component=mysql --config-spec=mysql-3node-tpl --config-file=my.cnf 
+		kbcli cluster edit-config mycluster
 	`)
 )
 
@@ -71,7 +71,7 @@ func (o *editConfigOptions) Run(fn func(info *cfgcore.ConfigPatchInfo, cc *appsv
 		return err
 	}
 
-	diff, err := util.GetUnifiedDiffString(cfgEditContext.original, cfgEditContext.edited)
+	diff, err := util.GetUnifiedDiffString(cfgEditContext.original, cfgEditContext.edited, "Original", "Current", 3)
 	if err != nil {
 		return err
 	}
@@ -186,7 +186,7 @@ func NewEditConfigureCmd(f cmdutil.Factory, streams genericclioptions.IOStreams)
 			}))
 		},
 	}
-	o.buildReconfigureCommonFlags(cmd)
+	o.buildReconfigureCommonFlags(cmd, f)
 	cmd.Flags().BoolVar(&o.replaceFile, "replace", false, "Boolean flag to enable replacing config file. Default with false.")
 	return cmd
 }

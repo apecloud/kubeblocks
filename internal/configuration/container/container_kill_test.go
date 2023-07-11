@@ -261,3 +261,49 @@ func TestAutoCheckCRIType(t *testing.T) {
 		}
 	}
 }
+
+func TestContainerdInit(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	criCli := mocks.NewMockRuntimeServiceClient(mockCtrl)
+
+	containerd := containerdContainer{
+		logger:          zapLog.Sugar(),
+		backendRuntime:  criCli,
+		runtimeEndpoint: "not_exist_point",
+	}
+	require.NotNil(t, containerd.Init(context.Background()))
+}
+
+func TestContainerdPingCRI(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	criCli := mocks.NewMockRuntimeServiceClient(mockCtrl)
+
+	criCli.EXPECT().Status(gomock.Any(), gomock.Any()).
+		Return(nil, cfgcore.MakeError("failed to ping CRI!"))
+	criCli.EXPECT().Status(gomock.Any(), gomock.Any()).
+		Return(&runtimeapi.StatusResponse{
+			Status: &runtimeapi.RuntimeStatus{},
+		}, nil)
+
+	containerd := containerdContainer{
+		logger:         zapLog.Sugar(),
+		backendRuntime: criCli,
+	}
+
+	require.NotNil(t, containerd.pingCRI(context.Background(), criCli))
+	require.Nil(t, containerd.pingCRI(context.Background(), criCli))
+}
+
+func TestDockerInit(t *testing.T) {
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "SocketFileTest-")
+	require.Nil(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	docker := &dockerContainer{
+		logger:         zapLog.Sugar(),
+		dockerEndpoint: filepath.Join(tmpDir, "docker.sock"),
+	}
+	require.NotNil(t, docker.Init(context.Background()))
+}

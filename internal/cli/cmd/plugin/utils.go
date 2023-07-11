@@ -58,9 +58,18 @@ func NewPaths(base string) *Paths {
 	return &Paths{base: base, tmp: os.TempDir()}
 }
 
-func LoadPluginByName(pluginsDir, pluginName string) (Plugin, error) {
-	klog.V(4).Infof("Reading plugin %q from %s", pluginName, pluginsDir)
-	return ReadPluginFromFile(filepath.Join(pluginsDir, pluginName+ManifestExtension))
+// LoadPluginByName loads plugin from index repository
+func LoadPluginByName(pluginsDirs []string, pluginName string) (Plugin, error) {
+	var plugin Plugin
+	var err error
+	for _, p := range pluginsDirs {
+		plugin, err = ReadPluginFromFile(filepath.Join(p, pluginName+ManifestExtension))
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		break
+	}
+	return plugin, err
 }
 
 func ReadPluginFromFile(path string) (Plugin, error) {
@@ -239,4 +248,48 @@ func validateSelector(sel *metav1.LabelSelector) error {
 	}
 
 	return nil
+}
+
+func findPluginManifestFiles(indexDir string) ([]string, error) {
+	var out []string
+	files, err := os.ReadDir(indexDir)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to open index dir")
+	}
+	for _, file := range files {
+		if file.Type().IsRegular() && filepath.Ext(file.Name()) == ManifestExtension {
+			out = append(out, file.Name())
+		}
+	}
+	return out, nil
+}
+
+// LoadPluginListFromFS will parse and retrieve all plugin files.
+func LoadPluginListFromFS(pluginDirs []string) ([]Plugin, error) {
+	list := make([]Plugin, 0)
+	for _, pluginDir := range pluginDirs {
+		pluginDir, err := filepath.EvalSymlinks(pluginDir)
+		if err != nil {
+			return nil, err
+		}
+
+		files, err := findPluginManifestFiles(pluginDir)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to scan plugins in index directory")
+		}
+		klog.V(4).Infof("found %d plugins in dir %s", len(files), pluginDir)
+
+		for _, file := range files {
+			pluginName := strings.TrimSuffix(file, filepath.Ext(file))
+			p, err := LoadPluginByName([]string{pluginDir}, pluginName)
+			if err != nil {
+				// loading the index repository shouldn't fail because of one plugin
+				// if loading the plugin fails, log the error and continue
+				klog.Errorf("failed to read or parse plugin manifest %q: %v", pluginName, err)
+				continue
+			}
+			list = append(list, p)
+		}
+	}
+	return list, nil
 }

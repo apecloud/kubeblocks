@@ -397,6 +397,93 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
 	}
 
+	testSwitchover := func(clusterDef *ClusterDefinition, cluster *Cluster) {
+		switchoverList := []Switchover{
+			{
+				ComponentOps: ComponentOps{ComponentName: "switchover-component-not-exist"},
+				InstanceName: "*",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: componentName},
+				InstanceName: "",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: componentName},
+				InstanceName: "switchover-instance-name-not-exist",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: componentName},
+				InstanceName: "*",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: componentName},
+				InstanceName: fmt.Sprintf("%s-%s-0", cluster.Name, componentName),
+			},
+		}
+
+		By("By testing horizontalScaling - delete component proxy from cluster definition which is exist in cluster")
+		patch := client.MergeFrom(clusterDef.DeepCopy())
+		// delete component proxy from cluster definition
+		if clusterDef.Spec.ComponentDefs[0].Name == proxyComponentName {
+			clusterDef.Spec.ComponentDefs = clusterDef.Spec.ComponentDefs[1:]
+		} else {
+			clusterDef.Spec.ComponentDefs = clusterDef.Spec.ComponentDefs[:1]
+		}
+		Expect(k8sClient.Patch(ctx, clusterDef, patch)).Should(Succeed())
+		tmp := &ClusterDefinition{}
+		_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDef.Name, Namespace: clusterDef.Namespace}, tmp)
+		Expect(len(tmp.Spec.ComponentDefs)).Should(Equal(1))
+
+		By("By testing switchover - target component not exist")
+		opsRequest := createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[0]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(notFoundComponentsString("switchover-component-not-exist")))
+
+		By("By testing switchover - target switchover.Instance cannot be empty")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[1]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("switchover.instanceName"))
+
+		By("By testing switchover - clusterDefinition has no switchoverSpec and do not support switchover")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[3]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("does not support switchover"))
+
+		By("By testing switchover - target switchover.Instance cannot be empty")
+		patch = client.MergeFrom(clusterDef.DeepCopy())
+		commandExecutorEnvItem := CommandExecutorEnvItem{
+			Image: "",
+		}
+		commandExecutorItem := CommandExecutorItem{
+			Command: []string{"echo", "hello"},
+			Args:    []string{},
+		}
+		switchoverSpec := &SwitchoverSpec{
+			WithCandidate: &SwitchoverAction{
+				CmdExecutorConfig: &CmdExecutorConfig{
+					CommandExecutorEnvItem: commandExecutorEnvItem,
+					CommandExecutorItem:    commandExecutorItem,
+				},
+			},
+			WithoutCandidate: &SwitchoverAction{
+				CmdExecutorConfig: &CmdExecutorConfig{
+					CommandExecutorEnvItem: commandExecutorEnvItem,
+					CommandExecutorItem:    commandExecutorItem,
+				},
+			},
+		}
+		clusterDef.Spec.ComponentDefs[0].SwitchoverSpec = switchoverSpec
+		Expect(k8sClient.Patch(ctx, clusterDef, patch)).Should(Succeed())
+		tmp = &ClusterDefinition{}
+		_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: clusterDef.Name, Namespace: clusterDef.Namespace}, tmp)
+		Expect(len(tmp.Spec.ComponentDefs)).Should(Equal(1))
+
+		By("By testing switchover - switchover.InstanceName is * and should succeed ")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[3]}
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
+	}
+
 	testWhenClusterDeleted := func(cluster *Cluster, opsRequest *OpsRequest) {
 		By("delete cluster")
 		newCluster := &Cluster{}
@@ -452,6 +539,8 @@ var _ = Describe("OpsRequest webhook", func() {
 			testVolumeExpansion(cluster)
 
 			testHorizontalScaling(clusterDef, cluster)
+
+			testSwitchover(clusterDef, cluster)
 
 			opsRequest = testRestart(cluster)
 

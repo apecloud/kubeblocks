@@ -1,0 +1,10 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupRepo
+metadata:
+  generateName: backup-repo-
+  annotations:
+    dataprotection.kubeblocks.io/is-default-repo: "true"
+spec:
+  storageProviderRef: "storage-provider-test"
+  pvReclaimPolicy: "Retain"
+  volumeCapacity: 100Gi

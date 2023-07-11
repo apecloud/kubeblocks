@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	types2 "github.com/apecloud/kubeblocks/internal/controller/client"
 )
 
@@ -194,7 +195,7 @@ func NewTplEngine(values *TplValues, funcs *BuiltInObjectsFunc, tplName string, 
 		tplValues:     values,
 		ctx:           ctx,
 		cli:           cli,
-		importModules: set.NewLinkedHashSetString(),
+		importModules: cfgutil.NewSet(),
 		importFuncs:   make(map[string]functional),
 	}
 

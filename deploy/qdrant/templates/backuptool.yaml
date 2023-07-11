@@ -1,0 +1,25 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: BackupTool
+metadata:
+  name: qdrant-snapshot
+  labels:
+    clusterdefinition.kubeblocks.io/name: qdrant
+    {{- include "qdrant.labels" . | nindent 4 }}
+spec:
+  image: apecloud/curl-jq:latest
+  deployKind: job
+  env:
+    - name: DATA_DIR
+      value: /qdrant/storage/
+  physical:
+    restoreCommands:
+      - |-
+      {{- .Files.Get "scripts/qdrant-restore.sh" | nindent 8 }}
+    incrementalRestoreCommands: []
+  logical:
+    restoreCommands: []
+    incrementalRestoreCommands: []
+  backupCommands:
+    - |-
+    {{- .Files.Get "scripts/qdrant-backup.sh" | nindent 6 }}
+  incrementalBackupCommands: []

@@ -56,13 +56,13 @@ var (
 		kbcli alert add-receiver --webhook='url=https://open.feishu.cn/open-apis/bot/v2/hook/foo,token=XXX'
 
 		# add email receiver
-        kbcli alter add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io'
+        kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io'
 
 		# add email receiver, and only receive alert from cluster mycluster
-		kbcli alter add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster
+		kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster
 
 		# add email receiver, and only receive alert from cluster mycluster and alert severity is warning
-		kbcli alter add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster --severity=warning
+		kbcli alert add-receiver --email='user1@kubeblocks.io,user2@kubeblocks.io' --cluster=mycluster --severity=warning
 
 		# add slack receiver
   		kbcli alert add-receiver --slack api_url=https://hooks.slackConfig.com/services/foo,channel=monitor,username=kubeblocks-alert-bot`)
@@ -70,7 +70,7 @@ var (
 
 type baseOptions struct {
 	genericclioptions.IOStreams
-	alterConfigMap   *corev1.ConfigMap
+	alertConfigMap   *corev1.ConfigMap
 	webhookConfigMap *corev1.ConfigMap
 	client           kubernetes.Interface
 }
@@ -133,7 +133,7 @@ func (o *baseOptions) complete(f cmdutil.Factory) error {
 	}
 
 	// get alertmanager configmap
-	o.alterConfigMap, err = o.client.CoreV1().ConfigMaps(namespace).Get(ctx, alertConfigmapName, metav1.GetOptions{})
+	o.alertConfigMap, err = o.client.CoreV1().ConfigMaps(namespace).Get(ctx, alertConfigmapName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -194,8 +194,8 @@ func (o *addReceiverOptions) checkEmails() error {
 		return nil
 	}
 
-	errMsg := "SMTP %sis not configured, if you want to add email receiver, please configure it first"
-	data, err := getConfigData(o.alterConfigMap, alertConfigFileName)
+	errMsg := "SMTP %sis not configured, if you want to add email receiver, please use `kbcli alert config-smtpserver` configure it first"
+	data, err := getConfigData(o.alertConfigMap, alertConfigFileName)
 	if err != nil {
 		return err
 	}
@@ -309,7 +309,7 @@ func (o *addReceiverOptions) buildRoute() {
 
 // addReceiver adds receiver to alertmanager config
 func (o *addReceiverOptions) addReceiver() error {
-	data, err := getConfigData(o.alterConfigMap, alertConfigFileName)
+	data, err := getConfigData(o.alertConfigMap, alertConfigFileName)
 	if err != nil {
 		return err
 	}
@@ -329,7 +329,7 @@ func (o *addReceiverOptions) addReceiver() error {
 	data["route"].(map[string]interface{})["routes"] = routes
 
 	// update alertmanager configmap
-	return updateConfig(o.client, o.alterConfigMap, alertConfigFileName, data)
+	return updateConfig(o.client, o.alertConfigMap, alertConfigFileName, data)
 }
 
 func (o *addReceiverOptions) addWebhookReceivers() error {

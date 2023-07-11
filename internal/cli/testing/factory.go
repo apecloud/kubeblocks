@@ -84,6 +84,7 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 					{Name: "secrets", Namespaced: true, Kind: "Secret"},
 					{Name: "configmaps", Namespaced: true, Kind: "ConfigMap"},
 					{Name: "namespaces", Namespaced: false, Kind: "Namespace"},
+					{Name: "serviceaccounts", Namespaced: true, Kind: "ServiceAccount"},
 				},
 			},
 		},
@@ -99,6 +100,21 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 				"v1": {
 					{Name: "deployments", Namespaced: true, Kind: "Deployment"},
 					{Name: "statefulsets", Namespaced: true, Kind: "StatefulSet"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
+				Name: "rbac.authorization.k8s.io",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1": {
+					{Name: "roles", Namespaced: true, Kind: "Role"},
+					{Name: "rolebindings", Namespaced: true, Kind: "RoleBinding"},
 				},
 			},
 		},
@@ -119,6 +135,24 @@ func testDynamicResources() []*restmapper.APIGroupResources {
 					{Name: "clusterdefinitions", Namespaced: false, Kind: "clusterdefinition"},
 					{Name: "clusterversions", Namespaced: false, Kind: "clusterversion"},
 					{Name: "opsrequests", Namespaced: true, Kind: "OpsRequest"},
+				},
+			},
+		},
+		{
+			Group: metav1.APIGroup{
+				Name: "chaos-mesh.org",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{GroupVersion: "chaos-mesh.org/v1alpha1", Version: "v1alpha1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{
+					GroupVersion: "chaos-mesh.org/v1alpha1",
+					Version:      "v1alpha1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1alpha1": {
+					{Name: "podchaoses", Namespaced: true, Kind: "PodChaos"},
+					{Name: "networkchaoses", Namespaced: true, Kind: "NetworkChaos"},
+					{Name: "httpchaoses", Namespaced: true, Kind: "HTTPChaos"},
 				},
 			},
 		},

@@ -19,7 +19,7 @@ VERSION ?= 0.5.0-alpha.0
 GITHUB_PROXY ?=
 GIT_COMMIT  = $(shell git rev-list -1 HEAD)
 GIT_VERSION = $(shell git describe --always --abbrev=0 --tag)
-
+GENERATED_CLIENT_PKG = "pkg/client"
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -67,6 +67,8 @@ LD_FLAGS="-s -w -X main.version=v${VERSION} -X main.buildDate=`date -u +'%Y-%m-%
 local : ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
 ARCH ?= linux-amd64
 
+# build tags
+BUILD_TAGS="containers_image_openpgp"
 
 
 TAG_LATEST ?= false
@@ -125,17 +127,22 @@ all: manager kbcli probe reloader ## Make all cmd binaries.
 
 .PHONY: manifests
 manifests: test-go-generate controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./cmd/manager/...;./apis/...;./controllers/...;./internal/..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./cmd/manager/...;./apis/...;./controllers/..." output:crd:artifacts:config=config/crd/bases
 	@cp config/crd/bases/* $(CHART_PATH)/crds
 	@cp config/rbac/role.yaml $(CHART_PATH)/config/rbac/role.yaml
+	$(MAKE) client-sdk-gen
 
 .PHONY: preflight-manifests
 preflight-manifests: generate ## Generate external Preflight API
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd:generateEmbeddedObjectMeta=true webhook paths="./externalapis/preflight/..." output:crd:artifacts:config=config/crd/preflight
 
 .PHONY: generate
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: controller-gen build-kbcli-embed-chart ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./apis/...;./externalapis/..."
+
+.PHONY: client-sdk-gen
+client-sdk-gen: module ## Generate CRD client code.
+	@./hack/client-sdk-gen.sh
 
 .PHONY: manager-go-generate
 manager-go-generate: ## Run go generate against lifecycle manager code.
@@ -151,11 +158,11 @@ test-go-generate: ## Run go generate against test code.
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
-	$(GOFMT) -l -w -s $$(git ls-files --exclude-standard | grep "\.go$$")
+	$(GOFMT) -l -w -s $$(git ls-files --exclude-standard | grep "\.go$$" | grep -v $(GENERATED_CLIENT_PKG))
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	GOOS=linux $(GO) vet -mod=mod ./...
+	GOOS=$(GOOS) $(GO) vet -tags $(BUILD_TAGS) -mod=mod ./...
 
 .PHONY: cue-fmt
 cue-fmt: cuetool ## Run cue fmt against code.
@@ -163,16 +170,19 @@ cue-fmt: cuetool ## Run cue fmt against code.
 	git ls-files --exclude-standard | grep "\.cue$$" | xargs $(CUE) fix
 
 .PHONY: lint-fast
-lint-fast: golangci staticcheck vet  # [INTERNAL] fast lint
-	$(GOLANGCILINT) run ./...
+lint-fast: staticcheck vet golangci-lint # [INTERNAL] Run all lint job against code.
 
 .PHONY: lint
-lint: test-go-generate generate ## Run golangci-lint against code.
-	$(MAKE) lint-fast
+lint: test-go-generate generate ## Run default lint job against code.
+	$(MAKE) golangci-lint
+
+.PHONY: golangci-lint
+golangci-lint: golangci generate ## Run golangci-lint against code.
+	$(GOLANGCILINT) run ./...
 
 .PHONY: staticcheck
-staticcheck: staticchecktool ## Run staticcheck against code.
-	$(STATICCHECK) ./...
+staticcheck: staticchecktool test-go-generate generate ## Run staticcheck against code.
+	$(STATICCHECK) -tags $(BUILD_TAGS) ./...
 
 .PHONY: build-checks
 build-checks: generate fmt vet goimports lint-fast ## Run build checks.
@@ -201,27 +211,29 @@ ifeq (, $(shell sed -n "/^127.0.0.1[[:space:]]*host.$(EXISTING_CLUSTER_TYPE).int
 endif
 endif
 
+
+OUTPUT_COVERAGE=-coverprofile cover.out.tmp && grep -v "zz_generated.deepcopy.go" cover.out.tmp > cover.out && rm cover.out.tmp
 .PHONY: test-current-ctx
-test-current-ctx: manifests generate fmt vet add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
-	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test  -p 1 -coverprofile cover.out $(TEST_PACKAGES)
+test-current-ctx: manifests generate add-k8s-host ## Run operator controller tests with current $KUBECONFIG context. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+	USE_EXISTING_CLUSTER=true KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) -p 1 $(TEST_PACKAGES) $(OUTPUT_COVERAGE)
 
 .PHONY: test-fast
 test-fast: envtest
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -short -coverprofile cover.out $(TEST_PACKAGES)
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) -short $(TEST_PACKAGES)  $(OUTPUT_COVERAGE)
 
 .PHONY: test
-test: manifests generate test-go-generate fmt vet add-k8s-host test-fast ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+test: manifests generate test-go-generate add-k8s-host test-fast ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
 
 .PHONY: race
 race:
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -race $(TEST_PACKAGES)
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) -race $(TEST_PACKAGES)
 
 .PHONY: test-integration
-test-integration: manifests generate fmt vet envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test ./test/integration
+test-integration: manifests generate envtest add-k8s-host ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -tags $(BUILD_TAGS) ./test/integration
 
 .PHONY: test-delve
-test-delve: manifests generate fmt vet envtest ## Run tests.
+test-delve: manifests generate envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" dlv --listen=:$(DEBUG_PORT) --headless=true --api-version=2 --accept-multiclient test $(TEST_PACKAGES)
 
 .PHONY: test-webhook-enabled
@@ -239,7 +251,7 @@ endif
 
 .PHONY: goimports
 goimports: goimportstool ## Run goimports against code.
-	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(git ls-files|grep "\.go$$")
+	$(GOIMPORTS) -local github.com/apecloud/kubeblocks -w $$(git ls-files|grep "\.go$$" | grep -v $(GENERATED_CLIENT_PKG))
 
 
 ##@ CLI
@@ -257,14 +269,39 @@ CLI_LD_FLAGS ="-s -w \
 	-X github.com/apecloud/kubeblocks/version.DefaultKubeBlocksVersion=$(VERSION)"
 
 bin/kbcli.%: test-go-generate ## Cross build bin/kbcli.$(OS).$(ARCH).
-	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) CGO_ENABLED=0 $(GO) build -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
+	GOOS=$(word 2,$(subst ., ,$@)) GOARCH=$(word 3,$(subst ., ,$@)) CGO_ENABLED=0 $(GO) build -tags $(BUILD_TAGS) -ldflags=${CLI_LD_FLAGS} -o $@ cmd/cli/main.go
 
 .PHONY: kbcli-fast
 kbcli-fast: OS=$(shell $(GO) env GOOS)
 kbcli-fast: ARCH=$(shell $(GO) env GOARCH)
-kbcli-fast:
+kbcli-fast: build-kbcli-embed-chart
 	$(MAKE) bin/kbcli.$(OS).$(ARCH)
 	@mv bin/kbcli.$(OS).$(ARCH) bin/kbcli
+
+create-kbcli-embed-charts-dir:
+	mkdir -p internal/cli/cluster/charts/
+build-single-kbcli-embed-chart.%: chart=$(word 2,$(subst ., ,$@))
+build-single-kbcli-embed-chart.%:
+	$(HELM) dependency update deploy/$(chart) --skip-refresh
+ifeq ($(VERSION), latest)
+	$(HELM) package deploy/$(chart)
+else
+	$(HELM) package deploy/$(chart) --version $(VERSION)
+endif
+	mv $(chart)-*.tgz internal/cli/cluster/charts/$(chart).tgz
+
+.PHONY: build-kbcli-embed-chart
+build-kbcli-embed-chart: helmtool create-kbcli-embed-charts-dir \
+	build-single-kbcli-embed-chart.apecloud-mysql-cluster \
+	build-single-kbcli-embed-chart.redis-cluster \
+	build-single-kbcli-embed-chart.postgresql-cluster \
+	build-single-kbcli-embed-chart.kafka-cluster \
+	build-single-kbcli-embed-chart.mongodb-cluster
+#	build-single-kbcli-embed-chart.postgresql-cluster \
+#	build-single-kbcli-embed-chart.clickhouse-cluster \
+#	build-single-kbcli-embed-chart.milvus-cluster \
+#	build-single-kbcli-embed-chart.qdrant-cluster \
+#	build-single-kbcli-embed-chart.weaviate-cluster
 
 .PHONY: kbcli
 kbcli: test-go-generate build-checks kbcli-fast ## Build bin/kbcli.
@@ -275,9 +312,7 @@ clean-kbcli: ## Clean bin/kbcli*.
 
 .PHONY: kbcli-doc
 kbcli-doc: generate test-go-generate ## generate CLI command reference manual.
-	$(GO) run ./hack/docgen/cli/main.go ./docs/user_docs/cli
-
-
+	$(GO) run -tags $(BUILD_TAGS) ./hack/docgen/cli/main.go ./docs/user_docs/cli
 
 .PHONY: api-doc
 api-doc:  ## generate API reference manual.
@@ -288,7 +323,7 @@ api-doc:  ## generate API reference manual.
 
 .PHONY: manager
 manager: cue-fmt generate manager-go-generate test-go-generate build-checks ## Build manager binary.
-	$(GO) build -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
+	$(GO) build -tags $(BUILD_TAGS) -ldflags=${LD_FLAGS} -o bin/manager ./cmd/manager/main.go
 
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
 .PHONY: webhook-cert
@@ -366,7 +401,7 @@ fix-license-header: ## Run license header fix.
 
 ##@ Helm Chart Tasks
 
-bump-single-chart-appver.%: chart=$(word 2,$(subst ., ,$@))
+bump-single-chart-appver.%: chart=$*
 bump-single-chart-appver.%:
 ifeq ($(GOOS), darwin)
 	sed -i '' "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
@@ -374,7 +409,7 @@ else
 	sed -i "s/^appVersion:.*/appVersion: $(VERSION)/" deploy/$(chart)/Chart.yaml
 endif
 
-bump-single-chart-ver.%: chart=$(word 2,$(subst ., ,$@))
+bump-single-chart-ver.%: chart=$*
 bump-single-chart-ver.%:
 ifeq ($(GOOS), darwin)
 	sed -i '' "s/^version:.*/version: $(VERSION)/" deploy/$(chart)/Chart.yaml
@@ -388,8 +423,6 @@ bump-chart-ver: \
 	bump-single-chart-appver.helm \
 	bump-single-chart-ver.apecloud-mysql \
 	bump-single-chart-ver.apecloud-mysql-cluster \
-	bump-single-chart-ver.apecloud-mysql-scale \
-	bump-single-chart-ver.apecloud-mysql-scale-cluster \
 	bump-single-chart-ver.clickhouse \
 	bump-single-chart-ver.clickhouse-cluster \
 	bump-single-chart-ver.kafka \
@@ -408,20 +441,13 @@ bump-chart-ver: \
 	bump-single-chart-ver.qdrant-cluster \
 	bump-single-chart-ver.weaviate \
 	bump-single-chart-ver.weaviate-cluster \
-	bump-single-chart-ver.chatgpt-retrieval-plugin
+	bump-single-chart-ver.chatgpt-retrieval-plugin \
+	bump-single-chart-ver.tdengine \
+	bump-single-chart-ver.tdengine-cluster
 bump-chart-ver: ## Bump helm chart version.
 
 .PHONY: helm-package
 helm-package: bump-chart-ver ## Do helm package.
-## it will pull down the latest charts that satisfy the dependencies, and clean up old dependencies.
-## this is a hack fix: decompress the tgz from the depend-charts directory to the charts directory
-## before dependency update.
-	# cd $(CHART_PATH)/charts && ls ../depend-charts/*.tgz | xargs -n1 tar xf
-	#$(HELM) dependency update --skip-refresh $(CHART_PATH)
-	$(HELM) package deploy/apecloud-mysql
-	mv apecloud-mysql-*.tgz deploy/helm/depend-charts/
-	$(HELM) package deploy/postgresql
-	mv postgresql-*.tgz deploy/helm/depend-charts/
 	$(HELM) package $(CHART_PATH)
 
 ##@ Build Dependencies
@@ -439,7 +465,6 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v4.5.7
 CONTROLLER_TOOLS_VERSION ?= v0.9.0
-HELM_VERSION ?= v3.9.0
 CUE_VERSION ?= v0.4.3
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "$(GITHUB_PROXY)https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
@@ -456,6 +481,7 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 ifeq (, $(shell ls $(LOCALBIN)/controller-gen 2>/dev/null))
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 endif
+
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
@@ -536,24 +562,14 @@ helmtool: ## Download helm locally if necessary.
 ifeq (, $(shell which helm))
 	@{ \
 	set -e ;\
-	go install github.com/helm/helm@$(HELM_VERSION);\
+	echo 'installing helm' ;\
+	curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash;\
+	echo 'Successfully installed' ;\
 	}
 HELM=$(GOBIN)/helm
 else
 HELM=$(shell which helm)
 endif
-
-.PHONY: minikube
-minikube: ## Download minikube locally if necessary.
-ifeq (, $(shell which minikube))
-	@{ \
-	set -e ;\
-	echo 'installing minikube' ;\
-	curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-$(GOOS)-$(GOARCH) && chmod +x minikube && sudo mv minikube /usr/local/bin ;\
-	echo 'Successfully installed' ;\
-	}
-endif
-MINIKUBE=$(shell which minikube)
 
 .PHONY: kubectl
 kubectl: ## Download kubectl locally if necessary.
@@ -567,214 +583,23 @@ ifeq (, $(shell which kubectl))
 endif
 KUBECTL=$(shell which kubectl)
 
-
-##@ Minikube
-# using `minikube version: v1.29.0`, and use one of following k8s versions:
-# K8S_VERSION ?= v1.22.15
-K8S_VERSION ?= v1.23.15
-# K8S_VERSION ?= v1.24.9
-# K8S_VERSION ?= v1.25.5
-# K8S_VERSION ?= v1.26.1
-
-K8S_VERSION_MAJOR_MINOR=$(shell echo $(K8S_VERSION) | head -c 5)
-
-# minikube v1.28+ support `--image-mirror-country=cn` for China mainland users.
-MINIKUBE_IMAGE_MIRROR_COUNTRY ?= cn
-MINIKUBE_START_ARGS ?= --memory=4g --cpus=4
-
-ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.26)
-	K8S_IMAGE_REPO ?= registry.k8s.io
-	SIGSTORAGE_IMAGE_REPO ?= registry.k8s.io/sig-storage
-endif
-
-ifeq ($(MINIKUBE_IMAGE_MIRROR_COUNTRY), cn)
-	K8S_IMAGE_REPO := registry.cn-hangzhou.aliyuncs.com/google_containers
-	SIGSTORAGE_IMAGE_REPO := registry.cn-hangzhou.aliyuncs.com/google_containers
-	MINIKUBE_START_ARGS := $(MINIKUBE_START_ARGS) --image-mirror-country=$(MINIKUBE_IMAGE_MIRROR_COUNTRY)
-	MINIKUBE_REGISTRY_MIRROR ?= https://tenxhptk.mirror.aliyuncs.com
-endif
-
-K8S_IMAGE_REPO ?= k8s.gcr.io
-SIGSTORAGE_IMAGE_REPO ?= k8s.gcr.io/sig-storage
-
-KICBASE_IMG := kicbase/stable:v0.0.36
-ETCT_IMG := $(K8S_IMAGE_REPO)/etcd:3.5.6-0
-COREDNS_IMG := $(K8S_IMAGE_REPO)/coredns/coredns:v1.8.6
-KUBE_APISERVER_IMG := $(K8S_IMAGE_REPO)/kube-apiserver:$(K8S_VERSION)
-KUBE_SCHEDULER_IMG := $(K8S_IMAGE_REPO)/kube-scheduler:$(K8S_VERSION)
-KUBE_CTLR_MGR_IMG := $(K8S_IMAGE_REPO)/kube-controller-manager:$(K8S_VERSION)
-KUBE_PROXY_IMG := $(K8S_IMAGE_REPO)/kube-proxy:$(K8S_VERSION)
-
-CSI_PROVISIONER_IMG := $(SIGSTORAGE_IMAGE_REPO)/csi-provisioner:v2.1.0
-CSI_ATTACHER_IMG := $(SIGSTORAGE_IMAGE_REPO)/csi-attacher:v3.1.0
-CSI_EXT_HMC_IMG := $(SIGSTORAGE_IMAGE_REPO)/csi-external-health-monitor-controller:v0.2.0
-CSI_EXT_HMA_IMG := $(SIGSTORAGE_IMAGE_REPO)/csi-external-health-monitor-agent:v0.2.0
-CSI_NODE_DRIVER_REG_IMG := $(SIGSTORAGE_IMAGE_REPO)/csi-node-driver-registrar:v2.0.1
-LIVENESSPROBE_IMG := $(SIGSTORAGE_IMAGE_REPO)/livenessprobe:v2.2.0
-CSI_RESIZER_IMG := $(SIGSTORAGE_IMAGE_REPO)/csi-resizer:v1.1.0
-CSI_SNAPSHOTTER_IMG := $(SIGSTORAGE_IMAGE_REPO)/csi-snapshotter:v4.0.0
-HOSTPATHPLUGIN_IMG := $(SIGSTORAGE_IMAGE_REPO)/hostpathplugin:v1.6.0
-SNAPSHOT_CONTROLLER_IMG := $(SIGSTORAGE_IMAGE_REPO)/snapshot-controller:v4.0.0
-
-STORAGE_PROVISIONER_IMG := gcr.io/k8s-minikube/storage-provisioner:v5
-METRICS_SERVER_IMG := registry.k8s.io/metrics-server:v0.6.2
-
-ifeq ($(MINIKUBE_IMAGE_MIRROR_COUNTRY), cn)
-	STORAGE_PROVISIONER_IMG := $(K8S_IMAGE_REPO)/storage-provisioner:v5
-	METRICS_SERVER_IMG := $(K8S_IMAGE_REPO)/metrics-server:v0.6.2
-endif
-
-PAUSE_IMG_TAG := 3.7
-ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.22)
-	PAUSE_IMG_TAG := 3.5
-endif
-
-ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.23)
-	PAUSE_IMG_TAG := 3.6
-endif
-
-ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.24)
-	PAUSE_IMG_TAG := 3.7
-endif
-
-ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.25)
-	PAUSE_IMG_TAG := 3.8
-endif
-
-ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.26)
-	PAUSE_IMG_TAG := 3.9
-	COREDNS_IMG := $(K8S_IMAGE_REPO)/coredns/coredns:v1.9.3
-endif
-
-PAUSE_IMG := $(K8S_IMAGE_REPO)/pause:$(PAUSE_IMG_TAG)
-
-
-ifneq ($(MINIKUBE_REGISTRY_MIRROR),)
-	MINIKUBE_START_ARGS := $(MINIKUBE_START_ARGS) --registry-mirror=$(MINIKUBE_REGISTRY_MIRROR)
-endif
-
-ifeq ($(MINIKUBE_IMAGE_MIRROR_COUNTRY), cn)
-	TAG_K8S_IMAGE_REPO := k8s.gcr.io
-	TAG_SIGSTORAGE_IMAGE_REPO := k8s.gcr.io/sig-storage
-ifeq ($(K8S_VERSION_MAJOR_MINOR), v1.26)
-	TAG_K8S_IMAGE_REPO := registry.k8s.io
-endif
-endif
-
-.PHONY: pull-all-images
-pull-all-images: DOCKER_PULLQ=docker pull -q
-pull-all-images: DOCKER_TAG=docker tag
-pull-all-images: ## Pull K8s & minikube required container images.
-	$(DOCKER_PULLQ) $(KICBASE_IMG)
-	$(DOCKER_PULLQ) $(KUBE_APISERVER_IMG)
-	$(DOCKER_PULLQ) $(KUBE_SCHEDULER_IMG)
-	$(DOCKER_PULLQ) $(KUBE_CTLR_MGR_IMG)
-	$(DOCKER_PULLQ) $(KUBE_PROXY_IMG)
-	$(DOCKER_PULLQ) $(PAUSE_IMG)
-	$(DOCKER_PULLQ) $(HOSTPATHPLUGIN_IMG)
-	$(DOCKER_PULLQ) $(LIVENESSPROBE_IMG)
-	$(DOCKER_PULLQ) $(CSI_PROVISIONER_IMG)
-	$(DOCKER_PULLQ) $(CSI_ATTACHER_IMG)
-	$(DOCKER_PULLQ) $(CSI_RESIZER_IMG)
-	$(DOCKER_PULLQ) $(CSI_SNAPSHOTTER_IMG)
-	$(DOCKER_PULLQ) $(SNAPSHOT_CONTROLLER_IMG)
-	$(DOCKER_PULLQ) $(CSI_EXT_HMC_IMG)
-	$(DOCKER_PULLQ) $(CSI_EXT_HMA_IMG)
-	$(DOCKER_PULLQ) $(CSI_NODE_DRIVER_REG_IMG)
-	$(DOCKER_PULLQ) $(STORAGE_PROVISIONER_IMG)
-	$(DOCKER_PULLQ) $(METRICS_SERVER_IMG)
-	# if image is using China mirror repository, re-tag it to original image repositories
-ifeq ($(MINIKUBE_IMAGE_MIRROR_COUNTRY), cn)
-	$(DOCKER_TAG) $(KUBE_APISERVER_IMG) $(TAG_K8S_IMAGE_REPO)/kube-apiserver:$(K8S_VERSION)
-	$(DOCKER_TAG) $(KUBE_SCHEDULER_IMG) $(TAG_K8S_IMAGE_REPO)/kube-scheduler:$(K8S_VERSION)
-	$(DOCKER_TAG) $(KUBE_CTLR_MGR_IMG) $(TAG_K8S_IMAGE_REPO)/kube-controller-manager:$(K8S_VERSION)
-	$(DOCKER_TAG) $(KUBE_PROXY_IMG) $(TAG_K8S_IMAGE_REPO)/kube-proxy:$(K8S_VERSION)
-	$(DOCKER_TAG) $(PAUSE_IMG) $(TAG_K8S_IMAGE_REPO)/pause:$(PAUSE_IMG_TAG)
-	$(DOCKER_TAG) $(HOSTPATHPLUGIN_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/hostpathplugin:v1.6.0
-	$(DOCKER_TAG) $(LIVENESSPROBE_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/livenessprobe:v2.2.0
-	$(DOCKER_TAG) $(CSI_PROVISIONER_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/csi-provisioner:v2.1.0
-	$(DOCKER_TAG) $(CSI_ATTACHER_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/csi-attacher:v3.1.0
-	$(DOCKER_TAG) $(CSI_RESIZER_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/csi-resizer:v1.1.0
-	$(DOCKER_TAG) $(CSI_SNAPSHOTTER_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/csi-snapshotter:v4.0.0
-	$(DOCKER_TAG) $(SNAPSHOT_CONTROLLER_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/snapshot-controller:v4.0.0
-	$(DOCKER_TAG) $(CSI_EXT_HMC_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/csi-external-health-monitor-controller:v0.2.0
-	$(DOCKER_TAG) $(CSI_EXT_HMA_IMG) $(TAG_SIGSTORAGE_IMAGE_REPO)/csi-external-health-monitor-agent:v0.2.0
-	$(DOCKER_TAG) $(CSI_NODE_DRIVER_REG_IMG)  $(TAG_SIGSTORAGE_IMAGE_REPO)/csi-node-driver-registrar:v2.0.1
-	$(DOCKER_TAG) $(METRICS_SERVER_IMG) registry.k8s.io/metrics-server:v0.6.2
-	$(DOCKER_TAG) $(STORAGE_PROVISIONER_IMG) gcr.io/k8s-minikube/storage-provisioner:v5
-endif
-
-
-.PHONY: minikube-start
-minikube-start: IMG_CACHE_CMD=image load --daemon=true
-minikube-start: minikube ## Start minikube cluster.
-ifneq (, $(shell which minikube))
-ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson 2>/dev/null| jq -r '.Host' | grep Running))
-	$(MINIKUBE) start --kubernetes-version=$(K8S_VERSION) $(MINIKUBE_START_ARGS) --base-image=$(KICBASE_IMG)
-endif
-endif
-	$(MINIKUBE) update-context
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(KUBE_APISERVER_IMG)
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(KUBE_SCHEDULER_IMG)
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(KUBE_CTLR_MGR_IMG)
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(KUBE_PROXY_IMG)
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(PAUSE_IMG)
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(HOSTPATHPLUGIN_IMG)
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(LIVENESSPROBE_IMG)
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_PROVISIONER_IMG)
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_ATTACHER_IMG)
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_RESIZER_IMG)
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_SNAPSHOTTER_IMG)
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_EXT_HMA_IMG)
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_EXT_HMC_IMG)
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(SNAPSHOT_CONTROLLER_IMG)
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(CSI_NODE_DRIVER_REG_IMG)
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(STORAGE_PROVISIONER_IMG)
-	$(MINIKUBE) $(IMG_CACHE_CMD) $(METRICS_SERVER_IMG)
-	$(MINIKUBE) addons enable metrics-server
-	$(MINIKUBE) addons enable volumesnapshots
-	$(MINIKUBE) addons enable csi-hostpath-driver
-	kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
-	kubectl patch storageclass csi-hostpath-sc -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
-	kubectl patch volumesnapshotclass/csi-hostpath-snapclass --type=merge -p '{"metadata": {"annotations": {"snapshot.storage.kubernetes.io/is-default-class": "true"}}}'
-
-
-.PHONY: minikube-delete
-minikube-delete: minikube ## Delete minikube cluster.
-	$(MINIKUBE) delete
-
-.PHONY: minikube-run
-minikube-run: manifests generate fmt vet minikube helmtool ## Start minikube cluster and helm install kubeblocks.
-ifneq (, $(shell which minikube))
-ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson 2>/dev/null| jq -r '.Host' | grep Running))
-	$(MINIKUBE) start --wait=all --kubernetes-version=$(K8S_VERSION) $(MINIKUBE_START_ARGS)
-endif
-endif
-	kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
-	$(HELM) upgrade --install kubeblocks deploy/helm --set versionOverride=$(VERSION),csi-hostpath-driver.enabled=true --reuse-values --wait --wait-for-jobs --atomic
-
-.PHONY: minikube-run-fast
-minikube-run-fast: minikube helmtool ## Fast start minikube cluster and helm install kubeblocks.
-ifneq (, $(shell which minikube))
-ifeq (, $(shell $(MINIKUBE) status -n minikube -ojson 2>/dev/null| jq -r '.Host' | grep Running))
-	$(MINIKUBE) start --wait=all --kubernetes-version=$(K8S_VERSION) $(MINIKUBE_START_ARGS)
-endif
-endif
-	kubectl patch storageclass standard -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
-	$(HELM) upgrade --install kubeblocks deploy/helm --set versionOverride=$(VERSION),csi-hostpath-driver.enabled=true --reuse-values --wait --wait-for-jobs --atomic
-
 ##@ End-to-end (E2E) tests
 .PHONY: render-smoke-testdata-manifests
 render-smoke-testdata-manifests: ## Update E2E test dataset
-	$(HELM) template mycluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
-	$(HELM) template mycluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
-	$(HELM) template mycluster deploy/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
-	$(HELM) template mycluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
+	$(HELM) dependency build deploy/apecloud-mysql-cluster --skip-refresh
+	$(HELM) dependency build deploy/redis-cluster --skip-refresh
+	$(HELM) dependency build deploy/postgresql-cluster --skip-refresh
+	$(HELM) dependency build deploy/kafka-cluster --skip-refresh
+	$(HELM) dependency build deploy/mongodb-cluster --skip-refresh
+	$(HELM) template mysql-cluster deploy/apecloud-mysql-cluster > test/e2e/testdata/smoketest/wesql/00_wesqlcluster.yaml
+	$(HELM) template pg-cluster deploy/postgresql-cluster > test/e2e/testdata/smoketest/postgresql/00_postgresqlcluster.yaml
+	$(HELM) template redis-cluster deploy/redis-cluster > test/e2e/testdata/smoketest/redis/00_rediscluster.yaml
+	$(HELM) template mongodb-cluster deploy/mongodb-cluster > test/e2e/testdata/smoketest/mongodb/00_mongodbcluster.yaml
 
 
 .PHONY: test-e2e
 test-e2e: helm-package render-smoke-testdata-manifests ## Run E2E tests.
-	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) -C test/e2e run
+	$(MAKE) -e VERSION=$(VERSION) PROVIDER=$(PROVIDER) REGION=$(REGION) SECRET_ID=$(SECRET_ID) SECRET_KEY=$(SECRET_KEY) INIT_ENV=$(INIT_ENV) -C test/e2e run
 
 # NOTE: include must be placed at the end
 include docker/docker.mk

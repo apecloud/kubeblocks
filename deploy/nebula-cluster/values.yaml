@@ -1,0 +1,78 @@
+## cluster settings for nebula graph
+nebula:
+  ## @param nebula.version, version of nebula-graph
+  ## more info: check https://docs.nebula-graph.io/ for latest and LTS versions
+  version: v3.5.0
+  ## @param nebula.storageClassName, storage class name
+  storageClassName: ""
+  ## @param nebula.terminationPolicy, temination policy for nebula-cluster
+  terminationPolicy: Delete
+
+  console:
+    ## @param nebula.console.replicas, number of nebula-console instances
+    ## in a nebula-graph cluster
+    replicas: 1
+    ## @param nebula.console.resources
+    ## resource management
+    ## more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "100Mi"
+      limits:
+        cpu: "500m"
+        memory: "500Mi"
+  graphd:
+    ## @param nebula.graph.replicas, number of nebula-graph instances
+    ## in a nebula-graph cluster, all nebula-graphd instances are independent
+    replicas: 1
+    ## @param nebula.graphd.serviceType
+    serviceType: NodePort
+    ## @param nebula.graphd.resources
+    ## resource management
+    ## more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "500Mi"
+      limits:
+        cpu: "1"
+        memory: "500Mi"
+    ## @param nebula.graphd.resoruces.logStorage
+    logStorage: "500Mi"
+  metad:
+    ## @param nebula.metad.replicas, number of nebula-graph instances
+    ## in a nebula-graph cluter, nebula-metad instances form a raft group
+    replicas: 3
+    ## @param nebula.metad.resources
+    ## resource management
+    ## more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "500Mi"
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+    ## @param nebula.metad.logStorage
+    logStorage: "500Mi"
+    ## @param nebula.metad.dataStorage
+    dataStorage: "1Gi"
+  storaged:
+    ## @param nebula.storaged.replicas, number of nebula-graph instances
+    ## in a nebula-graph cluter, nebula-storaged instances form a raft group
+    replicas: 3
+    ## @param nebula.storaged.resources
+    ## resource management
+    ## more info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "500Mi"
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+    ## @param nebula.metad.logStorage
+    logStorage: "500Mi"
+    ## @param nebula.metad.dataStorage
+    dataStorage: "1Gi"

@@ -203,6 +203,15 @@ func (factory *MockClusterDefFactory) AddSystemAccountSpec(sysAccounts *appsv1al
 	return factory
 }
 
+func (factory *MockClusterDefFactory) AddSwitchoverSpec(switchoverSpec *appsv1alpha1.SwitchoverSpec) *MockClusterDefFactory {
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return factory
+	}
+	comp.SwitchoverSpec = switchoverSpec
+	return factory
+}
+
 func (factory *MockClusterDefFactory) AddInitContainerVolumeMounts(containerName string, volumeMounts []corev1.VolumeMount) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {
@@ -254,4 +263,40 @@ func appendContainerVolumeMounts(containers []corev1.Container, targetContainerN
 		}
 	}
 	return containers
+}
+
+func (factory *MockClusterDefFactory) AddComponentRef(ref *appsv1alpha1.ComponentDefRef) *MockClusterDefFactory {
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return factory
+	}
+	if len(comp.ComponentDefRef) == 0 {
+		comp.ComponentDefRef = make([]appsv1alpha1.ComponentDefRef, 0)
+	}
+	comp.ComponentDefRef = append(comp.ComponentDefRef, *ref)
+	return factory
+}
+
+func (factory *MockClusterDefFactory) AddNamedServicePort(name string, port int32) *MockClusterDefFactory {
+	comp := factory.getLastCompDef()
+	if comp == nil {
+		return nil
+	}
+	if comp.Service != nil {
+		comp.Service.Ports = append(comp.Service.Ports, appsv1alpha1.ServicePort{
+			Name:     name,
+			Protocol: corev1.ProtocolTCP,
+			Port:     port,
+		})
+		return factory
+	}
+	comp.Service = &appsv1alpha1.ServiceSpec{
+		Ports: []appsv1alpha1.ServicePort{{
+			Name:     name,
+			Protocol: corev1.ProtocolTCP,
+			Port:     port,
+		}},
+	}
+	return factory
+
 }

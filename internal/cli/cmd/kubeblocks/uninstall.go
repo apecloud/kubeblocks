@@ -52,6 +52,11 @@ import (
 	"github.com/apecloud/kubeblocks/internal/cli/util/helm"
 )
 
+const (
+	kbBuiltinLabelKey   = "addons.extensions.kubeblocks.io"
+	kbBuiltinLabelValue = "true"
+)
+
 var (
 	uninstallExample = templates.Examples(`
 		# uninstall KubeBlocks
@@ -69,6 +74,7 @@ type UninstallOptions struct {
 	RemoveNamespace bool
 	addons          []*extensionsv1alpha1.Addon
 	Quiet           bool
+	force           bool
 }
 
 func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -77,6 +83,7 @@ func newUninstallCmd(f cmdutil.Factory, streams genericclioptions.IOStreams) *co
 			IOStreams: streams,
 		},
 		Factory: f,
+		force:   true,
 	}
 	cmd := &cobra.Command{
 		Use:     "uninstall",
@@ -156,9 +163,9 @@ func (o *UninstallOptions) Uninstall() error {
 	// custom resources will not be deleted, so we will remove finalizers later.
 	v, _ := util.GetVersionInfo(o.Client)
 	chart := helm.InstallOpts{
-		Name:      types.KubeBlocksChartName,
-		Namespace: o.Namespace,
-
+		Name:           types.KubeBlocksChartName,
+		Namespace:      o.Namespace,
+		ForceUninstall: o.force,
 		// KubeBlocks chart has a hook to delete addons, but we have already deleted addons,
 		// and that webhook may fail, so we need to disable hooks.
 		DisableHooks: true,
@@ -342,6 +349,15 @@ func checkResources(dynamic dynamic.Interface) error {
 		}
 
 		for _, item := range objList.Items {
+			labels := item.GetLabels()
+			if labels == nil {
+				crs[gvr.Resource] = append(crs[gvr.Resource], item.GetName())
+				continue
+			}
+			// skip builtin resources managed by KubeBlocks
+			if v, ok := labels[kbBuiltinLabelKey]; ok && v == kbBuiltinLabelValue {
+				continue
+			}
 			crs[gvr.Resource] = append(crs[gvr.Resource], item.GetName())
 		}
 	}

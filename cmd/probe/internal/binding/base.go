@@ -33,6 +33,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/component"
+	"github.com/apecloud/kubeblocks/cmd/probe/internal/dcs"
 	. "github.com/apecloud/kubeblocks/internal/sqlchannel/util"
 )
 
@@ -106,8 +108,13 @@ func (ops *BaseOperations) Init(metadata bindings.Metadata) {
 		CheckRunningOperation: ops.CheckRunningOps,
 		CheckRoleOperation:    ops.CheckRoleOps,
 		GetRoleOperation:      ops.GetRoleOps,
+		SwitchoverOperation:   ops.SwitchoverOps,
 	}
 	ops.DBAddress = ops.getAddress()
+}
+
+func (ops *BaseOperations) RegisterOperationOnDBReady(opsKind bindings.OperationKind, operation Operation, manager component.DBManager) {
+	ops.RegisterOperation(opsKind, StartupCheckWraper(manager, operation))
 }
 
 func (ops *BaseOperations) RegisterOperation(opsKind bindings.OperationKind, operation Operation) {
@@ -199,9 +206,12 @@ func (ops *BaseOperations) CheckRoleOps(ctx context.Context, req *bindings.Invok
 		return opsRes, nil
 	}
 
-	role, err := ops.GetRole(ctx, req, resp)
+	// sql exec timeout needs to be less than httpget's timeout which by default 1s.
+	ctx1, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
+	role, err := ops.GetRole(ctx1, req, resp)
 	if err != nil {
-		ops.Logger.Infof("error executing checkRole: %v", err)
+		ops.Logger.Errorf("error executing checkRole: %v", err)
 		opsRes["event"] = OperationFailed
 		opsRes["message"] = err.Error()
 		if ops.CheckRoleFailedCount%ops.FailedEventReportFrequency == 0 {
@@ -321,5 +331,84 @@ func (ops *BaseOperations) CheckRunningOps(ctx context.Context, req *bindings.In
 	}
 	opsRes["event"] = OperationSuccess
 	opsRes["message"] = message
+	return opsRes, nil
+}
+
+func (ops *BaseOperations) SwitchoverOps(ctx context.Context, req *bindings.InvokeRequest, resp *bindings.InvokeResponse) (OpsResult, error) {
+	opsRes := OpsResult{}
+	leader, _ := req.Metadata["leader"]
+	candidate, _ := req.Metadata["candidate"]
+	if leader == "" && candidate == "" {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = "Leader or Candidate must be set"
+		return opsRes, nil
+	}
+
+	dcsStore := dcs.GetStore()
+	if dcsStore == nil {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = "DCS store init failed"
+		return opsRes, nil
+	}
+	cluster, err := dcsStore.GetCluster()
+	if cluster == nil {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = fmt.Sprintf("Get Cluster %s error: %v.", dcsStore.GetClusterName(), err)
+		return opsRes, nil
+	}
+
+	characterType := viper.GetString("KB_SERVICE_CHARACTER_TYPE")
+	if characterType == "" {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = "KB_SERVICE_CHARACTER_TYPE not set"
+		return opsRes, nil
+	}
+
+	manager := component.GetManager(characterType)
+	if manager == nil {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = fmt.Sprintf("No DB Manager for character type %s", characterType)
+		return opsRes, nil
+	}
+
+	if leader != "" {
+		leaderMember := cluster.GetMemberWithName(leader)
+		if leaderMember == nil {
+			opsRes["event"] = OperationFailed
+			opsRes["message"] = fmt.Sprintf("leader %s not exists", leader)
+			return opsRes, nil
+		}
+		if ok, err := manager.IsLeaderMember(ctx, cluster, leaderMember); err != nil || !ok {
+			opsRes["event"] = OperationFailed
+			opsRes["message"] = fmt.Sprintf("%s is not the leader", leader)
+			return opsRes, nil
+		}
+	}
+	if candidate != "" {
+		candidateMember := cluster.GetMemberWithName(candidate)
+		if candidateMember == nil {
+			opsRes["event"] = OperationFailed
+			opsRes["message"] = fmt.Sprintf("candidate %s not exists", candidate)
+			return opsRes, nil
+		}
+		if !manager.IsMemberHealthy(cluster, candidateMember) {
+			opsRes["event"] = OperationFailed
+			opsRes["message"] = fmt.Sprintf("candidate %s is unhealthy", candidate)
+			return opsRes, nil
+		}
+	} else if len(manager.HasOtherHealthyMembers(cluster, leader)) == 0 {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = fmt.Sprintf("candidate is not set and has no other healthy members")
+		return opsRes, nil
+	}
+
+	err = dcsStore.CreateSwitchover(leader, candidate)
+	if err != nil {
+		opsRes["event"] = OperationFailed
+		opsRes["message"] = fmt.Sprintf("Create switchover failed: %v", err)
+		return opsRes, nil
+	}
+
+	opsRes["event"] = OperationSuccess
 	return opsRes, nil
 }

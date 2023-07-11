@@ -1,30 +1,25 @@
 ---
-# Source: mongodb-cluster/templates/serviceaccount.yaml
+# Source: mongodb-cluster/templates/rbac.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: kb-mycluster-mongodb-cluster
+  name: kb-sa-mongodb-cluster
+  namespace: default
   labels:
-    
-    helm.sh/chart: mongodb-cluster-0.5.1-beta.0
-    app.kubernetes.io/name: mongodb-cluster
-    app.kubernetes.io/instance: mycluster
+    helm.sh/chart: mongodb-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "5.0.14"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: mongodb-cluster
 ---
-# Source: mongodb-cluster/templates/role.yaml
+# Source: mongodb-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: kb-mycluster-mongodb-cluster
+  name: kb-role-mongodb-cluster
   namespace: default
   labels:
-    
-    helm.sh/chart: mongodb-cluster-0.5.1-beta.0
-    app.kubernetes.io/name: mongodb-cluster
-    app.kubernetes.io/instance: mycluster
+    helm.sh/chart: mongodb-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "5.0.14"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: mongodb-cluster
 rules:
   - apiGroups:
       - ""
@@ -33,57 +28,53 @@ rules:
     verbs:
       - create
 ---
-# Source: mongodb-cluster/templates/rolebinding.yaml
+# Source: mongodb-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: kb-mycluster-mongodb-cluster
+  name: kb-rolebinding-mongodb-cluster
   labels:
-    
-    helm.sh/chart: mongodb-cluster-0.5.1-beta.0
-    app.kubernetes.io/name: mongodb-cluster
-    app.kubernetes.io/instance: mycluster
+    helm.sh/chart: mongodb-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "5.0.14"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: mongodb-cluster
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: kb-mycluster-mongodb-cluster
+  name: kb-role-mongodb-cluster
 subjects:
   - kind: ServiceAccount
-    name: kb-mycluster-mongodb-cluster
+    name: kb-sa-mongodb-cluster
     namespace: default
 ---
-# Source: mongodb-cluster/templates/replicaset.yaml
+# Source: mongodb-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mycluster
-  labels:
-    helm.sh/chart: mongodb-cluster-0.5.1-beta.0
-    app.kubernetes.io/name: mongodb-cluster
-    app.kubernetes.io/instance: mycluster
+  name: mongodb-cluster
+  namespace: default
+  labels: 
+    helm.sh/chart: mongodb-cluster-0.6.0-alpha.33
     app.kubernetes.io/version: "5.0.14"
-    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: mongodb-cluster
 spec:
-  clusterDefinitionRef: mongodb
   clusterVersionRef: mongodb-5.0.14
-  terminationPolicy: Halt
+  terminationPolicy: Delete  
   affinity:
-    topologyKeys: 
+    podAntiAffinity: Preferred
+    topologyKeys:
       - kubernetes.io/hostname
+    tenancy: SharedNode
+  clusterDefinitionRef: mongodb
   componentSpecs:
     - name: mongodb
-      componentDefRef: mongodb
-      monitor: false
-      replicas: 3
-      serviceAccountName: kb-mycluster-mongodb-cluster
-      volumeClaimTemplates:
-        - name: data # ref clusterdefinition components.containers.volumeMounts.name
-          spec:
-            storageClassName: 
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
+      componentDefRef: mongodb      
+      monitor: false      
+      replicas: 1
+      serviceAccountName: kb-sa-mongodb-cluster      
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "1Gi"
+        requests:
+          cpu: "0.5"
+          memory: "1Gi"

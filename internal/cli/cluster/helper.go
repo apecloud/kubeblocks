@@ -243,7 +243,7 @@ func GetClusterDefByName(dynamic dynamic.Interface, name string) (*appsv1alpha1.
 }
 
 func GetDefaultCompName(cd *appsv1alpha1.ClusterDefinition) (string, error) {
-	if len(cd.Spec.ComponentDefs) == 1 {
+	if len(cd.Spec.ComponentDefs) >= 1 {
 		return cd.Spec.ComponentDefs[0].Name, nil
 	}
 	return "", fmt.Errorf("failed to get the default component definition name")
@@ -259,17 +259,16 @@ func GetClusterByName(dynamic dynamic.Interface, name string, namespace string) 
 
 func GetVersionByClusterDef(dynamic dynamic.Interface, clusterDef string) (*appsv1alpha1.ClusterVersionList, error) {
 	versionList := &appsv1alpha1.ClusterVersionList{}
-	objList, err := dynamic.Resource(types.ClusterVersionGVR()).Namespace("").
-		List(context.TODO(), metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDef),
-		})
+	obj, err := dynamic.Resource(types.ClusterVersionGVR()).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", constant.ClusterDefLabelKey, clusterDef),
+	})
 	if err != nil {
 		return nil, err
 	}
-	if objList == nil {
+	if obj == nil {
 		return nil, fmt.Errorf("failed to find component version referencing cluster definition %s", clusterDef)
 	}
-	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(objList.UnstructuredContent(), versionList); err != nil {
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), versionList); err != nil {
 		return nil, err
 	}
 	return versionList, nil
@@ -302,40 +301,34 @@ func BuildStorageClass(storages []StorageInfo) string {
 	return util.CheckEmpty(strings.Join(scs, "\n"))
 }
 
-// GetLatestVersion gets the latest cluster versions that referencing the cluster definition
-func GetLatestVersion(dynamic dynamic.Interface, clusterDef string) (string, error) {
+// GetDefaultVersion gets the default cluster version that referencing the cluster definition.
+// If only one version is found, it will be returned directly, otherwise the version with
+// constant.DefaultClusterVersionAnnotationKey label will be returned.
+func GetDefaultVersion(dynamic dynamic.Interface, clusterDef string) (string, error) {
 	versionList, err := GetVersionByClusterDef(dynamic, clusterDef)
 	if err != nil {
 		return "", err
 	}
 
-	// find the latest version to use
-	version := findLatestVersion(versionList)
-	if version == nil {
-		return "", fmt.Errorf("failed to find the latest cluster version referencing current cluster definition %s", clusterDef)
-	}
-	return version.Name, nil
-}
-
-func findLatestVersion(versions *appsv1alpha1.ClusterVersionList) *appsv1alpha1.ClusterVersion {
-	if len(versions.Items) == 0 {
-		return nil
-	}
-	if len(versions.Items) == 1 {
-		return &versions.Items[0]
+	if len(versionList.Items) == 1 {
+		return versionList.Items[0].Name, nil
 	}
 
-	var version *appsv1alpha1.ClusterVersion
-	for i, v := range versions.Items {
-		if version == nil {
-			version = &versions.Items[i]
+	defaultVersion := ""
+	for _, item := range versionList.Items {
+		if k, ok := item.Annotations[constant.DefaultClusterVersionAnnotationKey]; !ok || k != "true" {
 			continue
 		}
-		if v.CreationTimestamp.Time.After(version.CreationTimestamp.Time) {
-			version = &versions.Items[i]
+		if defaultVersion != "" {
+			return "", fmt.Errorf("found more than one default cluster version referencing cluster definition %s", clusterDef)
 		}
+		defaultVersion = item.Name
 	}
-	return version
+
+	if defaultVersion == "" {
+		return "", fmt.Errorf("failed to find default cluster version referencing cluster definition %s", clusterDef)
+	}
+	return defaultVersion, nil
 }
 
 type CompInfo struct {
@@ -421,13 +414,6 @@ func GetPodComponentName(pod *corev1.Pod) string {
 		return ""
 	}
 	return pod.Labels[constant.KBAppComponentLabelKey]
-}
-
-func GetPodWorkloadType(pod *corev1.Pod) string {
-	if pod.Labels == nil {
-		return ""
-	}
-	return pod.Labels[constant.WorkloadTypeLabelKey]
 }
 
 func GetConfigMapByName(dynamic dynamic.Interface, namespace, name string) (*corev1.ConfigMap, error) {

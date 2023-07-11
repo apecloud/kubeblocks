@@ -7,7 +7,7 @@ image:
   repository: apecloud/apecloud-mysql-server
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: 8.0.30-5.alpha8.20230523.g3e93ae7.8
+  tag: 8.0.30-5.alpha9.20230606.gf80d546.9
 
 ## MySQL Cluster parameters
 cluster:
@@ -71,6 +71,17 @@ roleProbe:
 metrics:
   image:
     registry: registry.cn-hangzhou.aliyuncs.com
-    repository: apecloud/mysqld-exporter
-    tag: 0.14.1
+    repository: apecloud/agamotto
+    tag: 0.1.2-beta.1
+    pullPolicy: IfNotPresent
+
+  service:
+    port: 9104
+
+wesqlscale:
+  cell: "zone1"
+  image:
+    registry: registry.cn-hangzhou.aliyuncs.com
+    repository: apecloud/apecloud-mysql-scale
+    tag: "latest"
     pullPolicy: IfNotPresent

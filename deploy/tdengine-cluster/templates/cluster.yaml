@@ -1,0 +1,19 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ include "kblib.clusterName" . }}
+  labels: {{ include "kblib.clusterLabels" . | nindent 4 }}
+spec:
+  clusterVersionRef: {{ .Values.version }}
+  terminationPolicy: {{ .Values.extra.terminationPolicy }}
+  {{- include "kblib.affinity" . | indent 2 }}
+  clusterDefinitionRef: tdengine # ref clusterdefinition.name
+  componentSpecs:
+    - name: tdengine
+      componentDefRef: tdengine # ref clusterdefinition componentDefs.name
+      {{- include "kblib.componentMonitor" . | indent 6 }}
+      {{- include "tdengine-cluster.replicaCount" . | indent 6 }}
+      serviceAccountName: {{ include "kblib.serviceAccountName" . }}
+      {{- include "kblib.componentResources" . | indent 6 }}
+      {{- include "kblib.componentStorages" . | indent 6 }}
+      {{- include "kblib.componentServices" . | indent 6 }}

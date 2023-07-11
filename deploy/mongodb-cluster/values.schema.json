@@ -33,7 +33,7 @@
         "number",
         "string"
       ],
-      "default": 1,
+      "default": 0.5,
       "minimum": 0.5,
       "maximum": 64,
       "multipleOf": 0.5
@@ -45,7 +45,7 @@
         "number",
         "string"
       ],
-      "default": 1,
+      "default": 0.5,
       "minimum": 0.5,
       "maximum": 1000
     },

@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"time"
+
 	"github.com/spf13/viper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/graph"
 	ictrltypes "github.com/apecloud/kubeblocks/internal/controller/types"
+	ictrlutil "github.com/apecloud/kubeblocks/internal/controllerutil"
 )
 
 // RBACTransformer puts the rbac at the beginning of the DAG
@@ -58,12 +61,12 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 
 		if !viper.GetBool("ENABLE_RBAC_MANAGER") {
 			transCtx.Logger.V(1).Info("rbac manager is not enabled")
-			isRoleBindingExist(transCtx, serviceAccountName, true)
-			isServiceAccountExist(transCtx, serviceAccountName, true)
-			return nil
+			if !isServiceAccountExist(transCtx, serviceAccountName, true) {
+				return ictrlutil.NewRequeueError(time.Second, serviceAccountName+" ServiceAccount is not exist")
+			}
 		}
 
-		if isRoleBindingExist(transCtx, serviceAccountName, false) {
+		if isRoleBindingExist(transCtx, serviceAccountName) {
 			continue
 		}
 		roleBinding, err := builder.BuildRoleBinding(cluster)
@@ -110,7 +113,7 @@ func isServiceAccountExist(transCtx *ClusterTransformContext, serviceAccountName
 			transCtx.Logger.V(1).Info("ServiceAccount not exists", "namespaceName", namespaceName)
 			if sendEvent {
 				transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning,
-					"ServiceAccountNotFound", namespaceName.String()+" ServiceAccount is not exist")
+					string(ictrlutil.ErrorTypeNotFound), serviceAccountName+" ServiceAccount is not exist")
 			}
 			return false
 		}
@@ -120,7 +123,7 @@ func isServiceAccountExist(transCtx *ClusterTransformContext, serviceAccountName
 	return true
 }
 
-func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName string, sendEvent bool) bool {
+func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName string) bool {
 	cluster := transCtx.Cluster
 	namespaceName := types.NamespacedName{
 		Namespace: cluster.Namespace,
@@ -132,10 +135,6 @@ func isRoleBindingExist(transCtx *ClusterTransformContext, serviceAccountName st
 		// the rolebinding is not already present.
 		if errors.IsNotFound(err) {
 			transCtx.Logger.V(1).Info("RoleBinding not exists", "namespaceName", namespaceName)
-			if sendEvent {
-				transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning,
-					"RoleBindingNotFound", namespaceName.String()+" RoleBinding is not exist")
-			}
 			return false
 		}
 		transCtx.Logger.Error(err, "get role binding failed")

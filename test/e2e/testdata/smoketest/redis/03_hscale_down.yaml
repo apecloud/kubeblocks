@@ -3,7 +3,7 @@ kind: OpsRequest
 metadata:
   name: ops-hscale-down
 spec:
-  clusterRef: mycluster-redis-cluster
+  clusterRef: redis-cluster
   type: HorizontalScaling
   horizontalScaling:
     - componentName: redis

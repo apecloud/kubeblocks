@@ -38,3 +38,7 @@ storage: 20
 ## if mode is raftGroup, proxyEnabled can be true or false
 ##
 proxyEnabled: false
+
+## customized default values to override kblib chart's values
+extra:
+  podAntiAffinity: Required

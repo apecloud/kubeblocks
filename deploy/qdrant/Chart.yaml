@@ -5,7 +5,7 @@ description: .
 type: application
 
 # This is the chart version.
-version: 0.6.0-alpha.28
+version: 0.6.0-alpha.33
 
 # This is the version number of qdrant.
 appVersion: "1.1.0"

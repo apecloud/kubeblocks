@@ -9,7 +9,11 @@ terminationPolicy: Delete
 
 ## @param availablePolicy
 ##
-availabilityPolicy: none
+availabilityPolicy: node
+
+## @param podAntiAffinity
+##
+podAntiAffinity: Preferred
 
 ## @param tenancy dedicated or shared
 ##

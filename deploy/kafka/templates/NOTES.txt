@@ -4,4 +4,4 @@ APP VERSION: {{ .Chart.AppVersion }}
 
 KubeBlocks Kafka server cluster definition, start create your Kafka Server Cluster with following command:
 
-    kbcli cluster create --cluster-definition=kafka
+    kbcli cluster create kafka

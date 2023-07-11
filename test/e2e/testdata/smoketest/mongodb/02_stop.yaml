@@ -3,7 +3,7 @@ kind: OpsRequest
 metadata:
   name: ops-stop
 spec:
-  clusterRef: mycluster
+  clusterRef: mongodb-cluster
   ttlSecondsAfterSucceed: 27017
   type: Stop
   restart:

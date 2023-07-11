@@ -306,8 +306,7 @@ spec:
               # --broker-service-url ${brokerServiceUrl} \
               # --broker-service-url-tls pulsar+ssl://pulsar-mini-broker.pulsar.svc.cluster.local:6651/
 
-              bin/pulsar initialize-namespace -cs ${zookeeperServers} \
-              --cluster $clusterName sn/system && (curl -sf -XPOST http://127.0.0.1:15020/quitquitquit || true) && exit 0
+              (curl -sf -XPOST http://127.0.0.1:15020/quitquitquit || true) && exit 0
             command:
               - sh
               - -c

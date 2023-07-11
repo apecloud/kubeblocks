@@ -3018,7 +3018,7 @@ int64
 <h3 id="apps.kubeblocks.io/v1alpha1.ClusterPhase">ClusterPhase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterStatus">ClusterStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestBehaviour">OpsRequestBehaviour</a>, <a href="#apps.kubeblocks.io/v1alpha1.WaitForClusterPhaseErr">WaitForClusterPhaseErr</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterStatus">ClusterStatus</a>, <a href="#apps.kubeblocks.io/v1alpha1.OpsRequestBehaviour">OpsRequestBehaviour</a>)
 </p>
 <div>
 <p>ClusterPhase defines the Cluster CR .status.phase</p><br />
@@ -9343,54 +9343,6 @@ VolumeType
 <td>
 <em>(Optional)</em>
 <p>type is in enum of &#123;data, log&#125;.<br />VolumeTypeData: the volume is for the persistent data storage.<br />VolumeTypeLog: the volume is for the persistent log storage.</p><br />
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.WaitForClusterPhaseErr">WaitForClusterPhaseErr
-</h3>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>clusterName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>currentPhase</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterPhase">
-ClusterPhase
-</a>
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>expectedPhase</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ClusterPhase">
-[]ClusterPhase
-</a>
-</em>
-</td>
-<td>
 </td>
 </tr>
 </tbody>

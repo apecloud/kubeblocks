@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
@@ -47,18 +46,6 @@ var (
 	// OpsRequestBehaviourMapper records the opsRequest behaviour according to the OpsType.
 	OpsRequestBehaviourMapper = map[OpsType]OpsRequestBehaviour{}
 )
-
-var _ error = &WaitForClusterPhaseErr{}
-
-type WaitForClusterPhaseErr struct {
-	clusterName   string
-	currentPhase  ClusterPhase
-	expectedPhase []ClusterPhase
-}
-
-func (e *WaitForClusterPhaseErr) Error() string {
-	return fmt.Sprintf("wait for cluster %s to reach phase %v, current status is :%s", e.clusterName, e.expectedPhase, e.currentPhase)
-}
 
 func (r *OpsRequest) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
@@ -148,17 +135,9 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	// check if the opsRequest can be executed in the current cluster phase unless this opsRequest is reentrant.
 	if !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) &&
 		!slices.Contains(opsNamesInQueue, r.Name) {
-		// check if entry-condition is met
-		// if the cluster is not in the expected phase, we should wait for it for up to TTLSecondsBeforeAbort seconds.
-		// if len(opsRecorder) == 0 && !slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
-		// TTLSecondsBeforeAbort is 0 means that the we do not need to wait for the cluster to reach the expected phase.
-		if r.Spec.TTLSecondsBeforeAbort == nil || (time.Now().After(r.GetCreationTimestamp().Add(time.Duration(*r.Spec.TTLSecondsBeforeAbort) * time.Second))) {
+		// if TTLSecondsBeforeAbort is not set or 0, return error
+		if r.Spec.TTLSecondsBeforeAbort == nil || *r.Spec.TTLSecondsBeforeAbort == 0 {
 			return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
-		}
-		return &WaitForClusterPhaseErr{
-			clusterName:   cluster.Name,
-			currentPhase:  cluster.Status.Phase,
-			expectedPhase: opsBehaviour.FromClusterPhases,
 		}
 	}
 	return nil

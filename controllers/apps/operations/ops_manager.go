@@ -56,18 +56,25 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 	if opsBehaviour, ok = opsMgr.OpsMap[opsRequest.Spec.Type]; !ok || opsBehaviour.OpsHandler == nil {
 		return nil, patchOpsHandlerNotSupported(reqCtx.Ctx, cli, opsRes)
 	}
-
 	// validate OpsRequest.spec
 	if err = opsRequest.Validate(reqCtx.Ctx, cli, opsRes.Cluster, true); err != nil {
-		// check if the error is caused by WaitForClusterPhaseErr  error
-		if _, ok := err.(*appsv1alpha1.WaitForClusterPhaseErr); ok {
-			return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Second, reqCtx.Log, ""))
-		}
-
 		if patchErr := patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error()); patchErr != nil {
 			return nil, patchErr
 		}
 		return nil, err
+	}
+	// validate entry condition for OpsRequest
+	if opsRequest.Status.Phase == appsv1alpha1.OpsPendingPhase {
+		if err = validateOpsWaitingPhase(opsRes.Cluster, opsRequest, opsBehaviour); err != nil {
+			// check if the error is caused by WaitForClusterPhaseErr  error
+			if _, ok := err.(*WaitForClusterPhaseErr); ok {
+				return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Second, reqCtx.Log, ""))
+			}
+			if patchErr := patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error()); patchErr != nil {
+				return nil, patchErr
+			}
+			return nil, err
+		}
 	}
 
 	if opsRequest.Status.Phase != appsv1alpha1.OpsCreatingPhase {

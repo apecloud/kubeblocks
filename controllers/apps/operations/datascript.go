@@ -65,8 +65,8 @@ func (o DataScriptOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.C
 		return &FastFaileError{message: fmt.Sprintf("component %s not found in cluster %s", spec.ComponentName, cluster.Name)}
 	}
 
-	clusterDef := &appsv1alpha1.ClusterDefinition{}
-	if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Name: cluster.Spec.ClusterDefRef}, clusterDef); err != nil {
+	clusterDef, err := getClusterDefByName(reqCtx.Ctx, cli, cluster.Spec.ClusterDefRef)
+	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// fail fast if cluster def does not exists
 			return &FastFaileError{message: err.Error()}
@@ -104,12 +104,11 @@ func (o DataScriptOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.C
 	}
 
 	// create job
-	if job, err := createDataScriptJob(opsResource.Cluster, component, opsRequest,
+	if job, err := buildDataScriptJob(opsResource.Cluster, component, opsRequest,
 		fmt.Sprintf(sqlchannelutil.DataScriptRequestTpl, podIP, componentDef.CharacterType, string(scriptRequestJSON))); err != nil {
 		return err
 	} else {
-		err = cli.Create(reqCtx.Ctx, job)
-		return err
+		return cli.Create(reqCtx.Ctx, job)
 	}
 }
 
@@ -238,8 +237,12 @@ func getTargetPod(reqCtx intctrlutil.RequestCtx, cli client.Client, clusterObjec
 	return podIP, nil
 }
 
-func createDataScriptJob(cluster *appsv1alpha1.Cluster, component *appsv1alpha1.ClusterComponentSpec, ops *appsv1alpha1.OpsRequest, scripts string) (*batchv1.Job, error) {
+func buildDataScriptJob(cluster *appsv1alpha1.Cluster, component *appsv1alpha1.ClusterComponentSpec, ops *appsv1alpha1.OpsRequest, scripts string) (*batchv1.Job, error) {
 	jobName := fmt.Sprintf("%s-%s-%s", "script", ops.Name, component.Name)
+	if len(jobName) > 63 {
+		jobName = jobName[:63]
+	}
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      jobName,

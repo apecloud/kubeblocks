@@ -154,7 +154,7 @@ var _ = Describe("DataScriptOps", func() {
 			// create a datascript ops with ttlSecondsBeforeAbort=0
 			ops := createClusterDatascriptOps(consensusComp, 100)
 			opsKey := client.ObjectKeyFromObject(ops)
-			patchOpsPhase(opsKey, appsv1alpha1.OpsCreatingPhase)
+			patchOpsPhase(opsKey, appsv1alpha1.OpsPendingPhase)
 			Expect(k8sClient.Get(testCtx.Ctx, opsKey, ops)).Should(Succeed())
 			opsResource.OpsRequest = ops
 			prevOpsStatus := ops.Status.Phase
@@ -200,10 +200,9 @@ var _ = Describe("DataScriptOps", func() {
 			reqCtx.Req = reconcile.Request{NamespacedName: opsKey}
 			By("mock a job")
 			comp := clusterObj.Spec.GetComponentByName(consensusComp)
-			job, err := createDataScriptJob(clusterObj, comp, ops, "mock-script")
+			job, err := buildDataScriptJob(clusterObj, comp, ops, "mock-script")
 			Expect(err).Should(Succeed())
 			Expect(k8sClient.Create(testCtx.Ctx, job)).Should(Succeed())
-			// patch job to running
 
 			By("reconcile the opsRequest phase")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
@@ -226,7 +225,7 @@ var _ = Describe("DataScriptOps", func() {
 			reqCtx.Req = reconcile.Request{NamespacedName: opsKey}
 			By("mock a job")
 			comp := clusterObj.Spec.GetComponentByName(consensusComp)
-			job, err := createDataScriptJob(clusterObj, comp, ops, "mock-script")
+			job, err := buildDataScriptJob(clusterObj, comp, ops, "mock-script")
 			Expect(err).Should(Succeed())
 			Expect(k8sClient.Create(testCtx.Ctx, job)).Should(Succeed())
 			// patch job to running
@@ -268,7 +267,7 @@ var _ = Describe("DataScriptOps", func() {
 			reqCtx.Req = reconcile.Request{NamespacedName: opsKey}
 			By("mock a job")
 			comp := clusterObj.Spec.GetComponentByName(consensusComp)
-			job, err := createDataScriptJob(clusterObj, comp, ops, "mock-script")
+			job, err := buildDataScriptJob(clusterObj, comp, ops, "mock-script")
 			Expect(err).Should(Succeed())
 			Expect(k8sClient.Create(testCtx.Ctx, job)).Should(Succeed())
 			// patch job to running

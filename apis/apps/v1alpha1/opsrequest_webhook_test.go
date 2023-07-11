@@ -580,12 +580,8 @@ var _ = Describe("OpsRequest webhook", func() {
 			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(HaveOccurred())
 
 			By("By testing dataScript, with script, no wait, should fail")
-			opsRequest.Spec.ScriptSpec.Script = []string{"echo test"}
-
+			opsRequest.Spec.ScriptSpec.Script = []string{"create database test;"}
 			Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).To(ContainSubstring("DataScript is forbidden"))
-
-			opsRequest.Spec.TTLSecondsBeforeAbort = int32Ptr(10)
-			Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).To(ContainSubstring("wait for cluster"))
 
 			By("By testing dataScript, with illegal configmap, should fail")
 			opsRequest.Spec.ScriptSpec.ScriptFrom = &ScriptFrom{

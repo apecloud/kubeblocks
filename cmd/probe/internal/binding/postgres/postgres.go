@@ -23,9 +23,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"strconv"
 	"sync"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dapr/components-contrib/bindings"
 	"github.com/dapr/kit/logger"
@@ -108,8 +109,14 @@ func (pgOps *PostgresOperations) Init(metadata bindings.Metadata) error {
 	if viper.IsSet("KB_SERVICE_PASSWORD") {
 		dbPasswd = viper.GetString("KB_SERVICE_PASSWORD")
 	}
-	config, _ := postgres.NewConfig(metadata.Properties)
-	manager, _ := postgres.NewManager(pgOps.Logger)
+	config, err := postgres.NewConfig(metadata.Properties)
+	if err != nil {
+		pgOps.Logger.Errorf("new postgresql config failed, err:%v", err)
+	}
+	manager, err := postgres.NewManager(pgOps.Logger)
+	if err != nil {
+		pgOps.Logger.Errorf("new postgresql manager failed, err:%v", err)
+	}
 
 	pgOps.DBType = "postgresql"
 	pgOps.manager = manager

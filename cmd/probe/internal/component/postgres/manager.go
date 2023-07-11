@@ -63,11 +63,13 @@ func NewManager(logger logger.Logger) (*Manager, error) {
 		return nil, errors.Wrap(err, "new process from pid file")
 	}
 
+	component.RegisterManager("postgresql", Mgr)
 	return Mgr, nil
 }
 
 func (mgr *Manager) readPidFile() (*PidFile, error) {
 	file := &PidFile{}
+	mgr.Logger.Infof("postgresql data dir:%s, os data dir:%s", mgr.DataDir, os.Getenv("PGDATA"))
 	f, err := os.Open(mgr.DataDir + "/postmaster.pid")
 	if err != nil {
 		return nil, err

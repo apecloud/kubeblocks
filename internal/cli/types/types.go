@@ -26,7 +26,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -154,6 +153,14 @@ const (
 	CustomResourceDefinitionAPIGroup   = "apiextensions.k8s.io"
 	CustomResourceDefinitionAPIVersion = "v1"
 	ResourceCustomResourceDefinition   = "customresourcedefinitions"
+)
+
+// Kubebench API group
+const (
+	KubebenchAPIGroup   = "benchmark.kubebench.io"
+	KubebenchAPIVersion = "v1alpha1"
+	ResourcePgBench     = "pgbenches"
+	ResourceSysBench    = "sysbenches"
 )
 
 const (
@@ -367,4 +374,12 @@ func JobGVR() schema.GroupVersionResource {
 }
 func CronJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: K8SBatchAPIGroup, Version: K8sBatchAPIVersion, Resource: ResourceCronJobs}
+}
+
+func PgBenchGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: KubebenchAPIGroup, Version: KubebenchAPIVersion, Resource: ResourcePgBench}
+}
+
+func SysbenchGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: KubebenchAPIGroup, Version: KubebenchAPIVersion, Resource: ResourceSysBench}
 }

@@ -28,11 +28,11 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubectl/pkg/util/storage"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/internal/constant"
+	// testapps "github.com/apecloud/kubeblocks/internal/testutil/apps"
 )
 
 var _ = Describe("OpsRequest webhook", func() {
@@ -546,25 +546,94 @@ var _ = Describe("OpsRequest webhook", func() {
 
 			testWhenClusterDeleted(cluster, opsRequest)
 		})
+
+		It("check datascript opts", func() {
+			OpsRequestBehaviourMapper[DataScriptType] = OpsRequestBehaviour{
+				FromClusterPhases: []ClusterPhase{RunningClusterPhase},
+			}
+
+			By("By create a clusterDefinition")
+			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
+			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
+			By("By creating a clusterVersion")
+			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
+			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
+
+			opsRequest := createTestOpsRequest(clusterName, opsRequestName, DataScriptType)
+			opsRequest.Spec.ScriptSpec = &ScriptSpec{
+				ComponentOps: ComponentOps{ComponentName: componentName},
+			}
+
+			// create Cluster
+			By("By testing spec.clusterDef is legal")
+			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(HaveOccurred())
+			By("By create a new cluster ")
+			cluster, _ := createTestCluster(clusterDefinitionName, clusterVersionName, clusterName)
+			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
+
+			By("By testing dataScript without script, should fail")
+			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(HaveOccurred())
+
+			By("By testing dataScript, with script, no wait, should fail")
+			opsRequest.Spec.ScriptSpec.Script = []string{"echo test"}
+
+			Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).To(ContainSubstring("DataScript is forbidden"))
+
+			opsRequest.Spec.TTLSecondsBeforeAbort = 10
+			Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).To(ContainSubstring("wait for cluster"))
+
+			By("By testing dataScript, with illegal configmap, should fail")
+			opsRequest.Spec.ScriptSpec.ScriptFrom = &ScriptFrom{
+				ConfigMapRef: []corev1.ConfigMapKeySelector{
+					{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "test-cm",
+						},
+						Key: "createdb",
+					},
+				},
+			}
+
+			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(HaveOccurred())
+
+			By("By testing dataScript, with illegal scriptFrom, should fail")
+			opsRequest.Spec.ScriptSpec.ScriptFrom.SecretRef = nil
+			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(HaveOccurred())
+
+			// patch cluster to running
+			By("By patching cluster to running")
+			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
+			clusterPatch := client.MergeFrom(cluster.DeepCopy())
+			cluster.Status.Phase = RunningClusterPhase
+			Expect(k8sClient.Status().Patch(ctx, cluster, clusterPatch)).Should(Succeed())
+
+			Eventually(func() bool {
+				_ = k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)
+				return cluster.Status.Phase == RunningClusterPhase
+			}).Should(BeTrue())
+
+			opsRequest.Spec.ScriptSpec.Script = []string{"create database test;"}
+			opsRequest.Spec.ScriptSpec.ScriptFrom = nil
+			opsRequest.Spec.TTLSecondsBeforeAbort = 0
+			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
+		})
 	})
 })
 
 func createTestOpsRequest(clusterName, opsRequestName string, opsType OpsType) *OpsRequest {
 	randomStr, _ := password.Generate(6, 0, 0, true, false)
-	opsRequestYaml := fmt.Sprintf(`
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: OpsRequest
-metadata:
-  name: %s
-  namespace: default
-  labels:
-     app.kubernetes.io/instance: %s
-     ops.kubeblocks.io/ops-type: %s
-spec:
-  clusterRef: %s
-  type: %s
-`, opsRequestName+randomStr, clusterName, opsType, clusterName, opsType)
-	opsRequest := &OpsRequest{}
-	_ = yaml.Unmarshal([]byte(opsRequestYaml), opsRequest)
-	return opsRequest
+	return &OpsRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opsRequestName + randomStr,
+			Namespace: "default",
+			Labels: map[string]string{
+				"app.kubernetes.io/instance": clusterName,
+				"ops.kubeblocks.io/ops-type": string(opsType),
+			},
+		},
+		Spec: OpsRequestSpec{
+			ClusterRef: clusterName,
+			Type:       opsType,
+		},
+	}
 }

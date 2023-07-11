@@ -543,6 +543,16 @@ func (r *OpsRequest) validateDataScript(ctx context.Context, cli client.Client, 
 			if scriptsFrom.ConfigMapRef == nil && scriptsFrom.SecretRef == nil {
 				return fmt.Errorf("spec.scriptSpec.scriptFrom.configMapRefs and spec.scriptSpec.scriptFrom.secretRefs can not be empty at the same time")
 			}
+			for _, configMapRef := range scriptsFrom.ConfigMapRef {
+				if err := cli.Get(ctx, types.NamespacedName{Name: configMapRef.Name, Namespace: r.Namespace}, &corev1.ConfigMap{}); err != nil {
+					return err
+				}
+			}
+			for _, secret := range scriptsFrom.SecretRef {
+				if err := cli.Get(ctx, types.NamespacedName{Name: secret.Name, Namespace: r.Namespace}, &corev1.Secret{}); err != nil {
+					return err
+				}
+			}
 		}
 		return nil
 	}

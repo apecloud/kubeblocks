@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: zookeepers-zk-config
+  name: pulsar-zookeeper-config
   labels:
     {{- include "pulsar.labels" . | nindent 4 }}
 data:

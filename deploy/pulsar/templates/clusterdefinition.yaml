@@ -4,12 +4,6 @@ metadata:
   name: pulsar
   labels:
     {{- include "pulsar.labels" . | nindent 4 }}
-    {{- if .Values.commonLabels }}
-    {{- include "common.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
-    {{- end }}
-  {{- if .Values.commonAnnotations }}
-  annotations: {{- include "common.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
-  {{- end }}
 spec:
   type: pulsar
   connectionCredential:
@@ -20,19 +14,23 @@ spec:
     mysqlEndpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-mysql)"
     pgEndpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
   componentDefs:
-    - name: bookies-bk
+    - name: bookies
       workloadType: Stateful
       characterType: bookies
       statefulSpec:
         updateStrategy: BestEffortParallel
       configSpecs:
-        - name: bookies-bk-config
-          templateRef: bookies-bk-config
+        - name: pulsar-bookies-config
+          templateRef: pulsar-bookies-config
           namespace: {{ .Release.Namespace }}
-          volumeName: bookies-bk-config
+          volumeName: pulsar-bookies-config
       podSpec:
         initContainers:
-          - args:
+          - name: init-bookies
+            command:
+              - bash
+              - -c
+            args:
             - |
               echo "waiting zookeeper ready..."
               zkDomain="${zkServers%%:*}"
@@ -51,33 +49,24 @@ spec:
               bin/apply-config-from-env.py conf/bookkeeper.conf;until bin/bookkeeper shell whatisinstanceid; do
                 sleep 3;
               done; bin/bookkeeper shell bookieformat -nonInteractive -force -deleteCookie || true
-            command:
-              - sh
-              - -c
             envFrom:
               - configMapRef:
-                  name: pulsar-pulsar-cluster-bookies-bookies-bk-config
-            image: apachepulsar/pulsar:2.11.1
-            imagePullPolicy: IfNotPresent
-            name: pulsar-bookkeeper-verify-clusterid
-            resources: { }
+                  name: pulsar-pulsar-cluster-bookies-pulsar-bookies-config
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
         containers:
-          - args:
-            - |
-              bin/apply-config-from-env.py conf/bookkeeper.conf;
-              OPTS="${OPTS} -Dlog4j2.formatMsgNoLookups=true" exec bin/pulsar bookie;
+          - name: bookies
             command:
               - bash
               - -c
+            args:
+            - |
+              bin/apply-config-from-env.py conf/bookkeeper.conf;
+              OPTS="${OPTS} -Dlog4j2.formatMsgNoLookups=true" exec bin/pulsar bookie;
             envFrom:
               - configMapRef:
                   ## name: bookies-bk-config
-                  name: pulsar-pulsar-cluster-bookies-bookies-bk-config
-            ## image: streamnative/sn-platform-slim:2.10.3.4
-            image: apachepulsar/pulsar:2.11.1
-            imagePullPolicy: IfNotPresent
+                  name: pulsar-pulsar-cluster-bookies-pulsar-bookies-config
             livenessProbe:
               failureThreshold: 60
               httpGet:
@@ -88,7 +77,6 @@ spec:
               periodSeconds: 30
               successThreshold: 1
               timeoutSeconds: 5
-            name: bookie
             ports:
               - containerPort: 8000
                 name: http
@@ -116,10 +104,10 @@ spec:
             terminationMessagePath: /dev/termination-log
             terminationMessagePolicy: File
             volumeMounts:
-              - mountPath: /pulsar/data/bookkeeper/journal-0
-                name: journal-0
-              - mountPath: /pulsar/data/bookkeeper/ledgers-0
-                name: ledgers-0
+              - mountPath: /pulsar/data/bookkeeper/journal
+                name: journal
+              - mountPath: /pulsar/data/bookkeeper/ledgers
+                name: ledgers
     - name: zookeeper
       workloadType: Stateful
       characterType: zookeeper
@@ -136,10 +124,10 @@ spec:
           filePathPattern: {{ $pattern }}
         {{- end }}
       configSpecs:
-        - name: zookeepers-zk-config
-          templateRef: zookeepers-zk-config
+        - name: pulsar-zookeeper-config
+          templateRef: pulsar-zookeeper-config
           namespace: {{ .Release.Namespace }}
-          volumeName: zookeepers-zk-config
+          volumeName: pulsar-zookeeper-config
       service:
         ports:
           - name: client
@@ -155,7 +143,8 @@ spec:
           runAsNonRoot: true
           runAsUser: 10000
         containers:
-          - command:
+          - name: zookeeper
+            command:
               - bash
               - -c
             args:
@@ -170,24 +159,7 @@ spec:
             envFrom:
               - configMapRef:
                   ## name: zookeepers-zk-config
-                  name: pulsar-pulsar-cluster-zookeeper-zookeepers-zk-config
-            image: apachepulsar/pulsar:2.11.1
-            imagePullPolicy: IfNotPresent
-            lifecycle: {}
-            livenessProbe:
-              exec:
-                command:
-                  - timeout
-                  - "30"
-                  - bash
-                  - -c
-                  - echo ruok | nc -q 1 localhost 2181 | grep imok
-              failureThreshold: 10
-              initialDelaySeconds: 20
-              periodSeconds: 30
-              successThreshold: 1
-              timeoutSeconds: 30
-            name: zookeeper
+                  name: pulsar-pulsar-cluster-zookeeper-pulsar-zookeeper-config
             ports:
               - containerPort: 2181
                 name: client
@@ -204,6 +176,19 @@ spec:
               - containerPort: 9990
                 name: http-admin
                 protocol: TCP
+            livenessProbe:
+              exec:
+                command:
+                  - timeout
+                  - "30"
+                  - bash
+                  - -c
+                  - echo ruok | nc -q 1 localhost 2181 | grep imok
+              failureThreshold: 10
+              initialDelaySeconds: 20
+              periodSeconds: 30
+              successThreshold: 1
+              timeoutSeconds: 30
             readinessProbe:
               exec:
                 command:

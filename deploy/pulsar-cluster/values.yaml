@@ -50,8 +50,8 @@ bookies:
       cpu: 500m
       memory: 3Gi
     requests:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 200m
+      memory: 512Mi
 
   persistence:
     enabled: true

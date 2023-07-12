@@ -9,11 +9,131 @@ spec:
   connectionCredential:
     username: "admin"
     admin-password: "$(RANDOM_PASSWD)"
-    endpoint: "http://$(SVC_FQDN):$(SVC_PORT_http)"
-    tcpEndpoint: "$(SVC_FQDN):$(SVC_PORT_tcp)"
-    mysqlEndpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-mysql)"
-    pgEndpoint: "$(SVC_FQDN):$(SVC_PORT_tcp-postgresql)"
+    httpEndpoint: "http://$(SVC_FQDN):$(SVC_PORT_http)"
+    pulsarEndpoint: "pulsar://$(SVC_FQDN):$(SVC_PORT_pulsar)"
   componentDefs:
+    - name: proxy
+      workloadType: Stateful
+      characterType: proxy
+      statefulSpec:
+        updateStrategy: BestEffortParallel
+      componentDefRef:
+      - componentDefName: broker
+        componentRefEnv:
+        - name: brokerSVC
+          valueFrom:
+            type: ServiceRef
+      # TODO: support monitor
+      monitor:
+        builtIn: false
+        exporterConfig:
+          scrapePath: /metrics
+          scrapePort: 9141
+      logConfigs:
+      # TODO: refer to broker configuration
+      configSpecs:
+      {{- if .Values.proxy.configuration }}
+        - name: proxy-config
+          templateRef: proxy-tpl
+          namespace: {{ .Release.Namespace }}
+          volumeName: config
+      {{- end }}
+      service:
+        ports:
+        - name: pulsar
+          port: 6650
+          protocol: TCP
+          targetPort: 6650
+        - name: http
+          port: 8080
+          protocol: TCP
+          targetPort: 8080
+      podSpec:
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10000
+          fsGroup: 0
+          runAsGroup: 0
+        initContainers:
+          - name: check-broker
+            args:
+            - set -e; while [ "$(curl -s -o /dev/null -w '%{http_code}' ${brokerSVC}:8080/status.html)"
+                  -ne "200" ]; do echo "pulsar cluster isn't initialized yet..."; sleep 3;
+              done
+            command:
+              - sh
+              - -c
+        containers:
+          - name: proxy
+            securityContext:
+              allowPrivilegeEscalation: false
+              runAsNonRoot: true
+              runAsUser: 10000
+              capabilities:
+                drop:
+                - ALL
+              privileged: false
+              runAsGroup: 0
+            args:
+            - bin/apply-config-from-env.py conf/proxy.conf && echo 'OK' > status && exec bin/pulsar proxy
+            command:
+              - sh
+              - -c
+            env:
+            - name: brokerWebServiceURL
+              value: http://$(brokerSVC):8080
+            - name: brokerServiceURL
+              value: pulsar://$(brokerSVC):6650
+            - name: clusterName
+              value: $(KB_NAMESPACE)-$(KB_CLUSTER_COMP_NAME)
+            - name: webServicePort
+              value: "8080"
+            envFrom:
+              - configMapRef:
+                  name: proxy-test-config
+            ports:
+            - containerPort: 6650
+              name: pulsar
+              protocol: TCP
+            - containerPort: 6651
+              name: pulsarssl
+              protocol: TCP
+            - containerPort: 8443
+              name: https
+              protocol: TCP
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+            livenessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /status.html
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 100
+            readinessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /status.html
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 100
+            startupProbe:
+              failureThreshold: 20
+              httpGet:
+                path: /status.html
+                port: http
+                scheme: HTTP
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 100
     - name: bookies
       workloadType: Stateful
       characterType: bookies
@@ -271,18 +391,10 @@ spec:
             args:
             - |2-
               set -x
-              # wait zookeeper ready
               echo "INFO: wait for zookeeper ready..."
               until bin/pulsar zookeeper-shell -server ${zookeeperServers} --run-once "ls /"; do
                 sleep 3;
               done;
-              # TODO: remove it
-              # wait bookkeeper ready
-              # bin/apply-config-from-env.py conf/bookkeeper.conf;
-              # echo "INFO: wait for bookkeeper ready..."
-              # until bin/bookkeeper shell whatisinstanceid; do
-              #  sleep 3;
-              # done;
               idx=${KB_POD_NAME##*-}
               if [ $idx -ne 0 ]; then
                 # if not the first pod, do it
@@ -314,7 +426,7 @@ spec:
             - name: brokerServiceUrl
               value: pulsar://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:6650
             - name: clusterName
-              value: $(KB_NAMESPACE)-$(KB_CLUSTER_NAME)
+              value: $(KB_NAMESPACE)-$(KB_CLUSTER_COMP_NAME)
             - name: webServiceUrl
               value: http://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:8080
             - name: zookeeperServers
@@ -372,7 +484,7 @@ spec:
             - name: brokerServiceUrl
               value: pulsar://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:6650
             - name: clusterName
-              value: $(KB_NAMESPACE)-$(KB_CLUSTER_NAME)
+              value: $(KB_NAMESPACE)-$(KB_CLUSTER_COMP_NAME)
             - name: webServiceUrl
               value: http://$(KB_CLUSTER_COMP_NAME).$(KB_NAMESPACE).svc.cluster.local:8080
             - name: zookeeperServers
@@ -427,125 +539,3 @@ spec:
               readOnly: true
            #   - name: conf
            #     mountPath: /pulsar/conf
-    - name: proxy
-      workloadType: Stateful
-      characterType: proxy
-      statefulSpec:
-        updateStrategy: BestEffortParallel
-      componentDefRef:
-      - componentDefName: broker
-        componentRefEnv:
-        - name: brokerSVC
-          valueFrom:
-            type: ServiceRef
-      # TODO: support monitor
-      monitor:
-        builtIn: false
-        exporterConfig:
-          scrapePath: /metrics
-          scrapePort: 9141
-      logConfigs:
-      # TODO: refer to broker configuration
-      configSpecs:
-      {{- if .Values.proxy.configuration }}
-        - name: proxy-config
-          templateRef: proxy-tpl
-          namespace: {{ .Release.Namespace }}
-          volumeName: config
-      {{- end }}
-      service:
-        ports:
-        - name: pulsar
-          port: 6650
-          protocol: TCP
-          targetPort: 6650
-        - name: http
-          port: 8080
-          protocol: TCP
-          targetPort: 8080
-      podSpec:
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 10000
-          fsGroup: 0
-          runAsGroup: 0
-        initContainers:
-          - name: check-broker
-            args:
-            - set -e; while [ "$(curl -s -o /dev/null -w '%{http_code}' ${brokerSVC}:8080/status.html)"
-                  -ne "200" ]; do echo "pulsar cluster isn't initialized yet..."; sleep 3;
-              done
-            command:
-              - sh
-              - -c
-        containers:
-          - name: proxy
-            securityContext:
-              allowPrivilegeEscalation: false
-              runAsNonRoot: true
-              runAsUser: 10000
-              capabilities:
-                drop:
-                - ALL
-              privileged: false
-              runAsGroup: 0
-            args:
-            - bin/apply-config-from-env.py conf/proxy.conf && echo 'OK' > status && exec bin/pulsar proxy
-            command:
-              - sh
-              - -c
-            env:
-            - name: brokerWebServiceURL
-              value: http://$(brokerSVC):8080
-            - name: brokerServiceURL
-              value: pulsar://$(brokerSVC):6650
-            - name: clusterName
-              value: $(KB_NAMESPACE)-$(KB_CLUSTER_NAME)-proxy
-            - name: webServicePort
-              value: "8080"
-            envFrom:
-              - configMapRef:
-                  name: proxy-test-config
-            ports:
-            - containerPort: 6650
-              name: pulsar
-              protocol: TCP
-            - containerPort: 6651
-              name: pulsarssl
-              protocol: TCP
-            - containerPort: 8443
-              name: https
-              protocol: TCP
-            - containerPort: 8080
-              name: http
-              protocol: TCP
-            livenessProbe:
-              failureThreshold: 3
-              httpGet:
-                path: /status.html
-                port: http
-                scheme: HTTP
-              initialDelaySeconds: 30
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 100
-            readinessProbe:
-              failureThreshold: 3
-              httpGet:
-                path: /status.html
-                port: http
-                scheme: HTTP
-              initialDelaySeconds: 30
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 100
-            startupProbe:
-              failureThreshold: 20
-              httpGet:
-                path: /status.html
-                port: http
-                scheme: HTTP
-              initialDelaySeconds: 5
-              periodSeconds: 10
-              successThreshold: 1
-              timeoutSeconds: 100

@@ -46,6 +46,7 @@ type ClusterTemplate struct {
 }
 
 type ClusterTemplateSpec struct {
+	// default value of cluster.spec.componentSpecs
 	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty"`
 }
 

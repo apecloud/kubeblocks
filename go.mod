@@ -75,6 +75,7 @@ require (
 	github.com/valyala/fasthttp v1.41.0
 	github.com/vmware-tanzu/velero v1.10.1
 	github.com/xdg-go/scram v1.1.1
+	github.com/xeipuuv/gojsonschema v1.2.0
 	go.etcd.io/etcd/client/v3 v3.5.6
 	go.etcd.io/etcd/server/v3 v3.5.6
 	go.mongodb.org/mongo-driver v1.11.1
@@ -367,7 +368,6 @@ require (
 	github.com/xdg-go/stringprep v1.0.3 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
-	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
 	github.com/xlab/treeprint v1.1.0 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect

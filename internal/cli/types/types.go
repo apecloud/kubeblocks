@@ -131,6 +131,7 @@ const (
 	ResourceBackupTools    = "backuptools"
 	ResourceRestoreJobs    = "restorejobs"
 	ResourceBackupPolicies = "backuppolicies"
+	ResourceBackupRepoes   = "backuprepoes"
 )
 
 // Extensions API group
@@ -138,6 +139,13 @@ const (
 	ExtensionsAPIGroup   = "extensions.kubeblocks.io"
 	ExtensionsAPIVersion = "v1alpha1"
 	ResourceAddons       = "addons"
+)
+
+// Storage API group
+const (
+	StorageAPIGroup          = "storage.kubeblocks.io"
+	StorageAPIVersion        = "v1alpha1"
+	ResourceStorageProviders = "storageproviders"
 )
 
 // Migration API group
@@ -234,12 +242,20 @@ func BackupToolGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupTools}
 }
 
+func BackupRepoGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupRepoes}
+}
+
 func RestoreJobGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceRestoreJobs}
 }
 
 func AddonGVR() schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: ExtensionsAPIGroup, Version: ExtensionsAPIVersion, Resource: ResourceAddons}
+}
+
+func StorageProviderGVR() schema.GroupVersionResource {
+	return schema.GroupVersionResource{Group: StorageAPIGroup, Version: StorageAPIVersion, Resource: ResourceStorageProviders}
 }
 
 func ComponentResourceConstraintGVR() schema.GroupVersionResource {

@@ -131,7 +131,7 @@ const (
 	ResourceBackupTools    = "backuptools"
 	ResourceRestoreJobs    = "restorejobs"
 	ResourceBackupPolicies = "backuppolicies"
-	ResourceBackupRepoes   = "backuprepoes"
+	ResourceBackupRepos    = "backuprepos"
 )
 
 // Extensions API group
@@ -243,7 +243,7 @@ func BackupToolGVR() schema.GroupVersionResource {
 }
 
 func BackupRepoGVR() schema.GroupVersionResource {
-	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupRepoes}
+	return schema.GroupVersionResource{Group: DPAPIGroup, Version: DPAPIVersion, Resource: ResourceBackupRepos}
 }
 
 func RestoreJobGVR() schema.GroupVersionResource {

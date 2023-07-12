@@ -70,12 +70,17 @@ func init() {
 }
 
 type ClusterFamilyTemplateRef struct {
+
+	// key defines which parameters in cluster should be checked, if key equals to value, the clustertemplate defined in templateRef will be chosen
 	Key string `json:"key,omitempty"`
 
+	// if the evaluated result equals to value, the clustertemplate defined in templateRef will be chosen, when this field is set, key will be ignored
 	Expression string `json:"expression,omitempty"`
 
+	// the value of the key or the expression
 	Value string `json:"value,omitempty"`
 
+	// clustertemplate name referenced to, when value is match
 	TemplateRef string `json:"templateRef,omitempty"`
 
 	Selector []ClusterFamilyTemplateRefSelector `json:"selector,omitempty"`

@@ -124,6 +124,36 @@ var _ = Describe("utils", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(tplNames).Should(BeEquivalentTo(expectedNames))
 		})
+		It("should not report error if key not exist", func() {
+			cluster := appsv1alpha1.Cluster{
+				Spec: appsv1alpha1.ClusterSpec{},
+			}
+			cf := appsv1alpha1.ClusterFamily{
+				Spec: appsv1alpha1.ClusterFamilySpec{
+					ClusterTemplateRefs: []appsv1alpha1.ClusterFamilyTemplateRef{
+						{
+							Key:         "cluster.spec.mode",
+							Value:       "raftGroup",
+							TemplateRef: "mysql-raft-template",
+						},
+						{
+							Expression:  "cluster.spec.mode=='raftGroup' && cluster.spec.parameters.proxyEnabled=='true'",
+							Value:       "true",
+							TemplateRef: "mysql-vitess-template",
+						},
+						{
+							TemplateRef: "mysql-template",
+						},
+					},
+				},
+			}
+			expectedNames := []string{
+				"mysql-template",
+			}
+			tplNames, err := getTemplateNamesFromCF(context.TODO(), &cf, &cluster)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(tplNames).Should(BeEquivalentTo(expectedNames))
+		})
 	})
 
 	Context("test evalCEL", func() {

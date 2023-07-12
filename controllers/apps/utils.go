@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	celgo "github.com/google/cel-go/cel"
@@ -113,6 +114,10 @@ func getTemplateNamesFromCF(ctx context.Context, cf *appsv1alpha1.ClusterFamily,
 		}
 		res, err := evalCEL(ctx, exp, cluster)
 		if err != nil {
+			// ignore errors if key not exists
+			if strings.Contains(res, "no such key") {
+				continue
+			}
 			return nil, err
 		}
 		if res == ref.Value {

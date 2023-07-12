@@ -62,6 +62,7 @@ type ClusterDefinitionSpec struct {
 	// +optional
 	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
 
+	// reference name of clusterfamily
 	ClusterFamilyRef string `json:"clusterFamilyRef,omitempty"`
 }
 

@@ -31,6 +31,7 @@ type ClusterFamilySpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
+	// list of clustertemplates
 	ClusterTemplateRefs []ClusterFamilyTemplateRef `json:"clusterTemplateRefs,omitempty"`
 }
 
@@ -49,7 +50,9 @@ type ClusterFamily struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ClusterFamilySpec   `json:"spec,omitempty"`
+	// spec of clusterfamily which defines what kind of clustertemplate to use in some conditions
+	Spec ClusterFamilySpec `json:"spec,omitempty"`
+	// status of clusterfamily
 	Status ClusterFamilyStatus `json:"status,omitempty"`
 }
 

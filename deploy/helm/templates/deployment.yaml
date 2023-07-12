@@ -77,6 +77,8 @@ spec:
               value: {{ .Values.image.pullPolicy }}
             - name: KUBEBLOCKS_TOOLS_IMAGE
               value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            - name: KUBEBLOCKS_CHARTS_IMAGE
+                value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.charts.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
             - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
               value: {{ include "kubeblocks.serviceAccountName" . }}
             {{- if or .Values.dataProtection.enableVolumeSnapshot (index .Values "snapshot-controller" "enabled") }}

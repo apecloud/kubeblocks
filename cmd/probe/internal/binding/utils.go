@@ -235,13 +235,13 @@ func createProbeEvent(opsResult OpsResult) (*corev1.Event, error) {
 apiVersion: v1
 kind: Event
 metadata:
-  name: {{ .Pod }}.{{ .EventSeq }}
+  name: {{ .PodName }}.{{ .EventSeq }}
   namespace: {{ .Namespace }}
 involvedObject:
   apiVersion: v1
   fieldPath: spec.containers{sqlchannel}
   kind: Pod
-  name: {{ .Pod }}
+  name: {{ .PodName }}
   namespace: {{ .Namespace }}
 reason: RoleChanged
 type: Normal
@@ -257,7 +257,7 @@ source:
 	msg, _ := json.Marshal(opsResult)
 	seq := rand.String(16)
 	roleValue := map[string]string{
-		"Pod":       podName,
+		"PodName":   podName,
 		"Namespace": namespace,
 		"EventSeq":  seq,
 	}

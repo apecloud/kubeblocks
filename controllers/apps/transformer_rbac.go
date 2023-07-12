@@ -55,16 +55,16 @@ func (c *RBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) 
 
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		serviceAccountName := compSpec.ServiceAccountName
-		if serviceAccountName == "" {
-			serviceAccountName = "kb-" + cluster.Name
-		}
-
 		if !viper.GetBool("ENABLE_RBAC_MANAGER") {
 			transCtx.Logger.V(1).Info("rbac manager is not enabled")
-			if !isServiceAccountExist(transCtx, serviceAccountName, true) {
+			if serviceAccountName != "" && !isServiceAccountExist(transCtx, serviceAccountName, true) {
 				return ictrlutil.NewRequeueError(time.Second, serviceAccountName+" ServiceAccount is not exist")
 			}
 			return nil
+		}
+
+		if serviceAccountName == "" {
+			serviceAccountName = "kb-" + cluster.Name
 		}
 
 		if isRoleBindingExist(transCtx, serviceAccountName) {

@@ -17,6 +17,8 @@ spec:
   helm:
     {{- if hasPrefix "oci://" .Values.addonChartLocationBase }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/postgresql
+    {{- else if hasPrefix "https://github.com/apecloud/helm-charts/releases/download" .Values.addonChartLocationBase }}
+    chartLocationURL: {{ .Values.addonChartLocationBase }}/postgresql-{{ default .Chart.Version .Values.versionOverride }}/postgresql-{{ default .Chart.Version .Values.versionOverride }}.tgz
     {{- else }}
     chartLocationURL: {{ .Values.addonChartLocationBase }}/postgresql-{{ default .Chart.Version .Values.versionOverride }}.tgz
     {{- end }}

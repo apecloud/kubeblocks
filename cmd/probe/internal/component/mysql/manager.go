@@ -157,30 +157,34 @@ func (mgr *Manager) IsLeader(ctx context.Context, cluster *dcs.Cluster) (bool, e
 		return false, err
 	}
 
-	if cluster.Leader != nil && cluster.Leader.Name != "" {
-		if cluster.Leader.Name == mgr.CurrentMemberName {
-			return true, nil
-		} else {
-			return false, nil
-		}
-	}
+	// if cluster.Leader != nil && cluster.Leader.Name != "" {
+	// 	if cluster.Leader.Name == mgr.CurrentMemberName {
+	// 		return true, nil
+	// 	} else {
+	// 		return false, nil
+	// 	}
+	// }
 
-	// During the initialization of cluster, there would be more than one leader,
-	// in this case, the first member is chosen as the leader
-	if mgr.CurrentMemberName == cluster.Members[0].Name {
-		return true, nil
-	}
-	isFirstMemberLeader, err := mgr.IsLeaderMember(ctx, cluster, &cluster.Members[0])
-	if err == nil && isFirstMemberLeader {
-		return false, nil
-	}
+	// // During the initialization of cluster, there would be more than one leader,
+	// // in this case, the first member is chosen as the leader
+	// if mgr.CurrentMemberName == cluster.Members[0].Name {
+	// 	return true, nil
+	// }
+	// isFirstMemberLeader, err := mgr.IsLeaderMember(ctx, cluster, &cluster.Members[0])
+	// if err == nil && isFirstMemberLeader {
+	// 	return false, nil
+	// }
 
 	return true, err
 }
 
 func (mgr *Manager) IsLeaderMember(ctx context.Context, cluster *dcs.Cluster, member *dcs.Member) (bool, error) {
 	readonly, err := mgr.IsReadonly(ctx, cluster, member)
-	return !readonly, err
+	if err != nil || readonly {
+		return false, err
+	}
+
+	return true, err
 }
 
 func (mgr *Manager) InitiateCluster(cluster *dcs.Cluster) error {

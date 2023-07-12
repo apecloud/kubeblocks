@@ -121,15 +121,16 @@ func (ha *Ha) RunCycle() {
 		// TODO: In the event that the database service and SQL channel both go down concurrently, eg. Pod deleted,
 		// there is no healthy leader node and the lock remains unreleased, attempt to acquire the leader lock.
 
-		if ok, _ := ha.dbManager.IsLeader(context.TODO(), cluster); ok {
+		leaderMember := cluster.GetLeaderMember()
+		if ok, _ := ha.dbManager.IsLeaderMember(ha.ctx, cluster, leaderMember); ok {
+			// make sure sync source is leader when role changed
+			ha.dbManager.Demote()
+			ha.dbManager.Follow(cluster)
+		} else if ok, _ := ha.dbManager.IsLeader(context.TODO(), cluster); ok {
 			ha.logger.Infof("I am the real leader, wait for lock released")
 			// if ha.dcs.AttempAcquireLock() == nil {
 			// 	ha.dbManager.Premote()
 			// }
-		} else {
-			// make sure sync source is leader when role changed
-			ha.dbManager.Demote()
-			ha.dbManager.Follow(cluster)
 		}
 	}
 }

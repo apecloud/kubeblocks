@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
-	"github.com/spf13/viper"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 )
 
 const (

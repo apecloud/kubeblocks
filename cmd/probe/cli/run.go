@@ -48,7 +48,7 @@ var RunCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run sqlchannel and db service.",
 	Example: `
-sqlctl run  -- mysqld
+sqlctl run -- mysqld
   `,
 	Args: cobra.MinimumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {

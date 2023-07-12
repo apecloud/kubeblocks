@@ -18,14 +18,14 @@ bookies:
   image:
     repository: registry.cn-hangzhou.aliyuncs.com/apecloud/pulsar
     pullPolicy: IfNotPresent
-    tag: 2.11.1-2
+    tag: 2.11.1
 
 zookeeper:
   image:
     repository: registry.cn-hangzhou.aliyuncs.com/apecloud/pulsar
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
-    tag: 2.11.1-2
+    tag: 2.11.1
 
   logConfigs: {}
   roleProbe:
@@ -48,7 +48,7 @@ broker:
     repository: registry.cn-hangzhou.aliyuncs.com/apecloud/pulsar
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
-    tag: 2.11.1-2
+    tag: 2.11.1
 
 proxy:
   configuration: ""
@@ -56,4 +56,4 @@ proxy:
     repository: registry.cn-hangzhou.aliyuncs.com/apecloud/pulsar
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion.
-    tag: 2.11.1-2
+    tag: 2.11.1

@@ -24,16 +24,18 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/spf13/cast"
 	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	cfgcm "github.com/apecloud/kubeblocks/internal/configuration/config_manager"
-	"github.com/apecloud/kubeblocks/internal/configuration/util"
+	cfgutil "github.com/apecloud/kubeblocks/internal/configuration/util"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -85,8 +87,113 @@ func RenderConfigNScriptFiles(clusterVersion *appsv1alpha1.ClusterVersion,
 	if err := buildConfigManagerWithComponent(podSpec, component.ConfigTemplates, ctx, cli, cluster, component); err != nil {
 		return cfgcore.WrapError(err, "failed to generate sidecar for configmap's reloader")
 	}
-	// TODO config resource objects are updated by the operator
-	return createConfigObjects(cli, ctx, renderWrapper.renderedObjs)
+
+	if err := createConfigObjects(cli, ctx, renderWrapper.renderedObjs); err != nil {
+		return err
+	}
+	return injectTemplateEnvFrom(cluster, component, podSpec, cli, ctx)
+}
+
+func injectTemplateEnvFrom(cluster *appsv1alpha1.Cluster, component *component.SynthesizedComponent, podSpec *corev1.PodSpec, cli client.Client, ctx context.Context) error {
+	for _, template := range component.ConfigTemplates {
+		if len(template.AsEnvFrom) != 0 && template.ConfigConstraintRef != "" {
+			cmName := cfgcore.GetComponentCfgName(cluster.Name, component.Name, template.Name)
+			cm := &corev1.ConfigMap{}
+			cmKey := client.ObjectKey{
+				Name:      cmName,
+				Namespace: cluster.Namespace,
+			}
+			if err := cli.Get(ctx, cmKey, cm); err != nil {
+				return err
+			}
+			keys := template.Keys
+			if len(keys) == 0 {
+				keys = cfgutil.ToSet(cm.Data).AsSlice()
+			}
+			for _, key := range keys {
+				if _, ok := cm.Data[key]; !ok {
+					continue
+				}
+				envConfigMap, err := generateEnvMap(cluster, template, cmName, key, cm.Data[key], ctx, cli)
+				if err != nil {
+					return err
+				}
+				injectEnvFrom(podSpec.Containers, template.AsEnvFrom, envConfigMap.Name)
+				injectEnvFrom(podSpec.InitContainers, template.AsEnvFrom, envConfigMap.Name)
+			}
+		}
+	}
+	return nil
+}
+
+func generateEnvMap(cluster *appsv1alpha1.Cluster, template appsv1alpha1.ComponentConfigSpec, cmName, fileName, fileContext string, ctx context.Context, cli client.Client) (*corev1.ConfigMap, error) {
+	ccKey := client.ObjectKey{
+		Namespace: "",
+		Name:      template.ConfigConstraintRef,
+	}
+	cc := &appsv1alpha1.ConfigConstraint{}
+	if err := cli.Get(ctx, ccKey, cc); err != nil {
+		return nil, cfgcore.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
+	}
+	if cc.Spec.FormatterConfig == nil {
+		return nil, cfgcore.MakeError("ConfigConstraint[%v] is not a formatter", cc.Name)
+	}
+
+	keyValue, err := cfgcore.LoadConfigObjectFromContent(cc.Spec.FormatterConfig.Format, fileContext)
+	if err != nil {
+		return nil, err
+	}
+
+	envMap := make(map[string]string, len(keyValue))
+	for key, v := range keyValue {
+		envMap[key] = cast.ToString(v)
+	}
+	cmKey := client.ObjectKey{
+		Name:      strings.Join([]string{cmName, fileName}, "-"),
+		Namespace: cluster.Namespace,
+	}
+	cm := &corev1.ConfigMap{}
+	if err := cli.Get(ctx, cmKey, cm); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+		cm.Name = cmKey.Name
+		cm.Namespace = cmKey.Namespace
+		cm.Data = envMap
+		if err := controllerutil.SetOwnerReference(cluster, cm, scheme); err != nil {
+			return nil, err
+		}
+		return cm, cli.Create(ctx, cm)
+	}
+	cm.Data = envMap
+	return cm, cli.Update(ctx, cm)
+}
+
+func checkEnvFrom(container *corev1.Container, cmName string) bool {
+	for i := range container.EnvFrom {
+		source := &container.EnvFrom[i]
+		if source.ConfigMapRef != nil && source.ConfigMapRef.Name == cmName {
+			return true
+		}
+	}
+	return false
+}
+
+func injectEnvFrom(containers []corev1.Container, asEnvFrom []string, cmName string) {
+	sets := cfgutil.NewSet(asEnvFrom...)
+	for i := range containers {
+		container := &containers[i]
+		if sets.InArray(container.Name) && !checkEnvFrom(container, cmName) {
+			container.EnvFrom = append(container.EnvFrom,
+				corev1.EnvFromSource{
+					ConfigMapRef: &corev1.ConfigMapEnvSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: cmName,
+						}},
+				})
+		}
+	}
 }
 
 func createConfigObjects(cli client.Client, ctx context.Context, objs []client.Object) error {
@@ -121,7 +228,7 @@ func updateResourceAnnotationsWithTemplate(obj client.Object, allTemplateAnnotat
 	}
 
 	// delete not exist configmap label
-	deletedLabels := util.MapKeyDifference(existLabels, allTemplateAnnotations)
+	deletedLabels := cfgutil.MapKeyDifference(existLabels, allTemplateAnnotations)
 	for l := range deletedLabels.Iter() {
 		delete(annotations, l)
 	}
@@ -256,7 +363,7 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1a
 		if !cfgcore.NeedReloadVolume(configSpec) {
 			continue
 		}
-		sets := util.NewSet()
+		sets := cfgutil.NewSet()
 		for _, container := range config2Containers[configSpec.Name] {
 			volume := intctrlutil.GetVolumeMountByVolume(container, configSpec.VolumeName)
 			if volume != nil && !sets.InArray(volume.Name) {

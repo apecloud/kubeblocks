@@ -1,70 +1,9 @@
----
-# Source: redis-cluster/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: kb-mycluster-redis-cluster
-  labels:
-
-    helm.sh/chart: redis-cluster-0.6.0-alpha.16
-    app.kubernetes.io/name: redis-cluster
-    app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "7.0.6"
-    app.kubernetes.io/managed-by: Helm
----
-# Source: redis-cluster/templates/role.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: kb-mycluster-redis-cluster
-  namespace: default
-  labels:
-
-    helm.sh/chart: redis-cluster-0.6.0-alpha.16
-    app.kubernetes.io/name: redis-cluster
-    app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "7.0.6"
-    app.kubernetes.io/managed-by: Helm
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - events
-    verbs:
-      - create
----
-# Source: redis-cluster/templates/rolebinding.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: kb-mycluster-redis-cluster
-  labels:
-
-    helm.sh/chart: redis-cluster-0.6.0-alpha.16
-    app.kubernetes.io/name: redis-cluster
-    app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "7.0.6"
-    app.kubernetes.io/managed-by: Helm
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: kb-mycluster-redis-cluster
-subjects:
-  - kind: ServiceAccount
-    name: kb-mycluster-redis-cluster
-    namespace: default
----
-# Source: redis-cluster/templates/cluster.yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: mycluster-redis-cluster-snapshot
-  labels:
-    helm.sh/chart: redis-cluster-0.6.0-alpha.16
-    app.kubernetes.io/name: redis-cluster
-    app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: "7.0.6"
-    app.kubernetes.io/managed-by: Helm
+  annotations:
+    kubeblocks.io/restore-from-backup: "{\"redis\":\"redis-cluster-redis-backup-policy\"}"
 spec:
   clusterDefinitionRef: redis  # ref clusterDefinition.name
   clusterVersionRef: redis-7.0.6 # ref clusterVersion.name
@@ -79,7 +18,6 @@ spec:
       enabledLogs:     ["running"]
       replicas: 2
       serviceAccountName: kb-mycluster-redis-cluster
-      primaryIndex: 0
       switchPolicy:
         type: Noop
       resources:

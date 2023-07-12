@@ -7,8 +7,8 @@ groups:
   - name: RedisExporter
     rules:
       - alert: RedisDown
-        expr: 'redis_up == 0'
-        for: 5m
+        expr: 'max_over_time(redis_up[1m]) == 0'
+        for: 0m
         labels:
           severity: critical
         annotations:
@@ -26,7 +26,7 @@ groups:
 
       - alert: RedisMemoryHigh
         expr: '(redis_memory_max_bytes == 0 or redis_memory_used_bytes * 100 / redis_memory_max_bytes) > 90'
-        for: 5m
+        for: 2m
         labels:
           severity: warning
         annotations:
@@ -44,7 +44,7 @@ groups:
 
       - alert: RedisRejectedConnections
         expr: 'increase(redis_rejected_connections_total[1m]) > 0'
-        for: 5m
+        for: 3m
         labels:
           severity: error
         annotations:

@@ -158,7 +158,7 @@ func buildConfigManagerArgs(params *CfgManagerBuildParams, volumeDirs []corev1.V
 	args = append(args, "--operator-update-enable")
 	args = append(args, "--tcp", viper.GetString(constant.ConfigManagerGPRCPortEnv))
 
-	if err := createOrUpdateConfigMap(frmConfigSpecMeta(params.ConfigSpecsBuildParams), params, cli, ctx); err != nil {
+	if err := createOrUpdateConfigMap(fromConfigSpecMeta(params.ConfigSpecsBuildParams), params, cli, ctx); err != nil {
 		return err
 	}
 	args = append(args, "--config", filepath.Join(configManagerConfigMountPoint, configManagerConfig))
@@ -225,7 +225,7 @@ func createOrUpdateConfigMap(configInfo []ConfigSpecInfo, manager *CfgManagerBui
 	return err
 }
 
-func frmConfigSpecMeta(metas []ConfigSpecMeta) []ConfigSpecInfo {
+func fromConfigSpecMeta(metas []ConfigSpecMeta) []ConfigSpecInfo {
 	configSpecs := make([]ConfigSpecInfo, 0, len(metas))
 	for _, meta := range metas {
 		configSpecs = append(configSpecs, meta.ConfigSpecInfo)

@@ -88,7 +88,7 @@ subjects:
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  name: mycluster-pgcluster-snapshot
+  name: pg-cluster-snapshot
   annotations:
     kubeblocks.io/restore-from-backup: "{\"postgresql\":\"backup-snapshot-mycluster\"}"
 spec:

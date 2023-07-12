@@ -24,15 +24,16 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/spf13/cobra"
 
+	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/client-go/kubernetes/scheme"
-
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/resource"
+	fakediscovery "k8s.io/client-go/discovery/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 	clientfake "k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 
@@ -63,6 +64,7 @@ var _ = Describe("create cluster by cluster type", func() {
 			}
 			tf.Client = tf.UnstructuredClient
 			tf.FakeDynamicClient = testing.FakeDynamicClient(data)
+			tf.WithDiscoveryClient(cmdtesting.NewFakeCachedDiscoveryClient())
 			return tf
 		}
 	)
@@ -115,6 +117,9 @@ var _ = Describe("create cluster by cluster type", func() {
 
 		By("run")
 		o.DryRun = "client"
+		o.Client = testing.FakeClientSet()
+		fakeDiscovery, _ := o.Client.Discovery().(*fakediscovery.FakeDiscovery)
+		fakeDiscovery.FakedServerVersion = &version.Info{Major: "1", Minor: "27", GitVersion: "v1.27.0"}
 		Expect(o.run()).Should(Succeed())
 	})
 })

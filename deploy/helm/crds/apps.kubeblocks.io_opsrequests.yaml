@@ -289,6 +289,81 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.restoreFrom
                   rule: self == oldSelf
+              scriptSpec:
+                description: scriptSpec defines the script to be executed.
+                properties:
+                  componentName:
+                    description: componentName cluster component name.
+                    type: string
+                  script:
+                    description: script defines the script to be executed.
+                    items:
+                      type: string
+                    type: array
+                    x-kubernetes-validations:
+                    - message: forbidden to update spec.scriptSpec.script
+                      rule: self == oldSelf
+                  scriptFrom:
+                    description: scriptFrom defines the script to be executed from
+                      configMap or secret.
+                    properties:
+                      configMapRef:
+                        description: configMapRef defines the configMap to be executed.
+                        items:
+                          description: Selects a key from a ConfigMap.
+                          properties:
+                            key:
+                              description: The key to select.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the ConfigMap or its key
+                                must be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                        type: array
+                        x-kubernetes-validations:
+                        - message: forbidden to update spec.scriptSpec.scriptFrom.configMapRef
+                          rule: self == oldSelf
+                      secretRef:
+                        description: secretRef defines the secret to be executed.
+                        items:
+                          description: SecretKeySelector selects a key of a Secret.
+                          properties:
+                            key:
+                              description: The key of the secret to select from.  Must
+                                be a valid secret key.
+                              type: string
+                            name:
+                              description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                TODO: Add other useful fields. apiVersion, kind, uid?'
+                              type: string
+                            optional:
+                              description: Specify whether the Secret or its key must
+                                be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                        type: array
+                        x-kubernetes-validations:
+                        - message: forbidden to update spec.scriptSpec.scriptFrom.secretRef
+                          rule: self == oldSelf
+                    type: object
+                    x-kubernetes-validations:
+                    - message: forbidden to update spec.scriptSpec.scriptFrom
+                      rule: self == oldSelf
+                required:
+                - componentName
+                type: object
+                x-kubernetes-validations:
+                - message: forbidden to update spec.scriptSpec
+                  rule: self == oldSelf
               switchover:
                 description: switchover the specified components.
                 items:
@@ -328,6 +403,13 @@ spec:
                   TTLSecondsAfterSucceed second when OpsRequest.status.phase is Succeed.
                 format: int32
                 type: integer
+              ttlSecondsBeforeAbort:
+                default: 0
+                description: ttlSecondsBeforeAbort OpsRequest will wait at most TTLSecondsBeforeAbort
+                  seconds for start-conditions to be met. If not specified, the default
+                  value is 0, which means that the start-conditions must be met immediately.
+                format: int32
+                type: integer
               type:
                 description: type defines the operation type.
                 enum:
@@ -341,6 +423,7 @@ spec:
                 - Stop
                 - Expose
                 - Switchover
+                - DataScript
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.type

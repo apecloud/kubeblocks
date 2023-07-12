@@ -29,12 +29,12 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	batchv1 "k8s.io/api/batch/v1"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -42,6 +42,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/scheme"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -118,7 +119,7 @@ var _ = Describe("Cluster Controller", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -1568,6 +1569,80 @@ var _ = Describe("Cluster Controller", func() {
 		})).ShouldNot(HaveOccurred())
 	}
 
+	testUpdateKubeBlocksToolsImage := func(compName, compDefName string) {
+		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName,
+			clusterDefObj.Name, clusterVersionObj.Name).WithRandomName().
+			AddComponent(compName, compDefName).
+			Create(&testCtx).GetObject()
+		clusterKey = client.ObjectKeyFromObject(clusterObj)
+
+		By("Waiting for the cluster controller to create resources completely")
+		waitForCreatingResourceCompletely(clusterKey, compName)
+
+		oldToolsImage := viper.GetString(constant.KBToolsImage)
+		newToolsImage := fmt.Sprintf("%s-%s", oldToolsImage, rand.String(4))
+		defer func() {
+			viper.Set(constant.KBToolsImage, oldToolsImage)
+		}()
+
+		checkWorkloadGenerationAndToolsImage := func(workloadGenerationExpected int64, oldImageCntExpected, newImageCntExpected int) {
+			checkSingleWorkload(compDefName, func(g Gomega, sts *appsv1.StatefulSet, deploy *appsv1.Deployment) {
+				if sts != nil {
+					g.Expect(sts.Generation).Should(Equal(workloadGenerationExpected))
+				}
+				if deploy != nil {
+					g.Expect(deploy.Generation).Should(Equal(workloadGenerationExpected))
+				}
+				oldImageCnt := 0
+				newImageCnt := 0
+				for _, c := range getPodSpec(sts, deploy).Containers {
+					if c.Image == oldToolsImage {
+						oldImageCnt += 1
+					}
+					if c.Image == newToolsImage {
+						newImageCnt += 1
+					}
+				}
+				g.Expect(oldImageCnt).Should(Equal(oldImageCntExpected))
+				g.Expect(newImageCnt).Should(Equal(newImageCntExpected))
+			})
+		}
+
+		By("check the workload generation as 1")
+		checkWorkloadGenerationAndToolsImage(int64(1), 1, 0)
+
+		By("update kubeblocks tools image")
+		viper.Set(constant.KBToolsImage, newToolsImage)
+
+		By("update cluster annotation to trigger cluster status reconcile")
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			cluster.Annotations = map[string]string{"time": time.Now().Format(time.RFC3339)}
+		})()).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			g.Expect(cluster.Status.ObservedGeneration).Should(Equal(int64(1)))
+		})).Should(Succeed())
+		checkWorkloadGenerationAndToolsImage(int64(1), 1, 0)
+
+		By("update termination policy to trigger cluster spec reconcile, but workload not changed")
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			cluster.Spec.TerminationPolicy = appsv1alpha1.DoNotTerminate
+		})()).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			g.Expect(cluster.Status.ObservedGeneration).Should(Equal(int64(2)))
+		})).Should(Succeed())
+		checkWorkloadGenerationAndToolsImage(int64(1), 1, 0)
+
+		By("update replicas to trigger cluster spec and workload reconcile")
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			replicas := cluster.Spec.ComponentSpecs[0].Replicas
+			cluster.Spec.ComponentSpecs[0].Replicas = replicas + 1
+		})()).Should(Succeed())
+		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1alpha1.Cluster) {
+			g.Expect(cluster.Status.ObservedGeneration).Should(Equal(int64(3)))
+		})).Should(Succeed())
+		checkWorkloadGenerationAndToolsImage(int64(2), 0, 1)
+	}
+
 	// Test cases
 	// Scenarios
 	// TODO: add case: empty image in cd, should report applyResourceFailed condition
@@ -1915,6 +1990,10 @@ var _ = Describe("Cluster Controller", func() {
 				It("Should observe the component tolerations will override the cluster tolerations", func() {
 					testStsWorkloadComponentToleration(compName, compDefName)
 				})
+			})
+
+			It(fmt.Sprintf("[comp: %s] update kubeblocks-tools image", compName), func() {
+				testUpdateKubeBlocksToolsImage(compName, compDefName)
 			})
 		}
 	})

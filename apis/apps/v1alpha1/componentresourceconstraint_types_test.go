@@ -45,6 +45,7 @@ spec:
       slots: [0.1, 0.2, 0.4, 0.6, 0.8, 1]
     memory:
       minPerCPU: 200Mi
+      maxPerCPU: 400Mi
     storage:
       min: 20Gi
       max: 100Ti
@@ -149,6 +150,11 @@ func TestResourceConstraints(t *testing.T) {
 			expect: false,
 		},
 		{
+			desc:   "test with only memory",
+			memory: "200Gi",
+			expect: true,
+		},
+		{
 			desc:   "test invalid memory",
 			cpu:    "2",
 			memory: "6Gi",
@@ -181,7 +187,9 @@ func TestResourceConstraints(t *testing.T) {
 		if item.storage != "" {
 			requests[corev1.ResourceStorage] = resource.MustParse(item.storage)
 		}
-		assert.Equal(t, item.expect, len(cf.FindMatchingConstraints(requests)) > 0)
+
+		constraints := cf.FindMatchingConstraints(requests)
+		assert.Equal(t, item.expect, len(constraints) > 0)
 
 		// if storage is empty, we should also validate function MatchClass which only consider cpu and memory
 		if item.storage == "" {

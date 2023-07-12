@@ -255,7 +255,7 @@ func NewCreateOptions(f cmdutil.Factory, streams genericclioptions.IOStreams) *C
 	}}
 	o.CreateOptions.Options = o
 	o.CreateOptions.PreCreate = o.PreCreate
-	o.CreateOptions.CreateDependencies = o.CreateDependencies
+	// o.CreateOptions.CreateDependencies = o.CreateDependencies
 	return o
 }
 
@@ -615,9 +615,9 @@ func (o *CreateOptions) buildComponents(clusterCompSpecs []appsv1alpha1.ClusterC
 }
 
 const (
-	saNamePrefix          = "kb-sa-"
-	roleNamePrefix        = "kb-role-"
-	roleBindingNamePrefix = "kb-rolebinding-"
+	saNamePrefix          = "kb-"
+	roleNamePrefix        = "kb-"
+	roleBindingNamePrefix = "kb-"
 )
 
 // buildDependenciesFn creates dependencies function for components, e.g. postgresql depends on

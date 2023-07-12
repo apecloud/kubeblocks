@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	cfgcore "github.com/apecloud/kubeblocks/internal/configuration"
 	"github.com/apecloud/kubeblocks/internal/constant"
 	"github.com/apecloud/kubeblocks/internal/controller/builder"
 	"github.com/apecloud/kubeblocks/internal/controller/component"
@@ -219,7 +220,12 @@ var _ = Describe("Cluster Controller", func() {
 		clusterDef     *appsv1alpha1.ClusterDefinition
 		clusterVersion *appsv1alpha1.ClusterVersion
 		cluster        *appsv1alpha1.Cluster
+		configSpecName string
 	)
+
+	isStatefulSet := func(v string) bool {
+		return v == "StatefulSet"
+	}
 
 	Context("with Deployment workload", func() {
 		BeforeEach(func() {
@@ -312,7 +318,7 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(resources).Should(HaveLen(len(expects)))
 			for i, v := range expects {
 				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
-				if v == "StatefulSet" {
+				if isStatefulSet(v) {
 					container := clusterDef.Spec.ComponentDefs[0].PodSpec.Containers[0]
 					sts := resources[i].(*appsv1.StatefulSet)
 					Expect(len(sts.Spec.Template.Spec.Volumes)).Should(Equal(len(container.VolumeMounts)))
@@ -323,15 +329,16 @@ var _ = Describe("Cluster Controller", func() {
 
 	Context("with Stateful workload and with config template", func() {
 		BeforeEach(func() {
-			cm := testapps.CreateCustomizedObj(&testCtx, "config/config-template.yaml", &corev1.ConfigMap{},
+			cm := testapps.CreateCustomizedObj(&testCtx, "config/envfrom-config.yaml", &corev1.ConfigMap{},
 				testCtx.UseDefaultNamespace())
 
-			cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/config-constraint.yaml",
+			cfgTpl := testapps.CreateCustomizedObj(&testCtx, "config/envfrom-constraint.yaml",
 				&appsv1alpha1.ConfigConstraint{})
 
+			configSpecName = cm.Name
 			clusterDef = testapps.NewClusterDefFactory(clusterDefName).
 				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
-				AddConfigTemplate(cm.Name, cm.Name, cfgTpl.Name, testCtx.DefaultNamespace, "mysql-config").
+				AddConfigTemplate(cm.Name, cm.Name, cfgTpl.Name, testCtx.DefaultNamespace, "mysql-config", testapps.DefaultMySQLContainerName, "not-exist").
 				GetObject()
 			clusterVersion = testapps.NewClusterVersionFactory(clusterVersionName, clusterDefName).
 				AddComponentVersion(mysqlCompDefName).
@@ -372,6 +379,10 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(resources).Should(HaveLen(len(expects)))
 			for i, v := range expects {
 				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
+				if isStatefulSet(v) {
+					sts := resources[i].(*appsv1.StatefulSet)
+					Expect(checkEnvFrom(&sts.Spec.Template.Spec.Containers[0], fmt.Sprintf("%s-%s", cfgcore.GetComponentCfgName(cluster.Name, component.Name, configSpecName), "env-config"))).Should(BeTrue())
+				}
 			}
 		})
 	})
@@ -428,10 +439,10 @@ var _ = Describe("Cluster Controller", func() {
 			Expect(resources).Should(HaveLen(len(expects)))
 			for i, v := range expects {
 				Expect(reflect.TypeOf(resources[i]).String()).Should(ContainSubstring(v), fmt.Sprintf("failed at idx %d", i))
-				if v == "StatefulSet" {
+				if isStatefulSet(v) {
 					sts := resources[i].(*appsv1.StatefulSet)
 					podSpec := sts.Spec.Template.Spec
-					Expect(len(podSpec.Containers)).Should(Equal(2))
+					Expect(len(podSpec.Containers)).Should(Equal(3))
 				}
 			}
 			originPodSpec := clusterDef.Spec.ComponentDefs[0].PodSpec

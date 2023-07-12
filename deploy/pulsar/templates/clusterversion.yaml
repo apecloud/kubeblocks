@@ -23,7 +23,7 @@ spec:
           - name: zookeeper
             image: {{ .Values.zookeeper.image.repository }}:{{ .Values.zookeeper.image.tag }}
             imagePullPolicy: {{ default "IfNotPresent" .Values.zookeeper.image.pullPolicy }}
-    - componentDefRef: broker
+    - componentDefRef: pulsar-broker
       versionsContext:
         containers:
           - name: broker
@@ -36,7 +36,7 @@ spec:
         - name: init-sysctl
           image: {{ .Values.broker.image.repository }}:{{ .Values.broker.image.tag }}
           imagePullPolicy: {{ default .Values.broker.image.pullPolicy "IfNotPresent" }}
-    - componentDefRef: proxy
+    - componentDefRef: pulsar-proxy
       versionsContext:
         containers:
           - name: proxy

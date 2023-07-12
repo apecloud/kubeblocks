@@ -149,7 +149,7 @@ jobs:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-manager-image"
       IMG: "apecloud/kubeblocks"
-      VERSION: "check"
+      VERSION: "latest"
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
       APECD_REF: "v0.1.2"
@@ -164,7 +164,7 @@ jobs:
       MAKE_OPS_PRE: "generate"
       MAKE_OPS: "build-tools-image"
       IMG: "apecloud/kubeblocks-tools"
-      VERSION: "check"
+      VERSION: "latest"
       GO_VERSION: "1.20"
       BUILDX_PLATFORMS: "linux/amd64"
       APECD_REF: "v0.1.2"
@@ -174,13 +174,13 @@ jobs:
     name: check helm
     needs: trigger-mode
     if: contains(needs.trigger-mode.outputs.trigger-mode, '[deploy]')
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts-check.yml@v0.1.8
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts-check.yml@v0.1.9
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "v0.6.0-check"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      APECD_REF: "v0.1.8"
+      APECD_REF: "v0.1.9"
     secrets: inherit
 
   check-kbcli:

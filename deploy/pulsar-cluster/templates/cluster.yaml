@@ -16,8 +16,8 @@ spec:
   tolerations: {{ . | toYaml | nindent 4 }}
   {{- end }}
   componentSpecs:
-    - componentDefRef: proxy
-      name: proxy
+    - name: proxy
+      componentDefRef: pulsar-proxy
       replicas: {{ .Values.proxy.replicaCount | default 3 }}
       {{- with  .Values.proxy.resources }}
       resources:
@@ -27,8 +27,8 @@ spec:
           memory: {{ .requests.memory | quote }}
       {{- end }}
       {{- end }}
-    - componentDefRef: broker
-      name: broker
+    - name: broker
+      componentDefRef: pulsar-broker
       replicas: {{ .Values.broker.replicaCount | default 3 }}
       {{- with  .Values.broker.resources }}
       resources:

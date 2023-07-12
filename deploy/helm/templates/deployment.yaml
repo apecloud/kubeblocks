@@ -91,6 +91,8 @@ spec:
             - name: ENABLE_WEBHOOKS
               value: "true"
             {{- end }}
+            - name: ENABLE_RBAC_MANAGER
+              value: {{ .Values.rbac.enabled | quote}}
             {{- if ( include "kubeblocks.addonControllerEnabled" . ) | deepEqual "true" }}
             - name: ADDON_JOB_TTL
               value: {{ .jobTTL | quote }}

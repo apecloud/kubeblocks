@@ -112,6 +112,11 @@ type ComponentConfigSpec struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ConfigConstraintRef string `json:"constraintRef,omitempty"`
+
+	// asEnvFrom is optional: the list of containers will be injected into EnvFrom.
+	// +listType=set
+	// +optional
+	AsEnvFrom []string `json:"asEnvFrom,omitempty"`
 }
 
 // MergedPolicy defines how to merge external imported templates into component templates.

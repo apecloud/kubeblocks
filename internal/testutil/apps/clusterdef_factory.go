@@ -107,7 +107,7 @@ func (factory *MockClusterDefFactory) AddScriptTemplate(name,
 }
 
 func (factory *MockClusterDefFactory) AddConfigTemplate(name,
-	configTemplateRef, configConstraintRef, namespace, volumeName string) *MockClusterDefFactory {
+	configTemplateRef, configConstraintRef, namespace, volumeName string, asEnvFrom ...string) *MockClusterDefFactory {
 	comp := factory.getLastCompDef()
 	if comp == nil {
 		return nil
@@ -121,6 +121,7 @@ func (factory *MockClusterDefFactory) AddConfigTemplate(name,
 				VolumeName:  volumeName,
 			},
 			ConfigConstraintRef: configConstraintRef,
+			AsEnvFrom:           asEnvFrom,
 		})
 	return factory
 }

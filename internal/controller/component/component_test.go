@@ -195,7 +195,7 @@ spec:
 				&clusterVersion.Spec.ComponentVersions[0])
 			Expect(err).Should(Succeed())
 			Expect(component).ShouldNot(BeNil())
-			Expect(component.Replicas).Should(Equal(cluster.Spec.Replicas))
+			Expect(component.Replicas).Should(Equal(*cluster.Spec.Replicas))
 			Expect(component.VolumeClaimTemplates[0].Spec.Resources.Requests["storage"]).Should(Equal(cluster.Spec.Storage.Size))
 			component, err = buildComponent(
 				reqCtx,

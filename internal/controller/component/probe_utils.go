@@ -71,10 +71,12 @@ func buildProbeContainers(reqCtx intctrlutil.RequestCtx, component *SynthesizedC
 		return err
 	}
 
-	if componentProbes.RoleProbe != nil {
-		roleChangedContainer := container.DeepCopy()
-		buildRoleProbeContainer(component.CharacterType, roleChangedContainer, componentProbes.RoleProbe, int(probeSvcHTTPPort))
-		probeContainers = append(probeContainers, *roleChangedContainer)
+	if !viper.GetBool(constant.FeatureGateReplicatedStateMachine) {
+		if componentProbes.RoleProbe != nil {
+			roleChangedContainer := container.DeepCopy()
+			buildRoleProbeContainer(component.CharacterType, roleChangedContainer, componentProbes.RoleProbe, int(probeSvcHTTPPort))
+			probeContainers = append(probeContainers, *roleChangedContainer)
+		}
 	}
 
 	if componentProbes.StatusProbe != nil {

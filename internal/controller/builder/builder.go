@@ -403,7 +403,12 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		rsmBuilder.SetPodManagementPolicy(podManagementPolicy).SetUpdateStrategy(updateStrategy)
 	}
 
-	rsm := rsmBuilder.GetObject()
+	roles, roleObservation, membershipReconfiguration, memberUpdateStrategy := buildRoleInfo(component)
+	rsm := rsmBuilder.SetRoles(roles).
+		SetRoleObservation(roleObservation).
+		SetMembershipReconfiguration(membershipReconfiguration).
+		SetMemberUpdateStrategy(memberUpdateStrategy).
+		GetObject()
 
 	// update sts.spec.volumeClaimTemplates[].metadata.labels
 	if len(rsm.Spec.VolumeClaimTemplates) > 0 && len(rsm.GetLabels()) > 0 {
@@ -413,23 +418,171 @@ func BuildRSM(reqCtx intctrlutil.RequestCtx, cluster *appsv1alpha1.Cluster,
 		}
 	}
 
+	// TODO(free6om): refactor out rsm related envs
 	if err := processContainersInjection(reqCtx, cluster, component, envConfigName, &rsm.Spec.Template.Spec); err != nil {
 		return nil, err
 	}
 	return rsm, nil
 }
 
+func buildRoleInfo(component *component.SynthesizedComponent) ([]workloads.ReplicaRole, *workloads.RoleObservation, *workloads.MembershipReconfiguration, *workloads.MemberUpdateStrategy) {
+	var (
+		roles []workloads.ReplicaRole
+		observation *workloads.RoleObservation
+		reconfiguration *workloads.MembershipReconfiguration
+		strategy *workloads.MemberUpdateStrategy
+	)
+
+	actions := buildActionFromCharacterType(component.CharacterType, component.WorkloadType == appsv1alpha1.Consensus)
+	observation = &workloads.RoleObservation{ObservationActions: actions}
+	if component.Probes != nil && component.Probes.RoleProbe != nil {
+		roleProbe := component.Probes.RoleProbe
+		observation.PeriodSeconds = roleProbe.PeriodSeconds
+		observation.TimeoutSeconds = roleProbe.TimeoutSeconds
+		observation.FailureThreshold = roleProbe.FailureThreshold
+	}
+
+	// TODO(free6om): set default reconfiguration actions after relative addon refactored
+	reconfiguration = nil
+
+	switch component.WorkloadType {
+	case appsv1alpha1.Consensus:
+		roles, strategy = buildRoleInfoFromConsensus(component.ConsensusSpec)
+	case appsv1alpha1.Replication:
+		roles = buildRoleInfoFromReplication()
+		reconfiguration = nil
+		strgy := workloads.SerialUpdateStrategy
+		strategy = &strgy
+	}
+
+	return roles, observation, reconfiguration, strategy
+}
+
+func buildRoleInfoFromReplication() []workloads.ReplicaRole {
+	return []workloads.ReplicaRole{
+		{
+			Name:       constant.Primary,
+			IsLeader:   true,
+			CanVote:    true,
+			AccessMode: workloads.ReadWriteMode,
+		},
+		{
+			Name:       constant.Secondary,
+			IsLeader:   false,
+			CanVote:    true,
+			AccessMode: workloads.ReadonlyMode,
+		},
+	}
+}
+
+func buildRoleInfoFromConsensus(consensusSpec *appsv1alpha1.ConsensusSetSpec) ([]workloads.ReplicaRole, *workloads.MemberUpdateStrategy) {
+	if consensusSpec == nil {
+		return nil, nil
+	}
+
+	var (
+		roles []workloads.ReplicaRole
+		strategy *workloads.MemberUpdateStrategy
+	)
+
+	roles = append(roles, workloads.ReplicaRole{
+		Name:       consensusSpec.Leader.Name,
+		IsLeader:   true,
+		CanVote:    true,
+		AccessMode: workloads.AccessMode(consensusSpec.Leader.AccessMode),
+	})
+	for _, follower := range consensusSpec.Followers {
+		roles = append(roles, workloads.ReplicaRole{
+			Name: follower.Name,
+			IsLeader: false,
+			CanVote: true,
+			AccessMode: workloads.AccessMode(follower.AccessMode),
+		})
+	}
+	if consensusSpec.Learner != nil {
+		roles = append(roles, workloads.ReplicaRole{
+			Name: consensusSpec.Learner.Name,
+			IsLeader: false,
+			CanVote: false,
+			AccessMode: workloads.AccessMode(consensusSpec.Learner.AccessMode),
+		})
+	}
+
+	strgy := workloads.MemberUpdateStrategy(consensusSpec.UpdateStrategy)
+	strategy = &strgy
+
+	return roles, strategy
+}
+
+func buildActionFromCharacterType(characterType string, isConsensus bool) []workloads.Action {
+	kind := strings.ToLower(characterType)
+	switch kind {
+	case "mysql":
+		if isConsensus {
+			return []workloads.Action{
+				{
+					Image: "arey/mysql-client:latest",
+					Command: []string{
+						"mysql",
+						"-h127.0.0.1",
+						"-P3306",
+						"-u$KB_RSM_USERNAME",
+						"-p$KB_RSM_PASSWORD",
+						"-N",
+						"-B",
+						"-e",
+						"\"select role from information_schema.wesql_cluster_local\"",
+						"|",
+						"xargs echo -n",
+					},
+				},
+				{
+					Command: []string{"echo $v_KB_RSM_LAST_STDOUT | tr '[:upper:]' '[:lower:]' | xargs echo -n"},
+				},
+			}
+		}
+		// TODO(free6om): mysql primary-secondary
+	case "postgres":
+		return []workloads.Action{
+			{
+				Image: "governmentpaas/psql:latest",
+				Command: []string{
+					"PGPASSWORD=$KB_RSM_PASSWORD psql",
+					"-h 127.0.0.1",
+					"-p 5432",
+					"-U $KB_RSM_USERNAME",
+					"-w",
+					"-t",
+					"-c",
+					"\"select pg_is_in_recovery();\"",
+					"|",
+					"xargs echo -n",
+				},
+			},
+			{
+				Command: []string{"if [ \"f\" = \"$v_KB_RSM_LAST_STDOUT\" ]; then echo -n \"master\"; else echo -n \"replica\"; fi"},
+			},
+		}
+		// TODO(free6om): config the following actions
+	case "mongodb":
+	case "etcd":
+	case "redis":
+	case "kafka":
+	}
+	return nil
+}
+
 func randomString(length int) string {
 	return rand.String(length)
 }
 
-func BuildConnCredential(clusterDefiniiton *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
+func BuildConnCredential(clusterDefinition *appsv1alpha1.ClusterDefinition, cluster *appsv1alpha1.Cluster,
 	component *component.SynthesizedComponent) (*corev1.Secret, error) {
 	const tplFile = "conn_credential_template.cue"
 
 	connCredential := corev1.Secret{}
 	if err := buildFromCUE(tplFile, map[string]any{
-		"clusterdefinition": clusterDefiniiton,
+		"clusterdefinition": clusterDefinition,
 		"cluster":           cluster,
 	}, "secret", &connCredential); err != nil {
 		return nil, err

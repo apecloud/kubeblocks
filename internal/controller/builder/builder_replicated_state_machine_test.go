@@ -114,6 +114,8 @@ var _ = Describe("replicated_state_machine builder", func() {
 			},
 		}
 		strategyType := apps.OnDeleteStatefulSetStrategyType
+		delay := int32(10)
+		observation := workloads.RoleObservation{InitialDelaySeconds: delay}
 		actions := []workloads.Action{
 			{
 				Image:   "foo-1",
@@ -152,6 +154,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 			SetPodManagementPolicy(policy).
 			SetUpdateStrategy(strategy).
 			SetUpdateStrategyType(strategyType).
+			SetRoleObservation(observation).
 			SetObservationActions(actions).
 			AddObservationAction(action).
 			SetMemberUpdateStrategy(memberUpdateStrategy).
@@ -186,6 +189,7 @@ var _ = Describe("replicated_state_machine builder", func() {
 		Expect(rsm.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(BeNil())
 		Expect(rsm.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(Equal(maxUnavailable))
 		Expect(rsm.Spec.RoleObservation).ShouldNot(BeNil())
+		Expect(rsm.Spec.RoleObservation.InitialDelaySeconds).Should(Equal(delay))
 		Expect(rsm.Spec.RoleObservation.ObservationActions).Should(HaveLen(2))
 		Expect(rsm.Spec.RoleObservation.ObservationActions[0]).Should(Equal(actions[0]))
 		Expect(rsm.Spec.RoleObservation.ObservationActions[1]).Should(Equal(action))

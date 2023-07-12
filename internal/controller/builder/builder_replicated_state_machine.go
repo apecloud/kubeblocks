@@ -139,19 +139,26 @@ func (builder *ReplicatedStateMachineBuilder) AddObservationAction(action worklo
 	return builder
 }
 
+func (builder *ReplicatedStateMachineBuilder) SetRoleObservation(observation *workloads.RoleObservation) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.RoleObservation = observation
+	return builder
+}
+
 func (builder *ReplicatedStateMachineBuilder) SetService(service corev1.ServiceSpec) *ReplicatedStateMachineBuilder {
 	builder.get().Spec.Service = &service
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetMembershipReconfiguration(reconfiguration workloads.MembershipReconfiguration) *ReplicatedStateMachineBuilder {
-	builder.get().Spec.MembershipReconfiguration = &reconfiguration
+func (builder *ReplicatedStateMachineBuilder) SetMembershipReconfiguration(reconfiguration *workloads.MembershipReconfiguration) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.MembershipReconfiguration = reconfiguration
 	return builder
 }
 
-func (builder *ReplicatedStateMachineBuilder) SetMemberUpdateStrategy(strategy workloads.MemberUpdateStrategy) *ReplicatedStateMachineBuilder {
-	builder.get().Spec.MemberUpdateStrategy = &strategy
-	builder.SetUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType)
+func (builder *ReplicatedStateMachineBuilder) SetMemberUpdateStrategy(strategy *workloads.MemberUpdateStrategy) *ReplicatedStateMachineBuilder {
+	builder.get().Spec.MemberUpdateStrategy = strategy
+	if strategy != nil {
+		builder.SetUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType)
+	}
 	return builder
 }
 

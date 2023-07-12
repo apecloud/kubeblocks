@@ -48,7 +48,7 @@ SQL Channel client`,
 		if versionFlag {
 			printVersion()
 		} else {
-			cmd.Help()
+			_ = cmd.Help()
 		}
 	},
 }

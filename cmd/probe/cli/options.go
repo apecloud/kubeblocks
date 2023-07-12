@@ -279,8 +279,8 @@ func (commands *Commands) StopSQLChannel() bool {
 			fmt.Fprintln(os.Stdout, "Send SIGTERM to SQLChannel")
 		}
 	}
-	//state, err = commands.SQLChannelCMD.Process.Wait()
-	//fmt.Printf("state: %v, err: %v\n", state, err)
+	// state, err = commands.SQLChannelCMD.Process.Wait()
+	// fmt.Printf("state: %v, err: %v\n", state, err)
 	commands.WaitSQLChannel()
 	return exitWithError
 }

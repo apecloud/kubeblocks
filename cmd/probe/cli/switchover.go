@@ -71,6 +71,9 @@ sqlctl switchover  --primary xxx --candidate xxx
 		}
 		fmt.Println("SQLChannel Response:")
 		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			fmt.Printf("request error: %v", err)
+		}
 		fmt.Println(string(bodyBytes))
 		return
 	},
